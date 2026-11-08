@@ -5,9 +5,9 @@
  * A hand-written README drifts from the facts it restates, so this renders
  * one from two KG sources:
  *
- * - the **declaration** — every instance directory whose `storage`/`source`
+ * - the **declaration** — every layer directory whose `storage`/`source`
  *   names the branch, with its id, path, graph typologies and description.
- *   Each harness (or instance) declares its own; this reads the declarations
+ *   Each harness (or layer) declares its own; this reads the declarations
  *   where they are, never a central table of branches;
  * - the branch's own root **`manifest.json`** (`state-manifest/v1`, schema in
  *   `@litlfred/cat-harness/schemas/kg/state-manifest.ts`) — status, the seed
@@ -47,7 +47,7 @@ import { BranchStore, storeOptionsFor, tipLocations, type BranchKeying, type Fil
 import { gateOwnInstances } from "./lib/gate-own.ts";
 import { REPO_ROOT } from "./lib/roots.ts";
 
-/** One instance directory kept on a branch. */
+/** One layer directory kept on a branch. */
 export interface BranchDeclaration {
   instance: string;
   id: string;
@@ -63,15 +63,15 @@ export interface BranchDeclaration {
   repository?: string;
 }
 
-/** Every branch the instances in `root` declare, grouped by branch (or family prefix). */
+/** Every branch the layers in `root` declare, grouped by branch (or family prefix). */
 export function declaredBranches(root: string): Map<string, BranchDeclaration[]> {
   const out = new Map<string, BranchDeclaration[]>();
-  // Where each branch is KEPT, as the store resolves it: an instance mounted
+  // Where each branch is KEPT, as the store resolves it: a layer mounted
   // from another repository keeps its branches there, not in this `origin`.
   const kept = new Map<string, string>();
   // ...and where each directory IS, as the store resolves it: a
   // repository-scoped directory (`beans`) sits at the top of the checkout,
-  // not under the instance that declares it.
+  // not under the layer that declares it.
   const at = new Map<string, string>();
   try {
     for (const l of tipLocations(root, "any")) {
@@ -285,7 +285,7 @@ if (import.meta.main) {
     console.log(`${one}: ${w.state} — ${w.reason}`);
     process.exit(w.state === "pushed" || w.state === "unchanged" ? 0 : 1);
   }
-  // In a layer's PR checks, only branches the caller's own instances declare
+  // In a layer's PR checks, only branches the caller's own layers declare
   // (owner ruling 2026-11-05, "Move the checks", generator checks included; `lib/gate-own.ts`).
   const own = gateOwnInstances();
   const judged = [...all.entries()].filter(([, d]) => !own || d.some((x) => own.has(x.instance)));

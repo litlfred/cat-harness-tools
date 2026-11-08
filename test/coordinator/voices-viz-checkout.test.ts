@@ -20,7 +20,7 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 const INSTANCE = join(ORIGIN_DIR, "..", "..");
 
-/** Read once — the reader touches the filesystem across every instance. */
+/** Read once — the reader touches the filesystem across every layer. */
 const G: VoicesGraph = (() => {
   const g = readVoicesGraph([INSTANCE]);
   if (g === null) throw new Error("no voices directory is declared — the fixture is the corpus");
@@ -37,7 +37,7 @@ describe("the reader finds what the declarations say is there", () => {
   test("a voice is attributed to the instance that DERIVED it, never to the platform", () => {
     // The whole point of the move this graph exists to render: the checkout's
     // root (`folio-assistant`) derives no voice; each is attributed to the
-    // instance whose declared voices directory holds it. `cat-harness` is not
+    // layer whose declared voices directory holds it. `cat-harness` is not
     // excluded: it ships voices of its own (`skills/voices/`).
     for (const v of G.voices) expect(v.instance).not.toBe("folio-assistant");
     const owners = new Set(G.voices.map((v) => v.instance));
@@ -94,7 +94,7 @@ describe("the provenance QA flag — a question for a person, not a gate", () =>
   });
 
   test("the viewer renders provenance at all, which it did not before", () => {
-    // It showed the instance, the path, the rule count, the overlay criterion
+    // It showed the layer, the path, the rule count, the overlay criterion
     // and the SKILL.md — and never the field this whole section is about.
     const html = viewerHtml("../../assets/voices/index.json");
     expect(html).toContain("renderFlags");

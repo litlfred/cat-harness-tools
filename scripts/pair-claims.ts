@@ -18,7 +18,7 @@
  * - a cited path is `false` only when the DIRECTORY it names exists here — the
  *   check can then honestly say the file is not in it. A path whose directory
  *   is not here points outside this repository and is `undetermined`;
- * - `folio-assistant/…` is tried as this instance's own root, because that is
+ * - `folio-assistant/…` is tried as this layer's own root, because that is
  *   where a folio mounts the platform, and adapter skills are written from a
  *   folio's point of view;
  * - `bun run <name>` is `holds` when the root `package.json` has the script,
@@ -192,7 +192,7 @@ if (import.meta.main) {
   const repo = join(dirname(HARNESS_ROOT));
   const inst = join(HARNESS_ROOT);
   // The DECLARED directories, not literals — the same helpers kg-audit reads.
-  // `.claude/skills/*` entries are relative to the REPOSITORY, the rest to the instance.
+  // `.claude/skills/*` entries are relative to the REPOSITORY, the rest to the layer.
   const skillMds = skillMdDirs(inst).flatMap((segs) => {
     const dir = [join(inst, ...segs), join(repo, ...segs)].find((d) => isDir(d));
     if (!dir) return [];

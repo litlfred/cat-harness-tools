@@ -112,7 +112,7 @@ export function translatedLinkDepth(root: string = ROOT): DepthReport {
 
   // `check:declared-paths` refused a hardcoded `"docs"` here, and was right
   // to: which directory publishes a site is a DECLARATION, and naming it
-  // would make this gate silently scan nothing the day the instance moves it
+  // would make this gate silently scan nothing the day the layer moves it
   // — the `dh4f` shape. Taken from the same resolution `scanSubgraphs` uses,
   // keyed by the `fromDir` id it already reports, so the two cannot disagree
   // about which directory a page belongs to.

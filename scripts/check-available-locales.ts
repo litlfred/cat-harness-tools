@@ -119,10 +119,10 @@ export function backedLocales(index: TranslationIndex, src: string, sourceKey: s
   return new Set<string>([src, ...Object.keys(entry?.translations ?? {})]);
 }
 
-/** Tracked `.md` files under the instance's site directory, repo-relative. */
+/** Tracked `.md` files under the layer's site directory, repo-relative. */
 function trackedPages(): string[] {
   const siteAbs = join(INSTANCE_ROOT, SITE_DIR);
-  // In a composed checkout every instance is a REMOTE MOUNT, laid down from
+  // In a composed checkout every layer is a REMOTE MOUNT, laid down from
   // `index.lock.json` and ignored by the index repository's git, so a bare
   // `git ls-files` at the root lists none of their files. `gitCorpus` counts a
   // mount's files as it counted a submodule's, and is tracked-plus-untracked

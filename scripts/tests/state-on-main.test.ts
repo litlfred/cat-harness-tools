@@ -32,7 +32,7 @@ afterAll(() => {
   for (const d of made) rmSync(d, { recursive: true, force: true });
 });
 
-/** A fixture instance whose declaration is written from `dirs`. */
+/** A fixture layer whose declaration is written from `dirs`. */
 function instance(dirs: unknown[], nested?: Record<string, unknown[]>): string {
   const root = mkdtempSync(join(tmpdir(), "state-on-main-"));
   made.push(root);

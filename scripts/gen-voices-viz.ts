@@ -421,7 +421,7 @@ if (import.meta.main) {
 
   const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   // The published segment is the DECLARED directory's own name, and THIS
-  // instance declares no voices — it derives none, which is the whole point of
+  // layer declares no voices — it derives none, which is the whole point of
   // the move that produced this graph. So the segment is read from the
   // directories the graph found, whose basename is `voices` under every
   // layout that exists. Composing it here would be a second answer to a
@@ -438,9 +438,9 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  // `<base>/<handler>/<kind>/` — the handler is THIS instance (the machinery),
+  // `<base>/<handler>/<kind>/` — the handler is THIS layer (the machinery),
   // the kind names what it renders. A subject page goes under it and never at
-  // `<base>/<subject>/<kind>/`, which is the instance's own themed namespace.
+  // `<base>/<subject>/<kind>/`, which is the layer's own themed namespace.
   const handler = readDeclaration(ROOT)?.name;
   if (!handler) {
     console.log("  · this instance declares no name — no handler segment to publish under");
@@ -456,9 +456,9 @@ if (import.meta.main) {
     process.exit(0);
   }
   const { pageDir, dataDir, dataHref } = viewerPlacement(site, route, seg);
-  // A KG-node citation is a file in the cited instance (bean `qgjh`): it links
+  // A KG-node citation is a file in the cited layer (bean `qgjh`): it links
   // to that file on the repository host, and a skill also to its published
-  // instruction page. Resolved against the instance's root, and only where
+  // instruction page. Resolved against the layer's root, and only where
   // the file exists; anything else stays text.
   const skillPages = skillPagesOf(repoRoot);
   const repoUrl = detectRepoUrl(repoRoot);
@@ -479,8 +479,8 @@ if (import.meta.main) {
   const subjects = [...new Set(g.voices.map((v) => v.instance))].sort();
   emit(join(pageDir, "index.html"), withRenderedByFrontMatter(viewerHtml(dataHref, "", subjects), VIEWER_TOOL));
 
-  // One page per SUBJECT — the instances whose voices this handler renders.
-  // Read from the VOICES rather than from the directory list, so the instance
+  // One page per SUBJECT — the layers whose voices this handler renders.
+  // Read from the VOICES rather than from the directory list, so the layer
   // that declares a voices directory and ships none gets no page claiming to
   // show it. It still gets a row in the directories table, which is the
   // honest place for "declared, not present".

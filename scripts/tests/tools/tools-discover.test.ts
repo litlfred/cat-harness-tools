@@ -3,7 +3,7 @@
  * every way loading can go wrong is REPORTED — never read as "no tools".
  *
  * The tests of this file that read the whole checkout (discovers the Tools
- * every instance in the checkout declares, smart-base's among them) live in
+ * every layer in the checkout declares, smart-base's among them) live in
  * `test/tools-discover-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
@@ -35,7 +35,7 @@ afterEach(() => {
   roots = [];
 });
 
-/** A repo holding one instance per entry; `index` is that instance's tools/index.ts, or null for none. */
+/** A repo holding one layer per entry; `index` is that layer's tools/index.ts, or null for none. */
 function repo(instances: Record<string, string | null>): string {
   const root = mkdtempSync(join(tmpdir(), "tooldisc-"));
   roots.push(root);

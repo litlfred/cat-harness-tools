@@ -732,7 +732,7 @@ describe("injectMarkdown preserves document structure", () => {
   });
 
   test("over the REAL corpus: injection never changes the blank-line count", () => {
-    // 62 (catalogue, source) pairs in this instance. A fixture proves the
+    // 62 (catalogue, source) pairs in this layer. A fixture proves the
     // mechanism; only the corpus says whether any real page trips it. Measured
     // before the fix: the old filter would have destroyed 3,871 blank lines
     // across these same pairs.

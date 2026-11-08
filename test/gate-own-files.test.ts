@@ -1,13 +1,13 @@
 /**
  * A check of a layer's own committed files judges only the caller's own
- * instances in a layer's PR checks (owner ruling 2026-11-05, "Move the
+ * layers in a layer's PR checks (owner ruling 2026-11-05, "Move the
  * checks"; `scripts/lib/gate-own.ts`).
  *
  * `check:schema-nodes` walked every declared `schemas/` in the root, the
  * mounted layers' included, so cat-harness-tools#1478 (two untagged modules
  * on its main) was a NEW failure in every root that mounts it (smart-ra#228).
- * These pin the three halves: the runner names the own instances, the
- * reader parses them, and the audit keeps only those instances' directories.
+ * These pin the three halves: the runner names the own layers, the
+ * reader parses them, and the audit keeps only those layers' directories.
  *
  * @module test/gate-own-files.test
  */

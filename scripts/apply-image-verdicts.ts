@@ -78,10 +78,10 @@ import { libraryEntryDir } from "./lib/library-entry-graphs.ts";
 const ROOT = resolve(HARNESS_ROOT);
 
 /**
- * The library directory as the instance DECLARES it, not as convention
+ * The library directory as the layer DECLARES it, not as convention
  * assumes it. `harness.json` is the list; hardcoding the path is how a
  * consumer comes to scan a directory that is not there after a relocation —
- * which this repository has already done once, moving the whole instance
+ * which this repository has already done once, moving the whole layer
  * under `cat-harness/`.
  */
 // EVERY declared library, not the first — a verdict names a document, and

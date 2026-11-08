@@ -3,8 +3,8 @@
  *
  * @module cat-harness-tools/scripts/lib/index-pages
  *
- * The README's instance table links a declared `docs` directory only when it
- * is on disk (`pipeline/readme-sections.ts`), and an IG instance's `docs/` is
+ * The README's layer table links a declared `docs` directory only when it
+ * is on disk (`pipeline/readme-sections.ts`), and an IG layer's `docs/` is
  * BUILT, by its `<instance>:pages` script, never committed. So the rendered
  * README depended on whether somebody had built the pages: the gate job, which
  * builds them, read one README; a checkout that had not, another
@@ -13,8 +13,8 @@
  * Owner, 2026-10-14: "Build pages first". `index:render` and its check build
  * the declared pages first, so the links are always computed against a built
  * tree. A docs directory counts when its declaration names a `writer` (it is
- * built, not authored) and its instance's package declares `<instance>:pages`
- * (the convention every IG instance follows); one already on disk is not
+ * built, not authored) and its layer's package declares `<instance>:pages`
+ * (the convention every IG layer follows); one already on disk is not
  * rebuilt, since only its presence is read.
  */
 import { spawnSync } from "node:child_process";
@@ -28,11 +28,11 @@ export interface PagesBuild {
   instance: string;
   /** The package script, run as `bun run cat <script>` from the checkout root. */
   script: string;
-  /** The built docs directories it is run for, relative to the instance. */
+  /** The built docs directories it is run for, relative to the layer. */
   dirs: string[];
 }
 
-/** The `<instance>:pages` script, when the instance's package declares it. */
+/** The `<instance>:pages` script, when the layer's package declares it. */
 function pagesScriptOf(instanceAbs: string, name: string): string | undefined {
   const p = join(instanceAbs, "package.json");
   if (!existsSync(p)) return undefined;

@@ -6,7 +6,7 @@
  * scroll sideways inside the strip, with no arrow, count or edge fade."*
  *
  * Owner, 2026-10-01, option 1 of 4: **"Pinned tiles first, plus '+N more'"**.
- * The strip shows Todos, Settings and the key kinds the instance DECLARES, as
+ * The strip shows Todos, Settings and the key kinds the layer DECLARES, as
  * many as fit, then one "+N more" tile whose N is exactly the count of tiles
  * not on screen, and which opens More. No tile may be silently off-screen.
  *

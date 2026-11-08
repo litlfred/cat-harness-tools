@@ -2,7 +2,7 @@
  * `processes-viz` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/scripts/tests/processes-viz.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each regenerates the processes page over
- * every instance's diagrams, which only the checkout holds. Standing alone,
+ * every layer's diagrams, which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects
  * every test in that layer. The rest of that file's tests stay there; every
  * path here is composed from ORIGIN_DIR, the directory they were written in,

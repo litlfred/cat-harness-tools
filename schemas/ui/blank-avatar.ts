@@ -11,12 +11,12 @@
 import type { Avatar } from "../content/avatars";
 
 /**
- * What an instance, role or kind with no declared avatar gets.
+ * What a layer, role or kind with no declared avatar gets.
  *
  * Owner ruling, 2026-09-20: *"there is always an avatar, even when there is none
  * (always have default blank/themecolor if no avatar. etc)"*.
  *
- * Absence of an avatar is not absence of a mark: an instance, role or kind
+ * Absence of an avatar is not absence of a mark: a layer, role or kind
  * with no declared avatar gets a BLANK one drawn in its theme's colour,
  * rather than a gap or generic question mark fallback.
  *

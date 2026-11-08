@@ -107,7 +107,7 @@ describe("capture is off by default and `unknown` is a real answer", () => {
     (v) => {
       // The distinction the field exists for: `off` says somebody decided,
       // `unknown` says nobody could tell. Collapsing them makes a
-      // misconfigured instance look like a deliberately quiet one.
+      // misconfigured layer look like a deliberately quiet one.
       expect(resolveCapture(v)).toBe("unknown");
       expect(resolveCapture(v)).not.toBe("off");
     },

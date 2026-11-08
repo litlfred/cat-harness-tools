@@ -1,10 +1,10 @@
 /**
- * Which instance owns a glossary scheme: the one rule, shared by the record and the page.
+ * Which layer owns a glossary scheme: the one rule, shared by the record and the page.
  *
- * A scheme id such as `kg-tools` is every instance's Tool extraction, so the
+ * A scheme id such as `kg-tools` is every layer's Tool extraction, so the
  * id alone names no one scheme. The owner ruled on bean `q3n9` (2026-10-24,
  * option A) that a scheme is keyed by **(instance, scheme)**, with the
- * instance taken from the scheme's source by this function. There is no
+ * layer taken from the scheme's source by this function. There is no
  * `instance` field in the glossary file and no rule from its path: a file
  * that moves keeps its owner, and the index and a standalone checkout agree.
  *
@@ -20,7 +20,7 @@ import { resolve } from "node:path";
 import { readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 
-/** An instance's root and its declared name. */
+/** A layer's root and its declared name. */
 export interface InstanceRoot {
   root: string;
   name: string;
@@ -39,7 +39,7 @@ export function repoPathOf(src: string | undefined, repo: string): string | unde
   return path && existsSync(resolve(repo, path)) ? path : undefined;
 }
 
-/** Every instance root with its name, longest first, so a path resolves to the MOST specific instance holding it. */
+/** Every layer root with its name, longest first, so a path resolves to the MOST specific layer holding it. */
 export function instanceRoots(repo: string): InstanceRoot[] {
   const out: InstanceRoot[] = [];
   for (const root of instanceRootsIn(repo)) {
@@ -49,31 +49,31 @@ export function instanceRoots(repo: string): InstanceRoot[] {
   return out.sort((a, b) => b.root.length - a.root.length);
 }
 
-/** The instance whose root holds a repository path. `owners` must be longest root first. */
+/** The layer whose root holds a repository path. `owners` must be longest root first. */
 export function ownerOfPath(repo: string, path: string, owners: readonly InstanceRoot[] = instanceRoots(repo)): string | undefined {
   const p = resolve(repo, path);
   return owners.find((o) => p === o.root || p.startsWith(`${o.root}/`) || p.startsWith(`${o.root}\\`))?.name;
 }
 
 /**
- * The instance that owns a scheme.
+ * The layer that owns a scheme.
  *
- * 1. The scheme's own `source`, when it is a repository path: the instance
+ * 1. The scheme's own `source`, when it is a repository path: the layer
  *    that DEFINES the scheme. A code list extended by several packages is the
- *    defining instance's, and each term's `source` still names the package
+ *    defining layer's, and each term's `source` still names the package
  *    that contributed it.
  *    A relative path the repository does not hold (a mount that does not
  *    carry it: dth-pc mounts only dth-sc's `glossary/`, so dth-sc's
  *    `folio/dth-sc` is absent there) still names a path in the declaring
- *    instance, so the scheme is `declaredBy`'s. Only a URL `source` says
+ *    layer, so the scheme is `declaredBy`'s. Only a URL `source` says
  *    nothing about the owner.
- * 2. Otherwise the one instance whose root holds every term's `source`.
- * 3. No repository source at all: `declaredBy`, the instance whose directory
+ * 2. Otherwise the one layer whose root holds every term's `source`.
+ * 3. No repository source at all: `declaredBy`, the layer whose directory
  *    holds the file.
  *
- * Terms sourced in several instances with no defining `source` have no one
+ * Terms sourced in several layers with no defining `source` have no one
  * owner, and that is an error rather than a guess: split the scheme per
- * instance, or name the instance that defines it.
+ * layer, or name the layer that defines it.
  */
 export function schemeOwner(
   repo: string,

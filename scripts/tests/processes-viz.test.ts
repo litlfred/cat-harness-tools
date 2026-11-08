@@ -6,8 +6,8 @@
  *
  * ## Three defects this file pins, all committed during its own construction
  *
- * 1. **It swept nothing and called that success.** `workflowFiles` takes an
- *    INSTANCE root; handed the repository root it returns `[]`. The first run
+ * 1. **It swept nothing and called that success.** `workflowFiles` takes a
+ *    LAYER root; handed the repository root it returns `[]`. The first run
  *    printed *"Wrote processes-index.md — 0 diagram(s)"* and exited 0, over a
  *    corpus of 62. The `dh4f` shape, produced by the generator written to
  *    report it.
@@ -26,7 +26,7 @@
  * @module cat-harness/scripts/tests/processes-viz.test
  *
  * The tests of this file that read the whole checkout (regenerates the
- * processes page over every instance's diagrams) live in
+ * processes page over every layer's diagrams) live in
  * `test/processes-viz-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
@@ -57,7 +57,7 @@ describe("the sweep actually swept", () => {
   });
 
   it("reaches MORE THAN ONE instance", () => {
-    // `workflowFiles` resolves one instance's declared graph plus its
+    // `workflowFiles` resolves one layer's declared graph plus its
     // dependencies'. `bootstrap` declares its own diagrams and `cat-harness`
     // does not reach them, so a single-root index omits them silently — which
     // is a quieter version of the same defect.

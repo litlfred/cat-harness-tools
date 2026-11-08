@@ -10,7 +10,7 @@
  * @module scripts/tests/qa-checker-discovery.test
  *
  * The tests here whose subject is folio-assistant-sci's contribution (the
- * checkers this instance contributes for criteria declared
+ * checkers this layer contributes for criteria declared
  * `checker_contributed`) live in
  * the checkout's `test/qa-checker-discovery-sci-checkout.test.ts` (bean
  * `ho66`): standing alone, cat-harness has no such contribution to read.

@@ -2,7 +2,7 @@
  * `external-schemas-viz` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/scripts/tests/external-schemas-viz.test.ts` (bean `7zz1`, owner
  * ruling 2026-10-06 "Top-level instance"): each reads the external-schema
- * registry and the declarations of every content instance that uses it, which
+ * registry and the declarations of every content layer that uses it, which
  * only the checkout holds. Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. The rest
  * of that file's tests stay there; every path here is composed from

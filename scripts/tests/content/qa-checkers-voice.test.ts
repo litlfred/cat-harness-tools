@@ -12,7 +12,7 @@
  * Run via `bun test`.
  *
  * The tests here whose subject is folio-assistant-sci's contribution (the
- * `milnorlink` entry in this instance's library) live in
+ * `milnorlink` entry in this layer's library) live in
  * `folio-assistant-sci/scripts/tests/qa-checkers-voice.test.ts` (bean `ho66`):
  * standing alone, cat-harness has no such contribution to read.
  */

@@ -110,7 +110,7 @@ describe("renderMountedMarkdown", () => {
     const dest = mkdtempSync(join(tmpdir(), "mount-md-site-"));
     try {
       const text = "# Agents\n\n[library](../library/) [agents](../AGENTS.md#top) [sibling](style-guide.md) [root](../../AGENTS.md) [web](https://example.org/x.md) [assets](assets/) [guide](guide/)\n";
-      // The instance's site directory, composed in one place (`site-dir-single-answer`).
+      // The layer's site directory, composed in one place (`site-dir-single-answer`).
       const docs = join(instance, siteDir({ name: "who-iris" }));
       mkdirSync(join(docs, "assets"), { recursive: true });
       mkdirSync(join(docs, "guide"), { recursive: true });

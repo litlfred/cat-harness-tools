@@ -3,8 +3,8 @@
  * each pinned on a THROWAWAY tree and then held against this checkout.
  *
  * - **0a, the checkout aggregates** (cmsl option A). A corpus-wide question is
- *   answered by the checkout's root instance, which `needs` every staged
- *   instance; the platform names none of its dependents.
+ *   answered by the checkout's root layer, which `needs` every staged
+ *   layer; the platform names none of its dependents.
  * - **0b, extension by id.** A dependent's `scenarios/` extends a lower role
  *   (skills), actor (roles, capabilities) or capability (requires), pointing
  *   DOWN at it the way a voice points at the role it addresses.
@@ -64,7 +64,7 @@ function put(root: string, rel: string, body: unknown): void {
 }
 
 /**
- * A checkout: a ROOT instance declared at the top, `base` (the platform's
+ * A checkout: a ROOT layer declared at the top, `base` (the platform's
  * stand-in), and two dependents `a` and `b` that each need `base`.
  */
 function checkout(extra: (root: string) => void = () => {}): string {
@@ -404,13 +404,13 @@ describe("this checkout", () => {
 
   test("falsifier 2: the platform resolved alone names nothing above it", () => {
     // RESTATED 2026-10-09. The checkout-root state graphs (`beans/`, `todos/`,
-    // `fsh-guts/`, `issue-marks/`) were the ROOT instance's until the owner
+    // `fsh-guts/`, `issue-marks/`) were the ROOT layer's until the owner
     // removed that declaration (3d4caf6, 2026-10-08); the platform declares
     // them now, `scope: "repository"` (coordinator decision (b)), so they and
     // their nested nodes resolve from the platform alone. They sit at the
-    // checkout root -- not inside any instance -- so they are not "above" it
+    // checkout root -- not inside any layer -- so they are not "above" it
     // in the sense this falsifier means: a dependent's directory. That stays
-    // forbidden, and is checked directly: no hosted root may be an instance.
+    // forbidden, and is checked directly: no hosted root may be a layer.
     const hosted = (readDeclaration(PLATFORM)?.directories ?? [])
       .filter((d) => d.scope === "repository")
       .map((d) => d.path.replace(/\/+$/, ""));

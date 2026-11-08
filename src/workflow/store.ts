@@ -81,7 +81,7 @@ export function workflowDir(repoRoot: string): string {
 
 /**
  * Whether this checkout keeps NO workflow instances, by determination: the
- * bean graph is declared by another instance on a branch family this
+ * bean graph is declared by another layer on a branch family this
  * checkout's remote does not carry, and a mount recorded it ABSENT (bean
  * `x5e0`; owner, 2026-10-14: "Report as absent"). Returns the reason then,
  * and `undefined` otherwise — including for an UNREACHABLE graph, which

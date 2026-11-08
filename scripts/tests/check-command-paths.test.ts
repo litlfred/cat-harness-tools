@@ -119,7 +119,7 @@ describe("a FOLIO-OWNED head is declined even when that directory exists HERE", 
 
   test("the PLATFORM's own docs keep their instance prefix, and stay judged", () => {
     // `cat-harness/docs/…` is the platform's documentation and is spelled with
-    // the instance that owns it, so nothing about this loosens the check for
+    // the layer that owns it, so nothing about this loosens the check for
     // the pages that actually live in this repository.
     expect(aboutThisTree(root, "cat-harness/docs/guides/agent-onboarding.md")).toBe(true);
   });
@@ -296,7 +296,7 @@ describe("the printed-command reader — bean `b963`'s third class", () => {
 
 describe("the owner's verdict on the 237 — fail on scripts/, count content/", () => {
   /**
-   * The target must EXIST under the instance, or there is nothing to find.
+   * The target must EXIST under the layer, or there is nothing to find.
    * The rule is "resolves under an instance but not from the root" — a path
    * that resolves nowhere is a folio's and is counted, which is what the first
    * draft of these fixtures accidentally exercised.
@@ -343,7 +343,7 @@ describe("the owner's verdict on the 237 — fail on scripts/, count content/", 
 describe("the corpus is DISCOVERED, not listed", () => {
   test("a new instance's scripts/ is scanned without anyone editing this check", () => {
     // The first draft listed `cat-harness/{scripts,src,...}`. A merge from
-    // `main` brought a `who-iris/` instance whose scripts/ the check then
+    // `main` brought a `who-iris/` layer whose scripts/ the check then
     // walked straight past — a hardcoded list going stale INSIDE the check
     // whose whole subject is hardcoded paths going stale.
     const root = fixture(
@@ -363,7 +363,7 @@ describe("the corpus is DISCOVERED, not listed", () => {
   });
 });
 
-// folio-assistant-tsh9: a command naming a path an instance moved passes while
+// folio-assistant-tsh9: a command naming a path a layer moved passes while
 // the move is in its window, reported as moved (sdlc skill `two-phase-move`).
 describe("a declared move", () => {
   const moved = (until: string): string =>

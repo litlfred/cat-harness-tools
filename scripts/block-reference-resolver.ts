@@ -2,7 +2,7 @@
  * Reference resolution checker for content blocks.
  *
  * Verifies that:
- * 1. `computation.script` paths resolve against declared computation directories or instance paths.
+ * 1. `computation.script` paths resolve against declared computation directories or layer paths.
  * 2. Relative links and references in block manifests resolve against declared directories.
  * 3. `{{...}}` macro templates in prose resolve against declared templates/macros or known symbols.
  * 4. Third-state rule: if a directory is undeclared or absent from disk, return undetermined/unknown rather than false pass or false clean.
@@ -79,7 +79,7 @@ export interface BlockResolverOptions {
 }
 
 /**
- * Resolves declared directories for an instance, merging declaration with explicit options.
+ * Resolves declared directories for a layer, merging declaration with explicit options.
  */
 export function getDeclaredDirectories(
   instanceRoot?: string,
@@ -282,7 +282,7 @@ export function checkRelativeLink(
     return undefined;
   }
 
-  // Path relative to block file or instance
+  // Path relative to block file or layer
   if (blockFile) {
     const resolvedInBlock = join(dirname(blockFile), linkPath);
     if (existsSync(resolvedInBlock)) return undefined;
@@ -511,7 +511,7 @@ export function resolveBlockReferences(
 }
 
 /**
- * Audit all blocks in an instance's declared folio directory.
+ * Audit all blocks in a layer's declared folio directory.
  */
 export function auditBlockReferences(
   instanceRoot: string,
@@ -553,7 +553,7 @@ export function auditBlockReferences(
 }
 
 /**
- * Generate KgQaReport for folio blocks in an instance (for kg:audit integration).
+ * Generate KgQaReport for folio blocks in a layer (for kg:audit integration).
  */
 export function auditFolioBlocks(
   instanceRoot: string,

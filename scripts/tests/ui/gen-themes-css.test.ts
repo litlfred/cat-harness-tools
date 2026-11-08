@@ -6,13 +6,13 @@
  * card named a theme and rendered on the default — a fallback that looks like
  * a working page. These tests pin the three things that close it:
  *
- *   - an instance sticky theme passed in IS emitted, labelled with its owner;
- *   - the COMMITTED stylesheet carries every instance sticky theme this
+ *   - a layer sticky theme passed in IS emitted, labelled with its owner;
+ *   - the COMMITTED stylesheet carries every layer sticky theme this
  *     repository declares, so a card citing one cannot silently fall back;
- *   - the generator's source names no instance and holds no colour value —
- *     the values arrive from the instance's `themes.ts` at build time.
+ *   - the generator's source names no layer and holds no colour value —
+ *     the values arrive from the layer's `themes.ts` at build time.
  *
- * The tests of this file that read the whole checkout (reads every instance's
+ * The tests of this file that read the whole checkout (reads every layer's
  * sticky themes) live in `test/gen-themes-css-checkout.test.ts` (bean `7zz1`):
  * standing alone, cat-harness has none of it.
  */

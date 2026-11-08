@@ -1,5 +1,5 @@
 /**
- * Bean `ghgn`: a retired instance's UML pages must not stay published. The
+ * Bean `ghgn`: a retired layer's UML pages must not stay published. The
  * generator removes, and `--check` reports, what it would no longer write.
  *
  * Bean `f8wp` (Placement PR8, falsifier 3): `uml:overview` / `uml:overview:check`

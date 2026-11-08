@@ -81,7 +81,7 @@ export const TILE_COUNT_FIELD = "tile" as const;
  * omits the unit is malformed rather than partially usable.
  *
  * Own properties only. `hasOwnProperty` via `Object.prototype` rather than the
- * instance's, and `Object.keys` rather than `for…in`: `constructor` and
+ * layer's, and `Object.keys` rather than `for…in`: `constructor` and
  * `toString` are inherited by every object literal, so a naive walk would mint
  * entries for directories nobody declared. The same trap `glyphFor` carries a
  * note about in `docs-ui.js`.

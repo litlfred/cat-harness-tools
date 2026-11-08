@@ -152,10 +152,10 @@ function linked(href: string | undefined, identifier: string, type?: string, nam
 
 /**
  * A site node's IRI from a todo's `target` parts: the page's QUALIFIED key
- * and the node id. The default suits a page of the base instance; the
+ * and the node id. The default suits a page of the base layer; the
  * generator passes the checkout's answer (`siteNodeOf` in
  * `lib/docs-sources.ts`), which also places a page of a source above the base
- * under its instance, where `gen-site-jsonld.ts` publishes it.
+ * under its layer, where `gen-site-jsonld.ts` publishes it.
  */
 export type TargetIri = (page: string, node: string) => string;
 
@@ -222,7 +222,7 @@ export function todoDocument(item: TodoIndexItem, subgraph?: TodoSubgraph, targe
  * `fetchTodoGraph`, #1953) sees the same todos. Order is the input's, which
  * `readTodoFiles` makes deterministic.
  *
- * Without a subgraph — an instance that declares no `todos` — the document is
+ * Without a subgraph — a layer that declares no `todos` — the document is
  * the bare `@graph`: no container is invented to stand in for the missing
  * declaration.
  */
@@ -235,8 +235,8 @@ export function todoGraphDocument(items: readonly TodoIndexItem[], subgraph?: To
           // NO `name`. The node's name is the declaration's, published by
           // kg-export; restating it here as `"todos"` made `docs/todos.json`
           // a file whose `name` equals its stem — which `findDeclarationFile`
-          // reads as an INSTANCE declaration, turning the site directory into
-          // an instance root and hiding the checkout from every resolver.
+          // reads as a LAYER declaration, turning the site directory into
+          // a layer root and hiding the checkout from every resolver.
           members: items.map((i) => todoIri(i.id)),
           ...(subgraph.contentSource ? { contentSource: subgraph.contentSource } : {}),
         })

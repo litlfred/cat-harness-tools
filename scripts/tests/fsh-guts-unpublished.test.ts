@@ -7,7 +7,7 @@
  * Bean `folio-assistant-uv09`. This is a CORRECTION to work shipped earlier
  * the same day: `fsh-guts/` was kept out of the render pipeline and tested
  * (`fsh-guts-not-rendered.test.ts`), which is a different property from
- * keeping it out of the GRAPH. An instance's declared directories become
+ * keeping it out of the GRAPH. A layer's declared directories become
  * nodes in `<stub>.jsonld`, so declaring the trashcan locally — required, or
  * no tool can find it — put its id, path and description into the published
  * document.

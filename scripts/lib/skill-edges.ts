@@ -81,7 +81,7 @@ export function skillEdgesOf(text: string): SkillEdges {
 /**
  * skill name → its edges, over every skill file each root declares. A skill
  * that says neither is absent from the map. The first root to hold a name
- * wins, in the order given — callers pass the instance roots they already
+ * wins, in the order given — callers pass the layer roots they already
  * resolve skills against.
  */
 export function skillEdgeIndex(roots: readonly string[]): Map<string, SkillEdges> {

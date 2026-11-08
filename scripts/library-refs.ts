@@ -35,7 +35,7 @@ import { join, relative, sep } from "node:path";
 export interface RefSource {
   /** The declared graph typology — used verbatim as the referrer's kind. */
   kind: string;
-  /** The instance whose declaration named this directory. */
+  /** The layer whose declaration named this directory. */
   instance: string;
   /** Absolute path. */
   dir: string;

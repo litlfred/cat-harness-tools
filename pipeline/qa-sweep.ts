@@ -53,7 +53,7 @@ import { existsSync, statSync } from "fs";
 import { resolve, relative, dirname } from "path";
 import { fileURLToPath } from "url";
 
-// Stable anchor for path normalisation: the INSTANCE root, computed
+// Stable anchor for path normalisation: the LAYER root, computed
 // from this file's location (`cat-harness-tools/pipeline/qa-sweep.ts`
 // → `cat-harness/`, two levels up). Using `process.cwd()` instead
 // would make the emitted `.qa.json` paths sensitive to the directory
@@ -304,7 +304,7 @@ async function run(): Promise<void> {
   //   (default)         every registered criterion across all axes
   // Criteria BY ID, through the instance-aware index rather than the static
   // one. Since bean `btuv` the voice-overlay criteria are derived from the
-  // voices an instance ships, and every lookup below would return `undefined`
+  // voices a layer ships, and every lookup below would return `undefined`
   // for them: the selection filter would drop `--only voice-overlay-milnor`,
   // the per-block loop's `if (!def) continue` would leave them out of every
   // sidecar, and — worst — the voice gate would see `{}` and a criterion naming

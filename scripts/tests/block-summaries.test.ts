@@ -359,7 +359,7 @@ describe("the real backlog — not vacuous, and it adds up", () => {
     // An entry can be held on its own (`heldEntries`, bean `j7ql`).
     const ownerEntry = (lib: string): { summaries?: string; heldEntries?: string[] } | undefined => {
       const owner = dirname(resolve(lib));
-      // The instance's declaration, or — for a library declared from within a
+      // The layer's declaration, or — for a library declared from within a
       // named sub-graph, as cat-harness's corpus is — that sub-graph's `graph.json`.
       const decl = [join(owner, `${basename(owner)}.json`), join(owner, "graph.json")].find((f) => existsSync(f));
       if (decl === undefined) return undefined;

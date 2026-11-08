@@ -1,11 +1,11 @@
 /**
- * A separated instance composes its own landing, and a mounted layer's card is
+ * A separated layer composes its own landing, and a mounted layer's card is
  * not its to write — bean `1yd7`.
  *
  * Measured from who-iris's own repository before this: the script resolved its
  * root from its own location, which is the REMOTE-MOUNTED cat-harness, so it
  * wrote cards into the mounts (gitignored, committed nowhere) and never
- * declared a `folio` graph in who-iris, the instance actually being composed.
+ * declared a `folio` graph in who-iris, the layer actually being composed.
  *
  * @module scripts/tests/ensure-landing-sticky-mounted.test
  */
@@ -21,7 +21,7 @@ import { mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
 const SHA = "a".repeat(40);
 const DIGEST = "b".repeat(64);
 
-/** A downstream instance `down` with one remote-mounted layer `base` beneath it, each contributing a card. */
+/** A downstream layer `down` with one remote-mounted layer `base` beneath it, each contributing a card. */
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "sticky-mounted-"));
   writeFileSync(

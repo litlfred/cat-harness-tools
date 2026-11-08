@@ -9,7 +9,7 @@
  * Moved again, from `cat-harness-tools/scripts/tests/` to the checkout's own
  * test home `test/` (bean `7zz1`, owner ruling 2026-10-06 "Top-level
  * instance"): what it reads belongs to the whole checkout, which the root
- * instance declares, not to any one layer — so cat-harness-tools stays green
+ * layer declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
@@ -32,8 +32,8 @@ import { sitePathOf } from "../../scripts/print-published-path.ts";
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 const ROOT = resolve(ORIGIN_DIR, "../..");
-// `bootstrap/` is at the REPOSITORY root, not inside this instance — it is
-// the graph read before anything knows which instance it is looking at.
+// `bootstrap/` is at the REPOSITORY root, not inside this layer — it is
+// the graph read before anything knows which layer it is looking at.
 const CAT_BOOTSTRAP = join(repoRootFor(ROOT), "bootstrap");
 const STUB = artefactStub(readDeclaration(CAT_BOOTSTRAP)!);
 /** The document as the site build makes it: `@id` = base + the `--out` file name. */
@@ -44,7 +44,7 @@ const build = (provenance = false) =>
  * The steps in a workflow that publish a bootstrap GRAPH document.
  *
  * bootstrap-tools' `export-graph.ts` is the publisher; `kg-export.ts` pointed
- * at that instance was the previous one, and stays named so it cannot come
+ * at that layer was the previous one, and stays named so it cannot come
  * back unnoticed as a second. `ns-export.ts` also writes into `bootstrap/`, and is not one of these:
  * it publishes the NAMESPACE document, a different subject at a different URL.
  */
@@ -67,11 +67,11 @@ function bootstrapGraphPublishers(workflowText: string): string[] {
  * Every `--out` path a workflow writes, with its shell variables expanded.
  *
  * The workflow captures stubs — `BOOT_STUB=$(… print-stub.ts ./bootstrap)` —
- * and the instance's directory — `BOOT_DIR=$(… print-published-path.ts
+ * and the layer's directory — `BOOT_DIR=$(… print-published-path.ts
  * ./bootstrap)`, the resolver's `<name>/` (bean `sthf`) — so a literal-text
  * match cannot see the path at all. Expanding the capture rather than
  * hardcoding `bootstrap` keeps the assertion pointed at the DECLARATION: rename
- * the instance and both sides move together, which is the whole reason the
+ * the layer and both sides move together, which is the whole reason the
  * workflow captures it instead of spelling it out. A directory capture expands
  * without its trailing slash, as the workflow writes `${BOOT_DIR}/`.
  */

@@ -250,9 +250,9 @@ export async function optimizeLibraryPngs(opts: OptimizeOptions = {}): Promise<O
   const targetDirs =
     opts.dirs && opts.dirs.length > 0
       ? opts.dirs
-      : // Every instance's own `library` directory, read from its declaration
+      : // Every layer's own `library` directory, read from its declaration
         // rather than spelled: the four this listed were a monorepo's, and a
-        // literal here names another instance's directory (check:foreign-paths).
+        // literal here names another layer's directory (check:foreign-paths).
         instanceRootsIn(process.cwd())
           .flatMap((root) => instanceDirectoriesForGraph(root, "library"))
           .filter((d) => existsSync(d));

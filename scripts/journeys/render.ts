@@ -18,8 +18,8 @@
  *
  * | path | page |
  * |---|---|
- * | `index.html` | every journey in the checkout, by instance, then by `partOf`, ordered along `follows`; every workshop |
- * | `<instance>/index.html` | the same for one instance: the sub-graph page |
+ * | `index.html` | every journey in the checkout, by layer, then by `partOf`, ordered along `follows`; every workshop |
+ * | `<instance>/index.html` | the same for one layer: the sub-graph page |
  * | `<instance>/<journey id>/index.html` | one journey |
  * | `<instance>/workshops/<workshop id>/index.html` | one workshop |
  * | `<instance>/workshops/<workshop id>/<module>/index.html` | one module |
@@ -68,7 +68,7 @@ export const FONT_FILES = ["PlusJakartaSans-Regular.woff2", "PlusJakartaSans-Med
 
 export interface PageFile {
   path: string;
-  /** A page or an asset as text; an illustration copied from its instance as bytes. */
+  /** A page or an asset as text; an illustration copied from its layer as bytes. */
   content: string | Uint8Array;
 }
 
@@ -76,13 +76,13 @@ export interface PageFile {
 export interface SiteLinks extends StepPageLinks {
   /** Site-relative route of the viewer, no trailing slash: `en/<harness>/<id>`. */
   route: string;
-  /** Site-relative page of each process drawing's viewer, by instance; absent when no processes viewer is declared. */
+  /** Site-relative page of each process drawing's viewer, by layer; absent when no processes viewer is declared. */
   processesPage?: (instance: string) => string | undefined;
   /** Site-relative ⓘ panel sidecar of a BPMN file (instance-relative) the processes viewer draws; absent when no processes viewer is declared. */
   processPanel?: (instance: string, bpmn: string) => string | undefined;
   /** An ArchiMate view's drawing and page, site-relative; absent when it cannot be placed. */
   archimateView?: (instance: string, model: string, view: string) => { svg: string; page: string; name: string } | undefined;
-  /** Title of the site's declaring instance, for the index heading. */
+  /** Title of the site's declaring layer, for the index heading. */
   title: string;
 }
 
@@ -256,7 +256,7 @@ function partMarks(part: Part | undefined): string {
   return marks.map(([w, t]) => `<span class="jv-part-mark" title="${e(t!)}">${e(w!)}</span>`).join("");
 }
 
-/** The journeys of one instance at the top of its `partOf` tree. */
+/** The journeys of one layer at the top of its `partOf` tree. */
 function rootsOf(corpus: JourneyCorpus, instance: string): Journey[] {
   const mine = corpus.journeys.filter((j) => j.instance === instance);
   return orderByFollows(mine.filter((j) => parentOf(corpus, j) === undefined));
@@ -401,7 +401,7 @@ ${problems.length ? `<div class="jv-problems"><h3>Files that would not load</h3>
 </section>`;
 }
 
-/** The instances with anything to show, the declaring instance first. */
+/** The layers with anything to show, the declaring layer first. */
 export function instancesWithJourneys(corpus: JourneyCorpus, first?: string): string[] {
   const names = new Set([...corpus.journeys.map((j) => j.instance), ...corpus.workshops.map((w) => w.instance), ...corpus.problems.map((p) => p.instance)]);
   return [...names].sort((a, b) => (a === first ? -1 : b === first ? 1 : a.localeCompare(b)));

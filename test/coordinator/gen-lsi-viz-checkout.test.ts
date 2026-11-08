@@ -1,7 +1,7 @@
 /**
  * `gen-lsi-viz` tests about the WHOLE CHECKOUT (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): the evidence chain is read from every
- * instance's methodologies, skills, Tools and processes, which only the
+ * layer's methodologies, skills, Tools and processes, which only the
  * checkout holds. Standing alone, cat-harness has none of it.
  */
 import { describe, expect, test } from "bun:test";

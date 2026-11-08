@@ -6,15 +6,15 @@
  *
  * Owner, 2026-10-23T14:57Z: *"the info button/icons in the bpmn rendering
  * should point to those new IRIs"* (litlfred/cat-harness-tools#603). The IRI
- * is `makeIri`'s, against the document of the instance that declares the
+ * is `makeIri`'s, against the document of the layer that declares the
  * subject (`publishedIdentity`), so a link and the `@id` it names cannot
  * disagree. `kg-export`'s `writeSubjectDocuments` writes the page there.
  *
  * A link is answered ONLY where a page is written: the host's document and
- * every instance `instance-exports.ts` exports that mints against this site
+ * every layer `instance-exports.ts` exports that mints against this site
  * (not its own `canonicalUrl`), and — since the owner's 2026-10-29 choice
  * on litlfred/cat-harness-tools#638 (option B) — the COPY this site publishes
- * of an own-canonical instance's subjects, `owl:sameAs` the canonical IRI.
+ * of an own-canonical layer's subjects, `owl:sameAs` the canonical IRI.
  * bootstrap's graph is still
  * bootstrap-tools' `export-graph.ts`, which mints fragments until its own
  * phase of #603, so its subjects get `undefined` and the caller keeps the
@@ -44,8 +44,8 @@ const docIris = new Map<string, string | undefined>();
 /**
  * Does building `checkout` publish the site of the host at `host`, where
  * `kg-export` writes the subject pages? Yes when the checkout IS the host, or
- * its root declares no instance (an index of the host's layers), or declares
- * the host itself. No when its root declares another instance: a downstream,
+ * its root declares no layer (an index of the host's layers), or declares
+ * the host itself. No when its root declares another layer: a downstream,
  * building its own site with the host mounted in it.
  */
 export function publishesHostSite(checkout: string, host: string): boolean {
@@ -87,7 +87,7 @@ function servingDocIri(instanceRoot: string): string | undefined {
       if (host || (publishesInstanceSchema(key) && !declaresOwnCanonical(decl))) {
         doc = publishedIdentity(key).docIri;
       } else if (publishesInstanceSchema(key) && decl !== undefined) {
-        // An instance minting against its OWN `canonicalUrl` (e.g.
+        // A layer minting against its OWN `canonicalUrl` (e.g.
         // `http://smart.who.int/base`), which serves nothing yet: link the
         // copy `instance-exports` publishes on THIS site under `<name>/`
         // (#638 option B), never the canonical IRI.

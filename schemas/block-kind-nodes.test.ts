@@ -133,7 +133,7 @@ describe("content-adapter vocabularies are nodes (bean riit, step 5)", () => {
 
   test("a node is never mistaken for an instance declaration", () => {
     // `paper.json` carrying `name: "paper"` read as a declaration, made
-    // `content-adapters/` an instance, and hid core from sci's needs. The
+    // `content-adapters/` a layer, and hid core from sci's needs. The
     // field is `adapter` so the two shapes cannot coincide.
     for (const n of CONTENT_ADAPTER_NODES) expect("name" in n).toBe(false);
   });

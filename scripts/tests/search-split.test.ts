@@ -7,7 +7,7 @@
  * partition the source), the scope rule reads only declared facts, and the
  * output is the same bytes for the same index.
  *
- * The tests of this file that read the whole checkout (reads the instances the
+ * The tests of this file that read the whole checkout (reads the layers the
  * checkout's site mounts) live in `test/search-split-checkout.test.ts` (bean
  * `7zz1`): standing alone, cat-harness has none of it.
  */
@@ -60,7 +60,7 @@ describe("scopeOf", () => {
     }
   });
   test("the first segment wins over the second", () => {
-    // `/fr/smart-trust/` is a French page that mentions the instance in its path.
+    // `/fr/smart-trust/` is a French page that mentions the layer in its path.
     expect(scopeOf("/fr/smart-trust/x.html", INSTANCES, LOCALES).id).toBe("locale-fr");
   });
 });

@@ -1,14 +1,14 @@
 /**
  * The `[fhir]` row of the rail's Harnesses list: a link to the index page of
- * an instance's FHIR IG, rendered through just-the-docs on this site.
+ * a layer's FHIR IG, rendered through just-the-docs on this site.
  *
  * Owner, 2026-10-31: *"if harnessed FHIR IG, then I want LHS navbar should
  * have [fhir] harness that will go to index.html of FHIR justthedocs
  * render"*.
  *
  * The row is decided from the FINISHED site, not from a declaration: the
- * render sits at `<instance>/ig/` beside an instance's own pages, at
- * `<instance>/` when it is the instance's whole site, and at the root (or
+ * render sits at `<instance>/ig/` beside a layer's own pages, at
+ * `<instance>/` when it is the layer's whole site, and at the root (or
  * `ig/`) of an IG repository's own site. Whichever it is, the render writes
  * the IG's table of contents (`toc.html`) beside its `index.html`, and no
  * other page kind on these sites does. So a directory holding both is the
@@ -46,14 +46,14 @@ export function isIgRender(siteAbs: string, dir: string): boolean {
 }
 
 /**
- * Where the IG render of a page's owning instance sits on this site, as a
+ * Where the IG render of a page's owning layer sits on this site, as a
  * directory relative to the site root (`""` is the root, otherwise it ends in
  * `/`), or `undefined` when the site holds none.
  *
- * `atRoot` says the site IS the instance's (an IG repository's own site, or
+ * `atRoot` says the site IS the layer's (an IG repository's own site, or
  * the folio whose checkout this is): its render is then looked for at `ig/`
  * and at the root. Otherwise it is looked for at `<owner>/ig/` and
- * `<owner>/`. `ig/` comes first both times, because when an instance has
+ * `<owner>/`. `ig/` comes first both times, because when a layer has
  * pages of its own the root of its directory is those pages, not the IG.
  */
 export function igRenderDir(siteAbs: string, owner: string, atRoot: boolean): string | undefined {
@@ -63,7 +63,7 @@ export function igRenderDir(siteAbs: string, owner: string, atRoot: boolean): st
 
 /**
  * The harness rows with the `[fhir]` row added right after the owning
- * instance's row (found by its label), or first when the list has no row of
+ * layer's row (found by its label), or first when the list has no row of
  * that label. Unchanged when the site holds no render for the owner, or when
  * the list already carries the row.
  */

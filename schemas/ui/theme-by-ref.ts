@@ -1,16 +1,16 @@
 /**
  * A theme by REFERENCE — `{instance?, themeId}` — resolved against the
- * instance that owns it, not only against the platform's own table
+ * layer that owns it, not only against the platform's own table
  * ({@link THEMES}).
  *
  * @module cat-harness/schemas/theme-by-ref
  * @graphNode none — a resolver over theme nodes declared elsewhere; it defines no schema of its own
  *
- * ## The platform finds an instance's themes; it never holds them
+ * ## The platform finds a layer's themes; it never holds them
  *
  * A palette read off an organisation's style guide is subject matter, so it
- * lives in its instance, not in `cat-harness/schemas/`. Nothing here names an
- * instance or copies a colour. The owner is found by its declared `name`, its
+ * lives in its layer, not in `cat-harness/schemas/`. Nothing here names a
+ * layer or copies a colour. The owner is found by its declared `name`, its
  * themes by the directory it declares with graph typology `themes`, and the
  * module there by one convention: a `themes.ts` exporting `INSTANCE_THEMES`,
  * already resolved. The harness loads a layer by what its declaration says
@@ -18,7 +18,7 @@
  *
  * ## Absent is not the platform's
  *
- * A reference with no `instance` means the CITING instance's own
+ * A reference with no `instance` means the CITING layer's own
  * ({@link ThemeRefSchema}). The platform table is the answer only when the
  * owner is the platform itself or nobody is named.
  */
@@ -29,10 +29,10 @@ import { declaresInstance, instanceDirectoriesForGraph, instanceRootsIn, readDec
 import type { ResolvedTheme, ThemeRef } from "./theme.js";
 import { themeById } from "./themes.js";
 
-/** The instance whose themes are {@link THEMES} — the default `platform` below. */
+/** The layer whose themes are {@link THEMES} — the default `platform` below. */
 export const PLATFORM_THEME_OWNER = "cat-harness";
 
-/** The graph typology an instance's own themes are declared under. */
+/** The graph typology a layer's own themes are declared under. */
 export const THEMES_GRAPH_TYPOLOGY = "themes";
 /** The module a `themes` directory holds, and the export it must carry. */
 export const INSTANCE_THEMES_MODULE = "themes.ts";
@@ -48,7 +48,7 @@ export type ThemeRefMiss =
 export type ThemeRefResult = { ok: true; theme: ResolvedTheme; owner: string | undefined } | { ok: false; miss: ThemeRefMiss };
 
 /**
- * The themes an instance declares, or why it declares none that can be read.
+ * The themes a layer declares, or why it declares none that can be read.
  *
  * **Exported so a GATE can ask the same question the runtime asks.** Bean
  * `z6xd`: three gates declared `@covers themes` while none of them resolved a
@@ -72,7 +72,7 @@ export function instanceThemes(repoRoot: string, instance: string): { ok: true; 
     // Synchronous on purpose: every consumer is a generator that resolves
     // themes inline while it builds a page, and Bun's `require` loads a `.ts`
     // module synchronously.
-    // input-site: imports */themes/themes.ts #28454d5a — an instance's declared themes module; input-sites.test.ts holds every declared one to this glob
+    // input-site: imports */themes/themes.ts #28454d5a — a layer's declared themes module; input-sites.test.ts holds every declared one to this glob
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require(path) as Record<string, unknown>;
     const list = mod[INSTANCE_THEMES_EXPORT];
@@ -91,10 +91,10 @@ export function instanceThemes(repoRoot: string, instance: string): { ok: true; 
  * Resolve a theme reference.
  *
  * @param ref            the reference as declared
- * @param repoRoot       the repository whose instances may own it
- * @param citingInstance the instance that wrote the reference — the owner when
+ * @param repoRoot       the repository whose layers may own it
+ * @param citingInstance the layer that wrote the reference — the owner when
  *                       `ref.instance` is absent
- * @param platform       the platform instance's name; its themes are {@link THEMES}
+ * @param platform       the platform layer's name; its themes are {@link THEMES}
  */
 export function themeByRef(ref: ThemeRef, repoRoot: string, citingInstance?: string, platform = PLATFORM_THEME_OWNER): ThemeRefResult {
   // A reference names the owner by `owner/repo` (bean `6rmv`); the platform
@@ -107,7 +107,7 @@ export function themeByRef(ref: ThemeRef, repoRoot: string, citingInstance?: str
   }
   const found = instanceThemes(repoRoot, owner);
   if (!found.ok) {
-    // An instance that owns no themes of its own may still cite the
+    // A layer that owns no themes of its own may still cite the
     // platform's by bare id — that is how every reference read before B8.
     if (ref.instance === undefined) {
       const theme = themeById(ref.themeId);
@@ -124,27 +124,27 @@ export function themeByRef(ref: ThemeRef, repoRoot: string, citingInstance?: str
   return { ok: false, miss: { kind: "no-such-theme", instance: owner, themeId: ref.themeId } };
 }
 
-/** The declared `name` of the instance `ref` identifies, or `ref` itself when none does. */
+/** The declared `name` of the layer `ref` identifies, or `ref` itself when none does. */
 function instanceNameIn(repoRoot: string, ref: string): string {
   if (!ref.includes("/")) return ref;
   const root = instanceRootsIn(repoRoot).find((r) => declaresInstance(readDeclaration(r), ref));
   return (root === undefined ? undefined : readDeclaration(root)?.name) ?? ref;
 }
 
-/** One instance-declared sticky theme, with the instance that owns it. */
+/** One instance-declared sticky theme, with the layer that owns it. */
 export interface OwnedStickyTheme {
   instance: string;
   theme: Extract<ResolvedTheme, { kind: "sticky" }>;
 }
 
-/** One instance-declared WEBPAGE theme, with the instance that owns it. */
+/** One instance-declared WEBPAGE theme, with the layer that owns it. */
 export interface OwnedWebpageTheme {
   instance: string;
   theme: Extract<ResolvedTheme, { kind: "webpage" }>;
 }
 
 /**
- * Every WEBPAGE-kind theme an instance declares — one per instance, at most.
+ * Every WEBPAGE-kind theme a layer declares — one per layer, at most.
  *
  * Bean `7h3u`. The sibling of {@link instanceStickyThemes}, and the difference
  * between them is the whole reason this is a second function rather than a
@@ -152,19 +152,19 @@ export interface OwnedWebpageTheme {
  *
  * **A sticky theme id is ONE namespace on the page.** The board selects on
  * `[data-fa-sticky-theme="<themeId>"]` and a card writes the bare id, so two
- * instances declaring the same id collide and `instanceStickyThemes` refuses
+ * layers declaring the same id collide and `instanceStickyThemes` refuses
  * one of them.
  *
- * **A webpage theme is scoped by the INSTANCE whose pages it dresses**, so two
- * instances may both declare `id: "web"` and never meet — their rules apply on
+ * **A webpage theme is scoped by the LAYER whose pages it dresses**, so two
+ * layers may both declare `id: "web"` and never meet — their rules apply on
  * different URLs. Refusing that collision would be inventing a constraint the
  * surface does not have, so there are no `conflicts` here and none is reported.
  *
- * What IS refused is a second webpage theme inside ONE instance, because
- * nothing would say which of them dresses that instance's pages. That is
+ * What IS refused is a second webpage theme inside ONE layer, because
+ * nothing would say which of them dresses that layer's pages. That is
  * ambiguity in the declaration rather than a clash between declarations, so it
  * throws rather than being filtered: a silently-picked theme is the failure
- * mode, and `themes.test.ts` in the declaring instance is where it surfaces.
+ * mode, and `themes.test.ts` in the declaring layer is where it surfaces.
  */
 export function instanceWebpageThemes(repoRoot: string, platform = PLATFORM_THEME_OWNER): OwnedWebpageTheme[] {
   const out: OwnedWebpageTheme[] = [];
@@ -187,25 +187,25 @@ export function instanceWebpageThemes(repoRoot: string, platform = PLATFORM_THEM
   return out;
 }
 
-/** Why an instance's sticky theme was NOT emitted — each a finding, never a silent drop. */
+/** Why a layer's sticky theme was NOT emitted — each a finding, never a silent drop. */
 export type StickyThemeConflict =
   | { kind: "shadows-platform"; instance: string; themeId: string }
   | { kind: "duplicate-across-instances"; themeId: string; instances: string[] };
 
 /**
- * Every STICKY-kind theme an instance in this repository declares, found the
+ * Every STICKY-kind theme a layer in this repository declares, found the
  * same way {@link themeByRef} finds one — by declaration, never by import.
  *
  * Bean `v8n5`. The note board's stylesheet (`gen-themes-css.ts`) selects on
  * `[data-fa-sticky-theme="<themeId>"]` and a card writes the bare `themeId`
  * there, so an id is ONE namespace on the page even though it is two in the
- * graph. Two answers were possible — scope the selector by instance, or refuse
+ * graph. Two answers were possible — scope the selector by layer, or refuse
  * a collision — and this refuses: scoping would change what every card writes
- * and every e2e test asserts, for a collision no instance has. A colliding
+ * and every e2e test asserts, for a collision no layer has. A colliding
  * theme is REPORTED in `conflicts` and left out of `themes`, so the platform's
  * own theme keeps its CSS and nothing is overwritten by declaration order.
  *
- * Instances that declare no themes, or whose module is unreadable, contribute
+ * Layers that declare no themes, or whose module is unreadable, contribute
  * nothing — that is `themeByRef`'s miss to report when something cites them.
  */
 export function instanceStickyThemes(

@@ -35,7 +35,7 @@ const BPMN_CARE = `<?xml version="1.0"?><bpmn:definitions xmlns:bpmn="http://www
 </bpmn:process></bpmn:definitions>`;
 const BPMN_TRIAGE = '<?xml version="1.0"?><bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Defs2"><bpmn:process id="Process_Triage"><bpmn:task id="Task_Triage" name="Triage"/></bpmn:process></bpmn:definitions>';
 
-/** A checkout of two instances: `base` holds actors, a catalogue beside its ArchiMate, a requirement and an example index; `demo` holds the journeys, the BPMN they name (instance-relative) and a workshop. */
+/** A checkout of two layers: `base` holds actors, a catalogue beside its ArchiMate, a requirement and an example index; `demo` holds the journeys, the BPMN they name (instance-relative) and a workshop. */
 function clean(): Files {
   return {
     "base/base.json": {

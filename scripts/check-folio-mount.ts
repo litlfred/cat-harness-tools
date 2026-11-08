@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * Every page an instance publishes as a standalone replica carries the folio
+ * Every page a layer publishes as a standalone replica carries the folio
  * mount.
  *
- * The requirement is **consistency**, not quality: the content instances are
+ * The requirement is **consistency**, not quality: the content layers are
  * libraries a user browses, and the folio the cat-harness gives them is the
  * same across them (`board-windows`: *"the test is not 'is this folio good'
  * but 'is this the same folio'"*). A page missing the mount silently loses
@@ -15,8 +15,8 @@
  * ## The scope is DECLARED, not inferred
  *
  * Most standalone HTML in the repository (fixtures, the viewer shell,
- * generated visualisation pages) has no business carrying a folio. So an
- * instance **opts in**, in its own `<instance>.json`:
+ * generated visualisation pages) has no business carrying a folio. So a
+ * layer **opts in**, in its own `<instance>.json`:
  *
  * ```json
  * "folioMount": {
@@ -25,11 +25,11 @@
  * }
  * ```
  *
- * An instance with no `folioMount` block is **not configured**, a third state
+ * A layer with no `folioMount` block is **not configured**, a third state
  * reported by name on every run, never a pass (`check-harness-dirs`'s shape,
  * `check-ci-health`'s rule).
  *
- * The roots are relative to the instance, which owns them; a platform gate
+ * The roots are relative to the layer, which owns them; a platform gate
  * listing library directories would know about one library.
  *
  * ## Exemptions carry reasons, and a stale one fails
@@ -78,7 +78,7 @@ import { instantiatedHarnessNames } from "../schemas/kg/harness-config.js";
  * Resolved from this file rather than from `process.cwd()`.
  *
  * `check-avatar-instances` shipped with `repoRootFor(process.cwd())` and, run
- * from the repository root, walked UP to the parent, found no instances, and
+ * from the repository root, walked UP to the parent, found no layers, and
  * reported a clean run over nothing. That is `dh4f` and it is avoided here by
  * construction rather than by remembering.
  */
@@ -96,7 +96,7 @@ export interface FolioMountDecl {
 
 export interface InstanceReport {
   instance: string;
-  /** `null` when the instance declares no `folioMount` block — NOT a pass. */
+  /** `null` when the layer declares no `folioMount` block — NOT a pass. */
   decl: FolioMountDecl | null;
   mounted: string[];
   /** Pages on the theme's layout, which loads the folio itself — a subset of `mounted`. */
@@ -140,9 +140,9 @@ function isPage(file: string): boolean {
 }
 
 /**
- * The instances this repository holds — `instantiatedHarnessNames`, the same
+ * The layers this repository holds — `instantiatedHarnessNames`, the same
  * answer `check-avatar-instances` reads, so the two checks cannot disagree
- * about what an instance is. It was a local scan of `*.config.json` that did
+ * about what a layer is. It was a local scan of `*.config.json` that did
  * not exclude the retired `harness.config.json` (nor, now, the reserved
  * `index.config.json`).
  */
@@ -243,7 +243,7 @@ function main(): void {
       }
     }
 
-    // NOT a pass. An instance that grows replica pages and never opts in is
+    // NOT a pass. A layer that grows replica pages and never opts in is
     // exactly the reader who loses their folio, so it is named every run.
     for (const r of unconfigured) {
       console.log(`  · ${r.instance}: no \`folioMount\` block — not configured, not checked`);

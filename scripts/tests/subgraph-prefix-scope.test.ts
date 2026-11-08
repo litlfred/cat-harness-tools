@@ -1,13 +1,13 @@
 /**
  * `prefixesInScope` answers from the declarations, not from what else is
- * checked out beside the instance (bean `cat-tools-d5j0`).
+ * checked out beside the layer (bean `cat-tools-d5j0`).
  *
  * Two fixture checkouts hold the same `cat-harness` declaration, which needs
  * `bootstrap`. One also holds bootstrap; the other is cat-harness alone, the
  * sibling-clone layout where `checkoutRootFor` stops at cat-harness's own
  * `.git`. Both must give the same reach and the same subgraph context, with the
  * `bootstrap` prefix bound. A `needs` name that is no own prefix and no
- * instance here still binds nothing.
+ * layer here still binds nothing.
  */
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { spawnSync } from "node:child_process";

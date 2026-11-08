@@ -121,10 +121,10 @@ const R = "cat-harness/test/results";
 
 /**
  * The hosted KG-QA homes `kg:audit:all` writes under {@link R}: the harness's
- * known hosted instances, plus any instance declared in `repoRoot` whose
- * `kgQaHomeFor` resolves to `"hosted"` (such as a content root's own instance
+ * known hosted layers, plus any layer declared in `repoRoot` whose
+ * `kgQaHomeFor` resolves to `"hosted"` (such as a content root's own layer
  * when it declares no `qa` directory of its own — bean `rn24`). Still named
- * per declared instance rather than globbed, so the folded `agent-skills/` and
+ * per declared layer rather than globbed, so the folded `agent-skills/` and
  * `large-datasets/` trees remain unclaimed.
  */
 export function hostedKgWrites(repoRoot: string | undefined = REPO_ROOT): string[] {
@@ -155,8 +155,8 @@ export function hostedKgWrites(repoRoot: string | undefined = REPO_ROOT): string
  * Measured 2026-10-02 on a scratch branch with `5hox`'s removal applied, each
  * run into the empty tree: together they reproduce 1,182 of the inventory's
  * 1,186 paths. The other four are `agent-skills/` and `large-datasets/`
- * kg-qa trees of two instances that were folded away (`j7ql`): no writer
- * audits an instance that no longer exists, so the record correctly loses
+ * kg-qa trees of two layers that were folded away (`j7ql`): no writer
+ * audits a layer that no longer exists, so the record correctly loses
  * them. The block sweep covers the whole docs tree, which adds the 106 block
  * verdicts no hand sweep had reached — a derived result is a function of the
  * tree, not of which chapters somebody once swept.
@@ -191,9 +191,9 @@ export const QA_WRITERS: readonly QaWriter[] = [
     because: "script block verdicts over the docs tree; agent verdicts are composed from test/attestations/, which stays on main. Read by the witnesses below",
   },
   // `*/test/results`, not `${R}`: since cat-harness#12 each verdict is written
-  // under the instance that owns the library entry (the IRIS replica, the DAK
+  // under the layer that owns the library entry (the IRIS replica, the DAK
   // base layer, the FHIR IG harness …), and claiming only cat-harness's tree left 24 of them
-  // `unclaimed` in the composed checkout (2026-10-09). And the ROOT instance's
+  // `unclaimed` in the composed checkout (2026-10-09). And the ROOT layer's
   // own entries land at `test/results/library-qa/`, which `*/` never matches:
   // in smart-ra (library/ at the repo root) the writer read as producing
   // nothing and uml:overview failed (smart-ra#228, 2026-11-05).
@@ -217,7 +217,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
     id: "docs:pages",
     run: ["docs:pages"],
     // `*/test/results`, as for check:l1-complete: since #609 docs:pages writes each
-    // mounted instance's witnesses under that instance's own test/results/ (qaAssetDirOf).
+    // mounted layer's witnesses under that layer's own test/results/ (qaAssetDirOf).
     writes: [`*/test/results/witnesses/**`],
     // declared-path-literal: the docs projections it regenerates beside the witnesses (bean `72a8`), measured from the 2026-10-07 restore log.
     rewrites: ["cat-harness/docs/assets/beans/*.json", "cat-harness/docs/assets/qa/*.json"],
@@ -336,7 +336,7 @@ export interface NotApplicable {
 /** What {@link notApplicableWriters} needs to know about the root. */
 export interface RootFacts {
   profile: RootProfile;
-  /** Whether an npm script of this name is declared by any instance on disk. */
+  /** Whether an npm script of this name is declared by any layer on disk. */
   declares: (script: string) => boolean;
   /** Whether any state branch is mounted in this worktree. */
   stateMounted: boolean;
@@ -352,7 +352,7 @@ export interface RootFacts {
  * it stays a failure. In a content root two things are true that are not
  * failures of the root:
  *
- * - the writer's script is declared by no instance mounted there (`p2:refusals`
+ * - the writer's script is declared by no layer mounted there (`p2:refusals`
  *   is declared by the IG layers smart-ra does not mount);
  * - it reads state graphs and no state branch is mounted (`readsState`).
  *
@@ -484,7 +484,7 @@ export function trackedQaFiles(repoRoot: string, roots: readonly string[]): stri
 }
 
 /**
- * The qa files a REMOTE MOUNT laid down: paths under a mounted instance's root,
+ * The qa files a REMOTE MOUNT laid down: paths under a mounted layer's root,
  * on disk before any writer runs. In a composed checkout a mount is ignored by
  * the aggregate's git, so `trackedQaFiles` names none of its files, but each one
  * was laid down from the mount's pinned commit and checked against its lock. Its
@@ -690,10 +690,10 @@ function main(argv: string[]): number {
   // Every declared results directory exists before any writer runs. This
   // command IS the computation, so an absent directory here means "not yet
   // written", never "not computed". Without it, a fresh checkout's first writer
-  // (kg:audit:all) audits each nested instance before anything has created that
-  // instance's directory, so its test-run criteria read `unknown` (bean `2gst`'s
+  // (kg:audit:all) audits each nested layer before anything has created that
+  // layer's directory, so its test-run criteria read `unknown` (bean `2gst`'s
   // rule for an uncomputed tree), and that critical `unknown` is recorded in the
-  // very sidecars it then writes there. `check:qa-corpus` failed on 8 instances
+  // very sidecars it then writes there. `check:qa-corpus` failed on 8 layers
   // in CI on #2080 for exactly this. On main the directories exist because their
   // sidecars are committed; this restores that, nothing more.
   for (const r of roots) mkdirSync(join(repoRoot, r), { recursive: true });

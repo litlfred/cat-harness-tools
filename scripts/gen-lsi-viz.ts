@@ -70,7 +70,7 @@ const VIEWER_TOOL = "lsi-viewer";
 /**
  * Every page this writes declares itself generated in its own front matter —
  * the `generated:` key `check:reference-direction` reads (bean `ws99`). The page
- * names skills, Tools and processes of every instance in the checkout, so
+ * names skills, Tools and processes of every layer in the checkout, so
  * without the key those names read as authored prose in this layer naming the
  * layers above it.
  */

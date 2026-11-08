@@ -2,7 +2,7 @@
  * `subgraph-source` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/schemas/subgraph-source.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each resolves every subgraph every
- * instance in the checkout declares, which only the checkout holds. Standing
+ * layer in the checkout declares, which only the checkout holds. Standing
  * alone, cat-harness has none of it, and `check:cat-harness-standalone`
  * collects every test in that layer. The rest of that file's tests stay there;
  * every path here is composed from ORIGIN_DIR, the directory they were written
@@ -29,7 +29,7 @@ describe("THE GATE — every declared subgraph in this checkout resolves", () =>
     expect(ids.length).toBeGreaterThan(0);
   });
   // An explicit budget, measured rather than guessed: this resolves EVERY
-  // declared subgraph across every instance in the checkout (one
+  // declared subgraph across every layer in the checkout (one
   // checkout-wide walk per id), which took ~4.5 s of a 5.47 s file run in the
   // CI-shaped mount on 2026-10-11 — at Bun's 5 s default, so a loaded runner
   // timed it out on unrelated PRs (#69, #93) while it passed everywhere else.
@@ -41,7 +41,7 @@ describe("THE GATE — every declared subgraph in this checkout resolves", () =>
         const d = declaredSubgraph(REPO, id);
         if (d === undefined) findings.push(`${id}: declared, but resolves to nothing`);
       } catch (e) {
-        if (e instanceof Error && /declared by \d+ instances/.test(e.message)) continue; // ambiguous ids are asked per instance
+        if (e instanceof Error && /declared by \d+ instances/.test(e.message)) continue; // ambiguous ids are asked per layer
         findings.push(`${id}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }

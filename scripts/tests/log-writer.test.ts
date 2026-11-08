@@ -27,7 +27,7 @@ import { describeCapture, writeLogEntry } from "../../src/logging/log-writer.ts"
 import {  } from "../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
-/** An instance whose declaration names a trashcan, so there is somewhere to log. */
+/** A layer whose declaration names a trashcan, so there is somewhere to log. */
 function instance(declareFshGuts = true): string {
   const root = mkdtempSync(join(tmpdir(), "log-writer-"));
   const directories = declareFshGuts
@@ -59,7 +59,7 @@ describe("the log directory is composed from the declaration, not spelled", () =
   test("an instance that declares no trashcan has nowhere to log", () => {
     // A determined empty, not a guess at the conventional path. Writing to
     // `fsh-guts/logs` regardless would create a second trashcan beside the
-    // one the instance actually declared — the `dh4f` defect one level down.
+    // one the layer actually declared — the `dh4f` defect one level down.
     expect(logDirs(instance(false))).toEqual([]);
   });
 

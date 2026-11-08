@@ -12,7 +12,7 @@
  * adapter in the science layer. Standing alone, as
  * `check:cat-harness-standalone` runs it, none of them is there.
  *
- * So: when no instance in this checkout declares a `block-kinds` graph,
+ * So: when no layer in this checkout declares a `block-kinds` graph,
  * `FOLIO_FIXTURE_CHECKOUT` names `test/fixtures/standalone-checkout/`, which
  * `declared-nodes.ts` then scans beside the real checkout. In the monorepo it
  * is never set, so no test there can pass on the fixture instead of the real

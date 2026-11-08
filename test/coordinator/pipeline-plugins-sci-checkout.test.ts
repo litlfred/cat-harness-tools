@@ -1,9 +1,9 @@
 /**
  * `pipeline-plugins` tests whose subject is folio-assistant-sci's contribution
- * — that this instance fills every pipeline-plugin slot — moved here from
+ * — that this layer fills every pipeline-plugin slot — moved here from
  * `cat-harness/content/pipeline/pipeline-plugins.test.ts` (bean `ho66`). The
  * code under test is cat-harness's, imported DOWN; what it is held against is
- * this instance's, so standing alone cat-harness has nothing for these to
+ * this layer's, so standing alone cat-harness has nothing for these to
  * read. The rest of that file's tests stay there.
  *
  * Then moved up again, to the aggregate's `test/` (bean `7zz1`, owner ruling

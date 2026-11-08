@@ -89,7 +89,7 @@ import { loadManifestValue, manifestPath } from "../pipeline/json-manifest.ts";
 const INSTANCE_ROOT = join(HARNESS_ROOT);
 
 /**
- * The language these generated pages are authored in — the instance's answer,
+ * The language these generated pages are authored in — the layer's answer,
  * not the `en` literal this file used to write into every page's front matter.
  */
 const SOURCE_LOCALE = sourceLocale(INSTANCE_ROOT);
@@ -108,10 +108,10 @@ const SRC_DIR = docsSourceDirFor(INSTANCE_ROOT);
 const OUT_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
 
 /**
- * EVERY docs source in the checkout, the base instance's first (owner,
+ * EVERY docs source in the checkout, the base layer's first (owner,
  * 2026-10-23, "A1": one run reads the docs-source directory every mounted
- * instance declares). The base instance's is {@link SRC_DIR} → {@link OUT_DIR},
- * unchanged; an instance above it renders its own pages into the docs
+ * layer declares). The base layer's is {@link SRC_DIR} → {@link OUT_DIR},
+ * unchanged; a layer above it renders its own pages into the docs
  * directory that declares them (`lib/docs-sources.ts`). Lazy, so importing
  * this module for a test does not walk the checkout.
  */
@@ -125,7 +125,7 @@ function allDocsSources(): DocsSource[] {
  * The docs source the page being rendered belongs to. Module-level, like
  * `qaIndex` below and for its reason: the page loop sets it before each page,
  * and the functions that read a block, a sidecar or a witness are several
- * frames down. Starts as the base instance's, so every exported helper a test
+ * frames down. Starts as the base layer's, so every exported helper a test
  * calls answers exactly as it did before there was more than one source.
  */
 let CUR: DocsSource = {
@@ -136,7 +136,7 @@ let CUR: DocsSource = {
   base: true,
 };
 
-/** The source directory as its instance sees it — `docs/source` for the base. */
+/** The source directory as its layer sees it — `docs/source` for the base. */
 function srcRel(src: DocsSource = CUR): string {
   return relative(src.root, src.srcDir).split(sep).join("/");
 }
@@ -146,7 +146,7 @@ function srcRel(src: DocsSource = CUR): string {
  *
  * DETECTED, not written down. This was the literal
  * `https://github.com/litlfred/folio-assistant` until 2026-09-20 — one
- * instance's address inside a generator every instance runs, which is exactly
+ * layer's address inside a generator every layer runs, which is exactly
  * the genericity failure `AGENTS.md` catalogues (a platform script carrying
  * `quantum-observable-universe`). Every edit link, every bean link and every
  * QA link this file emits was composed from it, so a fork's published docs
@@ -176,7 +176,7 @@ const REPO_WEB = detectRepoUrl(repoRootFor(INSTANCE_ROOT)) ?? "https://github.co
  * A path `readTodoFiles` reports, as the REPOSITORY sees it.
  *
  * `todos/` sits at the repository root while this generator's `INSTANCE_ROOT` is
- * the cat-harness instance, so `readTodoFiles` returns `../todos/items/x.md`.
+ * the cat-harness layer, so `readTodoFiles` returns `../todos/items/x.md`.
  *
  * **The old edit link shipped that verbatim**, as
  * `https://github.com/.../edit/main/../todos/items/x.md`. A browser normalises
@@ -278,7 +278,7 @@ let storedAbsent = 0;
  * The repository and path an edit link names, from the DECLARATIONS rather
  * than the checkout — bean `5o5c`, owner ruling C (2026-10-22).
  *
- * The page is generated inside whichever checkout mounts this instance — the
+ * The page is generated inside whichever checkout mounts this layer — the
  * index, a content layer's own checkout, a bare clone — and `REPO_WEB` is that
  * checkout's `origin`. Stamping it as `data-repo` made the same block render
  * three ways, and the rendered line is a msgid in the translation catalogues,
@@ -286,9 +286,9 @@ let storedAbsent = 0;
  * it differed: `docs/source/…` is instance-relative, so
  * `litlfred/folio-assistant` + that path named a file the index does not hold.
  *
- * The owning instance is the one whose root holds the file, and its
+ * The owning layer is the one whose root holds the file, and its
  * `repository` is the repo the link names; the path is relative to that root.
- * A file no declaring instance holds keeps the checkout's own repository.
+ * A file no declaring layer holds keeps the checkout's own repository.
  */
 export function declaredEditLocation(target: string): { source: string; repo?: string } {
   // `editTarget` answers instance-relative, except for a `../` asset, which it
@@ -372,10 +372,10 @@ const QA_ASSET_DIR = join(INSTANCE_ROOT, "test", "results", "witnesses");
 const QA_ASSETS_STORED = qaStorageOf(QA_ASSET_DIR) !== undefined;
 
 /**
- * An instance's OWN witness tree: its pages' projections are its QA output, so
- * they sit under its `test/results/`, as the base instance's do under
+ * A layer's OWN witness tree: its pages' projections are its QA output, so
+ * they sit under its `test/results/`, as the base layer's do under
  * {@link QA_ASSET_DIR}. The site build copies the base's tree into
- * `/assets/qa/` and each other instance's into `/assets/qa/<instance>/`, the
+ * `/assets/qa/` and each other layer's into `/assets/qa/<instance>/`, the
  * address its badges name (`lib/docs-sources.ts`), so one slug in two sources
  * is two witness directories.
  */
@@ -409,7 +409,7 @@ function qaStoredFor(path: string): boolean {
  */
 const QA_CORPUS = qaCorpusAvailability(INSTANCE_ROOT);
 const corpora = new Map<string, ReturnType<typeof qaCorpusAvailability>>();
-/** {@link QA_CORPUS} for the source being rendered — asked once per instance, before its first witness. */
+/** {@link QA_CORPUS} for the source being rendered — asked once per layer, before its first witness. */
 function corpusOf(src: DocsSource = CUR): ReturnType<typeof qaCorpusAvailability> {
   if (src.base) return QA_CORPUS;
   if (!corpora.has(src.root)) corpora.set(src.root, qaCorpusAvailability(src.root));
@@ -740,7 +740,7 @@ function qaIcons(page: WebPage, node: WebPageNode): string {
   for (const subject of subjects) {
     for (const family of familiesFor(subject)) {
       const key = `${node.id}.${family}`;
-      // The ADDRESS is qualified by instance above the base — its witness tree
+      // The ADDRESS is qualified by layer above the base — its witness tree
       // is published at `/assets/qa/<instance>/` (`lib/docs-sources.ts`) — and
       // the files on disk keep their plain `<slug>/` directory.
       out.push(qaBadgePlaceholder({ family, key, noun: subjectNoun(subject), slug: qualifiedKey(CUR, slug) }));
@@ -962,7 +962,7 @@ const TRANSLATION_INDEXES = new Map<string, TranslationIndex>();
 function translationIndex(src: DocsSource = CUR): TranslationIndex {
   const cached = TRANSLATION_INDEXES.get(src.outDir);
   if (cached !== undefined) return cached;
-  // An instance above the base renders into its own docs directory, which is
+  // A layer above the base renders into its own docs directory, which is
   // composed into the base's site rather than being a Jekyll site itself — so
   // its index is asked of that directory, by name.
   const { index, findings } = src.base ? buildTranslationIndex(src.root) : buildTranslationIndex(src.root, src.outDir);
@@ -1071,8 +1071,8 @@ function renderPage(page: WebPage): string {
   lines.push("{:toc}");
   lines.push("</details>");
   lines.push("");
-  // The forge the source sits in: this checkout's for the base instance, as
-  // always; the DECLARING instance's repository for one above it, from the
+  // The forge the source sits in: this checkout's for the base layer, as
+  // always; the DECLARING layer's repository for one above it, from the
   // same declarations the per-node edit links read.
   const owner = CUR.base ? undefined : declaredEditLocation(manifestRef(page));
   const web = owner?.repo ? `https://github.com/${owner.repo}` : REPO_WEB;
@@ -1209,7 +1209,7 @@ function withSidecarLinks(doc: QaWitnessDoc): QaWitnessDoc {
 
 /**
  * Where QA results live in `repoRoot`, resolved ONCE per run
- * (cat-harness-tools#871). `resolveQaLocation` walks every instance in the
+ * (cat-harness-tools#871). `resolveQaLocation` walks every layer in the
  * checkout and reads its declarations; asked per sidecar link, as it was,
  * that walk was ~22 s of a ~23 s run (2026-10-30, ~1200 links), and it put
  * `gen-docs-pages-orphan-qa-checkout.test.ts` past its 30 s timeout.
@@ -1272,9 +1272,9 @@ const labelFile = new Map<string, string>();
  * Where each page is PUBLISHED, site-relative, for the links the todo board
  * composes to a block — keyed by the page's QUALIFIED slug
  * (`lib/docs-sources.ts`), so one slug in two sources is two pages. A page of
- * a source above the base is composed into the site under its instance's name
+ * a source above the base is composed into the site under its layer's name
  * (`compose-docs.ts`), so its address carries that prefix; the base
- * instance's is Jekyll's answer for its own site.
+ * layer's is Jekyll's answer for its own site.
  */
 const pageRoute = new Map<string, string>();
 const publishedAt = (slug: string): string => pageRoute.get(slug) ?? publishedPagePath(OUT_DIR, slug);
@@ -1324,7 +1324,7 @@ for (const slug of slugs) {
   if (page.slug.replace(/\//g, "-") !== slug) {
     throw new Error(`${manifest} declares slug "${page.slug}" but lives in ${slug}/`);
   }
-  // Qualified by instance above the base, so the same slug in two sources is
+  // Qualified by layer above the base, so the same slug in two sources is
   // two pages (`docsSources` has already warned, naming both files).
   const pageKey = qualifiedKey(src, page.slug);
   pageRoute.set(pageKey, src.base ? publishedPagePath(OUT_DIR, page.slug) : `${src.instance}/${publishedPagePath(src.outDir, page.slug)}`);
@@ -1394,7 +1394,7 @@ for (const slug of slugs) {
   console.log(`  ${check ? "·" : "✓"} ${slug}.md (${page.nodes.length} nodes)`);
 }
 }
-// Everything below is the BASE instance's: its todos, beans, zoom and QA graph.
+// Everything below is the BASE layer's: its todos, beans, zoom and QA graph.
 CUR = allDocsSources()[0]!;
 
 /**
@@ -1402,7 +1402,7 @@ CUR = allDocsSources()[0]!;
  *
  * Composed at BUILD time, like `editHref` and for the same reason: the client
  * would otherwise need the repo's web URL and the bean store's layout, and
- * both are this instance's business rather than shared client code's.
+ * both are this layer's business rather than shared client code's.
  *
  * **A reference that cannot be resolved is still rendered, without a link.**
  * `folio-assistant-29ij` names a bean whether or not a file for it is on disk,
@@ -1883,7 +1883,7 @@ function processHierarchy(): Record<string, string[]> {
   //   todos/<id>/index.html         its RENDERING — a thin page, not the asset
   {
     // The container is the DECLARED `todos` Subgraph node — the one the KG
-    // export publishes in the declaring instance's document — never a
+    // export publishes in the declaring layer's document — never a
     // collection minted here (bean `l4ay`, `subgraph-node.ts`).
     const declared = declaredSubgraphNode(INSTANCE_ROOT, "todos");
     if (declared === undefined) {
@@ -1891,7 +1891,7 @@ function processHierarchy(): Record<string, string[]> {
     }
     const subgraph = declared && { iri: declared.iri, contentSource: declared.contentSource };
     // A target on a page of a source above the base is published under that
-    // instance (`gen-site-jsonld.ts`), so its IRI is resolved, not spelled.
+    // layer (`gen-site-jsonld.ts`), so its IRI is resolved, not spelled.
     const targetIri = (page: string, node: string): string => `${DOCS_SITE_BASE}${siteNodeOf(allDocsSources(), page, node).sitePath}`;
     const graph = serialiseJsonld(todoGraphDocument(items, subgraph, targetIri));
     for (const ext of [".jsonld", ".json"]) {
@@ -2013,9 +2013,9 @@ function processHierarchy(): Record<string, string[]> {
     const blocks = blocksOf(beans);
     // WORK PLANS (work item folio-assistant-exrp, owner 2026-11-05: "Epic is
     // the plan"). An epic or milestone that names the process it runs, read
-    // from its `process:` / `proposal:` tags, and the instances that name it
+    // from its `process:` / `proposal:` tags, and the layers that name it
     // as their plan. Joined HERE, so the board renders a plan's process and
-    // its runs without reading the instance store itself. An instance store
+    // its runs without reading the layer store itself. A layer store
     // that cannot be read gives no runs, and the plan says so (`runs: null`)
     // rather than showing none.
     let instancesRead: ReturnType<typeof listInstances> | null;
@@ -2033,7 +2033,7 @@ function processHierarchy(): Record<string, string[]> {
     // The proposal's link, resolved HERE from the declarations: a proposal
     // path is checkout-relative (`cat-harness/docs/proposals/x.md`), and the
     // board's own `fileWeb` is the work-item store's repository, which does
-    // not hold it. The declaring instance's repository does (as edit links).
+    // not hold it. The declaring layer's repository does (as edit links).
     const proposalHref = (path: string): string => {
       const at = declaredEditLocation(path);
       return at.repo ? `https://github.com/${at.repo}/blob/main/${at.source}` : `${REPO_WEB}/blob/main/${path}`;
@@ -2093,7 +2093,7 @@ function processHierarchy(): Record<string, string[]> {
         // declared here rather than inferred by the reader.
         ...tileCounts({ beans: [openBeanCount(beans), OPEN_BEANS_UNIT] }),
         // The forge, so `work-plan.js` composes its links from DATA rather
-        // than carrying one instance's address in shared client code. Same
+        // than carrying one layer's address in shared client code. Same
         // reason `editHref` is composed here, one level further on.
         repoWeb: REPO_WEB,
         // The repository and branch every `file` below is a path on.
@@ -2299,7 +2299,7 @@ publishAuthoredPageTranslationQa();
 // another commit's pages, not this checkout's defect: reported, not gated.
 // The write path still removes it, so what the site build publishes is clean.
 const orphanedQaAssets = new Set<string>();
-// Every source's tree, each judged by its own storage — an instance above the
+// Every source's tree, each judged by its own storage — a layer above the
 // base that loses a page must lose that page's projections too.
 const witnessTrees = [...new Set(allDocsSources().map(qaAssetDirOf))];
 for (const orphan of witnessTrees.flatMap((d) => listQaAssets(d))) {

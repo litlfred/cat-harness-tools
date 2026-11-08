@@ -206,7 +206,7 @@ describe("what it must NOT touch — each failure renders fine and is therefore 
   test("a mount route is the OTHER pass's subject", () => {
     // `injectRails` walks these with a per-instance model. Railing them here
     // too would give a mounted page two rails, and the second would carry the
-    // ROOT instance's graphs rather than the mounted instance's — right-looking
+    // ROOT layer's graphs rather than the mounted layer's — right-looking
     // and wrong.
     const root = site();
     run(root);
@@ -260,10 +260,10 @@ describe("the mount routes are ASKED for, not guessed", () => {
   });
 
   test("it returns the routes the mount pass actually owns", () => {
-    // Not pinned to a list: which instances are mountable is a property of the
+    // Not pinned to a list: which layers are mountable is a property of the
     // repository and changes when one is added. What must hold is that every
     // route names a directory the mount pass would copy, and that the root
-    // instance's own docs are not among them — it is already the site root.
+    // layer's own docs are not among them — it is already the site root.
     const routes = mountRoutes("cat-harness");
     expect(routes.every((r) => r.length > 0 && !r.startsWith("/"))).toBe(true);
     expect(routes).not.toContain("cat-harness");

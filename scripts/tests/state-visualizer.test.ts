@@ -3,7 +3,7 @@
  *
  * @module scripts/tests/state-visualizer
  *
- * The generator writes COMMITTED pages under this instance's site dir, so
+ * The generator writes COMMITTED pages under this layer's site dir, so
  * `state:visualizer:check` is the staleness gate and this file is the
  * behaviour gate. It reads what the generator produced rather than re-deriving
  * it the same way, and it must never assert a COUNT of beans or epics — those
@@ -113,10 +113,10 @@ describe("the route is the policy, not this generator's choice", () => {
   });
 
   test("no stub segment, and no invented one", () => {
-    // Bean `o7eq` ruling 1: the segment is the instance's NAME, never its
+    // Bean `o7eq` ruling 1: the segment is the layer's NAME, never its
     // stub. Two earlier drafts published under `folio-assistant`, which names
-    // the published graph DOCUMENT and not the instance. Ruling 3 then elides
-    // this instance's own name, because its docs are the published root.
+    // the published graph DOCUMENT and not the layer. Ruling 3 then elides
+    // this layer's own name, because its docs are the published root.
     expect(existsSync(join(SITE, "folio-assistant"))).toBe(false);
     expect(existsSync(join(SITE, "state"))).toBe(false);
     expect(existsSync(join(SITE, "state-visualizer"))).toBe(false);
@@ -420,7 +420,7 @@ describe("declaredVisualiserFor — the four outcomes, against fixtures", () => 
   test("resolution is against the REPO root, not the instance root", () => {
     // The trap that would have marked all 27 missing. Measured 2026-09-20: 25
     // of 27 coverage paths resolve ONLY from the repo root, 0 only from the
-    // instance. The same page, spelled both ways: the repo-root spelling must
+    // layer. The same page, spelled both ways: the repo-root spelling must
     // resolve and the instance-relative one must not, or the assertion above
     // is not discriminating.
     const rel = page("lib", "x", "index.html");

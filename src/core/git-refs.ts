@@ -1,5 +1,5 @@
 /**
- * Git facts about a repository's refs, and where this instance publishes.
+ * Git facts about a repository's refs, and where this layer publishes.
  *
  * @module src/core/git-refs
  *
@@ -137,7 +137,7 @@ export function publishedPaths(
 export const DEFAULT_PUBLISH_REF = "gh-pages";
 
 /**
- * Where this instance publishes: the repo URL, the Pages base, the ref.
+ * Where this layer publishes: the repo URL, the Pages base, the ref.
  *
  * **These are repository-level facts that happen to be stored under the
  * `readme` key**, which is where the first consumer put them. They are read
@@ -157,7 +157,7 @@ export function publishTargets(root: string): {
 } {
   const eff = readEffectiveConfig(root);
   let block: { repoUrl?: string; pagesBaseUrl?: string; publishRef?: string } = {};
-  // The index entry when one lists the instance, else `<name>.config.json`.
+  // The index entry when one lists the layer, else `<name>.config.json`.
   if (eff.state === "ok") {
     try {
       const parsed = eff.config as {

@@ -34,9 +34,9 @@ import {
 import { tools as harnessTools } from "../schemas/tools/harness-tools.ts";
 import { discoverTools } from "../tools/discover.ts";
 
-/** This instance's root, for the ad-hoc declarations below. */
+/** This layer's root, for the ad-hoc declarations below. */
 const MCP_ROOT = new URL("..", import.meta.url).pathname;
-/** The repository: an instance root whose dependency tree holds every layer. */
+/** The repository: a layer root whose dependency tree holds every layer. */
 const REPO = new URL("../..", import.meta.url).pathname;
 const HARNESS = new URL("../../cat-harness/", import.meta.url).pathname;
 import {
@@ -89,7 +89,7 @@ describe("MCP tool groups", () => {
   });
 
   test("a folio that declares nothing still gets the harness's tools", () => {
-    // Bean `zmdo`: `folio_init` must reach a fresh instance, whose chain is
+    // Bean `zmdo`: `folio_init` must reach a fresh layer, whose chain is
     // empty because it has no declaration yet.
     const tmp = mkdtempSync(join(tmpdir(), "served-tools-"));
     try {
@@ -157,8 +157,8 @@ describe("built-in content adapters", () => {
   test("a specialisation leads its base, because it is the superset", () => {
     // Falling back TO a specialisation loses nothing — it registers its base's
     // tools too. Falling back FROM it loses its own, which is why that
-    // direction has to be announced. Which instances ship `paper` and
-    // `document` is asserted by THOSE instances' tests, not here: this one
+    // direction has to be announced. Which layers ship `paper` and
+    // `document` is asserted by THOSE layers' tests, not here: this one
     // must hold in a checkout of the harness alone.
     for (const d of BUILTIN_ADAPTERS) {
       if (d.extends === undefined) continue;

@@ -66,9 +66,9 @@ import { declarationPathIn } from "../../schemas/kg/cat-harness.ts";
 export type MarkerTarget =
   /** `index.config.json#contentTypes.<id>`. */
   | "contentTypes"
-  /** An instance declaration's `directories[]`, with a graph typology. */
+  /** A layer declaration's `directories[]`, with a graph typology. */
   | "directories"
-  /** An instance's `contentType` (its folio content type). */
+  /** A layer's `contentType` (its folio content type). */
   | "contentType";
 
 export type DeclaredState = "declared" | "not-declared" | "unknown";
@@ -101,7 +101,7 @@ export interface MarkerFinding {
 export interface MarkerScan {
   /** `index.config.json` at the scanned root: present and parsed, absent, or unreadable. */
   index: "present" | "absent" | "unreadable";
-  /** Local instances found through the index (`source.local.at`), by name. */
+  /** Local layers found through the index (`source.local.at`), by name. */
   instances: Array<{ name: string; at: string; contentType?: string }>;
   /** Types the repository already ASSERTS, per `describeRepository` — context, not suggestions. */
   asserted: Array<{ id: string; marker: string; parsed: boolean }>;
@@ -274,7 +274,7 @@ export const EVIDENCE: readonly Evidence[] = [
 // ---------------------------------------------------------------------------
 
 function instanceFor(decl: Declared, path: string): Declared["instances"][number] | undefined {
-  // The deepest local instance whose root contains the path.
+  // The deepest local layer whose root contains the path.
   return [...decl.instances]
     .filter((i) => i.at === "" || path.startsWith(i.at))
     .sort((a, b) => b.at.length - a.at.length)[0];
@@ -370,7 +370,7 @@ export function scanMarkers(
       continue;
     }
 
-    // contentType: the folio content type of a local instance.
+    // contentType: the folio content type of a local layer.
     const inst = instanceFor(decl, hit[0]!);
     const has = inst?.contentType;
     const declared: DeclaredState = unknown ? "unknown" : has === e.id ? "declared" : "not-declared";

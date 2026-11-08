@@ -9,7 +9,7 @@
  * Moved again, from `cat-harness-tools/scripts/tests/` to the checkout's own
  * test home `test/` (bean `7zz1`, owner ruling 2026-10-06 "Top-level
  * instance"): what it reads belongs to the whole checkout, which the root
- * instance declares, not to any one layer — so cat-harness-tools stays green
+ * layer declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
 import { describe, expect, it } from "bun:test";

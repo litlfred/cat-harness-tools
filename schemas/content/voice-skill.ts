@@ -5,11 +5,11 @@
  *
  * A voice tells an actor what to do, is bound to processes by name, and is
  * versioned with the graph — what a skill does. As a skill, its instructions
- * and its rules are the same node, owned by the same instance, so writing
+ * and its rules are the same node, owned by the same layer, so writing
  * guidance cannot drift away from the rules and their citations.
  *
  * A voice skill lives at `<instance>/skills/voices/<id>/`, inside the `kg`
- * graph, and the instance that holds it is the instance that DERIVED it.
+ * graph, and the layer that holds it is the layer that DERIVED it.
  *
  * ## Three consumers, and the schema says which field serves which
  *
@@ -41,13 +41,13 @@ import {
 } from "./voices.ts";
 
 /**
- * Where a voice skill lives, relative to the instance that owns it.
+ * Where a voice skill lives, relative to the layer that owns it.
  *
  * `skills/` rather than `voices/` because a voice IS a skill; the `voices/`
  * segment under it because the `kg` graph holds several kinds and a reader
  * scanning for voices should not have to open every skill to find them.
  *
- * **The owning instance is the one the voice BELONGS TO semantically, and it
+ * **The owning layer is the one the voice BELONGS TO semantically, and it
  * is a judgement.** Owner, 2026-09-21: *"voices should be associated to
  * appropriate home semantically/by judgement."*
  *
@@ -172,12 +172,12 @@ export const VoiceSkillSchema = z
     description: z.string().min(1),
 
     /**
-     * The instance that DERIVED this voice, by declared name.
+     * The layer that DERIVED this voice, by declared name.
      *
      * Absent means this one — the same convention `VoiceRefSchema` uses, and
      * for the same reason: a name, never a path, so a checkout layout cannot
-     * be hardcoded into content. Present is for a voice re-exported by an
-     * instance that did not derive it, which must say whose it is.
+     * be hardcoded into content. Present is for a voice re-exported by a
+     * layer that did not derive it, which must say whose it is.
      */
     owner: z.string().min(1).optional(),
 

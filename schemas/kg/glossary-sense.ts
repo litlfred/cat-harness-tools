@@ -1,5 +1,5 @@
 /**
- * **The glossary sense verdicts** of an instance: for a use of a glossary term
+ * **The glossary sense verdicts** of a layer: for a use of a glossary term
  * in the narrative that no rule decides, whether the term is used in its
  * glossary sense — the store `translation:glossary:check` reads and its
  * `--record` writes.
@@ -24,7 +24,7 @@
  * that ruled, never the model behind an agent.
  *
  * The file is `<translation-sources>/glossary-sense.json`, committed in the
- * instance.
+ * layer.
  *
  * @module schemas/kg/glossary-sense
  * @graphNode schema
@@ -34,7 +34,7 @@ import { z } from "zod";
 /** The `$schema` of the store. */
 export const GLOSSARY_SENSE_SCHEMA = "glossary-sense/v1";
 
-/** The store's file name, in the instance's declared `translation-sources` directory. */
+/** The store's file name, in the layer's declared `translation-sources` directory. */
 export const GLOSSARY_SENSE_FILE = "glossary-sense.json";
 
 /** What an adjudicator may rule. */

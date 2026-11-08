@@ -21,7 +21,7 @@
  * must match and never something an agent dispatches, and every plan says
  * whether the repository declares it. This file keeps no list of them. So:
  *
- * - **a declared site first**: a repository whose instance config (its
+ * - **a declared site first**: a repository whose layer config (its
  *   `index.config.json` entry; a legacy `<instance>.config.json` is a reported fallback)
  *   carries `site.build` is built by `build-instance-site.ts` from its own
  *   package scripts ({@link declaredRecipe}, {@link stageDeclared});
@@ -836,11 +836,11 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   if (target === "preview") {
     git(repo, ["fetch", "-q", "origin", base]);
     // The ChangeSet and the rendered impact are a content layer's, above this
-    // one: found in whichever of the platform's instances carries them, never
+    // one: found in whichever of the platform's layers carries them, never
     // named here. A platform without them gets no review data, and the review
     // page says so, as the workflow does when it has no renderer.
-    // declared-path-literal: a path INSIDE another platform instance, resolved
-    // by inPlatform against each instance's root, never against this one.
+    // declared-path-literal: a path INSIDE another platform layer, resolved
+    // by inPlatform against each layer's root, never against this one.
     const changeset = inPlatform(platform, "schemas/changeset.ts");
     if (changeset) run(repo, "bun", ["run", changeset, "--folio", inputs.folio_dir, "--base", `origin/${base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json"), "--structure-out", join(site, "changeset-structure.json")]);
     else log("· this platform has no ChangeSet tool: no review data on this preview");
@@ -872,7 +872,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
 }
 
 /**
- * The instance a checkout declares at its root, and the `site.build` recipe its
+ * The layer a checkout declares at its root, and the `site.build` recipe its
  * config carries (its `index.config.json` entry, index first), or undefined when it declares none. A
  * repository that declares a recipe builds its site from its own package
  * scripts, through `build-instance-site.ts`, rather than from a workflow file.
@@ -1080,7 +1080,7 @@ export function previewData(
   log: (s: string) => void,
 ): void {
   git(repo, ["fetch", "-q", "origin", f.base]);
-  // declared-path-literal: the conventional `<repo>/folio/<instance>` root of a `site.build` folio, and a path INSIDE another platform instance resolved by inPlatform against each instance's root.
+  // declared-path-literal: the conventional `<repo>/folio/<instance>` root of a `site.build` folio, and a path INSIDE another platform layer resolved by inPlatform against each layer's root.
   const folio = join("folio", f.instance);
   const changeset = inPlatform(repo, "schemas/changeset.ts");
   if (!changeset) log("· this platform has no ChangeSet tool: no review data on this preview");

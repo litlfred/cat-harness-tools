@@ -88,7 +88,7 @@ describe("the report that accompanies exit 2", () => {
   });
 
   it("names the file it looked for and the root it looked under", () => {
-    // A downstream instance gets this Tool and none of the workflows it reads —
+    // A downstream layer gets this Tool and none of the workflows it reads —
     // the case the node's own `selection.when` says it matters most in. "Could
     // not derive" without the path is unactionable there.
     const lines = undeterminedReport(new Error("boom"), "/some/root");

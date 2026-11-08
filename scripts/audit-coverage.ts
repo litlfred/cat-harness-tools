@@ -30,8 +30,8 @@
  *
  * ## Three states per kind, kept distinguishable
  *
- * 1. **no directory** — no instance declares a directory of this kind (a
- *    nested kind such as `bean-defs` inside `beans/`, or one this instance
+ * 1. **no directory** — no layer declares a directory of this kind (a
+ *    nested kind such as `bean-defs` inside `beans/`, or one this layer
  *    does not have). NOT a gap.
  * 2. **a directory with no files** — a determined empty.
  * 3. **files, and no criterion and no gate reaching them** — the finding.
@@ -109,13 +109,13 @@ import { exitNotApplicable } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";
 import { absenceAt } from "./branch-store.ts";
 
-/** The INSTANCE root — this file lives at `<instance>/scripts/`. */
+/** The LAYER root — this file lives at `<instance>/scripts/`. */
 const ROOT = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
 
 /** Where a kind's files stand relative to the audits that reach them. */
 export type KindState =
-  /** No instance declares a directory of this kind. Not a gap. */
+  /** No layer declares a directory of this kind. Not a gap. */
   | "no-directory"
   /** A directory exists and holds no files. A determined empty. */
   | "empty"
@@ -602,7 +602,7 @@ export function gateCoverage(root: string, repo: string, given?: readonly Gate[]
   return out;
 }
 
-/** The universe of kinds: the registry, plus anything an instance declares that it does not know. */
+/** The universe of kinds: the registry, plus anything a layer declares that it does not know. */
 export function kindUniverse(repo: string): { registered: string[]; declaredOnly: string[] } {
   const registered = defaultGraphTypologies.names().sort();
   const extra = new Set<string>();
@@ -697,13 +697,13 @@ export function adversarialCoverageByGraph(repo: string, root: string = ROOT): M
   }
 
   // The committed half. The harness root's own store first, then every
-  // instance's that `kg-audit` would resolve from it; a layout whose
-  // instances cannot be listed still reads the harness root's.
+  // layer's that `kg-audit` would resolve from it; a layout whose
+  // layers cannot be listed still reads the harness root's.
   const homes = new Set<string>([resolve(attestationsHomeFor(root).root)]);
   try {
     for (const t of kgAttestationTrees(repo, root)) homes.add(resolve(t.attHome));
   } catch {
-    // instance discovery failed: the harness root's store is still read
+    // layer discovery failed: the harness root's store is still read
   }
   for (const home of homes) {
     for (const s of storedAdversarialReviews(home)) record(s.file.subject, s.file.source_hash ?? undefined);
@@ -776,11 +776,11 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
     }
   }
 
-  // Each instance's directories, resolved ONCE rather than once per kind. The
+  // Each layer's directories, resolved ONCE rather than once per kind. The
   // resolution does not depend on the kind, and it was the run's cost: about
-  // 50 ms per pass over the checkout's instances, repeated for each of ~90
+  // 50 ms per pass over the checkout's layers, repeated for each of ~90
   // kinds, so most of a `coverage()` call (measured 2026-10-26: 6.5 s, of
-  // which under 1 s was the gates, the universe and the census). An instance
+  // which under 1 s was the gates, the universe and the census). A layer
   // whose declaration will not resolve is skipped here as it was in the loop.
   const dirsByInstance: ResolvedDirectory[][] = [];
   for (const inst of instanceRootsIn(repo)) {
@@ -1050,7 +1050,7 @@ function main(): number {
   // - a missing baseline, and a kind with no census, are UNKNOWN: printed,
   //   never a pass, never a failure (proposal §2.3).
   //
-  // The INSTANCE root, not the repository root: `check:undeclared-files`
+  // The LAYER root, not the repository root: `check:undeclared-files`
   // caught the first version writing to `<repo>/test/results/`, a directory no
   // declaration names — the `dh4f` defect, committed by the script whose whole
   // subject is coverage.

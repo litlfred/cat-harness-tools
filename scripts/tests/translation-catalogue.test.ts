@@ -85,12 +85,12 @@ describe("addedFiles distinguishes `no additions` from `could not tell`", () => 
 
 describe("uncatalogued reports exactly the added translations with no catalogue", () => {
   /**
-   * A whole instance in a temp dir, so the three cases are decided by the
+   * A whole layer in a temp dir, so the three cases are decided by the
    * fixture rather than by whatever this repository happens to hold today.
    *
    * `catalogueFor` resolves `<instance>/translations/<locale>/<page>.po` through
    * the `translation-sources` declaration, falling back to the convention when
-   * the instance declares none — which a bare temp dir does not, so the
+   * the layer declares none — which a bare temp dir does not, so the
    * convention path is what these assertions exercise.
    */
   function fixture(): { root: string; cleanup: () => void } {

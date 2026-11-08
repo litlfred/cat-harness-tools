@@ -15,7 +15,7 @@
  * **The folio root decides, and nothing is inherited.** A layer's list
  * enables the sub-graphs for ITSELF. So every reader asks
  * {@link enabledSubgraphs} of the root it is resolving FOR — the folio, the
- * downstream of a mount, the instance whose own resolution it is — never of
+ * downstream of a mount, the layer whose own resolution it is — never of
  * the layer that declared the sub-graph.
  *
  * **A development override.** `CAT_SUBGRAPHS` (`+cat-harness.sdlc,-x.y`)
@@ -23,7 +23,7 @@
  * without editing a declaration. Unset in CI, and in every agent test context.
  *
  * **Switched off is invisible, not deleted.** A switched-off sub-graph — and
- * everything declared from within it, in any member instance — is left out
+ * everything declared from within it, in any member layer — is left out
  * of what the agent is given: the resolved directories, the skill overlay,
  * the served Tool groups and a mount's default directory list. An explicit
  * mount override naming it still mounts it, and the harness's own machinery
@@ -53,7 +53,7 @@ export function qualifiedSubgraphId(instance: string, id: string): string {
   return `${instance}.${id}`;
 }
 
-/** The instance and directory id of a qualified id; `undefined` when it is not `<instance>.<id>`. */
+/** The layer and directory id of a qualified id; `undefined` when it is not `<instance>.<id>`. */
 export function splitQualifiedSubgraphId(q: string): { instance: string; id: string } | undefined {
   const dot = q.indexOf(".");
   if (dot <= 0 || dot === q.length - 1) return undefined;
@@ -132,7 +132,7 @@ export function enabledSubgraphs(
 export interface OptInCarrier {
   id: string;
   optIn?: boolean;
-  /** The instance whose declaration (or declaration file from within) wrote the entry. */
+  /** The layer whose declaration (or declaration file from within) wrote the entry. */
   declaredBy?: string;
   /** The id of the entry this one was declared from within. */
   within?: string;
@@ -169,14 +169,14 @@ export function switchedOff(
 /** One instance of a chain, as {@link enableSubgraphsProblems} needs it. */
 export interface DeclaredOptIns {
   name: string;
-  /** Every directory the instance declares — top level and from within — with its `optIn`. */
+  /** Every directory the layer declares — top level and from within — with its `optIn`. */
   directories: ReadonlyArray<{ id: string; optIn?: boolean }>;
 }
 
 /**
  * Why each `enableSubgraphs` id of `self` cannot be honoured: not
- * `<instance>.<id>`, names an instance outside `self` and its `needs`
- * closure (`closure`), names a directory that instance does not declare, or
+ * `<instance>.<id>`, names a layer outside `self` and its `needs`
+ * closure (`closure`), names a directory that layer does not declare, or
  * one that is not `optIn`. Empty means every id names an opt-in sub-graph.
  */
 export function enableSubgraphsProblems(

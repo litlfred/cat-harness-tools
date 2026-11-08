@@ -412,7 +412,7 @@ export const TranslationConfigSchema = z.object({
  * English is the `heading` on the kind's own `folio-block-kind/v1` node. Every
  * other locale is an entry in the TRANSLATION GRAPH — owner, 2026-10-04: locale
  * headings live there, not on the node (option 1 of 2) — read from
- * `<translations>/<lang>/block-kinds.po` in each instance that declares a
+ * `<translations>/<lang>/block-kinds.po` in each layer that declares a
  * `translation-sources` directory, with `msgctxt "block-kind:<kind>"`. So a
  * harness that owns a kind ships its headings beside it, and no module lists
  * them; the six-locale table that stood here was the last per-kind table in

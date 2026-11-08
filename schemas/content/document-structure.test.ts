@@ -1,6 +1,6 @@
 /**
  * The tests of this file that read the whole checkout (reads the document
- * structures committed in the content instances' libraries) live in
+ * structures committed in the content layers' libraries) live in
  * `test/document-structure-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

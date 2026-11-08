@@ -2,7 +2,7 @@
  * The site mark's mask, and the one number that can silently disagree again.
  *
  * Bean `nwrm`. The defect being fixed was two colour vocabularies for one
- * instance: `cat-harness` declared tone **268** while its mark was sage
+ * layer: `cat-harness` declared tone **268** while its mark was sage
  * (~hue 100), because the mark's colours were baked into an SVG that no CSS
  * could reach. The mask form takes its colour from CSS — so the hue now lives
  * in `docs-ui.css` as a literal, and a literal is exactly what drifted before.
@@ -40,7 +40,7 @@ function markColours(): { hue: number; sat: number; light: number }[] {
 describe("the site mark is themed from the DECLARED tone", () => {
   test("the stylesheet's hue IS cat-harness's avatar tone — not a second number", () => {
     // THE WITNESS. If somebody retones the avatar and not this, the mark goes
-    // back to disagreeing with its own instance, which is the whole defect.
+    // back to disagreeing with its own layer, which is the whole defect.
     const tone = avatarFor("cat-harness").tone;
     const hues = [...new Set(markColours().map((c) => c.hue))];
     expect(hues.length).toBeGreaterThan(0);

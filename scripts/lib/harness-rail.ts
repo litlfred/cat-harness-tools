@@ -27,7 +27,7 @@
  *
  * ## No JavaScript, and here it is not a preference
  *
- * These documents are copied verbatim from instances the harness does not
+ * These documents are copied verbatim from layers the harness does not
  * control. Injecting a nav into somebody else's page is one claim; injecting
  * script into it is a larger one.
  *
@@ -50,13 +50,13 @@ import { GROUP_GLYPHS, NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEn
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
-  /** The instance whose page this is. */
+  /** The layer whose page this is. */
   instance: string;
   /** Path back to the site root from this page — `..`, `../..`, … */
   toRoot: string;
-  /** The instance's own themed root, for the fixed top — never inside the graphs group. */
+  /** The layer's own themed root, for the fixed top — never inside the graphs group. */
   root?: NavItem;
-  /** This instance's own graphs — the scrollable middle. */
+  /** This layer's own graphs — the scrollable middle. */
   links: readonly NavItem[];
   /**
    * The instantiated harnesses, for the fixed bottom.
@@ -127,7 +127,7 @@ export interface RailOptions {
    */
   documentIndex?: NavGroup;
   /**
-   * The instance's mark for the header — avatar, or tone for its initial.
+   * The layer's mark for the header — avatar, or tone for its initial.
    * `instanceMark` in `mount-instance-docs.ts` reads it off the same
    * `_data/harness.json` the harnesses region comes from.
    */
@@ -353,7 +353,7 @@ export function navbarRowJsonOf(html: string, readFile: (file: string) => string
  * WITH `toRoot`, ALSO WHAT DRAWS IT — beans `lhvt`, `9rq1`. The data alone
  * was written onto 2,747 railed pages by #2149, and on the 2,709 of them that
  * never load `docs-ui.js` nothing drew it. `navbar-row.js` and its stylesheet
- * are linked before `</head>`, each once; a row the instance declined (`null`)
+ * are linked before `</head>`, each once; a row the layer declined (`null`)
  * still gets them, so the decline is reported the same way on every page.
  */
 export function withNavbarRow(
@@ -421,7 +421,7 @@ export function withNavbarRow(
  * a 26 KB page — 25 links, each with its glyph, tone and description twice.
  *
  * Split by what varies. SHARED (one file per distinct content, named by its
- * hash, so callers whose rails agree share it): the instance, its mark, root,
+ * hash, so callers whose rails agree share it): the layer, its mark, root,
  * graphs, harnesses and home label. THE PAGE'S OWN: its depth, its published
  * path (for "you are here") and its own section. `navbar.js` — a bundle of
  * THIS module and `navbar.ts`, so the browser runs the same drawing the build

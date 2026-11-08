@@ -5,12 +5,12 @@
  * @module scripts/lib/actor-capabilities
  *
  * `kg-audit` reads its actors three ways: on the platform's own run the
- * checkout overlay (`checkoutActors` — every instance above adds actors), on an
- * `--instance` run the platform's registry plus every instance it needs and its
+ * checkout overlay (`checkoutActors` — every layer above adds actors), on an
+ * `--instance` run the platform's registry plus every layer it needs and its
  * own (`neededActors`), and otherwise the platform's registry alone. The
  * capabilities were read from the platform's `scenarios/capabilities/` alone in
- * every case. So an actor a higher instance declares, claiming a capability
- * that same instance declares beside it, was judged against a registry that
+ * every case. So an actor a higher layer declares, claiming a capability
+ * that same layer declares beside it, was judged against a registry that
  * could not hold the capability: the science layer's `lean-mcp` claims
  * `lean-toolchain`, which that layer's own `scenarios/capabilities/`
  * declares, and the platform's run reported it CRITICAL. The rule is the one
@@ -32,9 +32,9 @@ export type ActorScope = "checkout" | "needed" | "own";
 /**
  * The capability ids an actor read over `scope` may claim.
  *
- * - `checkout` — the platform's registry overlaid by every instance above
+ * - `checkout` — the platform's registry overlaid by every layer above
  *   `root` (`checkoutCapabilities`), as `checkoutActors`.
- * - `needed` — the platform's registry overlaid by every instance `root` needs
+ * - `needed` — the platform's registry overlaid by every layer `root` needs
  *   and its own, the platform's own layer not read twice, as `neededActors`.
  * - `own` — `capabilityDir` alone.
  *

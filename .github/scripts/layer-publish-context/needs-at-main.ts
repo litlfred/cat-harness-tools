@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Replace the locked mounts of an instance's dependency harness with those
+ * Replace the locked mounts of a layer's dependency harness with those
  * layers at `main`, for `layer-publish-context.yml`.
  *
  * A context published from the caller's `main` is built from the prefix tables
- * of every instance it transitively `needs` (`gen-instance-contexts`
+ * of every layer it transitively `needs` (`gen-instance-contexts`
  * flattens them), and by the generator itself, which lives in
  * cat-harness-tools. The folio-assistant index's lock may pin any of those
  * before the tables or the generator existed (it did on 2026-10-15: the locked
@@ -28,7 +28,7 @@ import { join } from "node:path";
 
 export interface LockedInstance {
   repository: string;
-  /** Where the instance sits in its repository; '' or '.' for the root. */
+  /** Where the layer sits in its repository; '' or '.' for the root. */
   upstreamRoot: string;
 }
 
@@ -80,7 +80,7 @@ export function cloneAtMain(root: string, name: string, locked: Map<string, Lock
   const where = locked.get(name) ?? { repository: `${owner}/${name}`, upstreamRoot: "" };
   // Inside the root, dot-prefixed: a rename across filesystems (the runner's
   // /tmp and its workspace) fails with EXDEV, and a dot directory is never
-  // read as an instance.
+  // read as a layer.
   const tmp = mkdtempSync(join(root, `.needs-at-main-${name}-`));
   try {
     execFileSync("git", ["clone", "-q", "--depth", "1", `https://github.com/${where.repository}`, join(tmp, "repo")], { stdio: "inherit" });

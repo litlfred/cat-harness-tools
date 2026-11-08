@@ -61,7 +61,7 @@ const ROOT = resolve(HARNESS_ROOT);
 export const SPDX_3_0_1_CONTEXT_URL = "https://spdx.org/rdf/3.0.1/spdx-context.jsonld";
 
 /**
- * The tool-release directories an instance can see, in overlay order —
+ * The tool-release directories a layer can see, in overlay order —
  * resolved from declarations, including every dependency, the way
  * `codeListDirs` does. T1: every layer inherits cat-harness's.
  */

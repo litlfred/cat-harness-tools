@@ -37,7 +37,7 @@ import { resolveScriptCommand } from "./lib/script-command.ts";
 import { missingSiteWorkflows } from "./site-workflow.ts";
 
 /**
- * THIS INSTANCE'S OWN `schemas` directory, or the convention.
+ * THIS LAYER'S OWN `schemas` directory, or the convention.
  *
  * declared-path-literal: the fallback is at the call site so the choice is
  * visible. `schemas/` declares TWO graphs — it is a knowledge-graph node AND
@@ -58,14 +58,14 @@ import { missingSiteWorkflows } from "./site-workflow.ts";
 const ROOT = join(HARNESS_ROOT);
 
 /**
- * The Tools an answer is about: ONE instance's, or the whole repository's.
+ * The Tools an answer is about: ONE layer's, or the whole repository's.
  *
  * **Absent means the repository, and that is the pre-existing behaviour rather
- * than a default chosen here.** `tools()` reads every declared instance's
+ * than a default chosen here.** `tools()` reads every declared layer's
  * `tools` graph, which is right for a repo-wide check — `discover.ts` says so
  * on `tools` itself ("A check or an audit over the whole repository reads
- * tools"). Passing an instance switches to `toolsOf`, whose docblock names
- * exactly the failure this parameter exists to fix: filling one instance's
+ * tools"). Passing a layer switches to `toolsOf`, whose docblock names
+ * exactly the failure this parameter exists to fix: filling one layer's
  * document with another's Tools gives `satisfies` links into documents that are
  * never published.
  *
@@ -75,13 +75,13 @@ const ROOT = join(HARNESS_ROOT);
  * cat-harness's Tool nodes audited as bootstrap's, so `graph.test.ts > nothing
  * in bootstrap/ names anything above it` (bean `iwtn`) failed on the NAMES —
  * `tools/folio-init` and three more — with zero path escapes. A criterion
- * scoped to an instance is only as instance-scoped as the data it reads.
+ * scoped to a layer is only as instance-scoped as the data it reads.
  */
 export function toolsFor(instance?: string) {
   return instance === undefined ? tools() : toolsOf(instance);
 }
 
-/** The repository, one level above the instance. `invoke.shell` runs from here. */
+/** The repository, one level above the layer. `invoke.shell` runs from here. */
 const REPO = join(ROOT, "..");
 
 /**
@@ -91,7 +91,7 @@ const REPO = join(ROOT, "..");
  *
  * **Nine of the forty-four checkable `invoke.shell` values named a command that
  * does not run.** Every one was missing the `cat-harness/` prefix — stale since
- * the instance moved under that directory — and `bun run cat-harness-tools/scripts/ingest-document.ts`
+ * the layer moved under that directory — and `bun run cat-harness-tools/scripts/ingest-document.ts`
  * failed with `Module not found`. Two Tool nodes, `ingest-stdlib` and
  * `ingest-extended`, had been unreachable through their own declared invocation
  * for as long as the inversion has been in.
@@ -107,11 +107,11 @@ const REPO = join(ROOT, "..");
  * | field | resolved against | why |
  * |---|---|---|
  * | `invoke.shell` | the **repository** | it is a command a caller types, and `package.json` and `.github/` are at the repo root |
- * | `invoke.*.module` | the **declaring instance**, then the one instance that **implements** it | it is loaded by the implementing instance's server, and matches `maintains.source` |
+ * | `invoke.*.module` | the **declaring layer**, then the one layer that **implements** it | it is loaded by the implementing layer's server, and matches `maintains.source` |
  *
  * "Implements" is owner ruling T1 (2026-10-01, bean `70lx`): the definitions
  * stay in the harness and the code moves to the layer above, so a module path
- * stays as written (`src/tools/x.ts`) and is found in the instance whose own
+ * stays as written (`src/tools/x.ts`) and is found in the layer whose own
  * `needs` names the declarer — `resolveImplementingPath` in
  * `schemas/kg/harness-config.ts`. Writing the implementer's name into the path
  * instead would be the harness naming a layer above it. Two implementers
@@ -131,12 +131,12 @@ export function unresolvedPaths(
 ): { field: string; tool: string; value: string; expected: string }[] {
   const out: { field: string; tool: string; value: string; expected: string }[] = [];
   // `REPO` stays the checkout either way: an `invoke` path is repo-relative
-  // whichever instance declared the Tool, so narrowing the tool SET must not
+  // whichever layer declared the Tool, so narrowing the tool SET must not
   // narrow where its paths are resolved.
   //
-  // A `module`, by contrast, is resolved against the instance that DECLARED
-  // the Tool, and then against the instance that implements it — so the Tools
-  // are read per declaring instance rather than as one flat list.
+  // A `module`, by contrast, is resolved against the layer that DECLARED
+  // the Tool, and then against the layer that implements it — so the Tools
+  // are read per declaring layer rather than as one flat list.
   const roots = instance === undefined ? instanceRootsIn(REPO) : [instance];
   const declared: Array<{ declaringRoot: string; t: ToolDefinition }> = roots.flatMap((r) =>
     toolsOf(r).map((t) => ({ declaringRoot: resolve(r), t })),
@@ -219,7 +219,7 @@ export function unresolvedPaths(
  *
  * Zero-argument, because every caller here means THIS repository and the root
  * is this module's own. The canonical function takes one, since a checker for
- * another instance is a thing that exists.
+ * another layer is a thing that exists.
  */
 export function knownSkills(): Set<string> {
   return knownSkillsIn(ROOT, corpusScopeFor(ROOT));
@@ -326,11 +326,11 @@ export interface ToolCheck {
 
 /**
  * Skill ids a `satisfies` may legitimately name, which is WIDER than the ones
- * this instance overlays.
+ * this layer overlays.
  *
  * `knownSkills()` answers *"which skills are in MY overlay"*. For "every skill
- * has a Tool" that is the right question — an instance is not accountable for
- * covering another instance's skills. For *"does this `satisfies` name a real
+ * has a Tool" that is the right question — a layer is not accountable for
+ * covering another layer's skills. For *"does this `satisfies` name a real
  * skill"* it is the WRONG one, and the difference is the same conflation this
  * repository keeps paying for: **not in my overlay is not does not exist.**
  *
@@ -345,12 +345,12 @@ export interface ToolCheck {
  * architecture rather than a defect.
  *
  * This widens ONE direction on purpose. Coverage still counts only this
- * instance's skills, so adding a sibling cannot silently create an obligation
+ * layer's skills, so adding a sibling cannot silently create an obligation
  * to write Tools for it.
  */
 /**
- * Every process id (`.bpmn` stem) any instance in this checkout declares —
- * the set a Tool's `subprocesses` may name. Every instance, for the reason
+ * Every process id (`.bpmn` stem) any layer in this checkout declares —
+ * the set a Tool's `subprocesses` may name. Every layer, for the reason
  * `satisfiableSkills` gives: not in my overlay is not does not exist.
  */
 function declaredProcessIds(instance: string = ROOT): Set<string> {
@@ -365,8 +365,8 @@ function declaredProcessIds(instance: string = ROOT): Set<string> {
 
 function satisfiableSkills(instance: string = ROOT): Set<string> {
   const out = new Set(knownSkillsIn(instance));
-  // `ROOT` is THIS INSTANCE (`cat-harness/`), not the checkout. Sibling
-  // instances are enumerated from the repository root, and reading the wrong
+  // `ROOT` is THIS LAYER (`cat-harness/`), not the checkout. Sibling
+  // layers are enumerated from the repository root, and reading the wrong
   // one here returns an empty list that looks exactly like "no siblings
   // declare it" — the vacuous-green shape, arrived at by using a variable
   // whose name does not say which root it is.
@@ -408,11 +408,11 @@ export function danglingStorageTools(repoRoot: string = REPO): Array<{ instance:
 }
 
 /**
- * Every declared `tools` directory in the repository, with its instance.
+ * Every declared `tools` directory in the repository, with its layer.
  *
  * Read from the declarations, as discovery reads them (`tools/discover.ts`),
- * so a directory this reports on is exactly one whose Tools are loaded. An
- * instance whose declaration cannot be resolved is skipped here: discovery
+ * so a directory this reports on is exactly one whose Tools are loaded. A
+ * layer whose declaration cannot be resolved is skipped here: discovery
  * already reports it as a failure, and `check:tools` fails on that.
  */
 export function declaredToolsDirs(repoRoot: string = REPO): Array<{ instance: string; dir: string }> {
@@ -437,8 +437,8 @@ export function declaredToolsDirs(repoRoot: string = REPO): Array<{ instance: st
  * Tool declared in a barrel has no folder of its own for its scripts, tests
  * and QA, and its `id` is not the name of anything on disk. So this is a
  * FINDING, printed by the CLI and NOT failing the gate yet. It becomes a gate
- * once every litlfred instance is migrated (the seven on
- * `claude/tool-folders-tdir` are; an instance outside that set may not be),
+ * once every litlfred layer is migrated (the seven on
+ * `claude/tool-folders-tdir` are; a layer outside that set may not be),
  * at which point the CLI's section below sets `bad`.
  *
  * `inlineToolDeclarations` (`schemas/tools/tool-folders.ts`) is the one test of
@@ -455,11 +455,11 @@ export function inlineToolFindings(
 }
 
 export function checkTools(instance?: string): ToolCheck {
-  // Coverage is asked of THE AUDITED instance's skills; resolution is asked of
+  // Coverage is asked of THE AUDITED layer's skills; resolution is asked of
   // every declared one. Two questions, two sets — see `satisfiableSkills`.
   //
   // `instance` absent keeps every existing call site and the repo-wide gate
-  // exactly as they were: this instance's skills, the repository's Tools.
+  // exactly as they were: this layer's skills, the repository's Tools.
   const skills = instance === undefined ? knownSkills() : knownSkillsIn(instance);
   const resolvable = satisfiableSkills(instance);
   const typeNames = new Set(Object.keys(TOOL_TYPES));
@@ -483,7 +483,7 @@ export function checkTools(instance?: string): ToolCheck {
     for (const s of t.satisfies) {
       if (skills.has(s)) covered.add(s);
       // Resolvable-but-not-ours is neither covered nor dangling: the edge is
-      // real and this instance is not accountable for the skill.
+      // real and this layer is not accountable for the skill.
       else if (!resolvable.has(s)) dangling.push({ tool: t.id, skill: s });
 
       // ## What is compared
@@ -560,8 +560,8 @@ export function checkTools(instance?: string): ToolCheck {
 }
 
 if (import.meta.main) {
-  // The CLI is the REPOSITORY-wide gate and passes no instance on purpose:
-  // `check:tools` is one verdict over every declared instance's Tools, which is
+  // The CLI is the REPOSITORY-wide gate and passes no layer on purpose:
+  // `check:tools` is one verdict over every declared layer's Tools, which is
   // what it has always been. Per-instance auditing is `kg:audit --instance`.
   const r = checkTools();
   const all = tools();
@@ -601,7 +601,7 @@ if (import.meta.main) {
   }
   // Bean `6mk7`, owner 2026-10-06: a Tool that reaches the network says what
   // to do when the host refuses it — a Tool, or `none` with the reason. Asked
-  // of every instance's Tools, as the rest of this CLI is.
+  // of every layer's Tools, as the rest of this CLI is.
   const unremedied = networkToolsWithoutRemedies(all);
   if (unremedied.length > 0) {
     bad = true;
@@ -672,7 +672,7 @@ if (import.meta.main) {
     for (const m of missingWorkflows) console.error(`    ${m}`);
   }
   // A FINDING, not a failure (bean `tdir`): see `inlineToolFindings`. When
-  // every litlfred instance declares its Tools in folders, this sets `bad`.
+  // every litlfred layer declares its Tools in folders, this sets `bad`.
   const inline = inlineToolFindings();
   if (inline.length > 0) {
     console.warn(`\n! Inline Tool declarations — move each to tools/<id>/<id>.ts, bean tdir (${inline.length}, not yet a gate):`);

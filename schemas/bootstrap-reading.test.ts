@@ -5,7 +5,7 @@
  * bootstrap-tools was re-created (bean `xsqm`), because a test of the harness
  * belongs with the harness: bootstrap-tools may import nothing above bootstrap.
  *
- * The tests of this file that read the whole checkout (reads every instance
+ * The tests of this file that read the whole checkout (reads every layer
  * declaration in the checkout) live in
  * `test/bootstrap-reading-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.

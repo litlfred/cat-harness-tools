@@ -85,7 +85,7 @@ const mineToCheck = (abs: string): boolean => gateOwnsFile(relative(REPO_ROOT, a
 const check = process.argv.includes("--check");
 /**
  * This harness's own repository. NOT where an entry's links point: an entry
- * is held by its own instance, in that instance's repository, which
+ * is held by its own layer, in that layer's repository, which
  * `forgeAt` reads from the mount lock (`lib/library-source.ts`). This is the
  * fallback for a path no mount covers when the checkout's origin is unknown.
  */
@@ -954,13 +954,13 @@ export interface SourceLink {
   view?: ViewSource;
 }
 
-/** One instance's library, as the whole-library page lists it. */
+/** One layer's library, as the whole-library page lists it. */
 export interface LibrarySubgraphLink {
   instance: string;
   entries: number;
-  /** The instance's library page, when this handler renders one. */
+  /** The layer's library page, when this handler renders one. */
   page?: string;
-  /** The instance's published subgraph JSON-LD, which holds its `library` directory as a member. */
+  /** The layer's published subgraph JSON-LD, which holds its `library` directory as a member. */
   jsonld?: string;
 }
 
@@ -973,10 +973,10 @@ export function entryDataFiles(dataDir: string, id: string): { blocks: string; d
 }
 
 /**
- * An instance's subgraph JSON-LD on disk under this harness's site, or
+ * A layer's subgraph JSON-LD on disk under this harness's site, or
  * `undefined` when none is published. There is no document for the library
  * alone: `gen-subgraph-jsonld.ts` frames subgraphs under the KG directories
- * only, and the library is a member (`#directory/library`) of the instance's
+ * only, and the library is a member (`#directory/library`) of the layer's
  * root, so the root is the graph the library page links.
  */
 export function instanceSubgraphFile(harnessRoot: string, site: string, instance?: string): string | undefined {
@@ -993,8 +993,8 @@ export function instanceSubgraphFile(harnessRoot: string, site: string, instance
 
 /**
  * One entry's own subgraph JSON-LD (cat-harness#180): since library entries
- * are framed, `library/<doc>/` is a subgraph of its instance's tree, at the
- * entry's path relative to its instance. `undefined` when it is not on disk
+ * are framed, `library/<doc>/` is a subgraph of its layer's tree, at the
+ * entry's path relative to its layer. `undefined` when it is not on disk
  * (subgraphs are built before this writer, and not on every run).
  */
 export function entrySubgraphFile(harnessRoot: string, site: string, instance: string, entryAbs: string): string | undefined {
@@ -1007,11 +1007,11 @@ export function entrySubgraphFile(harnessRoot: string, site: string, instance: s
 }
 
 /**
- * The instance roots a site COMPOSES — owner, 2026-10-15: *"a harness should
+ * The layer roots a site COMPOSES — owner, 2026-10-15: *"a harness should
  * combine it libray/ (or whatever) sites of it and all its depndencies"*.
- * When the checkout's root declares an instance (a per-repository site such
- * as a folio), that instance and its transitive `needs` (`declarationChain`);
- * when it declares none (a hub index), `undefined`: every instance listed.
+ * When the checkout's root declares a layer (a per-repository site such
+ * as a folio), that layer and its transitive `needs` (`declarationChain`);
+ * when it declares none (a hub index), `undefined`: every layer listed.
  */
 export function composedInstanceRoots(repoRoot: string): Set<string> | undefined {
   let name: string | undefined;
@@ -1024,7 +1024,7 @@ export function composedInstanceRoots(repoRoot: string): Set<string> | undefined
   return new Set(declarationChain(repoRoot).map((c) => resolve(c.root)));
 }
 
-/** Whether `repoRel` (a path in the checkout) belongs to an instance the site composes. */
+/** Whether `repoRel` (a path in the checkout) belongs to a layer the site composes. */
 export function inComposition(scope: ReadonlySet<string> | undefined, repoRoot: string, repoRel: string): boolean {
   if (scope === undefined) return true;
   const inst = findInstanceRoot(join(repoRoot, repoRel));
@@ -1073,7 +1073,7 @@ export function entrySources(
   ];
 }
 
-/** The files an instance's page renders: the projection, its subgraph JSON-LD, and each entry's manifest. */
+/** The files a layer's page renders: the projection, its subgraph JSON-LD, and each entry's manifest. */
 export function instanceSources(
   o: { pageDir: string; dataFile: string; subgraph?: string; manifests: readonly { id: string; abs: string }[] },
 ): SourceLink[] {
@@ -1085,14 +1085,14 @@ export function instanceSources(
 }
 
 /**
- * Every instance in the CHECKOUT that declares a library, with its page and
+ * Every layer in the CHECKOUT that declares a library, with its page and
  * its subgraph JSON-LD. Owner, 2026-10-15: the whole-library page *"should
  * also link to the library sub-graphs from the other harnesses"*, and *"a
  * harness should combine it libray/ (or whatever) sites of it and all its
  * depndencies"*. So the set is read from the checkout's declarations
  * (`checkoutDirectoriesForGraph`), never listed: on folio-assistant it is every
- * instance, on one repository's site its own and its mounted `needs`. An
- * instance with no page here (no entries, no queue) is still listed.
+ * layer, on one repository's site its own and its mounted `needs`. A
+ * layer with no page here (no entries, no queue) is still listed.
  */
 export function librarySubgraphs(
   o: {
@@ -1102,7 +1102,7 @@ export function librarySubgraphs(
     pageDir: string;
     pages: ReadonlySet<string>;
     entries: readonly { instance: string }[];
-    /** {@link composedInstanceRoots}; `undefined` lists every instance. */
+    /** {@link composedInstanceRoots}; `undefined` lists every layer. */
     scope?: ReadonlySet<string>;
   },
 ): LibrarySubgraphLink[] {
@@ -1121,7 +1121,7 @@ export function librarySubgraphs(
   });
 }
 
-/** The visible list of {@link SourceLink}s, and on the whole-library page the table of every instance's library. */
+/** The visible list of {@link SourceLink}s, and on the whole-library page the table of every layer's library. */
 export function sourcesHtml(links: readonly SourceLink[], libraries: readonly LibrarySubgraphLink[] = []): string {
   if (links.length === 0 && libraries.length === 0) return "";
   const a = (href: string, text: string): string => `<a href="${escHtml(href)}">${escHtml(text)}</a>`;
@@ -1198,8 +1198,8 @@ export const LIBRARY_CONFIG_ID = "fa-library-config";
 
 /**
  * The skeleton {@link VIEWER_JS} fills — this head, then the view panel when
- * there is one, then {@link VIEWER_BODY}: the same on the handler's page, an
- * instance's page and every entry page, since the script decides from the
+ * there is one, then {@link VIEWER_BODY}: the same on the handler's page, a
+ * layer's page and every entry page, since the script decides from the
  * config and the page's own path what to draw into it.
  */
 const VIEWER_HEAD = `<div class="lib-head">
@@ -1297,8 +1297,8 @@ ${p.sources ?? ""}
 }
 
 /**
- * A library page that is NOT about one entry — the handler's whole view or an
- * instance's library: a THIN SHELL — owner, 2026-10-02, #1881: *"each
+ * A library page that is NOT about one entry — the handler's whole view or a
+ * layer's library: a THIN SHELL — owner, 2026-10-02, #1881: *"each
  * link/page needs to be materialized on the CDN (gh-pagees), just load the
  * content from the KG json(ld) assets already published"*.
  *
@@ -1328,7 +1328,7 @@ export function viewerHtml(
 /**
  * One ENTRY's page, at `<library>/<instance>/<id>/` (#1881, #1899).
  *
- * The same skeleton ({@link VIEWER_BODY}) the instance page draws into, with
+ * The same skeleton ({@link VIEWER_BODY}) the layer page draws into, with
  * the entry's identity in the config; the `<noscript>` names both sources the
  * page loads — the library projection and the entry's JSON-LD — and the
  * JSON-LD is the page's `alternate`. Kept out of the site search: seventy
@@ -1400,7 +1400,7 @@ export function orphanFiles(root: string, wanted: ReadonlySet<string>): string[]
 }
 
 /**
- * Every instance whose declaration publishes a renderable directory at its
+ * Every layer whose declaration publishes a renderable directory at its
  * ROOT route (`instanceRoot: true`), by name → its site-root path `/<name>/`.
  * The route rule is `mount-instance-docs.ts` `withRoutes`: a declared root
  * answers at `/<instance>/`.
@@ -1425,11 +1425,11 @@ export function instanceRootRoutes(repoRoot: string): Map<string, string> {
 /**
  * An entry's `view` — the site-root path of the page that RENDERS it.
  *
- * Owner, 2026-10-02 (paraphrased): clicking a referenced instance's slug
- * should open that instance's visualiser. Two cases:
+ * Owner, 2026-10-02 (paraphrased): clicking a referenced layer's slug
+ * should open that layer's visualiser. Two cases:
  *
  * - a REFERENCED entry whose record links a `site_path` that is another
- *   instance's DECLARED root route (`instanceRootRoutes`) is rendered there —
+ *   layer's DECLARED root route (`instanceRootRoutes`) is rendered there —
  *   a DAK IG's viewer at its `/<instance>/` root. The link chooses the
  *   candidate; the declaration is what makes it a visualiser rather than a
  *   page that merely exists, so a link to anything else is not taken;
@@ -1536,8 +1536,8 @@ if (import.meta.main) {
     console.log("  · no library or uploads directory is declared — nothing to publish");
     process.exit(0);
   }
-  // A per-repository site composes its own instance and its `needs`, not
-  // every instance its checkout happens to mount (`composedInstanceRoots`).
+  // A per-repository site composes its own layer and its `needs`, not
+  // every layer its checkout happens to mount (`composedInstanceRoots`).
   const scope = composedInstanceRoots(repoRoot);
   g.entries = g.entries.filter((e) => inComposition(scope, repoRoot, e.dir));
   g.queues = g.queues.filter((q) => inComposition(scope, repoRoot, q.dir));
@@ -1545,13 +1545,13 @@ if (import.meta.main) {
   const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   // ── Who references a slug — bean `jbx2`'s third ask ───────────────────
   //
-  // The sources are DERIVED: every instance's own declaration, every
+  // The sources are DERIVED: every layer's own declaration, every
   // directory it names, labelled by that directory's declared graph typology. So
   // `catalogue` and `voices` appear because they are declared and carry the
   // field, not because this file lists them — and a new kind that starts
   // referencing slugs shows up the day it is declared.
   //
-  // Each instance's SITE directory is skipped: it holds published copies of
+  // Each layer's SITE directory is skipped: it holds published copies of
   // the catalogue and of this projection, so scanning it would count the page
   // that displays a reference as a reference.
   {
@@ -1601,7 +1601,7 @@ if (import.meta.main) {
   };
   const seg = libDirs.length > 0 ? topOf(libDirs[0]!) : null;
   if (seg === null) {
-    // No library directory declared by this instance — the uploads half alone
+    // No library directory declared by this layer — the uploads half alone
     // has nowhere to hang, and composing a name would be exactly the literal
     // the rule forbids.
     console.log("  · no library directory declared by this instance — nothing to publish");
@@ -1612,18 +1612,18 @@ if (import.meta.main) {
   // Owner, 2026-09-20, reducing three cases to two:
   //
   //   (paraphrased) two rules, not three: one is cat-harness handling the
-  //   library/ dir, which holds a content instance's assets; the other is that
-  //   instance's own handler, which replicates the source website.
+  //   library/ dir, which holds a content layer's assets; the other is that
+  //   layer's own handler, which replicates the source website.
   //
   // So the form is `<base>/<handler>/<kind>/<optional subject>` — which is the
   // owner's own first example, `<base>/cat-harness/docs/<instance>/`. The
-  // handler is THIS instance (the machinery), the kind names what it renders,
-  // and the subject scopes it to one instance's assets.
+  // handler is THIS layer (the machinery), the kind names what it renders,
+  // and the subject scopes it to one layer's assets.
   //
   // **A subject page must NOT be published at `<base>/<subject>/<kind>/`.**
   // That is rule 2's namespace — `<base>/<instance>/` is the IRIS replica presenting
   // ITSELF, mocking the IRIS website — and a viewer parked there would squat
-  // on the instance's own site. An earlier draft of this file was about to do
+  // on the layer's own site. An earlier draft of this file was about to do
   // exactly that.
   const handler = readDeclaration(ROOT)?.name;
   if (!handler) {
@@ -1644,7 +1644,7 @@ if (import.meta.main) {
   // NO FOLIO MOUNT since 2026-10-07: the pages are on the theme's layout,
   // which loads docs-ui.js and docs-ui.css itself (`libraryPageHtml`).
 
-  // One page per SUBJECT — the instances whose assets this handler renders.
+  // One page per SUBJECT — the layers whose assets this handler renders.
   // Read from the entries and the queues rather than from the directory list,
   // so a declared-but-empty directory gets no page claiming to show it.
   const subjects = [...new Set([
@@ -1664,17 +1664,17 @@ if (import.meta.main) {
    * Counted FOR THE PAGE, which is the whole correction: the `library`
    * directory's page is the cat-harness-scoped one, so its count is
    * cat-harness's entries — zero — and not the eight entries the graph holds
-   * across every instance.
+   * across every layer.
    */
   // THE LANDING HARNESS'S directories only, because those are the ones that
   // produce tiles (`tileDirectories`, the list `sync-docs-harness.ts` hands
   // `graphTiles`; #931: reading `ROOT`'s own declaration keyed every count by
-  // a cat-harness id once the landing moved to the core content layer). Scanning every instance was the first draft and it was
+  // a cat-harness id once the landing moved to the core content layer). Scanning every layer was the first draft and it was
   // wrong in a way worth recording, because it looked more thorough:
   //
   // a page is NOT uniquely owned by one directory id. The page at
-  // `.../library/agent-skills/` is `agent-skills-library` to this instance and
-  // plain `library` to the agent-skills instance, which declares its own view
+  // `.../library/agent-skills/` is `agent-skills-library` to this layer and
+  // plain `library` to the agent-skills layer, which declares its own view
   // of it. Scanning both meant the first-wins rule picked an id that is not a
   // tile here, so `agent-skills-library` silently lost its badge while
   // `uploads` gained a count over the wrong page entirely.
@@ -1752,12 +1752,12 @@ if (import.meta.main) {
   // The browsable document — TOC, pages with their printed labels, figures
   // and tables, sections with a summary or an extract, the document checks —
   // read from the INGESTION SCHEMA (`pdf-structure/v1`), so every library
-  // entry of every instance gets it. Written for every entry: one with no
+  // entry of every layer gets it. Written for every entry: one with no
   // structure.json gets `{absent: true}`, a determined answer rather than a
   // 404 the viewer would have to tell apart from a failure.
   for (const e of g.entries) {
     // [source] and [feedback] on the document and each section (bean zcak).
-    // No [edit]: an entry is frozen, and this instance materialises none.
+    // No [edit]: an entry is frozen, and this layer materialises none.
     // In the repository that HOLDS the entry, at its path there — never this
     // harness's repository plus the checkout path (owner, 2026-10-15: a 404).
     const at = forgeAt(repoRoot, e.dir, checkoutRepo);
@@ -1788,7 +1788,7 @@ if (import.meta.main) {
   // ── AVATARS (bean `zrvt`) ─────────────────────────────────────────────
   //
   // Each entry's picture, COPIED under the site so it resolves wherever the
-  // committed tree is served — the instance mount exists only on the built
+  // committed tree is served — the layer mount exists only on the built
   // site. `--check` compares BYTES, so a cover regenerated upstream and not
   // re-copied here is stale, never silently old.
   const copies = avatarCopies(g, site, repoRoot);
@@ -1821,7 +1821,7 @@ if (import.meta.main) {
   emit(join(dataDir, "viewer.js"), VIEWER_JS);
 
   // The whole-library page links the projection, the repository's subgraph
-  // index, and every instance's library in the checkout (`librarySubgraphs`).
+  // index, and every layer's library in the checkout (`librarySubgraphs`).
   const dataFile = join(dataDir, "index.json");
   const repoIndex = instanceSubgraphFile(ROOT, site);
   emit(
@@ -1867,7 +1867,7 @@ if (import.meta.main) {
     //   > … no query strings... each asset gets its own IRI
     //
     // So `<library>/<instance>/<id>/` is a REAL file — no 404 routing, which
-    // the owner ruled "a hack" — and it is the SAME template as the instance
+    // the owner ruled "a hack" — and it is the SAME template as the layer
     // page with the entry's identity in its config: nothing of the entry's
     // content is written into it. The script reads the projection and the
     // entry's block file, both already published, and selects the entry from
@@ -1901,7 +1901,7 @@ if (import.meta.main) {
       // are linked from the page (here, and through the projection's `links`).
       //
       // The copies are NOT committed (owner, 2026-10-15, "H1"): their bytes
-      // come from the entry's instance at whatever pin the checkout mounts, so
+      // come from the entry's layer at whatever pin the checkout mounts, so
       // this harness declares them `builtAtPublish` and `derive:publish` runs
       // this writer to lay them down. A declared copy has no committed bytes
       // for `--check` to compare, so it is skipped there (the `folio:viz`

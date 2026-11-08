@@ -1,38 +1,38 @@
 /**
- * Every DOCS SOURCE the checkout declares: the base instance's, then each
- * instance above it that declares one of its own.
+ * Every DOCS SOURCE the checkout declares: the base layer's, then each
+ * layer above it that declares one of its own.
  *
  * Owner, 2026-10-23 ("A1"): ONE docs-page build run that reads the
- * docs-source directory EVERY mounted instance declares — not one run per
- * instance. Until then `gen-docs-pages.ts` took its one root from
+ * docs-source directory EVERY mounted layer declares — not one run per
+ * layer. Until then `gen-docs-pages.ts` took its one root from
  * `HARNESS_ROOT`, so a page about a higher layer's process could only be
  * authored here, in the layer below it, which is the wrong direction.
  *
  * ## Where a docs source is declared, and where its pages land
  *
- * The same place the base instance declares its own: a `docs-source` entry
- * in the `docs.json` of a directory the instance declares with graph typology
+ * The same place the base layer declares its own: a `docs-source` entry
+ * in the `docs.json` of a directory the layer declares with graph typology
  * `docs`. Its pages render into THAT directory (`<docs dir>/<slug>.md`),
- * exactly as the base instance's render into its site directory. So an
- * instance publishes its pages wherever that directory is published — for a
- * `composed` one, inside the one Jekyll site, under the instance's own name.
+ * exactly as the base layer's render into its site directory. So a
+ * layer publishes its pages wherever that directory is published — for a
+ * `composed` one, inside the one Jekyll site, under the layer's own name.
  *
- * ## Which instances, and in what order
+ * ## Which layers, and in what order
  *
- * The base first, then the checkout's instances that DEPEND on it, deepest
+ * The base first, then the checkout's layers that DEPEND on it, deepest
  * first ({@link checkoutDependentsOf}) — the order `scenario-overlay` reads
- * higher layers' scenarios in. This file names no instance: which ones exist
+ * higher layers' scenarios in. This file names no layer: which ones exist
  * is the checkout's answer, never a list written down here.
  *
- * ## Every key a source above the base publishes is qualified by its instance
+ * ## Every key a source above the base publishes is qualified by its layer
  *
  * A page's slug is unique only WITHIN its source. Its route already carries
- * the instance (a source above the base is composed into the site under the
- * instance's name), and so does every key derived from it
+ * the layer (a source above the base is composed into the site under the
+ * layer's name), and so does every key derived from it
  * ({@link qualifiedKey}): the page key todos attach to and the listing they
  * are grouped under, the address of its QA witnesses
  * (`/assets/qa/<instance>/<slug>/`, which the site build copies each
- * instance's witness tree into) and its block labels. The base instance's keys
+ * layer's witness tree into) and its block labels. The base layer's keys
  * are its own, unqualified, so what it publishes is unchanged.
  *
  * So the same page in two layers is two distinct pages with two distinct
@@ -50,15 +50,15 @@ import { checkoutDependentsOf } from "../../schemas/kg/harness-config.ts";
 
 /** One declared docs source: where its pages are authored and where they render. */
 export interface DocsSource {
-  /** The declaring instance's name. */
+  /** The declaring layer's name. */
   instance: string;
-  /** The declaring instance's root, absolute. */
+  /** The declaring layer's root, absolute. */
   root: string;
   /** The docs source directory, absolute. */
   srcDir: string;
   /** The docs directory its pages render into, absolute. */
   outDir: string;
-  /** True for the base instance — the one the site is built from. */
+  /** True for the base layer — the one the site is built from. */
   base: boolean;
 }
 
@@ -84,9 +84,9 @@ function declaredSourceIn(docsDir: string): string | undefined {
 }
 
 /**
- * The docs sources ONE instance declares, read RAW from its declaration (a
+ * The docs sources ONE layer declares, read RAW from its declaration (a
  * validating read throws on a typology this layer does not register, and a
- * higher instance is free to register its own). Only instance-scoped `docs`
+ * higher layer is free to register its own). Only instance-scoped `docs`
  * directories, and only a source that exists on disk: a declared-but-absent
  * one is `check:declared-dirs`' to report.
  */
@@ -111,7 +111,7 @@ export function declaredDocsSources(root: string, fallbackName = root): DocsSour
 }
 
 /**
- * The base instance's docs source — {@link docsSourceDirFor} and
+ * The base layer's docs source — {@link docsSourceDirFor} and
  * {@link siteDirFor}, unchanged, so its pages keep the routes they have.
  */
 export function baseDocsSource(root: string): DocsSource {
@@ -132,7 +132,7 @@ export function baseDocsSource(root: string): DocsSource {
 }
 
 /**
- * Every docs source in the checkout: the base instance's first, then each
+ * Every docs source in the checkout: the base layer's first, then each
  * dependent's, deepest first. `dependents` is injectable for tests; by
  * default it is the checkout's own answer.
  */
@@ -156,7 +156,7 @@ export function docsSources(
 
 /**
  * `key` — a page slug, a flattened slug, a label — as the whole checkout
- * names it: unchanged for the base instance, prefixed with the instance's
+ * names it: unchanged for the base layer, prefixed with the layer's
  * name (`<instance>/<key>`) for a source above it, the prefix its pages are
  * composed under. Two sources holding one key therefore never share one.
  */
@@ -169,7 +169,7 @@ export function qualifiedKey(src: DocsSource, key: string): string {
  * SITE-relative, which is also its `@id` against the site base:
  * `site/<slug>[/nodes/<id>].jsonld`, under `<instance>/` for a source above
  * the base, because that source is composed into the site under its
- * instance's name. `gen-site-jsonld.ts` writes it at this address, so
+ * layer's name. `gen-site-jsonld.ts` writes it at this address, so
  * anything that links a node (a todo's `target`) asks here rather than
  * prefixing `site/` to a qualified key — which named
  * `site/<instance>/<slug>/…`, a file nothing publishes.
@@ -182,7 +182,7 @@ export function sourceSiteNodePath(src: DocsSource, slug: string, nodeId?: strin
  * A page named by its QUALIFIED key ({@link qualifiedKey}), resolved to the
  * source that holds it: its site-relative node path
  * ({@link sourceSiteNodePath}) and the file `gen-site-jsonld.ts` writes it
- * to. A key is a source's above the base when it starts with that instance's
+ * to. A key is a source's above the base when it starts with that layer's
  * name and the source holds the page; otherwise it is the base's.
  */
 export function siteNodeOf(sources: readonly DocsSource[], key: string, nodeId?: string): { sitePath: string; file: string } {

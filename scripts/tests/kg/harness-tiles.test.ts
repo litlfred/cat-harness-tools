@@ -54,9 +54,9 @@ function fixture(
 }
 
 /**
- * Give an instance its own site directory — what `folioRoot` looks for.
+ * Give a layer its own site directory — what `folioRoot` looks for.
  *
- * The path is READ from that instance's declaration rather than written here.
+ * The path is READ from that layer's declaration rather than written here.
  * `site-dir-single-answer.test.ts` guards that rule across the whole tree, and
  * it caught this helper's first version hardcoding the default.
  */
@@ -66,7 +66,7 @@ function giveOwnSite(repo: string, name: string): void {
 
 /**
  * The site owner's VISUALISERS (owner, 2026-10-09: the harness declares each
- * one, at `<base>/<harness>/<visualiser>/`). By kind, so an instance stacked
+ * one, at `<base>/<harness>/<visualiser>/`). By kind, so a layer stacked
  * on `host` (`needs: ["host"]`) is covered and one that is not, is not.
  */
 const HOST_VISUALISERS = [
@@ -110,10 +110,10 @@ describe("the ORDER is the declared dependency stack, bottom to top", () => {
   test("an instance that declares NO needs sits BELOW the spine's head, and says so", () => {
     // Owner, 2026-09-21: "in reverse dep order (so bootsrap on bottom,
     // folio-asst, on top)". The first version put the whole unplaced group
-    // above the spine, which left the most derived instance eighth from the
+    // above the spine, which left the most derived layer eighth from the
     // top — both endpoints of that sentence were wrong.
     // Absent is not `[]`. A node that needs nothing is free to sort first in
-    // `flattenDependencies`, which would put an unlabelled instance on the
+    // `flattenDependencies`, which would put an unlabelled layer on the
     // floor beside the bootstrap — asserting something nobody declared.
     const f = fixture({
       host: host({ needs: [] }),
@@ -126,7 +126,7 @@ describe("the ORDER is the declared dependency stack, bottom to top", () => {
   });
 
   test("the declared FLOOR is last even when its layer was never declared", () => {
-    // The second rule, and the reason it is kept separate: an exempt instance
+    // The second rule, and the reason it is kept separate: an exempt layer
     // with no `needs` is undetermined, and undetermined floats to the top of
     // the unplaced group — which would put the bootstrap above everything it
     // underpins.
@@ -159,7 +159,7 @@ describe("the ORDER is the declared dependency stack, bottom to top", () => {
   test("a CYCLE is reported and falls back to alphabetical — it does not blank the navbar", () => {
     // `flattenDependencies` returns an empty order on a broken graph, which is
     // right for a pipeline and wrong for a sidebar: showing nothing hides
-    // every instance over one typo.
+    // every layer over one typo.
     const f = fixture({
       host: host({ needs: ["b"] }),
       b: { name: "b", directories: [], needs: ["host"] },
@@ -293,7 +293,7 @@ describe("the published paths are the OTHER generators' rules, read rather than 
   test("a subject page is handler/kind/subject — never subject first", () => {
     // `gen-library-viz.ts` is emphatic: `<base>/who-iris/` is who-iris
     // presenting itself, and a viewer parked there would squat on the
-    // instance's own site.
+    // layer's own site.
     // Under the page locale (folio-assistant#2527): the old address is a
     // forwarding page, and nothing we publish links one.
     expect(subjectPage("cat-harness", "library", "who-iris")).toBe(`/${PAGE_LOCALE}/cat-harness/library/who-iris/`);
@@ -351,7 +351,7 @@ describe("the tile opens the INSTANCE, not a kind handler's view of it", () => {
 
   test("the folio view WINS over a viewer that also exists", () => {
     // The defect the owner reported: the first version took whichever viewer
-    // sorted first, which for a schemas-only instance is the schema viewer.
+    // sorted first, which for a schemas-only layer is the schema viewer.
     const f = fixture(
       { host: host(), who: { name: "who", needs: ["host"], directories: [{ id: "s", path: "s/", graphTypologies: ["schemas"] }] } },
       ["host/schemas/who"],
@@ -365,7 +365,7 @@ describe("the tile opens the INSTANCE, not a kind handler's view of it", () => {
 });
 
 describe("an icon is PUBLISHED, never declared — owner: \"broken image on LHS navbar\"", () => {
-  /** An instance declaring an icon at a path under its own site directory. */
+  /** A layer declaring an icon at a path under its own site directory. */
   const withIcon = (name: string, extra: Record<string, unknown> = {}) => ({
     name,
     directories: [{ id: "beans", path: "beans/", graphTypologies: ["beans"] }],
@@ -381,7 +381,7 @@ describe("an icon is PUBLISHED, never declared — owner: \"broken image on LHS 
   test("the site directory's prefix is STRIPPED, because the mount does not carry it", () => {
     // Measured on the served bytes, 2026-09-21:
     //   src="/folio-assistant/branches/<branch>/docs/assets/img/icons/cat-mark.svg"
-    // `docs/` is the instance's site directory and the build copies its
+    // `docs/` is the layer's site directory and the build copies its
     // CONTENTS to the mount, so every reader got a 404 and a placeholder.
     const f = fixture({ host: withIcon("host") });
     const [tile] = tilesOf(f).filter((t) => t.name === "host");
@@ -398,7 +398,7 @@ describe("an icon is PUBLISHED, never declared — owner: \"broken image on LHS 
     //     who-iris/library/  ->  /who-iris/        (1378 files)
     //     who-iris/docs/     ->  /docs/who-iris/   (4 files)
     //
-    // Every instance gets a `<kind>/<name>` route unconditionally; the bare
+    // Every layer gets a `<kind>/<name>` route unconditionally; the bare
     // `<name>` route goes to whichever kind claims it FIRST, and for who-iris
     // that is the library. So the front door served 1,378 corpus files and the
     // icon composed against it 404'd — 404 against 200 for the same asset at
@@ -422,7 +422,7 @@ describe("an icon is PUBLISHED, never declared — owner: \"broken image on LHS 
 
   test("no mount means NO icon and a finding — `pb04` one layer down", () => {
     // An `<img>` whose `src` 404s is worse than no `<img>`: a placeholder
-    // reads as a broken site rather than as an instance with no art. `sibling`
+    // reads as a broken site rather than as a layer with no art. `sibling`
     // has no site directory of its own, so there is nowhere to serve it from.
     const f = fixture({ host: host(), sibling: withIcon("sibling") });
     const [tile] = tilesOf(f).filter((t) => t.name === "sibling");
@@ -431,7 +431,7 @@ describe("an icon is PUBLISHED, never declared — owner: \"broken image on LHS 
   });
 
   test("a path outside the site directory is refused rather than rewritten", () => {
-    // Guessing would turn a path the instance meant into one it did not, and
+    // Guessing would turn a path the layer meant into one it did not, and
     // the result would look exactly like art that failed to load.
     const f = fixture({
       host: {
@@ -450,7 +450,7 @@ describe("an icon is PUBLISHED, never declared — owner: \"broken image on LHS 
 describe("a LABEL identifies its subject, or it is not a label", () => {
   test("two instances with one title are told apart, and both say so", () => {
     // Owner, 2026-09-21: the sidebar showed `folio-assistant` twice — the
-    // repository root acting as an instance, and `cat-harness`, whose declared
+    // repository root acting as a layer, and `cat-harness`, whose declared
     // title is the product's name. Both linked `/`.
     const f = fixture({
       host: { name: "host", title: "Shared", directories: [{ id: "b", path: "b/", graphTypologies: ["beans"] }] },
@@ -484,7 +484,7 @@ describe("a LABEL identifies its subject, or it is not a label", () => {
   });
 });
 
-/* ── A render-exempt instance is still REACHABLE ──────────────────────────
+/* ── A render-exempt layer is still REACHABLE ──────────────────────────
  *
  * Owner, 2026-09-21: *"Boostrap should be clicable. even though it doesnt
  * render itself, cat-bootrap does take over ... render responsibles of
@@ -498,7 +498,7 @@ describe("a LABEL identifies its subject, or it is not a label", () => {
  * link") was wrong. What was missing is that the exemption said "I do not
  * render myself" without saying "so go here instead". These cover the field
  * that closes it — and, more importantly, the two ways it can be wrong,
- * because a link invented for an exempt instance 404s for every reader.
+ * because a link invented for an exempt layer 404s for every reader.
  */
 describe("a render-exempt instance links to one of its own files, as published", () => {
   const exempt = (reachableAt?: string) => ({
@@ -513,13 +513,13 @@ describe("a render-exempt instance links to one of its own files, as published",
   });
 
   test("with `reachableAt`, the tab is a link and says what KIND of target it is", () => {
-    // `reachableAt` names one of the instance's OWN files, relative to its own
+    // `reachableAt` names one of the layer's OWN files, relative to its own
     // directory (bean iwtn), and the site build publishes it at `/<stub>/`.
     const f = fixture({ host: host(), floor: exempt("README.md") });
     writeFileSync(join(f.repo, "floor", "README.md"), "# floor\n");
 
     const floor = tilesOf(f).find((t) => t.name === "floor")!;
-    // `.md` publishes as `.html`, under the instance's stub.
+    // `.md` publishes as `.html`, under the layer's stub.
     expect(floor.href).toBe("/floor/README.html");
     // NOT "viewer" and NOT "folio". A third kind, so a consumer can tell that
     // this tab points at a published file rather than a rendering.
@@ -528,7 +528,7 @@ describe("a render-exempt instance links to one of its own files, as published",
   });
 
   test("WITHOUT `reachableAt` it stays unlinked — absent is a real state", () => {
-    // An exempt instance with nothing published about it has no honest
+    // An exempt layer with nothing published about it has no honest
     // target, and inventing one would 404 for every reader.
     const f = fixture({ host: host(), floor: exempt() });
     const floor = tilesOf(f).find((t) => t.name === "floor")!;
@@ -548,7 +548,7 @@ describe("a render-exempt instance links to one of its own files, as published",
 
   test("a `reachableAt` outside the instance is a FINDING, and still unlinked", () => {
     // The file EXISTS, so an existence check alone would pass it — but it is
-    // a layer above the instance, which is the leak bean iwtn removed.
+    // a layer above the layer, which is the leak bean iwtn removed.
     const f = fixture({ host: host(), floor: exempt("../host/NOTES.md") });
     writeFileSync(join(f.repo, "host", "NOTES.md"), "# notes\n");
     const floor = tilesOf(f).find((t) => t.name === "floor")!;
@@ -557,8 +557,8 @@ describe("a render-exempt instance links to one of its own files, as published",
   });
 
   test("an instance with its OWN site ignores `reachableAt` — it is the last resort", () => {
-    // The control. `reachableAt` must not outrank a real folio root, or an
-    // instance that gained one would keep pointing at a bare file.
+    // The control. `reachableAt` must not outrank a real folio root, or a
+    // layer that gained one would keep pointing at a bare file.
     const f = fixture({ host: host(), floor: exempt("README.md") });
     writeFileSync(join(f.repo, "floor", "README.md"), "# floor\n");
     giveOwnSite(f.repo, "floor");
@@ -689,7 +689,7 @@ describe("a DECLARED visualiser is a viewer — the other half of `flh4`", () =>
     //
     // NOT LINKED is this block's rule: the tile links what the SITE serves,
     // and a ref outside the site directory has no published path to compose
-    // without resolving it through `withRoutes` — an instance's own mounted
+    // without resolving it through `withRoutes` — a layer's own mounted
     // `docs/` lands somewhere the strip above cannot guess.
     //
     // NAMED AS BUILT is main's, and it is the better message. "No published
@@ -866,7 +866,7 @@ describe("an icon's URL is the SITE DIRECTORY's mount, not the instance's front 
   //     who-iris/library/  ->  /who-iris/        (1378 files)
   //     who-iris/docs/     ->  /docs/who-iris/   (4 files)
   //
-  // Every instance gets a `<kind>/<name>` route unconditionally; the bare
+  // Every layer gets a `<kind>/<name>` route unconditionally; the bare
   // `<name>` route goes to whichever kind claims it first, and for who-iris
   // that is the LIBRARY. So its front door serves 1,378 corpus files and its
   // docs are somewhere else entirely.
@@ -937,7 +937,7 @@ describe("an icon's URL is the SITE DIRECTORY's mount, not the instance's front 
  * Two of these four answers occur ZERO times in this repository — measured
  * over all 31 unlinked kinds in `docs/_data/harness.json` on 2026-09-23, of
  * which 24 are `unbuilt` and 7 are `unbuilt` under `bootstrap`'s exemption.
- * `staging-only` and `undiscovered` are produced by no instance here, and
+ * `staging-only` and `undiscovered` are produced by no layer here, and
  * `harnessTiles` emits no finding of either shape either.
  *
  * `undiscovered` is still reached by a FIXTURE — the `flh4` test above, for a
@@ -1023,7 +1023,7 @@ describe("one name per destination (bean `ob3m` finding 6)", () => {
   });
 
   test("an INSTANTIATED harness with no folio opens its landing section, not a graph's viewer", () => {
-    // `host` declares a processes visualiser drawing one view per instance.
+    // `host` declares a processes visualiser drawing one view per layer.
     // Bootstrap's row linked `/processes/` and named that page "Bootstrap".
     const f = fixture(
       {

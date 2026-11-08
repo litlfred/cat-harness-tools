@@ -8,7 +8,7 @@
  * `docs/_config.yml` sets `baseurl: "/folio-assistant"` — a PROJECT Pages
  * site — and `sync-docs-harness.ts`'s `siteRelative()` DELIBERATELY writes a
  * site-root-absolute path into `docs/_data/harness.json`, because that data
- * file has to stay baseurl-agnostic for a downstream instance at a different
+ * file has to stay baseurl-agnostic for a downstream layer at a different
  * baseurl. A template that interpolates such a path without `| relative_url`
  * emits `/assets/x.webp` where the site serves
  * `/folio-assistant/assets/x.webp`, and the asset 404s. (`readme-links.ts`

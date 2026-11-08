@@ -4,7 +4,7 @@
  * Owner, 2026-09-30: a library reference links to THREE things, and a
  * reference is resolved to each only where that target exists:
  *
- * 1. `viewer` — the library viewer's page for the item's instance, opened on
+ * 1. `viewer` — the library viewer's page for the item's layer, opened on
  *    the item (`#<instance>/<id>`, the key the viewer honours on load and
  *    on hashchange).
  *    A SITE-relative path; the page that shows it prefixes its own root.
@@ -83,7 +83,7 @@ export function libraryResolver(repo: string, instanceRoot: string): LibraryReso
   return {
     links(id, instance) {
       const matches = entries.filter((e) => e.id === id && (instance === undefined || e.instance === instance));
-      // Ambiguous without an instance: two libraries hold the slug, and
+      // Ambiguous without a layer: two libraries hold the slug, and
       // picking one would be a guess that reads as a resolution.
       if (matches.length !== 1) return undefined;
       const e = matches[0]!;

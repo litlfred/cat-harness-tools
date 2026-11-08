@@ -8,7 +8,7 @@
  *
  * ## The rule
  *
- * A directory this instance declares with graph typology `code` (top level or
+ * A directory this layer declares with graph typology `code` (top level or
  * from within, through `instanceDirectories`) is a named subgraph of code. A
  * subpath `./<dir>/*` is exported exactly when `<dir>/` is
  *

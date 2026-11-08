@@ -88,7 +88,7 @@ export const BranchSchema = z
 
 /**
  * A package script name (`check:catalogue`, `site:catalogue`): what a Tool
- * runs as `bun run <name>`, so the thing executed is what the instance's own
+ * runs as `bun run <name>`, so the thing executed is what the layer's own
  * package.json says. Alphanumerics, colon, dot, underscore and hyphen, and it
  * cannot start with a hyphen (no flag injection). Owner, 2026-10-10 (bean n3h9).
  */
@@ -233,7 +233,7 @@ export const NodeIdSchema = z
  *
  * **Named by its graph typology rather than by a path, deliberately.** An earlier
  * draft of this comment named a directory that had already been relocated, and
- * a path written into a doc comment is checked by nothing. The instance
+ * a path written into a doc comment is checked by nothing. The layer
  * declares where that node lives (`beans/beans.json`), so a reader who needs
  * the directory resolves it there and a relocation costs one edit rather than a
  * corpus sweep.
@@ -369,7 +369,7 @@ export const PinnedRepoSchema = z
   .describe("A repository at one commit, e.g. <owner>/<repo>@<40-hex sha>");
 
 /**
- * One `mount:remote --seed`: `<name>=<owner/repo>@<40-hex sha>`, the instance to
+ * One `mount:remote --seed`: `<name>=<owner/repo>@<40-hex sha>`, the layer to
  * create or re-pin in `index.config.json`. Constrained to that exact shape, so
  * no shell metacharacter can parse.
  */
@@ -381,7 +381,7 @@ export const MountSeedSchema = z
 /**
  * One `mount:remote --choose`: `<harness>` or `<harness>:<instance>`, the mount
  * entry (and closure instance) a review's choice is written to (bean `mo75`).
- * Instance names only, so no shell metacharacter can parse.
+ * Layer names only, so no shell metacharacter can parse.
  */
 export const MountChoiceSchema = z
   .string()
@@ -422,7 +422,7 @@ export const LinkModeSchema = z
   .describe("How a new folio links the platform: a git submodule, a sibling checkout, or pinned remote mounts in index.config.json.");
 
 /**
- * The id of one ArchiMate model in an instance's `cat-archimate.config.json`,
+ * The id of one ArchiMate model in a layer's `cat-archimate.config.json`,
  * which is the SemVer version it describes (`0.2.0`, `0.2.0-draft.3`). The
  * config's own pattern, less a leading `.` or `-`, so neither a metacharacter
  * nor an option can parse.

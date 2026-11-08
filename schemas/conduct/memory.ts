@@ -154,8 +154,8 @@ export const MEMORY_SCHEMA_TAG = "folio-memory/v1";
  * Overlay a dependency chain's memory into what one agent should be handed.
  *
  * `entries` arrive **in dependency order — least specific first**, the way
- * every other context setting in this instance composes: a dependency's
- * entries, then the instance's own, so the nearer one wins.
+ * every other context setting in this layer composes: a dependency's
+ * entries, then the layer's own, so the nearer one wins.
  *
  * ## The composition hazard, stated because the role model already paid for it
  *

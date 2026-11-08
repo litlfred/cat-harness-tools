@@ -1,10 +1,10 @@
 /**
- * `kg:audit --instance .` audits the instance declared AT the repository root.
+ * `kg:audit --instance .` audits the layer declared AT the repository root.
  *
  * ## The defect this pins (bean `pgzn`)
  *
  * `kg-audit.ts` computed its repository root as `resolve(root, "..")` — that
- * is `dirname`, right for every instance nested one level under the checkout
+ * is `dirname`, right for every layer nested one level under the checkout
  * and wrong for the one declared at its root. Measured on `main` `cf3e624`:
  *
  * ```
@@ -13,7 +13,7 @@
  *     at rootScripts (cat-harness/scripts/pair-claims.ts)
  * ```
  *
- * so the root instance was audited by nothing, and `kg-audit-all.ts` skipped
+ * so the root layer was audited by nothing, and `kg-audit-all.ts` skipped
  * it by name. The audit now asks `checkoutRootFor`.
  *
  * ## Why two assertions and not one
@@ -27,7 +27,7 @@
  * @module scripts/tests/kg-audit-root-instance
  *
  * The tests here that read the aggregate repository's own root (the root
- * instance declaration) live in
+ * layer declaration) live in
  * `test/kg-audit-root-instance-repo-root.test.ts`
  * (bean `ho66`): standing alone, cat-harness has no such root to read.
  */
@@ -45,7 +45,7 @@ const REPO = resolve(dirname(HARNESS_ROOT));
 
 describe("kg:audit over the instance declared at the repository root (bean `pgzn`)", () => {
 
-  // The root instance here is the AGGREGATE's, the one checkout whose root
+  // The root layer here is the AGGREGATE's, the one checkout whose root
   // carries `package.json` and nests `cat-harness/`. cat-harness run as its own
   // clone is a different shape — schemas/instance-roots-worktrees.test.ts
   // covers a checkout answering itself there — so this is skipped, not passed
@@ -55,7 +55,7 @@ describe("kg:audit over the instance declared at the repository root (bean `pgzn
     expect(resolve(repoRootFor(REPO))).not.toBe(REPO);
     expect(checkoutRootFor(REPO)).toBe(REPO);
     expect(existsSync(join(checkoutRootFor(REPO), "package.json"))).toBe(true);
-    // And it agrees with `dirname` for a nested instance.
+    // And it agrees with `dirname` for a nested layer.
     const nested = join(REPO, "cat-harness");
     expect(checkoutRootFor(nested)).toBe(resolve(repoRootFor(nested)));
   });

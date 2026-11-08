@@ -16,7 +16,7 @@ import { spawnSync } from "node:child_process";
 /** The bean ref every copy keeps its store on today. */
 export const BEAN_REF = "cat/cat-harness/beans";
 // declared-path-literal: the drain reads bean copies as git objects on their
-// bean branch, in checkouts that may hold no instance declaration at all (a
+// bean branch, in checkouts that may hold no layer declaration at all (a
 // clone of the bean branch alone), so there is nothing to resolve `beans/defs`
 // through. It is the layout every copy's beans.json declares today; the
 // skill's commands name the same path.

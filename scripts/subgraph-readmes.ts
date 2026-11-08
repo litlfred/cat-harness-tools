@@ -12,7 +12,7 @@
  *
  * - **resolving its Extensions** before the writer sees a directory: a
  *   directory entry `scope: "repository"` is relative to the repository
- *   rather than the instance, one declaring `absent` may be missing, and an
+ *   rather than the layer, one declaring `absent` may be missing, and an
  *   asset's README is found through {@link declaredAssetPath}, which honours
  *   the asset's scope too;
  * - **resolving the governing process** a directory declares in
@@ -33,10 +33,10 @@
  *
  * ## `--repo <checkout>`: a mounted layer's own READMEs
  *
- * Run in an index, the writer skips every remote-mounted instance (a mount is
+ * Run in an index, the writer skips every remote-mounted layer (a mount is
  * another repository's bytes), and in the layer's own checkout there is no
  * gates workflow and no `cat` command. `--repo` plans and writes (or
- * `--check`s) the READMEs of the instances in ANOTHER checkout — the layer's
+ * `--check`s) the READMEs of the layers in ANOTHER checkout — the layer's
  * own git checkout, where its files are tracked, not the swapped-in copy
  * inside the index (no `.git`, so every README would say the directory holds
  * nothing). Run it from the composed index (its working directory), so the
@@ -77,7 +77,7 @@ const REPO = repoRootFor(ROOT);
  *
  * Only entries WITHOUT `"subgraph": true`. Those are parts of this
  * directory's graph (`beans.json`'s `defs`), and they are what the README's
- * table names; a `subgraph: true` entry is promoted to an instance directory
+ * table names; a `subgraph: true` entry is promoted to a layer directory
  * of its own (`skills.json`'s `voices`) and describes itself under its own
  * heading. The two partition, so a promoted directory's row borrows nothing.
  *
@@ -131,7 +131,7 @@ export function isStored(d: unknown): boolean {
 }
 
 /**
- * Every instance under `repo`, with this harness's Extensions resolved: the
+ * Every layer under `repo`, with this harness's Extensions resolved: the
  * declared README (scope-aware), each directory's real location, and whether
  * it may be absent. An unreadable declaration is skipped — it is
  * `readDeclaration`'s own finding, reported by its checkers.
@@ -206,7 +206,7 @@ export function harnessInstances(repo: string): InstanceInput[] {
   return out;
 }
 
-/** The writer's plan over every instance in this checkout. */
+/** The writer's plan over every layer in this checkout. */
 export function harnessPlan(repo: string = REPO): Promise<Plan> {
   return plan(repo, harnessInstances(repo));
 }
@@ -273,7 +273,7 @@ export function repoArg(argv: readonly string[]): string | undefined {
 }
 
 /**
- * `--repo`: write (or `--check`) the READMEs of another checkout's instances,
+ * `--repo`: write (or `--check`) the READMEs of another checkout's layers,
  * and nothing else — see the module comment. Exit 1 on a stale README under
  * `--check`, 2 when the directory is not a checkout this harness can read.
  */

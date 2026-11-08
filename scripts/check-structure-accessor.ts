@@ -10,7 +10,7 @@
  * reader that builds the path itself learns one variant and misreads the
  * other. So the quoted token `"structure.json"` on a CODE line is refused
  * outside the accessor and a short allowlist, each entry carrying its reason:
- * {@link ALLOWED} for this layer and below, and each instance's own
+ * {@link ALLOWED} for this layer and below, and each layer's own
  * `gateExemptions.files` for its files. Use `STRUCTURE_FILENAME` and
  * `readStructure`.
  *
@@ -32,7 +32,7 @@ import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 
-/** This gate's name, as an instance's `gateExemptions.files[].gate` names it. */
+/** This gate's name, as a layer's `gateExemptions.files[].gate` names it. */
 export const GATE = "check:structure-accessor";
 
 /**
@@ -50,7 +50,7 @@ export const ALLOWED: Readonly<Record<string, string>> = {
 };
 
 /**
- * Every present instance's declared entries for this gate, repo-relative —
+ * Every present layer's declared entries for this gate, repo-relative —
  * `<instance root>/<file>` — with the declared reason.
  */
 export function declaredAllowed(repo: string = REPO): Record<string, string> {

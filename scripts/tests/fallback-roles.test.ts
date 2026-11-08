@@ -32,7 +32,7 @@ import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import { notApplicableAlone } from "../../test/support/checkout.js";
 
-/** The Lean pair (`lean-toolchain`, `lean-mcp`) is declared by folio-assistant-sci, the instance its subject belongs to; only a composed checkout holds it. */
+/** The Lean pair (`lean-toolchain`, `lean-mcp`) is declared by folio-assistant-sci, the layer its subject belongs to; only a composed checkout holds it. */
 const NO_LEAN_CAPABILITIES = notApplicableAlone(
   "folio-assistant-sci's scenarios/capabilities/, which declares `lean-toolchain` and its `fallbackTo: lean-mcp`",
 );
@@ -156,7 +156,7 @@ describe("the scan", () => {
 describe("the capability-level fallback, and the contradiction it exposed", () => {
   /** The platform's own registry — what the id-set helper below is compared against. */
   const own = declaredCapabilityFacts(ROOT);
-  // The whole checkout's: a capability is declared by the instance its
+  // The whole checkout's: a capability is declared by the layer its
   // subject belongs to, and the Lean pair is no longer the platform's.
   const facts = checkoutCapabilityFacts(repoRootFor(ROOT));
 
@@ -237,7 +237,7 @@ describe("the capability-level fallback, and the contradiction it exposed", () =
  * took **36 s** and timed out on bun's 5000 ms default. Re-measured 2026-10-24 over
  * 101 diagrams: ~6.4 s quiet, every test here over budget — instance-layout discovery
  * redone per diagram, not the corpus outgrowing the formula. With the layout resolved
- * once per instance root in `process-model.ts`: **~1.6 s quiet, ~2.9 s cold**, so the
+ * once per layer root in `process-model.ts`: **~1.6 s quiet, ~2.9 s cold**, so the
  * budget below stands as derived.
  *
  * Two moves, both from this bean's own taxonomy, and then a judgement:

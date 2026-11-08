@@ -9,9 +9,9 @@
  * defects composed:
  *
  * - `harness-tiles.ts` resolved a navbar mark only from a theme card or a
- *   declared `icon`, so a glyph-only instance had no `mark` at all;
+ *   declared `icon`, so a glyph-only layer had no `mark` at all;
  * - the mounted and viewer pages read the row's `icon` rather than its `mark`,
- *   so even a THEME avatar never reached them — only an instance with a
+ *   so even a THEME avatar never reached them — only a layer with a
  *   declared `icon` (cat-harness) ever drew an image there.
  *
  * Three readers each converted a row by hand (`gen-navbar-include.ts`,

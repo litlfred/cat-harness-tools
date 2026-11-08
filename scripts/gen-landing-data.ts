@@ -6,12 +6,12 @@
  * @covers folio, docs
  *
  * Core owns the folio graph, so this (not `sync-docs-harness.ts`, which writes
- * the instance's declaration data) writes the folio content's data file; each
+ * the layer's declaration data) writes the folio content's data file; each
  * imports only downward.
  *
  * ## Resolved HERE, not in Liquid
  *
- * A sticky names a theme by id; the theme names an image ROLE; the instance's
+ * A sticky names a theme by id; the theme names an image ROLE; the layer's
  * `images[]` answers what that role's three crops are. Liquid cannot report a
  * broken link in that chain — it renders empty. `resolveThemeBackdrop` returns
  * the three-state answer and refuses a partial resolution wholesale, so the
@@ -46,14 +46,14 @@ import { landingMountedNotOwned } from "./lib/mounted-landing.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 /**
- * The instance whose landing stickies these are: the site's LANDING instance,
+ * The layer whose landing stickies these are: the site's LANDING layer,
  * asked of `resolveLandingInstance` (which reads `index.config.json` first),
  * not this script's own location. Until 2026-10-07 this was
  * `HARNESS_ROOT` — cat-harness, because that is where the
  * script lives — which was right only while cat-harness was the landing.
  *
  * A hub, or a checkout with nothing instantiated, has no single landing
- * harness, so the stickies stay this script's own instance's (the site owner)
+ * harness, so the stickies stay this script's own layer's (the site owner)
  * — the same choice `sync-docs-harness` makes for a hub's sidebar. An
  * undecidable landing THROWS: `check:landing-instance` is the gate that says
  * why, and guessing here would render one harness's stickies at another's `/`.
@@ -80,7 +80,7 @@ const ROOT = landingRoot();
  * (`/concepts/agentic-harness.html`) and `publishedHref` maps it to where
  * Jekyll publishes it (`/docs/cat-harness/…`) by reading that directory. While
  * cat-harness was the landing the two were one directory; on a site whose
- * landing is another instance (the IRIS replica's own site, 2026-10-09) the landing's
+ * landing is another layer (the IRIS replica's own site, 2026-10-09) the landing's
  * docs hold none of those pages, so every link was left at its source spelling
  * and 404'd. An unknown contributor keeps the old answer, the landing's.
  */
@@ -94,12 +94,12 @@ function contributorSiteDir(contributor: string | undefined): string {
 }
 
 /**
- * The checkout the landing instance lives in, and the only place its themes'
+ * The checkout the landing layer lives in, and the only place its themes'
  * owners are looked for.
  *
  * `repoRootFor(ROOT)` until 2026-10-15, which is `dirname`: right while the
- * landing was a NESTED instance (cat-harness in the monorepo), and an escape
- * the moment it is the checkout-root instance — a folio such as smart-ra,
+ * landing was a NESTED layer (cat-harness in the monorepo), and an escape
+ * the moment it is the checkout-root layer — a folio such as smart-ra,
  * whose landing is the repository itself. There it answered the directory
  * HOLDING the clone, so `themeByRef` read every sibling clone's declaration on
  * the machine and a stranger's invalid one (`qou.json`, next to smart-ra in
@@ -143,7 +143,7 @@ const decl = readDeclaration(ROOT);
  * IMPLEMENTATION moved to `publishedAssetPath` in `schemas/kg/cat-harness.ts`
  * when the todo board needed the same transform (bean `5y4b`): this copy
  * hardcoded `docs/` where the site directory has a single answer already, and
- * a second hardcoded copy is how an instance that moves its site directory
+ * a second hardcoded copy is how a layer that moves its site directory
  * ends up serving one correct path and one 404.
  */
 function siteRelative(src: string): string {
@@ -155,7 +155,7 @@ function siteRelative(src: string): string {
  *
  * ## Resolved HERE, not in Liquid
  *
- * A sticky names a theme by id; the theme names an image ROLE; the instance's
+ * A sticky names a theme by id; the theme names an image ROLE; the layer's
  * `images[]` answers what that role's three crops are. Following that chain in
  * a template would mean a Liquid `where` over two collections per sticky per
  * layout, and Liquid has no way to REPORT that a link in the chain is missing —
@@ -167,7 +167,7 @@ function siteRelative(src: string): string {
  * where they can be tested.
  *
  * An unknown theme id degrades to no art rather than failing the build: whether
- * a theme is installed is a question about the instance's theme set, which a
+ * a theme is installed is a question about the layer's theme set, which a
  * sticky cannot see, and `theme.ts` already says resolution happens at render
  * time "where a missing theme degrades rather than failing the page".
  */
@@ -217,7 +217,7 @@ function shapeFor(comment: string, links: readonly { label: string; note?: strin
  * of the **default grump cloud** (across three layouts)."*
  *
  * `grumpy-cat`'s backdrop is the `landing` image role, and its three images are
- * the only ones in this instance that declare a `textRegion` — 0.33/0.25 on the
+ * the only ones in this layer that declare a `textRegion` — 0.33/0.25 on the
  * laptop crop, 0.13/0.225 on the mobile, 0.30/0.255 on the card. Every other
  * backdrop role (engineer, library, analyst) declares none, so without a
  * fallback their words sit in a generic inset box and the cloud above them is
@@ -250,8 +250,8 @@ function defaultCloud(layout: string): unknown {
 
 const stickies = readLandingStickies(ROOT).map((st) => {
   // By REFERENCE, owner first (bean `v8n5`): a card citing another
-  // instance's theme resolves against that instance's declared themes, and a
-  // bare id against the contributing instance's own, then the platform's.
+  // layer's theme resolves against that layer's declared themes, and a
+  // bare id against the contributing layer's own, then the platform's.
   const found = themeByRef(st.theme, CHECKOUT, st.contributedBy);
   const theme = found.ok ? found.theme : undefined;
   const resolved = theme ? resolveThemeBackdrop(theme, decl?.images) : undefined;

@@ -29,10 +29,10 @@ import { TOOLS_ROOT } from "../lib/roots.ts";
 // `requirements.txt` is addressed from THIS LAYER's root — it lives at
 // `requirementsPath("lean")` (`python/`, bean `ar1s`), though CI installs it
 // from the checkout root.
-// The `.py` files that import those packages are the INSTANCE's, under
+// The `.py` files that import those packages are the LAYER's, under
 // `cat-harness/scripts/`. One `ROOT` answered both when this arrived from
 // main, and pointing it at either alone breaks the other half: at the
-// instance, `requirements.txt` is ENOENT; at the repository, the
+// layer, `requirements.txt` is ENOENT; at the repository, the
 // `scripts/**/*.py` glob matches nothing and the scan reports 0 imports —
 // which the vacuity guard below is there to refuse.
 const INSTANCE = TOOLS_ROOT;  // bean 70lx: where the scripts are

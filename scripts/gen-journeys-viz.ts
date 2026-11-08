@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * The journeys viewer: write the pages of the `journeys-viewer` visualiser an
- * instance declares — an index of every journey in the checkout, one page per
+ * The journeys viewer: write the pages of the `journeys-viewer` visualiser a
+ * layer declares — an index of every journey in the checkout, one page per
  * journey, and the workshop layer — into a site being built.
  *
  * @module scripts/gen-journeys-viz
@@ -12,15 +12,15 @@
  *
  * The pages go to the route of the visualiser `--instance` declares
  * `renderedBy: "journeys-viewer"`, `<site>/<locale>/<instance>/<id>/`
- * (`visualiserRoute`). An instance that declares none gets nothing and the
+ * (`visualiserRoute`). A layer that declares none gets nothing and the
  * run exits 78 (not applicable), so a site build running every declared
  * writer (`visualiser-writers.ts`) reads it as declined rather than failed.
- * Without `--site` the pages go under the instance's own site directory.
+ * Without `--site` the pages go under the layer's own site directory.
  *
  * WHAT is drawn is read from the declarations (`journeys/read.ts`): every
- * `user-scenario` and `workshop` directory of every instance in the checkout,
+ * `user-scenario` and `workshop` directory of every layer in the checkout,
  * so a downstream's site shows its own journeys and those of the layers it
- * mounts, each instance a sub-graph page. HOW is `journeys/render.ts`.
+ * mounts, each layer a sub-graph page. HOW is `journeys/render.ts`.
  *
  * Nothing is committed: like `archimate:pages --out`, the pages are a build
  * product of the site, and a re-run with the same inputs writes the same
@@ -58,7 +58,7 @@ function readDecl(root: string): Decl {
   return JSON.parse(readFileSync(join(root, file), "utf8")) as Decl;
 }
 
-/** The route the instance declares for this Tool, site-relative with no trailing slash; undefined when it declares none. */
+/** The route the layer declares for this Tool, site-relative with no trailing slash; undefined when it declares none. */
 export function journeysRoute(root: string): string | undefined {
   const d = readDecl(root);
   const v = (d.visualisers ?? []).find((x) => x.renderedBy === TOOL_ID);
@@ -93,7 +93,7 @@ export function siteLinks(corpus: JourneyCorpus, route: string, title: string): 
         }
       }
     } catch {
-      out = null; // no ArchiMate pages for this instance: the view is drawn as unresolved
+      out = null; // no ArchiMate pages for this layer: the view is drawn as unresolved
     }
     views.set(instance, out);
     return out ?? undefined;

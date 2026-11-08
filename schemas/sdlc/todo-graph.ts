@@ -20,7 +20,7 @@
  *
  * ## It is content, and the folio owns it
  *
- * `beans/` is the AGENT work plan and lives in every instance. `todos/`
+ * `beans/` is the AGENT work plan and lives in every layer. `todos/`
  * records what **people** have outstanding, so it belongs to the folio — the
  * platform ships the kind and the schema and declares no directory of its
  * own, since a declared-but-absent directory would let a consumer scan
@@ -83,7 +83,7 @@ export const TodoGraphSchema = z.object({
    *
    * Because **a wrong theme is worse than no theme.** A plain card says
    * nothing; a card themed `operations` says *"this is operations work"* about
-   * a todo that may be nothing of the sort. A default that is the instance's
+   * a todo that may be nothing of the sort. A default that is the layer's
    * own theme makes no claim — it says "this belongs to this folio" — so it is
    * safe to apply to everything, which is exactly what a clever guess is not.
    *
@@ -91,7 +91,7 @@ export const TodoGraphSchema = z.object({
    *
    * A folio's own theme is the folio's to choose, and a literal in the
    * generator would be this repository's answer imposed on every downstream
-   * instance. Absent means **no default**: a todo that chooses nothing renders
+   * layer. Absent means **no default**: a todo that chooses nothing renders
    * as a flat card, which is today's behaviour and a determined state rather
    * than a failure.
    */

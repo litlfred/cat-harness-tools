@@ -55,8 +55,8 @@ export interface SharedDeclaration {
 }
 
 /**
- * An instance declaration: `<dir>/<dir>.json`, e.g. `cat-harness/cat-harness.json`.
- * The instance's own name is the file name, so no glob can say it.
+ * A layer declaration: `<dir>/<dir>.json`, e.g. `cat-harness/cat-harness.json`.
+ * The layer's own name is the file name, so no glob can say it.
  */
 export function isInstanceDeclaration(path: string): boolean {
   const m = /^(?:.*\/)?([^/]+)\/([^/]+)\.json$/.exec(path);

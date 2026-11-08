@@ -21,7 +21,7 @@
  * An agent with no MCP can walk 1–3 by hand; the engine calls each step names
  * make it auditable.
  *
- * ## Committed, beside the diagram, in the instance that owns it
+ * ## Committed, beside the diagram, in the layer that owns it
  *
  * Checklists are committed, so `bpmn:checklist:check` compares committed
  * bytes: `<dir>/<stem>.bpmn` → `<dir>/<stem>.checklist.md`.
@@ -190,14 +190,14 @@ export function checklistFor(model: ProcessModel, sourceRel: string): string {
   return out.join("\n").replace(/\n+$/, "\n");
 }
 
-/** Every `.bpmn` in every instance of the repository, by its declared knowledge-graph directories. */
+/** Every `.bpmn` in every layer of the repository, by its declared knowledge-graph directories. */
 export function bpmnSources(root: string = HARNESS_ROOT): string[] {
   const all = new Set<string>();
   for (const inst of instanceRootsIn(repoRootFor(root))) for (const f of processDiagrams(workflowFiles(inst))) all.add(f);
   return [...all].sort();
 }
 
-/** Where the harness keeps the checklists of the instances below it (bootstrap, bootstrap-tools). */
+/** Where the harness keeps the checklists of the layers below it (bootstrap, bootstrap-tools). */
 export const defaultOutDir = (root: string = HARNESS_ROOT): string => join(root, siteDirFor(root), "assets", "workflows", "checklists");
 
 /** One diagram's checklist: the file it is written to, and the source line it cites. */
@@ -210,16 +210,16 @@ export interface Placement {
 
 /**
  * Where each diagram's checklist is committed (see the module header): beside
- * the diagram in the instance that owns it, or, for an instance below the
+ * the diagram in the layer that owns it, or, for a layer below the
  * harness, in the harness's `defaultOutDir`. `harnessRoot` is the harness
- * instance; a source outside every instance is labelled from the repository
+ * instance; a source outside every layer is labelled from the repository
  * root and kept beside its diagram.
  */
 export function placementOf(sources: readonly string[], repoRoot: string, harnessRoot: string = HARNESS_ROOT): Map<string, Placement> {
   const instances = instanceRootsIn(repoRoot)
     .map((root) => ({ root: resolve(root), decl: readDeclaration(root) }))
     .filter((i): i is { root: string; decl: NonNullable<typeof i.decl> } => i.decl?.name !== undefined)
-    // Deepest first, so a nested instance owns its own files.
+    // Deepest first, so a nested layer owns its own files.
     .sort((a, b) => b.root.length - a.root.length);
   const needs = new Map(instances.map((i) => [i.decl.name!, (i.decl.needs ?? []) as readonly string[]] as const));
   const harness = readDeclaration(harnessRoot)?.name;

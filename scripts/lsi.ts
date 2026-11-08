@@ -77,7 +77,7 @@ export type { LsiSidecar };
 const REPO = resolve(dirname(HARNESS_ROOT));
 // declared-path-literal: the LSI run records under cat-harness's `qa` graph. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 const RESULTS = join(REPO, "cat-harness/test/results/lsi");
-/** The instance whose Tool graph declares `lsi-index`; its run records live under its `qa` directory. */
+/** The layer whose Tool graph declares `lsi-index`; its run records live under its `qa` directory. */
 const HARNESS = join(REPO, "cat-harness");
 /** The Tool node whose runs this module records (`tools/index.ts`, `downstream`). */
 export const LSI_TOOL_ID = "lsi-index";
@@ -181,9 +181,9 @@ export interface GraphTarget {
 }
 
 export function proseGraphs(): GraphTarget[] {
-  // A directory is declared again by every instance that sees it — a
+  // A directory is declared again by every layer that sees it — a
   // dependency's graph by each dependent, a sibling's library by the harness.
-  // Index it once, attributed to the instance whose ROOT contains it (the
+  // Index it once, attributed to the layer whose ROOT contains it (the
   // owner), falling back to the first declarer for a repository-scoped path.
   const byPath = new Map<string, GraphTarget & { rootLen: number }>();
   for (const root of instanceRootsIn(REPO)) {
@@ -632,7 +632,7 @@ function targets(): GraphTarget[] {
   }
   // `--needed`: only the graphs `needOf` says need an index — the set `lsi
   // audit` judges, computed from the instances present rather than listed by
-  // a caller that cannot know which instances sit above it (bean `0r7u`). An
+  // a caller that cannot know which layers sit above it (bean `0r7u`). An
   // empty selection here is a determined "none needs one", not a miss.
   if (process.argv.includes("--needed")) return all.filter((t) => needOf(t).needed);
   return all;

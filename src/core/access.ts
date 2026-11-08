@@ -1,5 +1,5 @@
 /**
- * Folio Assistant — who is asking, and what the instance's ODRL policies say
+ * Folio Assistant — who is asking, and what the layer's ODRL policies say
  * they may do.
  *
  * One loader for both callers that decide access: the HTTP routes
@@ -55,13 +55,13 @@ export interface AccessContext {
   actors: ReadonlyMap<string, LoadedActor>;
 }
 
-/** This platform instance's own root: where its default policies live. */
+/** This platform layer's own root: where its default policies live. */
 const PLATFORM_ROOT = resolve(HARNESS_ROOT);
 
 /**
  * The policies, action profile and actors in force for `root`.
  *
- * `root` may be an instance root or the repository root above it (the server is
+ * `root` may be a layer root or the repository root above it (the server is
  * started with either). When `root` declares no `policies` graph the platform's
  * own policies apply — a folio that writes none inherits the defaults, which is
  * what `dependents: skip` on the declaration means.
@@ -86,8 +86,8 @@ export function loadAccessContext(root: string, opts: { dependents?: boolean } =
   const actors = new Map<string, LoadedActor>();
   // The declared home inside `scenarios` (bean rqao), the same one kg-audit
   // and check-actor-reach read — overlaid, as they overlay it, with the actors
-  // the checkout's dependent instances add or extend, and with the policies
-  // those instances keep beside them. Read alone, an actor a dependent adds
+  // the checkout's dependent layers add or extend, and with the policies
+  // those layers keep beside them. Read alone, an actor a dependent adds
   // is "not a declared actor" here, and the lane it plays refuses it.
   for (const base of [root, checkoutRootFor(instanceRoot)]) {
     const dir = actorsDir(base);

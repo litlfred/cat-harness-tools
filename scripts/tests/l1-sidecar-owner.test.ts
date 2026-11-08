@@ -1,7 +1,7 @@
 /**
- * An L1 verdict is written under the instance that owns the library entry.
+ * An L1 verdict is written under the layer that owns the library entry.
  *
- * In the index checkout the root declares no instance (owner, 2026-10-08),
+ * In the index checkout the root declares no layer (owner, 2026-10-08),
  * so writing under it put the `library-qa` sidecars in an undeclared
  * `<index>/test/results/` (measured 2026-10-09: 79 files).
  */

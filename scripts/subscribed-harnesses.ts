@@ -42,14 +42,14 @@ import { type SubscribedTree, subscribedTrees } from "./subscribed-trees.js";
 
 type DirLike = { path: string; graphTypologies?: readonly string[]; scope?: DeclarationScope };
 
-/** The directory an instance keeps its substrate snapshots in, or undefined when it declares none. */
+/** The directory a layer keeps its substrate snapshots in, or undefined when it declares none. */
 export function snapshotDirFor(instanceRoot: string, decl: { directories?: readonly DirLike[] }): string | undefined {
   const d = (decl.directories ?? []).find((x) => (x.graphTypologies ?? []).includes(SNAPSHOT_GRAPH_TYPOLOGY));
   return d ? resolve(rootForScope(instanceRoot, d.scope), d.path) : undefined;
 }
 
 /**
- * The directory an instance keeps its instantiated subscribed harnesses' state
+ * The directory a layer keeps its instantiated subscribed harnesses' state
  * in (`subscribed-harnesses`, `holds: "state"`), or undefined when it declares
  * none. Separate from {@link snapshotDirFor}: the snapshot directory holds
  * upstream's bytes and is read-only; this one is written by `kg:instantiate`
@@ -167,7 +167,7 @@ export function subscribedHarnesses(root: string, decls: readonly { dir: string;
           subscription: s,
           instantiated: instantiated.has(h),
           snapshot,
-          // A tree whose instance could not be read cannot be attributed to a
+          // A tree whose layer could not be read cannot be attributed to a
           // harness, and is still the subscription's — listed under each.
           trees: trees.filter((t) => t.instance === undefined || t.instance === h),
         });
@@ -187,8 +187,8 @@ export function subscribedTile(h: SubscribedHarness): HarnessTile {
   const s = h.subscription;
   const pin = `${s.repository}@${s.ref.slice(0, 12)}`;
   const decl = h.snapshot.state === "read" ? harnessDeclarationIn(h.snapshot.snapshot, h.harness) : undefined;
-  // THE INSTANCE'S OWN MARK, read from its declaration at the pin (bean sod4
-  // #4: "an instance declares its own mark"). An in-tree instance's `avatar`
+  // THE LAYER'S OWN MARK, read from its declaration at the pin (bean sod4
+  // #4: "an instance declares its own mark"). An in-tree layer's `avatar`
   // reaches the registry by a scan; a subscribed one is not in the tree, so
   // without this it fell to GENERIC the day it left (bean `g8jp`).
   const declared = h.snapshot.state === "read" ? declaredAvatarIn(h.snapshot.snapshot) : undefined;
@@ -204,7 +204,7 @@ export function subscribedTile(h: SubscribedHarness): HarnessTile {
   const heldIds = new Set(held.map((t) => t.subgraph));
   // ITS OWN THEMED ROOT, when a held directory gives it one. The site build
   // mounts a held directory exactly as it would an in-tree one, and
-  // `withRoutes` always gives an instance with a mountable directory the
+  // `withRoutes` always gives a layer with a mountable directory the
   // route `/<instance>/` — so the tile goes there, as an in-tree tile does.
   const rooted = held.some((t) => mountableTree(t));
   const kinds = [...new Set((decl?.directories ?? []).flatMap((d) => d.graphTypologies))];
@@ -219,7 +219,7 @@ export function subscribedTile(h: SubscribedHarness): HarnessTile {
       (decl?.description ? `. ${decl.description}` : "."),
     footer: false,
     icon: null,
-    // The registry glyph is the mark when the instance has one of its own; its
+    // The registry glyph is the mark when the layer has one of its own; its
     // declared `icon` image is not drawn, since the image is a file at the pin.
     ...(own ? { mark: { glyph: avatar.glyph, title: avatar.reads } } : {}),
     tone: avatar.tone,

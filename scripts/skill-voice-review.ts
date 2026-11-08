@@ -106,7 +106,7 @@ export function skillVoices(
   // `undefined` ("the config could not be read") is a real answer here.
   opts: { active?: string[] | undefined } = {},
 ): SkillVoice[] | undefined {
-  // In an index checkout the root declares no instance, and the checkout's
+  // In an index checkout the root declares no layer, and the checkout's
   // skill-authoring voice activation lives on `cat-harness`'s entry in
   // `index.config.json` (moved from the retired root config on 2026-10-09;
   // see `voice-gate-checkout.test.ts`).
@@ -336,8 +336,8 @@ if (import.meta.main) {
     for (const p of problems) console.error(`✗ ${p}`);
     process.exit(1);
   }
-  // The sidecar mirrors the subject's path under the instance's results tree;
-  // the subject path is relative to that instance root.
+  // The sidecar mirrors the subject's path under the layer's results tree;
+  // the subject path is relative to that layer root.
   const instanceRoot = resolve(abs.slice(0, abs.lastIndexOf("/test/results/kg-qa/")));
   const skillHash = fileHash(resolve(instanceRoot, report.subject.path));
   if (!skillHash) {

@@ -54,8 +54,8 @@ export interface AuditResult {
   ok: number;
   dead: DeadLink[];
   /**
-   * Links to a path an instance has MOVED, resolved at its new place through
-   * that instance's declared `moves` (sdlc skill `two-phase-move`). Counted
+   * Links to a path a layer has MOVED, resolved at its new place through
+   * that layer's declared `moves` (sdlc skill `two-phase-move`). Counted
    * as resolved while the move's window is open; each is still to switch.
    */
   moved: Array<LinkRef & { to: string; move: string }>;
@@ -248,9 +248,9 @@ export function auditLinks(
     /**
      * What a relative link is relative TO — the directory holding the file
      * being audited. Defaults to `root`, which is what it meant while the
-     * README sat in the instance.
+     * README sat in the layer.
      *
-     * The two parted at the move (bean `wggr`): this instance's README is
+     * The two parted at the move (bean `wggr`): this layer's README is
      * declared `scope: "repository"` and sits one directory above `root`, so
      * every worktree link in it was resolved one level too deep and 25 of 25
      * came back dead. `root` still answers the OTHER question this function

@@ -49,12 +49,12 @@ function realAuditAll(repo: string): ReturnType<typeof auditAll> {
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 /**
- * A throwaway instance whose one directory carries `coverage`.
+ * A throwaway layer whose one directory carries `coverage`.
  *
  * **`realTargets` are written at the REPOSITORY root (`base`), not under the
- * instance**, because that is where a `coverage.*` value resolves — the
+ * layer**, because that is where a `coverage.*` value resolves — the
  * owner's ruling of 2026-09-21 on bean `yt7j`, and what all 45 coverage paths
- * in this repository already do. The fixture wrote them under the instance
+ * in this repository already do. The fixture wrote them under the layer
  * while `targetExists` accepted either root, so it was passing against the
  * fallback rather than against the convention; eight tests turned red the
  * moment the fallback came out, which is the evidence that they were.
@@ -80,7 +80,7 @@ function instance(
   // gets that page declaring the directory's kinds under `documents:`. Only
   // when the page is meant to exist — a fixture naming a page it never
   // writes is asking for an undocumented directory. The page sits INSIDE the
-  // instance, since a kind claim reaches only from an instance in reach.
+  // layer, since a kind claim reaches only from a layer in reach.
   if (typeof docs === "string" && (opts.realTargets ?? []).includes(docs)) {
     const abs = join(root, docs);
     mkdirSync(dirname(abs), { recursive: true });
@@ -288,7 +288,7 @@ describe("bootstrap's exemption is by layer, and is a second criterion not a hol
     // `bootstrap` on main while this branch was open. A set holding only
     // the old name matches nothing, the owner's exemption silently stops
     // firing, and the only symptom is one extra minor finding among fifty.
-    // Asserting against the instances discovery really finds turns that
+    // Asserting against the layers discovery really finds turns that
     // silence into a failure.
     const repo = resolve(import.meta.dir, "..", "..", "..");
     const real = realAuditAll(repo).map((r) => r.instance);
@@ -298,7 +298,7 @@ describe("bootstrap's exemption is by layer, and is a second criterion not a hol
 });
 
 describe("an unmet OBLIGATION outranks an unanswered question", () => {
-  // The owner, 2026-09-20: a directory an instance declares or initiates and
+  // The owner, 2026-09-20: a directory a layer declares or initiates and
   // writes to — `beans/`, `todos/`, `fsh-guts/` — owes a visualiser "as
   // requiement of handler". So a missing one there is a promise unkept, not a
   // question nobody has answered, and the axis has to rank them apart.
@@ -419,7 +419,7 @@ describe("could not determine is never a clean run", () => {
 describe("this repository", () => {
   it("is audited across every instance discovery finds", () => {
     // Against the REAL repo, like `instanceRootsIn`'s own test: a fixture
-    // would keep passing if the axis silently stopped seeing an instance.
+    // would keep passing if the axis silently stopped seeing a layer.
     const repo = resolve(import.meta.dir, "..", "..", "..");
     const rs = realAuditAll(repo);
     expect(rs.map((r) => r.instance)).toContain("cat-harness");
@@ -461,7 +461,7 @@ describe("every instance needs a starting README OF ITS OWN (bean `ie9l`)", () =
 
   it("...but the repository ROOT may legitimately own the repository's README", () => {
     // The falsifier for the rule above: if it fired on the root too, the check
-    // would be demanding every instance avoid a file only one of them can own.
+    // would be demanding every layer avoid a file only one of them can own.
     const base = mkdtempSync(join(tmpdir(), "readme-root-"));
     writeFileSync(join(base, "README.md"), "#");
     expect(
@@ -480,7 +480,7 @@ describe("every instance needs a starting README OF ITS OWN (bean `ie9l`)", () =
 
   it("this repository has no README offender left", () => {
     // It had exactly two — the root declared no assets at all, and cat-harness
-    // borrowed the root's README. Issue #592 split them, so every instance now
+    // borrowed the root's README. Issue #592 split them, so every layer now
     // owns its own. Asserted as EMPTY rather than deleted: a list that went to
     // zero and a check that stopped looking are indistinguishable from a
     // deleted test, and this is the fix's only durable witness.
@@ -491,7 +491,7 @@ describe("every instance needs a starting README OF ITS OWN (bean `ie9l`)", () =
 
   it("the AGENT half is asked about too, and no instance is mute any more", () => {
     // Measured 2026-09-20 when the criterion was added: ten of eleven
-    // instances declared `instance-readme` and TWO declared
+    // layers declared `instance-readme` and TWO declared
     // `agent-instructions`. Eight were readable by a person and mute to an
     // agent — including `folio-assistant-core`, which HAD an AGENTS.md on disk
     // and did not declare it (a finding, not an exemption: an undeclared file
@@ -508,13 +508,13 @@ describe("every instance needs a starting README OF ITS OWN (bean `ie9l`)", () =
 });
 
 describe("the own-docs axis — an instance owes documentation of its own", () => {
-  // Bean `op30`. `<instance>/docs/` is the instance's SOURCE documentation. A
+  // Bean `op30`. `<instance>/docs/` is the layer's SOURCE documentation. A
   // handler's rendering of a subject — `<base>/cat-harness/docs/<subject>/` —
   // is documentation ABOUT that subject, and an axis that conflated the two
   // would pass a repository where half the documentation is missing.
 
   /**
-   * A REAL instance root — with a declaration, so `siteDirFor` resolves.
+   * A REAL layer root — with a declaration, so `siteDirFor` resolves.
    *
    * A bare temp directory is not a weaker fixture, it is a different case:
    * `siteDirFor` throws on one, which is the UNKNOWN state rather than the
@@ -571,7 +571,7 @@ describe("the own-docs axis — an instance owes documentation of its own", () =
   });
 
   it("an instance with no declaration ARGUMENT is still asked the question", () => {
-    // `undefined` is not an exemption. An instance that declares nothing has
+    // `undefined` is not an exemption. A layer that declares nothing has
     // not been excused; it has said nothing.
     expect(ownDocsFinding(inst(), undefined)).toBeDefined();
     expect(ownDocsFinding(inst({ docs: true }), undefined)).toBeUndefined();
@@ -591,7 +591,7 @@ describe("the own-docs axis — an instance owes documentation of its own", () =
 
   it("is reported as its own line, separate from the README axis", () => {
     // They were argued for as separate because the satisfying sets were
-    // disjoint. Measured 2026-09-21 they are not — every instance declares a
+    // disjoint. Measured 2026-09-21 they are not — every layer declares a
     // README, so docs is a strict subset. They stay separate for the reason
     // that survives: "can a reader enter" and "is there anything to read once
     // inside" are different questions.
@@ -608,7 +608,7 @@ describe("the own-docs axis — an instance owes documentation of its own", () =
 
 describe("coverage.* resolves against the REPOSITORY root and nothing else — bean `yt7j`", () => {
   // The owner's ruling of 2026-09-21. Before it, `targetExists` tried the
-  // instance root and fell back to the repository root, accepting either —
+  // layer root and fell back to the repository root, accepting either —
   // which reads as tolerance and is the opposite: a path incorrect in its
   // declared base passed anyway through the other, so the axis could not
   // enforce the convention its own schema documents.
@@ -622,12 +622,12 @@ describe("coverage.* resolves against the REPOSITORY root and nothing else — b
   it("THE FALSIFICATION: a target that exists ONLY under the instance is a finding", () => {
     // The fallback's removal has to be provable, not asserted. This fixture
     // plants the file where the old code would have found it and nowhere else;
-    // if the instance root is still being tried, this test goes green and says
+    // if the layer root is still being tried, this test goes green and says
     // nothing.
     const base = mkdtempSync(join(tmpdir(), "coverage-inst-only-"));
     const root = join(base, "inst");
     mkdirSync(join(root, "thing"), { recursive: true });
-    writeFileSync(join(root, "viz.html"), "x"); // under the INSTANCE, not the repo
+    writeFileSync(join(root, "viz.html"), "x"); // under the LAYER, not the repo
     writeDeclaration(root, JSON.stringify({
         name: "inst",
         directories: [
@@ -669,11 +669,11 @@ describe("the repository root is recognised as itself — bean `yt7j`", () => {
   // `isRoot` was `resolve(root) === resolve(repoRootFor(root))`: a directory
   // compared with its own PARENT, equal only at the filesystem root. So the
   // guard "the repository root legitimately owns the repository's files" could
-  // never fire for the one instance it exists for. Latent rather than visible
+  // never fire for the one layer it exists for. Latent rather than visible
   // — this repository's root declaration carries no `scope: "repository"`
   // asset today — which is exactly why it needs a test rather than a sighting.
 
-  /** An instance declaring one asset, optionally repository-scoped. */
+  /** A layer declaring one asset, optionally repository-scoped. */
   function withAsset(scope: string | undefined): { root: string; cleanup: () => void } {
     const base = mkdtempSync(join(tmpdir(), "coverage-root-"));
     const root = join(base, "inst");
@@ -747,7 +747,7 @@ describe("this repository declares nothing that fails to resolve — bean `bsay`
  * reported the first would put every directory in the report, which is the
  * wall this check's own header says somebody switches off.
  *
- * Fixture instances in a temporary directory; nothing walks the real corpus.
+ * Fixture layers in a temporary directory; nothing walks the real corpus.
  */
 function processInstance(opts: { process?: string; withDiagram?: boolean }): {
   root: string;

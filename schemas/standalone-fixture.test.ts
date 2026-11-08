@@ -38,7 +38,7 @@ const copies = filesUnder(FIXTURE).filter((f) => {
   const rel = relative(FIXTURE, f).split("/");
   return !(rel.length === 2 && rel[1] === `${rel[0]}.json`);
 });
-/** The instances the fixture copies from: one directory per instance, as in a checkout. */
+/** The layers the fixture copies from: one directory per layer, as in a checkout. */
 const FIXTURE_INSTANCES = readdirSync(FIXTURE).filter((e) => statSync(join(FIXTURE, e)).isDirectory());
 const sourcesPresent = FIXTURE_INSTANCES.every((i) => existsSync(join(CHECKOUT, i)));
 

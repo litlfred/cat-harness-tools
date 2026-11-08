@@ -16,7 +16,7 @@
  *
  * | target | authoritative for | resolved against |
  * |---|---|---|
- * | `skos` | what a term MEANS | SKOS concept schemes — the instance's own authored terms, plus any external scheme it declares |
+ * | `skos` | what a term MEANS | SKOS concept schemes — the layer's own authored terms, plus any external scheme it declares |
  * | `fhir` | a clinical code's OPERATIONAL semantics | the pinned published IG snapshot (`cat-harness/external-schemas/who-smart-base.terminology.json`), a published IG at a version, not a live collection |
  *
  * A SKOS match and a FHIR match are **different assertions with different
@@ -100,10 +100,10 @@ export const TermMappingSchema = z
     /** The candidate's id, as its glossary scheme records it. */
     term: z.string().min(1),
     /**
-     * The instance that owns the scheme. A scheme id such as `kg-tools` is
-     * shared by every instance's extraction, so a scheme is keyed by
+     * The layer that owns the scheme. A scheme id such as `kg-tools` is
+     * shared by every layer's extraction, so a scheme is keyed by
      * (instance, scheme): bean `q3n9`, owner ruling A, 2026-10-24. The
-     * instance is derived from the scheme's source, never from where its
+     * layer is derived from the scheme's source, never from where its
      * glossary file sits, so a file that moves keeps its key.
      */
     instance: z.string().min(1),
@@ -163,7 +163,7 @@ export const MappingScopeSchema = z
     target: z.enum(MAPPING_TARGETS),
     /**
      * The schemes or collections consulted. **May be empty**, and an empty
-     * list is a determined finding — this instance declares nothing to check
+     * list is a determined finding — this layer declares nothing to check
      * against for that target — rather than a missing field.
      */
     consulted: z.array(z.string().min(1)),

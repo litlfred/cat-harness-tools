@@ -374,14 +374,14 @@ export async function buildReport(
 }
 
 /**
- * Mints a subject in the published knowledge graph of the instance that owns
+ * Mints a subject in the published knowledge graph of the layer that owns
  * it: `<doc dir>/<kind>/<id>`, against the document the deploy writes for
- * that instance (`publishedIdentity` at the host's base), so the IRI is the
+ * that layer (`publishedIdentity` at the host's base), so the IRI is the
  * page `kg-export` serves for it (issue #959).
  *
  * An actor is the exception: `kg-export` publishes the actor registry it
- * reads at the checkout root (`actorsDir`), in the document of the instance
- * holding it, and no other. An actor only another instance declares has no
+ * reads at the checkout root (`actorsDir`), in the document of the layer
+ * holding it, and no other. An actor only another layer declares has no
  * page, so it gets no subject rather than an address nobody serves.
  */
 export function publishedSubjects(repo: string = REPO): SubjectMinter {

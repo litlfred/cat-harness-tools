@@ -62,7 +62,7 @@ describe("the mechanical facts", () => {
     // intake, and the line here was `join(ROOT, "uploads/WHO_PUB_TPS_93.1.pdf")`
     // — a literal, in the one test whose own comment says asserting a spelling
     // of a location is what re-pins the next relocation. `structure.json`
-    // records the source FILENAME, and the library entry says which instance and slug,
+    // records the source FILENAME, and the library entry says which layer and slug,
     // so the upload sits at `<instance>/uploads/<slug>/<basename>` with nothing
     // spelled out here.
     const slug = basename(entry!);

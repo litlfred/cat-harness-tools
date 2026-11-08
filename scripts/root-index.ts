@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * The root meta-skeleton: `<site>/index.jsonld` (and its `.json` alias) names
- * every declared instance at depth 1. Built at publish time only; there is no
+ * every declared layer at depth 1. Built at publish time only; there is no
  * committed copy, since a committed one would conflict whenever two PRs change
  * the set of harnesses.
  *
@@ -10,7 +10,7 @@
  *
  * ## What an entry carries
  *
- * One `Harness` per declared instance ({@link instanceRootsIn}),
+ * One `Harness` per declared layer ({@link instanceRootsIn}),
  * read from its declaration and from the files the deploy already wrote:
  *
  * - `@id` — its export document, at the address {@link exportIdentity} gives
@@ -26,7 +26,7 @@
  *
  * ## Could-not-determine is a failure, never a shorter index
  *
- * An instance whose export document is not where its identity says is a
+ * A layer whose export document is not where its identity says is a
  * PROBLEM and the run exits 1 having written nothing.
  *
  * Usage:
@@ -55,7 +55,7 @@ const list = (v: unknown): unknown[] => (v == null ? [] : Array.isArray(v) ? v :
 export const ROOT_INDEX_FILE = "index.jsonld";
 export const ROOT_INDEX_ALIAS = "index.json";
 
-/** One instance as the root index carries it. */
+/** One layer as the root index carries it. */
 export interface HarnessEntry {
   "@id": string;
   "@type": string;
@@ -95,7 +95,7 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
 
   const byName = new Map<string, string>();
   const entries: HarnessEntry[] = [];
-  // The site this index is published at: the host instance's base, which is
+  // The site this index is published at: the host layer's base, which is
   // where `_site/` is served (`exportIdentity`'s `base` for the host).
   const siteBase = exportIdentity({ baseUrl: opts.baseUrl }).base;
   for (const inst of instanceRootsIn(repo)) {
@@ -104,7 +104,7 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
     // no entry — the same answer the deploy's plan gives (`isPublished`).
     if (!decl || !isPublished(decl)) continue;
     const id = exportIdentity({ instanceRoot: inst, baseUrl: opts.baseUrl });
-    // WHERE ON THIS SITE, which is not always `docPath`: an instance that
+    // WHERE ON THIS SITE, which is not always `docPath`: a layer that
     // declares its own `canonicalUrl` mints `@id`s against that, so its
     // `docPath` is `<stub>.jsonld` under ITS base, while `instance-exports.ts`
     // writes the copy this site serves at `<stub>/<stub>.jsonld` (measured
@@ -126,7 +126,7 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
       problems.push(`${decl.name}: ${id.docPath} does not parse — ${String(e)}`);
       continue;
     }
-    // A framed instance's root is in the repository index's `hasSubgraph`; an
+    // A framed layer's root is in the repository index's `hasSubgraph`; an
     // unframed one publishes its own, which the index links with `seeAlso`
     // (bean `t8c4`) at the address bootstrap-tools' `publicationBase` gives
     // it — the same rule `gen-subgraph-jsonld.ts` wrote the link with.
@@ -152,7 +152,7 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
       sha256: createHash("sha256").update(bytes).digest("hex"),
     });
   }
-  // `needs` names instances; the index names their documents.
+  // `needs` names layers; the index names their documents.
   for (const e of entries) {
     if (!e.dependsOn) continue;
     e.dependsOn = e.dependsOn.map((n) => {

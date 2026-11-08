@@ -17,7 +17,7 @@
  *
  * ## Why the property is assertable at all now
  *
- * It was not, until this commit. The criterion had legitimate instances it
+ * It was not, until this commit. The criterion had legitimate layers it
  * could not distinguish from defects: a stakeholder's sign-off, a corpus being
  * written into, and a skill nobody has written all read as "names no skill".
  * Gating on that would have forced a fake `<folio:skill ref>` onto a real step,

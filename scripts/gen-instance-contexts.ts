@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 /**
- * Write each instance's JSON-LD `@context`, generated from the prefixes its
+ * Write each layer's JSON-LD `@context`, generated from the prefixes its
  * documents actually use — and, with `--check`, gate that every prefix a
  * document speaks resolves.
  *
- * No prefix is forward-declared. An instance declares the external namespaces
+ * No prefix is forward-declared. A layer declares the external namespaces
  * it speaks (`jsonldPrefixes`, cat-harness `schemas/kg/jsonld-prefixes.ts`);
  * its published context binds exactly the prefixes its `.jsonld` documents
- * use, resolved through its own table flattened with those of every instance
+ * use, resolved through its own table flattened with those of every layer
  * it `needs` (dependency order, `@protected`). A node then references ONE
  * context URL plus its own inline `@base`.
  *
@@ -15,30 +15,30 @@
  *
  * In the same `ns/<what>/v<major>.jsonld` shape as `ns/content/v1.jsonld` and
  * `ns/subgraph/v1.jsonld`. INSTANCE-relative, so it is served at
- * `<iriBase>ns/context/v1.jsonld`, under the instance's own base, and a
+ * `<iriBase>ns/context/v1.jsonld`, under the layer's own base, and a
  * layer's context is published by that layer. The terms are `@protected`, so
  * a change that rebinds one is a NEW context (`v2`) published beside the old
  * one, never an edit under a cached URL.
  *
- * ## Except where the instance's `ns` is a DOCUMENT: `<instance>/ns.context.v1.jsonld`
+ * ## Except where the layer's `ns` is a DOCUMENT: `<instance>/ns.context.v1.jsonld`
  *
- * An instance that holds its vocabulary as `ns.jsonld` at its root
+ * A layer that holds its vocabulary as `ns.jsonld` at its root
  * (bootstrap) has it staged at the extensionless `ns` and `v<major>/ns`, a
- * FILE, so `ns/context/v1.jsonld` cannot sit under it. Such an instance's
+ * FILE, so `ns/context/v1.jsonld` cannot sit under it. Such a layer's
  * context goes BESIDE the vocabulary, at {@link NS_DOCUMENT_CONTEXT_PATH},
- * same `v1` rule. Decided by what the instance holds ({@link contextPathFor}),
+ * same `v1` rule. Decided by what the layer holds ({@link contextPathFor}),
  * never by its name.
  *
  * ## What it reads, and what it refuses to read
  *
  * - Declarations as DATA — `name`, `needs`, `stub`, `jsonldPrefixes` from each
  *   `<dir>/<dir>.json` — never by importing the layer above.
- * - An instance's OWN namespace (`<stub>` → `…/<stub>/v0/ns/`) is implicit:
+ * - A layer's OWN namespace (`<stub>` → `…/<stub>/v0/ns/`) is implicit:
  *   it comes from cat-harness's `ownPrefixTable` / `own-namespaces.json`, not from
  *   `jsonldPrefixes`, which holds EXTERNAL vocabularies only.
  * - Documents: every `.jsonld` git lists (tracked plus untracked-not-ignored,
  *   plus remote mounts — `contentDocuments` in `lib/jsonld-corpus.ts`), each
- *   assigned to its innermost instance.
+ *   assigned to its innermost layer.
  *   EXCLUDED: a context document under `ns/` (a file whose only key is
  *   `@context`): a context binding a prefix is not a document using it.
  *
@@ -47,10 +47,10 @@
  * A document naming the content context speaks its TERMS — `title`, `cites`,
  * `meta` — and binding `dcterms` and `cito` alone does not make `cites` an
  * `@id`-typed set or `meta` a JSON literal. So the generated context also
- * DEFINES every content- and subgraph-context term the instance's documents
+ * DEFINES every content- and subgraph-context term the layer's documents
  * use, copied verbatim, `@protected` with the rest, and with the prefixes those
  * definitions are written in bound alongside. A term's context must belong to
- * an instance in the flattened `needs`; only the instance's own documents'
+ * a layer in the flattened `needs`; only the layer's own documents'
  * terms are carried. The generated context can therefore REPLACE
  * `ns/content/v1.jsonld` in a document with no triple lost.
  *
@@ -59,7 +59,7 @@
  * drift (a context on disk differs from the generated one — an ABSENT one is
  * not drift, since the contexts are built at publish and never committed), a prefix used
  * in an IRI position that neither the flattened table nor the document's own
- * inline context binds, a prefix two instances in a flattened table bind
+ * inline context binds, a prefix two layers in a flattened table bind
  * differently, a term two contexts define differently (or that a bound prefix
  * shares a name with), a term whose context or prefixes do not resolve here,
  * and a malformed `jsonldPrefixes` table. Each names the file and
@@ -105,14 +105,14 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 /** Instance-relative, and why it is this path: see the module note. Defined once, beside the write boundary. */
 export const INSTANCE_CONTEXT_PATH = BOUNDARY_INSTANCE_CONTEXT_PATH;
 
-/** The namespace DOCUMENT an instance may hold at its root, staged at the extensionless `ns`. */
+/** The namespace DOCUMENT a layer may hold at its root, staged at the extensionless `ns`. */
 export const NS_DOCUMENT = "ns.jsonld";
 
-/** Where the context of an instance whose `ns` is a document goes: beside it (D1, see the module note). */
+/** Where the context of a layer whose `ns` is a document goes: beside it (D1, see the module note). */
 export const NS_DOCUMENT_CONTEXT_PATH = "ns.context.v1.jsonld";
 
 /**
- * The instance-relative path of the context of the instance at `root`:
+ * The instance-relative path of the context of the layer at `root`:
  * {@link NS_DOCUMENT_CONTEXT_PATH} when it holds its namespace as a document
  * ({@link NS_DOCUMENT}), else {@link INSTANCE_CONTEXT_PATH}.
  */
@@ -122,12 +122,12 @@ export function contextPathFor(root: string): string {
 
 const DEFAULT_ROOT = resolve(dirname(HARNESS_ROOT));
 
-/** One instance, read from its declaration as data. */
+/** One layer, read from its declaration as data. */
 export interface InstanceDecl {
   root: string;
   name: string;
   stub: string;
-  /** The declared `iriBase`: the instance's context is published at `<iriBase>ns/context/v1.jsonld`. */
+  /** The declared `iriBase`: the layer's context is published at `<iriBase>ns/context/v1.jsonld`. */
   iriBase?: string;
   needs: string[] | undefined;
   /** The declared table, or the error that made it unreadable. */
@@ -136,10 +136,10 @@ export interface InstanceDecl {
   contextPath: string;
   prefixError?: string;
   /**
-   * The instance declares its context as built at publish (a `builtAtPublish`
+   * The layer declares its context as built at publish (a `builtAtPublish`
    * entry for its {@link contextPathFor} path). The declaration promises the
-   * file, so it is written even when no document of the instance is mounted
-   * here — an index that mounts none of an instance's directories otherwise
+   * file, so it is written even when no document of the layer is mounted
+   * here — an index that mounts none of a layer's directories otherwise
    * fails `derive:publish` with "declared built at publish, and built nothing".
    */
   declaresContext?: boolean;
@@ -179,7 +179,7 @@ export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
 }
 
 /**
- * An instance's own namespace, if it has one: the own-prefix table first
+ * A layer's own namespace, if it has one: the own-prefix table first
  * (`ownPrefixTable`: the harness's stub spellings — it is how `bootstrap`
  * reaches `cat-bootstrap`'s namespace — and the content layer's, derived from
  * its declaration since folio-assistant#2598), then the `own-namespaces` code
@@ -199,14 +199,14 @@ export interface InstanceReport extends InstanceContext {
   instance: string;
   /** Repo-relative path of the generated context. */
   path: string;
-  /** Documents read for this instance. Zero means no context is written. */
+  /** Documents read for this layer. Zero means no context is written. */
   documents: number;
   /** Documents that did not parse — `kg:schema:check`'s finding, counted here so a skipped file is visible. */
   unparseable: string[];
   /** The tables, in the dependency order they were flattened in. */
   flattenedFrom: string[];
   prefixError?: string;
-  /** The file to write: `undefined` when the instance has no documents and does not declare its context built at publish. */
+  /** The file to write: `undefined` when the layer has no documents and does not declare its context built at publish. */
   expected: string | undefined;
   /** What is on disk now, `undefined` when absent. */
   current: string | undefined;
@@ -218,7 +218,7 @@ export interface GenerateOptions {
   remoteContexts?: ReadonlyMap<string, Record<string, unknown>>;
   /** Remote contexts whose prefixes count as the DOCUMENT's own binding — third-party contexts only. */
   bindingContexts?: ReadonlyMap<string, Record<string, unknown>>;
-  /** Remote contexts whose TERMS an instance context carries, with their owning instance. Defaults to the platform's. */
+  /** Remote contexts whose TERMS an instance context carries, with their owning layer. Defaults to the platform's. */
   termSources?: ReadonlyMap<string, TermSource>;
   /** Override the corpus (tests). */
   documents?: string[];
@@ -260,7 +260,7 @@ export function platformContexts(repoRoot: string): {
   return { aliases, bindings, terms };
 }
 
-/** Innermost instance root containing `abs`. */
+/** Innermost layer root containing `abs`. */
 function ownerOf(abs: string, decls: readonly InstanceDecl[]): InstanceDecl | undefined {
   let best: InstanceDecl | undefined;
   for (const d of decls) {
@@ -273,7 +273,7 @@ function ownerOf(abs: string, decls: readonly InstanceDecl[]): InstanceDecl | un
 function isExcluded(abs: string, owner: InstanceDecl, doc: unknown): boolean {
   const rel = relative(owner.root, abs).split(sep).join("/");
   if (rel === owner.contextPath) return true;
-  // declared-path-literal: `ns/` relative to ANY instance's own root (this tests every instance's context files); cat-harness's `ns/` declaration names one instance's directory, not this convention.
+  // declared-path-literal: `ns/` relative to ANY layer's own root (this tests every layer's context files); cat-harness's `ns/` declaration names one layer's directory, not this convention.
   return rel.startsWith("ns/") && isContextDocument(doc);
 }
 
@@ -283,7 +283,7 @@ export function render(context: Record<string, unknown>): string {
 
 export interface GenerateResult {
   reports: InstanceReport[];
-  /** `.jsonld` documents no instance owns — counted, never silently dropped. */
+  /** `.jsonld` documents no layer owns — counted, never silently dropped. */
   unowned: string[];
 }
 
@@ -303,9 +303,9 @@ export function generateInstanceContexts(repoRoot = DEFAULT_ROOT, options: Gener
   const aliases = options.remoteContexts ?? platform!.aliases;
   const bindings = options.bindingContexts ?? platform!.bindings;
   const termSources = options.termSources ?? platform!.terms;
-  // A document already switched to its instance's OWN context (cat-harness
+  // A document already switched to its layer's OWN context (cat-harness
   // `atInstanceContext`) names `<iriBase>ns/context/v1.jsonld`, not the
-  // content context. Its terms are still the content context's — the instance
+  // content context. Its terms are still the content context's — the layer
   // context is generated from them — so that URL reads as the content context
   // here, and the generated file stays a FIXED POINT of what it generates:
   // without this, switching the emitters would make the next run see no terms

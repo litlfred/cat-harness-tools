@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { kgViewerRoute, upFrom, viewerHtml, writeViewer } from "../../kg-viewer.ts";
 
 // Owner, 2026-10-20: "move graph viewer so aligns" — the viewer leaves
-// `<stub>/` (the instance as itself) for a viewer's route.
+// `<stub>/` (the layer as itself) for a viewer's route.
 describe("kg-viewer route", () => {
   test("the viewer is published at <locale>/<stub>/kg/", () => {
     expect(kgViewerRoute("cat-harness")).toBe("en/cat-harness/kg/");

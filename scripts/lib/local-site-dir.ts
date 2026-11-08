@@ -1,5 +1,5 @@
 /**
- * An instance's site directory, read from its declaration — the one answer to
+ * A layer's site directory, read from its declaration — the one answer to
  * "where are this instance's pages" (`siteDirFor`), for the callers that used
  * to spell `"docs"` and check whether it existed.
  *

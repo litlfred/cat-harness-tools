@@ -230,7 +230,7 @@ export async function impactOf(plan: ConePlan, locks: ReadonlyMap<string, FleetL
   return out;
 }
 
-/** The site's own files: every path except those under a mounted instance's `path`. */
+/** The site's own files: every path except those under a mounted layer's `path`. */
 async function ownPaths(site: string, lock: FleetLock, api: FleetApi): Promise<string[]> {
   const mountedAt = new Set<string>();
   for (const i of (lock as { instances?: Array<{ path?: string; repository: string }> }).instances ?? []) {

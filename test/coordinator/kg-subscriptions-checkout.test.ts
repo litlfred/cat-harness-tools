@@ -1,7 +1,7 @@
 /**
  * `kg-subscriptions` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness-tools/scripts/tests/kg/kg-subscriptions.test.ts` (bean `7zz1`, owner
- * ruling 2026-10-06 "Top-level instance"): each derives the staged instances
+ * ruling 2026-10-06 "Top-level instance"): each derives the staged layers
  * of the checkout, which only the checkout holds. Standing alone, cat-harness
  * has none of it, and `check:cat-harness-standalone` collects every test in
  * that layer. The rest of that file's tests stay there; every path here is
@@ -23,11 +23,11 @@ describe("the known-substrates registry (subscriptions-viz)", () => {
 
   // RESTATED 2026-10-09. This asserted the rule on the real checkout, where
   // folio-assistant-core was STAGED: declared with a `livesAt` in a repository
-  // other than its own. Since cat-harness#15 every mounted instance's
+  // other than its own. Since cat-harness#15 every mounted layer's
   // `livesAt` names its own home, so nothing here is staged and no row is
   // derived as planned -- core became the repository it was planned to be.
   // The rule is unchanged and is asserted over a synthetic checkout, where a
-  // staged instance can still exist; the real checkout asserts its half.
+  // staged layer can still exist; the real checkout asserts its half.
   test("a staged instance is DERIVED as planned — nobody keeps a second list of it", () => {
     const root = mkdtempSync(join(tmpdir(), "substrates-"));
     try {

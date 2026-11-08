@@ -9,7 +9,7 @@
  * instances.** The DECLARATION half is `check:declared-dirs`, which runs in CI
  * and fails on every declared directory not on disk (verified by moving
  * a content layer's `library/` away: `absent — declared and not on disk`, exit 1). A
- * SCANNER is the instance half and must not fail on it — a new folio's library
+ * SCANNER is the layer half and must not fail on it — a new folio's library
  * is absent until its first ingest — but it must not be silent either. So an
  * absent directory is reported here, in its own words, distinct from "empty":
  * an empty directory that exists is a determined empty; a declared path with

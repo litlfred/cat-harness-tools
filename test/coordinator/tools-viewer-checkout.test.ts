@@ -2,7 +2,7 @@
  * `tools-viewer` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness-tools/scripts/tests/tools/tools-viewer.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each joins every Tool to the skills of
- * every instance in the checkout, which only the checkout holds. Standing
+ * every layer in the checkout, which only the checkout holds. Standing
  * alone, cat-harness has none of it, and `check:cat-harness-standalone`
  * collects every test in that layer. The rest of that file's tests stay there;
  * every path here is composed from ORIGIN_DIR, the directory they were written
@@ -49,7 +49,7 @@ const entryFor = (kind: string) => (decl.directories ?? []).find((e) => (e.graph
 const docsPagesFor = (kind: string): string[] => {
   const e = entryFor(kind)!;
   // `gitCorpus`, not a bare `git ls-files`: in the composed checkout every
-  // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored by
+  // layer is a REMOTE MOUNT, laid down from `index.lock.json` and ignored by
   // the index repository's git, so `ls-files` from the root lists none of
   // cat-harness's pages. `gitCorpus` counts a mount's files as a submodule's
   // were counted, which is what "the checkout's pages" means since the split.
@@ -167,7 +167,7 @@ describe("the page reports the join in both directions", () => {
 describe("the generator writes where the declaration says", () => {
 
   // The full view is the full KG (bean 1nu0): every declared `tools` graph,
-  // read by auto-discovery, with one sub-graph page per instance.
+  // read by auto-discovery, with one sub-graph page per layer.
   const { subjects, empty } = toolSubjects(REPO);
 
   // Standing alone the page is not built: `tools:viz` writes it at publish and

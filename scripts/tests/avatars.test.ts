@@ -153,7 +153,7 @@ describe("coverage is a QA axis, not a promise", () => {
   });
 
   test("it reports against the instance's OWN declaration, not just the registry", () => {
-    // An instance may declare a kind the base registry never heard of, which
+    // A layer may declare a kind the base registry never heard of, which
     // is what an open vocabulary is for. Checking only the registry would
     // report a clean run over exactly those.
     const { required, declared } = requiredKinds(ROOT);
@@ -166,7 +166,7 @@ describe("coverage is a QA axis, not a promise", () => {
   });
 
   test("an INSTANCE-keyed avatar is REPORTED on the kind axis, not pruned", () => {
-    // These two are keyed on a declared INSTANCE name, not on a graph typology —
+    // These two are keyed on a declared LAYER name, not on a graph typology —
     // `harness-tiles` calls `avatarFor(decl.name)`. So this check, which asks
     // only about kinds, is right to report them and will go on doing so.
     //
@@ -182,7 +182,7 @@ describe("coverage is a QA axis, not a promise", () => {
     // while the art sat under a name nothing carries. This assertion is what
     // now fails if the key drifts off the declared name again.
     //
-    // Since sod4 #4 an instance's avatar lives on its own declaration, so
+    // Since sod4 #4 a layer's avatar lives on its own declaration, so
     // `folio-assistant-core` is no longer a table key and no longer reported.
     // `bootstrap` stays in the table (it is below the harness and declares no
     // avatar field of its own), so it still is.
@@ -192,7 +192,7 @@ describe("coverage is a QA axis, not a promise", () => {
   });
 
   // The avatar now lives on folio-assistant-core's own declaration (sod4 #4),
-  // so it resolves only where that higher instance is composed.
+  // so it resolves only where that higher layer is composed.
   const NO_CORE =
     !instanceRootsIn(resolve(ROOT, "..")).some((r) => readDeclaration(r)?.name === "folio-assistant-core") &&
     notApplicableAlone("folio-assistant-core, whose declaration carries its avatar (an instance above the harness)");
@@ -202,12 +202,12 @@ describe("coverage is a QA axis, not a promise", () => {
 
   test("every instance-keyed avatar resolves for the name an instance declares", () => {
     // The defect `hso8` left behind, stated as a property rather than as one
-    // spelling: an avatar keyed on an instance must match a real declared
+    // spelling: an avatar keyed on a layer must match a real declared
     // name, or it is unreachable AND counted as declared — worse than absent,
     // because coverage reads clean over it.
-    // The REPOSITORY root, not `ROOT`. `ROOT` is this INSTANCE (`cat-harness/`)
-    // and is the right argument for `coverage`, which asks what this instance
-    // declares — but instance NAMES are a repository-level fact, and asking
+    // The REPOSITORY root, not `ROOT`. `ROOT` is this LAYER (`cat-harness/`)
+    // and is the right argument for `coverage`, which asks what this layer
+    // declares — but layer NAMES are a repository-level fact, and asking
     // `instanceRootsIn(ROOT)` returns cat-harness's own subdirectories. The
     // two roots were the same directory before the split, which is why this
     // distinction is easy to get wrong and worth saying in place.

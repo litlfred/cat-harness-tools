@@ -1,7 +1,7 @@
 /**
  * `partition-names` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness-tools/scripts/tests/kg/partition-names.test.ts` (bean `7zz1`, owner
- * ruling 2026-10-06 "Top-level instance"): each reads every staged instance's
+ * ruling 2026-10-06 "Top-level instance"): each reads every staged layer's
  * declaration in the checkout, which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects
  * every test in that layer. The rest of that file's tests stay there; every
@@ -20,7 +20,7 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 const ROOT = join(ORIGIN_DIR, "..", "..", "..");
 
-/** The `name` an instance declares for itself, or `undefined` if it has no declaration. */
+/** The `name` a layer declares for itself, or `undefined` if it has no declaration. */
 function declaredName(instance: string): string | undefined {
   const path = join(ROOT, instance, `${instance}.json`);
   if (!existsSync(path)) return undefined;
@@ -30,7 +30,7 @@ function declaredName(instance: string): string | undefined {
 }
 
 /**
- * The entries that name a staging instance, narrowed so `instance` is a string.
+ * The entries that name a staging layer, narrowed so `instance` is a string.
  *
  * `REPOS.filter(r => r.instance !== undefined)` does NOT narrow the type —
  * TypeScript keeps `string | undefined` through a plain predicate — so every

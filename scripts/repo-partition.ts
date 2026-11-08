@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Repo partition — an import-graph partition of this instance's modules into
+ * Repo partition — an import-graph partition of this layer's modules into
  * the five proposed repositories. Answers two questions:
  *
  *   1. Which modules would land in each of the five proposed repositories?
@@ -9,15 +9,15 @@
  * Every entry in the answer to question 2 is a module that must move, a
  * dependency that must invert, or a documented exception.
  *
- * ## BOTH QUESTIONS ARE ASKED WITHIN ONE INSTANCE
+ * ## BOTH QUESTIONS ARE ASKED WITHIN ONE LAYER
  *
- * `ROOT` is this instance, and `SCAN_ROOTS` are relative to it, so question 2
+ * `ROOT` is this layer, and `SCAN_ROOTS` are relative to it, so question 2
  * is "which edges cross a proposed boundary **among this instance's own
- * modules**". It is silent about imports between instances that already exist
+ * modules**". It is silent about imports between layers that already exist
  * side by side in the checkout, and the report says so in its own output.
  *
  * The cross-instance axis belongs to `kg:detangle:direction` (blocking in
- * CI), where a node's layer is the instance it lives in: this one partitions
+ * CI), where a node's layer is the layer it lives in: this one partitions
  * a future layout by path rule, that one checks a present layout against
  * declared `needs`.
  *
@@ -65,7 +65,7 @@ import {
 
 // ── The CLI, and nothing else ───────────────────────────────────
 //
-// This file was 1,194 lines: the algorithm, this instance's 272 lines of
+// This file was 1,194 lines: the algorithm, this layer's 272 lines of
 // exception data, and 532 lines of rationale for that data, in one module.
 // The algorithm is now `partition/engine.ts` and takes a spec; the data is
 // `partition/instance-rules.ts` and keeps every comment, positioned where it
@@ -73,17 +73,17 @@ import {
 // that are genuinely about running the tool from a terminal.
 //
 // `classify` and `analyse` are re-exported at their old names and old arity,
-// bound to this instance's spec. Nothing imports them today (the partition
+// bound to this layer's spec. Nothing imports them today (the partition
 // tool is standalone; every other mention of it in the tree is prose), but
 // the gate is invoked by name from CI and by hand constantly, and a rename
 // nobody needed is a rename that costs somebody a confused minute.
 
-/** Classify one repo-relative path against THIS instance's rules. */
+/** Classify one repo-relative path against THIS layer's rules. */
 export function classify(relPath: string): Assignment {
   return classifyWith(SPEC, relPath);
 }
 
-/** Analyse THIS instance. */
+/** Analyse THIS layer. */
 export function analyse(): PartitionReport {
   return analyseWith(SPEC);
 }
@@ -136,8 +136,8 @@ function main(): void {
 
   // ── SCOPE, printed WITH the number rather than assumed by the reader.
   //
-  // Bean `p11x`. This tool's ROOT is ONE instance, so every wrong-direction
-  // count it has ever printed is scoped to that instance's own modules and is
+  // Bean `p11x`. This tool's ROOT is ONE layer, so every wrong-direction
+  // count it has ever printed is scoped to that layer's own modules and is
   // silent about edges between already-extracted siblings. A PR citing the
   // bare number therefore made an over-broad claim, which had to be corrected
   // by comment on #1465 — and the bean's own line is that the fix belongs
@@ -158,7 +158,7 @@ function main(): void {
   // incomplete and cannot find its complement is not much better off than
   // one who never doubted it.
   //
-  // DERIVED from `ROOT` and `SCAN_ROOTS`, never spelled out: this instance's
+  // DERIVED from `ROOT` and `SCAN_ROOTS`, never spelled out: this layer's
   // name is exactly the thing the bean recorded as wrong to assume, and a
   // literal here would go stale on the next relocation while still reading
   // as authoritative.
@@ -223,14 +223,14 @@ function main(): void {
   // `--strict` is kept as an accepted no-op so existing invocations do not
   // break; there is no longer a laxer mode for it to select.
   //
-  // ── BOTH AXES ARE ZERO AND ENFORCED WITHIN ONE INSTANCE, and that is not
+  // ── BOTH AXES ARE ZERO AND ENFORCED WITHIN ONE LAYER, and that is not
   // the same sentence as "the layering holds". Bean `p11x`, corrected
   // 2026-09-30 on the owner's Option 2 ruling.
   //
   // The paragraph above was read — here, in the migration plan, and on at
   // least one PR — as discharging Phase I.1, whose gate is "the cross-edge
   // list is empty or every survivor has a written reason". It does not,
-  // because `ROOT` is this instance and the scan never leaves it. `bf5l`
+  // because `ROOT` is this layer and the scan never leaves it. `bf5l`
   // measured the gap rather than arguing it: with a real wrong-direction
   // import in place (`cat-harness/schemas/library/intake.ts` importing
   // `folio-assistant-core`), `check:instance-graph` said no cycle, THIS TOOL
@@ -238,12 +238,12 @@ function main(): void {
   // layering held.
   //
   // So I.1's gate is now BOTH this tool and `kg:detangle:direction`, which is
-  // blocking in CI and whose node layer IS the instance. Neither discharges
+  // blocking in CI and whose node layer IS the layer. Neither discharges
   // I.1 alone; they answer different questions and are not each other's
   // second opinion. Option 1 — widening `ROOT`/`SCAN_ROOTS` to the checkout —
   // was considered and NOT taken: the path rules here are written against
   // instance-relative paths, so it would have meant a large reclassification
-  // across ~17 instances to reach a fact another tool already reports.
+  // across ~17 layers to reach a fact another tool already reports.
   const unassigned = [...modules].filter(([, a]) => a.repo === "unassigned").map(([m]) => m);
   let failed = false;
   if (unassigned.length > 0) {
@@ -255,7 +255,7 @@ function main(): void {
   // ── A RULE NAMING A FILE THAT IS NOT THERE is a dead rule (bean `70lx`).
   //
   // An `exact` entry classifies one path; when that file moves out of this
-  // instance it matches nothing, forever, and nothing said so — 117 had piled
+  // layer it matches nothing, forever, and nothing said so — 117 had piled
   // up by 2026-10-04, one per file each 70lx batch moved to
   // `cat-harness-tools`. A dead entry is not harmless: it reads as a ruling
   // about a file this tool no longer scans, and the next reader trusts it.

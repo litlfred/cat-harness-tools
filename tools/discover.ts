@@ -3,9 +3,9 @@
  *
  * @module cat-harness-tools/tools/discover
  *
- * Every directory an instance declares with graph typology `tools` is loaded,
+ * Every directory a layer declares with graph typology `tools` is loaded,
  * and its `tools()` export merged. A static barrel could not do this: the
- * harness may not import an instance that depends on it (`check:partition`).
+ * harness may not import a layer that depends on it (`check:partition`).
  *
  * ## No import edge
  *
@@ -38,22 +38,22 @@ import { toolsFromFolders } from "../schemas/tools/tool-folders.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { hostSchemaBase } from "../scripts/lib/host-schema.ts";
 
-/** This instance's root (`<repo>/cat-harness`) and the repository above it. */
+/** This layer's root (`<repo>/cat-harness`) and the repository above it. */
 const HARNESS = resolve(HARNESS_ROOT);
 const REPO = resolve(HARNESS, "..");
 
 /**
  * The base every Tool's I/O type IRIs are minted against when the caller
- * names none: THIS instance's declared `canonicalUrl`.
+ * names none: THIS layer's declared `canonicalUrl`.
  *
  * The tool-type vocabulary (`schemas/tools/tool-types.ts`) is the harness's, and
  * it is published once, at the harness's base. Before discovery, each
- * instance's `tools()` fell back to its OWN canonical. Nothing checked that,
+ * layer's `tools()` fell back to its OWN canonical. Nothing checked that,
  * because nothing could see those Tools, and so the DAK base layer's nine pointed at
  * `http://smart.who.int/base/tool-types.schema.json`. That is a FHIR
  * canonical, and WHO publishes no such document. Found by `tools.test.ts` the
  * first time it saw them (bean p0za). A caller that names a base (a preview
- * build) still gets that base for every instance.
+ * build) still gets that base for every layer.
  */
 function harnessBase(): string | undefined {
   const p = declarationPathIn(HARNESS);
@@ -75,7 +75,7 @@ function harnessBase(): string | undefined {
 const load = createRequire(import.meta.url);
 
 export interface ToolSource {
-  /** Instance root, relative to the repository. */
+  /** Layer root, relative to the repository. */
   instance: string;
   /** The declared `tools` directory, relative to the repository. */
   dir: string;
@@ -89,7 +89,7 @@ export interface ToolDiscoveryFailure {
 }
 
 export interface ToolDiscovery {
-  /** Every Tool that loaded and validated, in instance order. */
+  /** Every Tool that loaded and validated, in layer order. */
   tools: ToolDefinition[];
   sources: ToolSource[];
   failures: ToolDiscoveryFailure[];
@@ -110,8 +110,8 @@ export function discoverTools(
   onlyInstance?: string,
   /**
    * `enabledSubgraphs`: the opt-in sub-graphs switched on — a `tools` graph
-   * inside one is loaded beside the instance's own, one inside a switched-off
-   * one is not. Absent, each instance's own list decides; a server pass the
+   * inside one is loaded beside the layer's own, one inside a switched-off
+   * one is not. Absent, each layer's own list decides; a server pass the
    * FOLIO's (`src/tool-groups.ts`, `opt-in-subgraphs.ts`).
    */
   opts: { enabledSubgraphs?: EnabledSubgraphs } = {},
@@ -150,7 +150,7 @@ export function discoverTools(
         }
         // A declared graph holding neither a loader nor a Tool folder is a
         // failure, not zero tools: a moved or emptied directory must not read
-        // as an instance that simply declares none.
+        // as a layer that simply declares none.
         if (Array.isArray(defs) && defs.length === 0) {
           out.failures.push({ ...where, reason: "declares a tools graph that holds no index.ts and no `<id>/<id>.json` Tool folder" });
           continue;
@@ -209,7 +209,7 @@ const _cache = new Map<string, ToolDefinition[]>();
  * consumer's call sites do not change.
  *
  * **Throws on any discovery failure.** A consumer reading a partial list would
- * export, audit or cover-check an instance as if its unloadable Tools did not
+ * export, audit or cover-check a layer as if its unloadable Tools did not
  * exist. `check:tools` reads {@link discoverTools} directly and reports each
  * failure; everything else refuses to proceed on a partial list.
  */
@@ -218,9 +218,9 @@ export function tools(baseUrl?: string): ToolDefinition[] {
 }
 
 /**
- * ONE instance's Tools: the ones its own `tools` graph declares.
+ * ONE layer's Tools: the ones its own `tools` graph declares.
  *
- * For a consumer that writes one instance's document. `kg-export` publishes
+ * For a consumer that writes one layer's document. `kg-export` publishes
  * `<instance>.jsonld`, and filling the harness's document with a higher layer's
  * Tools would give them `satisfies` links into documents that are never
  * published. A check or an audit over the whole repository reads

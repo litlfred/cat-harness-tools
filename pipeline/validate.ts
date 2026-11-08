@@ -314,7 +314,7 @@ async function loadBlocksFromDir(
       // scheme changes. The probe name never touches the filesystem.
       const mirrorDir = dirname(blockQaPath(repoRoot, join(dir, "__probe__")));
       // The results tree's ROOT, asked of the same writer function: the
-      // mirror of the instance root itself.
+      // mirror of the layer root itself.
       const resultsRoot = dirname(blockQaPath(repoRoot, join(repoRoot, "__probe__")));
       // TWO absences, and they are different facts (bean `c8uq`, defect C7).
       //

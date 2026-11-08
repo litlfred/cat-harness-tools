@@ -162,7 +162,7 @@ export interface AutoDocType {
    * a DAK IG's `docs/` there overlays its `index.md` onto the site's own.
    * Measured: `compose-docs.test.ts` failed exactly that way when tried.
    *
-   * So the docs type asks each instance about itself instead, which is what
+   * So the docs type asks each layer about itself instead, which is what
    * `mount-instance-docs` already does.
    */
   directories?: () => Array<{ id: string; absPath: string; path: string }>;
@@ -204,17 +204,17 @@ function frontMatterDescription(text: string): string | undefined {
  * than a guess: a listing with no summary says less than a wrong one.
  */
 /**
- * Docs directories across EVERY instance, each read from its own declaration.
+ * Docs directories across EVERY layer, each read from its own declaration.
  *
  * `instanceRootsIn` rather than a list: its own docstring records two gates
- * that each carried `["cat-harness", "bootstrap"]` while four instances
+ * that each carried `["cat-harness", "bootstrap"]` while four layers
  * existed, and reported clean runs over half the subject. A list that must be
  * edited when a directory is added is a list that will be wrong.
  *
  * `scope !== "repository"` matches what `mount-instance-docs` publishes, so
  * this index covers exactly the docs that get a route and no more.
  *
- * Ids are the DECLARING instance's own, which is what makes the sub-page a
+ * Ids are the DECLARING layer's own, which is what makes the sub-page a
  * per-dependency answer — `who-iris-docs`, `smart-trust-docs` — rather than
  * one page for the root's docs and silence about everyone else's.
  */
@@ -224,7 +224,7 @@ function docsDirectoriesAcrossInstances(): Array<{ id: string; absPath: string; 
   for (const instance of instanceRootsIn(REPO)) {
     // `findDeclarationFile` returns a BASENAME, not a path — join it.
     // Without the join this reads relative to the process cwd, which silently
-    // "works" for whichever instance happens to sit there and fails for every
+    // "works" for whichever layer happens to sit there and fails for every
     // other, leaving one sub-graph where there should be three. That is how
     // the first attempt at this looked correct.
     const declName = findDeclarationFile(instance);
@@ -259,7 +259,7 @@ function docsDirectoriesAcrossInstances(): Array<{ id: string; absPath: string; 
  *
  * Read from the declaration's own `publish` field rather than by name, so a
  * second staging-only page is withheld without editing this file — naming
- * `fsh-guts` here would be a rule true only for the instance somebody
+ * `fsh-guts` here would be a rule true only for the layer somebody
  * remembered.
  */
 function stagingOnlyRefs(): Set<string> {
@@ -315,10 +315,10 @@ function walk(dir: string, pred: (name: string) => boolean): string[] {
  */
 export function declaredDirectories(graph: string): Array<{ id: string; absPath: string; path: string; instance: string }> {
   // The CORPUS this handler documents (placement PR0, bean `ejye`): this
-  // instance plus everything stacked on it, which the platform's
+  // layer plus everything stacked on it, which the platform's
   // `scope: "repository"` mirrors used to supply under ids of their own. Each
   // directory now keeps its OWNER's id; one that collides with an id already
-  // taken (the DAK base layer's `processes`) is qualified by its instance, which is
+  // taken (the DAK base layer's `processes`) is qualified by its layer, which is
   // the mirror id it had (`<instance>-processes`).
   const own = new Set(resolveDirectories([{ name: "(local)", root: ROOT, own: true }]).map((d) => d.absPath));
   const all = checkoutDirectories(ROOT, { stackedOn: ROOT })
@@ -679,7 +679,7 @@ export const TYPES: AutoDocType[] = [
       // AUTHORED only, and `classify` from `check-docs-populated.ts` is what
       // decides — imported rather than re-derived.
       //
-      // 261 of this instance's 316 docs markdown files are the GENERATED
+      // 261 of this layer's 316 docs markdown files are the GENERATED
       // reference (`docs/reference/**`, written by `gen-schema-docs` and
       // `gen-skill-docs`), plus this generator's own output under
       // `auto-docs/`. Listing them would bury the ~55 authored pages a reader
@@ -696,7 +696,7 @@ export const TYPES: AutoDocType[] = [
       // `.html` AS WELL AS `.md`, and that is not defensive breadth.
       // The IRIS replica's `docs/` holds FOUR pages and every one is `.html` —
       // pre-rendered rather than Jekyll source. An `.md`-only filter reports
-      // that instance as having no documentation while it publishes four
+      // that layer as having no documentation while it publishes four
       // pages, which is the `dh4f` shape: a consumer scanning nothing and
       // calling the result clean. Measured before this was written.
       const items: AutoDocItem[] = [];
@@ -731,7 +731,7 @@ export const TYPES: AutoDocType[] = [
       const items: AutoDocItem[] = [];
       // BOTH the split kind and the umbrella it came out of. `processes` is
       // where an in-tree diagram lives after 2026-09-21; `cat-harness` is
-      // where a downstream instance's still is, and dropping it would make
+      // where a downstream layer's still is, and dropping it would make
       // this index silently empty for them — which is worse than useless,
       // because an empty index reads as "this instance has no processes".
       //
@@ -787,8 +787,8 @@ export const TYPES: AutoDocType[] = [
             const shared = [...new Set([...defs.values()].flat())].sort();
             items.push({
               path: relative(REPO, f).split("\\").join("/"),
-              // Named by its INSTANCE, not its file: every layer's file is
-              // `processes/global-tasks.bpmn` (a diagram is its instance plus
+              // Named by its LAYER, not its file: every layer's file is
+              // `processes/global-tasks.bpmn` (a diagram is its layer plus
               // its path), so a basename here would label two rows alike.
               name: `Shared steps (${d.instance})`,
               summary: `${defs.size} global task(s) that this layer's processes call by id.`,
@@ -870,7 +870,7 @@ export const TYPES: AutoDocType[] = [
           try {
             parsed = JSON.parse(readFileSync(f, "utf-8"));
           } catch {
-            // A ledger this code cannot read is NOT an instance with no terms.
+            // A ledger this code cannot read is NOT a layer with no terms.
             // Skipping it silently would report a clean, empty glossary over a
             // broken file — `dh4f`, which is the shape this whole handler is
             // careful about.
@@ -889,7 +889,7 @@ export const TYPES: AutoDocType[] = [
               // keys on path, so it is deliberately not applied here.
               path: `${relative(REPO, f).split("\\").join("/")}#${key}`,
               // The ledger, relative to the sub-graph: more than one ledger
-              // lives under it (an instance's own, and bootstrap's), so which
+              // lives under it (a layer's own, and bootstrap's), so which
               // one is still worth a line — the `#key` is the notation fact.
               pathLabel: relative(d.absPath, f).split("\\").join("/"),
               name: entry.prefLabel ?? key,
@@ -1566,7 +1566,7 @@ if (import.meta.main) {
     //   - declared directories WITH FILES, and the type collects nothing
     //     → the reader is wrong, or its source moved. **Refuse.**
     //
-    // So this cannot fire on an instance that simply does not have the
+    // So this cannot fire on a layer that simply does not have the
     // material; it fires when the material is there and the type cannot see
     // it. `check` mode counts it as stale rather than throwing, so one run
     // reports every type rather than dying on the first.

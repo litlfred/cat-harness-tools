@@ -128,7 +128,7 @@ describe("bean dp1j — KG affordances: browse, materialise, instantiate, copy-i
     });
     expect(local.source).toBeUndefined();
 
-    // Invalid instance slug is refused by AssetSourceSchema.
+    // Invalid layer slug is refused by AssetSourceSchema.
     expect(() =>
       AssetSourceSchema.parse({
         instance: "not-a-repo-slug",

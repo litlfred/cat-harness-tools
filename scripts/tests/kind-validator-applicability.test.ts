@@ -50,7 +50,7 @@ describe("the three states partition the registry", () => {
 
   test("a kind left to another layer names an owner this checkout does not hold", async () => {
     // So `elsewhere` cannot become the place a kind of THIS checkout hides:
-    // only the declaring instance's absence puts a kind there.
+    // only the declaring layer's absence puts a kind there.
     const r = await sweep(INSTANCE);
     const here = new Set(instanceRootsIn(join(INSTANCE, "..")).map((root) => readDeclaration(root)?.name));
     for (const e of r.elsewhere) {

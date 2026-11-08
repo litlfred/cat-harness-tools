@@ -20,8 +20,8 @@
  * only. Without script, or before `pins.json` arrives, the link still opens
  * the file, on the repository's default branch.
  *
- * Only the pins of THIS build are rewritten: a link at any other commit (an
- * instance site built elsewhere, a quoted historical commit) is a fact of its
+ * Only the pins of THIS build are rewritten: a link at any other commit (a
+ * layer site built elsewhere, a quoted historical commit) is a fact of its
  * page and stays as written.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

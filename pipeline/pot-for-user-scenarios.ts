@@ -3,7 +3,7 @@
  * journey page, and nothing a machine resolves.
  *
  * A user scenario is JSON, so no prose extractor reaches it; until this
- * existed an instance's journeys were the one part of its site no translator
+ * existed a layer's journeys were the one part of its site no translator
  * was ever handed. The translatable fields are listed here, by path, rather
  * than guessed from the data: an id, an href, a code of the trust ladder or a
  * FHIR resource key is text too, and translating any of them breaks a
@@ -95,7 +95,7 @@ export function contextOf(field: FieldPath): string {
 /**
  * The `.pot` entries of one user scenario, field by field in the order of
  * {@link USER_SCENARIO_TEXT_FIELDS}, each value in document order. `source`
- * is the path a translator sees in `#:`, relative to the instance root.
+ * is the path a translator sees in `#:`, relative to the layer root.
  */
 export function extractUserScenario(raw: string, source: string): PotEntry[] {
   const doc = JSON.parse(raw) as unknown;

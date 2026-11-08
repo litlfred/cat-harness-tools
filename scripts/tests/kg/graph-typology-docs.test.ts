@@ -12,7 +12,7 @@
  * that skill the source of truth, so an agent following it would have written
  * `graph: "workplan"` and been refused by the registry it was told to trust.
  *
- * #269 fixed the instance. This is the guard, and nothing existing could have
+ * #269 fixed the layer. This is the guard, and nothing existing could have
  * been it: `gen-skill-docs --check` verifies the generated mirror matches its
  * hand-authored source, so it cannot notice that BOTH describe a registry they
  * no longer match.

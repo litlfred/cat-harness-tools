@@ -1,6 +1,6 @@
 /**
  * The files of every declared directory of one graph typology, across the
- * instances of a checkout: the one scan behind each node graph a harness
+ * layers of a checkout: the one scan behind each node graph a harness
  * declares instead of a central table (`typologies/`, `validators/`). Reads
  * each declaration RAW (`directories[].graphTypologies`, `path`, `scope`)
  * because the declaration's Zod schema lives in `cat-harness.ts`, which
@@ -20,7 +20,7 @@ import { findDeclarationFile, instanceRootsIn } from "./instance-roots";
  *
  * Set by `test-preload.ts` only when the checkout under test holds no
  * vocabulary — cat-harness standing alone, as `check:cat-harness-standalone`
- * runs it — and never in the monorepo, where the real instances are present.
+ * runs it — and never in the monorepo, where the real layers are present.
  * It points at `test/fixtures/standalone-checkout/`, copies of the node graphs
  * cat-harness's tests read from core and sci, held equal to them by
  * `standalone-fixture.test.ts`. Owner, 2026-10-05: fixture the tests rather
@@ -29,21 +29,21 @@ import { findDeclarationFile, instanceRootsIn } from "./instance-roots";
 const FIXTURE_ENV = "FOLIO_FIXTURE_CHECKOUT";
 
 /**
- * Which instances of a checkout a scan reads: given an instance root, whether
- * its declared directories count. Omitted, every instance does. A generator
+ * Which layers of a checkout a scan reads: given a layer root, whether
+ * its declared directories count. Omitted, every layer does. A generator
  * whose output must not depend on what else is mounted beside it (bean `8lcl`:
- * the harness's published JSON Schemas) passes the instances it may read.
+ * the harness's published JSON Schemas) passes the layers it may read.
  */
 export type InstanceFilter = (instanceRoot: string) => boolean;
 
-/** Every directory declared with `graphTypology`, across the instances of a checkout (absolute paths, declaration order). */
+/** Every directory declared with `graphTypology`, across the layers of a checkout (absolute paths, declaration order). */
 export function declaredDirectories(repoRoot: string, graphTypology: string, include?: InstanceFilter): string[] {
   // input-site: env-unset FOLIO_FIXTURE_CHECKOUT #d3ac43d3 — a test-only override naming a checkout OUTSIDE the tree
   const fixture = process.env[FIXTURE_ENV];
   const ownRoots = instanceRootsIn(repoRoot);
-  // The fixture's instances are scanned BESIDE this checkout's, for every
+  // The fixture's layers are scanned BESIDE this checkout's, for every
   // graph typology. It was "only when no own instance declares the typology",
-  // which hid the fixture's IG-pipeline instance's `typologies/` from a standalone
+  // which hid the fixture's IG-pipeline layer's `typologies/` from a standalone
   // cat-harness that declares a `typologies/` of its own (ig-pages, ig-ast,
   // ig-metadata-index, the todo kinds), so four tests failed standalone. The
   // fixture is set only when the checkout holds no vocabulary, never in a
@@ -53,7 +53,7 @@ export function declaredDirectories(repoRoot: string, graphTypology: string, inc
   return roots.filter((root) => include === undefined || include(root)).flatMap((root) => ownDeclaredDirectories(root, graphTypology, repoRoot));
 }
 
-/** The directories ONE instance declares with `graphTypology` (absolute paths). `repository`-scoped paths resolve against `repoRoot`. */
+/** The directories ONE layer declares with `graphTypology` (absolute paths). `repository`-scoped paths resolve against `repoRoot`. */
 export function ownDeclaredDirectories(root: string, graphTypology: string, repoRoot: string = root): string[] {
   const declFile = findDeclarationFile(root);
   if (declFile === undefined) return [];

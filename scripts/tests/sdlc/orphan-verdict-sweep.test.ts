@@ -108,7 +108,7 @@ describe("check:orphan-verdicts, the CLI", () => {
 
   it("refuses with exit 2 over an absent results tree, and prints no pass", () => {
     inTmp((root) => {
-      // `findContentRepoRoot` walks up from the cwd to an instance root.
+      // `findContentRepoRoot` walks up from the cwd to a layer root.
       writeFileSync(join(root, "demo.json"), JSON.stringify({ name: "demo" }));
       mkdirSync(join(root, "folio"), { recursive: true });
       const r = run(root);

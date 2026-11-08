@@ -35,7 +35,7 @@ function git(root: string, ...args: string[]): void {
   expect(`${args.join(" ")} -> ${r.status}`).toBe(`${args.join(" ")} -> 0`);
 }
 
-/** A git repository whose instance declares exactly `dirs`. */
+/** A git repository whose layer declares exactly `dirs`. */
 function repo(dirs: Array<Record<string, unknown>>): string {
   const root = mkdtempSync(join(tmpdir(), "mq-store-"));
   made.push(root);
@@ -159,7 +159,7 @@ describe("the live shape: declared FROM WITHIN, and cut over", () => {
     // The composed id is what `nestedDirectories` reports under, and
     // `markerPath` refuses it outright. Asking with it used to be "could not
     // determine", rendered as `unmounted` — the defect. `tipPresence` now finds
-    // a mount by its declared PATH first (an id several instances share is
+    // a mount by its declared PATH first (an id several layers share is
     // filed under `<instance>.<id>`), so even the composed id sees the mount.
     const nested = nestedDirectories(root, readDeclaration(root)!)!.find((n) => n.ownId === "queue")!;
     expect(nested.id).toBe("beans/queue");

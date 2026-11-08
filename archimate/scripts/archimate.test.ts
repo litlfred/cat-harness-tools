@@ -370,7 +370,7 @@ describe("an instance", () => {
     const root = make(config);
     try {
       const { graphPath, pageRoot, files } = pagesFor(root, { site: true });
-      // `<locale>/<harness>/<visualiser>`: the route the instance declares for this Tool.
+      // `<locale>/<harness>/<visualiser>`: the route the layer declares for this Tool.
       expect(pageRoot).toBe("en/tiny/archimate");
       const at = (f: Written) => sitePathOf({ graphPath, pageRoot }, f);
       // Pages at the route, every other file at the graph's own path.

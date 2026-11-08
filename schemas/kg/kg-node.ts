@@ -10,13 +10,13 @@
  * ## `title` is not `id`, and not `name`
  *
  * `id` is the handle other nodes reference. `name` — where a node still has one
- * — is the instance's own identifier, the thing `harness.json` calls
+ * — is the layer's own identifier, the thing `harness.json` calls
  * `folio-assistant` and publishes artefacts under. `title` is display text,
  * may contain punctuation an identifier could not, and is **translatable**.
  * `C@T Harness` is a title; `cat-harness` is a name.
  *
  * **The default is no title.** {@link displayTitle} falls back to `name`, so
- * an instance whose display text should match its repository omits `title`
+ * a layer whose display text should match its repository omits `title`
  * rather than repeating `name`.
  *
  * ## Translatable means extractable
@@ -96,7 +96,7 @@ export interface KgImage extends KgNodeLabels {
    *
    * `browser-icon` is the one with a hard constraint — it has to survive
    * 16&nbsp;px — so it is named rather than left to a consumer to guess from
-   * the filename. Open string: an instance may have marks this vocabulary has
+   * the filename. Open string: a layer may have marks this vocabulary has
    * not met.
    */
   role?: string;
@@ -175,7 +175,7 @@ export interface KgImage extends KgNodeLabels {
   avatarRegion?: ImageRegion;
   /**
    * What the navbar draws BEHIND this image when it is an avatar: `tone` (the
-   * default), the instance's hue square, which a card-art crop covers; or
+   * default), the layer's hue square, which a card-art crop covers; or
    * `none`, the image on the rail itself, for a mark that is transparent
    * around its shape (issue #46, gap 5).
    */
@@ -290,13 +290,13 @@ export const KgImageSchema = z
  * determine when the upstream is unreachable."*
  *
  * Absent is a **third state, not "unknown"**: an asset with no `source` was
- * authored in this instance and is its own origin, which is a different fact
+ * authored in this layer and is its own origin, which is a different fact
  * from one whose upstream cannot be reached.
  */
 export const AssetSourceSchema = z.object({
-  /** The instance it came from, as a reference — `litlfred/cat-harness`. */
+  /** The layer it came from, as a reference — `litlfred/cat-harness`. */
   instance: RepoFullNameSchema,
-  /** Path within that instance. */
+  /** Path within that layer. */
   path: z.string().min(1),
   /** The ref it was taken at, when known. Absent means "not recorded". */
   ref: z.string().min(1).optional(),
@@ -304,7 +304,7 @@ export const AssetSourceSchema = z.object({
 export type AssetSource = z.infer<typeof AssetSourceSchema>;
 
 /**
- * A declared non-image artefact of an instance — `AGENTS.md` first among them.
+ * A declared non-image artefact of a layer — `AGENTS.md` first among them.
  *
  * ## Why this is not {@link KgImageSchema} with a wider type
  *
@@ -320,7 +320,7 @@ export type AssetSource = z.infer<typeof AssetSourceSchema>;
  *
  * ## Why declare it at all
  *
- * Measured 2026-09-19: `AGENTS.md` is the only root artefact this instance
+ * Measured 2026-09-19: `AGENTS.md` is the only root artefact this layer
  * does not declare — `harness.json` carries `directories[]` and `images[]` and
  * it is in neither. Bean `v8gh` is what that costs: seven dead links in it,
  * five broken by a single directory move, including the one its own banner
@@ -331,12 +331,12 @@ export type AssetSource = z.infer<typeof AssetSourceSchema>;
  * Declaring it is what makes a check follow rather than be special-cased.
  */
 /**
- * Which ROOT a declared path is relative to — the instance's, or the
+ * Which ROOT a declared path is relative to — the layer's, or the
  * repository's.
  *
  * ## Why this exists
  *
- * An instance root and a repository root were the **same directory** until the
+ * A layer root and a repository root were the **same directory** until the
  * move (bean `wggr`), so every declared path answered both questions at once
  * and nothing had to say which it meant. Afterwards four directories and both
  * assets resolved one level too deep, producing the `dh4f` shape from the
@@ -356,7 +356,7 @@ export type AssetSource = z.infer<typeof AssetSourceSchema>;
  * ## What `repository` implies beyond the path
  *
  * **It is not inherited.** A dependency's repository is not this one's, so a
- * repository-scoped entry reaching this instance through the dependency chain
+ * repository-scoped entry reaching this layer through the dependency chain
  * would name somebody else's `beans/`. `resolveDirectories` skips those, which
  * is how the never-overlaid property of `beans/` and `todos/` stops being
  * something an agent has to remember.
@@ -377,11 +377,11 @@ export const KgAssetSchema = z.object({
   id: z.string().min(1),
   /**
    * Path relative to the root {@link DeclarationScopeSchema | `scope`} names —
-   * this instance's by default, the repository's when `scope` says so.
+   * this layer's by default, the repository's when `scope` says so.
    *
    * `AGENTS.md` and `README.md` are the repository's: a cold agent reads them
    * at the top of the checkout, and the repository has exactly one of each
-   * however many instances it holds.
+   * however many layers it holds.
    */
   src: z.string().min(1),
   /** What this artefact is FOR — `agent-instructions`, `licence`, … */

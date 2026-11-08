@@ -65,7 +65,7 @@ export interface PoResolveOptions {
  * 2. the **declaration** — `harness.json`'s `translation-sources` graph. This
  *    is what the rest of the pipeline reads, including
  *    `translationSourcesDir` in `src/tools/translation.ts`.
- * 3. the convention, `translations/`, for an instance that declares neither.
+ * 3. the convention, `translations/`, for a layer that declares neither.
  *
  * Step 2 was MISSING and it cost a red build. The directory was declared in TWO
  * places — here by convention and in `harness.json` as a graph — and `wggr`
@@ -76,7 +76,7 @@ export interface PoResolveOptions {
  * exactly as `AGENTS.md` warns.
  *
  * Reading the declaration here removes the second place rather than adding a
- * third: this instance sets no `translationDir` and now needs none.
+ * third: this layer sets no `translationDir` and now needs none.
  */
 function translationDir(folioRoot: string, config?: HarnessConfig | null): string {
   const explicit = config?.translation?.translationDir;
@@ -94,7 +94,7 @@ function translationDir(folioRoot: string, config?: HarnessConfig | null): strin
  *
  * Steps 1–3 compose paths under the folio's own translation directory and
  * step 4 walks its ordered dependencies — and both of those are a function of
- * `folioRoot` alone. Resolving them per call made a sweep pay for the instance
+ * `folioRoot` alone. Resolving them per call made a sweep pay for the layer
  * graph once per (block, locale): measured 2026-10-03, 86 s of the 93 s
  * `translation-block-qa --check` was `orderedDependencies` and 12 s more was
  * `directoryForGraph`, re-reading every declaration for every pair (bean `ksg3`).

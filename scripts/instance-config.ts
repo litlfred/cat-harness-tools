@@ -1,5 +1,5 @@
 /**
- * An instance's config, read by NAME at a checkout root: the
+ * A layer's config, read by NAME at a checkout root: the
  * `index.config.json` entry first, a root `<name>.config.json` only as a
  * fallback that is reported as LEGACY.
  *
@@ -7,12 +7,12 @@
  * @graphNode none — a reader over `cat-harness/schemas/kg/index-config.ts`; the schema stays there
  *
  * A checkout's root `index.config.json` is the ONE authoritative config, each
- * instance's config is inline in its `instances[]` entry, and a
+ * layer's config is inline in its `instances[]` entry, and a
  * `<name>.config.json` is only a migration step.
  *
  * `readHarnessConfig` / `readEffectiveConfig` in cat-harness answer the same
- * question from a DIRECTORY (they find the instance that owns it); the
- * readers here are handed a root and an instance name, so this resolves the
+ * question from a DIRECTORY (they find the layer that owns it); the
+ * readers here are handed a root and a layer name, so this resolves the
  * entry by name and keeps the same overlay rule: the imported file, when one
  * exists, overlaid by the entry's inline fields (objects merge key by key,
  * anything else is replaced).
@@ -23,7 +23,7 @@ import { join, resolve } from "node:path";
 import { importedConfigFilename, inlineOverrides, readIndexConfig } from "../schemas/kg/index-config.ts";
 
 export interface InstanceConfigRead {
-  /** The effective config, raw (keys the schema does not name are kept). Absent when nothing configures the instance. */
+  /** The effective config, raw (keys the schema does not name are kept). Absent when nothing configures the layer. */
   config?: Record<string, unknown>;
   /** Where it came from, as a sentence fragment a message can name. */
   from: string;

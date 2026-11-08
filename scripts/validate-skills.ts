@@ -23,7 +23,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  *
  * declared-path-literal: the fallback is at the call site so the choice is
  * visible. `kgRoots()` returns a LIST because a topical layout has several;
- * this site wants one directory, and takes the first, which is the instance's
+ * this site wants one directory, and takes the first, which is the layer's
  * own root in every layout shipped so far.
  */
 function kgRoot(root: string): string {
@@ -104,14 +104,14 @@ validateDir(
 // nothing would say so until something tried to load it. Only `.json` here —
 // the directory also holds `.md` instruction bodies, which `validateDir`
 // already filters out.
-// Split by theme across the instances that own them (bean `rqao`).
+// Split by theme across the layers that own them (bean `rqao`).
 for (const dir of skillDefinitionDirs(rootDir)) {
   validateDir(dir, SkillDefinitionSchema, "skill-definitions");
 }
 
 // Validate skill package manifests
 //
-// Every skills graph the instance declares, its opt-in sub-graphs' included
+// Every skills graph the layer declares, its opt-in sub-graphs' included
 // (cat-harness#991 step 23.2: `sdlc/skills/` and `work-plan/skills/` hold
 // packages too). The convention only when nothing is declared.
 const declaredSkillDirs = instanceDirectoriesForGraph(rootDir, "skills");

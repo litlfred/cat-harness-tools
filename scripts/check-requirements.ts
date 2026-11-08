@@ -205,7 +205,7 @@ function slugsIn(dir: string): string[] {
 }
 
 /**
- * The directory the instance declares for `kind` — at its root, or FROM WITHIN
+ * The directory the layer declares for `kind` — at its root, or FROM WITHIN
  * a declared directory (`docs/docs.json`, issue #1164). Throws when it
  * declares none or several, or the directory is missing.
  */

@@ -98,7 +98,7 @@ describe("quotations are not claims", () => {
   test("blockquote and fenced lines are dropped before matching", () => {
     // The live case is `tlj9`, which quotes `4ccr`'s sentence. Asserted on the
     // source rather than by planting, because the plant would have to edit a
-    // bean and this is the invariant, not the instance.
+    // bean and this is the invariant, not the layer.
     const src = readFileSync(SOURCE, "utf-8");
     expect(src).toContain("assertedProse");
     expect(src).toMatch(/\/\^\\s\*>\//); // the blockquote guard

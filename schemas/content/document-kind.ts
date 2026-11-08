@@ -112,7 +112,7 @@ export type DocumentKindSection = z.infer<typeof DocumentKindSectionSchema>;
 // ── Coverage: how one subject realises a kind ───────────────────────────
 
 /**
- * How one SUBJECT (an instance, a document) realises a kind, section by
+ * How one SUBJECT (a layer, a document) realises a kind, section by
  * section, as computed by whoever owns the kind.
  *
  * Generic like the kind itself: the rule that assigns a member to a section is
@@ -131,7 +131,7 @@ const CoverageMemberSchema = z.object({
 export const DocumentKindCoverageKind = nodeKind(DOCUMENT_KIND_COVERAGE_SCHEMA_TAG, [], {
   /** The kind's id. */
   kind: z.string().min(1),
-  /** The instance whose content was classified. */
+  /** The layer whose content was classified. */
   subject: z.string().min(1),
   /** Repo-relative path of what was classified. */
   from: z.string().min(1),

@@ -1,17 +1,17 @@
 /**
- * Roles, actors and capabilities EXTENDED BY ID from a higher instance's own
+ * Roles, actors and capabilities EXTENDED BY ID from a higher layer's own
  * `scenarios/`.
  *
  * @module schemas/scenario-overlay
  * @graphNode schema
  *
  * A role→skill edge naming a skill that belongs above the harness has to live
- * in the higher instance, pointing down; otherwise the harness holds an UPWARD
+ * in the higher layer, pointing down; otherwise the harness holds an UPWARD
  * reference.
  *
  * ## The rule — the dependent holds the pointer
  *
- * As a story points at the role it is told as, a higher instance's
+ * As a story points at the role it is told as, a higher layer's
  * `scenarios/` may:
  *
  * | what | how | what it may change |
@@ -25,7 +25,7 @@
  * | add a POLICY | `policies/<file>.jsonld`, a NEW `uid` | its own ODRL rules, e.g. the grants of the actors it adds |
  *
  * Id-matching is the same rule as a directory override and as `inherits`.
- * **Redeclaring a lower id is refused**, not merged, so the lower instance's
+ * **Redeclaring a lower id is refused**, not merged, so the lower layer's
  * audit and the checkout's agree on what the role IS. An extension may only
  * name something declared BELOW it.
  *
@@ -41,21 +41,21 @@
  * that changes or drops anything is refused.
  *
  * Skill front matter does not carry `roles:`; the edge stays on the role
- * graph, spread across instances.
+ * graph, spread across layers.
  *
  * ## Where the layers come from
  *
- * The base is the instance asked about; the layers are the CHECKOUT's
- * instances that depend on it ({@link checkoutDependentsOf}), deepest first.
- * Resolved alone, an instance sees only its own graph.
+ * The base is the layer asked about; the layers are the CHECKOUT's
+ * layers that depend on it ({@link checkoutDependentsOf}), deepest first.
+ * Resolved alone, a layer sees only its own graph.
  *
- * Auditing ONE instance asks the other direction: which actors may its
- * requirements and lanes name? Those are the platform's, every instance it
+ * Auditing ONE layer asks the other direction: which actors may its
+ * requirements and lanes name? Those are the platform's, every layer it
  * `needs`, and its own ({@link neededActors}) — never a dependent's.
  *
  * ## Policies travel with the actors they grant
  *
- * An actor a higher instance adds holds its grants in THAT instance's
+ * An actor a higher layer adds holds its grants in THAT layer's
  * `policies/`. {@link checkoutPolicies} and {@link neededPolicies} read the
  * same layers as the actor overlay, by the same rule: a new `uid` is added, a
  * redeclared one is refused unless it only adds. A policy may `inheritFrom` a
@@ -127,17 +127,17 @@ function warnMoveInFlight(kind: string, id: string, lower: string, higher: strin
   console.warn(msg);
 }
 
-/** A higher instance's `scenarios/` directory, as an overlay layer. */
+/** A higher layer's `scenarios/` directory, as an overlay layer. */
 export interface ScenarioLayer {
-  /** The instance's declared name. */
+  /** The layer's declared name. */
   instance: string;
   /** Absolute path of its `scenarios` directory. */
   dir: string;
 }
 
 /**
- * The `scenarios` directories of every checkout instance that depends on
- * `instanceRoot`, deepest first. Each is asked of THAT instance's own
+ * The `scenarios` directories of every checkout layer that depends on
+ * `instanceRoot`, deepest first. Each is asked of THAT layer's own
  * declaration — never inherited — so the harness's own `scenarios/` is never
  * read twice as a layer of itself.
  */
@@ -152,7 +152,7 @@ export function scenarioLayersAbove(instanceRoot: string): ScenarioLayer[] {
   return out;
 }
 
-/** Who added what to a role, for a report that must name the instance. */
+/** Who added what to a role, for a report that must name the layer. */
 export interface RoleExtensionRecord {
   instance: string;
   role: string;
@@ -160,7 +160,7 @@ export interface RoleExtensionRecord {
 }
 
 /**
- * Overlay higher instances' role graphs onto `base`.
+ * Overlay higher layers' role graphs onto `base`.
  *
  * Throws on a redeclared id that does not only add (a move in flight that
  * only adds is accepted with a warning), an extension naming no lower role, or a new
@@ -223,8 +223,8 @@ export function overlayRoleGraphs(
  * The role graph of `instanceRoot` as its CHECKOUT sees it: its own graph,
  * then every dependent's `scenarios/roles.json` overlaid by id.
  *
- * `undefined` when the instance has no role graph of its own. Identical to the
- * instance's own graph when no dependent extends it — which is every role on
+ * `undefined` when the layer has no role graph of its own. Identical to the
+ * layer's own graph when no dependent extends it — which is every role on
  * the day PR0 lands, and the falsifier it is held to.
  */
 export function checkoutRoleGraph(
@@ -242,7 +242,7 @@ export function checkoutRoleGraph(
     const byOwnId = new Map(roles.map((r) => [r.id, r]));
     const extensions = (g.extensions ?? []).filter((ext) => {
       if (known.has(ext.role)) return true;
-      // Move in flight across repositories: the lower instance removed `ext.role`
+      // Move in flight across repositories: the lower layer removed `ext.role`
       // while the mounted dependent either still pins the pre-move `extensions`
       // entry or carries both `roles` and `extensions` before folding them.
       const movedHere = byOwnId.get(ext.role);
@@ -303,7 +303,7 @@ function rawActor(a: LoadedActor): Record<string, unknown> {
 }
 
 /**
- * Overlay higher instances' actor directories onto `base`: a file with
+ * Overlay higher layers' actor directories onto `base`: a file with
  * `extends` adds `roles` and `capabilities` to a lower actor; any other file
  * is a new actor, refused if its id is already taken — unless the file only
  * adds to the lower one's, a move in flight ({@link onlyAdds}): then it is
@@ -366,7 +366,7 @@ export function checkoutActors(
 export type CapabilityRecord = Record<string, unknown> & { id: string; path: string };
 
 /**
- * Overlay higher instances' capability directories onto `base`'s: a file with
+ * Overlay higher layers' capability directories onto `base`'s: a file with
  * `extends` adds `requires` to a lower probe; any other file is a new probe,
  * refused if its id is already taken — unless it only adds to the lower one,
  * a move in flight ({@link onlyAdds}): then it is used, with a warning.
@@ -421,8 +421,8 @@ export function checkoutCapabilities(instanceRoot: string, ownCapabilitiesDir: s
 }
 
 /**
- * The `scenarios` directories of every instance `instanceRoot` needs, deepest
- * first, then its own: the layers below an instance, as
+ * The `scenarios` directories of every layer `instanceRoot` needs, deepest
+ * first, then its own: the layers below a layer, as
  * {@link scenarioLayersAbove} gives the layers above one.
  */
 export function scenarioLayersBelow(instanceRoot: string): ScenarioLayer[] {
@@ -441,11 +441,11 @@ export function scenarioLayersBelow(instanceRoot: string): ScenarioLayer[] {
 }
 
 /**
- * The actors an instance's requirements and lanes may name: the platform's
- * registry, overlaid with the `scenarios/actors/` of every instance it needs
+ * The actors a layer's requirements and lanes may name: the platform's
+ * registry, overlaid with the `scenarios/actors/` of every layer it needs
  * and then its own.
  *
- * Before this, an instance audit read the platform's registry alone, so a
+ * Before this, a layer audit read the platform's registry alone, so a
  * downstream that declared the actors of its own domain (the IHE ITI VHL
  * Sharer and Receiver, say) saw every requirement naming them fail
  * `requirement-actors-resolve`, and every role they take on fail
@@ -467,7 +467,7 @@ export function neededActors(
 }
 
 /**
- * The `policies` directories of every checkout instance that depends on
+ * The `policies` directories of every checkout layer that depends on
  * `instanceRoot`, deepest first — {@link scenarioLayersAbove}, one graph over.
  */
 export function policyLayersAbove(instanceRoot: string): ScenarioLayer[] {
@@ -482,7 +482,7 @@ export function policyLayersAbove(instanceRoot: string): ScenarioLayer[] {
 }
 
 /**
- * The `policies` directories of every instance `instanceRoot` needs, deepest
+ * The `policies` directories of every layer `instanceRoot` needs, deepest
  * first, then its own — {@link scenarioLayersBelow}, one graph over.
  */
 export function policyLayersBelow(instanceRoot: string): ScenarioLayer[] {
@@ -501,10 +501,10 @@ export function policyLayersBelow(instanceRoot: string): ScenarioLayer[] {
 }
 
 /**
- * Overlay higher instances' policies onto `base`, keyed by `uid`. A layer adds
+ * Overlay higher layers' policies onto `base`, keyed by `uid`. A layer adds
  * policies; a `uid` already declared below is refused, as a redeclared role or
- * actor is: a higher instance that could replace a lower policy could take a
- * grant away without the lower instance's own audit seeing it. The exception
+ * actor is: a higher layer that could replace a lower policy could take a
+ * grant away without the lower layer's own audit seeing it. The exception
  * is the same as theirs: a redeclaration that only adds — every rule the lower
  * policy states is in it unchanged — is a move in flight, used with a warning.
  */
@@ -539,8 +539,8 @@ export function checkoutPolicies(instanceRoot: string, ownPoliciesDir: string): 
 }
 
 /**
- * The policies an instance's own audit may read: the platform's, every
- * instance it needs, and its own — {@link neededActors}, one graph over.
+ * The policies a layer's own audit may read: the platform's, every
+ * layer it needs, and its own — {@link neededActors}, one graph over.
  */
 export function neededPolicies(instanceRoot: string, platformPoliciesDir: string): Map<string, OdrlPolicy> {
   const platform = resolve(platformPoliciesDir);

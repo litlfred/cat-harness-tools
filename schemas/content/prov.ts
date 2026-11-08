@@ -335,7 +335,7 @@ const ProvActivityObjectSchema = z
      * The ODRL policy uid(s) the run was under. Required: a run under no policy
      * cannot be checked. An array when several policies were in force, which is
      * how JSON-LD writes several values of one property: `decide` evaluates
-     * every policy an instance holds, so naming only one would misstate what
+     * every policy a layer holds, so naming only one would misstate what
      * the verdict was computed against.
      */
     "cat-harness:underPolicy": z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),

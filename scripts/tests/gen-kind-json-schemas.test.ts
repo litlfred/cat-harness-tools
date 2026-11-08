@@ -28,7 +28,7 @@ import { notApplicableAlone } from "../../test/support/checkout.ts";
 
 /**
  * Whether the harness's `needs` cannot be found here. `rootOf` finds a needed
- * instance in the composed checkout, and standing alone it does not search the
+ * layer in the composed checkout, and standing alone it does not search the
  * clone's siblings (bean `68k7`; the sibling root is w1gy F11). Only that
  * throw, and only standing alone, is "not applicable": any other error, or the
  * same one in a composed checkout, fails the tests below by name.
@@ -86,7 +86,7 @@ describe("renderKind", () => {
 });
 
 // Bean `8lcl`, folio-assistant#2812: the output must not depend on what is
-// mounted beside the harness. A synthetic higher instance contributes what the
+// mounted beside the harness. A synthetic higher layer contributes what the
 // real ones did — a validator node answering a harness kind's family (core's,
 // for `uploads`) and a block kind — and nothing it contributes may reach the
 // documents.

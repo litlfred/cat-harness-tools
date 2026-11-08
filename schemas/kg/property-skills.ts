@@ -29,7 +29,7 @@ export const PROPERTY_SKILLS = {
   // section on the landing page (bean `ob3m` findings 4–5).
   summary: { skills: ["harness-tiles"] },
   alsoWritten: { skills: ["harness-tiles"] },
-  // The instance's own avatar, moved off the table in avatars.ts (sod4 #4).
+  // The layer's own avatar, moved off the table in avatars.ts (sod4 #4).
   avatar: { skills: ["harness-tiles"] },
   images: { skills: ["theme-declaration", "harness-tiles"] },
   assets: { skills: ["directory-conventions"] },
@@ -42,14 +42,14 @@ export const PROPERTY_SKILLS = {
   // today (bean 6rmv); `instance-repositories.ts` derives the map from both.
   repository: { skills: ["instance-kinds", "directory-conventions"] },
   livesAt: { skills: ["instance-kinds", "directory-conventions"] },
-  // Bean `bamf`: the upstream repository and commit an instance's built site
+  // Bean `bamf`: the upstream repository and commit a layer's built site
   // is staged from; feature-staging §"Built sites follow the same rule" says
-  // the stager reads it from the instance's own files.
+  // the stager reads it from the layer's own files.
   source: { skills: ["feature-staging"] },
-  // Content or tools half of the split (bean eayu); a content instance holding
+  // Content or tools half of the split (bean eayu); a content layer holding
   // code is a failing kg:audit finding.
   separation: { skills: ["kg-separation"] },
-  // Instances seeded in the same step (owner, 2026-10-04); seed:ready does not
+  // Layers seeded in the same step (owner, 2026-10-04); seed:ready does not
   // count a path into one as upward.
   seedsWith: { skills: ["kg-separation"] },
   stub: { skills: ["directory-conventions"] },
@@ -62,7 +62,7 @@ export const PROPERTY_SKILLS = {
   // Where identifiers are minted, before the version — and the rule for which
   // audience gets the full version and which the major (instance-publication).
   iriBase: { skills: ["instance-publication"] },
-  // The instance's Node Kinds: `$schema` tag → the published schema defining it.
+  // The layer's Node Kinds: `$schema` tag → the published schema defining it.
   nodeSchemas: { skills: ["directory-conventions"] },
   // TWO facets, two skills: `publication.host` is what kind of thing serves
   // the rendering (document-publishing); `publication.state` is how far along
@@ -88,7 +88,7 @@ export const PROPERTY_SKILLS = {
     skills: [],
     gap: "no skill edits `builtAtPublish` yet: the rule (commit an artefact only if every input is pinned by this commit) and its two causes are documented only in the schema (built-at-publish.ts)",
   },
-  // Owner, 2026-10-14 (bean 63q4): the external vocabularies an instance's JSON-LD speaks — schemas/kg/jsonld-prefixes.ts.
+  // Owner, 2026-10-14 (bean 63q4): the external vocabularies a layer's JSON-LD speaks — schemas/kg/jsonld-prefixes.ts.
   jsonldPrefixes: {
     skills: [],
     gap: "no skill edits `jsonldPrefixes` yet: the rule (declare a vocabulary in the layer that owns it; the published context is generated from what documents use, flattened over `needs`) is documented only in the schema (jsonld-prefixes.ts)",
@@ -118,18 +118,18 @@ export const PROPERTY_SKILLS = {
   // folio-assistant-tsh9: paths a layer moved and still answers for while the
   // layers that link to them switch, in any order.
   moves: { skills: ["two-phase-move"] },
-  // Bean `0r7u`: what an instance's own check scripts read and write, so
+  // Bean `0r7u`: what a layer's own check scripts read and write, so
   // `gates` may pool them and `regen` may skip them. prepare-merge says what
   // a wrong declaration costs.
   taskIo: { skills: ["prepare-merge"] },
-  // Same bean: the CI steps and scripts an instance's gate set deliberately
+  // Same bean: the CI steps and scripts a layer's gate set deliberately
   // skips, with their reasons. prepare-merge runs `bun run cat gates`, which
   // reports an unclassified step.
   gateExemptions: { skills: ["prepare-merge"] },
   contentAdapters: { skills: ["content-profiles"] },
   // Bean `ec2a` step 3: the graphs `lsi:near` searches beside the beans.
   lsiUnitProviders: { skills: ["lsi-indexing"] },
-  // Bean `0r7u`: each instance's translation profile per content type it owns.
+  // Bean `0r7u`: each layer's translation profile per content type it owns.
   contentTranslations: { skills: ["translation-manager"] },
   liquid: { skills: ["witnessed-values"] },
   // `publishable` was here until 2026-09-24 and the field is gone — replaced

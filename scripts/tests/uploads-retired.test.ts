@@ -63,7 +63,7 @@ afterAll(() => {
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex");
 
 interface Fixture {
-  /** Files to write into the instance's `uploads/`, by relative path. */
+  /** Files to write into the layer's `uploads/`, by relative path. */
   queue?: Record<string, string>;
   /** Library entries: slug → the content whose hash the manifest records. */
   entries?: Record<string, string>;
@@ -72,7 +72,7 @@ interface Fixture {
 }
 
 /**
- * An instance that DECLARES its `library/` and `uploads/`, because the whole
+ * A layer that DECLARES its `library/` and `uploads/`, because the whole
  * defect class here is a directory nobody resolved. A fixture that hardcoded
  * the paths would pass over a declaration bug.
  */

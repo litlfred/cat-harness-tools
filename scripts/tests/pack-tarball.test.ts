@@ -14,7 +14,7 @@ describe("pack-tarball and kg-retrieve-npm tooling", () => {
     const pkgDir = join(tmp, "my-kg-pkg");
     mkdirSync(pkgDir, { recursive: true });
 
-    // Authored instance setup
+    // Authored layer setup
     writeFileSync(
       join(pkgDir, "package.json"),
       JSON.stringify(

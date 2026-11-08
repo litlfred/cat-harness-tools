@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * No instance spells a path into ANOTHER instance's declared directories.
+ * No layer spells a path into ANOTHER layer's declared directories.
  *
  * @module cat-harness/scripts/check-foreign-paths
- * @covers code — every instance's own source, read for literals that name a directory some other instance declares
+ * @covers code — every layer's own source, read for literals that name a directory some other layer declares
  *
- * `check:declared-paths` reads one instance's code against that instance's
- * OWN declarations, so it cannot see platform code naming another instance's
+ * `check:declared-paths` reads one layer's code against that layer's
+ * OWN declarations, so it cannot see platform code naming another layer's
  * `fsh-guts/`, `beans/`, `uploads/`, … by literal. Such directories may move
  * to their own branches, and a spelled path then keeps "finding" an empty
  * directory.
@@ -18,10 +18,10 @@
  * literal of a path-building call, templates and sentences skipped, and the
  * `declared-path-literal: <reason>` marker honoured.
  *
- * A literal is foreign when it lands in a directory another instance
- * declares — and the scanning instance does NOT declare a directory of the
+ * A literal is foreign when it lands in a directory another layer
+ * declares — and the scanning layer does NOT declare a directory of the
  * same name itself. So `join(ROOT, "docs")` in cat-harness, which declares
- * its own `docs/`, is not counted; names only another instance declares —
+ * its own `docs/`, is not counted; names only another layer declares —
  * `beans`, `todos`, `fsh-guts`, `uploads`, `issue-marks` — are.
  *
  * Also excluded: a module specifier (`"../cat-harness/schemas/x.js"`), which
@@ -61,10 +61,10 @@ import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 
 export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "foreign-path-baseline.json");
 
-/** One instance and the directories it declares, repo-relative and code-free. */
+/** One layer and the directories it declares, repo-relative and code-free. */
 export interface InstanceDirs {
   name: string;
-  /** Repo-relative instance root ("" for the checkout root). */
+  /** Repo-relative layer root ("" for the checkout root). */
   root: string;
   /** Repo-relative declared directories, without a trailing slash. */
   dirs: string[];
@@ -84,7 +84,7 @@ export interface ForeignScan {
   marked: Array<ForeignSite & { reason: string }>;
 }
 
-/** Every instance's declared, non-code directories, repo-relative. */
+/** Every layer's declared, non-code directories, repo-relative. */
 export function instanceDirsIn(repo: string): InstanceDirs[] {
   return instanceRootsIn(repo).map((at) => {
     const abs = resolve(at);
@@ -97,13 +97,13 @@ export function instanceDirsIn(repo: string): InstanceDirs[] {
   });
 }
 
-/** The last path segment of each directory an instance declares: the names it OWNS. */
+/** The last path segment of each directory a layer declares: the names it OWNS. */
 function ownNames(i: InstanceDirs): Set<string> {
   return new Set(i.dirs.map((d) => d.split("/").pop()!));
 }
 
 /**
- * The directories `scanner`'s code must not spell: every other instance's,
+ * The directories `scanner`'s code must not spell: every other layer's,
  * minus any whose name the scanner declares for itself (the `docs/` rule).
  */
 export function foreignTargets(scanner: InstanceDirs, all: InstanceDirs[]): Array<{ dir: string; owner: string }> {
@@ -122,11 +122,11 @@ export function foreignTargets(scanner: InstanceDirs, all: InstanceDirs[]): Arra
   return out.sort((a, b) => b.dir.length - a.dir.length);
 }
 
-/** Tracked, non-test `.ts` files of an instance, excluding nested instances. */
+/** Tracked, non-test `.ts` files of a layer, excluding nested layers. */
 function sourceFiles(repo: string, inst: InstanceDirs, all: InstanceDirs[]): string[] {
   const nested = all.map((i) => i.root).filter((r) => r !== inst.root && (inst.root === "" || r.startsWith(`${inst.root}/`)));
   // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
-  // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
+  // layer is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
   // by the index repository's git, so `ls-files` at the root lists none of
   // their files. `gitCorpus` counts a mount's files as it counted a
   // submodule's, and is tracked-plus-untracked exactly as before elsewhere.
@@ -176,7 +176,7 @@ export function scanText(
       // A module specifier is CODE, addressed by path on purpose — the same
       // exemption `check:declared-paths` gives code directories.
       if (/\.(?:[cm]?[jt]sx?)$/.test(value)) continue;
-      // As written (repo-relative), or `../`-relative to the instance's root.
+      // As written (repo-relative), or `../`-relative to the layer's root.
       const asRepo = value.startsWith("../") && instRoot !== "" ? normalize(join(instRoot, value)).split(sep).join("/") : value;
       const hit = targets.find((t) => asRepo === t.dir || asRepo.startsWith(`${t.dir}/`));
       if (!hit) continue;
@@ -189,8 +189,8 @@ export function scanText(
         // `resolve(opt("todos"))` the literal is an option NAME (gz47, measured).
         if (nestedInAnotherCall(code, range[0], at)) continue;
         // ...and not when the call builds from the INSTANCE's own root:
-        // `join(INSTANCE, "docs")` is that instance's directory (gz47, measured
-        // on the FHIR IG harness), whatever another instance also declares.
+        // `join(INSTANCE, "docs")` is that layer's directory (gz47, measured
+        // on the FHIR IG harness), whatever another layer also declares.
         if (INSTANCE_BASE.test(code.slice(range[0], at))) continue;
       }
       const site: ForeignSite = { file, line: n + 1, literal: value, target: hit.dir, owner: hit.owner };
@@ -219,7 +219,7 @@ function nestedInAnotherCall(code: string, start: number, at: number): boolean {
 /**
  * A base argument that names the INSTANCE rather than the checkout. A
  * heuristic over names, stated as one: `ROOT` is not in it, because in this
- * corpus `ROOT` is as often the checkout as the instance, and a missed foreign
+ * corpus `ROOT` is as often the checkout as the layer, and a missed foreign
  * path is the cheaper error for a ratchet that must not cry wolf.
  */
 const INSTANCE_BASE = /^\s*(?:INSTANCE\w*|instanceRoot|instance|HERE|import\.meta\.dir|__dirname)\b/;

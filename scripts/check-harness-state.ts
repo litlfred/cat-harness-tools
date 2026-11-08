@@ -99,11 +99,11 @@ export interface Family {
 }
 
 /**
- * Every file of a kind, across every instance that declares a directory for it.
+ * Every file of a kind, across every layer that declares a directory for it.
  *
  * ## DEDUPED, and the duplicate is not hypothetical
  *
- * Two instance roots can resolve one kind to the SAME directory: measured
+ * Two layer roots can resolve one kind to the SAME directory: measured
  * 2026-09-24, the repository root and `cat-harness` both resolve `todos` to
  * `./todos`, so a naive walk listed three todo items as six and reported one
  * planted defect twice. That is worse than a cosmetic double-count — it inflates
@@ -115,12 +115,12 @@ export interface Family {
  * still overlap by nesting.
  */
 /**
- * Every root whose declaration may name a directory: each instance, AND the
- * checkout root itself. Until the separation the checkout root WAS an instance
+ * Every root whose declaration may name a directory: each layer, AND the
+ * checkout root itself. Until the separation the checkout root WAS a layer
  * (folio-assistant.json), and it declared `beans/`; now the index checkout
  * declares nothing and `beans/` is declared `scope: "repository"` by
  * cat-harness, which only a lookup FROM the checkout resolves. Asking the
- * instances alone found no `merge-queue` or `session-survey` directory and
+ * layers alone found no `merge-queue` or `session-survey` directory and
  * reported both families could-not-determine over a mounted store holding them.
  */
 function declaringRoots(): string[] {
@@ -205,7 +205,7 @@ export const HEALTH_PRODUCER_GRACE_HOURS = 26;
 
 /**
  * Is a report under `root` this repository's OWN, rather than one a mounted
- * instance carries? Only the own report is judged here: each other report is
+ * layer carries? Only the own report is judged here: each other report is
  * written at its repository's own tools pin and judged by that repository's
  * own CI, which is the only place its producer is known (Q-FAD-6 A).
  */
@@ -257,7 +257,7 @@ export function healthProducerCurrent(opts: { against?: string; now?: Date } = {
   };
   const roots = instanceRootsIn(REPO);
   const allLocal = nodesOf("health", ".json");
-  // Mounted instances' reports are left to their own repositories (Q-FAD-6 A).
+  // Mounted layers' reports are left to their own repositories (Q-FAD-6 A).
   const local = allLocal.filter((p) => isOwnHealthReport(p, REPO, roots));
   // ── Where the report is: here, or on the `qa-reports` branch (bean `0dav`) ──
   //
@@ -517,7 +517,7 @@ export function interactionProfilesRead(): Family {
   // very family is about, committed one function away from it: a hardcoded
   // directory is a declaration read from memory, and it goes stale the moment
   // anybody relocates one. It also under-searched: a literal list covers THIS
-  // instance, while a profile may be honoured by a dependency's skill.
+  // layer, while a profile may be honoured by a dependency's skill.
   for (const inst of declaringRoots()) {
     for (const kind of ["cat-harness", "skills", "code", "schemas"]) {
       for (const dir of directoriesForGraph(inst, kind)) walk(dir);
@@ -557,7 +557,7 @@ export function interactionProfilesRead(): Family {
 
 /**
  * The declared directories of one kind that exist, or `undefined` when no
- * instance declares one that does. A declared-but-absent directory is
+ * layer declares one that does. A declared-but-absent directory is
  * `check:declared-dirs`'s finding; here it means there is nothing to walk, and
  * a family that walked nothing must say so rather than pass.
  */

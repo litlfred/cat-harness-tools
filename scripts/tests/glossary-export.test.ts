@@ -19,7 +19,7 @@
  * the tests written to prevent it.
  *
  * The tests of this file that read the whole checkout (reads roles another
- * instance (folio-assistant-core) draws) live in
+ * layer (folio-assistant-core) draws) live in
  * `test/glossary-export-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
@@ -52,7 +52,7 @@ import { notApplicableAlone } from "../../test/support/checkout.js";
 
 /**
  * The committed ledger is the retirement record of the CHECKOUT's roles: it is
- * written with the higher instances present, and standing alone their roles
+ * written with the higher layers present, and standing alone their roles
  * (sci's Lean and compute agents, fhir-harness's fhir-modeller, ...) read as
  * newly retired. Only a composed checkout can say whether it is current.
  */
@@ -197,7 +197,7 @@ describe("bootstrap — the instance with the one varying performer", () => {
 
   test("it is bootstrap's own graph, not cat-harness's under bootstrap's name", () => {
     // `7u3g`: two earlier sessions widened a scan instead of running a second
-    // pass, and published one instance's content under another's identity.
+    // pass, and published one layer's content under another's identity.
     expect(report.concepts).toBeGreaterThan(0);
     // ROLES, not every concept: since work item folio-assistant-dkqd the
     // glossary also defines bootstrap's own graph kinds, which are bootstrap's
@@ -226,7 +226,7 @@ describe("bootstrap — the instance with the one varying performer", () => {
 
 // ── Retirement ──────────────────────────────────────────────────
 
-/** A throwaway instance root carrying only a ledger, for the retirement path. */
+/** A throwaway layer root carrying only a ledger, for the retirement path. */
 function withLedger(concepts: Ledger["concepts"]): string {
   const dir = mkdtempSync(join(tmpdir(), "gloss-"));
   mkdirSync(join(dir, GLOSSARY_DIR), { recursive: true });
@@ -239,7 +239,7 @@ function withLedger(concepts: Ledger["concepts"]): string {
 
 describe("retirement — reported, never deleted", () => {
   test("a term the corpus no longer derives is KEPT, deprecated and dated", () => {
-    // An instance that derives nothing, with a ledger that remembers two
+    // A layer that derives nothing, with a ledger that remembers two
     // terms. That is the extreme of the case the ruling is about: a derived
     // document has no memory, so without the ledger both would simply stop
     // appearing — which is what "never existed" also looks like.
@@ -285,8 +285,8 @@ describe("retirement — reported, never deleted", () => {
       [someLiveKey]: { ...live.ledger.concepts[someLiveKey]!, retiredOn: "2025-01-01" },
     });
     try {
-      // The temp instance derives nothing, so instead assert the pure rule on
-      // the real instance: nothing live is ever left carrying a retiredOn.
+      // The temp layer derives nothing, so instead assert the pure rule on
+      // the real layer: nothing live is ever left carrying a retiredOn.
       const after = buildGlossary({ today: () => "2026-09-22" });
       for (const [k, v] of Object.entries(after.ledger.concepts)) {
         if (after.report.retired.includes(k)) continue;
@@ -351,7 +351,7 @@ describe("glossaryIri", () => {
     // Bean `dyd3`: a document's path decides it, wherever that is — the
     // host's root `<stub>.jsonld` until #603 decision 1b, and every layer's
     // `<name>/<stub>.jsonld` since. A caller that recomposes the path gets
-    // one instance's answer for every instance.
+    // one layer's answer for every layer.
     expect(glossaryIri("https://x.test", "cat-harness.jsonld")).toBe("https://x.test/cat-harness-glossary.jsonld");
     expect(glossaryIri("https://x.test/", "bootstrap/bootstrap.jsonld")).toBe(
       "https://x.test/bootstrap/bootstrap-glossary.jsonld",
@@ -378,7 +378,7 @@ describe("an old-layout --out names the same site (placedOut)", () => {
     expect(placedOut("./_site/cat-harness.jsonld", P, L)).toEqual({ out: "./_site/cat-harness/cat-harness.jsonld", moved: true });
     expect(placedOut("./_site/cat-harness/cat-harness.jsonld", P, L)).toEqual({ out: "./_site/cat-harness/cat-harness.jsonld", moved: false });
     expect(placedOut("/tmp/x/doc.jsonld", P, L)).toEqual({ out: "/tmp/x/doc.jsonld", moved: false });
-    // A foreign instance has no old address: nothing is moved.
+    // A foreign layer has no old address: nothing is moved.
     expect(placedOut("./_site/cat-harness.jsonld", P, undefined)).toEqual({ out: "./_site/cat-harness.jsonld", moved: false });
   });
 });
@@ -480,7 +480,7 @@ describe("graph kinds, node kinds and the harness are glossary terms", () => {
     expect(own).toContain("beans");
     // bootstrap's base kinds are bootstrap's.
     for (const k of kindsDeclaredBy(BOOTSTRAP)) expect(own).not.toContain(k);
-    // A directory that declares no instance owns nothing.
+    // A directory that declares no layer owns nothing.
     expect(kindsDeclaredBy(mkdtempSync(join(tmpdir(), "glossary-kinds-")))).toEqual([]);
   });
 
@@ -539,7 +539,7 @@ describe("graph kinds, node kinds and the harness are glossary terms", () => {
 describe("pending — a graph kind defined in code, not yet in the ledger", () => {
   // The ledger is cat-harness's file; the registry that defines a base kind is
   // cat-harness-tools' code, a layer above, and each layer's PR is judged
-  // against the other's main. Built from the instance's own ledger with ONE
+  // against the other's main. Built from the layer's own ledger with ONE
   // entry taken out or changed, so each case differs from current by one fact.
   const today = () => "2026-09-21";
   const current = (): Ledger => buildGlossary({ today }).ledger;

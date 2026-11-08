@@ -380,7 +380,7 @@ export function pushState(opts: PushOptions = {}): PushResult {
  * A mount whose every file is gone while the branch still holds them looks,
  * to the splice, exactly like an editor who deleted every file — so it is
  * pushed, and the branch is emptied. Measured 2026-10-15: an index worktree
- * whose instance directories were cleared and remounted lost the state graphs
+ * whose layer directories were cleared and remounted lost the state graphs
  * mounted inside them, and one `state:push` for a single bean edit emptied
  * five branches (`<instance>/health` x4 and `marks`). Deleting a whole graph
  * is rare and deliberate, so it takes `--allow-empty`; anything else is

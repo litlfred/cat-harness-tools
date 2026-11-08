@@ -175,7 +175,7 @@ function sequence(fm: string, key: string): string[] {
 }
 
 /**
- * Where this instance keeps its bean definitions, READ from the graph rather
+ * Where this layer keeps its bean definitions, READ from the graph rather
  * than composed.
  *
  * `beans/beans.json` declares its own nodes and a node's path resolves against
@@ -183,7 +183,7 @@ function sequence(fm: string, key: string): string[] {
  * second answer to a question the graph already answers — which
  * `check:declared-paths` is there to catch.
  *
- * Returns `null` when the graph declares no `bean-defs` node. An instance with
+ * Returns `null` when the graph declares no `bean-defs` node. A layer with
  * no declaration at all falls back to the schema's own default, which is what
  * an unmigrated folio has: absent is "no store", not "wrong".
  *
@@ -271,8 +271,8 @@ export function resolveBeanDefs(root: string): BeanDefsResolution {
  * this takes as given.
  *
  * Two questions, deliberately not merged into one resolver: the mount is keyed
- * on the `beans` entry in `folio-assistant.json`, and `beans/` is not an
- * instance root, so `beans/beans.json`'s nodes are invisible to it. A single
+ * on the `beans` entry in `folio-assistant.json`, and `beans/` is not a
+ * layer root, so `beans/beans.json`'s nodes are invisible to it. A single
  * resolver would have to know both and would be wrong about one.
  */
 export function resolveBeanDefsAt(graphRoot: string): BeanDefsResolution {
@@ -341,7 +341,7 @@ export interface BeanArchiveResolution {
  * either is reading beans. What differs is whether the work is still in front
  * of anybody, and `check:bean-archive` is what holds that line.
  *
- * `declared: false` with `dir: null` is an instance that has no archive, which
+ * `declared: false` with `dir: null` is a layer that has no archive, which
  * is fine. A declared path that is absent is `dh4f` and is the caller's to
  * report as COULD NOT DETERMINE rather than as empty.
  */
@@ -590,8 +590,8 @@ export function hasExpiry(b: BeanNode): boolean {
  * ## Why these three and not the obvious fourth
  *
  * Bean `v49e` names the interesting states as *"the ones that look like
- * nothing"* — a step enabled but not taken, a block with no expiry, an
- * instance whose position has not moved. Two of those need
+ * nothing"* — a step enabled but not taken, a block with no expiry, a
+ * layer whose position has not moved. Two of those need
  * `beans/workflows/`, the declared `workflow-state` graph, which was **empty**
  * when this was written: a BPMN-position finding would have had no data on one
  * side of its join and would have reported "nowhere" for all 239 beans. They

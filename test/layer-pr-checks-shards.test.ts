@@ -22,7 +22,7 @@ const MERGE = join(DIR, "merge-shards.py");
 /** One RUNNER_TEMP for every run here: kg-export's command names it, and the runs are compared. */
 const RUNNER_TEMP = mkdtempSync(join(tmpdir(), "gate-runner-temp-"));
 
-/** A root declaring instance `a`, with 17 declared gates that all pass. */
+/** A root declaring layer `a`, with 17 declared gates that all pass. */
 function fixtureRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "gate-shards-"));
   writeFileSync(join(root, "a.json"), JSON.stringify({ name: "a", needs: [] }));

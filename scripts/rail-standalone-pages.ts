@@ -42,7 +42,7 @@ function main(): number {
         platformBase: DOCS_SITE_BASE.replace(/\/$/, ""),
         ...(homeLabel ? { homeLabel } : {}),
         ...(at("--instance") ? { instance: at("--instance")! } : {}),
-        // `--landing`: the checkout declares no instance; `--instance` is only the harness it lands on.
+        // `--landing`: the checkout declares no layer; `--instance` is only the harness it lands on.
         ...(argv.includes("--landing") ? { landing: true } : {}),
       }
     : undefined;

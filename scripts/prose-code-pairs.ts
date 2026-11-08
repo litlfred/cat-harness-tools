@@ -71,7 +71,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 export const PAIR_KINDS = ["implements", "co-located"] as const;
 export type PairKind = (typeof PAIR_KINDS)[number];
 
-/** Declared kinds with no instances in this repository — reported, not dropped. */
+/** Declared kinds with no layers in this repository — reported, not dropped. */
 export const PAIR_KINDS_NOT_SCANNED = ["block-lean (a paper folio's .md ↔ lean.ref)"] as const;
 
 /** The criterion id, one place. */
@@ -79,7 +79,7 @@ export const PAIR_CRITERION = "prose-reviewed-since-code-changed";
 
 export interface ProseCodePair {
   kind: PairKind;
-  /** Repo-relative paths, so a workflow outside the instance root still has one spelling. */
+  /** Repo-relative paths, so a workflow outside the layer root still has one spelling. */
   prose: string;
   code: string;
 }
@@ -100,7 +100,7 @@ const hashOf = (abs: string): string | null =>
  *
  * `instanceRoot` is what `subject.path` is relative to; `repoRoot` is what a
  * workflow path is relative to. Both are needed because `.github/` sits above
- * the instance.
+ * the layer.
  */
 export function discoverPairs(
   subject: { kind: string; path: string | null },

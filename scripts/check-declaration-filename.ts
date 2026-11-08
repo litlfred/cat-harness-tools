@@ -16,7 +16,7 @@
  *   line, a thrown `Error`, a tool description). An operator reads it and
  *   looks for the file, so name the file actually used (a computed path, or
  *   `<name>.config.json`), or the Jekyll file by its `_data/` path. This
- *   fails outside the owning instance too.
+ *   fails outside the owning layer too.
  * - **A workflow `use`**: {@link classifyWorkflowLine} splits each `.yml`
  *   line into `prose` (reworded by a rename), `jekyll-data` (must never be
  *   renamed) and `use`, which fails.
@@ -31,7 +31,7 @@
  * |---|---|
  * | prose — the name inside a doc comment | a rename REWORDS these; it does not substitute a constant into them |
  * | test fixtures | a fixture writing `join(root, "harness.json")` constructs the file the code under test looks for; routing it through a constant would make the test pass vacuously after a rename. An open judgement, not decided here |
- * | path literals outside the owning instance | making them use the constant would add a cross-instance code dependency, and a second copy would be two constants; a boundary decision, so counted rather than silently excluded |
+ * | path literals outside the owning layer | making them use the constant would add a cross-instance code dependency, and a second copy would be two constants; a boundary decision, so counted rather than silently excluded |
  *
  * @covers cat-harness
  */
@@ -62,13 +62,13 @@ const DEFINITION_SITE = "cat-harness/schemas/kg/cat-harness.ts";
 const THIS_GATE = "cat-harness-tools/scripts/check-declaration-filename.ts";
 
 /**
- * The instance that owns the constant, DERIVED from where it is defined.
+ * The layer that owns the constant, DERIVED from where it is defined.
  *
  * A call site outside it cannot import the constant without creating a
  * cross-instance dependency — a boundary decision, not a refactor. See the
  * module header.
  *
- * Derived rather than written out a second time: the owning instance and the
+ * Derived rather than written out a second time: the owning layer and the
  * definition site are one fact, and this repository has paid for stating one
  * fact twice often enough to have a rule about it. Moving the constant moves
  * this with it.
@@ -110,7 +110,7 @@ export interface DeclarationFilenameReport {
   bypasses: Bypass[];
   /**
    * Message strings, log lines, error text and tool descriptions naming the
-   * retired declaration, in any instance. These FAIL (bean `k8rc`).
+   * retired declaration, in any layer. These FAIL (bean `k8rc`).
    */
   userVisible: UserVisibleRef[];
   /** Counted, never failed — see the module header for each reason. */
@@ -182,8 +182,8 @@ function wholeStringLiteral(line: string, filename: string): boolean {
  * ## `docs/_data/harness.json` is a DIFFERENT FILE
  *
  * Found by that false positive and worth more than the rule it corrected: the
- * Jekyll data file under `docs/_data/` shares the basename and is **not** an
- * instance declaration. Under the REPLACE ruling it must not be renamed. The
+ * Jekyll data file under `docs/_data/` shares the basename and is **not** a
+ * layer declaration. Under the REPLACE ruling it must not be renamed. The
  * whole-value test already excludes it — nothing joins to it as a bare
  * filename — but a sweep run by hand over the basename would take it, which is
  * exactly how a rename breaks a site build.
@@ -291,7 +291,7 @@ export function classifyMarkdownLine(
 /**
  * Prefixes holding GENERATED reference markdown, composed rather than typed.
  *
- * Each instance's site root comes from `siteDirFor()` — the declaration — and
+ * Each layer's site root comes from `siteDirFor()` — the declaration — and
  * the two reference trees hang off it, exactly as `gen-skill-docs.ts` and
  * `gen-schema-docs.ts` compose their own output. Writing the paths out here
  * would be a third copy of a fact the declaration already carries, and
@@ -304,7 +304,7 @@ function generatedPrefixes(repoRoot: string): string[] {
     try {
       site = siteDirFor(instance);
     } catch {
-      continue; // an instance whose site root cannot be resolved is not pruned
+      continue; // a layer whose site root cannot be resolved is not pruned
     }
     const base = relative(repoRoot, join(instance, site)).split("\\").join("/");
     for (const leaf of ["skill-instructions", "skills"]) {
@@ -403,7 +403,7 @@ function scanMarkdown(root: string): MarkdownRef[] {
  * The YAML side's answer to the TypeScript side's whole-value rule, and it is
  * load-bearing rather than defensive: **`cat-harness.json` contains
  * `harness.json`.** A bare `indexOf` reports the CURRENT declaration of the
- * instance that owns this gate as a reference to the retired one.
+ * layer that owns this gate as a reference to the retired one.
  *
  * That is not hypothetical. It was found by writing the fix for
  * `docs-site.yml` — the corrected comment names
@@ -419,7 +419,7 @@ function scanMarkdown(root: string): MarkdownRef[] {
  * already written down.** The bean that added the left check named
  * `harness.jsonld` in the same sentence as `cat-harness.json`, then guarded
  * only the side it had a failing example for. The markdown scanner (`vzur`)
- * found it on its first run: `serving-renderings.md` names this instance's
+ * found it on its first run: `serving-renderings.md` names this layer's
  * published rendering, and a left-bounded match read `/harness.jsonld` as a
  * reference to the retired declaration.
  *
@@ -504,7 +504,7 @@ export function checkDeclarationFilename(root = REPO_ROOT): DeclarationFilenameR
       if (rel === THIS_GATE) continue;
 
       // `docs/_data/harness.json` is JEKYLL's data file and has nothing to do
-      // with an instance declaration. It merely shares a basename, which is
+      // with a layer declaration. It merely shares a basename, which is
       // exactly the kind of collision a bare string match gets wrong.
       if (line.includes("_data")) continue;
 

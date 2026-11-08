@@ -105,7 +105,7 @@ describe("hue is reported and never graded", () => {
     // The evidence that it is a convention is IN the data, not inferred.
     expect(avatarFor("who-iris").reads).toContain("WHO blue");
     expect(avatarFor("smart-base").reads).toContain("WHO blue");
-    // Declared by each instance now (bean sod4 #4), so read through avatarFor.
+    // Declared by each layer now (bean sod4 #4), so read through avatarFor.
     expect(avatarFor("who-iris").tone).toBe(avatarFor("smart-base").tone);
   });
 

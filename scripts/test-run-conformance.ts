@@ -94,7 +94,7 @@ export function checkTestRuns(
   if (!out.looked) return out;
   const contracts = skillContracts(root);
   const schemaCache = new Map<string, ZodType | Error>();
-  // Against the instance HOLDING the skill: its local contract path is
+  // Against the layer HOLDING the skill: its local contract path is
   // relative to that root, not to the one this check was asked of.
   const load = (base: string, ref: string): ZodType | Error | undefined => {
     const f = contractFile(base, ref);

@@ -119,7 +119,7 @@ const DEFAULT_CONFIG: ReadmeTocConfig = {
 export function loadReadmeConfig(root: string): ReadmeTocConfig {
   const eff = readEffectiveConfig(root);
   let fromFile: Partial<ReadmeTocConfig> = {};
-  // The index entry when one lists the instance, else `<name>.config.json`.
+  // The index entry when one lists the layer, else `<name>.config.json`.
   if (eff.state === "ok") {
     try {
       const parsed = eff.config as {

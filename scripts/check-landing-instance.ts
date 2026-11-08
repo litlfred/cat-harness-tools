@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * The site's landing page (the instance published at `/`) is decided, not
+ * The site's landing page (the layer published at `/`) is decided, not
  * guessed.
  *
  * @module scripts/check-landing-instance
  * @covers cat-harness — the instance axis: which instantiated harness the published site puts at `/`
  *
- * Rule: the chosen instance's `<name>.config.json` carries
+ * Rule: the chosen layer's `<name>.config.json` carries
  * `"site": { "landing": true }`. If exactly one harness is instantiated it is
  * the landing page and needs no flag. Several and none flagged fails; more
  * than one flagged gives a neutral hub listing the harnesses.
@@ -19,7 +19,7 @@
  * imports ({@link legacyImports}): a pending migration is reported, a file
  * that disagrees with its entry fails.
  *
- * Exit codes: 0 decided (an instance, a hub, or nothing instantiated) · 1
+ * Exit codes: 0 decided (a layer, a hub, or nothing instantiated) · 1
  * several harnesses and none flagged, a config that cannot be read, or a
  * legacy config that disagrees with its index entry.
  */
@@ -79,7 +79,7 @@ export function formatLanding(r: LandingInstance): { text: string; ok: boolean }
  * config the index does not import is a FAILURE: under the index it is not
  * instantiated, and under the old rule it was, so the two rules disagree about
  * this checkout and nothing should pick silently. An `import` naming a file
- * that is not there fails too. An instance with no config at all is fine.
+ * that is not there fails too. A layer with no config at all is fine.
  */
 export function formatAgreement(a: IndexAgreement | undefined): { text: string; ok: boolean } {
   if (a === undefined) return { text: "index.config.json: absent — the root *.config.json files are the instantiated set", ok: true };
@@ -106,7 +106,7 @@ export function formatAgreement(a: IndexAgreement | undefined): { text: string; 
  * - `diverged`: NOT merely a pending migration. The entry sets a key inline to
  *   a different value, so the file's value is dead text that a reader of the
  *   file alone (a person, a stale tool) takes for the config. Fails: two
- *   places disagree about one instance, and nothing should pick silently.
+ *   places disagree about one layer, and nothing should pick silently.
  */
 export interface LegacyImport {
   name: string;

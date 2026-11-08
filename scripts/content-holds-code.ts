@@ -1,25 +1,25 @@
 /**
- * Does a CONTENT instance hold code? — kg:audit's `content-instance-holds-code`.
+ * Does a CONTENT layer hold code? — kg:audit's `content-instance-holds-code`.
  *
  * @module scripts/content-holds-code
  *
  * `kg-separation`: a knowledge graph separates into a CONTENT repository
  * (files to read, no code; a reader needs nothing installed) and a TOOLS
  * repository (`<name>-tools`, the code that writes and checks it). Code
- * tolerated in a content instance is still reported as a failing finding.
+ * tolerated in a content layer is still reported as a failing finding.
  *
- * Which instances are content is read from declarations, never guessed:
+ * Which layers are content is read from declarations, never guessed:
  *
- *   1. `separation: "content"` on the instance itself;
- *   2. a declared TOOLS instance names it in `supports` (bootstrap, supported
+ *   1. `separation: "content"` on the layer itself;
+ *   2. a declared TOOLS layer names it in `supports` (bootstrap, supported
  *      by bootstrap-tools).
  *
  * A `repository` differing from `livesAt.repository` is NOT a signal (every
- * staged instance has that).
+ * staged layer has that).
  *
- * Code is a file git accounts for under the instance root whose extension is
+ * Code is a file git accounts for under the layer root whose extension is
  * a programming language's ({@link CODE_EXTENSIONS}), EXCEPT under a
- * directory the instance declares as graph typology `folio`, whose block
+ * directory the layer declares as graph typology `folio`, whose block
  * manifests are authored content written as TypeScript data.
  *
  * States: `n/a` — not declared content. `pass`/`fail` — content, and git
@@ -42,7 +42,7 @@ export const CODE_EXTENSIONS: readonly string[] = [
 /** Graph typologies whose directories hold authored content written as code-shaped data. */
 export const CONTENT_MANIFEST_KINDS: readonly string[] = ["folio"];
 
-/** Why an instance is content, or `undefined` when nothing declares it so. */
+/** Why a layer is content, or `undefined` when nothing declares it so. */
 export function contentBasis(instanceRoot: string, siblings: readonly string[]): string | undefined {
   const decl = readDeclaration(instanceRoot);
   if (decl === undefined) return undefined;
@@ -91,7 +91,7 @@ export type ContentCodeVerdict =
   | { state: "judged"; basis: string; files: string[] };
 
 /**
- * The verdict for one instance. `lister` defaults to git; a test passes its own.
+ * The verdict for one layer. `lister` defaults to git; a test passes its own.
  */
 export function contentInstanceCode(
   instanceRoot: string,

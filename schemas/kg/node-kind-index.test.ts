@@ -115,8 +115,8 @@ describe("the ratchet", async () => {
 });
 
 /**
- * Owner, 2026-10-15: one baseline per layer. A family is owned by the instance
- * that declares its typology, and each instance is judged against its own.
+ * Owner, 2026-10-15: one baseline per layer. A family is owned by the layer
+ * that declares its typology, and each layer is judged against its own.
  */
 describe("who owns a family", () => {
   const root = mkdtempSync(join(tmpdir(), "node-kind-owner-"));
@@ -140,7 +140,7 @@ describe("who owns a family", () => {
   });
 
   test("a typology a FIXTURE instance declares belongs to that instance, not to the one containing the fixture (bean w1gy)", () => {
-    // The standalone fixture's shape: copies of other layers' instances under
+    // The standalone fixture's shape: copies of other layers' layers under
     // this one's test/fixtures/, scanned beside it through FOLIO_FIXTURE_CHECKOUT.
     const checkout = join(root, "alpha", "test", "fixtures", "checkout");
     mkdirSync(join(checkout, "beta", "typologies"), { recursive: true });
@@ -157,7 +157,7 @@ describe("who owns a family", () => {
       expect(r.declaredBy("sprockets")).toBe(join(checkout, "beta", "typologies", "sprockets.json"));
       expect(typologyOwner(r, "sprockets")).toBe("beta");
       expect(typologyOwner(r, "gadgets")).toBe("alpha");
-      // beta is not an instance of the checkout at `root`: its kinds are left to it.
+      // beta is not a layer of the checkout at `root`: its kinds are left to it.
       expect(ownedOutside(r, "sprockets", root)).toBe(true);
       expect(ownedOutside(r, "gadgets", root)).toBe(false);
     } finally {

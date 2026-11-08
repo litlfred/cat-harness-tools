@@ -29,9 +29,9 @@
  * ## Where the verdicts are
  *
  * `blockQaPath` puts verdicts under `test/results/block-qa/` relative to the
- * INSTANCE root. A folio swept by an older sweep may still have them under
+ * LAYER root. A folio swept by an older sweep may still have them under
  * the swept directory (e.g. `folio/test/results/block-qa/…`), so this reads
- * the instance root first and the swept directory second. The legacy sibling
+ * the layer root first and the swept directory second. The legacy sibling
  * beside each block is read by `existingBlockQaPath` in both cases.
  *
  * ## Whether there was a corpus at all
@@ -206,7 +206,7 @@ if (import.meta.main) {
   // directory. The directory is whatever the caller passes, and the staging
   // workflow passes the one the folio declares.
   const folio = resolve(opt("folio")!);
-  // The instance root, found exactly as the sweep finds it (`s3p2`). It
+  // The layer root, found exactly as the sweep finds it (`s3p2`). It
   // defaulted to ".", the repository root. A folio in a subfolder (ojcx's
   // real run: `handbook/`) then had every block reported unaudited after a
   // sweep that had written verdicts under `handbook/test/results/`.

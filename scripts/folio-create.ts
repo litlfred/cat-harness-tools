@@ -9,7 +9,7 @@
  * @graphNode none — a writer into the folio and library graphs, not a schema itself
  *
  * The kinds are not a list here. They are whatever `document-kinds`
- * directories the instances in this checkout, its mounted layers
+ * directories the layers in this checkout, its mounted layers
  * (`index.lock.json`), and its dependency chain (`needs` and
  * `dependencies.folioAssistant`) declare, read by
  * `gen-document-kinds-viz.ts`'s `readDocumentKinds` (the reader the
@@ -54,13 +54,13 @@ import { readDocumentKinds, type KindEntry } from "./gen-document-kinds-viz.ts";
 import { libraryRoot } from "./ingest-document.ts";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 
-/** A kind as a reader names it: `id`, or `instance:id` when two instances declare one id. */
+/** A kind as a reader names it: `id`, or `instance:id` when two layers declare one id. */
 export function qualifiedKind(e: Pick<KindEntry, "instance" | "kind">): string {
   return `${e.instance}:${e.kind.id}`;
 }
 
 /**
- * Every document kind reachable from `root` — its own instances, its mounted
+ * Every document kind reachable from `root` — its own layers, its mounted
  * layers (`index.lock.json`), and its dependency chain (`needs` and
  * `dependencies.folioAssistant`).
  */
@@ -70,7 +70,7 @@ export function loadedDocumentKinds(root: string = REPO_ROOT ?? HARNESS_ROOT): K
 
 /**
  * The one kind `name` means, or why it means none. An unqualified id that two
- * instances declare is refused with both names, never picked: choosing one
+ * layers declare is refused with both names, never picked: choosing one
  * would create a document of a structure the reader did not ask for.
  */
 export function resolveKind(entries: readonly KindEntry[], name: string): KindEntry | { error: string } {
@@ -92,7 +92,7 @@ export function sectionsOf(entry: KindEntry, entries: readonly KindEntry[]): Doc
     chain.unshift(cur);
     const parent: string | undefined = cur.kind.extends;
     if (!parent) break;
-    // The parent its own instance declares, else the one other instance that does.
+    // The parent its own layer declares, else the one other layer that does.
     const here: string = cur.instance;
     const own: KindEntry | undefined = entries.find((e) => e.instance === here && e.kind.id === parent);
     const r: KindEntry | { error: string } = own ?? resolveKind(entries, parent);

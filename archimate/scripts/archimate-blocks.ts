@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Write the document blocks an instance draws from its ArchiMate data: each
+ * Write the document blocks a layer draws from its ArchiMate data: each
  * table `cat-archimate.config.json` lists under `tables`, and the SVG of each
  * figure under `figures` that names an `svg`. The Tool `archimate-blocks`.
  *

@@ -7,19 +7,19 @@
  * `qa-criteria-registry.ts` carried four hand-written entries —
  * `voice-overlay-who-editorial`, `-who-guideline-development`,
  * `-who-publication-design` and `-milnor` — each restating that voice's rules
- * in prose. Three of them described files in ANOTHER INSTANCE
+ * in prose. Three of them described files in ANOTHER LAYER
  * (`who-style-guide`), and every one of them restated rules **without the
  * citation the voice itself carries**. So the platform held an uncited copy of
- * rules the owning instance holds cited, in the one subsystem whose whole
+ * rules the owning layer holds cited, in the one subsystem whose whole
  * argument is that a voice is auditable rather than asserted. Bean `btuv`;
  * `check-voices.ts` exists because PR #210 shipped ten plausible rules with
  * `source: null`.
  *
  * It was generic machinery HAND-INSTANTIATED per voice, which is why the
- * content leaked in: there was no way for an instance to contribute a
+ * content leaked in: there was no way for a layer to contribute a
  * criterion, so a voice shipping anywhere had to be written into the platform
- * by hand. Now a voice shipping in any instance gets its criterion with no
- * platform edit at all, and the platform holds no instance's rules.
+ * by hand. Now a voice shipping in any layer gets its criterion with no
+ * platform edit at all, and the platform holds no layer's rules.
  *
  * ## The description names the voice; it does not restate it
  *
@@ -36,7 +36,7 @@
  * module-scope `const`, and module-scope filesystem work is what bean `1hkj`
  * deferred and what `check:module-scope-resolution` now gates — a malformed
  * declaration must not be able to abort a module and strand its exports. So
- * these are computed on first call and memoised per instance root, never at
+ * these are computed on first call and memoised per layer root, never at
  * import.
  *
  * @module pipeline/voice-criteria
@@ -47,33 +47,33 @@ import { instanceRootsIn, readDeclaration, siblingScopeFor } from "../schemas/kg
 import type { QaCriterionDefinition } from "../schemas/sdlc/block-qa.ts";
 
 /**
- * A voice, plus the instance that ships it.
+ * A voice, plus the layer that ships it.
  *
- * The instance is carried because the criterion's description names it: a
+ * The layer is carried because the criterion's description names it: a
  * reader of a finding has to know which repository to open, and three of the
  * four voices here are not in the one running the check.
  */
 export interface OwnedVoice {
   voice: VoiceProfile;
-  /** The declared name of the instance shipping it. */
+  /** The declared name of the layer shipping it. */
   instance: string;
 }
 
 /**
  * Every voice shipped anywhere in this repository, sorted by id.
  *
- * Across instances rather than `loadVoices(root)` alone, because a voice is
+ * Across layers rather than `loadVoices(root)` alone, because a voice is
  * owned by whoever DERIVED it and the platform derives none. `loadVoices`
- * reads one instance; this asks every instance the repository declares.
+ * reads one layer; this asks every layer the repository declares.
  *
- * **An instance whose voices will not load throws**, as `loadVoices` does. A
+ * **A layer whose voices will not load throws**, as `loadVoices` does. A
  * malformed voice must not present as a folio with fewer voices: the second is
  * a legitimate state and the first is a defect, and collapsing them is the
  * false-clean this repository keeps paying for.
  */
 export function shippedVoices(instanceRoot: string): OwnedVoice[] {
-  // `siblingScopeFor`, not `repoRootFor`: for the root instance `dirname` is
-  // outside the checkout and lists no instance at all — zero voices (g43f).
+  // `siblingScopeFor`, not `repoRootFor`: for the root layer `dirname` is
+  // outside the checkout and lists no layer at all — zero voices (g43f).
   const repo = siblingScopeFor(instanceRoot);
   const out: OwnedVoice[] = [];
   for (const root of instanceRootsIn(repo)) {
@@ -163,11 +163,11 @@ export function judgesBlocks(voice: VoiceProfile): boolean {
   return scope === undefined || scope.some((k) => !(VOICE_ARTEFACT_KINDS as readonly string[]).includes(k));
 }
 
-/** Memoised per instance root — the filesystem is read once per process. */
+/** Memoised per layer root — the filesystem is read once per process. */
 const CACHE = new Map<string, QaCriterionDefinition[]>();
 
 /**
- * The voice criteria for an instance, computed once.
+ * The voice criteria for a layer, computed once.
  *
  * Callers use this rather than {@link voiceOverlayCriteria} directly; the
  * uncached form stays exported for a test that wants a fresh read after

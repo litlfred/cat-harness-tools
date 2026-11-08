@@ -10,7 +10,7 @@
  * ## Why a package
  *
  * The subgraph index files are `builtAtPublish` — computed over the
- * checkout's other instances — so no commit carries them, and a hydrated
+ * checkout's other layers — so no commit carries them, and a hydrated
  * mount reading the git tree at a pin finds nothing. So they are published
  * per pin in a package, and a hydrated mount fetches them through the Tool
  * its source names. The contract, every name included, is
@@ -71,7 +71,7 @@ const strip = (p: string): string => p.replace(/^\.\//, "").replace(/\/+$/, "");
 // ── pack ─────────────────────────────────────────────────────────────────────
 
 export interface PackSubgraphIndexOptions {
-  /** The instance root whose `<docs>/subgraph/<name>/` is packed. */
+  /** The layer root whose `<docs>/subgraph/<name>/` is packed. */
   root: string;
   repository: string;
   /** The pin the files were built from. */
@@ -118,7 +118,7 @@ export function collectIndexFiles(root: string, docs: string, harness: string): 
 
 /**
  * Pack one pin's subgraph index files. Throws — never packs an empty
- * package — when the instance declares no `docs` directory or has built no
+ * package — when the layer declares no `docs` directory or has built no
  * subgraph files there.
  */
 export function packSubgraphIndex(opts: PackSubgraphIndexOptions): PackSubgraphIndexResult {

@@ -51,7 +51,7 @@ const ROOT = mkdtempSync(join(tmpdir(), "preflight-"));
  */
 function writeProcess(dir: string, requiredFile: string): void {
   mkdirSync(dir, { recursive: true });
-  // The instance that owns the diagram. A `file-exists` ref resolves against
+  // The layer that owns the diagram. A `file-exists` ref resolves against
   // it, so without one the diagram is refused at parse — and a refusal test
   // would then pass on the parse error rather than on the gate.
   writeFileSync(join(dir, "..", "fixture.json"), JSON.stringify({ name: "fixture" }));

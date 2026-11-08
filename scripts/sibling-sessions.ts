@@ -33,7 +33,7 @@ import { resolve } from "node:path";
 import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** The INSTANCE root — this file lives at `<instance>/scripts/`. */
+/** The LAYER root — this file lives at `<instance>/scripts/`. */
 export const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 
 /** The trailer a Claude Code session leaves on every commit it authors. */

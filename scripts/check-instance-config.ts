@@ -1,5 +1,5 @@
 /**
- * Every instance's config is named after the instance, and no retired name
+ * Every layer's config is named after the layer, and no retired name
  * survives.
  *
  * The config is `<instance>.config.json`. A retired name is not read at all,
@@ -8,18 +8,18 @@
  *
  * ## What it checks, and the third state
  *
- * For every instance in the checkout:
+ * For every layer in the checkout:
  *
- *   - a config named after the instance, or none at all — both fine;
+ *   - a config named after the layer, or none at all — both fine;
  *   - a config under the RETIRED global name — a finding, with the `git mv`
  *     to run, because nothing reads it and nothing else would say so;
  *   - a `*.config.json` at the instantiation root matching no declared
- *     instance, and no harness a subscription chose — a finding, because
- *     it is either a rename half-done or a config for an instance that is
+ *     layer, and no harness a subscription chose — a finding, because
+ *     it is either a rename half-done or a config for a layer that is
  *     not here, and the two are worth telling apart by hand.
  *
  * COULD-NOT-DETERMINE is its own exit. An unreadable declaration means the
- * instance's name is unknown, so its filename is unknowable — reported, never
+ * layer's name is unknown, so its filename is unknowable — reported, never
  * folded into "no finding".
  *
  * @module scripts/check-instance-config
@@ -40,7 +40,7 @@ interface Finding {
   fix?: string;
 }
 
-/** Instance roots: the checkout itself, and each immediate subdirectory that declares. */
+/** Layer roots: the checkout itself, and each immediate subdirectory that declares. */
 function instanceRoots(checkout: string): string[] {
   const out: string[] = [];
   if (findDeclarationFile(checkout) !== undefined) out.push(checkout);
@@ -93,9 +93,9 @@ export function sweep(checkout: string): { findings: Finding[]; expected: Set<st
     }
   }
 
-  // A `*.config.json` at the instantiation root that no instance claims.
+  // A `*.config.json` at the instantiation root that no layer claims.
   // `rootConfigStems` — the one scan, which excludes the retired name and the
-  // reserved `index.config.json` (not an instance's config, so never an orphan).
+  // reserved `index.config.json` (not a layer's config, so never an orphan).
   for (const f of rootConfigStems(checkout).map(instanceConfigFilename)) {
     if (expected.has(f)) continue;
     findings.push({

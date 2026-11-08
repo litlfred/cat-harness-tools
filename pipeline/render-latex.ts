@@ -313,7 +313,7 @@ function breakableCode(text: string): string {
 
 // ── Markdown → LaTeX conversion (AST-based) ─────────────────────
 
-/** Shared remark parser instance with math + selective GFM (no autolink).
+/** Shared remark parser layer with math + selective GFM (no autolink).
  *  The full remarkGfm bundle includes gfm-autolink-literal which causes
  *  OOM on dotted Lean identifiers. We load only tables + strikethrough. */
 

@@ -98,7 +98,7 @@ import { exitCode as remoteExitCode, remoteFanOut } from "./remote-mount.ts";
  * that the path is still tracked, and that graph is not mounted at all.
  */
 interface GraphMountBase {
-  /** The graph's marker key: its id, or `<instance>.<id>` when several instances declare that id. */
+  /** The graph's marker key: its id, or `<instance>.<id>` when several layers declare that id. */
   id: string;
   /** Repository-relative, as declared — where the files were put. */
   path: string;
@@ -118,7 +118,7 @@ export type GraphMount =
   | (GraphMountBase & { state: "stale"; damaged?: boolean })
   | (GraphMountBase & { state: "refused" | "miss" | "corrupt" | "unknown" })
   /**
-   * A checkout-level (`scope: "repository"`) graph that a mounted instance
+   * A checkout-level (`scope: "repository"`) graph that a mounted layer
    * declares, that the root does not declare, and whose branch the root's
    * `origin` does not carry, where that origin carries NO branch of the
    * graph's namespace either ({@link TipLocation.unownedBy},
@@ -546,9 +546,9 @@ if (import.meta.main) {
   // Skipped for `--id`, which names one branch-kept graph.
   //
   // FIRST, because a state graph can be declared INSIDE a remote-mounted
-  // instance (cat-harness's, a content instance's … `health`): the instance is laid down,
+  // layer (cat-harness's, a content layer's … `health`): the layer is laid down,
   // then its graphs are mounted into it. The other order mounted the graphs
-  // and then re-laid the instance over them.
+  // and then re-laid the layer over them.
   const remote = at === -1 ? remoteFanOut(repoRootOf()) : undefined;
   const r = mountState({ id: at === -1 ? undefined : argv[at + 1], layerMounts: remote?.state });
   if (argv.includes("--json")) console.log(JSON.stringify(remote ? { ...r, remote: { state: remote.state } } : r, null, 2));

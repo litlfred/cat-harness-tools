@@ -49,7 +49,7 @@
 
   // Hrefs, relative to the page that is drawing.
   // A view's or an element's page is at its slug where the model gives one
-  // (`slugs`, from the instance's slug ledger), else at its id.
+  // (`slugs`, from the layer's slug ledger), else at its id.
   var root = cfg.kind === "model" ? "./" : "../../";
   var slugs = {};
   function seg(id) { return encodeURIComponent(Object.prototype.hasOwnProperty.call(slugs, id) ? slugs[id] : id); }

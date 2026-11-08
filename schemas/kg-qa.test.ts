@@ -65,7 +65,7 @@ describe("the criteria registry", () => {
 
   test("`call-activity-resolves` is not critical — an outward call is not a defect", () => {
     // It was written `critical`, which would have broken the build of the first
-    // downstream instance calling a process it does not host. PR #282 states
+    // downstream layer calling a process it does not host. PR #282 states
     // the interpreter's side of the same rule: such a call activity stays
     // opaque rather than failing. The audit cannot tell that case from a typo,
     // so it records `unknown` at `major` — visible under `--strict`, and not a
@@ -105,7 +105,7 @@ describe("tally and worstSeverity", () => {
     // applying to a process. Once its exemptions became declarations it earned
     // `major`, and NO process criterion is `minor` any more — so the example
     // has to come from another subject kind. `role-binds-a-lane` is `minor`:
-    // a role nothing enters is a real gap with legitimate instances.
+    // a role nothing enters is a real gap with legitimate layers.
     expect(worstSeverity(mk({ "role-binds-a-lane": { result: "unknown", findings: [] } }))).toBe("minor");
   });
 
@@ -283,7 +283,7 @@ describe("where an instance's verdicts live (kgQaHomeFor)", () => {
     expect(existsSync(join(bootstrap, "test"))).toBe(false);
   });
 
-  // Bean de9k (C1) added a walk of every instance's home here. It read the
+  // Bean de9k (C1) added a walk of every layer's home here. It read the
   // committed corpus, so it moved to `check:qa-corpus` with the rest (bean
   // `cxcn`); the RESOLUTION it relied on stays asserted.
   test("every instance's home resolves, and bootstrap's is the hosted one", () => {

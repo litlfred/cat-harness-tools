@@ -22,7 +22,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-/** An instance with an (empty) attestation store at the convention path. */
+/** A layer with an (empty) attestation store at the convention path. */
 function instance(): string {
   const d = mkdtempSync(join(tmpdir(), "file-cert-"));
   dirs.push(d);

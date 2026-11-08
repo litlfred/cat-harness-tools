@@ -17,20 +17,20 @@
  *
  * ## A link is DECLARATION-driven and PRESENCE-checked
  *
- * The declaration supplies the CANDIDATES — an instance's declared graphs are
+ * The declaration supplies the CANDIDATES — a layer's declared graphs are
  * the only things a tile may claim to show — and the disk decides whether
  * each one is a LINK or a gap. A candidate with no page is reported, never
  * linked: a dead link is worse than none.
  *
- * ## The tone comes from the instance's OWN THEME, else the AVATAR's
+ * ## The tone comes from the layer's OWN THEME, else the AVATAR's
  *
- * When the sticky an instance contributes about itself resolves to a theme
- * THE INSTANCE DECLARES ITSELF (by reference, owner first — `themeByRef`; not
+ * When the sticky a layer contributes about itself resolves to a theme
+ * THE LAYER DECLARES ITSELF (by reference, owner first — `themeByRef`; not
  * one of the platform's shared themes), the tile's `tone` is the HUE of that
  * theme's `accent` (`hexHue`). Otherwise it is the avatar's hue angle
  * (`schemas/content/avatars.ts`), so there is no second colour vocabulary
- * beside `schemas/ui/theme.ts`. `toneFrom` says which answer was used. An
- * instance with no avatar of its own takes `GENERIC`, which is reported as a
+ * beside `schemas/ui/theme.ts`. `toneFrom` says which answer was used. A
+ * layer with no avatar of its own takes `GENERIC`, which is reported as a
  * finding rather than rendered as a blank.
  *
  * A tone is a HUE and nothing more: the tile's words (title, counts, viewer
@@ -97,14 +97,14 @@ export type HarnessVisualisation = {
    * What every surface CALLS this row — set by `labelVisualisations` in
    * `lib/nav-label.ts`, and never composed by a surface (bean `ob3m`,
    * finding 6: "One name everywhere"). The kind's display name, or, where two
-   * of this instance's kinds share one page, the display name of the kind its
+   * of this layer's kinds share one page, the display name of the kind its
    * directories declare first, so that page has one name.
    */
   label?: string;
   /**
    * Set when this kind's page is the SAME destination as another kind's row
-   * of this instance, and names that kind — or, when the page is the
-   * instance's own root, names the HARNESS (`nameInstanceRoot`). A list of
+   * of this layer, and names that kind — or, when the page is the
+   * layer's own root, names the HARNESS (`nameInstanceRoot`). A list of
    * destinations skips the row, so one page is listed once, under one name.
    */
   sameAs?: string;
@@ -190,7 +190,7 @@ export type HarnessTile = {
    * What the tile SAYS, which is `title` unless another tile says the same.
    *
    * Owner, 2026-09-21, on the sidebar: two tiles both read `folio-assistant` —
-   * the repository root acting as an instance, and `cat-harness`, whose
+   * the repository root acting as a layer, and `cat-harness`, whose
    * declared title is the product's name. Both link `/`, so a reader could not
    * tell which one they were about to open, or that they were two.
    *
@@ -212,21 +212,21 @@ export type HarnessTile = {
   footer: boolean;
   icon: { src: string; title: string } | null;
   /**
-   * Which icons this instance's navbar row shows, after inheritance.
+   * Which icons this layer's navbar row shows, after inheritance.
    *
-   * OPTIONAL, and absent means UNDETERMINED — neither this instance nor
+   * OPTIONAL, and absent means UNDETERMINED — neither this layer nor
    * anything it needs nor the site owner has decided. `[]` is a different
    * answer and means "show none", which the owner asked for by name. A
-   * consumer that renders the two the same reports an un-migrated instance as
+   * consumer that renders the two the same reports an un-migrated layer as
    * a deliberate one.
    */
   navbarIcons?: NavbarIcon[];
   /**
    * The mark the navbar renders — THE one answer every navbar surface reads
-   * (bean `2vpn`): the theme avatar if there is one, else the instance's own
+   * (bean `2vpn`): the theme avatar if there is one, else the layer's own
    * icon, else its glyph from the avatar registry. An image carries `src` (and
    * its crop, both declared and solved); a glyph carries `glyph`, SVG path data
-   * in a 24×24 box. Absent only when an instance has none of the three — and
+   * in a 24×24 box. Absent only when a layer has none of the three — and
    * the navbar then draws an INITIAL, which is a different answer from a broken
    * image and from a placeholder glyph.
    *
@@ -238,21 +238,21 @@ export type HarnessTile = {
    */
   mark?: HarnessMark;
   /**
-   * THE PAGE GROUND — this instance's theme art behind every one of its docs
+   * THE PAGE GROUND — this layer's theme art behind every one of its docs
    * pages (bean `yj32`, owner card Q-DEP-2 A, 2026-11-01: "behind every docs
    * page").
    *
-   * `scopes` are the URL segments that make a page this instance's, matched
+   * `scopes` are the URL segments that make a page this layer's, matched
    * with `contains` by `_includes/page_ground.html` — the same rule the
-   * instance webpage theme already uses (`/<name>/`), plus the site mount.
+   * layer webpage theme already uses (`/<name>/`), plus the site mount.
    * The FIRST tile that matches wins, and tiles come dependents first, so the
-   * content instance a page is about beats the platform that renders it
+   * content layer a page is about beats the platform that renders it
    * (`/en/cat-harness/processes/<content layer>/` is that layer's page).
    * `siteDefault` marks the site owner, whose mount is `/`: its ground is the
    * fallback for a page no scope claims, never a scope itself, because `/`
    * is in every URL and would claim them all.
    *
-   * `art` is all three crops or absent: absent means this instance's theme
+   * `art` is all three crops or absent: absent means this layer's theme
    * has no backdrop (or no theme), and its pages get NO ground rather than
    * the owner's — a palette-only theme is a choice. The scrim is the page's
    * own (`docs-ui.css`, `.fa-page-ground`), not the theme's sticky scrim,
@@ -265,15 +265,15 @@ export type HarnessTile = {
     title?: string;
   };
   /**
-   * Hue angle — the tile's theme. From the instance's own theme accent when it
+   * Hue angle — the tile's theme. From the layer's own theme accent when it
    * resolves one, else from the avatar registry; {@link toneFrom} says which.
    */
   tone: number;
-  /** Where {@link tone} came from: the instance's own theme accent, or the avatar registry. */
+  /** Where {@link tone} came from: the layer's own theme accent, or the avatar registry. */
   toneFrom: "theme" | "avatar";
   /** What the avatar reads as, for the accessible name. */
   reads: string;
-  /** Whether the avatar is the instance's own or the generic fallback. */
+  /** Whether the avatar is the layer's own or the generic fallback. */
   genericAvatar: boolean;
   /**
    * INSTANTIATED here, rather than merely present as a dependency.
@@ -281,44 +281,44 @@ export type HarnessTile = {
    * The owner, 2026-09-21: *"only the instiatiated harnesses (not all
    * dependent ones) in teh folio... so repo root has
    * `<harness>.config.json`"*. So the signal is the config at the
-   * instantiation root, not the declaration: `harness.json` says what an
-   * instance DECLARES, and the config says that the instance is instantiated
+   * instantiation root, not the declaration: `harness.json` says what a
+   * layer DECLARES, and the config says that the layer is instantiated
    * HERE. Two different facts, and the navbar could not be derived from the
    * declarations alone.
    */
   instantiated: boolean;
   /**
-   * Where the tile GOES when clicked — the instance's own themed root when it
+   * Where the tile GOES when clicked — the layer's own themed root when it
    * has one, else its first viewer, else absent and the tile is not a link.
    */
   href?: string;
   /**
    * What {@link href} points AT, which is three different kinds of thing:
    *
-   * - `folio`   — the instance's own themed root
+   * - `folio`   — the layer's own themed root
    * - `section` — its own section of the landing page, for an INSTANTIATED
-   *               instance with no folio. Before `viewer`, so a harness row
+   *               layer with no folio. Before `viewer`, so a harness row
    *               never takes the name of a graph's page (bean `ob3m` 6).
    * - `viewer`  — a kind handler's view of one of its graphs
-   * - `handled` — one of the instance's OWN files, published for it by the
+   * - `handled` — one of the layer's OWN files, published for it by the
    *               site build and named by its `renderExemption.reachableAt`.
-   *               Only a render-exempt instance can have this, and it is the
+   *               Only a render-exempt layer can have this, and it is the
    *               last resort.
    */
   hrefKind?: "folio" | "section" | "viewer" | "handled";
   stats: HarnessStat[];
   visualisations: HarnessVisualisation[];
   /**
-   * Every graph this instance declares, each marked LOCAL or REMOTE — `603s`'s
+   * Every graph this layer declares, each marked LOCAL or REMOTE — `603s`'s
    * last open item: *"a tab for all materizled local subgraphs and declared
    * remote graphs. opening up content should indicate if local or remote"*.
    * See {@link subgraphsOf}.
    */
   subgraphs: HarnessSubgraph[];
   /**
-   * The instances this one sits on, as declared. `undefined` is UNDETERMINED
-   * — nobody has said — and is a different answer from `[]`, which is an
-   * instance asserting it sits on nothing.
+   * The layers this one sits on, as declared. `undefined` is UNDETERMINED
+   * — nobody has said — and is a different answer from `[]`, which is a
+   * layer asserting it sits on nothing.
    */
   needs?: readonly string[];
   /** Candidates with no published page, and any other honest gap. */
@@ -326,7 +326,7 @@ export type HarnessTile = {
 };
 
 /**
- * One graph an instance declares, and WHERE it is.
+ * One graph a layer declares, and WHERE it is.
  *
  * `local` — its bytes are in this checkout, at `path` (repository-relative —
  * the caller rebases the declaration's instance-relative path).
@@ -353,7 +353,7 @@ export type HarnessSubgraph =
     };
 
 /**
- * The graphs an instance declares, local first, then remote — `603s`.
+ * The graphs a layer declares, local first, then remote — `603s`.
  *
  * READ, never scanned: local rows are the declared directories (`dirs`, the
  * same list the "declared directories" stat counts, so the two cannot
@@ -410,30 +410,30 @@ export function subgraphsOf(
  *      src="/folio-assistant/branches/<branch>/docs/assets/img/icons/cat-mark.svg">
  * ```
  *
- * `docs/` is the instance's site directory, and the site build copies that
+ * `docs/` is the layer's site directory, and the site build copies that
  * directory's CONTENTS to the mount — so the declared prefix is exactly what a
  * published URL does not carry. Every reader got a 404 and a placeholder.
  *
  * The old helper was handed the wrong KIND of value and could never have
  * stripped anything: `siteDir` is ABSOLUTE
- * (`/…/cat-harness/docs`) while `icon.src` is relative to the instance
+ * (`/…/cat-harness/docs`) while `icon.src` is relative to the layer
  * (`docs/assets/…`), so the prefix test was false for every input. A helper
  * that silently passes everything through is indistinguishable from one that
- * is working, which is why this now takes the instance's own directory and
+ * is working, which is why this now takes the layer's own directory and
  * derives the prefix from its OWN declaration.
  *
- * ## Two parts, because an instance is not always at the site root
+ * ## Two parts, because a layer is not always at the site root
  *
- * The published path is the instance's mount plus the asset's path with its
- * site directory removed. An instance whose mount is unknown gets **no icon at
+ * The published path is the layer's mount plus the asset's path with its
+ * site directory removed. A layer whose mount is unknown gets **no icon at
  * all** — the `pb04` rule one layer down: an `<img>` whose `src` 404s is worse
  * than no `<img>`, because a placeholder reads as a broken site rather than as
- * an instance with no art.
+ * a layer with no art.
  *
  * ## `folioRoot` IS THE WRONG MOUNT FOR THIS, and it shipped
  *
  * This took `folioRoot` — *"`/` for the instance that owns the site,
- * `/<name>/` for one mounted beneath it"* — and that is the instance's FRONT
+ * `/<name>/` for one mounted beneath it"* — and that is the layer's FRONT
  * DOOR, which is a different question from where its SITE DIRECTORY lands.
  *
  * MEASURED by running the mount rather than by reading either file:
@@ -441,9 +441,9 @@ export function subgraphsOf(
  *     <iris>/library/  ->  /<iris>/        (1378 files)
  *     <iris>/docs/     ->  /docs/<iris>/   (4 files)
  *
- * (`<iris>` being the IRIS replica instance.)
+ * (`<iris>` being the IRIS replica layer.)
  *
- * `mount-instance-docs` gives every instance a `<kind>/<name>` route
+ * `mount-instance-docs` gives every layer a `<kind>/<name>` route
  * unconditionally and a bare `<name>` route to whichever kind claims it first.
  * For the IRIS replica that is the **library**, so `/<iris>/` serves 1,378 corpus
  * files and the front door is not the docs at all. The icon composed against
@@ -451,7 +451,7 @@ export function subgraphsOf(
  * `/docs/<iris>/assets/img/who-emblem.svg`.
  *
  * So this composes against the route the site directory ACTUALLY takes: the
- * unconditional `<kind>/<name>` one, from the kind the instance declares for
+ * unconditional `<kind>/<name>` one, from the kind the layer declares for
  * that directory. The site owner keeps `/`, because its docs are the site
  * root and are not mounted at all.
  *
@@ -471,13 +471,13 @@ function publishedIcon(
 }
 
 /**
- * Where this instance's SITE DIRECTORY is served from.
+ * Where this layer's SITE DIRECTORY is served from.
  *
- * `/` for the instance that owns the site — the main docs pipeline builds it
- * in place. For every other instance, the `<kind>/<name>` route
+ * `/` for the layer that owns the site — the main docs pipeline builds it
+ * in place. For every other layer, the `<kind>/<name>` route
  * `mount-instance-docs` always produces, with the kind read from the
  * declaration entry whose path IS the site directory. `undefined` when the
- * instance declares no kind for it, which is a real answer: nothing can be
+ * layer declares no kind for it, which is a real answer: nothing can be
  * said about where a directory nobody classified will be served.
  */
 function siteDirMount(
@@ -495,11 +495,11 @@ function siteDirMount(
 }
 
 /**
- * Where a visualiser's sub-graph page for one instance is published:
+ * Where a visualiser's sub-graph page for one layer is published:
  * `/<locale>/<harness>/<visualiser>/<subject>/` — `visualiserRoute`, the ONE
  * function every route is computed with (owner, 2026-10-09), under the page
  * locale (`pageParts`, folio-assistant#2527). The subject never comes first:
- * `<base>/<instance>/` is the instance presenting itself.
+ * `<base>/<instance>/` is the layer presenting itself.
  */
 export function subjectPage(handler: string, visualiser: string, subject: string): string {
   return `/${visualiserRoute(pageParts({ harness: handler, visualiser, subgraph: subject }))}`;
@@ -517,24 +517,24 @@ export function ownStatePage(alias: string): string {
 }
 
 /**
- * An instance's OWN themed root — `<base>/<name>/` — when it has one.
+ * A layer's OWN themed root — `<base>/<name>/` — when it has one.
  *
  * The owner, 2026-09-20, settled the two routes in `mount-instance-docs.ts`
  * (quoted at its top: the kind route is the cat-harness handler's default,
- * the instance's own root is themed), and, 2026-09-21, on what a tile should open:
+ * the layer's own root is themed), and, 2026-09-21, on what a tile should open:
  *
  * > cliking shoud go to folio view, not the schema viweer
  *
- * So the tile's target is the INSTANCE acting as handler for its own name, not
- * a kind handler's default rendering of it. An instance has that root exactly
+ * So the tile's target is the LAYER acting as handler for its own name, not
+ * a kind handler's default rendering of it. A layer has that root exactly
  * when it has its own `docs/` to mount — which is what `mount-instance-docs`
  * walks — so the test is for that directory rather than for a published page.
  *
  * **Probing the built site would give the wrong answer**, and that is measured
- * rather than assumed: the IRIS replica's `docs/` is generated by the instance's own
+ * rather than assumed: the IRIS replica's `docs/` is generated by the layer's own
  * `gen-iris-pages.ts` and mounted at build time, so a working tree that has
  * not run it carries no `docs/<iris>/` while the published site does. The
- * DECLARATION-shaped question — does this instance have docs of its own? — is
+ * DECLARATION-shaped question — does this layer have docs of its own? — is
  * the one that survives both.
  *
  * The site owner's root is the site root: `mount-instance-docs` leaves it to
@@ -543,9 +543,9 @@ export function ownStatePage(alias: string): string {
 function folioRoot(repoRoot: string, name: string, atSiteRoot: boolean): string | undefined {
   if (atSiteRoot) return "/";
   const dir = join(repoRoot, name);
-  // The instance's OWN site directory, read from its OWN declaration rather
+  // The layer's OWN site directory, read from its OWN declaration rather
   // than assumed to be `docs/`. `check:declared-paths` is what caught the
-  // literal, and it was right to: an instance may publish from anywhere, and
+  // literal, and it was right to: a layer may publish from anywhere, and
   // this function would have quietly answered "no folio view" for one that
   // did.
   if (findDeclarationFile(dir) === undefined) return undefined;
@@ -590,7 +590,7 @@ export function instanceDirs(repoRoot: string, names: readonly string[]): string
  * is anything a `renderExemption` has a view about.
  *
  * @param bucket which of the three reasons a kind has no published viewer
- * @param exempt the instance declares `renderExemption.of: ["visualiser"]`
+ * @param exempt the layer declares `renderExemption.of: ["visualiser"]`
  */
 export function inertNote(bucket: "staging-only" | "undiscovered" | "unbuilt", exempt: boolean): string {
   if (bucket === "staging-only") return "staging only";
@@ -604,15 +604,15 @@ function tileFor(
   siteDir: string,
   ownsSite: boolean,
   repoRoot: string,
-  /** This instance IS the repository root — the checkout acting as an instance. */
+  /** This layer IS the repository root — the checkout acting as a layer. */
   isRepoRoot: boolean,
-  /** This instance's OWN directory, which is where its declared paths are relative to. */
+  /** This layer's OWN directory, which is where its declared paths are relative to. */
   instanceDir: string,
   /**
-   * The SITE-OWNING instance — its declaration and its directory.
+   * The SITE-OWNING layer — its declaration and its directory.
    *
    * Needed because theme art is routinely declared by the harness that
-   * SUPPLIES it rather than by the instance it is about: `bootstrap` declares
+   * SUPPLIES it rather than by the layer it is about: `bootstrap` declares
    * a sticky with `theme: bootstrap` and **no images at all**, while
    * `cat-harness` declares the `landing-bootstrap` role's three layouts. That
    * is the inversion `ThemeBackdropSchema` describes — a theme names a ROLE,
@@ -635,7 +635,7 @@ function tileFor(
     });
   });
   type Dir = NonNullable<CatHarnessDeclaration["directories"]>[number];
-  // `instanceDirectories` adds the INSTANCE directories declared from within
+  // `instanceDirectories` adds the LAYER directories declared from within
   // (bean `cmsl`: `skills/skills.json` names `voices/`). `nestedDirectories`
   // walks only DECLARED parents, and `skills/` is now inherited, so without
   // this SMART Base's voices tile vanished (measured 2026-09-30).
@@ -681,12 +681,12 @@ function tileFor(
    * resolves on disk but is not published is not something a tile can open,
    * and claiming it would put a 404 behind the tab — `pb04`.
    */
-  // A COMPOSED directory of this instance is the second place a declared ref
+  // A COMPOSED directory of this layer is the second place a declared ref
   // can be published, and its URL is as computable as the site prefix's:
   // `compose-docs.ts` copies the directory to `_docs/<name>/`, so a page in it
   // is served at `/<name>/<path within it>`. Reading `composed` off the
   // declaration, as `composedInstances` does, rather than restating the rule.
-  // Before this, an instance's own generated viewer (`<instance>/docs/`, with
+  // Before this, a layer's own generated viewer (`<instance>/docs/`, with
   // `rendered-by` naming a kind's viewer Tool) was found and then reported as
   // "built and unreachable" — the routing gap the `declaredFor` note below
   // names. #1767, stage C3.
@@ -695,7 +695,7 @@ function tileFor(
     // An `igSite` directory is served at the same `/<name>/` route, inside the IG's own site (bean `mftp`).
     .filter((d) => ((d as { composed?: boolean }).composed === true || (d as { igSite?: boolean }).igSite === true) && typeof d.path === "string")
     .map((d) => `${instanceRel}/${d.path!.replace(/^\.?\/+/, "").replace(/\/*$/, "/")}`);
-  // THE INSTANCE'S OWN SITE DIRECTORY, when it is served at the site root: the
+  // THE LAYER'S OWN SITE DIRECTORY, when it is served at the site root: the
   // `ownsSite || isRepoRoot` rule `siteDirMount` already applies to its
   // declared ICON (issue #46, gap 3). A folio that generates its own site and
   // is the checkout's root declared its pages under its own `docs/`, and they
@@ -754,7 +754,7 @@ function tileFor(
   }
 
   // THE DECLARATION ALONE (owner, 2026-10-09). A kind's page is the route of
-  // a visualiser some harness DECLARES over one of this instance's
+  // a visualiser some harness DECLARES over one of this layer's
   // directories of that kind — `<base>/<locale>/<harness>/<visualiser>/[<sub-graph>/]`
   // from `visualiserRoute` — and nothing else. Until then this probed two
   // CONVENTIONS first (`/<handler>/<kind>/<name>/`, and `/<kind>/` for the
@@ -834,7 +834,7 @@ function tileFor(
   // Discovery above is by CONVENTION — a page at `/<handler>/<kind>/<name>/`
   // or, for the site's owner, `/<kind>/`. A kind can therefore have a viewer
   // that is real, declared and on disk, and still not be found here, because
-  // it was published somewhere the convention does not look: an instance's own
+  // it was published somewhere the convention does not look: a layer's own
   // mounted `docs/`, for example.
   //
   // Reporting both as "no published viewer" makes the artefact assert
@@ -851,7 +851,7 @@ function tileFor(
   // Those kinds never reach this block, because they have a `path`.
   //
   // What is left here is the case that genuinely needs `withRoutes`: a ref
-  // INSIDE an instance's own tree, which the site build mounts somewhere the
+  // INSIDE a layer's own tree, which the site build mounts somewhere the
   // strip above cannot compute — that replica's `docs/catalogue.html` is the
   // measured example. For those the fix is still the DISTINCTION rather than
   // the discovery: naming the case stops the report lying in the meantime,
@@ -890,9 +890,9 @@ function tileFor(
    *
    * `renderExemption` (instance-wide) and `coverage.exempt.visualiser`
    * (directory-level, as `check-subgraph-coverage.ts` honours for e.g.
-   * a higher instance's Lean template directory; bean
+   * a higher layer's Lean template directory; bean
    * `folio-assistant-6gme`) split `unbuilt`, and only `unbuilt`: the same
-   * predicate the finding twenty lines down calls, so an exempt instance or
+   * predicate the finding twenty lines down calls, so an exempt layer or
    * directory cannot be told "no viewer yet" by one surface and "not a gap" by
    * the other.
    */
@@ -931,7 +931,7 @@ function tileFor(
   }
 
   if (unbuilt.length > 0) {
-    /* A RENDER-EXEMPT INSTANCE IS NOT MISSING ANYTHING, and this finding said
+    /* A RENDER-EXEMPT LAYER IS NOT MISSING ANYTHING, and this finding said
      * it was. Bean `sbck`, third done-when.
      *
      * bootstrap declares `renderExemption.of: ["visualiser", ...]` — the
@@ -1032,7 +1032,7 @@ function tileFor(
     }
   }
 
-  // THE OTHER HALF OF `flh4`: a page published for this instance by a
+  // THE OTHER HALF OF `flh4`: a page published for this layer by a
   // declared visualiser that covers NONE of its directories. The tile must not
   // link it — the declaration decides what a tile claims to show — but staying
   // silent would hide a working viewer behind a rule, and the remedy is one
@@ -1054,7 +1054,7 @@ function tileFor(
   }
 
   // The declaration's own `avatar` first (sod4 #4), so a tile is drawn from
-  // the instance it describes; the table by name covers the instances below
+  // the layer it describes; the table by name covers the layers below
   // the harness that carry none.
   const own = decl.avatar !== undefined || hasAvatar(decl.name);
   const avatar = decl.avatar ?? (own ? avatarFor(decl.name) : GENERIC);
@@ -1064,14 +1064,14 @@ function tileFor(
 
   const icon = decl.images?.find((i) => i.id === decl.icon);
 
-  // THE CLICK TARGET: the instance's own themed root FIRST, a kind handler's
+  // THE CLICK TARGET: the layer's own themed root FIRST, a kind handler's
   // viewer only when it has none. The owner asked for exactly this — "cliking
   // shoud go to folio view, not the schema viweer" — and the first version got
   // it wrong by taking whichever viewer happened to sort first, which for
   // `detangle` and `large-datasets` is the schema viewer.
-  // TWO instances resolve to `/`, and that is this repository rather than a
+  // TWO layers resolve to `/`, and that is this repository rather than a
   // bug: `mount-instance-docs` leaves the site root to the main docs pipeline,
-  // which the site-owning harness supplies, and the repository root instance IS
+  // which the site-owning harness supplies, and the repository root layer IS
   // the checkout that pipeline publishes. Saying so beats giving one of them a
   // link that 404s — `docs/cat-harness/` has viewers beneath it and no index.
   const folio = folioRoot(repoRoot, decl.name, ownsSite || isRepoRoot);
@@ -1080,11 +1080,11 @@ function tileFor(
   // here rather than beside `icon` because it needs the mount, and the mount
   // is `folio`.
   // The SITE-DIR mount, not `folio` — see `publishedIcon`. `folio` is the
-  // instance's front door, which for the IRIS replica is its 1,378-file library.
+  // layer's front door, which for the IRIS replica is its 1,378-file library.
   const siteMount = siteDirMount(decl, instanceDir, ownsSite || isRepoRoot);
   const iconSrc = icon ? publishedIcon(instanceDir, icon.src, siteMount) : undefined;
   if (icon && iconSrc === undefined) {
-    // Reported, never rendered as a placeholder. The instance ASKED for a
+    // Reported, never rendered as a placeholder. The layer ASKED for a
     // mark and did not get one, and that is a fact about its declaration
     // rather than about this tile.
     findings.push(
@@ -1095,7 +1095,7 @@ function tileFor(
   }
   const firstViewer = visualisations.find((v) => v.path)?.path;
 
-  /* THE THIRD TARGET, for an instance that renders nothing of its own.
+  /* THE THIRD TARGET, for a layer that renders nothing of its own.
    *
    * bootstrap is instantiated, correctly has no viewer (it declares a
    * `renderExemption` — the owner, 2026-09-20: *"it is exception to
@@ -1109,17 +1109,17 @@ function tileFor(
    * said "I do not render myself" without saying "so go here instead".
    * `reachableAt` is that second half, and it is DECLARED for the same reason
    * the exemption itself is — a checker naming one instance states a rule
-   * true only for the instance somebody remembered (`hfkl`).
+   * true only for the layer somebody remembered (`hfkl`).
    *
    * THE FILE IS CHECKED, not composed. A declared path that does not resolve
    * is `flh4`'s defect and a DIFFERENT finding from "nothing is published":
    * one says the declaration is wrong, the other says nobody built it. Both
    * leave the tab unlinked, which is correct either way.
    *
-   * RELATIVE TO THE INSTANCE, and inside it (owner, 2026-09-23, bean iwtn:
+   * RELATIVE TO THE LAYER, and inside it (owner, 2026-09-23, bean iwtn:
    * "bootstrap is bootstrap"). It named a page in the site-owning harness's
    * docs until then, which made the floor of the stack point at a layer above
-   * it. It now names one of the instance's OWN files, which the site build
+   * it. It now names one of the layer's OWN files, which the site build
    * publishes at `<base>/<stub>/` (`publish-instance-files.ts`), `.md`
    * rendered as `.html`.
    */
@@ -1147,10 +1147,10 @@ function tileFor(
     }
   }
 
-  // The instance's theme, from the sticky it contributes about ITSELF. A
-  // contribution whose id is this instance is the instance talking about
+  // The layer's theme, from the sticky it contributes about ITSELF. A
+  // contribution whose id is this layer is the layer talking about
   // itself, which is the same key `composeContributions` dedupes on.
-  // THE INSTANCE'S OWN STICKY — and a card id is NOT the instance name.
+  // THE LAYER'S OWN STICKY — and a card id is NOT the layer name.
   //
   // This matched `st.id === decl.name` and therefore found nothing for
   // the content core, whose card id is `folio-assist-core`. That is not
@@ -1161,10 +1161,10 @@ function tileFor(
   // assumption, written here one file over, and it cost core its avatar while
   // its theme had been declared all along.
   //
-  // THE SET IS ALREADY RIGHT: `decl.stickies` is what THIS instance
+  // THE SET IS ALREADY RIGHT: `decl.stickies` is what THIS layer
   // contributes, so its own card is in there whatever it is called. An exact
   // match still wins where one exists (cat-harness, bootstrap); a lone
-  // contribution is taken as the instance's own; and several with no exact
+  // contribution is taken as the layer's own; and several with no exact
   // match is REPORTED rather than picked from, because choosing by order would
   // make the avatar depend on declaration order.
   const contributed = decl.stickies ?? [];
@@ -1187,15 +1187,15 @@ function tileFor(
         `showing no theme avatar rather than a broken image.`,
     );
   }
-  // THE TONE, from the accent of a theme the instance DECLARED ITSELF (bean
-  // `v8n5`). Scoped to an instance's own theme on purpose: a card citing one
+  // THE TONE, from the accent of a theme the layer DECLARED ITSELF (bean
+  // `v8n5`). Scoped to a layer's own theme on purpose: a card citing one
   // of the platform's shared sticky themes chose a note style, not an
   // identity colour, and re-hueing every such tile is a change nobody asked
   // for. A grey accent has no hue, and then the avatar's tone stands.
   const ownTheme = found?.ok === true && found.owner !== undefined && found.owner !== PLATFORM_THEME_OWNER;
   const themeTone = theme && ownTheme ? hexHue(theme.palette.accent) : undefined;
 
-  // Resolved theme for blank fallback: when an instance has no avatar, its blank
+  // Resolved theme for blank fallback: when a layer has no avatar, its blank
   // mark takes the colour from the resolved theme (including parent/owner theme).
   const ownerContributed = owner?.decl.stickies ?? [];
   const ownerExact = owner ? ownerContributed.find((st) => st.id === owner.decl.name) : undefined;
@@ -1217,7 +1217,7 @@ function tileFor(
   // `gen-landing-data.ts` has always resolved a contributed sticky's art
   // against the site owner's images, so this is that join rather than a second
   // one — widened by the own-first step, which changes no existing answer
-  // because no instance below the owner declares a landing role today.
+  // because no layer below the owner declares a landing role today.
   const ownCard = theme ? resolveThemeBackdrop(theme, decl.images).art.get("card") : undefined;
   const ownerCard =
     theme && ownCard === undefined && owner
@@ -1241,9 +1241,9 @@ function tileFor(
   }
   const groundComplete = ["mobile", "laptop", "card"].every((l) => groundSrcs[l] !== undefined);
   // THE PATH FOLLOWS THE SOURCE. An image declared by the site owner is
-  // published under the SITE's own root, not under this instance's mount —
-  // composing it from `folio` would point at a path the instance does not
-  // serve, which is `68au` with the baseurl replaced by the wrong instance.
+  // published under the SITE's own root, not under this layer's mount —
+  // composing it from `folio` would point at a path the layer does not
+  // serve, which is `68au` with the baseurl replaced by the wrong layer.
   const cardSrc = card
     ? ownCard !== undefined
       ? publishedIcon(instanceDir, card.src, siteMount)
@@ -1290,10 +1290,10 @@ function tileFor(
           ...(icon?.avatarRegion ? { region: icon.avatarRegion, crop: solveCrop(icon.avatarRegion) } : {}),
           ...(icon?.ground ? { ground: icon.ground } : {}),
         };
-  // The registry glyph is the THIRD candidate, not a separate mechanism: an
-  // instance with its own avatar entry (never the generic one, which is a
+  // The registry glyph is the THIRD candidate, not a separate mechanism: a
+  // layer with its own avatar entry (never the generic one, which is a
   // fallback rather than a mark) still has a mark when it declares no image.
-  // When an instance has no declared avatar (own === false), it renders the
+  // When a layer has no declared avatar (own === false), it renders the
   // themed blank mark (owner ruling 2026-09-20: "there is always an avatar,
   // even when there is none (always have default blank/themecolor if no avatar. etc)").
   const blankMark: HarnessMark = { glyph: BLANK_AVATAR.glyph, title: BLANK_AVATAR.reads, blank: true };
@@ -1317,14 +1317,14 @@ function tileFor(
   // row below it. The landing renders a section for every instantiated
   // harness (`_includes/harness_details.html`), so the anchor always resolves.
   // The CHECKOUT's answer, index included (cat-harness#21's rule): an index
-  // lists its instances in `index.config.json` and none has a root
+  // lists its layers in `index.config.json` and none has a root
   // `<name>.config.json`, so the file test made every harness uninstantiated
   // and the landing listed none of them (`harness-row-alignment`,
   // `rail-tips`, 2026-10-09).
   const instantiated = instantiatedHarnessNames(repoRoot).includes(decl.name);
   const section = rooted === undefined && instantiated ? `/#harness-${decl.name}` : undefined;
   const href = rooted ?? section ?? firstViewer ?? handled;
-  // A VIEWER AT THE INSTANCE'S OWN ROOT is the harness's page again, and
+  // A VIEWER AT THE LAYER'S OWN ROOT is the harness's page again, and
   // takes the harness's name (stage C of #1767 put the `fhir-artifact-index`
   // viewer at a DAK base layer's root). See `nameInstanceRoot`.
   nameInstanceRoot(visualisations, folio, decl);
@@ -1359,7 +1359,7 @@ function tileFor(
     ...(decl.needs ? { needs: decl.needs } : {}),
     // `avatarRegion` rides the ICON too, when the icon image declares one.
     // None does today; the THEME avatar below is where the declared crops
-    // actually live. Kept because the two are different questions: an instance
+    // actually live. Kept because the two are different questions: a layer
     // may declare a mark that wants cropping without having a theme at all.
     icon:
       iconSrc === undefined
@@ -1374,8 +1374,8 @@ function tileFor(
     // I reported on 2026-09-22 that the harness->card assignment "does not
     // exist". THAT WAS WRONG, and the correction matters because it was the
     // reason gap 6 was left unwired: the assignment is THEME-MEDIATED and has
-    // been all along. An instance contributes a sticky, the sticky names a
-    // `theme`, the theme names an `imageRole`, and the instance's own images
+    // been all along. A layer contributes a sticky, the sticky names a
+    // `theme`, the theme names an `imageRole`, and the layer's own images
     // carry that role per layout. `resolveThemeBackdrop` is the join and it
     // already returns the DeclaredImage, so the `avatarRegion` `603s` measured
     // comes with it. Nothing new is invented here; a chain that existed is
@@ -1390,7 +1390,7 @@ function tileFor(
      * THE MARK THE NAVBAR SHOWS, resolved once here rather than branched on in
      * a template.
      *
-     * Theme avatar first, the instance's own `icon` second, its registry
+     * Theme avatar first, the layer's own `icon` second, its registry
      * glyph third (bean `2vpn`). The precedence is
      * the owner's — *"use theme avatar not the purply thing"* — and it is
      * decided HERE because the alternative is five branches of Liquid
@@ -1437,7 +1437,7 @@ function tileFor(
       { id: "views", label: "visualisations you can open", value: visualisations.filter((v) => v.path).length },
     ],
     visualisations,
-    // Paths REPOSITORY-relative: a declared `path` is the instance's own
+    // Paths REPOSITORY-relative: a declared `path` is the layer's own
     // (`library/`), and a reader needs to know which `library/`.
     subgraphs: subgraphsOf(
       decl,
@@ -1448,9 +1448,9 @@ function tileFor(
 }
 
 /**
- * Every initiated harness, as a tile, with the footer instances last.
+ * Every initiated harness, as a tile, with the footer layers last.
  *
- * `harnessRoot` is the instance that owns the published site — its `docs/` is
+ * `harnessRoot` is the layer that owns the published site — its `docs/` is
  * the site root, and it supplies the handler segment every subject page sits
  * under. `names` is the directory list to look in, passed rather than globbed
  * so a caller can test this against a fixture without a filesystem walk.
@@ -1491,12 +1491,12 @@ export function harnessTiles(
   }
 
   // THE ICON ROW IS RESOLVED OVER THE WHOLE SET, not per tile, because
-  // inheritance is a question about the OTHER instances. Owner: *"should be in
+  // inheritance is a question about the OTHER layers. Owner: *"should be in
   // each harness config which are shown (so some could show none, but make
   // this default in cat-harness that is inherited)."*
   //
   // `handler` is the floor rather than a literal `"cat-harness"`: the
-  // site-owning instance is whoever declares this site, and naming it here
+  // site-owning layer is whoever declares this site, and naming it here
   // would be the hardcoded-four-names failure `builtOn` was declared to end.
   const declaredIcons = new Map(decls.map(({ decl }) => [decl.name, decl.navbarIcons]));
   const needsOf = new Map(decls.map(({ decl }) => [decl.name, decl.needs]));
@@ -1524,7 +1524,7 @@ export function harnessTiles(
   // SUBSCRIBED HARNESSES (issue #1719, slice 7): a harness a subscription
   // chose, with `<name>.config.json` at the root and no local declaration, is
   // instantiated here and gets a tile drawn from its cached snapshot. A local
-  // instance of the same name wins: `kg:instantiate` refuses that case, and
+  // layer of the same name wins: `kg:instantiate` refuses that case, and
   // drawing both would be the duplicate `disambiguate` exists to flag.
   const local = new Set(decls.map(({ decl }) => decl.name));
   for (const h of subscribedHarnesses(repoRoot, decls)) {
@@ -1539,7 +1539,7 @@ export function harnessTiles(
 /**
  * Make every tile's label identify its subject, and say when it did not.
  *
- * A duplicate is qualified with the instance's own directory name, which IS
+ * A duplicate is qualified with the layer's own directory name, which IS
  * unique — it is the directory the declaration was read from. `folio-assistant`
  * and `folio-assistant (cat-harness)` are then two labels a reader can act on.
  *
@@ -1622,7 +1622,7 @@ export function solveCrop(r: { x: number; y: number; w: number; h: number }): {
 }
 
 /**
- * Is this checkout-root instance's site GENERATED — no authored site on disk,
+ * Is this checkout-root layer's site GENERATED — no authored site on disk,
  * every page written into the site source at publish (litlfred/smart-ra)?
  *
  * "Authored" is a Jekyll config or a home page, not the directory existing:
@@ -1681,7 +1681,7 @@ export function disambiguate(tiles: readonly HarnessTile[]): HarnessTile[] {
 const byName = (a: HarnessTile, b: HarnessTile) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
 /**
- * Top to bottom: the most derived instance first, the floor last.
+ * Top to bottom: the most derived layer first, the floor last.
  *
  * The owner, 2026-09-20, giving the spine in one sentence:
  *
@@ -1691,7 +1691,7 @@ const byName = (a: HarnessTile, b: HarnessTile) => (a.name < b.name ? -1 : a.nam
  * what is built on it above, which is how a layer diagram is drawn everywhere
  * else in this repository. So it is computed from the declared `needs` rather
  * than written out as four names: a list of names would be a rule true only
- * for the instances somebody remembered, which is exactly why
+ * for the layers somebody remembered, which is exactly why
  * `bootstrap`'s footer position is read from its declared exemption
  * instead of from its name.
  *
@@ -1704,10 +1704,10 @@ const byName = (a: HarnessTile, b: HarnessTile) => (a.name < b.name ? -1 : a.nam
  * chose; nothing is run here, so every step takes `false` and the field is
  * carried rather than consulted.
  *
- * ## An instance with no declared layer is UNDETERMINED, and says so
+ * ## A layer with no declared layer is UNDETERMINED, and says so
  *
  * `flattenDependencies` is free to put a node that needs nothing first, so an
- * unlabelled instance would land on the floor beside the bootstrap — asserting
+ * unlabelled layer would land on the floor beside the bootstrap — asserting
  * something nobody declared. They are partitioned out instead and listed
  * above the spine, alphabetically, with a finding. Absent is not `[]`.
  *
@@ -1716,7 +1716,7 @@ const byName = (a: HarnessTile, b: HarnessTile) => (a.name < b.name ? -1 : a.nam
  * `flattenDependencies` returns an EMPTY order when it finds a cycle or a
  * missing dependency, which is right for a pipeline — a partial order over a
  * broken graph is the shape that gets run anyway. A sidebar is not a pipeline:
- * showing nothing hides every instance over one typo. So the problems are
+ * showing nothing hides every layer over one typo. So the problems are
  * reported on the tiles and the list falls back to alphabetical, which is
  * undetermined rather than wrong.
  */
@@ -1733,7 +1733,7 @@ export function orderTiles(tiles: readonly HarnessTile[]): HarnessTile[] {
 
   const { order, problems } = flattenDependencies(
     // Declaration order is what `flattenDependencies` breaks ties on, so the
-    // input is sorted by name: two instances on the same layer then read
+    // input is sorted by name: two layers on the same layer then read
     // alphabetically instead of in whichever order the directory was walked.
     [...spine].sort(byName).map((t) => ({
       id: t.name,
@@ -1756,16 +1756,16 @@ export function orderTiles(tiles: readonly HarnessTile[]): HarnessTile[] {
   // REVERSED: `flattenDependencies` yields foundation-first, and the owner
   // asked for bottom-to-top.
   const stack = [...order].reverse().map((s) => byId.get(s.id)!);
-  // THE MOST DERIVED INSTANCE IS ON TOP, and the undetermined sit under it.
+  // THE MOST DERIVED LAYER IS ON TOP, and the undetermined sit under it.
   //
   // The owner, 2026-09-21: *"in reverse dep order (so bootsrap on bottom,
   // folio-asst, on top)"*. The first version put the whole unplaced group
   // above the spine, which left `folio-assistant` eighth from the top — the
   // sentence's two endpoints were both wrong.
   //
-  // So the spine's head keeps the top and its floor keeps the bottom, and an
-  // instance whose layer nobody declared goes immediately BELOW the head:
-  // the only thing known about it is that it is neither the root instance nor
+  // So the spine's head keeps the top and its floor keeps the bottom, and a
+  // layer whose layer nobody declared goes immediately BELOW the head:
+  // the only thing known about it is that it is neither the root layer nor
   // the floor. It still carries the finding that says its place is not derived.
   const [head, ...rest] = stack;
   return floorLast(head === undefined ? unplaced : [head, ...unplaced, ...rest]);
@@ -1781,13 +1781,13 @@ export function orderTiles(tiles: readonly HarnessTile[]): HarnessTile[] {
  * it.
  *
  * They are not the same rule, though, and collapsing them would lose the one
- * that survives a missing declaration: an instance that declares no `needs`
+ * that survives a missing declaration: a layer that declares no `needs`
  * is undetermined and would float to the top of the unplaced group, so a
  * bootstrap whose layer nobody wrote down would land ABOVE everything it
  * underpins. The exemption is the fact that does not depend on the ordering
  * having been declared, so it is applied last and wins.
  *
- * A stable partition rather than a comparator, so two exempt instances keep
+ * A stable partition rather than a comparator, so two exempt layers keep
  * the order the stack gave them.
  */
 function floorLast(tiles: readonly HarnessTile[]): HarnessTile[] {

@@ -95,7 +95,7 @@ export function qaResultHref(i: {
  * The declaration-aware form: an absolute path in the checkout, addressed by
  * whether its `qa` directory declares `storage`. A caller linking many files
  * passes `location`, resolved once for `repoRoot`: resolving it walks every
- * instance's declarations, per call.
+ * layer's declarations, per call.
  */
 export function qaResultLinkFor(
   absPath: string,

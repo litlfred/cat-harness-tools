@@ -162,7 +162,7 @@ describe("formatReport", () => {
 
   test("the node count rides with the tick, so a drop to nothing is visible", () => {
     // `exit 0` alone was not enough and the falsification proved it: an
-    // invocation pointed at a nonexistent instance exited 0 and this gate
+    // invocation pointed at a nonexistent layer exited 0 and this gate
     // printed a tick over an empty graph.
     const out = formatReport({
       invocations: [inv("docs-site.yml", "./bootstrap")],

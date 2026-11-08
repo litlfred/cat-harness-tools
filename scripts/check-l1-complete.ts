@@ -101,12 +101,12 @@ export interface EntryReport {
   slug: string;
   /**
    * The library this entry is in, repo-relative — present only when there is
-   * more than one, so a single-library instance's output is unchanged.
+   * more than one, so a single-library layer's output is unchanged.
    *
    * A slug alone stopped locating an entry when `library` gained a second home
    * (bean `frs5`): the report printed `library/milnorlink/` and
    * `library/who-pub-tps-931/` identically while they sat in different
-   * instances. Same reasoning as the per-directory root names in
+   * layers. Same reasoning as the per-directory root names in
    * `graph-index.ts` and the MCP server's GRAPH_ROOTS — a line that says where
    * something came from is useless the moment two sources share a name.
    */
@@ -561,7 +561,7 @@ export function declaredFigureCaptions(sectionsDir: string): Map<string, string 
 
 /**
  * The locales an entry's narratives are owed in: the `translation.supportedLocales`
- * its instance declares, else the schema's default (the six UN languages).
+ * its layer declares, else the schema's default (the six UN languages).
  *
  * Bean `d5f1`'s Done-when is *"a description per configured language"*. The
  * gate used to ask only whether an image had ANY narrative, so an entry whose
@@ -569,7 +569,7 @@ export function declaredFigureCaptions(sectionsDir: string): Map<string, string 
  * reported "0 remaining English-only figures" while smart-ra's copy of the
  * DPI-H reference architecture held 31, which nothing could see.
  *
- * The entry is `<instance>/library/<slug>`, so its instance is two levels up.
+ * The entry is `<instance>/library/<slug>`, so its layer is two levels up.
  */
 export function entryLocales(dir: string): string[] {
   let raw: unknown = {};
@@ -739,7 +739,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     };
     // A DECLARED library sub-graph inside the entry (bean `8pzh` item 1, owner
     // 2026-10-12: L1 extraction output lives beside its entry and is published
-    // with it). The instance declares the directory with a kind that is
+    // with it). The layer declares the directory with a kind that is
     // `within: "library"`, so it is the entry's own KG content, not an arm's
     // misfiled output — the same lookup the library publisher follows. An
     // UNDECLARED directory there is still a stray.
@@ -1604,9 +1604,9 @@ export function checkEntry(dir: string, registry: GraphTypologyRegistry = defaul
 }
 
 /**
- * The instance root, which is NOT the current working directory.
+ * The layer root, which is NOT the current working directory.
  *
- * This resolved the library from `resolve(".")` alone. The instance moved
+ * This resolved the library from `resolve(".")` alone. The layer moved
  * under `cat-harness/` (bean `wggr`), npm scripts run from the REPOSITORY
  * root, and so `bun run cat check:l1-complete` — a CI gate — found no declaration,
  * reported "no library/ entries — nothing to check" and **exited 0**. Measured
@@ -1735,15 +1735,15 @@ export function sidecarDocument(report: EntryReport) {
   return result;
 }
 
-/** {@link sidecarDocument}, written under the declared `qa` tree of the instance that owns the entry. */
+/** {@link sidecarDocument}, written under the declared `qa` tree of the layer that owns the entry. */
 export function sidecarFor(root: string, report: EntryReport): string {
   return writeQaResult(sidecarRootFor(root, report.slug), join("library-qa", report.slug), sidecarDocument(report));
 }
 
 /**
- * The instance whose `qa` tree holds an entry's verdict: the one that owns the
- * library the entry sits in. In a standalone instance that is `root` itself.
- * In the index checkout `root` declares no instance (owner, 2026-10-08), and
+ * The layer whose `qa` tree holds an entry's verdict: the one that owns the
+ * library the entry sits in. In a standalone layer that is `root` itself.
+ * In the index checkout `root` declares no layer (owner, 2026-10-08), and
  * writing under it put 79 sidecars in an undeclared `<index>/test/results/`
  * while the libraries sat in the IRIS replica and the others (measured 2026-10-09).
  * An entry no declared library holds stays at `root`, as before.
@@ -1830,7 +1830,7 @@ function format(reports: EntryReport[]): string {
   for (const r of reports) {
     const unmet = blockingUnmet(r.requirements);
     // `<library>/<slug>/` when several libraries are in play, `library/<slug>/`
-    // when there is only one — an instance with a single library reads exactly
+    // when there is only one — a layer with a single library reads exactly
     // as it always did.
     out.push(`${unmet.length ? "✗" : "✓"} ${r.library ?? "library"}/${r.slug}/`);
     for (const q of r.requirements) {
@@ -1938,7 +1938,7 @@ if (import.meta.main) {
     // The SAME root the reports came from. `resolve(".")` wrote the sidecars
     // beside the working directory, so running the documented command from
     // the repository root put them in a `test/` tree of their own while the
-    // committed ones sat under the instance — two sets, neither checking the
+    // committed ones sat under the layer — two sets, neither checking the
     // other. Measured 2026-09-20.
     const writeRoot = libraryRootFor(resolve(".")) ?? resolve(".");
     for (const r of reports) console.log(`wrote ${sidecarFor(writeRoot, r)}`);

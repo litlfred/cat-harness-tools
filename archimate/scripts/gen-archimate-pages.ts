@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Write a JSON-LD node and a thin page for every ArchiMate model an instance
+ * Write a JSON-LD node and a thin page for every ArchiMate model a layer
  * holds, and for every VIEW, ELEMENT and RELATIONSHIP in each — and draw every
  * view as SVG from the model's own diagram.
  *
@@ -15,12 +15,12 @@
  * With `--out`, they are written into a site being built — the way a folio's
  * staging build uses it, since a large model is thousands of nodes and nobody
  * should commit them. The DATA (every `.jsonld`, `.json`, `model.json`, drawn
- * view and the loader) is at the path the graph has in the instance,
+ * view and the loader) is at the path the graph has in the layer,
  * `<site>/<graph path>/…`, so no IRI moves. The PAGES are at the route of the
- * visualiser the instance DECLARES for this Tool, `<site>/en/<harness>/<id>/…`
+ * visualiser the layer DECLARES for this Tool, `<site>/en/<harness>/<id>/…`
  * (`visualiserRoute`; owner 2026-10-09, every visualiser page at
  * `<base>/<harness>/<visualiser>`, and folio-assistant#2527, under the
- * locale). An instance that declares none gets no site pages: the run stops
+ * locale). A layer that declares none gets no site pages: the run stops
  * and says so, because a generator writing to a route nobody declared is what
  * the routes gate exists to end. Each page carries `rendered-by`, so
  * `check:visualiser-routes` can see it. Each page reaches its data, and each
@@ -83,11 +83,11 @@ import { visualiserRoute } from "../../schemas/kg/visualiser-route.ts";
 
 /** The config-block id every page written here carries — how a run recognises its own output. */
 export const PAGE_CONFIG_ID = "archimate-page";
-/** The Tool node these pages are drawn by (`cat-harness/tools/index.ts`), which an instance names in its `visualisers`. */
+/** The Tool node these pages are drawn by (`cat-harness/tools/index.ts`), which a layer names in its `visualisers`. */
 export const TOOL_ID = "archimate-pages";
 const LOADER = "assets/archimate.js";
 const STYLE = "assets/archimate.css";
-// declared-path-literal: this module's own templates under cat-harness-tools/archimate/, not an instance's archimate/ directory.
+// declared-path-literal: this module's own templates under cat-harness-tools/archimate/, not a layer's archimate/ directory.
 const TEMPLATES = join(TOOLS_ROOT, "archimate", "scripts", "templates");
 
 export const CONTEXT = {
@@ -106,7 +106,7 @@ export interface Written {
 
 /** Where a run's files go: the data at the graph's path, and the pages — in a site — at the declared route. */
 export interface Layout {
-  /** The graph's path in the instance, with no trailing slash: where the data is, in the graph and in a site. */
+  /** The graph's path in the layer, with no trailing slash: where the data is, in the graph and in a site. */
   graphPath: string;
   /**
    * Site-relative, with no trailing slash: where the PAGES are in a site,
@@ -133,7 +133,7 @@ interface Declaration {
 }
 
 /**
- * The route an instance declares for these pages: its one visualiser
+ * The route a layer declares for these pages: its one visualiser
  * `renderedBy` {@link TOOL_ID}, or — when it declares several — the one that
  * covers the archimate directory. Throws when there is none to choose, and
  * says what to declare.
@@ -152,14 +152,14 @@ export function declaredPageRoot(decl: Declaration, directory: string): string {
   return visualiserRoute(pageParts({ harness: decl.name, visualiser: chosen.id })).replace(/\/$/, "");
 }
 
-/** Where the instance's IRIs start: its own `iriBase`, else the platform's site under its name. */
+/** Where the layer's IRIs start: its own `iriBase`, else the platform's site under its name. */
 export function iriBaseOf(decl: Declaration): string {
   const b = decl.iriBase ?? `${DOCS_SITE_BASE}${decl.name}/`;
   return b.endsWith("/") ? b : `${b}/`;
 }
 
 /**
- * Every file a run writes for one instance, keyed by its path under the graph.
+ * Every file a run writes for one layer, keyed by its path under the graph.
  * `site`: the files are for a site being built (`--out`), so each page links
  * its data and loader, and each drawn view its pages, across the locale (see
  * {@link sitePathOf}); otherwise everything sits together in the graph.
@@ -610,7 +610,7 @@ function thinPage(
 
 /** A document figure the config maps to a view, with where the site holds its drawing and its page. */
 export interface FigureTarget {
-  /** The block holding the figure, relative to the instance root (`figures[].block`). */
+  /** The block holding the figure, relative to the layer root (`figures[].block`). */
   block: string;
   label: string;
   model: string;
@@ -624,10 +624,10 @@ export interface FigureTarget {
 }
 
 /**
- * Every figure the instance's config maps to a view (`figures`), with the site
+ * Every figure the layer's config maps to a view (`figures`), with the site
  * paths `archimate-pages --out` writes for it, so a document site can show the
  * live drawing in the figure's place and link its page. Empty when the
- * instance holds no ArchiMate config or maps no figure. Reads only the models
+ * layer holds no ArchiMate config or maps no figure. Reads only the models
  * a figure names.
  */
 export function figureTargets(instanceRoot: string): FigureTarget[] {

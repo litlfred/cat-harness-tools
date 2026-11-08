@@ -86,13 +86,13 @@ export interface SubgraphReport {
    */
   dangling: Array<{ from: string; fromDir: string; target: string }>;
   /**
-   * Links that name a path an instance has MOVED, resolved at its new place
-   * through that instance's declared `moves` (sdlc skill `two-phase-move`).
+   * Links that name a path a layer has MOVED, resolved at its new place
+   * through that layer's declared `moves` (sdlc skill `two-phase-move`).
    * Not dangling while the move's window is open; each is a link its layer
    * still has to switch to the new path. `to` is the file it resolved to.
    */
   moved: Array<{ from: string; fromDir: string; target: string; to: string; move: string }>;
-  /** Every move the instances of this checkout declare, with how many links still use the old path. */
+  /** Every move the layers of this checkout declare, with how many links still use the old path. */
   moves: Array<ResolvedMove & { inbound: number }>;
   /**
    * Links into a declared directory that is ABSENT from this checkout and may
@@ -138,7 +138,7 @@ export interface SubgraphReport {
    * `docs/` — 241 files, until 2026-09-20 invisible to every
    * declaration-driven consumer — put them in scope for the first time and
    * produced 171, of which 23 ARE source-tree links carrying one `../` too
-   * many, rot left by the move of the instance under `cat-harness/`. That
+   * many, rot left by the move of the layer under `cat-harness/`. That
    * audit is bean `mi97`.
    *
    * Without this the gate below could not be held at 0 once `docs/` was
@@ -183,7 +183,7 @@ export interface SubgraphReport {
    * Added 2026-09-20 after this sweep reported **0 dangling links** over a
    * corpus in which a just-retired page still carried seven. The page had
    * moved to `fsh-guts/`, which is `scope: "repository"` and therefore sits
-   * OUTSIDE this instance — and `owningDirectory` compares in the instance's
+   * OUTSIDE this layer — and `owningDirectory` compares in the layer's
    * path space, so every repository-scoped directory was skipped without a
    * word. `bootstrap/skills/` and `uploads/` are skipped the
    * same way.
@@ -419,7 +419,7 @@ export function resolveAcrossArchive(
   return undefined;
 }
 
-/** One entry of an instance's `moves`, with its paths made absolute. */
+/** One entry of a layer's `moves`, with its paths made absolute. */
 export interface ResolvedMove {
   /** `<instance>:<from>`, how the report names it. */
   id: string;
@@ -431,7 +431,7 @@ export interface ResolvedMove {
 }
 
 /**
- * The moves the instances under {@link roots} declare (`moves` on each
+ * The moves the layers under {@link roots} declare (`moves` on each
  * declaration). An unreadable declaration contributes none; reporting it is
  * `check:harness-dirs`'s job.
  */
@@ -495,7 +495,7 @@ export interface LinkContext {
   label: (d: ReturnType<typeof resolveDirectories>[number]) => string;
   absentOffMain: string[];
   archiveViews: Array<{ store: string; view: string }>;
-  /** The `moves` the checkout's instances declare (sdlc skill `two-phase-move`). */
+  /** The `moves` the checkout's layers declare (sdlc skill `two-phase-move`). */
   moves?: ResolvedMove[];
   /**
    * Declared `builtAtPublish` paths (absolute) that are not built in this
@@ -507,7 +507,7 @@ export interface LinkContext {
 }
 
 /**
- * The `builtAtPublish` paths the instances under {@link roots} declare that
+ * The `builtAtPublish` paths the layers under {@link roots} declare that
  * are ABSENT here, as absolute paths (a directory entry keeps its trailing
  * `/`). Only an absent one counts: a built one is judged like any other file,
  * so a link to a file the build did not write is still reported. An
@@ -539,14 +539,14 @@ function underUnbuilt(wanted: string, unbuilt: readonly string[]): boolean {
 export function linkContext(root: string = ROOT): LinkContext {
   // The CORPUS on the platform's own run (placement PR0, bean `ejye`): what
   // the platform's `scope: "repository"` mirrors used to bring into this sweep
-  // is asked of the checkout now. Ids repeat across instances there (several
+  // is asked of the checkout now. Ids repeat across layers there (several
   // `library`), so ownership is compared by ABSOLUTE PATH below and a foreign
   // directory is labelled `<member>/<id>`; the containment TREE is still this
-  // instance's own declaration, the question it always answered.
+  // layer's own declaration, the question it always answered.
   const own = resolveDirectories([{ name: "(local)", root, own: true }]);
   const dirs = corpusScopeFor(root) === "checkout" ? checkoutDirectories(root, { stackedOn: root }) : own;
   // `own` on a checkout entry means "its own instance's", not this one's, so
-  // the test is membership of THIS instance's resolution.
+  // the test is membership of THIS layer's resolution.
   const ownPaths = new Set(own.map((o) => o.absPath));
   const label = (d: (typeof dirs)[number]): string =>
     ownPaths.has(d.absPath) || d.member === undefined ? d.id : `${d.member}/${d.id}`;
@@ -628,7 +628,7 @@ export function danglingLinksIn(ctx: LinkContext, file: string, text: string): s
 }
 
 /**
- * `scope`, when given, sweeps only the directories those instances commit
+ * `scope`, when given, sweeps only the directories those layers commit
  * (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`). Every
  * directory stays a link TARGET, so an edge into a mounted layer is still
  * resolved and reported.
@@ -662,7 +662,7 @@ export function scanSubgraphs(root: string = ROOT, scope?: ReadonlySet<string>):
     for (const rel of markdownIn(abs)) {
       const file = join(abs, rel);
       // ABSOLUTE, not instance-relative. A `scope: "repository"` directory
-      // resolves OUTSIDE this instance, so `relative(root, …)` yields a
+      // resolves OUTSIDE this layer, so `relative(root, …)` yields a
       // `../…` path that matches no declared prefix and the file is
       // attributed to nothing — silently. Six declared directories were
       // swept past that way (bean `3ye4`), and the symptom was a sweep

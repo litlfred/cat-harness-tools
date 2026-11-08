@@ -1,5 +1,5 @@
 /**
- * The declared-asset gate DISCOVERS instances, and refuses to find none.
+ * The declared-asset gate DISCOVERS layers, and refuses to find none.
  *
  * Bean `6tkl`. This gate has been bitten twice by the same shape.
  *
@@ -11,8 +11,8 @@
  * subject is a file nobody was looking at.
  *
  * **Second**, the list drifted again the moment `folio-assistant-core` became a
- * real instance on 2026-09-20: four declarations existed and two were checked,
- * so that instance's `README.md` was declared with `role: "instance-readme"`
+ * real layer on 2026-09-20: four declarations existed and two were checked,
+ * so that layer's `README.md` was declared with `role: "instance-readme"`
  * and never verified.
  *
  * Discovery fixes the list. It does not fix the failure mode — a discovery
@@ -36,7 +36,7 @@ const ROOT = repoRootFor(resolve(import.meta.dir, "..", "..", ".."));
 describe("instances are discovered, not listed", () => {
   test("this repository has at least three, and the next one needs no edit", () => {
     // The concrete regression: two were listed while four existed. Asserting
-    // a FLOOR rather than an exact count, so adding an instance does not fail
+    // a FLOOR rather than an exact count, so adding a layer does not fail
     // a test whose subject is that adding one should require nothing.
     expect(declaredInstances(ROOT).length).toBeGreaterThanOrEqual(3);
   });
@@ -48,18 +48,18 @@ describe("instances are discovered, not listed", () => {
     // (`bootstrap` -> `bootstrap`, taken from main) and does NOT extend to
     // `folio-assistant-*`, which keeps the long form.
     //
-    // The instance this test is ABOUT is unchanged — it is still the one that
+    // The layer this test is ABOUT is unchanged — it is still the one that
     // went silently unchecked while `declaredInstances` was a hardcoded pair.
     const names = declaredInstances(ROOT).map((p) => p.replace(ROOT + "/", ""));
     expect(names).toContain("folio-assistant-core");
   });
 
   test("the root declares no instance, so it is not among them", () => {
-    // The root BECAME an instance during this work, and this asserted that it
+    // The root BECAME a layer during this work, and this asserted that it
     // counted. RESTATED 2026-10-09: the owner removed that declaration
     // (3d4caf6, 2026-10-08: "should not need folio-assistant declared at
-    // all"), so the checkout root is an index and discovery must not invent an
-    // instance there. Discovered, not listed, in both directions.
+    // all"), so the checkout root is an index and discovery must not invent a
+    // layer there. Discovered, not listed, in both directions.
     expect(readDeclaration(ROOT)).toBeUndefined();
     expect(declaredInstances(ROOT)).not.toContain(ROOT);
   });

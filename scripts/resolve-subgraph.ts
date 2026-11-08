@@ -6,14 +6,14 @@
  *   bun run cat subgraph:resolve <dir-id> [--from <instance-root>] [--json]
  *   bun run cat subgraph:resolve --all [--json]
  *
- * Prints the declaring instance, the entry's path, the resolved source
+ * Prints the declaring layer, the entry's path, the resolved source
  * (`directory`, `branch` with its keying, or a branch `family` with its
  * prefix, key and repository) and `declaredIn` — which layer answered: the
- * declaration, a legacy `storage`, the instance config's override, or the
+ * declaration, a legacy `storage`, the layer config's override, or the
  * `directory` default. `branch-store mount`/`push` dispatch on the same
  * answer; this is the way to see it from a shell.
  *
- * Exit: 0 resolved; 1 no instance declares the id; 2 the declaration
+ * Exit: 0 resolved; 1 no layer declares the id; 2 the declaration
  * contradicts itself (both `source` and `storage`, a tip-keyed `qa`), or a
  * declaration cannot be resolved. The declaration is the authority for a
  * branch source.

@@ -1,6 +1,6 @@
 /**
  * The tests of this file that read the whole checkout (reads the folio
- * directory a content instance above cat-harness declares) live in
+ * directory a content layer above cat-harness declares) live in
  * `test/folio-viz-checkout.test.ts` (bean `7zz1`): standing alone, cat-harness
  * has none of it.
  */

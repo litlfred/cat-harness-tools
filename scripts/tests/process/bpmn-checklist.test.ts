@@ -124,8 +124,8 @@ describe("the checklist projection", () => {
 
 describe("where a checklist is committed (owner, 2026-10-14: commit them, in the layer that owns it)", () => {
   /**
-   * Three instances: `b` below the harness, `h` the harness, `u` above it.
-   * Declarations as instances write them — `<name>/<name>.json` — so the
+   * Three layers: `b` below the harness, `h` the harness, `u` above it.
+   * Declarations as layers write them — `<name>/<name>.json` — so the
    * placement is read the way the real checkout is, not from a stub.
    */
   function checkout(): { root: string; harness: string; below: string; above: string; nested: string } {

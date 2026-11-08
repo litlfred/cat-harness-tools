@@ -41,15 +41,15 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // `code` joined on 2026-09-23 when `who-iris/scripts/` was declared under
     // bean `ylj7` — `gen-iris-pages.ts` and the catalogue checker had been
     // sitting in no declared directory while every OTHER graph in this
-    // instance was declared. The list grew because the instance did, which is
+    // layer was declared. The list grew because the layer did, which is
     // what "every kind the instance declares" is for; pinning it at six would
     // have made the assertion a statement about 2026-09-22 rather than about
     // the declaration.
     // EIGHT since 2026-09-27: `qa` joined when `who-iris/test/results/` was
-    // declared, so that auditing this instance produces a committed verdict
-    // rather than nothing — 13 instances had no `test/results` at all, which
+    // declared, so that auditing this layer produces a committed verdict
+    // rather than nothing — 13 layers had no `test/results` at all, which
     // made "audited clean" and "never audited" the same observation (bean
-    // `bjzs`). The list grew because the instance did, exactly as it did for
+    // `bjzs`). The list grew because the layer did, exactly as it did for
     // `code`; pinning it at seven would make the assertion a statement about
     // 2026-09-26 rather than about the declaration.
     // ELEVEN since 2026-10-01: `schemas` joined when who-iris took its own
@@ -149,7 +149,7 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // `gh-pages`, measured 2026-09-23 — the rail was losing a working link.
     //
     // The mount table cannot see it. `mountable()` requires an `index.html`
-    // in the instance's own directory, and `who-iris/catalogue/` holds DATA.
+    // in the layer's own directory, and `who-iris/catalogue/` holds DATA.
     // The page that renders it is the cat-harness HANDLER's, and a handler's
     // viewer is never a mount.
     const got = declaredGraphs(
@@ -164,9 +164,9 @@ describe("every declared graph reaches the navbar, linked or not", () => {
 
   it("the MOUNT TABLE wins where it has an answer — the owner's order, not a tie-break", () => {
     // *"cliking shoud go to folio view, not the schema viweer."* A mount is
-    // the instance presenting itself; the handler's viewer is cat-harness's
+    // the layer presenting itself; the handler's viewer is cat-harness's
     // default rendering of the same graph. Both exist for `library`, and the
-    // instance's own route is the one a reader gets.
+    // layer's own route is the one a reader gets.
     const got = declaredGraphs(
       "who-iris",
       new Map([["library", "../who-iris/"]]),

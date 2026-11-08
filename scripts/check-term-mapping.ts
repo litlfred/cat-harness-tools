@@ -83,16 +83,16 @@ interface GlossScheme {
   id: string;
   terms: GlossTerm[];
   /**
-   * The instance that owns the scheme, by {@link schemeOwner}. With `id` it
+   * The layer that owns the scheme, by {@link schemeOwner}. With `id` it
    * is the scheme's key (bean `q3n9`, owner ruling A, 2026-10-24): a scheme
-   * id such as `kg-tools` is every instance's Tool extraction.
+   * id such as `kg-tools` is every layer's Tool extraction.
    */
   instance: string;
 }
 
 /**
  * Every file whose name ends in `suffix` under a declared `glossary` graph of
- * any instance in this checkout.
+ * any layer in this checkout.
  *
  * Found through the declarations, not a literal path: this script lives in
  * cat-harness and the glossary is declared by the content core, a layer
@@ -104,7 +104,7 @@ function glossaryFiles(root: string, suffix: string): string[] {
   return declaredGlossaryFiles(root, suffix).map((f) => f.abs);
 }
 
-/** {@link glossaryFiles}, each with the instance whose declared directory holds it. */
+/** {@link glossaryFiles}, each with the layer whose declared directory holds it. */
 function declaredGlossaryFiles(root: string, suffix: string): { abs: string; declaredBy: string }[] {
   const out: { abs: string; declaredBy: string }[] = [];
   let declaredBy = "";
@@ -178,11 +178,11 @@ export function adjudications(
 
 /**
  * Every `*.glossary.json` in the checkout, authored and generated alike, each
- * keyed by its owning instance.
+ * keyed by its owning layer.
  *
  * The owner is {@link schemeOwner}'s answer, the same rule the glossary page
  * places terms by, so the record and the page cannot key one scheme two ways.
- * Where it has no answer (terms sourced in several instances, no defining
+ * Where it has no answer (terms sourced in several layers, no defining
  * source) the page drops the scheme and `check:glossary` reports it; this
  * drops it too, rather than guess an owner the page does not show.
  */
@@ -208,7 +208,7 @@ export function glossarySchemes(root: string): GlossScheme[] {
  * The SKOS half, resolved LOCALLY against authored concepts.
  *
  * "Authoritative for meaning" does not mean "somewhere else": an authored
- * term in this instance is a concept somebody decided, and a candidate that
+ * term in this layer is a concept somebody decided, and a candidate that
  * duplicates one is the promotion `glossary-terms` describes. External
  * schemes reached through an authored term's `exactMatch` travel with it, so
  * a match against `policy` also reports the ODRL URI it is an exact match for.
@@ -471,9 +471,9 @@ export interface MappedTerm {
  */
 export interface SchemeState {
   /**
-   * The instance that owns the scheme. A row is keyed by (instance, scheme,
-   * target), because a scheme id alone is shared across instances: `kg-tools`
-   * is every instance's Tool extraction (beans `wvzp`, `q3n9`; owner ruling A,
+   * The layer that owns the scheme. A row is keyed by (instance, scheme,
+   * target), because a scheme id alone is shared across layers: `kg-tools`
+   * is every layer's Tool extraction (beans `wvzp`, `q3n9`; owner ruling A,
    * 2026-10-24).
    */
   instance: string;
@@ -566,7 +566,7 @@ export function perScheme(
 ): SchemeState[] {
   const of = ms.filter((m) => m.target === target);
   const reason = scope.find((s) => s.target === target)?.unreachable_reason;
-  // One row per (instance, scheme): a scheme id is shared across instances
+  // One row per (instance, scheme): a scheme id is shared across layers
   // (bean `wvzp`), and folding them into one row mixed their terms.
   const keyOf = (m: TermMapping) => `${m.instance}\0${m.scheme}`;
   const keys = [...new Map(of.map((m) => [keyOf(m), m] as const)).entries()]
@@ -667,7 +667,7 @@ function main(): number {
     script: "cat-harness-tools/scripts/check-term-mapping.ts",
     scriptAbsPath: import.meta.path,
     // declared-path-literal: a QA subject ID (the glossary's declared route), recorded in the sidecar; nothing reads it as a filesystem path.
-    // The glossary's owner: the instance declaring the `core` layer's kinds,
+    // The glossary's owner: the layer declaring the `core` layer's kinds,
     // `glossary` among them (folio-assistant#2598).
     subject: { kind: "glossary", id: `${contentLayerName()}/glossary` },
     families: Object.fromEntries(

@@ -18,7 +18,7 @@ import { actorsDir } from "../../schemas/process/role-graph.ts";
 
 type Actor = Record<string, unknown>;
 
-/** A throwaway instance: a harness declaration plus an actor registry. */
+/** A throwaway layer: a harness declaration plus an actor registry. */
 function instance(network: string | undefined, actors: Actor[]): string {
   const root = mkdtempSync(join(tmpdir(), "reach-"));
   const dir = join(root, ".claude", "skills", "actors");

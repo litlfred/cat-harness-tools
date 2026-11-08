@@ -1,5 +1,5 @@
 /**
- * Where the cat-harness instance lives: the directory holding `cat-harness.json`.
+ * Where the cat-harness layer lives: the directory holding `cat-harness.json`.
  *
  * Schema modules that need cat-harness's data files (`code-lists/`,
  * `test/fixtures/`, the declaration) cannot find them by walking up from
@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url";
 
 let cached: string | undefined | null = null;
 
-/** The cat-harness instance root, or `undefined` when none can be found. */
+/** The cat-harness layer root, or `undefined` when none can be found. */
 export function harnessRoot(): string | undefined {
   if (cached !== null) return cached;
   // input-site: env-unset CAT_HARNESS_ROOT #5f5eb0bf — an override naming a cat-harness root outside the checkout; unset in CI

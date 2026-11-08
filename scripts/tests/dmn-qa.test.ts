@@ -8,7 +8,7 @@ import { checkDmn } from "../dmn-check";
 
 /**
  * The DMN table checks (bean `lo3p`): three errors and two warnings, on small
- * tables written here, so nothing depends on a mounted instance.
+ * tables written here, so nothing depends on a mounted layer.
  */
 
 const dir = mkdtempSync(join(tmpdir(), "dmn-qa-"));

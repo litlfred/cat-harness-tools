@@ -181,7 +181,7 @@ export interface QaWitnessDoc {
   subject: string;
   /**
    * The sidecar path(s) this was projected from, relative to the `repoRoot`
-   * argument, which every caller passes as the INSTANCE root. They were
+   * argument, which every caller passes as the LAYER root. They were
    * documented as repo-relative, and the panel built URLs from them on that
    * belief, missing `cat-harness/` (bean `bejf`). They are not an address:
    * link through {@link QaWitnessDoc.sidecarLinks}.

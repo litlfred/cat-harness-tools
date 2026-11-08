@@ -1,16 +1,16 @@
 /**
- * THE DIRECTORIES AN UPSTREAM INSTANCE DECLARES AT A PIN — its own entries and
+ * THE DIRECTORIES AN UPSTREAM LAYER DECLARES AT A PIN — its own entries and
  * the ones it declares FROM WITHIN them — read from a {@link RemoteTree}
- * without checking the instance out.
+ * without checking the layer out.
  *
  * @module scripts/upstream-directories
  * @graphNode none — a library: it reads declarations at a pin and judges nothing
  *
- * A remote mount (and anything else naming a subgraph of an instance it has
- * not got) needs the id → path map of the instance AT THE PIN. The top-level
+ * A remote mount (and anything else naming a subgraph of a layer it has
+ * not got) needs the id → path map of the layer AT THE PIN. The top-level
  * `directories` of `<name>.json` are only half of it: an entry declared from
- * within (`skills/skills.json` naming `voices/`; `"subgraph": true`) is an
- * instance directory too, so a reader of only the top-level list would refuse
+ * within (`skills/skills.json` naming `voices/`; `"subgraph": true`) is a
+ * layer directory too, so a reader of only the top-level list would refuse
  * a nested id as "not declared".
  *
  * It does not walk the nesting itself. It checks out the declaration files
@@ -54,7 +54,7 @@ export function declarationFileNames(registry: GraphTypologyRegistry = defaultGr
 }
 
 /**
- * The directories instance `root` (repository-relative, `""` for the root)
+ * The directories layer `root` (repository-relative, `""` for the root)
  * declares at the tree's pin, `<name>.json`'s own first, then those declared
  * from within, each with an instance-relative `path`.
  *
@@ -95,7 +95,7 @@ export function upstreamDirectories(
 /**
  * A CONCERN NAME at a pin (bean `mo75`): the kind-first members of concern
  * group `code` — `processes/sdlc/`, `skills/sdlc/`, `schemas/sdlc/` … — that
- * instance `root` declares. Each top-level directory whose kind groups by
+ * layer `root` declares. Each top-level directory whose kind groups by
  * concern is read through its own declaration file (`processes.json`
  * `groups`, `skills.json` `topics`); a group it names `code` is one member,
  * with the id `<directory id>/<code>`. `[]` when no directory names the code.

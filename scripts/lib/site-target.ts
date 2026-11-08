@@ -36,7 +36,7 @@ export function siteTarget(fallback: string, argv: readonly string[] = process.a
  * Whether `site` holds the page at site-relative `href`: the built `.html`, or
  * the Jekyll source (`.md`) it will be built from. A writer pointed at a site
  * being built links a page of its harness's own site only when this site
- * carries it too: a repository's own site holds its instance's pages, not the
+ * carries it too: a repository's own site holds its layer's pages, not the
  * harness's guides, and an unresolved link refuses its publish.
  */
 export function sitePageAt(site: string, href: string): boolean {

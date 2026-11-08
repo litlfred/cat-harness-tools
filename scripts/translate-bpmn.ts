@@ -56,9 +56,9 @@ import { parsePo } from "../pipeline/po-inject.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
- * The instance whose diagrams are extracted — this one, or `--instance <root>`.
+ * The layer whose diagrams are extracted — this one, or `--instance <root>`.
  *
- * Bean `j28g`. `bootstrap/` is a NESTED instance, so the root's scan does not
+ * Bean `j28g`. `bootstrap/` is a NESTED layer, so the root's scan does not
  * reach its three diagrams by design (`7u3g`, enforced by
  * `instance-graph-isolation.test.ts`) — and it must not, because widening the
  * scan re-introduces the leak that test exists to stop. But their `.pot` files
@@ -67,7 +67,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * documentation added to that diagram the same day, so a translator opening it
  * would have translated text the diagram no longer contains.
  *
- * The fix is not a wider scan but a SECOND RUN, pointed at the instance that
+ * The fix is not a wider scan but a SECOND RUN, pointed at the layer that
  * owns those diagrams — the same shape `kg-export.ts --instance ./bootstrap`
  * already uses, and for the same reason.
  */
@@ -78,13 +78,13 @@ const instanceFlag = ((): string | undefined => {
 })();
 const root = instanceFlag ? resolve(instanceFlag) : resolve(HARNESS_ROOT);
 /**
- * This script's OWN instance, which is the host when `--instance` names a
+ * This script's OWN layer, which is the host when `--instance` names a
  * different one. Always cat-harness, whatever `--instance` says — that is the
  * point: the tool resolving a dependency's templates is the tool that publishes
  * them.
  */
 /**
- * For reporting only. A hosted instance's templates sit outside `--instance`,
+ * For reporting only. A hosted layer's templates sit outside `--instance`,
  * so a path relative to IT would climb out with `../`, and one relative to the
  * host would read as the host's own file. The repo root is the one base under
  * which every case reads as itself.
@@ -116,10 +116,10 @@ if (wantInject && !locale) {
 //
 // SCOPE DIFFERS FROM glossary-export ON PURPOSE (bean `nafz`). `workflowFiles`
 // walks the dependency overlay, so a dependent's diagrams are translated here:
-// a translator works on what the instance SHOWS, inherited diagrams included.
-// `glossary-export` walks this instance's own diagrams only, because a
-// glossary is a published artefact OF one instance and each dependent builds
-// its own; it names roles drawn in another instance rather than hiding them.
+// a translator works on what the layer SHOWS, inherited diagrams included.
+// `glossary-export` walks this layer's own diagrams only, because a
+// glossary is a published artefact OF one layer and each dependent builds
+// its own; it names roles drawn in another layer rather than hiding them.
 // The skill says so: `swimlane-glossary` §"Run it once per instance — never
 // widen the scan" (widening re-opens the `7u3g` leak).
 const diagrams = workflowFiles(root, corpusScopeFor(root)).filter((f) => f.endsWith(".bpmn"));
@@ -137,7 +137,7 @@ if (diagrams.length === 0) {
  * tree is a declaration edit, not a sweep — and so this script and
  * `translate-kg-viewer` cannot disagree about where a translator's files are.
  *
- * Falls back to the convention when nothing declares it: an instance with no
+ * Falls back to the convention when nothing declares it: a layer with no
  * declaration still has a `translations/`, and refusing to run over one would
  * be worse than assuming the default the schema already supplies.
  */
@@ -146,7 +146,7 @@ if (diagrams.length === 0) {
 // The third is `bootstrap`, whose templates live in cat-harness's corpus under
 // `<locale>/bootstrap/` because a `.pot` is tooling output and bootstrap is a
 // floor an agent reads. The host is passed as `HARNESS_ROOT`, this script's own
-// instance: the host is a DEPENDENT (cat-harness declares `needs: ['bootstrap']`,
+// layer: the host is a DEPENDENT (cat-harness declares `needs: ['bootstrap']`,
 // not the reverse), so it cannot be found by walking `--instance`'s own
 // dependencies.
 const HOME = translationsHomeFor(root, HARNESS_ROOT);
@@ -192,12 +192,12 @@ function potPathFor(file: string, loc: string): string {
 }
 
 /**
- * The instance that OWNS a diagram: the deepest instance root containing it.
- * `--instance`'s corpus reaches other instances' `processes/` graphs (core's,
+ * The layer that OWNS a diagram: the deepest layer root containing it.
+ * `--instance`'s corpus reaches other layers' `processes/` graphs (core's,
  * sci's, the FHIR IG harness's, the DAK base layer's), and until 2026-10-04 every one of their
- * templates was written into THIS instance's tree because it had no other
+ * templates was written into THIS layer's tree because it had no other
  * home. Owner, that day: *"move things to semantically appropriate place"*
- * (bean riit) — a diagram's templates sit with the instance that draws it.
+ * (bean riit) — a diagram's templates sit with the layer that draws it.
  */
 const INSTANCE_ROOTS = [root, ...instanceRootsIn(REPO_ROOT)]
   .map((r) => resolve(r))
@@ -310,11 +310,11 @@ if (wantCheck) {
   // never did. `fd6i`: declared and never used, so nothing breaks, which is
   // exactly why it survived.
   //
-  // Scoped to THIS instance's own templates. A nested instance's diagrams are
+  // Scoped to THIS layer's own templates. A nested layer's diagrams are
   // deliberately unscanned (`7u3g`), so its templates are not orphans here —
   // they are somebody else's to check, with their own `--instance` run.
   // Per HOME (bean riit): a template is owned only in the home its diagram's
-  // owner declares, so one left in another instance's tree is an orphan there
+  // owner declares, so one left in another layer's tree is an orphan there
   // — which is how a template that did not move with its diagram is caught.
   const ownedIn = new Map<string, Set<string>>();
   const homeList = new Map<string, ReturnType<typeof translationsHomeFor>>();
@@ -333,7 +333,7 @@ if (wantCheck) {
   const orphaned: string[] = [];
   for (const loc of [...gating].sort()) {
     for (const [key, h] of homeList) {
-      // `localeDirIn`, NOT a join on the home's root — a hosted instance's
+      // `localeDirIn`, NOT a join on the home's root — a hosted layer's
       // root is its HOST's corpus, and composing `<root>/<locale>/processes`
       // reads every template the host owns and calls each an orphan (355
       // spurious ones, measured 2026-09-27, against bootstrap's three).
@@ -385,9 +385,9 @@ if (wantCheck) {
   }
 
   if (bad) {
-    // The remedy names THIS run's instance. It said `translate-bpmn --extract`
+    // The remedy names THIS run's layer. It said `translate-bpmn --extract`
     // for every run, which for a `--instance ./bootstrap` check is a command
-    // that refreshes the OTHER instance's templates and leaves these red.
+    // that refreshes the OTHER layer's templates and leaves these red.
     const scope = instanceFlag ? ` --instance ${instanceFlag}` : "";
     console.log(`\n${bad} template(s) need attention: bun run cat-harness-tools/scripts/translate-bpmn.ts${scope} --extract`);
     process.exit(1);

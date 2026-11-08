@@ -85,7 +85,7 @@ export class GitUnanswerable extends Error {
 }
 
 /**
- * The manifests of each REMOTE-MOUNTED instance, for one filename.
+ * The manifests of each REMOTE-MOUNTED layer, for one filename.
  *
  * In the index checkout every layer is a mount: another repository's bytes,
  * laid down from the lock and never tracked here, so `git ls-files` sees none

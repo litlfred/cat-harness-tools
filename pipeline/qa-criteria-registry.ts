@@ -22,7 +22,7 @@ import { voiceCriteriaFor } from "./voice-criteria.ts";
  * themselves:
  *
  * - `voice` — the editorial register. Its per-VOICE overlay criteria are
- *   DERIVED from the voices an instance ships, not written here: see
+ *   DERIVED from the voices a layer ships, not written here: see
  *   `voice-criteria.ts`, and `qaCriteriaFor(root)` rather than
  *   `QA_CRITERIA_REGISTRY` if you want them.
  * - `framework` and `wall` — **one folio's mathematics**, not platform
@@ -1774,7 +1774,7 @@ export const DETANGLER_ARCHIMEDEAN_WALL: QaCriterionDefinition[] = [
 //
 // The prime directive for this whole domain: **never pollute `uses[]`
 // with Lean dependencies.** A formal edge without an editorial
-// counterpart is usually correct — a `simp` lemma or library instance
+// counterpart is usually correct — a `simp` lemma or library layer
 // nobody needs to read about. `uses-formal-coverage` surfaces that
 // divergence as an advisory exposition-gap signal for a human, and is
 // deliberately `minor` so it can never gate a build or motivate a
@@ -2179,7 +2179,7 @@ const DEVILS_ADVOCATE: QaCriterionDefinition[] = [
   { id: "da-hidden-dof", domain: "devils-advocate", description: "Undisclosed free parameter: 4th calibration, off-menu coefficient, constant with no canonical-chain origin.", default_severity: "major", depends_on: ["md", "ts", "lean"], automated: false },
   { id: "da-non-sequitur", domain: "devils-advocate", description: "Logical gap: step B does not follow from step A; 'therefore' with a missing lemma.", default_severity: "major", depends_on: ["md", "ts", "lean"], automated: false },
   // `automated: false` here is a MEASURED necessity, not a convenience. A
-  // prototype scanner flags all 4 known instances but fires IDENTICALLY on the
+  // prototype scanner flags all 4 known layers but fires IDENTICALLY on the
   // CORRECTED text — it detects the topic, not the defect, because the
   // discriminating fact (does the index bind across the equivalence? is the
   // symbol level-indexed in its Lean type? are the two legs the same instance?)
@@ -2195,7 +2195,7 @@ const DEVILS_ADVOCATE: QaCriterionDefinition[] = [
   //
   // That strengthens this `automated: false` rather than weakening it: a
   // checker with 0% adjudicated precision must not write sidecars. The
-  // criterion itself stands — the four historical instances were real, and it
+  // criterion itself stands — the four historical layers were real, and it
   // is the DISCIPLINE (the four questions) that catches them, not the regex.
   //
   // Candidate lister is print-only; only an agent verdict writes a sidecar.
@@ -2256,7 +2256,7 @@ const EXPO_NARRATIVE_KINDS = [
 //
 // Each names its voice in `voices`, so `voiceExcludesCriterion` makes it `n/a`
 // on a folio that has not activated it — with the reason written into the entry
-// rather than left to a reader to infer. This instance activates none, so all
+// rather than left to a reader to infer. This layer activates none, so all
 // four read `n/a` here, which is the correct and intended output.
 //
 // `automated: false` on all four: the mechanical half belongs to the individual
@@ -2268,13 +2268,13 @@ const VOICE_OVERLAYS: QaCriterionDefinition[] = [
   //
   // Four entries stood at this point, one per voice, each restating that
   // voice's rules in prose — three of them describing files in ANOTHER
-  // instance, and every one of them restating rules WITHOUT the citation the
+  // layer, and every one of them restating rules WITHOUT the citation the
   // voice itself carries. The platform held an uncited copy of rules the
-  // owning instance holds cited, in the subsystem whose whole argument is that
+  // owning layer holds cited, in the subsystem whose whole argument is that
   // a voice is auditable rather than asserted. Bean `btuv`.
   //
   // `voice-criteria.ts` derives them from the voices instead, so a voice
-  // shipping in any instance gets its criterion with no edit here. They are
+  // shipping in any layer gets its criterion with no edit here. They are
   // NOT spliced into this array: deriving reads the filesystem, and this is a
   // module-scope const — the work `1hkj` deferred and `check:module-scope-
   // resolution` gates. Use `qaCriteriaFor(root)` below, which is lazy.
@@ -2337,11 +2337,11 @@ export function folioOptionalAxes(): string[] {
   const axes: string[] = [];
   _optionalAxes = axes;
   try {
-    // `undefined` when nothing declares an instance here — no name, so no
+    // `undefined` when nothing declares a layer here — no name, so no
     // filename, so no axes. Same answer as an absent config and for the same
     // reason: a folio that has not asked for an axis is not audited against
     // it, and neither is a directory that is not a folio.
-    // The index entry when one lists the instance, else `<name>.config.json`.
+    // The index entry when one lists the layer, else `<name>.config.json`.
     const eff = readEffectiveConfig(findContentRepoRoot());
     if (eff.state === "ok") {
       const cfg = eff.config as { qaAxes?: unknown };
@@ -2747,7 +2747,7 @@ export const USES_CHECKER_FILE = "pipeline/qa-checkers-uses.ts";
 // here. They moved out on 2026-10-02 (bean `1335`), with the `dak`
 // adapter itself, and the constant is gone rather than repointed for the same
 // reason the cost checkers' is: a core module holding a path into another
-// instance is core naming a higher layer. The five criteria carry
+// layer is core naming a higher layer. The five criteria carry
 // `checker_contributed: true`.
 
 // ── The allow-list, and why getting it wrong is silent ─────────────
@@ -2858,7 +2858,7 @@ export function getCriterionExtraInputs(criterionId: string): string[] {
 // ── The whole set: written + derived ──────────────────────────────────────
 
 /**
- * Every criterion that applies to an instance — the static ones above plus the
+ * Every criterion that applies to a layer — the static ones above plus the
  * voice overlays derived from whatever voices the repository ships.
  *
  * **Callers should prefer this over {@link QA_CRITERIA_REGISTRY}.** That array

@@ -1,18 +1,18 @@
 #!/usr/bin/env bun
 /**
- * check-publishable.ts — a census of which instances are publishable, plus
+ * check-publishable.ts — a census of which layers are publishable, plus
  * the two cross-instance rules a per-instance schema cannot see.
  *
- * Absence is a third state: an instance that has not declared `publishable`
+ * Absence is a third state: a layer that has not declared `publishable`
  * is *undecided*, never *false*. The report prints three buckets and names
- * every undecided instance; an all-undecided repository is reported as such,
+ * every undecided layer; an all-undecided repository is reported as such,
  * not as a pass.
  *
  * `CatHarnessDeclarationSchema` already refuses an `id`/`version`/`canonicalUrl`
- * that does not match the instance's `publishable` state, and a range version.
+ * that does not match the layer's `publishable` state, and a range version.
  * This adds the CROSS-INSTANCE rules:
  *
- * 1. **Two instances must not share an `id`.**
+ * 1. **Two layers must not share an `id`.**
  * 2. **An unreadable declaration is a finding, not a skip.** Its
  *    publishability is unknown (a fact about this run), which is not
  *    undecided (a fact about the repository).
@@ -32,7 +32,7 @@ import {
 } from "../schemas/kg/cat-harness.js";
 
 /**
- * The publication state. `unknown` is about THIS RUN, not about the instance.
+ * The publication state. `unknown` is about THIS RUN, not about the layer.
  *
  * `draft` is the only state a declaration can be in today — `"published"`
  * fails to PARSE, so it can never appear here. `unknown` means this run could
@@ -42,7 +42,7 @@ import {
 export type Publishability = "draft" | "unknown";
 
 export interface InstanceRow {
-  /** Repo-relative instance root, `.` for the repository root itself. */
+  /** Repo-relative layer root, `.` for the repository root itself. */
   where: string;
   /** The declared `name`, or the directory when the declaration was unreadable. */
   name: string;
@@ -121,12 +121,12 @@ export function auditPublishable(repoRoot: string): PublishableReport {
     // The schema deliberately does not require it — doing so breaks 376
     // fixtures across 20+ files, and a sweep that size hides a real regression
     // among the noise. So the type permits absence and this refuses it, which
-    // delivers the same property with a legible failure: the instance is
+    // delivers the same property with a legible failure: the layer is
     // NAMED, rather than a parse error somewhere in a test fixture.
     //
-    // `major` rather than `minor`: an instance with no version cannot be
+    // `major` rather than `minor`: a layer with no version cannot be
     // scored by `check:version-bump`, which skips it — so an unversioned
-    // instance is invisible to the machinery that exists to watch versions.
+    // layer is invisible to the machinery that exists to watch versions.
     if (decl.version === undefined) {
       findings.push({
         severity: "major",
@@ -139,7 +139,7 @@ export function auditPublishable(repoRoot: string): PublishableReport {
     }
   }
 
-  // Cross-instance rule: an id is an identity, so it belongs to one instance.
+  // Cross-instance rule: an id is an identity, so it belongs to one layer.
   const byId = new Map<string, InstanceRow[]>();
   for (const row of rows) {
     if (row.id === undefined) continue;
@@ -170,7 +170,7 @@ export function formatReport(report: PublishableReport): string {
 
   for (const row of rows) {
     const mark = { draft: "◐", unknown: "✗" }[row.state];
-    // The identity is printed for EVERY row now, because every instance has
+    // The identity is printed for EVERY row now, because every layer has
     // one. Under the old model it was printed only for the published, which
     // made an id look like a badge rather than a fact.
     const identity =

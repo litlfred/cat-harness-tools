@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Build an instance's own site from its checkout, check it, and (optionally)
+ * Build a layer's own site from its checkout, check it, and (optionally)
  * publish it: the root site, or a branch preview at `branches/<branch>/`.
  *
  * @module cat-harness-tools/scripts/build-instance-site
@@ -13,7 +13,7 @@
  *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> --instance <name>
  *
- * reads the steps from the instance's `index.config.json` entry `site.build` ({@link recipeFromConfig};
+ * reads the steps from the layer's `index.config.json` entry `site.build` ({@link recipeFromConfig};
  * a legacy `<name>.config.json` only as a reported fallback, bean `ymvt`).
  * Any step flag below replaces it whole (no merging of flags and recipe):
  *
@@ -30,23 +30,23 @@
  *     `--fresh` has the mount script replace the mounts the build wrote into (`remote-mount.ts
  *     --fresh`); with `--no-mount` it removes exactly the paths the lock names, and only paths the checkout
  *     itself does not track: an explicit choice, never a default
- *  2. `bun install --no-save` in the checkout and in every mounted instance
+ *  2. `bun install --no-save` in the checkout and in every mounted layer
  *     with a package.json, so a mount still hashes to its lock and the next mount can verify it
- *  3. each `--pre` package script (`bun run <name>`), in the checkout: the instance's own gates
+ *  3. each `--pre` package script (`bun run <name>`), in the checkout: the layer's own gates
  *  4. landing data and the chrome: sync-docs-harness, gen-landing-data, the publish-time
  *     writers whose `builtAtPublish` output lies in the chrome ({@link chromeArtefacts}:
  *     `avatars:css`), compose-docs --shell,
  *     gen-navbar-include; `--home` becomes the site's index.md; each `--source-step` package
  *     script runs as `bun run <name> <site source>`
  *  4b. the writer of every declared visualiser page the site source does not hold yet — the
- *     checkout's own instance and every instance it needs — as its Tool declares it, pointed at
+ *     checkout's own layer and every layer it needs — as its Tool declares it, pointed at
  *     the site source by the Tool's `site` input (`visualiser-writers.ts`; owner, 2026-10-15)
  *
  * `--pre`, `--source-step`, `--site-step` and `--final-step` take package SCRIPT NAMES, never commands: the
  * Tool contract admits no input that can carry a shell payload (check:tools),
- * so what runs is what the instance's own package.json says, and nothing else.
+ * so what runs is what the layer's own package.json says, and nothing else.
  *  5. Jekyll, as preview-site.sh does it: remote_theme dropped (codeload is not reachable
- *     everywhere), title and description from the instance's declaration, baseurl from the
+ *     everywhere), title and description from the layer's declaration, baseurl from the
  *     git remote (`/<repo>`, or `/<repo>/branches/<branch>` for a preview)
  *  6. each `--site-step` package script, as `bun run <name> <built site>`: a generator that
  *     writes finished pages AFTER the site is built (gen-node-kind-pages says so of itself).
@@ -129,7 +129,7 @@ export interface BuildOptions {
   siteSteps?: string[];
   /**
    * Package scripts run as `bun run <name> <built site>` LAST: after the platform's own writers
-   * (instance docs, identifier lookup, the rail on standalone pages), before the parity guard and
+   * (layer docs, identifier lookup, the rail on standalone pages), before the parity guard and
    * the link check. For a step that must see every page of the finished site, the platform's too.
    */
   finalSteps?: string[];
@@ -155,10 +155,10 @@ export interface BuildOptions {
   remote?: string;
   message?: string;
   /**
-   * The site's title and description when the checkout declares no instance:
+   * The site's title and description when the checkout declares no layer:
    * a repository that only mounts layers (`index.config.json`), such as an IG
-   * repository on its base harness. `instance` is then the chrome's SCOPE, an
-   * instance the checkout mounts, and the title is the site's own.
+   * repository on its base harness. `instance` is then the chrome's SCOPE, a
+   * layer the checkout mounts, and the title is the site's own.
    */
   identity?: { title: string; description?: string };
   /** Root entries a root publish keeps besides `branches/` and `_render-log/` (an IG's `branches/` previews). */
@@ -234,11 +234,11 @@ export function stagingDir(branch: string): string {
 }
 
 /**
- * The fields of the instance's declaration this tool reads: name, title and
+ * The fields of the layer's declaration this tool reads: name, title and
  * description, and only those. Read STRUCTURALLY, as remote-mount reads mount
  * fields (bean qump): a full read needs every graph typology the declaration
  * names to be registered, and some are registered by the layers the mount
- * lays down (an instance may name a kind, such as `catalogue`, that a layer it
+ * lays down (a layer may name a kind, such as `catalogue`, that a layer it
  * mounts registers). Run from a sibling toolset,
  * the full read refused a declaration the build could otherwise serve.
  */
@@ -277,7 +277,7 @@ export function gateSteps(pre: readonly string[]): string[] {
 /** A package script name: what `--pre` and `--source-step` accept, and nothing that could carry a shell payload. */
 export const SCRIPT_NAME = /^[A-Za-z0-9][A-Za-z0-9:._-]*$/;
 
-/** The steps that build an instance's site, as its own package script names. */
+/** The steps that build a layer's site, as its own package script names. */
 export interface SiteRecipe {
   home?: string;
   pre: string[];
@@ -303,9 +303,9 @@ export type SiteProfile = "folio" | "ig-repo-site";
 
 /**
  * The platform steps each profile runs besides the shell, its navbar, Jekyll and the rail.
- * An IG repository's own site (`folio-site.yml`) never ran the folio's landing data, instance
+ * An IG repository's own site (`folio-site.yml`) never ran the folio's landing data, layer
  * mounts, PDF viewer, `lang` pass or identifier lookup: run there, `mount-instance-docs` laid
- * seven other instances' directories at an IG's root (a DAK IG, measured 2026-10-14).
+ * seven other layers' directories at an IG's root (a DAK IG, measured 2026-10-14).
  *
  * `own-chrome`: the shell carries the chrome of the checkout root's OWN docs layers as well as
  * the platform's. `folio-site.yml` composed the shell in a folio-assistant checkout, which
@@ -328,7 +328,7 @@ export function shellFlags(profile: SiteProfile = "folio"): string {
 export const KEEP_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 
 /**
- * The recipe instance `instance` declares under `site.build`, or undefined
+ * The recipe layer `instance` declares under `site.build`, or undefined
  * when it declares none. Owner, 2026-10-10: "i want one consolidated
  * worfklow". The recipe lived only as prose in a folio's AGENTS.md, so
  * `stage-local.ts` could not find it and every runner re-typed it. The
@@ -337,7 +337,7 @@ export const KEEP_NAME = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
  * schema, and every step is held to {@link SCRIPT_NAME} exactly as the flags are.
  *
  * READ INDEX FIRST (bean `ymvt`, owner 2026-10-14: *"i thought ONLY
- * index.config.json"*): the instance's `index.config.json` entry, inline; a
+ * index.config.json"*): the layer's `index.config.json` entry, inline; a
  * root `<instance>.config.json` only as a fallback that {@link recipeRead}
  * reports as legacy. Until 2026-10-14 this read the file directly, so a
  * repository had to keep one to publish
@@ -409,7 +409,7 @@ export function ownerRepo(url: string): { owner: string; repo: string } | undefi
  */
 export const DEFAULT_LAYOUT = ['  - scope:', '      path: ""', "    values:", "      layout: default"];
 
-/** Jekyll's build config: the instance's own, minus the remote theme it cannot fetch, plus {@link DEFAULT_LAYOUT}. */
+/** Jekyll's build config: the layer's own, minus the remote theme it cannot fetch, plus {@link DEFAULT_LAYOUT}. */
 export function buildConfig(configYml: string): string {
   const lines = configYml
     .split("\n")
@@ -529,7 +529,7 @@ export async function checkLinks(site: string, base: string, upstream: ReadonlyS
 
 /**
  * The publish-time artefacts the site CHROME holds: every `builtAtPublish`
- * entry of any instance in the checkout whose path lies inside one of the
+ * entry of any layer in the checkout whose path lies inside one of the
  * harness's chrome layers ({@link chromeLayers}). Derived from the
  * declarations, so the next stylesheet or script a chrome writer adds is run
  * without a change here.
@@ -804,7 +804,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${shellQuote(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
     if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
     for (const s of o.sourceSteps) run(`source: ${s}`, `${stepCommand(root, s)} ${shellQuote(docs)}`, root, env);
-    // Every declared visualiser page the site owes (its own instance and every one it needs),
+    // Every declared visualiser page the site owes (its own layer and every one it needs),
     // written by the writer its Tool declares, into the site source — the pages a recipe
     // step already wrote are not written twice ({@link writeMissingVisualisers}). A writer
     // that fails or cannot be pointed at a site is said here, and its pages are judged
@@ -842,7 +842,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     for (const st of o.finalSteps ?? []) run(`final: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
     // The forwarding pages at the old addresses (folio-assistant#2527). The
     // chrome step composes with `--shell`, which writes none, so a visualiser
-    // that moved under its locale lost its old address on every instance site
+    // that moved under its locale lost its old address on every layer site
     // and the parity guard refused the publish (an IG's site, 2026-10-16: the
     // glossary under `en/`). Written last, on the built site, so they forward
     // to the pages as published and never replace one.
@@ -857,7 +857,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   if (lacking.length > 0) throw new Error(`the built site lacks ${lacking.join(", ")}, which a step was to write: the site is not published`);
 
   // Every page the declarations say this site serves — the root's and every
-  // instance it needs (owner, 2026-10-15: smart-ra was published without
+  // layer it needs (owner, 2026-10-15: smart-ra was published without
   // `en/cat-harness/library/`, and nothing noticed). The parity guard below
   // only compares with the root being replaced, so it cannot miss a page that
   // was never published.
@@ -966,7 +966,7 @@ if (import.meta.main) {
     );
     process.exit(2);
   }
-  // Explicit step flags win. With none, the instance's own `site.build`.
+  // Explicit step flags win. With none, the layer's own `site.build`.
   const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "finalSteps" | "keep" | "profile" | "links"> => {
     const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step"), finalSteps: many("--final-step") };
     if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length + flags.finalSteps.length > 0) return { ...flags, keep: many("--keep") };

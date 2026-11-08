@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Ingest the OpenAPI documents an instance's `cat-openapi.config.json` names
+ * Ingest the OpenAPI documents a layer's `cat-openapi.config.json` names
  * into its `openapi` directory — each document VERBATIM, with a
  * `<id>.source.json` recording where it came from.
  *
@@ -50,8 +50,8 @@ import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 export const CONFIG_FILE = "cat-openapi.config.json";
 
 /**
- * Where the instance's config is: at its root, or — where a fork keeps it with
- * the documents it names — inside a directory the instance declares with graph
+ * Where the layer's config is: at its root, or — where a fork keeps it with
+ * the documents it names — inside a directory the layer declares with graph
  * typology `openapi`. The root wins; `undefined` when neither holds one. The
  * file keeps its `cat-openapi.config.json` name after the harness folded into
  * cat-harness as the `openapi` subgraph (owner, 2026-10-07).
@@ -75,7 +75,7 @@ export function configPath(instanceRoot: string): string | undefined {
   return undefined;
 }
 
-/** The instance's config, parsed. Throws naming the file when it is absent or invalid. */
+/** The layer's config, parsed. Throws naming the file when it is absent or invalid. */
 export function readConfig(instanceRoot: string): OpenApiConfig {
   const p = configPath(instanceRoot) ?? join(instanceRoot, CONFIG_FILE);
   if (!existsSync(p)) throw new Error(`${p}: no ${CONFIG_FILE} — this instance does not instantiate cat-harness's openapi subgraph`);
@@ -85,13 +85,13 @@ export function readConfig(instanceRoot: string): OpenApiConfig {
 }
 
 /**
- * The directory the config names, resolved through the instance's own
+ * The directory the config names, resolved through the layer's own
  * declaration — never a path written in the config, so moving the directory
  * is one edit to `<instance>.json` and nothing else.
  */
 export function openapiDir(instanceRoot: string, config: OpenApiConfig): string {
   // The declaration is FOUND, never composed from the directory name: in an IG
-  // fork the instance lives under the base IG's checkout name and declares
+  // fork the layer lives under the base IG's checkout name and declares
   // itself by its own (n3ni stage E), so `<dirname>.json` names a file that is not there.
   const found = findDeclarationFile(instanceRoot);
   if (found === undefined) throw new Error(`no instance declaration in ${resolve(instanceRoot)}`);

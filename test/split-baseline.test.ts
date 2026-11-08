@@ -21,7 +21,7 @@ describe("split-baseline --check findings", () => {
 });
 
 describe("split-baseline judges only the root it was recorded at", () => {
-  // Owner, 2026-11-05: "scope to fa". A site that does not mount an instance
+  // Owner, 2026-11-05: "scope to fa". A site that does not mount a layer
   // resolves none of its skills, and each read as "no longer resolves".
   test("the root it names is judged", () => {
     expect(judges({ root: "folio-assistant" }, "folio-assistant")).toBe(true);

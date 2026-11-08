@@ -75,7 +75,7 @@ function tsFiles(root: string): string[] {
   return out;
 }
 
-/** A throwaway instance: one package naming a skill only a remote file declares. */
+/** A throwaway layer: one package naming a skill only a remote file declares. */
 function fixtureRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "nup0-"));
   mkdirSync(join(root, "skills", "pkg-a"), { recursive: true });
@@ -175,7 +175,7 @@ describe("the reason the allowance was closed is still true", () => {
     // was never reached.
     //
     // The third entry RENAMED on 2026-09-20 rather than changing what it is:
-    // `repo-partition.ts` was split into a generic engine and this instance's
+    // `repo-partition.ts` was split into a generic engine and this layer's
     // data, and the literal travelled with the data. Still three, still the
     // same three readers — the invariant this test states is unchanged and
     // the assertion was not weakened to absorb the move.

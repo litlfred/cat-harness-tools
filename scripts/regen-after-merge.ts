@@ -219,7 +219,7 @@ const OWN_WRITER_OVERRIDES: Readonly<Record<string, string>> = {
   // `kg-export.bootstrap.qa-results.json` with a fresh re-export (bean `ymsu`
   // stopped it rewriting the file on its way past), so a stale sidecar is red
   // here and nothing in regen knew the writer: it had to be run by hand after
-  // every merge that changed `kg-export.ts` or the bootstrap instance.
+  // every merge that changed `kg-export.ts` or the bootstrap layer.
   // `kg-export.ts --instance ./bootstrap` rewrites exactly that sidecar. A red
   // that is NOT staleness (the export itself failing) comes back `unrepaired`.
   "check:published-instance-exports": "kg:export:bootstrap",
@@ -232,7 +232,7 @@ const OWN_WRITER_OVERRIDES: Readonly<Record<string, string>> = {
   // 3, #1876, #1883). `check:l1-complete -- --check` was not a bare script,
   // so regen never saw it; it is now the named `check:l1-complete:check`,
   // whose writer is `--write`. (Its sibling gate, which took one `--entry`
-  // at a time, is declared by its own instance under `taskIo` since bean
+  // at a time, is declared by its own layer under `taskIo` since bean
   // `0r7u`.)
   "check:l1-complete:check": "l1-complete:write",
   // the formal-math layer's checkout script (bean `folio-assistant-63q4`):
@@ -245,7 +245,7 @@ const OWN_WRITER_OVERRIDES: Readonly<Record<string, string>> = {
 };
 
 /**
- * {@link OWN_WRITER_OVERRIDES} plus each present instance's declared
+ * {@link OWN_WRITER_OVERRIDES} plus each present layer's declared
  * `taskIo[check].writer` (bean `0r7u`): a layer above declares the writer of
  * its own check rather than this table naming it. A check given a writer in
  * both places throws — two answers to one question.

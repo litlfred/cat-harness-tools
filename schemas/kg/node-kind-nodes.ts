@@ -5,7 +5,7 @@
  * @graphNode none — a reader over declared directories; it defines no schema
  *
  * A kind's page lists its own nodes and its subclasses'. The node-kind index
- * says which typologies hold each kind, and each instance's `<instance>.json`
+ * says which typologies hold each kind, and each layer's `<instance>.json`
  * says which of its directories have that typology; this joins the two and
  * reads the files.
  *
@@ -14,10 +14,10 @@
  * earlier minor still appears. JSON nodes carry the tag as `$schema`; Markdown
  * nodes (todos) carry it in their front matter.
  *
- * Each node is filed under the HARNESS that holds it — the instance whose
- * declaration names the directory — with a path relative to that instance's
+ * Each node is filed under the HARNESS that holds it — the layer whose
+ * declaration names the directory — with a path relative to that layer's
  * root and without its extension: `<declaring>/<kind>/<harness>/<path>`. A
- * repository-scoped directory sits OUTSIDE its declaring instance's root, so
+ * repository-scoped directory sits OUTSIDE its declaring layer's root, so
  * its nodes are addressed relative to the repository.
  *
  * ## What this does NOT read
@@ -26,7 +26,7 @@
  *   `directory`, e.g. beans and todos kept at the tip of a state branch, which
  *   moves without a commit. The state viewer renders those nodes live. A
  *   NESTED entry (`within`) inherits its parent's source.
- * - Nothing else is skipped. A kind with no typology (an instance declaration)
+ * - Nothing else is skipped. A kind with no typology (a layer declaration)
  *   is found by its NAME RULE instead: see `NAME_RULE_KINDS` in `node-kind-index.ts`.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -42,9 +42,9 @@ import { contentIsOffCheckout } from "./subgraph-source.js";
 export interface KindNode {
   /** The kind the node IS — the kind asked for, or one of its subclasses. */
   kind: string;
-  /** The instance that holds it. */
+  /** The layer that holds it. */
   harness: string;
-  /** Relative to that instance's root, extension dropped: the node's address. */
+  /** Relative to that layer's root, extension dropped: the node's address. */
   path: string;
   /** Repo-relative, for a reader who wants the source. */
   file: string;
@@ -90,7 +90,7 @@ export function readNode(file: string): Record<string, unknown> | undefined {
 }
 
 /**
- * The directories of `typologies` an instance holds ON THE CHECKOUT: its
+ * The directories of `typologies` a layer holds ON THE CHECKOUT: its
  * resolved entries, nested ones included (`todos/todos.json` declares
  * `items/` — the resolver `check:kind-validators` uses, so the two agree),
  * less any whose content is off the checkout, directly or through the entry
@@ -108,14 +108,14 @@ function checkoutDirectories(root: string, typologies: readonly string[]): Resol
   return all.filter((d) => d.graphTypologies.some((t) => typologies.includes(t)) && !offCheckout(d));
 }
 
-/** The instance's own declaration, `<instance>.json`, as an absolute path. */
+/** The layer's own declaration, `<instance>.json`, as an absolute path. */
 function declarationPath(root: string): string | undefined {
   const name = findDeclarationFile(root); // a file NAME, not a path
   return name === undefined ? undefined : join(root, name);
 }
 
 /**
- * A node's address within its harness: relative to the instance root, or to
+ * A node's address within its harness: relative to the layer root, or to
  * the repository when the file is outside it (a repository-scoped directory),
  * extension dropped.
  */
@@ -153,7 +153,7 @@ export function nodesOfKind(index: Pick<NodeKindIndex, "kinds">, kindId: string,
         for (const file of files(absPath)) take(file, harness, root, kinds);
       }
     }
-    // The one name rule: the instance's own declaration, `<instance>.json`.
+    // The one name rule: the layer's own declaration, `<instance>.json`.
     const declaration = byRule.some((k) => k.foundBy === "instance-declaration") ? declarationPath(root) : undefined;
     if (declaration !== undefined) take(declaration, harness, root, byRule.filter((k) => k.foundBy === "instance-declaration"));
   }
@@ -162,7 +162,7 @@ export function nodesOfKind(index: Pick<NodeKindIndex, "kinds">, kindId: string,
 
 /**
  * Every directory `nodesOfKind` can read for ANY kind on the index: each
- * instance's directories of a typology that holds a versioned kind. Absolute.
+ * layer's directories of a typology that holds a versioned kind. Absolute.
  * What a page generator over the index reads (bean `ehh6`), so a changed file
  * outside all of them cannot change one of its pages.
  */
@@ -173,7 +173,7 @@ export function kindDirectories(index: Pick<NodeKindIndex, "kinds">, repoRoot: s
   for (const root of instanceRootsIn(repoRoot)) {
     if (!readDeclaration(root)?.name) continue;
     for (const { absPath } of checkoutDirectories(root, typologies)) out.add(absPath);
-    // A name-rule node is a FILE at the instance root, not a directory; the
+    // A name-rule node is a FILE at the layer root, not a directory; the
     // file itself is what a changed-path test compares against.
     const declaration = byRule ? declarationPath(root) : undefined;
     if (declaration !== undefined) out.add(declaration);

@@ -30,7 +30,7 @@
  *
  * ## What it reads
  *
- * Every `.bpmn` and `.dmn` under a directory the instance declares as
+ * Every `.bpmn` and `.dmn` under a directory the layer declares as
  * `processes`, and every `.bpmn` of a declared `business-processes` directory
  * (`businessProcessFiles`, without folio blocks): the registry names this
  * check as what grades the second kind, whose diagrams nothing runs and so
@@ -108,13 +108,13 @@ export function xmlSourcesUnder(dir: string): string[] {
 }
 
 /**
- * The diagrams this check reads under one instance root: every `.bpmn` and
+ * The diagrams this check reads under one layer root: every `.bpmn` and
  * `.dmn` of its declared `processes` directories, and every `.bpmn` of its
  * declared `business-processes` directories (folio blocks excluded: a block
  * carries its own drawing and is graded with its folio). Sorted, no repeats.
  */
 export function xmlCommentFiles(root: string): { dirs: string[]; files: string[] } {
-  // Every directory the instance DECLARES as holding processes, not the
+  // Every directory the layer DECLARES as holding processes, not the
   // literal `processes`. A topical layout puts them in several.
   const dirs = workflowDirs(root, corpusScopeFor(root));
   const files = new Set(dirs.flatMap((d) => xmlSourcesUnder(d)));

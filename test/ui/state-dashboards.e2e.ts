@@ -157,7 +157,7 @@ test.describe("every generated state dashboard is accessible", () => {
     test(`${id} does not scroll sideways at phone width`, async ({ page }) => {
       // The declared interaction profile here is low-dexterity. A page that
       // needs horizontal scrolling to read is a page that needs a drag, and a
-      // drag is the affordance this instance's own UI rules avoid.
+      // drag is the affordance this layer's own UI rules avoid.
       await page.setViewportSize({ width: 390, height: 844 });
       await open(page, id);
       const { scrollW, clientW } = await page.evaluate(() => ({

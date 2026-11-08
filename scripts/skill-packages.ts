@@ -53,7 +53,7 @@ export function holdsSkill(dir: string): boolean {
  * was unservable until 2026-09-18.
  *
  * It is discovered through {@link resolveSkillDirs}, which reads each
- * instance's declaration, so a DEPENDENCY's packages are served too. That is
+ * layer's declaration, so a DEPENDENCY's packages are served too. That is
  * the overlay `AGENTS.md` describes as outstanding Phase 0.1 work.
  *
  * ## The filter is the whole design
@@ -87,16 +87,16 @@ export function holdsSkill(dir: string): boolean {
 export function discoverLocalPackages(root: string, scope?: CorpusScope): Record<string, string> {
   const out: Record<string, string> = {};
   // Collected first and named in a SECOND PASS, because which directly-held
-  // directory gets the instance name depends on how many there are — see
+  // directory gets the layer name depends on how many there are — see
   // `nameDirectlyHeld`. Deciding it inline made the answer depend on
   // iteration order, which is the defect rather than the implementation.
   const held: string[] = [];
-  // The overlay (dependencies, then this instance), and on the platform's own
+  // The overlay (dependencies, then this layer), and on the platform's own
   // run the CORPUS stacked on it — which the 19 `scope: "repository"` mirrors
   // supplied until placement PR0 (bean `ejye`), so core's, sci's and the
   // others' packages stay servable from here with the arrow the right way round.
   // When `scope === "instance"` (bean `t5zb`), only `root`'s OWN declared skill
-  // directories are read, never its `needs` overlay or sibling instances.
+  // directories are read, never its `needs` overlay or sibling layers.
   const kgDirs =
     scope === "instance"
       ? [...new Set(kgRoots(root, "instance").map((d) => resolve(d)))]
@@ -115,14 +115,14 @@ export function discoverLocalPackages(root: string, scope?: CorpusScope): Record
     // The history below is kept because the RULES it explains are unchanged
     // and were paid for; only their subject moved.
     //
-    // A directly-held set is the INSTANCE's own package, named after the
-    // instance, because that is what it is — there is no subdirectory name to
+    // A directly-held set is the LAYER's own package, named after the
+    // layer, because that is what it is — there is no subdirectory name to
     // take. Before `src/skills/` was declared this was a hand-written
     // exception in this file; now it falls out of the declaration.
     //
-    // NAMED BY THE INSTANCE THE DIRECTORY LIVES IN, not by the caller's root.
+    // NAMED BY THE LAYER THE DIRECTORY LIVES IN, not by the caller's root.
     // `readDeclaration(root)` gave the ROOT's name to every directly-held set
-    // regardless of which instance contributed it, which is correct only while
+    // regardless of which layer contributed it, which is correct only while
     // exactly one such directory is ever discovered. The moment a second one
     // is — `bootstrap/skills/`, once `ownDirectories` resolved its declared
     // repository scope — both are assigned the same key and the later wins.
@@ -137,7 +137,7 @@ export function discoverLocalPackages(root: string, scope?: CorpusScope): Record
     // → `bootstrap`. A directory under no declaration at all is skipped rather
     // than guessed at.
     //
-    // ...AND THE INSTANCE NAME IS TAKEN BY THE `skills` DIRECTORY ALONE.
+    // ...AND THE LAYER NAME IS TAKEN BY THE `skills` DIRECTORY ALONE.
     // The paragraph above fixed the CROSS-instance half of this collision and
     // left the within-instance half, which `1hvo` walked straight into:
     // `cat-harness` declares `src/skills/` AND now `theming/`, both hold their
@@ -148,8 +148,8 @@ export function discoverLocalPackages(root: string, scope?: CorpusScope): Record
     //
     // Resolved BY A RULE rather than by first-wins, because first-wins is the
     // defect: whichever directory `resolveSkillDirs` happened to yield last
-    // took the name. A directory basenamed `skills` IS the instance's own
-    // package — there is no other name for it — so it takes the instance name;
+    // took the name. A directory basenamed `skills` IS the layer's own
+    // package — there is no other name for it — so it takes the layer name;
     // any other directly-held directory takes its own basename, which is what
     // a person calls it anyway. `src/skills/` stayed `folio-assistant` and
     // `bootstrap/skills/` stays `bootstrap`, both measured unchanged
@@ -159,7 +159,7 @@ export function discoverLocalPackages(root: string, scope?: CorpusScope): Record
     // folded it into `skills/kg/kg-navigation/`, and `large-datasets/skills/`
     // until bean `j7ql` dissolved it into `skills/library/large-datasets/`.
     //
-    // Two `skills`-named directly-held directories in ONE instance would still
+    // Two `skills`-named directly-held directories in ONE layer would still
     // collide. That is a narrower and more obviously wrong configuration than
     // the one this fixes, and inventing a disambiguator for it now would be a
     // rule with no subject.
@@ -180,12 +180,12 @@ export function discoverLocalPackages(root: string, scope?: CorpusScope): Record
  *
  * Three rules, and the third needs the whole set:
  *
- * 1. A directory basenamed **`skills`** is the instance's own package — there
- *    is no other name for it — so it takes the instance's name. `src/skills/`
+ * 1. A directory basenamed **`skills`** is the layer's own package — there
+ *    is no other name for it — so it takes the layer's name. `src/skills/`
  *    stays `folio-assistant`; `bootstrap/skills/` stays `bootstrap`.
- * 2. Otherwise, if it is the instance's **only** directly-held directory, it
- *    takes the instance's name, because there is nothing to disambiguate it
- *    from and the instance's name is the better one.
+ * 2. Otherwise, if it is the layer's **only** directly-held directory, it
+ *    takes the layer's name, because there is nothing to disambiguate it
+ *    from and the layer's name is the better one.
  * 3. Otherwise it takes its **basename** — `theming/`, `sdlc/skills/crdm/`.
  *
  * Rule 2 is the one that needs the set, and stating it as "unique" rather than
@@ -199,7 +199,7 @@ export function discoverLocalPackages(root: string, scope?: CorpusScope): Record
  * No collision was reported and nothing threw — `dh4f` one scope in from the
  * cross-instance half the caller's docs describe.
  *
- * Two `skills`-basenamed directories in ONE instance would still collide. That
+ * Two `skills`-basenamed directories in ONE layer would still collide. That
  * is a narrower and more obviously wrong configuration, and inventing a
  * disambiguator for it now would be a rule with no subject.
  */

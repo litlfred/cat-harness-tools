@@ -83,7 +83,7 @@ const SHARED: Record<string, string[]> = { "md-exists": ["mathpaper-md-exists"] 
 
 const RULES = allConstraintRules();
 const byId = new Map(RULES.map((c) => [c.id, c]));
-/** A kind-specific entry about kinds no instance here declares (the science layer, unmounted) has no rule to find. */
+/** A kind-specific entry about kinds no layer here declares (the science layer, unmounted) has no rule to find. */
 const inScope = (kinds: string[]): boolean => kinds.some((k) => (BLOCK_KINDS as readonly string[]).includes(k));
 
 describe("constraint appliesTo coverage", () => {

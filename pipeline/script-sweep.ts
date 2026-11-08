@@ -245,7 +245,7 @@ async function run(): Promise<void> {
   // Precompute the script-hash bundle per criterion (mirrors
   // qa-sweep tranche-1 plumbing).
   const scriptHashesByCriterion: Record<string, CriterionScriptHashes> = {};
-  // Read each checker from the instance that implements it (ruling T7, bean
+  // Read each checker from the layer that implements it (ruling T7, bean
   // `70lx`); the recorded `source_file` is the declared path either way.
   for (const id of runnableIds) {
     scriptHashesByCriterion[id] = computeCriterionScriptHashes(

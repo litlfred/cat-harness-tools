@@ -39,11 +39,11 @@ import { exitUnlessMounted } from "./branch-store.ts";
 const ROOT = resolve(import.meta.dir, "..", "..");
 
 /**
- * The instance roots this repository's own run asks — **a pair, and neither
+ * The layer roots this repository's own run asks — **a pair, and neither
  * alone is the corpus.**
  *
  * `directoriesForGraph(ROOT, "library")` returns **zero** directories, because
- * the repository root is not an instance that declares a library. Measured
+ * the repository root is not a layer that declares a library. Measured
  * 2026-09-30, and it is why the first version of this file printed
  * "✓ 15 queue file(s), none already ingested" over a corpus it had not read —
  * `dh4f`, in the check written to stop `dh4f`.
@@ -133,7 +133,7 @@ export function declaredLibraries(roots: readonly string[] = DEFAULT_ROOTS): Set
 
 /**
  * Every library entry's recorded `source_sha256`, across every declared
- * library in every instance — the measurement the 2026-09-30 sweep got wrong
+ * library in every layer — the measurement the 2026-09-30 sweep got wrong
  * by asking one of them.
  *
  * Walked rather than read from a fixed key path: a manifest is JSON-LD and the
@@ -221,10 +221,10 @@ export function resolvedQueues(roots: readonly string[] = DEFAULT_ROOTS): string
   for (const r of roots) {
     for (const d of directoriesForGraph(r, "uploads")) queues.add(d);
   }
-  // An instance that declares a library declares its own queue, and that
+  // A layer that declares a library declares its own queue, and that
   // declaration does not always reach the root's own resolution — measured in
   // `library-graph.ts` on 2026-09-20 for the IRIS replica. Asking each library's
-  // instance is what makes this total rather than nearly so.
+  // layer is what makes this total rather than nearly so.
   for (const lib of declaredLibraries(roots)) {
     for (const d of directoriesForGraph(resolve(lib, ".."), "uploads")) queues.add(d);
   }

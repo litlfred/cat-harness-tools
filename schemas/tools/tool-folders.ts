@@ -39,7 +39,7 @@ import { defineTool, type ToolDefinition } from "./tool.js";
 import { TOOL_TYPES, toolTypeIri, type ToolTypeName } from "./tool-types.js";
 
 /**
- * The directory, beside an instance's published document, that holds one
+ * The directory, beside a layer's published document, that holds one
  * JSON-LD document per Tool.
  *
  * Bean `tdir`. The owner, 2026-10-15: *"i want a seperate jsonld for each Tool
@@ -61,7 +61,7 @@ export function toolDocumentPath(id: string): string {
  *
  * BESIDE the document, never at a second composed address, for the reason
  * `instanceSchemaBase` gives in `harness-schema-export.ts`: the host's
- * document is `<base>/<stub>.jsonld`, a foreign instance's
+ * document is `<base>/<stub>.jsonld`, a foreign layer's
  * `<base>/<stub>/<stub>.jsonld`, and one with its own `canonicalUrl`
  * `<canonicalUrl>/<stub>.jsonld`. Deriving from the document's own IRI gives
  * all three the right answer and keeps a preview's Tools under the preview.

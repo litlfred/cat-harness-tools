@@ -17,7 +17,7 @@
  *
  * The test is {@link isExemptFrom}`(decl, "visualiser")`, the rule the navbar
  * tiles sort by: bootstrap's own `renderExemption` says it renders nothing a
- * human browses. No instance is named here.
+ * human browses. No layer is named here.
  *
  * ## INSTANTIATED, not merely present
  *
@@ -76,7 +76,7 @@ export function boardsDir(_repoRoot: string, todoRoot: string = TODO_ROOT()): st
 export function harnessesOwedABoard(repoRoot: string, names: readonly string[]): string[] {
   const out: string[] = [];
   // INSTANTIATED is the checkout's answer, not a file test: an index lists its
-  // instances in `index.config.json` and none of them has a root
+  // layers in `index.config.json` and none of them has a root
   // `<name>.config.json`, so asking for the file owed no harness a board in
   // the index checkout (2026-10-09, `gen-default-boards-checkout`). Without an
   // index, `instantiatedHarnessNames` is the same root config set as before.

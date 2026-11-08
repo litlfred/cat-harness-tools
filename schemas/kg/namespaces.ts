@@ -5,7 +5,7 @@
  *
  * `jsonld.ts` is the **content** vocabulary (block kinds, DoCO, SPAR, FHIR and
  * WHO SMART Base namespaces) and imports `./block-kinds`. `schemas/kg/cat-harness.ts`
- * — the root declaration every instance carries, including a Tool or Test
+ * — the root declaration every layer carries, including a Tool or Test
  * repo with no content — also needs the platform namespace to mint the
  * `@type` IRIs for its graph kinds. Importing it from `jsonld.ts` would make
  * the harness depend on the content model, a wrong-direction edge
@@ -83,18 +83,18 @@ export const LEGACY_FOLIO_NS = ownNamespace("legacy-folio");
  * **Now is the only cheap moment and it is why this changed immediately.**
  * Nothing served `<base>/ns` until this branch, so no consumer holds any of
  * these IRIs. Once the vocabulary is published, changing a term's IRI is a
- * breaking change for every downstream instance and needs an alias to carry
+ * breaking change for every downstream layer and needs an alias to carry
  * forever — the `kg` -> `cat-harness` migration, one layer down and with no
  * `GRAPH_TYPOLOGY_ALIASES` to soften it.
  *
  * The paths name the REPOSITORIES the split creates, not the layer words, so
- * that after separation each namespace is already the IRI its own instance
+ * that after separation each namespace is already the IRI its own layer
  * publishes at and nothing has to move a second time.
  */
 export const CAT_BOOTSTRAP_NS = ownNamespace("cat-bootstrap");
 export const CAT_HARNESS_NS = ownNamespace("cat-harness");
 // The content layer's namespace is NOT here (folio-assistant#2598, owner
-// 2026-10-16, "2a" then "1a"). An instance above this one mints into its own
+// 2026-10-16, "2a" then "1a"). A layer above this one mints into its own
 // namespace, `<iriBase>v<major>/ns/` from its declaration
 // (`instanceNamespace`), and a kind it declares in its `typologies/` graph is
 // named in that namespace by the registry (`GraphTypologyDef.namespace`).
@@ -155,7 +155,7 @@ export const LEGACY_FOLIO_BPMN_NS = ownNamespace("legacy-folio-bpmn");
  * change was invisible here and only a standards tool would have noticed.
  *
  * Bootstrap's diagrams use `…/bootstrap/workflows` on purpose: a different
- * instance, so a different set of process ids.
+ * layer, so a different set of process ids.
  */
 export const WORKFLOWS_NS = ownNamespace("workflows");
 
@@ -284,7 +284,7 @@ export function ownElementPattern(xml: string, local: string, rest = "", flags =
 
 /**
  * The prefixes those namespaces bind to in a `@context` — and each prefix IS
- * the declaring instance's stub.
+ * the declaring layer's stub.
  *
  * Owner, 2026-09-23: "prefix -> match stub". Each namespace above is already
  * `<canonical>/<stub>/ns/`, so the path segment, the stub and the prefix are
@@ -298,7 +298,7 @@ export function ownElementPattern(xml: string, local: string, rest = "", flags =
  * two drift.
  *
  * Both halves hold by construction since bean `folio-assistant-63q4`: each
- * instance's context is generated (`jsonld:contexts`), spelling own prefixes
+ * layer's context is generated (`jsonld:contexts`), spelling own prefixes
  * from the declarations, and its `--check` fails on a prefix a document USES
  * that nothing binds.
  */
@@ -307,15 +307,15 @@ export const NS_PREFIXES = {
   "cat-harness": CAT_HARNESS_NS,
 } as const;
 
-/** One of our own prefixes — each the stub of the instance declaring it. */
+/** One of our own prefixes — each the stub of the layer declaring it. */
 export type NsPrefix = keyof typeof NS_PREFIXES;
 
 /**
- * The namespace a DECLARATION mints under — the one rule every instance's own
+ * The namespace a DECLARATION mints under — the one rule every layer's own
  * namespace follows, so the content layer's is derived from its declaration
  * rather than listed here (folio-assistant#2598, owner 2026-10-16).
  *
- * An instance that declares an `iriBase` mints under its own release,
+ * A layer that declares an `iriBase` mints under its own release,
  * `<iriBase>v<major>/ns/` (`release-iri.ts`). One that declares none mints
  * under the platform's site, `<stem><stub>/ns/`. `instanceNamespace` in
  * `instance-repositories.ts` is this function; it lives here because the
@@ -327,11 +327,11 @@ export function instanceNamespaceOf(decl: { name: string; stub?: string; iriBase
   return release ? `${release.agent}ns/` : `${LEGACY_FOLIO_NS.replace(/ns[#/]$/, "")}${decl.stub ?? decl.name}/ns/`;
 }
 
-/** The instance stub a namespace of ours names — the segment before `/ns/`. */
+/** The layer stub a namespace of ours names — the segment before `/ns/`. */
 export function stubOfNamespace(ns: string): string | undefined {
   // A release segment — `v0`, the major every address carries since the
   // owner's 2026-10-23 ruling, or the full `0.1.0` an older copy may still
-  // spell — sits between the stub and `ns/` once an instance declares an
+  // spell — sits between the stub and `ns/` once a layer declares an
   // iriBase (`bootstrap-tools/schemas/release-iri.ts`); it is never the stub.
   return /\/([^/]+)\/(?:(?:\d+\.\d+\.\d+|v\d+)\/)?ns\/$/.exec(ns)?.[1];
 }
@@ -340,9 +340,9 @@ export function stubOfNamespace(ns: string): string | undefined {
  * The namespace a layer's terms hang off — for the two layers this module can
  * name. The `core` layer has no namespace of its own here: a content layer
  * above the harness mints into the namespace its declaration derives, so a
- * caller asks the instance that declares the term (`contentLayerInstance` in
+ * caller asks the layer that declares the term (`contentLayerInstance` in
  * `graph-typology-registry.ts`), not this function. Throws for `core`, rather
- * than answering with a namespace that is not the declaring instance's.
+ * than answering with a namespace that is not the declaring layer's.
  */
 export function namespaceForLayer(layer: TermLayer): string {
   if (layer === "core") throw new Error(CORE_LAYER_UNNAMED);

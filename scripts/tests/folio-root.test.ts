@@ -1,6 +1,6 @@
 /**
  * The tests of this file that read the whole checkout (reads the root
- * instance's declaration (`folio-assistant.json`)) live in
+ * layer's declaration (`folio-assistant.json`)) live in
  * `test/folio-root-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

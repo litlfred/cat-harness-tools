@@ -146,7 +146,7 @@ export function writeFixture(root: string): string {
 if (import.meta.main) {
   // The REPOSITORY root. The fixture lands under `_kg/`, which is a repository
   // build output, and the e2e specs fetch it from `test-server.mjs` — which
-  // serves the repository root. Writing it to the INSTANCE root put it one
+  // serves the repository root. Writing it to the LAYER root put it one
   // level below where every reader looks, and sixteen specs timed out waiting
   // for a page that had been written to a path nothing serves.
   const root = repoRootFor(join(HARNESS_ROOT));

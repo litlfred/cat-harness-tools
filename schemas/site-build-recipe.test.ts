@@ -1,5 +1,5 @@
 /**
- * `site.build` in `<name>.config.json`: the steps that build an instance's
+ * `site.build` in `<name>.config.json`: the steps that build a layer's
  * site, as package script names (owner, 2026-10-10: "i want one consolidated
  * worfklow"). `build-instance-site.ts` and `stage-local.ts` both read it.
  */

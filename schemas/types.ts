@@ -420,7 +420,7 @@ export interface BlockBase {
   /** Optional display title. */
   title?: string;
   /**
-   * Who this block is written FOR — Role ids from the instance's KG
+   * Who this block is written FOR — Role ids from the layer's KG
    * (`scenarios/roles.json`, {@link RoleGraph}).
    *
    * Narrative content has an intended reader, and prose that does not know
@@ -462,7 +462,7 @@ export interface BlockBase {
    * The two relations genuinely differ, in both directions:
    *
    * - A proof may formally invoke a lemma that needs no exposition
-   *   (a `simp` set, a Mathlib instance). Formal edge, no editorial
+   *   (a `simp` set, a Mathlib layer). Formal edge, no editorial
    *   edge. That is correct and must not be "fixed".
    * - A block may depend editorially on a definition it never formally
    *   cites — motivation, notation, a worked example the argument
@@ -1309,7 +1309,7 @@ export interface TodoItem {
   /**
    * Which theme's art backs this todo's sticky — declared, never inferred.
    *
-   * Absent means the instance's own theme. See {@link TodoItemSchema} in
+   * Absent means the layer's own theme. See {@link TodoItemSchema} in
    * `constraints.ts` for why this is a bare string rather than an enum, and
    * why the default is inherited rather than guessed (bean `5y4b`).
    */

@@ -40,7 +40,7 @@ import { repoRootFor, declarationPathIn } from "../../schemas/kg/cat-harness.js"
 import { configNameFor, writeInstanceConfig } from "../../test/support/instance-fixture.js";
 
 // The REPOSITORY root, and it has to be said out loud now: `"..", ".."` from
-// here reaches the INSTANCE, and this file's subject — `.beans.yml`, `beans/`
+// here reaches the LAYER, and this file's subject — `.beans.yml`, `beans/`
 // and `workflow/store.ts` — is the repository's throughout. The constant kept
 // the right name and the wrong value through the move (bean `wggr`), so eleven
 // assertions ran against `cat-harness/beans/`, a directory that has never
@@ -50,7 +50,7 @@ const REPO_ROOT = repoRootFor(resolve(import.meta.dir, "..", ".."));
 /**
  * A throwaway store shaped exactly like the real one.
  *
- * `root` IS a repository root — a fixture has no enclosing instance, so
+ * `root` IS a repository root — a fixture has no enclosing layer, so
  * `repoRootFor(root)` is `/tmp` and every file the fixture wrote landed beside
  * every other test's. Same over-reach as the `check-agents-xref` fixture, and
  * the same lesson: `repoRootFor` means "up from an INSTANCE root".
@@ -242,9 +242,9 @@ describe("the fallback can work the plan, not just read it", () => {
 
 describe("the config name — `<instance>.config.json`, and only that", () => {
   test("the config is found by the name its INSTANCE declares", () => {
-    // Not a global filename any more. The name comes from the instance's own
+    // Not a global filename any more. The name comes from the layer's own
     // `harness.json`, which is what lets one checkout hold several configured
-    // instances without either of them answering for the other.
+    // layers without either of them answering for the other.
     const root = scratchStore();
     try {
       writeInstanceConfig(root, JSON.stringify({ contentType: "document" }));

@@ -80,8 +80,8 @@ export type VoiceRuleCategory = (typeof VOICE_RULE_CATEGORIES)[number];
 export const VoiceRuleSourceSchema = z
   .object({
     /**
-     * The instance holding the corpus, as its planned `owner/repo` (bean
-     * `6rmv`; it was the declared name until then), when it is not this one. Absent means this instance, so every existing citation keeps its
+     * The layer holding the corpus, as its planned `owner/repo` (bean
+     * `6rmv`; it was the declared name until then), when it is not this one. Absent means this layer, so every existing citation keeps its
      * meaning unchanged.
      *
      * Bean `r1lz` predicted why this is needed, on 2026-09-19, while deciding
@@ -95,7 +95,7 @@ export const VoiceRuleSourceSchema = z
      * hardcode a checkout layout into content, which is the practice
      * `AGENTS.md` opens by warning against and which this repository paid for
      * twice in one week. Resolution is `folio-assist-core`'s
-     * `resolveLibraryRef`, which reports an unknown instance as its own
+     * `resolveLibraryRef`, which reports an unknown layer as its own
      * finding and NEVER falls back to local.
      */
     instance: RepoFullNameSchema.optional(),
@@ -106,7 +106,7 @@ export const VoiceRuleSourceSchema = z
     /** Page range in the source document, e.g. "14" or "131-132". */
     pages: z.string().min(1).optional(),
     /**
-     * A node of THIS instance's knowledge graph, as a repo-relative path, for a
+     * A node of THIS layer's knowledge graph, as a repo-relative path, for a
      * voice that is a house standard rather than a reading of an outside
      * document.
      *
@@ -192,7 +192,7 @@ export const VoiceRuleSchema = z.object({
 export type VoiceRule = z.infer<typeof VoiceRuleSchema>;
 
 /**
- * A voice in this instance, or in another one.
+ * A voice in this layer, or in another one.
  *
  * Mirrors `ThemeRef` and `LibraryRef` exactly, and for the same reason: a
  * NAME, never a path. `../<instance>/skills/voices/who-editorial/voice.json` would
@@ -200,7 +200,7 @@ export type VoiceRule = z.infer<typeof VoiceRuleSchema>;
  */
 export const VoiceRefSchema = z
   .object({
-    /** The instance holding it, as `owner/repo` (bean `6rmv`). Absent means this one. */
+    /** The layer holding it, as `owner/repo` (bean `6rmv`). Absent means this one. */
     instance: RepoFullNameSchema.optional(),
     voiceId: z.string().regex(/^[a-z0-9-]+$/, "a voice id is lower-case kebab"),
   })
@@ -304,7 +304,7 @@ export type VoiceProvenance = (typeof VOICE_PROVENANCE)[number];
  */
 export interface VoiceProvenanceFlag {
   code: "declared-outside-cites-inside";
-  /** Rule ids that cite a node of this instance's own graph. */
+  /** Rule ids that cite a node of this layer's own graph. */
   ruleIds: string[];
   detail: string;
 }
@@ -378,7 +378,7 @@ export const VoiceApplicabilitySchema = z
      * voice meant editing the role, and a role could hold only one. A role is
      * the swimlane, so a voice bound here applies for exactly the duration
      * somebody acts in it. `check:voices` resolves each against the named
-     * instance's role graph.
+     * layer's role graph.
      */
     roles: z.array(RoleRefSchema).min(1).optional(),
     /**
@@ -475,7 +475,7 @@ export const VoiceProfileSchema = z.object({
     .array(
       z.object({
         title: z.string().min(1),
-        /** The instance holding it, when not this one. See `VoiceRuleSourceSchema.instance`. */
+        /** The layer holding it, when not this one. See `VoiceRuleSourceSchema.instance`. */
         instance: RepoFullNameSchema.optional(),
         /** Absent for a house standard — see `VoiceRuleSourceSchema.path`. */
         libraryId: z.string().min(1).optional(),
@@ -569,9 +569,9 @@ export class VoiceLoadError extends Error {
 }
 
 /**
- * The directory a voice graph lives in, relative to an instance root.
+ * The directory a voice graph lives in, relative to a layer root.
  *
- * **Asked of the declaration, not composed.** Every instance that ships voices
+ * **Asked of the declaration, not composed.** Every layer that ships voices
  * declares a `voices` graph in its own `<name>.config.json`, and that entry is
  * the answer — the same rule `po-resolve.ts` follows for `translation-sources`
  * and for the same reason: the layout moved once already (2026-09-21, from
@@ -583,10 +583,10 @@ export function voicesDirFor(instanceRoot: string): string | undefined {
 }
 
 /**
- * The convention for an instance that declares nothing.
+ * The convention for a layer that declares nothing.
  *
  * declared-path-literal: the fallback, stated at the call site so the choice is
- * visible. It names the CURRENT layout, so an undeclared instance and a
+ * visible. It names the CURRENT layout, so an undeclared layer and a
  * declared one land in the same place rather than the reader silently serving
  * the pre-migration one.
  */
@@ -599,8 +599,8 @@ export const VOICES_DIR = "skills/voices";
  * `skills/` has on disk. It is named here rather than at the call site so
  * "where voices used to live" is one fact with one home.
  *
- * Voices moved under `skills/` because a voice IS a skill (bean `btuv`). An
- * instance that declares its directory is unaffected either way; this is for
+ * Voices moved under `skills/` because a voice IS a skill (bean `btuv`). A
+ * layer that declares its directory is unaffected either way; this is for
  * the one that declares nothing and has not migrated, and it is the same
  * read-both/write-new asymmetry {@link voiceFilesIn} applies to the two FILE
  * layouts one level down. An upgrade must not make a downstream folio's voices
@@ -609,7 +609,7 @@ export const VOICES_DIR = "skills/voices";
 export const LEGACY_VOICES_DIR = "voices";
 
 /**
- * Where to look when the instance declares nothing: the current layout, or the
+ * Where to look when the layer declares nothing: the current layout, or the
  * legacy one if that is what is actually on disk.
  *
  * Returns the CURRENT path when neither exists, so a caller reporting "absent"
@@ -760,7 +760,7 @@ function voiceFilesPresent(dir: string): boolean {
 }
 
 /**
- * Load every voice profile an instance ships.
+ * Load every voice profile a layer ships.
  *
  * Reads and VALIDATES — a malformed voice throws rather than being skipped.
  * PR #210 declared `export const VOICE_REGISTRY: VoiceProfile[] = []` with the
@@ -806,7 +806,7 @@ export function loadVoices(instanceRoot: string): VoiceProfile[] {
   return out;
 }
 
-/** Whether this instance ships a voice graph at all — the third state. */
+/** Whether this layer ships a voice graph at all — the third state. */
 export function voicesPresent(instanceRoot: string): boolean {
   const dir = voicesDirFor(instanceRoot) ?? resolve(instanceRoot, VOICES_DIR);
   return existsSync(dir);
@@ -857,7 +857,7 @@ export function unionRules(
  * THREE-VALUED, and the distinction is what the QA voice gate turns on:
  *
  * - `[]` — the config was read and activates no voice. The common case, and this
- *   instance's. A voice-scoped criterion is `n/a`.
+ *   layer's. A voice-scoped criterion is `n/a`.
  * - `["who-editorial", …]` — the config was read and activates these.
  * - `undefined` — the config could NOT be read: absent, or present and
  *   unparseable. A criterion must then RUN, because "could not determine" must
@@ -891,8 +891,8 @@ export function readActiveVoices(repoRoot: string): string[] | undefined {
   // setting silently, so the one signal that could have said "your config is
   // not being read" instead said "no voices are active", which is a legitimate
   // answer. Reaching the third state is the point: it makes the criteria RUN.
-  // An indexed instance's voices are its index ENTRY's (2026-10-09): it has
-  // no `<name>.config.json`, and reading only the file put every instance in
+  // An indexed layer's voices are its index ENTRY's (2026-10-09): it has
+  // no `<name>.config.json`, and reading only the file put every layer in
   // the index checkout in the third state.
   const eff = readEffectiveConfig(repoRoot);
   if (eff.via === "index") {
@@ -1005,7 +1005,7 @@ export interface ResolvedVoice {
  * Fold a voice's `extends` chain into one rule set.
  *
  * `lookup` resolves a {@link VoiceRef} the same way `resolveTheme`'s does, and
- * for the same reason: this module cannot read another instance's directory
+ * for the same reason: this module cannot read another layer's directory
  * without hardcoding a layout, so the caller that already resolved the
  * declaration supplies it.
  */
@@ -1087,7 +1087,7 @@ export function explainVoiceFailure(f: VoiceResolveFailure): string {
  * nothing.
  *
  * `role` is the id of the role whose lane the work is in. It matches a
- * declared {@link RoleRefSchema} by role id; two instances declaring a role of
+ * declared {@link RoleRefSchema} by role id; two layers declaring a role of
  * the same id are not told apart here.
  *
  * Each declared list is an OR within itself and an AND across the three: a

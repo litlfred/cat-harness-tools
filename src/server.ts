@@ -96,7 +96,7 @@ export interface FolioServerConfig {
   feedbackDir: string;
   /** Directory for the assistant UI static files. */
   assistantDir: string;
-  /** Content adapter instance. */
+  /** Content adapter layer. */
   adapter: ContentAdapter;
   /** Server name for MCP protocol. */
   serverName?: string;
@@ -169,7 +169,7 @@ export class FolioServer {
     // The person-facing half of the skills: each `user_invocable` one as an
     // MCP PROMPT. Not a Tool node — bean `j6t3`, the owner's "keep tools and
     // skills separate!" — so it is registered here rather than read from the
-    // tools graph, and for every instance, content or none.
+    // tools graph, and for every layer, content or none.
     registerSkillPrompts(this.mcpServer);
 
     // Register adapter-specific MCP tools
@@ -297,7 +297,7 @@ export class FolioServer {
     // Every Tool node in the folio's dependency tree, the harness's always —
     // read from the declared `tools` graphs, not listed here (bean `zmdo`;
     // owner 2026-10-05, bean riit 3c: the viewer server uses the same rule).
-    // Each group resolves from the instance that declares it.
+    // Each group resolves from the layer that declares it.
     const { outcomes, failures } = await registerServedToolGroups(this.mcpServer, repoRoot, [repoRoot]);
     for (const f of failures) log("init", "\u2717 tools graph", f);
     for (const o of outcomes) {

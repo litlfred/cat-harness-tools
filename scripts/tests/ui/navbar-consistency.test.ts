@@ -7,7 +7,7 @@
  *
  * ## What these tests hold, and why each one cost something
  *
- * **The two namespaces are separate.** An instance's `icon` is an id into its
+ * **The two namespaces are separate.** A layer's `icon` is an id into its
  * own `images` list; a `directories[].tile.icon` is a name in the client's
  * glyph registry. The first draft of the checking script treated `icon: "mark"`
  * as a registry name and would have reported `cat-harness`'s navbar mark as
@@ -40,13 +40,13 @@ const REPO = resolve(import.meta.dir, "..", "..", "..", "..");
 const SCRIPT = join("cat-harness-tools", "scripts", "check-navbar-consistency.ts");
 // Resolved, not spelled out — `check:site-root` rejects a literal output site
 // root in any source file, and a test is a source file. `siteDirFor` answers
-// relative to the instance, so the instance root is joined in front of it.
+// relative to the layer, so the layer root is joined in front of it.
 const CLIENT_INSTANCE = join(REPO, "cat-harness");
 const CLIENT = join(CLIENT_INSTANCE, siteFileFor(CLIENT_INSTANCE, "assets/js/docs-ui.js"));
 // The row's registry, `ROW_GLYPHS`, lives beside it (beans `lhvt`, `9rq1`).
 const ROW_CLIENT = join(dirname(CLIENT), "navbar-row.js");
 const DECL = join(REPO, "cat-harness", "cat-harness.json");
-// The declaration that holds the `beans` tile. The ROOT instance's from
+// The declaration that holds the `beans` tile. The ROOT layer's from
 // placement PR0 (bean `ejye`) until the owner removed it (3d4caf6,
 // 2026-10-08); cat-harness hosts the checkout-root `beans/` again since then,
 // repository-scoped (coordinator decision (b)), so its tile is declared here.
@@ -80,8 +80,8 @@ let CWD = REPO;
  * reader can see it instead.
  *
  * The copy is cheap because almost all of it is symlinks. The directories that
- * must be REAL are the root, every instance root (`instanceRootsIn` takes
- * `isDirectory()`, which is false for a symlink, so a symlinked instance would
+ * must be REAL are the root, every layer root (`instanceRootsIn` takes
+ * `isDirectory()`, which is false for a symlink, so a symlinked layer would
  * silently vanish from the scan) and every directory on the way to an edited
  * file; the edited file itself is a copy. Everything else links back.
  */
@@ -119,7 +119,7 @@ describe("the repository is clean under the blocking families", () => {
   test("`--check` finds no blocking defect as committed — and is never 0 while blind", () => {
     // Two answers are acceptable, and they are NOT the same answer. 0: every
     // family ran clean. 2: no defect was found, but a kind-for-kind theme
-    // comparison could not be made (`pnn5`) — an instance's `themes.ts` would
+    // comparison could not be made (`pnn5`) — a layer's `themes.ts` would
     // not load — and the script says which. 1, a blocking finding, is the
     // failure this test exists for. What must never happen is 0 printed over a
     // ❔, which would be the `dh4f` defect.
@@ -150,7 +150,7 @@ describe("the two namespaces stay separate", () => {
       expect(status).toBe(2);
       expect(out).toContain("cannot read the declaration");
       expect(out).not.toContain("dangling-instance-icon");
-      // The instances it DID read must not be reported as a clean sweep.
+      // The layers it DID read must not be reported as a clean sweep.
       expect(out).not.toContain("✓ no finding");
     });
   });
@@ -289,7 +289,7 @@ describe("the denominator comes from the declared enumerator", () => {
   test("`instanceRootsIn` excludes the repository root and graph declarations", () => {
     const roots = instanceRootsIn(REPO).map((p) => resolve(p));
     // The root DECLARED until the owner removed that declaration (3d4caf6,
-    // 2026-10-08); it holds an index now, so it is not an instance and the
+    // 2026-10-08); it holds an index now, so it is not a layer and the
     // enumerator must not count it. Still compared as a PATH: its basename is
     // whatever the operator named the checkout (bean `8zsb`).
     expect(roots).not.toContain(REPO);

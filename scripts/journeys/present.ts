@@ -475,7 +475,7 @@ export const deviceGlyph = (x: DemoScreen, cls = ""): string => glyph(DEVICE_GLY
 /** The Device Demo's name on the frame: the workshop's word for it, else "Device Demo". */
 export const demoLabel = (p: Presentation): string => p.w.workshop.presentation?.deviceDemo?.label ?? "Device Demo";
 
-/** A framed screen's address in the instance's app. */
+/** A framed screen's address in the layer's app. */
 export function screenHref(pr: WorkshopPresentation, id: string, siteRoot: string): string | undefined {
   const d = pr.deviceDemo;
   if (!d) return undefined;

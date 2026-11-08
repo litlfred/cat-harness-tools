@@ -18,14 +18,14 @@
  * ## Why this is asserted as an invariant and not as a snapshot
  *
  * Pinning "library is 0" would go red the first time somebody ingests a
- * document into this instance, which is a corpus change and not a defect. So
+ * document into this layer, which is a corpus change and not a defect. So
  * the assertion is the SUM: every scoped tile counts a disjoint slice of one
  * graph, so their counts can never add up to more than the graph holds.
  *
  * A whole-graph number on a scoped tile breaks that the moment more than one
- * instance contributes — which is the defect's own shape, and is why this
+ * layer contributes — which is the defect's own shape, and is why this
  * fails on the code as it shipped rather than merely describing it. Equality
- * holds today because every contributing instance's page is declared; a page
+ * holds today because every contributing layer's page is declared; a page
  * nobody declares gets no tile and no count, so the sum falls BELOW the total
  * without anything being wrong. Hence `<=` rather than `===`.
  */
@@ -42,7 +42,7 @@ import { notApplicableAlone, siteNotBuilt } from "../../../test/support/checkout
 /**
  * Resolved, never written down. `check:site-root` forbids the literal in
  * source AND in test fixtures, and it caught the first draft of this file
- * doing exactly that — an instance's site root is a fact its declaration
+ * doing exactly that — a layer's site root is a fact its declaration
  * answers, and a second copy here is free to be wrong the day it moves.
  */
 const INSTANCE = join(HARNESS_ROOT);
@@ -95,14 +95,14 @@ describe("scoped counts partition their graph — they never over-count it", () 
     expect(sum).toBeLessThanOrEqual(total);
   });
 
-  // More than one instance is a property of the COMPOSED build: a standalone
+  // More than one layer is a property of the COMPOSED build: a standalone
   // clone that builds its own site projects only itself, so this is not
   // applicable standing alone even with the projection present.
   test.skipIf(
     notApplicableAlone("a schema projection built over more than one instance (only the composed checkout's build has one)"),
   )("and more than one instance contributes, so the sum can actually fail", () => {
     // Without this, both assertions above would pass trivially on a corpus
-    // with a single instance — one scoped count carrying the whole graph would
+    // with a single layer — one scoped count carrying the whole graph would
     // equal the total and nothing would notice. Measured rather than assumed,
     // because it is the precondition that makes this file a check at all.
     const p = projection("schemas");

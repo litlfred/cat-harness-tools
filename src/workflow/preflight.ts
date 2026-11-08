@@ -70,7 +70,7 @@ export interface PreflightReport {
 
 /**
  * Ask every precondition of `model`. A `file-exists` ref resolves against the
- * root of the instance that owns the diagram, carried on the check itself.
+ * root of the layer that owns the diagram, carried on the check itself.
  *
  * A process declaring none yields four empty lists, which is a determined
  * answer and not a missing one — {@link describePreflight} says so in words

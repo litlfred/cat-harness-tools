@@ -17,9 +17,9 @@
  * defect one layer along, so a test asserts the import.
  *
  * **Kinds are reported and never graded.** The board styles a card only from
- * `sticky` themes, and whether an instance authors one is the owner's call
+ * `sticky` themes, and whether a layer authors one is the owner's call
  * (#1584; answered for who-iris on 2026-09-30, bean `v8n5`). So a green run over
- * a missing `sticky` is CORRECT and a test pins it, over a fixture instance: a
+ * a missing `sticky` is CORRECT and a test pins it, over a fixture layer: a
  * check that failed would be answering a question its author was told not to.
  */
 import { describe, expect, test } from "bun:test";
@@ -116,10 +116,10 @@ describe("one answer, not two", () => {
 
 describe("kinds are reported, never graded", () => {
   test("a declaring instance with no `sticky` theme is still green", () => {
-    // Authoring a sticky theme is the owner's call per instance (#1584); this
+    // Authoring a sticky theme is the owner's call per layer (#1584); this
     // MUST pass, and if it ever fails somebody has graded an authoring call.
     // It used who-iris as the example until who-iris authored one (bean
-    // `v8n5`, owner 2026-09-30), so the case is now a FIXTURE instance whose
+    // `v8n5`, owner 2026-09-30), so the case is now a FIXTURE layer whose
     // only theme is a `webpage` — the real corpus no longer holds one.
     const dir = mkdtempSync(join(tmpdir(), "instance-themes-"));
     try {

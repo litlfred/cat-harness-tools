@@ -1,7 +1,7 @@
 /**
  * The asset LAYER and the delivery path — bean `folio-assistant-7syd`.
  *
- * `instance-readme` and `agent-instructions` are declared on every instance
+ * `instance-readme` and `agent-instructions` are declared on every layer
  * and, until this, said nothing about which layer they hold. The owner's word
  * on why that matters:
  *
@@ -99,8 +99,8 @@ describe("the delivery path — read as a file, with no injection budget", () =>
    * The longest file this checkout DECLARES in `role`, and its length.
    *
    * It measured the checkout root's own files until 2026-10-09. The root of
-   * an index checkout declares no instance, and its AGENTS.md and README are
-   * RENDERED indexes (owner, option a) — short, and no instance's asset — so
+   * an index checkout declares no layer, and its AGENTS.md and README are
+   * RENDERED indexes (owner, option a) — short, and no layer's asset — so
    * the rule's observable consequence is now carried by whichever declared
    * file is longest: the harness layer's own AGENTS.md, which took the root's
    * pointers, and bootstrap's README.

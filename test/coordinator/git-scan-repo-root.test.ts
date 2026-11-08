@@ -3,7 +3,7 @@
  * `cat-harness/schemas/git-scan.test.ts` (owner, 2026-10-06: "Throwaway
  * repository, plus moving the real-repo checks"). The pattern it reads — a
  * `manifest.jsonld` under any `library/<entry>/` — matches library entries in
- * every instance of the checkout, and the two-sided control below is about that real
+ * every layer of the checkout, and the two-sided control below is about that real
  * corpus — what the old bare walk admitted, and that git's corpus loses none of
  * it. Standing alone, cat-harness's parent is not a repository, so git cannot
  * be asked there at all. `gitScan`'s logic stays in that file, over throwaway

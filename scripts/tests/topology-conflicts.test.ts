@@ -27,7 +27,7 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 const ROOT = resolve(HARNESS_ROOT);
 const temps: string[] = [];
 
-/** An instance root whose `harness.json` is exactly `body`. */
+/** A layer root whose `harness.json` is exactly `body`. */
 function instance(body: string): string {
   const dir = mkdtempSync(join(tmpdir(), "topology-"));
   temps.push(dir);
@@ -42,7 +42,7 @@ afterAll(() => {
 describe("topology axes — absent is a third state", () => {
   // This is the test that would have falsified the whole approach, so it goes
   // first. Nothing in existence declares a topology; a check that treated an
-  // absent axis as a value would refuse every instance the day it shipped.
+  // absent axis as a value would refuse every layer the day it shipped.
   test("a declaration with no topology at all names no conflict", () => {
     expect(topologyConflicts(undefined, undefined)).toEqual([]);
     expect(topologyConflicts({}, undefined)).toEqual([]);

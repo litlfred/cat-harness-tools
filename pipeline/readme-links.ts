@@ -66,7 +66,7 @@ export function runReadmeAudit(opts: {
   const cfg = loadReadmeConfig(root);
   // ASKED, not composed — see the same line in `readme-sections.ts`. The
   // README is declared `scope: "repository"` here, one directory above the
-  // instance `root` every link is resolved against.
+  // layer `root` every link is resolved against.
   const file =
     opts.file ?? declaredAssetPath(root, INSTANCE_README_ROLE) ?? join(root, "README.md");
 
@@ -77,7 +77,7 @@ export function runReadmeAudit(opts: {
     pagesBaseUrl: cfg.pagesBaseUrl,
     publishRef: cfg.publishRef,
     fetch: opts.fetch,
-    // A link into a path an instance moved resolves there in the move's window.
+    // A link into a path a layer moved resolves there in the move's window.
     resolveMoved: movesResolver(root),
   });
 }

@@ -11,7 +11,7 @@
  * resolves. Planning writes nothing.
  *
  * The `coverage.process` Extension is one this harness resolves, so it is
- * tested here — on FIXTURE instances in a temporary directory, never the real
+ * tested here — on FIXTURE layers in a temporary directory, never the real
  * corpus. A prior test here walked the corpus and pushed a sibling past its
  * timeout, and the three states below are all reachable in a tree of a dozen
  * files.
@@ -56,7 +56,7 @@ test("over the real tree, every link in every generated README resolves", async 
 /**
  * The DECLARED governing process (`coverage.process`), and its three states.
  *
- * Fixture instances only — `harnessInstances` resolves this harness's
+ * Fixture layers only — `harnessInstances` resolves this harness's
  * Extensions over a temporary tree, and the writer plans from that.
  */
 const BPMN = (name: string, extra = "") => `<?xml version="1.0" encoding="UTF-8"?>
@@ -278,8 +278,8 @@ describe("a subgraph kept OFF the checkout is not described from it (bean 9c7h)"
     // no files" — true of main, false of the subgraph, whose README lives on
     // `cat/cat-harness/fsh-guts` with its content.
     //
-    // Asked of cat-harness, the instance that DECLARES fsh-guts, rather than of
-    // the checkout: in the index checkout every instance is a remote mount,
+    // Asked of cat-harness, the layer that DECLARES fsh-guts, rather than of
+    // the checkout: in the index checkout every layer is a remote mount,
     // whose READMEs are written in its own repository, so the checkout's plan
     // is empty and the guard below was vacuous (0 directories). The plan
     // cat-harness writes in its own repository is the one this rule binds.

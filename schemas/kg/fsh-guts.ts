@@ -306,7 +306,7 @@ export const FSH_GUTS_KIND = "fsh-guts";
 /**
  * Every `fsh-guts` directory that `root` declares; if it declares none, those
  * of the checkout stacked on it. Since placement PR0a the repository's
- * `fsh-guts/` is declared by the ROOT instance, not by the platform whose
+ * `fsh-guts/` is declared by the ROOT layer, not by the platform whose
  * tools read and write it.
  *
  * **The one place "where is the trashcan" is answered.** Before bean `9c7h`

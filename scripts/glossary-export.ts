@@ -8,7 +8,7 @@
  *
  * The input is each BPMN lane's name and `<bpmn:documentation>`
  * (`check:lane-documentation` keeps the latter present). The output is a
- * separate glossary document in the same instance namespace, not part of
+ * separate glossary document in the same layer namespace, not part of
  * `ns-export`'s vocabulary: a persona like `Board renderer` is a
  * `skos:Concept`, not an `rdfs:Class`. `--check` is its staleness gate.
  *
@@ -103,7 +103,7 @@ const DCTERMS = "http://purl.org/dc/terms/";
 const OWL = "http://www.w3.org/2002/07/owl#";
 const RDFS = "http://www.w3.org/2000/01/rdf-schema#";
 
-/** The committed directory, relative to an instance root. */
+/** The committed directory, relative to a layer root. */
 export const GLOSSARY_DIR = "glossary";
 /** The ledger's filename — the one non-derivable fact this module stores. */
 export const LEDGER_FILENAME = "glossary-ledger.json";
@@ -143,7 +143,7 @@ function bpmnFiles(root: string): string[] {
 }
 
 /**
- * Read every lane in an instance's diagrams, scoped to its own process.
+ * Read every lane in a layer's diagrams, scoped to its own process.
  *
  * Regex rather than a parse, matching `check-lane-documentation`,
  * `check-workflow-refs` and `translate-bpmn` beside it — one generator and
@@ -223,16 +223,16 @@ export interface LedgerEntry {
 
 export interface Ledger {
   readonly $schema: string;
-  /** Which instance's glossary this is — the stub, never a path. */
+  /** Which layer's glossary this is — the stub, never a path. */
   readonly instance: string;
   /** Keyed by the IRI's LOCAL PART, never the absolute IRI. See the header. */
   readonly concepts: Record<string, LedgerEntry>;
 }
 
 /**
- * The ledger's file: in the instance's own `swimlane-glossary` directory, or —
- * for an instance that declares none, as bootstrap does not since 2026-09-30 —
- * hosted in this harness's under the instance's stub ({@link glossaryHomeFor}).
+ * The ledger's file: in the layer's own `swimlane-glossary` directory, or —
+ * for a layer that declares none, as bootstrap does not since 2026-09-30 —
+ * hosted in this harness's under the layer's stub ({@link glossaryHomeFor}).
  */
 /**
  * A live key's next ledger entry. New: minted today. Known: keeps its
@@ -275,18 +275,18 @@ export function readLedger(instanceRoot: string, stub: string): Ledger {
 // ── Node kinds and harnesses ────────────────────────────────────
 
 /**
- * The node kinds an instance DECLARES — the ones its glossary defines.
+ * The node kinds a layer DECLARES — the ones its glossary defines.
  *
  * Work item folio-assistant-dkqd (2026-11-04): the glossary held roles only,
  * so "Work item", "Skills", "Library" and the rest of the words a reader meets
  * for what a harness keeps were defined nowhere a reader looks a word up.
  *
- * One glossary per instance, as for roles (`7u3g`): a kind is defined by the
- * instance that declares it, never by every instance that can see it. A kind
+ * One glossary per layer, as for roles (`7u3g`): a kind is defined by the
+ * layer that declares it, never by every layer that can see it. A kind
  * read from a `typologies/` graph carries its declarer; a base kind belongs to
  * the layer whose namespace names it ({@link graphTypologyLayer}): bootstrap's
  * to `bootstrap`, the harness's to this harness. A `core` kind with no
- * declarer belongs to nobody here, and is left for the instance that declares it.
+ * declarer belongs to nobody here, and is left for the layer that declares it.
  */
 export function kindsDeclaredBy(
   instanceRoot: string,
@@ -324,7 +324,7 @@ export interface NodeKindTerm {
 }
 
 /**
- * The node kinds an instance declares, with the ancestors nothing else
+ * The node kinds a layer declares, with the ancestors nothing else
  * declares, read from the node-kind index (`schemas/kg/node-kind-index.ts`).
  *
  * A node kind is the schema a FILE is written against (`bean/1.0.0`), as a
@@ -332,7 +332,7 @@ export interface NodeKindTerm {
  * their parents; the label and definition are read off the kind itself, by
  * importing the module the index names, so the index file's format is
  * unchanged. An ancestor that no typology names (`memory-record-core`, a
- * mixin) has no declarer, and is defined by the instance whose kind inherits
+ * mixin) has no declarer, and is defined by the layer whose kind inherits
  * it, so "Work item" has a broader term to point at.
  *
  * Async because the index imports the validator modules; {@link buildGlossary}
@@ -365,7 +365,7 @@ export async function nodeKindTerms(instanceRoot: string, repoRoot: string): Pro
   const ownIds = new Set(own.map((e) => e.id));
   const out: NodeKindTerm[] = [];
   for (const [id, k] of kinds) {
-    // An ancestor another instance declares is THAT instance's term.
+    // An ancestor another layer declares is THAT layer's term.
     if (!ownIds.has(id) && byId.get(id)?.declaredBy !== undefined) continue;
     out.push({
       id,
@@ -407,12 +407,12 @@ export interface GlossaryReport {
   readonly notBuilt: readonly string[];
   /** Live concepts by family: roles (with the varying lanes), graph kinds, node kinds, harnesses. */
   readonly families: { readonly roles: number; readonly kinds: number; readonly nodeKinds: number; readonly harnesses: number };
-  /** Declared roles no task-containing lane in this instance draws. */
+  /** Declared roles no task-containing lane in this layer draws. */
   readonly undrawn: string[];
   /**
-   * ...of those, the ones a lane OUTSIDE this instance binds by
+   * ...of those, the ones a lane OUTSIDE this layer binds by
    * `<folio:role ref>`, with the diagrams that draw them. Bean `nafz`: the
-   * walk is scoped to one instance (a glossary is published per instance), so
+   * walk is scoped to one layer (a glossary is published per layer), so
    * "no swimlane draws" is a fact about the WALK, and a role drawn in a
    * dependent's diagram must not read like one drawn nowhere. Informational —
    * it does not change the glossary, only what the report claims.
@@ -423,14 +423,14 @@ export interface GlossaryReport {
   /**
    * Graph-kind terms this run derives that the committed ledger does not hold
    * YET, for kinds defined in the registry's code rather than by a node of
-   * the instance's own ({@link pendingKind}). Minted on the build day, written
+   * the layer's own ({@link pendingKind}). Minted on the build day, written
    * by the next `glossary:export`, and reported; not stale on their own.
    */
   readonly pending: string[];
   /**
    * True when the ledger on disk differs from the one this run computed, the
    * {@link pending} terms aside: a recorded term changed, was retired or came
-   * back, the ledger names another instance, or a term of any other family is
+   * back, the ledger names another layer, or a term of any other family is
    * missing.
    */
   readonly ledgerStale: boolean;
@@ -439,7 +439,7 @@ export interface GlossaryReport {
 /**
  * Whether a graph kind's term may be PENDING in the ledger: the kind is defined
  * by the registry's code (`BASE_GRAPH_TYPOLOGIES`, in cat-harness-tools), not by
- * a `typologies/` node of the instance whose ledger records it.
+ * a `typologies/` node of the layer whose ledger records it.
  *
  * The ledger is committed in cat-harness (`glossary/`), a layer BELOW the code
  * that defines these kinds, and each layer's pull request is judged against
@@ -450,7 +450,7 @@ export interface GlossaryReport {
  * lag: it is minted on the build day, reported as pending, and recorded by the
  * ledger's writer in a cat-harness pull request after the kind lands. It is
  * the ONLY lag allowed: a recorded term whose label changed, a term retired or
- * restored, and every term of a family the instance derives from its own
+ * restored, and every term of a family the layer derives from its own
  * files (roles, the harness, node kinds) are still stale.
  */
 export function pendingKind(def: object | undefined): boolean {
@@ -475,16 +475,16 @@ const isoToday: Today = () => {
  * The glossary document's own IRI, derived from the graph document's PATH.
  *
  * `docPath` rather than `<stub>.jsonld` recomposed from the stub: the host
- * instance publishes at `<stub>.jsonld` and a foreign one at
+ * layer publishes at `<stub>.jsonld` and a foreign one at
  * `<stub>/<stub>.jsonld` (bean `dyd3`), and a caller that rebuilds the path
- * gets the host's answer for every instance.
+ * gets the host's answer for every layer.
  */
 export function glossaryIri(base: string, docPath: string): string {
   return `${base.replace(/\/$/, "")}/${docPath.replace(/\.jsonld$/, "-glossary.jsonld")}`;
 }
 
 /**
- * Build the glossary for one instance.
+ * Build the glossary for one layer.
  *
  * `laneBinding` is asked once per occurrence and its answer is the only route
  * from a lane to a concept, so a `variable` lane cannot accidentally be read
@@ -514,7 +514,7 @@ export function buildGlossary(opts: {
   const id = exportIdentity({ baseUrl: opts.baseUrl, instanceRoot: opts.instanceRoot });
   const now = (opts.today ?? isoToday)();
 
-  // EVERY declared `kg` root of this instance, not the literal `skills/`.
+  // EVERY declared `kg` root of this layer, not the literal `skills/`.
   // `kgRoots` is explicit that taking the first is `dh4f` arriving through the
   // helper written to prevent it — and bootstrap's roles live under its own.
   const graphs: RoleGraph[] = [];
@@ -533,9 +533,9 @@ export function buildGlossary(opts: {
   }
   const merged: RoleGraph | undefined = graphs.length > 0 ? { name: id.stub, roles } : undefined;
 
-  // THIS instance's diagrams only — not the dependency overlay
+  // THIS layer's diagrams only — not the dependency overlay
   // `translate-bpmn` walks (bean `nafz`). A glossary is published per
-  // instance and each dependent builds its own, so a role drawn only in a
+  // layer and each dependent builds its own, so a role drawn only in a
   // dependent's diagram is reported in `drawnElsewhere`, not bound here.
   // Never widen this walk: skill `swimlane-glossary` §"Run it once per
   // instance", and `instance-graph-isolation.test.ts` (`7u3g`).
@@ -547,8 +547,8 @@ export function buildGlossary(opts: {
   const varying: LaneOccurrence[] = [];
   const problems: string[] = [];
   // ONE problem, not one per lane. Bean `7go7`: `laneBinding` used to take an
-  // undefined graph and answer `dangling` for every lane carrying a ref, so an
-  // instance with swimlanes and no role registry failed this gate with N false
+  // undefined graph and answer `dangling` for every lane carrying a ref, so a
+  // layer with swimlanes and no role registry failed this gate with N false
   // symptoms instead of its one real cause — and `problems` is fatal here
   // (`exit(1)`), so that wall was a red gate, not a report. The graph is now a
   // required parameter and the question is not asked.
@@ -615,7 +615,7 @@ export function buildGlossary(opts: {
   // applied here by the `vocab-map` Tool. What stays in this file is identity
   // (`@id`, `@type`) and the values that need preparing first, each of which
   // its table row marks `transform: "code"`. The tables are this harness's,
-  // read from ROOT whichever instance is being exported.
+  // read from ROOT whichever layer is being exported.
   const table = (tableId: string) => vocabMapping(ROOT, tableId);
   const usageMap = table("glossary-lane-usage");
   // `role-naming` and `concept-scheme-naming` are SHARED (bean `lodp`):
@@ -677,7 +677,7 @@ export function buildGlossary(opts: {
     const ls = occurrences.get(r.id) ?? [];
     const localPart = `role/${r.id}`;
     const iri = makeIri(id.docIri, "role", r.id);
-    // A declared role with no lane in THIS instance is still a declared term
+    // A declared role with no lane in THIS layer is still a declared term
     // — omitting it would be `dh4f`, a glossary silently short of the
     // vocabulary it claims to index. It is reported in `undrawn` instead.
     // Alternative labels from two sources, merged: the names the role's lanes
@@ -757,7 +757,7 @@ export function buildGlossary(opts: {
   };
   const roleConcepts = live.size;
 
-  // Node kinds: one concept per kind this instance declares.
+  // Node kinds: one concept per kind this layer declares.
   let kinds = 0;
   const mayLag = new Set<string>();
   for (const kind of kindMap === undefined ? [] : kindsDeclaredBy(instanceRoot)) {
@@ -941,8 +941,8 @@ export function buildGlossary(opts: {
   for (const r of roles) {
     if (!occurrences.has(r.id)) undrawn.push(r.id);
   }
-  // Which of those another instance draws (bean `nafz`). Read the whole
-  // repository's diagrams, drop this instance's own, and match only an
+  // Which of those another layer draws (bean `nafz`). Read the whole
+  // repository's diagrams, drop this layer's own, and match only an
   // explicit `<folio:role ref>` — a lane NAME that happens to equal a role's
   // is not a binding, and claiming one would be the report inventing a fact.
   const drawnElsewhere: Array<{ role: string; files: string[] }> = [];
@@ -1102,8 +1102,8 @@ if (import.meta.main) {
   if (report.retired.length > 0) console.log(`  ${report.retired.length} retired (kept, never deleted)`);
   for (const k of report.newlyRetired) console.log(`    NEWLY RETIRED: ${k}`);
   if (report.undrawn.length > 0) {
-    // Scoped wording (bean `nafz`): the walk covers THIS instance's diagrams
-    // only, so say so, and separate a role drawn in another instance from one
+    // Scoped wording (bean `nafz`): the walk covers THIS layer's diagrams
+    // only, so say so, and separate a role drawn in another layer from one
     // no diagram in the repository draws.
     const where = relative(repoRootFor(ROOT), instanceDir) || ".";
     const elsewhere = new Map(report.drawnElsewhere.map((d) => [d.role, d.files]));
@@ -1145,10 +1145,10 @@ if (import.meta.main) {
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, `${JSON.stringify(doc, null, 2)}\n`);
 
-  // The instance's CODE LISTS, as SKOS, beside the glossary — the same run and
+  // The layer's CODE LISTS, as SKOS, beside the glossary — the same run and
   // the same predicates (owner, 2026-09-23: use the existing SKOS tooling).
   // A separate document because this one IS the swimlane scheme; code lists
-  // are schemes of their own. Written only when the instance can see a list.
+  // are schemes of their own. Written only when the layer can see a list.
   const lists = [...loadCodeLists(await codeListDirs(instanceDir)).values()];
   if (lists.length > 0) {
     // Named and addressed BESIDE the glossary — derived from its path and

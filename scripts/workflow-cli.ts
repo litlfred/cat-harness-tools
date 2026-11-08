@@ -131,8 +131,8 @@ class UsageError extends Error {
 }
 
 /**
- * Default checkout root when `--root` is not given: if `cwd` itself declares an
- * instance or an index (`index.config.json`), use `cwd`; otherwise fall back to
+ * Default checkout root when `--root` is not given: if `cwd` itself declares a
+ * layer or an index (`index.config.json`), use `cwd`; otherwise fall back to
  * `REPO_ROOT ?? cwd`.
  */
 export function defaultWorkflowRoot(cwd: string = process.cwd()): string {

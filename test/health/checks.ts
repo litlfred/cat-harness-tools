@@ -223,7 +223,7 @@ export interface TodoEvidence {
  */
 export interface HealthContext {
   now: Date;
-  /** `owner/repo`, or the instance name when there is no GitHub remote. */
+  /** `owner/repo`, or the layer name when there is no GitHub remote. */
   subject: string;
   staging: Probe<StagingEvidence>;
   /** Head refs of the currently open pull requests — `claude/foo`, unsanitised. */
@@ -260,7 +260,7 @@ export interface HealthContext {
   lsiIndexes?: StoreProbe<LsiHealthEvidence>;
 }
 
-/** One declared remote instance as the mount check left it. */
+/** One declared remote layer as the mount check left it. */
 export interface RemoteMountEvidence {
   outcomes: { instance: string; state: string; detail?: string }[];
   command: string;

@@ -80,7 +80,7 @@ const escHtml = (s: string): string =>
 
 /**
  * The in-page list of a viewer family's SUBJECT pages — the index and one page
- * per instance — for a themed page.
+ * per layer — for a themed page.
  *
  * Standalone, these pages listed their subjects in the injected harness rail
  * (`subjectSection`, #1757). Themed, the theme's sidebar is the navigation and

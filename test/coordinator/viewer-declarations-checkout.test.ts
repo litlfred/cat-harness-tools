@@ -1,6 +1,6 @@
 /**
  * `viewer-declarations` tests about the WHOLE CHECKOUT (bean `7zz1`): each
- * reads every instance's declared visualisers, which only the checkout holds.
+ * reads every layer's declared visualisers, which only the checkout holds.
  *
  * Since 2026-10-09 a visualiser is declared by the HARNESS, in its own
  * `<instance>.json` `visualisers`, and published at the route
@@ -47,7 +47,7 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
       return row ? viewersOf(row.dir, row.root, REPO)[0]?.ref : undefined;
     };
     const page = (route: string) => new RegExp(`^cat-harness/docs/(${PAGE_LOCALE}/)?${route.replace(/\./g, "\\.")}$`);
-    // Each instance's `beans/` is its own store, not the repository one.
+    // Each layer's `beans/` is its own store, not the repository one.
     if (dirs.some((d) => d.instance === "cat-harness-tools" && d.dir.id === "beans")) {
       expect(resolveFor("cat-harness-tools", "beans")).toMatch(page("cat-harness/beans/cat-harness-tools/index.html"));
     }
@@ -67,8 +67,8 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
     // A committed page under the page locale — or, until the committed site is
     // regenerated (folio-assistant#2527), at the address without it.
     const committed = (route: string) => new RegExp(`^cat-harness/docs/(${PAGE_LOCALE}/)?${route.replace(/\./g, "\\.")}$`);
-    // Covered by kind with per-instance sub-graphs (bean 1nu0): each instance's
-    // tools directory opens its own instance's page.
+    // Covered by kind with per-instance sub-graphs (bean 1nu0): each layer's
+    // tools directory opens its own layer's page.
     expect(resolveFor("cat-harness", "tools")).toMatch(committed("cat-harness/tools/cat-harness/index.md"));
     expect(resolveFor("smart-base", "tools")).toMatch(committed("cat-harness/tools/smart-base/index.md"));
     // Processes has per-instance sub-graph pages too since cat-harness#930.
@@ -78,7 +78,7 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
     // A declared nested sub-graph path (`subgraphUnder`), never one inferred from the pages.
     expect(resolveFor("cat-harness", "skills")).toBe("cat-harness/docs/cat-harness/auto-docs/index/skills/skills/index.html");
     // ...and for `subgraphs: "instance"` too (owner, 2026-10-15, "3a"): each
-    // instance's glossary tile opens `glossary/instance/<instance>/`, never
+    // layer's glossary tile opens `glossary/instance/<instance>/`, never
     // the shared page, so it cannot meet `glossary/skills/` and the like.
     // Asserted where the mounted core declares the nesting.
     const glossaryVis = declaredVisualisers(REPO).find((v) => v.renderedBy === "glossary-page");

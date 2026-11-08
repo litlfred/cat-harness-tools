@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * SUBSCRIBE an instance to an external Knowledge Graph — a **substrate** — at a
+ * SUBSCRIBE a layer to an external Knowledge Graph — a **substrate** — at a
  * pinned commit: fetch ONLY the substrate's declaration (at its root, or one
  * directory down — `upstreamPath`), judge it, and on
  * success record the subscription and a cached snapshot of what was judged.
@@ -36,8 +36,8 @@
  *
  * ### Where the declaration is looked for — `upstreamPath`
  *
- * A fork that left a monorepo often keeps its instance one directory down
- * (e.g. `shared/<name>.json`, the directory not named for the instance). So
+ * A fork that left a monorepo often keeps its layer one directory down
+ * (e.g. `shared/<name>.json`, the directory not named for the layer). So
  * the search is, in order ({@link judgeTree}):
  *
  * 1. **`--upstream-path <dir>`, or the one the subscription already records.**
@@ -98,7 +98,7 @@
  *   whatever the subscriber has chosen since and changes no byte.
  * - A {@link SubstrateSnapshotSchema} node, `<id>.substrate.json`, in the
  *   subscriber's OWN directory declared with graph typology `substrate-snapshot`.
- *   Found through the declaration, never by a path literal; an instance that
+ *   Found through the declaration, never by a path literal; a layer that
  *   declares none is refused with what to declare. Why a wrapper rather than a
  *   copy of `<name>.json` is on the schema.
  *
@@ -108,7 +108,7 @@
  *
  * ## `--check` — the gate over what was written
  *
- * Offline, over every instance in the checkout: each subscription has its
+ * Offline, over every layer in the checkout: each subscription has its
  * snapshot at its pin, each snapshot's digest is over its bytes and its
  * summary is what re-judging those bytes gives, every chosen part is one the
  * substrate offers, and no snapshot is orphaned ({@link checkSubscriptions}).
@@ -193,11 +193,11 @@ export type SubstrateVerdict =
   | { state: "ambiguous"; reason: string; candidates: string[] }
   | { state: "could-not-determine"; reason: string };
 
-/** Where {@link judgeTree} looks, and which instance it accepts. */
+/** Where {@link judgeTree} looks, and which layer it accepts. */
 export interface LocateOptions {
   /** Read only this repository-relative directory. `"."` or `""` names the root. */
   upstreamPath?: string;
-  /** The instance name the declaration must carry (`--name`, or the one a recorded snapshot names). */
+  /** The layer name the declaration must carry (`--name`, or the one a recorded snapshot names). */
   name?: string;
 }
 
@@ -267,7 +267,7 @@ function declarationsIn(dir: string): string[] {
     .sort();
 }
 
-/** The top-level directories of a fetched tree that may hold an instance: not dot-prefixed, sorted. */
+/** The top-level directories of a fetched tree that may hold a layer: not dot-prefixed, sorted. */
 function topLevelDirs(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith("."))
@@ -542,13 +542,13 @@ export interface SubscribeOptions {
   id?: string;
   /** The directory holding the declaration (`--upstream-path`); `"."` names the root. Absent: the recorded one, else the search. */
   upstreamPath?: string;
-  /** The instance name the declaration must carry (`--name`). Absent: the name the recorded snapshot carries, if any. */
+  /** The layer name the declaration must carry (`--name`). Absent: the name the recorded snapshot carries, if any. */
   name?: string;
   dryRun?: boolean;
   fetch?: RootFetcher;
 }
 
-/** The instance name a subscription's committed snapshot records, when it has a readable one. */
+/** The layer name a subscription's committed snapshot records, when it has a readable one. */
 function recordedName(snapshotDir: string, id: string): string | undefined {
   try {
     const snap = SubstrateSnapshotSchema.safeParse(JSON.parse(readFileSync(join(snapshotDir, `${id}${SNAPSHOT_SUFFIX}`), "utf8")));
@@ -558,7 +558,7 @@ function recordedName(snapshotDir: string, id: string): string | undefined {
   }
 }
 
-/** The instance's declared `substrate-snapshot` directory, resolved; `undefined` when it declares none. */
+/** The layer's declared `substrate-snapshot` directory, resolved; `undefined` when it declares none. */
 export function snapshotDirOf(instanceRoot: string, raw: Record<string, unknown>): string | undefined {
   return declaredDirOf(instanceRoot, raw, SNAPSHOT_GRAPH_TYPOLOGY);
 }
@@ -596,8 +596,8 @@ export async function subscribe(opts: SubscribeOptions): Promise<SubscribeResult
 
   const existing = ((raw["subscriptions"] ?? []) as Subscription[]).slice();
   // What was recorded the last time this repository was subscribed: the
-  // directory, and the instance its snapshot names. A re-subscribe judges the
-  // SAME subtree for the SAME instance unless it is told otherwise.
+  // directory, and the layer its snapshot names. A re-subscribe judges the
+  // SAME subtree for the SAME layer unless it is told otherwise.
   const sameRepo = existing.filter((s) => s.repository === t.repository);
   const recorded = opts.id ? sameRepo.find((s) => s.id === opts.id) : sameRepo.length === 1 ? sameRepo[0] : undefined;
   const locate: LocateOptions = {};
@@ -698,11 +698,11 @@ export async function subscribe(opts: SubscribeOptions): Promise<SubscribeResult
 
 
 /**
- * Offline judgement of one instance's subscriptions and snapshots. Findings,
+ * Offline judgement of one layer's subscriptions and snapshots. Findings,
  * each a sentence; `[]` is clean. What it holds:
  *
  * - every `subscriptions` entry has its snapshot, at the entry's repository
- *   and pin, and the instance declares somewhere to keep it;
+ *   and pin, and the layer declares somewhere to keep it;
  * - each snapshot parses, its digest is over its `raw`, and re-judging `raw`
  *   gives the committed `summary` — so a hand edit to either is caught;
  * - every CHOSEN subgraph and harness is one the substrate offers;

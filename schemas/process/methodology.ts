@@ -109,7 +109,7 @@ export type MethodologyFrontMatter = z.infer<typeof MethodologyFrontMatterSchema
  * its users, `data-modelling` step 8), and the methodologies viewer reads the
  * edge back to show, on each node's page, which skills apply it.
  *
- * Each entry is a methodology `name`, resolved across every instance that
+ * Each entry is a methodology `name`, resolved across every layer that
  * declares a `methodology` graph. Only a skill that APPLIES the method carries
  * it; a skill that merely mentions one (a worked example, a related reading)
  * keeps its prose link.

@@ -78,11 +78,11 @@ function translationsRoot(root: string): string {
  * copy is free to disagree with it. `site-dir-single-answer` refuses the
  * literal, and it refused this one twice.
  *
- * **`siteDirFor` returns a path RELATIVE to the instance root, so it must be
+ * **`siteDirFor` returns a path RELATIVE to the layer root, so it must be
  * joined to one.** The first version of this returned `join(siteDirFor(root),
  * ...)` and the missing root is not a cosmetic slip: with no root the result is
  * resolved against the process's CWD, so the function answered correctly only
- * while the CWD happened to be an instance that happened to hold a `docs/`.
+ * while the CWD happened to be a layer that happened to hold a `docs/`.
  * It did, for one run — which is how 25 templates were extracted through a path
  * that was wrong, and why the accessor is now used the way the other eleven
  * call sites in this repository use it (`join(INSTANCE_ROOT, siteDirFor(...))`).

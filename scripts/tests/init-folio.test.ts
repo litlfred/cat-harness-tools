@@ -577,7 +577,7 @@ describe("the scaffolded folio actually builds", () => {
     const { checkFolioProfile } = await import("../../pipeline/profile-check");
     const r = checkFolioProfile(d);
     expect(r.profile).toBe("document");
-    // Through the scaffold's OWN index entry: an instance an
+    // Through the scaffold's OWN index entry: a layer an
     // `index.config.json` lists is configured by its entry (cd041e2b), and
     // init-folio writes that index naming the scaffold, so the profile is
     // declared there rather than read from `<slug>.config.json` alone.
@@ -616,7 +616,7 @@ describe("a contentless instance (mer2)", () => {
     "CLAUDE.md",
     "GEMINI.md",
     // Bean folio-assistant-63q4 (owner, 2026-10-15): initiation turns on the
-    // publishing of the instance's JSON-LD context.
+    // publishing of the layer's JSON-LD context.
     ".github/workflows/publish-context.yml",
     // Bean folio-assistant-7mwa (owner, 2026-11-03, "2. Each layer
     // publishes"): and the publishing of its QA results to its own store.
@@ -728,7 +728,7 @@ describe("a contentless instance (mer2)", () => {
     expect(config.adapterModule).toBeUndefined();
     const decl = readDeclaration(d);
     expect(decl?.name).toBe(SLUG);
-    // No `folio` entry — only the graphs every instance keeps off main (hp54),
+    // No `folio` entry — only the graphs every layer keeps off main (hp54),
     // the trashcan among them so its first cutover has somewhere to deposit.
     expect(decl?.directories.map((e) => e.id)).toEqual(["beans", "todos", "fsh-guts"]);
   });
@@ -803,9 +803,9 @@ describe("a contentless instance (mer2)", () => {
 });
 
 /**
- * Bean `zmdo`, measured 2026-10-04: a scaffolded instance's declaration chain
- * was the instance ALONE — 0 skill directories reachable, for a contentless
- * instance and a document folio alike — because neither scaffold said what it
+ * Bean `zmdo`, measured 2026-10-04: a scaffolded layer's declaration chain
+ * was the layer ALONE — 0 skill directories reachable, for a contentless
+ * layer and a document folio alike — because neither scaffold said what it
  * stands on. The config now names one layer and the layers' own `needs` carry
  * the rest.
  */

@@ -43,7 +43,7 @@ const SITE = join(H, siteDirFor(H));
 const read = (p: string) => readFileSync(p, "utf-8");
 
 /**
- * A skill's file, found under the instance's declared knowledge-graph roots
+ * A skill's file, found under the layer's declared knowledge-graph roots
  * rather than at a literal path — skills move between topic directories
  * (`role-model` left `skills/folio-core/` for `skills/process/process-core/`).
  */

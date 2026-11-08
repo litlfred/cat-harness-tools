@@ -33,7 +33,7 @@ describe("invocations", () => {
 
   test("`kg-export` and `kg-export --instance X` are DIFFERENT obligations", () => {
     // The whole of `3jhq`: staging ran the exporter, just not for the foreign
-    // instance. Collapsing the two is what let that pass unnoticed.
+    // layer. Collapsing the two is what let that pass unnoticed.
     const yml = [
       "          bun run cat-harness/scripts/kg-export.ts --out a.jsonld",
       "          bun run cat-harness/scripts/kg-export.ts --instance ./no-such-instance --out b.jsonld",

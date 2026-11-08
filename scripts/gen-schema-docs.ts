@@ -2,7 +2,7 @@
 /**
  * gen-schema-docs.ts — Generate human-readable Markdown reference pages from the
  * JSON Schema files that define each skill's input/output contract (the
- * `skills/` directory under the instance's schemas root).
+ * `skills/` directory under the layer's schemas root).
  *
  * Output:           docs/reference/skills/<skill>.md  (+ docs/reference/skills/index.md)
  *
@@ -26,7 +26,7 @@ import { instanceDirectories, instanceDirectoryForGraph } from "../schemas/kg/ca
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
- * THIS INSTANCE'S OWN `schemas` directory, or the convention.
+ * THIS LAYER'S OWN `schemas` directory, or the convention.
  *
  * declared-path-literal: the fallback is at the call site so the choice is
  * visible. `schemas/` declares TWO graphs — it is a knowledge-graph node AND
@@ -44,7 +44,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * sent this generator's output into another checkout, silently. Bean `a02m`.
  */
 function schemasRoot(root: string): string {
-  // The instance's OWN `schemas` directory, by id. The harness also declares
+  // The layer's OWN `schemas` directory, by id. The harness also declares
   // the `openapi` and `archimate` subgraphs' schema directories (both of graph
   // `schemas`), so asking for "the" schemas directory is ambiguous and throws;
   // the skill-instruction schemas this page documents live in the one whose id
@@ -58,7 +58,7 @@ function schemasRoot(root: string): string {
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 
 /**
- * The repository the links name: the one the instance's own declaration names
+ * The repository the links name: the one the layer's own declaration names
  * (`"repository"` in `cat-harness.json`), never the cwd's git remote.
  *
  * Bean `w1gy`, finding F12. This was `repoOf(detectRepoUrl(process.cwd()))`
@@ -67,7 +67,7 @@ const INSTANCE_ROOT = resolve(HARNESS_ROOT);
  * the links read `litlfred/folio-assistant/blob/main/cat-harness/schemas/…`
  * (a path that repository does not hold since the separation, so every one was
  * dead), and in a sibling clone `--check` failed and a write rewrote all of
- * them. The skills directory is inside the instance, and the instance's root
+ * them. The skills directory is inside the layer, and the layer's root
  * is its repository's root, so the declared repository plus an
  * instance-relative path names the same file from every layout.
  */
@@ -103,11 +103,11 @@ const SKILLS_DIR = join(schemasRoot(INSTANCE_ROOT), "skills");
  *
  * DERIVED from `SKILLS_DIR` rather than written out, since a literal is
  * precisely what went stale: the two roots were the same directory until the
- * `wggr` stub inversion moved the instance into `cat-harness/`, so this read
+ * `wggr` stub inversion moved the layer into `cat-harness/`, so this read
  * correctly for as long as it did and broke with no edit to this file.
  *
- * Since the separation the links name the instance's DECLARED repository
- * (F12, above), whose root is the instance root — the index mounts
+ * Since the separation the links name the layer's DECLARED repository
+ * (F12, above), whose root is the layer root — the index mounts
  * `litlfred/cat-harness` whole — so the repository-relative path is now the
  * instance-relative one, and reads the same from the index and a sibling clone. */
 const SKILLS_REPO_PREFIX = relative(INSTANCE_ROOT, SKILLS_DIR).split("\\").join("/");

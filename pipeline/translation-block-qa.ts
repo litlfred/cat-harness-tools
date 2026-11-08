@@ -68,14 +68,14 @@
  * no page on this site, so nothing measured it and its round-trip verdicts
  * ended up in PR text. `--catalogues` adds a third pass: every
  * `<translations>/<locale>/<rel>.po` with its `.pot` beside it, in the
- * `translation-sources` directory the instance declares, not already measured
+ * `translation-sources` directory the layer declares, not already measured
  * by a block or page verdict, is measured against the template with the same
  * criteria. Its sidecar is the same `translation-qa/v1` document, at
  * `translationQaPath` with the catalogue's path (locale removed) as subject,
- * under the instance's QA tree: `test/results/translation-qa/translations/<rel>.<locale>.translation-qa.json`.
+ * under the layer's QA tree: `test/results/translation-qa/translations/<rel>.<locale>.translation-qa.json`.
  * `bun run cat translation:page-qa` runs it. The default run is unchanged.
  *
- * `--instance <dir>` sweeps the instance at `<dir>` instead of this one, by
+ * `--instance <dir>` sweeps the layer at `<dir>` instead of this one, by
  * its own declarations; the sidecars go into ITS QA tree.
  *
  * ## `--check` computes and judges (bean `oqe3`)
@@ -131,7 +131,7 @@ import { manifestPath } from "./json-manifest.ts";
 export type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport };
 
 /**
- * The instance swept: this one, or the one `--instance <dir>` names (set once,
+ * The layer swept: this one, or the one `--instance <dir>` names (set once,
  * at the top of the CLI, before anything reads it).
  */
 let INSTANCE_ROOT = join(HARNESS_ROOT);
@@ -212,9 +212,9 @@ export function readPrior(
 }
 
 /**
- * The checkout this INSTANCE sits in, asked from the instance rather than from
+ * The checkout this LAYER sits in, asked from the layer rather than from
  * the caller's working directory. They agree in the monorepo; they part when
- * the instance stands alone (`check:cat-harness-standalone` lays each layer out
+ * the layer stands alone (`check:cat-harness-standalone` lays each layer out
  * as its own repository with no checkout at the root), where asking from the
  * cwd found no checkout, read the declared `storage` as absent, and turned an
  * absent working-copy sidecar into a gated "stale in an unstored tree" (bean
@@ -829,7 +829,7 @@ export function cataloguePairs(translationsDir: string, locales: readonly string
  * The report for one catalogue measured against ITS TEMPLATE, or `undefined`
  * when none of the template's strings is translated (absence, as for a block).
  *
- * For a subject whose page is not on this instance's docs site — an IG page, a
+ * For a subject whose page is not on this layer's docs site — an IG page, a
  * BPMN diagram, a glossary scheme — the `.pot` is the source of record: it is
  * what the extractor said the subject contains. The criteria, their thresholds
  * and the glossary rule are {@link buildReport}'s, through {@link criteriaFor}.
@@ -1162,7 +1162,7 @@ function settleSidecar(
     tally.stale++;
     return;
   }
-  // On an instance that never had a store, the prior's attestations move into one now.
+  // On a layer that never had a store, the prior's attestations move into one now.
   if (merged.resolution.adopt) {
     writeCriteriaAttestations(INSTANCE_ROOT, merged.resolution.key, merged.resolution.attestations, {
       asciiEscape: existing !== undefined && isAsciiEscaped(readFileSync(existing, "utf-8")),
@@ -1217,7 +1217,7 @@ export function notOwnLine(
 export const JUDGE_FLAGS: readonly string[] = ["--catalogues", "--root", "--locales", "--against", "--instance"];
 
 if (import.meta.main) {
-  // `--instance <dir>`: sweep that instance, through ITS declarations. Set
+  // `--instance <dir>`: sweep that layer, through ITS declarations. Set
   // before anything reads INSTANCE_ROOT (`derivedStored` memoises on it).
   INSTANCE_ROOT = explicitInstanceRoot() ?? INSTANCE_ROOT;
   const catalogues = process.argv.includes("--catalogues");
@@ -1266,7 +1266,7 @@ if (import.meta.main) {
   const tally: SweepTally = { written: 0, stale: 0, skipped: 0, refused: 0, fresh: [], consumed: new Set() };
   const poContext = poResolveContext(INSTANCE_ROOT);
 
-  // An instance with no docs source (one swept with `--instance`) has no blocks.
+  // A layer with no docs source (one swept with `--instance`) has no blocks.
   for (const block of existsSync(root) ? walkBlocks(root, { includeUnlabelled: true, verify: false }) : []) {
     if (!block.md || !existsSync(block.md)) continue;
     const stem = basename(block.md).replace(/\.md$/, "");

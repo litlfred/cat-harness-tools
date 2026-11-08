@@ -111,12 +111,12 @@ export function rendersAvatar(zoom: SemanticZoom, kind: string, widthPx: number)
  *
  * ## Where the file lives, and why it took a bean to decide
  *
- * At the **root of the instance that owns the folio**, beside its
+ * At the **root of the layer that owns the folio**, beside its
  * `<name>.config.json` — because the threshold is a fact about the FOLIO, and
  * that is where a folio's own declarations sit. (It said `harness.json` until
- * #649 renamed every declaration to carry its instance's name; the rule is
+ * #649 renamed every declaration to carry its layer's name; the rule is
  * unchanged, the filename is not composable any more.) Not the instantiation root: that is
- * where `<name>.config.json` says an instance is instantiated HERE, which is a
+ * where `<name>.config.json` says a layer is instantiated HERE, which is a
  * different question from what one of them declares about its content.
  *
  * The other two candidates were wrong for reasons worth keeping. A board

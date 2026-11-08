@@ -109,10 +109,10 @@ export function contentCompileGates(paths: readonly string[]): ContentCompileGat
 }
 
 // The REPOSITORY root. `GATES_WORKFLOW` is `.github/workflows/…`, which
-// belongs to the repository rather than to this instance, and the gates
+// belongs to the repository rather than to this layer, and the gates
 // themselves are npm scripts run from the repository root. This arrived from
 // `main` as `resolve(HARNESS_ROOT)` — correct there, because the
-// instance and the repository were one directory; after the move (bean
+// layer and the repository were one directory; after the move (bean
 // `wggr`) it named `cat-harness/.github/`, which does not exist, and
 // `loadGates` would have thrown `NoGatesFound` on a workflow that is fine.
 const ROOT = repoRootFor(resolve(HARNESS_ROOT));
@@ -198,7 +198,7 @@ export const WORKFLOW_DIR = join(".github", "workflows");
  * one somebody added to get to green.
  */
 /**
- * Every present instance's declared `gateExemptions`. Read from the CHECKOUT
+ * Every present layer's declared `gateExemptions`. Read from the CHECKOUT
  * (`checkoutRootFor`), not `ROOT`: `repoRootFor` climbs out of a standalone
  * checkout whose root IS cat-harness (bean `g43f`).
  */
@@ -335,7 +335,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
   // `bun` line, which is all this reader extracts, so no exemption is needed
   // and the old one exempted nothing — the stale-exemption test's finding.
   {
-    // Bean `hupw`: the IG instances are remote mounts of their forks, which
+    // Bean `hupw`: the IG layers are remote mounts of their forks, which
     // do not commit the pages this checkout generates for them, so the
     // publish builds write them. (In the monorepo since before the
     // separation; this repository was seeded without it.)
@@ -387,7 +387,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     // Bean `4ak5` item 3. The root index is BUILT at publish time over the
     // exports the deploy has just written into `./_site`, and never committed
     // (owner, 2026-10-04), so there is no committed artefact for a `--check`
-    // to compare. It refuses to write when any declared instance has no
+    // to compare. It refuses to write when any declared layer has no
     // export, which is its verdict, and root-index.test.ts pins that over a
     // real site layout.
     match: "scripts/root-index.ts --site ./_site",
@@ -484,11 +484,11 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "nav include's one-checkbox rule are pinned by duplicate-ids.test.ts in `bun test`",
   },
   {
-    // Mounts each instance's rendered content into the built site. It COPIES
+    // Mounts each layer's rendered content into the built site. It COPIES
     // rather than checks, so there is no verdict for a contributor to run —
     // and it is meaningless outside a job that has just built `_site/`.
     //
-    // Its refusals are not exempt: the collision rule (two instances claiming
+    // Its refusals are not exempt: the collision rule (two layers claiming
     // one path) is asserted by `mount-instance-docs.test.ts` in `bun test`,
     // which IS in the gate set, and the staleness of what it mounts is gated
     // by `iris:pages:check`.
@@ -1021,7 +1021,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     // substring, and a deploy step whose destination carries a shell variable
     // must quote it. `--out "./_site` and `--out-dir ./_site` were the two
     // forms that had occurred; `--out-dir "./_site` had not until a per-locale
-    // export wrote into a foreign instance's subdirectory. Same reason, not a
+    // export wrote into a foreign layer's subdirectory. Same reason, not a
     // new exemption — a step that got to green by being spelled differently
     // would be the thing this ratchet exists to stop.
     // input-site: inert #4229d23b — prose naming the directory, in a message or a description
@@ -1108,8 +1108,8 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
 ];
 
 /**
- * {@link OWN_STEP_EXEMPTIONS} plus each present instance's declared
- * `gateExemptions.steps`. An instance above this layer declares the steps of
+ * {@link OWN_STEP_EXEMPTIONS} plus each present layer's declared
+ * `gateExemptions.steps`. A layer above this layer declares the steps of
  * its own that CI runs and the gate set does not (bean `0r7u`): naming them
  * here broke this layer standalone, where those steps do not exist and the
  * stale-exemption test would refuse them.
@@ -1916,7 +1916,7 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   },
 ];
 
-/** {@link OWN_SCRIPT_EXEMPTIONS} plus each present instance's declared `gateExemptions.scripts` (bean `0r7u`). */
+/** {@link OWN_SCRIPT_EXEMPTIONS} plus each present layer's declared `gateExemptions.scripts` (bean `0r7u`). */
 export const SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   ...OWN_SCRIPT_EXEMPTIONS,
   ...declaredExemptions().scripts,

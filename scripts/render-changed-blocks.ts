@@ -68,7 +68,7 @@ const EXPLICIT_FILES = args.filter(a => !a.startsWith("--") && (a.endsWith(".ts"
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function resolveConfigDriveFolder(): string | undefined {
-  // Read this instance's config (its index entry, else `<name>.config.json`) if present.
+  // Read this layer's config (its index entry, else `<name>.config.json`) if present.
   const eff = readEffectiveConfig(INSTANCE_ROOT);
   if (eff.state !== "ok") return undefined;
   try {

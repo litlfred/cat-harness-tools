@@ -26,7 +26,7 @@
  * ## Why this test builds a corpus rather than reading an option
  *
  * Asserting `maxBuffer` is passed pins the spelling of the fix, and there are
- * two helpers in two instances that may not import each other (bean `xsqm`),
+ * two helpers in two layers that may not import each other (bean `xsqm`),
  * so the constant cannot be shared and an option assertion would have to be
  * written twice against two literals. What both must do is ANSWER, so both are
  * asked, over a scratch repository whose listing is deliberately past 1 MiB.

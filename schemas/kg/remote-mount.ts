@@ -16,7 +16,7 @@
  *   directories a downstream mounts, and where — so a downstream names only
  *   the harness and its pin ({@link MountDefaultsSchema});
  * - a downstream **may override** those defaults, matched on **id** (the
- *   instance's name, then a directory's id), never on path
+ *   layer's name, then a directory's id), never on path
  *   ({@link MountOverrideSchema});
  * - mounts are resolved **transitively** across the dependency closure;
  * - code arrives through the mounted code directories, so imports resolve
@@ -30,11 +30,11 @@
  *
  * 1. **A Tool brings its definition AND its implementation**, each with its
  *    import closure: the definition is `<tools dir>/<id>/<id>.ts` in the
- *    instance that declares it (the folder convention, `tool-folders.ts`);
+ *    layer that declares it (the folder convention, `tool-folders.ts`);
  *    the implementation is the module its `invoke` names — `inProcess.module`
- *    in the declarer or an instance that needs it (`resolveImplementingPath`'s
+ *    in the declarer or a layer that needs it (`resolveImplementingPath`'s
  *    rule), or the script a `bun run cat <key>` command resolves to through
- *    the instances' `checkoutScripts`.
+ *    the layers' `checkoutScripts`.
  * 2. **One closure walker**: bootstrap-tools' `importClosure`
  *    (`scripts/check-closure.ts`), the walk `check:tools-closure` itself runs.
  * 3. **Directory granularity**: every DECLARED directory the closure touches
@@ -42,9 +42,9 @@
  *    alone. The lock is unchanged: it records directories, as it always has,
  *    and never a single file.
  *
- * With `tools` named anywhere in a mount entry, the entry's instances mount
+ * With `tools` named anywhere in a mount entry, the entry's layers mount
  * what the closure touches plus the directories their override names, and
- * not their default list; a `whole` instance stays whole.
+ * not their default list; a `whole` layer stays whole.
  *
  * ## Hydrated: metadata first (bean `mo75` G2)
  *
@@ -52,8 +52,8 @@
  * chosen directory as ONE file: that subgraph's published
  * `index.hydrated.jsonld` at the pin (`SubgraphSource` → `kind: "hydrated"`),
  * so a downstream can read what `tools/` or `skills/` holds before it decides
- * which of it to materialise. No code arrives, so the instance is not laid
- * down as an instance: no `<name>.json` is written (discovery would otherwise
+ * which of it to materialise. No code arrives, so the layer is not laid
+ * down as a layer: no `<name>.json` is written (discovery would otherwise
  * read every absent directory as empty — `dh4f`), the lock marks it
  * `hydrated`, and {@link mountedInstanceRoots} never offers it to the overlay
  * as somewhere to import from.
@@ -66,14 +66,14 @@
  *
  * ## Why the default path is the harness's HOME path
  *
- * A mounted instance lands, by default, at the path it has in its own
- * repository (`livesAt.path`), relative to the DOWNSTREAM instance's root —
+ * A mounted layer lands, by default, at the path it has in its own
+ * repository (`livesAt.path`), relative to the DOWNSTREAM layer's root —
  * where its lock sits, and for a folio repository the checkout root. Two things then hold with no further machinery:
  * `instanceRootsIn` — which scans a checkout one level deep — finds every
  * mounted sibling, so `needs` resolves exactly as it does in the monorepo; and
- * a relative import from one mounted instance into another
+ * a relative import from one mounted layer into another
  * (`../../cat-harness/schemas/…`) finds the file it names, because the
- * instances keep their relative layout. Moving one instance by override is
+ * layers keep their relative layout. Moving one layer by override is
  * allowed, and the lock records where it went, but it is the override that
  * takes responsibility for imports that climb out of it.
  *
@@ -81,7 +81,7 @@
  *
  * The declaration says WHAT is mounted (a harness and a pin). The lock
  * ({@link MountLockSchema}) says what the closure RESOLVED to at that pin —
- * every instance reached, the commit each was read at (a gitlink in the tree
+ * every layer reached, the commit each was read at (a gitlink in the tree
  * pins a dependency in another repository), and each directory's tree digest.
  * The check compares the disk against the lock, and the lock's pins against the
  * declaration, so "mounted", "missing" and "could not determine" are three
@@ -97,7 +97,7 @@ import { MountTrustBasisSchema, MountTrustSchema } from "./mount-trust.js";
 import { RepoFullNameSchema } from "./repo-full-name.js";
 import { ToolIdSchema } from "../tools/tool-id.js";
 
-/** An instance name — the same rule `cat-harness.ts` applies to `needs` and subscriptions. */
+/** A layer name — the same rule `cat-harness.ts` applies to `needs` and subscriptions. */
 const InstanceNameSchema = z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "an instance name: lowercase, digits and dashes");
 
 /** A full commit SHA. A branch moves under the reader; an abbreviated SHA is ambiguous. */
@@ -115,11 +115,11 @@ export const MountPathSchema = z
   .refine((p) => !p.split("/").includes(".."), "a mount path may not climb with `..`");
 
 /**
- * HARNESS SIDE — what a downstream mounts of THIS instance unless it says
+ * HARNESS SIDE — what a downstream mounts of THIS layer unless it says
  * otherwise. Declared once, by the harness, on its own `<name>.json`.
  *
  * Both fields optional, and each absence has a stated meaning rather than a
- * hidden one: `path` absent is the instance's home path (`livesAt.path`, else
+ * hidden one: `path` absent is the layer's home path (`livesAt.path`, else
  * its directory in its own repository); `directories` absent is every declared
  * directory whose content is in the checkout (`source` absent or `directory`)
  * — a branch-kept or remote-kept subgraph is somebody's state, not part of
@@ -128,14 +128,14 @@ export const MountPathSchema = z
 export const MountDefaultsSchema = z
   .object({
     path: MountPathSchema.optional(),
-    /** Directory ids, in this instance's own declaration. */
+    /** Directory ids, in this layer's own declaration. */
     directories: z
       .array(z.string().min(1))
       .refine((xs) => new Set(xs).size === xs.length, { message: "mountDefaults.directories: an id appears twice" })
       .optional(),
     /**
-     * Mount the WHOLE instance root — every tracked file at the pin, root
-     * files included — instead of its declared directories. For an instance a
+     * Mount the WHOLE layer root — every tracked file at the pin, root
+     * files included — instead of its declared directories. For a layer a
      * downstream reads as a checkout rather than as graphs: `bootstrap` (whose
      * `ns.jsonld` and README sit at its root) and `bootstrap-tools` (whose
      * `package.json` and `tsconfig.json` do), the two git submodules a remote
@@ -147,11 +147,11 @@ export const MountDefaultsSchema = z
 export type MountDefaults = z.infer<typeof MountDefaultsSchema>;
 
 /**
- * DOWNSTREAM SIDE — an override of ONE instance's defaults in the closure,
- * keyed (in {@link RemoteMountSchema}.overrides) by that instance's name.
+ * DOWNSTREAM SIDE — an override of ONE layer's defaults in the closure,
+ * keyed (in {@link RemoteMountSchema}.overrides) by that layer's name.
  *
- * `directories` REPLACES the default list (an id the instance does not declare
- * is refused at plan time, not dropped). `skip: true` leaves the instance
+ * `directories` REPLACES the default list (an id the layer does not declare
+ * is refused at plan time, not dropped). `skip: true` leaves the layer
  * unmounted — the downstream supplies it some other way, and the plan says so
  * rather than reporting it missing.
  */
@@ -164,10 +164,10 @@ export const MountOverrideSchema = z
       .optional(),
     skip: z.literal(true).optional(),
     /**
-     * Tool ids THIS instance declares, each mounted runnable: its definition,
+     * Tool ids THIS layer declares, each mounted runnable: its definition,
      * its implementation and their import closure, as the declared
      * directories that closure touches (module note, §"Tools"). An id the
-     * instance does not declare at the pin is refused at plan time, never
+     * layer does not declare at the pin is refused at plan time, never
      * dropped. Not with `hydrated` (metadata brings no code) or `skip`.
      */
     tools: z
@@ -178,7 +178,7 @@ export const MountOverrideSchema = z
     /** Overrides the harness's `mountDefaults.whole` either way; `directories` is then ignored. */
     whole: z.boolean().optional(),
     /**
-     * Mount this instance's directories as their published
+     * Mount this layer's directories as their published
      * `index.hydrated.jsonld` only — metadata, no files (bean `mo75` G2).
      * Overrides the mount entry's own `hydrated` either way. `directories`
      * still chooses which subgraphs; `whole` and `hydrated` together are
@@ -186,10 +186,10 @@ export const MountOverrideSchema = z
      */
     hydrated: z.boolean().optional(),
     /**
-     * Consent for THIS instance at its own pin. Required for an instance
+     * Consent for THIS layer at its own pin. Required for a layer
      * reached through a GITLINK: that is another repository at another
      * commit, and the parent mount's consent does not cover it (roast `1ygp`
-     * L4.2). Ignored for the declared harness and same-tree instances, which
+     * L4.2). Ignored for the declared harness and same-tree layers, which
      * the mount's own `trust` covers.
      */
     trust: MountTrustSchema.optional(),
@@ -200,19 +200,19 @@ export type MountOverride = z.infer<typeof MountOverrideSchema>;
 /**
  * One remote mount a downstream declares: a harness, the repository it lives
  * in and the pin. Everything else — which directories, where, and which other
- * instances its closure brings — comes from the harness's own declaration at
+ * layers its closure brings — comes from the harness's own declaration at
  * that pin.
  */
 export const RemoteMountSchema = z
   .object({
-    /** The harness's instance name, as its own declaration states it. */
+    /** The harness's layer name, as its own declaration states it. */
     harness: InstanceNameSchema,
     repository: RepoFullNameSchema,
     ref: CommitShaSchema,
-    /** Per-instance overrides across the closure, keyed by instance name. */
+    /** Per-instance overrides across the closure, keyed by layer name. */
     overrides: z.record(InstanceNameSchema, MountOverrideSchema).optional(),
     /**
-     * Mount every instance this entry reaches as hydrated metadata
+     * Mount every layer this entry reaches as hydrated metadata
      * ({@link MountOverrideSchema}`.hydrated`), unless its override says
      * `hydrated: false`. Bean `mo75` G2.
      */
@@ -239,7 +239,7 @@ export const MOUNT_LOCK_SCHEMA = "cat-harness-mount-lock/v1";
 
 /**
  * The directory id a WHOLE-instance mount is locked under: one entry whose
- * `path` is the instance's mount path and whose `upstreamPath` is its root in
+ * `path` is the layer's mount path and whose `upstreamPath` is its root in
  * the upstream repository (`.` for that repository's root).
  */
 export const WHOLE_INSTANCE_ID = "*";
@@ -280,7 +280,7 @@ export function mountLockPathFor(dir: string, instance: string): string {
 export const LockedDirectorySchema = z
   .object({
     id: z.string().min(1),
-    /** Relative to the downstream instance's root, no trailing slash. */
+    /** Relative to the downstream layer's root, no trailing slash. */
     path: z.string().min(1),
     /** Where the bytes are in the upstream repository. */
     upstreamPath: z.string().min(1),
@@ -310,7 +310,7 @@ export const LockedInstanceSchema = z
     instance: InstanceNameSchema,
     repository: z.string().min(1),
     sha: CommitShaSchema,
-    /** The instance's root in the upstream repository; `""` is that repository's root. */
+    /** The layer's root in the upstream repository; `""` is that repository's root. */
     upstreamRoot: z.string(),
     /** Where its root landed downstream. */
     path: z.string().min(1),
@@ -321,12 +321,12 @@ export const LockedInstanceSchema = z
     declaration: z.object({ file: z.string().min(1), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
     directories: z.array(LockedDirectorySchema),
     /**
-     * The instance's DECLARED ASSETS (`assets[].src` — its README and
+     * The layer's DECLARED ASSETS (`assets[].src` — its README and
      * AGENTS.md), each a single file the declaration names and the mount lays
      * down beside the declaration. Bean `hupw`: a mount without them left
-     * every declared asset of a mounted instance a dangling reference. Only
-     * instance-scoped assets inside the instance are taken; a declared asset
-     * the pinned tree lacks makes the instance `missing`.
+     * every declared asset of a mounted layer a dangling reference. Only
+     * instance-scoped assets inside the layer are taken; a declared asset
+     * the pinned tree lacks makes the layer `missing`.
      */
     assets: z
       .array(z.object({ src: z.string().min(1), sha256: z.string().regex(/^[0-9a-f]{64}$/) }).strict())
@@ -342,9 +342,9 @@ export const LockedInstanceSchema = z
     /**
      * Mounted as hydrated metadata (bean `mo75` G2): each directory holds one
      * `index.hydrated.jsonld`, read from the `upstreamPath` directory the
-     * instance publishes it in, and the declaration is recorded (it fixed
+     * layer publishes it in, and the declaration is recorded (it fixed
      * those paths) but NOT laid down — so nothing discovers a code-less
-     * instance there.
+     * layer there.
      */
     hydrated: z.literal(true).optional(),
   })
@@ -359,8 +359,8 @@ export const MountLockSchema = z
     instances: z.array(LockedInstanceSchema),
     /**
      * What the closure reached and did NOT mount, with why — so the check,
-     * which reads the lock and never the network, cannot report clean over an
-     * instance the mount never laid down. `local` and `skipped` are recorded
+     * which reads the lock and never the network, cannot report clean over a
+     * layer the mount never laid down. `local` and `skipped` are recorded
      * too: they are answers, and a reader should see them as such.
      */
     unmounted: z
@@ -372,7 +372,7 @@ export const MountLockSchema = z
             state: z.enum(["local", "skipped", "missing", "refused", "could-not-determine"]),
             detail: z.string(),
             /**
-             * A REFUSED instance's previous mount, still on disk because an
+             * A REFUSED layer's previous mount, still on disk because an
              * agent does not delete it (`deletion-requires-confirmation`). It
              * is recorded here, not in `instances`, so nothing presents it as
              * current: the check reports it, and the next mount knows this
@@ -390,9 +390,9 @@ export type MountLock = z.infer<typeof MountLockSchema>;
 // ── Reading the lock (the overlay's half) ────────────────────────────────────
 
 /**
- * Every mounted instance the locks in `scope` record, as `name → absolute root`.
+ * Every mounted layer the locks in `scope` record, as `name → absolute root`.
  *
- * `scope` is the DOWNSTREAM instance's root: the lock sits beside its
+ * `scope` is the DOWNSTREAM layer's root: the lock sits beside its
  * declaration, and every mount path in it is relative to that root. The
  * overlay asks this rather than guessing a directory: `resolveDependencyPath`
  * used to fall back to `.deps/<name>/`, which the owner ruled out
@@ -425,9 +425,9 @@ export function mountedInstanceRoots(scope: string): Map<string, string> {
 }
 
 /**
- * The scope a MOUNTED instance's siblings are found in: the nearest ancestor
- * holding a lock that put `instanceRoot` where it is. `undefined` for an
- * instance no mount placed. Bounded, and reads only lock files.
+ * The scope a MOUNTED layer's siblings are found in: the nearest ancestor
+ * holding a lock that put `instanceRoot` where it is. `undefined` for a
+ * layer no mount placed. Bounded, and reads only lock files.
  */
 export function mountScopeFor(instanceRoot: string): string | undefined {
   const abs = resolve(instanceRoot);
@@ -445,19 +445,19 @@ export function mountScopeFor(instanceRoot: string): string | undefined {
  * Whether the mount that placed {@link instanceRoot} CHOSE its declared
  * directory {@link absDir}.
  *
- * A downstream mounts a chosen subset of an upstream instance's directories,
+ * A downstream mounts a chosen subset of an upstream layer's directories,
  * and the declaration it lays down still names all of them. So a declared
  * directory that is not on disk is one of two different facts: the upstream
  * keeps it and this mount did not choose it (nothing here to examine), or it
  * was chosen and is gone (a corpus that should be here and is not). The lock
  * records which (`instances[].directories`); this asks it.
  *
- * - `undefined` — no lock placed the instance (the checkout's own, or a plain
+ * - `undefined` — no lock placed the layer (the checkout's own, or a plain
  *   directory), or the lock cannot be read: no answer, and a caller must not
  *   treat that as "not chosen".
  * - `{ chosen: true }` — a whole-instance mount, or a locked directory equals,
  *   encloses or lies inside `absDir` (a partly chosen directory is chosen).
- * - `{ chosen: false, lock }` — the lock records the instance and none of its
+ * - `{ chosen: false, lock }` — the lock records the layer and none of its
  *   directories reaches `absDir`.
  */
 export function mountChoiceOf(instanceRoot: string, absDir: string): { chosen: boolean; lock: string } | undefined {

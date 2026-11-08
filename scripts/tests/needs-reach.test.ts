@@ -1,5 +1,5 @@
 /**
- * Bean `w1gy`: "below the harness" is every instance that does not reach the
+ * Bean `w1gy`: "below the harness" is every layer that does not reach the
  * harness through `needs`, whatever the harness itself names.
  *
  * @module scripts/tests/needs-reach.test

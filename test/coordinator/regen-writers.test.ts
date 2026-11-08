@@ -24,7 +24,7 @@
  * Moved here from `cat-harness/scripts/tests/regen-writers.test.ts` to the
  * checkout's own test home `test/` (bean `7zz1`, owner ruling 2026-10-06
  * "Top-level instance"): every test in it runs the checkout's real regen
- * writers, whose artefacts span instances (`bat:sync` wraps scripts in
+ * writers, whose artefacts span layers (`bat:sync` wraps scripts in
  * folio-assistant-sci and the root `.claude/`), which only the whole checkout
  * holds. Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. Paths are

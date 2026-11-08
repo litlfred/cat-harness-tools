@@ -3,9 +3,9 @@
  *
  * If A depends on B (directly or through a chain), nothing in B may reference
  * A: B is lower and must not know what sits on top of it.
- * `bootstrap-tools/schemas/graph.test.ts` enforces this for ONE instance
+ * `bootstrap-tools/schemas/graph.test.ts` enforces this for ONE layer
  * (`bootstrap/`); this module is the same invariant over every declared
- * instance.
+ * layer.
  *
  * ## One arrow — this does NOT recompute direction
  *
@@ -23,7 +23,7 @@
  * `undetermined` means the tool declined to judge — never clean. Two things
  * land there:
  *
- *   - an instance that declares no `needs` (absent is nobody-has-said, never
+ *   - a layer that declares no `needs` (absent is nobody-has-said, never
  *     "may reach nothing" and never "may reach anything"), which
  *     `allowedFromNeeds` already reports; and
  *   - a bare mention of a name that is ALSO the repository's name, with
@@ -31,14 +31,14 @@
  *
  * ## The repository-name collision, decided per occurrence
  *
- * An instance rooted AT the repository root shares its name with the
+ * A layer rooted AT the repository root shares its name with the
  * repository and the product, and every relative path resolves inside its
  * root, so the name alone cannot tell them apart. The occurrence usually can:
  * a URL is an address and `<owner>/<name>` is a repository slug. So
  * {@link NameCollision} is decided per OCCURRENCE:
  *
  *   - `"instance"` — the occurrence points INTO a directory the colliding
- *     instance declares, so it is a reference to the instance and is judged
+ *     layer declares, so it is a reference to the layer and is judged
  *     by the arrow like any other, `wrong-direction` included;
  *   - `"repository"` — it names the repository or the product address, and
  *     {@link ReferenceVerdict}'s `names-repository` says exactly that;
@@ -66,21 +66,21 @@ export interface ReferenceExemption {
   pattern?: RegExp;
   /** Matches the FILE the occurrence sits in, repo-relative. Omitted means any file. */
   file?: RegExp;
-  /** Why this is not a reference to the instance. Required. */
+  /** Why this is not a reference to the layer. Required. */
   reason: string;
-  /** Limit to one target instance; omitted means any. */
+  /** Limit to one target layer; omitted means any. */
   to?: string;
 }
 
-/** One bounded occurrence of an instance's name in a file. */
+/** One bounded occurrence of a layer's name in a file. */
 export interface Occurrence {
   file: string;
   line: number;
   /** The whole line, which is what an exemption matches against. */
   text: string;
-  /** The instance the FILE belongs to. */
+  /** The layer the FILE belongs to. */
   from: string;
-  /** The instance whose NAME was found. */
+  /** The layer whose NAME was found. */
   to: string;
 }
 
@@ -90,7 +90,7 @@ export type ReferenceVerdict =
   | { verdict: "wrong-direction"; basis: string }
   /**
    * The string found names the REPOSITORY (or its published address), not the
-   * instance that shares its name. A repository is not a layer, so no
+   * layer that shares its name. A repository is not a layer, so no
    * direction is owed — which is a different statement from `allowed` (a
    * reference that follows the arrow), from `exempt` (a reference the arrow
    * refuses, excused) and from `undetermined` (a question declined). It gets
@@ -116,9 +116,9 @@ export type NameCollision = "instance" | "repository" | "unknown";
  * Every bounded occurrence of `name` in `text`, as 1-based line numbers.
  *
  * **Bounded, which is not a detail.** A name may be a prefix of another
- * instance's name — `bootstrap` of `bootstrap-tools` — so a
- * substring scan counts one occurrence twice and attributes the second to an
- * instance that was never named. That is not hypothetical: the 2026-09-23
+ * layer's name — `bootstrap` of `bootstrap-tools` — so a
+ * substring scan counts one occurrence twice and attributes the second to a
+ * layer that was never named. That is not hypothetical: the 2026-09-23
  * measurement that opened this work reported 6,778 occurrences by substring
  * where the bounded count is 3,651, and the inflation was entirely this.
  *
@@ -147,7 +147,7 @@ export function occurrencesOf(text: string, name: string): { line: number; text:
  * It is consulted BEFORE the direction rule for the two answers that make the
  * direction question moot rather than answerable-then-excused — which is also
  * why neither is an exemption. `"instance"` falls THROUGH, so a genuine
- * reference to an instance whose name collides is judged by the arrow like
+ * reference to a layer whose name collides is judged by the arrow like
  * every other: it can be `wrong-direction`, `allowed` or `exempt`. The blanket
  * that preceded this could reach none of those three.
  *

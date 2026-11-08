@@ -3,7 +3,7 @@
  * check-process-bindings.ts — a process binds only skills it can reach.
  *
  * A process may bind only skills (and, through them, Tools) from its own
- * instance or from an instance it `needs`. It is `check:import-direction`'s
+ * layer or from a layer it `needs`. It is `check:import-direction`'s
  * rule applied to a SKILL a BPMN activity says implements a step. It uses the
  * same direction computation as `check:import-direction` and
  * `check:reference-direction` (`allowedFromNeeds` over `ancestorsOf`).
@@ -11,14 +11,14 @@
  * "exists somewhere", not "reachable from here".
  *
  * Each `<bootstrap.processes:skill ref>` on an activity, in every `.bpmn`
- * under a declared instance, is resolved against every instance's OWN skill
- * files (a skill belongs to the innermost instance root containing it):
+ * under a declared layer, is resolved against every layer's OWN skill
+ * files (a skill belongs to the innermost layer root containing it):
  *
  * - **allowed**: some holder of the skill is the process's instance or one it
  *   `needs`, transitively;
- * - **wrong-direction**: the skill exists, but only in instances the process
+ * - **wrong-direction**: the skill exists, but only in layers the process
  *   cannot reach. GRADED;
- * - **dangling**: no instance in this checkout holds it. That is
+ * - **dangling**: no layer in this checkout holds it. That is
  *   `check:workflow-refs`' finding, so it is counted here and never graded;
  * - **undetermined**: the process's instance declares no `needs` (absent is
  *   not `[]`), printed as COULD NOT DETERMINE.
@@ -76,7 +76,7 @@ export interface Binding {
   /** The ref as written — `name` or `package/name`, process id, or role id. */
   ref: string;
   fromInstance: string;
-  /** Instances that hold a target of that name. */
+  /** Layers that hold a target of that name. */
   holders: string[];
   verdict: BindingVerdict;
   kind?: BindingKind;
@@ -90,8 +90,8 @@ export const roleName = (ref: string): string => ref.replace(/^role:/, "");
 
 /**
  * Judge one binding. Pure, so the tests can plant violations without a
- * checkout. `allowed` is `allowedFromNeeds`' map: instance → itself plus
- * everything it needs, or absent when the instance declared no `needs`.
+ * checkout. `allowed` is `allowedFromNeeds`' map: layer → itself plus
+ * everything it needs, or absent when the layer declared no `needs`.
  */
 export function judgeBinding(
   b: { file: string; node: string; ref: string; fromInstance: string; kind?: BindingKind },
@@ -211,7 +211,7 @@ export function actorRoleRefs(actor: { id?: string; roles?: readonly string[] })
   return (actor.roles ?? []).map((ref) => ({ node: actor.id!, ref }));
 }
 
-/** skill name → the instances whose own skill files hold one of that name. */
+/** skill name → the layers whose own skill files hold one of that name. */
 function skillHolders(all: readonly Instance[]): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();
   const seen = new Set<string>();
@@ -248,7 +248,7 @@ interface RoleDocEntry {
   };
 }
 
-/** Read each instance's own `roles.json` and map role id → declaring instances. */
+/** Read each layer's own `roles.json` and map role id → declaring layers. */
 function readRoleDocs(all: readonly Instance[]): { docs: RoleDocEntry[]; holders: Map<string, Set<string>> } {
   const docs: RoleDocEntry[] = [];
   const holders = new Map<string, Set<string>>();
@@ -299,7 +299,7 @@ export function analyse(repoRoot = REPO_ROOT): Binding[] {
   const { docs: roleDocs, holders: roles } = readRoleDocs(all);
 
   // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
-  // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
+  // layer is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
   // by the index repository's git, so `ls-files` at the root lists none of
   // their files. `gitCorpus` counts a mount's files as it counted a
   // submodule's, and is tracked-plus-untracked exactly as before elsewhere.

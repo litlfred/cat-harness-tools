@@ -195,7 +195,7 @@ test.describe("opening projects a window", () => {
     // Driven from the KEYBOARD, because by now a window is painted over the
     // first avatar and moving one is `le8b`'s, not this unit's. Focus does not
     // care what is on top, which is exactly why the keyboard path has to work
-    // — and it is the path this instance's low-dexterity profile relies on.
+    // — and it is the path this layer's low-dexterity profile relies on.
     await first.focus();
     await p.keyboard.press("Enter");
     await expect(p.locator(".fa-board-window")).toHaveCount(2);

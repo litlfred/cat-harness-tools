@@ -14,9 +14,9 @@
  *
  * **The join, over a fixture.** Which node lands in which of the three
  * evidence states is the one piece of logic in the generator, and it is keyed
- * by node PATH rather than by name — two instances may adopt methods with
+ * by node PATH rather than by name — two layers may adopt methods with
  * names one letter apart (`raci`, `rasci` already do), and a name-keyed join
- * would attribute one instance's evidence to another's node without saying so.
+ * would attribute one layer's evidence to another's node without saying so.
  *
  * **The consumer property, over the real corpus.** `check:artefact-verification`
  * asks what verifies a generated artefact FOR ITS CONSUMER, as against merely
@@ -29,7 +29,7 @@
  * @module scripts/tests/methodologies-viz.test
  *
  * The tests of this file that read the whole checkout (reads the methodology
- * graphs of the content instances, smart-base's among them) live in
+ * graphs of the content layers, smart-base's among them) live in
  * `test/methodologies-viz-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
@@ -124,7 +124,7 @@ describe("the three evidence states are three, and stay apart", () => {
 
 describe("the join is keyed by node path, not by name", () => {
   it("two instances adopting the same name do not share a verdict", () => {
-    // The failure this pins: a name-keyed join makes one instance's missing
+    // The failure this pins: a name-keyed join makes one layer's missing
     // source into the other's, silently, and the page then says a method rests
     // on a document that was never ingested for it.
     const nodes = [

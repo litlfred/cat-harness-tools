@@ -108,7 +108,7 @@ describe("the survey's three states", () => {
    * A scratch repo with a workflows directory and a `processes/` graph.
    *
    * Every call below passes the root TWICE — as the repository root and as the
-   * instance root — because in this checkout they differ: `.github/workflows/`
+   * layer root — because in this checkout they differ: `.github/workflows/`
    * is at the repository root and the diagrams are under `cat-harness/`. A
    * first version of both the tool and these tests conflated them, and the
    * tests could not catch it, because a scratch repo puts both at one path.

@@ -82,7 +82,7 @@ export interface GutsFile {
  * generator that keeps working after the directory moves, over nothing.
  */
 export function gutsDir(repo = REPO): string | undefined {
-  // The shared resolution (bean 9c7h): the checkout's root instance declares
+  // The shared resolution (bean 9c7h): the checkout's root layer declares
   // it since placement PR0a, and `fshGutsDirectories` reads cat-harness's own
   // declaration after it, as this function did. More than one declared
   // trashcan is no single answer, so it is `undefined`, never "the first".
@@ -93,7 +93,7 @@ export function gutsDir(repo = REPO): string | undefined {
   }
 }
 
-/** The declarations that may hold the trashcan: the checkout's root instance, then the platform. */
+/** The declarations that may hold the trashcan: the checkout's root layer, then the platform. */
 export function pageRelPath(repo = REPO): string | undefined {
   try {
     const cat = existsSync(join(repo, "cat-harness")) ? join(repo, "cat-harness") : repo;
@@ -170,7 +170,7 @@ export function gutsFiles(dir: string, repo = REPO): GutsFile[] {
   const rels = trackedRels(dir, repo);
   // Only a file that can CARRY a node is opened: markdown front matter or a
   // top-level JSON `$schema` (`readFshGutsNode`). Since the separation the
-  // trashcan holds each separated instance's in-tree copy as a `.tar.gz`
+  // trashcan holds each separated layer's in-tree copy as a `.tar.gz`
   // (272 MB with the uploaded PDFs), and decoding every byte of it to search
   // for the tag took ~6 s a run — past the 5 s budget of the test that runs
   // this writer. Same rule as `titleOf` above, for the same reason.
@@ -323,7 +323,7 @@ export function page(files: GutsFile[], blobBase: string): string {
  * check reports clean.
  *
  * `docsLayers()` rather than `siteDirFor()`, and the difference bit once
- * already: `siteDirFor` answers RELATIVE TO AN INSTANCE (`"docs"`), so
+ * already: `siteDirFor` answers RELATIVE TO A LAYER (`"docs"`), so
  * `join(repo, siteDirFor(...))` resolves to the repository's OVERLAY layer
  * rather than to `cat-harness`'s base. `docsLayers` reads both from the
  * declaration and marks which is which, so asking it is the one answer —

@@ -2,8 +2,8 @@
  * **Deployment descriptions**: which declared actors run where, in one
  * deployment.
  *
- * 1. Descriptions live in a `deployments/` folder, several per instance (one
- *    instance may run as cloud agent sessions and on a workstation).
+ * 1. Descriptions live in a `deployments/` folder, several per layer (one
+ *    layer may run as cloud agent sessions and on a workstation).
  * 2. Jurisdiction is four optional fields.
  * 3. The resolver only reports, and never fails. The checks here are about a
  *    description being well formed, not about whether every task can be run.
@@ -143,7 +143,7 @@ export interface Jurisdiction {
   residency?: string;
 }
 
-/** One deployment of an instance. */
+/** One deployment of a layer. */
 export interface DeploymentDescription {
   id: string;
   title?: string;

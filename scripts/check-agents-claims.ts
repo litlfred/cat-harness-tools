@@ -4,7 +4,7 @@
  *
  * @module scripts/check-agents-claims
  * @covers code — its subject is the CODE a prose claim asserts about — the symbols and paths it
- *   names. The `AGENTS.md` it reads is this instance's declared `agent-instructions` asset
+ *   names. The `AGENTS.md` it reads is this layer's declared `agent-instructions` asset
  *
  * `check:agents-xref` verifies citations INTO `AGENTS.md`,
  * `check:agent-entry-links` verifies links OUT of it; this reads what the
@@ -42,14 +42,14 @@ const HERE = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(HERE);
 
 /**
- * The file whose claims are checked: THIS instance's declared
+ * The file whose claims are checked: THIS layer's declared
  * `agent-instructions`.
  *
  * It was the checkout root's `AGENTS.md` until 2026-10-09. The root of an
- * index checkout declares no instance, and its `AGENTS.md` became a RENDERED
- * file (`scripts/index-render.ts`) — an index of the instances, carrying no
+ * index checkout declares no layer, and its `AGENTS.md` became a RENDERED
+ * file (`scripts/index-render.ts`) — an index of the layers, carrying no
  * claim about code. The pointers it held, claims included, moved to this
- * instance's own `AGENTS.md`, so that is where they are checked; and it works
+ * layer's own `AGENTS.md`, so that is where they are checked; and it works
  * the same in a checkout of this layer standing alone, where there is no root
  * file to read.
  */
@@ -59,7 +59,7 @@ export function agentsFile(instanceRoot: string = HERE): string {
 
 /**
  * Roots a cited module path may be written relative to: the checkout, this
- * instance, and this instance's `src/`. The instance is located rather than
+ * layer, and this layer's `src/`. The layer is located rather than
  * spelled — it was the literal `cat-harness`, which named nothing in a clone
  * of this layer under any other directory name.
  */

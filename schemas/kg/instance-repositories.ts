@@ -1,14 +1,14 @@
 /**
  * The `owner/repo ↔ instance` map — DERIVED, never kept by hand.
  *
- * Instance references are `owner/repo` everywhere, keyed by each instance's
+ * Layer references are `owner/repo` everywhere, keyed by each layer's
  * PLANNED repository. Each declaration says what it is (`repository`) and,
  * pre-split, where it sits today (`livesAt`); this module reads those over a
  * checkout and over the folio's dependency overlay and answers the lookups.
  *
  * Every entry keeps `name` alongside `repository` because the name is still
  * what `needs` edges, filenames and `declaredBy` resolve against; the
- * repository is the identity a reference outside the instance uses.
+ * repository is the identity a reference outside the layer uses.
  *
  * @module schemas/instance-repositories
  * @graphNode schema
@@ -28,7 +28,7 @@ export interface InstanceRepository {
   repository: RepoFullName;
   /** Where it sits today, when not at the root of `repository`. */
   livesAt?: InstanceLocation;
-  /** Absolute path of the instance root in this checkout or overlay. */
+  /** Absolute path of the layer root in this checkout or overlay. */
   root: string;
   /** The vocabulary namespace its terms are minted under — {@link instanceNamespace}. */
   namespace: string;
@@ -43,10 +43,10 @@ export interface InstanceRepositoryMap {
 }
 
 /**
- * Build the map from every instance under `checkoutRoot` plus, when
- * `folioRoot` is given, every instance its dependency overlay reaches.
+ * Build the map from every layer under `checkoutRoot` plus, when
+ * `folioRoot` is given, every layer its dependency overlay reaches.
  *
- * Throws when two instances claim one repository or one name, since either
+ * Throws when two layers claim one repository or one name, since either
  * makes a reference resolve to whichever was read first.
  */
 export function instanceRepositories(checkoutRoot: string, folioRoot?: string): InstanceRepositoryMap {
@@ -89,10 +89,10 @@ export function instanceRepositories(checkoutRoot: string, folioRoot?: string): 
 }
 
 /**
- * The namespace an instance's terms are minted under — ONE rule, so the
+ * The namespace a layer's terms are minted under — ONE rule, so the
  * glossary, the vocabulary and the `owner/repo → IRI` map cannot disagree.
  *
- * An instance that declares an `iriBase` mints under its own release,
+ * A layer that declares an `iriBase` mints under its own release,
  * `<iriBase>v<major>/ns/` (`release-iri.ts`). One that declares none mints
  * under the platform's site, `<stem><stub>/ns/`. Owner, 2026-09-30: the map
  * is "dynamic generated based on overlays", which is why it is read from each
@@ -111,7 +111,7 @@ export function repositoryNamespaces(checkoutRoot: string, folioRoot?: string): 
 }
 
 /**
- * Resolve an instance reference. `owner/repo` is the form references take;
+ * Resolve a layer reference. `owner/repo` is the form references take;
  * a bare name is accepted while the references are converted (bean `6rmv`
  * phase 2) and will be refused once none remain.
  */
@@ -120,19 +120,19 @@ export function resolveInstance(map: InstanceRepositoryMap, ref: string): Instan
 }
 
 /**
- * Where `livesAt` says an instance is, checked against where it was found:
+ * Where `livesAt` says a layer is, checked against where it was found:
  * the directory relative to the host checkout. `undefined` when they agree.
- * An instance with no `livesAt` must sit at the checkout root itself.
+ * A layer with no `livesAt` must sit at the checkout root itself.
  */
 export function locationMismatch(entry: InstanceRepository, checkoutRoot: string): string | undefined {
-  // An instance that is its OWN repository — a submodule, like bootstrap and
+  // A layer that is its OWN repository — a submodule, like bootstrap and
   // bootstrap-tools since 2026-09-30 (bean `xsqm`) — sits at that repository's
   // root, which is exactly what an absent `livesAt` says.
   if (entry.livesAt === undefined && ownWorkTreeRoot(entry.root)) return undefined;
   // ...and so does one a REMOTE MOUNT laid down (the submodule's successor,
   // bean `nn8e`, #2462): no `.git` of its own, but a lock that put it there.
-  // WITH a `livesAt` too: a mounted instance's `livesAt` describes where it
-  // sits in its OWN repository (an IG instance at a subdirectory of
+  // WITH a `livesAt` too: a mounted layer's `livesAt` describes where it
+  // sits in its OWN repository (an IG layer at a subdirectory of
   // its own repository), while where it sits HERE is the lock's to say.
   // Comparing the two failed every correct post-split declaration, and passed
   // only the stale ones that still named the monorepo (measured 2026-10-09).

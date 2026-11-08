@@ -1,12 +1,12 @@
 /**
- * A requirement's `derivedFrom` resolves against this instance AND everything
+ * A requirement's `derivedFrom` resolves against this layer AND everything
  * it `needs` — the rule `resolution-across-needs.test.ts` pins for skills and
  * roles, one node kind over (bean `w1gy`, owner option A, 2026-10-30).
  *
  * ## The defect this pins
  *
  * `requirement-derived-from-resolves` checked each `derivedFrom` against the
- * audited instance's OWN requirements only. fhir-harness#233 moved
+ * audited layer's OWN requirements only. fhir-harness#233 moved
  * `skills/requirements/fhir-validation.json` into fhir-harness, and it derives
  * from `req:content-lifecycle`, which cat-harness — four layers down its
  * `needs` — declares. Measured on `kg:audit --instance ./fhir-harness` before
@@ -35,7 +35,7 @@ type Criterion = { result?: string; findings?: { where?: string; detail?: string
 
 let dir: string;
 
-/** A minimal instance declaration, with `needs` given. */
+/** A minimal layer declaration, with `needs` given. */
 function instance(name: string, needs: string[], requirements: Record<string, string[]>): void {
   const root = join(dir, name);
   mkdirSync(join(root, "skills", "requirements"), { recursive: true });

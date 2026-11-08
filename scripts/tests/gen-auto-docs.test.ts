@@ -247,7 +247,7 @@ describe("a THEMED page, so the layout gives it the top band (2026-10-07)", () =
 });
 
 describe("what is published", () => {
-  // who-iris is a higher instance; standing alone it contributes nothing to render.
+  // who-iris is a higher layer; standing alone it contributes nothing to render.
   it.skipIf(notApplicableAlone("who-iris, whose one skill (iris-dspace) is the sparse sub-graph this page renders"))("a sub-graph page exists for who-iris, the sparse case", () => {
     // The owner asked for the handler to be exercised on who-iris, which
     // contributes ONE skill. A thin index is a real answer; the test is that

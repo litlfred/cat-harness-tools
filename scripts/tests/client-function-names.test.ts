@@ -24,7 +24,7 @@
  * ONE consequence of one collision. The next duplicate will be a different
  * pair of features, and the test that would catch it is the one nobody wrote
  * — which is exactly the `hfkl` reading: a checker naming one instance states
- * a rule true only for the instance somebody remembered.
+ * a rule true only for the layer somebody remembered.
  *
  * A collision is also the hardest kind of merge result to see in review. Both
  * halves of the diff look right, and the defect is in neither of them.

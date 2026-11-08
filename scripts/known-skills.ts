@@ -15,7 +15,7 @@ import { checkoutRootFor, directoriesForGraph, resolveDirectories, repoRootFor, 
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
- * The instance this module belongs to — the one that owns the repository-level
+ * The layer this module belongs to — the one that owns the repository-level
  * agent configuration under `.claude/`.
  *
  * Derived from the module's own path and never written down: the same device
@@ -29,10 +29,10 @@ const OWN_INSTANCE = resolve(HARNESS_ROOT);
  * Which directories a known-skills question is asked over (placement PR0a,
  * bean `ejye`).
  *
- * - `"instance"` — the instance at `root` alone, through its own declaration.
+ * - `"instance"` — the layer at `root` alone, through its own declaration.
  *   Since PR0 this sees nothing above it: cat-harness no longer declares its
  *   dependents' directories.
- * - `"checkout"` — `root` and every instance the checkout stacks ON it
+ * - `"checkout"` — `root` and every layer the checkout stacks ON it
  *   (`checkoutDirectories` with `stackedOn`), which is what a CORPUS-WIDE
  *   tool shipped by `root` asks. Its own dependencies are not added: callers
  *   that resolve downward already walk `orderedDependencies`. Paths are still
@@ -51,9 +51,9 @@ export type CorpusScope = "instance" | "checkout";
 
 /**
  * The scope a platform tool asks over when it is pointed at `root`: the
- * CHECKOUT when `root` is the platform instance that ships these tools — the
+ * CHECKOUT when `root` is the platform layer that ships these tools — the
  * corpus-wide run, which is what the mirrors made every such run — and the
- * instance alone otherwise (`kg-audit --instance core` audits core, not core
+ * layer alone otherwise (`kg-audit --instance core` audits core, not core
  * and everything stacked on it). This is the pre-PR0 behaviour stated as a
  * rule instead of produced by a declaration, which is the whole of PR0a for a
  * known-skills caller.
@@ -131,9 +131,9 @@ function holdsMarkdown(abs: string): boolean {
 }
 
 /**
- * The instance's declared `cat-harness` directories, or nothing it cannot read.
+ * The layer's declared `cat-harness` directories, or nothing it cannot read.
  *
- * A declaration that will not parse is the instance's problem to fix, not this
+ * A declaration that will not parse is the layer's problem to fix, not this
  * function's to guess around — but skill discovery must not crash a tool that
  * had nothing to do with the declaration, so an unreadable one yields an empty
  * list and the explicit extras below still resolve.
@@ -210,7 +210,7 @@ export function declaredKgDirectories(
 }
 
 /**
- * Every directory the instance declares as holding ONLY its knowledge graph.
+ * Every directory the layer declares as holding ONLY its knowledge graph.
  *
  * Absolute paths. This is the answer to `join(root, "skills")` — the literal
  * `check:declared-paths` found in a dozen consumers, each of which a topical
@@ -230,7 +230,7 @@ export function declaredKgDirectories(
  * READMEs. See {@link kgDirectories} for the measurement that established it.
  */
 /**
- * This instance's role graph, found across EVERY declared graph root.
+ * This layer's role graph, found across EVERY declared graph root.
  *
  * Callers wrote `readRoleGraph(kgRoots(root)[0])`, which worked only while the
  * roles lived under the first root returned. Since 2026-09-21 they are in
@@ -244,8 +244,8 @@ export function declaredKgDirectories(
  */
 export function roleGraphFor(root: string, scope: CorpusScope = corpusScopeFor(root)): RoleGraph | undefined {
   // NOT `kgRoots(root, "checkout")`: that is deepest-first, so its first role
-  // graph is bootstrap's 4 roles rather than this instance's 48 — the `[0]`
-  // hazard above, one level out. The checkout's answer is this instance's
+  // graph is bootstrap's 4 roles rather than this layer's 48 — the `[0]`
+  // hazard above, one level out. The checkout's answer is this layer's
   // own graph with its DEPENDENTS' extensions overlaid by id (placement PR0b).
   let own: RoleGraph | undefined;
   for (const r of kgRoots(root)) {
@@ -262,21 +262,21 @@ export function kgRoots(root: string, scope: CorpusScope = corpusScopeFor(root))
 /**
  * Knowledge-graph roots this audit may write sidecars for.
  *
- * **Every root the instance DECLARES, minus the ones belonging to another
- * instance** — bean `lps0`. This walked the literal
+ * **Every root the layer DECLARES, minus the ones belonging to another
+ * layer** — bean `lps0`. This walked the literal
  * `KG_ROOT = join(root, "skills")`, so a skill in a topical directory was not
  * audited AND not reported as unaudited: the `dh4f` shape inside the tool
  * whose job is finding that shape. Measured when it was fixed — 219 skills
  * under the literal, 229 under the declaration, and the 10 in the gap had
  * never been audited at all.
  *
- * ## Another instance's roots are excluded, and that is not this function's
+ * ## Another layer's roots are excluded, and that is not this function's
  * ## judgement to make
  *
  * `kgRoots` resolves a DEPENDENCY's directories too, so it returns paths like
  * `../bootstrap/skills`. Walking them is forbidden by
  * `instance-graph-isolation.test.ts`, which guards a live 2026-09-19 leak of
- * 88 references: one instance's graph must not carry another's nodes.
+ * 88 references: one layer's graph must not carry another's nodes.
  * `unreadNestedInstances` states the same rule in its own finding text — *"do
  * NOT declare its directories here"*.
  *
@@ -289,7 +289,7 @@ export function kgRoots(root: string, scope: CorpusScope = corpusScopeFor(root))
  *
  * **The exclusion is not silent, and it needs nothing added here.** The
  * `nested-instance-audited` criterion already names every unread nested
- * instance and counts what it holds — added by bean `sa8y` for exactly this
+ * layer and counts what it holds — added by bean `sa8y` for exactly this
  * invisibility. A second report from this function would be a second answer to
  * one question, free to disagree with the first.
  */
@@ -297,12 +297,12 @@ export function ownKgRoots(root: string): string[] {
   const here = resolve(root);
   const kept = kgRoots(root).filter((r) => {
     const rel = relative(here, resolve(r));
-    // `rel === ""` is the instance root itself, which would walk everything
+    // `rel === ""` is the layer root itself, which would walk everything
     // including its own results tree.
     return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
   });
   // DEDUPLICATED. `resolveDirectories` supplies the conventional defaults
-  // alongside the declaration, so an instance that ALSO declares `skills/`
+  // alongside the declaration, so a layer that ALSO declares `skills/`
   // gets it twice — measured on a fixture declaring it explicitly. Harmless to
   // a caller that dedupes its own output and wasteful to one that does not,
   // and a caller cannot tell the two apart from the list alone.
@@ -443,7 +443,7 @@ export function isSkillMd(path: string): boolean {
 export function skillMdDirs(root: string, scope: CorpusScope = corpusScopeFor(root)): string[][] {
   const dirs: string[][] = [];
 
-  // Every directory the instance DECLARES as holding a `cat-harness` graph —
+  // Every directory the layer DECLARES as holding a `cat-harness` graph —
   // not the literal `skills/`.
   //
   // This is what lets a topical directory (`bootstrap/`, `crdm/`, …) cost a
@@ -452,14 +452,14 @@ export function skillMdDirs(root: string, scope: CorpusScope = corpusScopeFor(ro
   // describe it: `harness.json` said where the knowledge graph lives and
   // this function did not read it.
   //
-  // `resolveDirectories` supplies the defaults too, so an instance that
+  // `resolveDirectories` supplies the defaults too, so a layer that
   // follows the convention still resolves `skills/` without declaring it.
   for (const d of kgDirectories(root, scope)) {
     // RELATIVE TO `root`, computed from the absPath the resolver already
     // produced — not from `d.path`, which is relative to whatever root the
     // entry's SCOPE names. Those were the same directory until the move (bean
     // `wggr`); afterwards `bootstrap/skills/` is repository-scoped, so `d.path`
-    // said `bootstrap/skills` while `root` was the instance, and every caller
+    // said `bootstrap/skills` while `root` was the layer, and every caller
     // resolved `<instance>/bootstrap/skills`. kg-export's `collectSkills`
     // skips a directory that is not there as "a package this instance does not
     // carry", so bootstrap's skills left the published graph IN SILENCE —
@@ -502,17 +502,17 @@ export function skillMdDirs(root: string, scope: CorpusScope = corpusScopeFor(ro
   // exists today), and now impossible: the exporter reads this function.
   //
   // `checkoutRootFor` (bean `g43f`): `repoRootFor` is `dirname`, so for the
-  // root instance this read `.claude/worktrees/.claude/skills` in a worktree
+  // root layer this read `.claude/worktrees/.claude/skills` in a worktree
   // and `/home/user/.claude/skills` in the main checkout — outside the
-  // checkout. The root instance now reads the checkout's own `.claude/skills`
+  // checkout. The root layer now reads the checkout's own `.claude/skills`
   // (owner, 2026-10-04: "do g43f"), which is the same directory a nested
-  // instance already reached through `repoRootFor`.
+  // layer already reached through `repoRootFor`.
   //
   // `SKILL.md` does not make a group. It is Claude Code's loader stub
   // (`.claude/skills/<name>/SKILL.md`), a trigger pointing at the corpus
   // skill, so a group holding only that is not a group of skills — counted,
   // it published a skill literally named `SKILL` (measured 2026-10-03: the
-  // root instance went 0 -> 4 names with it, 0 -> 3 without).
+  // root layer went 0 -> 4 names with it, 0 -> 3 without).
   const checkout = checkoutRootFor(root);
   const localRoot = join(checkout, ".claude", "skills");
   if (existsSync(localRoot)) {
@@ -554,11 +554,11 @@ export function skillMdFile(root: string, name: string, scope: CorpusScope = cor
 }
 
 /**
- * Skills a **declared remote package** supplies, which this instance does not hold.
+ * Skills a **declared remote package** supplies, which this layer does not hold.
  *
  * Two questions, and they must not be collapsed:
  *
- *  - **can this instance SERVE it** — {@link knownSkills}. A remote skill is
+ *  - **can this layer SERVE it** — {@link knownSkills}. A remote skill is
  *    `false` here: its body is in another repository, so `skill_fetch` cannot
  *    answer for it and an activity naming it is a real dangling reference.
  *  - **is this entry a real skill SOMEWHERE** — this function, unioned with
@@ -616,9 +616,9 @@ export interface RemoteDeclaration {
 export function remotePackageDeclarations(root: string): RemoteDeclaration[] {
   const out: RemoteDeclaration[] = [];
   // EVERY declared skills root, not `kgRoots(root)[0]`: a wrapper sits with
-  // the instance whose skills use it — sci holds `claude-scientific-skills`,
+  // the layer whose skills use it — sci holds `claude-scientific-skills`,
   // the FHIR IG harness `smarter-fhir` (placement PR1, bean `ybwt`) — and from the
-  // checkout the first root is the deepest instance's, which holds none.
+  // checkout the first root is the deepest layer's, which holds none.
   const dirs = [...new Set(kgRoots(root).map((d) => resolve(d, "remote-packages")))].filter((d) => existsSync(d));
   for (const dir of dirs) for (const f of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
     try {
@@ -761,7 +761,7 @@ export function unpublishedSkills(root: string, scope: CorpusScope = corpusScope
   return out;
 }
 
-/** Every skill name this instance can resolve. */
+/** Every skill name this layer can resolve. */
 export function knownSkills(root: string, scope: CorpusScope = corpusScopeFor(root)): Set<string> {
   const names = new Set<string>();
 
@@ -803,8 +803,8 @@ export function knownSkills(root: string, scope: CorpusScope = corpusScopeFor(ro
   // Only `.json` here: the `.md` files come through `skillMdDirs()` above, so
   // the deny-list is applied in ONE place rather than two that can disagree.
   //
-  // AND IT IS READ FOR ONE INSTANCE ONLY. `repoRootFor` here is the REPOSITORY,
-  // so without this guard every nested instance inherited the repository's
+  // AND IT IS READ FOR ONE LAYER ONLY. `repoRootFor` here is the REPOSITORY,
+  // so without this guard every nested layer inherited the repository's
   // agent-level skills as its own. Measured 2026-09-27:
   //
   //     knownSkills("./bootstrap")   30, of which 23 came from .claude/skills/local/
@@ -847,7 +847,7 @@ export function knownSkills(root: string, scope: CorpusScope = corpusScopeFor(ro
 }
 
 /**
- * Where this instance's BPMN and DMN live, read from the declaration.
+ * Where this layer's BPMN and DMN live, read from the declaration.
  *
  * ## The literal this replaces
  *
@@ -893,12 +893,12 @@ export function workflowDirs(root: string, scope: CorpusScope = corpusScopeFor(r
     // `.bpmn` files would otherwise reach the engine through `holdsDiagrams`
     // below, and every engine gate would grade a DAK's diagrams as workflows.
     if (d.graphTypologies?.includes("business-processes")) continue;
-    // `processes/`, the convention since 2026-09-21. An instance that has not
+    // `processes/`, the convention since 2026-09-21. A layer that has not
     // migrated declares its diagrams directly and is reached by the second
     // branch below, so no legacy name is needed here.
     // declared-path-literal: the convention fallback, at the call site. This
     // walks a DEPENDENCY's directory, so the local declaration cannot answer
-    // for it — the second branch below is what catches an instance that
+    // for it — the second branch below is what catches a layer that
     // declares its diagrams directly instead.
     const wf = joinPath(d.absPath, "processes");
     if (existsSync(wf)) out.push(wf);
@@ -922,7 +922,7 @@ export function workflowDirs(root: string, scope: CorpusScope = corpusScopeFor(r
 }
 
 /**
- * Every `.bpmn` and `.dmn` this instance declares, as absolute paths.
+ * Every `.bpmn` and `.dmn` this layer declares, as absolute paths.
  *
  * One call for the common case, so a caller that only wants the files does not
  * have to re-derive "and their `decisions/` subdirectory too".
@@ -985,7 +985,7 @@ export function businessProcessFiles(root: string, opts: { folio?: boolean } = {
  * One declared diagram by FILE NAME (`getting-started.bpmn`,
  * `draft-qa-gate.dmn`), wherever its owner placed it.
  *
- * Placement PR3 (bean `63wl`) grouped every instance's diagrams by concern and
+ * Placement PR3 (bean `63wl`) grouped every layer's diagrams by concern and
  * moved the content-type ones up to their owners, so a path composed as
  * `<instance>/processes/<name>` stopped being a fact about the diagram. A
  * name is: `workflowFiles` already walks every declared `processes` graph in
@@ -1028,7 +1028,7 @@ export function skillIndex(root: string, scope: CorpusScope = corpusScopeFor(roo
 }
 
 /**
- * {@link skillIndex} over this instance AND everything it `needs`.
+ * {@link skillIndex} over this layer AND everything it `needs`.
  *
  * Resolution follows `needs` downward — the rule `kg-audit.ts` applies to
  * `<skill ref>` (`resolvableSkills`) and `check-tools.ts` to `satisfies`

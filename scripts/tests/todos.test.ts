@@ -9,7 +9,7 @@
  * nothing and reports a clean run over it.
  *
  * The tests here that read the aggregate repository's own root (the
- * root-declared `todos/` and `beans/` graphs, and the processes every instance
+ * root-declared `todos/` and `beans/` graphs, and the processes every layer
  * stacks) live in `test/todos-repo-root.test.ts`
  * (bean `ho66`): standing alone, cat-harness has no such root to read.
  */

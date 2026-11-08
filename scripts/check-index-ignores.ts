@@ -4,11 +4,11 @@
  * names — the generated index-mounts block agrees with the index.
  *
  * @module scripts/check-index-ignores
- * @covers cat-harness — the instance axis: every remote instance index.config.json declares is ignored by the committed .gitignore block generated from it
+ * @covers cat-harness — the instance axis: every remote layer index.config.json declares is ignored by the committed .gitignore block generated from it
  *
  * The root `.gitignore` carries a marked block,
  * `# BEGIN index mounts (generated from index.config.json — do not edit)` …
- * `# END index mounts`, one `/<path>/` per remote instance (its
+ * `# END index mounts`, one `/<path>/` per remote layer (its
  * `overrides.<name>.path`, else `<name>/`). `mount:remote`,
  * `writeDeclaredMounts` and `index-config:migrate --write` write it; this
  * fails when it is missing or disagrees.

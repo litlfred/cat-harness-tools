@@ -51,7 +51,7 @@ const STUB = artefactStubFor(join(HARNESS_ROOT));
 // than a stand-in that could agree with the test and disagree with what ships.
 //
 // The viewer lives at `_kg/<stub>/index.html` reading `../<stub>/<stub>.jsonld`
-// (the document's site path, under its instance's own directory since #603
+// (the document's site path, under its layer's own directory since #603
 // decision 1b) — mirroring the published layout, where
 // `<base>/<stub>/` is the directory that makes the extensionless
 // `<base>/<stub>` a page Pages can serve. Driving the real relative path is
@@ -305,7 +305,7 @@ test.describe("kg viewer", () => {
     //
     // The path is `../<stub>/<stub>.jsonld`, not a bare sibling name: the
     // page climbs to the site root and descends the document's own path,
-    // which is under the instance's directory since #603 decision 1b. That layout changed under this branch, and these two tests
+    // which is under the layer's directory since #603 decision 1b. That layout changed under this branch, and these two tests
     // kept passing locally against a STALE `_kg/` while failing in CI — which
     // is the same class of defect as the one this PR fixes in `qa-panel`, so it
     // is worth saying out loud: `_kg/` is gitignored build output, and a suite
@@ -466,7 +466,7 @@ test.describe("kg viewer", () => {
   });
 
   test("the disabled switcher's targets clear 24px, and a tap opens the reason", async ({ page }) => {
-    // SC 2.5.8's floor is 24px; this instance's interaction profile is
+    // SC 2.5.8's floor is 24px; this layer's interaction profile is
     // low-dexterity, so the switcher keeps the facets' 32px.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(PAGE);

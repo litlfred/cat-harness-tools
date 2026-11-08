@@ -50,7 +50,7 @@ describe("classifyRef", () => {
 });
 
 /**
- * An instance tree with a declaration and an optional folio config.
+ * A layer tree with a declaration and an optional folio config.
  *
  * **The config goes through `writeInstanceConfig`, not a literal filename.**
  * It wrote `harness.config.json` until 2026-09-21, matching a literal that
@@ -128,7 +128,7 @@ describe("carrier 2 — asset sources", () => {
   it("this repository names no asset source now, and the carrier SAYS so rather than reading clean", () => {
     // Until 2026-10-08 the real case was the root's `agent-instructions`,
     // naming bootstrap's file with no ref. The root stopped declaring any
-    // instance, and its AGENTS.md is RENDERED (owner, 2026-10-09, option a):
+    // layer, and its AGENTS.md is RENDERED (owner, 2026-10-09, option a):
     // the renderer quotes bootstrap's file from the mount `index.lock.json`
     // pins, so the reference is pinned by the lock rather than carried as an
     // unpinned `source`. The fixture above keeps the finding itself honest;

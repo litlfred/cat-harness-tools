@@ -38,7 +38,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 // declared knowledge-graph directory, so there is no declaration to read it
 // from — the same literal `kg-audit.ts` uses. It arrived from main as
 // `process.cwd()`, which was a claim about where a gate happened to be invoked
-// and was true only while the instance and the repository were one directory.
+// and was true only while the layer and the repository were one directory.
 // Here it named `cat-harness/.claude/`, and `readActors` over a directory that
 // is not there returns `[]` — so the check reported "EXAMINED NOTHING" over 27
 // actors that were sitting one level up.
@@ -59,7 +59,7 @@ export function buildReport(actorDir: string, instanceRoot: string): ReachReport
   const deployment = decl?.topology?.network;
   // The checkout's registry: the platform's actors plus a dependent's
   // extension or new actor (placement PR0b). Identical while none exists.
-  // Overlaid on the instance that HOLDS the registry, which is the platform.
+  // Overlaid on the layer that HOLDS the registry, which is the platform.
   const actors = checkoutActors(findInstanceRoot(actorDir) ?? instanceRoot, actorDir);
   const declared: ReachReport["declared"] = [];
   const undeclared: ReachReport["undeclared"] = [];

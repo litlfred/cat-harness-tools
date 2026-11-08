@@ -16,9 +16,9 @@
  * not indexed twice. A node with no upstream URL is refused rather than
  * indexed with an empty link.
  *
- * Which corpora are indexed is read off the checkout: every instance that
+ * Which corpora are indexed is read off the checkout: every layer that
  * declares a directory with id `id-lookup` hosts one, written THERE, and its
- * catalogue is found through the same instance's declaration — never a literal
+ * catalogue is found through the same layer's declaration — never a literal
  * path or a name. An empty selection is refused.
  *
  * ## `--check`
@@ -31,7 +31,7 @@
  * Usage:
  *   bun run cat id-lookup                    # write every hosted index (one library's `id-lookup` directory today)
  *   bun run cat id-lookup:check              # fail if any is stale
- *   bun run cat id-lookup -- --source <name> # one instance's only
+ *   bun run cat id-lookup -- --source <name> # one layer's only
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -43,11 +43,11 @@ const TOOLS = resolve(import.meta.dir, "..");
 const REPO = resolve(TOOLS, "..");
 
 /**
- * The declared id an instance gives the directory that HOSTS its generated
- * lookup (D3: an instance hosts its own generated outputs; bean `j7ql`).
+ * The declared id a layer gives the directory that HOSTS its generated
+ * lookup (D3: a layer hosts its own generated outputs; bean `j7ql`).
  *
- * Found by id rather than by instance name, so this generator names no corpus:
- * it named the IRIS replica's instance as a constant until 2026-10-01, which was an upward
+ * Found by id rather than by layer name, so this generator names no corpus:
+ * it named the IRIS replica's layer as a constant until 2026-10-01, which was an upward
  * name from the layer below every catalogue. Overrides match on id, never on
  * path, so an id is the stable handle a relocation keeps.
  */
@@ -58,7 +58,7 @@ function dirsOf(source: string): ReturnType<typeof checkoutDirectories> {
   return checkoutDirectories(REPO).filter((d) => d.declaredBy === source);
 }
 
-/** Every instance in the checkout that hosts an identifier lookup, sorted. */
+/** Every layer in the checkout that hosts an identifier lookup, sorted. */
 export function indexedSources(): string[] {
   return [...new Set(checkoutDirectories(REPO).filter((d) => d.id === ID_LOOKUP_DIR_ID).map((d) => d.declaredBy))].sort();
 }
@@ -79,14 +79,14 @@ export function defaultSource(): string {
   return all[0]!;
 }
 
-/** Where the index for `source` is written: that instance's declared `id-lookup` directory. */
+/** Where the index for `source` is written: that layer's declared `id-lookup` directory. */
 export function outDirFor(source: string): string {
   const d = dirsOf(source).find((x) => x.id === ID_LOOKUP_DIR_ID);
   if (!d) throw new Error(`${source} declares no directory with id "${ID_LOOKUP_DIR_ID}"`);
   return d.absPath;
 }
 
-/** The catalogue nodes directory, through the source instance's declaration. */
+/** The catalogue nodes directory, through the source layer's declaration. */
 export function catalogueNodesDir(source: string): string {
   const d = dirsOf(source).find((x) => x.graphTypologies.includes("catalogue" as never));
   if (!d) throw new Error(`${source} declares no directory of graph typology "catalogue"`);
@@ -117,7 +117,7 @@ export function referencedEntries(nodesDir: string): IdEntry[] {
 /**
  * The file at the top of an index directory that is NOT the index's: the
  * declared directory's own subgraph README, written by `readme:subgraphs`
- * because the directory is a declared one in its host instance (bean `j7ql`).
+ * because the directory is a declared one in its host layer (bean `j7ql`).
  * This build neither writes nor removes it.
  */
 const NOT_THE_INDEX = new Set(["README.md"]);

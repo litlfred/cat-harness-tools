@@ -9,7 +9,7 @@ export default toolFactory((t) =>
       "Run a declared BPMN process as an instance: `workflow_start` opens one for a subject, `workflow_next` reports what is enabled, `workflow_complete` records a step or answers a decision (a DMN-computed one from `facts`) and REFUSES a step that is not enabled. State is committed under the work plan, so which edge was taken is a record, not a memory.",
     install: { none: true },
     // The registrar the MCP server loads. `inProcess.module` is relative to
-    // the instance that declares the node, which is this one.
+    // the layer that declares the node, which is this one.
     invoke: { inProcess: { module: "src/tools/workflow.ts", register: "registerWorkflowTools" }, mcp: { tool: "workflow_*" } },
     io: {
       inputs: [

@@ -61,9 +61,9 @@ describe("processTarget — where a subprocess box lands", () => {
 
 describe("this repository, right now", () => {
   test("the index is not empty — and reading .json page manifests reaches no traced input site", async () => {
-    // The checkout's index, not one instance's: a page that presents this
-    // instance's process may be authored in an instance above it, and then
-    // its address carries that instance's name (`lib/docs-sources.ts`).
+    // The checkout's index, not one layer's: a page that presents this
+    // layer's process may be authored in a layer above it, and then
+    // its address carries that layer's name (`lib/docs-sources.ts`).
     const scratch = mkdtempSync(join(tmpdir(), "proc-pres-trace-"));
     const trace = openTrace(scratch);
     // input-site: inert #01b64b17 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
@@ -111,9 +111,9 @@ describe("this repository, right now", () => {
     expect(links.length).toBeGreaterThan(0);
     const broken: string[] = [];
     // A page of a layer above the base is composed into the site under its
-    // instance's name, from that layer's own docs directory (moves M6–M8).
+    // layer's name, from that layer's own docs directory (moves M6–M8).
     const above = docsSources(ROOT).filter((s) => !s.base);
-    // A call to a process whose instance's graph publishes subject pages links
+    // A call to a process whose layer's graph publishes subject pages links
     // to that page by its absolute subject IRI (cat-harness-tools#603). Such a
     // link must be exactly the IRI `subjectHref` answers for a process some
     // diagram declares — the page `kg-export` writes — never any other URL.

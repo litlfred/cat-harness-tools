@@ -2,7 +2,7 @@
  * The root meta-skeleton — bean `4ak5` item 3.
  *
  * Over a REAL site layout built in a temporary directory: every declared
- * instance's export written where `exportIdentity` says, plus the committed
+ * layer's export written where `exportIdentity` says, plus the committed
  * repository subgraph index. A stub of the declarations would assert the stub.
  *
  * @module scripts/tests/root-index
@@ -37,7 +37,7 @@ const declared = instanceRootsIn(REPO).filter((i) => readDeclaration(i) !== unde
 const SUBGRAPH_INDEX = join(HARNESS, subgraphOutDir(HARNESS), SUBGRAPH_INDEX_FILE);
 const NOT_BUILT = siteNotBuilt("the repository subgraph index `subgraph:jsonld` writes at publish (gitignored)", SUBGRAPH_INDEX);
 
-/** A site with every declared instance's export, `skip` excepted. */
+/** A site with every declared layer's export, `skip` excepted. */
 function site(skip: string[] = []): string {
   const dir = mkdtempSync(join(tmpdir(), "root-index-"));
   made.push(dir);
@@ -46,7 +46,7 @@ function site(skip: string[] = []): string {
   for (const inst of declared) {
     if (skip.includes(readDeclaration(inst)!.name)) continue;
     // Where the deploy writes it: the host at its docPath, every other
-    // instance at `<name>/<stub>.jsonld` (`instanceDocPath`).
+    // layer at `<name>/<stub>.jsonld` (`instanceDocPath`).
     const id = exportIdentity({ instanceRoot: inst });
     const file = join(dir, id.foreignInstance ? instanceDocPath({ name: readDeclaration(inst)!.name, stub: id.stub }) : id.docPath);
     mkdirSync(dirname(file), { recursive: true });

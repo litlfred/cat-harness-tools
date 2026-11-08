@@ -24,7 +24,7 @@
  * and a composer that did the first without the second would pass one of them.
  *
  * The tests of this file that read the whole checkout (reads the root
- * instance's declaration, which declares the `root-docs` layer) live in
+ * layer's declaration, which declares the `root-docs` layer) live in
  * `test/compose-docs-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
@@ -55,7 +55,7 @@ import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
-/** The instance that owns the base layer in these fixtures. */
+/** The layer that owns the base layer in these fixtures. */
 const INSTANCE = "cat-harness";
 /**
  * The fixture's declared entries, written into `harness.json` AND used to
@@ -78,7 +78,7 @@ const layerDir = (root: string, id: string): string => {
   return join("scope" in e && e.scope === "repository" ? root : join(root, INSTANCE), e.path);
 };
 
-/** A repository with a base layer under the instance and a root overlay. */
+/** A repository with a base layer under the layer and a root overlay. */
 function fixture(base: Record<string, string>, overlay: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "composedocs-"));
   mkdirSync(join(root, INSTANCE), { recursive: true });
@@ -141,7 +141,7 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     // rather than a fixture, because that is what the publish path builds.
     //
     // SINCE SLICE 1 OF THE SEMANTIC SUBGRAPHS (owner, 2026-10-09) the real tree
-    // has TWO instance layers: the just-the-docs chrome, `site-chrome/`, and
+    // has TWO layer layers: the just-the-docs chrome, `site-chrome/`, and
     // the harness's pages, `docs/`, over it. So "the base" is their later-wins
     // union, and the owner's ruling D1 ("parse-equal") states what `_config.yml`
     // may do: the two layers' configs are MERGED, so the composed file must
@@ -175,13 +175,13 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
 
     // THE PROPERTY IS "COMPOSITION NEVER CHANGES A BASE FILE", not "the tree
     // has the same number of files in it". Those were the same assertion until
-    // instances could be composed (`jut3`), and the size check is the half
+    // layers could be composed (`jut3`), and the size check is the half
     // that stopped being true: `smart-trust/docs/` now lands under
     // `smart-trust/`, so the composed tree is base PLUS that.
     //
     // Weakening it to "the base files match" alone would license a composer
     // that scattered files anywhere, so the additions are checked too: every
-    // path the composed tree adds must sit under a composed instance's own
+    // path the composed tree adds must sit under a composed layer's own
     // prefix. That is strictly stronger than the count it replaces, which
     // said nothing about WHERE a new file could appear.
     // WITHHELD PATHS ARE ABSENT ON PURPOSE, so the property is stated against
@@ -243,11 +243,11 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     // before.size))`, which is an identity and guarded nothing — the same
     // defect as a test that restates the expression it checks.
     //
-    // SINCE BEAN `mftp` NO INSTANCE ON THE REAL TREE COMPOSES: every smart-*
+    // SINCE BEAN `mftp` NO LAYER ON THE REAL TREE COMPOSES: every smart-*
     // IG builds into its own IG site (`igSite`). So the addition is asserted
     // to follow the composition exactly, either way, rather than to be
-    // non-empty: added files exist iff an instance composed. The composer's
-    // own behaviour on an instance stays pinned by the fixtures below.
+    // non-empty: added files exist iff a layer composed. The composer's
+    // own behaviour on a layer stays pinned by the fixtures below.
     const added = [...after.keys()].filter((p) => !before.has(p) && !stubs.has(p));
     expect(added.length > 0).toBe(report.composed.length > 0);
     rmSync(join(dest, ".."), { recursive: true, force: true });
@@ -394,7 +394,7 @@ describe("the merge rule itself", () => {
 });
 
 /**
- * Bean `ga8a` — a composed instance is carried only when the branch touches it.
+ * Bean `ga8a` — a composed layer is carried only when the branch touches it.
  *
  * `tebu` cut `reference/` and `api/` from a preview whose branch cannot have
  * changed them. This is the same cut one directory over, and by 2026-09-23 the
@@ -416,7 +416,7 @@ describe("the merge rule itself", () => {
  * conflating them is exactly the failure this family of bugs keeps making.
  */
 describe("carriedInstances — what a preview must carry (bean `ga8a`)", () => {
-  /** A composed instance shaped like the real one, without touching disk. */
+  /** A composed layer shaped like the real one, without touching disk. */
   const inst = (root: string, under = root): ComposedInstance => ({
     instance: under,
     dir: `/nowhere/${root}/docs`,
@@ -434,7 +434,7 @@ describe("carriedInstances — what a preview must carry (bean `ga8a`)", () => {
   });
 
   test("an EMPTY list is a determined zero, and it stubs", () => {
-    // A pull request that genuinely changes nothing touches no instance. If
+    // A pull request that genuinely changes nothing touches no layer. If
     // this fell through to "carry everything", the flag would be unable to
     // distinguish a failed API call from a real answer — the `dh4f` shape.
     const d = carriedInstances([inst("smart-trust")], []);
@@ -507,7 +507,7 @@ describe("carriedInstances — what a preview must carry (bean `ga8a`)", () => {
 
 describe("the cut, on the REAL tree", () => {
   // Each real-tree compose costs seconds, and these tests ask about only two
-  // trees: the full one and the one cut for a branch touching no instance. So
+  // trees: the full one and the one cut for a branch touching no layer. So
   // each is composed once, on first use, and read by every test that needs it
   // (read only — no test writes into either). Composing the same tree again
   // per test bought nothing and pushed the ratio test past its 5 s budget.
@@ -534,10 +534,10 @@ describe("the cut, on the REAL tree", () => {
   });
 
   test("every composed instance gets exactly one decision", () => {
-    // Reported rather than inferred: a tree quietly missing an instance's
-    // pages must be distinguishable from an instance that failed to read.
+    // Reported rather than inferred: a tree quietly missing a layer's
+    // pages must be distinguishable from a layer that failed to read.
     const r = tree("cut").report;
-    // No instance composes on the real tree since bean `mftp` (each smart-* IG
+    // No layer composes on the real tree since bean `mftp` (each smart-* IG
     // builds its own site); the decisions must still match the compositions.
     expect(r.carried.map((d) => d.instance.under).sort()).toEqual(
       r.composed.map((c) => c.under).sort(),
@@ -554,7 +554,7 @@ describe("the cut, on the REAL tree", () => {
 
     const nAll = Object.keys(all.suppliedBy).length;
     const nCut = Object.keys(cut.suppliedBy).length;
-    // The cut fires on every composed instance a branch does not touch. Since
+    // The cut fires on every composed layer a branch does not touch. Since
     // bean `mftp` the real tree composes none — the smart-* IGs build their
     // own sites, whose cut is `stage-ig-sites`' staging cone — so with none,
     // there is nothing to cut and the two trees must be the same size.
@@ -563,21 +563,21 @@ describe("the cut, on the REAL tree", () => {
       return;
     }
     expect(cut.carried.some((d) => !d.carry)).toBe(true);
-    // EVERY page of every stubbed instance is gone, each replaced by its one
+    // EVERY page of every stubbed layer is gone, each replaced by its one
     // stub. This was a ratio (`nCut < 0.75 * nAll`) while smart-trust and
     // smart-base were composed; since bean `mftp` they build into their own
     // IG sites (`igSite`), whose cut is the staging cone in `stage-ig-sites`,
-    // so a ratio tuned to that corpus measured instances no longer here.
+    // so a ratio tuned to that corpus measured layers no longer here.
     const stubbed = cut.carried.filter((d) => !d.carry).map((d) => `${d.instance.under}/`);
-    // The instance's OWN files — supplied BY it. Since 2026-10-09 a harness's
+    // The layer's OWN files — supplied BY it. Since 2026-10-09 a harness's
     // declared visualisers are also drawn under `<name>/<visualiser>/`, in the
-    // base layer, and a cut that stubs the instance's docs rightly keeps them.
+    // base layer, and a cut that stubs the layer's docs rightly keeps them.
     const stubbedNames = new Set(cut.carried.filter((d) => !d.carry).map((d) => d.instance.instance));
-    // An instance with its own IG site gets NO stub: its IG build answers
+    // A layer with its own IG site gets NO stub: its IG build answers
     // `/<instance>/` (smart-base, whose docs pages compose beside its IG).
     const stubCount = cut.carried.filter((d) => !d.carry && !d.instance.igSite).length;
     const theirs = Object.entries(all.suppliedBy).filter(([k, by]) => stubbedNames.has(by) && stubbed.some((u) => k.startsWith(u))).length;
-    // A stubbed instance whose docs are ONE page (folio-assistant-core's, since
+    // A stubbed layer whose docs are ONE page (folio-assistant-core's, since
     // bean c5fm) is replaced by exactly one stub, so the cut cannot shrink the
     // tree: assert that it does not grow it either, the same answer the
     // composes-none case above gives. Otherwise the cut must remove pages.
@@ -588,7 +588,7 @@ describe("the cut, on the REAL tree", () => {
     }
     expect(nCut).toBeLessThanOrEqual(nAll - theirs + stubCount);
 
-    // ...and what remains in place of each stubbed instance is its stub, not a
+    // ...and what remains in place of each stubbed layer is its stub, not a
     // hole. A 404 where a tile links is the `pb04` defect this replaces.
     for (const d of cut.carried.filter((x) => !x.carry)) {
       const stub = join(b, d.instance.under, "index.md");
@@ -691,7 +691,7 @@ describe("--shell: the chrome only", () => {
 });
 
 /**
- * A fixture whose instance DECLARES visualisers, so the route machinery has
+ * A fixture whose layer DECLARES visualisers, so the route machinery has
  * something to forward: `todos` (alias `todos`), `fsh` (staging-only).
  */
 function routedFixture(base: Record<string, string>): string {

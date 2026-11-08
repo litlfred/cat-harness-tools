@@ -42,7 +42,7 @@
  * Length does not show what a page is FOR. So a second dimension: does an
  * authored page NAME a declared process, a declared role and a declared task
  * of that harness? These are **resolved from the DECLARATIONS**
- * (`processes` and `scenarios` graph typologies on the instance's own
+ * (`processes` and `scenarios` graph typologies on the layer's own
  * declaration, as the `docs` kind is), never from a list here.
  *
  * A harness that declares no processes, no roles and no tasks cannot be
@@ -149,9 +149,9 @@ export interface Subjects {
 }
 
 /**
- * The processes, roles and tasks an instance DECLARES.
+ * The processes, roles and tasks a layer DECLARES.
  *
- * Read off that instance's own declaration — `processes` and `scenarios` graph
+ * Read off that layer's own declaration — `processes` and `scenarios` graph
  * kinds — exactly as `harnessesWithDocs` reads the `docs` kind. Never a list in
  * this file: a list would be a second answer to "what processes does this
  * harness have", free to disagree with the declaration the moment either moves.
@@ -554,15 +554,15 @@ export function assess(repoRoot: string, instance: string, dirs: string[], insta
 }
 
 /**
- * Every instance that declares a `docs` graph, with the directories it names.
+ * Every layer that declares a `docs` graph, with the directories it names.
  *
- * A `docs` directory the instance declares it BUILDS AT PUBLISH
+ * A `docs` directory the layer declares it BUILDS AT PUBLISH
  * (`builtAtPublish`, `schemas/kg/built-at-publish.ts`; owner, 2026-10-14 and
  * 2026-10-15, "B1") is left out. Every page in it is written by the declared
  * writer, so none can be the AUTHORED documentation this check asks for, and
  * before publish it is correctly absent, which the `dh4f` verdict below would
  * otherwise read as "cannot be determined". Whether the writer built it is
- * `derive:publish`'s question. An instance whose only `docs` directory is built
+ * `derive:publish`'s question. A layer whose only `docs` directory is built
  * at publish therefore drops out of the sweep, as one declaring none does.
  */
 export function harnessesWithDocs(repoRoot: string): { instance: string; root: string; dirs: string[] }[] {
@@ -587,7 +587,7 @@ if (import.meta.main) {
   // FROM THIS MODULE'S OWN LOCATION, never the CWD. The first draft used
   // `repoRootFor(process.cwd())`, which resolved to the repository's PARENT
   // when run from anywhere but the root: `instanceRootsIn` then found one
-  // instance, no `docs` graph, and the check printed a clean pass over a
+  // layer, no `docs` graph, and the check printed a clean pass over a
   // sweep that had looked at nothing. That is the CWD-vs-instance-root defect
   // bean `a6kl` swept every gate for, committed by the gate written after it.
   const repoRoot = repoRootFor(HARNESS_ROOT);

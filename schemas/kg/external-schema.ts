@@ -44,7 +44,7 @@ export type SpecAuthority = (typeof SPEC_AUTHORITIES)[number];
  *
  * The distinction is what a reader needs in order to judge a version bump:
  * `conforms` means our artefacts claim to BE instances of it, so a bump is a
- * migration; `reads` means we parse someone else's instances, so a bump is a
+ * migration; `reads` means we parse someone else's layers, so a bump is a
  * compatibility question; `cites` means we quote it and nothing breaks.
  */
 export const SPEC_USES = ["conforms", "reads", "cites"] as const;

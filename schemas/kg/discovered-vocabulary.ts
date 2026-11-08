@@ -1,5 +1,5 @@
 /**
- * An enum whose members are DISCOVERED from the instances mounted beside this
+ * An enum whose members are DISCOVERED from the layers mounted beside this
  * layer, rather than written in code — marked, so a reader that publishes the
  * schema knows its members are the composition's and not the schema's.
  *
@@ -8,7 +8,7 @@
  *
  * ## Why a mark is needed
  *
- * `BLOCK_KINDS` is read at import from every mounted instance's `block-kinds/`
+ * `BLOCK_KINDS` is read at import from every mounted layer's `block-kinds/`
  * graph, so `z.enum(BLOCK_KINDS)` is a different enum in each composition. A
  * JSON Schema written from it would record which repositories were mounted
  * (with the harness alone, `{ "not": {} }`, rejecting every value; in a full
@@ -28,7 +28,7 @@ export interface DiscoveredVocabulary {
   graph: string;
 }
 
-/** Every Zod schema whose members are discovered from the mounted instances. */
+/** Every Zod schema whose members are discovered from the mounted layers. */
 export const DISCOVERED_VOCABULARIES = z.registry<DiscoveredVocabulary>();
 
 /** `z.enum(values)`, marked as a vocabulary the `graph` graphs of the composition declare. */

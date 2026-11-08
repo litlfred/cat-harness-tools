@@ -1,5 +1,5 @@
 /**
- * One instance's graph does not carry another instance's nodes.
+ * One layer's graph does not carry another layer's nodes.
  *
  * @module scripts/tests/instance-graph-isolation.test
  *
@@ -26,11 +26,11 @@ const DOC = "https://example.org/x.jsonld";
 const ids = (nodes: Array<Record<string, unknown>>): string[] => nodes.map((n) => String(n["@id"]));
 
 /**
- * The ROOT instance's collection, made once for this file.
+ * The ROOT layer's collection, made once for this file.
  *
  * It is a whole-corpus walk, and since `collectInstanceNodes` collects Tools
  * (bean `tdir`) it also re-homes every Tool's `satisfies` skill across every
- * instance. Measured 2026-10-15 in the CI layout: 7.1 s cold before `tdir`,
+ * layer. Measured 2026-10-15 in the CI layout: 7.1 s cold before `tdir`,
  * 9.2 s cold after, 5.3 s warm on both — so each of two calls was past bun's
  * 5 s default on its own, and which side of it the cold call landed on was
  * the runner's mood (it flipped "new failure" on PRs that did not touch it).
@@ -73,7 +73,7 @@ describe("a second instance in the tree stays out of the first's graph", () => {
 describe("discovery reads the declaration rather than the tree", () => {
   test("an undeclared directory holding a .bpmn is NOT collected", async () => {
     // This is the whole difference. A walk would find it; a declaration does
-    // not, because the instance never said it was its graph.
+    // not, because the layer never said it was its graph.
     const root = mkdtempSync(join(tmpdir(), "iso-"));
     mkdirSync(join(root, "skills"), { recursive: true });
     mkdirSync(join(root, "stray"), { recursive: true });
@@ -91,7 +91,7 @@ describe("discovery reads the declaration rather than the tree", () => {
     //
     // In `notes` since 2026-09-20, not `problems`. The assertion this test
     // cares about is unchanged — the fact is SAID — and what changed is that
-    // saying it no longer fails the instance. A skills package with no
+    // saying it no longer fails the layer. A skills package with no
     // workflow is ordinary; three of them arrived at once and each failed on
     // this message alone while rendering all its nodes.
     expect(notes.some((n) => n.includes("bpmn"))).toBe(true);

@@ -134,13 +134,13 @@ export function carriesRenders(text: string): boolean {
 
 /** One declared visualiser, with the harness that declares it. */
 export interface DeclaredVisualiser extends HarnessVisualiser {
-  /** The declaring instance's `name` — the `<harness>` route segment. */
+  /** The declaring layer's `name` — the `<harness>` route segment. */
   harness: string;
   /** Its root, absolute. */
   harnessRoot: string;
 }
 
-/** A declaration read raw: generators must not throw on an instance whose other fields a newer schema refuses. */
+/** A declaration read raw: generators must not throw on a layer whose other fields a newer schema refuses. */
 interface RawDecl {
   name?: string;
   visualisers?: HarnessVisualiser[];
@@ -203,7 +203,7 @@ export function builtAtPublishWriter(repoRoot: string, harnessRoot: string, ref:
   return entry === undefined ? undefined : writerFilesFor(repoRoot, entry.writer);
 }
 
-/** Every instance root in the checkout: top level, and every remote mount wherever it landed. */
+/** Every layer root in the checkout: top level, and every remote mount wherever it landed. */
 export function checkoutInstanceRoots(repoRoot: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -219,7 +219,7 @@ export function checkoutInstanceRoots(repoRoot: string): string[] {
 const declaredCache = new Map<string, DeclaredVisualiser[]>();
 
 /**
- * Every visualiser every instance in the checkout declares, in instance order.
+ * Every visualiser every layer in the checkout declares, in layer order.
  *
  * Read from the declarations as written — the `visualisers` array of each
  * `<instance>.json` — so this answers the same in a standalone repository and
@@ -253,7 +253,7 @@ export interface RecordedRoute {
 
 /**
  * The routes a built site records, read from the generated pages in it — for a
- * checkout where the instance that DECLARES a visualiser is not mounted.
+ * checkout where the layer that DECLARES a visualiser is not mounted.
  *
  * A layer standing alone (`check-standalone`) still carries the harness site,
  * and that site still holds pages a higher layer's generator wrote there; only
@@ -349,21 +349,21 @@ export function visualiserFor(harnessRoot: string, tool: string, repoRoot: strin
 
 /**
  * The SITE directory every visualiser page is written into: the docs layer
- * of the instance that owns the site — cat-harness's, the Jekyll source
+ * of the layer that owns the site — cat-harness's, the Jekyll source
  * every deploy builds (`compose-docs.ts`'s base layer). A page of ANY
  * harness lives at `<site>/<harness>/<visualiser>/…`, which is the route, so
  * the file and the URL cannot disagree.
  */
 export function siteOwnerDir(repoRoot: string): string {
   const owner = checkoutInstanceRoots(repoRoot).find((r) => readRaw(r)?.name === "cat-harness");
-  // A checkout with no cat-harness instance is a folio standing alone: its own
+  // A checkout with no cat-harness layer is a folio standing alone: its own
   // root's site directory is the site.
   const root = owner ?? resolve(repoRoot);
   try {
     return join(root, siteDirFor(root));
   } catch {
     // No declaration there at all (a fixture, a bare directory): the
-    // conventional answer `siteDir` gives every instance — asked of it, not
+    // conventional answer `siteDir` gives every layer — asked of it, not
     // spelled here.
     const name = basename(root);
     return join(root, siteDir({ name, stub: name }));
@@ -528,8 +528,8 @@ export function visualiserPageRef(repoRoot: string, parts: VisualiserRouteParts,
 }
 
 /**
- * The directories of a kind the handler instance declares, as a page names
- * them. `corpus`: the handler AND every instance stacked on it.
+ * The directories of a kind the handler layer declares, as a page names
+ * them. `corpus`: the handler AND every layer stacked on it.
  */
 export function handledDirectories(
   repoRoot: string,
@@ -618,18 +618,18 @@ export interface ViewedDirectory {
 }
 
 /**
- * Does visualiser `v` cover directory `d` of the instance named `owner`?
+ * Does visualiser `v` cover directory `d` of the layer named `owner`?
  *
  * - `covers`: only the declaring harness's own directories, by id;
  * - `coversKinds`: every declared directory of those kinds in the checkout —
  *   the "full KG" the owner's rule names, which is what a corpus-wide viewer
  *   (the library, schemas, processes) draws: it lists bootstrap's processes
- *   as readily as a content instance's.
+ *   as readily as a content layer's.
  */
 export function covers(v: DeclaredVisualiser, d: ViewedDirectory, owner: string, absDir?: string, repoRoot?: string): boolean {
   if (v.harness === owner && (v.covers ?? []).includes(d.id)) return true;
-  // The SAME directory declared by another instance (`beans/`, scope
-  // `repository`, is one directory however many instances name it): a
+  // The SAME directory declared by another layer (`beans/`, scope
+  // `repository`, is one directory however many layers name it): a
   // visualiser of it is a visualiser of it, whoever declared the entry.
   if (absDir !== undefined && repoRoot !== undefined && (v.covers ?? []).length > 0) {
     const mine = readRaw(v.harnessRoot)?.directories ?? [];
@@ -651,7 +651,7 @@ export function covers(v: DeclaredVisualiser, d: ViewedDirectory, owner: string,
  * the directory's own {@link Tile} — a directory's presentation is its own
  * business. `[]` when nothing covers it.
  *
- * @param instanceRoot the root of the instance whose declaration `d` is from
+ * @param instanceRoot the root of the layer whose declaration `d` is from
  */
 export function viewersOf(
   d: ViewedDirectory,
@@ -660,13 +660,13 @@ export function viewersOf(
   /** The site directory the routes are under; default the site owner's (`siteOwnerDir`). */
   siteDir?: string,
 ): Array<Visualisation & { title: string }> {
-  // The OWNER is the instance whose declaration carries the entry: this one,
+  // The OWNER is the layer whose declaration carries the entry: this one,
   // or — for an entry `siteDirectories` presented from the checkout root —
   // the root. A `repository`-scoped path resolves from the checkout either way.
   const own = readRaw(instanceRoot);
   //
   // Only a REPOSITORY-scoped entry can be the root's: a directory declared
-  // inside this instance's own tree by a nested declaration (`beans/beans.json`'s
+  // inside this layer's own tree by a nested declaration (`beans/beans.json`'s
   // `defs/`, `notes/`, `workflows/`) is absent from `own.directories` too, and
   // was handed to the root — core's and tools' work items then opened
   // `beans/dth-hrh/`, the site owner's page, under a second name
@@ -684,18 +684,18 @@ export function viewersOf(
     site ??= siteOwnerDir(repoRoot);
     const full = pageParts({ harness: v.harness, visualiser: v.id });
     // The sub-graph a directory's tile opens. `instance`: the owner's name.
-    // `directory`: the directory id — qualified by its instance first when
+    // `directory`: the directory id — qualified by its layer first when
     // another harness owns the visualiser, because a corpus-wide view keeps
     // ids unique that way (`folio-assistant-sci-skills` beside `skills`).
     const under = (d.graphTypologies ?? []).map((k) => v.subgraphUnder?.[k]).find((u) => u !== undefined);
     const at = (seg: string): string => (under ? `${under}/${seg}` : seg);
-    // A bare id is taken for another instance's directory only when the
+    // A bare id is taken for another layer's directory only when the
     // declaring harness does not hold a directory of that id itself: a bare
     // `skills` is cat-harness's own, `core-skills` can only be core's.
     const harnessIds = new Set((readRaw(v.harnessRoot)?.directories ?? []).map((x) => x.id));
     // `subgraphUnder` nests either kind of sub-graph: the glossary's
     // per-instance pages sit at `glossary/instance/<instance>/` (owner,
-    // 2026-10-15, "3a") so an instance name cannot meet an asset-type page.
+    // 2026-10-15, "3a") so a layer name cannot meet an asset-type page.
     const subs =
       v.subgraphs === "instance"
         ? [at(owner)]
@@ -713,19 +713,19 @@ export function viewersOf(
       .find((r) => existsSync(join(repoRoot, r)) || v.writer !== undefined || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
     // Covered BY KIND, a visualiser that draws per-sub-graph views covers a
     // directory only where it drew that directory's view: the full KG page of
-    // a viewer that never reached this instance is not its viewer.
+    // a viewer that never reached this layer is not its viewer.
     //
     // A directory the visualiser ALSO names by id (`covers`) keeps its full
     // view when no sub-graph page was drawn for it (bean
     // `folio-assistant-1nu0`): `beans` draws cat-harness's own repository
-    // store as the full board and every other instance's store as a page of
+    // store as the full board and every other layer's store as a page of
     // its own, so the declarer's row must not lose the board it already had.
     const byId =
       (v.harness === owner && (v.covers ?? []).includes(d.id)) ||
       !(v.coversKinds ?? []).some((k) => (d.graphTypologies ?? []).includes(k));
     if (subs.length > 0 && subRef === undefined && !byId) continue;
     // A directory the visualiser NAMES by id keeps its full view even when a
-    // sub-graph page of the same instance exists (bean `folio-assistant-750a`):
+    // sub-graph page of the same layer exists (bean `folio-assistant-750a`):
     // `beans` draws the repository store as the board AND as `beans/cat-harness/`,
     // the page its parts (`defs/`, `notes/`, `workflows/`) open, and the store's
     // own row must still open the board.
@@ -736,7 +736,7 @@ export function viewersOf(
     // repository-relative like `ref`, so a mount path is never written down.
     // ...where it is IMPLEMENTED: the harness's scripts live in cat-harness-tools (bean 70lx).
     //
-    // A writer neither the declaring instance nor its implementers hold may be
+    // A writer neither the declaring layer nor its implementers hold may be
     // spelled from the CHECKOUT root, where the layers are mounted: smart-ra
     // declares `cat-harness-tools/archimate/scripts/gen-archimate-pages.ts`,
     // which resolves when smart-ra is the checkout but, read against its mount
@@ -768,12 +768,12 @@ export function siteDirectories<T extends ViewedDirectory>(
   instanceRoot: string,
   repoRoot: string = repoRootFor(instanceRoot),
 ): T[] {
-  // The site this instance builds draws the CHECKOUT, and since placement PR0
+  // The site this layer builds draws the CHECKOUT, and since placement PR0
   // (bean `ejye`) the checkout's own directories — `beans/`, `todos/`,
   // `fsh-guts/`, `memory/`, the root docs overlay — are declared by the
-  // checkout's ROOT instance. They are read from there and presented as
+  // checkout's ROOT layer. They are read from there and presented as
   // repository-scoped entries of this site, ids unchanged. An id this
-  // instance already declares wins.
+  // layer already declares wins.
   if (resolve(repoRoot) === resolve(instanceRoot)) return [...own];
   const shared = checkoutSharedDirectories<T>(repoRoot);
   if (shared === undefined || shared.root === resolve(instanceRoot)) return [...own];
@@ -793,9 +793,9 @@ export function siteDirectories<T extends ViewedDirectory>(
 
 /**
  * The checkout's own directories, as repository-scoped entries, and the
- * instance root that declares them: the checkout ROOT's instance when it has
+ * layer root that declares them: the checkout ROOT's layer when it has
  * one, else — the index checkout, whose root declares nothing (owner,
- * 2026-10-08) — the instance that declares the repository-scoped directories
+ * 2026-10-08) — the layer that declares the repository-scoped directories
  * (cat-harness, decision (b)), the same answer `checkoutGraphOwner` gives
  * the navbar. `undefined` when neither is readable.
  */
@@ -833,7 +833,7 @@ function checkoutSharedDirectories<T extends ViewedDirectory>(
  * directories become the site's tiles lives (issue #1904).
  *
  * `instance` is that harness's root. A hub, or a checkout where nothing can
- * be decided, falls back to the checkout root when it declares an instance,
+ * be decided, falls back to the checkout root when it declares a layer,
  * else to `fallback`. `sync-docs-harness.ts` refuses an ambiguous or invalid
  * landing before it gets here; a generator only needs the same answer when
  * there is one.

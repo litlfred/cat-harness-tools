@@ -1,7 +1,7 @@
 /**
  * `init-folio --staged <path>`: a sub-KG staged INSIDE a host repository.
  *
- * Owner ruling 1, 2026-10-06 (bean `3tza`): it writes the staged instance's
+ * Owner ruling 1, 2026-10-06 (bean `3tza`): it writes the staged layer's
  * declaration and its import seam, and NOTHING at the repository level. The
  * second half is the load-bearing assertion: `--instance` writes fifteen
  * repository-level files (`AGENTS.md`, `.mcp.json`, a beans store, …), and a

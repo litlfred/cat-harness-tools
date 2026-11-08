@@ -5,7 +5,7 @@
  *
  * A harness declares a directory of graph typology `typologies`; each `*.json` in it is
  * one {@link GraphTypologyNodeSchema}. The registry a reader sees is the base
- * layer's own kinds plus every declared node across the instances, loaded
+ * layer's own kinds plus every declared node across the layers, loaded
  * lazily by `graph-typology-registry.ts` on first use, and a name declared by two
  * files is refused, naming both.
  *
@@ -50,8 +50,8 @@ export const GraphTypologyNodeSchema = z
     /**
      * The kind's word, as a directory's `graphTypologies` names it. `kind`, NOT
      * `name`: a JSON file whose `name` equals its filename stem is how
-     * `findDeclarationFile` recognises an INSTANCE declaration, so a node
-     * spelled with `name` made `typologies/` read as a directory of four instances
+     * `findDeclarationFile` recognises a LAYER declaration, so a node
+     * spelled with `name` made `typologies/` read as a directory of four layers
      * (measured on the first move, 2026-10-04).
      */
     kind: z.string().regex(/^[a-z][a-z0-9-]*$/, "a lower-case kind word, e.g. ig-ast"),

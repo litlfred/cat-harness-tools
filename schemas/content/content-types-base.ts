@@ -12,7 +12,7 @@
  *
  * ## They are NOT the same type
  *
- * `harness` says *this is an instance*: a name, a stub, the directories it
+ * `harness` says *this is a layer*: a name, a stub, the directories it
  * holds. `folio` says *this authors folio content*: it carries `contentType`,
  * and `folio_init` writes it.
  *
@@ -33,7 +33,7 @@
  * importing downstream (`check:partition:edges` refuses it). `dak` and `sushi`
  * live in {@link module:schemas/dak-content-type}, registered by the layer that
  * owns the model. `ig` is registered nowhere: nothing declares an IG
- * instance, so there is no marker file to recognise.
+ * layer, so there is no marker file to recognise.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -47,7 +47,7 @@ import { termIri } from "../kg/namespaces";
 export const HARNESS_TYPE = termIri("Instance");
 
 /**
- * The folio marker's filename, resolved from the instance that declares it.
+ * The folio marker's filename, resolved from the layer that declares it.
  *
  * HOISTED to module scope, and that is not tidiness. `sameType` compares
  * `filename` by `===`, so a resolver defined inline inside
@@ -80,7 +80,7 @@ function folioMarkerFilename(repoRoot: string): string | undefined {
   // files, so the mere presence of `<name>.config.json` meant somebody had
   // configured a folio. They are ONE file since 2026-09-21, and a bare
   // `{"name":"x"}` is an instance that is not a folio — asserting both
-  // memberships off one marker made every declared instance a folio.
+  // memberships off one marker made every declared layer a folio.
   //
   // This type's own summary is the rule: "it declares a content type". The
   // `harness` marker still reports the file, so nothing is lost — the two
@@ -100,7 +100,7 @@ function folioMarkerFilename(repoRoot: string): string | undefined {
  * The harness marker — any `<name>.config.json` at this root.
  *
  * A FUNCTION rather than a constant because `harness.json` was excised
- * (2026-09-21) and the filename now carries the instance's name, so there is
+ * (2026-09-21) and the filename now carries the layer's name, so there is
  * no fixed string to look for.
  *
  * It falls back to any `*.config.json` when none is a valid declaration, and
@@ -207,9 +207,9 @@ export function registerBaseContentTypes(registry: ContentTypeRegistry = default
   });
 
   registry.register("folio", {
-    // COMPUTED, because the marker's name is the instance's own as of
+    // COMPUTED, because the marker's name is the layer's own as of
     // 2026-09-20 — `<name>.config.json` at the instantiation root. A literal
-    // here would have gone on testing for a file no instance writes, and
+    // here would have gone on testing for a file no layer writes, and
     // `describeRepository` would have reported every folio as not-a-folio
     // while looking perfectly healthy.
     filename: folioMarkerFilename,

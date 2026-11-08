@@ -1,6 +1,6 @@
 /**
  * The shared fixture for `state:mount` / `state:push`: a bare remote over
- * `file://` holding a seeded state branch, and checkouts whose instance
+ * `file://` holding a seeded state branch, and checkouts whose layer
  * DECLARES a subgraph kept on that branch, the current way
  * (`source: { kind: "branch" }`). Real git throughout: the failures these
  * commands exist for are a fetch that does not happen and a push that loses

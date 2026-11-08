@@ -81,7 +81,7 @@ function send(res, status, body, headers) {
  * THE ONE DEPLOY-TIME MOUNT A COMMITTED PAGE REACHES INTO (bean `2vpn`).
  *
  * This serves the repository as it is committed, and `mount-instance-docs`
- * runs only in the site build: it publishes an instance's `docs/` site
+ * runs only in the site build: it publishes a layer's `docs/` site
  * directory at the `docs` kind's route, `<site>/docs/<instance>/`. A committed
  * page that links an asset there — who-iris's WHO emblem in every navbar
  * header and harness row, since its mark is resolved through that route —
@@ -92,7 +92,7 @@ function send(res, status, body, headers) {
  * only that one route is emulated: anything else still 404s, as it should.
  */
 const SITE_ROOT = "/cat-harness/docs";
-// An instance's site directory, relative to the instance root. The one answer is
+// A layer's site directory, relative to the layer root. The one answer is
 // `siteDir()` in cat-harness/schemas/cat-harness.ts; this file runs under plain
 // `node` (playwright's webServer) and cannot import TypeScript, so it names the
 // value once here rather than inline at each use.
@@ -110,14 +110,14 @@ function mountedPath(pathname) {
 }
 
 /**
- * THE COMPOSED ROUTE, emulated the same way. `compose-docs.ts` lays an
- * instance's directory declared `composed: true` into the site's Jekyll source
- * under the instance's name, so `<site>/<instance>/<rest>` is
+ * THE COMPOSED ROUTE, emulated the same way. `compose-docs.ts` lays a
+ * layer's directory declared `composed: true` into the site's Jekyll source
+ * under the layer's name, so `<site>/<instance>/<rest>` is
  * `<instance>/<that directory>/<rest>` — where a page of a docs source above
  * the base, and its site JSON-LD (`gen-site-jsonld.ts`, the `@id` a todo's
  * `target` names), are published. The build composes; this server serves the
  * checkout, so a request there that names no committed file falls back to the
- * declared directory. Read from the instance's own declaration, plain JSON,
+ * declared directory. Read from the layer's own declaration, plain JSON,
  * and checked to stay under that directory; nothing else is emulated.
  */
 function composedPath(pathname) {

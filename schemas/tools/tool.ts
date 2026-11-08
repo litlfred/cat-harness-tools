@@ -150,7 +150,7 @@ export const ToolInputSchema = ToolPortSchema.extend({
    *
    * ## Why cardinality is a flag and not a type
    *
-   * Three of the tools this instance serves take lists — `folio_init.authors`,
+   * Three of the tools this layer serves take lists — `folio_init.authors`,
    * `stakeholder_map.paths`, `readme_sync.only` — so without this the migration
    * could not describe the surface it was migrating. The alternative was an
    * `ArrayOfRepoPath` beside `RepoPath` in the shared vocabulary, which
@@ -220,7 +220,7 @@ export const ToolInvokeSchema = z.object({
   container: z.string().optional(),
   mcp: z.object({ tool: z.string().min(1) }).optional(),
   /**
-   * A function in **this instance's own code**.
+   * A function in **this layer's own code**.
    *
    * Added because 17 of the 20 tools this repository already serves have no
    * shell equivalent — they are TypeScript registered on the MCP server, and
@@ -244,13 +244,13 @@ export const ToolInvokeSchema = z.object({
       /**
        * INSTANCE-relative path to the module, e.g. `src/tools/workflow.ts`.
        *
-       * The instance, not the repository — this said "repo-relative" while giving
+       * The layer, not the repository — this said "repo-relative" while giving
        * an example that is instance-relative, and after the move under
        * `cat-harness/` the two stopped being the same thing. The values were
        * right and the word was stale; `check:tools` now resolves this field
-       * against the instance root and `invoke.shell` against the repository,
+       * against the layer root and `invoke.shell` against the repository,
        * because a shell command is typed from the repo root while a module is
-       * loaded by the instance's own server. Same convention as
+       * loaded by the layer's own server. Same convention as
        * `maintains.source`.
        */
       module: z.string().min(1),
@@ -346,7 +346,7 @@ export type ToolRemedy = z.infer<typeof ToolRemedySchema>;
  * ## Why `source` is a path and `artefact` is not
  *
  * `source` is repo-relative and stable: it names a file in the tree the graph
- * describes. `artefact` is the PUBLISHED path relative to the instance's base,
+ * describes. `artefact` is the PUBLISHED path relative to the layer's base,
  * because the base differs per deployment — main, a branches/ preview, a local
  * checkout — and baking one in would make the node wrong everywhere else.
  * `renderingPath()` in `schemas/kg/cat-harness.ts` is what joins the two, and is
@@ -364,7 +364,7 @@ export const ToolMaintainsSchema = z.object({
   /** Repo-relative module that defines it, e.g. `schemas/tools/tool.ts`. */
   source: z.string().min(1),
   /**
-   * Published path relative to the instance's base, e.g. `tool.schema.json`.
+   * Published path relative to the layer's base, e.g. `tool.schema.json`.
    * No leading slash: it is joined by `renderingPath`, which owns the layout.
    */
   artefact: z.string().min(1).refine((a) => !a.startsWith("/"), {
@@ -372,7 +372,7 @@ export const ToolMaintainsSchema = z.object({
   }),
   /**
    * What the artefact IS, for a consumer deciding whether it can read it.
-   * Open string: an instance may maintain kinds this vocabulary has not met.
+   * Open string: a layer may maintain kinds this vocabulary has not met.
    */
   format: z.string().min(1).optional(),
 });
@@ -538,7 +538,7 @@ export const ToolDefinitionSchema = z
      *
      * Each id is the stem of a `.bpmn` the checkout declares;
      * `check:tools` reports one that resolves to nothing. By convention it
-     * lives under the declaring instance's `processes/tools/` concern group
+     * lives under the declaring layer's `processes/tools/` concern group
      * (placement PR0c), beside the other tools' procedures rather than
      * among the general processes.
      */
@@ -569,7 +569,7 @@ export type ToolPort = z.infer<typeof ToolPortSchema>;
  *
  * Tool nodes are authored as `.ts` calling this, so a malformed one fails at
  * `tsc` and in the editor rather than at CI. That is the whole argument for the
- * carrier decision, applied to instances as well as to the schema.
+ * carrier decision, applied to layers as well as to the schema.
  */
 export function defineTool(t: ToolDefinition): ToolDefinition {
   return ToolDefinitionSchema.parse(t);

@@ -115,7 +115,7 @@ function syncSubmodules(root: string): void {
  * git holds for it (`ls-files -u`: 1 base, 2 ours, 3 theirs).
  *
  * Measured 2026-10-02 on #1805: main DELETED generated files (auto-docs pages
- * under a folded instance) that the branch had modified. There is no stage 3,
+ * under a folded layer) that the branch had modified. There is no stage 3,
  * so `checkout --theirs` threw "does not have their version" and the run ended
  * in "Error". Taking the base's side of a deletion IS the deletion: generated
  * output the base removed stays removed, and regen recreates anything still

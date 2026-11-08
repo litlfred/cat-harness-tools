@@ -101,7 +101,7 @@ describe("discovery, not a hardcoded list", () => {
 describe("this repository, right now", () => {
   test("the entry files are found, and there is more than one", () => {
     // A green run over zero files is not coverage. Asserting ">1" rather than
-    // an exact count: the number changes when an instance is added, and the
+    // an exact count: the number changes when a layer is added, and the
     // check is where that number belongs.
     expect(findEntryFiles(REPO).length).toBeGreaterThan(1);
   });
@@ -120,7 +120,7 @@ describe("this repository, right now", () => {
   });
 });
 
-// folio-assistant-tsh9: a link into a path an instance moved resolves at the
+// folio-assistant-tsh9: a link into a path a layer moved resolves at the
 // new path while the move is in its window (sdlc skill `two-phase-move`).
 describe("a link into a moved path", () => {
   const checkout = (until: string): string => {

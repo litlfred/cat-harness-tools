@@ -18,7 +18,7 @@
  *   scripts import by a relative path, transitively;
  * - `bun.lock`, so a dependency bump invalidates everything;
  * - when the declaration names {@link TRACKED}, the whole working tree as
- *   version control sees it — for the scripts that walk every instance;
+ *   version control sees it — for the scripts that walk every layer;
  * - for every `--against <ref>` a command passes, the IDENTITY of the baseline
  *   that ref resolves to on the `qa-reports` branch (see {@link againstRefsOf}).
  *
@@ -332,7 +332,7 @@ export function expandGlobs(root: string, globs: readonly string[]): { files: st
 /**
  * The input token that means "the whole working tree as version control sees
  * it": every tracked file's content and every untracked, non-ignored file's
- * content. For scripts that walk every instance, skill and bean — declaring a
+ * content. For scripts that walk every layer, skill and bean — declaring a
  * narrower list for those would be a guess, and a guess that misses a file is
  * a false skip.
  */
@@ -614,7 +614,7 @@ export function toolsLine(): string {
 /** Memoised per-file content digests, keyed by path + size + mtime. */
 export class FileDigests {
   private memo = new Map<string, { key: string; digest: string }>();
-  /** The tracked-tree digest, computed at most once per instance. */
+  /** The tracked-tree digest, computed at most once per layer. */
   tree: ReturnType<typeof trackedTreeDigest> | undefined;
   constructor(private root: string) {
     this.declared = new DeclaredImports(root);

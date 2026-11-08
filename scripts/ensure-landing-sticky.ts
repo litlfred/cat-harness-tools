@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Give an instance a folio and a landing sticky — the last act of initiation.
+ * Give a layer a folio and a landing sticky — the last act of initiation.
  *
  * @module scripts/ensure-landing-sticky
  * @covers folio
@@ -11,7 +11,7 @@
  *
  * It belongs to cat-harness and runs after bootstrap's hand-off (`A_Install`):
  * bootstrap may not import from the layer composed on top of it, so a bare
- * bootstrap instance gets no folio.
+ * bootstrap layer gets no folio.
  *
  * ## Idempotent
  *
@@ -57,7 +57,7 @@ import {
 } from "../schemas/content/sticky-contribution.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** The graph typology, and the conventional directory an instance keeps it in. */
+/** The graph typology, and the conventional directory a layer keeps it in. */
 export const FOLIO_GRAPH_TYPOLOGY = "folio";
 export const FOLIO_DIR_ID = "folio";
 // declared-path-literal: the convention for a directory that does not exist yet.
@@ -127,7 +127,7 @@ type RawDirectory = Partial<ContentDirectory> & { graphs?: readonly string[] };
 
 /** Does this declaration already know about a folio graph? */
 export function declaresFolio(decl: { directories?: readonly RawDirectory[] } | undefined): boolean {
-  // Matched on the GRAPH TYPOLOGY rather than on `id` or `path`. An instance may
+  // Matched on the GRAPH TYPOLOGY rather than on `id` or `path`. A layer may
   // keep its folio anywhere and call the entry what it likes — `harness.json`'s
   // own comment records that overrides match on id, not path, precisely because
   // a relocation must not mint a second graph. What makes an entry "the folio"
@@ -296,15 +296,15 @@ export function readExistingSticky(path: string): LandingSticky | undefined {
 }
 
 /**
- * Every layer that contributes to this instance's board, in read order.
+ * Every layer that contributes to this layer's board, in read order.
  *
  * Two sources, and the second is what makes bootstrap's card possible:
  *
- * 1. **the instance itself** — its own `harness.json`;
- * 2. **every NESTED instance** — a declared directory that belongs to another
- *    instance in this checkout. `bootstrap/` is exactly that.
+ * 1. **the layer itself** — its own `harness.json`;
+ * 2. **every NESTED layer** — a declared directory that belongs to another
+ *    layer in this checkout. `bootstrap/` is exactly that.
  *
- * Nested instances are the PRE-SPLIT shape (issue #223). After the split they
+ * Nested layers are the PRE-SPLIT shape (issue #223). After the split they
  * become dependencies and arrive through the dependency chain instead, which is
  * why this returns a **list of roots** rather than doing the reading: the caller
  * supplies whichever set is true of its layout, the same way `resolveDirectories`
@@ -323,8 +323,8 @@ export function readExistingSticky(path: string): LandingSticky | undefined {
  *
  * | | why a naive `join(root, dir.path)` misses it |
  * |---|---|
- * | **`scope`** | `bootstrap` is declared `repository`-scoped, so its path resolves against the REPOSITORY root, not the instance. `rootForScope` is what knows that. |
- * | **the declared path is not the instance root** | the entry is `bootstrap/skills/` — the graph directory — and `harness.json` sits one level up, in `bootstrap/`. `findInstanceRoot` walks up to the instance that OWNS a directory. |
+ * | **`scope`** | `bootstrap` is declared `repository`-scoped, so its path resolves against the REPOSITORY root, not the layer. `rootForScope` is what knows that. |
+ * | **the declared path is not the layer root** | the entry is `bootstrap/skills/` — the graph directory — and `harness.json` sits one level up, in `bootstrap/`. `findInstanceRoot` walks up to the layer that OWNS a directory. |
  *
  * Looking for `harness.json` inside the declared directory finds nothing here,
  * and the failure is silent: the board renders, bootstrap's card is simply not on
@@ -337,10 +337,10 @@ export function contributingRoots(root: string): string[] {
   const nested: string[] = [];
   for (const dir of decl?.directories ?? []) {
     // `rootForScope` FIRST: a repository-scoped entry is relative to the
-    // checkout, and resolving it against the instance would point outside it.
+    // checkout, and resolving it against the layer would point outside it.
     const abs = resolve(rootForScope(own, dir.scope), dir.path);
-    // Then up to the instance that owns that directory. `undefined` means the
-    // directory belongs to no instance — `beans/` at the repository root is the
+    // Then up to the layer that owns that directory. `undefined` means the
+    // directory belongs to no layer — `beans/` at the repository root is the
     // live case — which is a real answer and not a gap.
     const owner = findInstanceRoot(abs);
     if (owner !== undefined && resolve(owner) !== own) nested.push(resolve(owner));
@@ -348,12 +348,12 @@ export function contributingRoots(root: string): string[] {
   // SIBLINGS AT THE REPOSITORY ROOT, and this is the third source rather than a
   // tidier way of writing the second.
   //
-  // The walk above finds a layer only when THIS instance declares a directory
+  // The walk above finds a layer only when THIS layer declares a directory
   // inside it — which is how `bootstrap/` is found, since cat-harness declares
   // `bootstrap/skills/`. The content core's directory is declared by nobody: it is a
   // sibling directory that declares itself, and under the rule everywhere else
-  // here — an instance is a directory holding its own `harness.json` — it is an
-  // instance the moment it exists.
+  // here — a layer is a directory holding its own `harness.json` — it is a
+  // layer the moment it exists.
   //
   // Without this, adding a layer meant ALSO editing the layer above to mention
   // it, which is the ownership inversion the whole contribution design undoes.
@@ -361,8 +361,8 @@ export function contributingRoots(root: string): string[] {
   // it.
   // GUARDED ON `.git`, and the guard is not belt-and-braces — without it this
   // scan is actively wrong. `repoRootFor` is just `instanceRoot/..`, so for a
-  // throwaway instance at `/tmp/xyz/` the "repository root" is `/tmp`, and
-  // scanning it picks up every other temp instance on the machine. Measured:
+  // throwaway layer at `/tmp/xyz/` the "repository root" is `/tmp`, and
+  // scanning it picks up every other temp layer on the machine. Measured:
   // 22 tests failed the moment this scan was added, each one reading somebody
   // else's fixture as a contributing layer.
   //
@@ -370,14 +370,14 @@ export function contributingRoots(root: string): string[] {
   // repository has one; a temp directory does not.
   //
   // `checkoutRootFor`, not `repoRootFor` (2026-10-15): for the CHECKOUT-ROOT
-  // instance — a folio whose landing is the repository itself — `dirname` is
+  // layer — a folio whose landing is the repository itself — `dirname` is
   // the directory holding the clone, and the `.git` guard does not stop it
   // when that directory is a checkout too: a Claude Code worktree's parent
-  // resolves to the MAIN checkout, so every instance in another session's tree
+  // resolves to the MAIN checkout, so every layer in another session's tree
   // joined this board. The checkout root answers itself and the scan is skipped.
   const repoRoot = checkoutRootFor(own);
   if (repoRoot !== own && existsSync(join(repoRoot, ".git"))) {
-    // THE CHECKOUT ROOT ITSELF, by the same rule: it is an instance the moment
+    // THE CHECKOUT ROOT ITSELF, by the same rule: it is a layer the moment
     // it declares itself. It used to be reached only by accident — cat-harness
     // declared `beans/` with `scope: "repository"`, and walking up from it found
     // the root's declaration. cmsl step 2 (issue #1694) moved those entries to
@@ -390,8 +390,8 @@ export function contributingRoots(root: string): string[] {
       if (abs === own) continue;
       if (findDeclarationFile(abs) !== undefined) nested.push(abs);
     }
-    // THE CHECKOUT'S ROOT INSTANCE, when the repository root is one. It was
-    // reached only through the walk above, because this instance declared
+    // THE CHECKOUT'S ROOT LAYER, when the repository root is one. It was
+    // reached only through the walk above, because this layer declared
     // `beans/` at `scope: "repository"` and the root's declaration owns that
     // path — so the root's card was on the board by accident of a mirror.
     // Placement PR0 (bean `ejye`) moved `beans/` to the root's own
@@ -399,8 +399,8 @@ export function contributingRoots(root: string): string[] {
     if (findDeclarationFile(repoRoot) !== undefined) nested.push(resolve(repoRoot));
   }
 
-  // MOUNTED INSTANCES: remote-mounted instances declared in index.lock.json
-  // (or mount lock). For a mounted instance, the sticky arrives with the mount.
+  // MOUNTED LAYERS: remote-mounted layers declared in index.lock.json
+  // (or mount lock). For a mounted layer, the sticky arrives with the mount.
   for (const mRoot of mountedInstanceRoots(own).values()) {
     if (resolve(mRoot) !== own && findDeclarationFile(mRoot) !== undefined) nested.push(resolve(mRoot));
   }
@@ -410,7 +410,7 @@ export function contributingRoots(root: string): string[] {
     }
   }
 
-  // The instance LAST, so its own contributions are read after its nested
+  // The layer LAST, so its own contributions are read after its nested
   // layers'. Order here does not decide the board — `order` does — but a stable
   // read order makes the duplicate-id error message name the layers in a
   // predictable sequence.
@@ -422,8 +422,8 @@ export function contributingRoots(root: string): string[] {
  *
  * Reads `stickies` off each layer's declaration and pairs it with that layer's
  * own `name`, `summary`, `alsoWritten` and `description`. `bodyFrom` reads **the
- * declaring instance's** fields, so bootstrap's card carries bootstrap's sentence and
- * not this instance's. Reading the root's for every layer would give a board of
+ * declaring layer's** fields, so bootstrap's card carries bootstrap's sentence and
+ * not this layer's. Reading the root's for every layer would give a board of
  * one sentence repeated, which is the defect that makes the whole seam pointless.
  */
 export function declaredContributions(root: string): DeclaredContribution[] {
@@ -436,9 +436,9 @@ export function declaredContributions(root: string): DeclaredContribution[] {
         contribution: StickyContributionSchema.parse(raw),
         declaredBy: decl.name,
         // The FILE, not just the layer's name. `layer` is the contributing
-        // instance's root and was being discarded here; a consumer wanting to
+        // layer's root and was being discarded here; a consumer wanting to
         // link to the source had only a name, which is not resolvable — and
-        // resolving one by searching is how two instances sharing a `name`
+        // resolving one by searching is how two layers sharing a `name`
         // silently attribute a card to the wrong file.
         declaredIn: relative(checkoutRootFor(root), declarationPathIn(layer)!) || (findDeclarationFile(layer) ?? ""),
         instanceRoot: resolve(layer),
@@ -454,9 +454,9 @@ export function declaredContributions(root: string): DeclaredContribution[] {
 /**
  * Find the file for a declared contribution on disk.
  *
- * Looks in the declaring instance's own declared folio directory first:
- * each instance's sticky lives in its own folio/, not in cat-harness/folio/.
- * Falls back to the composing instance's folio directory for backward
+ * Looks in the declaring layer's own declared folio directory first:
+ * each layer's sticky lives in its own folio/, not in cat-harness/folio/.
+ * Falls back to the composing layer's folio directory for backward
  * compatibility / pre-split fixtures.
  */
 export function stickyPathForContribution(
@@ -486,7 +486,7 @@ export function stickyPathForContribution(
 }
 
 /**
- * The stickies this instance should have, each reusing its own `createdAt`.
+ * The stickies this layer should have, each reusing its own `createdAt`.
  *
  * **Per-sticky reuse, not one timestamp for the set.** Reading the first
  * sticky's `createdAt` and applying it to all of them would rewrite the second
@@ -566,7 +566,7 @@ export function readerTextProblems(root: string): string[] {
 
 /** What a `--begin` / `--complete` run is asking for. */
 export interface InitiationUpdate {
-  /** The instance NAME whose card this is about — `declaredBy`, not a path. */
+  /** The layer NAME whose card this is about — `declaredBy`, not a path. */
   harness: string;
   phase: "begin" | "complete";
   /** `ok` unless the caller says otherwise. Only read on `complete`. */
@@ -607,7 +607,7 @@ export function nextInitiation(
  * Every landing sticky currently on disk, in the declared render order.
  *
  * Reads the FILES rather than rebuilding them, because the two answer different
- * questions: the declarations say what an instance *should* have, and a renderer
+ * questions: the declarations say what a layer *should* have, and a renderer
  * must draw what it *does* have. If initiation has not run, or has run against an
  * older set, drawing the declarations' answer would render a page that does not
  * exist on disk — and the `--check` gate that exists to report exactly that
@@ -735,14 +735,14 @@ export function initiationFromArgv(argv: readonly string[]): InitiationUpdate | 
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
-  // `instanceRootFor` rather than cwd: the instance root and the repository root
+  // `instanceRootFor` rather than cwd: the layer root and the repository root
   // stopped being the same directory in bean `wggr`, and a gate invoked from the
   // repository root would look for `harness.json` one level up from where it is.
   //
-  // An instance directory given as an argument wins (bean `1yd7`). Run from a
-  // separated instance's own repository, this script sits in the REMOTE-MOUNTED
+  // A layer directory given as an argument wins (bean `1yd7`). Run from a
+  // separated layer's own repository, this script sits in the REMOTE-MOUNTED
   // cat-harness, so its own root is the mount: the mounted layers were then not
-  // recognised as mounts and were written into, and the instance actually being
+  // recognised as mounts and were written into, and the layer actually being
   // composed — the IRIS replica — never had its `folio` graph declared.
   const positional = process.argv.slice(2).find((a, i, all) => !a.startsWith("--") && !["--begin", "--complete"].includes(all[i - 1] ?? ""));
   const root = positional === undefined ? HARNESS_ROOT : resolve(positional);

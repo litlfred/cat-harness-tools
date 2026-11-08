@@ -98,7 +98,7 @@ export function personaArtifact(corpus: JourneyCorpus, instance: string, actor: 
   return undefined;
 }
 
-/** The IG a journey's pages link into: the first workshop of its instance that declares one, else of the checkout. */
+/** The IG a journey's pages link into: the first workshop of its layer that declares one, else of the checkout. */
 export function igOf(corpus: JourneyCorpus, instance: string): WorkshopPresentation | undefined {
   const withIg = corpus.workshops.filter((w) => w.workshop.presentation?.ig);
   return (withIg.find((w) => w.instance === instance) ?? withIg[0])?.workshop.presentation;

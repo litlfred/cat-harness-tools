@@ -1,5 +1,5 @@
 /**
- * A checkout-level graph that a MOUNTED instance declares and the root does
+ * A checkout-level graph that a MOUNTED layer declares and the root does
  * not: absent, not a failed mount.
  *
  * Found on smart-ra#59 (2026-10-14). cat-harness declares `issue-marks` with
@@ -14,7 +14,7 @@
  *
  * | test | the rule |
  * |---|---|
- * | tipLocations | only a repository-scoped location of a non-root instance carries `unownedBy` |
+ * | tipLocations | only a repository-scoped location of a non-root layer carries `unownedBy` |
  * | origin carries no branch of the namespace | `absent`, and the mount as a whole is `mounted` (the smart-ra case) |
  * | origin carries the branch | it mounts as before |
  * | origin carries OTHER branches of the namespace, not this one | `miss`, a failure: the checkout adopted the namespace (the folio-assistant case; "Tighten it", #249) |
@@ -66,9 +66,9 @@ const ROOT_MARKS_BRANCH = "cat/root/issue-marks";
 const BEANS_BRANCH = "cat/root/beans";
 
 interface Opts {
-  /** Seed the lower instance's `issue-marks` branch on the checkout's origin. */
+  /** Seed the lower layer's `issue-marks` branch on the checkout's origin. */
   originCarriesMarks?: boolean;
-  /** Seed ANOTHER branch of the lower instance's namespace (`cat/lower/todos`) on the checkout's origin. */
+  /** Seed ANOTHER branch of the lower layer's namespace (`cat/lower/todos`) on the checkout's origin. */
   originCarriesSibling?: boolean;
   /** The root declares `issue-marks/` itself, on its own branch (seeded only if `rootMarksSeeded`). */
   rootDeclaresMarks?: boolean;
@@ -76,8 +76,8 @@ interface Opts {
 }
 
 /**
- * An index checkout: a root instance that declares `beans/` (seeded), and a
- * mounted instance `lower/` that declares `issue-marks/` with
+ * An index checkout: a root layer that declares `beans/` (seeded), and a
+ * mounted layer `lower/` that declares `issue-marks/` with
  * `scope: "repository"`.
  */
 function index(o: Opts = {}) {

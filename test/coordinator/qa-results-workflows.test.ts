@@ -9,7 +9,7 @@
  * Moved again, from `cat-harness-tools/scripts/tests/` to the checkout's own
  * test home `test/` (bean `7zz1`, owner ruling 2026-10-06 "Top-level
  * instance"): what it reads belongs to the whole checkout, which the root
- * instance declares, not to any one layer — so cat-harness-tools stays green
+ * layer declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
 import { describe, expect, it } from "bun:test";
@@ -37,7 +37,7 @@ describe("the witnesses are committed in one place and published in another", ()
       const text = readFileSync(join(repoRootFor(ROOT), ".github", "workflows", wf), "utf-8");
       // Two facts rather than one command line: `-T` so the CONTENTS land in
       // `assets/qa/`, and the destination both workflows must agree on. The
-      // SOURCE path moved with the instance and is not what this is about —
+      // SOURCE path moved with the layer and is not what this is about —
       // pinning the whole string made it fail on a correct relocation, the
       // same way `site-links.test.ts` did an hour earlier.
       expect(text).toContain("cp -rT ");

@@ -11,7 +11,7 @@ import { declarationPathIn } from "../kg/cat-harness.js";
 import type { ToolDefinition } from "./tool.js";
 import type { TypeIri } from "./tool-folders.js";
 
-// The INSTANCE root — where `cat-harness.json` lives. Found, not walked to:
+// The LAYER root — where `cat-harness.json` lives. Found, not walked to:
 // this file is no longer inside the harness (bean `8lcl`).
 export function decl(): { canonicalUrl?: string; stub?: string; name?: string } {
   const root = harnessRoot();
@@ -31,10 +31,10 @@ export function base(): string {
 }
 
 /**
- * This instance's artefact stub, read from the declaration.
+ * This layer's artefact stub, read from the declaration.
  *
  * NEVER written in. `<stub>.schema.json` is one of the artefacts declared
- * below, and an instance that renames itself — the `folio-assistant` /
+ * below, and a layer that renames itself — the `folio-assistant` /
  * `cat-harness` question still open at the time of writing — must not have to
  * edit a Tool node for the declaration to stay true.
  */
@@ -47,7 +47,7 @@ export function stub(): string {
 //
 // What was `tools/mcp.ts`'s header, kept with the two helpers it explains.
 /**
- * The Tool nodes for the twenty tools this instance already serves over MCP.
+ * The Tool nodes for the twenty tools this layer already serves over MCP.
  *
  * ## Why these exist as nodes at all
  *

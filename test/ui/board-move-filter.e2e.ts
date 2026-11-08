@@ -6,7 +6,7 @@
  *
  * ## Why the keyboard cases come first in this file, not just in the code
  *
- * This instance's declared interaction profile is low-dexterity. A board whose
+ * This layer's declared interaction profile is low-dexterity. A board whose
  * only affordance is drag excludes its own owner, so the keyboard path is the
  * requirement and the pointer path is the extra — and a test file that opened
  * with drag would be describing the opposite priority to whoever reads it next.

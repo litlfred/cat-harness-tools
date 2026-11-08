@@ -56,10 +56,10 @@ const ROOT = join(HARNESS_ROOT);
 
 // The catalogues live where the DECLARATION says, not at a composed path. These
 // three assertions read `join(ROOT, "translations/…")` until `wggr` moved the
-// directory under the instance stub and they failed ENOENT — correctly, and for
+// directory under the layer stub and they failed ENOENT — correctly, and for
 // the reason the slice exists to surface: a reader that composes a declared path
 // is a reader that has to be edited every time the layout moves.
-// declared-path-literal: the convention fallback for an instance that declares
+// declared-path-literal: the convention fallback for a layer that declares
 // nothing, matching `translationSourcesDir` in src/tools/translation.ts.
 const TRANSLATIONS = deferResolution(() => directoryForGraph(ROOT, "translation-sources") ?? join(ROOT, "translations"), {
   moduleUrl: import.meta.url,

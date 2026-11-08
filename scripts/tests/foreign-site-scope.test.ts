@@ -12,8 +12,8 @@
  * and the injected rail (`rail-standalone-pages --foreign-site`) — over a
  * FOLIO, and assert the two halves of the rule:
  *
- *   (a) the tiles describe the folio's instance: no other instance's count,
- *       and no other instance's state graph linked;
+ *   (a) the tiles describe the folio's layer: no other layer's count,
+ *       and no other layer's state graph linked;
  *   (b) no href is left root-relative unless it is the folio's own path,
  *       resolved inside the folio's baseurl.
  *
@@ -138,7 +138,7 @@ try {
     );
   } else {
     // `docs:pages` also re-derives the committed QA witnesses under every
-    // instance's `test/results/`: they are put back as they were, so this
+    // layer's `test/results/`: they are put back as they were, so this
     // build leaves no tracked file changed (bean w1gy F24).
     restoringTracked(qaResultDirsIn(REPO), () => {
       for (const w of writersOf(READ_PLAN)) {
@@ -309,7 +309,7 @@ describe("the rule, one row per case", () => {
   });
 });
 
-// smart-trust is a higher instance a standalone checkout does not hold, and
+// smart-trust is a higher layer a standalone checkout does not hold, and
 // the platform's harness data is built at publish and gitignored (bean w1gy
 // F18). Either absent, there is no real data to scope.
 const NO_REAL_DATA =
@@ -370,7 +370,7 @@ describe.skipIf(NO_REAL_DATA)("smart-trust, against the platform's real harness 
 describe("the IG site's shell (compose-docs --shell), end to end", () => {
   const out = mkdtempSync(join(tmpdir(), "foreign-shell-"));
   const r = compose(out, REPO, { shell: true, foreign: { instance: "smart-trust", platformBase: BASE } });
-  // The shell is smart-trust's, a higher instance a standalone checkout does
+  // The shell is smart-trust's, a higher layer a standalone checkout does
   // not hold; and what it leaves out or scopes is the platform's BUILT site,
   // written at publish and gitignored (bean w1gy F18). Either absent, the
   // composition has nothing to scope.
@@ -440,7 +440,7 @@ describe("the footer line: a folio's site does not print the platform's (#1901 f
     const c = scopeSiteConfig({ title: "Platform", footer_content: "Platform — code under Some Licence" }, { instance: "scratch-folio", title: "Scratch <Folio>", platformBase: BASE });
     expect(c.footer_content).toBe(`Scratch &lt;Folio&gt; — built with <a href="${BASE}/">Platform</a>.`);
     expect(String(c.footer_content)).not.toMatch(/licen[cs]e/i);
-    // No title: the instance name. No instance either: no name is invented.
+    // No title: the layer name. No layer either: no name is invented.
     expect(foreignFooterContent({ instance: "scratch-folio", platformBase: BASE }, "P")).toStartWith("scratch-folio — built with");
     expect(foreignFooterContent({ platformBase: BASE }, "P")).toBe(`This site is built with <a href="${BASE}/">P</a>.`);
     // Nothing to replace: the same object back.

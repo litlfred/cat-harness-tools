@@ -18,7 +18,7 @@
  * `<family>` is the derived family the judgements sit beside — `kg-qa`,
  * `block-qa` or `translation-qa` — and the mirror below it is EXACTLY the one
  * that family's derived tree uses, so the attestation for a subject is found
- * by swapping the tree root and the suffix. A hosted instance (one with no
+ * by swapping the tree root and the suffix. A hosted layer (one with no
  * `attestations` directory of its own, audited from a host) lives under
  * `<host>/test/attestations/<stub>/`, the same three answers
  * {@link attestationsHomeFor} shares with `kgQaHomeFor`.
@@ -48,7 +48,7 @@
  * `unknown`, the vocabulary `scripts/qa-store.ts` uses plus `absent`:
  *
  * - `miss` — the store is there and this subject has no file. A hosted
- *   instance's subtree that does not exist yet is a `miss` too.
+ *   layer's subtree that does not exist yet is a `miss` too.
  * - `absent` — the store directory itself is not there: a folio that has never
  *   had one.
  * - `unknown` — the store path is there and could not be read.
@@ -606,10 +606,10 @@ export type QaAttestations = z.infer<typeof QaAttestationsSchema>;
 // ── Where ────────────────────────────────────────────────────────────────
 
 /**
- * Where an instance's attestations live — the same three answers as
+ * Where a layer's attestations live — the same three answers as
  * `kgQaHomeFor` (`schemas/kg/cat-harness.ts`), for the same reason:
  *
- * - **own** — the instance declares an `attestations` directory;
+ * - **own** — the layer declares an `attestations` directory;
  * - **hosted** — it does not, and `hostRoot` does: `<host dir>/<stub>`;
  * - **convention** — neither: `<instance>/test/attestations`.
  */
@@ -622,7 +622,7 @@ export function attestationsHomeFor(
   by: "own" | "hosted" | "convention";
   /**
    * The DECLARED directory whose absence makes every read `unknown`: the
-   * instance's own, or the host's for a hosted instance. A hosted subtree
+   * layer's own, or the host's for a hosted layer. A hosted subtree
    * that does not exist yet is a store with nothing in it (a `miss`), not a
    * missing store — only the declared directory going is "store absent".
    */
@@ -641,7 +641,7 @@ export function attestationsHomeFor(
       return { root: join(host.absPath, artefactStub(decl)), by: "hosted", storeRoot: host.absPath };
     }
   }
-  // declared-path-literal: the base case for an instance that declares no
+  // declared-path-literal: the base case for a layer that declares no
   // `attestations` directory and is hosted by nobody.
   const conv = join(instanceRoot, "test", "attestations");
   return { root: conv, by: "convention", storeRoot: conv };
@@ -751,9 +751,9 @@ export function serialiseAttestations(file: QaAttestations, asciiEscape = false)
 
 // ── The kg-qa family's trees ─────────────────────────────────────────────
 
-/** One instance's `kg-qa/` derived tree and the attestation home it maps onto. */
+/** One layer's `kg-qa/` derived tree and the attestation home it maps onto. */
 export interface KgAttestationTree {
-  /** Repo-relative instance root, `.` for the checkout root. */
+  /** Repo-relative layer root, `.` for the checkout root. */
   instance: string;
   /** Absolute `<qa home>/kg-qa`. */
   kgTree: string;
@@ -767,9 +767,9 @@ export interface KgAttestationTree {
 export const KG_QA_SIDECAR_SUFFIX = ".kg-qa.json";
 
 /**
- * Every instance's `kg-qa/` tree with its attestation home, as `kg-audit`
- * resolves them when `hostRoot` is the auditor's instance. Deduplicated on the
- * tree, since two instance roots can share a hosted home.
+ * Every layer's `kg-qa/` tree with its attestation home, as `kg-audit`
+ * resolves them when `hostRoot` is the auditor's layer. Deduplicated on the
+ * tree, since two layer roots can share a hosted home.
  */
 export function kgAttestationTrees(repoRoot: string, hostRoot: string): KgAttestationTree[] {
   const out = new Map<string, KgAttestationTree>();
@@ -784,7 +784,7 @@ export function kgAttestationTrees(repoRoot: string, hostRoot: string): KgAttest
 
 /**
  * The attestation file and family tree for a kg-qa sidecar path, or
- * `undefined` when the path is under no instance's `kg-qa/` tree.
+ * `undefined` when the path is under no layer's `kg-qa/` tree.
  */
 export function kgAttestationFor(
   sidecarAbs: string,
@@ -807,7 +807,7 @@ export function kgAttestationFor(
 /**
  * The `adversarial-review` attestation file for a kg-qa sidecar path — the
  * `kg-qa` mirror under the family's own directory — or `undefined` when the
- * path is under no instance's `kg-qa/` tree.
+ * path is under no layer's `kg-qa/` tree.
  */
 export function adversarialAttestationFor(
   sidecarAbs: string,
@@ -902,7 +902,7 @@ export type CriteriaMap<E = QaEntryLike> = Record<string, E[]>;
 /** Which subject's judgements, in which family. */
 export interface AttestationKey {
   family: CriteriaFamily;
-  /** The subject root relative to the instance root, POSIX, without extension. */
+  /** The subject root relative to the layer root, POSIX, without extension. */
   subject: string;
   /** `translation-qa` only. */
   locale?: string;
@@ -920,7 +920,7 @@ const homes = new Map<string, ReturnType<typeof attestationsHomeFor>>();
 /**
  * The attestation home a block/translation writer uses: {@link attestationsHomeFor}
  * with no host, because a block writer runs against the content repository it
- * writes. Cached per instance root: a sweep asks once per block.
+ * writes. Cached per layer root: a sweep asks once per block.
  */
 export function criteriaAttestationsHome(instanceRoot: string): ReturnType<typeof attestationsHomeFor> {
   const k = resolve(instanceRoot);

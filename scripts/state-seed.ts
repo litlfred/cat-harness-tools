@@ -70,7 +70,7 @@
  * - `HEAD:<path>` and the branch's `<path>` are the SAME tree id — byte-
  *   identical, every file, mode and name, so nothing is removed from `main`
  *   that the branch does not hold;
- * - the directory's OWN instance declares a `fsh-guts` graph kept at a branch
+ * - the directory's OWN layer declares a `fsh-guts` graph kept at a branch
  *   tip, and the snapshot DEPOSIT into it succeeds and re-reads verified
  *   (§"The deposit", below). No
  *   trashcan, or a deposit that did not land, is a refusal with main
@@ -373,16 +373,16 @@ export interface CutoverProvenance {
   date: string;
 }
 
-/** Where the cut-over directory's OWN instance keeps its trashcan. */
+/** Where the cut-over directory's OWN layer keeps its trashcan. */
 type GutsTarget =
   | { state: "ok"; instance: string; directoryId: string; id: string; path: string; branch: string }
   | { state: "refused" | "unknown"; reason: string };
 
 /**
- * The fsh-guts graph of the instance that declares `path` — never another
- * instance's. A folio linking the platform must not deposit into the
+ * The fsh-guts graph of the layer that declares `path` — never another
+ * layer's. A folio linking the platform must not deposit into the
  * platform's trashcan (a branch its own remote does not carry), and the
- * submodule's declarations are not this checkout's instances anyway
+ * submodule's declarations are not this checkout's layers anyway
  * (`instanceRootsIn` excludes foreign checkouts).
  */
 export function fshGutsTargetFor(repoRoot: string, path: string): GutsTarget {
@@ -403,7 +403,7 @@ export function fshGutsTargetFor(repoRoot: string, path: string): GutsTarget {
   return { state: "refused", reason: `no instance under ${repoRoot} declares ${path}/, so there is no instance whose trashcan it belongs in` };
 }
 
-/** An instance root's own directories and its declared name. */
+/** A layer root's own directories and its declared name. */
 type ReadInstance =
   | { state: "ok"; root: string; instance: string; dirs: ResolvedDirectory[]; rel: (d: ResolvedDirectory) => string }
   | { state: "unknown"; reason: string };
@@ -422,7 +422,7 @@ function readInstance(repoRoot: string, inst: string): ReadInstance {
     // `findDeclarationFile` answers with the FILENAME, relative to `inst`.
     instance = String((JSON.parse(readFileSync(resolve(inst, declFile!), "utf-8")) as { name?: unknown }).name ?? "");
   } catch {
-    // Named below as unknown: provenance without the instance is not provenance.
+    // Named below as unknown: provenance without the layer is not provenance.
   }
   if (!instance) return { state: "unknown", reason: `could not read the instance name from ${declFile ?? inst}` };
   return { state: "ok", root: inst, instance, dirs, rel };
@@ -650,7 +650,7 @@ export type CutoverResult =
       branch: string;
       paths: Array<{ path: string; tree: string; files: number; bytes: number }>;
       /**
-       * Each removed path's snapshot in its instance's fsh-guts graph — made
+       * Each removed path's snapshot in its layer's fsh-guts graph — made
        * and verified BEFORE the removal commit, or (dry run) checked possible.
        */
       deposits: Deposit[];
@@ -741,7 +741,7 @@ export function cutoverMain(row: SpecialBranch, opts: CutoverOptions = {}): Cuto
   const summary = out.map((p) => `${p.path}/ (${p.files} file(s), ${p.bytes} bytes, tree ${p.tree.slice(0, 12)})`).join(", ");
 
   // DEPOSIT FIRST (owner, 2026-10-06: "cutover dirs should go to fsh-guts").
-  // Every path's snapshot lands in its instance's trashcan and is re-read from
+  // Every path's snapshot lands in its layer's trashcan and is re-read from
   // the tip before a single `git rm` runs; any refusal here returns with main
   // untouched. A dry run checks the trashcan can take it and writes nothing.
   const head = git(["rev-parse", "HEAD"]).stdout.trim();
@@ -809,18 +809,18 @@ export function cutoverReport(r: CutoverResult): string {
 }
 
 /**
- * ## `--retire <path> --into <instance>` — separating a whole instance
+ * ## `--retire <path> --into <instance>` — separating a whole layer
  *
- * A cutover moves one DIRECTORY of an instance onto that instance's own state
- * branch. Separation moves a whole INSTANCE ROOT out of the repository into
+ * A cutover moves one DIRECTORY of a layer onto that layer's own state
+ * branch. Separation moves a whole LAYER ROOT out of the repository into
  * its own (stage 13 of `sub-kg-lifecycle`), so neither half of `--cutover`
  * fits: there is no tip-keyed branch the path is kept on — the live copy is
- * another repository — and the trashcan is not the instance's own, because
- * that instance is the thing leaving. It is the instance named by `--into`:
+ * another repository — and the trashcan is not the layer's own, because
+ * that layer is the thing leaving. It is the layer named by `--into`:
  * the host that keeps the frozen copy.
  *
- * It REFUSES unless `<path>` is an instance root (it carries a declaration),
- * `--into` names a different instance under the same checkout whose
+ * It REFUSES unless `<path>` is a layer root (it carries a declaration),
+ * `--into` names a different layer under the same checkout whose
  * `fsh-guts` graph is kept at a branch tip, `--repository` answers
  * `git ls-remote`, and nothing under the paths is uncommitted. The deposit is
  * one archive of every path at HEAD — the root and each `--also` file beside
@@ -839,7 +839,7 @@ export interface RetireOptions {
   repoRoot?: string;
   remote?: string;
   storeDir?: string;
-  /** The instance whose `fsh-guts` keeps the frozen copy. */
+  /** The layer whose `fsh-guts` keeps the frozen copy. */
   into: string;
   /** Where the live graph is now — anything `git ls-remote` accepts. */
   repository: string;
@@ -952,7 +952,7 @@ export function archiveIds(archive: Buffer, paths: readonly string[]): Map<strin
   }
 }
 
-/** Separate the instance rooted at `path`. See §"`--retire`" above. */
+/** Separate the layer rooted at `path`. See §"`--retire`" above. */
 export function retireInstance(path: string, opts: RetireOptions): RetireResult {
   const repoRoot = opts.repoRoot ?? defaultRepoRoot();
   const clean = path.replace(/\/+$/, "").replace(/^\.\//, "");

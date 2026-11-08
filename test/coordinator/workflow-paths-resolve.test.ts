@@ -62,7 +62,7 @@
  * Moved again, from `cat-harness-tools/scripts/tests/` to the checkout's own
  * test home `test/` (bean `7zz1`, owner ruling 2026-10-06 "Top-level
  * instance"): what it reads belongs to the whole checkout, which the root
- * instance declares, not to any one layer — so cat-harness-tools stays green
+ * layer declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
@@ -84,7 +84,7 @@ const PLATFORM_WORKFLOWS = [
   "code-quality-gates.yml",
 ];
 
-/** Top-level directories the move relocated under the instance. */
+/** Top-level directories the move relocated under the layer. */
 const MOVED = [
   "adapters", "blueprint", "computations", "content", "deploy", "home_page",
   "latex", "library", "ns", "schemas", "scripts", "simulators", "skills",
@@ -105,7 +105,7 @@ const TOKEN = new RegExp(
   // outing — a real broken path, in a workflow already on the list. A guard
   // that misses the shape it was written for is worse than none, so this is
   // the one place to be generous.
-  // `*` too: `*/test/results/witnesses` is a glob over every instance's
+  // `*` too: `*/test/results/witnesses` is a glob over every layer's
   // tree, not the root path it ends in.
   String.raw`(?<![\w/\-*])\.?/?((?:${MOVED.join("|")})/[\w./*\-]*)`,
   "g",

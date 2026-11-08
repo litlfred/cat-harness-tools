@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { AMBIGUOUS_NAMES, checkAnchorNames, instanceDirs } from "../check-anchor-names.ts";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
-/** A repo with one instance at `cat-harness/`, holding `scripts/tests/a.ts`. */
+/** A repo with one layer at `cat-harness/`, holding `scripts/tests/a.ts`. */
 function fixture(src: string): string {
   const root = mkdtempSync(join(tmpdir(), "anchors-"));
   mkdirSync(join(root, "cat-harness", "scripts", "tests"), { recursive: true });
@@ -27,7 +27,7 @@ function fixture(src: string): string {
 
 describe("a name that claims an anchor must land on it", () => {
   test("REPO_ROOT landing on an instance root is a finding, and names its fix", () => {
-    // `../..` from cat-harness/scripts/tests/ is cat-harness/ — an instance.
+    // `../..` from cat-harness/scripts/tests/ is cat-harness/ — a layer.
     const r = checkAnchorNames(fixture('const REPO_ROOT = resolve(import.meta.dir, "..", "..");\n'));
     expect(r.findings).toHaveLength(1);
     expect(r.findings[0]!.detail).toContain("rename it to `INSTANCE_ROOT`");
@@ -84,7 +84,7 @@ describe("PLATFORM is refused because it means two things HERE", () => {
 
 describe("what this check does NOT claim", () => {
   test("a re-rooted ascent with a truthful name passes — the defect is NOT caught", () => {
-    // THE POINT OF THIS TEST. `INSTANCE_ROOT` landing on an instance root is
+    // THE POINT OF THIS TEST. `INSTANCE_ROOT` landing on a layer root is
     // clean whatever the fixture then does with it, which is exactly how
     // init-folio.test.ts's PLATFORM survived its move. Three designs that
     // tried to catch the real defect were measured and failed; this one

@@ -179,12 +179,12 @@ describe("no-orphan-sidecar in chapter mode", () => {
  * exist, the unmodified check reported ZERO orphans: a silent no-op wearing a
  * clean bill of health.
  *
- * Every fixture above is a `mkdtemp` directory, which is OUTSIDE any instance
+ * Every fixture above is a `mkdtemp` directory, which is OUTSIDE any layer
  * root — so none of them can reach a results tree at all, and none of them
  * would have noticed. That is not a flaw in those tests; it is why the ones
  * below build a whole miniature folio and run with the cwd inside it. The
  * check locates the results tree from `findContentRepoRoot()`, which walks up
- * from `process.cwd()`, so a fixture that does not look like an instance root
+ * from `process.cwd()`, so a fixture that does not look like a layer root
  * cannot exercise the half of the check that matters now.
  */
 describe("no-orphan-sidecar in the results tree", () => {

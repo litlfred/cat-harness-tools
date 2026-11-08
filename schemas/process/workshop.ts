@@ -27,8 +27,8 @@
  * A question is a question: a module asks a room to NAME, not to decide.
  *
  * The workshop's steps name a scenario and a step id. A scenario id is looked
- * up first in the workshop's own instance and then in every instance the
- * checkout mounts, so a workshop may teach from journeys another instance
+ * up first in the workshop's own layer and then in every layer the
+ * checkout mounts, so a workshop may teach from journeys another layer
  * holds.
  */
 import { z } from "zod";
@@ -113,7 +113,7 @@ const StepTagSchema = z.object({ table: Id, row: Id, why: Text.optional() }).str
 
 export const WorkshopStepSchema = z
   .object({
-    /** The scenario id (`user-scenario`), looked up in this instance first. */
+    /** The scenario id (`user-scenario`), looked up in this layer first. */
     scenario: Id,
     /** The step id in that scenario. */
     step: Text,
@@ -201,7 +201,7 @@ export const WorkshopPresentationSchema = z
     /**
      * The ArchiMate views How it works shows first (the systems, the journeys
      * as use cases), before the views each taught journey names: a model id of
-     * the instance's `cat-archimate.config.json` and a view id in it.
+     * the layer's `cat-archimate.config.json` and a view id in it.
      */
     views: z.array(z.object({ model: Text, view: Text, label: Text.optional() }).strict()).optional(),
     /** The line the Discussion view opens with ("The technology works. What do countries need to agree on to make it real?"). */
@@ -221,7 +221,7 @@ export const WorkshopPresentationSchema = z
       .strict()
       .optional(),
     /**
-     * The instance's own device demo: an app that shows each moment's screen.
+     * The layer's own device demo: an app that shows each moment's screen.
      * The viewer does not draw the screens; its Device Demo view frames the
      * app's own page for each (`href` + `#/demo/<id>` unless `route` says
      * otherwise) and links each screen and the steps it shows both ways.

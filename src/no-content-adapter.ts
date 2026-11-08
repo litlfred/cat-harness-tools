@@ -1,10 +1,10 @@
 /**
- * The adapter for an instance that holds no content.
+ * The adapter for a layer that holds no content.
  *
  * A harness layer (`cat-harness`, `bootstrap`) declares no content type and
  * carries no adapter: every content adapter lives above it. Until 2026-10-04
  * the server refused to start in that case — *"A server with no adapter can
- * serve no content, so it does not start"* — so a fresh instance standing on
+ * serve no content, so it does not start"* — so a fresh layer standing on
  * `cat-harness` alone could not reach `folio_init`, `skill_fetch` or the
  * workflow tools over MCP. Measured by bean `zmdo`'s rehearsal; the owner
  * ruled the same day that the server starts with the generic tools only.

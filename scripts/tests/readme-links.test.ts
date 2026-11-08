@@ -268,7 +268,7 @@ describe("runReadmeAudit", () => {
   });
 });
 
-// folio-assistant-tsh9: `readme:audit` honours a move the instance declares
+// folio-assistant-tsh9: `readme:audit` honours a move the layer declares
 // (sdlc skill `two-phase-move`) until its `until`, and not after.
 describe("runReadmeAudit and a declared move", () => {
   const moved = (until: string): string => {

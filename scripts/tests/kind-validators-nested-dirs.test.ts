@@ -22,7 +22,7 @@ import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "../../schemas/kg/g
 import { sweepFamilies } from "../check-kind-validators.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
-// One parent directory per case: the sweep reads every instance beside the
+// One parent directory per case: the sweep reads every layer beside the
 // one it is given, so two fixtures in one parent would each see the other.
 const made: string[] = [];
 function instanceDir(name: string): string {
@@ -76,7 +76,7 @@ describe("check:kind-validators reads a from-within directory as its own kind's"
 
 describe("a deeper directory of another kind still takes its nodes (folio-assistant#2529)", () => {
   const inst = instanceDir("deeper");
-  // `sweep-marks` declared by the instance itself at `beans/marks`, inside its
+  // `sweep-marks` declared by the layer itself at `beans/marks`, inside its
   // `beans/`. `beans` maps `folio-sweep-mark/v1` too, so without the guard its
   // sweep of `beans/` would claim the mark.
   mkdirSync(join(inst, "beans", "marks"), { recursive: true });
@@ -113,7 +113,7 @@ describe("a family declared with {} in nodeSchemas is routed as unvalidated, not
   );
 
   // The two families are `{}` in this layer's code, but a composition that
-  // mounts the instance holding their validators joins them, and the default
+  // mounts the layer holding their validators joins them, and the default
   // registry then resolves them instead. The claim is about `{}` families, so
   // the sweep reads a registry seeded from this layer's code alone, with no
   // checkout to join.

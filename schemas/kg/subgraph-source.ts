@@ -4,7 +4,7 @@
  * @module schemas/subgraph-source
  * @graphNode schema
  *
- * A declared subgraph says where it gets its content, and the instance config
+ * A declared subgraph says where it gets its content, and the layer config
  * may override that. Directory, branch and remote subgraphs are one thing
  * differing in SOURCE, a discriminated union on `kind`:
  *
@@ -14,7 +14,7 @@
  * | `branch` | a declared repository branch, keyed by `commit` or `tip` | where a mount of it lands |
  * | `family` | a family of branches, one per key | where a mount of ONE member lands |
  * | `remote` | another repository's tree, at a pinned 40-character commit | where the remote mount lands |
- * | `hydrated` | another instance's published `index.hydrated.jsonld` for one subgraph, at a pinned commit — metadata, no files | where that one file lands |
+ * | `hydrated` | another layer's published `index.hydrated.jsonld` for one subgraph, at a pinned commit — metadata, no files | where that one file lands |
  *
  * A new kind (e.g. a graph database) is a new MEMBER of the union, which every
  * `switch` on `kind` is then forced by the compiler to answer — never a
@@ -31,7 +31,7 @@
  * a branch no directory declares is a health finding (`state:drift`), not a
  * resolver failure.
  *
- * ## Overridable by the instance config, matched on id
+ * ## Overridable by the layer config, matched on id
  *
  * `<instance>.config.json` → `subgraphSources: { "<dir-id>": <source> }`. The
  * declaration says what the subgraph IS; the config says how THIS
@@ -267,7 +267,7 @@ export const NpmSourceSchema = z
 export type NpmSource = z.infer<typeof NpmSourceSchema>;
 
 /**
- * The content is ONE FILE OF METADATA: another instance's published
+ * The content is ONE FILE OF METADATA: another layer's published
  * `index.hydrated.jsonld` for one of its subgraphs, at a pinned commit — every
  * node of that subgraph inline, typed, labelled and described, its heavy
  * bodies as payload pointers, and not one byte of the subgraph itself (bean
@@ -279,11 +279,11 @@ export type NpmSource = z.infer<typeof NpmSourceSchema>;
  * directory that is not there and read the result as the subgraph. A new
  * member is a compile error at every such consumer instead (bean `l4ay`).
  *
- * `harness` and `subgraph` name the file rather than spell its path: where an
- * instance publishes is `<its docs dir>/subgraph/<harness>/<subgraph>/` and
+ * `harness` and `subgraph` name the file rather than spell its path: where a
+ * layer publishes is `<its docs dir>/subgraph/<harness>/<subgraph>/` and
  * the docs directory is read from ITS declaration at the pin, so the path is
  * the mounting tool's to compute ({@link publishedSubgraphDir} in
- * `subgraph-manifest.ts`). `subgraph` is never the instance root: a hydrated
+ * `subgraph-manifest.ts`). `subgraph` is never the layer root: a hydrated
  * file there would be the whole graph in one document (`f233`).
  *
  * `tool` names the declared Tool that fetches it (bean `j9cs`: the subgraph
@@ -296,9 +296,9 @@ export const HydratedSourceSchema = z
     kind: z.literal("hydrated"),
     repository: RemoteSourceSchema.shape.repository,
     ref: RemoteSourceSchema.shape.ref,
-    /** The upstream instance's name — the `<HARNESS>` segment of the subgraph IRI. */
+    /** The upstream layer's name — the `<HARNESS>` segment of the subgraph IRI. */
     harness: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "an instance name"),
-    /** The subgraph's path in that instance, e.g. `tools` or `skills/sdlc`; never the root. */
+    /** The subgraph's path in that layer, e.g. `tools` or `skills/sdlc`; never the root. */
     subgraph: z
       .string()
       .regex(/^[A-Za-z0-9_-][A-Za-z0-9._-]*(?:\/[A-Za-z0-9_-][A-Za-z0-9._-]*)*\/?$/, "an instance-relative subgraph path, no dot-prefixed segment, never the root")
@@ -328,7 +328,7 @@ export type SubgraphSource = z.infer<typeof SubgraphSourceSchema>;
 export type SubgraphSourceKind = SubgraphSource["kind"];
 
 /**
- * Where a NEW instance's graph of a kind lives — the scaffold default a graph
+ * Where a NEW layer's graph of a kind lives — the scaffold default a graph
  * typology may carry (`newInstanceSource` on the graph-typology registry). Bean `hp54`.
  *
  * It has NO `branch`, and that is the point. The objection recorded on
@@ -337,10 +337,10 @@ export type SubgraphSourceKind = SubgraphSource["kind"];
  * partly in its declaration and partly in a registry entry somebody else
  * edits. This is not that. `folio_init` reads it once, composes the branch
  * with {@link instanceStateBranch}, and writes an ordinary, complete
- * `source: { kind: "branch", branch, keyedBy }` into the new instance's own
+ * `source: { kind: "branch", branch, keyedBy }` into the new layer's own
  * declaration. After that the declaration is the one place that answers, and
  * {@link resolveSubgraphSource} never consults this field — which is also why
- * an existing instance's undeclared-source `beans/` (this repository's own)
+ * an existing layer's undeclared-source `beans/` (this repository's own)
  * is not flipped by it.
  *
  * Only `tip`: it is for one-live-copy state, the keying beans and todos use.
@@ -351,19 +351,19 @@ export const NewInstanceSourceSchema = z
 export type NewInstanceSource = z.infer<typeof NewInstanceSourceSchema>;
 
 /**
- * THE branch-name convention for an instance's own state subgraph:
+ * THE branch-name convention for a layer's own state subgraph:
  * `cat/<instance>/<directory-id>`.
  *
  * The owner's 2026-10-02 ruling named special branches `cat/<harness>/<name>`
- * (`cat/cat-harness/beans`, `cat/cat-harness/qa-reports`). A folio is an
- * instance like any harness, so its own work plan is `cat/<instance>/beans` in
- * ITS repository: keyed by the same instance name that already prefixes its
+ * (`cat/cat-harness/beans`, `cat/cat-harness/qa-reports`). A folio is a
+ * layer like any harness, so its own work plan is `cat/<instance>/beans` in
+ * ITS repository: keyed by the same layer name that already prefixes its
  * bean ids (`.beans.yml` → `prefix: <instance>-`) and names its declaration
  * (`<instance>.json`), so one name answers all three. The directory id, not
  * the kind, is the last segment — the id is what `branch-store mount --id`
  * and `state:seed --id` are keyed by.
  *
- * Validated, so an instance name that would make an invalid ref is refused
+ * Validated, so a layer name that would make an invalid ref is refused
  * here rather than by `git push` later.
  */
 export function instanceStateBranch(instance: string, id: string): string {
@@ -484,7 +484,7 @@ export interface SourcedEntry {
  * `check:declared-dirs`, `audit:coverage`): a subgraph whose content is on a
  * branch is not "missing" when its directory is absent, and must not be
  * created empty. Asked of the declaration alone, so it never throws and needs
- * no IO; the instance config's override is the resolver's to apply.
+ * no IO; the layer config's override is the resolver's to apply.
  * `storage` (#1764) counts — it is the legacy spelling of a branch source.
  */
 export function contentIsOffCheckout(entry: { source?: SubgraphSource; storage?: unknown }): boolean {
@@ -493,7 +493,7 @@ export function contentIsOffCheckout(entry: { source?: SubgraphSource; storage?:
 }
 
 /**
- * THE resolver. Precedence: the instance config's override for this id, then
+ * THE resolver. Precedence: the layer config's override for this id, then
  * the entry's `source`, then a legacy `storage`, then `directory`.
  *
  * Throws on the two contradictions a reader must not paper over: an entry

@@ -27,20 +27,20 @@
  * ## Where a path resolves against
  *
  * `scope: "repository"` resolves against the REPOSITORY root; anything else
- * against the declaring INSTANCE's root — the rule `KgAssetSchema.src`
+ * against the declaring LAYER's root — the rule `KgAssetSchema.src`
  * already states for assets.
  *
- * ## Instances are DISCOVERED, not listed
+ * ## Layers are DISCOVERED, not listed
  *
  * Via {@link instanceRootsIn}, the same way `check:declared-assets` does.
  *
- * ## A MIRROR of another instance's directory
+ * ## A MIRROR of another layer's directory
  *
  * - **mirror** — a `scope: "repository"` entry whose path lies inside ANOTHER
- *   instance's root. Each instance declares its own directories; the checkout
- *   aggregates them (the root instance `needs` every staged instance, and
+ *   layer's root. Each layer declares its own directories; the checkout
+ *   aggregates them (the root layer `needs` every staged layer, and
  *   `check:instance-graph` refuses one it does not reach). So a lower layer
- *   never names the instances stacked on it.
+ *   never names the layers stacked on it.
  *
  * ## A directory kept at a branch TIP
  *
@@ -63,7 +63,7 @@
  * `todos/` on `main` leaves no reader able to ask where the work plan lives.
  * {@link auditUndeclaredState} reports a top-level directory at a
  * conventional state path (every `DEFAULT_DIRECTORIES` entry whose kinds all
- * `holds: "state"`) that the instance does not declare. It REPORTS: the
+ * `holds: "state"`) that the layer does not declare. It REPORTS: the
  * remedy is to declare it (with its `source`), never to remove it —
  * `deletion-requires-confirmation`.
  *
@@ -111,7 +111,7 @@ export interface DirFinding {
    * Set on a NESTED entry: the declaration that holds it, instance-relative
    * (`docs/docs.json`), and the parent entry's id.
    *
-   * Absent means the entry is in the instance's own `<instance>.json`. The
+   * Absent means the entry is in the layer's own `<instance>.json`. The
    * field exists because `detail` says *"drop the declaration"*, and a reader
    * who opens `<instance>.json` for a nested entry will not find it there —
    * a remedy pointing at the wrong file is worse than none.
@@ -169,7 +169,7 @@ export function tipPresence(
   repoRoot: string,
   /**
    * The id the MOUNT MARKER is keyed on. Defaults to `loc.id`, which is right
-   * for an instance's own entry and wrong for one declared from within: there
+   * for a layer's own entry and wrong for one declared from within: there
    * the composed `beans/queue` is the reader's id and `queue` is the mount's,
    * and `markerPath` refuses the former outright (bean `najo`).
    */
@@ -193,9 +193,9 @@ export function tipPresence(
   let marker;
   let markerRoot = repoRoot;
   try {
-    // By PATH first. An id several instances of an index declare (`health`,
+    // By PATH first. An id several layers of an index declare (`health`,
     // four times on 2026-10-11) is filed under `<instance>.<id>`, so the id
-    // alone either finds none or finds another instance's mount; the declared
+    // alone either finds none or finds another layer's mount; the declared
     // path is what says which graph this is. Then the id, as before — but a
     // marker for a DIFFERENT declared path is another graph's, not this one's.
     // Only where the mount lives is used below (`path`, `into`): read as a location (`read-projections.ts`).
@@ -308,7 +308,7 @@ export function routePresence(
 }
 
 /**
- * The directories this instance declares it BUILDS AT PUBLISH (`builtAtPublish`,
+ * The directories this layer declares it BUILDS AT PUBLISH (`builtAtPublish`,
  * `schemas/kg/built-at-publish.ts`; owner, 2026-10-14, "B1"), as absolute paths
  * ending in the separator. A declared directory among them is never on disk in
  * a checkout that has not run `derive:publish`, and that is its correct state,
@@ -325,10 +325,10 @@ export function builtAtPublishDirs(instanceRoot: string): Set<string> {
 const isBuiltAtPublishDir = (dirs: ReadonlySet<string>, abs: string): boolean => dirs.has(resolve(abs) + sep);
 
 /**
- * @param otherInstances every instance root in the checkout; a
+ * @param otherInstances every layer root in the checkout; a
  *   repository-scoped entry inside one of them other than the declaring
- *   instance is a `mirror`. An instance that CONTAINS the declaring one (the
- *   checkout's root instance) is not "other" for this purpose — every path is
+ *   layer is a `mirror`. A layer that CONTAINS the declaring one (the
+ *   checkout's root layer) is not "other" for this purpose — every path is
  *   inside it.
  */
 /**
@@ -373,7 +373,7 @@ export function auditInstance(
     // throw-free question: is this entry's content elsewhere at all. It is
     // asked FIRST so the common case costs nothing.
     if (contentIsOffCheckout(e)) {
-      // An instance's OWN entry is listed under its own id, so the mount
+      // A layer's OWN entry is listed under its own id, so the mount
       // marker is keyed on exactly that.
       findings.push(...offCheckoutFindings(e, abs, instanceRoot, repoRoot, e.id));
       continue;
@@ -444,12 +444,12 @@ export function conventionalStateDirectories(): Array<{ id: string; path: string
     .map((d) => ({ id: d.id, path: d.path, kinds: d.graphTypologies ?? [] }));
 }
 
-/** The conventional directory an instance may keep as repository data, outside its KG (owner, 2026-11-03). */
+/** The conventional directory a layer may keep as repository data, outside its KG (owner, 2026-11-03). */
 export const UPLOADS_DATA_STORE_ID = "uploads";
 
 /**
  * `undeclared-state` — a conventional state directory (`beans/`, `todos/`)
- * present at the top of an instance and named by none of its own entries.
+ * present at the top of a layer and named by none of its own entries.
  * See the module docblock. Any entry covering the path counts, whatever its
  * id or source: the question is whether ANY declaration says what this
  * directory is, not whether it says the right thing.
@@ -499,12 +499,12 @@ export function auditUndeclaredState(instanceRoot: string, repoRoot: string): Di
  * composes the path from the parent's, so it is already instance-relative and
  * there is nothing to resolve. They therefore cannot be a `mirror` — that
  * finding is about a `scope: "repository"` path landing inside another
- * instance, which a composed path cannot do. And the remedy differs, because
+ * layer, which a composed path cannot do. And the remedy differs, because
  * the entry is in a different file.
  *
  * ## The gap it closes, measured
  *
- * The loop above reads `decl.directories` — an instance's TOP-LEVEL entries
+ * The loop above reads `decl.directories` — a layer's TOP-LEVEL entries
  * only — and the summary counted the same list, so a nested entry was neither
  * checked nor counted. Measured 2026-10-03 by pointing a real nested entry at
  * `assets/img/uml/NOPE`:
@@ -691,9 +691,9 @@ export function auditNested(
   const publishTime = builtAtPublishDirs(instanceRoot);
   // `nestedDirectories` wants the whole declaration shape; only `directories`
   // is read, and a structural parameter keeps this callable from a test
-  // fixture that has no reason to carry an instance `name`.
+  // fixture that has no reason to carry a layer `name`.
   const nested = nestedDirectories(instanceRoot, decl as Parameters<typeof nestedDirectories>[1]);
-  // Every entry a parent id can name: the instance's own, then the nested ones
+  // Every entry a parent id can name: the layer's own, then the nested ones
   // (`walkNested` goes to any depth, so a parent may itself be nested).
   const byId = new Map<string, { path: string; graphTypologies: readonly string[] }>();
   for (const d of decl?.directories ?? []) byId.set(d.id, { path: d.path, graphTypologies: d.graphTypologies ?? [] });
@@ -701,7 +701,7 @@ export function auditNested(
   // A nested entry's path is relative to the same root its TOP-LEVEL ancestor
   // resolves against — `nestedDirectories` reads the nested declaration from
   // there (`rootForScope`), so judging the entry anywhere else reports a
-  // directory as absent that is on disk. It mattered once a non-root instance
+  // directory as absent that is on disk. It mattered once a non-root layer
   // could declare a `scope: "repository"` graph: cat-harness declares the
   // index checkout's `beans/` and `todos/`, and their nested `defs/`, `items/`
   // and the rest were looked for under `cat-harness/`.
@@ -781,7 +781,7 @@ if (import.meta.main) {
     declared += decl?.directories?.length ?? 0;
     exempt += (decl?.directories as Array<{ absent?: unknown }> | undefined)?.filter((d) => d.absent).length ?? 0;
     // Counted SEPARATELY, never folded into `declared`. The two numbers answer
-    // different questions — how many directories an instance declares, and how
+    // different questions — how many directories a layer declares, and how
     // many more are declared from within one of them — and a single total would
     // hide the second behind the first, which is how the nested entries went
     // unchecked in the first place. A zero here is also a fact worth printing:
@@ -799,7 +799,7 @@ if (import.meta.main) {
   }
   console.log(
     // NAMED, not just counted — `check:declared-assets` records why: a bare
-    // count reads as success until you know how many instances there were.
+    // count reads as success until you know how many layers there were.
     `${declared} declared director(ies) across ${instances.length} instance(s) ` +
       `(${instances.map((p) => basename(p) || p).sort().join(", ")}) ` +
       `plus ${nestedCount} declared FROM WITHIN one of them; ` +

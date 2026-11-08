@@ -61,7 +61,7 @@ import { readQaTree } from "../../../scripts/qa-store.ts";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));
 
-/** The content layer's schemas, when one is composed: the instance declaring the `core` layer's kinds. */
+/** The content layer's schemas, when one is composed: the layer declaring the `core` layer's kinds. */
 function contentLayerScan(): Array<{ path: string }> {
   const c = contentLayerInstance();
   return c === undefined ? [] : [{ path: `${c.name}/schemas` }];
@@ -83,7 +83,7 @@ function contentLayerScan(): Array<{ path: string }> {
  *   from it reads as "nothing to report" rather than as a gap.
  * - `cat-harness/skills` names its groups one level down and `bootstrap/skills`
  *   does not, despite being the same graph typology. That is a fact about where each
- *   instance keeps its nodes, which is why the depth is measured rather than
+ *   layer keeps its nodes, which is why the depth is measured rather than
  *   inferred from the kind.
  *
  * An entry naming a directory that does not exist is REPORTED as a determined
@@ -100,7 +100,7 @@ const LITERAL_SCAN: Array<{ path: string }> = [
   // declared-path-literal: the scan list is REPO-relative. The grouping depth it
   // used to pair with each path is now derived (`groupDepthFor`); the PATHS
   // remain literals, which is a separate and still-open concern.
-  // The content layer's schemas: the instance declaring the `core` layer's
+  // The content layer's schemas: the layer declaring the `core` layer's
   // kinds, read from where they were declared (folio-assistant#2598), and
   // absent when no content layer is composed.
   ...contentLayerScan(),
@@ -109,10 +109,10 @@ const LITERAL_SCAN: Array<{ path: string }> = [
 ];
 
 /**
- * Every instance's OWN `skills` directories, resolved from the declarations —
+ * Every layer's OWN `skills` directories, resolved from the declarations —
  * never hardcoded. Owner ruling, 2026-10-01 (separation arc S0, bean `hx65`):
  * placement PR1 moved eight skill packages out of `cat-harness/skills/` into
- * the instances that own them, which left their detangle sidecars measuring a
+ * the layers that own them, which left their detangle sidecars measuring a
  * path nobody had. The ruling was to WIDEN THE SCAN rather than delete the
  * measurements, so a package is measured wherever its owner declares it.
  *
@@ -137,7 +137,7 @@ function declaredSkillScan(literal: ReadonlyArray<{ path: string }>): Array<{ pa
 
 /**
  * `--gate-direction` keeps the LITERAL scan, for now. Widening it to every
- * instance's skills turns 104 refs that were dangling (and so excluded) into
+ * layer's skills turns 104 refs that were dangling (and so excluded) into
  * resolved WRONG-DIRECTION edges — 91 of them harness BPMN naming skills that
  * placement PR1 moved up, which PR1 deferred to PR3 (bean `63wl`, which moves
  * those diagrams to their owners), plus `cat-harness/scenarios/roles.json`
@@ -152,10 +152,10 @@ const SCAN: Array<{ path: string }> = GATING_DIRECTION ? [...LITERAL_SCAN] : dec
 const WIDENED = new Set(SCAN.slice(LITERAL_SCAN.length).map((s) => s.path));
 
 /**
- * Topics a WIDENED skills directory inherits from the instances it stacks on.
+ * Topics a WIDENED skills directory inherits from the layers it stacks on.
  *
  * Topic membership is option A (bean `1g4s`): the same-named directory of every
- * instance stacked on the declarer is a MEMBER of the topic, never a group of
+ * layer stacked on the declarer is a MEMBER of the topic, never a group of
  * its own — the content core declares `content`, so the formal-math layer's
  * `skills/content/authoring-math` is the group, exactly as
  * `cat-harness/skills/authoring/authoring-math` was before placement PR1 moved
@@ -419,7 +419,7 @@ function tsImportTarget(fromDir: string, spec: string): string {
  *
  * `kinds` is NOT optional and that is the fix for a measured defect. A first
  * cut preferred a hit in the SAME group, on the reasoning that a package's own
- * copy should win over a sibling instance's. Five `<bootstrap.processes:skill ref>` values —
+ * copy should win over a sibling layer's. Five `<bootstrap.processes:skill ref>` values —
  * `activity-log`, `getting-started`, `l2-dak-authoring`, `qa-report-signing`,
  * `upstream-version-adoption` — are ALSO the basenames of diagrams sitting in
  * the same directory, so every one of them resolved to the .bpmn referring to
@@ -502,12 +502,12 @@ for (const n of nodes) {
 
 // ── Direction — bean `j79e`.
 //
-// A node's LAYER is the instance it lives in: the first path segment, when
+// A node's LAYER is the layer it lives in: the first path segment, when
 // that directory declares itself with `<name>/<name>.json`. What a layer may
 // reach is its declared `needs`, transitively, plus itself — the same
 // relation `check:partition` applies to repos, through the same function.
 //
-// An instance with no `needs` is UNDETERMINED and its edges stay so. Filling
+// A layer with no `needs` is UNDETERMINED and its edges stay so. Filling
 // it in here would be deciding a layering nobody has declared.
 const layerNeeds = new Map<string, readonly string[] | undefined>();
 for (const seg of new Set(nodes.map((n) => n.id.split("/")[0]))) {
@@ -750,7 +750,7 @@ function compareWithStored(ref: string): { from: string; moved: { path: string; 
  * **That ruling stands and this flag does not touch it.**
  *
  * The one number that is not taste is this one. A module's BUCKET is a
- * judgement; an import pointing at an instance that declares a dependency on
+ * judgement; an import pointing at a layer that declares a dependency on
  * you is a contradiction between two declarations, and no amount of taste
  * makes it consistent. So the direction count is graded and the rest is not,
  * and the two live behind DIFFERENT FLAGS with different npm scripts and
@@ -761,12 +761,12 @@ function compareWithStored(ref: string): { from: string; moved: { path: string; 
  * ## Why this axis is here rather than in `check:partition`
  *
  * `check:partition` resolves its ROOT to `<checkout>/cat-harness`, so the
- * wrong-direction count it prints is scoped to ONE instance and is silent
+ * wrong-direction count it prints is scoped to ONE layer and is silent
  * about edges between already-extracted siblings. `bf5l` measured the
  * discriminator: with `cat-harness/schemas/library/intake.ts` importing
  * `folio-assistant-core` in place, `check:instance-graph` and
  * `check:partition` were both green and this script reported 1. A node's
- * layer HERE is the instance it lives in, which is why it can see the axis at
+ * layer HERE is the layer it lives in, which is why it can see the axis at
  * all.
  *
  * ## It writes nothing, and that is load-bearing twice over
@@ -906,7 +906,7 @@ function gateDirection(): void {
   // ── THE INSTANCE-LEVEL DENOMINATOR, and it is the one that matters most.
   //
   // `cjvs` made the gate state its EDGE denominator. This is the same demand
-  // one level up: how many of the checkout's instances the axis actually
+  // one level up: how many of the checkout's layers the axis actually
   // reaches. Without it a `0` is read as "the layering holds" when it may
   // only mean "the two instances I looked at agree".
   //
@@ -920,14 +920,14 @@ function gateDirection(): void {
   //
   // Either way the edge cannot be wrong-direction however blocking this gate
   // is made. Measured 2026-09-30: `cat-harness/` imports from
-  // `bootstrap-tools/` — a SIBLING instance (both declare `needs:
+  // `bootstrap-tools/` — a SIBLING layer (both declare `needs:
   // ["bootstrap"]`, so neither is the other's ancestor) which `cat-harness`
   // does not declare needing, and which no `permits` entry exempts because
   // the repository declares none. 20 import statements across 24 files; 10 of
   // those files are under `cat-harness/schemas` and in SCAN, 14 are under
   // `scripts`/`content` and are not; 6 surface as dangling refs and the rest
   // are invisible. `check:partition` cannot see them either (its ROOT is one
-  // instance) and `check:instance-graph` reports ✓ because it judges
+  // layer) and `check:instance-graph` reports ✓ because it judges
   // declarations and never imports — `bf5l`'s three-green-checks table with a
   // fourth row.
   //
@@ -936,10 +936,10 @@ function gateDirection(): void {
   // mid-flight, and whether `cat-harness` should declare it among its `needs`
   // or `bootstrap-tools` should fold into `bootstrap` is a declaration ruling
   // for the owner, not a side effect of wiring a gate. What this block does
-  // is refuse to let the omission read as clean — the unreached instances are
+  // is refuse to let the omission read as clean — the unreached layers are
   // DERIVED from the checkout and named, so one added tomorrow shows up here
   // without an edit, and a `0` can never again be mistaken for a verdict over
-  // instances this axis never looked at.
+  // layers this axis never looked at.
   const declaredInstances = readdirSync(ROOT, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith("."))
     .map((e) => e.name)

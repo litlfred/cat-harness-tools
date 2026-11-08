@@ -199,7 +199,7 @@ export const TodoNodeKind = nodeKind("todo/1.0.0", [CarriedNoteKind, ThemedKind]
  * `theme` arrives from the `themed` parent rather than a spread. It was a
  * spread until bean `a1lq`, and a spread is last-writer-wins with no record
  * that two parents were composed at all. The parents are now declared, and
- * the composition is the one walk instances use.
+ * the composition is the one walk layers use.
  *
  * `theme` — the id of the theme this todo's sticky renders with — was declared
  * by `ThemedTodoFieldsSchema` all along and merged in by nothing, so it was

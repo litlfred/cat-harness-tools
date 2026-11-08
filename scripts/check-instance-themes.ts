@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Every instance that declares a `themes` graph: does it load, and does each
+ * Every layer that declares a `themes` graph: does it load, and does each
  * theme in it validate?
  *
  * @module scripts/check-instance-themes
@@ -15,11 +15,11 @@
  * **Graded:** a declared themes directory whose module will not load, and a
  * theme that does not satisfy `ResolvedThemeSchema`.
  *
- * **Reported, never graded:** which kinds an instance's themes carry (e.g.
+ * **Reported, never graded:** which kinds a layer's themes carry (e.g.
  * `sticky`, which the board styles cards from). Authoring one is the
- * instance's choice, not a defect.
+ * layer's choice, not a defect.
  *
- * **Could-not-determine is never green:** an instance whose declaration will
+ * **Could-not-determine is never green:** a layer whose declaration will
  * not load, or a themes module that throws, exits 2.
  *
  * Exit codes: 0 report only, or `--check` with no blocking finding · 1
@@ -42,7 +42,7 @@ interface Finding {
   readonly detail: string;
 }
 
-/** One instance's themes, once its declaration has been read. */
+/** One layer's themes, once its declaration has been read. */
 interface Row {
   readonly instance: string;
   readonly dirs: number;
@@ -69,7 +69,7 @@ function main(): number {
     try {
       name = readDeclaration(root)?.name;
     } catch (e) {
-      // A declaration that will not load means this instance cannot be judged,
+      // A declaration that will not load means this layer cannot be judged,
       // and judging the rest and printing a clean sweep is the `dh4f` defect.
       console.error(`✗ cannot read the declaration in ${root}:`);
       console.error(`  ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`);
@@ -135,7 +135,7 @@ function main(): number {
   console.log(`  themes loaded               ${themes}\n`);
 
   if (declaring === 0) {
-    // NOT a pass dressed as one. No instance declares the graph, so every
+    // NOT a pass dressed as one. No layer declares the graph, so every
     // family below swept an empty domain and this run cleared nothing.
     console.log("  NOTE: no instance declares a `themes` graph, so this run examined");
     console.log("        nothing. That is a determined empty rather than a clean sweep.");

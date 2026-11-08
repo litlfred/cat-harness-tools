@@ -34,15 +34,15 @@ import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
-/** The INSTANCE root — this file lives at `<instance>/scripts/`. */
+/** The LAYER root — this file lives at `<instance>/scripts/`. */
 export const INSTANCE_ROOT = HARNESS_ROOT;
 /**
  * The REPOSITORY root, which is where the bean store is.
  *
- * The two parted company when `#437` moved this instance under `cat-harness/`,
+ * The two parted company when `#437` moved this layer under `cat-harness/`,
  * and they are needed for different questions here: `directoriesForGraph`
- * resolves a declaration from the INSTANCE, while `beans/` is repository-scoped
- * and sits a level up. Reading beans from the instance root returns `null` —
+ * resolves a declaration from the LAYER, while `beans/` is repository-scoped
+ * and sits a level up. Reading beans from the layer root returns `null` —
  * "no store" — which is a clean-looking answer to a question that was asked in
  * the wrong place, and it is what the first draft of this module did.
  */

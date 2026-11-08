@@ -4,7 +4,7 @@
  *
  * Two halves: provenance (`rendered-by`) on fixtures, and the reader —
  * `declaredVisualisers` / `viewersOf` — over a fixture checkout of two
- * instances, one declaring a corpus-wide visualiser over the other's
+ * layers, one declaring a corpus-wide visualiser over the other's
  * directory. The tests of this file that read the whole checkout live in
  * `cat-harness-tools/test/coordinator/viewer-declarations-checkout.test.ts`.
  */

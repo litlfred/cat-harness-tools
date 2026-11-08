@@ -133,7 +133,7 @@ describe("the reason the page has to say that is still true", () => {
     // strings alone does not fix it either, because a markdown code span in a
     // comment is backticked and backticks quote strings in TypeScript.
     for (const f of ["src/tools/skill-fetch.ts", "scripts/generate-registry.ts"]) {
-      // Resolved through the implementing instance: `skill-fetch.ts` moved up
+      // Resolved through the implementing layer: `skill-fetch.ts` moved up
       // with the server (bean `70lx`), and this layer names no path above it.
       const code = codeWithoutComments(readFileSync(join(implementingRootFor(ROOT, f), f), "utf8"));
       expect(code).not.toContain("remote-packages");

@@ -141,7 +141,7 @@ describe("three regions, and only the middle one scrolls", () => {
   });
 
   it("the instance's ROOT is in the fixed top, not inside the graphs group", () => {
-    // A group labelled "Graphs" containing the instance itself is a label that
+    // A group labelled "Graphs" containing the layer itself is a label that
     // does not tell the truth — and the root is the one destination that must
     // stay reachable when the graphs are folded away, since the `☰` beside it
     // is a toggle rather than a link.
@@ -1122,7 +1122,7 @@ describe("a harness row is not a graph-typology row, whatever its mark (#2151)",
   //
   // Rows built from `graphTypologyRowDecor` itself, the one function that sets
   // `NavItem.kind`, so this holds in a standalone cat-harness layer. That the
-  // rows `declaredGraphs` builds for a REAL instance carry it is asserted in
+  // rows `declaredGraphs` builds for a REAL layer carry it is asserted in
   // `cat-harness-tools/scripts/tests/ui/navbar-kind-rows.test.ts`, because it
   // reads who-iris's declaration, which only the monorepo has.
   const kinds = ["docs", "library", "skills"].map((k) => ({ href: `../${k}/`, label: k, ...graphTypologyRowDecor(k, "x") }));

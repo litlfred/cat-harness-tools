@@ -348,7 +348,7 @@ describe("kindUniverse", () => {
   test("the registry is the denominator, and an instance may add to it", () => {
     const u = kindUniverse(REPO);
     expect(u.registered.length).toBeGreaterThan(0);
-    // The registry is OPEN, so a kind an instance declares and the registry
+    // The registry is OPEN, so a kind a layer declares and the registry
     // does not know is reported separately rather than dropped — dropping it
     // would shrink the denominator without saying so.
     for (const k of u.declaredOnly) expect(u.registered).not.toContain(k);

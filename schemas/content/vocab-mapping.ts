@@ -368,7 +368,7 @@ export function applyVocabMapping(m: VocabMapping, record: Readonly<Record<strin
   return Object.fromEntries(out);
 }
 
-/** Prefixes a table may write a system with. Callers add an instance's own (`NS_PREFIXES`). */
+/** Prefixes a table may write a system with. Callers add a layer's own (`NS_PREFIXES`). */
 export const STANDARD_PREFIXES: Readonly<Record<string, string>> = {
   skos: "http://www.w3.org/2004/02/skos/core#",
   dcterms: "http://purl.org/dc/terms/",
@@ -475,10 +475,10 @@ export function loadVocabMappings(dirs: readonly string[]): Map<string, VocabMap
 }
 
 /**
- * The `vocab-mapping` directories an instance declares, its own only.
+ * The `vocab-mapping` directories a layer declares, its own only.
  *
  * Own rather than overlaid: a table belongs to the Tool that applies it, and
- * the Tool lives in this instance. Resolved from the declaration, never from
+ * the Tool lives in this layer. Resolved from the declaration, never from
  * a literal path. Synchronous, because its first caller (`glossary-export`'s
  * `buildGlossary`) is.
  */
@@ -488,7 +488,7 @@ export function vocabMappingDirs(instanceRoot: string): string[] {
     .map((d) => d.absPath);
 }
 
-/** One table by id from an instance's declared directories, or a thrown error naming what was looked for. */
+/** One table by id from a layer's declared directories, or a thrown error naming what was looked for. */
 export function vocabMapping(instanceRoot: string, id: string): VocabMapping {
   const dirs = vocabMappingDirs(instanceRoot);
   const m = loadVocabMappings(dirs).get(id);

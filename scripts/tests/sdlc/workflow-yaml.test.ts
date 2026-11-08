@@ -154,7 +154,7 @@ describe("GitHub Actions workflows", () => {
       .join("\n");
     expect(runs).toContain("bun test");
     expect(runs).toContain("bun run cat lint");
-    // In the index checkout `tsc --noEmit` runs per instance through
+    // In the index checkout `tsc --noEmit` runs per layer through
     // `typecheck:instances` (the root has no tsconfig.json); the check is that
     // script, so the step names the script and the script must run tsc.
     expect(runs).toContain("bun run cat typecheck:instances");
