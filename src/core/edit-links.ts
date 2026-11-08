@@ -1041,7 +1041,11 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // inside it (owner, 2026-11-06: "need bit padding to left of text and
     // buttons"), then the right gutter the icons sit in. The 📣's margin is
     // the panel's 1rem padding plus the anchor's 2.25rem, so both line up.
-    "@media (min-width:50rem){html.fa-bp .main-content-wrap{padding-left:.75rem;padding-right:2.5rem}" +
+    // Owner, 2026-11-08: "i dont wnat the left grill between LHS navbar and
+    // dsiplay content" — the .75rem of backdrop on the LEFT showed as a grey
+    // strip under the blue bar. It is gone: the white panel now meets the
+    // navbar, and its own 1rem keeps the text off the edge.
+    "@media (min-width:50rem){html.fa-bp .main-content-wrap{padding-left:0;padding-right:2.5rem}" +
     "html.fa-bp .main-content{position:relative;padding-left:1rem;padding-right:1rem}" +
     "html.fa-bp .main-content :is(h1,h2,h3,h4,h5,h6):has(>.anchor-heading){position:static}" +
     "html.fa-bp .main-content .anchor-heading{left:auto;right:-2.25rem;top:auto;height:auto;width:1.5rem}" +

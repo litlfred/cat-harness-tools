@@ -46,7 +46,7 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { GROUP_GLYPHS, NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
@@ -187,7 +187,7 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
   const harnesses: NavGroup | undefined =
     o.harnesses === undefined
       ? undefined
-      : { label: RAIL_SECTION_LABELS.harnesses, icon: "\u25A6", items: o.harnesses, collapsible: true };
+      : { label: RAIL_SECTION_LABELS.harnesses, icon: "H", glyphPath: GROUP_GLYPHS.harnesses, items: o.harnesses, collapsible: true };
   return {
     instance: o.instance,
     ...(o.mark ? { mark: o.mark } : {}),
@@ -207,8 +207,8 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
     // one of its rows is the current page, so the reader's place stays visible.
     // "Folders", not "Graphs" (owner, 2026-10-15): the theme sidebar's word
     // for the same rows, so the section reads the same on every site.
-    ...(o.pages && o.pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "\u25A5", items: o.pages, collapsible: true, open: false } } : {}),
-    graphs: { label: RAIL_SECTION_LABELS.folders, icon: "\u25A4", items: o.links, collapsible: true, open: false },
+    ...(o.pages && o.pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "P", glyphPath: GROUP_GLYPHS.pages, items: o.pages, collapsible: true, open: false } } : {}),
+    graphs: { label: RAIL_SECTION_LABELS.folders, icon: "F", glyphPath: GROUP_GLYPHS.folders, items: o.links, collapsible: true, open: false },
     ...(harnesses ? { harnesses } : {}),
     // No home row (owner, 2026-10-30: "dont need home on bottomof harnes
     // navbars"): the header's mark and name are the link to the landing page.
