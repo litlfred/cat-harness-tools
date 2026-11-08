@@ -9,7 +9,8 @@ listed, not counted: it is main's to fix, and failing every PR on it would
 teach `|| true`. Exit 2 from a gate is "could not determine" in this
 harness's convention; it is reported, and it counts as a failure only when
 base determined (0 or 1) and head did not. Exit 78 is "not applicable in
-this root" (`scripts/lib/not-applicable.ts`). Either one, on a gate base did
+this root" (`scripts/lib/not-applicable.ts`): on head it is listed and never
+counted, whatever base exited (#1701). Either one, on a gate base did
 not run at all, is listed and never counted: there is no base answer for head
 to have lost (smart-immunizations-uganda#15, where `check:unlinked-beans`
 exited 78 and `folio:shim:check` 2 on gates main had not yet run, and both
@@ -86,6 +87,15 @@ def main():
         b = base_exit(base.get(name))
         if h == 0:
             verdict = "pass"
+        elif h == 78:
+            # Not applicable in this root (`scripts/lib/not-applicable.ts`):
+            # neither a pass nor a failure, and main-verdict.py already never
+            # counts it red. A gate that main answered and that now declines
+            # here (a re-pin onto a gate that learned it does not apply to an
+            # instance, cat-harness-tools#1701; dth-phc#7, where
+            # check:qa-reviewer-permission went 0 -> 78) is listed, so the
+            # lost answer shows, and not counted.
+            verdict = "not applicable here; not counted" + (f" (main exited {b})" if b is not None else "")
         elif b is None and h in UNDETERMINED:
             verdict = f"{UNDETERMINED[h]}; main did not run it, so not counted"
         elif h == 2 and b in (0, 1):
