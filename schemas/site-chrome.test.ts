@@ -274,13 +274,21 @@ describe("the chrome's includes carry no HTML comments into pages", () => {
       // vendor/ holds third-party includes kept as their authors wrote them.
       e.isDirectory() ? (e.name === "vendor" ? [] : walk(join(dir, e.name))) : /\.html$/.test(e.name) ? [join(dir, e.name)] : [],
     );
-  test("every HTML comment outside <script>/<style> is a fa- marker", () => {
-    const offenders = walk(includes).flatMap((f) => {
-      const text = readFileSync(f, "utf-8").replace(/<(script|style)\b[\s\S]*?<\/\1>/g, "");
-      return [...text.matchAll(/<!--(?!\[)([\s\S]*?)-->/g)]
-        .filter((m) => !/^\s*fa-[a-z0-9:-]+\s*$/.test(m[1]!))
-        .map((m) => `${f.slice(includes.length + 1)}: ${m[1]!.trim().slice(0, 60)}`);
-    });
+  test("every HTML comment outside <script>/<style> is a fa- marker", async () => {
+    // An HTML parser, not a regex: it reports the comments a browser would see,
+    // and a comment-like string inside a <script> or <style> is raw text to it.
+    const offenders: string[] = [];
+    for (const f of walk(includes)) {
+      await new HTMLRewriter()
+        .onDocument({
+          comments(c) {
+            if (c.text.startsWith("[") || /^\s*fa-[a-z0-9:-]+\s*$/.test(c.text)) return;
+            offenders.push(`${f.slice(includes.length + 1)}: ${c.text.trim().slice(0, 60)}`);
+          },
+        })
+        .transform(new Response(readFileSync(f, "utf-8")))
+        .text();
+    }
     expect(offenders).toEqual([]);
   });
 });
