@@ -13,6 +13,7 @@ import {
   edgesThroughShapes,
   FIT_WIDTH,
   shapesOutsidePools,
+  sharedPorts,
   fixTaskSize,
   offSizeTasks,
   TASK_SIZE,
@@ -328,5 +329,28 @@ describe("pools", () => {
   test("a label across the pool's right edge is on a lane line", () => {
     const xml = pooled([["E", 540, 80, 36, 36, [560, 120, 90, 20]]]);
     expect(diagramFit(xml)["label-on-lane-line"]!.map((f) => f.where)).toContain("E/Pool");
+  });
+});
+
+describe("a flow in and a flow out never share a point (owner, 2026-11-08)", () => {
+  // A at the left, B in the middle, C at the right; F2 leaves B where the loop-back F3 enters it.
+  const shapes: S[] = [["A", 20, 20, 60, 60], ["B", 200, 20, 60, 60], ["C", 400, 20, 60, 60]];
+  test("an outgoing flow that leaves where another arrives is reported", () => {
+    const xml = bpmn(LANES, shapes, [
+      ["F1", "A", "B", [[80, 50], [200, 50]]],
+      ["F2", "B", "C", [[260, 50], [400, 50]]],
+      ["F3", "C", "B", [[430, 80], [430, 90], [260, 90], [260, 50]]],
+    ]);
+    expect(sharedPorts(readDi(xml))).toEqual([["F3", "F2", "B"]]);
+    expect(diagramFit(xml)["edge-shared-port"]!.map((f) => f.where)).toEqual(["F3+F2/B"]);
+  });
+  test("the same loop entering another side is clean, and two arrivals on one point are a join", () => {
+    const xml = bpmn(LANES, shapes, [
+      ["F1", "A", "B", [[80, 50], [200, 50]]],
+      ["F2", "B", "C", [[260, 50], [400, 50]]],
+      ["F3", "C", "B", [[430, 80], [430, 95], [230, 95], [230, 80]]],
+      ["F4", "A", "C", [[50, 20], [50, 5], [400, 5], [400, 50]]],
+    ]);
+    expect(sharedPorts(readDi(xml))).toEqual([]);
   });
 });
