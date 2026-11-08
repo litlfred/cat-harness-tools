@@ -40,6 +40,8 @@ import { archimateDir, configPath, localDirOf, readConfig } from "../archimate/s
 import { declaredPageRoot } from "../archimate/scripts/gen-archimate-pages.ts";
 import { readJourneyCorpus, type JourneyCorpus } from "./journeys/read.ts";
 import { renderJourneyPages, TOOL_ID, type PageFile, type SiteLinks } from "./journeys/render.ts";
+import { subjectHref } from "./lib/subject-pages.ts";
+import { panelFile } from "./lib/task-panel.ts";
 
 export { TOOL_ID };
 
@@ -100,9 +102,19 @@ export function siteLinks(corpus: JourneyCorpus, route: string, title: string): 
     route,
     title,
     ...(processes
-      ? { processesPage: (instance: string) => `${"../".repeat(route.split("/").length + 2)}${visualiserRoute(pageParts({ harness: processes.harness, visualiser: processes.id, subgraph: instance }))}` }
+      ? {
+          processesPage: (instance: string) => `${"../".repeat(route.split("/").length + 2)}${visualiserRoute(pageParts({ harness: processes.harness, visualiser: processes.id, subgraph: instance }))}`,
+          // The ⓘ panel's sidecar the processes viewer writes for the drawing, beside its pages.
+          processPanel: (_instance: string, bpmn: string) => visualiserRoute({ ...pageParts({ harness: processes.harness, visualiser: processes.id }), asset: panelFile(posix.basename(bpmn, ".bpmn")) }),
+        }
       : {}),
     archimateView: (instance, model, view) => archimateFor(instance)?.get(`${model}\0${view}`),
+    // A step's page as the KG site's own BPMN rendering links it
+    // (`render-bpmn.ts`): its subject IRI, where a page is published for it.
+    stepPage: (instance, bpmn, process, task) => {
+      const root = corpus.instances.get(instance)?.root;
+      return root === undefined ? undefined : subjectHref(resolve(root, bpmn), "process", `${process}/node/${task}`);
+    },
   };
 }
 

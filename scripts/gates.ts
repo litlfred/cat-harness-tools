@@ -35,6 +35,7 @@
  *
  * @module scripts/gates
  */
+import { QA_WRITERS } from "./qa-refresh.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
@@ -240,6 +241,44 @@ export interface StepExemption {
  * read its output — a race — and a second time on every run.
  */
 export const PRECONDITION_STEPS: readonly string[] = ["bun run cat qa:working-copy"];
+
+/**
+ * The setup steps a local run performs ONCE (owner, 2026-11-06, bean
+ * `cat-tools-sm8r` item 2: "a local gates run does each setup command once").
+ *
+ * CI runs the gates as jobs, each from a fresh checkout, so every job repeats
+ * its setup: the workflow names `state:mount` eight times, `ig-index:build`
+ * three, `bun install` nine. Here every job runs in ONE checkout, so a repeat
+ * sets up nothing new, and it reads what the steps between wrote: each later
+ * `state:mount` found the mounts those steps had written into, fetched every
+ * remote, and exited 1 (305 s of a 1396 s run, all eight red).
+ *
+ * Listed, not inferred from "a serial command that repeats": a repeated
+ * CHECK may judge what a step in between wrote, and answers for itself.
+ * A repeat is reported SKIPPED with the first run's exit; the first run's
+ * failure, if any, is the one counted.
+ */
+export const RUN_ONCE_SETUP_STEPS: readonly string[] = [
+  "bun install --frozen-lockfile",
+  "bun run cat state:mount",
+  "bun run cat ig-index:build",
+  "bun run cat smart:pages",
+  "bun run smart:pages",
+];
+
+/** Which run-once setup steps have run in this local run, and how they exited. */
+export class SetupOnce {
+  private readonly ran = new Map<string, number>();
+  constructor(private readonly steps: readonly string[] = RUN_ONCE_SETUP_STEPS) {}
+  /** The first run's exit when `command` is a run-once step that has already run, else undefined (run it). */
+  ranAlready(command: string): number | undefined {
+    return this.ran.get(command);
+  }
+  /** Record a run; only a listed setup step is remembered. */
+  record(command: string, code: number): void {
+    if (this.steps.includes(command) && !this.ran.has(command)) this.ran.set(command, code);
+  }
+}
 
 /**
  * A WRITER's mark: `@covers none — writer — …` as a use in its script's
@@ -1446,8 +1485,19 @@ export function unclassifiedSteps(root: string): ForeignStep[] {
 export interface ScriptExemption {
   /** The script name, matched EXACTLY. Never a substring — see below. */
   script: string;
-  kind: "report" | "covered-by" | "no-folio" | "scheduled";
+  kind: "report" | "covered-by" | "no-folio" | "scheduled" | "pending-baseline";
   reason: string;
+  /**
+   * `pending-baseline` only (owner, 2026-11-07, "A. Two steps"): the script
+   * that WRITES the stored baseline this check judges against. A new check
+   * judged against a baseline main has never written reports every finding as
+   * new, so it is wired in two steps: the writer first, so main's push records
+   * the baseline, then the check. The exemption holds only while CI runs this
+   * writer; with the writer unwired, the check is reported unrun as before.
+   */
+  writer?: string;
+  /** `pending-baseline` only: the change that wires the check, named so the wait is visible. */
+  followUp?: string;
 }
 
 /**
@@ -1458,6 +1508,14 @@ export interface ScriptExemption {
  * whole difference, since the comment silently covered six of nine.
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
+  {
+    script: "translate-user-scenarios:check",
+    kind: "no-folio",
+    reason:
+      "judges an instance's user-scenario templates, and the platform declares no user-scenario directory, so here it can " +
+      "only exit 2 (nothing to examine). Each instance that declares one runs it in its own CI over its own scenarios, as " +
+      "the IGs run their translation template checks",
+  },
   {
     script: "check:context-leak",
     kind: "report",
@@ -1902,9 +1960,97 @@ export function commandsCiRuns(root: string): string[] {
  */
 export function unrunScripts(root: string): string[] {
   const commands = commandsCiRuns(root);
-  return checkScriptNames(root).filter(
-    (n) => !commands.some((c) => commandRunsScript(c, n)) && !scriptExemptionFor(n),
-  );
+  return unrunFrom(checkScriptNames(root), commands, SCRIPT_EXEMPTIONS, writersRunBy(commands));
+}
+
+/** The commands that run every `QA_WRITERS` entry: `qa:refresh`, and `qa:working-copy`, which runs it. */
+const QA_RUNNERS = ["qa:refresh", "qa:working-copy"];
+
+/**
+ * The scripts CI runs INDIRECTLY, as `QA_WRITERS` entries of a `qa:refresh`
+ * some workflow runs. A baseline writer is usually one of these rather than a
+ * step of its own: the stored tree is what `qa:working-copy` builds.
+ */
+export function writersRunBy(commands: readonly string[]): string[] {
+  if (!commands.some((c) => QA_RUNNERS.some((r) => commandRunsScript(c, r)))) return [];
+  return QA_WRITERS.map((w) => w.run[0]!).filter(Boolean);
+}
+
+/**
+ * {@link unrunScripts} over given inputs, pure. A `pending-baseline` exemption
+ * covers its check only while some command CI runs invokes its `writer`.
+ */
+export function unrunFrom(
+  names: readonly string[],
+  commands: readonly string[],
+  exemptions: readonly ScriptExemption[],
+  indirect: readonly string[] = [],
+): string[] {
+  const runs = (script: string) => commands.some((c) => commandRunsScript(c, script));
+  const writerRuns = (w: string) => runs(w) || indirect.includes(w);
+  return names.filter((n) => {
+    if (runs(n)) return false;
+    const e = exemptions.find((x) => x.script === n);
+    if (!e) return true;
+    return e.kind === "pending-baseline" ? !(e.writer && writerRuns(e.writer)) : false;
+  });
+}
+
+/** Where one `pending-baseline` exemption stands. */
+export interface PendingBaseline {
+  script: string;
+  writer: string;
+  followUp: string;
+  /** CI runs the writer: the exemption holds. */
+  writerRun: boolean;
+  /** CI runs the check itself: the wait is over and the exemption can go. */
+  checkRun: boolean;
+}
+
+/** Every `pending-baseline` exemption, and whether its writer and its check are wired. Pure. */
+export function pendingBaselinesFrom(
+  commands: readonly string[],
+  exemptions: readonly ScriptExemption[],
+  indirect: readonly string[] = [],
+): PendingBaseline[] {
+  const runs = (script: string) => commands.some((c) => commandRunsScript(c, script));
+  return exemptions
+    .filter((e) => e.kind === "pending-baseline")
+    .map((e) => ({
+      script: e.script,
+      writer: e.writer ?? "",
+      followUp: e.followUp ?? "",
+      writerRun: !!e.writer && (runs(e.writer) || indirect.includes(e.writer)),
+      checkRun: runs(e.script),
+    }));
+}
+
+/**
+ * Print every check waiting on its first baseline. Unconditional, like
+ * {@link reportUnresolved}: a wait is a fact about the gate set whether or not
+ * the run is green, and an exemption nobody sees is the silent skip this table
+ * exists to prevent. A check already wired is printed as done, never failed:
+ * the exemption is declared by the index, and failing on it would hold the
+ * follow-up hostage to a second change.
+ */
+function reportPendingBaselines(root: string): void {
+  let rows: PendingBaseline[];
+  try {
+    const commands = commandsCiRuns(root);
+    rows = pendingBaselinesFrom(commands, SCRIPT_EXEMPTIONS, writersRunBy(commands));
+  } catch {
+    return;
+  }
+  if (rows.length === 0) return;
+  console.log(`\n· ${rows.length} check(s) WAITING FOR A FIRST BASELINE — not gated yet, and not counted clean:`);
+  for (const r of rows) {
+    const state = r.checkRun
+      ? "the check is wired now: remove this exemption"
+      : r.writerRun
+        ? `writer \`${r.writer}\` runs, so main stores the baseline; the check is wired by ${r.followUp}`
+        : `writer \`${r.writer}\` is NOT run, so the check is reported unrun`;
+    console.log(`    ${r.script}   (${state})`);
+  }
 }
 
 /**
@@ -2428,6 +2574,7 @@ if (import.meta.main) {
     // commands it will NOT run belong here most of all. Omitting them would
     // make the list read as the whole gate set.
     reportUnresolved(ROOT, { all });
+    reportPendingBaselines(ROOT);
     console.log(
       all ? "" : "\n`--all` adds the jobs that need a browser (bpmn-js renders through Chromium).",
     );
@@ -2508,9 +2655,15 @@ if (import.meta.main) {
     }
     return out;
   };
+  const setupOnce = new SetupOnce();
   for (const seg of segments) {
     if (!seg.parallel || jobs === 1) {
       for (const g of seg.gates) {
+        const once = setupOnce.ranAlready(g.command);
+        if (once !== undefined) {
+          process.stdout.write(`▸ ${g.command}   SKIPPED — setup, run once per local run (exit ${once} above; bean cat-tools-sm8r)\n`);
+          continue;
+        }
         // One at a time, so a gate's "before" is taken after the gate ahead of
         // it ran — the second `skill:register:check` sees the first's record.
         const [t] = triage([g]);
@@ -2526,6 +2679,7 @@ if (import.meta.main) {
         // the log rather than inferred from the total.
         process.stdout.write(`  ↳ ${((performance.now() - started) / 1000).toFixed(1)}s, exit ${r.code}: ${g.command}\n`);
         if (r.code !== 0) failed.push({ gate: g, why: salientFailures(r.output) });
+        setupOnce.record(g.command, r.code);
         if (t.script !== undefined && t.fp !== undefined) {
           skipper.record(t.script, r.code === 0 && !tracedReport(t.script, trace?.reached(againstRefsOf(pkgScripts, t.script))), t.fp, new FileDigests(ROOT));
         }
@@ -2647,6 +2801,7 @@ if (import.meta.main) {
         for (const { gate } of skippedGates) console.log(`    - ${gate.command}`);
       }
       reportUnresolved(ROOT, { all });
+      reportPendingBaselines(ROOT);
       if (!all) console.log("  `bun run cat gates --all` adds the browser jobs before you push.");
       process.exit(0);
     }
@@ -2667,6 +2822,7 @@ if (import.meta.main) {
     process.exit(1);
   }
   reportUnresolved(ROOT, { all });
+  reportPendingBaselines(ROOT);
   if (skippedGates.length > 0) {
     console.log(`  (${skippedGates.length} gate(s) SKIPPED — inputs unchanged since each last passed; \`--no-cache\` asks them)`);
   }

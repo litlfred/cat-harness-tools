@@ -158,6 +158,12 @@ export const AVATARS: Readonly<Record<string, Avatar>> = {
     tone: 192,
     reads: "blocks stacked on blocks, beside ArchiMate's blue — the tools, systems and standards a journey step uses",
   },
+  "device-screen": {
+    // A phone with a line of text and a tick on its screen: what one person sees.
+    glyph: "M7 2h10a2 2 0 012 2v16a2 2 0 01-2 2H7a2 2 0 01-2-2V4a2 2 0 012-2zM9 7h6M9.5 13l2 2 3.5-3.5M11 19h2",
+    tone: 212,
+    reads: "a phone with a tick on its screen — what one person sees on their device at a step of the journey",
+  },
   policies: {
     // A shield with a tick: what is permitted, and to whom. ODRL policies,
     // issue #1180.

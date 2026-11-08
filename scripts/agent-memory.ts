@@ -46,12 +46,29 @@ import {
   instanceRootsIn,
   readDeclaration,
 } from "../schemas/kg/cat-harness.js";
+import { lockedMountPaths } from "../schemas/kg/index-config.js";
 import { portableSegment } from "../schemas/kg/portable-path.ts";
+import { mountScopeFor } from "../schemas/kg/remote-mount.js";
 import { declaredDirectories, ownDeclaredDirectories } from "../schemas/kg/declared-nodes.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 export const ROOT = resolve(HARNESS_ROOT);
 export const DEFAULT_ROOT = checkoutRootFor(ROOT);
+
+/**
+ * True when `targetRoot` is a mounted instance placed by a mount lock (bean `bx4c`).
+ * A mounted instance is a read-only copy of a pinned commit; index surface
+ * regeneration must never write inside it.
+ */
+export function isMountedInstance(targetRoot: string, baseRoot?: string): boolean {
+  const abs = resolve(targetRoot);
+  if (baseRoot !== undefined && abs === resolve(baseRoot)) return false;
+  const scope = mountScopeFor(abs);
+  if (scope !== undefined && scope !== abs) return true;
+  const base = baseRoot ? resolve(baseRoot) : checkoutRootFor(abs);
+  if (abs === base) return false;
+  return lockedMountPaths(base).some((p) => resolve(base, p) === abs);
+}
 
 /**
  * Memory directories for `root`: an instance root reads only the `memory`
@@ -1188,6 +1205,171 @@ export function syncAgentsMd(
 
 // ── CLI ─────────────────────────────────────────────────────────
 
+export interface AgentMemoryRunResult {
+  ok: boolean;
+  stale: number;
+  mountedStale: number;
+  lines: string[];
+  mountedFindings: string[];
+  byteDropReport: string | null;
+  droppedReport: string | null;
+}
+
+export async function runAgentMemory(
+  opts: { baseRoot?: string; explicitDir?: string; check?: boolean } = {},
+): Promise<AgentMemoryRunResult> {
+  const check = opts.check ?? false;
+  const explicitDir = opts.explicitDir ? resolve(opts.explicitDir) : undefined;
+  const cwd = process.cwd();
+  const cwdRoot = existsSync(join(cwd, "index.config.json")) ? resolve(cwd) : checkoutRootFor(cwd);
+  const baseRoot = opts.baseRoot
+    ? resolve(opts.baseRoot)
+    : findDeclarationFile(cwdRoot) !== undefined || existsSync(join(cwdRoot, "index.config.json"))
+      ? cwdRoot
+      : DEFAULT_ROOT;
+  const roots =
+    explicitDir !== undefined
+      ? [explicitDir]
+      : [
+          baseRoot,
+          ...instanceRootsIn(baseRoot).filter(
+            (r) => resolve(r) !== resolve(baseRoot) && existsSync(join(r, ".claude", "agents")),
+          ),
+        ];
+
+  const { syncVendorAgents, vendorTargetsFor } = await import("./agent-memory-vendors.ts");
+  let stale = 0;
+  let mountedStale = 0;
+  const lines: string[] = [];
+  const mountedFindings: string[] = [];
+  const targetDropRecords: TargetDropRecord[] = [];
+  const dropped: { agent: string; entries: string[] }[] = [];
+
+  for (const targetRoot of roots) {
+    const mounted = isMountedInstance(targetRoot, baseRoot);
+    const shouldWrite = !check && !mounted;
+    const layerName = readDeclaration(targetRoot)?.name ?? (relative(baseRoot, targetRoot) || basename(targetRoot));
+    const prefix = mounted
+      ? `${layerName}/`
+      : roots.length > 1
+        ? `${relative(baseRoot, targetRoot) || "."}/`
+        : "";
+    const nodes = readMemoryNodes(memoryDirsFor(targetRoot));
+    const memDir = join(targetRoot, ".claude", "agent-memory");
+    const skillsDir = join(targetRoot, ".agents", "skills");
+    const ruleFile = join(targetRoot, ".agents", "rules", "agent-memory.md");
+    const agentsMdFile = join(targetRoot, "AGENTS.md");
+    const claudeAgentsDir = join(targetRoot, ".claude", "agents");
+    const results = syncAll(shouldWrite, memDir, nodes);
+
+    const recordState = (state: string, targetPath: string): string => {
+      if (state === "written" && (check || mounted)) {
+        stale++;
+        if (mounted) {
+          mountedStale++;
+          const msg = `✗ ${layerName}: ${targetPath} is stale in mounted layer ${layerName} (committed surface not rewritten — regenerate in ${layerName})`;
+          mountedFindings.push(msg);
+          return "stale";
+        }
+      }
+      return state;
+    };
+
+    for (const r of syncAntigravity(shouldWrite, nodes, ANTIGRAVITY_SKILL_BYTE_BUDGET, skillsDir, memDir)) {
+      const targetPath = `${prefix}.agents/skills/${antigravitySkillName(r.agent)}`;
+      const labelState = recordState(r.state, targetPath);
+      lines.push(
+        `  ${labelState.padEnd(11)} ${targetPath.padEnd(28)} ${r.entries} entries (${r.bytes} bytes, Antigravity skill)`,
+      );
+      if (r.dropped.length > 0) {
+        targetDropRecords.push({
+          target: targetPath,
+          budgetBytes: ANTIGRAVITY_SKILL_BYTE_BUDGET,
+          dropped: r.dropped,
+        });
+      }
+    }
+
+    const ruleResult = syncAntigravityRule(shouldWrite, nodes, ANTIGRAVITY_RULE_BYTE_BUDGET, ruleFile, targetRoot);
+    const ruleRel = `${prefix}.agents/rules/agent-memory.md`;
+    const ruleState = recordState(ruleResult.state, ruleRel);
+    lines.push(
+      `  ${ruleState.padEnd(11)} ${ruleRel.padEnd(28)} ${ruleResult.entries} entries (${ruleResult.bytes} bytes, Antigravity rule)`,
+    );
+    if (ruleResult.dropped.length > 0) {
+      targetDropRecords.push({
+        target: ruleRel,
+        budgetBytes: ANTIGRAVITY_RULE_BYTE_BUDGET,
+        dropped: ruleResult.dropped,
+      });
+    }
+
+    const agentsMdResult = syncAgentsMd(shouldWrite, nodes, AGENTS_MD_BYTE_BUDGET, agentsMdFile, targetRoot);
+    const agentsMdRel = `${prefix}AGENTS.md`;
+    const agentsMdState = recordState(agentsMdResult.state, agentsMdRel);
+    const agentsMdNote =
+      agentsMdResult.state === "no-markers"
+        ? "no marked region — not opted in, left untouched"
+        : agentsMdResult.state === "missing"
+          ? "no AGENTS.md — nothing to assemble"
+          : `${agentsMdResult.entries} entries (${agentsMdResult.bytes} bytes, repo-wide AGENTS.md)`;
+    lines.push(`  ${agentsMdState.padEnd(11)} ${agentsMdRel.padEnd(28)} ${agentsMdNote}`);
+    if (agentsMdResult.dropped.length > 0) {
+      targetDropRecords.push({
+        target: agentsMdRel,
+        budgetBytes: AGENTS_MD_BYTE_BUDGET,
+        dropped: agentsMdResult.dropped,
+      });
+    }
+
+    const vTargets = vendorTargetsFor(targetRoot);
+    for (const r of syncVendorAgents(shouldWrite, nodes, {
+      agents: agentNames(memDir),
+      claudeAgentsDir,
+      targets: vTargets,
+    })) {
+      const t = vTargets.find((x) => x.id === r.target)!;
+      const rel = `${prefix}${t.dir.slice(targetRoot.length + 1)}/${t.fileName(r.agent)}`;
+      const vState = recordState(r.state, rel);
+      const note =
+        r.state === "no-definition"
+          ? `no .claude/agents/${r.agent}.md — nothing to carry, left alone`
+          : `${r.entries} entries (${r.size} ${t.budget.unit}, ${t.vendor} agent)`;
+      lines.push(`  ${vState.padEnd(11)} ${rel.padEnd(28)} ${note}`);
+      if (r.dropped.length > 0) {
+        targetDropRecords.push({ target: rel, budgetBytes: t.budget.limit, unit: t.budget.unit, dropped: r.dropped });
+      }
+    }
+
+    for (const r of results) {
+      const agentLabel = `${prefix}${r.agent}`;
+      const mState = recordState(r.state, `${prefix}.claude/agent-memory/${r.agent}/MEMORY.md`);
+      const note =
+        r.state === "no-markers"
+          ? "no marked region — not opted in, left untouched"
+          : r.state === "missing"
+            ? "no MEMORY.md — nothing to assemble"
+            : `${r.entries} entries, ${r.lines} lines`;
+      lines.push(`  ${mState.padEnd(11)} ${agentLabel.padEnd(28)} ${note}`);
+      if (r.lines > CLAUDE_MEMORY_LINE_BUDGET) {
+        const detail = r.overflowEntries.length
+          ? `and ${r.overflowEntries.length} MEMORY ENTRY(S) fall past it: ${r.overflowEntries.join("; ")}`
+          : "and nothing past it is a memory entry — only the hand-written tail";
+        lines.push(
+          `  ${"".padEnd(11)} ${"".padEnd(28)} ⚠ ${r.lines - CLAUDE_MEMORY_LINE_BUDGET} line(s) over the harness's ${CLAUDE_MEMORY_LINE_BUDGET}-line budget, ${detail}`,
+        );
+        if (r.overflowEntries.length) dropped.push({ agent: agentLabel, entries: r.overflowEntries });
+      }
+    }
+  }
+
+  for (const f of mountedFindings) lines.push(f);
+  const byteDropReport = droppedTargetNodesReport(targetDropRecords);
+  const droppedReport = droppedEntryReport(dropped);
+  const ok = stale === 0 && (!check || (droppedReport === null && byteDropReport === null));
+  return { ok, stale, mountedStale, lines, mountedFindings, byteDropReport, droppedReport };
+}
+
 /**
  * `bun run cat-harness-tools/scripts/agent-memory.ts [--check] [--dir <root>]`
  *
@@ -1205,141 +1387,25 @@ if (import.meta.main) {
   const check = process.argv.includes("--check");
   const dirIdx = process.argv.indexOf("--dir");
   const explicitDir = dirIdx >= 0 && process.argv[dirIdx + 1] ? resolve(process.argv[dirIdx + 1]!) : undefined;
-  const cwdRoot = checkoutRootFor(process.cwd());
-  const baseRoot =
-    findDeclarationFile(cwdRoot) !== undefined || existsSync(join(cwdRoot, "index.config.json"))
-      ? cwdRoot
-      : DEFAULT_ROOT;
-  const roots =
-    explicitDir !== undefined
-      ? [explicitDir]
-      : [
-          baseRoot,
-          ...(findDeclarationFile(baseRoot) === undefined
-            ? instanceRootsIn(baseRoot).filter((r) => existsSync(join(r, ".claude", "agents")))
-            : []),
-        ];
+  const r = await runAgentMemory({ explicitDir, check });
+  for (const line of r.lines) console.log(line);
 
-  const { syncVendorAgents, vendorTargetsFor } = await import("./agent-memory-vendors.ts");
-  let stale = 0;
-  const targetDropRecords: TargetDropRecord[] = [];
-  const dropped: { agent: string; entries: string[] }[] = [];
-
-  for (const targetRoot of roots) {
-    const prefix = roots.length > 1 ? `${relative(baseRoot, targetRoot) || "."}/` : "";
-    const nodes = readMemoryNodes(memoryDirsFor(targetRoot));
-    const memDir = join(targetRoot, ".claude", "agent-memory");
-    const skillsDir = join(targetRoot, ".agents", "skills");
-    const ruleFile = join(targetRoot, ".agents", "rules", "agent-memory.md");
-    const agentsMdFile = join(targetRoot, "AGENTS.md");
-    const claudeAgentsDir = join(targetRoot, ".claude", "agents");
-    const results = syncAll(!check, memDir, nodes);
-
-    for (const r of syncAntigravity(!check, nodes, ANTIGRAVITY_SKILL_BYTE_BUDGET, skillsDir, memDir)) {
-      const targetPath = `${prefix}.agents/skills/${antigravitySkillName(r.agent)}`;
-      console.log(
-        `  ${r.state.padEnd(11)} ${targetPath.padEnd(28)} ${r.entries} entries (${r.bytes} bytes, Antigravity skill)`,
-      );
-      if (r.dropped.length > 0) {
-        targetDropRecords.push({
-          target: targetPath,
-          budgetBytes: ANTIGRAVITY_SKILL_BYTE_BUDGET,
-          dropped: r.dropped,
-        });
-      }
-      if (r.state === "written" && check) stale++;
-    }
-
-    const ruleResult = syncAntigravityRule(!check, nodes, ANTIGRAVITY_RULE_BYTE_BUDGET, ruleFile, targetRoot);
-    const ruleRel = `${prefix}.agents/rules/agent-memory.md`;
-    console.log(
-      `  ${ruleResult.state.padEnd(11)} ${ruleRel.padEnd(28)} ${ruleResult.entries} entries (${ruleResult.bytes} bytes, Antigravity rule)`,
-    );
-    if (ruleResult.dropped.length > 0) {
-      targetDropRecords.push({
-        target: ruleRel,
-        budgetBytes: ANTIGRAVITY_RULE_BYTE_BUDGET,
-        dropped: ruleResult.dropped,
-      });
-    }
-    if (ruleResult.state === "written" && check) stale++;
-
-    const agentsMdResult = syncAgentsMd(!check, nodes, AGENTS_MD_BYTE_BUDGET, agentsMdFile, targetRoot);
-    const agentsMdRel = `${prefix}AGENTS.md`;
-    const agentsMdNote =
-      agentsMdResult.state === "no-markers"
-        ? "no marked region — not opted in, left untouched"
-        : agentsMdResult.state === "missing"
-          ? "no AGENTS.md — nothing to assemble"
-          : `${agentsMdResult.entries} entries (${agentsMdResult.bytes} bytes, repo-wide AGENTS.md)`;
-    console.log(`  ${agentsMdResult.state.padEnd(11)} ${agentsMdRel.padEnd(28)} ${agentsMdNote}`);
-    if (agentsMdResult.dropped.length > 0) {
-      targetDropRecords.push({
-        target: agentsMdRel,
-        budgetBytes: AGENTS_MD_BYTE_BUDGET,
-        dropped: agentsMdResult.dropped,
-      });
-    }
-    if (agentsMdResult.state === "written" && check) stale++;
-
-    const vTargets = vendorTargetsFor(targetRoot);
-    for (const r of syncVendorAgents(!check, nodes, {
-      agents: agentNames(memDir),
-      claudeAgentsDir,
-      targets: vTargets,
-    })) {
-      const t = vTargets.find((x) => x.id === r.target)!;
-      const rel = `${prefix}${t.dir.slice(targetRoot.length + 1)}/${t.fileName(r.agent)}`;
-      const note =
-        r.state === "no-definition"
-          ? `no .claude/agents/${r.agent}.md — nothing to carry, left alone`
-          : `${r.entries} entries (${r.size} ${t.budget.unit}, ${t.vendor} agent)`;
-      console.log(`  ${r.state.padEnd(11)} ${rel.padEnd(28)} ${note}`);
-      if (r.dropped.length > 0) {
-        targetDropRecords.push({ target: rel, budgetBytes: t.budget.limit, unit: t.budget.unit, dropped: r.dropped });
-      }
-      if (r.state === "written" && check) stale++;
-    }
-
-    for (const r of results) {
-      const agentLabel = `${prefix}${r.agent}`;
-      const note =
-        r.state === "no-markers"
-          ? "no marked region — not opted in, left untouched"
-          : r.state === "missing"
-            ? "no MEMORY.md — nothing to assemble"
-            : `${r.entries} entries, ${r.lines} lines`;
-      console.log(`  ${r.state.padEnd(11)} ${agentLabel.padEnd(28)} ${note}`);
-      if (r.state === "written" && check) stale++;
-      if (r.lines > CLAUDE_MEMORY_LINE_BUDGET) {
-        const detail = r.overflowEntries.length
-          ? `and ${r.overflowEntries.length} MEMORY ENTRY(S) fall past it: ${r.overflowEntries.join("; ")}`
-          : "and nothing past it is a memory entry — only the hand-written tail";
-        console.log(
-          `  ${"".padEnd(11)} ${"".padEnd(28)} ⚠ ${r.lines - CLAUDE_MEMORY_LINE_BUDGET} line(s) over the harness's ${CLAUDE_MEMORY_LINE_BUDGET}-line budget, ${detail}`,
-        );
-        if (r.overflowEntries.length) dropped.push({ agent: agentLabel, entries: r.overflowEntries });
-      }
-    }
+  if (r.byteDropReport && !check) {
+    console.warn(r.byteDropReport);
   }
-
-  const byteDropReport = droppedTargetNodesReport(targetDropRecords);
-  if (byteDropReport && !check) {
-    console.warn(byteDropReport);
-  }
-  if (stale > 0) {
+  if (r.stale > 0) {
+    for (const f of r.mountedFindings) console.error(f);
     console.error(
-      `\n${stale} memory file(s) are stale. Run \`bun run cat agent-memory\` and commit the result.`,
+      `\n${r.stale} memory file(s) are stale. Run \`bun run cat agent-memory\` and commit the result.`,
     );
     process.exit(1);
   }
-  const report = droppedEntryReport(dropped);
-  if (check && report) {
-    console.error(report);
+  if (check && r.droppedReport) {
+    console.error(r.droppedReport);
     process.exit(1);
   }
-  if (check && byteDropReport) {
-    console.error(byteDropReport);
+  if (check && r.byteDropReport) {
+    console.error(r.byteDropReport);
     process.exit(1);
   }
 }

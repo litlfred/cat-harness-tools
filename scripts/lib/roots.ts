@@ -273,6 +273,20 @@ export function resolveWorkingInstanceRoot(inputs: InstanceRootInputs = {}): { r
 }
 
 /**
+ * The instance `--instance <dir>` names, validated as
+ * {@link resolveWorkingInstanceRoot} validates it — or `undefined` when the
+ * flag is absent, so the caller keeps the root it always had.
+ *
+ * For a tool whose default is its OWN instance and that gains `--instance` as
+ * an option: `resolveWorkingInstanceRoot` would also follow
+ * `$CAT_INSTANCE_ROOT` and the mounting checkout, which would change what the
+ * tool reads when nobody passed the flag.
+ */
+export function explicitInstanceRoot(argv: readonly string[] = process.argv): string | undefined {
+  return instanceFlag(argv) === undefined ? undefined : resolveWorkingInstanceRoot({ argv, env: {} }).root;
+}
+
+/**
  * The directory `bun run cat` resolves from: the checkout holding this layer
  * and the harness side by side, else the harness's parent — the one answer
  * every caller gave before {@link REPO_ROOT} existed.

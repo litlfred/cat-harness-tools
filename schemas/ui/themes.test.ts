@@ -73,7 +73,7 @@ describe("the corpus is what was asked for", () => {
 });
 
 describe("the default", () => {
-  test("it resolves, and it is a sage — the owner asked for one to match the staging bar", () => {
+  test("it resolves, and it is a pale sage", () => {
     expect(themeById(DEFAULT_THEME_ID)?.id).toBe(DEFAULT_THEME_ID);
     expect(DEFAULT_THEME_ID.startsWith("pale-sage")).toBe(true);
   });

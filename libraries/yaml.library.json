@@ -48,6 +48,7 @@
     "src/tools/skill-update.ts",
     "src/workflow/ci-health.ts",
     "test/coordinator/gate-shell-workflow.test.ts",
-    "test/coordinator/gates-workflows.test.ts"
+    "test/coordinator/gates-workflows.test.ts",
+    "test/layer-ready-reuse.test.ts"
   ]
 }

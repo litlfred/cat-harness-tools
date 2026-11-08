@@ -96,7 +96,15 @@ export const CACHE_FILE = join("build", "regen-cache", "input-hashes.json");
 /** Bump to invalidate every recorded hash when the fingerprint's recipe changes. */
 export const RECIPE_VERSION = 6;
 
-export type Fingerprint = { hash: string; files: number; wholeTree?: boolean } | { undetermined: string };
+export type Fingerprint =
+  | {
+      hash: string;
+      files: number;
+      wholeTree?: boolean;
+      /** A traced fingerprint's modules reached only through a computed load, left to the trace (`auditClosure`'s `deferComputed`). */
+      deferred?: string[];
+    }
+  | { undetermined: string };
 
 /**
  * Resolve an `--against` ref to the identity of the baseline it names, or say
@@ -665,8 +673,10 @@ export function fingerprint(
    * replaying every git command the run executed (`ci-cone.ts`, bean `4rbc`),
    * so a `tree` site does not need a `{tracked}` declaration; and its
    * read set holds every module file the run opened, so the modules reached
-   * only by a computed load (`input-sites.ts`, `computed`) are audited but
-   * not hashed. Nothing else may pass it.
+   * only by a computed load (`input-sites.ts`, `computed`) are neither
+   * audited nor hashed here: the result lists them in `deferred`, and the
+   * cone audits the ones the run opened (`ci-cone.ts` `deferredInputsOf`).
+   * Nothing else may pass it.
    */
   opts: { treeReplayed?: boolean } = {},
 ): Fingerprint {
@@ -712,6 +722,7 @@ export function fingerprint(
     undefined,
     (name) => entryFiles(root, scripts, name),
     (source) => digests.declared.resolve(source),
+    opts.treeReplayed === true,
   );
   if ("undetermined" in audit) return audit;
   if (audit.needsTree && !wholeTree && opts.treeReplayed !== true) {
@@ -728,8 +739,9 @@ export function fingerprint(
   // A traced run's read set records every module file it opened, so the
   // modules it reached by a computed load are hashed there, as the ones THAT
   // run loaded; hashing every module the declarations could name would tie
-  // each check to every other check's kinds and plugins (bean vgfp). They are
-  // still audited above, so what they read from the environment is hashed.
+  // each check to every other check's kinds and plugins (bean vgfp). Nor are
+  // they audited above: the cone audits the ones a run opened, and records
+  // what they read from the environment (`ci-cone.ts` `deferredInputsOf`).
   const computed = opts.treeReplayed === true ? new Set(audit.computed) : undefined;
   const closure = { files: wholeTree ? ([] as string[]) : computed === undefined ? audit.files : audit.files.filter((f) => !computed.has(f)) };
 
@@ -752,7 +764,7 @@ export function fingerprint(
   if (existsSync(join(root, "bun.lock"))) all.add("bun.lock");
   const sorted = [...all].sort();
   for (const f of sorted) h.update(`${f}\0${digests.digest(f)}\n`);
-  return { hash: h.digest("hex"), files: sorted.length, wholeTree: tree !== undefined };
+  return { hash: h.digest("hex"), files: sorted.length, wholeTree: tree !== undefined, ...(audit.deferred.length ? { deferred: audit.deferred } : {}) };
 }
 
 export interface HashCache {

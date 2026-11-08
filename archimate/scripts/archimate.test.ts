@@ -96,8 +96,14 @@ describe("reading a model", () => {
   });
 
   it("reads relationships, defaulting nothing it was told", () => {
-    expect(m.relationships.find((r) => r.id === "id-r1")).toMatchObject({ type: "Serving", source: "id-b", target: "id-a" });
+    // A serving relationship carries nothing it was not told: no name, access type or direction.
+    expect(m.relationships.find((r) => r.id === "id-r1")).toEqual({ id: "id-r1", type: "Serving", source: "id-b", target: "id-a", properties: [] });
+    // Told "1", the access is read, not Archi's default of write.
     expect(m.relationships.find((r) => r.id === "id-r2")).toMatchObject({ type: "Access", accessType: "read" });
+    const accessOf = (attr: string) => parseArchimate(XML.replace(' accessType="1"', attr)).relationships.find((r) => r.id === "id-r2")!.accessType;
+    expect([accessOf(' accessType="0"'), accessOf(' accessType="2"'), accessOf(' accessType="3"')]).toEqual(["write", "access", "readwrite"]);
+    // Told nothing, it takes Archi's own default, write.
+    expect(accessOf("")).toBe("write");
   });
 
   it("makes a nested object's bounds absolute, and gives -1 Archi's default size", () => {
@@ -135,6 +141,19 @@ describe("drawing a view", () => {
   it("escapes every string from the model", () => {
     expect(svg).toContain("Registry &lt;script&gt;");
     expect(svg).not.toContain("<script>");
+    // Markup in the model's, view's, group's, elements' and note's text is drawn as text, never as markup.
+    const marked = parseArchimate(
+      XML.replace('name="Lookup"', 'name="Lookup &lt;i&gt;"')
+        .replace('name="Record"', 'name="Record &lt;s&gt;"')
+        .replace('name="Platform"', 'name="Platform &lt;u&gt;"')
+        .replace('name="Overview"', 'name="Overview &lt;v&gt;"')
+        .replace("A note &amp; its text", "A note &lt;em&gt;"),
+    );
+    const out = renderViewSvg(marked, marked.views[0]!);
+    for (const tag of ["RA", "script", "i", "s", "u", "v", "em"]) {
+      expect(out).not.toContain(`<${tag}>`);
+      expect(out).toContain(`&lt;${tag}&gt;`);
+    }
   });
 
   it("links each box to its element, and draws each relationship with its own ends", () => {
@@ -198,7 +217,12 @@ describe("drawing a view", () => {
     expect(key).not.toContain("Influence");
     expect(key).not.toContain("Why: who cares");
     // The drawing grows to hold it, and it can be left off.
-    expect(renderViewSvg(m, m.views[0]!, { legend: false })).not.toContain("av-legend");
+    const bare = renderViewSvg(m, m.views[0]!, { legend: false });
+    expect(bare).not.toContain("av-legend");
+    const heightOf = (s: string) => Number(/<svg [^>]*\bheight="([0-9.]+)"/.exec(s)![1]);
+    const boxOf = (s: string) => /<svg [^>]*viewBox="([^"]+)"/.exec(s)![1]!.split(" ").map(Number);
+    expect(heightOf(svg)).toBeGreaterThan(heightOf(bare));
+    expect(boxOf(svg)[3]!).toBeGreaterThan(boxOf(bare)[3]!);
   });
 
   it("says a view with nothing on it is empty, rather than drawing an empty frame", () => {
@@ -309,14 +333,14 @@ describe("an instance", () => {
     }
   });
 
-  it("a page copies nothing of the model: its config points at the normalised model relative to itself", () => {
+  it("a page copies none of the model's documentation, properties or notes: its config points at the normalised model relative to itself", () => {
     const root = make(config);
     try {
       for (const p of pagesFor(root).files.filter((f) => f.path.endsWith("/index.html"))) {
         const cfg = thinPageConfigOf(p.content, PAGE_CONFIG_ID)!;
         const depth = p.path.split("/").length;
         expect(cfg.model).toBe(depth === 2 ? "./model.json" : depth === 3 ? "../model.json" : "../../model.json");
-        expect(p.content).not.toContain("Holds the records.");
+        for (const text of ["Holds the records.", "owner", "WHO", "A note", "its text"]) expect({ page: p.path, text, copied: p.content.includes(text) }).toEqual({ page: p.path, text, copied: false });
       }
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -381,7 +405,7 @@ describe("an instance", () => {
     }
   });
 
-  it("in a site, writes nothing for an instance that declares no route for these pages", () => {
+  it("in a site, refuses an instance that declares no route for these pages", () => {
     const { visualisers: _v, ...undeclared } = declaration;
     const root = make(config, undefined, undeclared);
     try {

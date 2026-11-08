@@ -61,42 +61,66 @@ describe("viewer Tools declare what they render", () => {
     // Owner, 2026-10-09: the `archimate` subgraph of cat-harness, whose first
     // instance is smart-ra's DPI-H reference architecture models.
     archimate: "litlfred/smart-ra",
-    // Owner, 2026-11-01, Q-SUBG-6 A: a display sub-graph of `processes` for a
-    // DAK's business processes. processes-viewer renders it (cat-harness
-    // 4fb8e9c); no instance this index mounts declares it yet.
-    "business-processes": "a DAK outside this index",
     // Owner, 2026-11-05, option A: journeys-viewer draws the journeys and
     // workshops of litlfred/smart-trust-demo and litlfred/smart-ips-pilgrimage,
     // neither of which this index mounts.
     "user-scenario": "litlfred/smart-trust-demo",
     workshop: "litlfred/smart-trust-demo",
+    // Owner, 2026-11-06, option A: journeys-viewer draws the device screens of
+    // the same two instances.
+    "device-screen": "litlfred/smart-trust-demo",
+  };
+
+  /**
+   * TRANSITIONAL (remove once folio-assistant main pins smart-trust-phw at or
+   * past 0ac4693): a kind that WAS held outside and is arriving in this index.
+   * Owner, 2026-11-01, Q-SUBG-6 A: `business-processes` is a display sub-graph
+   * of `processes` for a DAK's business processes, which processes-viewer
+   * renders (cat-harness 4fb8e9c). smart-trust-phw now declares it
+   * (`input/business-processes/`), and this layer is tested against both the
+   * index's main and its re-pin train, which pin smart-trust-phw on either
+   * side of that. So each entry is checked as exactly one of the two states,
+   * never waived: still rendered, and declared by NO instance or by the named
+   * one only.
+   */
+  const ARRIVING: Record<string, string> = {
+    "business-processes": "smart-trust-phw",
   };
 
   it("every rendered kind is declared by some directory", () => {
     const declared = new Set(dirs.flatMap(({ dir }) => dir.graphTypologies ?? []));
-    expect([...rendered].filter((k) => !declared.has(k) && !(k in HELD_OUTSIDE))).toEqual([]);
+    expect([...rendered].filter((k) => !declared.has(k) && !(k in HELD_OUTSIDE) && !(k in ARRIVING))).toEqual([]);
+  });
+
+  it("a kind arriving in this index is still rendered, and declared by no instance but the one it arrives in", () => {
+    for (const [k, by] of Object.entries(ARRIVING)) {
+      expect(k in HELD_OUTSIDE, `${k} is both arriving and held outside`).toBe(false);
+      expect(rendered.has(k), `${k} is no longer rendered by any Tool — drop it from ARRIVING`).toBe(true);
+      const holders = [...new Set(dirs.filter(({ dir }) => (dir.graphTypologies ?? []).includes(k)).map(({ instance }) => instance.split("/").pop()))];
+      expect(holders.filter((h) => h !== by), `${k} is declared outside ${by}`).toEqual([]);
+    }
   });
 
   /**
-   * TRANSITIONAL (remove after cat-harness#1058 merges): the Tool that renders
-   * these kinds is DEFINED in cat-harness (#1058) and implemented here (#1516),
-   * and this layer merges first. Until the definition is on cat-harness main no
-   * Tool renders them; that is checked as exactly that — the named Tool is
-   * absent and nothing else renders them — never waived. Once the Tool exists
-   * the ordinary check below holds them like every other entry.
+   * TRANSITIONAL (remove once the cat-harness PR that adds `device-screen` to
+   * journeys-viewer's `renders` is on cat-harness main): this layer draws the
+   * kind and merges first, and the Tool that renders it is defined in
+   * cat-harness, after. Until then the named Tool exists and does not render
+   * it yet; that is checked as exactly that, never waived. Once it renders it,
+   * the ordinary check holds it.
    */
-  const RENDERED_BY_A_TOOL_NOT_YET_DEFINED: Record<string, string> = {
-    "user-scenario": "journeys-viewer",
-    workshop: "journeys-viewer",
+  const NOT_YET_IN_THE_TOOLS_RENDERS: Record<string, string> = {
+    "device-screen": "journeys-viewer",
   };
 
   it("every kind listed as held outside is still rendered here and still not held here", () => {
     const declared = new Set(dirs.flatMap(({ dir }) => dir.graphTypologies ?? []));
     const ids = new Set(all.map((t) => t.id));
     for (const k of Object.keys(HELD_OUTSIDE)) {
-      const pending = RENDERED_BY_A_TOOL_NOT_YET_DEFINED[k];
-      if (pending !== undefined && !ids.has(pending)) {
-        expect(rendered.has(k), `${k} is rendered by a Tool other than ${pending}, which is not defined yet`).toBe(false);
+      const toCome = NOT_YET_IN_THE_TOOLS_RENDERS[k];
+      if (toCome !== undefined && !rendered.has(k)) {
+        // The Tool that will render it is defined; it does not list the kind yet.
+        expect(ids.has(toCome), `${k} is to be rendered by ${toCome}, which does not exist`).toBe(true);
         expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
         continue;
       }

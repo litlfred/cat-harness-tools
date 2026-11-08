@@ -115,25 +115,23 @@ const TOKEN = new RegExp(
 const SKIP = /\$\{\{|\*|__|\.\.\./;
 
 describe("a platform workflow names paths that exist", () => {
-  for (const wf of PLATFORM_WORKFLOWS) {
-    test(wf, () => {
-      const file = join(REPO, ".github/workflows", wf);
-      expect(existsSync(file)).toBe(true); // a renamed workflow is not a pass
-      const missing: string[] = [];
-      readFileSync(file, "utf-8")
-        .split("\n")
-        .forEach((line, i) => {
-          // Comments explain history and necessarily name old paths.
-          if (line.trimStart().startsWith("#")) return;
-          const code = line.split(" #")[0]!;
-          for (const m of code.matchAll(TOKEN)) {
-            const p = m[1]!.replace(/[.,;:'"`)\]]+$/, "");
-            if (SKIP.test(p) || p.endsWith("/")) continue;
-            if (existsSync(join(REPO, p))) continue;
-            missing.push(`${wf}:${i + 1}: ${p}`);
-          }
-        });
-      expect(missing).toEqual([]);
-    });
-  }
+  test.each(PLATFORM_WORKFLOWS.map((w): [string] => [w]))("%s names only paths that exist", (wf) => {
+    const file = join(REPO, ".github/workflows", wf);
+    expect(existsSync(file)).toBe(true); // a renamed workflow is not a pass
+    const missing: string[] = [];
+    readFileSync(file, "utf-8")
+      .split("\n")
+      .forEach((line, i) => {
+        // Comments explain history and necessarily name old paths.
+        if (line.trimStart().startsWith("#")) return;
+        const code = line.split(" #")[0]!;
+        for (const m of code.matchAll(TOKEN)) {
+          const p = m[1]!.replace(/[.,;:'"`)\]]+$/, "");
+          if (SKIP.test(p) || p.endsWith("/")) continue;
+          if (existsSync(join(REPO, p))) continue;
+          missing.push(`${wf}:${i + 1}: ${p}`);
+        }
+      });
+    expect(missing).toEqual([]);
+  });
 });

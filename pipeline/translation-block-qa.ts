@@ -59,6 +59,24 @@
  *   bun run cat-harness-tools/pipeline/translation-block-qa.ts                 # write
  *   bun run cat-harness-tools/pipeline/translation-block-qa.ts --check [--against <ref>]   # judge, write nothing
  *   bun run cat-harness-tools/pipeline/translation-block-qa.ts --root <dir> --locales fr,es
+ *   bun run cat-harness-tools/pipeline/translation-block-qa.ts --catalogues [--instance <dir>] [--check]
+ *
+ * ## `--catalogues` and `--instance` — pages and glossaries with no block
+ *
+ * Blocks and the docs site's pages are measured against their SOURCE. An IG
+ * page, a diagram or a glossary scheme is catalogued too, but has no block and
+ * no page on this site, so nothing measured it and its round-trip verdicts
+ * ended up in PR text. `--catalogues` adds a third pass: every
+ * `<translations>/<locale>/<rel>.po` with its `.pot` beside it, in the
+ * `translation-sources` directory the instance declares, not already measured
+ * by a block or page verdict, is measured against the template with the same
+ * criteria. Its sidecar is the same `translation-qa/v1` document, at
+ * `translationQaPath` with the catalogue's path (locale removed) as subject,
+ * under the instance's QA tree: `test/results/translation-qa/translations/<rel>.<locale>.translation-qa.json`.
+ * `bun run cat translation:page-qa` runs it. The default run is unchanged.
+ *
+ * `--instance <dir>` sweeps the instance at `<dir>` instead of this one, by
+ * its own declarations; the sidecars go into ITS QA tree.
  *
  * ## `--check` computes and judges (bean `oqe3`)
  *
@@ -105,13 +123,17 @@ import { sourceLocale, targetLocales } from "./translation-index.ts";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf, readBaseline, type FreshSidecar } from "../scripts/qa-results.ts";
 import { readQaManifest, type QaStoreOptions } from "../scripts/qa-store.ts";
 import { docsSourceDirFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { explicitInstanceRoot, HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "../schemas/kg/qa-record-shapes.ts";
 import { manifestPath } from "./json-manifest.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport };
 
-const INSTANCE_ROOT = join(HARNESS_ROOT);
+/**
+ * The instance swept: this one, or the one `--instance <dir>` names (set once,
+ * at the top of the CLI, before anything reads it).
+ */
+let INSTANCE_ROOT = join(HARNESS_ROOT);
 /**
  * This sweep's identity AS A REVIEWER, written into every sidecar it touches.
  *
@@ -470,7 +492,19 @@ export function measureBlock(
   const manifestEntries = manifest
     ? extractFromManifest(manifest, manifestSource ?? source.replace(/\.md$/, ".ts"))
     : [];
-  const entries = [...manifestEntries, ...extractMarkdown(md, source)];
+  return measureEntries([...manifestEntries, ...extractMarkdown(md, source)], po, glossary);
+}
+
+/**
+ * Measure a list of source strings against one locale's merged PO map — the
+ * half of {@link measureBlock} that does not care where the strings came from:
+ * a block's extraction, or a `.pot` template's entries.
+ */
+export function measureEntries(
+  entries: ReadonlyArray<{ msgid: string; msgctxt?: string }>,
+  po: Map<string, string>,
+  glossary: Glossary = new Map(),
+): Measured {
   const m: Measured = {
     total: entries.length, translated: 0, echoed: 0,
     missingStrict: [], missingAcronyms: [],
@@ -523,8 +557,8 @@ function entry(
     field_hash: fieldHash,
     result,
     reviewer: reviewer(),
-    // input-site: inert #1cab269c — reviewed_at; --check compares substantive(), which drops timestamps
-    reviewed_at: new Date().toISOString(),
+    // No reviewed_at (owner rulings 2026-11-06, cards "QA dates" and "Date
+    // source", option 1): the date is derived on read from reviewed_tree.
     // The tree, not the commit (bean 69lr; owner card Q4, 2026-11-05).
     reviewed_tree: gitHeadTree(INSTANCE_ROOT),
     ...extra,
@@ -602,50 +636,15 @@ export function poCovers(poText: string, subjectRel: string): boolean {
   return !sawAny;
 }
 
-/** Build the report for one (block, locale), or `undefined` if untranslated. */
-export function buildReport(
-  blockMd: string,
-  label: string,
+/**
+ * The three script criteria, and the declared-unwitnessed round trip, for one
+ * measurement. Shared by the block/page report and the catalogue report.
+ */
+function criteriaFor(
+  m: Measured,
+  fieldHash: TranslationFieldHash,
   locale: string,
-  poPaths: string[],
-): TranslationBlockQaReport | undefined {
-  if (poPaths.length === 0) return undefined;
-  const rel = relative(INSTANCE_ROOT, blockMd);
-  const merged = new Map<string, string>();
-  for (const p of poPaths) {
-    const text = readFileSync(p, "utf-8");
-    if (!poCovers(text, rel)) continue;
-    // Later sources override earlier ones for the same msgid — the order
-    // `resolvePoSources` returns them in, which is the pipeline's rule.
-    for (const [k, v] of parsePo(text)) merged.set(k, v);
-  }
-  // Every resolved PO disclaimed this subject: the stem matched and the content
-  // does not belong to it. Absence, exactly as if no PO had resolved at all.
-  if (merged.size === 0) return undefined;
-  const md = readFileSync(blockMd, "utf-8");
-  const stem = basename(blockMd).replace(/\.md$/, "");
-  const tsPath = manifestPath(dirname(blockMd), stem);
-  const tsSource = existsSync(tsPath) ? readFileSync(tsPath, "utf-8") : undefined;
-  const m = measureBlock(
-    md,
-    rel,
-    merged,
-    readGlossary(INSTANCE_ROOT, locale),
-    tsSource,
-    tsSource !== undefined ? relative(INSTANCE_ROOT, tsPath) : undefined,
-  );
-  // Nothing of this block is in the PO: it is untranslated, which is an absence
-  // and not a failing translation. See the header.
-  if (m.translated === 0) return undefined;
-
-  const poRel = relative(INSTANCE_ROOT, poPaths[poPaths.length - 1]!);
-  const hashes: TranslationFieldHash = {
-    md: hashFile(blockMd),
-    ts: existsSync(tsPath) ? hashFile(tsPath) : undefined,
-    po: hashFile(poPaths[poPaths.length - 1]!),
-  };
-  const fieldHash = { ...hashes };
-
+): Record<string, TranslationQaEntry[]> {
   const pct = m.total === 0 ? 0 : Math.round((m.translated / m.total) * 100);
   const criteria: Record<string, TranslationQaEntry[]> = {};
 
@@ -727,6 +726,55 @@ export function buildReport(
   // back-translation is the PO read backwards, which measures the lookup table.
   criteria["translation-semantic-roundtrip"] = [];
 
+  return criteria;
+}
+
+/** Build the report for one (block, locale), or `undefined` if untranslated. */
+export function buildReport(
+  blockMd: string,
+  label: string,
+  locale: string,
+  poPaths: string[],
+): TranslationBlockQaReport | undefined {
+  if (poPaths.length === 0) return undefined;
+  const rel = relative(INSTANCE_ROOT, blockMd);
+  const merged = new Map<string, string>();
+  for (const p of poPaths) {
+    const text = readFileSync(p, "utf-8");
+    if (!poCovers(text, rel)) continue;
+    // Later sources override earlier ones for the same msgid — the order
+    // `resolvePoSources` returns them in, which is the pipeline's rule.
+    for (const [k, v] of parsePo(text)) merged.set(k, v);
+  }
+  // Every resolved PO disclaimed this subject: the stem matched and the content
+  // does not belong to it. Absence, exactly as if no PO had resolved at all.
+  if (merged.size === 0) return undefined;
+  const md = readFileSync(blockMd, "utf-8");
+  const stem = basename(blockMd).replace(/\.md$/, "");
+  const tsPath = manifestPath(dirname(blockMd), stem);
+  const tsSource = existsSync(tsPath) ? readFileSync(tsPath, "utf-8") : undefined;
+  const m = measureBlock(
+    md,
+    rel,
+    merged,
+    readGlossary(INSTANCE_ROOT, locale),
+    tsSource,
+    tsSource !== undefined ? relative(INSTANCE_ROOT, tsPath) : undefined,
+  );
+  // Nothing of this block is in the PO: it is untranslated, which is an absence
+  // and not a failing translation. See the header.
+  if (m.translated === 0) return undefined;
+
+  const poRel = relative(INSTANCE_ROOT, poPaths[poPaths.length - 1]!);
+  const hashes: TranslationFieldHash = {
+    md: hashFile(blockMd),
+    ts: existsSync(tsPath) ? hashFile(tsPath) : undefined,
+    po: hashFile(poPaths[poPaths.length - 1]!),
+  };
+  const fieldHash = { ...hashes };
+
+  const criteria = criteriaFor(m, fieldHash, locale);
+
   return {
     $schema: "translation-qa/v1",
     // Two identities, not one: `trans:fr/overview` names the translation node,
@@ -740,8 +788,64 @@ export function buildReport(
     po: poRel,
     source_hashes: hashes,
     criteria,
-    // input-site: inert #66ee6012 — updated_at; --check compares substantive(), which drops timestamps
-    updated_at: new Date().toISOString(),
+    // No updated_at: the sidecar's date is derived from its entries' tree.
+  };
+}
+
+/** One locale's catalogue with the template beside it. */
+export interface CataloguePair {
+  locale: string;
+  /** Path under the locale directory, without extension: `pagecontent/personas`. */
+  rel: string;
+  po: string;
+  pot: string;
+}
+
+/**
+ * Every `<locale>/<rel>.po` in a `translation-sources` directory that has its
+ * `.pot` beside it, for the locales given. A `.po` with no template (the
+ * hand-authored terminology `glossary.po`) has nothing to be measured against.
+ */
+export function cataloguePairs(translationsDir: string, locales: readonly string[]): CataloguePair[] {
+  const out: CataloguePair[] = [];
+  const walk = (abs: string): string[] =>
+    readdirSync(abs, { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .flatMap((e) => (e.isDirectory() ? walk(join(abs, e.name)) : e.name.endsWith(".po") ? [join(abs, e.name)] : []));
+  for (const locale of locales) {
+    const dir = join(translationsDir, locale);
+    if (!existsSync(dir)) continue;
+    for (const po of walk(dir)) {
+      const pot = `${po}t`;
+      if (!existsSync(pot)) continue;
+      out.push({ locale, rel: relative(dir, po).replace(/\.po$/, "").split(sep).join("/"), po, pot });
+    }
+  }
+  return out;
+}
+
+/**
+ * The report for one catalogue measured against ITS TEMPLATE, or `undefined`
+ * when none of the template's strings is translated (absence, as for a block).
+ *
+ * For a subject whose page is not on this instance's docs site — an IG page, a
+ * BPMN diagram, a glossary scheme — the `.pot` is the source of record: it is
+ * what the extractor said the subject contains. The criteria, their thresholds
+ * and the glossary rule are {@link buildReport}'s, through {@link criteriaFor}.
+ */
+export function buildCatalogueReport(pair: CataloguePair): TranslationBlockQaReport | undefined {
+  const entries = parsePoEntries(readFileSync(pair.pot, "utf-8")).map((e) => ({ msgid: e.msgid, msgctxt: e.context }));
+  const m = measureEntries(entries, parsePo(readFileSync(pair.po, "utf-8")), readGlossary(INSTANCE_ROOT, pair.locale));
+  if (m.translated === 0) return undefined;
+  const hashes: TranslationFieldHash = { pot: hashFile(pair.pot), po: hashFile(pair.po) };
+  return {
+    $schema: "translation-qa/v1",
+    label: `trans:${pair.locale}/${pair.rel}`,
+    locale: pair.locale,
+    paths: { pot: relative(INSTANCE_ROOT, pair.pot) },
+    po: relative(INSTANCE_ROOT, pair.po),
+    source_hashes: hashes,
+    criteria: criteriaFor(m, { ...hashes }, pair.locale),
   };
 }
 
@@ -926,6 +1030,8 @@ interface SweepTally {
   refused: number;
   /** Judge mode: every sidecar this run computed, with its graded findings (bean `oqe3`). */
   fresh: FreshSidecar[];
+  /** Every `.po` a block or page verdict was measured against, so the catalogue pass does not measure it twice. */
+  consumed: Set<string>;
 }
 
 /**
@@ -995,71 +1101,98 @@ function sweepSubject(
       chapterSlug,
     }, poContext).map((s) => s.path);
     const doc = buildReport(md, label, locale, sources);
-    // READ wherever it is, WRITE only to the results tree — `qa-paths.ts`.
-    const existing = existingTranslationQaPath(INSTANCE_ROOT, subjectRoot, locale);
-    const out = translationQaPath(INSTANCE_ROOT, subjectRoot, locale);
-    if (!doc) {
-      // An existing sidecar whose translation has gone is REPORTED, never
-      // silently deleted: a verdict about a PO nobody can find any more is a
-      // thing a person should look at, not something a sweep decides. In a
-      // STORED tree the working copy is not a record, so it is advisory there
-      // (bean `oqe3`): the record is rebuilt from empty and cannot keep it.
-      if (existing) {
-        console.error(`  ${derivedStored() ? "advisory:" : "!"} ${relative(INSTANCE_ROOT, existing)} has no PO source any more`);
-        tally.stale++;
-      }
-      tally.skipped++;
-      continue;
-    }
-    const prior = readPrior(existing, out);
-    if (!prior.ok) {
-      console.error(`translation-block-qa: UNKNOWN ${relative(INSTANCE_ROOT, subjectRoot)} (${locale}) — ${prior.state}: ${prior.reason}. Nothing was judged for it.`);
-      tally.refused++;
-      continue;
-    }
-    const current = prior.doc;
-    const merged = mergeWithAttestations(INSTANCE_ROOT, subjectRoot, locale, current, doc.criteria);
-    if (!merged.ok) {
-      console.error(refusalLine("translation-block-qa", `${relative(INSTANCE_ROOT, subjectRoot)} (${locale})`, merged));
-      tally.refused++;
-      continue;
-    }
-    doc.criteria = merged.criteria;
-    const body = JSON.stringify(doc, null, 2) + "\n";
-    if (check) tally.fresh.push({ path: out, findings: gradedTranslationFindings(doc) });
-    // A verdict identical in substance but sitting at the LEGACY path is not
-    // up to date: it still has to be written to the results tree, or every run
-    // would report the corpus migrated while nothing moved.
-    if (current && existing === out && substantive(current) === substantive(doc)) continue;
-    if (check) {
-      // Bean `oqe3`: "stale" decides nothing in a stored tree — judge, never
-      // compare. Counted for one advisory line; still a finding unstored.
-      if (!derivedStored()) console.error(`  ✗ ${relative(INSTANCE_ROOT, out)} is stale`);
-      tally.stale++;
-      continue;
-    }
-    // On an instance that never had a store, the prior's attestations move into one now.
-    if (merged.resolution.adopt) {
-      writeCriteriaAttestations(INSTANCE_ROOT, merged.resolution.key, merged.resolution.attestations, {
-        asciiEscape: existing !== undefined && isAsciiEscaped(readFileSync(existing, "utf-8")),
-      });
-    }
-    mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, body);
-    tally.written++;
-    const cov = doc.criteria["translation-coverage"]?.[0]?.metrics;
-    console.log(`  ✓ ${relative(INSTANCE_ROOT, out)} (${cov?.translated}/${cov?.total} strings)`);
+    if (doc) for (const p of sources) tally.consumed.add(p);
+    settleSidecar(subjectRoot, locale, doc, check, tally);
   }
 }
 
+/**
+ * Write, judge, or report one (subject, locale) verdict — everything after the
+ * report is built, shared by the block, page and catalogue passes so the merge
+ * and storage rules have one copy.
+ */
+function settleSidecar(
+  subjectRoot: string,
+  locale: string,
+  doc: TranslationBlockQaReport | undefined,
+  check: boolean,
+  tally: SweepTally,
+): void {
+  // READ wherever it is, WRITE only to the results tree — `qa-paths.ts`.
+  const existing = existingTranslationQaPath(INSTANCE_ROOT, subjectRoot, locale);
+  const out = translationQaPath(INSTANCE_ROOT, subjectRoot, locale);
+  if (!doc) {
+    // An existing sidecar whose translation has gone is REPORTED, never
+    // silently deleted: a verdict about a PO nobody can find any more is a
+    // thing a person should look at, not something a sweep decides. In a
+    // STORED tree the working copy is not a record, so it is advisory there
+    // (bean `oqe3`): the record is rebuilt from empty and cannot keep it.
+    if (existing) {
+      console.error(`  ${derivedStored() ? "advisory:" : "!"} ${relative(INSTANCE_ROOT, existing)} has no PO source any more`);
+      tally.stale++;
+    }
+    tally.skipped++;
+    return;
+  }
+  const prior = readPrior(existing, out);
+  if (!prior.ok) {
+    console.error(`translation-block-qa: UNKNOWN ${relative(INSTANCE_ROOT, subjectRoot)} (${locale}) — ${prior.state}: ${prior.reason}. Nothing was judged for it.`);
+    tally.refused++;
+    return;
+  }
+  const current = prior.doc;
+  const merged = mergeWithAttestations(INSTANCE_ROOT, subjectRoot, locale, current, doc.criteria);
+  if (!merged.ok) {
+    console.error(refusalLine("translation-block-qa", `${relative(INSTANCE_ROOT, subjectRoot)} (${locale})`, merged));
+    tally.refused++;
+    return;
+  }
+  doc.criteria = merged.criteria;
+  const body = JSON.stringify(doc, null, 2) + "\n";
+  if (check) tally.fresh.push({ path: out, findings: gradedTranslationFindings(doc) });
+  // A verdict identical in substance but sitting at the LEGACY path is not
+  // up to date: it still has to be written to the results tree, or every run
+  // would report the corpus migrated while nothing moved.
+  if (current && existing === out && substantive(current) === substantive(doc)) return;
+  if (check) {
+    // Bean `oqe3`: "stale" decides nothing in a stored tree — judge, never
+    // compare. Counted for one advisory line; still a finding unstored.
+    if (!derivedStored()) console.error(`  ✗ ${relative(INSTANCE_ROOT, out)} is stale`);
+    tally.stale++;
+    return;
+  }
+  // On an instance that never had a store, the prior's attestations move into one now.
+  if (merged.resolution.adopt) {
+    writeCriteriaAttestations(INSTANCE_ROOT, merged.resolution.key, merged.resolution.attestations, {
+      asciiEscape: existing !== undefined && isAsciiEscaped(readFileSync(existing, "utf-8")),
+    });
+  }
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, body);
+  tally.written++;
+  const cov = doc.criteria["translation-coverage"]?.[0]?.metrics;
+  console.log(`  ✓ ${relative(INSTANCE_ROOT, out)} (${cov?.translated}/${cov?.total} strings)`);
+}
+
+/**
+ * The flags `--check` accepts besides `--check` itself. `--catalogues` selects
+ * the gate (`translation:page-qa:check`), so it is one of them: without it the
+ * package.json script was refused as "unknown flag(s): --catalogues".
+ */
+export const JUDGE_FLAGS: readonly string[] = ["--catalogues", "--root", "--locales", "--against", "--instance"];
+
 if (import.meta.main) {
+  // `--instance <dir>`: sweep that instance, through ITS declarations. Set
+  // before anything reads INSTANCE_ROOT (`derivedStored` memoises on it).
+  INSTANCE_ROOT = explicitInstanceRoot() ?? INSTANCE_ROOT;
+  const catalogues = process.argv.includes("--catalogues");
   const check = process.argv.includes("--check");
-  const GATE = "translation:block-qa:check";
+  const GATE = catalogues ? "translation:page-qa:check" : "translation:block-qa:check";
   let against: string | undefined;
   if (check) {
     const argv = process.argv.slice(2);
     // `--root` and `--locales` take values; judgeUsage reads only the flags.
-    const usage = judgeUsage(GATE, argv, ["--root", "--locales", "--against"]);
+    const usage = judgeUsage(GATE, argv, JUDGE_FLAGS);
     if (usage !== undefined) process.exit(usage);
     const a = againstOrUsage(GATE, argv);
     if (a.exit !== undefined) process.exit(a.exit);
@@ -1088,10 +1221,11 @@ if (import.meta.main) {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const tally: SweepTally = { written: 0, stale: 0, skipped: 0, refused: 0, fresh: [] };
+  const tally: SweepTally = { written: 0, stale: 0, skipped: 0, refused: 0, fresh: [], consumed: new Set() };
   const poContext = poResolveContext(INSTANCE_ROOT);
 
-  for (const block of walkBlocks(root, { includeUnlabelled: true, verify: false })) {
+  // An instance with no docs source (one swept with `--instance`) has no blocks.
+  for (const block of existsSync(root) ? walkBlocks(root, { includeUnlabelled: true, verify: false }) : []) {
     if (!block.md || !existsSync(block.md)) continue;
     const stem = basename(block.md).replace(/\.md$/, "");
     sweepSubject(block.md, block.label ?? stem, locales, check, tally, undefined, poContext);
@@ -1099,8 +1233,13 @@ if (import.meta.main) {
 
   // The docs site, unless the caller pointed `--root` somewhere else.
   if (!process.argv.includes("--root")) {
-    const siteDir = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
-    if (existsSync(siteDir)) {
+    let siteDir = "";
+    try {
+      siteDir = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
+    } catch {
+      // No declaration names a site: there are no pages to sweep here.
+    }
+    if (siteDir !== "" && existsSync(siteDir)) {
       for (const page of docsPages(siteDir, src)) {
         // The page's path relative to the SITE, which is what its catalogue
         // mirrors. `relative` rather than a manual strip so a page nested any
@@ -1108,6 +1247,23 @@ if (import.meta.main) {
         const stem = relative(siteDir, page.md).replace(/\.md$/, "").split(sep).join("/");
         sweepSubject(page.md, page.title, locales, check, tally, stem, poContext);
       }
+    }
+  }
+
+  // `--catalogues`: every catalogue in the declared `translation-sources`
+  // directory that no block or page verdict above was measured against — IG
+  // pages, diagrams, glossary schemes — measured against the `.pot` beside it.
+  // Its subject is the catalogue's path with the locale taken out, so its
+  // sidecar is `<qa>/translation-qa/<translations>/<rel>.<locale>.translation-qa.json`.
+  if (catalogues && !process.argv.includes("--root")) {
+    const tdir = directoryForGraph(INSTANCE_ROOT, "translation-sources");
+    if (tdir === undefined || !existsSync(tdir)) {
+      console.error(`translation-block-qa: ${INSTANCE_ROOT} declares no \`translation-sources\` directory — no catalogue was measured, and that is not a pass`);
+      process.exit(2);
+    }
+    for (const pair of cataloguePairs(tdir, locales)) {
+      if (tally.consumed.has(pair.po)) continue;
+      settleSidecar(join(tdir, pair.rel), pair.locale, buildCatalogueReport(pair), check, tally);
     }
   }
 

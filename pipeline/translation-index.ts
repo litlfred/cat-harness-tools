@@ -62,6 +62,13 @@
  * Usage:
  *   bun run cat translation:index          # write cat-harness/docs/_data/translations.json
  *   bun run cat translation:index:check    # fail if stale, invalid, or unreadable
+ *   bun run cat translation:index:check --instance <dir>   # another instance's own site
+ *
+ * `--instance <dir>` reads the instance at `<dir>` instead of this one, and its
+ * site is the one IT declares ({@link instanceSiteRoot}); the index is written
+ * into that site's `_data/`. An instance that declares no Jekyll site is
+ * reported `unreadable` (exit 2) — it has published no translated page to
+ * index, which is not the same answer as "none of its pages is translated".
  *
  * @module pipeline/translation-index
  * @covers translation-sources
@@ -73,7 +80,7 @@ import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 import { pagePermalink, permalinkDefaultsIn, type PermalinkDefault } from "../scripts/lib/jekyll-permalink.ts";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { explicitInstanceRoot, HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 /** Re-exported so a caller that already reads pages through this module needs no second import. */
 export { permalinkDefaultsIn };
@@ -406,6 +413,30 @@ export function siteRoot(instanceRoot: string): string | undefined {
   return existsSync(join(abs, "_config.yml")) ? abs : undefined;
 }
 
+/**
+ * The Jekyll site an instance DECLARES for itself — its own `docs` entry, else
+ * its composed `siteDirFor` — confirmed by `_config.yml` as {@link siteRoot} is.
+ *
+ * {@link siteRoot} composes THIS instance's site path under whatever root it is
+ * handed, which is right for this instance and its fixtures and wrong for
+ * another instance whose site sits elsewhere. `--instance` asks this instead.
+ * `undefined` when the instance has no declaration or no site there.
+ */
+export function instanceSiteRoot(instanceRoot: string): string | undefined {
+  let abs: string;
+  try {
+    abs = ownDirectoryById(instanceRoot, "docs", siteDirFor(instanceRoot));
+  } catch {
+    return undefined;
+  }
+  return existsSync(join(abs, "_config.yml")) ? abs : undefined;
+}
+
+/** Where the index for a site is written: `<site>/_data/translations.json`. */
+function indexPathFor(instanceRoot: string, siteDir?: string): string {
+  return siteDir === undefined ? join(instanceRoot, INDEX_PATH) : join(siteDir, "_data", "translations.json");
+}
+
 /** Every file under `dir` whose extension is translatable for `type`, sorted. */
 function translatablePages(root: string, type: string): string[] {
   const out: string[] = [];
@@ -655,8 +686,12 @@ export function serialise(index: TranslationIndex): string {
 }
 
 /** Write the index. Returns whether the file changed. */
-export function writeTranslationIndex(instanceRoot: string, index: TranslationIndex): boolean {
-  const p = join(instanceRoot, INDEX_PATH);
+export function writeTranslationIndex(
+  instanceRoot: string,
+  index: TranslationIndex,
+  siteDir?: string,
+): boolean {
+  const p = indexPathFor(instanceRoot, siteDir);
   const next = serialise(index);
   const prev = existsSync(p) ? readFileSync(p, "utf-8") : null;
   if (prev === next) return false;
@@ -666,19 +701,19 @@ export function writeTranslationIndex(instanceRoot: string, index: TranslationIn
 }
 
 /** `ok` | `stale` | `unreadable`, plus what to print. Exit codes: 0 / 1 / 2. */
-export function checkTranslationIndex(instanceRoot: string): {
+export function checkTranslationIndex(instanceRoot: string, siteDir?: string): {
   state: "ok" | "stale" | "unreadable";
   findings: IndexFinding[];
   stalePath?: string;
 } {
-  const { index, findings } = buildTranslationIndex(instanceRoot);
+  const { index, findings } = buildTranslationIndex(instanceRoot, siteDir);
   if (findings.some((f) => f.severity === "unreadable")) {
     return { state: "unreadable", findings };
   }
   if (findings.some((f) => f.severity === "error")) return { state: "stale", findings };
-  const p = join(instanceRoot, INDEX_PATH);
+  const p = indexPathFor(instanceRoot, siteDir);
   const prev = existsSync(p) ? readFileSync(p, "utf-8") : null;
-  if (prev !== serialise(index)) return { state: "stale", findings, stalePath: INDEX_PATH };
+  if (prev !== serialise(index)) return { state: "stale", findings, stalePath: relative(instanceRoot, p) };
   return { state: "ok", findings };
 }
 
@@ -699,10 +734,27 @@ function report(findings: IndexFinding[]): void {
 }
 
 if (import.meta.main) {
-  const root = REPO_ROOT;
+  // `--instance <dir>`: another instance, read through ITS declaration. Absent,
+  // this instance as before.
+  const explicit = explicitInstanceRoot();
+  const root = explicit ?? REPO_ROOT;
+  const site = explicit === undefined ? undefined : instanceSiteRoot(explicit);
+  if (explicit !== undefined && site === undefined) {
+    report([
+      {
+        where: explicit,
+        severity: "unreadable",
+        message:
+          "this instance declares no Jekyll site (no `docs` directory with a `_config.yml`), so it " +
+          "has published no translated page to index. Its catalogues are not pages: " +
+          "`translation:status --instance` and `translation:obsolete:check --instance` read them.",
+      },
+    ]);
+    process.exit(2);
+  }
   const check = process.argv.includes("--check");
   if (check) {
-    const r = checkTranslationIndex(root);
+    const r = checkTranslationIndex(root, site);
     report(r.findings);
     if (r.state === "unreadable") {
       console.error(
@@ -715,19 +767,19 @@ if (import.meta.main) {
       if (r.stalePath) console.error(`\n${r.stalePath} is stale. Run: bun run cat translation:index`);
       process.exit(1);
     }
-    const n = Object.keys(buildTranslationIndex(root).index.pages).length;
+    const n = Object.keys(buildTranslationIndex(root, site).index.pages).length;
     console.log(`translation index up to date — ${n} source page(s) with translations`);
   } else {
-    const { index, findings } = buildTranslationIndex(root);
+    const { index, findings } = buildTranslationIndex(root, site);
     report(findings);
     if (findings.some((f) => f.severity === "unreadable")) {
       console.error("\nRefusing to write a partial index over a complete one.");
       process.exit(2);
     }
     if (findings.some((f) => f.severity === "error")) process.exit(1);
-    const changed = writeTranslationIndex(root, index);
+    const changed = writeTranslationIndex(root, index, site);
     console.log(
-      `${changed ? "Wrote" : "Unchanged"} ${INDEX_PATH} — ` +
+      `${changed ? "Wrote" : "Unchanged"} ${relative(root, indexPathFor(root, site))} — ` +
         `${Object.keys(index.pages).length} source page(s), locales: ${index.locales.join(", ") || "(none)"}`,
     );
   }

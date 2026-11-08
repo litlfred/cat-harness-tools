@@ -74,6 +74,16 @@ describe("the schema", () => {
       jurisdiction: { publicationBase: "https://example.org/", audience: "authenticated", residency: "in-country" },
     };
     expect(DeploymentDescriptionSchema.safeParse(d).success).toBe(true);
+    // All four together, each one alone, none at all — and no fifth field.
+    const all = { publicationBase: "https://example.org/", audience: "authenticated", retention: "7 years", residency: "in-country" };
+    expect(DeploymentDescriptionSchema.safeParse({ ...d, jurisdiction: all }).success).toBe(true);
+    for (const [k, v] of Object.entries(all)) {
+      expect([k, DeploymentDescriptionSchema.safeParse({ ...d, jurisdiction: { [k]: v } }).success]).toEqual([k, true]);
+    }
+    expect(DeploymentDescriptionSchema.safeParse({ ...d, jurisdiction: {} }).success).toBe(true);
+    const { jurisdiction: _j, ...none } = d;
+    expect(DeploymentDescriptionSchema.safeParse(none).success).toBe(true);
+    expect(DeploymentDescriptionSchema.safeParse({ ...d, jurisdiction: { ...all, currency: "EUR" } }).success).toBe(false);
     const bad = { ...d, jurisdiction: { ...d.jurisdiction, audience: "everyone" } };
     expect(DeploymentDescriptionSchema.safeParse(bad).success).toBe(false);
   });

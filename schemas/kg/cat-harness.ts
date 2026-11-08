@@ -943,7 +943,15 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    */
   gateExemptions?: {
     steps?: Array<{ match: string; kind: "covered-by" | "ci-only" | "no-folio"; reason: string }>;
-    scripts?: Array<{ script: string; kind: "report" | "covered-by" | "no-folio" | "scheduled"; reason: string }>;
+    scripts?: Array<{
+      script: string;
+      kind: "report" | "covered-by" | "no-folio" | "scheduled" | "pending-baseline";
+      reason: string;
+      /** `pending-baseline` only: the script that writes the baseline, which CI must run. */
+      writer?: string;
+      /** `pending-baseline` only: the change that wires the check once the baseline exists. */
+      followUp?: string;
+    }>;
     /**
      * Files of THIS instance that one named gate's allowlist admits, each with
      * its reason — `gate` is the check's script name (`check:structure-accessor`),
@@ -1737,6 +1745,18 @@ export const HarnessVisualiserSchema = TileSchema.extend({
   subgraphUnder: z.record(z.string().min(1), z.string().regex(/^[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*$/, "a /-separated path of URL segments")).optional(),
   /** Opt-in `<base>/<alias>/` redirect to the canonical route (bean `t4xb`). */
   alias: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "a URL segment").optional(),
+  /**
+   * Its pages are built at publish on the HOST site (the site owner's, e.g.
+   * cat-harness's), at `<site>/<locale>/<harness>/<id>/`, so the publish plan
+   * derives those routes from this entry and the host lists none of them
+   * (bean folio-assistant-uldr, owner option "1", 2026-11-06). `translated`:
+   * it also writes one route per locale the checkout's translation sources
+   * hold, besides the page locale. The writer is the `renderedBy` Tool's
+   * `invoke.shell` script, and it marks each route it writes with a
+   * self-ignoring `.gitignore` (`*`), which keeps the route out of git and out
+   * of the mount digest.
+   */
+  builtOnHostSite: z.object({ translated: z.literal(true).optional() }).strict().optional(),
 }).refine((v) => v.covers !== undefined || v.coversKinds !== undefined, {
   message: "a visualiser covers something: declare `covers` (directory ids) or `coversKinds` (graph typologies)",
 });
@@ -3412,10 +3432,21 @@ export const GateExemptionsSchema = z
         z
           .object({
             script: z.string().min(1),
-            kind: z.enum(["report", "covered-by", "no-folio", "scheduled"]),
+            kind: z.enum(["report", "covered-by", "no-folio", "scheduled", "pending-baseline"]),
             reason: z.string().trim().min(1),
+            // `pending-baseline` only (owner, 2026-11-07, "A. Two steps"): the
+            // writer CI runs now, and the follow-up that wires the check.
+            writer: z.string().min(1).optional(),
+            followUp: z.string().trim().min(1).optional(),
           })
-          .strict(),
+          .strict()
+          .refine(
+            (e) =>
+              e.kind === "pending-baseline"
+                ? e.writer !== undefined && e.followUp !== undefined
+                : e.writer === undefined && e.followUp === undefined,
+            { message: "a `pending-baseline` exemption names its `writer` and its `followUp`, and no other kind does" },
+          ),
       )
       .optional(),
     files: z

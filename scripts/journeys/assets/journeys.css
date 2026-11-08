@@ -73,6 +73,8 @@ body.jv {
 .jv-av { --c: #888; display: inline-grid; place-items: center; border-radius: 50%; background: var(--c); color: #fff; font-weight: 700; flex: none; letter-spacing: 0.02em; }
 .jv-av-m { width: 36px; height: 36px; font-size: 0.78rem; }
 .jv-av-s { width: 22px; height: 22px; font-size: 0.6rem; vertical-align: middle; }
+.jv-av-img { background: #e2e8f0; overflow: hidden; }
+.jv-av-img img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .jv-avs { display: inline-flex; }
 .jv-avs { gap: 3px; }
 .jv-avs .jv-av { box-shadow: 0 0 0 1px var(--jv-paper); }
@@ -89,6 +91,8 @@ body.jv {
 .jv-card:hover { border-color: var(--jv-accent); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); }
 .jv-card-code { font: 600 0.75rem ui-monospace, Menlo, monospace; color: var(--jv-accent); }
 .jv-card-title { font-weight: 650; font-size: 1.03rem; }
+.jv-part-mark { display: inline-block; margin-left: 0.4em; padding: 0 0.4em; border: 1px dashed currentColor; border-radius: 0.6em; font-size: 0.72rem; font-weight: 500; vertical-align: 0.1em; opacity: 0.75; }
+.jv-includes { margin: 0.2rem 0 0; }
 .jv-card-meta { color: var(--jv-muted); font-size: 0.88rem; }
 .jv-card-foot { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
 .jv-card-count { font-size: 0.8rem; color: var(--jv-muted); margin-left: auto; }
@@ -180,14 +184,14 @@ body.jv {
 .jv-dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 0.9rem; margin: 0; }
 .jv-dl dt { color: var(--jv-muted); }
 .jv-dl dd { margin: 0; }
+.jv-dak dd { display: flex; flex-wrap: wrap; gap: 4px; }
+.jv-dak .jv-code { white-space: normal; }
 .jv-procs { margin-top: 10px; }
 .jv-bpmn { margin: 6px 0 12px; }
 .jv-bpmn-scroll { overflow-x: auto; border: 1px solid var(--jv-line); border-radius: 8px; background: #fff; }
 .jv-bpmn-scroll > svg { min-width: 900px; display: block; }
 .jv-bpmn figcaption { font-size: 0.8rem; color: var(--jv-muted); margin-top: 4px; }
-.jv-bpmn [data-jv-hl] > .djs-visual > :first-child { stroke: var(--jv-hl) !important; stroke-width: 4px !important; fill: #fff3d6 !important; }
-.jv-bpmn [data-jv-hl] > .djs-visual > path:first-child { fill: none !important; }
-.jv-has-hl .djs-shape:not([data-jv-hl]) .djs-visual > :first-child:not(rect[width="1920"]) { opacity: 0.75; }
+.jv-bpmn-scroll:focus-visible { outline: 2px solid var(--jv-hl); outline-offset: 2px; }
 .jv-pn { display: flex; justify-content: space-between; gap: 12px; margin-top: 14px; font-size: 0.9rem; }
 
 /* workshop panel on a step */
@@ -232,7 +236,7 @@ body.jv {
 .jv-jobaid { margin-top: 8px; padding: 8px 14px; border-radius: 8px; background: var(--jv-soft); font-size: 0.92rem; }
 .jv-views-list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; }
 .jv-am { margin: 0; background: var(--jv-paper); border: 1px solid var(--jv-line); border-radius: var(--jv-radius); padding: 10px; }
-.jv-am img { width: 100%; height: auto; display: block; }
+.jv-am img, .jv-am object { width: 100%; height: auto; display: block; }
 .jv-src { margin-top: 30px; font-size: 0.82rem; color: var(--jv-muted); }
 
 /* printable sheets */
@@ -277,3 +281,6 @@ body.jv {
   details { display: block; }
   details > summary { list-style: none; }
 }
+
+/* A persona's name that opens its page in the IG. */
+.jv-people b a[data-jv-dak] { color: inherit; text-decoration: underline; text-underline-offset: 2px; }

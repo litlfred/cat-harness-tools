@@ -12,7 +12,8 @@
  * one stays text.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import {
@@ -22,8 +23,11 @@ import {
   markersFor,
   expandMarkerBox,
   methodologyPageDir,
+  PANEL_CLIENT,
+  panelFile,
   PANEL_SCRIPT,
   svgViewBox,
+  taskSkillsDeclared,
 } from "../../lib/task-panel.ts";
 import { panelContext, processPage, processRows, taskPanelData, type PanelContext, type ProcessRow } from "../../gen-processes-viz.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
@@ -197,6 +201,71 @@ describe("the object view", () => {
   test("a lane naming no role says why, rather than showing nothing", () => {
     expect(data.tasks["T2"]!.role).toBeUndefined();
     expect(data.tasks["T2"]!.binding).toBe("variable");
+  });
+  test("skills are shown unless the site switches them off, and the data says which", () => {
+    expect(data.skills).toBeUndefined();
+    const off = taskPanelData(row, [row, called, elsewhere], ctx, { skills: false });
+    expect(off.skills).toBe(false);
+    expect(off.tasks["T1"]!.skills).toEqual([]);
+    expect(off.tasks["T1"]!.role!.skills).toEqual([]);
+    // Everything else the graph knows about the task is still there.
+    expect(off.tasks["T1"]!.href).toBe(data.tasks["T1"]!.href);
+    expect(off.tasks["T1"]!.role!.name).toBe("lead");
+    expect(off.tasks["C1"]!.calls).toEqual(data.tasks["C1"]!.calls);
+  });
+
+  test("the markers travel with the data, so another page can draw them", () => {
+    const m = [{ id: "T1", name: "Review", left: 10, top: 20 }];
+    expect(taskPanelData({ ...row, markers: m } as ProcessRow, [row], ctx).markers).toEqual(m);
+    expect(data.markers).toBeUndefined();
+  });
+});
+
+describe("the site's switch (index.config.json site.taskSkills)", () => {
+  const at = (site: unknown): string => {
+    const d = mkdtempSync(join(tmpdir(), "task-skills-"));
+    writeFileSync(join(d, "index.config.json"), JSON.stringify({ $schema: "folio-index-config/v1", instances: [], ...(site ? { site } : {}) }));
+    return d;
+  };
+  test("absent → on, as every knowledge-graph site has it", () => {
+    expect(taskSkillsDeclared(at(undefined))).toBe(true);
+    expect(taskSkillsDeclared(mkdtempSync(join(tmpdir(), "no-index-")))).toBe(true);
+  });
+  test("declared → as declared", () => {
+    expect(taskSkillsDeclared(at({ taskSkills: false }))).toBe(false);
+    expect(taskSkillsDeclared(at({ taskSkills: true }))).toBe(true);
+  });
+});
+
+describe("the client, for a page other than the process page", () => {
+  test("hrefs resolve against the sidecar, not the page that loads it", () => {
+    expect(PANEL_SCRIPT).toContain('var sidecar = root.getAttribute("data-panel");');
+    expect(PANEL_SCRIPT).toContain('new URL(sidecar || "", location.href)');
+    expect(PANEL_SCRIPT).toContain("e.href = abs(l.href)");
+  });
+  test("with no server-drawn layer, the markers come from the data", () => {
+    expect(PANEL_SCRIPT).toContain("j.markers || []");
+  });
+  test("skills switched off: no skill box, no role skill list, no 'names no skill'", () => {
+    expect(PANEL_SCRIPT).toContain("data.skills === false");
+    expect(PANEL_SCRIPT).toMatch(/if \(sk_on && !t\.skills\.length/);
+  });
+  test("it parses, and a page can pick out steps (data-pt-highlight), as a journey's step does", () => {
+    expect(() => new Function(PANEL_SCRIPT)).not.toThrow();
+    expect(PANEL_SCRIPT).toContain('getAttribute("data-pt-highlight")');
+    expect(PANEL_SCRIPT).toContain(".split(/\\s+/)");
+  });
+  test("the client and styles are published as files under fixed names", () => {
+    expect(PANEL_CLIENT).toEqual({ script: "task-panel.js", style: "task-panel.css" });
+    expect(panelFile("care")).toBe("care.tasks.json");
+  });
+  test("an inline drawing's viewBox is split on its spaces, so the markers keep its aspect", () => {
+    // In the template literal a lone backslash-s was an "s": "0 0 500 400" never split.
+    expect(PANEL_SCRIPT).toContain(".split(/[\\s,]+/).map(Number)");
+  });
+  test("a drawing with no sidecar is highlighted and fetches nothing", () => {
+    expect(PANEL_SCRIPT).toContain('var sidecar = root.getAttribute("data-panel");');
+    expect(PANEL_SCRIPT).toContain("if (!drawn && sidecar) load()");
   });
 });
 

@@ -651,3 +651,71 @@ describe.skipIf(!HAS_STRACE || Bun.which("python3") === null)("a test's python c
     expect(decide().skip).toBe(true);
   });
 });
+
+describe.skipIf(!HAS_STRACE)("a computed load the run did not open is no input; one it opened is audited from the trace", () => {
+  let root: string;
+  const write = (rel: string, text: string) => writeFileSync(join(root, rel), text);
+  const T = "test:t/a.test.ts";
+  const scripts = () => testGates(root, ["t/a.test.ts"]);
+  const record = () => recordRun({ root, scripts: scripts(), script: T, io: undefined, baseline: undefined, sha: "mainsha", stdio: "ignore" });
+  const decide = () => decideRun({ root, scripts: scripts(), script: T, io: undefined, baseline: undefined });
+  const VAR = "CONE_PLUGIN_FIXTURE";
+  /** A plugin whose env read is annotated and pinned the way a reviewer would. */
+  const reviewedPlugin = () => {
+    const lines = [`// input-site: env ${VAR} #PIN — the fixture's variable`, `export const v = process.env.${VAR} ?? "";`];
+    write("plugins/p.ts", lines.join("\n").replace("#PIN", `#${statementPin(lines, 1)}`) + "\n");
+  };
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "ci-cone-defer-"));
+    for (const d of ["t", "plugins", "data"]) mkdirSync(join(root, d));
+    write("package.json", JSON.stringify({ name: "fixture" }));
+    const load = "const m = await import(join(process.cwd(), p));";
+    const loader = ['import { join } from "node:path";', "export async function loadPlugin(p: string) {", "  // input-site: imports plugins/*.ts #PIN — the plugins the data names", `  ${load}`, "  return m;", "}"];
+    write("t/loader.ts", loader.join("\n").replace("#PIN", `#${statementPin(loader, 3)}`) + "\n");
+    write(
+      "t/a.test.ts",
+      [
+        'import { expect, test } from "bun:test";',
+        'import { readFileSync } from "node:fs";',
+        'import { loadPlugin } from "./loader.ts";',
+        'test("loads the plugin the data names, if any", async () => {',
+        '  const which = readFileSync("data/which.txt", "utf-8").trim();',
+        '  if (which !== "") expect(typeof (await loadPlugin(which)).v).toBe("string");',
+        "});",
+      ].join("\n") + "\n",
+    );
+    write("plugins/p.ts", "export const v = process.env.HOME ?? '';\n"); // an unreviewed site
+    write("data/which.txt", "\n");
+    process.env[VAR] = "one";
+  });
+  afterEach(() => {
+    delete process.env[VAR];
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a plugin the run never loaded does not stop the record, even with an unreviewed site", () => {
+    expect(record().note).toStartWith("recorded");
+    expect(decide().skip).toBe(true);
+  });
+
+  test("a loaded plugin with an unreviewed site records nothing", () => {
+    write("data/which.txt", "plugins/p.ts\n");
+    const r = record();
+    expect(r.code).toBe(0);
+    expect(r.note).toContain("a module the run loaded by a computed load");
+  });
+
+  test("a loaded, reviewed plugin's variable is recorded, and a change to it or to the plugin RUNS", () => {
+    write("data/which.txt", "plugins/p.ts\n");
+    reviewedPlugin();
+    expect(record().note).toStartWith("recorded");
+    expect(loadRecords(root)!.checks[T]!.env).toEqual({ [VAR]: "one" });
+    expect(decide().skip).toBe(true);
+    process.env[VAR] = "two";
+    expect(decide().skip).toBe(false);
+    process.env[VAR] = "one";
+    write("plugins/p.ts", readFileSync(join(root, "plugins/p.ts"), "utf-8") + "// edited\n");
+    expect(decide().skip).toBe(false);
+  });
+});

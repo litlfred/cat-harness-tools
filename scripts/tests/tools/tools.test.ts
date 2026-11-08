@@ -312,6 +312,10 @@ describe("substitutable Tools are DERIVED, and say how to choose (#1168, B9a)", 
       // Tools load only where core is mounted, so standalone has no such pair.
       ...(byId.has("glossary-table") && byId.has("references-render") ? ["glossary-table ~ references-render"] : []),
       "ingest-extended ~ ingest-stdlib",
+      // cat-harness 9cc0a6f4 (#991): both keep work context in memory, and
+      // each carries a `selection`: a running note while working, a
+      // checkpoint before stopping. Present only where cat-harness has them.
+      ...(byId.has("memory-checkpoint") && byId.has("memory-note") ? ["memory-checkpoint ~ memory-note"] : []),
       "package-release-manual ~ release-please",
       // Two runtimes for one server (bean `0hi8`: "at least two tools satisfy
       // it"): same ports, same skill, and a `selection` on each that says Bun

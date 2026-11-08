@@ -87,6 +87,13 @@ describe.skipIf(NO_ROOT)("generated skill registry", () => {
     // Highest priority first — the evaluation order the type documents.
     const priorities = reg.roleAssignments.map((r) => r.priority);
     expect([...priorities].sort((a, b) => b - a)).toEqual(priorities);
+    // And they are THE rules on disk: every rule in the file, nothing else,
+    // in the file's own order once sorted highest priority first.
+    const file: unknown = JSON.parse(readFileSync(join(repoRootFor(ROOT), ".claude", "scenarios", "role-assignments.json"), "utf-8"));
+    const onDisk = (Array.isArray(file) ? file : (file as { assignments?: { priority?: number }[] }).assignments ?? []) as { priority?: number }[];
+    expect(onDisk.length).toBeGreaterThan(0);
+    const raw = JSON.parse(readFileSync(OUT, "utf-8")) as { roleAssignments: unknown[] };
+    expect(raw.roleAssignments).toEqual([...onDisk].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0)));
   });
 
   test("hooks are HookCommands, not raw settings entries", () => {

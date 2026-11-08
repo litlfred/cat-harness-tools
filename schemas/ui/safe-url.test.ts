@@ -24,6 +24,16 @@ describe("the allowed schemes pass", () => {
     for (const s of ALLOWED_URL_SCHEMES) {
       expect(safeHref(`${s}//example.invalid`)).toBeDefined();
     }
+    // And the other way: a scheme passes exactly when it is on the list. None
+    // of these, common and harmless-looking ones included, is let through.
+    const others = ["ftp:", "file:", "data:", "javascript:", "vbscript:", "blob:", "ws:", "wss:", "sms:", "about:", "chrome:", "git:", "ssh:", "irc:", "x-custom:"];
+    for (const s of [...ALLOWED_URL_SCHEMES, ...others]) {
+      expect({ s, passes: safeHref(`${s}//example.invalid`) !== undefined }).toEqual({
+        s,
+        passes: ALLOWED_URL_SCHEMES.includes(s),
+      });
+    }
+    expect(others.filter((s) => ALLOWED_URL_SCHEMES.includes(s))).toEqual([]);
   });
 });
 

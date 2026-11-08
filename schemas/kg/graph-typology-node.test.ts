@@ -24,6 +24,16 @@ const node = (name: string, holds = "derived") => ({
   summary: `the ${name} kind`,
 });
 
+/** The message `f` throws, or "" when it does not throw. */
+function thrownMessage(f: () => unknown): string {
+  try {
+    f();
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+  return "";
+}
+
 /** A checkout whose instances each declare a typologies/ graph holding `typologies`. */
 function checkout(instances: Record<string, Record<string, unknown>[]>): string {
   const root = mkdtempSync(join(tmpdir(), "kinds-"));
@@ -55,7 +65,10 @@ describe("a declared kind", () => {
   });
   test("two files claiming one name are refused, naming both", () => {
     const root = checkout({ alpha: [node("widget")], beta: [node("widget", "content")] });
-    expect(() => new GraphTypologyRegistry({}, root).get("widget")).toThrow(/alpha.*beta|declared by/);
+    expect(() => new GraphTypologyRegistry({}, root).get("widget")).toThrow(/declared by/);
+    const message = thrownMessage(() => new GraphTypologyRegistry({}, root).get("widget"));
+    expect(message).toContain(join(root, "alpha", "typologies", "widget.json"));
+    expect(message).toContain(join(root, "beta", "typologies", "widget.json"));
   });
   test("a declared name that the code also lists is refused", () => {
     const root = checkout({ alpha: [node("widget")] });
@@ -132,9 +145,11 @@ describe("validators as nodes (bean riit): the validator names the family", () =
     expect(() => new GraphTypologyRegistry({}, withValidators([famKind], [v("widget", "other/v1")])).get("widget")).toThrow(/does not list/);
   });
   test("two validators for one family are refused, naming both", () => {
-    expect(() =>
-      new GraphTypologyRegistry({}, withValidators([famKind], [v("a", "widget/v1"), v("b", "widget/v1", "alpha:x.ts#Other")])).get("widget"),
-    ).toThrow(/two validators/);
+    const root = withValidators([famKind], [v("a", "widget/v1"), v("b", "widget/v1", "alpha:x.ts#Other")]);
+    expect(() => new GraphTypologyRegistry({}, root).get("widget")).toThrow(/two validators/);
+    const message = thrownMessage(() => new GraphTypologyRegistry({}, root).get("widget"));
+    expect(message).toContain(join(root, "alpha", "validators", "a.json"));
+    expect(message).toContain(join(root, "alpha", "validators", "b.json"));
   });
   test("a family that already names DIFFERENT code is two answers, and refused", () => {
     const coded = { ...node("widget"), nodeSchemas: { "widget/v1": { validator: "alpha:old.ts#OldSchema" } } };

@@ -54,6 +54,29 @@
  *   spelled exactly as `gen-auto-docs.ts` spells it.
  */
 import { BpmnModdle } from "bpmn-moddle";
+import { requireIndexConfig } from "../../schemas/kg/index-config.ts";
+
+/**
+ * Does the site built from `checkout` show skills in the ⓘ panel? Its
+ * `index.config.json` says, as `site.taskSkills`: absent or `true` shows
+ * them (the knowledge graph's own sites), `false` hides them (a site whose
+ * processes are not modelled with skills, such as an implementation guide's
+ * business processes). One switch, read here and nowhere else.
+ */
+export function taskSkillsDeclared(checkout: string): boolean {
+  return requireIndexConfig(checkout)?.site?.taskSkills !== false;
+}
+
+/**
+ * The panel's client and styles, as the files the processes viewer writes
+ * beside its pages and sidecars, for a page elsewhere on the site to load.
+ */
+export const PANEL_CLIENT = { script: "task-panel.js", style: "task-panel.css" } as const;
+
+/** The sidecar a process page fetches when a marker is first opened: `<stem>.tasks.json`, beside the page. */
+export function panelFile(stem: string): string {
+  return `${stem}.tasks.json`;
+}
 
 /** A rectangle in diagram coordinates. */
 export interface Box {
@@ -132,6 +155,22 @@ export interface PanelTask {
 export interface PanelData {
   $schema: "process-task-panel/v1";
   process: string;
+  /**
+   * `false` when the site declares `site.taskSkills: false` in its
+   * `index.config.json`: the panel then shows no skill, neither a task's nor
+   * its role's, and says nothing about their absence. Absent means shown.
+   * A switch, not a gap in the data: a site whose processes are not modelled
+   * with skills (an implementation guide's business processes) turns them
+   * off, and turns them on again with that one line when they are.
+   */
+  skills?: false;
+  /**
+   * Where each ⓘ goes, as the process page draws them. A page that shows the
+   * drawing without server-drawn markers (a guide's business-processes page)
+   * reads them from here, so it draws the same affordances from the same
+   * data rather than a second copy of the placement.
+   */
+  markers?: Marker[];
   /** The process's own page, `…/process/P` (#603). Absent as {@link PanelTask.href} is. */
   processHref?: string;
   tasks: Record<string, PanelTask>;
@@ -232,6 +271,21 @@ export const PANEL_SCRIPT = `(function () {
   Array.prototype.forEach.call(document.querySelectorAll(".pt-diagram:not([data-pt-ready])"), init);
   function init(root) {
   root.setAttribute("data-pt-ready", "");
+  // Every href in the sidecar is relative to the sidecar (it sits beside the
+  // process page), so a page elsewhere on the site that shows the same
+  // drawing resolves them to the same targets.
+  // A drawing with no sidecar (a page that only highlights steps, where no
+  // processes viewer is published) gets the highlight and nothing else.
+  var sidecar = root.getAttribute("data-panel");
+  var base = new URL(sidecar || "", location.href);
+  function abs(h) { try { return new URL(h, base).href; } catch (e) { return h; } }
+  // A page with no server-drawn markers gets them from the sidecar.
+  var drawn = !!root.querySelector(".pt-layer");
+  if (!drawn) {
+    var ly = document.createElement("div"); ly.className = "pt-layer"; root.appendChild(ly);
+    var pn = document.createElement("div"); pn.className = "pt-panel"; pn.setAttribute("role", "dialog");
+    pn.setAttribute("aria-label", "Task details"); pn.hidden = true; root.appendChild(pn);
+  }
   var panel = root.querySelector(".pt-panel"), data = null, pending = null, open = null;
   function load() {
     if (data) return Promise.resolve(data);
@@ -244,7 +298,7 @@ export const PANEL_SCRIPT = `(function () {
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function link(l, cls) {
     var e = el(l.href ? "a" : "code", cls, l.name);
-    if (l.href) e.href = l.href; else e.title = "no page for this one";
+    if (l.href) e.href = abs(l.href); else e.title = "no page for this one";
     return e;
   }
   function obj(stereo, name, kind) {
@@ -283,7 +337,8 @@ export const PANEL_SCRIPT = `(function () {
       Object.keys(t.shared.inputs || {}).forEach(function (k) { gt.appendChild(el("div", "pt-attr", k + " = " + t.shared.inputs[k])); });
       panel.appendChild(gt);
     }
-    t.skills.forEach(function (s) {
+    var sk_on = !(data && data.skills === false);
+    (sk_on ? t.skills : []).forEach(function (s) {
       panel.appendChild(edge("requires"));
       var sk = obj("Skill", link(s), "skill");
       (s.methodologies || []).forEach(function (m) {
@@ -292,19 +347,22 @@ export const PANEL_SCRIPT = `(function () {
       });
       panel.appendChild(sk);
     });
-    if (!t.skills.length && !t.calls) panel.appendChild(el("div", "pt-none", "This task names no skill."));
+    if (sk_on && !t.skills.length && !t.calls) panel.appendChild(el("div", "pt-none", "This task names no skill."));
     if (t.role) {
       panel.appendChild(edge("lane names"));
       var role = obj("Role", link(t.role), "role");
       if (t.role.title) role.appendChild(el("div", "pt-attr", "title = " + t.role.title));
-      var list = el("div", "pt-attr"); list.appendChild(el("span", "pt-st", "hasSkill: "));
-      if (!t.role.skills.length) list.appendChild(el("i", null, "none listed"));
-      t.role.skills.forEach(function (s, i) {
-        if (i) list.appendChild(document.createTextNode(", "));
-        list.appendChild(link(s));
-        if (s.via) list.appendChild(el("span", "pt-via", " (via " + s.via + ")"));
-      });
-      role.appendChild(list); panel.appendChild(role);
+      if (sk_on) {
+        var list = el("div", "pt-attr"); list.appendChild(el("span", "pt-st", "hasSkill: "));
+        if (!t.role.skills.length) list.appendChild(el("i", null, "none listed"));
+        t.role.skills.forEach(function (s, i) {
+          if (i) list.appendChild(document.createTextNode(", "));
+          list.appendChild(link(s));
+          if (s.via) list.appendChild(el("span", "pt-via", " (via " + s.via + ")"));
+        });
+        role.appendChild(list);
+      }
+      panel.appendChild(role);
     } else if (t.binding) {
       panel.appendChild(el("div", "pt-none", "Lane role: " + t.binding + "."));
     }
@@ -326,14 +384,27 @@ export const PANEL_SCRIPT = `(function () {
     }
     return null;
   }
+  // A page may name steps to pick out (a journey's step shows the tasks it
+  // realises): \`data-pt-highlight="Task_A Task_B"\`. Marked once the drawing
+  // is inline, which is when its shapes exist to mark.
+  var hl = (root.getAttribute("data-pt-highlight") || "").split(/\\s+/).filter(Boolean);
+  if (hl.length) root.classList.add("pt-has-hl");
+  function mark(a) {
+    if (!hl.length || a.tagName.toLowerCase() !== "svg" || a.hasAttribute("data-pt-marked")) return;
+    a.setAttribute("data-pt-marked", "");
+    Array.prototype.forEach.call(a.querySelectorAll("[data-element-id]"), function (g) {
+      if (hl.indexOf(g.getAttribute("data-element-id")) >= 0) g.setAttribute("data-pt-hl", "");
+    });
+  }
   function place() {
     queued = false;
     var a = art();
+    if (a) mark(a);
     if (!layer || !a) return;
     var r = root.getBoundingClientRect(), b = a.getBoundingClientRect();
     var x = b.left - r.left, y = b.top - r.top, w = b.width, h = b.height, vw = 0, vh = 0;
     if (a.tagName.toLowerCase() === "img") { vw = a.naturalWidth; vh = a.naturalHeight; }
-    else { var vb = (a.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number); vw = vb[2]; vh = vb[3]; }
+    else { var vb = (a.getAttribute("viewBox") || "").trim().split(/[\\s,]+/).map(Number); vw = vb[2]; vh = vb[3]; }
     // An SVG keeps its aspect inside a box of another shape (xMidYMid meet).
     if (vw > 0 && vh > 0 && w > 0 && h > 0) {
       var k = vw / vh;
@@ -359,6 +430,20 @@ export const PANEL_SCRIPT = `(function () {
   root.addEventListener("load", schedule, true);
   window.addEventListener("resize", schedule);
   schedule();
+  if (!drawn && sidecar) load().then(function (j) {
+    (j.markers || []).forEach(function (m) {
+      var t = j.tasks[m.id], to = t && t.calls ? (t.calls.diagram || t.calls.href) : null;
+      if (to && m.box) {
+        var g = el("a", "pt-go"); g.href = abs(to);
+        g.style.left = m.box.left + "%"; g.style.top = m.box.top + "%"; g.style.width = m.box.width + "%"; g.style.height = m.box.height + "%";
+        g.setAttribute("aria-label", "Open subprocess: " + m.name); g.title = "Open subprocess: " + m.name; layer.appendChild(g);
+      }
+      var b = el("button", "pt-mark", "i"); b.type = "button"; b.setAttribute("data-task", m.id);
+      b.style.left = m.left + "%"; b.style.top = m.top + "%"; b.setAttribute("aria-expanded", "false");
+      b.setAttribute("aria-label", "About step: " + m.name); b.title = "About: " + m.name; layer.appendChild(b);
+    });
+    schedule();
+  }).catch(function (e) { console.warn("task panel: could not load " + base.href + " (" + e.message + ")"); });
   function at(b) {
     var r = root.getBoundingClientRect(), m = b.getBoundingClientRect();
     panel.style.left = (m.left + m.width / 2 - r.left) + "px"; panel.style.top = (m.top + m.height / 2 - r.top) + "px";
@@ -400,7 +485,7 @@ export const PANEL_CSS = [
   ".pt-mark{z-index:1}",
   ".pt-mark:hover,.pt-mark[aria-expanded=true]{background:#1f6feb;color:#fff}",
   ".pt-mark:focus-visible{outline:2px solid #1f6feb;outline-offset:2px}",
-  ".pt-panel{position:absolute;z-index:5;margin:0.9em 0 0 -0.6em;max-width:min(26em,90vw);min-width:14em;padding:0.6em 0.7em;" +
+  ".pt-panel{position:absolute;z-index:5;text-align:left;margin:0.9em 0 0 -0.6em;max-width:min(26em,90vw);min-width:14em;padding:0.6em 0.7em;" +
     "background:#fff;color:#1b1f24;border:1px solid #8c959f;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:0.85em;line-height:1.35}",
   ".pt-close{position:absolute;top:0.2em;right:0.35em;border:0;background:none;font-size:1.2em;cursor:pointer;color:inherit}",
   ".pt-obj{border:1px solid #57606a;border-radius:3px;margin:0.15em 0}",
@@ -411,6 +496,11 @@ export const PANEL_CSS = [
   ".pt-edge{color:#57606a;font-size:0.85em;padding-left:1em}",
   ".pt-role .pt-head{background:#fff8c5}.pt-skill .pt-head{background:#ddf4ff}.pt-task .pt-head{background:#f6f8fa}",
   ".pt-none{color:#57606a;font-style:italic;margin-top:0.3em}",
+  // A highlighted step (data-pt-highlight). The drawing's own classes are
+  // prefixed when docs-ui.js inlines it, so they are matched by their ending.
+  '.pt-diagram [data-pt-hl]>[class$="djs-visual"]>:first-child{stroke:#d97706!important;stroke-width:4px!important;fill:#fff3d6!important}',
+  '.pt-diagram [data-pt-hl]>[class$="djs-visual"]>path:first-child{fill:none!important}',
+  '.pt-has-hl [class*="djs-shape"]:not([data-pt-hl])>[class$="djs-visual"]>:first-child{opacity:.75}',
 ].join("");
 
 /**

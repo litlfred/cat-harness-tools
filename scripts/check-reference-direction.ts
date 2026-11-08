@@ -87,6 +87,7 @@ import { BEGIN as SUBGRAPH_README_BEGIN } from "@litlfred/bootstrap-tools/script
 import { aliasRoute, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { gateOwnInstances, gateOwnsFile } from "./lib/gate-own.ts";
 import { declaredVisualisers, forwardingParts, pageParts, siteOwnerDir } from "./viewer-declarations.js";
+import { hostSiteArtefacts } from "./derive-at-publish.ts";
 import {
   againstOrUsage,
   buildQaResult,
@@ -800,6 +801,27 @@ function declaresMachineWritten(kinds: readonly string[] | undefined): boolean {
   return kinds.every((k) => isStateGraph(k) || isDerivedGraph(k));
 }
 
+/** The machine-written directories each sub-graph of `root` declares from within, in `<dir>/graph.json`. */
+export function subgraphMachineWritten(root: string, dirs: readonly { path?: string; scope?: "instance" | "repository" }[]): string[] {
+  const out: string[] = [];
+  for (const d of dirs) {
+    if (d.path === undefined || d.path === "") continue;
+    const dir = join(rootForScope(root, d.scope), d.path);
+    const graph = join(dir, "graph.json");
+    if (!existsSync(graph)) continue;
+    let inner: { directories?: { path?: string; graphTypologies?: string[] }[] };
+    try {
+      inner = JSON.parse(readFileSync(graph, "utf-8")) as typeof inner;
+    } catch {
+      continue;
+    }
+    for (const e of inner.directories ?? []) {
+      if (e.path !== undefined && e.path !== "" && declaresMachineWritten(e.graphTypologies)) out.push(join(dir, e.path));
+    }
+  }
+  return out;
+}
+
 function instances(repoRoot: string): Instance[] {
   return instanceRootsIn(repoRoot).map((root) => {
     const decl = JSON.parse(readFileSync(join(root, findDeclarationFile(root)!), "utf-8")) as {
@@ -820,6 +842,11 @@ function instances(repoRoot: string): Instance[] {
     const machineWritten = (decl.directories ?? [])
       .filter((d) => d.path !== undefined && declaresMachineWritten(d.graphTypologies))
       .map((d) => join(rootForScope(root, d.scope), d.path!))
+      // A named sub-graph declares its graphs FROM WITHIN, in its own
+      // `graph.json` (#980): cat-harness's corpus is `library/graph.json`'s
+      // `corpus/`, no longer a top-level entry of `cat-harness.json`, and it
+      // is just as machine-written as when it was one.
+      .concat(subgraphMachineWritten(root, decl.directories ?? []))
       // A `builtAtPublish` path is machine-written by declaration too: each
       // entry names the `writer` that builds it at publish, and nothing there
       // is committed or authored. The checkout-built ones project OTHER
@@ -885,7 +912,20 @@ export interface ReferenceReport {
   undeclared: string[];
 }
 
-export function analyse(root = REPO_ROOT): ReferenceReport {
+/**
+ * The routes a harness's visualisers build on ANOTHER instance's site
+ * (`builtOnHostSite`), as absolute directories: `derive:publish`'s own
+ * derivation ({@link hostSiteArtefacts}), so this check and the publish plan
+ * agree on what is built where. They sit inside the host's root, e.g.
+ * `cat-harness/docs/en/folio-assistant-core/bibliography/`, but the host
+ * declares none of them: they are another harness's built-at-publish output,
+ * machine-written exactly as a declared `builtAtPublish` path is.
+ */
+export function hostSiteDirs(root: string): string[] {
+  return hostSiteArtefacts(root).map((a) => a.abs.replace(/[\\/]+$/, ""));
+}
+
+export function analyse(root = REPO_ROOT, hostSite: readonly string[] = hostSiteDirs(root)): ReferenceReport {
   const all = instances(root).filter((i) => i.name !== "");
   const byName = new Map(all.map((i) => [i.name, i]));
   const needs = new Map(all.map((i) => [i.name, i.needs]));
@@ -970,7 +1010,12 @@ export function analyse(root = REPO_ROOT): ReferenceReport {
   // inside another's root (`cat-harness.json` declares
   // `folio-assistant-core/schemas/`), and the file is machine-written either
   // way — the declaration is about the DIRECTORY, not about who scans it.
-  const machineWritten = all.flatMap((i) => i.machineWritten);
+  // A host-site route (`builtOnHostSite`) is built at publish too, by the
+  // harness that declares the visualiser, inside the HOST's root; the host
+  // declares none of it. Judged by the directory it sits in, a core page built
+  // into cat-harness's site read as cat-harness naming whatever core's library
+  // projects (folio-assistant#2985: six bibliography files naming smart-trust).
+  const machineWritten = [...all.flatMap((i) => i.machineWritten), ...hostSite];
   const isMachineWritten = (abs: string): boolean =>
     machineWritten.some((d) => abs === d || abs.startsWith(d.endsWith(sep) ? d : d + sep));
 

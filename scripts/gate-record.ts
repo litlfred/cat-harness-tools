@@ -3,17 +3,14 @@
  * the set held, how each came out, and with which tools.
  *
  * Written by `scripts/pre-push-gates.ts` after `bun run cat gates` passes on
- * the tree being pushed. It serves two readers:
+ * the tree being pushed. Its one reader is the next push of the same tree
+ * (the Claude Code hook runs before `git push`, then git's own pre-push hook
+ * runs inside it): a record that covers the tree means the gates are not
+ * asked twice.
  *
- * 1. **The next push of the same tree** (the Claude Code hook runs before
- *    `git push`, then git's own pre-push hook runs inside it): a record that
- *    covers the tree means the gates are not asked twice.
- * 2. **CI, with deferred verification** (design in bean `cat-tools-pp9g`): a
- *    record attached to the commit as a git note (`refs/notes/cat-gates`)
- *    lets a PR's critical path skip the gates it covers, and a sweep off the
- *    critical path re-runs them and compares — the trust model agent-built
- *    previews already use. That CI side is a follow-up in folio-assistant;
- *    nothing here makes CI skip anything.
+ * The record never leaves the machine. CI never honours a committer's local
+ * gate record (owner's ruling, 2026-11-06): it runs every gate itself, so the
+ * record is not attached to the commit and nothing here is pushed.
  *
  * Only a PASS is recorded. A record is a claim that the gates are green on
  * this tree, so a fail, a not-clean run or an undetermined one leaves no
@@ -36,8 +33,6 @@ import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 
 export const LOCAL_GATE_RECORD_SCHEMA = "cat-local-gate-record/v1";
-/** The notes ref a record is attached under, so it can travel with a push. */
-export const RECORD_NOTES_REF = "refs/notes/cat-gates";
 
 /** What `bun run cat gates --report` writes (`schemas/sdlc/gates-report.ts`), the fields read here. */
 export interface GatesReportLike {
@@ -172,16 +167,6 @@ export function covers(rec: LocalGateRecord | undefined, tree: string, now: Tool
   return { covered: true, why: `gates passed on this tree at ${rec.finishedAt} (${rec.gates.length} gate(s), ${rec.set} set)` };
 }
 
-/** Attach the record to its commit as a git note, so a push of the notes ref carries it. */
-export function attachNote(root: string, rec: LocalGateRecord): boolean {
-  const r = spawnSync("git", ["notes", `--ref=${RECORD_NOTES_REF}`, "add", "-f", "-F", "-", rec.commit], {
-    cwd: root,
-    input: JSON.stringify(rec) + "\n",
-    encoding: "utf-8",
-  });
-  return r.status === 0;
-}
-
 /** One line of the push log: every bypass, refusal and undetermined push is written here. */
 export function logPush(root: string, entry: Record<string, unknown>): string {
   const p = join(stateDir(root), "push.log");
@@ -257,108 +242,4 @@ export function readResults(root: string, tree: string): LocalGateResults | unde
 export function newFailures(failedNow: readonly string[], base: LocalGateResults | undefined, now: ToolVersions): string[] {
   if (base === undefined || base.tools.bun !== now.bun) return [];
   return failedNow.filter((c) => base.outcomes[c] === "pass" || base.outcomes[c] === "skipped");
-}
-
-// ── Class B entries: one verdict per gate, under its derived key ─────────
-//
-// "Cache-First CI" (CI speed 14, 2026-11-05): keyed reuse goes through one
-// key, `bun run cat cache:key <script>` (cat-harness-tools#1511), the `f017`
-// fingerprint. A committer's verdict is Class B: CI cannot check it without
-// re-running it, so it is never a `cached-step` hit; only the cqg judge
-// reads it, under its pending → re-verify rule (folio-assistant #2957/#2958).
-//
-// The keys are not computed again here. A passing `gates` run has already
-// written each gate's fingerprint into the f017 cache (`checks`), and only
-// for a gate that passed with its inputs the same before and after
-// (`recordCheckRun`): exactly the verdicts a key can vouch for. A gate with
-// no such fingerprint (no input declaration, inputs moved under it, held out)
-// gets no entry, as `cache:key` would answer `undetermined`.
-
-export const LOCAL_GATE_VERDICT_SCHEMA = "cat-local-gate-verdict/v1";
-/** Where a Class B entry lives: never read by `cached-step` as a hit. */
-export const LOCAL_VERDICT_REF_PREFIX = "refs/cat-gates/local/";
-/** `build/regen-cache/input-hashes.json`, as `input-hash.ts` `CACHE_FILE` names it. */
-const F017_CACHE = join("build", "regen-cache", "input-hashes.json");
-
-export interface LocalGateVerdict {
-  schema: typeof LOCAL_GATE_VERDICT_SCHEMA;
-  /** The gate's command, as the workflow runs it. */
-  gate: string;
-  /** `cache:key <script>`: the f017 fingerprint of the gate's derived inputs. */
-  key: string;
-  verdict: "pass";
-  source: "local";
-  runBy: "agent" | "human";
-  tools: ToolVersions;
-  /** The tree the run judged: informative; the key is what a lookup matches. */
-  tree: string;
-  startedAt: string;
-  finishedAt: string;
-}
-
-/** The script a gate runs, when the gate is exactly `bun run [cat] <script>`: the only gates `cache:key` keys. */
-export function scriptOfGate(command: string): string | undefined {
-  return /^bun run (?:cat )?([A-Za-z0-9:_-]+)\s*$/.exec(command.trim())?.[1];
-}
-
-/** `refs/cat-gates/local/<script>/<key>`; `:` is not allowed in a ref, so it is written `--`. */
-export function verdictRef(script: string, key: string): string {
-  if (!/^[0-9a-f]{16,128}$/.test(key)) throw new Error(`not a cache key: ${key}`);
-  return `${LOCAL_VERDICT_REF_PREFIX}${script.replace(/:/g, "--")}/${key}`;
-}
-
-/** Each check's fingerprint at its last green run, from the f017 cache; empty when there is none. */
-export function f017Keys(root: string): Record<string, string> {
-  try {
-    return (JSON.parse(readFileSync(join(root, F017_CACHE), "utf-8")) as { checks?: Record<string, string> }).checks ?? {};
-  } catch {
-    return {};
-  }
-}
-
-/** One entry for each gate of a passing record that has a key. */
-export function verdictsFor(rec: LocalGateRecord, keys: Readonly<Record<string, string>>): LocalGateVerdict[] {
-  const out: LocalGateVerdict[] = [];
-  for (const gate of rec.gates) {
-    const script = scriptOfGate(gate);
-    const key = script === undefined ? undefined : keys[script];
-    if (key === undefined || !/^[0-9a-f]{16,128}$/.test(key)) continue;
-    out.push({
-      schema: LOCAL_GATE_VERDICT_SCHEMA,
-      gate,
-      key,
-      verdict: "pass",
-      source: "local",
-      runBy: rec.runBy,
-      tools: rec.tools,
-      tree: rec.tree,
-      startedAt: rec.startedAt,
-      finishedAt: rec.finishedAt,
-    });
-  }
-  return out;
-}
-
-/** Store each entry as a blob under its ref; the refs written. A push of `refs/cat-gates/local/*` carries them. */
-export function writeVerdictRefs(root: string, verdicts: readonly LocalGateVerdict[]): string[] {
-  const refs: string[] = [];
-  for (const v of verdicts) {
-    const blob = spawnSync("git", ["hash-object", "-w", "--stdin"], { cwd: root, input: JSON.stringify(v) + "\n", encoding: "utf-8" });
-    if (blob.status !== 0) continue;
-    const ref = verdictRef(scriptOfGate(v.gate)!, v.key);
-    if (git(root, ["update-ref", ref, blob.stdout.trim()]) !== undefined) refs.push(ref);
-  }
-  return refs;
-}
-
-/** The entry stored for `script` under `key`, or undefined. What the judge reads after fetching the ref. */
-export function readVerdict(root: string, script: string, key: string): LocalGateVerdict | undefined {
-  const text = git(root, ["cat-file", "blob", verdictRef(script, key)]);
-  if (text === undefined) return undefined;
-  try {
-    const v = JSON.parse(text) as LocalGateVerdict;
-    return v.schema === LOCAL_GATE_VERDICT_SCHEMA && v.key === key && scriptOfGate(v.gate) === script ? v : undefined;
-  } catch {
-    return undefined;
-  }
 }

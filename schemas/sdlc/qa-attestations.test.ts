@@ -3,7 +3,7 @@
  * path mirrors the derived family's tree, and a read answers in five states
  * where a miss or an absent store is "never attested" only once the prior derived file has been read.
  */
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -117,27 +117,42 @@ describe("where an attestation lives", () => {
 });
 
 describe("reading — five states, and a miss or an absent store is 'never attested' only after the prior is read", () => {
-  const home = mkdtempSync(join(tmpdir(), "att-read-"));
-  const tree = join(home, "kg-qa");
-  const path = join(tree, "processes", "p.attestations.json");
+  // Each test builds its own store in its own temp dir, so no test depends on
+  // a file or directory another test left behind, nor on the order they run in.
+  const homes: string[] = [];
+  afterEach(() => {
+    for (const h of homes.splice(0)) rmSync(h, { recursive: true, force: true });
+  });
+  function fresh(withSubjectDir = false): { home: string; tree: string; path: string } {
+    const home = mkdtempSync(join(tmpdir(), "att-read-"));
+    homes.push(home);
+    const tree = join(home, "kg-qa");
+    const path = join(tree, "processes", "p.attestations.json");
+    if (withSubjectDir) mkdirSync(join(tree, "processes"), { recursive: true });
+    return { home, tree, path };
+  }
 
   test("no store at all is ABSENT, not a miss — the writer then moves the prior's judgements (owner ruling 2)", () => {
+    const { home, path } = fresh();
     expect(readAttestationFile(path, join(home, "absent")).state).toBe("absent");
   });
 
   test("a store path that is not a directory is UNKNOWN", () => {
+    const { home, path } = fresh();
     const notDir = join(home, "a-file");
     writeFileSync(notDir, "");
     expect(readAttestationFile(path, notDir).state).toBe("unknown");
   });
 
   test("a store with no file for this subject is a miss — even with no family tree under it yet", () => {
+    const { home, tree, path } = fresh();
     expect(readAttestationFile(path, home).state).toBe("miss");
     mkdirSync(join(tree, "processes"), { recursive: true });
     expect(readAttestationFile(path, tree).state).toBe("miss");
   });
 
   test("a conflict-marked or invalid file is CORRUPT, never an empty list", () => {
+    const { tree, path } = fresh(true);
     writeFileSync(path, "<<<<<<< ours\n{}\n=======\n{}\n>>>>>>> theirs\n");
     expect(readAttestationFile(path, tree).state).toBe("corrupt");
     writeFileSync(path, JSON.stringify({ $schema: QA_ATTESTATIONS_SCHEMA, family: "kg-qa" }));
@@ -145,6 +160,7 @@ describe("reading — five states, and a miss or an absent store is 'never attes
   });
 
   test("a valid file is a hit, returned as written — key order included", () => {
+    const { tree, path } = fresh(true);
     // Keys deliberately NOT in schema order: zod would rebuild them, and a
     // writer round-tripping through it would rewrite every entry.
     const reordered = { ...file(), pair_attestations: [{ reason: "r", ...pair, by: "agent" }] };

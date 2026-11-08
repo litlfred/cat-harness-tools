@@ -16,6 +16,7 @@
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
  *   bun run cat mount:remote:check        # disk against lock against declaration — no network
  *   bun run cat mount:remote --no-install # lay the bytes down without `bun install` in each mount
+ *   bun run cat mount:remote --no-health  # a re-pin that moves cat-harness-tools does not regenerate the health report (lib/repin-health.ts)
  *   bun run cat mount:remote --help       # print this header; run nothing
  *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
  *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
@@ -190,12 +191,13 @@ import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type S
 import { enabledSubgraphs, isSubgraphEnabled, qualifiedSubgraphId, type EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "../schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
-import { builtAtPublishOf, installDependencies, isInstallArtefact, publishLayers, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
+import { builtAtPublishOf, installDependencies, isInstallArtefact, publishLayers, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutSelfIgnored, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
 import { upstreamConcernMembers, upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
 import { run as syncWorkflowPins } from "./workflow-pins.ts";
+import { afterMountHealth } from "./lib/repin-health.ts";
 import { ConcernGroupCodeSchema } from "../schemas/kg/concern-groups.ts";
 
 /**
@@ -378,7 +380,13 @@ export type InstanceOutcome =
   | { instance: string; state: "local"; path: string; detail: string }
   /** An override said `skip`. */
   | { instance: string; state: "skipped"; detail: string }
-  | { instance: string; state: "missing"; path?: string; detail: string }
+  /**
+   * `edited`: on disk at the pinned instance, but some pinned bytes changed
+   * (every bad directory or asset is `modified`, none `absent`). A mount
+   * leaves such an instance untouched unless `--fresh`, so a fetch cannot
+   * change its verdict (bean `cat-tools-sm8r`).
+   */
+  | { instance: string; state: "missing"; path?: string; detail: string; edited?: true }
   /** The trust check (H8) said no — at mount time, or on re-judging a recorded basis. */
   | { instance: string; state: "refused"; path?: string; detail: string }
   /** Mounted on consent whose `by` no declared `mountApprovers` list checked. Its own state, never clean. */
@@ -1248,9 +1256,9 @@ function digestOf(abs: string, skip: readonly string[] = []): { treeDigest: stri
   // writes them into the mount, so the lock's digest (mount-from-lock.ts
   // `digestOf`) leaves them out and this one must too, or a mount whose site
   // was built reads as modified.
-  const files = withoutBuiltAtPublish(
-    withoutInstallArtefacts(withoutStateMounts(abs, treeEntries(abs).files, skip)),
-    builtAtPublishOf(abs),
+  const files = withoutSelfIgnored(
+    abs,
+    withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(abs, treeEntries(abs).files, skip)), builtAtPublishOf(abs)),
   );
   return { treeDigest: treeDigest(abs, files), files: files.length };
 }
@@ -1279,7 +1287,7 @@ export function identicalToPin(
     const pinned = existsSync(src)
       ? withoutInstallArtefacts(treeEntries(src).files.filter((f) => !(d.upstreamPath === "." && (f === ".git" || f.startsWith(".git/")))))
       : [];
-    const onDisk = existsSync(dst) ? withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dst, treeEntries(dst).files, skip)), builtAtPublishOf(dst)) : [];
+    const onDisk = existsSync(dst) ? withoutSelfIgnored(dst, withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dst, treeEntries(dst).files, skip)), builtAtPublishOf(dst))) : [];
     const have = new Set(onDisk);
     const want = new Set(pinned);
     for (const f of pinned) {
@@ -1976,9 +1984,10 @@ export function checkRemote(opts: { instanceRoot?: string } = {}): CheckResult {
         if (!existsSync(abs)) bad.push(`${inst.path}/${a.src} absent`);
         else if (sha256Text(readFileSync(abs)) !== a.sha256) bad.push(`${inst.path}/${a.src} modified`);
       }
+      const edited = bad.length > 0 && bad.every((x) => x.endsWith(" modified"));
       outcomes.push(
         bad.length
-          ? { instance: inst.instance, state: "missing", path: inst.path, detail: `the pinned bytes are not on disk: ${bad.join("; ")}` }
+          ? { instance: inst.instance, state: "missing", path: inst.path, detail: `the pinned bytes are not on disk: ${bad.join("; ")}`, ...(edited ? { edited: true as const } : {}) }
           : {
             instance: inst.instance,
             state: mountedState(trust),
@@ -2065,6 +2074,68 @@ export function currentPerLock(root: string): CheckResult | undefined {
 }
 
 /**
+ * The lock check of `root` when every instance not at its pinned bytes is one
+ * a mount would leave untouched (`edited`: present, but its bytes changed),
+ * and at least one is; else undefined. Then a fetch cannot change the
+ * verdict, so `remoteFanOut` reports it without fetching.
+ *
+ * Measured 2026-11-06 (bean `cat-tools-sm8r`): a local gate run's eight
+ * `state:mount` steps each fetched every remote (32–42 s) only to report the
+ * same eight edited mounts as "left untouched", 305 s of a 1396 s run. The
+ * verdict is unchanged, still `missing`: an edited mount is not current,
+ * and saying so faster does not make it so.
+ */
+export function editedOnlyPerLock(root: string): CheckResult | undefined {
+  const c = checkRemote({ instanceRoot: root });
+  if (c.outcomes.length === 0) return undefined;
+  const off = c.outcomes.filter((o) => o.state !== "mounted" && o.state !== "unverified-approver");
+  if (off.length === 0 || !off.every((o) => o.state === "missing" && o.edited === true)) return undefined;
+  return c;
+}
+
+/** One mount whose bytes no longer hash to its lock: which root's lock, which instance, where, and what differs. */
+export interface EditedMount {
+  root: string;
+  instance: string;
+  path?: string;
+  detail: string;
+}
+
+/**
+ * Every mount in `checkout` that a plain mount would leave untouched because
+ * its bytes changed since it was laid (`edited`), over every declaring root
+ * as {@link remoteFanOut} walks them. Nothing is fetched. A publisher asks
+ * this before it mounts, so a build an earlier attempt left behind is named,
+ * with the command that re-lays it ({@link relayAdvice}), instead of failing
+ * inside the mount step (an IG's first agent publish, 2026-11-06).
+ */
+export function editedMountsIn(checkout: string): EditedMount[] {
+  return declaringInstances(checkout).roots.flatMap((root) =>
+    checkRemote({ instanceRoot: root }).outcomes.flatMap((o) =>
+      o.state === "missing" && (o as { edited?: boolean }).edited
+        ? [{ root, instance: o.instance, ...("path" in o && o.path ? { path: o.path } : {}), detail: o.detail }]
+        : [],
+    ),
+  );
+}
+
+/**
+ * What to run to re-lay `edited`, exactly: this script with `--fresh` from
+ * the checkout, which replaces only the mounts whose bytes no longer match
+ * the lock (and loses any edit in them), or the publisher's own `--fresh`.
+ */
+export function relayAdvice(checkout: string, edited: readonly EditedMount[], o: { script?: string } = {}): string {
+  const script = relative(checkout, o.script ?? join(import.meta.dir, "remote-mount.ts")) || "remote-mount.ts";
+  return [
+    `${edited.length} mount(s) no longer match the lock, so the mount step would leave them as they are and the build would not start:`,
+    ...edited.map((e) => `  - ${e.instance}${e.path ? ` (${e.path}/)` : ""}: ${e.detail}`),
+    "An earlier build most likely wrote into them. Re-lay them (any edit in them is lost):",
+    `  cd ${checkout} && bun run ${script} --fresh`,
+    "or pass --fresh to stage-local.ts (or build-instance-site.ts), which does the same before it builds.",
+  ].join("\n");
+}
+
+/**
  * What the full mount's install step would do for a current root, without
  * the fetch: `bun install` in a mounted instance that has a manifest and no
  * `node_modules/` yet. node_modules is outside every digest, so the lock check
@@ -2123,6 +2194,20 @@ export function remoteFanOut(checkout: string, opts: { check?: boolean; plan?: b
         parts.push(reportOutcomes(`Remote mounts — ${root} (current per the lock; nothing fetched)`, sum.state, sum.reason, current.outcomes));
         continue;
       }
+      // Bean `cat-tools-sm8r`: every instance off the lock is edited, and a
+      // mount leaves an edited instance untouched (only `--fresh` replaces
+      // it), so the fetch below could not change a single verdict.
+      const edited = opts.discardEdits ? undefined : editedOnlyPerLock(root);
+      if (edited !== undefined) {
+        if (opts.install !== false) installMissingDependencies(root, edited.outcomes.filter((o) => o.state !== "missing"), opts.install ?? "production");
+        for (const o of edited.outcomes) {
+          if (o.state === "missing" && o.edited) o.detail = `left untouched: ${o.detail} — edits there are somebody's work; move them upstream or delete the directory, then re-mount (or \`--fresh\`)`;
+        }
+        const sum = summarise(edited.outcomes);
+        states.push(sum.state);
+        parts.push(reportOutcomes(`Remote mounts — ${root} (only edited mounts are off the lock, and a mount leaves those untouched; nothing fetched)`, sum.state, sum.reason, edited.outcomes));
+        continue;
+      }
       const r = mountRemote({ instanceRoot: root, urlFor: opts.urlFor, purpose: opts.purpose, install: opts.install, discardEdits: opts.discardEdits });
       const sum = summarise(r.plan.outcomes);
       states.push(sum.state);
@@ -2157,7 +2242,10 @@ export function regenerateAgentSurface(root: string): { ok: boolean; lines: stri
     const r = spawnSync(process.execPath, [join(import.meta.dir, g)], { cwd: root, encoding: "utf-8" });
     const pass = r.status === 0;
     ok &&= pass;
-    lines.push(`  ${pass ? "✓" : "✗"} ${g}${pass ? "" : ` exited ${r.status ?? r.signal}: ${(r.stderr || r.stdout).trim().split("\n").slice(-3).join(" | ")}`}`);
+    const rawLines = (r.stderr || r.stdout).trim().split("\n").filter((l) => l.trim().length > 0);
+    const findings = rawLines.filter((l) => l.trim().startsWith("✗"));
+    const tail = findings.length > 0 ? findings : rawLines.slice(-3);
+    lines.push(`  ${pass ? "✓" : "✗"} ${g}${pass ? "" : ` exited ${r.status ?? r.signal}: ${tail.join(" | ")}`}`);
   }
   return { ok, lines };
 }
@@ -2178,6 +2266,14 @@ export function afterMount(root: string, before: string | undefined, argv: strin
   if (!argv.includes("--no-agent-surface")) {
     console.log(`\n## Agent surface — the lock changed, so the skills and memory agents read were re-rendered\n\n${r.lines.join("\n")}`);
     if (!r.ok) console.log("\nRe-run the failed generator before committing this re-pin: the new layer and the old agent surface disagree.");
+  }
+  if (!argv.includes("--no-health")) {
+    // Owner, 2026-11-07, card "Layer health": "A. The re-pin does it". A move
+    // of the cat-harness-tools pin moves the health checker, so this
+    // checkout's own report is regenerated and pushed here. Report only: it
+    // never changes the exit code (`lib/repin-health.ts`).
+    const h = afterMountHealth(root, before, lockBytes(root));
+    if (h) console.log(h.join("\n"));
   }
   if (code === 0 && !argv.includes("--no-layers-publish")) {
     // The committer who changed the lock writes its layers cache ref, so CI
@@ -2206,6 +2302,7 @@ export const MOUNT_REMOTE_FLAGS: ReadonlyMap<string, "switch" | "value"> = new M
   ["--install-all", "switch"],
   ["--no-agent-surface", "switch"],
   ["--no-layers-publish", "switch"],
+  ["--no-health", "switch"],
   ["--fresh", "switch"],
   ["--whole", "switch"],
   ["--instance", "value"],

@@ -34,9 +34,11 @@ describe("roundTripEntries — provenance is recorded, never invented", () => {
     }
   });
 
-  test("without them it stamps now, so a first recording is not left blank", () => {
+  test("without them it stamps no clock: a first recording is dated by its tree", () => {
+    // Owner rulings 2026-11-06 (cards "QA dates" and "Date source", option 1):
+    // the date is derived on read from reviewed_tree, never stamped as now.
     const e = roundTripEntries(base, { md: "h" });
-    expect(Date.parse(e[0]!.reviewed_at)).toBeGreaterThan(Date.now() - 60_000);
+    expect(e[0]!.reviewed_at).toBeUndefined();
     // The tree, not the commit (bean 69lr; owner card Q4, 2026-11-05).
     expect(e[0]!.reviewed_tree).toBeDefined();
     expect(e[0]!.reviewed_sha).toBeUndefined();

@@ -422,10 +422,17 @@ export async function workflowStartAnswer(
     model.logCapture,
   );
   const r = roles();
+  const hasWorkPlan = Boolean(plan?.trim()) || Boolean(bean?.trim());
+  const workPlanLine =
+    plan !== undefined && plan.trim() !== ""
+      ? `Part of work plan \`${plan}\`.\n`
+      : model.startsFromWorkPlan && !hasWorkPlan
+        ? `Work plan: \`${model.id}\` declares that it starts from a work plan, and none was passed (\`--plan <id>\` or \`--bean <id>\`).\n`
+        : "";
   return {
     text:
       `Started. State in \`${path.replace(`${root}/`, "")}\`.\n` +
-      (plan !== undefined ? `Part of work plan \`${plan}\`.\n` : "") +
+      workPlanLine +
       // Said on the tool's own output, on the same argument the capture
       // state is: a caller that has to go and look somewhere else to find
       // out whether the gate ran does not have one it can rely on.

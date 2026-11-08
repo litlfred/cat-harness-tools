@@ -30,6 +30,13 @@
  * counted clean, because "no findings over the subset I could resolve" is exactly
  * the shape that produced the wrong claim above.
  *
+ * ## `--instance <dir>`
+ *
+ * Surveys the catalogues of the instance at `<dir>` instead of this one: its
+ * `translation-sources` directory, from its declaration, and its pages,
+ * resolved against its own root. An instance that declares no such directory
+ * is reported and exits 2 — "no catalogue" is not "no stale catalogue".
+ *
  * @covers translation-sources
  * @module pipeline/obsolete-stale-po
  */
@@ -37,9 +44,10 @@ import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "
 import { join, relative } from "node:path";
 
 import { extractMarkdown } from "./pot-extract.ts";
-import { directoryForGraph } from "../schemas/kg/cat-harness.ts";
-import { siteRoot } from "./translation-index.ts";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { directoryForGraph, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { instanceSiteRoot, siteRoot } from "./translation-index.ts";
+import { gateOwnInstances, gateOwnsFile, nothingOwnLine } from "../scripts/lib/gate-own.ts";
+import { explicitInstanceRoot, HARNESS_ROOT, REPO_ROOT } from "../scripts/lib/roots.ts";
 
 /** Locale directories, which are never a source page. */
 const LOCALE_DIR_RE = /(^|\/)(ar|es|fr|ru|zh)(\/|$)/;
@@ -141,11 +149,17 @@ export function resolveSource(
   // name. The `site-dir-single-answer` gate exists because a hardcoded "docs"
   // silently stops being the site root the moment the declaration moves — and it
   // caught this file on its first push.
-  const docs = siteRoot(root);
+  // An instance-relative path is resolved before any site is asked for: it
+  // names its file exactly, and an instance with no Jekyll site (an IG whose
+  // pages are under `input/`) still has one.
+  const exact = join(root, ref);
+  if (existsSync(exact) && statSync(exact).isFile()) return { path: exact };
+  // This instance's site, else the site the instance at `root` declares for
+  // itself (`--instance`).
+  const docs = siteRoot(root) ?? instanceSiteRoot(root);
   if (docs === undefined) return { unresolved: "source-absent" };
-  for (const cand of [join(root, ref), join(docs, ref)]) {
-    if (existsSync(cand) && statSync(cand).isFile()) return { path: cand };
-  }
+  const inSite = join(docs, ref);
+  if (existsSync(inSite) && statSync(inSite).isFile()) return { path: inSite };
   const hits = walk(docs, (f) => f.endsWith(".md")).filter(
     (c) => !LOCALE_DIR_RE.test(relative(docs, c)) && c.endsWith(`/${ref}`),
   );
@@ -243,8 +257,36 @@ export function obsoleteEntries(poText: string, stale: readonly string[]): strin
 }
 
 function main(): void {
-  const root = join(HARNESS_ROOT);
+  const explicit = explicitInstanceRoot();
+  const root = explicit ?? join(HARNESS_ROOT);
   const check = process.argv.includes("--check");
+  const dir = directoryForGraph(root, "translation-sources");
+  if (explicit !== undefined) {
+    // Named by the caller, so judged whoever commits it: the layer-PR scoping
+    // below is for the default run over this instance.
+    if (dir === undefined || !existsSync(dir)) {
+      console.error(
+        `${root} declares no \`translation-sources\` directory, or it is absent. ` +
+          "Nothing was surveyed, and that is NOT a pass.",
+      );
+      process.exit(2);
+    }
+    console.log(`Catalogues of ${root}: ${relative(root, dir)}/`);
+  } else {
+    // In a layer's PR checks, only catalogues the caller commits (owner ruling
+    // 2026-11-05, "Move the checks"; `scripts/lib/gate-own.ts`).
+    const own = gateOwnInstances();
+    const instName = readDeclaration(root)?.name ?? "cat-harness";
+    const repoRoot = REPO_ROOT ?? root;
+    if (check && ((own !== undefined && !own.has(instName)) || (dir !== undefined && gateOwnsFile(relative(repoRoot, dir)) === false))) {
+      console.log(
+        own !== undefined
+          ? nothingOwnLine("translation:obsolete", "translations directory", own)
+          : `✓ translation:obsolete --check: the catalogues live in ${relative(repoRoot, dir!)}, which the caller does not commit; the owning layer's CI judges them.`,
+      );
+      return;
+    }
+  }
   const rows = survey(root);
 
   const comparable = rows.filter((r) => !isUnresolved(r.source));

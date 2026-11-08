@@ -12,7 +12,22 @@ import { dirname, join } from "node:path";
 
 import type { StandingConsent } from "../../../schemas/kg/mount-trust.js";
 import type { RemoteMount } from "../../../schemas/kg/remote-mount.js";
-import { applyRepin, candidateFor, planRepin, summaryOf, verdictOf, type CommitVerdict, type GitHubApi } from "../../repin-standing.ts";
+import {
+  alignToHeldPins,
+  applyRepin,
+  candidateFor,
+  extendExplicitDirectories,
+  inCheckoutDirectoryIds,
+  movesSince,
+  lockPinsOf,
+  newlyDeclaredDirectoryIds,
+  planRepin,
+  summaryOf,
+  verdictOf,
+  type CommitVerdict,
+  type GitHubApi,
+  type RepinPlan,
+} from "../../repin-standing.ts";
 
 const A = "a".repeat(40);
 const B = "b".repeat(40);
@@ -222,5 +237,146 @@ describe("applyRepin: index.config.json and index.lock.json move through the mou
     const before = readFileSync(join(root, "index.config.json"), "utf-8");
     expect(await applyRepin(root, { moves: [], held: [], unknown: [] })).toEqual({ exit: 0 });
     expect(readFileSync(join(root, "index.config.json"), "utf-8")).toBe(before);
+  });
+});
+
+describe("alignToHeldPins: an instance below the harness follows the harness's own lock (cascade, bean pqlh)", () => {
+  const open = rule({ require: undefined });
+  const withLocks = (api: GitHubApi, locks: Record<string, Record<string, string>>): GitHubApi => ({
+    ...api,
+    async lockPinsAt(repository, sha) {
+      return locks[`${repository}@${sha}`];
+    },
+  });
+  const cap = { harness: "harness", below: new Set(["base", "base-tools"]) };
+
+  test("the lower layer moves to the pin the harness's NEW commit holds, not to its branch head", async () => {
+    const mounts = [mount("harness", A, open), mount("base", A, open), mount("base-tools", A, open), mount("content", A, open)];
+    const api = withLocks(stubApi({ "o/harness@main": [B], "o/base@main": [D], "o/base-tools@main": [D], "o/content@main": [D] }), {
+      [`o/harness@${B}`]: { "o/base": C, "o/base-tools": A, "o/content": B },
+    });
+    const plan = await alignToHeldPins(await planRepin(mounts, api), mounts, api, cap);
+    const to = Object.fromEntries(plan.moves.map((m) => [m.harness, m.to]));
+    expect(to).toEqual({ harness: B, base: C, content: D });
+    expect(plan.moves.find((m) => m.harness === "base")?.alignedTo).toBe(`harness@${B.slice(0, 10)}`);
+    expect(plan.held.map((h) => h.harness)).toEqual(["base-tools"]);
+    expect(summaryOf(plan, true)).toContain("held by harness@");
+  });
+
+  test("a held pin the standing rule does not cover is held, not moved", async () => {
+    const mounts = [mount("harness", A, open), mount("base", A, rule())];
+    const api = withLocks(stubApi({ "o/harness@main": [B], "o/base@main": [D] }, { [D]: "green", [C]: "red" }), { [`o/harness@${B}`]: { "o/base": C } });
+    const plan = await alignToHeldPins(await planRepin(mounts, api), mounts, api, cap);
+    expect(plan.moves.map((m) => m.harness)).toEqual(["harness"]);
+    expect(plan.held.find((h) => h.harness === "base")?.reason).toContain("does not cover");
+  });
+
+  test("an unreadable harness lock is unknown, never a silent pass; no lock reader means no cascade", async () => {
+    const mounts = [mount("harness", A, open), mount("base", A, open)];
+    const base = stubApi({ "o/harness@main": [B], "o/base@main": [D] });
+    const broken: GitHubApi = { ...base, async lockPinsAt() { throw new Error("HTTP 500"); } };
+    const plan = await alignToHeldPins(await planRepin(mounts, broken), mounts, broken, cap);
+    expect(plan.unknown.map((u) => u.harness)).toEqual(["harness"]);
+    const plain = await alignToHeldPins(await planRepin(mounts, base), mounts, base, cap);
+    expect(plain.moves.find((m) => m.harness === "base")?.to).toBe(D);
+  });
+
+  test("lockPinsOf reads `mounts` and ignores anything else", () => {
+    expect(lockPinsOf({ mounts: [{ repository: "o/x", ref: A }, { repository: 1 }], instances: [{ repository: "o/y", sha: B }] })).toEqual({ "o/x": A });
+    expect(lockPinsOf(null)).toEqual({});
+  });
+});
+
+describe("extendExplicitDirectories: a directory the new pin declares joins an explicit list (folio-assistant#3023)", () => {
+  const decl = (...dirs: object[]) => ({ name: "up", directories: dirs });
+  const OLD = decl({ id: "library", path: "library/" }, { id: "ast", path: "fhir-ast/", storage: { branchPrefix: "x/" } });
+  const NEW = decl(
+    { id: "library", path: "library/" },
+    { id: "ast", path: "fhir-ast/", storage: { branchPrefix: "x/" } },
+    { id: "scenarios", path: "scenarios/" },
+    { id: "tools", path: "tools/" },
+    { id: "cache", path: "cache/", storage: { branchPrefix: "c/" } },
+    { id: "extra", path: "extra/", optIn: true },
+  );
+  const withDecls = (decls: Record<string, unknown>): GitHubApi => ({
+    ...stubApi({}),
+    async declarationAt(_r, sha) {
+      return decls[sha];
+    },
+  });
+  const listed = (dirs: string[] | undefined): RemoteMount => ({ ...mount("up", A, rule()), ...(dirs ? { overrides: { up: { directories: dirs } } } : {}) }) as RemoteMount;
+  const moved = (): RepinPlan => ({ moves: [{ harness: "up", repository: "o/up", from: A, to: B, rule: rule(), skipped: [] }], held: [], unknown: [] });
+
+  test("in the checkout only: a branch-kept or opt-in directory is never added", () => {
+    expect(inCheckoutDirectoryIds(NEW)).toEqual(["library", "scenarios", "tools"]);
+    expect(newlyDeclaredDirectoryIds(OLD, NEW)).toEqual(["scenarios", "tools"]);
+    expect(inCheckoutDirectoryIds(undefined)).toEqual([]);
+  });
+
+  test("an explicit list gains the new ids, less those it already names", async () => {
+    const plan = await extendExplicitDirectories(moved(), [listed(["library", "tools"])], withDecls({ [A]: OLD, [B]: NEW }));
+    expect(plan.moves[0]!.addDirectories).toEqual(["scenarios"]);
+    expect(summaryOf(plan, false)).toContain("- up: `scenarios`");
+  });
+
+  test("no explicit list: nothing to extend, and no declaration is read", async () => {
+    let read = 0;
+    const api: GitHubApi = { ...stubApi({}), async declarationAt() { read++; return NEW; } };
+    const plan = await extendExplicitDirectories(moved(), [listed(undefined)], api);
+    expect(plan.moves[0]!.addDirectories).toBeUndefined();
+    expect(read).toBe(0);
+  });
+
+  test("a declaration it cannot read withdraws the move as could-not-determine, never a short list", async () => {
+    const plan = await extendExplicitDirectories(moved(), [listed(["library"])], withDecls({ [A]: OLD }));
+    expect(plan.moves).toEqual([]);
+    expect(plan.unknown[0]!.reason).toContain("cannot be told");
+    const failing: GitHubApi = { ...stubApi({}), async declarationAt() { throw new Error("HTTP 500"); } };
+    expect((await extendExplicitDirectories(moved(), [listed(["library"])], failing)).unknown[0]!.reason).toContain("HTTP 500");
+  });
+
+  test("applyRepin writes the added ids after the site's own, and touches no other entry", async () => {
+    const root = site();
+    const f = join(root, "index.config.json");
+    const cfg = JSON.parse(readFileSync(f, "utf-8"));
+    cfg.instances.find((i: { name: string }) => i.name === "up").source.remote.overrides = { up: { directories: ["library"] } };
+    writeFileSync(f, JSON.stringify(cfg, null, 2));
+    const otherBefore = cfg.instances.find((i: { name: string }) => i.name === "other");
+    const plan: RepinPlan = { moves: [{ harness: "up", repository: "o/up", from: up.first, to: up.second, rule: rule(), skipped: [], addDirectories: ["scenarios", "tools"] }], held: [], unknown: [] };
+    await applyRepin(root, plan, { on: "2026-11-07", mount: false });
+    const after = JSON.parse(readFileSync(f, "utf-8"));
+    const upEntry = after.instances.find((i: { name: string }) => i.name === "up").source.remote;
+    expect(upEntry.ref).toBe(up.second);
+    expect(upEntry.overrides).toEqual({ up: { directories: ["library", "scenarios", "tools"] } });
+    expect(after.instances.find((i: { name: string }) => i.name === "other")).toEqual(otherBefore);
+  });
+});
+
+describe("movesSince + applyRepin({ seed: false }): step 4a after the pins already moved (--extend-from)", () => {
+  test("only instances whose ref changed AND carry a standing rule are moves", () => {
+    const before = { instances: [
+      { name: "up", source: { remote: { ref: A } } },
+      { name: "still", source: { remote: { ref: B } } },
+      { name: "norule", source: { remote: { ref: A } } },
+      { name: "local", source: { local: { at: "." } } },
+    ] };
+    const now = [mount("up", B, rule()), mount("still", B, rule()), mount("norule", C), mount("new", D, rule())];
+    expect(movesSince(before, now).map((m) => [m.harness, m.from, m.to])).toEqual([["up", A, B]]);
+    expect(movesSince(undefined, now)).toEqual([]);
+  });
+
+  test("seed: false writes the added ids and leaves the pin and its consent exactly as they are", async () => {
+    const root = site();
+    const f = join(root, "index.config.json");
+    const cfg = JSON.parse(readFileSync(f, "utf-8"));
+    cfg.instances.find((i: { name: string }) => i.name === "up").source.remote.overrides = { up: { directories: ["library"] } };
+    writeFileSync(f, JSON.stringify(cfg, null, 2));
+    const trustBefore = cfg.instances.find((i: { name: string }) => i.name === "up").source.remote.trust;
+    const plan: RepinPlan = { moves: [{ harness: "up", repository: "o/up", from: up.second, to: up.first, rule: rule(), skipped: [], addDirectories: ["scenarios"] }], held: [], unknown: [] };
+    await applyRepin(root, plan, { seed: false, mount: false });
+    const upEntry = JSON.parse(readFileSync(f, "utf-8")).instances.find((i: { name: string }) => i.name === "up").source.remote;
+    expect(upEntry.ref).toBe(up.first);
+    expect(upEntry.trust).toEqual(trustBefore);
+    expect(upEntry.overrides).toEqual({ up: { directories: ["library", "scenarios"] } });
   });
 });

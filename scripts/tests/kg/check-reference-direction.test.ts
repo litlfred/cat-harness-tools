@@ -42,6 +42,7 @@ import {
   exemptionCounts,
   movedTo,
   rekeyMovedPairs,
+  subgraphMachineWritten,
   rekeyToolSplits,
   type MoveEvidence,
   EXEMPTIONS_DECLARED,
@@ -266,6 +267,21 @@ describe("analyse over a synthetic tree", () => {
     const r = tree(files, [{ id: "out", path: "out/", graphTypologies: ["qa"] }]);
     expect(verdicts(r)).toEqual(["low/notes.md wrong-direction"]);
     expect(analyse(r).skippedMachineWritten).toBe(1);
+  });
+
+  test("a route another harness builds on this instance's site (builtOnHostSite) is not read as this instance's", () => {
+    // `high`'s viewer built into `low`'s site: the page names `high`'s own
+    // material, and `low` declares none of it.
+    const files = { "low/docs/en/high/bibliography/references.jsonld": '{"x":"high"}\n', "low/notes.md": "about high\n" };
+    const r = tree(files);
+    expect(verdicts(r).sort()).toEqual(["low/docs/en/high/bibliography/references.jsonld wrong-direction", "low/notes.md wrong-direction"]);
+    const withHostSite = analyse(r, [join(r, "low/docs/en/high/bibliography")]);
+    expect(withHostSite.classified.map((c) => c.occurrence.file)).toEqual(["low/notes.md"]);
+    expect(withHostSite.skippedMachineWritten).toBe(1);
+  });
+
+  test("a tree with no builtOnHostSite visualiser derives no host-site route", () => {
+    expect(analyse(tree({ "low/notes.md": "about high\n" })).skippedMachineWritten).toBe(0);
   });
 
   test("a directory holding an AUTHORED graph is read — the exclusion is the declaration, not the shape", () => {
@@ -1361,6 +1377,28 @@ describe("ruling (i) — a baseline pair on a MOVED file is compared at the file
     const v = judge(grew, true);
     expect(v.exit).toBe(1);
     expect(v.diff?.added["wrong-direction"]).toEqual([{ file: "cat-harness-tools/scripts/a.ts", target: "who-iris" }]);
+  });
+});
+
+describe("a sub-graph's machine-written directories, declared from within, are not read", () => {
+  test("cat-harness's corpus under library/graph.json is excluded like a top-level library entry", () => {
+    const root = mkdtempSync(join(tmpdir(), "refdir-subgraph-"));
+    made.push(root);
+    mkdirSync(join(root, "library", "corpus"), { recursive: true });
+    writeFileSync(
+      join(root, "library", "graph.json"),
+      JSON.stringify({
+        directories: [
+          { id: "library", path: "corpus/", graphTypologies: ["library"] },
+          { id: "library-skills", path: "skills/", graphTypologies: ["skills"] },
+        ],
+      }),
+    );
+    const dirs = [{ path: "library/" }, { path: "skills/" }];
+    expect(subgraphMachineWritten(root, dirs)).toEqual([join(root, "library", "corpus/")]);
+    // Vacuity guard: without the sub-graph's graph.json nothing is added.
+    rmSync(join(root, "library", "graph.json"));
+    expect(subgraphMachineWritten(root, dirs)).toEqual([]);
   });
 });
 

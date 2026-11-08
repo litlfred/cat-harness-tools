@@ -521,7 +521,9 @@ async function recordVerdict(): Promise<void> {
     note: vNote ?? prior?.note ?? null,
     reviewed_hash: staleKey,
     stale_mode: thorough ? "thorough" : "manifest",
-    reviewed_at: new Date().toISOString(),
+    // No clock (owner rulings 2026-11-06, "QA dates" / "Date source"): the
+    // verdict's identity is reviewed_hash, the content it ruled on, and nothing
+    // reads a time from this store.
   };
   const at = saveVerdicts(root, paper, verdicts);
   console.log(`✓ verdict: ${paper}/${chapterDir} · ${key} → ${vResult} (by ${vReviewer})${vNote ? ` — ${vNote}` : ""}`);

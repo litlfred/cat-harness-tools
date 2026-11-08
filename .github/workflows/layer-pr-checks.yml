@@ -343,7 +343,9 @@ jobs:
   prepare-head:
     name: Prepare the PR side (and typecheck)
     # A push to main has no PR side: it records main's side (the CI cone).
-    if: github.event.action != 'closed' && github.event_name != 'push'
+    # Not when `ready-reuse` found this PR already judged on these inputs.
+    needs: [ready-reuse]
+    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && github.event_name != 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -543,6 +545,44 @@ jobs:
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
           fi
           { echo "at=$at"; echo "layers-at=$layers_at"; echo "index=$index"; echo "tools=$tools"; } >> "$GITHUB_OUTPUT"
+      # What this run judges, as the name of an artifact (`ready-reuse.py
+      # key`), so a later `ready_for_review` on the same inputs can find it
+      # without the log host. Full-tier PR runs only: a draft's run never
+      # counts. Recording before the verdict is safe: `decide` also requires
+      # this run's "No new failures" job to have succeeded.
+      - &judged-key
+        name: What this run judges (for a later ready-for-review)
+        id: judged-key
+        if: github.event_name == 'pull_request' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        continue-on-error: true  # no record means no later reuse, never a red run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_SHA: ${{ github.sha }}
+          INDEX: ${{ steps.pins.outputs.index }}
+          TOOLS: ${{ steps.pins.outputs.tools }}
+        run: |
+          script=ci/.github/scripts/layer-pr-checks/ready-reuse.py
+          if [ ! -f "$script" ]; then echo "judging scripts without ready-reuse.py: nothing recorded"; echo "key=" >> "$GITHUB_OUTPUT"; exit 0; fi
+          STATE="$RUNNER_TEMP/pin/state.json" python3 -I "$script" key
+      - name: Record what this run judges
+        if: steps.judged-key.outputs.key != ''
+        continue-on-error: true
+        env:
+          KEY: ${{ steps.judged-key.outputs.key }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/judged"
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/judged/key"
+      - if: steps.judged-key.outputs.key != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ${{ steps.judged-key.outputs.key }}
+          path: ${{ runner.temp }}/judged
+          retention-days: 7
+          overwrite: true
       - &checkout-index
         name: Check out the root (the folio-assistant index, or the caller in index mode)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -1074,8 +1114,10 @@ jobs:
       - name: Directory READMEs (QA report, never a gate)
         # Owner, 2026-10-16: "QA report, but not gate". A layer's own PR is
         # told when its directory READMEs are stale, as a warning and in the
-        # step summary; it is never failed for it. The post-merge regen
-        # (`layer-post-merge-regen.yml`) is what repairs them. Run from `fa`,
+        # step summary; it is never failed for it. A dispatched regen
+        # (`layer-post-merge-regen.yml`, mode `pr`; full runs only on manual
+        # trigger or release build, owner 2026-11-06) commits them to the
+        # PR's branch. Run from `fa`,
         # so the graph typologies are the composed set, over the caller's own
         # git checkout. A locked cat-harness-tools older than `--repo` reports
         # that it could not judge, rather than a finding.
@@ -1139,11 +1181,77 @@ jobs:
           compression-level: 0  # already zstd
           if-no-files-found: error
 
+  # Marked ready for review (merge manager, 2026-11-07): a PR the merge queue
+  # paces goes draft -> ready -> draft -> ready without a push, and each
+  # `ready_for_review` ran the full tier again on the same inputs. This job
+  # pins the run exactly as prepare-head would (it writes the run's pin, so
+  # both prepare jobs restore the same pins), then asks `ready-reuse.py
+  # decide` whether an earlier run of this workflow already passed "No new
+  # failures" on the same head, base.sha, merge tree and pins. If so, both
+  # prepare jobs and the shards are skipped and `compare` reports "SKIPPED --
+  # already passed as judged in run <url>". When the earlier run recorded no
+  # pins, it counts only within `record-pin-max-hours`. Anything it cannot
+  # read is no reuse. Reading runs needs `actions: read` on the caller's job;
+  # without it the API refuses and every job runs, as before.
+  ready-reuse:
+    name: Already judged? (marked ready for review)
+    if: github.event_name == 'pull_request' && github.event.action == 'ready_for_review'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      reuse: ${{ steps.decide.outputs.reuse }}
+      run-url: ${{ steps.decide.outputs.run_url }}
+    steps:
+      - *tools-lock
+      - *judging-scripts
+      - *pin-restore
+      - *pin-record
+      - *pin-write
+      - *pin-save
+      - *pin-reread
+      - *pins
+      - name: Did an earlier run pass on these exact inputs?
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_SHA: ${{ github.sha }}
+          INDEX: ${{ steps.pins.outputs.index }}
+          TOOLS: ${{ steps.pins.outputs.tools }}
+          MAX_HOURS: ${{ inputs.record-pin-max-hours }}
+        run: |
+          script=ci/.github/scripts/layer-pr-checks/ready-reuse.py
+          if [ ! -f "$script" ]; then echo "judging scripts without ready-reuse.py: no reuse"; echo "reuse=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          STATE="$RUNNER_TEMP/pin/state.json" python3 -I "$script" decide
+      # A reused run records the same key, so a further draft -> ready
+      # round finds this run as well.
+      - name: Record what the reused run judged
+        if: steps.decide.outputs.reuse == 'true'
+        continue-on-error: true
+        env:
+          KEY: ${{ steps.decide.outputs.key }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/judged"
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/judged/key"
+      - if: steps.decide.outputs.reuse == 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ${{ steps.decide.outputs.key }}
+          path: ${{ runner.temp }}/judged
+          retention-days: 7
+          overwrite: true
+
   prepare-base:
     name: Prepare the main side, unless main's answer is cached
     # Not on a draft under `draft-fast-tier`: it has no full tier to compare
     # against. `run` then skips too, because it needs this job to succeed.
-    if: github.event.action != 'closed' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+    # Nor when `ready-reuse` found this PR already judged on these inputs.
+    needs: [ready-reuse]
+    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -1728,7 +1836,7 @@ jobs:
     # was marked ready and merged before the full run reported
     # (https://github.com/litlfred/fhir-harness/pull/167 and #169, 2026-10-24).
     name: ${{ (inputs.draft-fast-tier && github.event.pull_request.draft == true) && 'Draft fast tier only (not the full checks)' || 'No new failures (tests and gates)' }}
-    needs: [prepare-head, prepare-base, run]
+    needs: [ready-reuse, prepare-head, prepare-base, run]
     if: ${{ !cancelled() && github.event.action != 'closed' }}
     runs-on: ubuntu-latest
     outputs:
@@ -1743,8 +1851,14 @@ jobs:
           PREPARED: ${{ needs.prepare-base.outputs.prepared }}
           DRAFT: ${{ inputs.draft-fast-tier && github.event.pull_request.draft == true }}
           QUICK: ${{ needs.prepare-head.outputs.quick == 'true' }}
+          REUSED: ${{ needs.ready-reuse.result == 'success' && needs.ready-reuse.outputs.reuse == 'true' }}
+          REUSED_RUN: ${{ needs.ready-reuse.outputs.run-url }}
         run: |
-          if [ "$PUSH" = "true" ]; then
+          if [ "$REUSED" = "true" ]; then
+            msg="SKIPPED — already passed as judged in run $REUSED_RUN (same head, base and pins; marked ready for review)."
+            echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "only=true" >> "$GITHUB_OUTPUT"
+          elif [ "$PUSH" = "true" ]; then
             if [ "$PREPARED" = "true" ]; then
               echo "a push to main: main's side is joined and kept, with the CI cone's records; nothing is judged"
               echo "only=false" >> "$GITHUB_OUTPUT"

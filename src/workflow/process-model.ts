@@ -67,6 +67,22 @@ const SUPPORTED = new Set<string>([
 ]);
 
 /**
+ * Whether the interpreter runs this element. A boundary event runs only when
+ * it is non-interrupting (`cancelActivity="false"`): an optional side path
+ * that starts while its activity holds a token and never takes that token
+ * away. An interrupting one would cancel the activity, which the engine does
+ * not do, so it is refused (or, on a view load, listed as not run).
+ */
+function runs(e: { $type: string; cancelActivity?: boolean }): boolean {
+  return SUPPORTED.has(e.$type) || (e.$type === "bpmn:BoundaryEvent" && e.cancelActivity === false);
+}
+
+/** The type as a refusal names it: an interrupting boundary event says so. */
+function refusedType(e: { $type: string; cancelActivity?: boolean }): string {
+  return e.$type === "bpmn:BoundaryEvent" ? `${e.$type} (interrupting)` : e.$type;
+}
+
+/**
  * Elements that hold data rather than being steps: a store (`dataStoreReference`,
  * pointing at a `bpmn:dataStore`) and a document passed between steps
  * (`dataObjectReference` and its `dataObject`).
@@ -117,7 +133,7 @@ export interface DataStoreUse {
   storeDeclared?: boolean;
 }
 
-export type NodeKind = "start" | "end" | "activity" | "exclusive" | "parallel";
+export type NodeKind = "start" | "end" | "activity" | "exclusive" | "parallel" | "boundary";
 
 /**
  * The three RACI letters a diagram can declare. `responsible` is absent
@@ -217,6 +233,12 @@ export interface ProcessNode {
   /** The `name` on the diagram, with the `[skill]` line stripped. */
   name: string;
   kind: NodeKind;
+  /**
+   * For a non-interrupting boundary event (`kind: "boundary"`): the activity
+   * it sits on. It may be completed whenever that activity holds a token, any
+   * number of times, and the activity keeps its token.
+   */
+  attachedTo?: string;
   /** BPMN type, kept so a caller can tell a userTask from a serviceTask. */
   type: string;
   /** Name of the lane this node sits in — i.e. the role that performs it. */
@@ -783,6 +805,14 @@ export interface ProcessModel {
    */
   logCapture?: "on" | "off";
   /**
+   * Whether the process declares that it starts from a work plan (bean `rwhr`).
+   *
+   * Optional on the diagram; small processes need none. When `true` and
+   * `workflow_start` is called with no `plan` (and no `bean`), the instance
+   * starts without refusing and says so in its output.
+   */
+  startsFromWorkPlan?: boolean;
+  /**
    * `<bpmn:documentation>` on the process element itself — what the diagram
    * is FOR. The node-level `documentation` says what one step does; this is
    * the paragraph a reader meets before any step, and `process-documented`
@@ -1333,6 +1363,7 @@ function kindOf(type: string): NodeKind {
   if (type === "bpmn:EndEvent") return "end";
   if (type === "bpmn:ExclusiveGateway") return "exclusive";
   if (type === "bpmn:ParallelGateway") return "parallel";
+  if (type === "bpmn:BoundaryEvent") return "boundary";
   return "activity";
 }
 
@@ -1342,6 +1373,10 @@ interface ModdleElement {
   $type: string;
   id: string;
   name?: string;
+  /** A boundary event's activity. */
+  attachedToRef?: { id?: string };
+  /** A boundary event: false when it is non-interrupting. moddle's default is true. */
+  cancelActivity?: boolean;
   documentation?: { text?: string }[];
   extensionElements?: {
     values?: {
@@ -2020,7 +2055,7 @@ export async function loadProcessModel(
   const walked = allElements.filter((e) => !DATA_TYPES.has(e.$type));
   // A VIEW load lists what the interpreter does not run, and the flows that
   // touch it, instead of refusing; a run load refuses below, as it always did.
-  const notRunEls = opts.view ? walked.filter((e) => !SUPPORTED.has(e.$type)) : [];
+  const notRunEls = opts.view ? walked.filter((e) => !runs(e)) : [];
   const notRunIds = new Set(notRunEls.map((e) => e.id));
   const elements = walked.filter(
     (e) =>
@@ -2081,11 +2116,11 @@ export async function loadProcessModel(
 
   // Refuse before building anything, so the error names every offender at once
   // rather than one per re-run.
-  const unsupported = [...new Set(elements.filter((e) => !SUPPORTED.has(e.$type)).map((e) => e.$type))];
+  const unsupported = [...new Set(elements.filter((e) => !runs(e)).map(refusedType))];
   if (unsupported.length > 0) {
     throw new UnsupportedBpmn(
       `${basename(bpmnPath)} uses BPMN this interpreter does not implement: ` +
-        `${unsupported.join(", ")}. Supported: ${[...SUPPORTED].join(", ")}. ` +
+        `${unsupported.join(", ")}. Supported: ${[...SUPPORTED].join(", ")}, and a non-interrupting bpmn:BoundaryEvent. ` +
         `Extend the interpreter rather than letting the element be skipped — a ` +
         `process that silently omits a step is not the process on the diagram.`,
     );
@@ -2267,6 +2302,7 @@ export async function loadProcessModel(
       decisionRef: ext.find((v) => v.$type === "folio:decision" && v.ref)?.ref,
       documentation: el.documentation?.[0]?.text?.replace(...DOC_WS).trim() || undefined,
       calledElement: el.calledElement,
+      ...(raw.$type === "bpmn:BoundaryEvent" ? { attachedTo: raw.attachedToRef?.id } : {}),
       ...(step ? { globalTask: step.ref } : {}),
       ...(step?.inputs ? { inputs: step.inputs } : {}),
       incoming: [],
@@ -2294,6 +2330,25 @@ export async function loadProcessModel(
     });
     nodes.get(from)!.outgoing.push(el.id);
     nodes.get(to)!.incoming.push(el.id);
+  }
+
+  // A boundary event runs only as a non-interrupting side path off an
+  // activity: anything else would ask the engine to cancel a step or to route
+  // a token into an event, which it does not do. Refused at load, never
+  // walked wrongly.
+  for (const el of elements) {
+    if (el.$type !== "bpmn:BoundaryEvent") continue;
+    const n = nodes.get(el.id)!;
+    const host = n.attachedTo ? nodes.get(n.attachedTo) : undefined;
+    const problem =
+      !host || host.kind !== "activity"
+          ? `is attached to ${n.attachedTo ?? "nothing"}, which is not an activity of this process`
+          : n.incoming.length > 0
+            ? `has an incoming sequence flow; a boundary event starts its path from the activity it sits on`
+            : n.outgoing.length === 0
+              ? `has no outgoing sequence flow, so it would start nothing`
+              : undefined;
+    if (problem) throw new UnsupportedBpmn(`${basename(bpmnPath)}: boundary event ${el.id} ${problem}.`);
   }
 
   const procExt = proc.extensionElements?.values ?? [];
@@ -2327,6 +2382,7 @@ export async function loadProcessModel(
     );
   }
   const logCapture = captureDeclared as "on" | "off" | undefined;
+  const startsFromWorkPlan = readStartsFromWorkPlan(proc, bpmnPath);
 
   // `<bootstrap.processes:precondition>` — what must hold BEFORE the start event (`lv3j`).
   //
@@ -2537,6 +2593,7 @@ export async function loadProcessModel(
     enforcement,
     involvementVocabulary,
     logCapture,
+    ...(startsFromWorkPlan !== undefined ? { startsFromWorkPlan } : {}),
     preconditions,
     nodes,
     flows,
@@ -2547,6 +2604,55 @@ export async function loadProcessModel(
     children,
     ...(processInputs.size ? { inputs: [...processInputs.values()] } : {}),
   };
+}
+
+/**
+ * Whether `<bpmn:process>` declares that it starts from a work plan (bean `rwhr`).
+ *
+ * Accepts `<cat-harness.processes:work-plan/>` (or `starts="true|false"`),
+ * `<cat-harness.processes:bean/>` on the process, `<cat-harness.processes:policy workPlan="true|false"/>`,
+ * or `workPlan` / `startsFromWorkPlan` on `<bpmn:process>`. Small processes need
+ * no declaration (`undefined`). Any attribute value other than `"true"` or `"false"`
+ * is refused at load time so a typo cannot silently turn the declaration off.
+ */
+function readStartsFromWorkPlan(proc: ModdleElement, bpmnPath: string): boolean | undefined {
+  const parseBool = (raw: unknown, where: string): boolean => {
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    throw new UnsupportedBpmn(
+      `${basename(bpmnPath)}: ${where}="${String(raw)}" is not a boolean. Use "true" or "false".`,
+    );
+  };
+  const procExt = proc.extensionElements?.values ?? [];
+  const wpEl = procExt.find((v) => v.$type === "folio:work-plan" || v.$type === "folio:workPlan") as
+    | Record<string, unknown>
+    | undefined;
+  if (wpEl) {
+    const attrKey = ["starts", "required", "workPlan", "plan"].find((k) => wpEl[k] !== undefined);
+    if (attrKey === undefined) return true;
+    return parseBool(wpEl[attrKey], `cat-harness.processes:work-plan ${attrKey}`);
+  }
+  const beanEl = procExt.find((v) => v.$type === "folio:bean") as Record<string, unknown> | undefined;
+  if (beanEl) {
+    const attrKey = ["starts", "required", "workPlan", "plan"].find((k) => beanEl[k] !== undefined);
+    if (attrKey === undefined) return true;
+    return parseBool(beanEl[attrKey], `cat-harness.processes:bean ${attrKey}`);
+  }
+  const policyEl = procExt.find((v) => v.$type === "folio:policy") as Record<string, unknown> | undefined;
+  if (policyEl) {
+    const attrKey = ["workPlan", "startsFromWorkPlan", "plan"].find((k) => policyEl[k] !== undefined);
+    if (attrKey !== undefined) {
+      return parseBool(policyEl[attrKey], `cat-harness.processes:policy ${attrKey}`);
+    }
+  }
+  const attrs = (proc as unknown as { $attrs?: Record<string, unknown> }).$attrs ?? {};
+  for (const [k, v] of Object.entries(attrs)) {
+    const local = k.includes(":") ? k.slice(k.lastIndexOf(":") + 1) : k;
+    if (local === "workPlan" || local === "startsFromWorkPlan" || local === "work-plan") {
+      return parseBool(v, `bpmn:process ${k}`);
+    }
+  }
+  return undefined;
 }
 
 /**
