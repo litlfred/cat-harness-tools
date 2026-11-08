@@ -208,6 +208,40 @@ describe("publish", () => {
     expect((await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX })).kind).toBe("updated");
   });
 
+  test("a hash-IRI vocabulary file where the slash namespace needs a directory is removed, then the page written", async () => {
+    const VOC = "v0/ns/index.html";
+    const BLOCKED = { status: 409, json: { message: "Sorry, a file exists where you’re trying to create a subdirectory. Choose a new path and try again." } };
+    const { api, calls } = fakeApi([
+      ["GET /repos/o/r/branches/gh-pages", { status: 200 }],
+      [`GET /repos/o/r/contents/${VOC}?ref=gh-pages`, { status: 404 }],
+      [`PUT /repos/o/r/contents/${VOC}`, BLOCKED],
+      ["GET /repos/o/r/contents/v0?ref=gh-pages", { status: 200, json: [{ path: "v0/ns" }] }],
+      ["GET /repos/o/r/contents/v0/ns?ref=gh-pages", { status: 200, json: { sha: "old", encoding: "base64", content: b64('{"@id":"x#"}') } }],
+      ["DELETE /repos/o/r/contents/v0/ns", { status: 200 }],
+      [`GET /repos/o/r/contents/${VOC}?ref=gh-pages`, { status: 404 }],
+      [`PUT /repos/o/r/contents/${VOC}`, { status: 201 }],
+    ]);
+    const out = await publishFile(api, { repo: "o/r", path: VOC, content: "<html></html>" });
+    expect(out.kind).toBe("updated");
+    expect(out.detail).toContain("removed the file v0/ns");
+    expect(calls.find((c) => c.method === "DELETE")!.body).toMatchObject({ sha: "old", branch: "gh-pages" });
+  });
+
+  test("a blocking file that is not JSON is left for a person, and the write fails", async () => {
+    const VOC = "v0/ns/index.html";
+    const { api, calls } = fakeApi([
+      ["GET /repos/o/r/branches/gh-pages", { status: 200 }],
+      [`GET /repos/o/r/contents/${VOC}?ref=gh-pages`, { status: 404 }],
+      [`PUT /repos/o/r/contents/${VOC}`, { status: 409, json: { message: "Sorry, a file exists where you're trying to create a subdirectory." } }],
+      ["GET /repos/o/r/contents/v0?ref=gh-pages", { status: 200, json: [] }],
+      ["GET /repos/o/r/contents/v0/ns?ref=gh-pages", { status: 200, json: { sha: "old", encoding: "base64", content: b64("<html>not json</html>") } }],
+    ]);
+    const out = await publishFile(api, { repo: "o/r", path: VOC, content: "<html></html>" });
+    expect(out.kind).toBe("failed");
+    expect(out.detail).toContain("left for a person");
+    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+  });
+
   test("a failed read of the branch is a failure, never a guess", async () => {
     const { api } = fakeApi([["GET /repos/o/r/branches/gh-pages", { status: 403, json: { message: "Resource not accessible" } }]]);
     const out = await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX });
