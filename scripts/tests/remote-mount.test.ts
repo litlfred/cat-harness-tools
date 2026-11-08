@@ -926,11 +926,17 @@ describe("a changed lock re-renders the agent surface", () => {
 
 describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () => {
   // Each test here builds bare repositories and replays mounts through `git`
-  // subprocesses (local file:// fixtures: no network). Measured 2026-11-05:
-  // ~3 s each on an idle machine, 10-15 s on a loaded 4-CPU container, and
-  // bun's 5000 ms default failed H1-H6 at random on CI shards
-  // (folio-assistant#2949, #2950; cat-harness-tools#1487). 30 s is twice the
-  // worst measured cost.
+  // subprocesses over local file:// fixtures. The 30 s budget dates from
+  // 2026-11-05 (folio-assistant#2949, #2950; cat-harness-tools#1487), when the
+  // timeouts were read as load. They were not: a directory whose
+  // index.hydrated.jsonld the tree does not hold falls back to the pin's
+  // subgraph index PACKAGE (G2b), and with no `packageUrlFor` that fetch
+  // curled the real https://github.com/o/<repo>/releases/... — a 404 in
+  // ~1 s on a quiet runner, a hang until bun killed curl on a busy one, so a
+  // different subset failed each run as `could-not-determine`
+  // (cat-harness-tools#1487, #1488). `beforeAll` below points every package
+  // fetch at a file:// path that holds nothing, so the answer is "absent"
+  // and no test here reaches the network.
   const HYDRATED_TIMEOUT_MS = 30_000;
   // o/hy holds two instances. `hh` publishes ONE hydrated file, for `tools`
   // (and a child's, which must not travel); its `skills` and `docs` publish
@@ -957,7 +963,14 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
   let np: { bare: string; sha: string };
   let hUrl: (r: string) => string;
 
+  let prevPrefix: string | undefined;
   beforeAll(() => {
+    // No package is published for these fixtures: every release-asset URL is
+    // fetched from an empty file:// mirror (curl exit 37, read as absent),
+    // never from github.com. H6 and H10 set their own mirror and restore this one.
+    // input-site: inert #04b6f973 — saves the environment to restore it after the suite; no assertion reads the value
+    prevPrefix = process.env.CAT_MOUNT_URL_PREFIX;
+    process.env.CAT_MOUNT_URL_PREFIX = `file://${join(base, "no-packages-published")}`;
     hy = bareRepo(base, "hy", {
       "hh/hh.json": decl("hh", { livesAt: { repository: "o/hy", path: "hh" }, directories: dirs }),
       "hh/tools/a/a.ts": "export const a = 1;\n",
@@ -1187,6 +1200,11 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
       else process.env.CAT_MOUNT_URL_PREFIX = prev;
     }
   }, HYDRATED_TIMEOUT_MS);
+
+  afterAll(() => {
+    if (prevPrefix === undefined) delete process.env.CAT_MOUNT_URL_PREFIX;
+    else process.env.CAT_MOUNT_URL_PREFIX = prevPrefix;
+  });
 });
 
 describe("named ids declared FROM WITHIN (bean `mo75` G3)", () => {
