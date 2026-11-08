@@ -35,6 +35,7 @@ const GENERATOR = join(TOOLS_ROOT, "scripts", "gen-themes-css.ts");
 export function ensureThemesCss(root: string): string {
   const path = join(root, siteFileFor(root, "assets/css/themes.css"));
   if (!existsSync(path)) {
+    // input-site: runs */scripts/gen-themes-css.ts,scripts/gen-themes-css.ts #968cf591 — builds themes.css with this layer's generator when it is missing
     spawnSync("bun", [GENERATOR, `--harness=${root}`], { cwd: root, encoding: "utf-8", stdio: "inherit" });
   }
   return path;

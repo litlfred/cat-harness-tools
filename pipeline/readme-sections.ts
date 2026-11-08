@@ -172,6 +172,7 @@ export interface ReadmeSection {
 
 /** Does the checkout at `repo` track anything under `rel`? Independent of what is mounted. */
 function trackedByCheckout(repo: string, rel: string): boolean {
+  // input-site: tree #61aef05a — what this checkout's index tracks under a path: git's answer, which the cone replays
   const r = spawnSync("git", ["ls-files", "--", rel], { cwd: repo, encoding: "utf-8" });
   return r.status === 0 && r.stdout.trim() !== "";
 }

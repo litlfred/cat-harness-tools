@@ -64,8 +64,10 @@ export function layerQaRemote(source: LayerQaSource, env: Record<string, string 
 
 /** The private store a layer is read through: one per layer, beside the index's own. */
 function layerStoreDir(repoRoot: string, instance: string): string {
+  // input-site: env QA_STORE_DIR #96246ebf — a directory the layer stores are kept under instead of the checkout's git directory
   const base = process.env.QA_STORE_DIR;
   if (base) return `${base}-${instance}`;
+  // input-site: store #f48bd6b7 — configures a layer's qa-store read: where its private store lives; the store's reads are reported by its snapshot
   const c = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: repoRoot, encoding: "utf-8" });
   return join(c.status === 0 ? c.stdout.trim() : join(repoRoot, ".git"), `qa-store-${instance}.git`);
 }

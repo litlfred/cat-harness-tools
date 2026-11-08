@@ -247,6 +247,7 @@ function bpmnDirs(rel = ".", depth = 0): string[] {
   }
   if (es.some((e) => e.isFile() && e.name.endsWith(".bpmn"))) out.push(rel);
   for (const e of es) {
+    // input-site: inert #ad3f44f1 — names the directories the walk skips; none of them is read
     if (e.isDirectory() && !["node_modules", ".git", "_site", "_kg"].includes(e.name) && !e.name.startsWith(".")) {
       out.push(...bpmnDirs(rel === "." ? e.name : `${rel}/${e.name}`, depth + 1));
     }
