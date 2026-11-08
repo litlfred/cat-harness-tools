@@ -25,7 +25,7 @@
  * with findings.
  */
 import { spawnSync } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { findDeclarationFile, instanceRootFor, readDeclaration, repoRootFor, rootForScope } from "../schemas/kg/cat-harness.js";
@@ -83,6 +83,10 @@ export const ROOT_INFRASTRUCTURE: Readonly<Record<string, string>> = {
   "GEMINI.md": "the same, for another tool",
   "README.md": "what a person landing on the repository reads",
   LICENSE: "the repository's licence",
+  // The same file in its Markdown spelling, which GitHub's licence detection
+  // reads from the root exactly as it reads LICENSE (the WHO IG repositories,
+  // smart-ips-pilgrimage among them, ship it so; cat-harness-tools#1701).
+  "LICENSE.md": "the repository's licence, in the Markdown spelling GitHub also detects at the root",
   "LICENSE-CONTENT.md": "the separate licence for content",
   NOTICE: "attribution required by the licence",
   "THIRD-PARTY-NOTICES.md": "the dependency attributions",
@@ -287,6 +291,17 @@ export function accountedRootPaths(repoRoot: string): Map<string, string> {
     }
   }
 
+  // THE ROOT INDEX'S CONTENT-TYPE SECTIONS name root paths too
+  // (cat-harness-tools#1701). An IG repository that is its own index declares
+  // `contentTypes.ig.include` in `index.config.json` (fhir-harness's `ig`
+  // type, owner 2026-10-30: "harness declares what it pays attention to in
+  // the repo"), listing `sushi-config.yaml` and `ig.ini` among the paths it
+  // reads. A path a declaration lists is accounted for by that declaration,
+  // exactly as a declared directory is. Read as data, without naming the type:
+  // this layer may not import the FHIR layer, and only a section that LISTS
+  // paths accounts for any.
+  for (const [top, why] of contentTypeIncludes(repoRoot)) if (!out.has(top)) out.set(top, why);
+
   for (const name of instances) {
     const abs = join(repoRoot, name);
     const decl = readDeclaration(abs);
@@ -300,6 +315,36 @@ export function accountedRootPaths(repoRoot: string): Map<string, string> {
         // already marked an instance keeps that, and so does one already
         // claimed by an earlier instance's declaration.
         if (top && !out.has(top)) out.set(top, `declared by ${decl?.name ?? name} as "${dir.id}"`);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Root-level names listed by a `contentTypes.<id>.include` array of the root
+ * `index.config.json`, each with the section that lists it. An absent or
+ * unreadable file, or a section without a string `include`, contributes
+ * nothing — "could not tell" buys no file its place (cat-harness-tools#1701).
+ */
+export function contentTypeIncludes(repoRoot: string): Map<string, string> {
+  const out = new Map<string, string>();
+  let doc: unknown;
+  try {
+    doc = JSON.parse(readFileSync(join(repoRoot, "index.config.json"), "utf8"));
+  } catch {
+    return out;
+  }
+  const sections = (doc as { contentTypes?: unknown } | null)?.contentTypes;
+  if (!sections || typeof sections !== "object") return out;
+  for (const [id, section] of Object.entries(sections as Record<string, unknown>)) {
+    const include = (section as { include?: unknown } | null)?.include;
+    if (!Array.isArray(include)) continue;
+    for (const e of include) {
+      if (typeof e !== "string") continue;
+      const top = e.replace(/^\.\//, "").split("/")[0];
+      if (top && !top.startsWith(".") && !out.has(top)) {
+        out.set(top, `declared by index.config.json contentTypes.${id}.include`);
       }
     }
   }
