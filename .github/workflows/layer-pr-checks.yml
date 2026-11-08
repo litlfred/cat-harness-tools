@@ -167,26 +167,25 @@
 # run's summary, the red ones as not judged and the passing ones as gates to
 # add. No file: every gate is judged (owner, 2026-10-31).
 #
-# Draft PRs (owner, 2026-10-23, "1y"; bean `dft1`): with `draft-fast-tier:
-# true`, a DRAFT pull request runs the fast tier only. prepare-head mounts the
-# PR side and typechecks, without derive:publish or Chromium; prepare-base, the shards and the index's own gates are
-# skipped; and `compare` passes or fails on the typecheck alone, saying "draft:
-# full tier skipped" in its summary. The full tier runs when the PR is not a
-# draft. The input is off by default. A caller turns it on only together with
-# `ready_for_review` in its `pull_request` types:
+# Release-gated CI (owner, card Q-CIB-4 A, 2026-11-08: "CI not gate on
+# non-release merge to main"; cat-harness#1158). Every pull request that does
+# not carry the `release` label runs the FAST TIER only, draft or ready:
+# prepare-head mounts the PR side and typechecks, without derive:publish or
+# Chromium; prepare-base, the shards and the index's own gates are skipped;
+# and `compare` passes or fails on the typecheck alone. Its verdict is
+# reported as "Fast tier only (advisory; the full checks gate a release)",
+# never as "No new failures (tests and gates)", and merge-guard's check 5
+# treats CI on a non-release merge as advisory.
 #
-#   on: { pull_request: { types: [opened, synchronize, reopened, ready_for_review] }, ... }
-#   jobs: { checks: { uses: ...layer-pr-checks.yml@main, with: { draft-fast-tier: true } } }
+# A PR labelled `release` runs the full tier, as every ready PR did before.
+# Add the label before the push (or re-run): the callers' `pull_request`
+# types do not include `labeled`.
 #
-# Without that trigger, nothing runs when a draft is marked ready, so the
-# draft run's green check would stand on the head. merge-guard's check 5
-# reads that run, and it would pass a PR that never ran its tests and gates.
-#
-# A draft's verdict is reported as "Draft fast tier only (not the full
-# checks)", never as "No new failures (tests and gates)". So a head that was
-# a draft has no green "No new failures" until the full tier has run on it,
-# and a merge made seconds after `ready_for_review` cannot read the draft's
-# green as the full verdict.
+# Main's full suite runs on main's INTEGRATION run: a push to main, at most
+# once per `integration-minutes` window (prepare-base). This replaces the
+# 2026-10-23 "1y" draft rule (bean `dft1`); `draft-fast-tier` is kept as an
+# input so callers that pass it still parse, and it no longer changes
+# anything.
 #
 # Everything every caller would otherwise repeat is decided here: the instance
 # is the calling repository's name, the folio-assistant ref is `index-ref`'s
@@ -274,10 +273,15 @@ on:
         type: number
         default: 24
       draft-fast-tier:
-        description: "On a draft PR, run only the fast tier: prepare the PR side and typecheck. Turn it on only when the caller's pull_request types include ready_for_review, so the full tier runs when the PR is marked ready."
+        description: "Kept so callers that pass it still parse. Since release-gated CI (owner, card Q-CIB-4 A, 2026-11-08) every non-release PR runs the fast tier, draft or not, and this input changes nothing."
         required: false
         type: boolean
         default: false
+      integration-minutes:
+        description: "Release-gated CI (owner, card Q-CIB-4 A, 2026-11-08): a push to main runs the full suite (main's integration run) at most once per window of this many minutes. The first push in a window runs it; the rest of that window's pushes run nothing, and the next window's first push judges them. 0 runs it on every push."
+        required: false
+        type: number
+        default: 60
       writer-record-hours:
         description: "How often, at most, a push to main re-records EVERY page-build writer under strace (bean fwtz). Every other push records incrementally (cat-harness-tools#1702): it restores the newest records, skips each writer whose recorded reads still match and keeps its record, and traces only the writers whose inputs moved. The full record takes 70-120 minutes; it bounds how long a carried record lives. 0 records fully on every push."
         required: false
@@ -553,7 +557,7 @@ jobs:
       - &judged-key
         name: What this run judges (for a later ready-for-review)
         id: judged-key
-        if: github.event_name == 'pull_request' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: github.event_name == 'pull_request' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release'))
         continue-on-error: true  # no record means no later reuse, never a red run
         env:
           GH_TOKEN: ${{ github.token }}
@@ -846,9 +850,9 @@ jobs:
         run: bun install
       - &chromium
         name: Install Chromium, for the checks that draw through a browser
-        # Not on a draft under `draft-fast-tier`: only derive:publish and the
+        # Not on the fast tier (a non-release PR): only derive:publish and the
         # gates draw, and a draft runs neither (owner, 2026-10-23, "1y").
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
         # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
         # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
         # the same reason). The index's OWN Playwright installs it, so the
@@ -930,7 +934,7 @@ jobs:
         # layer it wrote into read "modified" (smart-ips-pilgrimage run
         # 42455839636, 8 of 9). Judged here, on the tree the lock produced;
         # the shards take this answer (run-gates.py `--as-mounted-record`).
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
         working-directory: fa
         env:
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
@@ -941,9 +945,9 @@ jobs:
         # After the state mount and the IG pages, before derive:publish, which
         # is the order the index's own TypeScript job runs them in. Never
         # fatal: recorded, and judged by the compare job against main.
-        # Part of the full tier: skipped on a draft under `draft-fast-tier`,
+        # Part of the full tier: skipped on the fast tier (a non-release PR),
         # with the shard hand-off steps below.
-        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
         working-directory: fa
         run: |
           python3 ../ci/.github/scripts/layer-pr-checks/run-root-gates.py . \
@@ -955,7 +959,7 @@ jobs:
         # keyed by each writer's inputs and script closure (#409), so a stale
         # entry is a key defect, which the derive log's "reused" lines show.
         # Saved per side and run; restored from the newest of this repository.
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/derive-cache
@@ -978,7 +982,7 @@ jobs:
       # Not found: the Actions cache below, as before.
       - &writer-ref
         name: Fetch the published writer records (refs/cat/writer-records)
-        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
         env:
           REPO_DIR: ${{ inputs.mode == 'layer' && 'src' || 'fa' }}
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -996,7 +1000,7 @@ jobs:
           echo "writer records: no published ref for $BASE or main; the Actions cache is tried"
       - &writer-cone
         name: Restore main's derive:publish writer records (bean fwtz)
-        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true' && hashFiles('fa/build/writer-cone/records.json') == ''
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true' && hashFiles('fa/build/writer-cone/records.json') == ''
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/writer-cone
@@ -1010,10 +1014,10 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq strace && strace -V | head -1
       - &derive
         name: Build the publish-time pages (derive:publish), on this side
-        # Not on a draft under `draft-fast-tier` (owner, 2026-10-23, "1y"):
+        # Not on the fast tier (a non-release PR) (owner, 2026-10-23, "1y"):
         # only the tests and gates read these pages, and a draft runs neither.
         # The typecheck does not read them. A ready_for_review run builds them.
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
         # B1 (owner, 2026-10-14; cat-harness#194, cb280cd): the pages an
         # instance declares `builtAtPublish` are no longer committed, and
         # `bun run cat derive:publish` builds them over the mounts, as
@@ -1235,7 +1239,7 @@ jobs:
           exit 0
       - &timings-restore
         name: The gate seconds the last run of this repository recorded
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/timings
@@ -1244,7 +1248,7 @@ jobs:
             layer-pr-checks-timings-v1-${{ github.repository }}-
       - &snapshot-save
         name: Hand this side's prepared root to its shards
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prepared"
@@ -1258,7 +1262,7 @@ jobs:
           ls -la "$RUNNER_TEMP/prepared"
       - &upload-prepared
         name: Upload this side's prepared root
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: prepared-${{ env.SIDE }}
@@ -1333,11 +1337,11 @@ jobs:
 
   prepare-base:
     name: Prepare the main side, unless main's answer is cached
-    # Not on a draft under `draft-fast-tier`: it has no full tier to compare
+    # Not on the fast tier (a non-release PR): it has no full tier to compare
     # against. `run` then skips too, because it needs this job to succeed.
     # Nor when `ready-reuse` found this PR already judged on these inputs.
     needs: [ready-reuse]
-    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) }}
+    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -1581,11 +1585,33 @@ jobs:
             echo "no answer for this PR's base commit is kept: main's side is computed by this run"
           fi
           { echo "hit=$hit"; echo "key=$key"; echo "tier=$tier"; } >> "$GITHUB_OUTPUT"
+      # Main's integration run is batched (release-gated CI, owner, card
+      # Q-CIB-4 A, 2026-11-08): the first push in each window of
+      # `integration-minutes` runs the full suite and stamps the window; the
+      # window's later pushes find the stamp and run nothing. The next
+      # window's first push judges every merge since. A started run is never
+      # cancelled (Q-CIS-1): a batched push simply does not start the work.
+      - name: Is main's integration run due in this window? (a push)
+        id: integ-bucket
+        if: github.event_name == 'push' && inputs.integration-minutes > 0
+        env:
+          MINUTES: ${{ inputs.integration-minutes }}
+        run: echo "bucket=$(( $(date -u +%s) / (60 * MINUTES) ))" >> "$GITHUB_OUTPUT"
+      - name: Has this window's integration run started?
+        id: integ-lookup
+        if: steps.integ-bucket.outcome == 'success'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/integration-stamp
+          key: integration-stamp-v1-${{ github.repository }}-${{ steps.integ-bucket.outputs.bucket }}
+          lookup-only: true
       # A PR needs only main's answer. A push is run for the records, so it
-      # stops early only when it would make neither (both already kept).
+      # stops early only when it would make neither (both already kept), or
+      # when this window's integration run already started.
       - name: Is there anything to prepare?
         id: skip-prep
         env:
+          BATCHED: ${{ steps.integ-lookup.outputs.cache-hit == 'true' }}
           PUSH: ${{ github.event_name == 'push' }}
           PINS_ONLY: ${{ steps.lock-only.outputs.skip == 'true' }}
           QUICK: ${{ steps.quick.outputs.quick == 'true' }}
@@ -1594,10 +1620,22 @@ jobs:
         run: |
           hit=false
           if [ "$PINS_ONLY" = "true" ] || [ "$QUICK" = "true" ]; then hit=true
+          elif [ "$PUSH" = "true" ] && [ "$BATCHED" = "true" ]; then
+            hit=true
+            echo "main's integration run already started in this window: this push runs nothing, and the next window's first push judges it" | tee -a "$GITHUB_STEP_SUMMARY"
           elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
           elif [ "$BASE_HIT" = "true" ]; then hit=true
           fi
           echo "hit=$hit" >> "$GITHUB_OUTPUT"
+      - name: Stamp this window's integration run
+        if: steps.integ-bucket.outcome == 'success' && steps.integ-lookup.outputs.cache-hit != 'true' && steps.skip-prep.outputs.hit != 'true'
+        run: mkdir -p "$RUNNER_TEMP/integration-stamp" && echo "$GITHUB_SHA $GITHUB_RUN_ID" > "$RUNNER_TEMP/integration-stamp/stamp"
+      - name: Save the stamp
+        if: steps.integ-bucket.outcome == 'success' && steps.integ-lookup.outputs.cache-hit != 'true' && steps.skip-prep.outputs.hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/integration-stamp
+          key: integration-stamp-v1-${{ github.repository }}-${{ steps.integ-bucket.outputs.bucket }}
       - *mount-cache
       - *mount
       - *mark
@@ -1946,11 +1984,11 @@ jobs:
   # PR side. It joins main's shards, keeps main's answer, the gate seconds and
   # the cone's records for the PRs, and is red only when that join fails.
   compare:
-    # A draft under `draft-fast-tier` reports under its own name, never as
+    # The fast tier (a non-release PR) reports under its own name, never as
     # "No new failures": that green was read as the full verdict when a draft
     # was marked ready and merged before the full run reported
     # (https://github.com/litlfred/fhir-harness/pull/167 and #169, 2026-10-24).
-    name: ${{ (inputs.draft-fast-tier && github.event.pull_request.draft == true) && 'Draft fast tier only (not the full checks)' || 'No new failures (tests and gates)' }}
+    name: ${{ (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && 'Fast tier only (advisory; the full checks gate a release)' || 'No new failures (tests and gates)' }}
     needs: [ready-reuse, prepare-head, prepare-base, run]
     if: ${{ !cancelled() && github.event.action != 'closed' }}
     runs-on: ubuntu-latest
@@ -1964,7 +2002,7 @@ jobs:
           SKIP: ${{ needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip == 'true' }}
           PUSH: ${{ github.event_name == 'push' }}
           PREPARED: ${{ needs.prepare-base.outputs.prepared }}
-          DRAFT: ${{ inputs.draft-fast-tier && github.event.pull_request.draft == true }}
+          DRAFT: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release') }}
           QUICK: ${{ needs.prepare-head.outputs.quick == 'true' }}
           REUSED: ${{ needs.ready-reuse.result == 'success' && needs.ready-reuse.outputs.reuse == 'true' }}
           REUSED_RUN: ${{ needs.ready-reuse.outputs.run-url }}
@@ -1992,7 +2030,7 @@ jobs:
             echo "only=true" >> "$GITHUB_OUTPUT"
             echo "quick=true" >> "$GITHUB_OUTPUT"
           elif [ "$DRAFT" = "true" ]; then
-            msg="draft: full tier skipped. This draft PR was prepared and typechecked only; the tests, the gates and the comparison with main run when it is marked ready for review."
+            msg="fast tier: this PR was prepared and typechecked only. Release-gated CI (owner, card Q-CIB-4 A, 2026-11-08): a non-release PR runs the fast tier, and the tests, the gates and the comparison with main run on main's integration run and on a PR labelled \`release\`."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             echo "only=true" >> "$GITHUB_OUTPUT"
             echo "draft=true" >> "$GITHUB_OUTPUT"
@@ -2276,7 +2314,7 @@ jobs:
           [ "$PREPARED" = "success" ] || { echo "::error::quick lane: the PR side could not be prepared ($PREPARED)"; exit 1; }
           [ "$TESTS" = "success" ] || { echo "::error::quick lane: tests ${TESTS:-not run}"; exit 1; }
           [ "$TYPECHECK" != "failure" ] || { echo "::error::quick lane: typecheck failed"; exit 1; }
-      # A draft under `draft-fast-tier`: the fast tier is judged here. A PR
+      # The fast tier (a non-release PR) is judged here. A PR
       # side that could not be prepared is red, never a pass. So is a failed
       # typecheck.
       - name: Draft verdict (fast tier)
@@ -2288,11 +2326,11 @@ jobs:
           echo "prepare-head: $PREPARED, typecheck: ${TYPECHECK:-not run}"
           echo "fast tier: prepare-head $PREPARED, typecheck ${TYPECHECK:-not run}" >> "$GITHUB_STEP_SUMMARY"
           if [ "$PREPARED" != "success" ]; then
-            echo "::error::draft: the PR side could not be prepared ($PREPARED)"
+            echo "::error::fast tier: the PR side could not be prepared ($PREPARED)"
             exit 1
           fi
           if [ "$TYPECHECK" = "failure" ]; then
-            echo "::error::draft: typecheck failed (full tier skipped)"
+            echo "::error::fast tier: typecheck failed"
             exit 1
           fi
 
