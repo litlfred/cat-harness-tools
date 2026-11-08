@@ -122,6 +122,7 @@ import {
   carryRecord,
   decideWriter,
   entryShaOf,
+  outputsDiffer,
   churnReport,
   renderChurn,
   WRITER_CHURN_FILE,
@@ -670,7 +671,9 @@ if (import.meta.main) {
       const fresh = decideDigests;
       fresh.tree = undefined;
       const d = decideWriter(prevRecords, w, writerBase(REPO_ROOT, recScripts, w, fresh), REPO_ROOT, fresh);
-      if (d.skip && hasEntry(outDir, w, d.sha) && restoreOutputs(outDir, w, d.sha, REPO_ROOT, keep)) {
+      const putBack = d.skip && hasEntry(outDir, w, d.sha) && restoreOutputs(outDir, w, d.sha, REPO_ROOT, keep);
+      const differ = putBack ? outputsDiffer(REPO_ROOT, prevRecords.writers[w]!) : [];
+      if (putBack && differ.length === 0) {
         reused.set(w, d.sha);
         if (incremental && carryRecord(records, prevRecords, w)) {
           const rw = prevRecords.writers[w]!.rewritten;
@@ -680,7 +683,7 @@ if (import.meta.main) {
         churn.push({ writer: w, did: "skipped", why: d.why, seconds: (performance.now() - t0) / 1000 });
         return { kind: "ran" };
       }
-      ranWhy = d.skip ? "its recorded outputs are not here" : d.why;
+      ranWhy = !d.skip ? d.why : differ.length > 0 ? `its put-back outputs do not match its record (${differ.slice(0, 3).join(", ")}${differ.length > 3 ? ", …" : ""})` : "its recorded outputs are not here";
       if (!d.skip) cause = d.cause;
       console.log(`  ${w} runs: ${ranWhy} [decided in ${secs()}]`);
     }

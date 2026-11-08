@@ -91,6 +91,16 @@ export interface WriterRecords {
   kept?: Record<string, string>;
 }
 
+/**
+ * The recorded outputs that do not hash, as the checkout now holds them, to
+ * what the record says (cat-harness-tools#1702): asked right after a skip put
+ * them back, so an entry damaged or swapped in the published ref is a rerun,
+ * never stale pages.
+ */
+export function outputsDiffer(root: string, rec: WriterRecord, digests: FileDigests = new FileDigests(root)): string[] {
+  return Object.entries(rec.outputs).filter(([p, state]) => pathState(root, p, digests) !== state).map(([p]) => p);
+}
+
 /** The commit whose outputs entry holds `writer`'s outputs: its record's, else the commit it was kept at, else the file's. */
 export function entryShaOf(records: WriterRecords, writer: string): string {
   return records.writers[writer]?.sha ?? records.kept?.[writer] ?? records.sha;

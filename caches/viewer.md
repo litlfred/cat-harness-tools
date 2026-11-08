@@ -20,6 +20,7 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 | [lpc-writer-cone](#lpc-writer-cone) | actions-cache | c | `writer-cone-v1-` | script: `writer-cone-v1-${{ github.repository }}-${{ github.sha }} (save) / -${{ github.event.pull_request.base.sha }} (restore)` | undetermined — computed only by writer-cone.ts | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 | [lpc-writer-stamp](#lpc-writer-stamp) | actions-cache | c | `writer-record-stamp-v1-` | per-run: `writer-record-stamp-v1-${repo}-<epoch/(3600*writer-record-hours) or GITHUB_SHA>` | undetermined — run-scoped: no key is implied between runs | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 | [pr-tests-main-answer](#pr-tests-main-answer) | actions-cache | c | `pr-tests-main-v1-` | hand-listed: `pr-tests-main-v1-$judge-$base-$MAINS_KEY-$INDEX ($judge = sha256 of 5 named files)` | undetermined — hand-listed inputs: no derived key to compare (a finding) | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
+| [writer-records-ref](#writer-records-ref) | git-ref | b | `refs/cat/writer-records/<commit> (and the moving refs/cat/writer-records/main), in the repository the records are for` | script: `refs/cat/writer-records/<the commit the records were built at>; a PR asks for its base commit, then main` | undetermined — computed only by scripts/writer-records-ref.ts#refFor | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 
 ### bundle-publish-pages
 
@@ -202,4 +203,17 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 - **Verify:** none: trusted by key
 - **Uses:** `.github/workflows/pr-tests.yml:259`, `.github/workflows/pr-tests.yml:282`, `.github/workflows/pr-tests.yml:628`
 - **Notes:** Saved from main only. The prefix fallback on attempt 1 can serve another main's answer.
+
+### writer-records-ref
+
+**Published page-build writer records (refs/cat/writer-records)** — cat-harness-tools, trust class b, owner cache-first CI (cat-harness-tools#1702).
+
+- **Holds:** build/writer-cone as derive:publish left it: records.json and one outputs entry per recorded writer
+- **Derived inputs:** the commit the records were built at; each writer's record is matched against the PR's reads path by path by writer-cone.ts
+- **Producer:** whoever re-pins (owner 2026-11-08): `bun run cat writer-records:publish --build --main` over the composed root, recording incrementally against the published main ref; refused unless the records are of the commit named and every record's outputs entry is present
+- **Consumers:** layer-pr-checks.yml prepare-head/prepare-base on PRs (the Actions cache lpc-writer-cone is the fallback)
+- **Save policy:** written by its publisher, never by a runner; pruned to the refs of the newest 20 main commits plus main
+- **Verify:** a skip restores a writer's outputs only when they hash to its record (writer-cone.ts outputsDiffer), else the writer runs; main's full build judges every record with writer-cone-verify.ts --gate, the gate publish:writer-records, red on any writer that would have been served stale
+- **Uses:** `scripts/writer-records-ref.ts`, `scripts/writer-cone-verify.ts`, `.github/workflows/layer-pr-checks.yml`
+- **Notes:** A verdict cache: a skip is reported, and re-verified by main's next full build. Replaces the Actions cache as the primary store so cancelled main runs no longer lose records.
 

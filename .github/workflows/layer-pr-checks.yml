@@ -955,9 +955,33 @@ jobs:
       # are traced instead: a push to
       # main records what each writer read and wrote; a PR skips a writer whose
       # every recorded read is unchanged and puts back what it wrote.
+      # Published records first (cat-harness-tools#1702; owner 2026-11-08: a
+      # cache is published by whoever re-pins, and CI only reads and checks
+      # it): `refs/cat/writer-records/<commit>` in the caller's repository,
+      # laid down by `writer-records-ref.ts publish`. The PR's base commit's
+      # ref, else main's. Plain git, so it needs no script at this side's pins.
+      # Not found: the Actions cache below, as before.
+      - &writer-ref
+        name: Fetch the published writer records (refs/cat/writer-records)
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        env:
+          REPO_DIR: ${{ inputs.mode == 'layer' && 'src' || 'fa' }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -uo pipefail
+          for ref in "refs/cat/writer-records/$BASE" refs/cat/writer-records/main; do
+            git -C "$REPO_DIR" fetch --quiet --no-tags origin "+$ref:$ref" 2>/dev/null || continue
+            rm -rf fa/build/writer-cone && mkdir -p fa/build/writer-cone
+            idx="$RUNNER_TEMP/writer-ref.index"
+            if GIT_INDEX_FILE="$idx" git -C "$REPO_DIR" --work-tree "$GITHUB_WORKSPACE/fa/build/writer-cone" checkout "$ref" -- . ; then
+              rm -f "$idx"; echo "writer records: $ref ($(git -C "$REPO_DIR" rev-parse --short=12 "$ref"))"; exit 0
+            fi
+            rm -f "$idx"; rm -rf fa/build/writer-cone
+          done
+          echo "writer records: no published ref for $BASE or main; the Actions cache is tried"
       - &writer-cone
         name: Restore main's derive:publish writer records (bean fwtz)
-        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true' && hashFiles('fa/build/writer-cone/records.json') == ''
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/writer-cone
@@ -1102,6 +1126,43 @@ jobs:
         with:
           path: fa/build/writer-cone
           key: writer-cone-v1-${{ github.repository }}-${{ github.sha }}
+      # The gate on published writer records (cat-harness-tools#1702): a push
+      # to main builds every page in full, so it can judge the records PRs
+      # skip with. `publish:writer-records` is red when a writer whose record
+      # matches would have been put back stale; it is judged with the gates.
+      - &writer-records-cached
+        name: The newest runner-kept writer records, for the gate (a push)
+        if: inputs.writer-skip && github.event_name == 'push' && steps.skip-prep.outputs.hit != 'true' && steps.quick.outputs.quick != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/cached-writer-records
+          key: writer-cone-v1-${{ github.repository }}-none-${{ github.run_id }}
+          restore-keys: writer-cone-v1-${{ github.repository }}-
+      - &writer-records-gate
+        name: Judge the published writer records against this full build (a push)
+        if: inputs.writer-skip && github.event_name == 'push' && steps.skip-prep.outputs.hit != 'true' && steps.quick.outputs.quick != 'true'
+        env:
+          REPO_DIR: ${{ inputs.mode == 'layer' && 'src' || 'fa' }}
+        run: |
+          set -uo pipefail
+          verify=fa/cat-harness-tools/scripts/writer-cone-verify.ts
+          if ! grep -q -- '--gate' "$verify" 2>/dev/null; then
+            echo "writer records gate: not at this side's pins (writer-cone-verify.ts has no --gate)"; exit 0
+          fi
+          pub="$RUNNER_TEMP/published-writer-records"
+          rm -rf "$pub"; mkdir -p "$pub"
+          prev=""
+          if git -C "$REPO_DIR" fetch --quiet --no-tags origin "+refs/cat/writer-records/main:refs/cat/writer-records/main" 2>/dev/null &&
+             git -C "$REPO_DIR" show refs/cat/writer-records/main:records.json > "$pub/records.json" 2>/dev/null; then
+            prev="--prev $pub/records.json"
+          elif [ -f "$RUNNER_TEMP/cached-writer-records/records.json" ]; then
+            # Not published by a re-pinner: the records a runner kept (layer mode), judged the same way.
+            cp "$RUNNER_TEMP/cached-writer-records/records.json" "$pub/records.json"
+            prev="--prev $pub/records.json"
+          fi
+          cd fa
+          # shellcheck disable=SC2086 -- prev is empty or one flag and its value
+          bun cat-harness-tools/scripts/writer-cone-verify.ts $prev --gate "$RUNNER_TEMP/derive-publish.json" --summary "$GITHUB_STEP_SUMMARY" || true
       # The typecheck, once, here: it was its own job, a third machine and
       # a third wait for one `tsc` (cat-harness-tools#397). Its outcome goes
       # to the compare job, which fails on it, so the shards still run.
@@ -1532,10 +1593,13 @@ jobs:
       - *state-mount
       - *root-gates
       - *derive-cache
+      - *writer-ref
       - *writer-cone
       - *strace
       - *derive
       - *writer-cone-save
+      - *writer-records-cached
+      - *writer-records-gate
       - *timings-restore
       - *snapshot-save
       - *upload-prepared
@@ -1549,9 +1613,14 @@ jobs:
     name: Record main's page-build scripts (bean fwtz)
     needs: [prepare-base]
     # Every push (cat-harness-tools#1702): a full record once per
-    # `writer-record-hours` window, an incremental one otherwise.
+    # `writer-record-hours` window, an incremental one otherwise. LAYER mode
+    # only (owner 2026-11-08, hybrid): a layer's PRs take the lower layers at
+    # main, so the writers' code moves with every lower-layer merge and no
+    # re-pin marks it. An index-mode repository changes that code only when
+    # it re-pins, so its re-pinner publishes the records
+    # (`writer-records-ref.ts publish`) and no runner records them.
     if: >-
-      !cancelled() && inputs.writer-skip && github.event_name == 'push' &&
+      !cancelled() && inputs.writer-skip && inputs.mode == 'layer' && github.event_name == 'push' &&
       needs.prepare-base.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 120
