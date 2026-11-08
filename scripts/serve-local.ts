@@ -35,7 +35,7 @@
  * @module scripts/serve-local
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -110,6 +110,20 @@ export function listStaging(dir: string): string[] {
     .split("\n")
     .map((s) => s.replace(lead, "").trim())
     .filter((s) => s.length > 0))];
+}
+
+/**
+ * Where to start reading a served directory that has no `index.html` of its
+ * own: the subdirectories one level down that do, sorted. A `--site` of a
+ * checkout serves the repository folder, so a layer whose pages sit in
+ * `site/` or `docs/` would otherwise print only a root that lists nothing.
+ */
+export function pagesBelow(dir: string): string[] {
+  if (!existsSync(dir) || existsSync(join(dir, "index.html"))) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !d.name.startsWith(".") && d.name !== "node_modules" && existsSync(join(dir, d.name, "index.html")))
+    .map((d) => d.name)
+    .sort();
 }
 
 /** Split `a,b , c` into repo names, refusing anything that is not one segment. */
@@ -204,7 +218,10 @@ if (import.meta.main) {
     throw e;
   }
   const base = `http://127.0.0.1:${server.port}`;
-  for (const m of mounts) console.log(`serving ${resolve(m.dir)} at ${base}${m.prefix}/`);
+  for (const m of mounts) {
+    console.log(`serving ${resolve(m.dir)} at ${base}${m.prefix}/`);
+    for (const sub of pagesBelow(m.dir)) console.log(`  pages: ${base}${m.prefix}/${sub}/`);
+  }
   if (!rewrite) console.log("IRIs: not rewritten (--no-rewrite)");
   else if (iriBases.length === 0) console.log("IRIs: not rewritten (no --iri-origin and no declared canonicalUrl)");
   else for (const b of iriBases) console.log(`IRIs: ${b.from}/… → ${base}${b.prefix}/…`);
