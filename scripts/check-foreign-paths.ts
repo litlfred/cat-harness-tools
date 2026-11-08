@@ -55,6 +55,7 @@ import {
   pathContextRanges,
   stripComments,
 } from "./check-declared-paths.js";
+import { mountedInstances } from "./lib/layer-output.ts";
 import { TOOLS_ROOT } from "./lib/roots.ts";
 import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 
@@ -240,6 +241,43 @@ export function scanForeignPaths(repo: string): ForeignScan {
   return out;
 }
 
+/**
+ * Sites that are not THIS checkout's to judge, split off the count
+ * (cat-harness-tools#1701).
+ *
+ * In a content instance's joined checkout (smart-ips-pilgrimage) the ROOT
+ * declares `docs/`, `translations/`, `fhir-artifact-index/`, and every literal
+ * in a MOUNTED layer's code that spells one of those names (bootstrap-tools,
+ * cat-harness-tools, fhir-harness — 39 sites) was counted against that layer's
+ * baseline, which is kept in the platform index where the root declares
+ * nothing. The root does not own that code and cannot change it.
+ *
+ * A site is excused only when all three hold: the checkout root declares an
+ * instance of its own, the site's target is that ROOT instance's directory,
+ * and the file sits inside a layer `index.lock.json` mounts. The root's own
+ * files, and a mounted layer spelling another mounted layer's directory, are
+ * judged exactly as before; in the index (root declares nothing) nothing is
+ * excused.
+ */
+export function notThisCheckouts(
+  scan: ForeignScan,
+  all: readonly InstanceDirs[],
+  mountedPaths: readonly string[],
+): { scan: ForeignScan; excused: Array<ForeignSite & { layer: string }> } {
+  const rootInst = all.find((i) => i.root === "" && i.name !== ".");
+  if (rootInst === undefined) return { scan, excused: [] };
+  const mounts = mountedPaths.map((p) => p.replace(/\\/g, "/").replace(/\/+$/, "")).filter((p) => p !== "" && p !== ".");
+  const layerOf = (file: string) => mounts.find((m) => file.startsWith(`${m}/`));
+  const counted: ForeignSite[] = [];
+  const excused: Array<ForeignSite & { layer: string }> = [];
+  for (const s of scan.counted) {
+    const layer = s.owner === rootInst.name ? layerOf(s.file) : undefined;
+    if (layer !== undefined) excused.push({ ...s, layer });
+    else counted.push(s);
+  }
+  return { scan: { counted, marked: scan.marked }, excused };
+}
+
 export function countsOf(scan: ForeignScan): Record<string, number> {
   const out: Record<string, number> = {};
   for (const s of scan.counted) out[s.file] = (out[s.file] ?? 0) + 1;
@@ -272,7 +310,11 @@ const COMMENT =
 
 if (import.meta.main) {
   const repo = repoRootFor(resolve(import.meta.dir, ".."));
-  const scan = scanForeignPaths(repo);
+  const { scan, excused } = notThisCheckouts(
+    scanForeignPaths(repo),
+    instanceDirsIn(repo),
+    [...mountedInstances(repo).values()],
+  );
   const current = countsOf(scan);
   if (process.argv.includes("--update")) {
     writeFileSync(BASELINE_PATH, JSON.stringify({ _comment: COMMENT, files: current }, null, 2) + "\n");
@@ -288,6 +330,13 @@ if (import.meta.main) {
   console.log(
     `Foreign paths — ${total} literal(s) in ${Object.keys(current).length} file(s) spell another instance's declared directory; ${scan.marked.length} marked.`,
   );
+  if (excused.length > 0) {
+    const layers = [...new Set(excused.map((e) => e.layer))].sort();
+    console.log(
+      `  · ${excused.length} literal(s) in mounted layer(s) ${layers.join(", ")} not applicable here — they spell ` +
+        `${excused[0]!.owner}'s own directories, and that code's ratchet is kept in the platform index (cat-harness-tools#1701)`,
+    );
+  }
   for (const o of j.over) {
     console.log(`  ✗ ${o.file}: ${o.was} → ${o.now}`);
     for (const s of scan.counted.filter((x) => x.file === o.file))
