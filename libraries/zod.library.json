@@ -62,6 +62,7 @@
     "schemas/kg/discovered-vocabulary.ts",
     "schemas/kg/external-schema.ts",
     "schemas/kg/fsh-guts.ts",
+    "schemas/kg/glossary-sense.ts",
     "schemas/kg/graph-typology-node.ts",
     "schemas/kg/harness-config.ts",
     "schemas/kg/id-lookup.ts",

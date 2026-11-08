@@ -254,6 +254,9 @@ describe("derived data class diagrams (D5)", () => {
       cardinality: "1..1",
     });
 
+    // Product Master Data is composed of its four parts.
+    expect(dm.relationships.filter((r) => r.source === "id-pmd" && r.type === "Composition").map((r) => r.target).sort()).toEqual(["id-gp", "id-pc", "id-rti", "id-ti"]);
+
     const pmd = dm.classes.find((c) => c.id === "id-pmd")!;
     expect(pmd.accessedBy.map((a) => [a.name, a.kind, a.label])).toEqual([
       ["National Product Catalogue", "readwrite", undefined],
@@ -421,19 +424,29 @@ describe("integration with archimate-pages and archimate-diagrams", () => {
       expect(mmPage.content).toContain("<h2>Data class diagram</h2>");
       expect(mmPage.content).toContain("<h2>Sequence diagrams</h2>");
 
-      // Every link on every page resolves to a written file or page directory in site mode.
-      const at = (f: Written) => sitePathOf(site, f);
-      const written = new Set(site.files.map(at));
-      const resolves = (from: string, ref: string) => {
-        const target = posix.normalize(posix.join(posix.dirname(from), ref));
-        return written.has(target) || written.has(posix.join(target, "index.html"));
+      // Every link on every page resolves to a written file or page directory, in a site and in the graph.
+      const linksResolve = (run: ReturnType<typeof pagesFor>) => {
+        const at = (f: Written) => sitePathOf(run, f);
+        const written = new Set(run.files.map(at));
+        const resolves = (from: string, ref: string) => {
+          const target = posix.normalize(posix.join(posix.dirname(from), ref));
+          return written.has(target) || written.has(posix.join(target, "index.html"));
+        };
+        let checked = 0;
+        for (const f of run.files.filter((x) => x.page)) {
+          const refs = [...f.content.matchAll(/(?:href|src|data)="([^"#:]+)"/g)].map((m) => m[1]!);
+          const cfg = f.path !== "index.html" ? thinPageConfigOf(f.content, PAGE_CONFIG_ID)! : {};
+          for (const k of ["node", "model", "svg", "metamodel"]) if (typeof cfg[k] === "string") refs.push(cfg[k] as string);
+          for (const r of refs) expect({ from: at(f), ref: r, ok: resolves(at(f), r) }).toEqual({ from: at(f), ref: r, ok: true });
+          checked += refs.length;
+        }
+        return checked;
       };
-      for (const f of site.files.filter((x) => x.page)) {
-        const refs = [...f.content.matchAll(/(?:href|src|data)="([^"#:]+)"/g)].map((m) => m[1]!);
-        const cfg = f.path !== "index.html" ? thinPageConfigOf(f.content, PAGE_CONFIG_ID)! : {};
-        for (const k of ["node", "model", "svg", "metamodel"]) if (typeof cfg[k] === "string") refs.push(cfg[k] as string);
-        for (const r of refs) expect({ from: at(f), ref: r, ok: resolves(at(f), r) }).toEqual({ from: at(f), ref: r, ok: true });
-      }
+      expect(linksResolve(site)).toBeGreaterThan(0);
+      const inGraph = pagesFor(root, { drawDot: () => "<svg xmlns='http://www.w3.org/2000/svg'/>" });
+      expect(inGraph.pageRoot).toBe(inGraph.graphPath);
+      expect(inGraph.files.find((f) => f.path === "1.0.0/metamodel/index.html")!.content).toContain("<h2>Data class diagram</h2>");
+      expect(linksResolve(inGraph)).toBeGreaterThan(0);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

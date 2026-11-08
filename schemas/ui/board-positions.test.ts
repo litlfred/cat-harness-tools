@@ -190,9 +190,10 @@ describe("orphans are reported, never removed", () => {
   });
 
   test("the document is not mutated by asking", () => {
-    const before = renderPositions(doc());
-    orphanPositions(doc(), new Set());
-    expect(renderPositions(doc())).toBe(before);
+    const asked = doc();
+    const before = renderPositions(asked);
+    expect(orphanPositions(asked, new Set())).toHaveLength(2);
+    expect(renderPositions(asked)).toBe(before);
   });
 });
 
@@ -232,6 +233,7 @@ describe("the document declares what it is", () => {
 
   test("an empty document is VALID — a folio with no board yet", () => {
     expect(Object.keys(emptyPositions().boards)).toEqual([]);
+    expect(BoardPositionsSchema.safeParse(emptyPositions()).success).toBe(true);
   });
 
   test("a non-finite coordinate is refused", () => {
@@ -285,7 +287,11 @@ describe("moveBy — a move edits the LAYER and reaches no note", () => {
   test("it returns a NEW document and leaves the old one alone", () => {
     const before = placed();
     const snapshot = renderPositions(before);
-    moveBy(before, "b", "n1", 100, 100);
+    const after = moveBy(before, "b", "n1", 100, 100)!;
+    expect(after).not.toBe(before);
+    expect(after.boards).not.toBe(before.boards);
+    expect(after.boards.b).not.toBe(before.boards.b);
+    expect(positionOf(after, "b", "n1")).toEqual({ x: 110, y: 120 });
     expect(renderPositions(before)).toBe(snapshot);
   });
 

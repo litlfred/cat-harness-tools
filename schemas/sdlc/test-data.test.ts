@@ -171,6 +171,13 @@ describe("fixed vs generated discrimination from file content, never from path (
     expect(
       GeneratedTestDataSetSchema.safeParse({
         ...sampleGeneratedRecipe(),
+        cases: [{ id: "c1", payload: {} }],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      GeneratedTestDataSetSchema.safeParse({
+        ...sampleGeneratedRecipe(),
         path: "test/data/materialised.json",
       }).success,
     ).toBe(false);

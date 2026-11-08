@@ -30,17 +30,18 @@ describe("the real corpus is deduplicated, and stays that way", () => {
     { path: "who-iris/library/9789240010567-eng", was: 17, now: 11 },
   ];
 
-  for (const e of entries) {
-    test(`${e.path.split("/").pop()} holds ${e.now} distinct images, not ${e.was} placements`, () => {
+  test.each(entries.map((e): [string, number, number, string] => [e.path.split("/").pop()!, e.now, e.was, e.path]))(
+    "%s holds %i distinct images, not %i placements",
+    (_entry, now, was, path) => {
       const s = ImagesSidecarSchema.parse(
-        JSON.parse(readFileSync(join(REPO, e.path, "images.json"), "utf8")),
+        JSON.parse(readFileSync(join(REPO, path, "images.json"), "utf8")),
       );
       expect(s.images).not.toBeNull();
-      expect(s.images!.length).toBe(e.now);
+      expect(s.images!.length).toBe(now);
       const placements = s.images!.reduce((n, i) => n + (i.placements?.length ?? 1), 0);
-      expect(placements, "every placement is still recorded").toBe(e.was);
-    });
-  }
+      expect(placements, "every placement is still recorded").toBe(was);
+    },
+  );
 
   test("no two entries in one sidecar name the same file", () => {
     // What duplication looked like from inside: distinct ids, one image. This

@@ -460,6 +460,9 @@ export type PotEntryKind =
   | "manifest-caption"
   | "manifest-narrative"
   | "ui-string"
+  // A text field of a JSON node, named by its path in `msgctxt`
+  // (`pot-for-user-scenarios.ts`: a user scenario's titles and narrative).
+  | "json-field"
   // A glossary term's label, alternative label or definition
   // (the content core's glossary producer). Declared 2026-09-30: that
   // producer predates `kind` and never decided, which compiled only because its

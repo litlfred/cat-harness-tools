@@ -5,7 +5,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { isPublished, publishedPath } from "./url-space.ts";
+import { isPublished, publishedPath, type PublishedLocation } from "./url-space.ts";
 import { visualiserRoute } from "./visualiser-route.ts";
 
 describe("publishedPath: the three cases", () => {
@@ -31,6 +31,14 @@ describe("publishedPath: the three cases", () => {
       "/en/cat-harness/todos/",
     );
     expect(() => publishedPath({ case: "viewer", locale: "", owner: "a", graph: "b" })).toThrow(/not a path segment/);
+    // The root and an instance as itself take no locale: the type refuses one
+    // (checked by tsc), and one smuggled past it never reaches the path.
+    // @ts-expect-error — `locale` is not a field of the root case
+    const root: PublishedLocation = { case: "root", locale: "en" };
+    // @ts-expect-error — `locale` is not a field of the instance case
+    const instance: PublishedLocation = { case: "instance", instance: "bootstrap", path: "bootstrap.jsonld", locale: "en" };
+    expect(publishedPath(root)).toBe("/");
+    expect(publishedPath(instance)).toBe("/bootstrap/bootstrap.jsonld");
   });
 
   test("with a locale, the viewer case is visualiserRoute's route: two resolvers, one answer", () => {
@@ -58,6 +66,11 @@ describe("publishedPath: the three cases", () => {
     expect(publishedPath({ case: "instance", instance: "bootstrap", path: "bootstrap.jsonld" }, base.slice(0, -1))).toBe(
       "https://litlfred.github.io/folio-assistant/bootstrap/bootstrap.jsonld",
     );
+    for (const b of [base, base.slice(0, -1)]) {
+      expect(publishedPath({ case: "viewer", locale: "en", owner: "cat-harness", graph: "todos", path: "index.html" }, b)).toBe(
+        "https://litlfred.github.io/folio-assistant/en/cat-harness/todos/index.html",
+      );
+    }
   });
 
   test("a segment or path that steps outside is refused, not normalised", () => {

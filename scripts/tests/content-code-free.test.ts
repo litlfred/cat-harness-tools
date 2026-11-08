@@ -3,7 +3,10 @@
  * the list does not allow is red; a listed file that is gone is not.
  */
 import { describe, expect, test } from "bun:test";
-import { isCode, judge, readBaseline } from "../check-content-code-free.ts";
+import { codeFiles, isBuiltAtPublish, isCode, judge, readBaseline } from "../check-content-code-free.ts";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 describe("check:content-code-free", () => {
   test("code is decided by extension", () => {
@@ -26,6 +29,25 @@ describe("check:content-code-free", () => {
     expect(isCode("docs/en/cat-harness/openapi/smart-trust/openapi.js")).toBe(true);
     expect(isCode("docs/source/x/assets/a.js")).toBe(true);
     expect(isCode("docs/en/x/assets/a.ts")).toBe(true);
+  });
+
+  test("a path the harness declares builtAtPublish is never tracked, so its code is not content's", () => {
+    const built = ["docs/en/cat-harness/processes/", "docs/assets/processes/index.json"]; // declared-path-literal: a test fixture written into a temp root; it matches this repo's built file only where render:bpmn already ran
+    expect(isBuiltAtPublish("docs/en/cat-harness/processes/task-panel.js", built)).toBe(true); // declared-path-literal: a test fixture written into a temp root; it matches this repo's built file only where render:bpmn already ran
+    expect(isBuiltAtPublish("docs/en/cat-harness/processes-x/a.js", built)).toBe(false);
+    expect(isBuiltAtPublish("schemas/x.ts", built)).toBe(false);
+    // A walked corpus (no git index, as in a mount): the declaration decides.
+    const root = mkdtempSync(join(tmpdir(), "code-free-"));
+    try {
+      mkdirSync(join(root, "docs/en/cat-harness/processes"), { recursive: true });
+      writeFileSync(join(root, "docs/en/cat-harness/processes/task-panel.js"), "x"); // declared-path-literal: a test fixture written into a temp root; it matches this repo's built file only where render:bpmn already ran
+      mkdirSync(join(root, "schemas"), { recursive: true });
+      writeFileSync(join(root, "schemas/x.ts"), "x");
+      expect(codeFiles(root, [])).toEqual(["docs/en/cat-harness/processes/task-panel.js", "schemas/x.ts"]); // declared-path-literal: a test fixture written into a temp root; it matches this repo's built file only where render:bpmn already ran
+      expect(codeFiles(root, built)).toEqual(["schemas/x.ts"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("the folio file-list renderer and the Jekyll plugins are kept by rule", () => {

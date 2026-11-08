@@ -56,9 +56,18 @@ describe("composition, in whatever checkout this runs", () => {
   });
 
   test("a module's rule replaces a built-in rule with the same id, so no rule runs twice", () => {
-    const ids = allConstraintRules().map((r) => r.id);
+    const all = allConstraintRules();
+    const ids = all.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const r of CONSTRAINT_RULES) expect(ids).toContain(r.id);
+    // Which one wins: for an id a module contributes, the rule that runs is the
+    // module's own object; for any other id, the built-in's.
+    const contributed = new Map(vocabularies().flatMap((v) => v.constraintRules.map((r) => [r.id, r] as const)));
+    const builtIn = new Map(CONSTRAINT_RULES.map((r) => [r.id, r] as const));
+    for (const r of all) {
+      expect(r).toBe(contributed.get(r.id) ?? builtIn.get(r.id)!);
+    }
+    for (const r of contributed.values()) expect(all).toContain(r);
   });
 
   test("every module's constraint context contributor is composed, and only those", () => {

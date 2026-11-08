@@ -33,6 +33,13 @@ import { instanceDirectoriesForGraph, readDeclaration } from "../schemas/kg/cat-
 import { visualiserRoute } from "../schemas/kg/visualiser-route.ts";
 import { checkoutInstanceRoots, declaredVisualisers, pageParts } from "./viewer-declarations.ts";
 
+/**
+ * The subject kind of the record `translation:glossary` writes. A record of
+ * this kind is drawn as a "Glossary consistency" section, one sub-section per
+ * locale (one family each), rather than as a generic table.
+ */
+export const GLOSSARY_SUBJECT_KIND = "glossary-consistency";
+
 /** One family of a `qa-results/v1` record. */
 export interface QaFamily {
   summary?: string;
@@ -193,6 +200,10 @@ export function kgQaMarkdown(report: KgQaReport, o: { assets: string; up?: strin
         continue;
       }
       const rec = r.record!;
+      if (rec.subject?.kind === GLOSSARY_SUBJECT_KIND) {
+        lines.push(...glossaryConsistencyMarkdown(rec, { href: `${up}${recordHref(o.assets, i.instance, r.file)}`, level: (o.level ?? 2) + 1 }));
+        continue;
+      }
       const total = recordTotal(rec);
       lines.push(
         `**${name}:** ${total === 0 ? "no findings" : `${total} finding(s)`}, written by \`${rec.producer?.script ?? "?"}\`` +
@@ -217,6 +228,76 @@ export function kgQaMarkdown(report: KgQaReport, o: { assets: string; up?: strin
         lines.push("", "</details>", "");
       }
     }
+  }
+  return lines;
+}
+
+/**
+ * A glossary-consistency record (`translation:glossary`) as its own section:
+ * one sub-section per locale, its summary (fixed terms, catalogues, sense-check
+ * notes) and its findings by rule.
+ */
+export function glossaryConsistencyMarkdown(rec: NonNullable<QaRecord["record"]>, o: { href: string; level?: number }): string[] {
+  const h = "#".repeat(o.level ?? 3);
+  const total = recordTotal(rec);
+  const lines = [
+    `${h} Glossary consistency`,
+    "",
+    `${total === 0 ? "No findings" : `${total} finding(s)`} against the term base merged from the layers' glossaries, ` +
+      `written by \`${rec.producer?.script ?? "?"}\`${rec.subject?.id ? ` about \`${rec.subject.id}\`` : ""}. [Record (JSON)](${o.href})`,
+    "",
+  ];
+  for (const [locale, f] of Object.entries(rec.families ?? {})) {
+    const entries = (f.entries ?? []) as Array<Record<string, unknown>>;
+    const inSense = entries.filter((e) => e.rule === "not-fixed-rendering").length;
+    lines.push(
+      `${h}# ${locale}`,
+      "",
+      `${cell(f.summary)}. ${entries.length === 0 ? "No findings." : `${entries.length} finding(s), ${inSense} of them in-sense violation(s):`}`,
+      "",
+    );
+    if (entries.length) {
+      lines.push("| rule | term | fixed (layer) | where | rendering |", "|---|---|---|---|---|");
+      for (const e of entries) {
+        const rule = `\`${cell(e.rule)}\`${e.inSense ? ` (in sense by ${e.inSense === "rule" ? "rule" : "verdict"})` : ""}`;
+        lines.push(
+          `| ${rule} | ${cell(e.term)} | ${e.fixed ? `${cell(e.fixed)} (${cell(e.layer)})` : "—"} | ${e.catalogue ? `\`${cell(e.catalogue)}\`` : "—"} | ${cell(e.rendering)} |`,
+        );
+      }
+      lines.push("");
+    }
+    lines.push(...adjudicationMarkdown((f as GlossaryFamily).adjudication, `${h}##`));
+  }
+  return lines;
+}
+
+/** A glossary family's adjudication lists, as `translation:glossary` records them beside its findings. */
+interface GlossaryFamily extends QaFamily {
+  adjudication?: Partial<Record<"pending" | "otherSense" | "exceptions", Array<Record<string, unknown>>>>;
+}
+
+/**
+ * The uses of a term whose sense an adjudicator decides: pending (listed,
+ * failing nothing), ruled other-sense (not checked) and exceptions (in sense,
+ * the fixed translation ruled wrong there; passing).
+ */
+function adjudicationMarkdown(a: GlossaryFamily["adjudication"], h: string): string[] {
+  if (!a) return [];
+  const lines: string[] = [];
+  const parts: Array<[string, Array<Record<string, unknown>>, string]> = [
+    ["Exceptions", a.exceptions ?? [], "in sense, but the fixed translation was ruled wrong here; they pass"],
+    ["Pending adjudication", a.pending ?? [], "a term of another subject area, not yet ruled on; they fail nothing"],
+    ["Other sense", a.otherSense ?? [], "ruled another concept; not checked"],
+  ];
+  for (const [title, list, what] of parts) {
+    if (!list.length) continue;
+    lines.push(`${h} ${title}`, "", `${list.length} use(s): ${what}.`, "", "| term | fixed (layer) | where | sentence | ruling |", "|---|---|---|---|---|");
+    for (const o of list) {
+      lines.push(
+        `| ${cell(o.term)} | ${cell(o.fixed)} (${cell(o.layer)}) | \`${cell(o.catalogue)}\` | ${cell(String(o.msgid ?? "").slice(0, 120))} | ${o.reason ? `${cell(o.reason)} (${cell(o.decidedBy)})` : "—"} |`,
+      );
+    }
+    lines.push("");
   }
   return lines;
 }

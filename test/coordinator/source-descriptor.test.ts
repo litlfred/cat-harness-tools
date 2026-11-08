@@ -76,14 +76,12 @@ describe("source descriptors", () => {
     expect(files.length).toBeGreaterThanOrEqual(2);
   });
 
-  for (const f of files) {
-    test(`${f} declares itself a descriptor and parses against the schema`, () => {
-      const raw = JSON.parse(read(f)) as Record<string, unknown>;
-      expect(raw.$schema).toBe(SOURCE_DESCRIPTOR_SCHEMA_TAG);
-      const r = SourceDescriptorSchema.safeParse(raw);
-      expect(r.success ? [] : r.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)).toEqual([]);
-    });
-  }
+  test.each(files.map((f): [string] => [f]))("%s declares itself a descriptor and parses against the schema", (f) => {
+    const raw = JSON.parse(read(f)) as Record<string, unknown>;
+    expect(raw.$schema).toBe(SOURCE_DESCRIPTOR_SCHEMA_TAG);
+    const r = SourceDescriptorSchema.safeParse(raw);
+    expect(r.success ? [] : r.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)).toEqual([]);
+  });
 
   test("a source whose subset is NOT self-contained says why", () => {
     // The `false` case is the one that changes what materialize-remote must

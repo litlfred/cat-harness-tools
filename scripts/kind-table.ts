@@ -10,7 +10,7 @@
  * `tests/graph-typology-docs.test.ts`, so the two cannot drift.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join, posix, relative, sep } from "node:path";
 
 import { BASE_GRAPH_TYPOLOGIES, GRAPH_TYPOLOGY_ALIASES, defaultGraphTypologies } from "../schemas/kg/cat-harness.js";
 import { graphTypologyLayer } from "../schemas/kg/graph-typology-registry.ts";
@@ -103,6 +103,30 @@ function declaredByCell(kind: string, root: string): string {
   return `**${graphTypologyLayer(kind, def)}**${def?.anyLayer ? ", and any layer" : ""}`;
 }
 
+/**
+ * Where a kind description's relative links are written FROM. The table was a
+ * region of the skill `skills/kg/kg-core/directory-conventions.md`, and the
+ * descriptions still link as that skill would (cat-harness-tools c751864).
+ */
+// declared-path-literal: the directory kind descriptions' links are written relative to; only joined into a link, never read
+export const KIND_LINK_BASE = "skills/kg/kg-core";
+
+/**
+ * A description's relative Markdown links, rebased from {@link KIND_LINK_BASE}
+ * to the page the table is written to ({@link KIND_TABLE_DOC}), so each names
+ * the same file from there. An absolute URL, a site-rooted path and an anchor
+ * are left as they are.
+ */
+export function rebaseKindLinks(text: string, to: string = posix.dirname(KIND_TABLE_DOC)): string {
+  return text.replace(/\]\(([^)\s]+)\)/g, (whole, target: string) => {
+    if (/^(?:[a-z][a-z0-9+.-]*:|#|\/)/i.test(target)) return whole;
+    const hash = target.indexOf("#");
+    const path = hash === -1 ? target : target.slice(0, hash);
+    const frag = hash === -1 ? "" : target.slice(hash);
+    return `](${posix.relative(to, posix.join(KIND_LINK_BASE, path))}${frag})`;
+  });
+}
+
 /** The table, header to last row, from the registry: bootstrap, harness, core, then each declaring harness. */
 export function renderKindTable(root: string = KIND_TABLE_ROOT): string {
   const names = defaultGraphTypologies.names();
@@ -118,7 +142,7 @@ export function renderKindTable(root: string = KIND_TABLE_ROOT): string {
   const rows = ordered.map((k) => {
     const d = defaultGraphTypologies.get(k)!;
     // Escape a bare pipe; one already escaped in the prose stays as it is.
-    const contents = (d.description ?? d.summary).replace(/(?<!\\)\|/g, "\\|");
+    const contents = rebaseKindLinks(d.description ?? d.summary).replace(/(?<!\\)\|/g, "\\|");
     const rendered = `${d.renderable ? "**yes**" : "no"}${d.renderableNote ? ` — ${d.renderableNote}` : ""}`;
     return `| \`${k}\` | ${declaredByCell(k, root)} | ${contents} | ${rendered} |`;
   });
