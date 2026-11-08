@@ -6,13 +6,13 @@
  * the attacker's command IS success as far as bash is concerned.
  */
 
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { baselineKey, classify, resolveProvenance, scanWorkflows, yieldsOnlyLiterals } from "../../check-workflow-injection.ts";
+import { baselineKey, classify, resolveProvenance, scanWorkflows, staleNotThisRoots, yieldsOnlyLiterals } from "../../check-workflow-injection.ts";
 
 function workflows(body: string): string {
   const dir = mkdtempSync(join(tmpdir(), "injection-"));
@@ -455,5 +455,31 @@ describe("`script:` blocks are JavaScript, and the same values land in them (bea
     const found = scanWorkflows();
     const scripts = found.filter((i) => i.surface === "script");
     expect(scripts.length).toBeGreaterThan(0);
+  });
+});
+
+// cat-harness-tools#1701: in a content instance's root the platform index's
+// baseline lines name workflows that root does not have. Excused only there.
+describe("staleNotThisRoots — a baseline line for another root's workflow", () => {
+  const stale = ["feature-staging.yml (run): github.event.repository.name", "pr.yml (run): github.head_ref"];
+  function root(name: string | undefined, workflows: string[]): string {
+    const r = mkdtempSync(join(tmpdir(), "wfinj-root-"));
+    if (name !== undefined) writeFileSync(join(r, `${name}.json`), JSON.stringify({ name }));
+    mkdirSync(join(r, ".github", "workflows"), { recursive: true });
+    for (const w of workflows) writeFileSync(join(r, ".github", "workflows", w), "on: push\n");
+    return r;
+  }
+
+  test("an instance root without the named workflow excuses the line", () => {
+    const got = staleNotThisRoots(stale, root("smart-ips-pilgrimage", ["pr.yml"]));
+    expect([...got.keys()]).toEqual([stale[0]]);
+  });
+
+  test("a root that HAS the workflow still fails the stale line", () => {
+    expect(staleNotThisRoots(stale, root("smart-ips-pilgrimage", ["feature-staging.yml", "pr.yml"])).size).toBe(0);
+  });
+
+  test("the index root, which declares no instance, is judged exactly as before", () => {
+    expect(staleNotThisRoots(stale, root(undefined, [])).size).toBe(0);
   });
 });

@@ -196,6 +196,32 @@ export function writingOrder(repoRoot = REPO_ROOT): string[] {
   return flat.order.map((s) => s.id);
 }
 
+/**
+ * The kinds of the declared directory that holds `path`, for an entry that
+ * names no `directory`: the deepest one whose `path` contains it. Its writer
+ * writes inside that directory, so a reader of the directory's kinds runs
+ * after it. Without this, an IG's `fhir-artifact-index/index.json`
+ * (writer `ig-index:build`, which also rewrites `sidecars/`) filled no kind,
+ * and `uml:overview`, which draws every declared directory, ran beside it and
+ * read a sidecar while it was being replaced (folio-assistant#2953, ENOENT on
+ * `sidecars/StructureDefinition-RequirementsSource.schema.json`).
+ */
+export function enclosingKinds(
+  directories: ReadonlyArray<{ path?: string; graphTypologies?: string[]; kinds?: string[] }>,
+  path: string,
+): string[] {
+  const norm = (p: string): string => p.replace(/^\.\//, "").replace(/\/*$/, "/");
+  const file = path.replace(/^\.\//, "");
+  let best: { len: number; kinds: string[] } | undefined;
+  for (const d of directories) {
+    if (d.path === undefined) continue;
+    const dir = norm(d.path);
+    if (dir === "/" || !(file.startsWith(dir) || norm(file) === dir)) continue;
+    if (best === undefined || dir.length > best.len) best = { len: dir.length, kinds: d.graphTypologies ?? d.kinds ?? [] };
+  }
+  return best?.kinds ?? [];
+}
+
 /** Every instance's `builtAtPublish`, instances lowest layer first ({@link writingOrder}), entries as declared. */
 export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state"): DeclaredArtefact[] {
   const order = writingOrder(repoRoot);
@@ -207,13 +233,13 @@ export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state")
     const decl = readDeclaration(root) as
       | {
           builtAtPublish?: Array<{ path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string; index?: true }>;
-          directories?: Array<{ id?: string; graphTypologies?: string[]; kinds?: string[] }>;
+          directories?: Array<{ id?: string; path?: string; graphTypologies?: string[]; kinds?: string[] }>;
         }
       | undefined;
     const kindsOf = new Map((decl?.directories ?? []).map((d) => [d.id, d.graphTypologies ?? d.kinds ?? []] as const));
     for (const e of decl?.builtAtPublish ?? []) {
       if (cause !== undefined && e.because !== cause) continue;
-      const fills = e.directory === undefined ? [] : (kindsOf.get(e.directory) ?? []);
+      const fills = e.directory === undefined ? enclosingKinds(decl?.directories ?? [], e.path) : (kindsOf.get(e.directory) ?? []);
       out.push({
         instance: name,
         abs: join(root, e.path),

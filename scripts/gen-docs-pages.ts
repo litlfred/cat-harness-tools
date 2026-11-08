@@ -51,6 +51,7 @@ import {
   type QaWitnessDoc,
 } from "../pipeline/qa-witness.ts";
 import { todoDefaultTheme } from "./todos.js";
+import { graphReadPath } from "./graph-read.ts";
 import { publishedTodoFiles } from "./todo-source.js";
 import { declaredSubgraphNode } from "./kg-export.ts";
 import { TODO_GRAPH_SITE_PATH, serialiseJsonld, todoDocument, todoGraphDocument, todoPageSitePath, todoSitePath } from "./todo-graph.ts";
@@ -1461,6 +1462,19 @@ function todoRelations(tags: {
 }
 
 /**
+ * Why the branch-kept graph `id` is DETERMINED absent from this checkout, or
+ * `undefined` when it is not (cat-harness-tools#1701). `state:mount` records
+ * that answer for a graph declared for every checkout by a mounted instance,
+ * not by this root, and not on this remote (an IG repository that is its own
+ * index). Only that answer is excused: any other refusal still throws where
+ * the graph is read.
+ */
+function determinedAbsent(id: string): string | undefined {
+  const where = graphReadPath(id, repoRootFor(INSTANCE_ROOT));
+  return where.state === "refused" && where.absent === true ? where.reason : undefined;
+}
+
+/**
  * The bean's file, or `undefined` when nothing on disk carries that id.
  *
  * The directory is RESOLVED from `beans/beans.json` rather than composed. It
@@ -1470,6 +1484,7 @@ function todoRelations(tags: {
  * reference as unlinkable while looking correct.
  */
 function beanFile(id: string): string | undefined {
+  if (determinedAbsent("beans") !== undefined) return undefined;
   const dir = beanDefsDir(repoRootFor(INSTANCE_ROOT));
   if (dir === null || !existsSync(dir)) return undefined;
   // Sorted for the same reason `processHierarchy` sorts: raw directory order
@@ -1588,8 +1603,16 @@ function processHierarchy(): Record<string, string[]> {
     const target = resolveTarget(blockByLabel, label);
     return target === undefined ? {} : { target };
   };
-  const fallbackTheme = todoDefaultTheme();
-  const items = publishedTodoFiles().map(({ todo, path }) => ({
+  // THE TODO GRAPH MAY BE DETERMINED ABSENT (cat-harness-tools#1701): declared
+  // for every checkout by a mounted instance, not by this root, and not on
+  // this remote (an IG repository that is its own index). Then there are no
+  // todos to publish, which is said, not thrown on; any other refusal still
+  // throws from the todo root, exactly as before.
+  const todosAbsentWhy = determinedAbsent("todos");
+  const todosAbsent = todosAbsentWhy !== undefined;
+  if (todosAbsent) console.log(`  · todos: not applicable here — ${todosAbsentWhy}; the board is published empty`);
+  const fallbackTheme = todosAbsent ? undefined : todoDefaultTheme();
+  const items = (todosAbsent ? [] : publishedTodoFiles()).map(({ todo, path }) => ({
     id: todo.id,
     summary: todo.summary,
     comment: todo.comment,
@@ -1955,7 +1978,11 @@ function processHierarchy(): Record<string, string[]> {
 // would otherwise need the repository's web address, and a literal in
 // `docs-ui.js` is one folio's own address inside shared client code.
 {
-  const beansRead = readBeans(repoRootFor(INSTANCE_ROOT));
+  // Determined absent (cat-harness-tools#1701): "no bean store" here, the
+  // `null` below, said with its reason rather than thrown on.
+  const beansAbsentWhy = determinedAbsent("beans");
+  if (beansAbsentWhy !== undefined) console.log(`  · beans: not applicable here — ${beansAbsentWhy}`);
+  const beansRead = beansAbsentWhy !== undefined ? null : readBeans(repoRootFor(INSTANCE_ROOT));
   // WHERE THE FILES ARE ON THE FORGE. Since the state cutover the bean store
   // is kept on its own branch (`cat/cat-harness/beans`) and untracked on
   // `main`, so `<repo>/blob/main/<file>` answers 404 for every bean. Each

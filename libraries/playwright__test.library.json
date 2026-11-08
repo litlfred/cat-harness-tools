@@ -62,6 +62,7 @@
     "test/glass-zoom-steady.e2e.ts",
     "test/harness-row-alignment.e2e.ts",
     "test/ig-diagram-viewer.e2e.ts",
+    "test/ig-section-rail.e2e.ts",
     "test/kg-graph.e2e.ts",
     "test/kg/harness-config-panel.e2e.ts",
     "test/kg/schema-overview-filter.e2e.ts",

@@ -118,6 +118,18 @@ describe("compare-gates.py with diagnostics", () => {
     expect(r.stdout).toContain("failing on main too");
   });
 
+  test("not applicable on the PR is never a new failure, and says what main answered (#1701)", () => {
+    const plain = (exit: number) => ({ "x:check": { command: "c", exit, tail: "t" } });
+    for (const b of [0, 1, 2]) {
+      const r = compare(plain(b), plain(78));
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain(`not applicable here; not counted (main exited ${b})`);
+    }
+    const absent = compare({}, plain(78));
+    expect(absent.status).toBe(0);
+    expect(absent.stdout).toContain("main did not run it, so not counted");
+  });
+
   test("a gate without diagnostics is judged by its exit, as before", () => {
     const plain = (exit: number) => ({ "x:check": { command: "c", exit, tail: "t" } });
     expect(compare(plain(1), plain(1)).status).toBe(0);

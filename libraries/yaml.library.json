@@ -29,6 +29,7 @@
     "scripts/check-workflows.ts",
     "scripts/compose-docs.ts",
     "scripts/gates.ts",
+    "scripts/gen-lsi-viz.ts",
     "scripts/kg-audit.ts",
     "scripts/lib/default-scope-globs.ts",
     "scripts/lib/jekyll-pages-nav.ts",
@@ -50,6 +51,7 @@
     "src/workflow/ci-health.ts",
     "test/coordinator/gate-shell-workflow.test.ts",
     "test/coordinator/gates-workflows.test.ts",
-    "test/layer-ready-reuse.test.ts"
+    "test/layer-ready-reuse.test.ts",
+    "test/release-gated-ci.test.ts"
   ]
 }
