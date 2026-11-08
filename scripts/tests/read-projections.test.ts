@@ -144,6 +144,7 @@ describe("mount-from-lock's restated report", () => {
   test("writes the same line projectedRead does", () => {
     const root = mkdtempSync(join(tmpdir(), "read-proj-mfl-"));
     const trace = join(root, "trace.log");
+    // input-site: inert #97f14c0f — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const prev = process.env["INPUT_HASH_TRACE"];
     try {
       process.env["INPUT_HASH_TRACE"] = trace;

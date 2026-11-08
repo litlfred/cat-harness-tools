@@ -1351,6 +1351,7 @@ export function renderBlock(
   // narrow case where TypeScript narrows the discriminated union
   // to a member that doesn't widen authorNotes back to the BlockBase
   // optional.
+  // input-site: env WITH_AUTHOR_NOTES #9d2b294e — author notes are rendered only when this is 1
   if (process.env.WITH_AUTHOR_NOTES === "1"
       && "authorNotes" in block
       && block.authorNotes?.length) {

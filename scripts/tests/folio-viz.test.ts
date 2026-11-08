@@ -95,6 +95,7 @@ describe("the page", () => {
     const html = viewerHtml("../../assets/folio/index.json");
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
     expect(scripts.length).toBeGreaterThan(0);
+    // input-site: inert #c1de1bde — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     for (const s of scripts) expect(() => new Function(s)).not.toThrow();
   });
 
@@ -198,6 +199,7 @@ describe("node links resolve on the page (qgjh)", () => {
   const script = html.match(/<script>([\s\S]*?)<\/script>/g)!.map((s) => s.replace(/<\/?script>/g, "")).join("\n");
   const start = script.indexOf("var SITE_ROOT");
   const end = script.indexOf("\n}\n", script.indexOf("function linkHref")) + 3;
+  // input-site: inert #0994ee00 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   const linkHref = new Function(
     `var DATA_HREF = "../../assets/folio/index.json";\n${script.slice(start, end)}\nreturn linkHref;`,
   )() as (h: string) => string;

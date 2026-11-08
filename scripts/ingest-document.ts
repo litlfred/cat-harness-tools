@@ -1246,6 +1246,7 @@ if (import.meta.main) {
   }
   for (const s of ingestMode(argv) === "promote" ? [] : plan.steps) {
     console.log(`\n$ ${s.join(" ")}`);
+    // input-site: inert #23cfbd9b — when a step started, stamped into the record of an undetermined step; never a check's input
     const started = Date.now();
     const r = Bun.spawnSync(s, { stdout: "inherit", stderr: "inherit" });
     if (r.exitCode !== 0) {

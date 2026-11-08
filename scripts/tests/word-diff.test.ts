@@ -38,6 +38,7 @@ describe("wordDiff", () => {
   });
 
   test("it is self-contained, so the page can embed exactly this function", () => {
+    // input-site: inert #1cc5728c — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     const embedded = new Function(`return (${wordDiff.toString()})`)() as typeof wordDiff;
     expect(embedded("a b", "a c")).toEqual(wordDiff("a b", "a c"));
   });

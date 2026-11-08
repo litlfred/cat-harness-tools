@@ -108,6 +108,7 @@ function fixture(): Fixture {
 /** A full clone of the branch, edited and pushed — how a test damages the store. */
 function tamper(f: Fixture, edit: (dir: string) => void): void {
   clearQaCache();
+  // input-site: inert #af82d745 — a unique scratch name or throwaway token; no assertion depends on its value
   const dir = join(f.base, `tamper-${Math.random().toString(36).slice(2)}`);
   git(f.base, "clone", "-q", "-b", "cat/cat-harness/qa-reports", f.url, dir);
   edit(dir);
@@ -750,6 +751,20 @@ describe("add-only publish (bean 1dre): an observation added to the commit's exi
     expect(a).toMatchObject({ state: "added", key: `main/${SHA_A}` });
     const t = readQaTree(`main/${SHA_B}`, "health", f.container("reader"));
     expect(t.state === "hit" && [...t.files.keys()]).toEqual([OBS]);
+  }, T);
+
+  test("a commit the gates have not published yet adds into its nearest recorded ancestor — the entry its readers are given", () => {
+    const f = fixture();
+    git(f.work, "commit", "-q", "--allow-empty", "-m", "a");
+    const a = git(f.work, "rev-parse", "HEAD").trim();
+    git(f.work, "commit", "-q", "--allow-empty", "-m", "b");
+    const b = git(f.work, "rev-parse", "HEAD").trim();
+    publishQa({ ref: `main/${a}`, roots: [RESULTS] }, f.container("gates"));
+    f.write(OBS, '{"day":1}\n');
+    const r = addQa({ ref: `main/${b}`, roots: ["health"] }, f.container("health"));
+    expect(r).toMatchObject({ state: "added", key: `main/${a}` });
+    const t = readQaTree(`main/${b}`, "health", f.container("reader"));
+    expect(t.state === "hit" && [t.key, [...t.files.keys()]]).toEqual([`main/${a}`, [OBS]]);
   }, T);
 
   test("CLI: --add needs a --root; added is exit 0, no entry is exit 1 (miss)", () => {

@@ -72,6 +72,7 @@ function parses(source: string): string | undefined {
     // `new Function` compiles without executing, which is the whole point:
     // the defect was a PARSE error, and running a viewer's script outside a
     // browser would fail for reasons that are not defects.
+    // input-site: inert #40d9df46 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     new Function(source);
     return undefined;
   } catch (e) {

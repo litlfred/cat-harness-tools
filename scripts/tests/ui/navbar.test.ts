@@ -1275,6 +1275,7 @@ describe("the row's glyphs are docs-ui.js's glyphs (bean lhvt)", () => {
       const m = new RegExp(`var ${name} =([\\s\\S]*?);\\n`).exec(src);
       if (!m) throw new Error(`${file}: ${name} not found`);
       const expr = m[1]!.replace(/^\s*\/\/.*$/gm, "");
+      // input-site: inert #042100c0 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
       out[name] = new Function(`return (${expr});`)() as string;
     }
     return out;

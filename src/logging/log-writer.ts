@@ -105,6 +105,7 @@ export interface LogResult {
  */
 function newId(at: Date): string {
   const stamp = at.toISOString().replace(/[:.]/g, "-");
+  // input-site: inert #cedea465 — a unique suffix for a new entry's id; written, never compared
   return `${stamp}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -125,6 +126,7 @@ export function writeLogEntry(
   root: string,
   draft: LogDraft,
   declaredCapture?: unknown,
+  // input-site: inert #929cabf1 — the moment an entry is written when the caller gives none; a write, never a check's input
   now: Date = new Date(),
 ): LogResult {
   const capture = resolveCapture(declaredCapture);

@@ -817,7 +817,8 @@ describe("per-instance beans pages (bean folio-assistant-1nu0)", () => {
     const html = beansSubjectPage({ id: "beans" }, s[0]!, s, {
       beans: [bean("a-1", "todo"), bean("a-2", "completed"), bean("a-3", "in-progress", "high")] as never,
     });
-    expect(html).toContain("Open — 2 of 3 bean(s)");
+    expect(html).toContain("Open in a's own store — 2 of 3 bean(s)");
+    expect(html).toContain("The Beans badge in the navbar counts");
     expect(html.indexOf("a-3")).toBeLessThan(html.indexOf("a-1"));
     expect(html).not.toContain("<code>a-2</code>");
     expect(html).toContain('href="../b/"');

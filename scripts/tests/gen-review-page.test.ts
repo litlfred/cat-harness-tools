@@ -152,6 +152,7 @@ describe("reviewSiteRoot — the site root from the review page's own path (#252
     expect(reviewSiteRoot("/preview/en/review/", L)).toBe("../../");
     expect(reviewSiteRoot("/smart-ra/STAGING/my-branch/en/review/index.html", L)).toBe("../../");
     expect(reviewSiteRoot("/en/review/", L)).toBe("../../");
+    // input-site: inert #fc5e2987 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(reviewSiteRoot("/tmp/site/en/review/index.html", L)).toBe("../../");
   });
   test("only a PUBLISHED locale counts: another segment there is the site's own path", () => {
@@ -159,6 +160,7 @@ describe("reviewSiteRoot — the site root from the review page's own path (#252
     expect(reviewSiteRoot("/preview/fr/review/", ["en", "fr"])).toBe("../../");
   });
   test("runs in the page as embedded: no TypeScript survives toString()", () => {
+    // input-site: inert #9dbf6aa7 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     const fn = new Function(`return (${reviewSiteRoot.toString()});`)() as typeof reviewSiteRoot;
     expect(fn("/x/en/review/", L)).toBe("../../");
   });
@@ -173,6 +175,7 @@ describe("matchesCommentFilter — filtering review comments on the page (423d)"
   });
 
   test("filters by exact status or kind, and runs as embedded via toString()", () => {
+    // input-site: inert #b719628c — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     const fn = new Function(`return (${matchesCommentFilter.toString()});`)() as typeof matchesCommentFilter;
     expect(fn("resolved", "defect", "status:resolved")).toBe(true);
     expect(fn("open", "defect", "status:resolved")).toBe(false);

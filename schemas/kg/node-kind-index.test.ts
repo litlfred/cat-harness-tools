@@ -149,6 +149,7 @@ describe("who owns a family", () => {
       join(checkout, "beta", "typologies", "sprockets.json"),
       JSON.stringify({ $schema: "folio-graph-typology/v1", kind: "sprockets", renderable: false, holds: "derived", summary: "the sprockets kind", nodeSchemas: { "sprocket/v1": {} } }),
     );
+    // input-site: inert #a5b6a02d — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const prior = process.env.FOLIO_FIXTURE_CHECKOUT;
     process.env.FOLIO_FIXTURE_CHECKOUT = checkout;
     try {

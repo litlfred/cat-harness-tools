@@ -70,6 +70,7 @@ beforeAll(() => {
   writeFileSync(join(dir, "main.tex"), "x\n");
   // A name with spaces — the case the six-field slice destroyed.
   writeFileSync(join(dir, "sub", "a b c.tex"), "y\n");
+  // input-site: inert #204d37d7 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
   symlinkSync("/etc/passwd", join(dir, "evil.tex"));
   linkSync(join(dir, "main.tex"), join(dir, "hard.tex"));
   execFileSync("tar", ["czf", "benign.tgz", "main.tex", "sub"], { cwd: dir });
@@ -131,6 +132,7 @@ describe("the type whitelist closes the residual `--no-same-*` cannot", () => {
 
 describe("the name checks still catch traversal by spelling", () => {
   it("refuses an absolute member", () => {
+    // input-site: inert #84f9f23e — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(refusedForName(["/etc/passwd"])).toEqual(["/etc/passwd"]);
   });
 
