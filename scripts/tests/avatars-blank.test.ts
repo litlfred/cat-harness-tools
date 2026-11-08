@@ -80,8 +80,10 @@ describe("navbar rendering of themed blank mark", () => {
     const at = html.indexOf('<div class="fa-nav-bottom">');
     const bottomHtml = html.slice(at);
     expect(bottomHtml).toContain('<span class="fa-nav-glyph fa-nav-tone fa-nav-blank" style="--fa-nav-hue:215" aria-hidden="true"></span>');
-    // Ensure no SVG glyph path or initial letter text was rendered inside the blank mark
-    expect(bottomHtml).not.toContain('<svg viewBox="0 0 24 24"');
+    // Ensure no SVG glyph path or initial letter text was rendered inside the blank mark.
+    // Scoped to the harness ROW: the group's own summary draws a mark (GROUP_GLYPHS).
+    const row = bottomHtml.slice(bottomHtml.indexOf('<a href="../unadorned-instance/"'));
+    expect(row).not.toContain('<svg viewBox="0 0 24 24"');
   });
 
   it("navbarCss includes the .fa-nav-glyph.fa-nav-blank rule", () => {
