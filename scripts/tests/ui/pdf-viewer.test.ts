@@ -42,6 +42,7 @@ async function runShim(src: string | null, opts: { sameOriginParent?: boolean; f
   const location = { search: src === null ? "" : `?src=${encodeURIComponent(src)}`, href: "https://site.example/assets/vendor/pdfjs/web/viewer.html", origin: "https://site.example" };
   win.PDFViewerApplicationOptions = { set: (k: string, v: unknown) => (set[k] = v) };
   win.PDFViewerApplication = { initializedPromise: Promise.resolve(), open: (o: { url: string }) => (opened.push(o.url), opts.fails ? Promise.reject(new Error(opts.fails)) : Promise.resolve()) };
+  // input-site: inert #b56f3cef — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   new Function("window", "document", "location", "parent", openShim([CDN]))(win, doc, location, parent);
   const fire = opts.sameOriginParent ? parentListeners : listeners;
   for (const f of fire["webviewerloaded"] ?? []) f({ detail: { source: win } });
@@ -107,6 +108,7 @@ describe("embed", () => {
     }
     const win = { IntersectionObserver: IO };
     const document = { currentScript: { parentNode: { querySelector: () => frame } }, lastModified };
+    // input-site: inert #04e02a06 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     new Function("window", "document", "location", "IntersectionObserver", script)(win, document, { pathname }, IO);
     expect(frame.src).toBeUndefined(); // lazy: nothing until it is in view
     cb?.([{ isIntersecting: true }]);
@@ -152,6 +154,7 @@ describe("embed", () => {
     const script = /<script>([\s\S]*?)<\/script>/.exec(html)![1]!;
     const frame: { src?: string; srcdoc?: string; getAttribute: () => string } = { getAttribute: () => "" };
     const document = { currentScript: { parentNode: { querySelector: () => frame } } };
+    // input-site: inert #578629d3 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     new Function("window", "document", "location", script)({}, document, { pathname: "/elsewhere/x.html" });
     expect(frame.src).toBeUndefined();
     expect(frame.srcdoc).toContain("could not find this site's root");
@@ -177,6 +180,7 @@ describe("embed inside a closed <details> (owner, 2026-10-16: load the viewer on
       disconnect() {}
     }
     const document = { currentScript: { parentNode: { querySelector: () => frame } }, lastModified: "" };
+    // input-site: inert #0160cb8c — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     new Function("window", "document", "location", "IntersectionObserver", script)({ IntersectionObserver: IO }, document, { pathname: "/x/" }, IO);
     return { frame, details, observed, open: () => { details.open = true; toggle?.(); } };
   }

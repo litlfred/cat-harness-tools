@@ -97,6 +97,7 @@ describe("the engine checks an adjudication's codes against the list it names", 
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
   const diagram = (adj: string) => {
+    // input-site: inert #9c8a98d8 — a unique scratch name or throwaway token; no assertion depends on its value
     const p = join(dir, `${Math.random().toString(36).slice(2)}.bpmn`);
     writeFileSync(
       p,

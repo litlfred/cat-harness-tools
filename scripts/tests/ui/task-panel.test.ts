@@ -251,6 +251,7 @@ describe("the client, for a page other than the process page", () => {
     expect(PANEL_SCRIPT).toMatch(/if \(sk_on && !t\.skills\.length/);
   });
   test("it parses, and a page can pick out steps (data-pt-highlight), as a journey's step does", () => {
+    // input-site: inert #097c83cd — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     expect(() => new Function(PANEL_SCRIPT)).not.toThrow();
     expect(PANEL_SCRIPT).toContain('getAttribute("data-pt-highlight")');
     expect(PANEL_SCRIPT).toContain(".split(/\\s+/)");

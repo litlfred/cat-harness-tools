@@ -53,9 +53,11 @@ describe("three states, never zeros for could-not-read", () => {
 });
 
 describe("readSiteBranch against a local remote", () => {
+  // input-site: tree #922e2944 — git in the test's own scratch repository, with the environment handed whole plus a fixed identity: git's answer, which the cone replays or records
   const git = (cwd: string, ...a: string[]) => spawnSync("git", a, { cwd, encoding: "utf-8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
   it("reads present, absent and unreachable as present, empty and could-not-read", () => {
     const d = mkdtempSync(join(tmpdir(), "site-viz-"));
+    // input-site: inert #3014726d — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const saved = { remote: process.env.BRANCH_STORE_REMOTE, dir: process.env.BRANCH_STORE_DIR };
     try {
       const work = join(d, "work");

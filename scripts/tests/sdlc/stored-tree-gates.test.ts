@@ -81,7 +81,9 @@ describe("lsi check over a stored index directory", () => {
     "--against a ref with no entry is UNKNOWN, reported and not gated",
     () => {
       const env = emptyStore();
+      // input-site: inert #9347e256 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
       const saved = { r: process.env.QA_STORE_REMOTE, d: process.env.QA_STORE_DIR };
+      // input-site: inert #4dfe08aa — sets the test's own variables, or hands the environment whole to a child; no value is read here
       Object.assign(process.env, env);
       try {
         const lines: string[] = [];

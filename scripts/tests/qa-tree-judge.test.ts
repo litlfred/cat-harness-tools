@@ -245,6 +245,7 @@ describe("what translation:block-qa:check grades", () => {
     severity: "major",
     evidence: ["a URL differs"],
     reviewed_at: new Date().toISOString(),
+    // input-site: inert #01bfcf99 — a unique scratch name or throwaway token; no assertion depends on its value
     reviewer: { kind: "script", id: "x", version: "v1", script_hash: Math.random().toString(36) },
     ...extra,
   });

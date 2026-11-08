@@ -50,6 +50,7 @@ describe("parseValidatorRef", () => {
 
   test("an absolute or escaping module is refused", () => {
     // It would resolve into whatever checkout is next door.
+    // input-site: inert #e2265d8e — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(() => parseValidatorRef("/etc/x.ts#S")).toThrow(/instance-relative/);
     expect(() => parseValidatorRef("../other/x.ts#S")).toThrow(/instance-relative/);
   });
@@ -169,6 +170,7 @@ describe("kindForPath", () => {
 
   test("a path outside the root belongs to no kind", async () => {
     const { kindForPath } = await import("../scripts/kg-validate.ts");
+    // input-site: inert #6813ae8c — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(kindForPath("/etc/passwd", "/tmp/x", [{ path: "a/", graphTypologies: ["beans"] }]))
       .toBeUndefined();
   });
