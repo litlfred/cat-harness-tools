@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { defaultCacheDir, fetchSite, pagesOwner, parseRepos, remoteUrl, sparsePatterns } from "../../serve-local.js";
+import { defaultCacheDir, fetchSite, pagesBelow, pagesOwner, parseRepos, remoteUrl, sparsePatterns } from "../../serve-local.js";
 
 let remote: string;
 let cache: string;
@@ -67,6 +67,16 @@ describe("fetching a site", () => {
 });
 
 describe("inputs", () => {
+  test("a served folder with no index.html points at the subfolders that have one", () => {
+    const dir = mkdtempSync(join(tmpdir(), "serve-local-pages-"));
+    for (const d of ["site", "docs", "scripts", ".git"]) mkdirSync(join(dir, d));
+    for (const d of ["site", "docs", ".git"]) writeFileSync(join(dir, d, "index.html"), "<p>x</p>");
+    expect(pagesBelow(dir)).toEqual(["docs", "site"]);
+    writeFileSync(join(dir, "index.html"), "<p>root</p>");
+    expect(pagesBelow(dir)).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   test("the owner comes from <owner>.github.io", () => {
     expect(pagesOwner("https://litlfred.github.io")).toBe("litlfred");
     expect(pagesOwner("https://example.org")).toBeUndefined();
