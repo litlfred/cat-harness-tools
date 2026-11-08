@@ -75,4 +75,15 @@ if [ -z "${CAT_LAYERS_URL:-}" ] && [ "${CAT_LAYERS_CACHE:-1}" != "0" ] && [ -f "
 fi
 status=0
 bun "$found" --root "$root" "$@" || status=$?
+# A full replay that succeeded stamps the lock it laid down, so `.github/cat.ts`
+# can tell, with one file hash, when the lock has moved past the mounts on disk
+# (a re-pin pulled in by `git pull`) and replay again. `--check` and the other
+# modes change nothing on disk, so they never stamp.
+if [ "$status" -eq 0 ] && [ "$#" -eq 0 ] && [ -f "$lock" ]; then
+  stamp="$(git -C "$root" rev-parse --git-path cat-mounted-lock 2>/dev/null || true)"
+  if [ -n "$stamp" ]; then
+    case "$stamp" in /*) ;; *) stamp="$root/$stamp" ;; esac
+    bun -e 'const c=require("node:crypto"),fs=require("node:fs");fs.writeFileSync(process.argv[2],c.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex")+"\n")' "$lock" "$stamp" || true
+  fi
+fi
 exit "$status"
