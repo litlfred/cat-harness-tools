@@ -37,6 +37,7 @@ import {
   pagesPublishHealthCheck,
   remoteMountHealthCheck,
   lsiIndexHealthCheck,
+  libraryKeywordsHealthCheck,
   ORPHAN_THRESHOLDS,
   RECENT_COMMIT_MINUTES,
   TRACKED_MAJOR_BYTES,
@@ -59,7 +60,7 @@ import {
   type SpecialBranchMeasure,
   type StagingPreview,
 } from "./checks.ts";
-import { declaredFamilyPrefix, hasRenderedDecision, membersFor, probeBeans, probeLsiIndexes, probePagesServing, probeTodos, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
+import { declaredFamilyPrefix, hasRenderedDecision, membersFor, probeBeans, probeLibraryKeywords, probeLsiIndexes, probePagesServing, probeTodos, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
 
 const MB = 1024 * 1024;
 
@@ -125,6 +126,35 @@ describe("lsi-indexes (cat-harness#1144: the LSI page's health half)", () => {
     expect(r.measurements.find((m) => m.metric === "lsi-graphs-needing-index")!.value).toBe(2);
     expect(r.measurements.find((m) => m.metric === "lsi-near-duplicate-pairs:inst/g0")!.value).toBe(5);
     expect(HealthCheckResultSchema.safeParse(r).success).toBe(true);
+  });
+});
+
+describe("library-keywords (cat-harness#1144)", () => {
+  const ev = (states: ("current" | "stale" | "missing")[]): HealthContext["libraryKeywords"] => ({
+    state: "ok",
+    value: states.map((state, i) => ({ path: `lib/e${i}/keywords.json`, state })),
+  });
+
+  it("every entry current is ok; no probe is not applicable; an error is unknown", () => {
+    expect(libraryKeywordsHealthCheck(healthyContext({ libraryKeywords: ev(["current", "current"]) })).state).toBe("ok");
+    expect(libraryKeywordsHealthCheck(healthyContext()).reason).toContain("not applicable");
+    expect(libraryKeywordsHealthCheck(healthyContext({ libraryKeywords: { state: "unknown", reason: "x" } })).state).toBe("unknown");
+  });
+
+  it("missing and stale files are one minor finding naming the missing ones and the command", () => {
+    const r = libraryKeywordsHealthCheck(healthyContext({ libraryKeywords: ev(["current", "stale", "missing"]) }));
+    expect(r.state).toBe("finding");
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]!.severity).toBe("minor");
+    expect(r.findings[0]!.summary).toContain("lib/e2/keywords.json");
+    expect(r.findings[0]!.action).toContain("bun run cat library:keywords");
+    expect(r.measurements.find((m) => m.metric === "library-keywords-stale")!.value).toBe(1);
+    expect(HealthCheckResultSchema.safeParse(r).success).toBe(true);
+  });
+
+  it("the probe: no library is absent, a throw is unknown", () => {
+    expect(probeLibraryKeywords("/x", () => ({ libraries: 0, entries: [], files: new Map() })).state).toBe("absent");
+    expect(probeLibraryKeywords("/x", () => { throw new Error("boom"); }).state).toBe("unknown");
   });
 });
 

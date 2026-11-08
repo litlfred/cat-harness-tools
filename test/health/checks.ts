@@ -51,6 +51,7 @@ import type {
 } from "../../schemas/sdlc/health-report.ts";
 import { isPreviewName, MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
 import type { LsiHealthEvidence } from "../../scripts/lsi-health.ts";
+import type { KeywordsState } from "../../scripts/library-keywords.ts";
 import { PREVIEW_PREFIX } from "../../schemas/sdlc/preview-prefix.ts";
 import {
   EXPIRY_BASIS,
@@ -258,6 +259,11 @@ export interface HealthContext {
    * Optional: a context built before this probe existed reads as `absent`.
    */
   lsiIndexes?: StoreProbe<LsiHealthEvidence>;
+  /**
+   * Each library entry's `keywords.json` against what `library:keywords` would
+   * write now (cat-harness#1144). Optional: absent without a probe.
+   */
+  libraryKeywords?: StoreProbe<KeywordsState[]>;
 }
 
 /** One declared remote instance as the mount check left it. */
@@ -2044,6 +2050,49 @@ export function lsiIndexHealthCheck(ctx: HealthContext): HealthCheckResult {
   return settle(id, summary, LSI_INDEX_THRESHOLDS, measurements, findings);
 }
 
+export const LIBRARY_KEYWORD_THRESHOLDS: HealthThreshold[] = [
+  {
+    metric: "library-keywords-not-current",
+    value: 0,
+    unit: "count",
+    severity: "minor",
+    basis:
+      "an entry whose keywords.json is missing or stale shows old or no keywords in the library viewer and in " +
+      "anything that reads the file. A report and never a gate (`gates.ts`): log-entropy weights derive from the " +
+      "WHOLE library, so one sibling's ingest re-weights every entry, and a gate would go red on a merge this diff " +
+      "did not make (folio-assistant#2302). `minor`: keywords are derived, and `bun run cat library:keywords` " +
+      "rewrites them all (owner, 2026-11-08, cat-harness#1144).",
+  },
+];
+
+export function libraryKeywordsHealthCheck(ctx: HealthContext): HealthCheckResult {
+  const id = "library-keywords";
+  const summary = "Each library entry's LSI keywords (keywords.json): present, and what `library:keywords` would write now.";
+  const probe = ctx.libraryKeywords ?? { state: "absent" as const, reason: "no library-keywords probe ran" };
+  if (probe.state === "absent") return absentResult(id, summary, LIBRARY_KEYWORD_THRESHOLDS, probe.reason);
+  if (probe.state === "unknown") return unknownResult(id, summary, LIBRARY_KEYWORD_THRESHOLDS, probe.reason);
+  const entries = probe.value;
+  const command = "bun run cat library:keywords:check";
+  const missing = entries.filter((e) => e.state === "missing");
+  const stale = entries.filter((e) => e.state === "stale");
+  const measurements: HealthMeasurement[] = [
+    { metric: "library-keywords-entries", value: entries.length, unit: "count", command },
+    { metric: "library-keywords-missing", value: missing.length, unit: "count", command },
+    { metric: "library-keywords-stale", value: stale.length, unit: "count", command },
+  ];
+  const findings: HealthFinding[] = [];
+  if (missing.length + stale.length > 0)
+    findings.push({
+      metric: "library-keywords-not-current",
+      severity: "minor",
+      summary:
+        `${missing.length} keywords.json missing, ${stale.length} stale` +
+        (missing.length ? ` — missing: ${missing.slice(0, 5).map((e) => e.path).join(", ")}${missing.length > 5 ? ", …" : ""}` : ""),
+      action: "Run `bun run cat library:keywords` and commit the files it writes; it rewrites every entry of the library together.",
+    });
+  return settle(id, summary, LIBRARY_KEYWORD_THRESHOLDS, measurements, findings);
+}
+
 export function todoStoreCheck(ctx: HealthContext): HealthCheckResult {
   const id = "todo-store";
   const summary = "The human todo store: how many items are open, and whether any have gone stale.";
@@ -2208,6 +2257,13 @@ export const HEALTH_CHECKS: readonly {
       "Each declared prose graph that needs a latent semantic index, whether its stored index is fresh, " +
       "and each index's narrow-dimension and near-duplicate counts (cat-harness#1144). Builds nothing.",
     run: lsiIndexHealthCheck,
+  },
+  {
+    id: "library-keywords",
+    summary:
+      "Each library entry's LSI keywords.json: missing or stale against `library:keywords` (cat-harness#1144). " +
+      "A report, never a gate: the weights derive from the whole library.",
+    run: libraryKeywordsHealthCheck,
   },
   {
     id: "staging-preview-orphans",

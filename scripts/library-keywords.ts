@@ -99,36 +99,56 @@ export function libraryKeywords(libRoot: string, repoRoot = ROOT): Map<string, K
   return out;
 }
 
-if (import.meta.main) {
-  const check = process.argv.includes("--check");
+/** One entry's keywords.json against what the writer would write now. */
+export interface KeywordsState {
+  /** The file, relative to the repository root. */
+  path: string;
+  state: "current" | "stale" | "missing";
+}
+
+/**
+ * Every entry of every declared library (under `within`, when given), with
+ * whether its keywords.json is current, stale or missing. Writes nothing.
+ * Also the reader the `library-keywords` health check uses (cat-harness#1144):
+ * a report, never a gate, for the reason `gates.ts` gives — the weights derive
+ * from the WHOLE library, so one sibling's ingest re-weights every entry.
+ */
+export function keywordsStates(within?: string, repoRoot = ROOT): { libraries: number; entries: KeywordsState[]; files: Map<string, string> } {
   // Discovery starts from the cat-harness declaration, as gen-library-viz does.
-  const g = readLibraryGraph([join(ROOT, "cat-harness"), ROOT], ROOT);
+  const g = readLibraryGraph([join(repoRoot, "cat-harness"), repoRoot], repoRoot);
   // The LIBRARY each entry is in, not its parent: a filed entry's parent is a
   // concern group (bean `6fez`), and weighting keywords over one group alone
   // would change every entry's scores.
-  const roots = new Set((g?.entries ?? []).map((e) => libraryOfEntry(join(ROOT, e.dir))));
-  let stale = 0;
-  let written = 0;
-  let entries = 0;
-  for (const root of [...roots].sort()) {
-    for (const [slug, kf] of libraryKeywords(root)) {
-      entries++;
+  const roots = [...new Set((g?.entries ?? []).map((e) => libraryOfEntry(join(repoRoot, e.dir))))]
+    .filter((r) => within === undefined || r === resolve(within) || r.startsWith(resolve(within) + "/"))
+    .sort();
+  const entries: KeywordsState[] = [];
+  const files = new Map<string, string>();
+  for (const root of roots) {
+    for (const [slug, kf] of libraryKeywords(root, repoRoot)) {
       const path = join(libraryEntryDir(root, slug) ?? join(root, slug), KEYWORDS_FILE);
       const text = JSON.stringify(kf, null, 2) + "\n";
-      const same = existsSync(path) && readFileSync(path, "utf8") === text;
-      if (same) continue;
-      if (check) {
-        console.error(`  ✗ ${relative(ROOT, path)} ${existsSync(path) ? "is stale" : "is missing"}`);
-        stale++;
-      } else {
-        writeFileSync(path, text);
-        written++;
-      }
+      files.set(path, text);
+      const state = !existsSync(path) ? "missing" : readFileSync(path, "utf8") === text ? "current" : "stale";
+      entries.push({ path: relative(repoRoot, path), state });
     }
   }
+  return { libraries: roots.length, entries, files };
+}
+
+if (import.meta.main) {
+  const check = process.argv.includes("--check");
+  const { libraries, entries, files } = keywordsStates();
+  let written = 0;
+  const bad = entries.filter((e) => e.state !== "current");
   if (check) {
-    console.log(stale ? `${stale} keywords.json file(s) stale — run \`bun run cat library:keywords\`` : `${entries} keywords.json file(s) current`);
-    process.exit(stale ? 1 : 0);
+    for (const e of bad) console.error(`  ✗ ${e.path} is ${e.state}`);
+    console.log(bad.length ? `${bad.length} keywords.json file(s) stale — run \`bun run cat library:keywords\`` : `${entries.length} keywords.json file(s) current`);
+    process.exit(bad.length ? 1 : 0);
   }
-  console.log(`${entries} entr(ies) over ${roots.size} librar(ies); wrote ${written}.`);
+  for (const e of bad) {
+    writeFileSync(join(ROOT, e.path), files.get(join(ROOT, e.path))!);
+    written++;
+  }
+  console.log(`${entries.length} entr(ies) over ${libraries} librar(ies); wrote ${written}.`);
 }
