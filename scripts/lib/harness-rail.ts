@@ -543,14 +543,18 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
           const { href: _here, ...rest } = item;
           return { ...rest, current: true };
         });
-  // The same for the page tree, at any depth.
+  // The page tree, at any depth, marks the page too — but KEEPS its link.
+  // Owner, 2026-11-08, on fhir-harness/fhir/: *"you should be able to navigate
+  // to pages like .../fhir/ by click on Page name on LHS navbar but it doesnt
+  // work"*. A page that has children is a section's landing page; as a dead,
+  // dimmed row it read as broken. It stays a link, drawn as current
+  // (`aria-current="page"`), so a click reloads it the way a reader expects.
   const markHere = (items: readonly NavItem[]): NavItem[] =>
     items.map((item) => {
       const kids = item.children ? { children: markHere(item.children) } : {};
       // The site's own pages are linked from the page's own root.
       if (page.here === undefined || item.href !== `${page.toRoot}${page.here}`) return { ...item, ...kids };
-      const { href: _here, ...rest } = item;
-      return { ...rest, ...kids, current: true };
+      return { ...item, ...kids, current: true };
     });
   return navbarRegionsHtml(
     railModel({
