@@ -38,6 +38,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const OWNER = "litlfred";
 const SHA = /^[0-9a-f]{40}$/;
@@ -67,6 +68,7 @@ export function lockedRefs(root: string): Map<string, string> {
 
 /** This repository's name on GitHub: GITHUB_REPOSITORY, else origin's URL, else the directory. */
 export function ownName(root: string): string {
+  // input-site: env GITHUB_REPOSITORY #bd3896fa — this repository's name, when CI says it
   const env = process.env.GITHUB_REPOSITORY;
   if (env?.startsWith(`${OWNER}/`)) return env.slice(OWNER.length + 1);
   return checkoutName(root);
@@ -81,6 +83,8 @@ export function ownName(root: string): string {
  */
 export function checkoutName(root: string): string {
   try {
+    // input-site: traced #06a06e7d — origin's URL, from this clone's git config: no fingerprint names it, so a run that reaches it records no hash
+    inputSiteReached("workflow-pins: origin's URL");
     const url = execFileSync("git", ["-C", root, "remote", "get-url", "origin"], { encoding: "utf8" }).trim();
     const m = url.match(/[/:]([^/]+?)(\.git)?$/);
     if (m) return m[1];
@@ -92,6 +96,8 @@ export function checkoutName(root: string): string {
 
 function git(root: string, args: string[]): string | null {
   try {
+    // input-site: traced #d3ed1c22 — a pinned commit's tree, fetched from origin when the clone lacks it: a run that reaches it records no hash
+    inputSiteReached("workflow-pins: git");
     return execFileSync("git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return null;
@@ -238,6 +244,7 @@ if (import.meta.main) {
     console.log(`  rewrote ${result.fixed} line(s)${left.length ? `; ${left.length} need a hand pin` : ""}`);
     process.exit(left.length ? 1 : 0);
   }
+  // input-site: env WORKFLOW_PINS_STRICT #4e1adbf3 — when 1, trailing pins fail the check too
   const strict = process.env.WORKFLOW_PINS_STRICT === "1";
   const failing = result.findings.filter((f) => strict || !f.trailing);
   console.log("  run `bun run cat workflow-pins` in an agent session (it needs to push .github/workflows)");

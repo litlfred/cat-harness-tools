@@ -22,7 +22,7 @@ import { moduleRootOf, parseValidatorRef } from "../../schemas/kg/kind-validator
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/theme-by-ref.ts";
 
-import { blankSource, auditClosure, mainBlockLines, outsideTemplates, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
+import { blankSource, auditClosure, isChildSpawn, mainBlockLines, outsideTemplates, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
 import { pluginTableModules, validatorModules } from "../declared-imports.ts";
 import { checkFingerprint, entryFiles, FileDigests, TRACKED, type Fingerprint } from "../input-hash.ts";
 import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "../../schemas/sdlc/input-trace.ts";
@@ -321,6 +321,7 @@ describe("the runtime trace", () => {
   });
 
   test("without the variable set, the hook writes nothing anywhere", () => {
+    // input-site: inert #01b64b17 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const prev = process.env[TRACE_ENV];
     delete process.env[TRACE_ENV];
     try {
@@ -636,5 +637,50 @@ describe("the test bun-spawn rule", () => {
     expect(verdictsOf("x/a.ts", 'Bun.spawnSync(["bun", "x.ts"]);')).toEqual([undefined]);
     expect(verdictsOf("x/a.test.ts", 'spawnSync("bun", ["x.ts"]); spawnSync("ruby", []);')).toEqual([undefined]);
     expect(verdictsOf("x/a.test.ts", 'spawnSync("bunx", ["x"]);')).toEqual([undefined]);
+  });
+});
+
+describe("the test env-write and build-path rules", () => {
+  const verdictsOf = (file: string, line: string) => scanSource(file, `${line}\n`).map((s) => s.verdicts);
+  test("process.env written, deleted or spread whole into a child is inert in a test", () => {
+    for (const line of ['process.env[VAR] = "x";', "delete process.env.CAT_MOUNT_URL_PREFIX;", 'env: { ...process.env, GIT_AUTHOR_NAME: "t" },']) {
+      expect(verdictsOf("x/a.test.ts", line), line).toEqual([[{ kind: "inert" }]]);
+    }
+  });
+  test("a value read from process.env still needs one, in a test or not", () => {
+    for (const line of ["const prev = process.env.X;", "process.env.A = process.env.B;", 'if (process.env.A === "1") run();']) {
+      expect(verdictsOf("x/a.test.ts", line), line).toEqual([undefined]);
+    }
+    expect(verdictsOf("x/a.ts", 'process.env[VAR] = "x";')).toEqual([undefined]);
+  });
+  test("a build directory named in a test is inert: the cone's read set records what the test opens there", () => {
+    expect(verdictsOf("x/a.test.ts", 'const cache = join(tmp, "build", "derive-cache");')).toEqual([[{ kind: "inert" }]]);
+    expect(verdictsOf("x/a.ts", 'const cache = join(tmp, "build", "derive-cache");')).toEqual([undefined]);
+  });
+});
+
+describe("an explicit `spawned` verdict, in a module", () => {
+  const annotated = (verdict: string, line: string): string => `// input-site: ${verdict} #${statementPin([line], 0)} — reviewed\n${line}\n`;
+  const site = (line: string, verdict = "spawned") => scanSource("scripts/x.ts", annotated(verdict, line))[0]!;
+
+  test("annotates a python3 or bun child, inline or a script", () => {
+    expect(site('const r = Bun.spawnSync(["python3", "-c", py, file]);').verdicts).toEqual([{ kind: "spawned" }]);
+    expect(site('spawnSync("bun", [SCRIPT], { cwd });').verdicts).toEqual([{ kind: "spawned" }]);
+    expect(site("spawnSync(process.execPath, [SCRIPT]);").verdicts).toEqual([{ kind: "spawned" }]);
+  });
+
+  test("is malformed on any other spawn", () => {
+    expect(site('spawnSync("curl", [url]);').malformed).toContain("`spawned` is for a spawn of");
+    expect(site("spawnSync(argv[0], argv.slice(1));").malformed).toContain("`spawned` is for a spawn of");
+    expect(site('spawnSync("python3", [a]) || spawnSync("node", [b]);').malformed).toContain("`spawned` is for a spawn of");
+  });
+
+  test("is still implicit nowhere but a test file", () => {
+    expect(scanSource("scripts/x.ts", 'spawnSync("python3", [a]);\n')[0]!.verdicts).toBeUndefined();
+  });
+
+  test("a git spawn alone is no child spawn", () => {
+    expect(isChildSpawn('Bun.spawnSync(["python3", "-c", py]);')).toBe(true);
+    expect(isChildSpawn('spawnSync("git", ["log"]);')).toBe(false);
   });
 });

@@ -1267,7 +1267,9 @@ type Entry = ReturnType<Store["lsTree"]>[number];
  *   written. Creating one here would make it the commit's first write, and the
  *   gates' publish of that commit would then be the one refused.
  * - A ref skipped as unchanged resolves to the entry it was skipped onto, the
- *   same entry a reader of that ref is given.
+ *   same entry a reader of that ref is given. So does a ref with no entry yet
+ *   whose nearest recorded ancestor has one (the checkout's history decides,
+ *   exactly as for a reader).
  * - The entry must verify; a corrupt one is `failed`, never extended.
  */
 export function addQa(
@@ -1313,7 +1315,12 @@ export function addQa(
     let existing = base ? store.lookup(base, kp) : undefined;
     if (!existing && base) {
       const parent = kp.slice(0, kp.lastIndexOf("/"));
-      const resolved = findSkippedTarget(store, base, parent, key.sha);
+      // repoRoot, as every reader passes it: a commit whose gates have not
+      // published yet reads its nearest recorded ancestor, so the add must
+      // land there too, or the daily pages-serving observation is dropped and
+      // `pages-publish-health` reads unknown (folio-assistant health sweep,
+      // 2026-11-02/03/06/08).
+      const resolved = findSkippedTarget(store, base, parent, key.sha, repoRoot);
       if (resolved) {
         target = resolved;
         existing = store.lookup(base, resolved);

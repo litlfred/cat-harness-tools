@@ -244,6 +244,7 @@ export function fileSignedCertification(instanceRoot: string, input: FileCertifi
   if (!input.reportPath) return { state: "refused", reason: "no reportPath — a certification must point at the report it certifies" };
   const entry: CertificationEntry = {
     signer: input.signer,
+    // input-site: inert #2361b9f6 — the time a certification is stamped with when the caller gives none: written, never read back
     timestamp: input.timestamp ?? new Date().toISOString(),
     decision: input.decision,
     testPlanId: input.plan.id,

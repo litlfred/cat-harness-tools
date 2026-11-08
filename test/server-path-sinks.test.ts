@@ -123,6 +123,7 @@ describe("safeSegment(basename(x)) — the composition the upload route now uses
   // then rejects what `basename` legitimately returns but a path must not be.
   it("basename alone CONTAINS a traversal but does not reject it", () => {
     expect(basename("../../../../etc/passwd")).toBe("passwd");
+    // input-site: inert #a9e1a1dc — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(basename("/etc/passwd")).toBe("passwd");
   });
 

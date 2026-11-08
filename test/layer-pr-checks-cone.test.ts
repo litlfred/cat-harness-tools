@@ -101,6 +101,7 @@ interface Run {
 
 function runGates(root: string, mode: string | undefined, spec: Spec | undefined, extraEnv: Record<string, string> = {}): Run {
   const out = mkdtempSync(join(tmpdir(), "cone-out-"));
+  // input-site: inert #cc5526e4 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
   const { GATE_SHARD: _a, GATE_CONE: _b, GATE_CONE_CLI: _c, GATE_TIMINGS: _d, ...rest } = process.env;
   const s = spec === undefined ? undefined : stub(spec);
   const env: NodeJS.ProcessEnv = { ...rest, RUNNER_TEMP, ...extraEnv };
@@ -340,6 +341,7 @@ describe("compare-gates.py with cone-skipped gates", () => {
     const d = mkdtempSync(join(tmpdir(), "cone-compare-"));
     writeFileSync(join(d, "base.json"), JSON.stringify(base));
     writeFileSync(join(d, "head.json"), JSON.stringify(head));
+    // input-site: inert #30464c2d — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const { GITHUB_STEP_SUMMARY: _s, ...env } = process.env;
     const r = spawnSync("python3", ["-I", COMPARE, join(d, "base.json"), join(d, "head.json")], { encoding: "utf-8", env });
     return { status: r.status, out: r.stdout };
@@ -391,6 +393,7 @@ describe("compare-gates.py with a gate main did not run", () => {
     const d = mkdtempSync(join(tmpdir(), "absent-compare-"));
     writeFileSync(join(d, "base.json"), JSON.stringify(base));
     writeFileSync(join(d, "head.json"), JSON.stringify(head));
+    // input-site: inert #30464c2d — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const { GITHUB_STEP_SUMMARY: _s, ...env } = process.env;
     const r = spawnSync("python3", ["-I", COMPARE, join(d, "base.json"), join(d, "head.json")], { encoding: "utf-8", env });
     return { status: r.status, out: r.stdout };

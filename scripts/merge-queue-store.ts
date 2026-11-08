@@ -55,6 +55,7 @@ import "../schemas/kg/folio-graph-typology.js";
 import { MergeQueueEntrySchema, type MergeQueueEntry } from "../schemas/sdlc/merge-queue.ts";
 import { RESERVED, pushMount, readMarker, type BranchStoreOptions, type PushResult } from "./branch-store.ts";
 import { graphReadPath } from "./graph-read.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** The graph typology whose directory holds the queue. The declaration says where. */
 export const QUEUE_KIND = "merge-queue";
@@ -179,7 +180,13 @@ export function readQueueEntries(root: string): QueueEntryFile[] | null {
 }
 
 /** Is this hold still in force at `now`? A hold past its expiry is not a hold. */
-export function holdInForce(e: MergeQueueEntry, now: number = Date.now()): boolean {
+export function holdInForce(e: MergeQueueEntry, at?: number): boolean {
+  let now = at;
+  if (now === undefined) {
+    // input-site: traced #d1f46f57 — the time a hold is checked against when the caller gives none: a run that reaches it records no hash
+    inputSiteReached("merge-queue-store: hold's time");
+    now = Date.now();
+  }
   return e.hold !== undefined && Date.parse(e.hold.expires) > now;
 }
 

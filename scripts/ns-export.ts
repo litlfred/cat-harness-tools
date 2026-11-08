@@ -169,6 +169,7 @@ export function instancesPublishingNs(root = ROOT): string[] {
   const instances = new Set<string>();
   instances.add("cat-harness");
   const platform = findPlatformRoot(root);
+  // input-site: env FOLIO_FIXTURE_CHECKOUT #eac4c68c — a fixture checkout whose instances join the platform's when the variable is set
   const fixture = process.env.FOLIO_FIXTURE_CHECKOUT;
   const roots = [...instanceRootsIn(platform), ...(fixture ? instanceRootsIn(fixture) : [])];
   for (const instRoot of roots) {
@@ -673,7 +674,7 @@ if (import.meta.main) {
       ? argv[outIdx + 1]
       : outDir
         ? join(outDir, "ns.jsonld")
-        // input-site: inert #d1a0656a — an OUTPUT path this script writes, never reads
+        // input-site: inert #b99db878 — an OUTPUT path this script writes, never reads
         : join(repoRootFor(ROOT), target ? `_kg/ns-${target}.jsonld` : "_kg/ns.jsonld");
 
   const { doc, report } = buildVocabulary(ROOT, target, exact);

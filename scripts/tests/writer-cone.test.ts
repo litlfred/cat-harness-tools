@@ -63,6 +63,7 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
   test("git run with an absolute -C at the root is replayed from the root", () => {
     const r = collect([
       `20 getcwd("/work/repo", 4096) = 11`,
+      // input-site: inert #1c312c7e — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
       `20 execve("/usr/bin/git", ["git", "-C", "/work/repo", "remote", "get-url", "origin"], 0x1 /* 3 vars */) = 0`,
     ]);
     expect(r).toEqual({ paths: [], git: [{ cwd: "", args: ["remote", "get-url", "origin"] }], writes: [], absentBefore: [] });
@@ -227,7 +228,9 @@ describe("writerRecordOf and decideWriter", () => {
   });
 
   test("tracedArgv wraps the writer in strace", () => {
+    // input-site: inert #b8af476a — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(tracedArgv(["bun", "run", "cat", "w"], "/tmp/l").slice(-6)).toEqual(["-o", "/tmp/l", "bun", "run", "cat", "w"]);
+    // input-site: inert #1b71d3c1 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(tracedArgv(["x"], "/tmp/l")[0]).toBe("strace");
   });
 });

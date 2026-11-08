@@ -36,6 +36,7 @@ function fixtureRoot(): string {
 }
 
 function env(shard?: string): NodeJS.ProcessEnv {
+  // input-site: inert #6693371f — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
   const { GATE_SHARD: _drop, ...rest } = process.env;
   return shard === undefined ? rest : { ...rest, GATE_SHARD: shard };
 }
@@ -119,6 +120,7 @@ describe("run-gates.py GATE_TIMINGS (cat-harness-tools#397)", () => {
   const file = join(mkdtempSync(join(tmpdir(), "gate-timings-")), "gates.json");
   writeFileSync(file, JSON.stringify(timings));
   const timed = (shard: string, path = file) => {
+    // input-site: inert #5eb54616 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const { GATE_SHARD: _s, GATE_TIMINGS: _t, ...rest } = process.env;
     const r = spawnSync("python3", ["-I", RUN_GATES, root, "--list"], { encoding: "utf-8", env: { ...rest, GATE_SHARD: shard, GATE_TIMINGS: path } });
     if (r.status !== 0) throw new Error(`--list exited ${r.status}: ${r.stderr}`);

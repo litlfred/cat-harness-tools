@@ -49,6 +49,8 @@ import {
   noteFileName,
   type BeanNoteFrontMatter,
 } from "../schemas/sdlc/bean-note.ts";
+import { resolveBeanDefs } from "./beans.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 export const ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -314,6 +316,9 @@ function main(argv: string[]): number {
       return 0;
     }
     if (argv.includes("--check")) {
+      // An instance with no bean store has no notes to check (smart-ips-pilgrimage#13).
+      const where = resolveBeanDefs(ROOT);
+      if (where.absent) exitNotApplicable("beans:notes:check", `this checkout has no bean store (${where.unreachable})`);
       const { findings, stale } = checkNotes();
       report(findings);
       if (stale) console.error("  ✗ the bean-notes index is stale — run `bun run cat beans:notes`");

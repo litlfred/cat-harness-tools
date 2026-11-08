@@ -44,6 +44,7 @@ function run(pathname: string, exists: string[]) {
       return { ok: false };
     },
   };
+  // input-site: inert #ae2239d5 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   new Function(...Object.keys(g), js)(...Object.values(g));
   return { detail, heads };
 }

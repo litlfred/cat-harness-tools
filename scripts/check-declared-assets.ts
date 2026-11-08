@@ -16,15 +16,23 @@
  * - **missing** — declared and not on disk. A finding: somebody asserted this
  *   file is ours (unlike a conventional directory an instance may not use).
  * - **dead link** — a relative target that does not resolve.
- * - **not checked** — a non-markdown asset, or a link this cannot resolve
- *   offline (`http(s)`, `mailto`). Reported as such and never counted clean.
+ * - **not checked** — a non-markdown asset, a link this cannot resolve
+ *   offline (`http(s)`, `mailto`), or a link into one of the instance's own
+ *   declared directories that is not on disk in this checkout. Reported as
+ *   such and never counted clean.
+ *
+ * The last case is a site that mounts only some of a layer's directories
+ * (an `overrides.<instance>.directories` list in `index.config.json`): the
+ * layer's README may link into a directory the site chose not to mount, and
+ * that link is not dead, only out of this checkout. Whether a declared
+ * directory exists at all is `check:declared-dirs`'s question, not this one.
  *
  * Exit codes: 0 clean · 1 any missing asset or dead link.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, resolve, sep } from "node:path";
 
-import { declaredAssets, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { declaredAssets, instanceDirectories, instanceRootsIn } from "../schemas/kg/cat-harness.js";
 import { movesResolver } from "./check-agent-entry-links.ts";
 
 /**
@@ -75,6 +83,20 @@ export function isCheckable(target: string): boolean {
   return !/^[a-z][a-z0-9+.-]*:/i.test(target);
 }
 
+/**
+ * The declared directory of `root` that `abs` falls inside, when that
+ * directory is not on disk here (a mount that left it out). `undefined`
+ * when `abs` is in no declared directory, or the directory is present.
+ */
+export function unmountedDirectory(root: string, abs: string): string | undefined {
+  for (const d of instanceDirectories(root)) {
+    const dir = resolve(root, d.path);
+    if (dir === resolve(root)) continue;
+    if ((abs === dir || abs.startsWith(dir + sep)) && !existsSync(dir)) return d.id;
+  }
+  return undefined;
+}
+
 export function auditInstance(
   root: string,
   resolveMoved: ReturnType<typeof movesResolver> = movesResolver(root),
@@ -101,6 +123,10 @@ export function auditInstance(
       if (!path) continue;
       const abs = resolve(dirname(a.absPath), path);
       if (existsSync(abs)) continue;
+      if (unmountedDirectory(root, abs) !== undefined) {
+        notChecked += 1;
+        continue;
+      }
       const through = resolveMoved(abs);
       if (through !== undefined) findings.push({ instance: root, asset: a.id, kind: "moved", detail: `${target} (${through.move})` });
       else findings.push({ instance: root, asset: a.id, kind: "dead-link", detail: target });
@@ -137,7 +163,7 @@ if (import.meta.main) {
     // were seven. The names are what a reader checks against the repository.
     `${declared} declared asset(s) across ${instances.length} instance(s) ` +
       `(${instances.map((p) => basename(p) || p).sort().join(", ")}); ` +
-      `${findings.length} finding(s), ${notChecked} not checked (external or non-markdown)`,
+      `${findings.length} finding(s), ${notChecked} not checked (external, non-markdown or not mounted)`,
   );
   process.exit(findings.length > 0 ? 1 : 0);
 }
