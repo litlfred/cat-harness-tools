@@ -2,15 +2,15 @@
 # cat-tools-sm8r
 $schema: bean/1.0.0
 title: 'A local gate run reddens every later state:mount: its own steps write into the mounted layers'
-status: todo
+status: in-progress
 type: bug
 priority: normal
 tags:
     - ci-speed
     - pp9g
 created_at: 2026-11-06T05:00:00Z
-updated_at: 2026-11-06T05:00:00Z
-parent: cat-tools-pp9g
+updated_at: 2026-11-08T14:35:00Z
+parent: folio-assistant-1xhc
 ---
 
 Found re-timing the pre-push hook (`pp9g`) on a cold, freshly mounted
@@ -84,29 +84,27 @@ untouched, so it cannot change the outcome.
 
 "Build all four", in this order:
 
-1. `remote-mount` skips the fetch when it cannot help (above, fix 1);
-2. a local `gates` run does each setup command once (fix 2);
-3. regenerate the stale committed glossaries in cat-harness, who-iris and
-   folio-assistant-core against the pins, one PR per layer;
-4. **no CI step writes inside a mount**: move the IG index, the QA copy, the
+- [x] 1. `remote-mount` skips the fetch when it cannot help (above, fix 1) — merged in `litlfred/cat-harness-tools#1565` (`213a9495`);
+- [x] 2. a local `gates` run does each setup command once (fix 2) — merged in `litlfred/cat-harness-tools#1578` (`64f0aa0b`);
+- [x] 3. regenerate the stale committed glossaries in cat-harness, who-iris and
+   folio-assistant-core against the pins, one PR per layer — measured as pin skew between locks and dropped per owner's ruling in `litlfred/cat-harness-tools#1554` (`a9374293`), replaced by pin alignment (`litlfred/smart-trust-phw#47` `b0d1ef8b`) and lock-consistency gate `litlfred/cat-harness-tools#1571` (`c73e95b2`);
+- [ ] 4. **no CI step writes inside a mount**: move the IG index, the QA copy, the
    docs and the glossary output out of the mounted layers. It touches many
    writers, so it is a written plan in this bean before any code.
 
 Measure before and after for each.
 
-Already in flight, consistent with the ruling:
+Merged across the stack for this bean (11 PRs):
 
-- cat-harness-tools#1558: `builtAtPublish` applies to every pinned
-  directory of an instance. It was ignored for one pinned as several
-  (smart-trust ×7, smart-trust-phw ×4). A bug fix on its own.
-- cat-harness-tools#1559: `check:published-packages` runs pytest without
-  writing `__pycache__/` or `.pytest_cache/` into the mounted
-  cat-harness-tools. That is fix 4 for that writer. Two tracked `.pyc` files
-  are untracked.
-- smart-base#310, smart-trust#142, smart-trust-phw#33: declare
-  `fhir-artifact-index/sidecars/` and `contexts/` built. **Back to draft**,
-  because the ruling moves the IG index out of the mounts instead; the plan
-  in fix 4 decides whether they are needed at all.
+- `litlfred/cat-harness-tools#1554` (`a9374293`): bean `sm8r` measurements, owner ruling, item 3 pin-skew proof and item 4 plan.
+- `litlfred/cat-harness-tools#1558` (`7e6976d3`): `builtAtPublish` applies to every pinned directory of an instance (was ignored for instances pinned as several directories: `smart-trust` ×7, `smart-trust-phw` ×4).
+- `litlfred/cat-harness-tools#1559` (`ac56dc3b`): `check:published-packages` runs pytest without writing `__pycache__/` or `.pytest_cache/` into the mounted `cat-harness-tools` (fix 4 for that writer; untracks two tracked `.pyc` files).
+- `litlfred/cat-harness-tools#1565` (`213a9495`): `remote-mount` skips the remote fetch when every off-lock mount is `edited` and would be left untouched (fix 1; 56.1 / 39.3 s down to 18.6 / 19.2 s).
+- `litlfred/cat-harness-tools#1571` (`c73e95b2`): `check:lock-consistency` ensures every lock in a composition pins one commit of a shared layer (replacing item 3's per-layer glossary regen).
+- `litlfred/cat-harness-tools#1578` (`64f0aa0b`): `gates: a local run performs each setup step once` (`RUN_ONCE_SETUP_STEPS` / `SetupOnce`; fix 2).
+- `litlfred/cat-harness-tools#1602` (`b22a9cec`): `scripts/lib/layer-output.ts` (`outputPathFor` / `readPathFor` over `build/layers/<instance>/<rel>`; item 4, plan step 1).
+- `litlfred/smart-base#310` (`f0f2d443`), `litlfred/smart-trust#142` (`a8061b23`), `litlfred/smart-trust-phw#33` (`307b6c40`): declare `fhir-artifact-index/sidecars/` and `contexts/` as built by `ig-index:build` (`builtAtPublish`), so `ig-index:build` outputs no longer dirty the mounted IG layers.
+- `litlfred/smart-trust-phw#47` (`b0d1ef8b`): align pins to `smart-base` `60d9b47` (wave 4 pin alignment).
 
 ## Which step writes into which mount (measured 2026-11-06)
 
@@ -194,16 +192,14 @@ by its write sites, in the same style as `check:input-sites`.
 | prose rewrite (writer not yet identified) | `cat-harness/docs/{concepts,guides,process}/*.md`, `test/attestations/**` | 7 | to find first: it rewrites COMMITTED source, which no step may do |
 
 ### Order (one PR each, measured before and after)
-1. The resolver and its write-site check, warning only.
-2. `ig-index:build` and its readers (smallest reader set; that also
-   retires smart-base#310, smart-trust#142 and smart-trust-phw#33, now
-   drafts).
-3. `glossary:page`.
-4. The docs writers.
-5. `qa:refresh`, the largest and most-read; the QA stamp work of CI speed
+- [x] 1. The resolver (`scripts/lib/layer-output.ts`, merged in `litlfred/cat-harness-tools#1602` `b22a9cec`) and its write-site check, warning only.
+- [x] 2. `ig-index:build` and its readers (`builtAtPublish` multi-directory support merged in `litlfred/cat-harness-tools#1558` `7e6976d3`, plus `fhir-artifact-index/sidecars/` and `contexts/` declared built in `litlfred/smart-base#310` `f0f2d443`, `litlfred/smart-trust#142` `a8061b23`, and `litlfred/smart-trust-phw#33` `307b6c40`, with pin alignment in `litlfred/smart-trust-phw#47` `b0d1ef8b`; migration of `ig-index:build` onto `layer-output.ts` can follow as readers move).
+- [ ] 3. `glossary:page`.
+- [ ] 4. The docs writers.
+- [ ] 5. `qa:refresh`, the largest and most-read; the QA stamp work of CI speed
    14 lands on the same paths, so coordinate.
-6. Find the prose rewriter, and stop it writing committed source.
-7. The write-site check goes from warning to red.
+- [ ] 6. Find the prose rewriter, and stop it writing committed source.
+- [ ] 7. The write-site check goes from warning to red.
 
 ### Done when
 In a fresh composed checkout, after a full local gate run,
