@@ -26,8 +26,21 @@ import { gateOwnsFile } from "./lib/gate-own.ts";
 const REPO = resolve(import.meta.dir, "../..");
 const WORKFLOWS = join(REPO, ".github", "workflows");
 
-/** `bun run <script>.ts --check [flags]`, as a workflow spells it. */
-const INVOCATION = /bun run ([\w/.-]+\.ts)((?:\s+--[\w-]+)*\s+--check(?:\s+--[\w-]+)*)/g;
+/**
+ * `bun run <script>.ts --check [flags]`, as a workflow spells it, or
+ * `bun <script>.ts --check [flags]`, which bun runs the same way.
+ *
+ * cat-harness-tools#1701: smart-ips-pilgrimage's `translations.yml` runs
+ * `bun input/scripts/translation-pot.ts --check` with no `run`, so the gate
+ * found nothing in that root and exited 2 ("could not determine") although
+ * the root's CI does run a direct `--check`. The bare form must END after its
+ * flags (end of line, or a shell operator), so a call that takes a positional
+ * or valued argument the gate cannot reproduce (`--check --repo "$own"`) is
+ * not run with that argument cut off; the `bun run` form is matched exactly as
+ * before.
+ */
+const INVOCATION =
+  /bun run ([\w/.-]+\.ts)((?:\s+--[\w-]+)*\s+--check(?:\s+--[\w-]+)*)|bun ([\w/.-]+\.ts)((?:[ \t]+--[\w-]+)*[ \t]+--check(?:[ \t]+--[\w-]+)*)(?=[ \t]*(?:$|[|;&)#]))/gm;
 
 export interface CiInvocation {
   script: string;
@@ -42,11 +55,11 @@ export function ciInvocations(dir = WORKFLOWS): CiInvocation[] {
   for (const f of readdirSync(dir).filter((f) => f.endsWith(".yml") || f.endsWith(".yaml"))) {
     const text = readFileSync(join(dir, f), "utf-8");
     for (const m of text.matchAll(INVOCATION)) {
-      const script = m[1]!;
+      const script = (m[1] ?? m[3])!;
       // A workflow may run it from a subdirectory; only what exists from the
       // repository root is runnable here, and anything else is reported
       // rather than silently dropped.
-      const args = m[2]!.trim().split(/\s+/);
+      const args = (m[2] ?? m[4])!.trim().split(/\s+/);
       seen.set(`${script} ${args.join(" ")}`, { script, args, workflow: f });
     }
   }

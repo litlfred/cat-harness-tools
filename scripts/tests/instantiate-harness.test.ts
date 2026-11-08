@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  CAT_SCRIPT,
   parseArgs,
   planLines,
   repositoryOfNeed,
@@ -8,7 +13,9 @@ import {
   withHoistedLinker,
   withIgnoredNodeModules,
   withSiteAndApprover,
+  withCatScript,
   withWorkspaces,
+  writeRootBootstrap,
   type Fetcher,
 } from "../instantiate-harness.ts";
 
@@ -101,6 +108,22 @@ describe("the files it writes", () => {
     expect(withWorkspaces({ name: "keep", workspaces: ["a"] }, "r", ["a", "b"])).toEqual({ name: "keep", workspaces: ["a", "b"] });
   });
 
+  test("package.json: `cat` is the bootstrap; the bare runner is replaced, a root's own `cat` kept", () => {
+    expect(withCatScript({ name: "x" })).toEqual({ name: "x", scripts: { cat: CAT_SCRIPT } });
+    expect(withCatScript({ scripts: { cat: "bun cat-harness-tools/scripts/run-script.ts", a: "b" } }).scripts).toEqual({ cat: CAT_SCRIPT, a: "b" });
+    expect(withCatScript({ scripts: { cat: "bun cat-harness/scripts/run-script.ts" } }).scripts).toEqual({ cat: CAT_SCRIPT });
+    expect(withCatScript({ scripts: { cat: "bun my/own.ts" } }).scripts).toEqual({ cat: "bun my/own.ts" });
+  });
+
+  test(".github/: the two bootstrap files, executable", () => {
+    const repo = mkdtempSync(join(tmpdir(), "ih-boot-"));
+    writeRootBootstrap(repo);
+    for (const f of ["cat.ts", "mount-from-lock.sh"]) {
+      expect(existsSync(join(repo, ".github", f))).toBe(true);
+      expect(statSync(join(repo, ".github", f)).mode & 0o111).not.toBe(0);
+    }
+  });
+
   test("bunfig.toml: the hoisted linker, added once", () => {
     expect(withHoistedLinker(undefined)).toBe(`[install]\nlinker = "hoisted"\n`);
     expect(withHoistedLinker(`[install]\n`)).toBe(`[install]\nlinker = "hoisted"\n`);
@@ -122,5 +145,45 @@ describe("the plan", () => {
     const lines = planLines(o, c, "harness/fhir-harness").join("\n");
     for (const s of ["seed", "mount", "install", "instantiate:fhir-harness", "prepare:fhir-harness", "branches/harness-fhir-harness/"]) expect(lines).toContain(s);
     expect(planLines({ ...o, local: true }, c, "b").join("\n")).toContain("--dry-run");
+  });
+});
+
+describe("the root bootstrap, .github/cat.ts", () => {
+  /** A root with the real cat.ts and a stand-in mount-from-lock.sh that lays down a runner echoing its arguments. */
+  const root = (mounted: boolean): string => {
+    const dir = mkdtempSync(join(tmpdir(), "ih-cat-"));
+    writeRootBootstrap(dir);
+    const runner = `console.log("runner", process.argv.slice(2).join(" "));\n`;
+    writeFileSync(join(dir, ".github", "mount-from-lock.sh"), `#!/usr/bin/env bash\necho mounted >> "$2/mount.log"\nmkdir -p "$2/cat-harness-tools/scripts"\nprintf '%s' '${runner}' > "$2/cat-harness-tools/scripts/run-script.ts"\n`);
+    if (mounted) {
+      mkdirSync(join(dir, "cat-harness-tools", "scripts"), { recursive: true });
+      writeFileSync(join(dir, "cat-harness-tools", "scripts", "run-script.ts"), runner);
+    }
+    return dir;
+  };
+  const cat = (dir: string, ...args: string[]) => spawnSync(process.execPath, [join(dir, ".github", "cat.ts"), ...args], { cwd: dir, encoding: "utf-8" });
+
+  test("a fresh clone: mounts once, then runs the runner with the arguments", () => {
+    const dir = root(false);
+    const r = cat(dir, "prepare:x", "--flag");
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe("runner prepare:x --flag\n");
+    expect(readFileSync(join(dir, "mount.log"), "utf-8")).toBe("mounted\n");
+    expect(cat(dir, "again").stdout).toBe("runner again\n");
+    expect(readFileSync(join(dir, "mount.log"), "utf-8")).toBe("mounted\n");
+  });
+
+  test("mounted already: hands over without mounting", () => {
+    const dir = root(true);
+    expect(cat(dir, "a").stdout).toBe("runner a\n");
+    expect(existsSync(join(dir, "mount.log"))).toBe(false);
+  });
+
+  test("a mount that fails stops with its exit code", () => {
+    const dir = root(false);
+    writeFileSync(join(dir, ".github", "mount-from-lock.sh"), "#!/usr/bin/env bash\nexit 2\n");
+    const r = cat(dir, "a");
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("mounting failed");
   });
 });

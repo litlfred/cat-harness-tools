@@ -45,7 +45,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { MOUNT_MARKER_SCHEMA, markerPath } from "../../branch-store.ts";
+import { MOUNT_MARKER_SCHEMA, markerPath, recordAbsence } from "../../branch-store.ts";
 
 import { ContentDirectorySchema, DirectoryStorageSchema, materialiseDirectories, resolveDirectories } from "../../../schemas/kg/cat-harness.js";
 import { censusDirectories } from "../../audit-coverage.js";
@@ -257,7 +257,7 @@ describe("presence checks honour it", () => {
       { absPath: a, storage: STORED },
       { absPath: b, storage: STORED },
     ]);
-    expect(r).toEqual({ files: 0, sidecars: 0, stored: 2, undetermined: 0, uncounted: 0 });
+    expect(r).toEqual({ files: 0, sidecars: 0, stored: 2, undetermined: 0, uncounted: 0, absent: 0 });
   });
 
   test("a directory neither stored nor present is UNCOUNTED, never a census of zero (bean 0dav, C8)", () => {
@@ -266,7 +266,7 @@ describe("presence checks honour it", () => {
     mkdirSync(here);
     writeFileSync(join(here, "x.json"), "{}");
     const r = censusDirectories([{ absPath: here }, { absPath: join(root, "gone") }]);
-    expect(r).toEqual({ files: 1, sidecars: 0, stored: 0, undetermined: 0, uncounted: 1 });
+    expect(r).toEqual({ files: 1, sidecars: 0, stored: 0, undetermined: 0, uncounted: 1, absent: 0 });
   });
 });
 
@@ -328,6 +328,7 @@ describe("a tip-keyed directory is three-valued, and only one value is a pass", 
       stored: 0,
       undetermined: 0,
       uncounted: 0,
+      absent: 0,
     });
 
     // Unmounted: `undetermined`, and NOT `stored` — "could not read the files"
@@ -338,7 +339,26 @@ describe("a tip-keyed directory is three-valued, and only one value is a pass", 
       stored: 0,
       undetermined: 1,
       uncounted: 0,
+      absent: 0,
     });
+  });
+
+  // cat-harness-tools#1701: a graph `state:mount` DETERMINED absent (declared
+  // for every checkout by a mounted instance, not by this root, not on this
+  // remote) is not this checkout's: `absent`, never a lower bound.
+  test("unmounted WITH an absence record is `absent`, not `undetermined`", () => {
+    const root = gitInstance([]);
+    recordAbsence(root, { id: "todos", path: "todos" }, "cat-harness", "declared for every checkout by cat-harness, not by this root");
+    expect(censusDirectories([{ id: "todos", absPath: join(root, "todos"), storage: TIP }], undefined, root)).toEqual({
+      files: 0,
+      sidecars: 0,
+      stored: 0,
+      undetermined: 0,
+      uncounted: 0,
+      absent: 1,
+    });
+    // A different graph with no record stays undetermined.
+    expect(censusDirectories([{ id: "beans", absPath: join(root, "beans"), storage: TIP }], undefined, root).undetermined).toBe(1);
   });
 
   // The MODERN spelling (#1987, bean `l4ay`). `storage` is its legacy form and
@@ -365,6 +385,7 @@ describe("a tip-keyed directory is three-valued, and only one value is a pass", 
       stored: 1,
       undetermined: 0,
       uncounted: 0,
+      absent: 0,
     });
   });
 

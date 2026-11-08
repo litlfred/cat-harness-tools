@@ -122,8 +122,9 @@ import {
 import { sourceLocale, targetLocales } from "./translation-index.ts";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf, readBaseline, type FreshSidecar } from "../scripts/qa-results.ts";
 import { readQaManifest, type QaStoreOptions } from "../scripts/qa-store.ts";
-import { docsSourceDirFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
-import { explicitInstanceRoot, HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { docsSourceDirFor, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { explicitInstanceRoot, HARNESS_ROOT, REPO_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { gateOwnInstances, gateOwnsFile, nothingOwnLine } from "../scripts/lib/gate-own.ts";
 import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "../schemas/kg/qa-record-shapes.ts";
 import { manifestPath } from "./json-manifest.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
@@ -1179,6 +1180,40 @@ function settleSidecar(
  * the gate (`translation:page-qa:check`), so it is one of them: without it the
  * package.json script was refused as "unknown flag(s): --catalogues".
  */
+/**
+ * Why a judge-mode run has nothing of its own to judge, or `undefined` when it
+ * does.
+ *
+ * Owner ruling 2026-11-05, "Move the checks" (`scripts/lib/gate-own.ts`): in a
+ * layer's PR checks a gate judges only what the caller commits. With no
+ * `--instance`, this sweep reads the harness's blocks and docs site, so in a
+ * content repository's pin PR it judged
+ * cat-harness's `docs/concepts/architecture` and `docs/index` translations,
+ * which the caller neither commits nor can fix. The harness's own CI judges
+ * those. Unscoped (a local run, the index's own gates) it judges as before.
+ */
+export function notOwnLine(
+  instanceRoot: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  repoRoot: string = REPO_ROOT ?? instanceRoot,
+): string | undefined {
+  const own = gateOwnInstances(env);
+  let name: string | undefined;
+  try {
+    name = readDeclaration(instanceRoot)?.name;
+  } catch {
+    name = undefined;
+  }
+  if (own !== undefined && name !== undefined && !own.has(name)) {
+    return nothingOwnLine("translation:block-qa", `block or docs page of ${name}`, own);
+  }
+  const rel = relative(repoRoot, instanceRoot) || ".";
+  if (gateOwnsFile(rel, env) === false) {
+    return `✓ translation:block-qa --check: ${rel} is not the caller's own; the owning layer's CI judges its translations.`;
+  }
+  return undefined;
+}
+
 export const JUDGE_FLAGS: readonly string[] = ["--catalogues", "--root", "--locales", "--against", "--instance"];
 
 if (import.meta.main) {
@@ -1189,6 +1224,13 @@ if (import.meta.main) {
   const check = process.argv.includes("--check");
   const GATE = catalogues ? "translation:page-qa:check" : "translation:block-qa:check";
   let against: string | undefined;
+  if (check && explicitInstanceRoot() === undefined) {
+    const skip = notOwnLine(INSTANCE_ROOT);
+    if (skip !== undefined) {
+      console.log(skip);
+      process.exit(0);
+    }
+  }
   if (check) {
     const argv = process.argv.slice(2);
     // `--root` and `--locales` take values; judgeUsage reads only the flags.

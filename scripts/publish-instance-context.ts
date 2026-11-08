@@ -29,8 +29,11 @@
  *
  *   - `gh-pages` present: `GET` the file; identical content is `unchanged`
  *     and nothing is written; otherwise one `PUT` to the contents API. It
- *     writes ONE path and never deletes, so the rest of `gh-pages` (an IG
- *     build, a docs site) is left exactly as it was.
+ *     writes ONE path, so the rest of `gh-pages` (an IG build, a docs site)
+ *     is left exactly as it was. The one delete: when a FILE sits where the
+ *     path needs a directory (a hash-IRI vocabulary at `v0/ns`, left behind
+ *     when its namespace became the slash IRI `v0/ns/`), and that file is a
+ *     JSON document, it is removed so `v0/ns/index.*` can be written.
  *   - `gh-pages` absent: an ORPHAN branch holding `.nojekyll`, the context
  *     and a placeholder `index.html` (the same text `pages-bootstrap
  *     --provision` writes), made with the git-data API (tree, commit with no
@@ -259,7 +262,7 @@ export function vocabularyPaths(id: unknown, iriBase: string, contextPath: strin
 // ── publish ──────────────────────────────────────────────────────
 
 /** The few REST calls `publish` makes; injected so a test reaches no network. */
-export type ApiRequest = (method: "GET" | "PUT" | "POST", path: string, body?: unknown) => Promise<{ status: number; json: unknown }>;
+export type ApiRequest = (method: "GET" | "PUT" | "POST" | "DELETE", path: string, body?: unknown) => Promise<{ status: number; json: unknown }>;
 
 export function githubApi(token: string, base = process.env.GITHUB_API_URL ?? "https://api.github.com"): ApiRequest {
   return async (method, path, body) => {
@@ -330,7 +333,41 @@ async function createOrphanBranch(api: ApiRequest, repo: string, branch: string,
   throw new Error(`create ref: ${errorOf(ref)}`);
 }
 
-/** Put one file on `gh-pages`, creating the branch when it is absent. Never deletes. */
+/** GitHub's 409 when a file sits where the path needs a directory. */
+const FILE_BLOCKS_DIRECTORY = /a file exists where you.re trying to create a subdirectory/i;
+
+/**
+ * Remove the file that sits where `path` needs a directory, when it is a JSON
+ * document (a vocabulary or context this workflow published at a hash IRI).
+ * Anything else is left alone and reported. Returns the removed path.
+ */
+async function removeBlockingFile(api: ApiRequest, o: PublishOptions, branch: string): Promise<{ removed: string } | { problem: string }> {
+  const parts = o.path.split("/");
+  for (let i = 1; i < parts.length; i++) {
+    const p = parts.slice(0, i).join("/");
+    const cur = await api("GET", `/repos/${o.repo}/contents/${enc(p)}?ref=${encodeURIComponent(branch)}`);
+    if (cur.status === 404 || Array.isArray(cur.json)) continue;
+    if (cur.status !== 200) return { problem: `read ${branch}:${p}: ${errorOf(cur)}` };
+    const f = cur.json as { sha: string; content?: string; encoding?: string };
+    let json = false;
+    try {
+      json = f.encoding === "base64" && typeof f.content === "string" && typeof JSON.parse(fromB64(f.content)) === "object";
+    } catch {
+      json = false;
+    }
+    if (!json) return { problem: `${branch}:${p} is a file where ${o.path} needs a directory, and it is not a JSON document, so it is left for a person` };
+    const del = await api("DELETE", `/repos/${o.repo}/contents/${enc(p)}`, {
+      message: `remove ${p}: ${p}/ is now a directory (slash IRI) (layer-publish-context)`,
+      sha: f.sha,
+      branch,
+    });
+    if (del.status !== 200) return { problem: `remove ${branch}:${p}: ${errorOf(del)}` };
+    return { removed: p };
+  }
+  return { problem: `no file found above ${o.path} on ${branch}` };
+}
+
+/** Put one file on `gh-pages`, creating the branch when it is absent. Deletes only a JSON file that blocks the path as a directory. */
 export async function publishFile(api: ApiRequest, o: PublishOptions): Promise<PublishOutcome> {
   const branch = o.branch ?? PAGES_BRANCH;
   const message = messageFor(o);
@@ -346,6 +383,8 @@ export async function publishFile(api: ApiRequest, o: PublishOptions): Promise<P
       return { kind: "failed", detail: `could not tell whether ${branch} exists: ${errorOf(b)}` };
     }
     // Two attempts: a 409 means the branch moved between the read and the write.
+    // A 409 for a file blocking the directory is not an attempt: the file is removed once, then the write retried.
+    let removed: string | undefined;
     for (let attempt = 1; attempt <= 2; attempt++) {
       const cur = await api("GET", `/repos/${o.repo}/contents/${enc(o.path)}?ref=${encodeURIComponent(branch)}`);
       let sha: string | undefined;
@@ -365,7 +404,14 @@ export async function publishFile(api: ApiRequest, o: PublishOptions): Promise<P
         ...(sha ? { sha } : {}),
       });
       if (put.status === 200 || put.status === 201) {
-        return { kind: "updated", detail: `${sha ? "updated" : "added"} ${branch}:${o.path}` };
+        return { kind: "updated", detail: `${sha ? "updated" : "added"} ${branch}:${o.path}${removed ? ` (removed the file ${removed} that stood where its directory goes)` : ""}` };
+      }
+      if (put.status === 409 && !removed && FILE_BLOCKS_DIRECTORY.test(errorOf(put))) {
+        const r = await removeBlockingFile(api, o, branch);
+        if ("problem" in r) return { kind: "failed", detail: `write ${branch}:${o.path}: ${errorOf(put)}; ${r.problem}` };
+        removed = r.removed;
+        attempt--;
+        continue;
       }
       if (put.status !== 409 || attempt === 2) return { kind: "failed", detail: `write ${branch}:${o.path}: ${errorOf(put)}` };
     }

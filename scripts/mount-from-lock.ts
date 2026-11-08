@@ -265,8 +265,17 @@ function declaredBuiltAtPublish(dir: string): string[] | undefined {
   const out: string[] = [];
   for (const n of names) {
     try {
-      const d = JSON.parse(readFileSync(join(dir, n), "utf-8")) as { $schema?: unknown; builtAtPublish?: unknown };
-      if (typeof d.$schema !== "string" || !d.$schema.startsWith("cat-harness-declaration")) continue;
+      const d = JSON.parse(readFileSync(join(dir, n), "utf-8")) as { $schema?: unknown; name?: unknown; builtAtPublish?: unknown };
+      // bootstrap's own layers declare `name` and `needs` with no `$schema`
+      // (the rule `run-gates.py` `is_declaration` reads): a bare
+      // `<name>.json` whose `name` is its file's. Read only by
+      // the harness's `$schema` before cat-harness-tools#1701, so bootstrap's
+      // declared `ns.context.v1.jsonld` (`jsonld:contexts`) was never left
+      // out, and once derive:publish wrote it every mount check read
+      // `bootstrap/ modified` (smart-ips-pilgrimage run 42455839636).
+      const harness = typeof d.$schema === "string" && d.$schema.startsWith("cat-harness-declaration");
+      const bare = d.$schema === undefined && typeof d.name === "string" && `${d.name}.json` === n;
+      if (!harness && !bare) continue;
       found = true;
       if (!Array.isArray(d.builtAtPublish)) continue;
       for (const e of d.builtAtPublish) if (e && typeof e.path === "string") out.push(e.path);

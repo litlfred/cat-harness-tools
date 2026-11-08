@@ -70,6 +70,8 @@ import { isAbsolute, join, resolve } from "node:path";
 import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { parse } from "yaml";
 
+import { rootProfile } from "./lib/root-gate-set.ts";
+
 const ROOT = repoRootFor(resolve(import.meta.dir, ".."));
 
 /** Where the workflows live, relative to the repository root. */
@@ -797,6 +799,23 @@ export function allInvocations(root = ROOT): Invocation[] {
   return out;
 }
 
+/**
+ * Why the allowlist ratchets ({@link FOLIO_PATHS}, {@link FOLIO_WORKDIRS},
+ * {@link workDirBaseline}) cannot be judged STALE in `root`, or null when they can.
+ *
+ * Every entry describes a step of the HARNESS index's own workflows — the root
+ * that carries the gates workflow (`rootProfile` "harness"). In a CONTENT root
+ * (an instance run by layer-pr-checks, e.g. smart-ips-pilgrimage#13) those
+ * steps were never here, so "matches nothing" says nothing about whether the
+ * exemption outlived its step (cat-harness-tools#1701). Both criteria still
+ * judge this root's own workflows in full, and a harness root ratchets as before.
+ */
+export function allowlistsNotOursReason(root: string): string | null {
+  return rootProfile(root) === "content"
+    ? "this is a content root (no .github/workflows/code-quality-gates.yml); the entry exempts a step of the harness index's workflows, not of this root's"
+    : null;
+}
+
 function main(): number {
   const list = process.argv.includes("--list");
   const invocations = allInvocations();
@@ -818,9 +837,16 @@ function main(): number {
 
   // An exemption matching nothing is a claim about the present that stopped
   // being true. Ratchet in the other direction, same as `gates.ts`.
-  const unused = FOLIO_PATHS.filter(
+  const notOurs = allowlistsNotOursReason(ROOT);
+  const unusedAll = FOLIO_PATHS.filter(
     (f) => !invocations.some((i) => i.path.includes(f.match)),
   );
+  // cat-harness-tools#1701: in a content root an unused entry is excused, and
+  // said so, rather than red — see allowlistsNotOursReason.
+  const unused = notOurs === null ? unusedAll : [];
+  for (const f of notOurs === null ? [] : unusedAll) {
+    console.log(`· FOLIO_PATHS entry \`${f.match}\` matches no invocation — not applicable here — ${notOurs}.`);
+  }
 
   console.log(
     `${invocations.length} invocation(s): ${invocations.length - missing.length - undetermined.length - folio.length} resolve, ` +
@@ -861,13 +887,24 @@ function main(): number {
   );
   // Same direction as every other ratchet here: an allowance that no longer
   // matches anything is a claim about the present that stopped being true.
-  const staleBaseline = [...baseline].filter(
+  const staleBaselineAll = [...baseline].filter(
     (k) => !workDirs.some((w) => workDirKey(w) === k && w.verdict !== Verdict.Resolves),
   );
   const folioDirs = workDirs.filter((w) => w.verdict === Verdict.NeedsFolio);
-  const unusedDirs = FOLIO_WORKDIRS.filter(
+  const unusedDirsAll = FOLIO_WORKDIRS.filter(
     (f) => !workDirs.some((w) => w.dir.startsWith(f.match)),
   );
+  // cat-harness-tools#1701: same excuse as FOLIO_PATHS above, for both ratchets.
+  const staleBaseline = notOurs === null ? staleBaselineAll : [];
+  const unusedDirs = notOurs === null ? unusedDirsAll : [];
+  if (notOurs !== null) {
+    for (const k of staleBaselineAll) {
+      console.log(`· workdir-baseline.json entry \`${k}\` matches nothing open — not applicable here — ${notOurs}.`);
+    }
+    for (const f of unusedDirsAll) {
+      console.log(`· FOLIO_WORKDIRS entry \`${f.match}\` matches no declaration — not applicable here — ${notOurs}.`);
+    }
+  }
 
   console.log(
     `${workDirs.length} working-directory declaration(s): ` +

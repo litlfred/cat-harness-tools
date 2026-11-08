@@ -57,6 +57,7 @@ import { join, resolve } from "node:path";
 
 import { beanDefsDir, isOpen, readBeans, type BeanNode } from "./beans.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
+import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 /** Where the accepted-for-now contradictions are recorded. */
 export const BASELINE_FILE = "cat-harness-tools/scripts/bean-rollup-baseline.json";
@@ -328,6 +329,7 @@ if (import.meta.main) {
       github: process.argv.includes("--github"),
     });
   } catch (e) {
+    exitIfBeanStoreAbsent("check:bean-rollup", e);
     console.error(`Could not check bean rollup: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
     process.exit(2);

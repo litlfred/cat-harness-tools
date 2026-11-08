@@ -14,7 +14,7 @@
   "holds": "stamp file",
   "producer": "record-writers",
   "consumers": [
-    "prepare-base (decides whether to record)"
+    "prepare-base (decides whether this push records every writer or only the changed ones)"
   ],
   "savePolicy": "push only",
   "verify": "none needed: it holds no output",

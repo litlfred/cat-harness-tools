@@ -6565,8 +6565,21 @@ export function materialiseDirectories(
     // missing or wrong `scope` rather than a coincidence — and creating an
     // empty twin beside it is the one outcome that helps nobody.
     const otherBase = rootForScope(rootAbs, dir.scope === "repository" ? undefined : "repository");
-    if (otherBase !== base) {
-      const twin = resolve(otherBase, dir.path);
+    const twinPath = resolve(otherBase, dir.path);
+    // A twin that is ITSELF a declared entry of this list is no scope mistake
+    // but a second directory on purpose: cat-harness declares `uploads`
+    // (its own queue) and `checkout-uploads` (the checkout's, `scope:
+    // "repository"`) at the same relative path. In a checkout whose root holds
+    // no `uploads/` yet (an IG repository that is its own index), the guard
+    // read the declared `cat-harness/uploads` as the misplaced content
+    // (cat-harness-tools#1701). An undeclared twin is still refused, and so
+    // is one only the existence-filtered `(default)` convention names: that
+    // entry exists BECAUSE the directory does, so it declares nothing.
+    const twinDeclared = dirs.some(
+      (o) => o !== dir && o.declaredBy !== "(default)" && resolve(rootForScope(rootAbs, o.scope), o.path) === twinPath,
+    );
+    if (otherBase !== base && !twinDeclared) {
+      const twin = twinPath;
       // The condition is "this one is EMPTY and the twin has content", not
       // "this one is absent" — so it DETECTS the mistake already standing as
       // well as preventing a new one. A first draft tested absence only, and

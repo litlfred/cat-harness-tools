@@ -753,6 +753,20 @@ describe("add-only publish (bean 1dre): an observation added to the commit's exi
     expect(t.state === "hit" && [...t.files.keys()]).toEqual([OBS]);
   }, T);
 
+  test("a commit the gates have not published yet adds into its nearest recorded ancestor — the entry its readers are given", () => {
+    const f = fixture();
+    git(f.work, "commit", "-q", "--allow-empty", "-m", "a");
+    const a = git(f.work, "rev-parse", "HEAD").trim();
+    git(f.work, "commit", "-q", "--allow-empty", "-m", "b");
+    const b = git(f.work, "rev-parse", "HEAD").trim();
+    publishQa({ ref: `main/${a}`, roots: [RESULTS] }, f.container("gates"));
+    f.write(OBS, '{"day":1}\n');
+    const r = addQa({ ref: `main/${b}`, roots: ["health"] }, f.container("health"));
+    expect(r).toMatchObject({ state: "added", key: `main/${a}` });
+    const t = readQaTree(`main/${b}`, "health", f.container("reader"));
+    expect(t.state === "hit" && [t.key, [...t.files.keys()]]).toEqual([`main/${a}`, [OBS]]);
+  }, T);
+
   test("CLI: --add needs a --root; added is exit 0, no entry is exit 1 (miss)", () => {
     const f = fixture();
     publishQa({ ref: `main/${SHA_A}`, roots: [RESULTS] }, f.container("gates"));

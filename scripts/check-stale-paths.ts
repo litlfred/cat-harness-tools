@@ -36,6 +36,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { CLOSED_STATUSES, OPEN_STATUSES, readBeanFiles, type BeanFile } from "./bean-store-read.ts";
+import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "../..");
 
@@ -348,6 +349,7 @@ if (import.meta.main) {
   try {
     report = checkStalePaths();
   } catch (e) {
+    exitIfBeanStoreAbsent("check:stale-paths", e);
     console.error(`Could not check stale paths: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
     process.exit(2);

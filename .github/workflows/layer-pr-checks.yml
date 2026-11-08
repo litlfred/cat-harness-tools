@@ -279,10 +279,10 @@ on:
         type: boolean
         default: false
       writer-record-hours:
-        description: "How often, at most, a push to main re-records the page-build writers under strace (bean fwtz). The record takes 40-85 minutes and every run waits for it at its end; a PR uses the newest record and checks it path by path, so an older one still serves. 0 records on every push."
+        description: "How often, at most, a push to main re-records EVERY page-build writer under strace (bean fwtz). Every other push records incrementally (cat-harness-tools#1702): it restores the newest records, skips each writer whose recorded reads still match and keeps its record, and traces only the writers whose inputs moved. The full record takes 70-120 minutes; it bounds how long a carried record lives. 0 records fully on every push."
         required: false
         type: number
-        default: 6
+        default: 24
       writer-skip:
         description: "Skip a derive:publish writer whose recorded reads are unchanged, putting back what it wrote (bean fwtz). A push to the caller's main records each writer under strace; a PR restores the newest record and skips. Off: every writer runs."
         required: false
@@ -921,6 +921,21 @@ jobs:
           if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
             bun run cat smart:pages
           fi
+      - &as-mounted
+        name: Judge the mounts as the lock laid them down, before anything is built on them
+        # cat-harness-tools#1701: mount:remote:check, mount:lock:check and
+        # separation:cutover:check ask whether the pinned bytes are on disk.
+        # In the shards they ran over the prepared tree, after derive:publish
+        # had written pages and QA results into the mounted layers, so every
+        # layer it wrote into read "modified" (smart-ips-pilgrimage run
+        # 42455839636, 8 of 9). Judged here, on the tree the lock produced;
+        # the shards take this answer (run-gates.py `--as-mounted-record`).
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        working-directory: fa
+        env:
+          OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
+        # shellcheck disable=SC2086 -- OWN is empty or one flag and its value
+        run: python3 ../ci/.github/scripts/layer-pr-checks/run-gates.py . --as-mounted "$RUNNER_TEMP/as-mounted.json" $OWN || true
       - &root-gates
         name: The index's own gates over the composed root (layer mode)
         # After the state mount and the IG pages, before derive:publish, which
@@ -955,9 +970,33 @@ jobs:
       # are traced instead: a push to
       # main records what each writer read and wrote; a PR skips a writer whose
       # every recorded read is unchanged and puts back what it wrote.
+      # Published records first (cat-harness-tools#1702; owner 2026-11-08: a
+      # cache is published by whoever re-pins, and CI only reads and checks
+      # it): `refs/cat/writer-records/<commit>` in the caller's repository,
+      # laid down by `writer-records-ref.ts publish`. The PR's base commit's
+      # ref, else main's. Plain git, so it needs no script at this side's pins.
+      # Not found: the Actions cache below, as before.
+      - &writer-ref
+        name: Fetch the published writer records (refs/cat/writer-records)
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        env:
+          REPO_DIR: ${{ inputs.mode == 'layer' && 'src' || 'fa' }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -uo pipefail
+          for ref in "refs/cat/writer-records/$BASE" refs/cat/writer-records/main; do
+            git -C "$REPO_DIR" fetch --quiet --no-tags origin "+$ref:$ref" 2>/dev/null || continue
+            rm -rf fa/build/writer-cone && mkdir -p fa/build/writer-cone
+            idx="$RUNNER_TEMP/writer-ref.index"
+            if GIT_INDEX_FILE="$idx" git -C "$REPO_DIR" --work-tree "$GITHUB_WORKSPACE/fa/build/writer-cone" checkout "$ref" -- . ; then
+              rm -f "$idx"; echo "writer records: $ref ($(git -C "$REPO_DIR" rev-parse --short=12 "$ref"))"; exit 0
+            fi
+            rm -f "$idx"; rm -rf fa/build/writer-cone
+          done
+          echo "writer records: no published ref for $BASE or main; the Actions cache is tried"
       - &writer-cone
         name: Restore main's derive:publish writer records (bean fwtz)
-        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true' && hashFiles('fa/build/writer-cone/records.json') == ''
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/writer-cone
@@ -1052,9 +1091,18 @@ jobs:
           # Reuse on (cat-harness-tools#400): derive:publish keeps reuse off under
           # CI unless a cache directory is named.
           export CAT_DERIVE_CACHE_DIR="$PWD/build/derive-cache"
-          # Writer records (bean fwtz): recorded on a push, used on a PR.
+          # Writer records (bean fwtz): recorded on a push, used on a PR. A
+          # push outside a full window records incrementally: skip a writer
+          # whose reads match and keep its record, trace the rest (#1702).
           if [ "$WRITER_SKIP" = "true" ]; then
-            if [ "${RECORD_WRITERS:-}" = "true" ]; then export CAT_WRITER_RECORD=1
+            if [ "${RECORD_WRITERS:-}" = "true" ]; then
+              export CAT_WRITER_RECORD=1
+              if [ "${WRITER_RECORD_FULL:-true}" != "true" ] && [ -f build/writer-cone/records.json ]; then
+                export CAT_WRITER_SKIP=1
+                echo "writer records: incremental, against the newest records kept"
+              else
+                echo "writer records: full, every writer traced"
+              fi
             elif [ -f build/writer-cone/records.json ]; then export CAT_WRITER_SKIP=1
             else echo "writer skip: no records restored, every writer runs"; fi
           fi
@@ -1093,6 +1141,43 @@ jobs:
         with:
           path: fa/build/writer-cone
           key: writer-cone-v1-${{ github.repository }}-${{ github.sha }}
+      # The gate on published writer records (cat-harness-tools#1702): a push
+      # to main builds every page in full, so it can judge the records PRs
+      # skip with. `publish:writer-records` is red when a writer whose record
+      # matches would have been put back stale; it is judged with the gates.
+      - &writer-records-cached
+        name: The newest runner-kept writer records, for the gate (a push)
+        if: inputs.writer-skip && github.event_name == 'push' && steps.skip-prep.outputs.hit != 'true' && steps.quick.outputs.quick != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/cached-writer-records
+          key: writer-cone-v1-${{ github.repository }}-none-${{ github.run_id }}
+          restore-keys: writer-cone-v1-${{ github.repository }}-
+      - &writer-records-gate
+        name: Judge the published writer records against this full build (a push)
+        if: inputs.writer-skip && github.event_name == 'push' && steps.skip-prep.outputs.hit != 'true' && steps.quick.outputs.quick != 'true'
+        env:
+          REPO_DIR: ${{ inputs.mode == 'layer' && 'src' || 'fa' }}
+        run: |
+          set -uo pipefail
+          verify=fa/cat-harness-tools/scripts/writer-cone-verify.ts
+          if ! grep -q -- '--gate' "$verify" 2>/dev/null; then
+            echo "writer records gate: not at this side's pins (writer-cone-verify.ts has no --gate)"; exit 0
+          fi
+          pub="$RUNNER_TEMP/published-writer-records"
+          rm -rf "$pub"; mkdir -p "$pub"
+          prev=""
+          if git -C "$REPO_DIR" fetch --quiet --no-tags origin "+refs/cat/writer-records/main:refs/cat/writer-records/main" 2>/dev/null &&
+             git -C "$REPO_DIR" show refs/cat/writer-records/main:records.json > "$pub/records.json" 2>/dev/null; then
+            prev="--prev $pub/records.json"
+          elif [ -f "$RUNNER_TEMP/cached-writer-records/records.json" ]; then
+            # Not published by a re-pinner: the records a runner kept (layer mode), judged the same way.
+            cp "$RUNNER_TEMP/cached-writer-records/records.json" "$pub/records.json"
+            prev="--prev $pub/records.json"
+          fi
+          cd fa
+          # shellcheck disable=SC2086 -- prev is empty or one flag and its value
+          bun cat-harness-tools/scripts/writer-cone-verify.ts $prev --gate "$RUNNER_TEMP/derive-publish.json" --summary "$GITHUB_STEP_SUMMARY" || true
       # The typecheck, once, here: it was its own job, a third machine and
       # a third wait for one `tsc` (cat-harness-tools#397). Its outcome goes
       # to the compare job, which fails on it, so the shards still run.
@@ -1166,6 +1251,7 @@ jobs:
           python3 ci/.github/scripts/layer-pr-checks/snapshot.py save fa "$RUNNER_TEMP/mounted.txt" "$RUNNER_TEMP/prepared/root"
           cp "$RUNNER_TEMP/derive-publish.json" "$RUNNER_TEMP/prepared/"
           if [ -f "$RUNNER_TEMP/root-gates.json" ]; then cp "$RUNNER_TEMP/root-gates.json" "$RUNNER_TEMP/prepared/"; fi
+          if [ -f "$RUNNER_TEMP/as-mounted.json" ]; then cp "$RUNNER_TEMP/as-mounted.json" "$RUNNER_TEMP/prepared/"; fi
           # The previous run's gate seconds, so the shards balance by time.
           if [ -f "$RUNNER_TEMP/timings/gates.json" ]; then cp "$RUNNER_TEMP/timings/gates.json" "$RUNNER_TEMP/prepared/timings.json"; fi
           zstd -q -T0 --rm "$RUNNER_TEMP/prepared/root.tar"
@@ -1280,17 +1366,20 @@ jobs:
       # True on the first harness PR: main had no lock, so main's side is
       # the PR's own tree (see the base-root step).
       first-setup: ${{ steps.base-root.outputs.first-setup == 'true' }}
-      # Whether this push re-records the page-build writers (writer-record-hours).
-      record-writers: ${{ steps.writer-stamp.outputs.record }}
+      # Whether this push re-records every page-build writer (writer-record-hours);
+      # otherwise it records incrementally (cat-harness-tools#1702).
+      writer-record-full: ${{ steps.writer-stamp.outputs.full }}
       writer-bucket: ${{ steps.writer-bucket.outputs.bucket }}
     steps:
       # The same matrix as prepare-head's; a push has no prepare-head.
       - *shards
       - *tools-lock
-      # Has a push recorded the page-build writers in this window? (bean fwtz;
+      # Has a push recorded every page-build writer in this window? (bean fwtz;
       # owner, 2026-11-01, card Q-CIS-2 A: off the main path.) A cache key per
       # window of `writer-record-hours`: the first push in a window records
-      # and saves the stamp, the rest skip the 40-85 minute job.
+      # every writer and saves the stamp; the rest record incrementally, tracing
+      # only the writers whose reads moved (cat-harness-tools#1702, option D of
+      # the 2026-11-08 CI bottleneck analysis: records from every main batch).
       - name: Is a writer record due? (a push)
         id: writer-bucket
         if: github.event_name == 'push' && inputs.writer-skip
@@ -1308,17 +1397,17 @@ jobs:
           path: ${{ runner.temp }}/writer-stamp
           key: writer-record-stamp-v1-${{ github.repository }}-${{ steps.writer-bucket.outputs.bucket }}
           lookup-only: true
-      - name: Record the writers on this push?
+      - name: Record every writer on this push, or only the ones whose reads moved?
         id: writer-stamp
         if: steps.writer-bucket.outcome == 'success'
         env:
           HIT: ${{ steps.writer-stamp-lookup.outputs.cache-hit == 'true' }}
         run: |
           if [ "$HIT" = "true" ]; then
-            echo "the page-build writers were recorded in this ${{ inputs.writer-record-hours }}-hour window: not recorded again"
-            echo "record=false" >> "$GITHUB_OUTPUT"
+            echo "every page-build writer was recorded in this ${{ inputs.writer-record-hours }}-hour window: this push records incrementally"
+            echo "full=false" >> "$GITHUB_OUTPUT"
           else
-            echo "record=true" >> "$GITHUB_OUTPUT"
+            echo "full=true" >> "$GITHUB_OUTPUT"
           fi
       - *judging-scripts
       - *pin-restore
@@ -1518,12 +1607,16 @@ jobs:
       - *install
       - *chromium
       - *state-mount
+      - *as-mounted
       - *root-gates
       - *derive-cache
+      - *writer-ref
       - *writer-cone
       - *strace
       - *derive
       - *writer-cone-save
+      - *writer-records-cached
+      - *writer-records-gate
       - *timings-restore
       - *snapshot-save
       - *upload-prepared
@@ -1536,14 +1629,22 @@ jobs:
   record-writers:
     name: Record main's page-build scripts (bean fwtz)
     needs: [prepare-base]
+    # Every push (cat-harness-tools#1702): a full record once per
+    # `writer-record-hours` window, an incremental one otherwise. LAYER mode
+    # only (owner 2026-11-08, hybrid): a layer's PRs take the lower layers at
+    # main, so the writers' code moves with every lower-layer merge and no
+    # re-pin marks it. An index-mode repository changes that code only when
+    # it re-pins, so its re-pinner publishes the records
+    # (`writer-records-ref.ts publish`) and no runner records them.
     if: >-
-      !cancelled() && inputs.writer-skip && github.event_name == 'push' &&
-      needs.prepare-base.outputs.record-writers == 'true'
+      !cancelled() && inputs.writer-skip && inputs.mode == 'layer' && github.event_name == 'push' &&
+      needs.prepare-base.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       SIDE: base
       RECORD_WRITERS: "true"
+      WRITER_RECORD_FULL: ${{ needs.prepare-base.outputs.writer-record-full != 'false' }}
     steps:
       - id: skip-prep
         run: echo "hit=false" >> "$GITHUB_OUTPUT"
@@ -1569,16 +1670,25 @@ jobs:
       - *install
       - *chromium
       - *state-mount
+      # An incremental record starts from the newest records a push kept, and
+      # the outputs entries beside them, which a skipped writer is put back from.
+      - name: Restore the newest writer records (an incremental record)
+        if: env.WRITER_RECORD_FULL != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fa/build/writer-cone
+          key: writer-cone-v1-${{ github.repository }}-${{ github.sha }}
+          restore-keys: writer-cone-v1-${{ github.repository }}-
       - *strace
       - *derive
       - *writer-cone-save
       - name: Stamp this window's writer record (writer-record-hours)
-        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        if: env.WRITER_RECORD_FULL == 'true' && steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
         run: |
           mkdir -p "$RUNNER_TEMP/writer-stamp"
           printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/writer-stamp/sha"
       - name: Keep the stamp
-        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        if: env.WRITER_RECORD_FULL == 'true' && steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
         continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -1650,6 +1760,7 @@ jobs:
           python3 ci/.github/scripts/layer-pr-checks/snapshot.py apply fa "$p/root"
           cp "$p/derive-publish.json" "$RUNNER_TEMP/derive-publish.json"
           if [ -f "$p/root-gates.json" ]; then cp "$p/root-gates.json" "$RUNNER_TEMP/root-gates.json"; fi
+          if [ -f "$p/as-mounted.json" ]; then cp "$p/as-mounted.json" "$RUNNER_TEMP/as-mounted.json"; fi
           # The same seconds in every shard of this side, so they agree on the split.
           if [ -f "$p/timings.json" ]; then echo "GATE_TIMINGS=$p/timings.json" >> "$GITHUB_ENV"; fi
       # The CI cone's records (bean `4rbc`, cat-harness-tools#398): the newest
@@ -1776,7 +1887,7 @@ jobs:
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
           MODE: ${{ inputs.mode }}
           SIDE: ${{ env.SIDE }}
-        # shellcheck disable=SC2086 -- OWN and ROOT_GATES are empty or one flag and its value
+        # shellcheck disable=SC2086 -- OWN, ROOT_GATES and AS_MOUNTED are empty or one flag and its value
         run: |
           set -euo pipefail
           export GATE_JUNIT="$RUNNER_TEMP/junit.xml"
@@ -1794,7 +1905,11 @@ jobs:
           # passed there, so a side that wrote none is recorded as exit 2.
           ROOT_GATES=""
           [ "$MODE" = "layer" ] && ROOT_GATES="--record $RUNNER_TEMP/root-gates.json"
-          python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES
+          # The mount gates, judged by the prepare job on the tree as mounted
+          # (cat-harness-tools#1701); with no record they run here as before.
+          AS_MOUNTED=""
+          [ -f "$RUNNER_TEMP/as-mounted.json" ] && AS_MOUNTED="--as-mounted-record $RUNNER_TEMP/as-mounted.json"
+          python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES $AS_MOUNTED
       # The artefact's own name, inside it: when the compare job's download
       # matches ONE artefact (one shard, one side), the action unpacks it into
       # `results/` itself rather than `results/<name>/`, and this file is how

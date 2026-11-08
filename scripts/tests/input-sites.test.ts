@@ -22,7 +22,7 @@ import { moduleRootOf, parseValidatorRef } from "../../schemas/kg/kind-validator
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/theme-by-ref.ts";
 
-import { blankSource, auditClosure, mainBlockLines, outsideTemplates, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
+import { blankSource, auditClosure, isChildSpawn, mainBlockLines, outsideTemplates, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
 import { pluginTableModules, validatorModules } from "../declared-imports.ts";
 import { checkFingerprint, entryFiles, FileDigests, TRACKED, type Fingerprint } from "../input-hash.ts";
 import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "../../schemas/sdlc/input-trace.ts";
@@ -656,5 +656,31 @@ describe("the test env-write and build-path rules", () => {
   test("a build directory named in a test is inert: the cone's read set records what the test opens there", () => {
     expect(verdictsOf("x/a.test.ts", 'const cache = join(tmp, "build", "derive-cache");')).toEqual([[{ kind: "inert" }]]);
     expect(verdictsOf("x/a.ts", 'const cache = join(tmp, "build", "derive-cache");')).toEqual([undefined]);
+  });
+});
+
+describe("an explicit `spawned` verdict, in a module", () => {
+  const annotated = (verdict: string, line: string): string => `// input-site: ${verdict} #${statementPin([line], 0)} — reviewed\n${line}\n`;
+  const site = (line: string, verdict = "spawned") => scanSource("scripts/x.ts", annotated(verdict, line))[0]!;
+
+  test("annotates a python3 or bun child, inline or a script", () => {
+    expect(site('const r = Bun.spawnSync(["python3", "-c", py, file]);').verdicts).toEqual([{ kind: "spawned" }]);
+    expect(site('spawnSync("bun", [SCRIPT], { cwd });').verdicts).toEqual([{ kind: "spawned" }]);
+    expect(site("spawnSync(process.execPath, [SCRIPT]);").verdicts).toEqual([{ kind: "spawned" }]);
+  });
+
+  test("is malformed on any other spawn", () => {
+    expect(site('spawnSync("curl", [url]);').malformed).toContain("`spawned` is for a spawn of");
+    expect(site("spawnSync(argv[0], argv.slice(1));").malformed).toContain("`spawned` is for a spawn of");
+    expect(site('spawnSync("python3", [a]) || spawnSync("node", [b]);').malformed).toContain("`spawned` is for a spawn of");
+  });
+
+  test("is still implicit nowhere but a test file", () => {
+    expect(scanSource("scripts/x.ts", 'spawnSync("python3", [a]);\n')[0]!.verdicts).toBeUndefined();
+  });
+
+  test("a git spawn alone is no child spawn", () => {
+    expect(isChildSpawn('Bun.spawnSync(["python3", "-c", py]);')).toBe(true);
+    expect(isChildSpawn('spawnSync("git", ["log"]);')).toBe(false);
   });
 });
