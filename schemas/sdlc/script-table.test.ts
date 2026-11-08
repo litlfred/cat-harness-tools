@@ -15,7 +15,7 @@ describe("scriptTable at a root that is itself an instance", () => {
   test("a name in both `scripts` and `checkoutScripts` of the root is its `scripts` spelling", () => {
     const t = scriptTable(rootWith({
       scripts: { "check:x": "bun run tool.ts ." },
-      checkoutScripts: { "check:x": "bun run tool.ts who-iris", "only:host": "bun run h.ts" },
+      checkoutScripts: { "check:x": "bun run tool.ts self", "only:host": "bun run h.ts" },
     }));
     expect(t.get("check:x")?.command).toBe("bun run tool.ts .");
     expect(t.get("only:host")?.command).toBe("bun run h.ts");

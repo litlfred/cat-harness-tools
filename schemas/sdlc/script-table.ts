@@ -69,7 +69,7 @@ export function scriptTable(repoRoot: string): Map<string, ScriptEntry> {
   };
   const rootPkg = readJson(join(root, "package.json"));
   add(rootPkg?.scripts, "package.json");
-  // A root that is itself an instance (who-iris) declares each script twice in
+  // A root that is itself an instance (an IRIS or IG repository) declares each script twice in
   // ONE manifest: `scripts` with root paths, `checkoutScripts` with the paths a
   // host that mounts it uses. At its own root the `scripts` spelling is the one
   // that runs, so a `checkoutScripts` name it already has is not a second declaration.
