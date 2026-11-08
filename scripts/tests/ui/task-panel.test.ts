@@ -31,8 +31,8 @@ import {
   taskSkillsDeclared,
   unlinkedPanelRefs,
 } from "../../lib/task-panel.ts";
-import { panelContext, processPage, processRows, taskPanelData, type PanelContext, type ProcessRow } from "../../gen-processes-viz.ts";
-import { skillTarget, sourceSkillPage } from "../../lib/skill-pages.ts";
+import { instanceRoots, panelContext, processPage, processRows, taskPanelData, type PanelContext, type ProcessRow } from "../../gen-processes-viz.ts";
+import { skillLinksOf, skillTarget, sourceSkillPage } from "../../lib/skill-pages.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 // A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
@@ -358,14 +358,20 @@ describe("the real corpus", () => {
   test("every skill a panel names links somewhere — bootstrap's confirm-harness to its source (owner, 2026-11-08)", async () => {
     const rows = (await processRows(REPO)).filter((r) => r.loadError === undefined);
     const ctx = panelContext(REPO);
+    // What this checkout can link: a page, or a source file the forge can
+    // place. Standing alone (no index lock, no origin) the forge places
+    // nothing, and a skill whose layer is not here has no file at all; the
+    // QA page reports those, and this guards the rest.
+    const links = skillLinksOf(REPO, instanceRoots(REPO));
+    const linkable = (s: string): boolean => links.has(s) || (links.sources?.has(s) ?? false);
     const discussion = rows.find((r) => r.id === "Process_Discussion");
-    if (discussion) {
+    if (discussion && linkable("confirm-harness")) {
       const s = taskPanelData(discussion, rows, ctx).tasks["A_ListHarnesses"]!.skills.find((x) => x.name === "confirm-harness");
       expect(s?.href).toMatch(/confirm-harness\.(html|md)$/);
     }
     const unlinked = rows.flatMap((r) =>
       unlinkedPanelRefs(taskPanelData(r, rows, ctx))
-        .filter((x) => x.kind === "skill" || x.kind === "role-skill")
+        .filter((x) => (x.kind === "skill" || x.kind === "role-skill") && linkable(x.name))
         .map((x) => `${r.file}: ${x.kind} ${x.name} at ${x.task}`),
     );
     expect(unlinked).toEqual([]);

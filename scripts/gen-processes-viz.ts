@@ -335,7 +335,7 @@ const uniq = (xs: string[]): string[] => [...new Set(xs.filter((x) => x))].sort(
  * declares its own three diagrams and `cat-harness` does not reach them, so a
  * single-root index would omit them silently rather than group them.
  */
-function instanceRoots(repo: string): string[] {
+export function instanceRoots(repo: string): string[] {
   const out: string[] = [];
   for (const e of readdirSync(repo, { withFileTypes: true })) {
     if (!e.isDirectory() || e.name.startsWith(".") || e.name === "node_modules") continue;
