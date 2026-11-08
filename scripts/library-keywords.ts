@@ -210,13 +210,13 @@ export function libraryKeywords(libRoot: string, repoRoot = ROOT, variants: read
 }
 
 /** One library entry, as the library graph names it. */
-interface EntryRef {
+export interface EntryRef {
   id: string;
   instance: string;
   dir: string;
 }
 
-function entriesOf(repoRoot: string): EntryRef[] {
+export function entriesOf(repoRoot: string): EntryRef[] {
   // Discovery starts from the cat-harness declaration, as gen-library-viz does.
   const g = readLibraryGraph([join(repoRoot, "cat-harness"), repoRoot], repoRoot);
   return (g?.entries ?? []).map((e) => ({ id: e.id, instance: e.instance, dir: e.dir }));
