@@ -15,7 +15,7 @@
  * four weeks), so a re-pin of that layer failed on a report three days old.
  *
  * The step, after a mount whose lock moved the cat-harness-tools pin, for a
- * checkout whose OWN instances declare a `health` graph:
+ * checkout whose OWN layers declare a `health` graph:
  *
  * 1. `state:mount`, so the report's branch is on disk;
  * 2. `bun run cat health -- --warn`, which writes the report at the new pins
@@ -33,7 +33,7 @@ import { join, relative, resolve, sep } from "node:path";
 
 import { directoriesForGraph, instanceRootsIn } from "../../schemas/kg/cat-harness.js";
 
-/** The instance whose pin moving makes a health report stale: it holds the checker. */
+/** The layer whose pin moving makes a health report stale: it holds the checker. */
 export const CHECKER_INSTANCE = "cat-harness-tools";
 
 /** The cat-harness-tools commit a lock's text pins, or `undefined` when it pins none or does not parse. */
@@ -54,8 +54,8 @@ export function checkerMoved(before: string | undefined, after: string | undefin
 }
 
 /**
- * The `health` directories the checkout's OWN instances declare, relative to
- * the root. An instance inside a mounted directory is a mount, and its report
+ * The `health` directories the checkout's OWN layers declare, relative to
+ * the root. A layer inside a mounted directory is a mount, and its report
  * belongs to its own repository.
  */
 export function ownHealthPaths(root: string): string[] {
@@ -107,7 +107,7 @@ export function refreshOwnHealth(root: string, paths: readonly string[], run: Ru
     const tail = r && !ok ? `: ${(r.stderr || r.stdout).trim().split("\n").slice(-2).join(" | ")}` : "";
     lines.push(`  ${ok ? "✓" : "✗"} ${what}${tail}`);
   };
-  // `state:mount` exits 1 for any instance it reports (an unverified approver
+  // `state:mount` exits 1 for any layer it reports (an unverified approver
   // among them) while still mounting the graphs, so its exit is not the verdict:
   // the push below is.
   const m = run(join(here, "../state-mount.ts"), [], root);
@@ -132,7 +132,7 @@ export function refreshOwnHealth(root: string, paths: readonly string[], run: Ru
 
 /**
  * The after-mount step: when the lock moved the checker's pin and the
- * checkout's own instances declare `health`, refresh and push the report.
+ * checkout's own layers declare `health`, refresh and push the report.
  * Returns the lines to print, or `undefined` when there was nothing to do.
  */
 export function afterMountHealth(

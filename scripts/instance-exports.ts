@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * One knowledge-graph export per declared instance, so each harness can be
+ * One knowledge-graph export per declared layer, so each harness can be
  * fetched on its own.
  *
  * @module scripts/instance-exports
@@ -13,19 +13,19 @@
  *
  * ## Published elsewhere — the only list, and each entry is CHECKED
  *
- * {@link PUBLISHED_ELSEWHERE} names the instances that keep their own
+ * {@link PUBLISHED_ELSEWHERE} names the layers that keep their own
  * publisher, each with the command that publishes it, and
  * `check:published-instance-exports` fails when a workflow that runs this
  * script does not also run that command.
  *
  * Each document lands at `<out-dir>/<name>/<stub>.jsonld`, which is the
- * `docPath` `exportIdentity` gives a foreign instance, with the `.json` alias
+ * `docPath` `exportIdentity` gives a foreign layer, with the `.json` alias
  * beside it because Pages serves `.jsonld` as octet-stream. The `<name>/`
  * segment is cat-harness's one URL-space resolver (`schemas/kg/url-space.ts`),
- * through {@link instanceSitePath}: the segment is the instance's NAME, never
- * its stub. An instance declaring `"enabled": false` is not published.
+ * through {@link instanceSitePath}: the segment is the layer's NAME, never
+ * its stub. A layer declaring `"enabled": false` is not published.
  *
- * Beside it, `<out-dir>/<name>/schema/`: the instance's own skill I/O
+ * Beside it, `<out-dir>/<name>/schema/`: the layer's own skill I/O
  * contracts, its public Zod schemas under `zod/<module>/<Export>.schema.json`
  * (every exported Zod `*Schema` const), and a `<stub>.schema.json` index. A
  * Zod module that fails to import or render fails the run, as a failed export
@@ -51,7 +51,7 @@ import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 const ROOT = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
 
-/** An instance this script does not export, and the command that does. */
+/** A layer this script does not export, and the command that does. */
 export interface PublishedElsewhere {
   /** Matches the publishing command in a workflow's text. */
   publisher: RegExp;
@@ -64,7 +64,7 @@ export const PUBLISHED_ELSEWHERE: Readonly<Record<string, PublishedElsewhere>> =
   "cat-harness": {
     // `--scope instance` is optional because it is the default, and is the
     // only scope accepted: `--scope checkout` would publish every stacked
-    // instance's nodes under this name again, so it does not match.
+    // layer's nodes under this name again, so it does not match.
     // `<name>/<stub>.jsonld` since #603 decision 1b (owner, 2026-10-23): the
     // host's document sits under its own directory like every layer's. The
     // old `--out "./_site/${STUB}.jsonld"` still matches: the exporter reads
@@ -83,17 +83,17 @@ export const PUBLISHED_ELSEWHERE: Readonly<Record<string, PublishedElsewhere>> =
   },
 };
 
-/** One instance this script exports. */
+/** One layer this script exports. */
 export interface PlannedExport {
   /** Repository-relative, as a workflow would spell it: `./<dir>`. */
   path: string;
-  /** The declared `name`: the instance's segment of the site ({@link instanceSitePath}). */
+  /** The declared `name`: the layer's segment of the site ({@link instanceSitePath}). */
   name: string;
   stub: string;
   /**
-   * The instance declares its own `canonicalUrl`, so its document's `@id` is
+   * The layer declares its own `canonicalUrl`, so its document's `@id` is
    * minted against that and a `--base-url` is NOT passed: `exportIdentity`
-   * puts a self-based instance at `<base>/<stub>.jsonld`, which under a
+   * puts a self-based layer at `<base>/<stub>.jsonld`, which under a
    * preview's base is a path nothing writes (measured 2026-10-04 for
    * `cat-harness-tools`, `cat-openapi`, the FHIR IG harness and the DAK base layer).
    * Its own address is the honest one in every build.
@@ -102,10 +102,10 @@ export interface PlannedExport {
 }
 
 /**
- * Where `rel` is served inside an instance's own part of the site,
+ * Where `rel` is served inside a layer's own part of the site,
  * site-relative with no leading slash: `<name>/<rel>`.
  *
- * Every consumer that writes or looks for a foreign instance's published
+ * Every consumer that writes or looks for a foreign layer's published
  * files asks this, so the deploy, the identity `kg-export` mints and the root
  * index cannot disagree about the segment. It is cat-harness's
  * `publishedPath` (`case: "instance"`), not a template here: a second spelling
@@ -115,20 +115,20 @@ export function instanceSitePath(name: string, rel: string): string {
   return publishedPath({ case: "instance", instance: name, path: rel }).replace(/^\//, "");
 }
 
-/** Where a foreign instance's export document is served: `<name>/<stub>.jsonld`. */
+/** Where a foreign layer's export document is served: `<name>/<stub>.jsonld`. */
 export function instanceDocPath(d: { name: string; stub: string }): string {
   return instanceSitePath(d.name, `${d.stub}.jsonld`);
 }
 
 /**
- * The instance's OWN code lists as one SKOS document, `@id` `docIri`, or
+ * The layer's OWN code lists as one SKOS document, `@id` `docIri`, or
  * `undefined` when it declares none (litlfred/cat-harness-tools#960).
  *
  * The host's lists are published by `glossary-export` beside its glossary
- * (`<stub>/<stub>-code-lists.jsonld`); no other instance's were published at
+ * (`<stub>/<stub>-code-lists.jsonld`); no other layer's were published at
  * all, so a concept IRI into, say, the content core's
  * `grade-recommendation-strength` named a document nobody wrote. Only the
- * instance's own directories are read: a dependency's lists are that
+ * layer's own directories are read: a dependency's lists are that
  * dependency's document.
  */
 export function ownCodeListsDocument(instanceRoot: string, name: string, docIri: string): Record<string, unknown> | undefined {
@@ -140,7 +140,7 @@ export function ownCodeListsDocument(instanceRoot: string, name: string, docIri:
 }
 
 /**
- * Does this instance mint its `@id`s against its OWN `canonicalUrl`? Then the
+ * Does this layer mint its `@id`s against its OWN `canonicalUrl`? Then the
  * deploy passes it no `--base-url` ({@link PlannedExport.ownCanonical}), and
  * anything that names a node in its published document — `kg-export`'s
  * tombstones and re-homed skill links (bean `4ak5` item 2) — must mint the
@@ -151,17 +151,17 @@ export function declaresOwnCanonical(decl: { canonicalUrl?: string } | undefined
 }
 
 /**
- * Does the deploy write this instance a `<stub>/schema/` directory (bean `4ak5`
+ * Does the deploy write this layer a `<stub>/schema/` directory (bean `4ak5`
  * item 1)? Exactly when it is in {@link instanceExportPlan} — the plan's own
  * answer, so `kg-export`'s link to the schema index and this script's write of
- * it cannot disagree about which instances have one.
+ * it cannot disagree about which layers have one.
  */
 export function publishesInstanceSchema(instanceRoot: string, repo: string = REPO): boolean {
   const abs = resolve(instanceRoot);
   return instanceExportPlan(repo).some((p) => resolve(repo, p.path) === abs);
 }
 
-/** Every declared instance's stub, readable declarations only. */
+/** Every declared layer's stub, readable declarations only. */
 export function declaredInstanceStubs(repo: string = REPO): Set<string> {
   const out = new Set<string>();
   for (const abs of instanceRootsIn(repo)) {
@@ -176,9 +176,9 @@ export function declaredInstanceStubs(repo: string = REPO): Set<string> {
 }
 
 /**
- * Every declared instance not in {@link PUBLISHED_ELSEWHERE}, in path order.
+ * Every declared layer not in {@link PUBLISHED_ELSEWHERE}, in path order.
  * An unreadable declaration is skipped here and reported by `readDeclaration`'s
- * own checkers; the completeness gate still sees the instance, by its root.
+ * own checkers; the completeness gate still sees the layer, by its root.
  */
 export function instanceExportPlan(repo: string = REPO): PlannedExport[] {
   const out: PlannedExport[] = [];
@@ -189,7 +189,7 @@ export function instanceExportPlan(repo: string = REPO): PlannedExport[] {
     try {
       const d = readDeclaration(abs);
       // Not publishing is a declaration (`"enabled": false`), so leaving the
-      // instance out here is the answer, not a gap: `isPublished` is the one
+      // layer out here is the answer, not a gap: `isPublished` is the one
       // place that reads it.
       if (!d || !isPublished(d)) continue;
       name = d.name;
@@ -231,7 +231,7 @@ if (import.meta.main) {
   // `declaresOwnCanonical` and the plan), so a static import back would be a
   // cycle, and `--list` has no use for the exporter's whole import graph.
   const { scannedInstanceSchemas, exportIdentity } = await import("./kg-export.js");
-  // This site's base: where an own-canonical instance's copy is served (#638).
+  // This site's base: where an own-canonical layer's copy is served (#638).
   const siteBase = exportIdentity(baseUrl ? { baseUrl } : {}).base;
   const staging = stagingFields();
   // The deploy publishes documents, not QA sidecars: those are committed and
@@ -245,7 +245,7 @@ if (import.meta.main) {
       mkdirSync(dirname(doc), { recursive: true });
       const args = ["run", join(TOOLS_ROOT, "scripts", "kg-export.ts"), "--instance", p.path, "--out", doc, "--qa-root", qaRoot];
       if (baseUrl && !p.ownCanonical) args.push("--base-url", baseUrl);
-      // An own-canonical instance mints at its own site, which serves nothing
+      // An own-canonical layer mints at its own site, which serves nothing
       // yet; its subject pages are a copy here, `sameAs` the canonical IRI
       // (owner, 2026-10-29, litlfred/cat-harness-tools#638 option B).
       if (p.ownCanonical && siteBase) args.push("--served-at", `${siteBase}/${instanceDocPath(p)}`);
@@ -284,7 +284,7 @@ if (import.meta.main) {
       }
       const zod = built.zodScanned ? `${built.zod.length} Zod schema(s)` : "Zod schemas NOT scanned";
       // A module that would not import or an export that would not render is
-      // a FAILED instance, as a failed `kg-export` is: what did render is still
+      // a FAILED layer, as a failed `kg-export` is: what did render is still
       // written (the index lists the rest as `unrendered`), the loop goes on,
       // and the run exits 1. Logging and exiting 0 would publish a partial
       // `zod/` that reads as complete — the third-state failure.

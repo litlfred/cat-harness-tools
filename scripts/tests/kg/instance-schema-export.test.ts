@@ -1,17 +1,17 @@
 /**
- * Each instance publishes its own schema directory — bean `4ak5` item 1, the
+ * Each layer publishes its own schema directory — bean `4ak5` item 1, the
  * "and a schema" half (owner ruling 2026-10-05, option B).
  *
  * Three things are pinned here, each for a reason:
  *
- * - the generalised builder over a FIXTURE instance, so the `$id` rule is
+ * - the generalised builder over a FIXTURE layer, so the `$id` rule is
  *   tested against inputs this file controls rather than whatever the corpus
  *   holds today;
  * - the host's outputs are what they were, because the generalisation's
  *   promise was "the host path byte-identical";
- * - a real foreign instance's contracts mint under ITS publication identity,
+ * - a real foreign layer's contracts mint under ITS publication identity,
  *   not this site's — guarded by `inAggregate()`, since it reads other
- *   instances' files (standalone rule, bean `ho66`);
+ *   layers' files (standalone rule, bean `ho66`);
  * - the public Zod schemas rule (owner ruling 2026-10-05, option C, "every
  *   exported *Schema") over a fixture: only an exported Zod `*Schema` is
  *   rendered, a non-Zod `*Schema` is listed as `notZod` and NOT a failure, and
@@ -43,7 +43,7 @@ import { INSTANCE, checkoutHolding, inAggregate } from "../../../test/support/ch
 
 const SITE = "https://site.example/pub";
 
-/** A fixture instance holding two contracts, one carrying a hand-written (wrong) `$id`. */
+/** A fixture layer holding two contracts, one carrying a hand-written (wrong) `$id`. */
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "instance-schema-"));
   const skill = join(root, "schemas", "skills", "widget");
@@ -193,7 +193,7 @@ describe.skipIf(!inAggregate())("a real foreign instance mints under its OWN bas
 /** The fixture's modules import zod by absolute path: they live in a temp dir with no node_modules. */
 const ZOD = JSON.stringify(Bun.resolveSync("zod", import.meta.dir));
 
-/** A fixture instance whose `schemas/` holds the given modules (name → source). */
+/** A fixture layer whose `schemas/` holds the given modules (name → source). */
 function zodFixture(modules: Record<string, string>): string {
   const root = fx();
   for (const [name, text] of Object.entries(modules)) writeFileSync(join(root, "schemas", name), text);

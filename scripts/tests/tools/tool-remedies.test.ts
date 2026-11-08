@@ -3,7 +3,7 @@
  *
  * Synthetic Tools only: the real graph's answer is asserted in
  * `test/tools-checkout.test.ts`, since the Tools that need packages.fhir.org
- * live in another instance and cat-harness standing alone has none of them.
+ * live in another layer and cat-harness standing alone has none of them.
  */
 import { describe, expect, test } from "bun:test";
 

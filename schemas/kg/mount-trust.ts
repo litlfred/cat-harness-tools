@@ -23,30 +23,30 @@
  *
  * **An unverified signature is not trust.** Until a verifier for the declared
  * network exists (GDHCN is the named example; its trust-list model belongs to
- * an instance above this layer), a signature-only mount is
+ * a layer above this layer), a signature-only mount is
  * `could-not-determine`, which never mounts.
  *
  * ## What the lock keeps, and who may consent
  *
- * - **The basis is recorded.** Every locked instance carries the basis it was
+ * - **The basis is recorded.** Every locked layer carries the basis it was
  *   mounted on ({@link MountTrustBasisSchema}): `staging` (the caller's
  *   `--staging` flag) or `consent` with who and when. `mount:remote:check`
  *   re-runs {@link mountTrust} against the CURRENT declaration and reports a
  *   mount whose recorded basis no longer holds.
- * - **Who consented is checked when the instance says who may.** An instance
+ * - **Who consented is checked when the layer says who may.** A layer
  *   may declare `mountApprovers`; then `consent.by` must be one of them. With
  *   no list, the verdict says `approver: "unverified"`, which callers report
  *   as its own state, never as clean.
- * - **A gitlink is not covered by its parent's consent.** An instance reached
+ * - **A gitlink is not covered by its parent's consent.** A layer reached
  *   through a gitlink needs consent of its own, given on the downstream's
- *   override for that instance.
+ *   override for that layer.
  *
  * ## Standing consent
  *
- * Each site keeps its own lock. A site may say, once, per upstream instance,
+ * Each site keeps its own lock. A site may say, once, per upstream layer,
  * *"keep me on `<branch>` of this upstream"* — a {@link StandingConsentSchema}
- * on that instance's `trust.standing` (the remote source's own `trust`, or
- * `overrides.<instance>.trust` for an instance reached through a gitlink). It
+ * on that layer's `trust.standing` (the remote source's own `trust`, or
+ * `overrides.<instance>.trust` for a layer reached through a gitlink). It
  * names the person who gave it and when.
  *
  * A standing consent does not trust a pin by itself, and a hand-moved pin is
@@ -55,7 +55,7 @@
  * per-pin consent for the new pin, attributed to the standing rule's person
  * and marked `consent.standing` ({@link withStandingConsent}). {@link mountTrust}
  * accepts that pin only while the rule it names is still declared, unchanged,
- * on the same instance; withdraw or edit the rule and every pin recorded under
+ * on the same layer; withdraw or edit the rule and every pin recorded under
  * it asks again.
  */
 import { z } from "zod";
@@ -73,9 +73,9 @@ const BranchSchema = z
   .refine((b) => !b.startsWith("refs/"), "the short branch name, not `refs/…`");
 
 /**
- * A person's STANDING consent for one upstream instance: "re-pin me to the
- * newest commit of `follows`" (owner, 2026-10-16). It sits on the instance's
- * `trust.standing`, so the instance is the entry it is declared on.
+ * A person's STANDING consent for one upstream layer: "re-pin me to the
+ * newest commit of `follows`" (owner, 2026-10-16). It sits on the layer's
+ * `trust.standing`, so the layer is the entry it is declared on.
  */
 export const StandingConsentSchema = z
   .object({
@@ -145,7 +145,7 @@ export const MountTrustSchema = z
   .object({
     consent: MountConsentSchema.optional(),
     signature: MountSignatureSchema.optional(),
-    /** A standing consent for this instance: see "Standing consent" above. */
+    /** A standing consent for this layer: see "Standing consent" above. */
     standing: StandingConsentSchema.optional(),
   })
   .strict();
@@ -182,7 +182,7 @@ export type TrustVerdict =
  * consent, by the owner's ruling; anything else needs consent for this exact
  * pin, because no signature can be verified yet.
  *
- * `approvers` is the instance's declared `mountApprovers`. Non-empty: a
+ * `approvers` is the layer's declared `mountApprovers`. Non-empty: a
  * consent by anyone else is REFUSED. Absent or empty: a consent proceeds with
  * `approver: "unverified"`.
  */
@@ -326,7 +326,7 @@ export function standingGrantOf(rule: StandingConsent, on?: string): ConsentGran
 
 /**
  * SEEDING writes consent; it is not left for hand editing (task #10, gap c).
- * Whatever creates or re-pins a remote instance in `index.config.json` passes
+ * Whatever creates or re-pins a remote layer in `index.config.json` passes
  * the person's grant here, and the mount comes back carrying
  * `trust.consent {by, on, ref, evidence}` with `ref` taken from the mount
  * itself — so the consent is for exactly the pin being written, and

@@ -1,6 +1,6 @@
 /**
  * The per-repository skill index (bean `e0uk`): the `skills:index`
- * region of an instance's AGENTS.md lists the skills that instance publishes.
+ * region of a layer's AGENTS.md lists the skills that layer publishes.
  *
  * What is worth gating: a summary that tells an agent nothing (a heading that
  * only repeats the name), an AGENTS.md pushed past what an agent reads, a
@@ -30,7 +30,7 @@ afterEach(() => {
 
 const REGION = `<!-- ${SKILLS_INDEX_MARKER}:begin -->\n<!-- ${SKILLS_INDEX_MARKER}:end -->\n`;
 
-/** An instance with a README, an AGENTS.md carrying the region, and the given skills under skills/<pkg>/. */
+/** A layer with a README, an AGENTS.md carrying the region, and the given skills under skills/<pkg>/. */
 function instance(skills: Record<string, string>, agentsPrefix = "# Agents\n\nHand-written.\n\n"): string {
   const root = mkdtempSync(join(tmpdir(), "skills-index-"));
   dirs.push(root);

@@ -3,7 +3,7 @@
  * and `needs` — in the checkout being checked, whatever its layout.
  *
  * @module cat-harness-tools/scripts/check-declaration-resolution
- * @covers cat-harness — every instance declaration in the checkout
+ * @covers cat-harness — every layer declaration in the checkout
  *
  * ## Mostly composition
  *
@@ -16,14 +16,14 @@
  * | `assets` | `check:declared-assets` → `auditInstance` | the file exists |
  * | `visualisers[].renderedBy` | `check:visualiser-routes` → `checkVisualiserRoutes` | names a discovered Tool node |
  * | `needs` | `check:instance-graph` → `resolveInstanceGraph` | every dependency resolves, no cycle |
- * | `enableSubgraphs` | here → `enableSubgraphsProblems` | each id names an opt-in sub-graph of this instance or its `needs` closure |
+ * | `enableSubgraphs` | here → `enableSubgraphsProblems` | each id names an opt-in sub-graph of this layer or its `needs` closure |
  *
  * It also resolves `visualisers[].coversKinds`, a graph typology, which
  * `checkVisualiserRoutes` drops unjudged (it filters to PUBLISHED kinds).
  * `covers`, a directory id, is refused by the declaration schema itself; a
  * declaration that does not parse is a finding.
  *
- * The result is one run, one verdict, per instance and per field, over the
+ * The result is one run, one verdict, per layer and per field, over the
  * checkout as it is actually laid out.
  *
  * ## The checkout is `cwd`
@@ -40,7 +40,7 @@
  *
  * Exit 0 every reference resolves · 1 at least one does not (reported even
  * when something else was undetermined: a certain finding is never hidden) ·
- * 2 could not determine (no instance in the checkout, or a composed gate that
+ * 2 could not determine (no layer in the checkout, or a composed gate that
  * could not run). 2 is never a pass.
  *
  * Usage:
@@ -60,12 +60,12 @@ import { auditInstance as auditDirs } from "./check-declared-dirs.ts";
 import { auditInstance as auditAssets } from "./check-declared-assets.ts";
 import { checkVisualiserRoutes } from "./check-visualiser-routes.ts";
 
-/** The fields a declaration names paths or instances in, and the declaration itself (it must parse for any to be read). */
+/** The fields a declaration names paths or layers in, and the declaration itself (it must parse for any to be read). */
 export const RESOLVED_FIELDS = ["declaration", "directories", "assets", "visualisers", "needs", "enableSubgraphs"] as const;
 export type ResolvedField = (typeof RESOLVED_FIELDS)[number];
 
 export interface ResolutionFinding {
-  /** The instance's declared name, or its path when it has none. */
+  /** The layer's declared name, or its path when it has none. */
   instance: string;
   field: ResolvedField;
   /** The entry, as the declaration spells it (a directory id, an asset id, `visualisers[<id>]`, a needs name). */
@@ -78,7 +78,7 @@ export interface ResolutionFinding {
 export interface ResolutionReport {
   root: string;
   instances: string[];
-  /** Entries examined per field, summed over instances — a zero is printed, never hidden. */
+  /** Entries examined per field, summed over layers — a zero is printed, never hidden. */
   examined: Record<ResolvedField, number>;
   findings: ResolutionFinding[];
   /** Reasons this run could not decide something. Non-empty means exit 2. */
@@ -197,7 +197,7 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     }
 
     // enableSubgraphs — each id names an opt-in sub-graph (`optIn: true`) of
-    // this instance or one in its `needs` closure, top level or from within.
+    // this layer or one in its `needs` closure, top level or from within.
     const enable = decl.enableSubgraphs ?? [];
     examined.enableSubgraphs += enable.length;
     if (enable.length > 0) {
@@ -216,9 +216,9 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     }
   }
 
-  // An index root declares no instance, so its `enableSubgraphs` is in its
-  // index.config.json (step 23.4). Each id names an opt-in sub-graph of an
-  // instance in this checkout, held to the same rule as a declaration's list.
+  // An index root declares no layer, so its `enableSubgraphs` is in its
+  // index.config.json (step 23.4). Each id names an opt-in sub-graph of a
+  // layer in this checkout, held to the same rule as a declaration's list.
   if (findDeclarationFile(root) === undefined) {
     const enable = declaredEnableSubgraphs(root);
     examined.enableSubgraphs += enable.length;

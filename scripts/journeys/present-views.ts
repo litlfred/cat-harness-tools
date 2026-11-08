@@ -16,13 +16,13 @@
  * | `how/`, `how/<block>/` | the catalogue's big ideas, the building blocks × moments grid by layer, a block's detail with the moments it makes possible, the ArchiMate views of the taught journeys, the business processes |
  * | `discuss/` | the closing questions with the moments to revisit, the questions module by module, the tables with the moments that force each row, the gap list the walkthrough's gap strips assembled, every moment's policy takeaway |
  * | `sheets/` | the printable sheets, in the frame |
- * | `demo/`, `demo/<screen>/` | the Device Demo: a screen per page with the moments it shows, both ways. The `device-screen` nodes that show a step the workshop presents, each drawn in its device frame with its owner beside it (`screens.ts`); only when there are none, the instance's own app framed, as the workshop's `presentation.deviceDemo` names it |
+ * | `demo/`, `demo/<screen>/` | the Device Demo: a screen per page with the moments it shows, both ways. The `device-screen` nodes that show a step the workshop presents, each drawn in its device frame with its owner beside it (`screens.ts`); only when there are none, the layer's own app framed, as the workshop's `presentation.deviceDemo` names it |
  *
  * VaxLink's own addresses (`#/map`, `#/personas/khamla`, `#/how/gdhcn`,
  * `#/discuss`, `#/sheets`, `#/demo/S4`) open these from the overview
  * (`present.js`).
  *
- * Everything is read from the graph; a view whose data an instance does not
+ * Everything is read from the graph; a view whose data a layer does not
  * carry (no catalogue, no ArchiMate view, no device demo, no sheets) draws
  * what it has and says what it lacks, never a hard-coded stand-in.
  */
@@ -101,7 +101,7 @@ function note(p: Presentation, view: Exclude<View, "overview" | "walkthrough">):
 
 const presentationName = (p: Presentation): string => p.w.workshop.presentation?.name ?? p.w.workshop.title;
 
-/** The building-block catalogue a workshop's steps read: the workshop's instance's, else its first step's, else any. */
+/** The building-block catalogue a workshop's steps read: the workshop's layer's, else its first step's, else any. */
 function catalogueOf(corpus: JourneyCorpus, p: Presentation) {
   return corpus.blocks.get(p.w.instance) ?? (p.steps[0] ? corpus.blocks.get(p.steps[0].journey.instance) : undefined) ?? [...corpus.blocks.values()][0];
 }

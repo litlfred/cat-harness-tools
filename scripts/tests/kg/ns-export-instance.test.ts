@@ -1,5 +1,5 @@
 /**
- * Instance namespace document generation and block-kind classes — bean folio-assistant-2osx.
+ * Layer namespace document generation and block-kind classes — bean folio-assistant-2osx.
  *
  * @module scripts/tests/ns-export-instance
  * @graphNode none — a test
@@ -85,7 +85,7 @@ describe("each instance publishes its own ns document for its block-kind classes
     expect(prose!.label).toBe("Prose");
     expect(String(prose!.definition)).toContain("Shown with no heading");
 
-    // Other instances' block kinds must NOT be in folio-assistant-core's exact document
+    // Other layers' block kinds must NOT be in folio-assistant-core's exact document
     const foreign = graph.filter(
       (n) =>
         String(n["@id"]).startsWith("folio-assistant-sci:") ||
@@ -177,7 +177,7 @@ describe("each instance publishes its own ns document for its block-kind classes
 describe("ns:check fails on a folioType whose owner does not publish an ns definition", () => {
   test("undefined block kind folioType is flagged in undefinedTerms", () => {
     const { report } = buildVocabulary();
-    // In our clean monorepo, all folioTypes belong to publishing instances
+    // In our clean monorepo, all folioTypes belong to publishing layers
     const unpublishingKinds = report.undefinedTerms.filter((t) => t.includes(":"));
     expect(unpublishingKinds).toHaveLength(0);
   });

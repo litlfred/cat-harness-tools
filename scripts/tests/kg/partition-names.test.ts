@@ -1,5 +1,5 @@
 /**
- * A target repo's `instance` must equal that instance's own declared `name`.
+ * A target repo's `instance` must equal that layer's own declared `name`.
  *
  * Bean `yx9p`. The partition named its five targets `agentic-harness`,
  * `folio-assist-core`, `folio-asst-sci`, `smart-kg`, `smart-base`; the
@@ -16,7 +16,7 @@
  * `instance-rules.ts` could have carried the declared names as literals and
  * this test could have checked the literals. That is two copies and one of
  * them would be stale within a week — the defect it is meant to prevent,
- * reproduced one level in. So the test resolves each instance's declaration
+ * reproduced one level in. So the test resolves each layer's declaration
  * and reads the `name` out of it: the declaration is the source of truth, and
  * `REPOS[].instance` is a pointer to it.
  *
@@ -26,13 +26,13 @@
  * checkout does not stage. That is NOT the `dh4f` defect (declared but absent,
  * so a consumer scans nothing and calls it clean) and the two must not
  * collapse: one is a plan, the other is a blind sweep. The test therefore
- * distinguishes three cases — has an instance and agrees, has an instance and
- * DISAGREES, has no instance — and passes only the first and third. An
+ * distinguishes three cases — has a layer and agrees, has a layer and
+ * DISAGREES, has no layer — and passes only the first and third. An
  * `instance` naming a directory that does not exist fails, so the escape
  * hatch cannot be used to paper over a missing one.
  *
  * The tests of this file that read the whole checkout (reads every staged
- * instance's declaration in the checkout) live in
+ * layer's declaration in the checkout) live in
  * `test/partition-names-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
@@ -42,7 +42,7 @@ import { expect, test } from "bun:test";
 import { REPOS } from "../../partition/instance-rules.js";
 
 /**
- * The entries that name a staging instance, narrowed so `instance` is a string.
+ * The entries that name a staging layer, narrowed so `instance` is a string.
  *
  * `REPOS.filter(r => r.instance !== undefined)` does NOT narrow the type —
  * TypeScript keeps `string | undefined` through a plain predicate — so every

@@ -60,13 +60,13 @@ import { isSkillMd, skillMdDirs } from "./known-skills.ts";
 import { libraryEntryDir } from "./lib/library-entry-graphs.ts";
 
 /**
- * This module's own instance root.
+ * This module's own layer root.
  *
  * Derived from the module's location rather than the CWD, for the reason
  * `ingest-document.ts` records at length: after the stub move the CWD is the
  * REPOSITORY root, which declares nothing, so a CWD-relative resolution
  * reported "this instance declares no such graph" — a true sentence about a
- * directory that is not this instance.
+ * directory that is not this layer.
  */
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 
@@ -162,8 +162,8 @@ export function frontMatterOf(text: string): string | undefined {
  * Where a `library/<bib-slug>` reference resolves, across EVERY declared
  * library, or undefined.
  *
- * Fanned out rather than resolved against the node's own instance, per bean
- * `a02m`: several instances declare a library, and a methodology's source may
+ * Fanned out rather than resolved against the node's own layer, per bean
+ * `a02m`: several layers declare a library, and a methodology's source may
  * sit in a sibling's corpus — `grade`'s would belong with the WHO material.
  * Resolving against one would report a present document as missing.
  */
@@ -330,7 +330,7 @@ export function checkMethodologyEvidence(root = INSTANCE_ROOT, dirs: readonly st
     for (const f of found) r.resolved.push({ node, name, evidence: f.ref, at: f.at });
   }
 
-  // The edge from this instance's skills: each name must be a node somewhere
+  // The edge from this layer's skills: each name must be a node somewhere
   // in the corpus, the same reach the nodes above were read from.
   const names = new Set(methodologyNodes(root).flatMap((n) => (n.front ? [n.front.name] : [])));
   for (const u of methodologyUses(root)) {

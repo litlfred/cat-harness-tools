@@ -30,24 +30,24 @@ const INSTANCE_ROOT = HARNESS_ROOT;
 const strict = process.argv.includes("--strict");
 
 /**
- * Every instance whose diagrams this repository is responsible for.
+ * Every layer whose diagrams this repository is responsible for.
  *
  * Root-only until 2026-09-19, and the comment below is the argument for the
  * change: *"a dangling `<bootstrap.processes:skill ref>` in a diagram this checker never
  * opens is a broken reference reported as clean."* `bootstrap/` is a separate
- * instance with its own declaration and its own two skills, so
+ * layer with its own declaration and its own two skills, so
  * `bootstrap/processes/bootstrap.bpmn` was in exactly that state from the day
  * it was written — unchecked, and reported clean by a checker scoped to
  * somebody else's graph.
  *
- * Each instance's refs resolve against ITS OWN skills, never the union: a
+ * Each layer's refs resolve against ITS OWN skills, never the union: a
  * bootstrap diagram naming a harness skill is a real dangling ref, because
  * bootstrap runs before the harness exists.
  */
 const INSTANCES = [INSTANCE_ROOT, join(repoRootFor(INSTANCE_ROOT), "bootstrap")];
 
 /**
- * An instance in {@link INSTANCES} that contributed no diagrams.
+ * A layer in {@link INSTANCES} that contributed no diagrams.
  *
  * **This is the guard that would have caught the defect above on the day it was
  * introduced.** `bootstrap` was added to `INSTANCES` on 2026-09-19 as
@@ -64,7 +64,7 @@ const INSTANCES = [INSTANCE_ROOT, join(repoRootFor(INSTANCE_ROOT), "bootstrap")]
  * whose own docblock argues that *"a dangling ref in a diagram this checker
  * never opens is a broken reference reported as clean"*.
  *
- * Reported rather than thrown: an instance legitimately holding no diagram is
+ * Reported rather than thrown: a layer legitimately holding no diagram is
  * possible, and the reader needs to be able to tell that from a path that does
  * not resolve. So the two are DIFFERENT messages.
  */
@@ -198,11 +198,11 @@ for (const file of files) {
 
 console.log(`Workflow skill refs  (${knownCount} skills known across ${INSTANCES.length} instances, ${fileCount} diagrams)\n`);
 
-// The vacuity report, ABOVE the findings rather than below them: an instance
+// The vacuity report, ABOVE the findings rather than below them: a layer
 // that contributed nothing makes every verdict here narrower than the summary
 // line claims, so a reader must meet it before the clean tick.
 const empty = emptyInstances();
-/** The unambiguous half: a listed instance whose path is not there. */
+/** The unambiguous half: a listed layer whose path is not there. */
 const absentInstances = empty.filter((r) => !existsSync(r));
 for (const r of empty) {
   const where = relative(repoRootFor(INSTANCE_ROOT), r) || ".";
@@ -279,7 +279,7 @@ const { CONTENT_TYPE_TRANSLATIONS, resolveTranslationPath } = await import("../s
 const missingDeclared: string[] = [];
 for (const ct of CONTENT_TYPE_TRANSLATIONS) {
   for (const rel of ct.bpmnDiagrams ?? []) {
-    // Resolved from the instance that DECLARES the profile, then down its
+    // Resolved from the layer that DECLARES the profile, then down its
     // `needs` chain (bean `0r7u`): the profiles left cat-harness for their owners.
     if (resolveTranslationPath(ct, rel) === undefined) missingDeclared.push(`${ct.contentType} → ${rel}`);
   }
@@ -328,11 +328,11 @@ if (branches.undeclared.length) {
   }
 }
 
-// A listed instance whose path does not resolve is FATAL, and the empty-but-
+// A listed layer whose path does not resolve is FATAL, and the empty-but-
 // present case is not. There is no reading of a non-existent directory that
 // makes the verdict above correct, so reporting it without failing would leave
 // exactly the gate that cannot fire — bean `1xhc`, which is how this defect
-// survived from 2026-09-19 in the first place. An instance that exists and
+// survived from 2026-09-19 in the first place. A layer that exists and
 // holds no diagram is a different fact and stays a report.
 const beanFindings = beanCallFindings(beanFacts);
 const takers = noteTakers(beanFacts);

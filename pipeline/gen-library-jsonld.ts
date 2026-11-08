@@ -233,7 +233,7 @@ export function readLicence(dir: string): unknown {
   }
 }
 
-/** The instance this generator belongs to, whose `vocab-mappings/` it reads. */
+/** The layer this generator belongs to, whose `vocab-mappings/` it reads. */
 const INSTANCE_ROOT = join(HARNESS_ROOT);
 
 let licenceNaming: VocabMapping | undefined;
@@ -359,9 +359,9 @@ function docIri(docId: string, rest: string): string {
 /**
  * The entry's node IRIs. Every node keeps its relative `library/<id>/…` id
  * EXCEPT the manifest — the asset itself — which is named by the address its
- * JSON-LD is published at when the entry's instance is known (#1881,
+ * JSON-LD is published at when the entry's layer is known (#1881,
  * `schemas/library/library-iri.ts`). A staged entry, outside any library, has no
- * instance yet and keeps the relative form until it is promoted and
+ * layer yet and keeps the relative form until it is promoted and
  * regenerated; `--check` then reports it stale, so it cannot linger.
  */
 function iriFor(docId: string, instance: string | undefined): (rest: string) => string {
@@ -369,14 +369,14 @@ function iriFor(docId: string, instance: string | undefined): (rest: string) => 
 }
 
 /**
- * The instance whose library holds `entryDir` — the DECLARED name of the
- * folder holding the library, when that folder declares an instance — else
+ * The layer whose library holds `entryDir` — the DECLARED name of the
+ * folder holding the library, when that folder declares a layer — else
  * `undefined`. The same answer `library-graph.ts` `instanceOf` gives, so the
- * IRI minted here and the page the viewer draws name one instance.
+ * IRI minted here and the page the viewer draws name one layer.
  *
  * The declared name, never the folder's (bean `j3ls`, as `t5dm` for
- * `instanceOf`): a separated instance's repository is wherever it was cloned,
- * and a separated instance cloned into `wim/` rewrote every manifest IRI to
+ * `instanceOf`): a separated layer's repository is wherever it was cloned,
+ * and a separated layer cloned into `wim/` rewrote every manifest IRI to
  * `.../jsonld/wim/<id>/`, so all 813 nodes read as stale.
  */
 export function libraryInstanceOf(entryDir: string): string | undefined {
@@ -396,8 +396,8 @@ export function libraryInstanceOf(entryDir: string): string | undefined {
   if (above !== undefined) return above;
   // A library declared from WITHIN a sub-graph (cat-harness#1032:
   // `library/corpus/<group>/<id>`, the corpus a directory below the
-  // instance): the declaring instance is further up. Walked to the nearest
-  // declaration, and only when that instance's checkout declares THIS folder
+  // layer): the declaring layer is further up. Walked to the nearest
+  // declaration, and only when that layer's checkout declares THIS folder
   // a `library` corpus — never a guess from the folder's name. Measured
   // 2026-11-07: with the corpus moved, 5611 nodes read as stale.
   for (let at = dirname(dirname(library)); at !== dirname(at); at = dirname(at)) {
@@ -410,12 +410,12 @@ export function libraryInstanceOf(entryDir: string): string | undefined {
 }
 
 /**
- * Where an entry's `library` subgraph is looked up: the instance whose library
- * holds it, when that instance declares a `library` of its own, so an entry in
+ * Where an entry's `library` subgraph is looked up: the layer whose library
+ * holds it, when that layer declares a `library` of its own, so an entry in
  * a sibling's library is a member of THAT library. Asked from the content repo
- * root instead, every instance's manifests named cat-harness's. An instance
+ * root instead, every layer's manifests named cat-harness's. A layer
  * that only inherits the entry keeps the content repo root's answer: asked
- * from there, the several instances declaring it are ambiguous.
+ * from there, the several layers declaring it are ambiguous.
  */
 export function librarySubgraphStart(locatedAt: string): string {
   const root = dirname(dirname(locatedAt));
@@ -651,8 +651,8 @@ export function buildDocumentNodes(
 let contentPrefixes: Map<string, string> | undefined;
 
 /**
- * The instance prefixes a library node may use: this checkout's, plus every
- * instance the CONTENT repository declares as a dependency.
+ * The layer prefixes a library node may use: this checkout's, plus every
+ * layer the CONTENT repository declares as a dependency.
  *
  * `defaultInstancePrefixes` reads only the checkout this module sits in, so
  * run from a content repository it could not bind a dependency's prefix
@@ -903,18 +903,18 @@ function entryTitle(
 
 /**
  * `locatedAt` is where the entry WILL sit when it is not there yet. The
- * instance a manifest names is read off the entry's location, and a STAGED
- * entry sits in `ingest-staging/`, which belongs to whichever instance holds
+ * layer a manifest names is read off the entry's location, and a STAGED
+ * entry sits in `ingest-staging/`, which belongs to whichever layer holds
  * the staging tree — not to the library it is being promoted into. Measured
  * 2026-10-06 (bean `apui`): a document staged and promoted into
- * a SIBLING instance's library carried a manifest `@id` naming
+ * a SIBLING layer's library carried a manifest `@id` naming
  * `cat-harness`, and `--check` called 37 of its nodes stale. So the files are
  * READ from `dir` and the identity is minted for `locatedAt`.
  */
 export function buildEntryNodes(docId: string, dir: string, locatedAt: string = dir): EntryOutcome {
   const outcome = buildEntryNodesAtContentContext(docId, dir, locatedAt);
   if (outcome.state !== "built") return outcome;
-  // Every node names the context of the instance it will LIVE in — `locatedAt`,
+  // Every node names the context of the layer it will LIVE in — `locatedAt`,
   // the same place its identity is minted for (bean folio-assistant-63q4).
   return { ...outcome, files: outcome.files.map((f) => ({ ...f, content: serialisedAtInstanceContext(f.content, join(locatedAt, f.path)) })) };
 }

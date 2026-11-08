@@ -12,11 +12,11 @@
  *
  * What resolves, and against what, is `journeys/check.ts`; it resolves with
  * the journeys viewer's own reader, so the gate and the pages agree. Every
- * instance the checkout mounts is read through its declarations, so a
- * workshop in one instance that teaches from another's journeys is checked
+ * layer the checkout mounts is read through its declarations, so a
+ * workshop in one layer that teaches from another's journeys is checked
  * whole.
  *
- * Exit 0 every reference resolves, or no instance declares a journey or a
+ * Exit 0 every reference resolves, or no layer declares a journey or a
  * workshop (said, with the count); 1 a reference does not resolve or a file
  * does not parse; 2 the declarations could not be read, or a reference could
  * be neither resolved nor called missing (a FHIR example while a declared

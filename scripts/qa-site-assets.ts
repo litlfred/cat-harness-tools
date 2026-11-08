@@ -364,7 +364,7 @@ function cmdFetch(a: ReturnType<typeof args>): number {
         rmSync(results, { recursive: true, force: true });
       }
       // Materialise the WHOLE entry: the generator reads block, translation
-      // and kg sidecars across every instance's results tree, not only the
+      // and kg sidecars across every layer's results tree, not only the
       // tree this build publishes from.
       cpSync(hitDir, root, { recursive: true });
     }

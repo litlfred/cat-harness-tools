@@ -19,7 +19,7 @@
  *     under a magnifier, and its **hue** from the same entry, so two adjacent
  *     rows differ in shape AND colour;
  *   - a **full accessible name** — the kind word, then the head of the kind's
- *     own `summary` from the graph-typology registry and the instance it belongs
+ *     own `summary` from the graph-typology registry and the layer it belongs
  *     to (`library — L1 source content, <instance>`). The kind word stays the
  *     visible label, so the accessible name CONTAINS the visible one (WCAG SC
  *     2.5.3), and the words still carry the meaning without the colour (SC
@@ -60,7 +60,7 @@ export interface GraphTypologyRowDecor {
  * The mark and accessible description for one kind's row.
  *
  * @param kind      the declared graph typology — also the row's visible label
- * @param instance  the instance whose graph the row opens, named in the
+ * @param instance  the layer whose graph the row opens, named in the
  *                  description so two harnesses' `library` rows are told apart
  * @param themeTone optional hue angle (0–359) for fallback when kind has no declared avatar
  */

@@ -56,8 +56,8 @@ import { graphReadPath } from "../../scripts/graph-read.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 /**
- * The instance whose REPOSITORY is checked: cat-harness by default, any
- * instance by `--instance <dir>`. Every repository the separation made is
+ * The layer whose REPOSITORY is checked: cat-harness by default, any
+ * layer by `--instance <dir>`. Every repository the separation made is
  * its own clone with its own size, branches and stores, so each gets its own
  * report, written under its own declared `health` directory.
  */
@@ -173,11 +173,11 @@ export function gates(report: HealthReport, strict: boolean): boolean {
  * The health report's path, through the declaration rather than the layout.
  *
  * Bean `9ofm` row D. `health` is a declared directory (id `health`, path
- * `test/health/results/` on the `cat-harness` instance) and one of the state
+ * `test/health/results/` on the `cat-harness` layer) and one of the state
  * graphs that moves, so once it is cut over the report belongs in the mount.
  *
  * Falls back to {@link healthReportPath} when nothing is declared — an
- * unmigrated instance has no `health` entry, which is fine rather than wrong
+ * unmigrated layer has no `health` entry, which is fine rather than wrong
  * — and **throws** when the graph is declared on a branch this checkout
  * cannot reach.
  *
@@ -212,14 +212,14 @@ if (import.meta.main) {
     process.exit(2);
   }
 
-  // `repoRootFor`, not ROOT. `ROOT` is the INSTANCE root — this file sits at
+  // `repoRootFor`, not ROOT. `ROOT` is the LAYER root — this file sits at
   // `<instance>/test/health/` — and two probes resolve their store from a
   // declaration whose entry is `scope: "repository"`: `beans/` and `todos/`
-  // are at the repository root, not inside the instance.
+  // are at the repository root, not inside the layer.
   //
-  // Passing the instance root sent them to `cat-harness/beans/defs` and
+  // Passing the layer root sent them to `cat-harness/beans/defs` and
   // `cat-harness/todos/items`, neither of which exists, from the moment #437
-  // moved the instance. They reported UNKNOWN rather than clean, which is the
+  // moved the layer. They reported UNKNOWN rather than clean, which is the
   // whole point of the three-state rule — the sweep said "could not be
   // evaluated" and refused to call itself clean for six hours — but blind is
   // not the state a check is for.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Tool `openapi-ingest-rendered` (bean `folio-assistant-7jkp`): ingest each
- * document the instance's `cat-openapi.config.json` lists under `rendered` —
+ * document the layer's `cat-openapi.config.json` lists under `rendered` —
  * an already-PUBLISHED OpenAPI spec, by URL — verbatim, with a
  * `<id>.source.json` recording the URL and when it was fetched.
  *

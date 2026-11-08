@@ -3,7 +3,7 @@
  *
  * Owner, 2026-10-11 (litlfred/qou): *"the library should be a declared graph
  * with all its dirs as subgraphs as declared"*. Owner, 2026-10-29 (card,
- * option A): each `library/<doc>/` hangs under its instance's `library`
+ * option A): each `library/<doc>/` hangs under its layer's `library`
  * subgraph, by the same containment rule as `skills/sdlc/` under `skills/`.
  *
  * kg-export does not read library entries, so the subgraph framing gets
@@ -35,7 +35,7 @@ export type Loader = (url: string) => Promise<{ contextUrl: null; documentUrl: s
 
 /**
  * A loader for entry documents that never fetches. An entry names its
- * instance's own context (`<iriBase>ns/context/v1.jsonld`), which is built at
+ * layer's own context (`<iriBase>ns/context/v1.jsonld`), which is built at
  * publish and so is usually not on disk: it is generated here in memory, by
  * the same function that writes it (`gen-instance-contexts.ts`). Anything else
  * goes to `publish-verify`'s local loader.

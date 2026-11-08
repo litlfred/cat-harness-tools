@@ -149,12 +149,12 @@ describe("every theme is readable, not just the ones that advertise it", () => {
   );
 });
 
-// ── A shipped backdrop must actually resolve against this instance ──
+// ── A shipped backdrop must actually resolve against this layer ──
 
 describe("every shipped backdrop resolves against THIS instance's declaration", () => {
   // The join no other test covers. A theme parses with `imageRole: "anything"`
   // — the schema validates the field's SHAPE, because whether art exists is a
-  // question about the instance, not about the theme. So a theme naming a role
+  // question about the layer, not about the theme. So a theme naming a role
   // this repository does not declare is well-formed, ships, and renders
   // palette-only with nothing reporting why.
   //

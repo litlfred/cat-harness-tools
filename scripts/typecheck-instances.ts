@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * typecheck-instances.ts — `tsc --noEmit` against every instance in the
+ * typecheck-instances.ts — `tsc --noEmit` against every layer in the
  * checkout that carries a `tsconfig.json`, with TypeScript 7.
  *
  * ## Why a script and not a loop in the workflow
  *
  * In the index checkout the root owns no code and has no `tsconfig.json`, so
- * the typecheck runs per instance, each against its own config. `bun run cat gates`
+ * the typecheck runs per layer, each against its own config. `bun run cat gates`
  * keeps only a step's `bun …` lines and cannot run a shell loop, so one
  * command is what both CI and the local gate set can run
  * (`gates-workflows.test.ts`).
@@ -20,8 +20,8 @@
  *
  * ## Exit codes
  *
- * 0 every instance typechecks · 1 any instance fails · 2 could not determine
- * (no instance carries a `tsconfig.json`, or the TS7 launcher is missing) —
+ * 0 every layer typechecks · 1 any layer fails · 2 could not determine
+ * (no layer carries a `tsconfig.json`, or the TS7 launcher is missing) —
  * never 0, because a typecheck over nothing is not a pass.
  *
  * @module scripts/typecheck-instances
@@ -33,7 +33,7 @@ import { spawn } from "node:child_process";
 
 import { instanceRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
 
-/** The instances under `repoRoot` that carry a `tsconfig.json`, as config paths. */
+/** The layers under `repoRoot` that carry a `tsconfig.json`, as config paths. */
 export function instanceConfigs(repoRoot: string): string[] {
   return instanceRootsIn(repoRoot)
     .map((r) => join(r, "tsconfig.json"))

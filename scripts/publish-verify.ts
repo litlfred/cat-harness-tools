@@ -157,9 +157,9 @@ let contextFiles: Map<string, string> | undefined;
 /**
  * Every instance context URL in this checkout — `<iriBase>ns/context/v1.jsonld`
  * (bean folio-assistant-63q4) — with the file `jsonld:contexts` writes for it.
- * An emitted document names its own instance's context, which lives under that
- * instance's `iriBase`, not under the content context's base, so the loader
- * resolves it from the instance in the checkout.
+ * An emitted document names its own layer's context, which lives under that
+ * layer's `iriBase`, not under the content context's base, so the loader
+ * resolves it from the layer in the checkout.
  */
 export function instanceContextFiles(repoRoot = resolve(dirname(HARNESS_ROOT))): Map<string, string> {
   if (contextFiles === undefined) {
@@ -173,8 +173,8 @@ export function instanceContextFiles(repoRoot = resolve(dirname(HARNESS_ROOT))):
 }
 
 /**
- * The site's own address, from the instance declaration — `undefined` when the
- * instance declares none, which leaves only the context test.
+ * The site's own address, from the layer declaration — `undefined` when the
+ * layer declares none, which leaves only the context test.
  */
 export function declaredBase(instanceRoot: string): string | undefined {
   return readDeclaration(instanceRoot)?.canonicalUrl;
@@ -801,7 +801,7 @@ if (import.meta.main) {
   const arg = (f: string) => (argv.includes(f) ? argv[argv.indexOf(f) + 1] : undefined);
   const dir = resolve(arg("--dir") ?? "_site");
   // `--base` may repeat (a staging build mints under its preview address as
-  // well); with none given, the instance's declared `canonicalUrl` is the base.
+  // well); with none given, the layer's declared `canonicalUrl` is the base.
   const given = argv.flatMap((a, i) => (a === "--base" && argv[i + 1] ? [argv[i + 1]!] : []));
   const declared = declaredBase(resolve(arg("--instance") ?? resolve(HARNESS_ROOT)));
   const bases = given.length > 0 ? given : declared ? [declared] : [];

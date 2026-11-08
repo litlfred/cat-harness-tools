@@ -11,7 +11,7 @@ import { ancestorsOf, flattenDependencies } from "./kg/dependency-order.ts";
 import { ALLOWED } from "../scripts/partition/instance-rules.ts";
 import { classifyByDirection } from "./kg/detangle.ts";
 
-/** This repository's instance stack, as `kg-detangle` reads it: three declared, one not. */
+/** This repository's layer stack, as `kg-detangle` reads it: three declared, one not. */
 function needsRule(): LayerRule {
   const needs = new Map<string, readonly string[] | undefined>([
     ["bootstrap", []],

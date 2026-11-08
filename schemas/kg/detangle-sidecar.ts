@@ -28,7 +28,7 @@
  * **The direction counts are pinned** because they are not thresholds:
  * `wrongDirection` counts edges whose `directionOf` said `wrong-direction`,
  * which changes only when an edge or a declaration changes — the event worth
- * failing on. `undeterminedDirection` (an edge whose instance declares no
+ * failing on. `undeterminedDirection` (an edge whose layer declares no
  * `needs`) rides with it, so an edge moving from `wrong-direction` to
  * `undetermined` does not read as a fix.
  *
@@ -66,7 +66,7 @@ export interface DetangleSidecar {
   readonly proseMentions: number;
   /** Outbound edges `directionOf` called `wrong-direction` — the layering is inverted. */
   readonly wrongDirection: number;
-  /** Outbound edges whose direction cannot be decided, because the source instance declares no `needs`. Not clean. */
+  /** Outbound edges whose direction cannot be decided, because the source layer declares no `needs`. Not clean. */
   readonly undeterminedDirection: number;
 }
 
@@ -145,8 +145,8 @@ export function detangleResultsDir(harness: string): string {
     resolveDirectories([{ name: "(local)", root: harness, own: true }]).find(
       (d) => d.id === "qa" && d.own && d.scope !== "repository",
     )?.absPath ??
-    // declared-path-literal: the convention fallback, at the call site — an
-    // instance declaring no `qa` directory still needs a home for the sidecars.
+    // declared-path-literal: the convention fallback, at the call site — a
+    // layer declaring no `qa` directory still needs a home for the sidecars.
     join(harness, "test", "results");
   return join(qaDir, "detangle");
 }

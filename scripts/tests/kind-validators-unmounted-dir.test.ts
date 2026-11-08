@@ -2,7 +2,7 @@
  * A declared directory the mount did not CHOOSE is not examined — never
  * `EXAMINED NOTHING` — while a chosen, mounted, empty one still is.
  *
- * A downstream mounts a subset of an upstream instance's directories, and the
+ * A downstream mounts a subset of an upstream layer's directories, and the
  * declaration it lays down names all of them. When the upstream later
  * declares a new directory (here `beans/`), the downstream's mount has no such
  * directory at all; the lock (`instances[].directories`) says it was not
@@ -26,7 +26,7 @@ afterAll(() => {
 const SHA = "a".repeat(40);
 const DIGEST = "b".repeat(64);
 
-/** A downstream scope holding its own instance, an index lock, and a mounted `up` whose `beans/` is chosen or not. */
+/** A downstream scope holding its own layer, an index lock, and a mounted `up` whose `beans/` is chosen or not. */
 function downstream(chooseBeans: boolean): { own: string; up: string } {
   const scope = mkdtempSync(join(tmpdir(), "kv-unmounted-"));
   made.push(scope);
@@ -79,7 +79,7 @@ describe("a declared directory the mount did not choose", () => {
   test("the lock answers: not chosen", () => {
     expect(mountChoiceOf(up, join(up, "beans"))).toEqual({ chosen: false, lock: "index.lock.json" });
     expect(mountChoiceOf(up, join(up, "glossary"))).toEqual({ chosen: true, lock: "index.lock.json" });
-    // The checkout's own instance: no mount placed it, so no answer.
+    // The checkout's own layer: no mount placed it, so no answer.
     expect(mountChoiceOf(own, join(own, "beans"))).toBeUndefined();
   });
 

@@ -9,7 +9,7 @@
  * Moved again, from `cat-harness-tools/scripts/tests/` to the checkout's own
  * test home `test/` (bean `7zz1`, owner ruling 2026-10-06 "Top-level
  * instance"): what it reads belongs to the whole checkout, which the root
- * instance declares, not to any one layer — so cat-harness-tools stays green
+ * layer declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
@@ -31,10 +31,10 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 const ROOT = resolve(ORIGIN_DIR, "../..");
 
 /**
- * A throwaway instance that declares a trashcan.
+ * A throwaway layer that declares a trashcan.
  *
- * A REPOSITORY holding an instance, which is the live shape: `fsh-guts/` is
- * declared `scope: "repository"`, so the directory sits beside the instance
+ * A REPOSITORY holding a layer, which is the live shape: `fsh-guts/` is
+ * declared `scope: "repository"`, so the directory sits beside the layer
  * rather than inside it. The fixture makes its own repository directory
  * instead of letting `repoRootFor` reach `/tmp` — that was shared, so every
  * fixture in this file wrote into one trashcan and the isolation each `try`

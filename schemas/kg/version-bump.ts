@@ -2,7 +2,7 @@
  * version-bump.ts — `instance-versioning.md` §4: what a version MEANS, and
  * what makes it go up.
  *
- * A version governs the instance's **declared** surface: graph typologies,
+ * A version governs the layer's **declared** surface: graph typologies,
  * skill ids, tool ids, block kinds, asset roles, declared directories —
  * everything `kg-export` walks.
  *

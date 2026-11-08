@@ -72,7 +72,7 @@ function releaseKey(r: ToolRelease): string {
 }
 
 /**
- * Problems across the WHOLE set of releases and profiles an instance can see.
+ * Problems across the WHOLE set of releases and profiles a layer can see.
  *
  * What one file's schema cannot know, because the answer is in another file:
  *

@@ -22,7 +22,7 @@
  *
  * ## Each declared `uploads` queue is counted on its own
  *
- * Several instances may declare an `uploads/` (the repository root and
+ * Several layers may declare an `uploads/` (the repository root and
  * `cat-harness` each do). Attribution follows declaration, so every count is
  * per queue and the reader returns them separately; a merged count would
  * report a set that does not exist.
@@ -75,7 +75,7 @@ export type UploadLink = "match" | "differs" | "absent" | "unknown";
 export interface LibraryEntry {
   /** The slug — the identifier every reference resolves through. */
   id: string;
-  /** The instance whose library this is, e.g. `cat-harness`. */
+  /** The layer whose library this is, e.g. `cat-harness`. */
   instance: string;
   /** Repo-relative directory. */
   dir: string;
@@ -251,7 +251,7 @@ export const AVATAR_MAX_BYTES = 128 * 1024;
  * The entry's avatar, or `undefined`.
  *
  * PUBLISHED AS A COPY under the site's own `assets/library/avatars/`, not at
- * the instance's mount. The mount (`/library/<instance>/`) exists only on the
+ * the layer's mount. The mount (`/library/<instance>/`) exists only on the
  * BUILT site, so a cover linked there 404'd on every surface that serves the
  * committed tree — the e2e server, and any page read before the build. A
  * copy resolves on all of them, and `gen-library-viz --check` fails when a
@@ -325,7 +325,7 @@ export interface UploadItem {
    * `intake` — a directory whose `intake.json` declares a capture.
    */
   kind: "file" | "intake";
-  /** The instance whose queue this is. */
+  /** The layer whose queue this is. */
   instance: string;
   /** Repo-relative path. */
   path: string;
@@ -427,24 +427,24 @@ function sha256(path: string): string {
 }
 
 /**
- * The instance a declared directory belongs to.
+ * The layer a declared directory belongs to.
  *
  * Its parent's basename — `cat-harness/library` belongs to `cat-harness`, and
  * a directory at the repository root belongs to the repository. Derived from
  * the resolved path rather than passed in, so a caller cannot label a queue
- * with an instance it did not come from, which is the mislabelling `v1hw`
+ * with a layer it did not come from, which is the mislabelling `v1hw`
  * warns about from the other direction.
  *
- * The repository root's instance is its DECLARED name, never
+ * The repository root's layer is its DECLARED name, never
  * `basename(repoRoot)` (bean `t5dm`): the root's basename is wherever the
  * repository was cloned — a worktree named `pr1290` published
  * `"uploadInstance": "pr1290"` — while a sub-instance's first path segment is
  * a path INSIDE the repository and the same in every clone.
  *
  * A root that declares nothing is NOT named after its folder any more (issue
- * #1904): it belongs to the landing instance when exactly one harness is
+ * #1904): it belongs to the landing layer when exactly one harness is
  * decided (`rootInstanceName`), and otherwise this throws, because a queue
- * labelled with a guessed instance is the mislabelling above.
+ * labelled with a guessed layer is the mislabelling above.
  */
 export function instanceOf(absDir: string, repoRoot: string): string {
   const rel = relative(repoRoot, absDir).split("\\").join("/");
@@ -681,7 +681,7 @@ export function readEntryBlocks(dir: string, opts: { verbatim?: boolean } = {}):
 }
 
 /**
- * Catalogue titles by library slug, for one instance root (bean `gnqa`,
+ * Catalogue titles by library slug, for one layer root (bean `gnqa`,
  * finding 5).
  *
  * A manifest's `title` is whatever the extractor found on the first page, and
@@ -694,7 +694,7 @@ export function readEntryBlocks(dir: string, opts: { verbatim?: boolean } = {}):
  * extractor guessed, so the catalogue answers first and the manifest only
  * where no catalogue node names the entry.
  *
- * Read from the instance's DECLARED `catalogue` graph, the same lookup
+ * Read from the layer's DECLARED `catalogue` graph, the same lookup
  * `intakeTitle` uses — never a hardcoded `catalogue/nodes` path.
  */
 const catalogueTitleCache = new Map<string, Map<string, string>>();
@@ -722,14 +722,14 @@ function catalogueTitles(instanceRoot: string): Map<string, string> {
  * `folio-intake/v1` no longer repeats what another record says: it names a
  * catalogue `item`, or a Dublin Core `record`, and carries its own `title`
  * only when neither exists. So the title is looked up in that order — the
- * intake's own, then the catalogue node (in the instance's declared
+ * intake's own, then the catalogue node (in the layer's declared
  * `catalogue` graph), then the record's `dc.title` — and is `""` when none
  * answers, which the uploads view already renders as untitled.
  */
 function intakeTitle(intake: { title?: string; item?: string; record?: string }, dir: string): string {
   if (intake.title) return intake.title;
   if (intake.item) {
-    // entry → its library (past a concern group, bean `6fez`) → the instance.
+    // entry → its library (past a concern group, bean `6fez`) → the layer.
     const instanceRoot = dirname(libraryOfEntry(dir));
     for (const cat of directoriesForGraph(instanceRoot, "catalogue")) {
       const nodes = join(cat, "nodes");
@@ -753,20 +753,20 @@ function intakeTitle(intake: { title?: string; item?: string; record?: string },
 export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRootFor(roots[0] ?? ".")): LibraryGraph | null {
   // `repoRoot` is passed by a caller whose first root IS the repository root:
   // `repoRootFor` of that is its parent, which put every upload queue under
-  // one wrong instance with a path one level too long (#1168 B7a-2).
+  // one wrong layer with a path one level too long (#1168 B7a-2).
   const libDirs = new Set<string>();
   const upDirs = new Set<string>();
   for (const r of roots) {
     for (const d of corpusDirectoriesForGraph(r, "library")) libDirs.add(d);
     for (const d of directoriesForGraph(r, "uploads")) upDirs.add(d);
   }
-  // An instance that declares a library declares its own queue, and that
+  // A layer that declares a library declares its own queue, and that
   // declaration does not always reach the roots passed in: measured
   // 2026-09-20, `directoriesForGraph(cat-harness, "library")` resolves
   // the IRIS replica's `library` while `…(cat-harness, "uploads")` does NOT
   // resolve its `uploads`. Reading the entries of a queue this reader then
-  // omitted would report an instance's corpus as though it arrived from
-  // nowhere. So each library's own instance root is asked for its queue.
+  // omitted would report a layer's corpus as though it arrived from
+  // nowhere. So each library's own layer root is asked for its queue.
   for (const lib of [...libDirs]) {
     for (const d of directoriesForGraph(dirname(lib), "uploads")) upDirs.add(d);
   }

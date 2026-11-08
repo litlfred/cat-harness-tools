@@ -27,7 +27,7 @@ const put = (rel: string, body: object): void => {
 
 // The host, as a checkout of its own and as a mount.
 put("host/host.json", { name: "host", directories: [] });
-// An index of the host's layers: its root declares no instance.
+// An index of the host's layers: its root declares no layer.
 put("index/index.config.json", { instances: ["host"] });
 put("index/host/host.json", { name: "host", directories: [] });
 // A downstream: its root declares itself, the host mounted inside it.

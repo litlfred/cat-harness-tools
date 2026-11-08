@@ -1,16 +1,16 @@
 /**
- * The generic half of the exporter serves an instance that is NOT this one.
+ * The generic half of the exporter serves a layer that is NOT this one.
  *
  * @module scripts/tests/kg-export-instance.test
  *
- * Bean `gn4l`. These assertions run against **bootstrap**, a real instance in
+ * Bean `gn4l`. These assertions run against **bootstrap**, a real layer in
  * this repository that has a declaration, two skills, no `tools/`, no
  * `package.json` and no `.claude/` — which is exactly the shape the exporter
  * was never written for.
  *
  * It had no BPMN too, until this branch gave it `workflows/bootstrap.bpmn`.
  * Anything asserting on an absence here is asserting on a property of a
- * REAL instance that is still being built, so it belongs in a fixture — see
+ * REAL layer that is still being built, so it belongs in a fixture — see
  * the workflow-directory test below, which was written against bootstrap and
  * broke the day bootstrap grew the feature.
  */
@@ -29,7 +29,7 @@ const BASE = "https://example.org";
 const DOC = "https://example.org/x.jsonld";
 
 /**
- * The ROOT instance's collection, made once for this file — see the same
+ * The ROOT layer's collection, made once for this file — see the same
  * pair in `instance-graph-isolation.test.ts` for the measurement (7.1 s cold
  * before bean `tdir` made Tools generic, 9.2 s after, 5.3 s warm: each call
  * alone was past bun's 5 s default). Both readers only read the nodes.
@@ -97,7 +97,7 @@ describe("what was not looked for is not reported as clean", () => {
     // different facts. Collapsing them is the `dh4f` defect.
     const { omitted } = await collectInstanceNodes(join(repoRootFor(ROOT), "bootstrap"), DOC, BASE, []);
     // `tools` left this list with bean `tdir`: discovery reads every
-    // instance's declared `tools` graph, so it IS looked for now.
+    // layer's declared `tools` graph, so it IS looked for now.
     expect([...omitted].sort()).toEqual(["packages", "registry", "schemas"]);
   });
 
@@ -139,7 +139,7 @@ describe("what was not looked for is not reported as clean", () => {
     // empty: looked, found none. The ENOENT-safety this test was written for
     // (a directory found under one root and joined against another) is still
     // what it guards — nothing throws — and the finding is still emitted; it
-    // simply no longer fails the instance.
+    // simply no longer fails the layer.
     expect(notes.filter((n) => /no directory containing \.bpmn files was found/.test(n)))
       .toHaveLength(1);
     expect(problems).toEqual([]);

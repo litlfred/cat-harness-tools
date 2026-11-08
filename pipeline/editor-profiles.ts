@@ -1,6 +1,6 @@
 /**
  * The ✍ suggest editor's profiles: the `folio-editor-checker/v1` nodes the
- * instances of a checkout declare (a directory of graph typology
+ * layers of a checkout declare (a directory of graph typology
  * `editor-checkers`), each bundled into one browser module the edit-links
  * runtime imports on first use (bean folio-assistant-4dx7).
  *
@@ -9,7 +9,7 @@
  *
  * ## The contract with the runtime
  *
- * A node names its code as `path.ts#Export`, relative to its instance's root.
+ * A node names its code as `path.ts#Export`, relative to its layer's root.
  * The bundle re-exports each under the ROLE the runtime calls, so the runtime
  * never learns an export name:
  *
@@ -42,11 +42,11 @@
  * serve a source that is not Markdown (`[".json"]`), and a host can name a
  * profile by id with `data-suggest-mode`.
  *
- * The node's schema is its declaring instance's (the formal-math layer's
+ * The node's schema is its declaring layer's (the formal-math layer's
  * `schemas/editor-checker.ts`); it is read raw here, as `declared-nodes.ts`
  * reads declarations, because this layer may not import the one above it.
  * What is checked here is only what the bundle needs: a code ref that names a
- * file inside its instance.
+ * file inside its layer.
  *
  * @module cat-harness-tools/pipeline/editor-profiles
  */
@@ -78,7 +78,7 @@ export interface EditorCheckerNode {
   tokens?: string;
 }
 
-/** A node and the instance root its code refs resolve against. */
+/** A node and the layer root its code refs resolve against. */
 export interface FoundProfile {
   node: EditorCheckerNode;
   root: string;
@@ -108,7 +108,7 @@ export function editorProfiles(repoRoot: string, contentType: string): FoundProf
         try {
           node = JSON.parse(readFileSync(file, "utf-8")) as EditorCheckerNode;
         } catch {
-          continue; // an unreadable node is its own instance's validator's finding
+          continue; // an unreadable node is its own layer's validator's finding
         }
         if (node?.$schema !== EDITOR_CHECKER_SCHEMA || node.contentType !== contentType) continue;
         // A profile does something: checks an edit, or opens an editor.

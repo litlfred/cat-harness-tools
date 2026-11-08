@@ -324,9 +324,9 @@ describe("a whole library entry, through the real branch — bean `p67i`", () =>
 
   test("a STAGED entry is minted for the library it is promoted INTO — bean `apui`", () => {
     // Measured 2026-10-06: a document staged under `cat-harness/ingest-staging/`
-    // and promoted into a sibling instance's library carried a manifest `@id`
-    // naming `cat-harness`, because the instance is read off the entry's
-    // location and staging is not where the entry ends up. Two instances, so
+    // and promoted into a sibling layer's library carried a manifest `@id`
+    // naming `cat-harness`, because the layer is read off the entry's
+    // location and staging is not where the entry ends up. Two layers, so
     // the location-derived answer and the right one differ.
     const root = mkdtempSync(join(tmpdir(), "located-"));
     for (const name of ["stager", "sib"]) {
@@ -342,7 +342,7 @@ describe("a whole library entry, through the real branch — bean `p67i`", () =>
     const manifestId = (o: ReturnType<typeof buildEntryNodes>) =>
       o.state === "built" ? JSON.parse(o.files.find((f) => f.path === "manifest.jsonld")!.content)["@id"] : o.state;
 
-    // Without a destination the staging tree's own instance answers — the defect.
+    // Without a destination the staging tree's own layer answers — the defect.
     expect(manifestId(buildEntryNodes("d", staged))).toContain("/stager/d/");
     // With one, the destination's — and the bytes are those the corpus walk
     // will compute once the entry sits there, which is what `--check` compares.
@@ -630,7 +630,7 @@ describe("D4: a library item's licence is dcterms:license, by the row a glossary
 
 describe("the instance an entry belongs to", () => {
   test("a relative entry path names the instance, not \".\"", () => {
-    // Measured 2026-10-11: `--entry library/<id>` run from the instance root
+    // Measured 2026-10-11: `--entry library/<id>` run from the layer root
     // minted manifests under `.../jsonld/./<id>/`, since the folder above
     // `library` is "." until the path is resolved.
     const root = mkdtempSync(join(tmpdir(), "relative-"));
@@ -693,7 +693,7 @@ describe("the instance a GROUPED entry belongs to (bean 6fez)", () => {
 describe("the instance an entry belongs to when its library sits BELOW the instance (cat-harness#1032)", () => {
   test("library/corpus/<group>/<id> and library/corpus/<id> name the instance that declares the corpus", () => {
     // Measured 2026-11-07: cat-harness moved its corpus to `library/corpus/`,
-    // the folder above the library was no instance, and every manifest IRI
+    // the folder above the library was no layer, and every manifest IRI
     // fell back to the relative form — 5611 nodes stale.
     const root = mkdtempSync(join(tmpdir(), "nested-"));
     const corpus = join(root, "inst", "library", "corpus");
@@ -709,7 +709,7 @@ describe("the instance an entry belongs to when its library sits BELOW the insta
     try {
       expect(libraryInstanceOf(join(corpus, "ui", "d"))).toBe("inst");
       expect(libraryInstanceOf(join(corpus, "e"))).toBe("inst");
-      // A folder the instance does not declare a library is not one: no guess.
+      // A folder the layer does not declare a library is not one: no guess.
       expect(libraryInstanceOf(join(root, "inst", "library", "other", "f"))).toBeUndefined();
     } finally {
       clearGroupCache();

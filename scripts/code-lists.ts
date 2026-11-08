@@ -13,13 +13,13 @@
  *
  * Exit 0 clean · 1 a finding · 2 nothing to check (no code list anywhere is
  * `could not determine`, never a pass). `--instance <root>` picks the
- * instance (default: this one).
+ * layer (default: this one).
  *
  * ## What it refuses
  *
  * 1. A file declaring `folio-code-list/v1` that does not parse — a malformed
  *    list fails where it lives, not when a diagram first reads it.
- * 2. An adjudication in this instance's diagrams that declares `codes` and
+ * 2. An adjudication in this layer's diagrams that declares `codes` and
  *    names no `list`. The engine accepts that (a downstream folio may not
  *    have written its lists yet); here it is a finding.
  *

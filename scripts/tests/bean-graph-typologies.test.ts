@@ -92,7 +92,7 @@ describe("the files declare what they are — that is what makes the array safe"
 
   test("a file written before the tag existed still loads", () => {
     // `$schema` is optional on read: adding a declaration must not orphan the
-    // instances already on disk.
+    // layers already on disk.
     const root = mkdtempSync(join(tmpdir(), "wf-untagged-"));
     try {
       const state = {

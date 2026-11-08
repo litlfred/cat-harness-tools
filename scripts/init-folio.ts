@@ -56,7 +56,7 @@ import { parseRemote } from "./pages-bootstrap.ts";
 import { DEFAULT_TODO_GRAPH, DEFAULT_TODO_GRAPH_ROOT, nodeOfKind } from "../schemas/sdlc/todo-graph.js";
 import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
 
-/** The version a new instance declares beside its `iriBase` (bean folio-assistant-63q4). */
+/** The version a new layer declares beside its `iriBase` (bean folio-assistant-63q4). */
 export const INITIAL_VERSION = "0.1.0";
 
 /** The upstream this folio pins its platform to. */
@@ -98,7 +98,7 @@ export interface InitInstanceOptions {
   /** Repo root to scaffold into. */
   targetDir: string;
   // declared-path-literal: the folio content root. Resolving it through `directoryForGraph` is bean `hs08`; the harness-side callers hit `ot9a`'s layering boundary, so the literal is COUNTED here rather than hidden.
-  /** Instance name: `<slug>.json`, and for a folio the directory under `folio/` and the manifest's name. */
+  /** Layer name: `<slug>.json`, and for a folio the directory under `folio/` and the manifest's name. */
   slug: string;
   title: string;
   link: LinkMode;
@@ -114,23 +114,23 @@ export interface InitInstanceOptions {
   /** Skip `git submodule add` / `git init`. */
   skipVcs?: boolean;
   /**
-   * The address the instance's IRIs are minted under, and where its JSON-LD
+   * The address the layer's IRIs are minted under, and where its JSON-LD
    * context is published (`<iriBase>ns/context/v1.jsonld`). `initInstance`
    * derives `https://<owner>.github.io/<repo>/` from a GitHub `origin` when
-   * this is absent and the instance is its repository's root; otherwise none
+   * this is absent and the layer is its repository's root; otherwise none
    * is declared, and the publish workflow skips with a notice until one is.
    */
   iriBase?: string;
 }
 
-/** An instance that holds a folio: the instance, plus what its adapter scaffolds. */
+/** A layer that holds a folio: the layer, plus what its adapter scaffolds. */
 export interface InitFolioOptions extends InitInstanceOptions {
   /** Content type — selects the adapter and the profile. */
   contentType: "paper" | "document";
   authors: string[];
 }
 
-/** The content type, when the instance being scaffolded holds a folio. */
+/** The content type, when the layer being scaffolded holds a folio. */
 type MaybeFolio = InitInstanceOptions & { contentType?: InitFolioOptions["contentType"] };
 
 export interface InitFolioResult {
@@ -140,7 +140,7 @@ export interface InitFolioResult {
   /** Anything the caller needs to act on — a failed submodule add, a next step. */
   notes: string[];
   /**
-   * Each STATE graph the instance holds (its work plan and its todos), with
+   * Each STATE graph the layer holds (its work plan and its todos), with
    * the source the one resolver gave it and what the scaffold therefore did:
    * `written` into the checkout, or `branch` — declared, not written, and
    * kept on `branch` (bean `hp54`). `seed` is the command that creates that
@@ -217,10 +217,10 @@ function toolsDir(assistant: string): string {
  * `./${platformDir(assistant)}/adapters/${o.contentType}/index.ts`
  * ```
  *
- * which assumed every adapter lives under the same instance. That stopped
+ * which assumed every adapter lives under the same layer. That stopped
  * being true on 2026-09-30, when `adapters/paper/` moved to
  * the formal-math (sci) layer (bean `y5si`): one template cannot name two
- * instances, so every paper folio scaffolded after the move would have got an
+ * layers, so every paper folio scaffolded after the move would have got an
  * `adapterModule` pointing at a path that does not exist.
  *
  * **The test did not catch it and could not have.** `init-folio.test.ts`
@@ -257,17 +257,17 @@ function posixSegments(path: string): string[] {
 }
 
 /**
- * The layer a new instance STANDS ON, as a config dependency (bean `zmdo`).
+ * The layer a new layer STANDS ON, as a config dependency (bean `zmdo`).
  *
- * Without it the scaffolded instance's declaration chain is the instance alone:
- * measured 2026-10-04 in a sibling layout, a fresh instance — and a fresh
+ * Without it the scaffolded layer's declaration chain is the layer alone:
+ * measured 2026-10-04 in a sibling layout, a fresh layer — and a fresh
  * document folio — reached **0** skill directories, so it could not read the
  * conventions it was scaffolded to follow. One entry is enough: the layer's own
  * `needs` carry the rest of the stack (`bootstrap ← bootstrap-tools ←
  * cat-harness ← …`), measured the same day.
  *
  * Which layer is DERIVED, never asked for: a folio stands on its adapter's
- * instance (`BUILTIN_ADAPTERS[].instance`), and a contentless instance on the
+ * layer (`BUILTIN_ADAPTERS[].instance`), and a contentless layer on the
  * harness whose scaffolder wrote it. A `--layer` flag was rejected for `mer2`
  * and is not reintroduced here.
  */
@@ -277,7 +277,7 @@ function standsOn(assistant: string, contentType: InitFolioOptions["contentType"
   const declared = BUILTIN_ADAPTERS.find((a) => a.contentType === contentType);
   if (!declared) return harness;
   // The adapter's module is relative to the harness directory and passes
-  // through its instance's directory: `../<content-core>/adapters/…`.
+  // through its layer's directory: `../<content-core>/adapters/…`.
   const segments = posixSegments(`${platformDir(assistant)}/${declared.module}`);
   const at = segments.lastIndexOf(declared.instance);
   return at < 0 ? harness : { name: declared.instance, path: segments.slice(0, at + 1).join("/") };
@@ -286,7 +286,7 @@ function standsOn(assistant: string, contentType: InitFolioOptions["contentType"
 // ── State graphs (bean `hp54`) ───────────────────────────────────
 
 /**
- * The graphs every instance keeps OFF main from its first commit — the work
+ * The graphs every layer keeps OFF main from its first commit — the work
  * plan and the todos (`holds: "state"`), and the trashcan a cutover deposits
  * into (`fsh-guts`, `holds: "context"`; the name predates it). Listed rather than
  * derived from the registry because the scaffold writes their CONTENT
@@ -310,10 +310,10 @@ export const INSTANCE_STATE_GRAPHS = [
     description: "People's outstanding items and the feedback raised against blocks; its inner directories are declared by `todos/todos.json`.",
   },
   {
-    // The trashcan that is kept. A NEW instance gets one from its first commit
+    // The trashcan that is kept. A NEW layer gets one from its first commit
     // (owner, 2026-10-06: "cutover dirs should go to fsh-guts") because
     // `state:seed --cutover` REFUSES to remove a directory from main when its
-    // instance has nowhere to deposit the snapshot — and an instance that had
+    // layer has nowhere to deposit the snapshot — and a layer that had
     // to declare one first would meet that refusal on its first cutover.
     id: "fsh-guts",
     // declared-path-literal: as above.
@@ -329,7 +329,7 @@ type StateGraphDef = (typeof INSTANCE_STATE_GRAPHS)[number];
  * The declaration entry for one state graph. Its `source` comes from the
  * kind's `newInstanceSource` with the branch composed by
  * {@link instanceStateBranch} — `cat/<instance>/<id>` — and is written out in
- * full, so the new instance's declaration is the one place that answers
+ * full, so the new layer's declaration is the one place that answers
  * afterwards. A kind with no `newInstanceSource` gets no `source`: the
  * resolver's `directory` default.
  */
@@ -381,7 +381,7 @@ function stateGraphFiles(slug: string, g: StateGraphDef): Record<string, string>
  * what to run instead of inventing a second writer. Content travels base64-
  * encoded so no quoting in it can break the command; a throwaway index keeps
  * the checkout's own index untouched. `authoritative: true` because for a new
- * instance there is no `main` copy — the branch is the store from its first
+ * layer there is no `main` copy — the branch is the store from its first
  * commit.
  */
 export function stateSeedCommand(branch: string, id: string, files: Record<string, string>): string {
@@ -415,12 +415,12 @@ export function stateSeedCommand(branch: string, id: string, files: Record<strin
 // ── Templates ────────────────────────────────────────────────────
 
 /**
- * The instance DECLARATION — `harness.json`, and the reason the config beside
+ * The layer DECLARATION — `harness.json`, and the reason the config beside
  * it has the name it has.
  *
  * Writing `<slug>.config.json` without this was a `dh4f` in miniature: the
  * file is on disk, and every reader answers "no config". A config filename is
- * composed from the instance's NAME, and a name is something a directory only
+ * composed from the layer's NAME, and a name is something a directory only
  * has by declaring one — `resolveHarnessConfigPath` refuses to guess a global
  * filename back into existence, which is correct and which leaves an
  * undeclared scaffold unconfigured in a way nothing reports.
@@ -436,11 +436,11 @@ export function stateSeedCommand(branch: string, id: string, files: Record<strin
  * Writing `directories: []` instead is a trap, and it is worth naming because
  * it looks like the humbler choice. `ownDirectories` falls back to
  * `DEFAULT_DIRECTORIES` only for a root with **no declaration at all**; an
- * empty array is a declaration that the instance owns nothing, so adding a
+ * empty array is a declaration that the layer owns nothing, so adding a
  * name would silently withdraw every convention the scaffold had before it.
  */
 /**
- * The scaffolded instance's DECLARATION — `<slug>.json`.
+ * The scaffolded layer's DECLARATION — `<slug>.json`.
  *
  * TWO files again since 2026-09-21. The history is worth keeping because both
  * transitions broke this function:
@@ -476,7 +476,7 @@ function instanceDeclaration(o: MaybeFolio): string {
       // which is how two restored DAK IG
       // declarations broke their IG publish on 2026-10-15.
       ...(o.iriBase !== undefined ? { iriBase: o.iriBase, version: INITIAL_VERSION } : {}),
-      // A contentless instance declares no `folio` directory: declaring one it
+      // A contentless layer declares no `folio` directory: declaring one it
       // does not hold would be the `dh4f` defect (a consumer scans nothing and
       // reports a clean run). Bean `mer2`.
       directories: o.contentType === undefined ? state : [
@@ -498,7 +498,7 @@ function instanceDeclaration(o: MaybeFolio): string {
 }
 
 /**
- * The scaffolded instance's CONFIG — written INLINE in its `index.config.json`
+ * The scaffolded layer's CONFIG — written INLINE in its `index.config.json`
  * entry, never as a `<slug>.config.json` (bean `ymvt`, owner 2026-10-14: *"i
  * thought ONLY index.config.json"*; the per-instance file is a legacy import,
  * retired by `index-config:migrate --inline`).
@@ -514,7 +514,7 @@ function instanceDeclaration(o: MaybeFolio): string {
  */
 function instanceConfig(o: MaybeFolio, assistant: string): Record<string, unknown> {
   return {
-      // Omitted, not defaulted, for a contentless instance (bean `mer2`):
+      // Omitted, not defaulted, for a contentless layer (bean `mer2`):
       // naming an adapter here would be inventing a content type for a layer
       // that has none.
       ...(o.contentType === undefined ? {} : {
@@ -535,22 +535,22 @@ function instanceConfig(o: MaybeFolio, assistant: string): Record<string, unknow
   };
 }
 
-/** The layers every remote-linked instance or folio mounts, whatever its content type. */
+/** The layers every remote-linked layer or folio mounts, whatever its content type. */
 const REMOTE_PLATFORM_LAYERS = ["cat-harness", "cat-harness-tools", "bootstrap", "bootstrap-tools"] as const;
 
 /**
- * The platform layers a remote-linked instance or folio declares as
+ * The platform layers a remote-linked layer or folio declares as
  * `source.remote` mounts in `index.config.json` (bean `c4lg`).
  *
- * The platform layers, then — for a content type — the instance whose
+ * The platform layers, then — for a content type — the layer whose
  * `contentAdapters` declares that type and its `needs` closure, deepest first.
  * DERIVED, not named: this layer sits below every content layer and may not
- * spell their names (`check:reference-direction`). A content type no instance
+ * spell their names (`check:reference-direction`). A content type no layer
  * in the checkout declares adds nothing — there is no layer to mount, and
  * guessing one would write a mount for a repository nobody said exists.
  *
  * Exported, with the adapters and the closure injectable, for the tests that
- * pin the derivation with and without a declaring instance.
+ * pin the derivation with and without a declaring layer.
  */
 export function remotePlatformLayers(
   contentType: InitFolioOptions["contentType"] | undefined,
@@ -611,7 +611,7 @@ function remotePlatformInstances(contentType: InitFolioOptions["contentType"] | 
 }
 
 /**
- * The `index.config.json` a new folio starts with: one instance, the one
+ * The `index.config.json` a new folio starts with: one layer, the one
  * scaffolded, declared at the root, its config INLINE in the entry (bean
  * `ymvt`), plus any remote-mounted platform layers when `--link remote` is
  * used (bean `c4lg`). Exported for the test that holds `init-folio` to the schema.
@@ -985,7 +985,7 @@ ${o.contentType === "paper" ? "\n# Lean build artifacts\n.lake/\n*.olean\n\n# Ra
  * something the author never chose.
  */
 /**
- * The layer that builds a document site: the content layer, the instance that
+ * The layer that builds a document site: the content layer, the layer that
  * declares the `core` layer's kinds, read from where they were declared rather
  * than spelt here (folio-assistant#2598).
  */
@@ -1333,10 +1333,10 @@ ${o.authors.join(", ")}
 }
 
 /**
- * A contentless instance's README (bean `mer2`).
+ * A contentless layer's README (bean `mer2`).
  *
- * Only the workflows markers: `folio:toc` lists a folio's contents, and an
- * instance that holds none would carry a region nothing can fill.
+ * Only the workflows markers: `folio:toc` lists a folio's contents, and a
+ * layer that holds none would carry a region nothing can fill.
  */
 function instanceReadme(o: InitInstanceOptions): string {
   return `# ${o.title}
@@ -1357,10 +1357,10 @@ work plan (\`beans/\`, \`todos/\`) and agent wiring. It holds no folio.
 }
 
 /**
- * A contentless instance's AGENTS.md (bean `mer2`).
+ * A contentless layer's AGENTS.md (bean `mer2`).
  *
- * Says what the instance is and is not, and where the platform is — the folio
- * version's block-kind rules would be rules about content this instance does
+ * Says what the layer is and is not, and where the platform is — the folio
+ * version's block-kind rules would be rules about content this layer does
  * not hold.
  */
 function instanceAgentsMd(o: InitInstanceOptions, assistant: string): string {
@@ -1509,7 +1509,7 @@ function startScaffold(o: MaybeFolio): Scaffold {
  *
  * `declaredSubgraph` first — THE lookup the publishers and `branch-store`
  * use — reading the declaration this scaffold just wrote (or found, when a
- * re-run left an existing one alone) and the instance config's
+ * re-run left an existing one alone) and the layer config's
  * `subgraphSources` override. A dry run has nothing on disk, and a directory
  * outside any checkout can make the checkout walk refuse; both fall back to
  * `resolveSubgraphSource` over the entry this scaffold would write, with
@@ -1551,13 +1551,13 @@ function resolveStateGraph(s: Scaffold, g: StateGraphDef): StateGraphOutcome {
 
 /**
  * The instance-level writes — everything that needs no content type (bean
- * `mer2`). Shared by `initInstance` and `initFolio`, so a folio's instance half
- * cannot drift from a bare instance's.
+ * `mer2`). Shared by `initInstance` and `initFolio`, so a folio's layer half
+ * cannot drift from a bare layer's.
  */
 function writeInstanceFiles(s: Scaffold): void {
   const { o, assistant, write } = s;
-  // Named after the instance, not after the harness: the config the scaffold
-  // writes is THIS instance's, and `folio_init` is where a new instance's
+  // Named after the layer, not after the harness: the config the scaffold
+  // writes is THIS layer's, and `folio_init` is where a new layer's
   // name first becomes a filename (2026-09-20).
   // The declaration comes FIRST, because it is what gives the next line's
   // filename a meaning. See `instanceConfig` above — ONE file now, its
@@ -1566,7 +1566,7 @@ function writeInstanceFiles(s: Scaffold): void {
   // The root INDEX (owner, 2026-10-07): which harnesses this checkout
   // instantiates — today the one being scaffolded, at the root — with its
   // config INLINE in the entry (bean `ymvt`: no `<slug>.config.json` is
-  // written; the index is the one config). No `site.landing`: a sole instance is the landing
+  // written; the index is the one config). No `site.landing`: a sole layer is the landing
   // with no flag, and naming one now would be a decision nobody has made.
   const remote = o.link === "remote" ? remotePlatformInstances(o.contentType) : [];
   const index = newFolioIndex(o.slug, instanceConfig(o, assistant), remote);
@@ -1649,12 +1649,12 @@ function finishScaffold(s: Scaffold): void {
     );
   }
 
-  // Every directory this instance DECLARES or INHERITS, created if absent.
+  // Every directory this layer DECLARES or INHERITS, created if absent.
   //
   // Last, and after the platform link, because the inherited half of the answer
-  // comes from walking the dependency tree — an instance whose platform is not
+  // comes from walking the dependency tree — a layer whose platform is not
   // checked out yet inherits nothing, and this then correctly creates only what
-  // the instance itself declares. Re-running with `--force` re-runs this,
+  // the layer itself declares. Re-running with `--force` re-runs this,
   // which is safe: it is idempotent and never overwrites a keep-marker.
   //
   // Placed here rather than left to the session-start sweep because the two
@@ -1699,7 +1699,7 @@ export function initInstance(options: InitInstanceOptions): InitFolioResult {
  * `https://<owner>.github.io/<repo>/` from a GitHub `origin`, the address
  * GitHub Pages serves a project repository at; `undefined` when there is no
  * such remote (a fresh `git init`), because a guessed address would be
- * minted into every IRI the instance writes.
+ * minted into every IRI the layer writes.
  */
 export function githubPagesBase(root: string): string | undefined {
   let probe = resolve(root);
@@ -1745,11 +1745,11 @@ jobs:
 
 /**
  * The caller of the tools layer's QA publisher (bean folio-assistant-7mwa;
- * owner, 2026-11-03, "2. Each layer publishes"). An instance that declares a
+ * owner, 2026-11-03, "2. Each layer publishes"). A layer that declares a
  * `qa` directory with `storage` keeps its results on that branch of its OWN
  * repository, and before this no initialisation step gave it a writer, so a
  * layer's declared store never existed. The reusable workflow skips with a
- * notice while the instance declares no `qa` directory of its own.
+ * notice while the layer declares no `qa` directory of its own.
  */
 export function publishQaWorkflow(slug: string): string {
   return `# Publish this instance's QA results (its declared \`qa\` directory) to the
@@ -1820,7 +1820,7 @@ export function initFolio(options: InitFolioOptions): InitFolioResult {
   const enclosing = enclosingRepoRoot(root);
   if (!o.dryRun) mkdirSync(root, { recursive: true });
 
-  // 1. The instance half — configuration, work plan, agent stubs.
+  // 1. The layer half — configuration, work plan, agent stubs.
   writeInstanceFiles(s);
 
   // 1b. The staging and QA workflows — folio-level: each builds or audits content.
@@ -2107,8 +2107,8 @@ export function formatInitResult(result: InitFolioResult, o: InitFolioOptions | 
  *
  * - `<path>/<slug>.json`: the declaration, with `repository` (the PLANNED
  *   home) different from `livesAt.repository` (the host). That difference is
- *   what makes it a staged instance: the separation guard and `seed:ready`
- *   read it, and nothing lists staged instances by hand.
+ *   what makes it a staged layer: the separation guard and `seed:ready`
+ *   read it, and nothing lists staged layers by hand.
  * - `<path>/platform.ts`: the import seam, empty. Every platform symbol the
  *   sub-KG later uses is re-exported from here, so re-pointing the platform on
  *   separation is a one-file edit (`instance-separation-imports.test.ts`).
@@ -2127,7 +2127,7 @@ export interface InitStagedOptions {
   repository: string;
   /** The host, `owner/name`. Derived from the host's `origin` remote when absent. */
   hostRepository?: string;
-  /** The instances it stands on. At least one: a staged sub-KG instantiates some harness. */
+  /** The layers it stands on. At least one: a staged sub-KG instantiates some harness. */
   needs: string[];
   force?: boolean;
   dryRun?: boolean;

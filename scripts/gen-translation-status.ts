@@ -20,19 +20,19 @@
  *
  * ## Paths come from the DECLARATION
  *
- * The translations directory is resolved from the instance's own
+ * The translations directory is resolved from the layer's own
  * `<instance>.json` (`translation-sources`), and the site directory from
  * `siteDirFor`. Neither is written here; `site-dir-single-answer.test.ts`
  * guards the second across the whole tree.
  *
- * ## `--instance <dir>`: another instance's catalogues, reported
+ * ## `--instance <dir>`: another layer's catalogues, reported
  *
- * The page and projection this generator writes are THIS instance's viewer, at
- * a route this instance declares, so another instance's numbers are not
- * written there. With `--instance`, the instance at `<dir>` is measured from
+ * The page and projection this generator writes are THIS layer's viewer, at
+ * a route this layer declares, so another layer's numbers are not
+ * written there. With `--instance`, the layer at `<dir>` is measured from
  * its own `translation-sources` declaration and the per-locale table is
  * printed (or emitted as the projection's `locales` array with `--json`);
- * nothing is written, with or without `--check`. An instance that declares no
+ * nothing is written, with or without `--check`. A layer that declares no
  * such directory exits 2, as this one would.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
@@ -247,7 +247,7 @@ function filesUnder(dir: string, exts: readonly string[]): string[] {
 /**
  * Where the gettext sources are, READ from the declaration.
  *
- * Returns undefined when the instance declares no such directory — which is a
+ * Returns undefined when the layer declares no such directory — which is a
  * real state for a folio that has no translations, and is reported rather
  * than treated as an empty one.
  */
@@ -353,17 +353,17 @@ function pct(v: number | null): string {
 }
 
 /**
- * Another instance's `translation-sources` directory, measured the same way.
+ * Another layer's `translation-sources` directory, measured the same way.
  *
- * Added for issue #2228: an instance's catalogues moved out of cat-harness's
- * directory into the instance's own on 2026-10-04 (bean `riit`), and from
+ * Added for issue #2228: a layer's catalogues moved out of cat-harness's
+ * directory into the layer's own on 2026-10-04 (bean `riit`), and from
  * then on this page, which measured one directory, no longer counted them. The move was
  * right and the page went quietly blind to it, which is the gap its own note
- * warned about. Each instance is a SEPARATE table, never summed into the
- * first: two instances' catalogues answer two questions.
+ * warned about. Each layer is a SEPARATE table, never summed into the
+ * first: two layers' catalogues answer two questions.
  */
 export interface InstanceStatus {
-  /** The instance's declared name. */
+  /** The layer's declared name. */
   instance: string;
   /** Its `translation-sources` directory, repo-relative. */
   scope: string;
@@ -371,9 +371,9 @@ export interface InstanceStatus {
 }
 
 /**
- * Every OTHER instance in the checkout that declares a `translation-sources`
+ * Every OTHER layer in the checkout that declares a `translation-sources`
  * directory, sorted by name. Found the way `mount-instance-docs.ts` finds
- * instances — a top-level directory carrying a declaration — so cat-harness
+ * layers — a top-level directory carrying a declaration — so cat-harness
  * names none of them.
  */
 export function otherInstances(repoRoot: string, except: string): InstanceStatus[] {
@@ -469,7 +469,7 @@ export function statusPage(doc: {
   changedAt: string;
   /** The declared directory measured first, repo-relative. See the page note. */
   scope: string;
-  /** Every other instance's declared directory, each its own table. */
+  /** Every other layer's declared directory, each its own table. */
   instances?: InstanceStatus[];
   /**
    * The prefix that climbs from this page's directory to the SITE ROOT, where
@@ -650,7 +650,7 @@ export function statusLine(l: LocaleStatus): string {
   );
 }
 
-/** `--instance <dir>`: measure that instance's catalogues and print them. Writes nothing. */
+/** `--instance <dir>`: measure that layer's catalogues and print them. Writes nothing. */
 function reportInstance(root: string): number {
   const translationsDir = translationsDirOf(root);
   if (translationsDir === undefined || !existsSync(translationsDir)) {
@@ -679,7 +679,7 @@ function main(): void {
 
   if (translationsDir === undefined || !existsSync(translationsDir)) {
     // COULD NOT DETERMINE, and exit 2 so it is never read as a clean run.
-    // An instance with no translation-sources directory is a real state; this
+    // A layer with no translation-sources directory is a real state; this
     // generator is not the thing that decides it means "no translations".
     console.error("gen-translation-status: no `translation-sources` directory is declared or present.");
     console.error("This is NOT a pass. Treat it as unknown.");
@@ -723,7 +723,7 @@ function main(): void {
     // (`translations/`), not this projection's own segment: `scanTileCounts`
     // reads whatever a projection names, so what it names has to be the
     // directory, which is the half a reader gets wrong first. And it is the
-    // id in the TILES' list (`tileDirectories`), not this instance's: since
+    // id in the TILES' list (`tileDirectories`), not this layer's: since
     // the landing moved to the core content layer the tile is
     // `folio-assistant-core-translations`, and the literal
     // `translation-sources` badged nothing (#931). The page is unscoped, so
@@ -766,12 +766,12 @@ function main(): void {
   const today = typeof kept === "string" && /^\d{4}-\d{2}-\d{2}$/.test(kept) ? kept : new Date().toISOString().slice(0, 10);
 
   // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). Both files carry
-  // `instances` — the catalogues of every OTHER instance in the checkout — so
-  // they moved with the index's pins, not with this instance's commit. The
-  // instance declares them `builtAtPublish` with this script as the writer,
+  // `instances` — the catalogues of every OTHER layer in the checkout — so
+  // they moved with the index's pins, not with this layer's commit. The
+  // layer declares them `builtAtPublish` with this script as the writer,
   // and `derive:publish` runs it; under `--check` a declared file has no
   // committed bytes to compare, so it is skipped there (the `folio:viz` rule).
-  // Asked by the file's path in the instance's own site, so `--site` asks the
+  // Asked by the file's path in the layer's own site, so `--site` asks the
   // same question.
   const declaredBuilt = readDeclaration(ROOT)?.builtAtPublish ?? [];
   const builtHere = (p: string): boolean =>

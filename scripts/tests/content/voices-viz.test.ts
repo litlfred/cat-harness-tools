@@ -27,10 +27,10 @@ import { directoriesForGraph, instanceRootsIn, repoRootFor } from "../../../sche
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
-/** The repository root — `repoRootFor` takes an INSTANCE root and is `dirname`. */
+/** The repository root — `repoRootFor` takes a LAYER root and is `dirname`. */
 const REPO = repoRootFor(INSTANCE);
 
-/** Read once — the reader touches the filesystem across every instance. */
+/** Read once — the reader touches the filesystem across every layer. */
 const G: VoicesGraph = (() => {
   const g = readVoicesGraph([INSTANCE]);
   if (g === null) throw new Error("no voices directory is declared — the fixture is the corpus");
@@ -46,7 +46,7 @@ describe("a declared directory that is not there is a ROW, not a silence", () =>
     // red for the good reason.
     //
     // A test whose subject is a defect expires when the defect is fixed, so
-    // the subject is now a fixture: an instance declaring a `voices` directory
+    // the subject is now a fixture: a layer declaring a `voices` directory
     // that is not there. It asserts the READER's behaviour, which is the thing
     // that must never regress, and no amount of tidying the corpus can make it
     // vacuous.

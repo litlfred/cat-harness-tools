@@ -6,7 +6,7 @@
  *
  * Judgements stay on main, and `baseline` pair attestations count as
  * judgements. A WRITER also moves a judgement it finds in a prior derived file
- * with no store entry as it saves; this command does a whole instance at
+ * with no store entry as it saves; this command does a whole layer at
  * once, and `--check` is the gate that says nothing is still waiting.
  *
  * ## kg-qa — move, then strip
@@ -202,7 +202,7 @@ export interface CriteriaMigrationReport {
 // input-site: inert #6a924837 — names a build-output directory only to leave it out of a walk
 const SKIP_DIRS = new Set(["node_modules", "_site", "vendor"]);
 
-/** Every derived block/translation report under an instance, results tree first, then legacy siblings. */
+/** Every derived block/translation report under a layer, results tree first, then legacy siblings. */
 export function derivedReports(instanceRoot: string): string[] {
   const out: string[] = [];
   const walkDerived = (dir: string, legacy: boolean): void => {
@@ -228,7 +228,7 @@ export function derivedReports(instanceRoot: string): string[] {
         if (name.startsWith(".") || SKIP_DIRS.has(name)) continue;
         // The results tree is walked separately; `test/attestations` is the store itself.
         if (relative(instanceRoot, abs) === "test") continue;
-        // A nested instance keeps its own store.
+        // A nested layer keeps its own store.
         if (findDeclarationFile(abs) !== undefined) continue;
         walkDerived(abs, true);
         continue;
@@ -243,7 +243,7 @@ export function derivedReports(instanceRoot: string): string[] {
   return out;
 }
 
-/** Migrate (or, with `check`, measure) one instance's block and translation judgements. */
+/** Migrate (or, with `check`, measure) one layer's block and translation judgements. */
 export function migrateCriteria(instanceRoot: string, opts: { check?: boolean; dryRun?: boolean } = {}): CriteriaMigrationReport {
   const report: CriteriaMigrationReport = {
     root: instanceRoot,

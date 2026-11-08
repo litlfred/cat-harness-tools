@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * check:document-kind-sources — a section's `computedFrom` names a graph its
- * instance can actually reach.
+ * layer can actually reach.
  *
  * `computedFrom` is how a document kind says *"this section is computable from
  * these assets"* (`schemas/content/document-kind.ts`). It names DECLARED
@@ -9,10 +9,10 @@
  * a renamed directory, or a graph never declared would otherwise read as a
  * computable claim.
  *
- * An id resolves when it is a directory id declared by the kind's own instance
- * or by an instance it `needs`, transitively — the same `allowedFromNeeds`
+ * An id resolves when it is a directory id declared by the kind's own layer
+ * or by a layer it `needs`, transitively — the same `allowedFromNeeds`
  * direction `check:import-direction` and `check:process-bindings` use, because
- * an instance inherits its dependencies' directories and nothing above it.
+ * a layer inherits its dependencies' directories and nothing above it.
  *
  * Name what is not yet a graph rather than fake one: a section whose content
  * needs evidence nobody has ingested says so in its description and carries
@@ -40,7 +40,7 @@ export interface SourceProblem {
   reachable: string[];
 }
 
-/** Every graph id each instance can name: its own declared ids plus those of everything it needs. */
+/** Every graph id each layer can name: its own declared ids plus those of everything it needs. */
 export function reachableGraphIds(repoRoot = REPO_ROOT): Map<string, Set<string>> {
   const all = readInstances(repoRoot);
   const byName = new Map(all.map((i) => [i.name, i]));
@@ -63,7 +63,7 @@ export function reachableGraphIds(repoRoot = REPO_ROOT): Map<string, Set<string>
   return out;
 }
 
-/** Judge kinds against what each instance can reach; pure, so a planted violation can be tested. */
+/** Judge kinds against what each layer can reach; pure, so a planted violation can be tested. */
 export function judge(
   kinds: readonly { instance: string; file: string; kind: { id: string; sections: readonly { id: string; computedFrom?: readonly string[] }[] } }[],
   reach: ReadonlyMap<string, ReadonlySet<string>>,

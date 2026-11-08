@@ -1,6 +1,6 @@
 /**
  * kg-qa-report — the KNOWLEDGE-GRAPH half of a site's QA report: what the
- * harness's graph checks recorded for each instance of a checkout, and where
+ * harness's graph checks recorded for each layer of a checkout, and where
  * the site publishes the harness's own view of that QA.
  *
  * Owner, 2026-11-06: *"QA report should link to harness QA reports = FHIR QA
@@ -11,15 +11,15 @@
  * Two sources, both read off declarations, never a path:
  *
  * - the **records**: every `*.qa-results.json` (`qa-results/v1`) in the
- *   directories an instance declares for the `qa` graph. A file that does not
+ *   directories a layer declares for the `qa` graph. A file that does not
  *   parse, or is not `qa-results/v1`, is listed as unreadable rather than
  *   dropped: a page that silently omits a record reads as one with nothing to
- *   report. An instance whose `qa` directory holds none says so; for a
+ *   report. A layer whose `qa` directory holds none says so; for a
  *   mounted layer that is the usual case, since its records are computed and
  *   kept on its own store (`layer-qa.ts`), not in the mount;
- * - the **view**: the visualiser some instance declares over the `qa` kind
+ * - the **view**: the visualiser some layer declares over the `qa` kind
  *   with per-instance sub-graphs (the state viewer's `qa` page), at its
- *   localised route — the whole graph, and one sub-page per instance holding
+ *   localised route — the whole graph, and one sub-page per layer holding
  *   a `qa` directory. Nothing is linked that no declaration names.
  *
  * @module scripts/kg-qa-report
@@ -79,31 +79,31 @@ export function readQaRecords(dirs: readonly string[]): QaRecord[] {
   return out;
 }
 
-/** One instance's KG QA: its declared `qa` directories, the records in them, and its page in the view. */
+/** One layer's KG QA: its declared `qa` directories, the records in them, and its page in the view. */
 export interface KgQaInstance {
   instance: string;
-  /** Absolute. Empty when the instance declares no `qa` directory. */
+  /** Absolute. Empty when the layer declares no `qa` directory. */
   dirs: string[];
   records: QaRecord[];
-  /** Site-root-relative route of this instance's sub-page of the view, when one is declared. */
+  /** Site-root-relative route of this layer's sub-page of the view, when one is declared. */
   page?: string;
 }
 
 export interface KgQaReport {
-  /** Site-root-relative route of the whole `qa` view, when an instance declares one. */
+  /** Site-root-relative route of the whole `qa` view, when a layer declares one. */
   view?: string;
   instances: KgQaInstance[];
 }
 
-/** The declared visualiser over the `qa` kind that draws one sub-page per instance. */
+/** The declared visualiser over the `qa` kind that draws one sub-page per layer. */
 function qaView(repoRoot: string): { harness: string; id: string } | undefined {
   const v = declaredVisualisers(repoRoot).find((x) => (x.coversKinds ?? []).includes("qa") && x.subgraphs === "instance");
   return v ? { harness: v.harness, id: v.id } : undefined;
 }
 
 /**
- * The KG QA of every instance in the checkout at `repoRoot` that declares a
- * `qa` directory, and of `subject` (the instance the site is about) whether
+ * The KG QA of every layer in the checkout at `repoRoot` that declares a
+ * `qa` directory, and of `subject` (the layer the site is about) whether
  * or not it declares one: it is listed FIRST, so a site that records no QA of
  * its own says so rather than showing only its layers'.
  */
@@ -129,7 +129,7 @@ export function kgQaReport(repoRoot: string, subject?: string): KgQaReport {
   return { ...(all ? { view: all } : {}), instances };
 }
 
-/** Where a record is published under `assets`: one directory per instance, so two instances' same-named records never collide. */
+/** Where a record is published under `assets`: one directory per layer, so two layers' same-named records never collide. */
 export function recordHref(assets: string, instance: string, file: string): string {
   return `${assets.replace(/\/$/, "")}/${instance}/${basename(file)}`;
 }

@@ -179,7 +179,7 @@ export function actionDirOf(line: string, pinned?: PinnedMounts): string | undef
 }
 
 /**
- * The lock's whole-repository mounts: instances mounted from the repository
+ * The lock's whole-repository mounts: layers mounted from the repository
  * root (`upstreamRoot` empty, one `*` directory at `.`). A partial mount is
  * left out, since its `.github/` may not be the pinned commit's.
  */

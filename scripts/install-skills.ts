@@ -14,9 +14,9 @@
  * - **At install, not at rest.** Nothing in any repository is renamed: skill
  *   files, manifests, BPMN `folio:skill` refs and cross-references keep the
  *   bare name. Only the installed copy carries the prefix.
- * - **Per harness.** Each instance may declare `skillPrefix` (cat-harness
- *   declares `cat`). A skill takes the prefix of the instance that OWNS it; an
- *   instance that declares none takes the prefix of the instance at `--root`,
+ * - **Per harness.** Each layer may declare `skillPrefix` (cat-harness
+ *   declares `cat`). A skill takes the prefix of the layer that OWNS it; a
+ *   layer that declares none takes the prefix of the layer at `--root`,
  *   the harness it is installed from. With no prefix anywhere, the install is
  *   refused rather than writing bare names into a host's namespace.
  *
@@ -52,11 +52,11 @@
  * ## Process checklists, installed as skills
  *
  * Each diagram's committed checklist (`bpmn-checklist.ts`) is installed as one
- * skill per host. Each `<stem>.checklist.md` found beside a diagram, or in an
- * instance's `assets/workflows/checklists/`, becomes
+ * skill per host. Each `<stem>.checklist.md` found beside a diagram, or in a
+ * layer's `assets/workflows/checklists/`, becomes
  * `<prefix>-process-<stem>`: a generated front matter (the description names
  * the process and how to walk it) over the checklist body, unchanged, with the
- * prefix of the instance that holds it. It is read as committed
+ * prefix of the layer that holds it. It is read as committed
  * (`bpmn:checklist:check` keeps it current), never regenerated here. An agent
  * with the MCP server uses `bpmn-engine`, which refuses a wrong turn; one
  * without walks the checklist.
@@ -96,9 +96,9 @@ export interface SourceSkill {
   name: string;
   /** Absolute path of the source `.md`. */
   file: string;
-  /** The instance that owns it. */
+  /** The layer that owns it. */
   instance: string;
-  /** That instance's declared prefix, if any. */
+  /** That layer's declared prefix, if any. */
   prefix?: string;
   /** Why it cannot be installed, when it cannot. */
   skip?: string;
@@ -109,7 +109,7 @@ export interface SourceSkill {
 const FRONT_MATTER = /^---\n([\s\S]*?)\n---\n?/;
 
 /**
- * An instance's declared `skillPrefix`. Read through a narrow view rather
+ * A layer's declared `skillPrefix`. Read through a narrow view rather
  * than the declaration type, so this compiles against a cat-harness that
  * predates the field (cat-harness#160) and simply finds none there.
  */
@@ -170,10 +170,10 @@ export function readChecklistSkill(file: string): SourceSkill | undefined {
 }
 
 /**
- * Every committed checklist in the instances the harness at `root` stands on:
- * beside each diagram in a declared workflow directory, and in each instance's
+ * Every committed checklist in the layers the harness at `root` stands on:
+ * beside each diagram in a declared workflow directory, and in each layer's
  * `assets/workflows/checklists/`, where the harness keeps those of the
- * instances below it. Dependencies first, the root last, as for skills.
+ * layers below it. Dependencies first, the root last, as for skills.
  */
 export function collectChecklists(root: string): SourceSkill[] {
   const instances: string[] = [];

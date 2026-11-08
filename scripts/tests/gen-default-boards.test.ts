@@ -35,11 +35,11 @@ describe("who owes a board", () => {
     //
     // A FIXTURE since 2026-10-09. This read the real checkout and called a
     // candidate a dependency when it had no root `<name>.config.json`; in the
-    // index checkout NO instance has one (the index lists them), so the rule
+    // index checkout NO layer has one (the index lists them), so the rule
     // and its example came apart in the opposite direction from 2026-09-21's.
     // The rule is about the checkout's answer to "instantiated", and a fixture
     // states both answers — the root config set, and an index — without
-    // depending on which instances some checkout happens to hold.
+    // depending on which layers some checkout happens to hold.
     const repo = mkdtempSync(join(tmpdir(), "boards-owed-"));
     try {
       for (const n of ["one", "two"]) {

@@ -46,7 +46,7 @@ describe("cache scripts carry the built-in family names newest first, and none u
   for (const [family, { names, files }] of Object.entries(FAMILIES)) {
     for (const file of files) {
       // The script is in the layer that owns the family (`fhir-harness`), a
-      // higher instance a standalone checkout does not hold (bean w1gy F18).
+      // higher layer a standalone checkout does not hold (bean w1gy F18).
       const absent = !existsSync(resolve(REPO, file)) && notApplicableAlone(`${file}, in ${file.split("/")[0]}'s checkout (a higher instance)`);
       test.skipIf(absent)(`${file}: its ${family} fallback list is a newest-first prefix of the known names`, () => {
         const text = readFileSync(resolve(REPO, file), "utf-8");

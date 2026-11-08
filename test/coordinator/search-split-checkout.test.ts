@@ -1,7 +1,7 @@
 /**
  * `search-split` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/scripts/tests/search-split.test.ts` (bean `7zz1`, owner ruling
- * 2026-10-06 "Top-level instance"): each reads the instances the checkout's
+ * 2026-10-06 "Top-level instance"): each reads the layers the checkout's
  * site mounts, which only the checkout holds. Standing alone, cat-harness has
  * none of it, and `check:cat-harness-standalone` collects every test in that
  * layer. The rest of that file's tests stay there; every path here is composed

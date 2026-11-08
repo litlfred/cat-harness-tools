@@ -1,7 +1,7 @@
 /**
  * `kg-export` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness-tools/scripts/tests/kg-export.test.ts` (bean `7zz1`, owner ruling
- * 2026-10-06 "Top-level instance"): each exports the graph of every instance
+ * 2026-10-06 "Top-level instance"): each exports the graph of every layer
  * in the checkout, who-iris's packages among them, which only the checkout
  * holds. Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. The rest
@@ -29,7 +29,7 @@ const BASE = readDeclaration(join(ORIGIN_DIR, "../.."))!.canonicalUrl!;
 const REPO = repoRootFor(join(ORIGIN_DIR, "../.."));
 const EXPORT = await buildExport();
 /**
- * The CHECKOUT-scope graph — every instance stacked on this one, under this
+ * The CHECKOUT-scope graph — every layer stacked on this one, under this
  * document's name. Not published since bean `4ak5` item 2 (owner ruling
  * 2026-10-05, option B): it is what the tombstones are measured against, and
  * the only graph still holding a package whose manifest name differs from its
@@ -40,16 +40,16 @@ const EXPORT_CHECKOUT = await buildExport({ baseUrl: BASE, scope: "checkout" });
 /*
  * THE SPLIT — bean `4ak5` item 2, owner ruling 2026-10-05 (option B).
  *
- * `cat-harness.jsonld` is built in instance scope: cat-harness's own declared
+ * `cat-harness.jsonld` is built in layer scope: cat-harness's own declared
  * directories only. Measured the day it landed, the checkout-scope document
- * it replaced carried 825 nodes of five other instances under
+ * it replaced carried 825 nodes of five other layers under
  * `cat-harness.jsonld#…` fragments. Each such `@id` keeps a tombstone for ONE
  * release, forwarding to the same node in its owner's published document —
  * GitHub Pages cannot redirect a fragment. Remove the tombstone tests with
  * `tombstonesFor`.
  */
 const OWNER_EXPORTS = new Map<string, Set<string>>();
-/** The same builds, whole, by instance root — for the schema-link tests below. */
+/** The same builds, whole, by layer root — for the schema-link tests below. */
 const OWNER_DOCS = new Map<string, Awaited<ReturnType<typeof buildExport>>>();
 for (const r of instanceRootsIn(REPO)) {
   if (resolve(r) === resolve(join(ORIGIN_DIR, "../.."))) continue;
@@ -95,7 +95,7 @@ describe("a package's id is declared, not derived from its path", () => {
   //
   // It is now `who-iris`: directory `who-iris/skills/`, basename `skills`,
   // manifest `who-iris`. (It was `large-datasets` until bean `j7ql` dissolved
-  // that instance into cat-harness on 2026-10-01, where its package sits at
+  // that layer into cat-harness on 2026-10-01, where its package sits at
   // `cat-harness/skills/library/large-datasets/` and the basename IS the name;
   // before that `kg-navigation`, until bean `byql` folded it into
   // `cat-harness/skills/kg/kg-navigation/` for the same reason.) Same shape,
@@ -104,7 +104,7 @@ describe("a package's id is declared, not derived from its path", () => {
   // rather than listed, so adding a skill there is not a test edit.
   //
   // Read from the CHECKOUT-scope graph since bean `4ak5` item 2: who-iris is
-  // its own instance, so the published graph holds a tombstone where its
+  // its own layer, so the published graph holds a tombstone where its
   // package was (asserted below), and no package of cat-harness's own has a
   // manifest name that differs from its directory. The rule is
   // `packageIdFor`'s, which runs the same in either scope.

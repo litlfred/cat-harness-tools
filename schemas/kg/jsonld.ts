@@ -64,7 +64,7 @@ import { z } from "zod";
 import { CAT_HARNESS_NS, FOLIO_BASE, ownNamespace, termCurie } from "./namespaces";
 
 // The content layer's namespace is no longer re-exported here
-// (folio-assistant#2598): it is derived from that instance's declaration
+// (folio-assistant#2598): it is derived from that layer's declaration
 // (`instanceNamespace`), and a block kind's class from its own node.
 /** SPAR Document Components Ontology — structural document parts. */
 export const DOCO_NS = "http://purl.org/spar/doco/";
@@ -84,7 +84,7 @@ export const BPMN_MODEL_NS = "http://www.omg.org/spec/BPMN/20100524/MODEL#";
 export const FHIR_NS = "http://hl7.org/fhir/";
 
 /**
- * CSV on the Web — W3C Recommendation, and the tabular model this instance
+ * CSV on the Web — W3C Recommendation, and the tabular model this layer
  * adopts rather than inventing one (bean `ulqj`, decided by the owner).
  *
  * It models table → column → datatype and nothing else: no formulas, no
@@ -110,10 +110,10 @@ export const CONTENT_CONTEXT_URL =
   "https://litlfred.github.io/folio-assistant/ns/content/v1.jsonld";
 
 /**
- * Where an instance's own published `@context` lives, relative to its
+ * Where a layer's own published `@context` lives, relative to its
  * `iriBase` — bean `folio-assistant-63q4`. `jsonld:contexts` (cat-harness-tools
  * `scripts/gen-instance-contexts.ts`) writes it at this path inside the
- * instance, built at publish, and an emitted document names
+ * layer, built at publish, and an emitted document names
  * `<iriBase>ns/context/v1.jsonld` in place of {@link CONTENT_CONTEXT_URL}.
  * The `v1` is load-bearing: its terms are `@protected`, so a change that
  * rebinds one is a `v2` beside it, never an edit under a cached URL.
@@ -121,7 +121,7 @@ export const CONTENT_CONTEXT_URL =
 // declared-path-literal: this constant DEFINES the published, dereferenceable IRI path of the context; it is fixed by that URL, not by where the `ns/` declaration points.
 export const INSTANCE_CONTEXT_PATH = "ns/context/v1.jsonld";
 
-/** An instance's context URL from its declared `iriBase` (with or without the trailing `/`). */
+/** A layer's context URL from its declared `iriBase` (with or without the trailing `/`). */
 export function instanceContextUrl(iriBase: string): string {
   return `${iriBase.endsWith("/") ? iriBase : `${iriBase}/`}${INSTANCE_CONTEXT_PATH}`;
 }
@@ -173,7 +173,7 @@ export const SITE_DOCUMENT_CONTEXT = [CONTENT_CONTEXT_URL, { "@base": DOCS_SITE_
 
 /**
  * A content document's `@context`, as a record schema accepts it: the
- * two-part form above, the site form, either of those naming an instance's
+ * two-part form above, the site form, either of those naming a layer's
  * own context instead of the shared one, or the bare URL that records written
  * before bean `bh4q` carry. Any other context would bind their keys to terms
  * nobody declared, so nothing else is accepted.
@@ -182,10 +182,10 @@ export const ContentContextSchema = z.union([
   z.literal(CONTENT_CONTEXT_URL),
   z.tuple([z.literal(CONTENT_CONTEXT_URL), z.object({ "@base": z.literal(FOLIO_BASE) }).strict()]),
   z.tuple([z.literal(CONTENT_CONTEXT_URL), z.object({ "@base": z.literal(DOCS_SITE_BASE) }).strict()]),
-  // An instance's own context (`instanceDocumentContext`, bean
+  // A layer's own context (`instanceDocumentContext`, bean
   // `folio-assistant-63q4`): `<iriBase>ns/context/v1.jsonld`, which defines
   // exactly the terms its documents use. The URL is checked for SHAPE only —
-  // which instance owns the file is the emitter's to know, not a schema's.
+  // which layer owns the file is the emitter's to know, not a schema's.
   z.tuple([z.string().url().regex(/\/ns\/context\/v1\.jsonld$/), z.object({ "@base": z.literal(FOLIO_BASE) }).strict()]),
   z.tuple([z.string().url().regex(/\/ns\/context\/v1\.jsonld$/), z.object({ "@base": z.literal(DOCS_SITE_BASE) }).strict()]),
 ]);
@@ -195,7 +195,7 @@ export const ContentContextSchema = z.union([
 /**
  * The RDF class for each block kind, read off its discovered
  * `folio-block-kind/v1` node (`folioType`; bean riit, step 2), and minted in the
- * namespace of the instance declaring the kind (bean `0r7u`). Our own classes because
+ * namespace of the layer declaring the kind (bean `0r7u`). Our own classes because
  * no published vocabulary distinguishes a theorem from a lemma from a
  * conjecture in the way this project's editorial machinery needs.
  */
@@ -233,7 +233,7 @@ export const BLOCK_KIND_TO_FOLIO_TYPE: Record<BlockKind, string> = Object.fromEn
  * page's nodes are `Block`s, told apart by their DoCO co-type (`doco:Section`
  * for narrative, `doco:Figure` for an asset): the site is not a folio, so it
  * borrows no folio's block-kind class (`Prose`, `Figure`), whose namespace is
- * the declaring instance's (bean `0r7u`).
+ * the declaring layer's (bean `0r7u`).
  *
  * The DoCO half is borrowed and verified: a page is `doco:Section` (its own
  * containment is `dcterms:hasPart`, per the note on `contains` below), an
@@ -583,7 +583,7 @@ export const CONTENT_CONTEXT = {
   // THE UPGRADE RULE, so this does not become the next thing nobody revisits:
   // these become links — `@type: @id` with ABSOLUTE IRIs minted by the one
   // function that mints block IRIs — when, and only when, the files they name
-  // are SERVED at a URL an instance declares. Until then any link would be a
+  // are SERVED at a URL a layer declares. Until then any link would be a
   // promise nothing keeps. `check:content-keys` fails if a path is put
   // back under an `@id` term (`checkPathsAreNotLinks`).
   text: { "@id": termCurie("text") },

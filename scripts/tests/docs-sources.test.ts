@@ -1,6 +1,6 @@
 /**
  * `lib/docs-sources.ts` — which docs sources one `gen-docs-pages` run renders
- * (owner, 2026-10-23, "A1": one run, every mounted instance's declared
+ * (owner, 2026-10-23, "A1": one run, every mounted layer's declared
  * docs-source).
  *
  * @module scripts/tests/docs-sources
@@ -10,9 +10,9 @@
  * declares a docs source is found and renders into the directory that
  * declares it; one that declares none, declares an absent one, or declares it
  * under a non-`docs` or repository-scoped directory contributes nothing; and
- * the base instance's own source is always first and never read twice. And
+ * the base layer's own source is always first and never read twice. And
  * the same page in two sources is two pages — every key above the base is
- * qualified by its instance — which is warned about, naming both files, and
+ * qualified by its layer — which is warned about, naming both files, and
  * never refused (owner, 2026-10-23).
  */
 import { afterEach, describe, expect, spyOn, test } from "bun:test";

@@ -23,7 +23,7 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 const ROOT = resolve(HARNESS_ROOT);
 const temps: string[] = [];
 
-/** An instance root whose declaration is exactly `body`. */
+/** A layer root whose declaration is exactly `body`. */
 function instance(body: string): string {
   const dir = mkdtempSync(join(tmpdir(), "publication-host-"));
   temps.push(dir);
@@ -125,7 +125,7 @@ describe("this repository's own declaration", () => {
     // RESOLVED, not composed. This repository instantiates more than one
     // harness, so there is no single config filename to join onto the repo
     // root any more — `resolveHarnessConfigPath` walks out from `ROOT` and
-    // answers with the config of the instance `ROOT` actually sits in.
+    // answers with the config of the layer `ROOT` actually sits in.
     const cfgPath = resolveHarnessConfigPath(ROOT)?.path;
     let linkStyle: string | undefined;
     if (cfgPath && existsSync(cfgPath)) {

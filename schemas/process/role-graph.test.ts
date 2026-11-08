@@ -550,7 +550,7 @@ describe("which actor kinds may fulfil an activity", () => {
 });
 
 describe("readRoleGraph — a role inherits a role of an instance it needs", () => {
-  /** A directory of sibling instances, each with a declaration and a role graph at the conventional `scenarios/`. */
+  /** A directory of sibling layers, each with a declaration and a role graph at the conventional `scenarios/`. */
   function instances(defs: { name: string; needs?: string[]; roles: unknown[] }[]): string {
     const repo = mkdtempSync(join(tmpdir(), "role-graph-needs-"));
     for (const d of defs) {

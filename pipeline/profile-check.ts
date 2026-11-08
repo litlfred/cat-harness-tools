@@ -79,9 +79,9 @@ export function readDeclaredFolioProfile(repoRoot: string): {
   profile?: ContentProfile;
   declaredBy: string;
 } {
-  // An instance an `index.config.json` lists is configured by its ENTRY; it
+  // A layer an `index.config.json` lists is configured by its ENTRY; it
   // has no `<name>.config.json` of its own, and reading only the file
-  // reported every indexed instance as unconfigured (2026-10-09).
+  // reported every indexed layer as unconfigured (2026-10-09).
   const eff = readEffectiveConfig(repoRoot);
   if (eff.via === "index") {
     if (eff.state === "unreadable") return { declaredBy: `undetermined (${eff.from} unreadable: ${eff.why})` };
@@ -91,7 +91,7 @@ export function readDeclaredFolioProfile(repoRoot: string): {
   }
   const configPath = expectedInstanceConfigPath(repoRoot);
   // A FOURTH way of not knowing, and it is not the same as the three below:
-  // nothing here declares an instance, so there is no name to compose a
+  // nothing here declares a layer, so there is no name to compose a
   // config filename from and no file to be absent. Reported as its own
   // sentence rather than folded into "no config", because the remedy differs
   // — one wants a config written, the other wants a declaration.
@@ -111,7 +111,7 @@ export function readDeclaredFolioProfile(repoRoot: string): {
     }
     return { declaredBy: "undetermined (no instance declares this directory)" };
   }
-  // The file's name is the instance's, so the messages below say which file
+  // The file's name is the layer's, so the messages below say which file
   // they mean rather than naming a global that no longer exists.
   const shown = basename(configPath);
   if (!existsSync(configPath)) {

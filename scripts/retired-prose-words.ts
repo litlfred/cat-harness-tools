@@ -8,7 +8,7 @@
  * notions of beans in the narrative text are changed to work item"*, prose
  * only: the `beans` CLI, `beans/`, `bean/1.0.0` and every other identifier
  * keep their names. The retired words and their replacements are DATA, the
- * `retired-prose-words` code list an instance declares, so this names no word.
+ * `retired-prose-words` code list a layer declares, so this names no word.
  *
  * ## What counts as prose
  *
@@ -45,10 +45,10 @@ import { codeListDirs, loadCodeLists } from "../schemas/library/code-list.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { builtAtPublishOf, withoutBuiltAtPublish } from "./mount-from-lock.ts";
 
-/** The code list an instance declares its retired words in. */
+/** The code list a layer declares its retired words in. */
 export const RETIRED_WORDS_LIST = "retired-prose-words";
 
-/** Top-level directories whose Markdown is not this instance's own prose. */
+/** Top-level directories whose Markdown is not this layer's own prose. */
 const NOT_OWN_PROSE = new Set(["library", "translations", "upstream", "uploads", "test", "node_modules"]);
 
 /** The record `kg:materialize` writes beside another graph's bytes; a directory holding one is not walked. */
@@ -152,7 +152,7 @@ export function isGenerated(src: string): boolean {
   return head.includes("do not edit") || head.includes("do not hand-edit") || /^generated:/m.test(src.slice(0, 400));
 }
 
-/** The retired words an instance declares, retired word → its replacement, or `undefined` when it declares none. */
+/** The retired words a layer declares, retired word → its replacement, or `undefined` when it declares none. */
 export async function retiredWordsOf(instanceRoot: string): Promise<Map<string, string> | undefined> {
   const list = loadCodeLists(await codeListDirs(instanceRoot)).get(RETIRED_WORDS_LIST);
   if (list === undefined) return undefined;
@@ -160,12 +160,12 @@ export async function retiredWordsOf(instanceRoot: string): Promise<Map<string, 
 }
 
 /**
- * The instance's own authored Markdown, relative to the instance root.
+ * The layer's own authored Markdown, relative to the layer root.
  *
  * A directory walk rather than `git ls-files`: a layer mounted into a composed
  * checkout carries no `.git` of its own (that is how CI runs it), and a git
  * listing there answers "no files", which this would report as clean.
- * Dot-directories are not walked, and nothing the instance declares
+ * Dot-directories are not walked, and nothing the layer declares
  * `builtAtPublish` is listed: those pages are written by a publish build, are
  * never committed, and so are their generator's prose. They are on disk only
  * where a build has run (CI's QA working copy), which made the scan's answer
@@ -181,7 +181,7 @@ export function ownProseFiles(instanceRoot: string): string[] {
         if (rel === "" && NOT_OWN_PROSE.has(e.name)) continue;
         if (e.name === "node_modules") continue;
         // Another graph's bytes, materialised here with a digest beside them
-        // (`kg:materialize`): its owner's prose, not this instance's, and
+        // (`kg:materialize`): its owner's prose, not this layer's, and
         // editing it in place breaks fixity (folio-assistant main, 2026-11-05).
         if (existsSync(join(dir, e.name, MATERIALIZATION_RECORD))) continue;
         walk(join(dir, e.name), r);
@@ -192,7 +192,7 @@ export function ownProseFiles(instanceRoot: string): string[] {
   return withoutBuiltAtPublish(out, builtAtPublishOf(instanceRoot)).sort();
 }
 
-/** Every retired word in an instance's own prose, by file. */
+/** Every retired word in a layer's own prose, by file. */
 export async function scanInstance(instanceRoot: string): Promise<
   { state: "undetermined"; reason: string } | { state: "scanned"; files: number; hits: Array<{ file: string } & RetiredWordHit> }
 > {

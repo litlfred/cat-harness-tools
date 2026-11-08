@@ -6,9 +6,9 @@
  * Issue #2302, bean `turh`. Owner, 2026-10-06: an ingested document should be
  * browsable "page by page", with "an overview of figures/tables, the TOC and
  * link to sections, and extracted summaries of each section" — and not for one
- * instance: "it is being ingested into a certain schema, no? that schema needs
+ * layer: "it is being ingested into a certain schema, no? that schema needs
  * a visualizer." So this reads the SCHEMA, `pdf-structure/v1`
- * (`schemas/ui/pdf-structure.ts`), and every `library/<slug>/` of every instance
+ * (`schemas/ui/pdf-structure.ts`), and every `library/<slug>/` of every layer
  * that carries a `structure.json` gets the same view.
  *
  * ## What it reads, and only that

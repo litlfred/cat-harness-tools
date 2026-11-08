@@ -38,10 +38,10 @@ import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
  *
  * ## Three states, again
  *
- * `#fa-navbar-row` is `null` when the instance declares no `navbarIcons` and
+ * `#fa-navbar-row` is `null` when the layer declares no `navbarIcons` and
  * inherits none, ABSENT when the template did not run, and an object when it
  * decided. The page must not draw an empty row for either of the first two:
- * that reports an un-migrated instance as a deliberate one, which is the same
+ * that reports an un-migrated layer as a deliberate one, which is the same
  * collapse `schemas/navbar-icons.test.ts` guards one layer down.
  *
  * NO BACKTICKS INSIDE THE TEMPLATE LITERAL that builds the page — the whole
@@ -63,7 +63,7 @@ const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js
 const BASEURL = "/folio-assistant";
 
 /**
- * The row this instance actually resolved — READ from the generated file.
+ * The row this layer actually resolved — READ from the generated file.
  *
  * Not retyped. `action-tiles.e2e.ts` carries the argument in full: a fixture
  * that restates the value under test agrees with a wrong one and passes. This
@@ -82,7 +82,7 @@ const HARNESS = JSON.parse(readFileSync(join(ROOT, SITE, "_data/harness.json"), 
 };
 const LIVE = HARNESS.navbar;
 if (LIVE === null) {
-  // Not a skip. This instance IS the floor that declares the default, so a
+  // Not a skip. This layer IS the floor that declares the default, so a
   // null here means `cat-harness.json` lost its `navbarIcons` — the spec would
   // otherwise quietly stop testing the thing it is named for.
   throw new Error(
@@ -238,7 +238,7 @@ async function load(
 
 test.describe("the icon row — line 2 of the fixed top", () => {
   test("draws one slot per declared icon, in order, minus the declared close", async ({ page }) => {
-    // `close` stays in the declaration -- the instance still says six -- and
+    // `close` stays in the declaration -- the layer still says six -- and
     // is SKIPPED here rather than dropped. Nothing draws it on a theme page
     // any more: the avatar is the open and close control (ob3m finding 8).
     const { errors } = await load(page, LIVE);
@@ -383,7 +383,7 @@ test.describe("the icon row — line 2 of the fixed top", () => {
   test("EVERY composed href carries the baseurl — the class, not the instance", async ({ page }) => {
     // Named as a class on purpose. Three separate tile/link families have now
     // shipped a site-root path unprefixed, each fixed on its own, and a test
-    // per instance is what let the next one through. This asserts the property
+    // per layer is what let the next one through. This asserts the property
     // over both regions that compose from `#fa-navbar-row`, so a FOURTH
     // consumer added to either of them cannot repeat it quietly.
     await load(page, LIVE);
@@ -396,7 +396,7 @@ test.describe("the icon row — line 2 of the fixed top", () => {
       // ...and prefixed ONCE. Running the base over an already-composed value
       // is the failure in the other direction, which is why the action tiles
       // do NOT prefix inside the shared `tileLink`.
-      // `BASEURL + "/"`, not the bare base: since the separation an instance
+      // `BASEURL + "/"`, not the bare base: since the separation a layer
       // is NAMED `folio-assistant-core`, and its auto-docs href
       // `…/docs/folio-assistant-core-docs/` contains the bare string without
       // repeating the prefix. A doubled prefix is `/folio-assistant/folio-assistant/`.
@@ -418,7 +418,7 @@ test.describe("the icon row — line 2 of the fixed top", () => {
   });
 
   test("DECLARED NONE draws no row at all, and says so once", async ({ page }) => {
-    // The third state. An empty row would report an un-migrated instance as a
+    // The third state. An empty row would report an un-migrated layer as a
     // deliberate one, so there is no row and the console carries the reason at
     // INFO — a declaration gap is an author's to fix, not a reader's.
     const { errors, console: logs } = await load(page, null);
@@ -618,7 +618,7 @@ test.describe("at rest the strip carries marks and nothing else", () => {
  *
  * `ui-accessibility`: *"Targets are at least 24x24 CSS px (SC 2.5.8), and aim
  * higher: 32px for rows in a list … Density is cheaper than a missed target."*
- * This instance's declared interaction profile is low-dexterity, so it is a
+ * This layer's declared interaction profile is low-dexterity, so it is a
  * binding constraint rather than a nicety.
  *
  * ## Why this test did not exist, and what its absence cost

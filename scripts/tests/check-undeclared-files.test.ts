@@ -22,7 +22,7 @@ import {
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
-/** A repository with one instance, which declares a repository-scoped directory. */
+/** A repository with one layer, which declares a repository-scoped directory. */
 function repo(): string {
   const root = mkdtempSync(join(tmpdir(), "undeclared-"));
   mkdirSync(join(root, "an-instance"), { recursive: true });
@@ -49,7 +49,7 @@ describe("an instance is accounted for because it DECLARES itself", () => {
   });
 
   test("and the reason says so, rather than naming it in a list", () => {
-    // A new instance is accounted for the moment it exists, not when somebody
+    // A new layer is accounted for the moment it exists, not when somebody
     // remembers to add it. That is the property; this is the evidence.
     expect(accountedRootPaths(repo()).get("an-instance")).toContain("declares itself");
   });
@@ -63,7 +63,7 @@ describe("a repository-scoped declared directory is accounted for", () => {
   });
 
   test("an INSTANCE-scoped directory of the same name would NOT account for a root one", () => {
-    // `own/` is declared without a scope, so it resolves inside the instance.
+    // `own/` is declared without a scope, so it resolves inside the layer.
     // A root-level `own/` is a different directory, and conflating the two is
     // how a sweep reports a clean run over something nothing names.
     const root = repo();
@@ -90,7 +90,7 @@ describe("the ROOT may itself be an instance", () => {
   test("its declared directory is accounted for, and the reason names the declaration", () => {
     // Owner, 2026-09-20: "only uploads/ on this repo's root b/c acting as if it
     // was intialized". This sweep was written when the root was deliberately
-    // NOT an instance and reported 19.4 MB of correctly declared content as
+    // NOT a layer and reported 19.4 MB of correctly declared content as
     // unaccounted the moment that changed.
     const root = repoWithRootInstance();
     expect(undeclaredAtRoot(root).map((e) => e.path)).not.toContain("uploads");
@@ -120,7 +120,7 @@ describe("the ROOT may itself be an instance", () => {
   });
 
   test("being an instance still outranks a root declaration naming the same directory", () => {
-    // Same ordering argument as the two-pass fix: an instance is accounted for
+    // Same ordering argument as the two-pass fix: a layer is accounted for
     // BY ITSELF, and another declaration claiming its name does not unmake it.
     const root = repo();
     writeDeclaration(root, JSON.stringify(
@@ -232,7 +232,7 @@ describe("this repository, as it stands", () => {
     // already used. Nothing failed. `resolveDirectories` sets
     // `declaredBy: decl.name` and a landing sticky carries `contributedBy`, so
     // both read `folio-assistant` with no way to tell WHICH — a directory can
-    // be attributed to the wrong instance while the string looks right.
+    // be attributed to the wrong layer while the string looks right.
     //
     // Over the real repository on purpose. A fixture would pin the collision I
     // already fixed; this pins the property for whatever is declared next.
@@ -280,7 +280,7 @@ describe("this repository, as it stands", () => {
 
   test("beans/ and todos/ are accounted for by declaration, not by a list", () => {
     // They live at the root because they are declared repository-scoped — the
-    // work plan belongs to the checkout rather than to any instance in it.
+    // work plan belongs to the checkout rather than to any layer in it.
     const accounted = accountedRootPaths(REPO);
     expect(accounted.get("beans")).toContain("declared by");
     expect(accounted.get("todos")).toContain("declared by");
@@ -318,7 +318,7 @@ describe("an instance's own declaration outranks another instance naming it", ()
    * The exact live shape, and the defect it exposed.
    *
    * `cat-harness/harness.json` declares `bootstrap/skills/` at REPOSITORY scope,
-   * whose first path segment is `bootstrap` — which is itself an instance. A
+   * whose first path segment is `bootstrap` — which is itself a layer. A
    * single-pass implementation marked `bootstrap` "an instance", then walked
    * cat-harness's declarations and OVERWROTE it with "declared by". Which value
    * survived depended on the order `readdirSync` returned the two directories.
@@ -329,7 +329,7 @@ describe("an instance's own declaration outranks another instance naming it", ()
   function pair(firstName: string, secondName: string): string {
     const root = mkdtempSync(join(tmpdir(), "outrank-"));
     // `outer` declares a repository-scoped directory INSIDE `inner`, which is
-    // itself an instance.
+    // itself a layer.
     const outer = { name: "outer", directories: [{ id: "inner-skills", path: `${secondName}/skills/`, graphTypologies: ["cat-harness"], scope: "repository" }] };
     const inner = { name: "inner", directories: [] };
     const byName: Record<string, unknown> = { [firstName]: outer, [secondName]: inner };

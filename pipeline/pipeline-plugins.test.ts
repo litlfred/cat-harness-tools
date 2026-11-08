@@ -11,7 +11,7 @@
  * 4. Generic pipeline code names none of the files that fill the slots.
  *
  * The tests here whose subject is folio-assistant-sci's contribution (that
- * this instance fills every pipeline-plugin slot) live in
+ * this layer fills every pipeline-plugin slot) live in
  * the checkout's `test/pipeline-plugins-sci-checkout.test.ts` (bean `ho66`):
  * standing alone, cat-harness has no such contribution to read.
  */

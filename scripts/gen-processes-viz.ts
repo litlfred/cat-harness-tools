@@ -87,7 +87,7 @@ const VIEWER_TOOL = "processes-viewer";
 /**
  * Every page this writes declares itself generated in its own front matter —
  * the `generated:` key `check:reference-direction` reads (bean `ws99`). A page
- * names the diagram it was drawn from, which may belong to an instance above
+ * names the diagram it was drawn from, which may belong to a layer above
  * the one that commits the page; without the key that path read as authored
  * prose naming a higher layer.
  */
@@ -98,12 +98,12 @@ const REPO = resolve(dirname(HARNESS_ROOT));
 
 /** One diagram, as the index sees it. */
 export interface ProcessRow {
-  /** Repo-relative path — the identity, because basenames collide across instances. */
+  /** Repo-relative path — the identity, because basenames collide across layers. */
   file: string;
   /** The directory it lives under, which is the instance/methodology facet. */
   group: string;
   /**
-   * The declared name of the instance whose directory holds the file: the
+   * The declared name of the layer whose directory holds the file: the
    * sub-graph whose page lists it (`<harness>/processes/<instance>/`).
    * Absent only on a row built by hand (a test fixture).
    */
@@ -316,9 +316,9 @@ const uniq = (xs: string[]): string[] => [...new Set(xs.filter((x) => x))].sort(
  * run over what it could not see.
  */
 /**
- * Every instance's diagrams, not just this one's.
+ * Every layer's diagrams, not just this one's.
  *
- * `workflowFiles` takes an INSTANCE root and resolves that instance's declared
+ * `workflowFiles` takes a LAYER root and resolves that layer's declared
  * graph plus its dependencies'. Handed the REPOSITORY root it returns nothing —
  * there is no declaration there — and the first run of this generator did
  * exactly that: it printed *"Wrote processes-index.md — 0 diagram(s)"* and
@@ -328,7 +328,7 @@ const uniq = (xs: string[]): string[] => [...new Set(xs.filter((x) => x))].sort(
  * vacuity guard in `main` is the fix for the symptom; this is the fix for the
  * cause.
  *
- * Asking each instance separately also keeps a real distinction: `bootstrap`
+ * Asking each layer separately also keeps a real distinction: `bootstrap`
  * declares its own three diagrams and `cat-harness` does not reach them, so a
  * single-root index would omit them silently rather than group them.
  */
@@ -340,14 +340,14 @@ function instanceRoots(repo: string): string[] {
     if (declarationPathIn(dir)) out.push(dir);
   }
   out.sort();
-  // An instance at the checkout ROOT (an IG repository, with
+  // A layer at the checkout ROOT (an IG repository, with
   // its layers mounted below it) holds diagrams too. Without it, the site's
-  // own instance was the one instance its processes page never listed.
+  // own layer was the one layer its processes page never listed.
   if (declarationPathIn(repo)) out.unshift(repo);
   return out;
 }
 
-/** An instance root and its declared name. */
+/** A layer root and its declared name. */
 interface NamedRoot {
   readonly root: string;
   readonly name: string;
@@ -369,8 +369,8 @@ function namedRoots(repo: string): NamedRoot[] {
 }
 
 /**
- * The instance whose directory holds `abs`: the DEEPEST root containing it,
- * so a layer mounted under the checkout root's own instance is its own
+ * The layer whose directory holds `abs`: the DEEPEST root containing it,
+ * so a layer mounted under the checkout root's own layer is its own
  * sub-graph rather than the root's.
  */
 export function owningInstance(abs: string, roots: readonly NamedRoot[]): string | undefined {
@@ -385,9 +385,9 @@ export function owningInstance(abs: string, roots: readonly NamedRoot[]): string
 
 /**
  * Every diagram file a row is drawn for (global-task files excluded, as
- * {@link processRows} excludes them), keyed by the instance that holds it.
+ * {@link processRows} excludes them), keyed by the layer that holds it.
  * Synchronous and parse-free, so `site-coverage` asks the same question the
- * writer answers: an instance owes a sub-graph page exactly when it is a key.
+ * writer answers: a layer owes a sub-graph page exactly when it is a key.
  */
 export function processSubjects(repo = REPO): Map<string, string[]> {
   const roots = namedRoots(repo);
@@ -548,7 +548,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
  */
 function loadRoleGraph(repo: string): RoleGraph | undefined {
   const roles = [];
-  // Per INSTANCE root, not per repo root. `kgRoots` resolves an instance's own
+  // Per LAYER root, not per repo root. `kgRoots` resolves a layer's own
   // declared `kg` directories, so handing it the repository returns nothing —
   // and nothing here is the same shape as "no role is declared anywhere",
   // which would have rendered every bound lane in the corpus as a dangling
@@ -660,7 +660,7 @@ export interface PanelContext {
  *   route and the methodology graph's own nodes — a name no node declares
  *   gets no link;
  * - roles: the Role's own page, its subject IRI `<doc dir>/role/<id>`
- *   (#603), where its instance's graph publishes one; else the row on the
+ *   (#603), where its layer's graph publishes one; else the row on the
  *   auto-docs Roles index, from the declared `auto-docs-viewer` route and
  *   the `roles.json` that declares the role;
  * - steps, lanes and processes: their own pages, `<doc dir>/process/P…` (#603).
@@ -794,14 +794,14 @@ const esc = (s: string): string => s.replace(/[\\|]/g, "\\$&");
  */
 /** How {@link page} scopes the index it draws: the whole corpus, or one sub-graph of it. */
 export interface PageScope {
-  /** `undefined` for every instance's diagrams; else the instance whose diagrams the page shows. */
+  /** `undefined` for every layer's diagrams; else the layer whose diagrams the page shows. */
   readonly instance?: string;
-  /** On the full index: one row per sub-graph page, to browse by instance. */
+  /** On the full index: one row per sub-graph page, to browse by layer. */
   readonly subjects?: readonly { name: string; count: number; href: string }[];
 }
 
 /**
- * `scope.instance` draws one instance's sub-graph page, one directory below
+ * `scope.instance` draws one layer's sub-graph page, one directory below
  * the index, so every link on it is one segment deeper.
  */
 export function page(
@@ -1306,7 +1306,7 @@ export function pageRelPath(repo = REPO, subgraph?: string): string | undefined 
   }
 }
 
-/** The sub-graph pages: one per instance holding diagrams, in instance order. */
+/** The sub-graph pages: one per layer holding diagrams, in layer order. */
 export function subgraphPages(rows: readonly ProcessRow[]): { name: string; rows: ProcessRow[] }[] {
   const by = new Map<string, ProcessRow[]>();
   for (const r of rows) if (r.instance) by.set(r.instance, [...(by.get(r.instance) ?? []), r]);
@@ -1325,8 +1325,8 @@ function up(repo = REPO): string {
 
 /**
  * The index as committed: {@link page} plus the directories it draws
- * (#1168 B7a-2) — every instance's declared processes directories, because
- * every instance's diagrams are on it.
+ * (#1168 B7a-2) — every layer's declared processes directories, because
+ * every layer's diagrams are on it.
  */
 /** The scope of the top index page: one "By subgraph" row per sub-graph page. */
 export function indexScope(rows: readonly ProcessRow[]): PageScope {
@@ -1373,7 +1373,7 @@ if (import.meta.main) {
   const subs = subgraphPages(rows);
   const html = publishedIndex(rows, REPO, skillPages, instances, indexScope(rows));
   // Which page sections present each diagram, keyed repository-relative so it
-  // matches `row.file` — a page spells its source relative to its OWN instance.
+  // matches `row.file` — a page spells its source relative to its OWN layer.
   const presented = new Map<string, Presentation[]>();
   for (const root of instanceRoots(REPO)) {
     for (const [source, list] of await processPresentations(root)) {

@@ -4,7 +4,7 @@
  * one computed from the exported surface.
  *
  * Compares the exported surface at `HEAD` against the last released tag for
- * that instance. **It never *writes* the version**: the author may bump
+ * that layer. **It never *writes* the version**: the author may bump
  * further than computed, never less. The rules live in
  * `schemas/kg/version-bump.ts`; this script finds the baseline, produces two
  * surfaces, and compares.
@@ -13,7 +13,7 @@
  * |---|---|
  * | `ok` | the declared version clears the computed floor |
  * | `under` | it does not — the finding this gate exists for |
- * | `unreleased` | the instance is publishable and has never been tagged; there is no baseline to diff against |
+ * | `unreleased` | the layer is publishable and has never been tagged; there is no baseline to diff against |
  * | `undetermined` | the baseline could not be exported, or a version is a pseudo-version with no triple |
  *
  * Advisory by default (exit 0); `--strict` exits 1 on `under` or
@@ -76,7 +76,7 @@ export interface BumpReport {
    * The committed `kg-export` QA sidecar, against what this run computed.
    *
    * Carried here rather than folded into a row because it is not a fact about
-   * any instance's version — it is a fact about an artefact this gate USED to
+   * any layer's version — it is a fact about an artefact this gate USED to
    * repair silently (bean `ymsu`). `undefined` is could-not-determine: the
    * exporter wrote no sidecar to compare, or it never ran.
    *
@@ -95,17 +95,17 @@ function git(repoRoot: string, ...args: string[]): { ok: boolean; out: string } 
 }
 
 /**
- * The release tags for an instance, newest version first.
+ * The release tags for a layer, newest version first.
  *
  * Two spellings. `<name>-v<major>.<minor>.<patch>` is the convention in a
- * repository holding several instances — the one existing tag here,
+ * repository holding several layers — the one existing tag here,
  * `folio-assistant-v0.1.0`, uses it. A STANDALONE repository holds one
- * instance, declared at its root, and tags it plainly `v<major>.<minor>.<patch>`
+ * layer, declared at its root, and tags it plainly `v<major>.<minor>.<patch>`
  * (owner, 2026-09-30, Q4 of bean `xsqm`: bootstrap and bootstrap-tools each tag
  * `v0.1.0`). So the plain form is read only when `standalone` is set — the
- * instance's declaration IS the repository root — because in a repository of
- * several instances a plain `v1.2.0` would say nothing about which one it
- * released — which is why a root instance that shares its repository, as
+ * layer's declaration IS the repository root — because in a repository of
+ * several layers a plain `v1.2.0` would say nothing about which one it
+ * released — which is why a root layer that shares its repository, as
  * folio-assistant does here, is NOT standalone. Where both spellings name one version, one entry is kept.
  *
  * Sorted by the parsed triple rather than by git's tag order or by string
@@ -245,11 +245,11 @@ export function auditVersionBumps(repoRoot: string, opts: { against?: string } =
     } catch {
       continue; // `check:publishable` is the census; this gate is about versions
     }
-    // EVERY instance now carries a version — owner's ruling, 2026-09-23 — so
+    // EVERY layer now carries a version — owner's ruling, 2026-09-23 — so
     // this no longer filters on publishability. It still skips a declaration
     // with no version, and that is NOT the same as the old skip: the type
     // allows absence (376 fixtures would break otherwise), so `check:publishable`
-    // is what FAILS on it. Scoring a bump for an instance with no version would
+    // is what FAILS on it. Scoring a bump for a layer with no version would
     // be scoring against nothing.
     if (decl === undefined || decl.version === undefined) continue;
     publishable.push({ root, name: decl.name, version: decl.version });
@@ -265,15 +265,15 @@ export function auditVersionBumps(repoRoot: string, opts: { against?: string } =
   }
 
   // Exported ONCE and reused: the surface is a property of the working tree,
-  // not of the instance being scored, and re-exporting per instance would
-  // multiply the slowest step by the number of publishable instances.
+  // not of the layer being scored, and re-exporting per layer would
+  // multiply the slowest step by the number of publishable layers.
   const headExport = surfaceAtHead(repoRoot, opts);
   const head = headExport?.subjects;
 
   for (const { root, name, version } of publishable) {
     const where = relative(repoRoot, root) || ".";
-    // Standalone: the repository's ONE instance, declared at its root. A root
-    // instance sharing its repository with others (this one does) keeps the
+    // Standalone: the repository's ONE layer, declared at its root. A root
+    // layer sharing its repository with others (this one does) keeps the
     // `<name>-v` spelling, because a plain tag could not say which it released.
     const standalone = roots.length === 1 && resolve(root) === resolve(repoRoot);
     const tags = releaseTags(repoRoot, name, standalone);

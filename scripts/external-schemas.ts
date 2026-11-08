@@ -42,7 +42,7 @@ const ROOT = resolve(HARNESS_ROOT);
 // job, and is why a held-but-undeclared directory is worse than it looks.
 //
 // declared-path-literal: the convention fallback, at the call site so the
-// choice is visible. An instance that declares no registry gets the
+// choice is visible. A layer that declares no registry gets the
 // conventional path and `loadSpecs` reports the empty result as the third
 // state rather than as a pass.
 const REGISTRY: string = (() => {
@@ -119,20 +119,20 @@ export function targetNamespacesInUse(
 }
 
 /**
- * Namespaces this instance BINDS IN JSON-LD, with the files that bind them.
+ * Namespaces this layer BINDS IN JSON-LD, with the files that bind them.
  *
  * Bean `2j09`. {@link namespacesInUse} reads only diagram `xmlns`, so the
  * registry could pin every namespace a BPMN file binds and none that only an
  * `@context` binds — and report a clean pass over the gap. Owner, 2026-09-23,
- * approved the scope: what THIS instance emits, i.e.
+ * approved the scope: what THIS layer emits, i.e.
  *
  * - every `.ts` file under a directory declared as `code` or `schemas` that
  *   writes an `@context` — the emitters, found by what they do rather than by
  *   a list that goes stale — and the namespace literals they carry;
- * - every committed `.jsonld` under this instance, by its `@context` bindings.
+ * - every committed `.jsonld` under this layer, by its `@context` bindings.
  *
- * NOT third-party documents another instance ingested (the DAK base layer's
- * and a DAK IG's FHIR artefact indexes): those are that instance's data.
+ * NOT third-party documents another layer ingested (the DAK base layer's
+ * and a DAK IG's FHIR artefact indexes): those are that layer's data.
  * `@base` is not a namespace and is not read; an IRI of OURS (the
  * `own-namespaces` code list, or one under it) is excluded — ours need
  * spelling one way, not a registry record.
@@ -322,12 +322,12 @@ export function namespaceMentions(iris: readonly string[], repoRoot = resolve(RO
  *
  * `use` on this record is `conforms`, not `reads`, and the distinction is the
  * one {@link SpecUse} draws: we do not parse somebody else's SKOS, we publish
- * documents that claim to BE `skos:ConceptScheme` instances. A version bump is
+ * documents that claim to BE `skos:ConceptScheme` layers. A version bump is
  * therefore a migration of our own output, not a compatibility question.
  */
 export function skosTermsInUse(root = resolve(ROOT, "..")): string[] {
   const out = new Set<string>();
-  // This script's own exporters, plus every instance's DECLARED `schemas`
+  // This script's own exporters, plus every layer's DECLARED `schemas`
   // graph. The third entry used to be a literal path to the content core's `schemas`:
   // a path into a layer above cat-harness that no import gate sees, and one
   // that would scan nothing, silently, once cat-harness stands alone

@@ -3,7 +3,7 @@
  * Every declared kind has an avatar — and every gap is a finding.
  *
  * @module scripts/check-avatar-coverage
- * @covers cat-harness — it reads the instance declaration's graph typologies and asks each for art; the
+ * @covers cat-harness — it reads the layer declaration's graph typologies and asks each for art; the
  *   avatars themselves are code in `schemas/content/avatars.ts`, as `gen-avatars-css` records
  *
  * ## Why this is a QA result and not an assertion
@@ -64,21 +64,21 @@ export interface CoverageGap {
 }
 
 export interface Coverage {
-  /** Kinds that must have art, from the registry and the instance. */
+  /** Kinds that must have art, from the registry and the layer. */
   required: string[];
   /** Those with none — each falls back to the question mark. */
   missing: CoverageGap[];
   /** Avatars declared for a kind nothing declares. Not a defect, but drift. */
   orphaned: string[];
-  /** Kinds this instance itself declares, before inheritance. */
+  /** Kinds this layer itself declares, before inheritance. */
   declared: string[];
 }
 
 /**
  * Which kinds need art.
  *
- * The registry's kinds PLUS whatever this instance declares, because the two
- * differ: an instance may declare a kind the base registry never heard of,
+ * The registry's kinds PLUS whatever this layer declares, because the two
+ * differ: a layer may declare a kind the base registry never heard of,
  * and that is exactly the case an open vocabulary exists to allow.
  *
  * `fsh-guts` is included even though it is stripped from published graphs —
@@ -100,7 +100,7 @@ export function requiredKinds(root: string = ROOT): { required: string[]; declar
     const d = readDeclaration(root);
     declared = [...new Set((d?.directories ?? []).flatMap((x) => x.graphTypologies ?? []))];
   } catch {
-    // An unreadable declaration is the instance's problem to fix, not this
+    // An unreadable declaration is the layer's problem to fix, not this
     // check's to guess around; the registry half still reports.
   }
   return { required: [...new Set([...registry, ...declared])].sort(), declared: declared.sort() };

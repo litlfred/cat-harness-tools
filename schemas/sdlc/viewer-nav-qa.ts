@@ -15,7 +15,7 @@
  * ## What this does NOT audit
  *
  * **Whether the rail's links resolve.** They cannot be checked from the source
- * tree: the `/<instance>/` roots of mounted instances are mount routes
+ * tree: the `/<instance>/` roots of mounted layers are mount routes
  * `mount-instance-docs.ts` creates AFTER Jekyll, and `/bootstrap/initialization.html`
  * is a `.md` Jekyll renders. `check:subgraphs` and the site-link tests own
  * that question against the built site; this one owns presence.
@@ -59,7 +59,7 @@ export type ViewerNavVerdict = z.infer<typeof ViewerNavVerdictSchema>;
  * | `no-redundant-toggle` | a `☰` or an `[x]` duplicates the header — *"excise [hamburger] and [x]"* |
  * | `rail-tips` | a control whose name is in `aria-label` and nowhere visible carries no `data-fa-tip` equal to it, or the page paints no tooltip on hover AND keyboard focus — bean `ob3m` finding 1, owner's ruling 2026-10-01: *"show each icon's name as a tooltip on hover or keyboard focus"* |
  * | `harnesses-at-rest` | the rail has no `▦ Harnesses` disclosure, or its stylesheet hides that summary at rest — same ruling: *"make ▦ Harnesses visible … too"* |
- * | `declared-mark` | the header draws its LETTER for a harness whose row in `_data/harness.json` carries a resolved `mark` — bean `2vpn`, owner 2026-10-04, paraphrased: one instance's site was missing the top icon on the left-hand navbar, and all of them need to be consistent and consolidated. The letter is the floor for a harness with no mark, never a substitute for one it has |
+ * | `declared-mark` | the header draws its LETTER for a harness whose row in `_data/harness.json` carries a resolved `mark` — bean `2vpn`, owner 2026-10-04, paraphrased: one layer's site was missing the top icon on the left-hand navbar, and all of them need to be consistent and consolidated. The letter is the floor for a harness with no mark, never a substitute for one it has |
  *
  * Only RAILED pages are graded: a page with no rail is already `missing`, and
  * failing it five more times would be one finding counted six ways.

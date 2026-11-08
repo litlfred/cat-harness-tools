@@ -19,7 +19,7 @@
  *
  * Usage:
  *   bun run cat secrets:check [<repo dir> …] [--json]
- * With no directory: the index root and every instance under it that carries
+ * With no directory: the index root and every layer under it that carries
  * `.github/workflows`.
  *
  * @module scripts/secrets-check
@@ -269,7 +269,7 @@ export async function gatherEvidence(dirs: readonly string[], repoFor: (dir: str
   return out;
 }
 
-/** The index root and each instance under it that carries workflows. */
+/** The index root and each layer under it that carries workflows. */
 export function defaultDirs(indexRoot: string): string[] {
   const dirs = [indexRoot];
   for (const name of readdirSync(indexRoot)) {

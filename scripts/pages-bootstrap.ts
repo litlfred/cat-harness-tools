@@ -162,7 +162,7 @@ function gitRemote(root: string): string | undefined {
 }
 
 /**
- * Where the site lives. The instance's config (`<name>.config.json`) wins
+ * Where the site lives. The layer's config (`<name>.config.json`) wins
  * when it says, because an
  * author with a custom domain has said something the remote cannot tell us.
  */
@@ -204,7 +204,7 @@ export function derivePagesUrl(root: string): Pick<PagesReport, "url" | "urlSour
  * "gh-pages.yml" are both common and neither is required.
  */
 export function findPublishWorkflows(root: string): string[] {
-  // The checkout's `.github/`: `dirname` of a root instance is outside it (g43f).
+  // The checkout's `.github/`: `dirname` of a root layer is outside it (g43f).
   const dir = join(checkoutRootFor(root), ".github", "workflows");
   if (!existsSync(dir)) return [];
   const hits: string[] = [];

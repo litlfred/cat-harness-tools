@@ -200,7 +200,7 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     const candidates = gatherCandidateNodes(ROOT);
     // The batch WRITES. Its sidecars go to a scratch tree, never the real
     // cat-harness results tree: written there, `merge-base` (a gate-path node
-    // that is no cat-harness Tool) became a verdict about another instance's
+    // that is no cat-harness Tool) became a verdict about another layer's
     // subject, and `kg-audit-foreign-subjects` failed whenever the two test
     // files shared a shard. The nodes are still READ from the real checkout.
     const scratch = mkdtempSync(join(tmpdir(), "adv-backfill-"));

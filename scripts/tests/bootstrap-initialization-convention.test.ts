@@ -1,5 +1,5 @@
 /**
- * Every instance keeps its initialization instructions in the same place.
+ * Every layer keeps its initialization instructions in the same place.
  *
  * @module scripts/tests/bootstrap-initialization-convention.test
  *
@@ -23,9 +23,9 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 // `bootstrap/` is the REPOSITORY's — it sits at the top of the checkout, beside
-// the instance rather than inside it, because it must be readable before any
+// the layer rather than inside it, because it must be readable before any
 // stub is resolved. Arrived from main as `join(ROOT, "bootstrap", …)`, correct
-// there because the instance and the repository were one directory; here it
+// there because the layer and the repository were one directory; here it
 // named `cat-harness/bootstrap/`, which does not exist.
 const REPO_ROOT = repoRootFor(ROOT);
 
@@ -41,7 +41,7 @@ describe("the convention is composed, not spelled", () => {
   });
 
   test("it is the SAME suffix for every instance", () => {
-    // The property bootstrap depends on: differing only by the instance's own
+    // The property bootstrap depends on: differing only by the layer's own
     // site root, never by which harness it is.
     const suffixes = new Set(
       ["a", "b", "c"].map((n) => initializationDoc({ name: n }).split("/").slice(1).join("/")),
@@ -52,18 +52,18 @@ describe("the convention is composed, not spelled", () => {
   test("the stub does NOT appear — the suffix is the same for every instance", () => {
     // This asserted `toContain("base/")` when it arrived, which was right while
     // `siteDir` returned `<stub>/docs`. It returns plain `docs` now: the
-    // instance has a directory of its own, so repeating the stub inside it
+    // layer has a directory of its own, so repeating the stub inside it
     // would be the redundancy the inversion removed.
     //
     // Inverted rather than deleted, because the property it was reaching for
     // still matters and is now STRONGER — the path is identical for every
-    // instance, not merely differing by site root.
+    // layer, not merely differing by site root.
     const a = initializationDoc({ name: "smart-base", stub: "base" });
     expect(a).not.toContain("base/");
     expect(a).toBe(initializationDoc({ name: "anything-at-all" }));
 
     // WHAT THIS DELIBERATELY NO LONGER PROVES, so the gap is not mistaken for
-    // a pass: bootstrap needs the instance's DIRECTORY to use this suffix, and
+    // a pass: bootstrap needs the layer's DIRECTORY to use this suffix, and
     // nothing here supplies it. Directory and stub are allowed to differ (here
     // `cat-harness/` against stub `folio-assistant`), so composing `<stub>/`
     // would name nothing. See `initializationDoc`'s docstring and bean `wggr`.

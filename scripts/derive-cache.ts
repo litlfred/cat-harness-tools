@@ -16,7 +16,7 @@
  * - its input-hash fingerprint (`input-hash.ts`): its script closure, AUDITED
  *   for every environment, network, clock and git read (`input-sites.ts`), the
  *   `bun` and `git` versions, `bun.lock`, and its declared inputs. A writer
- *   declares inputs the way a check does, in `task-io.ts` or its instance's
+ *   declares inputs the way a check does, in `task-io.ts` or its layer's
  *   `taskIo`; one that declares none is keyed on `{tracked}` — the WHOLE
  *   working tree, since inputs are declared or derived, never hand-narrowed
  *   globs (`ci-cone.ts`). It costs hits, never correctness.

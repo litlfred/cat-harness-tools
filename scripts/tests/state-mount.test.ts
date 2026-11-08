@@ -265,7 +265,7 @@ describe("a successful mount is ignored by the checkout", () => {
   });
 
   test("a FULL mount over layer mounts older than the lock leaves .gitignore byte-identical (bean x38u)", () => {
-    // Bean `x38u`: in every fresh session the instance mounts on disk were
+    // Bean `x38u`: in every fresh session the layer mounts on disk were
     // older than index.lock.json, and a plain `state:mount` (no `--id`)
     // rewrote the block from their declarations, dropping a graph only the
     // PINNED declaration names. Here the committed block names

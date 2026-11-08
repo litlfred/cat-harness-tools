@@ -139,7 +139,7 @@ describe("visibility and theme default, and may be overridden", () => {
 
   test("a tile's theme falls back to the directory's, then to nothing", () => {
     // The same inherit-and-override rule `semantic-zoom.ts` encodes: a tile
-    // that states nothing is complete, and absent means the instance's.
+    // that states nothing is complete, and absent means the layer's.
     expect(graphTiles([dir("x", { visualiser: "a.html" }, "library")])[0]?.theme).toBe("library");
     expect(
       graphTiles([dir("x", { visualiser: [{ ref: "a.html", theme: { themeId: "own" } }] }, "library")])[0]?.theme,
@@ -378,9 +378,9 @@ describe("a page's declared ref names the directory that declared it", () => {
   test("two directories over ONE page keep the first, rather than racing", () => {
     // A page is NOT uniquely owned, and assuming it was is the defect this
     // test exists for. `.../library/agent-skills/` is `agent-skills-library`
-    // to this instance and plain `library` to the agent-skills instance, which
+    // to this layer and plain `library` to the agent-skills layer, which
     // declares its own view of the same page. Building the lookup across every
-    // instance therefore returned an id that is not a tile HERE -- which is
+    // layer therefore returned an id that is not a tile HERE -- which is
     // why callers pass the ONE declaration their tiles came from.
     const got = directoryByVisualisationRef([
       dir("agent-skills-library", { visualiser: "docs/library/agent-skills/index.html" }),
@@ -397,7 +397,7 @@ describe("a page's declared ref names the directory that declared it", () => {
 
 describe("one tile per page (#1168 B7a-2b)", () => {
   // Viewers are read from the pages, and one page may draw several
-  // directories. The tile goes to the instance's own directory first.
+  // directories. The tile goes to the layer's own directory first.
   const shared = "docs/cat-harness/processes/index.md";
   const tiles = graphTiles([
     { id: "smart-base-processes", scope: "repository", coverage: { visualiser: shared } },

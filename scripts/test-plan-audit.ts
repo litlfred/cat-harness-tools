@@ -54,7 +54,7 @@ export interface SutActor {
 }
 
 export interface TestPlanAuditInput {
-  /** Instance root: findings are relative to it, and DMN refs resolve from it. */
+  /** Layer root: findings are relative to it, and DMN refs resolve from it. */
   root: string;
   /** Extra bases a DMN ref may be relative to — the process directories. */
   dmnBases?: string[];
@@ -331,7 +331,7 @@ export function auditTestPlanExitCriteria(input: TestPlanExitCriteriaAuditInput)
 // ── `certification-resolves` (bean `zaui`, Done-when 2) ─────────────────────
 
 export interface CertificationAuditInput {
-  /** Instance root: evidence paths and findings are relative to it. */
+  /** Layer root: evidence paths and findings are relative to it. */
   root: string;
   /** Plan files (`test-plan/v1`), from the declared `test-plan` directories. */
   plans: readonly string[];
@@ -392,7 +392,7 @@ export function auditCertifications(input: CertificationAuditInput): KgCriterion
 // ── `test-has-gherkin` (owner, 2026-11-06: "A test should always have a Gherkin") ──
 
 export interface TestGherkinAuditInput {
-  /** The instance root: tests and `.feature` files are scanned, and named, relative to it. */
+  /** The layer root: tests and `.feature` files are scanned, and named, relative to it. */
   root: string;
   plans: string[];
 }
@@ -404,7 +404,7 @@ const NAMES_PER_FINDING = 5;
  * Audit criterion `test-has-gherkin`.
  *
  * Joins every test the language adapters find to the `@test:` tags of the
- * instance's `.feature` files (`scripts/lib/test-gherkin.ts`), and every plan
+ * layer's `.feature` files (`scripts/lib/test-gherkin.ts`), and every plan
  * case to the `.feature` it names. Fails on an orphan either way: a test no
  * Scenario names, a tag naming no test, a test named twice, a Scenario naming
  * no test, and a plan case with no `.feature` (a `test-plan/v1` plan parses,

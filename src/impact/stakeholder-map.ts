@@ -80,7 +80,7 @@ export interface StakeholderMap {
 }
 
 /**
- * Every skill `.md`, by name, from the directories the instance DECLARES.
+ * Every skill `.md`, by name, from the directories the layer DECLARES.
  *
  * ## The list this replaces was already wrong
  *

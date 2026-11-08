@@ -5,7 +5,7 @@
  * SMART / FHIR in the DAK and FHIR IG layers, the content lifecycle and
  * document authoring in the content core, mathematical papers in the science
  * layer, BPMN/DMN authoring and the conventions in `cat-harness`. Each
- * instance keeps its own `skill-definitions/` inside a declared `skills`
+ * layer keeps its own `skill-definitions/` inside a declared `skills`
  * directory, and every reader asks this module for all of them.
  *
  * @module schemas/skill-definitions-dir
@@ -28,8 +28,8 @@ export const SKILL_DEFINITIONS_DIRNAME = "skill-definitions";
 export function skillDefinitionDirs(repoRoot: string): string[] {
   const out = new Set<string>();
   for (const root of instanceRootsIn(repoRoot)) {
-    // The declared `skills` directories, plus the conventional `skills/` an
-    // instance declaring none still has (the DAK and science layers):
+    // The declared `skills` directories, plus the conventional `skills/` a
+    // layer declaring none still has (the DAK and science layers):
     // declaring `skills/skill-definitions/` there would nest one declared
     // directory inside the conventional one, which layout-norms refuses.
     const candidates = new Set([...instanceDirectoriesForGraph(root, "skills"), ownDirectoryById(root, "skills", "skills")]);
@@ -51,7 +51,7 @@ export function skillDefinitionDirs(repoRoot: string): string[] {
  * `skills` graph, or `undefined` when there is none.
  */
 export function conventionsDir(repoRoot: string): string | undefined {
-  // The platform instance by its declaration, as role-graph.ts's
+  // The platform layer by its declaration, as role-graph.ts's
   // scenariosSubdir finds it (bean `uxn1`); its skills directory by id, since
   // several directories declare the `skills` kind.
   const platform = instanceRootNamed(repoRoot, "cat-harness");

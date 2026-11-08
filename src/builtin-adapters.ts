@@ -1,6 +1,6 @@
 /**
  * Which content adapter a declared content type gets — discovered from the
- * instances that ship one, resolved at startup.
+ * layers that ship one, resolved at startup.
  *
  * ## Why this is not a `switch`
  *
@@ -23,14 +23,14 @@
  * The switch became a table here of the formal-math layer's `adapters/paper/index.ts`
  * and the content core's `adapters/document/index.ts`, loaded by variable
  * path. That fixed the load failure and kept the edge: the harness still named
- * two instances built on top of it, so it could not be lifted into its own
+ * two layers built on top of it, so it could not be lifted into its own
  * repository, and — being a variable import — no static gate could see it.
  * The table's own comment said so.
  *
- * So the dependency is inverted. Each instance that ships an adapter declares
+ * So the dependency is inverted. Each layer that ships an adapter declares
  * it in its own `<instance>.json` under `contentAdapters`
  * ({@link ContentAdapterDeclaration}), and this file reads the declarations of
- * the instances in the checkout. It names none of them. `check:import-direction`
+ * the layers in the checkout. It names none of them. `check:import-direction`
  * is the gate that now sees the shape it replaced (bean `p11x`).
  *
  * **Where it looks is unchanged**: the checkout directory `cat-harness/` sits
@@ -74,21 +74,21 @@ export interface BuiltinAdapterDeclaration {
   contentType: string;
   /**
    * Module path relative to `cat-harness/` — composed from the declaring
-   * instance's root and its instance-relative `module`. Resolved by VARIABLE
+   * layer's root and its instance-relative `module`. Resolved by VARIABLE
    * path; this file imports none.
    */
   module: string;
   /** The exported class. */
   className: string;
-  /** The instance whose declaration this came from — for the boot log. */
+  /** The layer whose declaration this came from — for the boot log. */
   instance: string;
-  /** That instance's absolute root, so a caller can walk its `needs` without rescanning. */
+  /** That layer's absolute root, so a caller can walk its `needs` without rescanning. */
   root: string;
   /** The `contentType` this one specialises, if declared. */
   extends?: string;
 }
 
-/** Two instances declaring one `contentType`. Not resolved by order — see `schemas/content/contributions.ts`. */
+/** Two layers declaring one `contentType`. Not resolved by order — see `schemas/content/contributions.ts`. */
 export class AdapterDeclarationCollisionError extends Error {}
 
 /** How many `extends` hops lie beneath this entry — deeper sorts first. */
@@ -103,7 +103,7 @@ function depth(d: BuiltinAdapterDeclaration, byType: ReadonlyMap<string, Builtin
 }
 
 /**
- * Every content adapter declared by an instance in `checkoutRoot`, in fallback
+ * Every content adapter declared by a layer in `checkoutRoot`, in fallback
  * preference order: most specialised first, then declaration order.
  *
  * A declaration that cannot be read contributes nothing and is RECORDED in
@@ -208,7 +208,7 @@ export async function resolveBuiltinAdapter(
       return undefined;
     }
     try {
-      // VARIABLE specifier — the module comes from the instance's declaration.
+      // VARIABLE specifier — the module comes from the layer's declaration.
       const mod = (await import(abs)) as Record<string, unknown>;
       const ctor = mod[d.className];
       if (typeof ctor !== "function") {

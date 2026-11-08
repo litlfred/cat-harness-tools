@@ -4,7 +4,7 @@
  *
  * Bean `btuv`. `qa-criteria-registry.ts` carried one entry per voice, each
  * restating that voice's rules in prose — three of them describing files in
- * ANOTHER instance, and every one of them restating rules without the citation
+ * ANOTHER layer, and every one of them restating rules without the citation
  * the voice itself carries.
  *
  * **The expected values below are the ones the hand-written entries carried**,

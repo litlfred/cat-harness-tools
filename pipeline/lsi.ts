@@ -544,7 +544,7 @@ export interface Keyword {
  */
 // Words the index keeps (they do discriminate between texts) but that say
 // nothing about what a text is ABOUT. Measured 2026-10-06 on a catalogue
-// instance's handbook: "anyone", "aims", "take", "produce", "resulting" and "positive"
+// layer's handbook: "anyone", "aims", "take", "produce", "resulting" and "positive"
 // led section keyword lists. A keyword list only, never the index's tokens.
 const KEYWORD_STOP = new Set(
   ("anyone anything everyone someone something aim aims aimed take takes taken taking make makes made " +
@@ -657,7 +657,7 @@ export function keywordsOf(m: TermMatrix, cols: number[], texts: string[], top =
 // ─── Cross-group link proposals (bean `9udd`) ─────────────────────────────────
 
 /** Below this cosine a cross-group pair is not proposed. House number,
- *  measured 2026-09-29 on a catalogue instance's 15 strongest cross-document pairs a
+ *  measured 2026-09-29 on a catalogue layer's 15 strongest cross-document pairs a
  *  reader labelled: 0.5 keeps all 4 real pairs and drops 5 of 7 spurious
  *  ones. Fitted to 15 examples — move it when a larger ground truth exists. */
 export const LINK_FLOOR = 0.5;

@@ -229,7 +229,7 @@ describe("a todo's theme — declared, defaulted, and never guessed", () => {
    * 2. The **default makes no claim**. A wrong theme is worse than no theme: a
    *    plain card says nothing, while a card themed `operations` says *"this
    *    is operations work"* about a todo that may be nothing of the sort. The
-   *    instance's own theme says only "this belongs to this folio".
+   *    layer's own theme says only "this belongs to this folio".
    * 3. A theme id that resolves to nothing is a **finding**, not a flat card.
    *    The author asked for something and got nothing, and on the page that
    *    failure is invisible.

@@ -157,7 +157,7 @@ describe("a destination is compared by its normalised href", () => {
 });
 
 describe("a handler viewer's whole-view row is one more destination", () => {
-  // Since bean `j7ql` an instance with a `schemas` graph but no subject page of
+  // Since bean `j7ql` a layer with a `schemas` graph but no subject page of
   // its own (who-iris, folio-assistant-sci) links `/cat-harness/schemas/`, and
   // the sidebar calls that page "Schemas". The rail called it "all": two names.
   const name = (s: string | undefined) => (s === undefined ? { label: "Schemas" } : { label: "Schemas", qualifier: s });

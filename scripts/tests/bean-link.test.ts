@@ -13,7 +13,7 @@ import type { InstanceState } from "../../src/workflow/instance";
 import { loadProcessModel, UnsupportedBpmn } from "../../src/workflow/process-model";
 
 /**
- * `beans/` says what is being worked on; an instance says where it got to.
+ * `beans/` says what is being worked on; a layer says where it got to.
  * Kept apart they diverge. These tests are about the operations that keep them
  * one record — and about the one that deliberately refuses to fire.
  *

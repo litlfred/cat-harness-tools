@@ -8,7 +8,7 @@
  * `bootstrap-tools/schemas/`), follows `needs` across the closure, checks
  * trust and writes the lock. It cannot load until `bootstrap-tools` is
  * mounted, so this script does the one part that needs no declaration:
- * REPLAYING a lock. Every decision — which instances, which repository, which
+ * REPLAYING a lock. Every decision — which layers, which repository, which
  * commit, which directories, where — is in the committed lock; what is left
  * is fetch, copy and verify. So it imports only `node:*`, runs on a fresh
  * clone, and is what CI and the session-start hook run first.
@@ -16,7 +16,7 @@
  *
  * ## What it guarantees
  *
- * - **Pinned and verified.** Each instance is fetched at the lock's 40-char
+ * - **Pinned and verified.** Each layer is fetched at the lock's 40-char
  *   SHA, and each directory's bytes must hash to the lock's `treeDigest`
  *   (the same digest `kg-parts.ts` computes) — a mismatch is undone and
  *   reported, never kept. Trust was checked when the lock was written; the
@@ -34,14 +34,14 @@
  * Usage:
  *   bun run cat mount:lock                 # lay down / refresh every locked mount
  *   bun run cat mount:lock -- --check      # no network: is every locked mount on disk and intact?
- *   bun run cat mount:lock -- --root <dir> # the downstream instance root (default: cwd)
+ *   bun run cat mount:lock -- --root <dir> # the downstream layer root (default: cwd)
  *   bun run cat mount:lock -- --no-install # lay the bytes down, do not `bun install` in each mount
  *   bun run cat mount:lock -- --install-all # install devDependencies too (default: --omit dev)
  *   bun run cat mount:lock -- --no-layers-cache # skip the shared layers cache ref, fetch each repository
  *   bun run cat layers:publish             # (= --publish) build the overlay of the verified mounts, push refs/cat/layers/<key>
  *   bun run cat layers:publish -- --main --prune 20 [--keep <key>]… [--url <index remote>] [--no-push]
  *
- * The FAST PATH: before fetching instance by instance, the replay tries ONE
+ * The FAST PATH: before fetching layer by layer, the replay tries ONE
  * shallow fetch of the index's layers cache ref (`refs/cat/layers/<key>`, then
  * `refs/cat/layers/main`) and verifies every byte it takes from it against the
  * lock; see "The shared layers cache ref" below.
@@ -144,11 +144,11 @@ const sha256 = (b: string | Buffer): string => createHash("sha256").update(b).di
  * from `state:mount`'s own markers (`<git-dir>/branch-mounts/<id>.json`,
  * `branch-mount/v1`, written by `branch-store.ts`).
  *
- * An instance-scoped state graph sits INSIDE its instance: cat-harness's
+ * An instance-scoped state graph sits INSIDE its layer: cat-harness's
  * `health` is `cat-harness/test/health/results/`, and in an index that is
  * inside the remote mount of cat-harness. Its files come from the state
  * branch, not from the pinned tree, so hashing them against the lock reads
- * every state mount as an edit to the pinned instance ("no longer hash to the
+ * every state mount as an edit to the pinned layer ("no longer hash to the
  * lock") and refuses the remount. They are skipped here, and ONLY them: the
  * marker is the state store's own record of exactly what it put down, and the
  * store judges those bytes itself (`state:push` refuses a conflict).
@@ -201,22 +201,22 @@ export function withoutStateMounts(dir: string, files: readonly string[], skip: 
 }
 
 /**
- * The paths a mounted instance DECLARES it builds at publish (`builtAtPublish`
+ * The paths a mounted layer DECLARES it builds at publish (`builtAtPublish`
  * in its `<name>.json`; owner, 2026-10-14, "B1"), instance-relative. They are
  * excluded from the digest for the same reason as `node_modules/`: the pinned
- * commit cannot contain them (the instance ignores them, and its own test holds
+ * commit cannot contain them (the layer ignores them, and its own test holds
  * that nothing declared is tracked), so a publish build that writes them into
  * the mount has written none of the PINNED bytes, and must not make the next
  * re-mount refuse the mount as "somebody's work". An old pin declares nothing,
  * so its digest is unchanged. Read with `node:fs` alone, as this file must.
  */
 export function builtAtPublishOf(dir: string): string[] {
-  // `dir` is the instance root, or one of the directories the lock pins of an
-  // instance mounted as several (an IG pinned as `fhir-artifact-index`,
+  // `dir` is the layer root, or one of the directories the lock pins of a
+  // layer mounted as several (an IG pinned as `fhir-artifact-index`,
   // `document-kinds`, …). The entries are instance-relative, so they are
-  // read from the instance's declaration and rebased onto `dir`: before
+  // read from the layer's declaration and rebased onto `dir`: before
   // 2026-11-06 they were looked for in `dir` itself and compared as
-  // `dir`-relative paths, so no entry of a several-directory instance ever
+  // `dir`-relative paths, so no entry of a several-directory layer ever
   // applied, and `ig-index:build` writing its declared index made the mount
   // read as "somebody's work" (bean `cat-tools-sm8r`).
   const home = instanceHomeOf(dir);
@@ -238,8 +238,8 @@ const ALL_OF_IT = "./";
 /**
  * The nearest of `dir` and its ancestors that holds a harness declaration,
  * with that declaration's `builtAtPublish` paths. The walk stops at a
- * checkout or index boundary (`.git`, `index.lock.json`), so a directory of an
- * instance that declares nothing never borrows another declaration's entries.
+ * checkout or index boundary (`.git`, `index.lock.json`), so a directory of a
+ * layer that declares nothing never borrows another declaration's entries.
  */
 function instanceHomeOf(dir: string): { root: string; entries: string[] } | undefined {
   let at = resolve(dir);
@@ -287,7 +287,7 @@ export function withoutBuiltAtPublish(files: readonly string[], declared: readon
 /**
  * A `.gitignore` whose only pattern is `*`: the directory holding it ignores
  * itself, the marker file included. A viewer that writes its route onto
- * ANOTHER instance's site (`builtOnHostSite`) puts one there (bean
+ * ANOTHER layer's site (`builtOnHostSite`) puts one there (bean
  * folio-assistant-uldr, owner choice "A: derive + in-route ignore"), so the
  * host lists none of its routes under `builtAtPublish`.
  */
@@ -301,7 +301,7 @@ export function isSelfIgnore(text: string): boolean {
  * ignores itself ({@link isSelfIgnore}). The pinned commit cannot hold such a
  * directory's files, the marker included, since git ignores them all, so like a
  * declared `builtAtPublish` path none of them is a pinned byte. `dir`'s own
- * root `.gitignore` is never read as one: a root `*` would hide the instance.
+ * root `.gitignore` is never read as one: a root `*` would hide the layer.
  */
 export function withoutSelfIgnored(dir: string, files: readonly string[]): string[] {
   const routes = files
@@ -353,7 +353,7 @@ export function digestOf(dir: string, skip: readonly string[] = []): { treeDiges
 //   linker also writes into the SIBLING mounts a manifest's `workspaces` names
 //   (`../cat-harnes[s]`). Nothing upstream tracks a `node_modules/` (measured
 //   2026-10-12 over cat-harness, cat-harness-tools, bootstrap, bootstrap-tools
-//   and two content instances: 0 paths), and `remote-mount.ts` refuses
+//   and two content layers: 0 paths), and `remote-mount.ts` refuses
 //   to lay down a tree that does, so the exclusion can never hide a pinned byte.
 // - The lockfile is NOT excluded: it is a pinned byte. The install runs with
 //   `--no-save`, so bun writes no lockfile and edits no manifest, and the
@@ -394,7 +394,7 @@ export interface InstallOutcome {
 /**
  * The enclosing `package.json` whose `workspaces` names `dir`, or undefined.
  *
- * A mounted instance that is a WORKSPACE MEMBER of the checkout's root is
+ * A mounted layer that is a WORKSPACE MEMBER of the checkout's root is
  * installed by the root's own `bun install`. Installing it again from inside
  * the member is not local: bun resolves the whole workspace and rewrites the
  * ROOT `node_modules/` — and with `--omit dev` it does so without the dev
@@ -744,7 +744,7 @@ function carryOver(from: string, to: string, stateDirs: readonly string[]): stri
   return kept;
 }
 
-// ── One instance ─────────────────────────────────────────────────────────────
+// ── One layer ─────────────────────────────────────────────────────────────
 
 /** Is every locked directory of `inst` on disk with the locked digest? Lists the ones that are not. */
 function drift(root: string, inst: LockInstance): { absent: string[]; changed: string[] } {
@@ -799,7 +799,7 @@ function mountCacheDir(): string | undefined {
 }
 
 /**
- * Where a ready-made copy of an instance's locked bytes sits: a local
+ * Where a ready-made copy of a layer's locked bytes sits: a local
  * content-addressed cache, or the shared layers cache ref. Every path it
  * names is UNTRUSTED — {@link layDownFrom} verifies each against the lock.
  */
@@ -916,7 +916,7 @@ export function mountInstance(root: string, inst: LockInstance, layers?: LayersC
     detail: `left untouched: ${paths.join(", ")} no longer hash to the lock — edits there are somebody's work; move them upstream or delete the directory, then re-mount`,
   });
   // A drift is replaced only when EVERY drifted path is an earlier pin's
-  // exact bytes: one edited path keeps the whole instance as it stands.
+  // exact bytes: one edited path keeps the whole layer as it stands.
   const pins = prior?.();
   const stateDirs = stateMountedDirs(root);
   const edited = pins === undefined ? changed : changed.filter((p) => !isOlderPin(root, inst, p, pins, stateDirs));
@@ -1070,7 +1070,7 @@ function layDown(root: string, inst: LockInstance, absent: readonly string[], la
 
 // ── The shared layers cache ref ──────────────────────────────────────────────
 //
-// Replaying a lock fetches every pinned instance from its own repository: one
+// Replaying a lock fetches every pinned layer from its own repository: one
 // round trip, one negotiation, one sparse checkout per layer. The layers
 // cache is ONE git commit in the INDEX repository whose tree is the composed
 // overlay this file lays down — each locked directory at its mount path, each
@@ -1081,7 +1081,7 @@ function layDown(root: string, inst: LockInstance, absent: readonly string[], la
 // instances>`, plus a moving `refs/cat/layers/main` that the writer on main
 // updates. The lock stays the SOLE authority. The cache is untrusted: every
 // byte taken from it is verified by {@link layDownFrom} exactly as a fetched
-// byte is, an instance whose copy does not verify falls back to its own
+// byte is, a layer whose copy does not verify falls back to its own
 // repository, and a missing ref falls back for all of them. So a stale cache
 // (`main` after a re-pin) still serves every layer that did not move, and a
 // tampered one can cost time, never correctness. Trust was checked when the
@@ -1117,11 +1117,11 @@ export function layersUrl(root: string): string | undefined {
   return r.status === 0 && r.stdout.trim() ? r.stdout.trim() : undefined;
 }
 
-/** A lazily fetched layers cache: fetched the first time an instance needs it, at most once. */
+/** A lazily fetched layers cache: fetched the first time a layer needs it, at most once. */
 export interface LayersCache {
   /** The ref that served, once fetched; `undefined` on a miss. */
   ref?: string;
-  /** Instances whose cached copy did not verify and were fetched from their own repository. */
+  /** Layers whose cached copy did not verify and were fetched from their own repository. */
   fellBack: string[];
   /** Why there is no source, when there is none. */
   miss?: string;
@@ -1191,7 +1191,7 @@ function treeLinks(dir: string): string[] {
   return out.sort();
 }
 
-/** The composed overlay of every locked instance, as `mount-from-lock` lays it down. */
+/** The composed overlay of every locked layer, as `mount-from-lock` lays it down. */
 export function overlayEntries(root: string, instances: readonly LockInstance[]): OverlayEntry[] {
   const skip = stateMountedDirs(root);
   const out = new Map<string, OverlayEntry>();
@@ -1233,7 +1233,7 @@ function gitEnv(cwd: string, args: string[], env: Record<string, string>, input?
 /**
  * Build the overlay commit for `root`'s lock and (unless `push: false`) push
  * it to `refs/cat/layers/<key>` — and, with `main`, to `refs/cat/layers/main`.
- * Refuses unless every locked instance reads `current`: only bytes that hash
+ * Refuses unless every locked layer reads `current`: only bytes that hash
  * to the lock are ever published.
  */
 export function publishLayers(root: string, opts: { url?: string; main?: boolean; push?: boolean; prune?: number; keep?: string[] } = {}): PublishResult {
@@ -1338,15 +1338,15 @@ export interface LayersReport {
   ref?: string;
   miss?: string;
   fellBack: string[];
-  /** Instances laid down from the cache. */
+  /** Layers laid down from the cache. */
   served: string[];
-  /** Instances fetched from their own repository. */
+  /** Layers fetched from their own repository. */
   fetched: string[];
 }
 
 /**
  * The cache's one hit/miss/why line, in `cached-step`'s format (cache-first CI,
- * rule 4), or `undefined` when no instance needed laying down (the cache was
+ * rule 4), or `undefined` when no layer needed laying down (the cache was
  * never consulted). `hit`: every needed layer came from the lock's own ref;
  * `warm`: some did (from `main`, or with a layer that did not verify); `miss`:
  * none did.
@@ -1395,8 +1395,8 @@ export function run(
       layersReport.push({ key: layersKey(l.instances!), ref: layers.ref, miss: layers.miss, fellBack: layers.fellBack, served, fetched });
     }
   }
-  // AFTER every instance is down, so a manifest's `workspaces` reaching a
-  // sibling mount finds it. A failed install is reported against the instance
+  // AFTER every layer is down, so a manifest's `workspaces` reaching a
+  // sibling mount finds it. A failed install is reported against the layer
   // (its tools will not run) but never touches what `--check` verifies.
   const mode = opts.install ?? "production";
   if (!check && mode !== false) {

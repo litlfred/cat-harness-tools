@@ -6,7 +6,7 @@
  * rather than asserted.
  *
  * The tests of this file that read the whole checkout (discovers skills across
- * every instance in the checkout) live in `test/tools-checkout.test.ts` (bean
+ * every layer in the checkout) live in `test/tools-checkout.test.ts` (bean
  * `7zz1`): standing alone, cat-harness has none of it.
  */
 import { describe, expect, test } from "bun:test";
@@ -31,15 +31,15 @@ const BASE = "https://example.invalid/fa";
 const HOST = hostSchemaBase(BASE);
 
 /**
- * The INSTANCE root, not `process.cwd()`.
+ * The LAYER root, not `process.cwd()`.
  *
- * `contractRequires(root, …)` resolves `<root>/schemas/skills/<skill>/` — an
- * instance path. `process.cwd()` is the REPOSITORY root when the suite runs,
+ * `contractRequires(root, …)` resolves `<root>/schemas/skills/<skill>/` — a
+ * layer path. `process.cwd()` is the REPOSITORY root when the suite runs,
  * and the two were the same directory until the move (bean `wggr`), so passing
  * the cwd was right by coincidence rather than by argument.
  *
  * It is also the root the canonical `knownSkills` is asked for below, which is
- * the same question one level along: skill discovery resolves an instance's
+ * the same question one level along: skill discovery resolves a layer's
  * declaration, so handing it a repository root would scan the wrong tree the
  * moment the two differ.
  */
@@ -232,11 +232,11 @@ describe("tools", () => {
     // than in packages, and a scan of a root's subdirectories never looks at
     // the root. Both read as dangling, which is how this was found.
     //
-    // THOSE TWO NO LONGER BELONG TO THIS INSTANCE, and the assertion is
+    // THOSE TWO NO LONGER BELONG TO THIS LAYER, and the assertion is
     // inverted rather than deleted — bean `pve3`, the owner's ruling of
     // 2026-09-21 ("neither"). `cat-harness/harness.json` no longer declares
     // `bootstrap/skills/`, so bootstrap's skills are published through
-    // its OWN graph and this instance does not overlay them. Deleting the
+    // its OWN graph and this layer does not overlay them. Deleting the
     // lines would lose the regression they were written for; flipping them
     // keeps it, because the failure mode being guarded is a SCAN that
     // disagrees with the declaration, in either direction.
@@ -244,7 +244,7 @@ describe("tools", () => {
     expect(s.has("log-message")).toBe(false);
     // And they are still REACHABLE, which is what makes the removal a
     // relocation rather than a loss. `check-tools`' `satisfiableSkills` reads
-    // every declared instance for exactly this reason.
+    // every declared layer for exactly this reason.
     expect(canonicalKnownSkills(join(INSTANCE, "../bootstrap")).has("log-message")).toBe(true);
   });
 
@@ -427,7 +427,7 @@ describe("the gates Tool — one node over a derived list", () => {
   });
 
   test("it says why it exists where CI does not, which is the whole business case", () => {
-    // `tools/` is inherited across instances and `.github/workflows/` is not.
+    // `tools/` is inherited across layers and `.github/workflows/` is not.
     // An agent choosing this tool downstream has no CI to fall back on, so
     // `selection.when` has to carry that rather than leave it to the reader.
     for (const k of ["when", "limits", "cost"] as const) {

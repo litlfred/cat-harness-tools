@@ -11,7 +11,7 @@
  * `bun run cat check:workflow-refs`. This test gates only the unambiguous half.
  *
  * The tests of this file that read the whole checkout (resolves every
- * instance's declared diagrams) live in
+ * layer's declared diagrams) live in
  * `test/workflow-skill-refs-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

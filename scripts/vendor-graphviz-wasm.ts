@@ -27,7 +27,7 @@ import { repoRootFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
-/** Where `bun install` put the package: this instance's own install first, then the checkout root's. */
+/** Where `bun install` put the package: this layer's own install first, then the checkout root's. */
 function packageDir(): string {
   const own = join(INSTANCE_ROOT, "node_modules", "@hpcc-js", "wasm-graphviz");
   return existsSync(own) ? own : join(repoRootFor(INSTANCE_ROOT), "node_modules", "@hpcc-js", "wasm-graphviz");

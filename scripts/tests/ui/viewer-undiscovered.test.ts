@@ -2,7 +2,7 @@
  * "No published viewer" and "a viewer nothing links" are different findings.
  *
  * `harness-tiles.ts` discovers a kind's viewer by CONVENTION — a page at
- * `/<handler>/<kind>/<name>/`, or `/<kind>/` for the instance that owns the
+ * `/<handler>/<kind>/<name>/`, or `/<kind>/` for the layer that owns the
  * site. A viewer published anywhere else is real, on disk, and invisible to
  * that search.
  *
@@ -49,7 +49,7 @@ const BASE_DOCS = baseDocsDir(REPO);
 const HARNESS = join(BASE_DOCS, "_data", "harness.json");
 
 interface Harness {
-  /** The instance's DIRECTORY name — stable. See the lookup below. */
+  /** The layer's DIRECTORY name — stable. See the lookup below. */
   name?: string;
   title?: string;
   findings?: string[];
@@ -58,7 +58,7 @@ interface Harness {
 
 /** The harness report is written at publish and gitignored (bean w1gy F18). */
 const NOT_BUILT = siteNotBuilt("the harness data `docs:harness` writes at publish (gitignored)", HARNESS);
-/** Instances above the harness, which a standalone checkout does not hold. */
+/** Layers above the harness, which a standalone checkout does not hold. */
 const absentAbove = (names: string[]): boolean =>
   names.some((n) => !existsSync(join(REPO, n))) &&
   notApplicableAlone(`${names.join(" and ")}, the higher instance(s) whose report entries this reads`);
@@ -171,13 +171,13 @@ describe.skipIf(NO_IRIS)("who-iris/catalogue — the case that exposed it, now c
   /* FOUND BY `name`, NOT BY `title`, and the difference cost a red gate.
    *
    * This looked up `title === "who-iris"` and stopped matching on 2026-09-22,
-   * when bean `t3n8` gave every instance a declared DISPLAY title and
+   * when bean `t3n8` gave every layer a declared DISPLAY title and
    * who-iris became "WHO IRIS". `find` returned undefined, and all three
    * assertions below failed on a repository where nothing about viewers had
    * changed.
    *
    * `title` is a display string the owner may rewrite at any time; `name` is
-   * the instance's directory and is what every other consumer joins on. A
+   * the layer's directory and is what every other consumer joins on. A
    * test keyed to a label is a test that fails when somebody renames a tab.
    */
   const iris = harnesses.find((h) => h.name === "who-iris");
@@ -214,7 +214,7 @@ describe.skipIf(NO_IRIS)("who-iris/catalogue — the case that exposed it, now c
 const NO_IGS = NOT_BUILT || absentAbove(["smart-trust", "smart-base"]);
 describe.skipIf(NO_IGS)("fhir-artifact-index — a viewer inside a COMPOSED directory is linked", () => {
   /* Stage C of the smart-* separation (#1767). `gen-ig-pages` writes each IG
-   * instance's artefact index to `<instance>/docs/index.md`, which
+   * layer's artefact index to `<instance>/docs/index.md`, which
    * `compose-docs` publishes at `/<instance>/`. That ref is instance-relative,
    * not under the site prefix, so until the tile generator routed refs under a
    * `composed: true` directory it reported the page as "not at a conventional
@@ -228,7 +228,7 @@ describe.skipIf(NO_IGS)("fhir-artifact-index — a viewer inside a COMPOSED dire
    * that carries the viewer declaration is laid onto it at build time.
    */
   // Since 2026-10-09 the tile opens the visualiser smart-base DECLARES over
-  // the kind, per instance — `/smart-base/artifact-index/<instance>/`, a
+  // the kind, per layer — `/smart-base/artifact-index/<instance>/`, a
   // route page that opens the IG site's own `artifacts` page. The IG keeps
   // its URL; the tile links the declared route (owner: "<base URL>/<harness>/
   // <visualizer>/<sub-graph>").

@@ -1,5 +1,5 @@
 /**
- * An edit link names the repository its file's instance DECLARES, not the
+ * An edit link names the repository its file's layer DECLARES, not the
  * `origin` of whichever checkout generated the page — bean `5o5c`, owner
  * ruling C (2026-10-22). The rendered link is a msgid in the translation
  * catalogues, so a link that varied with the checkout root made every

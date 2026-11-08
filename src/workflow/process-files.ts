@@ -16,13 +16,13 @@ import { workflowFiles } from "../../scripts/known-skills.js";
 import { processDiagrams } from "./process-model.js";
 
 /**
- * The instances whose diagrams these tools can run: every dependency in
+ * The layers whose diagrams these tools can run: every dependency in
  * overlay order, then the root — LAST, so the root wins a name collision,
  * the rule `resolveSkillDirs` states for skills.
  *
  * Bean `nf2z`. `workflowFiles(root)` alone is root-only, through
  * `kgDirectories`, and on purpose: the export and the renderers rely on it.
- * But since the split the root instance declares no diagram at all — every
+ * But since the split the root layer declares no diagram at all — every
  * one belongs to a dependency — so a server started at the repository root
  * listed "Processes: (none)" and could start nothing, which made the
  * recorded-instance rule (bean `vlhk`) uncompliable. Only THIS module's

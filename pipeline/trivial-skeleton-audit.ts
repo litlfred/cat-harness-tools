@@ -6,7 +6,7 @@
  * the instance/def is Lean-verified but encodes none of the
  * conjectural content.  These are spec-compliant under the §3b-cond
  * pattern (prove the class is inhabited) but should be **upgraded
- * to faithful instances** as the genuine mathematics is formalised.
+ * to faithful layers** as the genuine mathematics is formalised.
  *
  * Patterns flagged:
  *   const_zero        : `def f ... := 0` / `:= constant 0`
@@ -59,7 +59,7 @@ const argv = process.argv.slice(2);
 // carries no declaration -- correct, since a guessed site root writes the
 // witness where nothing serves it -- but at module scope that throw fires on
 // IMPORT, taking down a run that passed `--out` and never needed the default.
-// A folio under audit is not always a declared instance.
+// A folio under audit is not always a declared layer.
 let WITNESS_OUT: string | undefined;
 const strictGates: Record<string, number> = {};
 for (let i = 0; i < argv.length; i++) {
@@ -182,9 +182,9 @@ async function main() {
     console.log(`  ${String(c).padStart(4)} ${name}`);
   }
 
-  // This script audits a FOLIO, which is not necessarily a declared instance
+  // This script audits a FOLIO, which is not necessarily a declared layer
   // -- `makeFolio` in the tests builds one with no `harness.json` at all. A
-  // declared instance publishes under its stub; an undeclared folio has no
+  // declared layer publishes under its stub; an undeclared folio has no
   // stub to publish under, and `docs/` is the pre-instance convention it has
   // always used. That is a documented fallback for a known case, not a
   // guessed stub, which `siteDirFor` still refuses.

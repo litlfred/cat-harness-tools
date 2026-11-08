@@ -50,7 +50,7 @@ describe("publication is a STATE, and `published` is refused (§3.1, superseded 
    * refusals are gone and their tests with them. What survives unchanged is
    * the DISCIPLINE those tests were protecting — that a model must be able to
    * say what is true — and it is what condemned the old model: all 17
-   * instances reported `undecided` while the answer was known for every one.
+   * layers reported `undecided` while the answer was known for every one.
    *
    * `skills/kg/kg-core/instance-publication.md`.
    */
@@ -83,7 +83,7 @@ describe("publication is a STATE, and `published` is refused (§3.1, superseded 
 });
 
 describe("a version is universal but GATE-enforced; an id is held (§3.2, owner 2026-09-23)", () => {
-  /** A throwaway instance tree. Never the real corpus — that is a sibling's timeout. */
+  /** A throwaway layer tree. Never the real corpus — that is a sibling's timeout. */
   function tree(instances: Record<string, unknown>): string {
     const root = mkdtempSync(join(tmpdir(), "vertest-"));
     for (const [name, body] of Object.entries(instances)) {
@@ -106,10 +106,10 @@ describe("a version is universal but GATE-enforced; an id is held (§3.2, owner 
    * owner reversed that on 2026-09-23 — every asset carries a version — and
    * requiring it in the TYPE breaks 376 tests across 20+ files, every fixture
    * that builds a declaration without one. So the requirement moved to
-   * `check:publishable`, which fails the instance BY NAME rather than as a
+   * `check:publishable`, which fails the layer BY NAME rather than as a
    * parse error inside a fixture.
    *
-   * `auditPublishable` raising a `major` on a versionless instance is the
+   * `auditPublishable` raising a `major` on a versionless layer is the
    * assertion that makes "universal" true; without it this file would be
    * pinning permission rather than a property.
    */
@@ -142,7 +142,7 @@ describe("a version is universal but GATE-enforced; an id is held (§3.2, owner 
    * 17 declarations is 17 places, and an id must be DERIVED from that single
    * reference once bean `iwtn` creates it.
    *
-   * Until then no instance declares one, and NOTHING should start requiring
+   * Until then no layer declares one, and NOTHING should start requiring
    * it. This test fails the moment something does.
    */
   test("no instance declares an `id` yet, and an absent one is legal", () => {
@@ -151,10 +151,10 @@ describe("a version is universal but GATE-enforced; an id is held (§3.2, owner 
 
   /**
    * `canonicalUrl` stays unrequired for the reason §3.4 gives: it plays FHIR's
-   * `uri` role, so an instance without one cannot be EXPRESSED as a dependency
+   * `uri` role, so a layer without one cannot be EXPRESSED as a dependency
    * — reported by `dependsOnFor` as a `no-uri` gap, which is a fact about the
    * RECORD rather than a reason to refuse the declaration. Only 3 of the
-   * instances here carry one.
+   * layers here carry one.
    */
   test("`canonicalUrl` is NOT required — a draft without one is legal", () => {
     expect(CatHarnessDeclarationSchema.safeParse(decl({ canonicalUrl: undefined })).success).toBe(true);
@@ -178,7 +178,7 @@ describe("versions are exact — ranges cannot be expressed in FHIR `dependsOn` 
  * The gate's two CROSS-INSTANCE rules, which no single parse can hold.
  *
  * Each runs over a throwaway tree rather than the repository, so the
- * assertions stay true when the repository's own instances change — the
+ * assertions stay true when the repository's own layers change — the
  * failure mode a test reading live data walks into (`yag0`, where the
  * assertion was derived from the very data it was meant to check).
  */
@@ -231,7 +231,7 @@ describe("check:publishable — the rules a per-declaration schema cannot see", 
   /**
    * UNKNOWN is a fact about the RUN; draft is a fact about the repository.
    * A gate that folded the first into the second would report a clean census
-   * over an instance it never read — the `dh4f` shape. The states changed with
+   * over a layer it never read — the `dh4f` shape. The states changed with
    * the 2026-09-23 ruling; this distinction did not, and is the reason the
    * `unknown` row survived a rewrite that removed every other state.
    */
@@ -291,11 +291,11 @@ describe("check:publishable — the rules a per-declaration schema cannot see", 
 /**
  * §3.4's record, and — the point of the section — the gaps it cannot fill.
  *
- * Every instance now carries an id and a version, so a gap is never about
+ * Every layer now carries an id and a version, so a gap is never about
  * PERMISSION any more — it is about the record being inexpressible. §3.4's
  * record is `{packageId, version, uri}` and `canonicalUrl` plays `uri`, so an
  * edge to something without one cannot be written down. `dependsOn: []` in
- * that case would state that the instance depends on nothing, which is false.
+ * that case would state that the layer depends on nothing, which is false.
  * Each case below is a DIFFERENT gap reason with a different remedy, which is
  * why it is an enum rather than a boolean.
  */
@@ -310,7 +310,7 @@ describe("dependsOn — §3.4's record, and what it reports instead", () => {
     return root;
   }
 
-  // Every instance carries an id and a version now, so this helper no longer
+  // Every layer carries an id and a version now, so this helper no longer
   // says "published" — it says "has a canonicalUrl", which is what §3.4's
   // record actually needs. Owner's ruling, 2026-09-23.
   const published = (name: string, over: Record<string, unknown> = {}) => ({
@@ -551,8 +551,8 @@ describe("version bump — computed from the surface, not claimed by a commit me
    * REPLACED, and the replacement runs over a THROWAWAY TREE rather than this
    * repository.
    *
-   * The old test asserted `rows` was empty because no instance declared
-   * `publishable: true`. Every instance now carries a version, so the gate has
+   * The old test asserted `rows` was empty because no layer declared
+   * `publishable: true`. Every layer now carries a version, so the gate has
    * 17 real rows and the old assertion inverted. Re-pointing it at the real
    * corpus would also have made it walk the whole tree every run — it was
    * already taking 6.5s against a 5s timeout while failing, and a test that

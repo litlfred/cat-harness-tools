@@ -53,10 +53,10 @@ describe("the site root is one answer, not a literal", () => {
    */
   test("`.gitignore` follows the site root, in both directions", () => {
     // REPO-relative, composed and said so: `git check-ignore` runs at the
-    // repository root, while `siteDir` is measured from the instance root.
+    // repository root, while `siteDir` is measured from the layer root.
     // This is the one caller that needs the other form.
     //
-    // Composed from the instance directory's BASENAME, not from `artefactStub`.
+    // Composed from the layer directory's BASENAME, not from `artefactStub`.
     // Those were the same string until the move (bean `wggr`) and are now two
     // different facts: the directory is `cat-harness/`, while the stub stays
     // `folio-assistant` because it names PUBLISHED artefacts — `<stub>.jsonld`
@@ -70,9 +70,9 @@ describe("the site root is one answer, not a literal", () => {
     // `.gitignore` ignores wholesale (`/cat-harness/`). Asked at the checkout
     // root, every path below is ignored and the guard says nothing about the
     // site root. So the question goes to the `.gitignore` of the repository
-    // that holds the site -- the instance's own, alone, in a throwaway
+    // that holds the site -- the layer's own, alone, in a throwaway
     // repository -- with the paths relative to that repository's root, which
-    // is the instance root. Same eight probes, same two directions.
+    // is the layer root. Same eight probes, same two directions.
     const site = siteDirFor(ROOT);
 
     // Hand-written source Jekyll serves verbatim. Ignoring these is the SILENT

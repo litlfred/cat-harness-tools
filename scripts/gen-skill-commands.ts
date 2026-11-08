@@ -105,8 +105,8 @@ export interface CommandReport {
 }
 
 /**
- * True when `targetRoot` is a mounted instance placed by a mount lock (bean `bx4c`).
- * A mounted instance is a read-only copy of a pinned commit; index surface
+ * True when `targetRoot` is a mounted layer placed by a mount lock (bean `bx4c`).
+ * A mounted layer is a read-only copy of a pinned commit; index surface
  * regeneration must never write inside it.
  */
 export function isMountedInstance(targetRoot: string, baseRoot?: string): boolean {
@@ -120,7 +120,7 @@ export function isMountedInstance(targetRoot: string, baseRoot?: string): boolea
 }
 
 /**
- * Skill packages for `repo`: an instance root gets only the skills it owns
+ * Skill packages for `repo`: a layer root gets only the skills it owns
  * (`"instance"`, bean `t5zb`), while an index root gets the checkout overlay.
  */
 export function packagesFor(repo: string = REPO_ROOT): Record<string, string> {
@@ -158,7 +158,7 @@ export function reconcile(repo: string = REPO_ROOT, packages: Record<string, str
   return { declared: skills.length, findings, duplicates };
 }
 
-/** Write what is missing or stale and remove this generator's orphans. Returns the files changed. Never writes inside a mounted instance (bean `bx4c`). */
+/** Write what is missing or stale and remove this generator's orphans. Returns the files changed. Never writes inside a mounted layer (bean `bx4c`). */
 export function write(repo: string = REPO_ROOT, packages: Record<string, string> = packagesFor(repo)): string[] {
   if (isMountedInstance(repo)) return [];
   const { skills } = userInvocableSkills(packages);

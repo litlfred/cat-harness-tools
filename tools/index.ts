@@ -6,11 +6,11 @@
  * @graphNode tool
  *
  * Reached through tool auto-discovery ({@link ./discover.ts}), never by an
- * import, like every other instance's `tools` graph.
+ * import, like every other layer's `tools` graph.
  *
  * A Tool whose `invoke.inProcess.module` is code in THIS layer is declared
  * here, beside that code, so its module path is instance-relative and names
- * no directory outside this instance (`check:import-direction` would refuse
+ * no directory outside this layer (`check:import-direction` would refuse
  * one that did). Tools invoked by shell (`bun run cat-harness-tools/scripts/…`)
  * stay declared in cat-harness: a command line is not a module path.
  *
@@ -33,7 +33,7 @@ import { hostSchemaBase } from "../scripts/lib/host-schema.ts";
  * the HARNESS's declared `canonicalUrl`, because the tool-type vocabulary is
  * the harness's and is published once, under its own directory at its base
  * (`hostSchemaBase`, #676) — the same answer `discover.ts` passes every
- * instance's `tools()`. An empty base would mint relative IRIs, which the
+ * layer's `tools()`. An empty base would mint relative IRIs, which the
  * Tool schema refuses at load (measured standalone).
  */
 function harnessBase(): string {

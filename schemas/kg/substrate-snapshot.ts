@@ -10,7 +10,7 @@
  *
  * A bare copy would carry a `name` equal to its file stem — the rule that
  * marks a directory's declaration (`declarationFileIn`, `findDeclarationFile`)
- * — so every scanner would see a second instance nobody installed. So the
+ * — so every scanner would see a second layer nobody installed. So the
  * snapshot declares what it is (`$schema`), and the upstream bytes sit in
  * `raw`, untouched, where no scanner reads them as a declaration.
  *
@@ -31,7 +31,7 @@ export const SUBSTRATE_SNAPSHOT_SCHEMA = "folio-substrate-snapshot/v1";
  * The tag on a MATERIALISED PART's record — a subgraph or asset of a
  * subscribed substrate, copied at the pin (slices 5 and 6). The record's full
  * schema is the content core's `schemas/kg-materialization.ts`, because it
- * embeds core's `MaterializationSchema`, which this instance may not import.
+ * embeds core's `MaterializationSchema`, which this layer may not import.
  * The tag lives HERE so the readers below core — the subscriptions page, and
  * `check:materialized-fixity`'s walk — recognise a record without importing up.
  */
@@ -46,11 +46,11 @@ export const KG_PART_RECORD_SCHEMA = "folio-kg-materialization/v1";
  */
 export const KG_NODES_RECORD_SCHEMA = "folio-kg-nodes/v1";
 
-/** The graph typology of the directory an instance keeps its snapshots in. Found through the declaration, never by path. */
+/** The graph typology of the directory a layer keeps its snapshots in. Found through the declaration, never by path. */
 export const SNAPSHOT_GRAPH_TYPOLOGY = "substrate-snapshot";
 
 /**
- * The graph typology of the directory an instance keeps its INSTANTIATED
+ * The graph typology of the directory a layer keeps its INSTANTIATED
  * subscribed harnesses' state in (`kg:instantiate`): `holds: "state"`, apart
  * from the snapshot directory, which holds upstream's bytes and is declared
  * `readOnly`. Owner, 2026-10-30 (bean `w1gy` finding 1, option C, "split the

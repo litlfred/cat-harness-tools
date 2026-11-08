@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 /**
- * A viewer over every instance's declared DOCUMENT KINDS.
+ * A viewer over every layer's declared DOCUMENT KINDS.
  *
  * @module scripts/gen-document-kinds-viz
  * @covers document-kinds
  * @graphNode none — a generator over the document-kinds graph, not a schema itself
  *
  * Placed like `gen-voices-viz.ts`: one index under
- * `<site>/<handler>/document-kinds/` and one page per SUBJECT instance under
+ * `<site>/<handler>/document-kinds/` and one page per SUBJECT layer under
  * it, each naming the directories it draws (`renders`) and this generator's
  * Tool (`rendered-by`). Static pages — there is nothing to filter.
  *
@@ -63,7 +63,7 @@ export interface KindEntry {
 }
 
 /**
- * Every instance root reachable from `repoRoot`: the checkout's own instances,
+ * Every layer root reachable from `repoRoot`: the checkout's own layers,
  * any mounted layers (`index.lock.json`, including overrides placed deeper than
  * one level), and the dependency closure (`needs` and `dependencies.folioAssistant`)
  * of each. Deduplicated in discovery order so the checkout's own order is
@@ -118,8 +118,8 @@ export function readDocumentKinds(repoRoot: string): { kinds: KindEntry[]; dirs:
   // Attached once every kind is read: a coverage report lives with the
   // SUBJECT it is about, which is usually a layer above the one declaring the
   // kind (an IG's report on a kind its base layer declares). The kind is the
-  // one of that id its own instance declares, else the one some other
-  // instance in the checkout declares; a report naming no kind anywhere is
+  // one of that id its own layer declares, else the one some other
+  // layer in the checkout declares; a report naming no kind anywhere is
   // still refused.
   for (const { instance, dir, report: c } of reports) {
     const owner =
@@ -133,11 +133,11 @@ export function readDocumentKinds(repoRoot: string): { kinds: KindEntry[]; dirs:
 /**
  * Every SUBJECT page and the kinds it shows (fa#2739).
  *
- * A subject is every instance that DECLARES a document-kinds directory, not
+ * A subject is every layer that DECLARES a document-kinds directory, not
  * only one that declares a kind: the harness tiles link `<route>/<instance>/`
- * for each declared directory, so an instance whose directory holds only a
+ * for each declared directory, so a layer whose directory holds only a
  * coverage report (an IG realising its base layer's kind) or nothing yet
- * still gets its page. Until then two IG instances above this layer were
+ * still gets its page. Until then two IG layers above this layer were
  * linked from the home page and never drawn. A subject's page shows the kinds
  * it declares and the kinds it reports coverage of.
  */

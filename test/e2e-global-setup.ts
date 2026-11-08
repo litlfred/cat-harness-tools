@@ -25,9 +25,9 @@ import { artefactStubFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 export default function globalSetup(): void {
-  // B1 (owner, 2026-10-14): the pages the specs read that no instance commits
+  // B1 (owner, 2026-10-14): the pages the specs read that no layer commits
   // any more — built at publish because they are computed over the checkout's
-  // other instances or from a branch-kept graph (`builtAtPublish`). Built here
+  // other layers or from a branch-kept graph (`builtAtPublish`). Built here
   // the way the deploy builds them, from the mounted state, so the beans count
   // in `_data/harness.json` and in `assets/beans/count.json` come from ONE
   // mount (`beans-count-agrees` failed on two snapshots taken at different
@@ -37,10 +37,10 @@ export default function globalSetup(): void {
   if (process.env.E2E_DERIVED !== "present") {
     execFileSync("bun", ["run", "cat", "derive:publish"], { stdio: "inherit" });
   }
-  // The same resolution both specs use: the instance directory above `test/`.
+  // The same resolution both specs use: the layer directory above `test/`.
   const stub = artefactStubFor(join(HARNESS_ROOT));
   for (const [file, script, ...args] of [
-    // The document's published path under `_kg/`, the instance's own
+    // The document's published path under `_kg/`, the layer's own
     // directory (#603 decision 1b), which the exporter's default `--out` is.
     [`_kg/${stub}/${stub}.jsonld`, "cat-harness-tools/scripts/kg-export.ts"],
     [`_kg/${stub}/index.html`, "cat-harness-tools/scripts/kg-viewer.ts", "--out", `_kg/${stub}/index.html`],

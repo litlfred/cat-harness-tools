@@ -33,7 +33,7 @@
  *
  * ## Reachability for a DIAGRAM is asked of the engine's own resolver
  *
- * The denominator is every `.bpmn` any instance DECLARES; the numerator is
+ * The denominator is every `.bpmn` any layer DECLARES; the numerator is
  * `processFiles` — the list `workflow_list` prints and `workflow_start`
  * resolves against. `processFiles` keys by file STEM and keeps the first
  * claimant (`if (!seen.has(stem))`), so a dependency's diagram whose stem
@@ -122,7 +122,7 @@ import {
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
-/** The INSTANCE root — this file lives at `<instance>/scripts/`. */
+/** The LAYER root — this file lives at `<instance>/scripts/`. */
 const ROOT = join(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
 
@@ -185,9 +185,9 @@ const STEM = "audit-reachability";
 // ── the declared corpus ─────────────────────────────────────────
 
 /**
- * Every `.bpmn` and `.dmn` ANY instance declares, as absolute paths.
+ * Every `.bpmn` and `.dmn` ANY layer declares, as absolute paths.
  *
- * The union over `instanceRootsIn`, not one instance's corpus scope: scoped
+ * The union over `instanceRootsIn`, not one layer's corpus scope: scoped
  * from `cat-harness` alone the walk sees 79 of the 85 diagrams, and the six it
  * misses are `bootstrap`'s. A denominator that quietly omits a dependency's
  * artefacts reports a clean run over them — `dh4f`, in the tool whose subject
@@ -201,7 +201,7 @@ export function declaredDiagrams(repo: string): { bpmn: string[]; dmn: string[];
     try {
       files = workflowFiles(inst, corpusScopeFor(inst));
     } catch {
-      // An instance whose declaration will not resolve is reported by
+      // A layer whose declaration will not resolve is reported by
       // `check:declared-dirs`; here it contributes nothing and is named.
       continue;
     }
@@ -325,7 +325,7 @@ export async function processReach(
   // Only a file `workflow_start` could resolve by stem competes for one. A
   // layer's shared global-tasks file holds no process, `processFiles` never
   // lists it, and its tasks are found by element id within the calling
-  // diagram's own instance (owner, 2026-10-20, "c1") — so two layers each
+  // diagram's own layer (owner, 2026-10-20, "c1") — so two layers each
   // holding `processes/global-tasks.bpmn` is not a clash, and counting it as
   // one was a false `process-ambiguous` that failed `--check`.
   const shared = new Set(
@@ -367,7 +367,7 @@ export async function processReach(
       for (const n of model.nodes.values()) {
         if (!n.decisionRef) continue;
         // Keyed by the table's resolved PATH, the way `loadDecisions` finds
-        // it (relative to the diagram), never its basename: two instances may
+        // it (relative to the diagram), never its basename: two layers may
         // each hold a `decisions/<name>.dmn`, and a basename key gave each
         // table the other's referrers.
         const [ref, id] = n.decisionRef.split("#");

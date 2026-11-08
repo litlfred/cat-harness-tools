@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * The KG subscriptions page: the known substrates, and what each instance has
+ * The KG subscriptions page: the known substrates, and what each layer has
  * subscribed to and chosen to hold. The design is
  * `docs/proposals/kg-subscriptions.md` §"Known substrates" and §"The visualizer".
  *
@@ -13,7 +13,7 @@
  *
  * Four sources, merged by `name`, the later overriding the earlier:
  *
- * 1. every instance in the checkout that declares a planned `repository` other
+ * 1. every layer in the checkout that declares a planned `repository` other
  *    than the one it lives in today, which is `planned`;
  * 2. every `associatedHarnesses` entry, which is `exists` (it has a site);
  * 3. every `subscriptions` entry, which is `exists` (it is pinned to a commit
@@ -21,7 +21,7 @@
  *    also be an associated harness;
  * 4. every `knownSubstrates` hand row, for what no declaration can say.
  *
- * So a staged instance appears the moment it declares its planned home, and
+ * So a staged layer appears the moment it declares its planned home, and
  * nobody keeps a second list of it.
  *
  * ## Nothing here needs the network
@@ -129,7 +129,7 @@ export function knownSubstrates(repoRoot: string): SubstrateRow[] {
 }
 
 export interface SubscriptionCard {
-  /** The subscribing instance. */
+  /** The subscribing layer. */
   subscriber: string;
   subscription: Subscription;
   /** The materialisation records under the subscription's directory, read structurally. */
@@ -296,9 +296,9 @@ if (import.meta.main) {
   const text = render(substrates, cards);
   const rel = relative(REPO, OUT);
   // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The page reads
-  // every instance declaration in the checkout (planned repositories,
+  // every layer declaration in the checkout (planned repositories,
   // associated harnesses, subscriptions), so it moved with the index's pins.
-  // The instance declares it `builtAtPublish` with this script as its writer,
+  // The layer declares it `builtAtPublish` with this script as its writer,
   // and `derive:publish` runs it; under `--check` a declared page has no
   // committed bytes to compare, so it is skipped there (the `folio:viz` rule).
   const builtHere = isBuiltAtPublish(readDeclaration(INSTANCE)?.builtAtPublish ?? [], relative(INSTANCE, OUT).split("\\").join("/"));

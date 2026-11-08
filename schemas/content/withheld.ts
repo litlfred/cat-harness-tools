@@ -4,11 +4,11 @@
  * @module schemas/withheld
  * @graphNode schema
  *
- * The site mount (`scripts/mount-instance-docs.ts`) copies an instance's
+ * The site mount (`scripts/mount-instance-docs.ts`) copies a layer's
  * directory wholesale, so a publication whose licence refuses redistribution
- * would stay reachable BY URL. The platform cannot know an instance's licence
- * rules; the instance's own generator writes this list from its own data, and
- * the mount honours it for every instance alike.
+ * would stay reachable BY URL. The platform cannot know a layer's licence
+ * rules; the layer's own generator writes this list from its own data, and
+ * the mount honours it for every layer alike.
  *
  * Each entry names a path relative to the directory the file sits in — a
  * trailing `/` for a directory, which is withheld with its whole subtree — and

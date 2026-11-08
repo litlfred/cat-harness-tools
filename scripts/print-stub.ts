@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Print this instance's artefact stub, for a workflow to capture.
+ * Print this layer's artefact stub, for a workflow to capture.
  *
  * @module scripts/print-stub
  *

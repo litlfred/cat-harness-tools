@@ -64,7 +64,7 @@ interface Spec {
   sha?: string;
 }
 
-/** A root with two instances: `c` (the caller) needs `b`. Each declares three gates, which pass (the root's `cat` script is `true`). */
+/** A root with two layers: `c` (the caller) needs `b`. Each declares three gates, which pass (the root's `cat` script is `true`). */
 function fixture(records?: object): string {
   const root = mkdtempSync(join(tmpdir(), "cone-root-"));
   writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", scripts: { cat: "true" } }));

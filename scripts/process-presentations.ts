@@ -52,8 +52,8 @@ export interface Presentation {
 }
 
 /**
- * The docs sources ONE instance holds, as `gen-docs-pages.ts` reads them: the
- * base instance's own (`docsSourceDirFor`), or the ones an instance above it
+ * The docs sources ONE layer holds, as `gen-docs-pages.ts` reads them: the
+ * base layer's own (`docsSourceDirFor`), or the ones a layer above it
  * declares (`lib/docs-sources.ts`).
  */
 function sourcesOf(instanceRoot: string): DocsSource[] {
@@ -79,8 +79,8 @@ export function docsManifests(instanceRoot: string): string[] {
 }
 
 /**
- * Where a page of `src` is published, site-relative. The base instance's
- * pages are the site's own; an instance above it is COMPOSED into the site
+ * Where a page of `src` is published, site-relative. The base layer's
+ * pages are the site's own; a layer above it is COMPOSED into the site
  * under its own name (`compose-docs.ts`), so its pages sit under that.
  */
 function publishedHref(src: DocsSource, slug: string): string {
@@ -115,7 +115,7 @@ async function presentationsIn(src: DocsSource, out: Map<string, Presentation[]>
 
 /**
  * Every BPMN presentation, keyed by the diagram's source path as the page
- * spells it (`processes/x.bpmn`) — relative to the page's OWN instance — in
+ * spells it (`processes/x.bpmn`) — relative to the page's OWN layer — in
  * page then section order.
  */
 export async function processPresentations(instanceRoot: string): Promise<Map<string, Presentation[]>> {
@@ -125,9 +125,9 @@ export async function processPresentations(instanceRoot: string): Promise<Map<st
 }
 
 /**
- * Every presentation in the checkout — the base instance's pages and every
+ * Every presentation in the checkout — the base layer's pages and every
  * docs source above it — keyed relative to `baseRoot`, so a reader rooted
- * there (`render-bpmn.ts`) finds a diagram whichever instance's page shows it.
+ * there (`render-bpmn.ts`) finds a diagram whichever layer's page shows it.
  */
 export async function checkoutProcessPresentations(baseRoot: string = HARNESS_ROOT): Promise<Map<string, Presentation[]>> {
   const out = new Map<string, Presentation[]>();

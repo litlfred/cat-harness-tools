@@ -6,8 +6,8 @@
  * - `scripts/partition/engine.ts` (`check:partition`) asks it of every import
  *   between modules, where the layers are the repos a module is assigned to.
  * - `skills/kg/graph-management/kg-detangle.ts` asks it of every outbound edge of a
- *   candidate group, where the layers are the instances a node lives in and
- *   the allowed relation is each instance's declared `needs`.
+ *   candidate group, where the layers are the layers a node lives in and
+ *   the allowed relation is each layer's declared `needs`.
  *
  * ## What it decides, and what it refuses to
  *
@@ -21,7 +21,7 @@
  *
  * ## Four verdicts, not a boolean
  *
- * `allowed`, `permitted`, `wrong-direction` and `undetermined`. An instance
+ * `allowed`, `permitted`, `wrong-direction` and `undetermined`. A layer
  * with no `needs` has not declared its layer, so its edges are UNDETERMINED,
  * never "may reach nothing" and never "may reach anything" (`cat-harness.ts`,
  * `needs`).

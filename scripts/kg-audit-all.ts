@@ -1,10 +1,10 @@
 /**
- * kg-audit-all.ts — run the knowledge-graph audit for EVERY declared instance,
+ * kg-audit-all.ts — run the knowledge-graph audit for EVERY declared layer,
  * the one at the repository root included, so `audit:coverage` can tell
  * "audited and clean" from "never audited".
  *
  * `kg-audit.ts` resolves its root once at module scope, so this spawns one
- * process per instance rather than adding a `--all` flag. A crash in any one
+ * process per layer rather than adding a `--all` flag. A crash in any one
  * is reported as "produced no report", never dropped.
  *
  * @covers processes, scenarios, skills, tools, cat-harness — the same kinds
@@ -29,7 +29,7 @@ const args = process.argv.slice(2);
 const check = args.includes("--check");
 const strict = args.includes("--strict");
 /**
- * Judge mode (bean `oqe3`): each instance's `kg-audit.ts --check` computes
+ * Judge mode (bean `oqe3`): each layer's `kg-audit.ts --check` computes
  * and judges against `--against <ref>`, passed through unchanged, and exits
  * on the four-state table (0 ok · 1 finding · 2 unknown or error). An unknown
  * flag is refused here before fifteen processes are spawned to ignore it.
@@ -43,7 +43,7 @@ if (check) {
   against = a.against;
 }
 
-/** One instance's outcome. `crashed` is NOT a kind of failure — it is worse. */
+/** One layer's outcome. `crashed` is NOT a kind of failure — it is worse. */
 interface Outcome {
   id: string;
   code: number;
@@ -60,21 +60,21 @@ const roots = instanceRootsIn(REPO).filter((r) => resolve(r) === resolve(REPO) |
 /**
  * Side by side under `--check`, one at a time otherwise.
  *
- * Each instance is its own process, so the only question is whether two runs
+ * Each layer is its own process, so the only question is whether two runs
  * can disturb each other — and that has a different answer per mode. Under
  * `--check` an audit writes NOTHING, so the runs share only the cores; this is
  * the mode CI runs, and serially it was 39 s of the Repository gates job
  * (measured 2026-10-03, bean `fmdl`). Writing runs are left serial: a run may
- * read a sidecar another instance's run is writing, and nothing here has
+ * read a sidecar another layer's run is writing, and nothing here has
  * established that it does not.
  *
- * Outcomes are reported in instance order either way, so the output is the
+ * Outcomes are reported in layer order either way, so the output is the
  * same text whichever mode ran.
  */
 const width = check ? Math.max(1, availableParallelism()) : 1;
 
 async function auditOne(root: string): Promise<Outcome> {
-  // The root instance's relative path is "", which would print as nothing and
+  // The root layer's relative path is "", which would print as nothing and
   // pass `./` — so it is named `.` in both places.
   const id = relative(REPO, root) || ".";
   const argv = ["bun", "run", "cat-harness-tools/scripts/kg-audit.ts", "--instance", id === "." ? "." : `./${id}`];
@@ -82,7 +82,7 @@ async function auditOne(root: string): Promise<Outcome> {
   if (strict) argv.push("--strict");
   if (against !== undefined) argv.push("--against", against);
 
-  // input-site: runs cat-harness/scripts/kg-audit.ts #6dfa6586 — one kg-audit per instance, inheriting this environment
+  // input-site: runs cat-harness/scripts/kg-audit.ts #6dfa6586 — one kg-audit per layer, inheriting this environment
   const p = Bun.spawn(argv, { cwd: REPO, stdout: "pipe", stderr: "pipe" });
   const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
   const code = await p.exited;
@@ -91,7 +91,7 @@ async function auditOne(root: string): Promise<Outcome> {
   // would be free to disagree with the sidecars it is reporting on.
   const summary = /^ {2}pass .*$/m.exec(out)?.[0]?.trim();
   const header = /Knowledge-graph audit\s+\([^)]*\)/.exec(out)?.[0];
-  // The instance's own judge verdict, quoted (bean `oqe3`): "OK on what was
+  // The layer's own judge verdict, quoted (bean `oqe3`): "OK on what was
   // determined — N part(s) UNKNOWN" must reach the sweep's reader, or a run
   // with no baseline reads as a plain pass one level up.
   const judged = check ? /\(judge mode, wrote nothing\): (.*)$/m.exec(`${out}\n${err}`)?.[1]?.trim() : undefined;
@@ -131,9 +131,9 @@ if (crashed.length > 0) {
   );
 }
 
-// Judge mode keeps the four states: an instance that could not be judged (a
+// Judge mode keeps the four states: a layer that could not be judged (a
 // crash, or its own exit 2) is UNKNOWN for the sweep, and outranks a finding —
-// a sweep blind on one instance has not cleared the others. The writer form
+// a sweep blind on one layer has not cleared the others. The writer form
 // keeps its historical 1.
 if (check) {
   // Any exit but 0 and 1 is BLIND, not only 2. An audit killed after printing

@@ -151,8 +151,8 @@ describe("the object view", () => {
     roleHref: (r) => `../../../cat-harness/auto-docs/index/roles/index.html#a-${r}`,
     roleTitle: (r) => (r === "lead" ? "Lead reviewer" : undefined),
     usesMethodology: (s) => (s === "review" ? ["raci", "unknown-method"] : undefined),
-    // Only `procs/` publishes subject pages here; `boot/` stands for an
-    // instance whose graph still mints fragments (bootstrap, until #603's phase 2).
+    // Only `procs/` publishes subject pages here; `boot/` stands for a
+    // layer whose graph still mints fragments (bootstrap, until #603's phase 2).
     subjectHref: (file, kind, id) => (file.startsWith("procs/") ? `https://e.org/i/${kind}/${id}` : undefined),
   };
   const called = { id: "Q", file: "procs/q.bpmn", stem: "q", name: "Q", steps: [], laneDetails: [] } as unknown as ProcessRow;

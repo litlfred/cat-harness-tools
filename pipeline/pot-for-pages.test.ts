@@ -8,10 +8,10 @@
  * 1. Is the page set DERIVED from the gate's own findings? A hardcoded list is
  *    a second answer to "which page needs a catalogue", free to drift the
  *    moment one is finished.
- * 2. Is the English source resolved against the instance ROOT? `siteDirFor`
+ * 2. Is the English source resolved against the layer ROOT? `siteDirFor`
  *    returns a RELATIVE path, so a missing join resolves against the process's
- *    CWD — which answers correctly only while the CWD happens to be an
- *    instance holding a `docs/`. That shipped.
+ *    CWD — which answers correctly only while the CWD happens to be a
+ *    layer holding a `docs/`. That shipped.
  * 3. Does the module keep owning a template after its page LEAVES the trigger
  *    set? 20 templates went stale behind a `--check` whose scope had shrunk
  *    away from its own output, and reported clean. That shipped too.

@@ -43,7 +43,7 @@ export const STATE_ON_MAIN_GENERATED = "scripts/check-state-on-main.ts --update 
 
 /** A declared directory that holds state, and where its content lives. */
 export interface StateDirectory {
-  /** Repo-relative instance root; `""` for the repository root itself. */
+  /** Repo-relative layer root; `""` for the repository root itself. */
   instance: string;
   id: string;
   /** Repo-relative path of the directory as declared. */
@@ -57,12 +57,12 @@ export interface StateDirectory {
 }
 
 /**
- * The key a baseline line carries: instance and id, NOT the path.
+ * The key a baseline line carries: layer and id, NOT the path.
  *
  * The path is reported but not keyed on, deliberately. A cutover changes
  * `source` and leaves `path` alone (it becomes where the mount lands), so
  * keying on the path would make a line stop matching for the one change it is
- * meant to track. Keying on `id` within its instance is stable across
+ * meant to track. Keying on `id` within its layer is stable across
  * everything except a rename, and a rename of a declared directory is a
  * reviewed act in its own right.
  */
@@ -78,7 +78,7 @@ function holdsState(kind: string): boolean {
 /**
  * Every declared directory in the checkout that holds state.
  *
- * Both levels: an instance's own `directories`, and the entries declared FROM
+ * Both levels: a layer's own `directories`, and the entries declared FROM
  * WITHIN one of them (`beans/beans.json`, `todos/todos.json`). The second
  * level is where most of them are, and a one-level read would have reported
  * `beans` as the only bean-shaped finding while missing `defs`, `notes`,
@@ -97,11 +97,11 @@ export function stateDirectories(repoRoot: string): StateDirectory[] {
     // worse than no message, because the reader goes looking for it.
     const declFile = `${instRel ? `${instRel}/` : ""}${findDeclarationFile(inst) ?? "<declaration>"}`;
     // A `repository`-scoped entry describes a directory of the CHECKOUT, not
-    // of the instance declaring it: in the index checkout cat-harness declares
+    // of the layer declaring it: in the index checkout cat-harness declares
     // the root's `beans/`, `todos/`, `uploads/` (decision (b), the root itself
     // declaring nothing). It is keyed and located at the root (`.`), where the
     // baseline has always named those directories; joining it under the
-    // instance reported `cat-harness/beans/defs`, which does not exist.
+    // layer reported `cat-harness/beans/defs`, which does not exist.
     const own = (decl.directories ?? []).map((d) => ({
       id: d.id,
       path: d.path,
@@ -121,7 +121,7 @@ export function stateDirectories(repoRoot: string): StateDirectory[] {
       storage: d.storage,
       atRoot: byId.get(d.parentId)?.atRoot ?? false,
       // The from-within file, named by the PARENT entry it hangs off, so a
-      // message says which file to edit rather than which instance to search.
+      // message says which file to edit rather than which layer to search.
       declaredIn: `${instRel ? `${instRel}/` : ""}${d.parentId}/${d.parentId}.json`,
       parent: d.parentId,
     }));

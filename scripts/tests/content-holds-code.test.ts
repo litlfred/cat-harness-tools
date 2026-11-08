@@ -4,7 +4,7 @@
  * planted violation has not been shown to guard anything). Bean `eayu`.
  *
  * The tests of this file that read the whole checkout (judges the content
- * instances of this checkout, who-iris among them) live in
+ * layers of this checkout, who-iris among them) live in
  * `test/content-holds-code-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

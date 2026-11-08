@@ -30,7 +30,7 @@
  *   bun run cat kg:audit --strict   ...and on `major` too
  *   bun run cat kg:audit --json     the full report set, for a tool
  *   bun run cat kg:audit --instance ./bootstrap
- *                               audit ANOTHER declared instance from its own
+ *                               audit ANOTHER declared layer from its own
  *                               root, writing its sidecars under its own
  *                               results directory
  *
@@ -172,7 +172,7 @@ const ENGINE_VERSION = "1";
  *
  * Only a reader needs a persona, a voice and use cases. Two kinds do not: a
  * `system` is a pipeline or a store that consumes files, not pages; an
- * `external` participant is outside this instance entirely. A role only they
+ * `external` participant is outside this layer entirely. A role only they
  * play is mechanical (`isMechanicalRole`), and its skills are a contract to be
  * tested, not prose to be read — `mechanical-role-untested` asks what does
  * apply. (An `actedUpon` flag made the same exemption by hand until it was
@@ -210,7 +210,7 @@ function instanceArg(args: readonly string[]): string | undefined {
 }
 
 /**
- * The AUDITOR's own instance. Never the instance under audit.
+ * The AUDITOR's own layer. Never the layer under audit.
  *
  * Split from {@link root} on 2026-09-26 (bean `bjzs`) because one constant was
  * answering two questions, and exactly one line needed the difference: the
@@ -222,14 +222,14 @@ function instanceArg(args: readonly string[]): string | undefined {
 const AUDITOR_ROOT = resolve(HARNESS_ROOT);
 
 /**
- * The instance under audit — `--instance ROOT`, defaulting to the auditor's own.
+ * The layer under audit — `--instance ROOT`, defaulting to the auditor's own.
  *
  * ## Why one assignment rather than a thread through 78 call sites
  *
  * Everything this script reads derives from here: the nine `*_DIR` constants
  * below, `knownSkills(root)`, and `sidecarPath`'s
  * `dirname(join(root, subject.path))`. So pointing this one constant at another
- * declared instance moves the whole audit, its subject discovery AND its output,
+ * declared layer moves the whole audit, its subject discovery AND its output,
  * with no change at any other site. Bean `bjzs` estimated this as *"`root` × 76
  * across 2344 lines plus 9 derived `*_DIR` constants"* and banked it as
  * expensive; measured, the cost is this assignment plus the auditor-hash split
@@ -241,16 +241,16 @@ const AUDITOR_ROOT = resolve(HARNESS_ROOT);
  * handles an escaping subject explicitly — `escaped = rel.startsWith("..")`. So
  * bean `chq5`'s concern, that a `../` subject escapes the results tree, is
  * answered inside that helper rather than needing an answer here, and each
- * instance's findings land under its own results directory: an instance's audit
- * is an artefact OF that instance, the same way its glossary is.
+ * layer's findings land under its own results directory: a layer's audit
+ * is an artefact OF that layer, the same way its glossary is.
  *
  * ## What this deliberately does NOT do
  *
- * It does not declare a nested instance's directories at the root. That is the
+ * It does not declare a nested layer's directories at the root. That is the
  * wrong fix established twice (`pve3`, `sa8y`) and guarded by
  * `instance-graph-isolation.test.ts` after a live 2026-09-19 leak in which
  * `findBpmnDirs` walked the filesystem and one export carried 88 references to
- * another instance's process. Per-instance means a separate RUN, not a wider
+ * another layer's process. Per-instance means a separate RUN, not a wider
  * walk.
  *
  * Parsed here rather than beside `--check` at the bottom because the nine
@@ -259,15 +259,15 @@ const AUDITOR_ROOT = resolve(HARNESS_ROOT);
 const root = resolve(instanceArg(process.argv.slice(2)) ?? AUDITOR_ROOT);
 
 /**
- * THIS instance's own directory with `id`, or the convention if it declares none.
+ * THIS layer's own directory with `id`, or the convention if it declares none.
  *
  * Not {@link instanceDirectoryForGraph}: that asks by KIND, and a path-less
- * subject belongs to the instance's OWN graph, which is a question only the id
+ * subject belongs to the layer's OWN graph, which is a question only the id
  * answers: *"a by-ID lookup through `resolveDirectories` is the answer when you
  * want a particular one."*
  *
  * THE CONCRETE WITNESS IS GONE, AND THAT IS WHY THIS PARAGRAPH IS REWRITTEN
- * RATHER THAN LEFT. Until 2026-09-22 this said the instance declares TWO
+ * RATHER THAN LEFT. Until 2026-09-22 this said the layer declares TWO
  * directories holding `processes` — its own and CRDM's
  * `methodologies/crdm/processes/` — so a by-kind lookup throws. CRDM's
  * diagrams moved into `processes/` that day (the owner's "dont bury sub-graph
@@ -285,8 +285,8 @@ const root = resolve(instanceArg(process.argv.slice(2)) ?? AUDITOR_ROOT);
 // `pipeline/translation-index.ts` became its second caller. The
 // reasoning for the BY-ID lookup travelled with it.
 
-// declared-path-literal: the convention fallback, at the call site — an
-// instance that declares no `processes` directory still needs a sidecar home
+// declared-path-literal: the convention fallback, at the call site — a
+// layer that declares no `processes` directory still needs a sidecar home
 // for a path-less subject, and the convention is where one would look.
 const WORKFLOW_DIR = ownDirectoryById(root, "processes", "processes");
 // declared-path-literal: the convention fallback, at the call site. Same
@@ -300,23 +300,23 @@ const FOLIO_DIR = ownDirectoryById(root, "folio", "folio");
 const DECISION_DIR = join(WORKFLOW_DIR, "decisions");
 const KG_ROOT = join(root, "skills");
 // The actor registry's declared home (bean rqao). kg-audit runs over ANY
-// instance, fixtures included, where the platform may declare no `scenarios`
+// layer, fixtures included, where the platform may declare no `scenarios`
 // graph: that is "no actor registry here", which `readActors` answers with an
 // empty list and the actor criteria then report on. It was the same before the
 // move, when the probed `.claude/skills/actors` simply did not exist.
 /**
- * The CHECKOUT the audited instance is staged in — where `package.json`,
+ * The CHECKOUT the audited layer is staged in — where `package.json`,
  * `.claude/`, the actor registry and the tracked-file list live, and what every
  * repo-relative path in a sidecar is relative to (bean `pgzn`).
  *
- * NOT `REPO_ROOT`, which is `dirname`. That is right for every instance
+ * NOT `REPO_ROOT`, which is `dirname`. That is right for every layer
  * nested one level under the repository and wrong for the one declared AT it:
  * for `--instance .` it climbed out of the checkout, so `rootScripts` threw
  * `ENOENT …/package.json` before anything was audited — and the other call
  * sites that asked the same question through `repoRootFor` would have read a
  * directory above the checkout without saying so. `checkoutRootFor` agrees
- * with `dirname` for every nested instance and is the root itself for the
- * root instance; `siblingScopeFor`'s docblock records the same trap.
+ * with `dirname` for every nested layer and is the root itself for the
+ * root layer; `siblingScopeFor`'s docblock records the same trap.
  */
 const REPO_ROOT = checkoutRootFor(root);
 const ACTOR_DIR = actorsDir(REPO_ROOT) ?? "";
@@ -355,7 +355,7 @@ function allUnknown(kind: KgSubjectKind, reason: string): Record<string, KgCrite
 }
 
 /**
- * Is this run scoped to an instance other than the one the auditor lives in?
+ * Is this run scoped to a layer other than the one the auditor lives in?
  *
  * The question a `repo`-scoped criterion cannot answer. Compared as resolved
  * paths rather than on the presence of `--instance`, so
@@ -365,9 +365,9 @@ function allUnknown(kind: KgSubjectKind, reason: string): Record<string, KgCrite
 const INSTANCE_RUN = root !== AUDITOR_ROOT;
 
 /**
- * Where this run's verdicts go: the instance's own `qa` directory, or — for an
- * instance that declares none, such as bootstrap — the auditor's, under the
- * instance's stub. `kgQaHomeFor` says why; everything below writes, reads and
+ * Where this run's verdicts go: the layer's own `qa` directory, or — for a
+ * layer that declares none, such as bootstrap — the auditor's, under the
+ * layer's stub. `kgQaHomeFor` says why; everything below writes, reads and
  * sweeps through these two paths and composes no other.
  */
 const QA_HOME = kgQaHomeFor(root, INSTANCE_RUN ? AUDITOR_ROOT : undefined);
@@ -467,7 +467,7 @@ function report(
 
 interface LoadedProcess {
   /** ABSOLUTE path. Was a bare basename joined to one WORKFLOW_DIR, which
-   *  stopped being a single directory once an instance can declare several. */
+   *  stopped being a single directory once a layer can declare several. */
   file: string;
   model?: ProcessModel;
   error?: string;
@@ -537,7 +537,7 @@ function loadRepoProcesses(repoRoot: string): Map<string, RepoProcess> {
  *
  * `undefined` when no docs layer is declared, which `process-diagram-published`
  * records as `unknown` — the third state. Treating "could not look" as "shown
- * nowhere" would fail every diagram in an instance that publishes elsewhere;
+ * nowhere" would fail every diagram in a layer that publishes elsewhere;
  * treating it as "shown" would be the clean run over nothing (`dh4f`).
  */
 interface DocsSurface {
@@ -691,7 +691,7 @@ async function auditProcess(
     }
     if (n.calledElement !== undefined) {
       if (processIds.has(n.calledElement)) {
-        // Resolves locally within this instance.
+        // Resolves locally within this layer.
       } else if (repoProcesses?.has(n.calledElement)) {
         const hosted = repoProcesses.get(n.calledElement)!;
         externalCall.push({
@@ -776,8 +776,8 @@ async function auditProcess(
   //
   // `laneBinding` below needs a `RoleGraph` and so cannot run without one —
   // but "does this ref name a declared role?" needs only the IDS, and those
-  // reach down the `needs` chain. Keeping the two apart is what lets an
-  // instance with no graph of its own still have its refs resolved, instead of
+  // reach down the `needs` chain. Keeping the two apart is what lets a
+  // layer with no graph of its own still have its refs resolved, instead of
   // every ref in it being reported as unresolvable (a DAK base layer, 2026-09-27).
   const roleRefs = m.lanes.flatMap((l) => (l.roleRef !== undefined && !l.performerVaries ? [l] : []));
   for (const lane of roleRefs) {
@@ -803,7 +803,7 @@ async function auditProcess(
     if (!graph) break;
     // One decision, in `laneBinding`, so the rule is testable without running
     // this script — which matters because the case it exists for
-    // (`log-message.bpmn`'s `Actor`) is in a NESTED instance this audit does
+    // (`log-message.bpmn`'s `Actor`) is in a NESTED layer this audit does
     // not read at all. A rule reachable only through a script that never sees
     // its own subject is a rule nothing checks.
     const b = laneBinding(graph, lane);
@@ -813,7 +813,7 @@ async function auditProcess(
         break;
       case "dangling":
         // Reported by the reference pass above, which consults the `needs`
-        // closure rather than only this instance's graph. Pushing here as well
+        // closure rather than only this layer's graph. Pushing here as well
         // would double-report every genuinely dangling ref, and would
         // contradict the pass above for one that resolves in a dependency.
         break;
@@ -1011,7 +1011,7 @@ async function auditProcess(
   // The WIDE id set, not `graph.roles`: every RACI value IS a role reference,
   // so it resolves exactly as a lane's `<role ref>` does — down the `needs`
   // chain. Passed even with no own graph, which is what lets `raci-role-resolves`
-  // be answered for an instance whose roles all live in a dependency.
+  // be answered for a layer whose roles all live in a dependency.
   const raciAll = raciBreaches(raciRows, resolvableRoleIds);
   const raciOf = (k: RaciBreachKind): KgFinding[] =>
     raciAll.filter((b) => b.kind === k).map((b) => ({ where: b.activity, detail: b.detail }));
@@ -1037,7 +1037,7 @@ async function auditProcess(
     // from `pass`, because a process with nothing to resolve has not been
     // shown to resolve anything.
     "convention-ref-resolves": entry(danglingConvention, conventionRefs > 0),
-    // `unknown` outranks both: an instance whose layering is undeclared has
+    // `unknown` outranks both: a layer whose layering is undeclared has
     // not been SHOWN to resolve its refs, and reporting that as a pass is the
     // `dh4f` defect — a clean verdict over a question nobody asked.
     "skill-ref-resolves": unjudgeableSkill.length
@@ -1076,9 +1076,9 @@ async function auditProcess(
     "activity-names-skill": entry(noSkill),
     "activity-fulfilment-kind": entry(wrongKind, Boolean(graph) && kindApplicable > 0),
     // Three states: `n/a` when the diagram has no call activities; `fail` when
-    // a target resolves neither locally nor in any instance across the
+    // a target resolves neither locally nor in any layer across the
     // repository; `pass` when every target resolves (naming the hosting
-    // instance as evidence when external). `unknown` is kept only when the
+    // layer as evidence when external). `unknown` is kept only when the
     // diagram itself could not be loaded.
     "call-activity-resolves":
       calls.length === 0
@@ -1103,7 +1103,7 @@ async function auditProcess(
     // `task-skill-outside-lane-role` from 2026-10-16, which needs the same
     // role objects `role-carries-activity-skill` does). `role-ref-resolves`
     // and `raci-role-resolves` were removed because they no longer need a graph
-    // of this instance's own: both ask whether a named role EXISTS, and
+    // of this layer's own: both ask whether a named role EXISTS, and
     // `resolvableRoleIds` answers that down the `needs` chain. Leaving them here
     // overwrote a correct verdict with `unknown` — measured on a DAK base layer
     // and the content core, whose every role reference resolves in
@@ -1111,7 +1111,7 @@ async function auditProcess(
     //
     // The six that remain need role OBJECTS: which skills a role carries, what
     // kind of performer it is, how many accountables a row names. A set of ids
-    // cannot answer those, and this instance does not hold the definitions.
+    // cannot answer those, and this layer does not hold the definitions.
     for (const id of [
       "lane-binds-role",
       "role-carries-activity-skill",
@@ -1411,17 +1411,17 @@ function auditSkills(): KgQaReport[] {
  * finding names where the answer lives rather than pretending to be it.
  */
 /**
- * The Tool nodes of the instance under audit — the repository's at the root.
+ * The Tool nodes of the layer under audit — the repository's at the root.
  *
  * **The third cross-instance leak, and the last of the three.** The other two
- * were a `scope` declaration (repo actors judged against one instance's roles:
+ * were a `scope` declaration (repo actors judged against one layer's roles:
  * 73 false criticals) and a one-line guard in `readSatisfiers` (repo
- * capabilities against one instance's requirements: 3 more). This one was
+ * capabilities against one layer's requirements: 3 more). This one was
  * neither, because the criteria are RIGHT: the six `tool-*` criteria are
  * correctly `instance`-scoped, and what was wrong is the set they read.
  * `checkTools()` took no root at all, so `--instance ./bootstrap` audited
  * cat-harness's 119 Tools as bootstrap's. Fixing it by reclassifying the
- * criteria would have thrown away the legitimate instance half — the same
+ * criteria would have thrown away the legitimate layer half — the same
  * mistake avoided in `readSatisfiers`, and the reason both fixes are in the
  * DATA rather than in the classification.
  */
@@ -1447,7 +1447,7 @@ function auditTools(instance?: string): KgQaReport[] {
   const alternatives = deriveAlternatives(instance === undefined ? tools() : toolsOf(instance));
   const unreadable = new Set(check.unreadableContracts);
 
-  // SUBJECTS are this instance's own Tools, on every run. The CHECKS above
+  // SUBJECTS are this layer's own Tools, on every run. The CHECKS above
   // still read the whole checkout on the default run, because a Tool here may
   // name one there — resolution widens, coverage does not (`satisfiableSkills`
   // in `check-tools.ts`, ruling `pve3`). Until 2026-10-01 the default run
@@ -1555,12 +1555,12 @@ function auditRoles(
       if (lane.roleRef) explicitRefs.add(lane.roleRef);
     }
   }
-  // A role may inherit one that an instance it `needs` declares — `readRoleGraph`
+  // A role may inherit one that a layer it `needs` declares — `readRoleGraph`
   // accepts that parent through `needs` — so a parent resolves against the same
-  // closure a lane's role ref does, not against this instance's own roles alone.
+  // closure a lane's role ref does, not against this layer's own roles alone.
   const declared = new Set([...graph.roles.map((r) => r.id), ...resolvableRoleIds]);
-  // `tested-by:` on every skill a role may carry — this instance's and every
-  // instance it `needs`, the reach `resolvableSkills` has — for
+  // `tested-by:` on every skill a role may carry — this layer's and every
+  // layer it `needs`, the reach `resolvableSkills` has — for
   // `mechanical-role-untested`.
   const skillEdges = skillEdgeIndex([root, ...orderedDependencies(root).map((d) => d.rootPath)]);
   const anyActorDeclaresRoles = actors.some((a) => (a.roles ?? []).length > 0);
@@ -1601,8 +1601,8 @@ function auditRoles(
               : [{ where: r.id, detail: `role "${r.id}" has no persona — an author has nobody to write for.` }],
           ),
       // No `role-declares-voice`: a voice points at the role it addresses
-      // (`activeIn.roles`), and the voices graph is a DEPENDENT instance's, so
-      // this instance cannot see it — `check:voices` reports which roles no
+      // (`activeIn.roles`), and the voices graph is a DEPENDENT layer's, so
+      // this layer cannot see it — `check:voices` reports which roles no
       // voice addresses, from the side that can (#1168, B2).
       "role-has-story": !readsProse(r)
         ? entry([], false)
@@ -1773,7 +1773,7 @@ function brokenSkillContracts(): KgFinding[] {
  */
 function unclaimedSkillContracts(): KgFinding[] {
   // EVERY declared `schemas` directory, not one. Asking for one threw outright on
-  // an instance that declares two — `kg:audit --instance ./large-datasets` never
+  // a layer that declares two — `kg:audit --instance ./large-datasets` never
   // audited at all, it crashed inside `instanceDirectoryForGraph`. Declaring a
   // kind twice is legal and `cat-harness.json` does it, so the singular accessor
   // was simply the wrong question here; its refusal to guess is correct and is
@@ -1785,7 +1785,7 @@ function unclaimedSkillContracts(): KgFinding[] {
     .map((d) => join(d, "skills"))
     .filter((d) => existsSync(d));
   if (dirs.length === 0) return [];
-  // Keyed by ABSOLUTE path: a ref is relative to the instance holding its
+  // Keyed by ABSOLUTE path: a ref is relative to the layer holding its
   // skill, which from the checkout is not always `root` (placement PR1).
   const claimed = new Set<string>();
   for (const c of skillContracts(root).values()) {
@@ -1843,9 +1843,9 @@ function proseNamesResolve(): KgCriterionEntry {
     return { result: "unknown", findings: [{ where: "—", detail: "`git ls-files` failed, so a bare file name cannot be looked up." }] };
   }
   const basenames = new Set(new TextDecoder().decode(ls.stdout).split("\n").map((f) => f.split("/").pop()!));
-  // Every instance's root, not only this one: `materialize-remote.bpmn`
+  // Every layer's root, not only this one: `materialize-remote.bpmn`
   // names `schemas/materialization.ts`, which is the content core's, and
-  // prose spells a sibling instance's path from that instance's root.
+  // prose spells a sibling layer's path from that layer's root.
   const roots = [
     repo,
     root,
@@ -1911,7 +1911,7 @@ function testRunCriteria(skills: Set<string>): Record<string, KgCriterionEntry> 
     // input-site: env QA_WORKING_COPY_BUILDING #a73dcccf — BUILDING_ENV: whether an empty branch-stored results copy is determined
     determined: process.env[BUILDING_ENV] === "1" || qaStorageOf(resultsDir) === undefined,
   });
-  // Only a DECLARED `qa` directory that is absent is unknown. An instance that
+  // Only a DECLARED `qa` directory that is absent is unknown. A layer that
   // declares none (bootstrap, …) has no results to read, and its
   // missing conventional directory is a determined "no runs": `n/a`.
   const qaDeclared = resolveDirectories([{ name: "(local)", root, own: true }]).some(
@@ -1919,7 +1919,7 @@ function testRunCriteria(skills: Set<string>): Record<string, KgCriterionEntry> 
   );
   if (!r.looked && qaDeclared) {
     // Neither the checkout nor a readable store holds the runs. A repository
-    // that mounts this instance cannot read its store (it lives on another
+    // that mounts this layer cannot read its store (it lives on another
     // repository), so compute them: each run's writer is declared, and one
     // marked `testRunOutEnv` writes only into a temporary directory, so
     // judge mode still writes nothing (cat-harness-tools#1191).
@@ -2010,14 +2010,14 @@ function readSatisfiers(): Satisfier[] {
   // passes with 0 findings at the root.
   //
   // Reading them in an instance run compares a repository-level satisfier set
-  // against ONE instance's requirement set, which is the same cross-level shape
+  // against ONE layer's requirement set, which is the same cross-level shape
   // as `actor-roles-resolve`. MEASURED 2026-09-26 on `--instance ./bootstrap`:
   // three criticals, every one citing `../.claude/skills/capabilities/*.json` —
-  // a `where` that escapes the instance being audited, which is the tell.
+  // a `where` that escapes the layer being audited, which is the tell.
   //
-  // Skipped rather than suppressing the criterion, because the instance half is
-  // a real question: a front-matter `satisfies` inside this instance still
-  // resolves against this instance's requirements. Suppressing
+  // Skipped rather than suppressing the criterion, because the layer half is
+  // a real question: a front-matter `satisfies` inside this layer still
+  // resolves against this layer's requirements. Suppressing
   // `satisfies-resolves` outright would have thrown that away to fix the repo
   // half.
   if (!INSTANCE_RUN && existsSync(CAPABILITY_DIR)) {
@@ -2032,15 +2032,15 @@ function readSatisfiers(): Satisfier[] {
 }
 
 /**
- * The requirement ids a `derivedFrom` in this instance may name: its own, plus
- * those of every instance it declares `needs` on, transitively (bean `w1gy`,
+ * The requirement ids a `derivedFrom` in this layer may name: its own, plus
+ * those of every layer it declares `needs` on, transitively (bean `w1gy`,
  * owner option A, 2026-10-30).
  *
  * The same widening {@link resolvableSkills} and `resolvableRoleIds` make, and
  * that actors get through `neededActors`: a requirement may specialise one a
  * lower layer declares — fhir-harness's `req:fhir-validation` derives from
  * cat-harness's `req:content-lifecycle` — and that is not a dangling ref.
- * Subjecthood does not widen: only this instance's own requirements are
+ * Subjecthood does not widen: only this layer's own requirements are
  * audited, so a dependency's are read for their ids alone.
  */
 function resolvableRequirementIds(own: LoadedRequirement[]): Set<string> {
@@ -2048,10 +2048,10 @@ function resolvableRequirementIds(own: LoadedRequirement[]): Set<string> {
   for (const dep of orderedDependencies(root)) {
     try {
       // declared-path-literal: the convention fallback, at the call site, as
-      // `REQUIREMENT_DIR` is the own instance's `skills/requirements`.
+      // `REQUIREMENT_DIR` is the own layer's `skills/requirements`.
       for (const r of readRequirements(join(ownDirectoryById(dep.rootPath, "skills", "skills"), "requirements"))) out.add(r.id);
     } catch {
-      // A dependency's unreadable requirement is that instance's own audit's
+      // A dependency's unreadable requirement is that layer's own audit's
       // finding; one broken dependency must not block every dependent.
     }
   }
@@ -2122,7 +2122,7 @@ function danglingSatisfies(reqs: LoadedRequirement[], satisfiers: Satisfier[]): 
 // ── Graph roll-up ───────────────────────────────────────────────
 
 /**
- * Every package manifest this instance declares, with the package it names.
+ * Every package manifest this layer declares, with the package it names.
  *
  * ## Two defects this replaces, and both were the same shape
  *
@@ -2218,14 +2218,14 @@ function manifestEntries(): { pkg: string; skill: string }[] {
 }
 
 /**
- * Nested instances in this tree whose graph this audit does not read.
+ * Nested layers in this tree whose graph this audit does not read.
  *
  * ## Why this is reported rather than fixed
  *
  * Reading them would be the defect. `instance-graph-isolation.test.ts` guards a
  * leak that was LIVE on 2026-09-19: a filesystem walk discovered
  * `bootstrap/processes/` from the repository root and put 88 references to a
- * bootstrap process into folio-assistant's published graph. One instance's graph
+ * bootstrap process into folio-assistant's published graph. One layer's graph
  * must not carry another's nodes, and this audit is right not to.
  *
  * What was wrong is that nothing said so. The silence was read as a blind spot on
@@ -2233,9 +2233,9 @@ function manifestEntries(): { pkg: string; skill: string }[] {
  * re-introduced that leak until the test stopped it. So the unread corpus is
  * counted here: a reported number is not deducible-and-mis-deducible.
  *
- * A declaration counts as an instance when it names `directories`. That excludes
+ * A declaration counts as a layer when it names `directories`. That excludes
  * `docs/_data/harness.json`, which `sync-docs-harness` writes with the
- * reader-facing fields only — a Jekyll data file, not an instance.
+ * reader-facing fields only — a Jekyll data file, not a layer.
  */
 function unreadNestedInstances(): KgFinding[] {
   const repo = REPO_ROOT;
@@ -2256,7 +2256,7 @@ function unreadNestedInstances(): KgFinding[] {
         continue;
       }
       if (!e.name.endsWith(DECLARATION_SUFFIX)) continue;
-      // Not this audit's own instance, whichever directory that is.
+      // Not this audit's own layer, whichever directory that is.
       if (resolve(dir) === resolve(root)) continue;
       let decl: { directories?: unknown[]; name?: string };
       try {
@@ -2301,7 +2301,7 @@ function contentInstanceHoldsCode(): KgCriterionEntry {
  * audit does not read, so the absolute wording looked like a blind spot. The
  * session "fixed" it by declaring that directory at the root and re-introduced a
  * defect `instance-graph-isolation.test.ts` had been written the day before to
- * prevent — one instance's graph carrying another's nodes, which had put 88
+ * prevent — one layer's graph carrying another's nodes, which had put 88
  * references to a bootstrap process into folio-assistant's published graph.
  *
  * The isolation is correct and the scoping is correct. **Only the sentence was
@@ -2320,7 +2320,7 @@ function graphScope(): string {
   return dirs.length > 0 ? dirs.join(", ") : "no knowledge-graph directory declared";
 }
 
-/** Appended to any finding whose range is this instance's graph and not the tree. */
+/** Appended to any finding whose range is this layer's graph and not the tree. */
 function scopedToThisGraph(): string {
   return (
     ` In this instance's graph only (read: ${graphScope()}) —` +
@@ -2425,11 +2425,11 @@ function auditGraph(
   );
 
   // Over the SAME layers the actors were read from (see `actors` below): an
-  // actor a higher instance declares may claim a capability declared beside it.
+  // actor a higher layer declares may claim a capability declared beside it.
   const capabilities = declaredCapabilityIds(root, CAPABILITY_DIR, ACTOR_SCOPE);
   const badCaps = unresolvedActorCapabilities(root, actors, capabilities);
 
-  // The folio ODRL profile is declared once, by the platform: an instance that
+  // The folio ODRL profile is declared once, by the platform: a layer that
   // declares none of its own (one whose actors' grants live in its own
   // policies/) names the profile's actions, as `core/access.ts` reads them.
   const vocabulary =
@@ -2545,7 +2545,7 @@ function auditGraph(
       // The other half of the same measurement, and the one the owner asked to
       // FAIL rather than be explained. `manifest-skill-exists` above asks
       // whether a MANIFEST names something unresolvable; this asks whether a
-      // REMOTE PACKAGE declares something this instance cannot serve — five
+      // REMOTE PACKAGE declares something this layer cannot serve — five
       // names today, across two wrappers that both claim a weekly shallow-clone
       // nothing performs. Bean `wlqd`.
       //
@@ -2580,7 +2580,7 @@ function auditGraph(
         policiesDir: POLICY_DIR,
       }),
       // A story points at its role (#1168); a story whose role is not declared
-      // is told as nobody. Only this instance's roles are judged — see
+      // is told as nobody. Only this layer's roles are judged — see
       // `danglingStoryRoles`.
       "story-role-resolves": !stories
         ? entry([], false)
@@ -2604,7 +2604,7 @@ function auditGraph(
       "prose-names-resolve": proseNamesResolve(),
       "skill-contract-claimed": entry(unclaimedSkillContracts()),
       "nested-instance-audited": entry(unreadNestedInstances()),
-      // A content instance holding code (bean `eayu`) — see content-holds-code.ts.
+      // A content layer holding code (bean `eayu`) — see content-holds-code.ts.
       "content-instance-holds-code": contentInstanceHoldsCode(),
       // Generic orphan detector across declared graph kinds (bean folio-assistant-9mmu).
       "orphan-subject-resolves": orphanSubjectResolves(root, { repoRoot: REPO_ROOT }),
@@ -2623,7 +2623,7 @@ function sidecarPath(r: KgQaReport): string {
   // This was skill-only, for a reason that turned out to be general: skills
   // live under several packages, so one directory per kind would collide two
   // packages' same-named skills into one sidecar. Processes have exactly that
-  // shape the moment an instance declares more than one knowledge-graph
+  // shape the moment a layer declares more than one knowledge-graph
   // directory — `bootstrap/processes/` and `crdm/workflows/` can each hold a
   // `review.bpmn`, and a kind-keyed table sends both to one file, so one
   // silently overwrites the other's findings.
@@ -2696,13 +2696,13 @@ const auditorHash = sha256(readFileSync(join(TOOLS_ROOT, "scripts", "kg-audit.ts
 const skills = knownSkills(root, corpusScopeFor(root));
 
 /**
- * The skills a REFERENCE in this instance may resolve to: its own, plus every
- * instance it declares `needs` on, transitively.
+ * The skills a REFERENCE in this layer may resolve to: its own, plus every
+ * layer it declares `needs` on, transitively.
  *
  * ## Why resolution is wider than ownership
  *
  * A skill ref names a body an activity's performer must read, and a body in a
- * DEPENDENCY is one this instance may read — that is what depending on it
+ * DEPENDENCY is one this layer may read — that is what depending on it
  * means. Resolving refs against `knownSkills(root)` alone made every such ref
  * dangle: measured 2026-09-27, a DAK base layer reported `skill-ref-resolves`
  * **fail (9)** on nine activities of `diig-investment-path.bpmn`, all naming
@@ -2720,17 +2720,17 @@ const skills = knownSkills(root, corpusScopeFor(root));
  *
  * ## This is the FIFTH cross-instance defect, and the only DOWNWARD one
  *
- * The other four leaked things an instance should not see (a repo's actors, its
+ * The other four leaked things a layer should not see (a repo's actors, its
  * capabilities, 119 phantom tool sidecars, 23 skills from `.claude/skills/`) and
- * were fixed by NARROWING. This one is the opposite polarity: an instance could
+ * were fixed by NARROWING. This one is the opposite polarity: a layer could
  * not see what is legitimately BELOW it. A narrowing fix cannot find it, which
  * is why it survived all four.
  *
  * ## Ownership stays narrow, deliberately
  *
  * `manifest-skill-exists` and `remote-skill-is-servable` keep reading
- * {@link skills}, because both ask whether THIS instance holds a BODY for a
- * name it publishes. A dependency's skill is not this instance's to serve, so
+ * {@link skills}, because both ask whether THIS layer holds a BODY for a
+ * name it publishes. A dependency's skill is not this layer's to serve, so
  * widening those would excuse exactly the defect they exist to catch. Same
  * split, and the same ruling (`pve3` — *"not in my overlay is not does not
  * exist"*), as `satisfiableSkills` in `check-tools.ts`: resolution widens,
@@ -2752,20 +2752,20 @@ const resolvableSkills: Set<string> = (() => {
 })();
 
 /**
- * Has this instance declared where it sits in the stack?
+ * Has this layer declared where it sits in the stack?
  *
  * `needs` is OPTIONAL with a documented THIRD STATE: an absent value is
- * UNDETERMINED, never `[]` — `[]` is an assertion that this instance is the
+ * UNDETERMINED, never `[]` — `[]` is an assertion that this layer is the
  * floor, absent is nobody having said (`schemas/kg/cat-harness.ts`, `needs`;
  * `schemas/kg/layer-direction.ts` refuses the same collapse for edges).
  *
  * Read straight from the declaration rather than inferred from
  * {@link resolvableSkills} being no wider than {@link skills}, because
- * `dependenciesFromNeeds` collapses the two states with `?? []` — an instance
+ * `dependenciesFromNeeds` collapses the two states with `?? []` — a layer
  * that declares nothing and one that declares the floor both derive zero
  * dependencies, and only one of them has said so.
  *
- * MEASURED 2026-09-27: **5 of 16** instances here declare no `needs` —
+ * MEASURED 2026-09-27: **5 of 16** layers here declare no `needs` —
  * `agent-skills`, the formal-math content layer, `large-datasets`, the IRIS
  * replica, `who-style-guide`. So this is a third of the subject, not a hypothetical.
  */
@@ -2781,7 +2781,7 @@ const layeringUndetermined = ((): boolean => {
 })();
 
 /**
- * Can a ref that is not in this instance's own set be judged at all?
+ * Can a ref that is not in this layer's own set be judged at all?
  *
  * Monotone, and that is the whole point: a closure only ever ADDS skills, so a
  * ref already in {@link skills} resolves no matter what the layering turns out
@@ -2796,8 +2796,8 @@ const refUnjudgeable = (ref: string): boolean =>
   layeringUndetermined && !resolvableSkills.has(ref);
 // The CHECKOUT's actors on the platform's own run: a dependent may extend an
 // actor by id with the roles and capabilities it takes on there (placement
-// PR0b). On `--instance`, the actors THAT instance may name: the platform's,
-// every instance it needs, and its own. Reading the platform's alone reported
+// PR0b). On `--instance`, the actors THAT layer may name: the platform's,
+// every layer it needs, and its own. Reading the platform's alone reported
 // a downstream's own actors (the IHE ITI VHL Sharer, Receiver) as undeclared
 // on every requirement and role that names them.
 //
@@ -2821,18 +2821,18 @@ let graphError: string | undefined;
  * WHERE the role graph was actually found, for the findings that cite it.
  *
  * Not a constant: `scenarios/` is the convention since 2026-09-21 and
- * `skills/roles/` is what an unmigrated instance still has, so a message
+ * `skills/roles/` is what an unmigrated layer still has, so a message
  * naming either unconditionally is wrong for half the corpus — and a
  * "roles.json is missing" pointing at the path the reader does not use is
  * worse than no path at all.
  */
 let roleGraphPath = "";
 /**
- * The ids of the roles THIS instance's own role graph declares.
+ * The ids of the roles THIS layer's own role graph declares.
  *
- * The checkout overlay above also brings in the roles a higher instance owns
+ * The checkout overlay above also brings in the roles a higher layer owns
  * outright (a DAK base layer's `l1-extraction-reviewer`, owner ruling 3b,
- * 2026-10-12). Those resolve here, but they are that instance's subjects:
+ * 2026-10-12). Those resolve here, but they are that layer's subjects:
  * its own `--instance` run audits them. Emitting them again from the
  * platform's run is the duplicated subject `instance-graph-isolation.test.ts`
  * forbids, and what `resolution-across-needs.test.ts` ("the audit's role
@@ -2843,7 +2843,7 @@ const ownRoleIds = new Set<string>();
 try {
   // declared-path-literal: the convention fallback, at the call site. The
   // role graph moved out of the skills tree on 2026-09-21 and is a declared
-  // directory of its own; `KG_ROOT` is the second branch for an instance
+  // directory of its own; `KG_ROOT` is the second branch for a layer
   // that has not migrated.
   graph = readRoleGraph(SCENARIO_DIR);
   roleGraphPath = join(SCENARIO_DIR, "roles.json");
@@ -2851,7 +2851,7 @@ try {
     graph = readRoleGraph(KG_ROOT);
     if (graph) roleGraphPath = join(KG_ROOT, "roles", "roles.json");
   }
-  // The roles this instance declares itself, before any overlay: the role
+  // The roles this layer declares itself, before any overlay: the role
   // SUBJECTS of this run (see `ownRoleIds` below).
   for (const r of graph?.roles ?? []) ownRoleIds.add(r.id);
   // Dependents' extensions, by id, on the platform's own run (placement PR0b).
@@ -2867,12 +2867,12 @@ if (graphError) {
 }
 
 /**
- * The role IDS a REFERENCE in this instance may resolve to: its own graph's,
- * plus every instance it declares `needs` on, transitively.
+ * The role IDS a REFERENCE in this layer may resolve to: its own graph's,
+ * plus every layer it declares `needs` on, transitively.
  *
  * ## The same defect as {@link resolvableSkills}, one graph over
  *
- * Measured 2026-09-27, after the skill half landed: 11 of 13 nested instances
+ * Measured 2026-09-27, after the skill half landed: 11 of 13 nested layers
  * reported ZERO criticals, and the two that did not — a DAK base layer and
  * the content core — reported `role-ref-resolves` and
  * `raci-role-resolves`. Their diagrams name `business-analyst`,
@@ -2898,8 +2898,8 @@ if (graphError) {
  *
  * The five criteria that need role OBJECTS — `lane-binds-role`,
  * `role-carries-activity-skill`, `activity-fulfilment-kind` and the two RACI
- * shape checks — stay `unknown` for an instance with no graph of its own,
- * because judging carriage requires the definition and this instance does not
+ * shape checks — stay `unknown` for a layer with no graph of its own,
+ * because judging carriage requires the definition and this layer does not
  * hold it. Their message is corrected rather than their verdict: saying only
  * "no role graph declared at scenarios/roles.json" reads as "these roles do
  * not exist", when they do, one layer down.
@@ -2909,23 +2909,23 @@ const resolvableRoleIds: Set<string> = (() => {
   const add = (g: RoleGraph | undefined): void => {
     for (const r of g?.roles ?? []) out.add(r.id);
   };
-  // THIS INSTANCE'S OWN ROLES FIRST, and the omission was measured rather than
+  // THIS LAYER'S OWN ROLES FIRST, and the omission was measured rather than
   // reasoned about: seeded from dependencies alone, cat-harness resolved refs
   // against bootstrap's 4 roles and none of its own 48, so the default run went
   // from 201 failures to 273. `resolvableSkills` seeds `new Set(skills)` for
-  // exactly this reason; a closure must CONTAIN the instance it is the closure
+  // exactly this reason; a closure must CONTAIN the layer it is the closure
   // of. That is why this is declared below the graph load rather than beside
   // `resolvableSkills` — it needs `graph`, which is read later.
   add(graph);
   for (const dep of orderedDependencies(root)) {
     // declared-path-literal: the convention fallback, at the call site, exactly
     // as for `SCENARIO_DIR` and `KG_ROOT` above — `ownDirectoryById` reads the
-    // DEPENDENCY's own declaration first, so an instance that declares its
+    // DEPENDENCY's own declaration first, so a layer that declares its
     // scenarios or skills elsewhere is honoured; these two strings are the ids
     // asked for and the conventional directory to fall back on when it declares
     // neither. Both spellings are tried for the reason the own load does:
     // `scenarios/` is the convention since 2026-09-21 and `skills/roles/` is
-    // what an unmigrated instance still has, and a dependency may be either.
+    // what an unmigrated layer still has, and a dependency may be either.
     try {
       add(
         readRoleGraph(ownDirectoryById(dep.rootPath, "scenarios", "scenarios")) ??
@@ -2933,7 +2933,7 @@ const resolvableRoleIds: Set<string> = (() => {
       );
     } catch {
       // A dependency's unreadable role graph is not this run's to diagnose —
-      // that instance's OWN audit reports it, and exiting here would make one
+      // that layer's OWN audit reports it, and exiting here would make one
       // broken dependency block every dependent's audit.
     }
   }
@@ -2970,7 +2970,7 @@ reports.push(...auditTools(INSTANCE_RUN ? root : undefined));
 reports.push(...auditFolioBlocks(root));
 
 /**
- * Drop every subject ANOTHER instance owns — it audits that subject itself.
+ * Drop every subject ANOTHER layer owns — it audits that subject itself.
  *
  * The default run walks the CHECKOUT (`corpusScopeFor`), so it loads
  * a DAK base layer's, large-datasets' and the content core's diagrams beside its
@@ -2982,7 +2982,7 @@ reports.push(...auditFolioBlocks(root));
  * (Q-A PR 4, epic `7x5n`); `kgQaSidecarPath` now refuses the path, so this
  * filter is what keeps the run from throwing rather than a courtesy.
  *
- * A subject outside this instance that NO checkout instance owns is refused
+ * A subject outside this layer that NO checkout layer owns is refused
  * loudly: dropping it would be a clean run over nothing (`dh4f`), and giving
  * it a path is what `_external/` was.
  */

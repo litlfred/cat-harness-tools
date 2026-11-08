@@ -15,7 +15,7 @@ import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 const ROOT = resolve(import.meta.dir, "../..");
 
-/** An instance with a declared kg directory and some package subdirectories. */
+/** A layer with a declared kg directory and some package subdirectories. */
 function instance(pkgs: Record<string, string>, kgPath = "skills"): string {
   const root = mkdtempSync(join(tmpdir(), "pkgs-"));
   writeDeclaration(root, JSON.stringify({
@@ -85,15 +85,15 @@ describe("the live table", () => {
   });
 
   test("a directly-held kg directory is named after its INSTANCE", () => {
-    // Rule 1: a directory basenamed `skills` IS the instance's own package —
-    // there is no subdirectory name to take — so it takes the instance's name.
+    // Rule 1: a directory basenamed `skills` IS the layer's own package —
+    // there is no subdirectory name to take — so it takes the layer's name.
     //
     // The subject was `src/skills/` until #760 folded it into
     // `skills/folio-core/`. THE TEST'S CLAIM IS UNCHANGED, which is the point:
     // the rule was never about that directory, so it is asserted here on a
     // live subject instead. `bootstrap/skills/` is basenamed `skills` and
-    // takes its instance's name, exactly as `src/skills/` did. (The subject was
-    // `kg-navigation/skills/` until bean `byql` folded that instance into
+    // takes its layer's name, exactly as `src/skills/` did. (The subject was
+    // `kg-navigation/skills/` until bean `byql` folded that layer into
     // cat-harness as an ordinary `skills/kg/kg-navigation/` package.)
     expect(discoverLocalPackages(ROOT)["bootstrap"]).toContain("bootstrap/skills");
   });
@@ -139,7 +139,7 @@ describe("a dependency's packages are served — the overlay", () => {
     // skills are not reachable today. This is what reachable looks like.
     const dep = instance({ shared: SKILL, "dep-only": SKILL });
     const root = instance({ shared: SKILL });
-    // `root` is a FIXTURE instance root; its config belongs IN it, under the
+    // `root` is a FIXTURE layer root; its config belongs IN it, under the
     // name `root` declares. The sweep sent this to the fixture's parent —
     // `/tmp` — and the name half is newer still: there is no global config
     // filename to join on any more.
@@ -163,7 +163,7 @@ describe("a directly-held set is named by ITS instance, not by the caller's root
   test("two directly-held directories do not collapse onto one name", () => {
     // The defect: the name came from `readDeclaration(root)` — the root passed
     // IN — so every directly-held kg directory got the same key regardless of
-    // which instance contributed it. With one such directory that is
+    // which layer contributed it. With one such directory that is
     // indistinguishable from correct; with two, the later assignment wins and
     // the earlier package is found and then silently dropped. No collision is
     // reported, nothing throws, and `skill_fetch` answers "package not found"
@@ -179,7 +179,7 @@ describe("a directly-held set is named by ITS instance, not by the caller's root
       }));
     writeFileSync(join(repo, "sibling", "skills", "s.md"), SKILL);
 
-    // The instance, declaring its own kg directory AND the sibling's, the
+    // The layer, declaring its own kg directory AND the sibling's, the
     // second at repository scope — the `bootstrap/skills/` shape.
     const inst = join(repo, "inst");
     mkdirSync(join(inst, "kg"), { recursive: true });
@@ -202,7 +202,7 @@ describe("a directly-held set is named by ITS instance, not by the caller's root
 
   test("FOUR directly-held directories in one instance, and none is dropped", () => {
     // The within-instance half of the same collision, which the test above
-    // does not reach: it has one directly-held directory per instance, so
+    // does not reach: it has one directly-held directory per layer, so
     // "named by its instance" and "named by first-wins" agree there.
     //
     // `cat-harness` really declares four — `src/skills/`, `sdlc/skills/crdm/`
@@ -227,7 +227,7 @@ describe("a directly-held set is named by ITS instance, not by the caller's root
       }));
 
     const found = discoverLocalPackages(inst);
-    // `skills` takes the instance name; the other three take their basenames.
+    // `skills` takes the layer name; the other three take their basenames.
     // Four in, four out — the property is that NOTHING is dropped.
     expect(Object.keys(found).sort()).toEqual(["a", "b", "inst", "theming"]);
     expect(found["inst"]).toBe(join(inst, "src", "skills"));
@@ -262,7 +262,7 @@ describe("a directly-held set is named by ITS instance, not by the caller's root
 
   test("a SOLE directly-held directory still takes the instance name, whatever it is called", () => {
     // Rule 2, and the reason the fixture above names its directory `kg`: with
-    // nothing to disambiguate from, the instance's name is the better one.
+    // nothing to disambiguate from, the layer's name is the better one.
     const repo = mkdtempSync(join(tmpdir(), "sole-"));
     const inst = join(repo, "inst");
     mkdirSync(join(inst, "kg"), { recursive: true });
@@ -292,13 +292,13 @@ describe("a directly-held set is named by ITS instance, not by the caller's root
     // `needs` now derives the dependency overlay for edges inside one checkout
     // (bean `5kn6`), so `bootstrap/skills/` became reachable from here where
     // only `bootstrap/tools/` was before. That flips which rule applies:
-    // rule 2 (the SOLE directly-held directory takes the instance name) gave
+    // rule 2 (the SOLE directly-held directory takes the layer name) gave
     // the name to `bootstrap/tools/` while it was alone; rule 1 (a directory
-    // basenamed `skills` IS the instance's own package) takes precedence now
+    // basenamed `skills` IS the layer's own package) takes precedence now
     // that the real one is in reach.
     //
     // The rule this test guards is unchanged and is the one in its title: a
-    // directly-held set is named by ITS instance, not by the caller's root.
+    // directly-held set is named by ITS layer, not by the caller's root.
     // `bootstrap/skills/` resolves to `bootstrap` and not to `cat-harness`,
     // which is the whole claim.
     const live = discoverLocalPackages(ROOT);

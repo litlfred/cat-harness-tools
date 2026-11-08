@@ -95,7 +95,7 @@ export const DECIDED_DISPOSITIONS = ["deleted-before-deploy", "superseded"] as c
  * The same shape as `FixitySchema`, restated rather than imported. It was a
  * deliberate duplicate while `FixitySchema` lived in core's `materialization.ts`:
  * nothing under `cat-harness/` imports from the content core. Since bean
- * `tlat` (2026-10-02) `FixitySchema` lives in this instance, in
+ * `tlat` (2026-10-02) `FixitySchema` lives in this layer, in
  * `materialization-state.ts`, so the two CAN now be unified without an upward
  * import; that is left as its own change, because this one's `verifiedAt`
  * semantics are a release's, and unifying is a decision about whether they are

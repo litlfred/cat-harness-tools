@@ -1,5 +1,5 @@
 /**
- * kg-audit writes a verdict only about a subject its OWN instance holds
+ * kg-audit writes a verdict only about a subject its OWN layer holds
  * (Q-A PR 4, epic `7x5n`, owner confirmation 2026-10-01 ~17:30).
  *
  * Until then the default run wrote two kinds of duplicate: eight sidecars under
@@ -53,7 +53,7 @@ describe("subjectEscapes", () => {
 });
 
 describe("owningInstanceOf", () => {
-  // The repository root is itself an instance and contains every other one,
+  // The repository root is itself a layer and contains every other one,
   // so the DEEPEST root must win or everything would be "owned by the root".
   const roots = ["/repo", "/repo/cat-harness", "/repo/smart-base"];
 

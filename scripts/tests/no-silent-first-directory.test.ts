@@ -42,7 +42,7 @@ import {
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
-/** The repository root — this rule is about every instance, not one. */
+/** The repository root — this rule is about every layer, not one. */
 const REPO = resolve(dirname(HARNESS_ROOT));
 
 /** Directories that are not source we control. */
@@ -131,12 +131,12 @@ afterAll(() => {
 });
 
 /**
- * An instance declaring `schemas` at two directories of its own — the shape
+ * A layer declaring `schemas` at two directories of its own — the shape
  * `large-datasets` had (`schemas/` and `sources/`) until bean `j7ql`.
  */
 function fixtureDeclaringSchemasTwice(): string {
   // A checkout of its own, as the audit expects one: a root `package.json`
-  // beside the instance, and no sibling it did not make.
+  // beside the layer, and no sibling it did not make.
   const checkout = mkdtempSync(join(tmpdir(), "schemas-twice-"));
   fixtures.push(checkout);
   writeFileSync(join(checkout, "package.json"), JSON.stringify({ name: "fixture", scripts: {} }));
@@ -163,7 +163,7 @@ describe("an instance that declares a kind twice is auditable, not a crash", () 
    *
    * Measured 2026-09-27: `kg:audit --instance ./large-datasets` never audited
    * anything. It threw inside `instanceDirectoryForGraph`, called from
-   * `unclaimedSkillContracts`, because that instance declares TWO `schemas`
+   * `unclaimedSkillContracts`, because that layer declares TWO `schemas`
    * directories at its own root:
    *
    *     large-datasets-schemas → large-datasets/schemas
@@ -172,7 +172,7 @@ describe("an instance that declares a kind twice is auditable, not a crash", () 
    * Both are legal; `cat-harness.json` declares `schemas` several times too. So
    * the singular was simply the wrong question for a caller that wants to scan
    * every contract directory, and the remedy is the plural accessor rather than
-   * an index — `[0]` here would have hidden one instance's contracts from the
+   * an index — `[0]` here would have hidden one layer's contracts from the
    * audit and reported a clean run, which is the `dh4f` shape this whole file
    * exists to prevent.
    */
@@ -199,7 +199,7 @@ describe("an instance that declares a kind twice is auditable, not a crash", () 
   });
 
   test("an instance that declares a kind twice really is plural, so the case above is live", () => {
-    // Anti-vacuity. With no such instance the assertion above holds trivially
+    // Anti-vacuity. With no such layer the assertion above holds trivially
     // and would keep passing after a regression — the shape that let the
     // original `[0]` survive unnoticed. The real one was `large-datasets`
     // until bean `j7ql` (2026-10-01) dissolved it into cat-harness and its two
@@ -221,7 +221,7 @@ describe("an instance that declares a kind twice is auditable, not a crash", () 
    * thing shows it, so this runs the thing.
    *
    * `--check` writes nothing, verified: it reports staleness and exits non-zero
-   * on an instance whose sidecars are not committed, which `large-datasets`'s
+   * on a layer whose sidecars are not committed, which `large-datasets`'s
    * are not. The assertion is therefore about the CRASH and not the exit code.
    */
   test("kg:audit --instance runs on such an instance instead of throwing", async () => {

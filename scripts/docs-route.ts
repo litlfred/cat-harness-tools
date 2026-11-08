@@ -6,11 +6,11 @@
  *
  * cat-harness's documentation pages publish under
  * `<base-url>/docs/cat-harness/<page>.html`, not at the site root — the same
- * `<base-url>/<kind>/<instance>/` rule that puts a mounted instance's
+ * `<base-url>/<kind>/<instance>/` rule that puts a mounted layer's
  * documentation at `/docs/<instance>/` (`mount-instance-docs.ts`).
  *
  * The route is read, not written down: the `docs` KIND and the built
- * instance's declared NAME, so it follows a rename. The one literal copy is
+ * layer's declared NAME, so it follows a rename. The one literal copy is
  * `_config.yml`'s `baseurl`, because Jekyll reads nothing else;
  * `docs-route.test.ts` checks it against this function.
  *
@@ -26,20 +26,20 @@ import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
-/** The graph kind whose handler publishes an instance's documentation. */
+/** The graph kind whose handler publishes a layer's documentation. */
 export const DOCS_KIND = "docs";
 
-/** `docs/<name>` — the route an instance's documentation is published at, site-root-relative, no slashes at either end. */
+/** `docs/<name>` — the route a layer's documentation is published at, site-root-relative, no slashes at either end. */
 export function docsRouteFor(name: string): string {
   return `${DOCS_KIND}/${name}`;
 }
 
 /**
- * The route of the BUILT instance's documentation — the one Jekyll renders.
+ * The route of the BUILT layer's documentation — the one Jekyll renders.
  *
- * `built` is the instance's directory, repo-relative (`cat-harness`); the
+ * `built` is the layer's directory, repo-relative (`cat-harness`); the
  * route uses its declared `name`, falling back to the directory name exactly
- * as `mount-instance-docs.ts` does for every other instance. Throws when there
+ * as `mount-instance-docs.ts` does for every other layer. Throws when there
  * is no declaration: a guessed route sends every rail link to a directory
  * nothing published, and "could not determine" is never rendered as an answer.
  */

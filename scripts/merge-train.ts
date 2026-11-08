@@ -15,7 +15,7 @@
  *    merge and restores the tree, and this records why and on which paths.
  *    Nothing is resolved by hand. A member already contained is recorded so.
  * 3. One `bun run cat regen` over the whole train, then the checks regen does not
- *    repair: `check:l1-complete --write`; every task an instance
+ *    repair: `check:l1-complete --write`; every task a layer
  *    declares `afterMerge` under `taskIo`, its declared writer run when the
  *    check is red; and `kg:audit:all:check` (its writer runs
  *    once when it is stale). What they wrote is committed as one commit.
@@ -243,10 +243,10 @@ function postChecks(root: string, label: string, regen: boolean): TrainCheck[] {
   record("l1-complete", "bun run cat check:l1-complete -- --write", l1, "passed", l1 === 1 ? "findings" : "failed",
     l1 === 1 ? "a library entry has an unmet L1 requirement (the verdict is written)" : l1 === 2 ? "could not check" : undefined);
 
-  // Each check an instance declares `afterMerge` under `taskIo`, with its
-  // writer run when red (bean `0r7u`). It named one instance's gate and
+  // Each check a layer declares `afterMerge` under `taskIo`, with its
+  // writer run when red (bean `0r7u`). It named one layer's gate and
   // extractor until 2026-10-06 — a layer above this one, so the train broke
-  // standalone; that instance now declares the pair itself.
+  // standalone; that layer now declares the pair itself.
   for (const { check, writer } of afterMergeRepairs()) {
     const first = run(root, "bun", ["run", "cat", check], true).code;
     if (first === 0) {

@@ -257,7 +257,7 @@ describe("a backdrop names a ROLE, never a path", () => {
 
 describe("the scrim is what makes ink over art legible, and the number is measured", () => {
   test("grumpy-cat's ink clears AAA over its scrim on the DARKEST possible art", () => {
-    // Worst case, not typical case: the art is whatever an instance declares,
+    // Worst case, not typical case: the art is whatever a layer declares,
     // so the only safe assumption is pure black underneath. If it holds there it
     // holds for every image.
     // The SHIPPED theme's own ink and scrim, read from `themes.ts` — not
@@ -311,7 +311,7 @@ describe("resolution against an instance's images — three outcomes, not two", 
 
   test("no backdrop is `none`, and NOT a gap", () => {
     // The distinction that must not collapse: a palette-only theme is a choice,
-    // an unresolvable one is a declaration bug in the instance. Same conflation
+    // an unresolvable one is a declaration bug in the layer. Same conflation
     // `note-anchor.ts` exists to undo for `targetLabel`.
     const r = resolveThemeBackdrop(ResolvedThemeSchema.parse(theme()), complete);
     expect(r.none).toBe(true);

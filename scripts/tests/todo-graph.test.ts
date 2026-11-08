@@ -195,14 +195,14 @@ describe("what is published", () => {
       const { page, node } = item.target;
       test(`${item.id}: its target IRI names a file the site publishes`, () => {
         // The checkout's answer, as the generator asks it: a page of a source
-        // above the base is published under its instance, and its JSON-LD is
-        // in that instance's docs directory until compose lays it there.
+        // above the base is published under its layer, and its JSON-LD is
+        // in that layer's docs directory until compose lays it there.
         const { sitePath, file } = siteNodeOf(docsSources(ROOT), page, node);
         const iri = `${DOCS_SITE_BASE}${sitePath}`;
         expect(existsSync(file)).toBe(true);
         const doc = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
         // The site form: the shared context, or since bean `63q4` the
-        // owning instance's own, always with the site as `@base`.
+        // owning layer's own, always with the site as `@base`.
         expect(ContentContextSchema.safeParse(doc["@context"]).success).toBe(true);
         expect((doc["@context"] as unknown[])[1]).toEqual(SITE_DOCUMENT_CONTEXT[1]);
         expect(doc["@id"]).toBe(sitePath);

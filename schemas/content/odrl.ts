@@ -303,7 +303,7 @@ export const OdrlRuleSchema = z
     /** An actor id, a party IRI/DID, or {@link ANYONE}. */
     assignee: z.string().min(1),
     action: z.string().min(1),
-    /** What the rule applies to; absent means the instance's whole graph. */
+    /** What the rule applies to; absent means the layer's whole graph. */
     target: z.string().min(1).optional(),
     constraint: z.array(OdrlConstraintSchema).optional(),
     /** Duties attached to a Permission rule (ODRL 2.2 §2.6.5). */
@@ -343,7 +343,7 @@ export const OdrlPolicySchema = z
 export type OdrlPolicy = z.infer<typeof OdrlPolicySchema>;
 export type OdrlRule = z.infer<typeof OdrlRuleSchema>;
 
-/** Where an instance keeps its policies: the `policies` graph typology's directory. */
+/** Where a layer keeps its policies: the `policies` graph typology's directory. */
 export const POLICY_DIR = "policies";
 
 /**
@@ -1041,7 +1041,7 @@ export function readPolicyGrants(dir: string): Map<string, string[]> {
 
 /**
  * {@link readPolicyGrants} over policies already read — from one directory, or
- * from several instances' directories overlaid into one map.
+ * from several layers' directories overlaid into one map.
  */
 export function policyGrants(all: ReadonlyMap<string, OdrlPolicy>): Map<string, string[]> {
   const out = new Map<string, string[]>();
@@ -1096,7 +1096,7 @@ export function decideWithConsent(
 }
 
 /**
- * {@link permits} across every policy an instance holds, which is the question
+ * {@link permits} across every policy a layer holds, which is the question
  * a caller actually has: not "does this one policy allow it" but "does
  * anything here speak to it". A `deny` from any policy wins (the folio default
  * conflict strategy is `odrl:prohibit`, and a prohibition in one file must not

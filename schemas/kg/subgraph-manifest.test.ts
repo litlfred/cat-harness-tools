@@ -1,5 +1,5 @@
 /**
- * Where an instance publishes one subgraph's two files (bean `mo75` G2).
+ * Where a layer publishes one subgraph's two files (bean `mo75` G2).
  *
  * @module schemas/subgraph-manifest.test
  */

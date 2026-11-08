@@ -24,7 +24,7 @@
  * @module cat-harness/scripts/tests/tools-viewer.test
  *
  * The tests of this file that read the whole checkout (joins every Tool to the
- * skills of every instance in the checkout) live in
+ * skills of every layer in the checkout) live in
  * `test/tools-viewer-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

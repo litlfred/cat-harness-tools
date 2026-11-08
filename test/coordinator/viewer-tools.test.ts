@@ -11,13 +11,13 @@
  * the test set the checkout runs.
  *
  * Moved here from `cat-harness/scripts/tests/viewer-tools.test.ts` to the
- * checkout's own test home `test/` (bean `7zz1`): it reads every instance's
+ * checkout's own test home `test/` (bean `7zz1`): it reads every layer's
  * declaration, which only the whole checkout holds.
  */
 import { describe, expect, it } from "bun:test";
 import { join, resolve } from "node:path";
 import { instanceRootsIn, instanceDirectories, isPublishedGraphTypology } from "../../schemas/kg/cat-harness.ts";
-// Every instance's Tools: a viewer Tool may live in a dependency's `tools`
+// Every layer's Tools: a viewer Tool may live in a dependency's `tools`
 // graph (fhir-harness's `ig-pages`).
 import { tools } from "../../tools/discover.js";
 import { declaredVisualisers } from "../../scripts/viewer-declarations.js";
@@ -52,14 +52,14 @@ describe("viewer Tools declare what they render", () => {
   });
 
   /**
-   * Kinds a Tool here renders whose only holders are instances this index does
-   * not mount — each with the instance that holds it. Listed rather than
+   * Kinds a Tool here renders whose only holders are layers this index does
+   * not mount — each with the layer that holds it. Listed rather than
    * waived: an entry whose kind starts being declared in the checkout fails
    * below, so the list can only shrink to what is still true.
    */
   const HELD_OUTSIDE: Record<string, string> = {
     // Owner, 2026-10-09: the `archimate` subgraph of cat-harness, whose first
-    // instance is smart-ra's DPI-H reference architecture models.
+    // layer is smart-ra's DPI-H reference architecture models.
     archimate: "litlfred/smart-ra",
     // Owner, 2026-11-05, option A: journeys-viewer draws the journeys and
     // workshops of litlfred/smart-trust-demo and litlfred/smart-ips-pilgrimage,
@@ -67,7 +67,7 @@ describe("viewer Tools declare what they render", () => {
     "user-scenario": "litlfred/smart-trust-demo",
     workshop: "litlfred/smart-trust-demo",
     // Owner, 2026-11-06, option A: journeys-viewer draws the device screens of
-    // the same two instances.
+    // the same two layers.
     "device-screen": "litlfred/smart-trust-demo",
   };
 
@@ -80,7 +80,7 @@ describe("viewer Tools declare what they render", () => {
    * (`input/business-processes/`), and this layer is tested against both the
    * index's main and its re-pin train, which pin smart-trust-phw on either
    * side of that. So each entry is checked as exactly one of the two states,
-   * never waived: still rendered, and declared by NO instance or by the named
+   * never waived: still rendered, and declared by NO layer or by the named
    * one only.
    */
   const ARRIVING: Record<string, string> = {

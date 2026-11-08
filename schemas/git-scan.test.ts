@@ -14,7 +14,7 @@
  * never the size.
  *
  * "check-source-licence's corpus, over this repository" reads THIS checkout's
- * corpus — every instance's `library/` — so it lives in the checkout's root
+ * corpus — every layer's `library/` — so it lives in the checkout's root
  * test home, as `test/git-scan-repo-root.test.ts` (owner, 2026-10-06:
  * "Throwaway repository, plus moving the real-repo checks"). The fixture
  * repositories above are what assert `gitScan`'s logic.

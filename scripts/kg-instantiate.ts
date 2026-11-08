@@ -21,10 +21,10 @@
  *   Choosing is the subscriber's act, recorded in the declaration.
  * - **not declared**: the snapshot does not list it among the substrate's
  *   harnesses at the pin.
- * - **a need unmet**: every name in the harness's `needs` must be an instance
+ * - **a need unmet**: every name in the harness's `needs` must be a layer
  *   in this checkout, or a substrate some subscription here holds the snapshot
  *   of. The missing ones are named.
- * - **a name taken**: a local instance already carries the harness's name. Two
+ * - **a name taken**: a local layer already carries the harness's name. Two
  *   declarations under one name is the ambiguity `disambiguate` reports, and
  *   the config file would bind to the wrong one.
  *
@@ -45,7 +45,7 @@
  * (`harnessHomeOf` in `kg-parts.ts`). A subscriber that declares no such
  * directory is refused, with what to declare, as `kg:subscribe` refuses one
  * that declares no snapshot directory. Not the instantiation root (not a
- * declared directory, and it may hold a staged instance of the same name),
+ * declared directory, and it may hold a staged layer of the same name),
  * and not the snapshot directory (which stays read-only). The harness has no
  * local declaration (see `schemas/kg/substrate-snapshot.ts`).
  *
@@ -59,12 +59,12 @@
  * ## How it reaches the navbar
  *
  * `harness-tiles.ts` draws a tile for every chosen harness whose config sits
- * at the root and that no local instance names, from its snapshot
+ * at the root and that no local layer names, from its snapshot
  * (`subscribedTile` in `subscribed-harnesses.ts`); `check-instance-config.ts` counts a chosen
  * harness's config as claimed rather than orphaned. Run `bun run
  * docs:harness` afterwards to regenerate `docs/_data/harness.json`.
  *
- * `check:instance-render` judges only instances with a local tree to render,
+ * `check:instance-render` judges only layers with a local tree to render,
  * so it says nothing about a subscribed harness until its subgraphs are
  * materialised.
  *
@@ -156,9 +156,9 @@ export type InstantiateResult =
 export interface InstantiateOptions {
   subscription: string;
   harness: string;
-  /** The subscribing instance's directory. Defaults to cat-harness. */
+  /** The subscribing layer's directory. Defaults to cat-harness. */
   instance?: string;
-  /** The instantiation root, where `<harness>.config.json` goes. Defaults to the instance's repository root. */
+  /** The instantiation root, where `<harness>.config.json` goes. Defaults to the layer's repository root. */
   root?: string;
   dryRun?: boolean;
 }
@@ -238,7 +238,7 @@ export function instantiate(opts: InstantiateOptions): InstantiateResult {
     );
   }
 
-  // NEEDS: local instances, or substrates whose snapshot some subscription here holds.
+  // NEEDS: local layers, or substrates whose snapshot some subscription here holds.
   const subscribed = new Set<string>();
   const snapshotGaps: string[] = [];
   for (const { dir, decl } of decls) {

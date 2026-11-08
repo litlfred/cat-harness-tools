@@ -454,8 +454,8 @@ export function computeCriterionScriptHashes(
    * the path the bytes are read at. Defaults to `sourceFile`.
    *
    * They differ for a CONTRIBUTED checker: the bytes live in the contributing
-   * instance, so `repoRoot`/`sourceFile` point there, while the recorded label
-   * is `<contributor>/<sourceFile>`. Without it two instances holding the same
+   * layer, so `repoRoot`/`sourceFile` point there, while the recorded label
+   * is `<contributor>/<sourceFile>`. Without it two layers holding the same
    * relative path would write the same `source_file` into different sidecars,
    * and a reader could not tell whose checker a verdict came from.
    *
@@ -889,7 +889,7 @@ export interface WalkBlocksOptions {
   onLoadFailure?: (failure: BlockLoadFailure) => void;
 
   /**
-   * Walk directories the instance declares as **not content** — `context` and
+   * Walk directories the layer declares as **not content** — `context` and
    * `state` graphs.
    *
    * Default `false`. Owner, 2026-09-20: *"qa-sweep skips fsh-guts"*, and the
@@ -903,7 +903,7 @@ export interface WalkBlocksOptions {
    * already answers the question, so nothing here spells a directory name and a
    * newly retired graph is skipped the day it is declared, with no edit.
    *
-   * Measured on this instance 2026-09-20 — what the default excludes, and what
+   * Measured on this layer 2026-09-20 — what the default excludes, and what
    * it does NOT:
    *
    *     skipped (context/state)  fsh-guts/  memory/  interaction/  uploads/
@@ -928,7 +928,7 @@ export interface WalkBlocksOptions {
 }
 
 /**
- * The instance root whose declaration governs `dir` — the nearest ancestor
+ * The layer root whose declaration governs `dir` — the nearest ancestor
  * carrying a `harness.json` or a `.git`.
  *
  * Deliberately NOT `findContentRepoRoot()`, which takes no argument and walks
@@ -974,7 +974,7 @@ export function* walkBlocks(
     ? new Set(opts.contributedBuilders.values())
     : undefined;
 
-  // Directories this instance declares as NOT content — `context` or `state`.
+  // Directories this layer declares as NOT content — `context` or `state`.
   // See {@link WalkBlocksOptions.includeNonContent} for the ruling and the
   // measurement. Computed once per walk and compared by absolute path, so a
   // declared directory OUTSIDE `rootDir` simply never matches and costs
@@ -1637,8 +1637,8 @@ export function summariseFreshness(
    *
    * Defaults to the static registry, which is right for every criterion
    * written out in it — but NOT for the voice-overlay criteria, which since
-   * bean `btuv` are derived from the voices an instance ships. A caller that
-   * has an instance root passes `qaCriteriaByIdFor(root)`.
+   * bean `btuv` are derived from the voices a layer ships. A caller that
+   * has a layer root passes `qaCriteriaByIdFor(root)`.
    *
    * The fallback below happens to give a voice criterion the right answer
    * today, because its `depends_on` is `["md"]` and so is the fallback. That

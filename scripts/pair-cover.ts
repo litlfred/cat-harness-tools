@@ -11,8 +11,8 @@
  *   a gate, so regen asks each of them as a pair of its own, spelt
  *   identically.
  * - **`kg:audit:check`** is `kg-audit.ts --check --against main` for the
- *   `cat-harness` instance. `kg:audit:all:check` spawns exactly that
- *   for every declared instance, `cat-harness` included, and
+ *   `cat-harness` layer. `kg:audit:all:check` spawns exactly that
+ *   for every declared layer, `cat-harness` included, and
  *   `--instance ./cat-harness` resolves to the auditor's own root, so the run
  *   is the same program on the same root with the same flags. The coverer's
  *   exit is non-zero whenever any spawned audit's is (`kg-audit-all.ts`).

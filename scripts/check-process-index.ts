@@ -8,7 +8,7 @@
  *
  *   1. the repository index, every harness root and every `processes`
  *      subgraph it reaches exist and validate against `schemas/kg/subgraph-manifest.ts`;
- *   2. every `.bpmn` an instance in this graph's corpus declares has a
+ *   2. every `.bpmn` a layer in this graph's corpus declares has a
  *      `Process` node there — recomputed from the declarations, so the
  *      published files cannot vouch for themselves;
  *   3. every such node carries its diagram's documentation (`summary`), and
@@ -23,16 +23,16 @@
  * at their own sites, linked from the repository index with `seeAlso`. Such a
  * diagram is covered when that link is there AND bootstrap-tools'
  * `buildSubgraphs` (run here in process, nothing fetched) holds a documented
- * Process node for it, keyed by its `source` IRI. An unframed instance with
+ * Process node for it, keyed by its `source` IRI. An unframed layer with
  * no such link is LISTED as not covered, with the reason, never folded into a
- * clean total. Which instances are unframed is computed (`framedInstances`).
+ * clean total. Which layers are unframed is computed (`framedInstances`).
  *
  * Staleness (the files differ from what the generator writes now) is
  * `subgraph:jsonld:check`'s, not this gate's.
  *
  * Usage:  bun run cat check:process-index
  * Exit:   0 covered (with any out-of-graph diagrams listed) · 1 a covered
- *         instance's diagram is missing or undocumented, a node is stale, or
+ *         layer's diagram is missing or undocumented, a node is stale, or
  *         the page lost its mount
  *
  * @covers processes, docs
@@ -57,8 +57,8 @@ const SITE = join(ROOT, siteDirFor(ROOT));
 const OUT = join(ROOT, subgraphOutDir(ROOT));
 /**
  * The block that mounts the view, in whichever docs source holds its page —
- * the page may be authored by an instance above this one (`lib/docs-sources.ts`).
- * The base instance's own path when no source holds it, so a missing page is
+ * the page may be authored by a layer above this one (`lib/docs-sources.ts`).
+ * The base layer's own path when no source holds it, so a missing page is
  * still reported where it was expected.
  */
 const PAGE_BLOCK = join("process-publication-workflow", "every-workflow-in-the-repo.md");
@@ -70,7 +70,7 @@ type Doc = Record<string, unknown>;
 const list = (v: unknown): unknown[] => (v == null ? [] : Array.isArray(v) ? v : [v]);
 const repoRel = (abs: string): string => relative(REPO, abs).split(sep).join("/");
 
-/** Every `.bpmn` any instance under the repository declares, by owning instance root. */
+/** Every `.bpmn` any layer under the repository declares, by owning layer root. */
 export function declaredDiagrams(repoRoot: string = REPO): Map<string, string> {
   const out = new Map<string, string>();
   for (const inst of instanceRootsIn(repoRoot)) {
@@ -85,7 +85,7 @@ export function declaredDiagrams(repoRoot: string = REPO): Map<string, string> {
 }
 
 /**
- * The instance roots whose knowledge-graph directories this graph frames —
+ * The layer roots whose knowledge-graph directories this graph frames —
  * `gen-subgraph-jsonld`'s own answer, so the gate and the generator cannot
  * disagree about which diagrams are covered.
  */
@@ -93,15 +93,15 @@ export function framedInstances(root: string = ROOT): Set<string> {
   return new Set(framedRoots(root));
 }
 
-/** Each repository's instances by declared name, read once per run. */
+/** Each repository's layers by declared name, read once per run. */
 const instanceByName = new Map<string, Map<string, string>>();
 
 /**
  * A published Process's diagram, repository-relative. Its `sourcePath` is
- * relative to the instance that EXPORTED it — the one whose tree it is in,
- * named by `harness` — since each instance is framed from its own export
- * (bean `4ak5` item 2). It was relative to this instance while one
- * checkout-scope export carried every framed instance's processes.
+ * relative to the layer that EXPORTED it — the one whose tree it is in,
+ * named by `harness` — since each layer is framed from its own export
+ * (bean `4ak5` item 2). It was relative to this layer while one
+ * checkout-scope export carried every framed layer's processes.
  */
 export function diagramPath(p: PublishedProcess, repoRoot: string = REPO): string {
   let byName = instanceByName.get(repoRoot);
@@ -115,7 +115,7 @@ export function diagramPath(p: PublishedProcess, repoRoot: string = REPO): strin
   return relative(repoRoot, resolve(byName.get(p.harness) ?? ROOT, p.sourcePath)).split(sep).join("/");
 }
 
-/** A Process node as the gate reads it, with the instance tree it was found in. */
+/** A Process node as the gate reads it, with the layer tree it was found in. */
 export interface PublishedProcess { id: string; sourcePath: string; summary?: string; depiction?: string; harness: string }
 
 /**
@@ -170,7 +170,7 @@ export function publishedProcesses(outDir: string = OUT): { processes: Published
 }
 
 /**
- * The diagrams an instance this graph does NOT frame publishes as documented
+ * The diagrams a layer this graph does NOT frame publishes as documented
  * Process nodes in its OWN subgraphs (bean `t8c4`) — bootstrap's, which
  * bootstrap-tools publishes at bootstrap's site. Counted only when the
  * repository index links that site (`seeAlso`), since that link is how the
@@ -178,7 +178,7 @@ export function publishedProcesses(outDir: string = OUT): { processes: Published
  * process: nothing is fetched, so a gate does not depend on a site being up,
  * and the files cannot vouch for themselves any more than ours can. Those
  * files carry no `sourcePath`; a node is keyed by its `source` IRI under the
- * instance's publication base.
+ * layer's publication base.
  */
 export function unframedProcesses(seeAlso: readonly string[], framed: ReadonlySet<string>, repoRoot: string = REPO): { byPath: Map<string, PublishedProcess>; problems: string[] } {
   const byPath = new Map<string, PublishedProcess>();

@@ -37,7 +37,7 @@
  *   bun run cat ingest ../qou/uploads/FILE.pdf --instance ../qou   # a content folio's library
  *
  * `--title` passes a KNOWN title through to the PDF rungs. Absent it, the
- * catalogue's Dublin Core `dc.title` is passed when the instance has a
+ * catalogue's Dublin Core `dc.title` is passed when the layer has a
  * catalogue node for this entry, so a scan does not carry its OCR's misreading
  * as `doc_title`.
  *
@@ -67,28 +67,28 @@ import { resolveWorkingInstanceRoot } from "./lib/roots.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
 
 /**
- * This module's own instance root — where its `harness.json` is.
+ * This module's own layer root — where its `harness.json` is.
  *
  * `libraryRoot` defaulted to `resolve(".")`, the CWD, which read as "the
- * instance you are standing in" and was right while the instance and the
+ * instance you are standing in" and was right while the layer and the
  * repository were one directory. After the move (bean `wggr`) the CWD is the
  * REPOSITORY root, which declares nothing, so `directoriesForGraph` returned
  * undefined and the ingest refused — correctly, by its own rule, for the wrong
  * reason: "this instance declares no `library` graph" was a true sentence
- * about a directory that is not this instance.
+ * about a directory that is not this layer.
  *
  * Derived from the module's location rather than from the caller's, because
- * this script BELONGS to this instance. A caller who means a different one
+ * this script BELONGS to this layer. A caller who means a different one
  * passes `root`, which is what the parameter is for.
  *
- * ## `--instance <dir>`: ingest into a CONTENT instance's library
+ * ## `--instance <dir>`: ingest into a CONTENT layer's library
  *
- * Without it this is the instance being worked on — cat-harness, unless a
- * separated instance's repository MOUNTS the harness, when it is that instance
- * (`resolveWorkingInstanceRoot`, bean `j3ls`: from a separated content instance the staging tree
+ * Without it this is the layer being worked on — cat-harness, unless a
+ * separated layer's repository MOUNTS the harness, when it is that layer
+ * (`resolveWorkingInstanceRoot`, bean `j3ls`: from a separated content layer the staging tree
  * landed inside the mounted harness). With it, the
  * staging tree and the destination library are resolved against `<dir>`, which
- * must hold an instance declaration (`<name>.json`). This is the case of a
+ * must hold a layer declaration (`<name>.json`). This is the case of a
  * content folio such as `litlfred/qou`, checked out beside the harness: before
  * the flag the only route was to re-implement this module's steps against the
  * folio's paths (qou's `scripts/library-ingest.ts` did exactly that, importing
@@ -102,7 +102,7 @@ import { COVER_FILENAME } from "./library-graph.ts";
  */
 const INSTANCE_ROOT = resolveInstanceRoot(process.argv);
 
-/** `--instance <dir>` or `--instance=<dir>`, else the working instance. Exported for tests. */
+/** `--instance <dir>` or `--instance=<dir>`, else the working layer. Exported for tests. */
 export function resolveInstanceRoot(
   argv: readonly string[],
   fallback: string = resolveWorkingInstanceRoot({ argv: [] }).root,
@@ -209,7 +209,7 @@ export function libraryRoot(root = INSTANCE_ROOT, choice?: string): string {
 
   // Matched EXACTLY, on either spelling a caller would reasonably use: the
   // relative path the declaration resolves to (`../<instance>/library`) or the
-  // instance directory holding it (`<instance>`). Both work and neither is a
+  // layer directory holding it (`<instance>`). Both work and neither is a
   // second vocabulary to learn.
   //
   // IT WAS A SUBSTRING MATCH, and that is a guess wearing the clothes of a
@@ -227,7 +227,7 @@ export function libraryRoot(root = INSTANCE_ROOT, choice?: string): string {
   const instanceOf = (d: string): string => {
     const rel = named(d);
     const parts = rel.split("/").filter((p) => p.length > 0 && p !== "..");
-    // `../<instance>/library` -> `<instance>`; a bare `library` is this instance's.
+    // `../<instance>/library` -> `<instance>`; a bare `library` is this layer's.
     return parts.length > 1 ? parts[parts.length - 2]! : ".";
   };
   const hits = declared.filter((d) => named(d) === choice || instanceOf(d) === choice);
@@ -1116,7 +1116,7 @@ export function mayPromote(requirements: readonly Requirement[]): boolean {
  * The command that promotes what was just staged — the caller's OWN arguments
  * with `--promote` added, never a path recomposed here.
  *
- * It was recomposed, relative to the instance root, and `bun run` runs from
+ * It was recomposed, relative to the layer root, and `bun run` runs from
  * the repository root: measured 2026-10-06 (bean `apui`), the printed line was
  * `ingest-document.ts ../uploads/X.pdf --promote`, which answers
  * "../uploads/X.pdf: not there". It also dropped `--library`, which a repo
@@ -1347,16 +1347,16 @@ if (import.meta.main) {
   // staged tree there, deleted the staging directory, and printed `✓ promoted`.
   //
   // Latent before bean `frs5` and load-bearing after it: while the only
-  // library was this instance's own, the relative path was `library` and the
+  // library was this layer's own, the relative path was `library` and the
   // mistake resolved to a wrong directory inside the repo. Once a library
-  // could sit in a SIBLING instance the path gained a `../` and the same line
+  // could sit in a SIBLING layer the path gained a `../` and the same line
   // started escaping the repository altogether.
   const out = join(resolve(INSTANCE_ROOT, destination), slug);
   // The entry's JSON-LD nodes, minted for where it is GOING (bean `apui`).
   //
   // The arms wrote a manifest in staging, and staging belongs to whichever
-  // instance holds `ingest-staging/` — so a document promoted into a sibling's
-  // library arrived naming the wrong instance, and `gen-library-jsonld
+  // layer holds `ingest-staging/` — so a document promoted into a sibling's
+  // library arrived naming the wrong layer, and `gen-library-jsonld
   // --check` called 37 of its nodes stale. That left the path as four
   // commands, two of them corpus-wide generators run by hand. This is the same
   // `buildEntryNodes` the corpus walk calls, scoped to ONE entry: the

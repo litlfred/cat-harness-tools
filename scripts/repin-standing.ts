@@ -19,7 +19,7 @@
  *   bun run cat mount:repin:standing --extend-from <old index.config.json>   # step 4a ONLY, after the pins moved
  *   ... --instance <root>   --depth <n>   --consent-on <YYYY-MM-DD>   --summary-file <f>   --no-install
  *
- * ## What it does, per instance
+ * ## What it does, per layer
  *
  * 1. Reads the site's declared mounts through `readDeclaredMounts` and keeps
  *    those whose own `trust.standing` is declared.
@@ -27,10 +27,10 @@
  *    this script reaches the network, so tests stub it. Without `require`, the
  *    candidate is the branch head; with `require: "green"`, the newest of the
  *    last `--depth` commits whose own combined status and check runs are green
- *    ({@link verdictOf}). None green: that instance does not move.
+ *    ({@link verdictOf}). None green: that layer does not move.
  * 3. Asks `standingCovers` (the harness's pure coverage decision) whether the
  *    rule covers the move. Not covered: reported, not moved.
- * 3a. The cascade ({@link alignToHeldPins}): an instance below the harness
+ * 3a. The cascade ({@link alignToHeldPins}): a layer below the harness
  *    is not pinned to its branch head but to the commit the harness's own
  *    lock holds at the harness's new pin, because the harness commits
  *    artefacts generated from those pins (bootstrap's checklists).
@@ -39,7 +39,7 @@
  *    for each new pin is written in the same write, by the rule's person,
  *    marked `standing`.
  * 4a. A NEWLY DECLARED directory ({@link extendExplicitDirectories}): where
- *    the site's override names the instance's directories explicitly, an id
+ *    the site's override names the layer's directories explicitly, an id
  *    the new pin declares in the checkout and the old pin did not is added to
  *    that list, and the summary says so. The standing consent follows the
  *    branch, and a directory the layer adds comes with it. Without this a
@@ -49,15 +49,15 @@
  *    content layer that added three). Ids are only ever ADDED: one the site left out on
  *    purpose stays out, and nothing the site wrote is removed.
  * 5. Re-mounts with `mountRemote`, which rewrites `index.lock.json` and runs
- *    the trust check over every instance of the closure, and re-renders the
- *    agent surface when the lock changed (`afterMount`). A transitive instance
+ *    the trust check over every layer of the closure, and re-renders the
+ *    agent surface when the lock changed (`afterMount`). A transitive layer
  *    whose consent does not cover its new pin is refused there, as always.
  *
- * Instances reached through a gitlink move with their parent's tree; a
+ * Layers reached through a gitlink move with their parent's tree; a
  * `standing` rule on `overrides.<name>.trust` is not followed here.
  *
  * Exit: 0 when it finished (moved or nothing to move); 1 when the re-mount
- * reported an instance missing or refused; 2 when a branch or verdict could
+ * reported a layer missing or refused; 2 when a branch or verdict could
  * not be determined, or a write failed.
  */
 import { appendFileSync, writeFileSync } from "node:fs";
@@ -167,7 +167,7 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
 }
 
 /**
- * The harness and the instances below it, as this checkout declares them —
+ * The harness and the layers below it, as this checkout declares them —
  * the same derivation `bpmn-checklist.ts` uses to decide whose checklists the
  * harness commits.
  */
@@ -228,9 +228,9 @@ export interface PlannedMove {
 
 export interface RepinPlan {
   moves: PlannedMove[];
-  /** Instances with a standing rule that do not move, and why. */
+  /** Layers with a standing rule that do not move, and why. */
   held: Array<{ harness: string; reason: string }>;
-  /** Instances whose branch or verdict could not be determined. */
+  /** Layers whose branch or verdict could not be determined. */
   unknown: Array<{ harness: string; reason: string }>;
 }
 
@@ -256,7 +256,7 @@ export function newlyDeclaredDirectoryIds(before: unknown, after: unknown): stri
 
 /**
  * The moves already MADE between `before` (an `index.config.json` as it was
- * before the pins moved) and `mounts` (as they are now): each remote instance
+ * before the pins moved) and `mounts` (as they are now): each remote layer
  * whose ref changed and that carries a standing rule. The train freezes its
  * pins with the tools the site had BEFORE the move, so a step those tools do
  * not have (4a, here) runs afterwards from the tools the move brought, given
@@ -281,7 +281,7 @@ export function movesSince(before: unknown, mounts: readonly RemoteMount[]): Pla
 }
 
 /**
- * Step 4a: for each move whose site override lists the instance's
+ * Step 4a: for each move whose site override lists the layer's
  * `directories` explicitly, the ids the new pin newly declares in the
  * checkout, less those the list already names. Reads the two declarations
  * through `api.declarationAt`; a declaration it cannot read is could-not-
@@ -346,20 +346,20 @@ export async function planRepin(mounts: readonly RemoteMount[], api: GitHubApi, 
 }
 
 /**
- * The cascade (owner litlfred, 2026-11-06, bean `folio-assistant-pqlh`): an
- * instance below the harness never moves to a commit other than the one the
+ * The cascade (owner litlfred, 2026-11-06, bean `folio-assistant-pqlh`): a
+ * layer below the harness never moves to a commit other than the one the
  * harness's OWN lock holds. The harness commits artefacts generated from those
- * pins — `bpmn-checklist.ts` writes the checklists of every instance below it
+ * pins — `bpmn-checklist.ts` writes the checklists of every layer below it
  * into the harness's site — so a site that moved bootstrap past the harness's
  * pin failed `bpmn:checklist:check` (re-pin trains folio-assistant#2975…#2986).
  * They move once the harness has re-pinned them: bottom-up, one layer at a time.
  *
- * Only the harness's lock caps, and only for the instances below it
+ * Only the harness's lock caps, and only for the layers below it
  * (`belowHarness`): a content layer's lock holds artefacts of nothing, and
  * those locks lag and disagree, so capping by them would freeze every train.
  *
  * The harness's lock is read at the commit this plan pins it to (its move, or
- * its current pin). For each instance below it with a standing rule:
+ * its current pin). For each layer below it with a standing rule:
  * - the harness holds its current pin → it does not move (held);
  * - otherwise it moves to the held pin, when its standing rule covers that
  *   commit; one the rule does not cover is held, as any other;
@@ -427,7 +427,7 @@ export interface ApplyResult {
 /**
  * Write each planned move through `seedRemote` (the `--seed` path: pin and
  * consent in one write, other entries untouched), one rule's grant per
- * instance, then re-mount so `index.lock.json` follows. Imported lazily so
+ * layer, then re-mount so `index.lock.json` follows. Imported lazily so
  * a dry run, and the pure parts' tests, load no mount machinery.
  */
 export async function applyRepin(instanceRoot: string, plan: RepinPlan, opts: ApplyOptions = {}): Promise<ApplyResult> {

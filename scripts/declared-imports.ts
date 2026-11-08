@@ -25,12 +25,12 @@
  * - `validator-refs`: every `validator` and `nodeSchemas[*].validator` ref of
  *   every graph typology the checkout declares, resolved as
  *   `kind-validator.ts` and `node-kind-index.ts` resolve them. An unqualified
- *   ref is resolved against the CALLER's instance root, which the declaration
- *   does not fix, so it is resolved against every instance root and the
+ *   ref is resolved against the CALLER's layer root, which the declaration
+ *   does not fix, so it is resolved against every layer root and the
  *   checkout root, and every target that exists is kept.
  * - `plugin-tables`: the module of every `check` / `implementation` own-code
  *   ref of every `qa-checkers` and `pipeline-plugins` node, resolved against
- *   the root of the instance that declares it, as `harness-config.ts`'s
+ *   the root of the layer that declares it, as `harness-config.ts`'s
  *   `tableEntry` does.
  *
  * A source that cannot be read — a declaration that does not parse, a kind
@@ -53,7 +53,7 @@ export type DeclarationSource = (typeof DECLARATION_SOURCES)[number];
 export const PLUGIN_TABLE_GRAPHS = ["qa-checkers", "pipeline-plugins"] as const;
 
 /**
- * The roots a loader can resolve against: every instance of the checkout and
+ * The roots a loader can resolve against: every layer of the checkout and
  * its declared dependencies — the roots `input-sites.test.ts` holds to be one
  * level below the checkout.
  */

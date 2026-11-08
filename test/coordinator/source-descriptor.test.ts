@@ -18,7 +18,7 @@
  * Moved here from `cat-harness/schemas/source-descriptor.test.ts` to the
  * checkout's own test home `test/` (bean `7zz1`, owner ruling 2026-10-06
  * "Top-level instance"): every test in it reads the source descriptors the
- * content instances' libraries commit, which only the whole checkout holds.
+ * content layers' libraries commit, which only the whole checkout holds.
  * Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. Paths are
  * composed from ORIGIN_DIR, the directory it was written in, so nothing it
@@ -41,7 +41,7 @@ const INSTANCE = join(ORIGIN_DIR, "..");
  * Every descriptor in the checkout, keyed by its path relative to the
  * checkout — found by what the FILE says it is.
  *
- * Since bean `j7ql` (2026-10-01) a descriptor lives with the instance that
+ * Since bean `j7ql` (2026-10-01) a descriptor lives with the layer that
  * owns its corpus (`who-iris/sources/`, `folio-assistant-sci/sources/`), and
  * the schema stays here. So the directories are read off the checkout's
  * `schemas` declarations and a file counts when its `$schema` is the

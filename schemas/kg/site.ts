@@ -11,7 +11,7 @@
  *   `gh-pages` Tool says so: *"Pages cannot serve server-side redirects or
  *   custom headers"*).
  * - **`cdn-site`** — the same, plus the three a real CDN adds, for a
- *   downstream instance's CDN deployment.
+ *   downstream layer's CDN deployment.
  *
  * ## A site is an archive with routes
  *
@@ -47,7 +47,7 @@ const SitePath = z
   .string()
   .regex(/^(?!\/)[^\s]*$/, "a site path is relative to the site root and carries no leading slash or whitespace");
 
-/** One instance's sub-site: the route it answers at, and the instance it is. */
+/** One layer's sub-site: the route it answers at, and the layer it is. */
 export const SubSiteSchema = z
   .object({
     path: SitePath,

@@ -21,7 +21,7 @@
  * from an IRI to the label an author actually wrote.
  *
  * The tests of this file that read the whole checkout (reads the label
- * prefixes the content instances contribute) live in
+ * prefixes the content layers contribute) live in
  * `test/jsonld-label-resolution-checkout.test.ts` (bean `7zz1`): standing
  * alone, cat-harness has none of it.
  */

@@ -190,7 +190,7 @@ describe("mount:remote over fixture repositories", () => {
     mountRemote({ instanceRoot: root, urlFor });
     const file = join(root, "index.lock.json");
     const lock = JSON.parse(readFileSync(file, "utf-8")) as { mounts: Array<{ harness: string; repository: string }>; instances: Array<{ instance: string; via: string; repository: string; sha: string }> };
-    // What `--seed` left behind: the pin moved, its own instance entry did not.
+    // What `--seed` left behind: the pin moved, its own layer entry did not.
     const own = lock.instances.find((i) => lock.mounts.some((m) => m.harness === i.via && m.repository === i.repository))!;
     own.sha = "f".repeat(40);
     writeFileSync(file, `${JSON.stringify(lock, null, 2)}\n`);
@@ -524,8 +524,8 @@ describe("whole-instance mounts and replaying the lock (bean `nn8e`, #2462)", ()
   });
 
   test("19b. a re-mount keeps a STATE mount inside the instance — never re-lays over it", () => {
-    // folio-assistant#2529: each instance's `health` is state-mounted inside
-    // the instance, and a re-mount that removed the instance's directories
+    // folio-assistant#2529: each layer's `health` is state-mounted inside
+    // the layer, and a re-mount that removed the layer's directories
     // removed it too — unpushed edits and all — leaving its marker describing
     // files that were gone. The marker is the state store's record of what it
     // put down; that directory is set aside and put back.
@@ -550,7 +550,7 @@ describe("whole-instance mounts and replaying the lock (bean `nn8e`, #2462)", ()
 
   test("19c. a re-mount keeps the instance's node_modules — an install artefact is never the mount's to delete", () => {
     // folio-assistant#2529: `state:mount` re-lays the mounts, and the re-lay
-    // removed each instance's directory whole — its `node_modules/` with it.
+    // removed each layer's directory whole — its `node_modules/` with it.
     // A workspace member's dependencies come from the root's `bun install`,
     // which the mount does not repeat, so folio-assistant-sci lost its pinned
     // katex 0.18 and resolved the root's 0.16.
@@ -913,7 +913,7 @@ describe("a changed lock re-renders the agent surface", () => {
     expect(existsSync(join(root, ".claude/commands/hello.md"))).toBe(true);
     expect(existsSync(join(root, ".agents/rules/agent-memory.md"))).toBe(true);
     expect(readFileSync(join(root, ".agents/rules/agent-memory.md"), "utf-8")).toContain("fresh mounted lesson");
-    // 2. Nothing under the mounted instance's directory was written: lock digests still match.
+    // 2. Nothing under the mounted layer's directory was written: lock digests still match.
     expect(readFileSync(join(root, "surf/.claude/commands/hello.md"), "utf-8")).toBe(staleCmd);
     expect(readFileSync(join(root, "surf/.claude/agent-memory/watcher/MEMORY.md"), "utf-8")).toBe(staleMem);
     expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
@@ -932,7 +932,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
   // (folio-assistant#2949, #2950; cat-harness-tools#1487). 30 s is twice the
   // worst measured cost.
   const HYDRATED_TIMEOUT_MS = 30_000;
-  // o/hy holds two instances. `hh` publishes ONE hydrated file, for `tools`
+  // o/hy holds two layers. `hh` publishes ONE hydrated file, for `tools`
   // (and a child's, which must not travel); its `skills` and `docs` publish
   // none, and its code must not arrive. `hb` publishes a file under the
   // wrong IRI. o/np builds its subgraph files at publish, so no pin of it
@@ -1005,7 +1005,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     expect(existsSync(join(root, "hh/tools/index.jsonld"))).toBe(false);
     expect(existsSync(join(root, "hh/skills"))).toBe(false);
     expect(existsSync(join(root, "hh/hh.json"))).toBe(false);
-    // nothing discovers a code-less instance there, and the overlay offers none
+    // nothing discovers a code-less layer there, and the overlay offers none
     expect(instanceRootsIn(root)).toEqual([root]);
     expect(mountedInstanceRoots(root).has("hh")).toBe(false);
 

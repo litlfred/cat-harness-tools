@@ -450,7 +450,7 @@ export class ContentGraph {
    * This is the *exposition-gap* signal: the proof leans on something
    * the narrative never asks the reader to have read. It is advisory —
    * frequently the correct state of affairs (`simp` lemmas, library
-   * instances). It is NOT a list of missing `uses[]` entries and must
+   * layers). It is NOT a list of missing `uses[]` entries and must
    * never be applied as one.
    */
   formalOnlyTargets(label: string): string[] {

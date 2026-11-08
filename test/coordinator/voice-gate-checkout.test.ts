@@ -2,7 +2,7 @@
  * `voice-gate` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness-tools/scripts/tests/content/voice-gate.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each reads the voices folio-assistant-sci,
- * smart-base and who-iris ship, or the root instance's voice configuration,
+ * smart-base and who-iris ship, or the root layer's voice configuration,
  * which only the checkout holds. Standing alone, cat-harness has none of it,
  * and `check:cat-harness-standalone` collects every test in that layer. The
  * rest of that file's tests stay there; every path here is composed from
@@ -25,7 +25,7 @@ describe("readActiveVoices", () => {
     // Issue #208: "the folio-asst's own docuemtnation conent doesnt have any
     // voice". Asserted so that activating one here is a deliberate act.
     //
-    // The INSTANCE root, and it has to be: a config belongs to an instance
+    // The LAYER root, and it has to be: a config belongs to a layer
     // and is named after it, so the question "what does this activate" is
     // only answerable of something that declares itself. `cat-harness/` is
     // where `folio-assistant` is declared; its config sits one level up at
@@ -36,7 +36,7 @@ describe("readActiveVoices", () => {
     // `folio-assistant.config.json`; the owner removed that file with the root
     // declaration (3d4caf6, 2026-10-08), and the activation now lives on
     // cat-harness's own `index.config.json` entry (`voices.active`). So the
-    // instance that judges this checkout's skills is the one that activates the
+    // layer that judges this checkout's skills is the one that activates the
     // voice, and it is still a DECISION read from config, not a default.
     const inst = join(ORIGIN_DIR, "../..");
     expect(readActiveVoices(inst)).toEqual(["agent-skill-authoring"]);
@@ -50,7 +50,7 @@ describe("readActiveVoices", () => {
     // (round 5, issue #1694). Still determined, which is the point here.
     //
     // RESTATED 2026-10-09, the other half of the swap: the root is an index
-    // now, not an instantiated instance, so it has no config and the answer
+    // now, not an instantiated layer, so it has no config and the answer
     // is the third state -- `undefined`, never `[]`, which would be a decision
     // nobody made.
     const root = repoRootFor(join(ORIGIN_DIR, "../.."));

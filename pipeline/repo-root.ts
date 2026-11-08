@@ -62,7 +62,7 @@ export function findContentRepoRoot(): string {
     dir = dirname(dir);
   }
   // A CANDIDATE THAT CANNOT BE READ IS NOT A MATCH, AND NOT A CRASH. `folioDir`
-  // resolves through the instance's declaration and THROWS when it will not
+  // resolves through the layer's declaration and THROWS when it will not
   // parse — which became reachable here on 2026-09-21: `harness.json` was
   // excised, so a corrupt config is now a corrupt DECLARATION too, and one
   // unreadable ancestor took down an entire `qa-sweep` that was not about it.
@@ -100,7 +100,7 @@ export function findContentRepoRoot(): string {
  * platform's own `cat-harness/` when no ancestor holds a folio, as in the
  * platform's own repository, and `cat-harness/` declares no dependencies.
  * Loading from there registers nothing, which is indistinguishable from
- * "nothing to contribute". In that case the instance actually running is the
+ * "nothing to contribute". In that case the layer actually running is the
  * repository root above it, so that is returned.
  *
  * Measured 2026-09-29 (folio-assistant#1492): qa-sweep loaded from

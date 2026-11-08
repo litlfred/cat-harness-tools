@@ -14,7 +14,7 @@
  *
  * The steps are bootstrap-tools' `initSteps` — the tool half of bootstrap's
  * `complete-initialization.bpmn` — run with `dryRun` and the `offlineProbe`,
- * so this writes nothing into any instance and touches no network. A step that
+ * so this writes nothing into any layer and touches no network. A step that
  * needs the network (the documents answering at their IRIs, Pages being live)
  * is therefore `could-not-determine` here, never done. The declarations name
  * the steps; there is no second list.
@@ -27,7 +27,7 @@
  * - `health.badges`: one per health notion that is the HARNESS's, not the
  *   repository's. `initialization` is red on any `not-done` step, unknown when
  *   only `could-not-determine` steps are left, green otherwise.
- *   `repository` reads the instance's own committed health report
+ *   `repository` reads the layer's own committed health report
  *   (`healthReportPath`) when there is one, and is `unknown` when there is
  *   not, which in an index checkout is the usual case.
  *
@@ -36,12 +36,12 @@
  *
  * ## A partial mount is not a missing directory
  *
- * An index mounts some instances in part: `index.lock.json` lists the
+ * An index mounts some layers in part: `index.lock.json` lists the
  * directories it brought. A file the lock did not bring may exist upstream,
- * so for such an instance every step that looks for a file is
+ * so for such a layer every step that looks for a file is
  * `could-not-determine` here, never `not-done` ({@link partiallyMounted}).
  *
- * Deterministic: instances in name order, steps in the order `initSteps`
+ * Deterministic: layers in name order, steps in the order `initSteps`
  * gives, and no time is written.
  *
  * @module cat-harness-tools/scripts/harness-state
@@ -93,7 +93,7 @@ export function initializationBadge(counts: Record<StepState, number>): Badge {
   return { id: "initialization", state: "ok", label: `every checkable setup step done (${counts.done})` };
 }
 
-/** The `repository` badge: the instance's own committed health report, or `unknown` without one. */
+/** The `repository` badge: the layer's own committed health report, or `unknown` without one. */
 export function repositoryBadge(instanceRoot: string): Badge {
   const p = healthReportPath(instanceRoot);
   if (!existsSync(p)) return { id: "repository", state: "unknown", label: "no committed health report in this checkout" };
@@ -127,7 +127,7 @@ export function partiallyMounted(instanceRoot: string, repoRoot: string): boolea
 
 /**
  * Steps a partial mount cannot answer: everything that looks for a file in the
- * instance. The declaration, its `needs` and the documents at their IRIs are
+ * layer. The declaration, its `needs` and the documents at their IRIs are
  * read the same way whole or in part.
  */
 export function readsInstanceFiles(stepId: string): boolean {

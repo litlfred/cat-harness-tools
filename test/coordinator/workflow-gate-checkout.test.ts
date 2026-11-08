@@ -44,9 +44,9 @@ const HARNESS = resolve(ORIGIN_DIR, "../..");
 
 /**
  * Where a shipped diagram lives. Not one directory: a content-type process is
- * held by the instance that owns its skills (`l2-dak-authoring` in smart-base,
+ * held by the layer that owns its skills (`l2-dak-authoring` in smart-base,
  * #1772; the paper and document processes since placement PR3, bean `63wl`),
- * and each instance groups its diagrams by concern. So a diagram is found by
+ * and each layer groups its diagrams by concern. So a diagram is found by
  * NAME through the declared `processes` graphs.
  */
 const processFile = (f: string): string => workflowFile(HARNESS, `${f}.bpmn`);

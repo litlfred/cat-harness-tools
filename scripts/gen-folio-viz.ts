@@ -22,14 +22,14 @@
  * The whole page is one template literal and a backtick anywhere inside it
  * terminates the string, failing at a line number far from the mistake.
  *
- * ## One page per instance
+ * ## One page per layer
  *
  * It covers the KIND with `subgraphs: "instance"`: the full view stays
  * cat-harness's own graph at `<locale>/<harness>/folio/`, and every OTHER
- * instance in the checkout holding a folio directory gets
+ * layer in the checkout holding a folio directory gets
  * `<locale>/<harness>/folio/<instance>/`, over a projection of that
- * instance's directories alone at `assets/folio/<instance>/index.json`. Those
- * pages describe instances above this layer, so they are built at publish
+ * layer's directories alone at `assets/folio/<instance>/index.json`. Those
+ * pages describe layers above this layer, so they are built at publish
  * (`builtAtPublish`) and never committed here.
  *
  * Usage:
@@ -107,7 +107,7 @@ export function readFolioGraph(roots: string[], repo?: string): FolioGraph | nul
 }
 
 /**
- * {@link readFolioGraph} over directories already resolved — one instance's,
+ * {@link readFolioGraph} over directories already resolved — one layer's,
  * for its own page. Absent directories are rows here too.
  */
 export function readFolioDirs(dirList: readonly string[], repo: string): FolioGraph {
@@ -349,16 +349,16 @@ function escText(t: string): string {
   return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-/** One instance's folio graph: its declared name and its folio directories. */
+/** One layer's folio graph: its declared name and its folio directories. */
 export interface FolioSubject {
   name: string;
   dirs: string[];
 }
 
 /**
- * Every instance in the checkout holding a folio directory, EXCEPT the
+ * Every layer in the checkout holding a folio directory, EXCEPT the
  * directories the visualiser names by id (`covers`) on its declarer — those
- * are the full view's. Read from the resolved checkout, so a new instance
+ * are the full view's. Read from the resolved checkout, so a new layer
  * declaring a folio graph gets its page with no edit here.
  */
 export function folioSubjects(
@@ -435,7 +435,7 @@ if (import.meta.main) {
     emit(join(subData, "index.json"), JSON.stringify(projection(sg), null, 2) + "\n");
     emit(join(subPage, "index.html"), withRenderedByFrontMatter(viewerHtml(subHref, sub.name), VIEWER_TOOL));
   }
-  // ORPHANS: a page this viewer drew for an instance that no longer holds a
+  // ORPHANS: a page this viewer drew for a layer that no longer holds a
   // folio graph. Only a page that names this Tool as its renderer is touched.
   const drawn = new Set(subjects.map((x) => x.name));
   const orphans = existsSync(pageDir)

@@ -17,7 +17,7 @@ import { KG_PART_RECORD_SCHEMA } from "../schemas/kg/substrate-snapshot.js";
  * Slices 5 and 6 copy a CHOSEN subgraph, or one asset, of a subscribed
  * substrate into the subscriber. The writer is `kg:materialize`, and it
  * lives in the content layer rather than here for one reason: its record embeds core's
- * `MaterializationSchema`, and this instance needs only bootstrap, so a
+ * `MaterializationSchema`, and this layer needs only bootstrap, so a
  * writer here would import up the dependency arrow (`check:partition`).
  *
  * What lives HERE is what the readers below core need without importing up:

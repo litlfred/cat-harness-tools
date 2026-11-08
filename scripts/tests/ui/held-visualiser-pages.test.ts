@@ -1,7 +1,7 @@
 /**
  * A visualiser page a harness commits in its OWN site directory, rather than
- * in the site owner's (wrong-direction move M1, 2026-10-20), and a wireframe an
- * instance keeps in a `docs` directory other than its site directory (move M3).
+ * in the site owner's (wrong-direction move M1, 2026-10-20), and a wireframe a
+ * layer keeps in a `docs` directory other than its site directory (move M3).
  *
  * One fixture checkout: `base` is the site owner (named cat-harness); `top`
  * needs it, declares a visualiser, and holds that visualiser's page at
@@ -50,7 +50,7 @@ put("top/docs/catalogue/data.json", "{}");
 // A docs page that happens to sit at another visualiser's id, drawn by nobody: not held.
 put("top/docs/other/index.html", "<html><head></head><body>docs</body></html>");
 put("top/docs/plain.html", "<html></html>");
-// Wireframes in the instance's SECOND docs directory.
+// Wireframes in the layer's SECOND docs directory.
 put("top/notes/wireframes/index.json", { wireframes: { catalogue: { covers: ["top/catalogue"] } } });
 put("top/notes/wireframes/catalogue/as-is.html", "<html><body>drawn</body></html>");
 clearDeclaredVisualisers();

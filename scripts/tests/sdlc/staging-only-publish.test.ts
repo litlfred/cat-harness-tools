@@ -63,7 +63,7 @@ const REPO = resolve(dirname(HARNESS_ROOT));
 // failing the whole file.
 //
 // Not the whole `derive:publish`. Since B1 (owner, 2026-10-14) that runs
-// every declared `builtAtPublish` writer of every instance: 112 s on run
+// every declared `builtAtPublish` writer of every layer: 112 s on run
 // 38696377785's publish job, and past this hook's 300 s budget in bun-test
 // shards 3 and 4 of main 03ded48, which failed as "(unnamed) a beforeAll hook
 // timed out" with no assertion run. It also rewrote, mid-shard, artefacts

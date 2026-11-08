@@ -25,7 +25,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * `withTranslationMeta` keeps a page's own block rather than overwriting it.
  * So the generated page now shows the TRANSLATED case: every declared locale
  * live. The case #2219 was about, a mounted page with no per-locale build,
- * still exists for any instance that has not translated, and the owner's
+ * still exists for any layer that has not translated, and the owner's
  * ruling, *"declared languages should still be there, just greyed out"*,
  * still governs it. That case and the no-block control are built from the
  * generated page with its own block REMOVED. Both are fixtures derived in
@@ -51,7 +51,7 @@ function withoutTranslationMeta(html: string): string {
   return html.slice(0, i) + html.slice(j);
 }
 
-/** The replica as an UNTRANSLATED instance's page: no block of its own. */
+/** The replica as an UNTRANSLATED layer's page: no block of its own. */
 const UNTRANSLATED = withoutTranslationMeta(PAGE);
 /** ...and that page as `mount-instance-docs.ts` publishes it: the mount-time block, no per-locale build. */
 const MOUNTED_UNTRANSLATED = withTranslationMeta(UNTRANSLATED, translationMetaBlock(join(REPO, "who-iris")));

@@ -13,7 +13,7 @@
  *
  * | | code registry | declaration |
  * |---|---|---|
- * | bootstrap can contribute | **no** — `bootstrap/` holds no TypeScript, and `bootstrap/harness.json` declares an instance that *may not import from the layer composed on top of it* | yes |
+ * | bootstrap can contribute | **no** — `bootstrap/` holds no TypeScript, and `bootstrap/harness.json` declares a layer that *may not import from the layer composed on top of it* | yes |
  * | a downstream folio can contribute | only by shipping code | yes |
  * | inheritance | hand-wired | already resolved, `resolveDirectories`-style |
  * | expressiveness | arbitrary | the fields below, and no more |
@@ -30,7 +30,7 @@
  *    initiation and writes every layer's card. `contributingRoots` already
  *    takes a LIST of roots, so per-harness minting is a caller change.
  * 2. **Every sticky links to ITS OWN harness's docs**, not the composing
- *    instance's — bootstrap's card points at `bootstrap/README.md` on the
+ *    layer's — bootstrap's card points at `bootstrap/README.md` on the
  *    forge.
  *
  * ## Harness vocabulary, not core
@@ -56,7 +56,7 @@ export const STICKY_CONTRIBUTION_SCHEMA_TAG = "folio-sticky-contribution/v1";
  *
  * The one validation here that is about a defect rather than a shape. Bean
  * `blv9`'s entire subject is **link-shaped values that resolve by luck**, and it
- * carries seven instances. The site is a *project* Pages site with
+ * carries seven layers. The site is a *project* Pages site with
  * `baseurl: /folio-assistant`, so:
  *
  * | form | what happens |
@@ -109,7 +109,7 @@ export function isExternalLink(link: StickyLink): boolean {
  * An enum rather than a boolean so a source can be added without a second
  * flag — `bodyFrom: "summary"` reads better than `useSummary: true`.
  *
- * Both sources read the DECLARING instance, not the root's. That is the point
+ * Both sources read the DECLARING layer, not the root's. That is the point
  * of a contribution: bootstrap's sticky carries bootstrap's words, and
  * cat-harness's carries cat-harness's. Reading the root's for every layer would
  * give a board of one sentence repeated.
@@ -135,9 +135,9 @@ export type StickyBodySource = (typeof STICKY_BODY_SOURCES)[number];
  * **Declared, never inherited from dependency resolution.** This is the cost the
  * work-plan item called out before any of it was written: a composed set with no
  * declared order renders in `resolveDirectories`' deepest-dependency-first order,
- * which would put bootstrap's sticky **above the instance's own description** —
+ * which would put bootstrap's sticky **above the layer's own description** —
  * and the description has to come first, because a reader needs to know what the
- * instance IS before anything else means anything.
+ * layer IS before anything else means anything.
  *
  * The scale reads *how early should a reader meet this*, 0 first. A layer can
  * only state its own priority — it cannot see the others — so bootstrap declaring
@@ -323,7 +323,7 @@ export const StickyContributionSchema = z
      * otherwise. Requiring it makes the choice visible in the declaration.
      *
      * Validated for **shape and not existence**, as `ThemedTodoFields` does:
-     * whether a theme is installed is a question about the instance's theme set,
+     * whether a theme is installed is a question about the layer's theme set,
      * which a declaration cannot see. Resolution happens at render time, where a
      * missing theme degrades rather than failing the page.
      */
@@ -332,20 +332,20 @@ export const StickyContributionSchema = z
     summary: z.string().min(1).optional(),
     /** The sticky's text, markdown, written out. Mutually exclusive with `bodyFrom`. */
     body: z.string().min(1).optional(),
-    /** Read the body from the declaring instance instead. See {@link STICKY_BODY_SOURCES}. */
+    /** Read the body from the declaring layer instead. See {@link STICKY_BODY_SOURCES}. */
     bodyFrom: z.enum(STICKY_BODY_SOURCES).optional(),
     /**
      * Markdown appended after the body, whichever way the body was obtained.
      *
      * Exists for one case, and it is a real one: a card that must carry the
-     * instance's `description` VERBATIM and then say something more. The owner:
-     * *"dont lose acronym definitions"* — this instance's description is the
+     * layer's `description` VERBATIM and then say something more. The owner:
+     * *"dont lose acronym definitions"* — this layer's description is the
      * `c@t-harness` derivation chain, and the alternative to composing was
      * copying it into a literal `body`, which is the same words in two places
      * and free to drift the moment one is edited.
      *
      * Deliberately NOT a general template mechanism. One append, at the end, in
-     * markdown. Anything richer belongs in the declaring instance's own
+     * markdown. Anything richer belongs in the declaring layer's own
      * description or in its own card.
      */
     bodyAppend: z.string().min(1).optional(),
@@ -391,12 +391,12 @@ export type StickyContribution = z.infer<typeof StickyContributionSchema>;
 /** A contribution, plus which layer declared it. */
 export interface DeclaredContribution {
   contribution: StickyContribution;
-  /** The declaring instance's `name`. */
+  /** The declaring layer's `name`. */
   declaredBy: string;
   /**
    * The declaration this contribution came from, RELATIVE TO THE REPOSITORY —
    * `cat-harness/cat-harness.json`, `bootstrap/bootstrap.json`: each
-   * instance's own `<instance>/<instance>.json`.
+   * layer's own `<instance>/<instance>.json`.
    *
    * ## Why the path and not just the name
    *
@@ -404,20 +404,20 @@ export interface DeclaredContribution {
    * attribution. It does NOT answer *which file*, and those are different
    * questions the moment anything wants to link to the source: a name is not
    * resolvable, and resolving one by searching would reintroduce exactly the
-   * ambiguity that two instances sharing a `name` already caused once here.
+   * ambiguity that two layers sharing a `name` already caused once here.
    *
    * Repo-relative rather than absolute because its consumers are a forge URL
    * (`/edit/<branch>/<path>`) and a published page — neither of which has any
    * use for this checkout's location on somebody's disk.
    */
   declaredIn: string;
-  /** The declaring instance's root path on disk, when known. */
+  /** The declaring layer's root path on disk, when known. */
   instanceRoot?: string;
-  /** The declaring instance's `description`, for `bodyFrom: "description"`. */
+  /** The declaring layer's `description`, for `bodyFrom: "description"`. */
   description?: string;
-  /** The declaring instance's `summary`, for `bodyFrom: "summary"`. */
+  /** The declaring layer's `summary`, for `bodyFrom: "summary"`. */
   summary?: string;
-  /** The declaring instance's `alsoWritten`, for `bodyFrom: "summary"`. */
+  /** The declaring layer's `alsoWritten`, for `bodyFrom: "summary"`. */
   alsoWritten?: readonly string[];
 }
 
@@ -431,10 +431,10 @@ export interface DeclaredContribution {
  * spelling in `<code>`. A sticky with `bodyFrom: "summary"` renders this, so
  * the two surfaces read the same two declaration fields and agree. Before the
  * owner's ruling on `ob3m` finding 3, a sticky read `description`, and the
- * folio-assistant card showed why the instance was NAMED what it is.
+ * folio-assistant card showed why the layer was NAMED what it is.
  *
  * Returns `undefined` when neither field has words. The caller falls back to
- * the instance's name.
+ * the layer's name.
  */
 export function readerText(fields: {
   summary?: string | undefined;

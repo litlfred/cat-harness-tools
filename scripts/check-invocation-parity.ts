@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * check-invocation-parity.ts — a preview must run the generators the deploy
- * runs, with the same instance arguments.
+ * runs, with the same layer arguments.
  *
  * A preview that skips an export the deploy runs (e.g. `kg-export.ts
  * --instance ./bootstrap`) publishes links to documents its build never
@@ -125,7 +125,7 @@ export function invocations(workflowText: string): Invocation[] {
     const instance = inst ? (inst[1] ?? inst[2] ?? inst[3]) : undefined;
     // Keyed on the PAIR: `kg-export` and `kg-export --instance ./bootstrap`
     // are different obligations, and collapsing them is exactly how `3jhq`
-    // hid — staging ran the exporter, just not for the foreign instance.
+    // hid — staging ran the exporter, just not for the foreign layer.
     const key = `${script}\u0000${instance ?? ""}`;
     if (!out.has(key)) out.set(key, instance === undefined ? { script } : { script, instance });
   }

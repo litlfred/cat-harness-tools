@@ -1,7 +1,7 @@
 /**
  * The rendering exemption — declared, reasoned, substituted, and not spreading.
  *
- * Bean `hfkl`. The obligation every instance carries is a visualiser per
+ * Bean `hfkl`. The obligation every layer carries is a visualiser per
  * declared subgraph (`2krx`); bootstrap is excused it and owes its own
  * `.jsonld`/`.json` instead. Three things have to hold for that to be an
  * exemption rather than a silence list: it is DECLARED where the axis reads it,
@@ -74,7 +74,7 @@ describe("this repository's actual declaration", () => {
   });
 
   test("the subgraph it owes is DECLARED, not merely present", () => {
-    // A directory that exists and is undeclared is not this instance's graph,
+    // A directory that exists and is undeclared is not this layer's graph,
     // however many files sit in it — bootstrap's own declaration says so.
     // So "the skills are on disk" is not the property; "the graph reaches
     // them" is.
@@ -151,7 +151,7 @@ describe("isExemptFrom is what the QA axis calls", () => {
 
   test("false for an instance that declares no exemption", () => {
     // The normal case, and the one the axis meets most often. Every other
-    // instance in this repository takes this branch.
+    // layer in this repository takes this branch.
     expect(isExemptFrom({}, "visualiser")).toBe(false);
   });
 

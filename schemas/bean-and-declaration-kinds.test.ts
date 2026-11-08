@@ -1,5 +1,5 @@
 /**
- * Bean `ujiv` (issue #88): beans and instance declarations are node kinds,
+ * Bean `ujiv` (issue #88): beans and layer declarations are node kinds,
  * by TAGGING the files — `bean/1.0.0` in a bean's front matter,
  * `cat-harness-declaration/1.0.0` in an `<instance>.json`.
  */

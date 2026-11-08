@@ -19,12 +19,12 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 
 /** Root of THIS repo — the folio-assistant platform checkout. */
 /**
- * The INSTANCE root — `<repo>/cat-harness`, where `harness.json` lives.
+ * The LAYER root — `<repo>/cat-harness`, where `harness.json` lives.
  *
  * This was called `REPO_ROOT` and the two were the same directory, so the name
  * cost nothing. The move (bean `wggr`) separated them and the name became a
  * false statement in 72 places at once: everything under here is the
- * instance's, while `.gitignore`, `.mcp.json`, `Dockerfile` and
+ * layer's, while `.gitignore`, `.mcp.json`, `Dockerfile` and
  * `.github/workflows/` are the repository's and sit one level up.
  *
  * Renamed rather than repointed, so that every existing use keeps resolving to
@@ -36,7 +36,7 @@ export const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 
 /**
  * The REPOSITORY root — one level up, holding what belongs to the repository
- * rather than to any instance in it: CI config, the package manifest,
+ * rather than to any layer in it: CI config, the package manifest,
  * `.gitignore`, `Dockerfile`, and the never-overlaid stores.
  */
 export const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
@@ -87,11 +87,11 @@ export const LEAN_DIR = FOLIO_ROOT ?? "";
 /**
  * The root every CONTENT path here resolves against: the folio when one is
  * attached, and otherwise the platform's own content root — which is the
- * INSTANCE, since `content/` sits beside `schemas/` and `scripts/` inside it.
+ * LAYER, since `content/` sits beside `schemas/` and `scripts/` inside it.
  *
  * Named, rather than written `FOLIO_ROOT ?? REPO_ROOT` at each of the four
  * sites that wanted it, because that expression was correct only while
- * `REPO_ROOT` meant the instance. Renaming that constant to say what it is
+ * `REPO_ROOT` meant the layer. Renaming that constant to say what it is
  * (bean `wggr`) changed all four lines' meaning without changing a character
  * of them — the one hazard a clarifying rename carries, and the reason
  * `folio-root.test.ts` failed on a `QOU_LEAN_DIR` that had silently moved one
@@ -117,10 +117,10 @@ export const QOU_LEAN_DIR = join(
  * the `FOLIO_ROOT` comment warns about.
  */
 // `chapters-dir`'s own test calls the no-folio fallback "the platform" and
-// resolves it as `resolve(HARNESS_ROOT)` — this instance, which
+// resolves it as `resolve(HARNESS_ROOT)` — this layer, which
 // is what `CONTENT_ROOT` is.
 export const CHAPTERS_DIR = join(CONTENT_ROOT, "chapters");
-// The INSTANCE's: `schemas/` is `cat-harness/schemas/`, and there is no
+// The LAYER's: `schemas/` is `cat-harness/schemas/`, and there is no
 // `schemas/` at the repository root at all. Unused today, which is the only
 // reason a path naming a directory that does not exist went unnoticed.
 export const SCHEMAS_DIR = join(INSTANCE_ROOT, "schemas");

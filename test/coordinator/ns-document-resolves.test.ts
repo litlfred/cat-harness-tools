@@ -7,7 +7,7 @@
  * into was a LITERAL in a shell loop, and the IRI is a constant in
  * `schemas/kg/namespaces.ts`. Nothing compared them.
  *
- * They drifted. #477 renamed the core instance from `folio-assist-core` to
+ * They drifted. #477 renamed the core layer from `folio-assist-core` to
  * `folio-assistant-core` and moved `CORE_NS` with it; both workflows kept
  * publishing to `_site/folio-assist-core/ns.jsonld`. So from that merge until
  * 2026-09-20, **every `fac:` term dereferenced to nothing** — the document sat
@@ -34,7 +34,7 @@
  * Moved again, from `cat-harness-tools/scripts/tests/` to the checkout's own
  * test home `test/` (bean `7zz1`, owner ruling 2026-10-06 "Top-level
  * instance"): what it reads belongs to the whole checkout, which the root
- * instance declares, not to any one layer — so cat-harness-tools stays green
+ * layer declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
@@ -82,7 +82,7 @@ function pairsIn(workflow: string): Array<{ layer: Layer; dir: string }> {
 
 /** The path segment a layer's namespace IRI names, e.g. `folio-assistant-core`. */
 function segmentOf(layer: Layer): string {
-  // The core layer's namespace is its declaring instance's (folio-assistant#2598).
+  // The core layer's namespace is its declaring layer's (folio-assistant#2598).
   const ns = layer === "core" ? contentLayerInstance()!.namespace : namespaceForLayer(layer);
   // Skipping a release segment (`v0`, or an older copy's `0.1.0`), which is the version and not the layer.
   const m = ns.match(/\/([^/]+)\/(?:(?:\d+\.\d+\.\d+|v\d+)\/)?ns\/$/);

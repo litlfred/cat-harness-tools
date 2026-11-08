@@ -59,7 +59,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 const ROOT = join(HARNESS_ROOT);
 
 /**
- * Every `scripts` key declared by this instance, from whichever `package.json`
+ * Every `scripts` key declared by this layer, from whichever `package.json`
  * carries them.
  *
  * Both are read and merged rather than one being hardcoded: after the
@@ -201,7 +201,7 @@ export interface SkillTriage {
  * declaration cannot reach.
  *
  * The declared part comes from {@link kgRoots} rather than from `"skills"`,
- * because an instance may put its knowledge graph anywhere and this repository
+ * because a layer may put its knowledge graph anywhere and this repository
  * declares TWO such directories since `src/skills/` was declared (bean `osbo`).
  * A package is a subdirectory holding skills; a kg directory may also hold them
  * DIRECTLY, which is what `src/skills/` does.
@@ -220,7 +220,7 @@ function skillDirs(): string[] {
     }
   }
   // declared-path-literal: `.claude/skills/local/` is the agent harness's own
-  // directory and is NOT a `cat-harness` graph in any instance's declaration,
+  // directory and is NOT a `cat-harness` graph in any layer's declaration,
   // so no declaration answers it. It is named here rather than discovered.
   const local = ".claude/skills/local";
   if (existsSync(join(ROOT, local))) d.push(local);

@@ -29,7 +29,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  *
  * declared-path-literal: the fallback is at the call site so the choice is
  * visible. `kgRoots()` returns a LIST because a topical layout has several;
- * this site wants one directory, and takes the first, which is the instance's
+ * this site wants one directory, and takes the first, which is the layer's
  * own root in every layout shipped so far.
  */
 function kgRoot(root: string): string {
@@ -46,7 +46,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * directory with the move (bean `wggr`).
  *
  * `.claude/` and `package.json` belong to the REPOSITORY. The knowledge graph
- * and `skills/requirements/` belong to the INSTANCE. A sweep that moved the
+ * and `skills/requirements/` belong to the LAYER. A sweep that moved the
  * single `rootDir` to the repository root got the first three right and made
  * the registry scan for skill packages one level above them — it emitted ZERO
  * packages where six exist, and "no packages" is a plausible-looking answer.

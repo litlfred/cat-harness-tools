@@ -7,7 +7,7 @@
  *   repositories unreachable;
  * - miss: no ref, the per-repository fetch mounts as before;
  * - tampered: a ref whose bytes do not hash to the lock is refused per
- *   instance and that instance falls back;
+ *   layer and that layer falls back;
  * - stale: `main` from an older lock still serves the layer that did not
  *   move, and the one that did is fetched;
  * - publish refuses a checkout whose mounts do not read `current`.

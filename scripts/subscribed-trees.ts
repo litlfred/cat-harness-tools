@@ -1,7 +1,7 @@
 /**
  * The directories a SUBSCRIBED harness declares, resolved to the tree this
  * checkout holds for each — the seam through which a site build (or anything
- * else that walks declared directories) reads an instance that is not in the
+ * else that walks declared directories) reads a layer that is not in the
  * tree.
  *
  * @module cat-harness/scripts/subscribed-trees
@@ -10,7 +10,7 @@
  *
  * Walking the repository's TOP-LEVEL directories for declarations (as
  * `mount-instance-docs.ts` and `compose-docs.ts` publish) finds only staged
- * instances: one read back by subscription has no `<instance>/`, and would
+ * layers: one read back by subscription has no `<instance>/`, and would
  * silently stop being published. So the question is asked of the DECLARATION:
  * each subscription names a substrate at a pin and the subgraphs it CHOSE;
  * the substrate's own root declaration (cached by `kg:subscribe`) says what
@@ -54,10 +54,10 @@ export type SubscribedTreeState = "held" | "referenced" | "could-not-determine";
 
 /** One chosen subgraph of one subscription, and what this checkout holds for it. */
 export interface SubscribedTree {
-  /** The subscribing instance's `name`. */
+  /** The subscribing layer's `name`. */
   subscriber: string;
   subscription: Subscription;
-  /** The substrate's own instance name — what its routes and tiles are keyed on. Undefined only when the snapshot could not be read. */
+  /** The substrate's own layer name — what its routes and tiles are keyed on. Undefined only when the snapshot could not be read. */
   instance?: string;
   /** The subgraph id the subscription chose. */
   subgraph: string;
@@ -80,7 +80,7 @@ type DeclLike = {
  * Every subgraph some subscription in `decls` chose, resolved to its held
  * tree or to why there is none.
  *
- * @param decls each subscribing instance's root directory and declaration
+ * @param decls each subscribing layer's root directory and declaration
  */
 export function subscribedTrees(decls: readonly { dir: string; decl: DeclLike }[]): SubscribedTree[] {
   const out: SubscribedTree[] = [];
@@ -143,16 +143,16 @@ export function subscribedTrees(decls: readonly { dir: string; decl: DeclLike }[
 }
 
 /**
- * Each subscribed instance's HELD subgraphs laid out at their declared paths
- * under one root — the instance as it would look checked out, with only the
+ * Each subscribed layer's HELD subgraphs laid out at their declared paths
+ * under one root — the layer as it would look checked out, with only the
  * held directories present. Each directory is a symbolic link to its part's
  * `tree/`; nothing is copied.
  *
  * Why a root at all, rather than each tree on its own: a page in one
- * directory may embed a file from another of the same instance — a catalogue
+ * directory may embed a file from another of the same layer — a catalogue
  * replica in `site/` shows covers kept in `library/` — and a reference like
- * `../library/x.png` only resolves against the instance's own layout. With
- * the root, a consumer treats a subscribed instance exactly as an in-tree one.
+ * `../library/x.png` only resolves against the layer's own layout. With
+ * the root, a consumer treats a subscribed layer exactly as an in-tree one.
  *
  * A consumer that COPIES a directory must copy its real path
  * (`realpathSync`), since copying the link copies a link.

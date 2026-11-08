@@ -133,7 +133,7 @@ describe("downstream of a change", () => {
   });
 });
 
-/** The real-tree cases need the IG instances; standing alone they are skipped, named as skipped. */
+/** The real-tree cases need the IG layers; standing alone they are skipped, named as skipped. */
 // smart-immunizations is mounted but declares no directories since the owner's
 // B1 ruling (2026-10-15, `directories: []`), so it has no IG pages to carry.
 const HAS_IGS = ["fhir-harness", "smart-base", "smart-trust"].every((i) =>
@@ -213,7 +213,7 @@ describe("the storage clock", () => {
     expect(j.publish).toEqual([]);
   });
 
-  // The fsh-guts declaration lives in the ROOT instance, which a standalone
+  // The fsh-guts declaration lives in the ROOT layer, which a standalone
   // cat-harness extract does not carry.
   it.skipIf(!existsSync(join(resolve(dirname(HARNESS_ROOT)), "folio-assistant.json")))("this checkout: the fsh-guts viewer is built at publish and nothing committed derives from a branch", () => {
     const j = analyse();

@@ -49,7 +49,7 @@ describe("operationsOf", () => {
 describe("cat-openapi.config.json", () => {
   it("smart-trust's config is found, and parses", () => {
     // Inside its declared `openapi/` directory since the cutover (bean hupw):
-    // the instance is a remote mount, which brings declared directories only.
+    // the layer is a remote mount, which brings declared directories only.
     const p = configPath(join(ROOT, "smart-trust"));
     expect(p).toBe(join(ROOT, "smart-trust", "openapi", "cat-openapi.config.json"));
     expect(OpenApiConfigSchema.safeParse(JSON.parse(readFileSync(p!, "utf8"))).success).toBe(true);
@@ -71,7 +71,7 @@ describe("the committed gateway API", () => {
     try {
       const inst = join(dir, "smart-trust");
       cpSync(join(ROOT, "smart-trust", "smart-trust.json"), join(inst, "smart-trust.json"));
-      // The config travels inside `openapi/`, where the instance keeps it.
+      // The config travels inside `openapi/`, where the layer keeps it.
       cpSync(join(ROOT, "smart-trust", "openapi"), join(inst, "openapi"), { recursive: true });
       const f = join(inst, "openapi", "gateway.openapi.json");
       writeFileSync(f, readFileSync(f, "utf8").replace("Uploads Trusted Certificate", "Uploads A Certificate"));

@@ -15,7 +15,7 @@
  * bun run <platform>/scripts/check-corpus-gate.ts --staged --warn
  * ```
  *
- * Exit 1 when a changed block has no instance recording that the findings
+ * Exit 1 when a changed block has no layer recording that the findings
  * reached the editor; exit 0 under `--warn`. Files that are not content blocks
  * are ignored entirely.
  *

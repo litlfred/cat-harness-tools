@@ -1,7 +1,7 @@
 /**
  * `content-holds-code` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/scripts/tests/content-holds-code.test.ts` (bean `7zz1`, owner
- * ruling 2026-10-06 "Top-level instance"): each judges the content instances
+ * ruling 2026-10-06 "Top-level instance"): each judges the content layers
  * of this checkout, who-iris among them, which only the checkout holds.
  * Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. The rest
@@ -25,7 +25,7 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 describe("contentInstanceCode — this checkout", () => {
   // Owner ruling 2026-10-01: a QA WARNING, not a failure — but one that still
   // NAMES every file. Bean `eayu`.
-  // who-iris is a content instance above the harness, held only by the composed checkout.
+  // who-iris is a content layer above the harness, held only by the composed checkout.
   const noIris = !existsSync(join(REPO, "who-iris")) && notApplicableAlone("who-iris's checkout, whose code files this names (a higher instance)");
   test.skipIf(noIris)("who-iris is a QA warning, naming its IRIS-specific code files", () => {
     expect(KG_CRITERIA_BY_ID["content-instance-holds-code"]?.severity).toBe("minor");
@@ -59,7 +59,7 @@ describe("contentInstanceCode — this checkout", () => {
       "themes/themes.ts",
       // Its Tool node (2026-10-09): the `iris-pages` generator its catalogue
       // visualiser is `renderedBy`. A declaration, but a `.ts` one, as every
-      // instance's `tools` graph is.
+      // layer's `tools` graph is.
       "tools/index.ts",
       // That Tool's own folder (bean `tdir`, tools/<id>/<id>.ts).
       "tools/iris-pages/iris-pages.ts",

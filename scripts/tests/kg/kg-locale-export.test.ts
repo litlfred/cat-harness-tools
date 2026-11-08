@@ -3,7 +3,7 @@
  *
  * @module scripts/tests/kg-locale-export.test
  *
- * Bean `jmpb`. Measured 2026-09-22: **58 of this instance's 62 `.pot`
+ * Bean `jmpb`. Measured 2026-09-22: **58 of this layer's 62 `.pot`
  * templates are BPMN diagrams and none has a `.po` in any of the five
  * locales**, so the real corpus produces ZERO substitutions. A suite that only
  * ran against it would assert nothing at all — `6tkl` — so the machinery is
@@ -155,7 +155,7 @@ describe("isIri — prose is not a link", () => {
 });
 
 describe("a catalogue is scoped to the asset it was extracted from", () => {
-  /** A throwaway instance: one diagram, and two catalogues in one locale. */
+  /** A throwaway layer: one diagram, and two catalogues in one locale. */
   function fixture(): string {
     const dir = mkdtempSync(join(tmpdir(), "kgloc-"));
     mkdirSync(join(dir, "workflows"), { recursive: true });
@@ -322,7 +322,7 @@ describe("the real corpus — what it can still answer with zero translations", 
     // WHAT THIS PROVES, exactly: that the call site still exists. It does not
     // prove the call is reached, nor that its findings reach the exit code —
     // the first needs a locale document with a planted root field, which this
-    // instance's content cannot produce, and the second is asserted by reading
+    // layer's content cannot produce, and the second is asserted by reading
     // the CLI, where `bad > 0` exits before `mkdirSync`. Stated rather than
     // implied, because a structural test that is read as an end-to-end one is
     // worse than none.
@@ -347,7 +347,7 @@ describe("hosted translations — an instance's templates may live in its HOST's
    * `.pot` is tooling output and bootstrap is a floor an agent reads.
    *
    * Three things are asserted separately because they fail separately, and the
-   * middle one is the whole point: a hosted instance's locale set is its HOST's,
+   * middle one is the whole point: a hosted layer's locale set is its HOST's,
    * not an empty set and not the host's set unfiltered.
    */
   test("cat-harness owns its corpus — scope is empty", () => {
@@ -384,7 +384,7 @@ describe("hosted translations — an instance's templates may live in its HOST's
 
   /**
    * The anti-vacuity pair. Each test above passes for a resolver that answered
-   * one constant shape; this asserts the two real instances DISAGREE on both
+   * one constant shape; this asserts the two real layers DISAGREE on both
    * fields, which no constant satisfies.
    */
   test("the two real instances disagree on `by` AND on `scope`", () => {

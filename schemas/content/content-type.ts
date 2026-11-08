@@ -51,7 +51,7 @@ export interface ContentTypeDef {
    * one marker in the set belongs to somebody else — so there is no
    * convention, there is this field.
    *
-   * ## A FUNCTION where the name is the instance's, not the type's
+   * ## A FUNCTION where the name is the layer's, not the type's
    *
    * `folio` was the one fixed name that stopped being fixed: a harness config
    * is `<instance>.config.json` as of 2026-09-20, so the marker's spelling is

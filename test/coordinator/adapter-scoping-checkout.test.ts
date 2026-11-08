@@ -2,7 +2,7 @@
  * `adapter-scoping` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/scripts/tests/adapter-scoping.test.ts` (bean `7zz1`, owner
  * ruling 2026-10-06 "Top-level instance"): each reads the adapters and block
- * kinds the content instances contribute (smart-base's `dak`), which only the
+ * kinds the content layers contribute (smart-base's `dak`), which only the
  * checkout holds. Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. The rest
  * of that file's tests stay there; every path here is composed from

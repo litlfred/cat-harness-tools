@@ -49,7 +49,7 @@ the writer and the gate (`scripts/libraries.ts`), so it records them, keyed by
 the layer each node describes (`layer`, `software-library/1.2.0`), the same
 rule core uses for the glossary schemes of the layers below its typology.
 
-The held set is derived, not listed: every instance with a `package.json` that
+The held set is derived, not listed: every layer with a `package.json` that
 declares no `software-library` directory and does not reach cat-harness
 through `needs`. The nodes are derived at this layer's pins, so a re-pin of
 bootstrap-tools runs `bun run cat libraries:derive` in the same PR, and

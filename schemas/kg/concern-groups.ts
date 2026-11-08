@@ -15,7 +15,7 @@
  *
  * ## Two lists, one node — the `skills.json` shape
  *
- * `groups` names the concern groups; `directories` names INSTANCE
+ * `groups` names the concern groups; `directories` names LAYER
  * directories declared from within (`"subgraph": true`), which the resolver
  * in `cat-harness.ts` promotes exactly as it does for `skills.json`.
  *
@@ -36,7 +36,7 @@ export const ConcernGroupsSchema = z
     _comment: z.string().optional(),
     /** The concern groups this directory holds, by code; each is `<dir>/<code>/`. */
     groups: z.array(ConcernGroupCodeSchema),
-    /** Instance directories declared from within, as in `skills.json`. */
+    /** Layer directories declared from within, as in `skills.json`. */
     directories: z
       .array(
         z

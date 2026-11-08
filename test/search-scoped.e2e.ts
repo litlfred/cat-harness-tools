@@ -23,11 +23,11 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * `docs-ui.js`, with search opened through the launcher's own control (see
  * `search-lazy.e2e.ts` for why it must be the control):
  *
- *   - an instance page fetches the manifest and ITS scope, never the whole;
+ *   - a layer page fetches the manifest and ITS scope, never the whole;
  *   - its results come from that scope only;
  *   - "Search everywhere" fetches the whole index once and re-runs the query;
  *   - with no manifest the page falls back to the whole index, as before;
- *   - a page outside every instance and locale gets the platform scope.
+ *   - a page outside every layer and locale gets the platform scope.
  */
 
 const ROOT = join(HARNESS_ROOT);

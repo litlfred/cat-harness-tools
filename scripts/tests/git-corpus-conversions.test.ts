@@ -45,7 +45,7 @@ const noDot = (r: string): boolean => !r.split("/").some((s) => s.startsWith("."
 /**
  * The checkout's corpus, as `gitCorpus` gives it: tracked and untracked files
  * git does not ignore, PLUS the files a remote mount laid down. In the index
- * checkout every instance is such a mount — ignored by the index's own git,
+ * checkout every layer is such a mount — ignored by the index's own git,
  * yet part of the corpus — so `git check-ignore` called every one of them
  * ignored and the discriminating control below found nothing swept-but-held.
  */

@@ -25,7 +25,7 @@
  *
  * ## The route shape is the CALLER's
  *
- * The caller passes the pattern that finds its own instance root, so the
+ * The caller passes the pattern that finds its own layer root, so the
  * platform names no library; the platform owns the mount, the marker and the
  * gate.
  *
@@ -46,16 +46,16 @@ export const MARKER = "data-fa-folio-mount";
 
 /**
  * Derive the site root from a pathname, given the pattern that finds the
- * instance's own root.
+ * layer's own root.
  *
  * `pattern` is a regular expression whose **first capture group is the site
- * root, including its trailing slash**. For an instance `<name>`, mounted at both
+ * root, including its trailing slash**. For a layer `<name>`, mounted at both
  * `/<name>/` and `/docs/<name>/`:
  *
  *     /^(.*?)(?:docs\/)?<name>\//
  *
  * Non-greedy, so it anchors on the FIRST occurrence: a library item whose
- * slug happened to contain the instance name cannot move the root.
+ * slug happened to contain the layer name cannot move the root.
  *
  * Returns `null` when the pathname does not match — a real state, not a
  * failure to paper over. The client leaves the page alone rather than
@@ -98,7 +98,7 @@ document.head.appendChild(s);
  * `pattern`.
  *
  * Constant for a given pattern — it carries no per-page fact, so every page
- * of an instance gets byte-identical bytes. That is `g196`'s property and it
+ * of a layer gets byte-identical bytes. That is `g196`'s property and it
  * matters here for the same reason: a fragment varying per page makes every
  * rebuild a new blob in `gh-pages`.
  */

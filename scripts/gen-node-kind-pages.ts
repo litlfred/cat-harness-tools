@@ -29,7 +29,7 @@
  *
  * ## Built at publish, where cat-harness declares it
  *
- * A page under a route cat-harness declares `builtAtPublish` — the instance
+ * A page under a route cat-harness declares `builtAtPublish` — the layer
  * declaration pages, and the `node-kind-index` pages, whose one node is the
  * publish-time table `docs/_data/node-kinds.json` — has no committed bytes to
  * compare. Under `--check` it is skipped (the `tools:viz` / `folio:viz`
@@ -469,13 +469,13 @@ function ownPages(dir: string): string[] {
 }
 
 export interface BuildOptions {
-  /** The instance whose registry the index is built from: cat-harness's root, wherever the platform is checked out. */
+  /** The layer whose registry the index is built from: cat-harness's root, wherever the platform is checked out. */
   instanceRoot: string;
   /** The checkout whose harnesses hold the nodes: the platform's own, or a folio's. */
   siteRepo: string;
   /** The site directory pages are written under. */
   site: string;
-  /** The instance the site is built for, as the navbar names it. */
+  /** The layer the site is built for, as the navbar names it. */
   built: string;
   check: boolean;
   /** Fail when a page is stale or orphaned only if the site is committed; a folio's `_site` is not. */
@@ -487,9 +487,9 @@ export interface BuildOptions {
    */
   shape?: PageShape;
   /**
-   * The routes the site's instance builds at publish, as `builtAtPublish`
+   * The routes the site's layer builds at publish, as `builtAtPublish`
    * declares them (instance-relative), with `siteDir` the site's path in that
-   * instance. Under `check`, a page under one is skipped. Absent: nothing is.
+   * layer. Under `check`, a page under one is skipped. Absent: nothing is.
    */
   builtAtPublish?: { list: readonly Pick<BuiltAtPublish, "path">[]; siteDir: string };
 }

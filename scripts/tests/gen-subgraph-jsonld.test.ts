@@ -48,7 +48,7 @@ import { toolsOf } from "../../tools/discover.js";
 import { toolIri } from "../../schemas/tools/tool-folders.js";
 
 const ROOT = resolve(HARNESS_ROOT);
-/** This instance's published document: its own nodes are fragments of it. */
+/** This layer's published document: its own nodes are fragments of it. */
 const HOST_DOC = exportIdentity().docIri;
 
 let plan: SubgraphPlan;
@@ -84,8 +84,8 @@ const SDLC_PARENT = SUBGRAPHS ? "sdlc/" : "skills/";
 
 /**
  * The sdlc nodes, by source path — independent of the generator's placement.
- * THIS instance's nodes only: since bean `4ak5` item 2 a stacked instance's
- * paths are relative to that instance, so its own `skills/sdlc/` is not ours.
+ * THIS layer's nodes only: since bean `4ak5` item 2 a stacked layer's
+ * paths are relative to that layer, so its own `skills/sdlc/` is not ours.
  * Since cat-harness#991 step 23.2 the sdlc skills are the `sdlc` sub-graph's
  * `sdlc/skills/`, a from-within graph of the named sub-graph `sdlc/`.
  */
@@ -138,7 +138,7 @@ describe("gen-subgraph-jsonld", () => {
 
   test("tools/ is a named subgraph: every Tool of this instance, one fetch, each in its own folder (bean mo75 G1)", () => {
     // The oracle is discovery's own list, not the plan: which Tools this
-    // instance defines, and the IRI kg-export gives each.
+    // layer defines, and the IRI kg-export gives each.
     // The Tools of the opt-in `work-plan` sub-graph sit in ITS tools graph,
     // `work-plan/tools/` (cat-harness#991 step 23.2), and are checked below.
     // declared-path-literal: the fallback only — read by the declared id `work-plan-tools`.
@@ -268,7 +268,7 @@ describe("gen-subgraph-jsonld", () => {
     expect(SubgraphIndexSchema.safeParse({ ...doc, "@context": { x: "http://x/" } }).success).toBe(false);
   });
 
-  // Its witness is folio-assistant-core, an instance only the aggregate holds;
+  // Its witness is folio-assistant-core, a layer only the aggregate holds;
   // cat-harness run as its own clone has no overlay to head (bean `ho66`).
   test.skipIf(!inAggregate())("an overlaid instance heads its own tree, and the repository index lists every root (bean ax6r)", () => {
     const repo = JSON.parse(files.get(join(outDir, SUBGRAPH_INDEX_FILE))!) as Record<string, unknown>;
@@ -276,7 +276,7 @@ describe("gen-subgraph-jsonld", () => {
     expect(SubgraphIndexSchema.safeParse(repo).success).toBe(true);
     expect(repo.hasSubgraph).toEqual(plan.harnessRoots);
     expect(plan.harnessRoots[0]).toBe(plan.rootIri);
-    // folio-assistant-core's processes are framed in that instance's tree —
+    // folio-assistant-core's processes are framed in that layer's tree —
     // not in this root — under the `@id`s ITS document gives them.
     const core = `${plan.repoIri}folio-assistant-core/`;
     expect(plan.harnessRoots).toContain(core);
@@ -292,7 +292,7 @@ describe("gen-subgraph-jsonld", () => {
   });
 
   test("each instance is framed from its OWN export: no tree names this document for a node that left it (bean 4ak5 item 2)", () => {
-    // `cat-harness.jsonld#…` for a stacked instance's node is a TOMBSTONE in
+    // `cat-harness.jsonld#…` for a stacked layer's node is a TOMBSTONE in
     // the published document now; framing it would publish the forwarding
     // address as if it were the node.
     const own = `${HOST_DOC}#`;
@@ -320,10 +320,10 @@ describe("gen-subgraph-jsonld", () => {
 });
 
 /**
- * Bean `folio-assistant-63q4`: a subgraph file belongs to the instance whose
+ * Bean `folio-assistant-63q4`: a subgraph file belongs to the layer whose
  * `docs/` it is written under, and `jsonld:contexts` resolves its prefixes
- * through THAT instance's flattened table (its own plus what it `needs`). An
- * own-namespace prefix of an instance above it must not be compacted to.
+ * through THAT layer's flattened table (its own plus what it `needs`). An
+ * own-namespace prefix of a layer above it must not be compacted to.
  */
 describe("own-namespace prefixes stay inside the writing instance's reach", () => {
   const ALL = Object.keys(ownPrefixTable());
@@ -430,7 +430,7 @@ describe("payloads", () => {
   });
 
   // The committed tree is generated in the AGGREGATE, where kg-export's graph
-  // also carries the higher instances' nodes; cat-harness run as its own clone
+  // also carries the higher layers' nodes; cat-harness run as its own clone
   // exports fewer, so their payloads read as orphans there. Skipped, not
   // passed, until the outputs are self-contained (bean `vj2p`; `ho66`).
   test.skipIf(!inAggregate())("the committed payload tree is that set, with no orphan either way", () => {

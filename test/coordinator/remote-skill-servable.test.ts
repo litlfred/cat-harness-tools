@@ -1,5 +1,5 @@
 /**
- * A remote package must not declare a skill this instance cannot serve.
+ * A remote package must not declare a skill this layer cannot serve.
  *
  * Bean `wlqd`, and the owner's instruction was specific: they wanted this "as a
  * todo that fails QA" rather than as prose. The previous pass made the
@@ -41,7 +41,7 @@
  * Moved here from `cat-harness/scripts/tests/remote-skill-servable.test.ts` to
  * the checkout's own test home `test/` (bean `7zz1`, owner ruling 2026-10-06
  * "Top-level instance"): every test in it compares the checkout's
- * remote-package declarations with the skills its instances (fhir-harness
+ * remote-package declarations with the skills its layers (fhir-harness
  * among them) serve, which only the whole checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects
  * every test in that layer. Paths are composed from ORIGIN_DIR, the directory
@@ -86,7 +86,7 @@ const EXPECTED_MATERIALIZED = [
   "scientific-visualization",
 ];
 
-/** Never skills upstream; authored here, in the FHIR instance. */
+/** Never skills upstream; authored here, in the FHIR layer. */
 const EXPECTED_AUTHORED_FHIR = ["fhir-client-operations", "smart-launch"];
 
 describe("remote-package declarations vs what this instance can serve", () => {

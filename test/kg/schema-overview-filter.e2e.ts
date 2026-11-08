@@ -296,7 +296,7 @@ test.describe("overview panel — a suppressed relationship is counted, never si
 
 test.describe("overview panel — drivable without a mouse", () => {
   // `gjli` is a standing rule here and it is load-bearing rather than
-  // boilerplate: this instance's declared interaction profile is
+  // boilerplate: this layer's declared interaction profile is
   // low-dexterity, so a control that needs precise pointing is unusable by
   // the person the page is built for. A filter that only a mouse can reach
   // would have made the picture follow the list for everyone except them.

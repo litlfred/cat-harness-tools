@@ -3,7 +3,7 @@
  * a `block-kinds/` graph the OWNING harness declares.
  *
  * Kinds are discoverable, not centrally managed: no module lists them, and
- * `block-kinds.ts` DISCOVERS them by scanning every instance's declared
+ * `block-kinds.ts` DISCOVERS them by scanning every layer's declared
  * `block-kinds` graph. Each per-kind fact (label prefix, RDF types, builder,
  * profile, whether a label is provable, whether the definition index lists
  * it) is a field here.

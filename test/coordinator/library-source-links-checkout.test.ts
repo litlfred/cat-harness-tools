@@ -2,7 +2,7 @@
  * The library pages' source links over the WHOLE CHECKOUT (owner, 2026-10-15):
  * every href an entry page or the whole-library page links resolves to a file
  * the site holds, and the whole-library page lists the library of every
- * instance in the checkout that declares one — read from the declarations,
+ * layer in the checkout that declares one — read from the declarations,
  * never named here. Lives in `test/coordinator/` with
  * `library-entry-iri-checkout.test.ts` for the same reason (bean `7zz1`):
  * standing alone, cat-harness holds none of these libraries.

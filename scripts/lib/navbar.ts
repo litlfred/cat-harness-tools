@@ -24,7 +24,7 @@
  *
  * | region | holds | scrolls |
  * |---|---|---|
- * | `top` | the instance's mark (its open/close control, #1757) and the open document's index when there is one | no |
+ * | `top` | the layer's mark (its open/close control, #1757) and the open document's index when there is one | no |
  * | `graphs` | this KG's own content — `docs/`, `library/`, every declared kind that HAS content | **yes** |
  * | `bottom` | the instantiated harnesses, expandable, each with its avatar (no home row since 2026-10-30: the header's mark, a house by default, is the home link) | no |
  *
@@ -169,7 +169,7 @@ export interface NavItem {
    *
    * The Jekyll sidebar has rendered these since `603s` (`.fa-harness-tab__graphs`)
    * and this rail never has, which is the single largest difference between the
-   * two surfaces: the sidebar lets a reader reach an instance's `library/` from the
+   * two surfaces: the sidebar lets a reader reach a layer's `library/` from the
    * harness row, and the rail stops at the harness. `sjic` calls that *"two
    * implementations of one navbar, disagreeing about whether a reader can reach
    * a graph"*.
@@ -223,10 +223,10 @@ export interface NavGroup {
 }
 
 export interface NavbarModel {
-  /** The instance this navbar belongs to, shown in the fixed top. */
+  /** The layer this navbar belongs to, shown in the fixed top. */
   instance: string;
   /**
-   * The instance's MARK in the header — its avatar image or its registry
+   * The layer's MARK in the header — its avatar image or its registry
    * glyph, whichever `harness-tiles.ts` resolved (bean `2vpn`), or failing
    * both its initial on its tone. Owner, 2026-10-01 (#1757): *"QA flag each page needs
    * avatar or atleast letter to be clickable"*.
@@ -237,8 +237,8 @@ export interface NavbarModel {
    * which the owner asked to be one: *"the hamburger menu thing and [x] seems
    * to replicate same functionality as clicking on avatar. excise"*.
    *
-   * Absent, the header still draws a LETTER: the instance's initial. It never
-   * falls back to a glyph that names an action rather than the instance.
+   * Absent, the header still draws a LETTER: the layer's initial. It never
+   * falls back to a glyph that names an action rather than the layer.
    */
   mark?: Pick<NavItem, "avatar" | "glyphPath" | "tone" | "icon">;
   /**
@@ -246,7 +246,7 @@ export interface NavbarModel {
    * difference between surfaces, beside {@link hrefs} and {@link openControl}.
    *
    * `"none"` on the Jekyll sidebar, and only there: the theme already draws
-   * the instance's avatar as `.site-title`, which `docs-ui.js` makes the
+   * the layer's avatar as `.site-title`, which `docs-ui.js` makes the
    * open/close control from 50rem up. A second header in the footer was the
    * `☰` the owner asked to excise (#1757) — the same control, drawn twice.
    */
@@ -275,13 +275,13 @@ export interface NavbarModel {
    */
   pages?: NavGroup;
   /**
-   * The instance's own themed root — its front door, in the fixed top.
+   * The layer's own themed root — its front door, in the fixed top.
    *
    * NOT inside the graphs group: a group labelled "Graphs" that contains the
-   * instance itself is a label that does not tell the truth, and the root is
+   * layer itself is a label that does not tell the truth, and the root is
    * the one destination that should stay reachable when the graphs are folded
-   * away. The header beside it (the instance's mark) is a TOGGLE, not a link, so this is the
-   * only way to the instance's front page from a page beneath it.
+   * away. The header beside it (the layer's mark) is a TOGGLE, not a link, so this is the
+   * only way to the layer's front page from a page beneath it.
    */
   root?: NavItem;
   /**
@@ -289,7 +289,7 @@ export interface NavbarModel {
    *
    * *"when a document or other indexed object is opened, the document
    * index/idices are shown in a navbar tab/menu"*. It sits in the FIXED top
-   * with the instance, not in the scrollable middle, because it is about the
+   * with the layer, not in the scrollable middle, because it is about the
    * thing the reader is looking at rather than about the graph they are in.
    * `undefined` when nothing is open, and the region is then absent rather
    * than empty — an empty disclosure invites a click that does nothing.
@@ -333,7 +333,7 @@ export interface NavbarModel {
   /**
    * Where the header goes: the site's landing page. Owner, 2026-10-30: *"who
    * eblmen not clicable to go to landing page. also dont need home on bottomof
-   * harnes navbars."* So the instance's mark and name in the header are the
+   * harnes navbars."* So the layer's mark and name in the header are the
    * home link, and the separate home row at the foot of the bar is gone.
    * Absent, the header is only the open/close control, as before.
    */
@@ -422,14 +422,14 @@ export { NAV_MARK_PX as NAV_GLYPH_PX } from "./navbar-geometry.js";
  * The navbar's stylesheet, scoped to `.fa-nav` so a host page keeps its own.
  *
  * Three ways in, one way back: `:hover` while the pointer is on it,
- * `:focus-visible` inside it for a keyboard, and the header — the instance's mark —
+ * `:focus-visible` inside it for a keyboard, and the header — the layer's mark —
  * which checks a box so it STAYS open, which is what a touch device needs,
  * having no hover at all. The same header unchecks it (#1757: the separate
  * `☰` and `[x]` were two more controls for that one bit). `board-windows`' `l4zi`: an action whose inverse is not
  * reachable is not a toggle.
  *
  * No JavaScript. On a mounted page that is not a preference: those documents
- * are copied verbatim from instances the harness does not control, and
+ * are copied verbatim from layers the harness does not control, and
  * injecting a nav into somebody else's page is one claim while injecting
  * script into it is a larger one.
  */
@@ -708,7 +708,7 @@ function mark(i: NavItem, c: Ctx): string {
       `left:${pct(-r.x / r.w)};top:${pct(-r.y / r.h)}"></span>`
     );
   }
-  // Themed blank mark: an instance or kind with no declared avatar draws a blank
+  // Themed blank mark: a layer or kind with no declared avatar draws a blank
   // in its theme's colour rather than an initial letter or generic question mark.
   if (i.blank || i.glyphPath === BLANK_AVATAR.glyph) {
     const blankTone = typeof i.tone === "number" ? ` style="--fa-nav-hue:${i.tone}"` : "";
@@ -905,10 +905,10 @@ export function navbarOpenInputHtml(): string {
 }
 
 /**
- * The header: the instance's mark and name, as ONE label for the open box.
+ * The header: the layer's mark and name, as ONE label for the open box.
  *
  * `aria-hidden` stays off the mark when it is an image with `alt=""` — the
- * image is already silent — and the label's name is the instance, so a
+ * image is already silent — and the label's name is the layer, so a
  * screen reader hears "cat-harness" and the `title` says what a click does.
  */
 /** The dead fish (`7vhe`), the same drawing `docs-ui.js` uses for fsh-guts. */
@@ -991,7 +991,7 @@ export function navbarRegionsHtml(m: NavbarModel): string {
     // NO `[x]` AND NO `☰` (#1757). The header below is a label for the same
     // checkbox, so it already opens AND closes: a label toggles. The `[x]`
     // was a second label for that box and the `☰` was this one wearing a
-    // glyph that named the action instead of the instance.
+    // glyph that named the action instead of the layer.
     `<div class="fa-nav-in">` +
     `<div class="fa-nav-top">` +
     (m.head === "none" ? "" : headHtml(m, c)) +
@@ -1092,7 +1092,7 @@ export const NAVBAR_CSS = "assets/css/navbar.css";
  *
  * - `pages` — the site's own page tree (the theme's site-nav).
  * - `onThisPage` — the open document's headings.
- * - `folders` — the instance's graphs, one row per folder.
+ * - `folders` — the layer's graphs, one row per folder.
  * - `harnesses` — the harnesses this site is built on.
  *
  * The home row is not a section: it is named after the site.
@@ -1125,7 +1125,7 @@ export const RAIL_SECTION_LABELS = {
  * ## `h2` and `h3` only
  *
  * `h1` is the document's title, which the reader is already looking at, and
- * the navbar names the instance directly above. Below `h3` an index stops
+ * the navbar names the layer directly above. Below `h3` an index stops
  * being a way in and becomes the document again — and this region is in the
  * FIXED top, so every row it takes is a row the scrollable middle does not
  * get.

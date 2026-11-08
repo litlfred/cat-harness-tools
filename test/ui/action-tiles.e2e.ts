@@ -26,7 +26,7 @@ import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
  * ones point where the site config says rather than at a hardcoded URL, and
  * that the whole thing is operable by someone who cannot use a mouse.
  *
- * The accessibility half is not decoration. This instance's declared
+ * The accessibility half is not decoration. This layer's declared
  * interaction profile is low-dexterity (`cat-harness/memory/interaction.json`), and the
  * standing rule is `skills/ui/ui-core/ui-accessibility.md`. A tile that is
  * barely 24px is a tile that is hard to hit, so the floor is checked and the

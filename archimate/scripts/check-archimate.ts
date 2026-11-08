@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Find an instance's `cat-archimate.config.json` and the directory it names,
+ * Find a layer's `cat-archimate.config.json` and the directory it names,
  * and check that what is committed there is what the config says.
  *
  * @module cat-harness/archimate/scripts/check-archimate
@@ -24,7 +24,7 @@ import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 export const CONFIG_FILE = "cat-archimate.config.json";
 
 /**
- * Where the instance's config is: at its root, or inside a directory it
+ * Where the layer's config is: at its root, or inside a directory it
  * declares with graph typology `archimate`. The root wins; `undefined` when
  * neither holds one — `configPath` in `ingest-openapi.ts`, for this kind.
  */
@@ -47,7 +47,7 @@ export function configPath(instanceRoot: string): string | undefined {
   return undefined;
 }
 
-/** The instance's config, parsed. Throws naming the file when it is absent or invalid. */
+/** The layer's config, parsed. Throws naming the file when it is absent or invalid. */
 export function readConfig(instanceRoot: string): ArchimateConfig {
   const p = configPath(instanceRoot) ?? join(instanceRoot, CONFIG_FILE);
   if (!existsSync(p)) throw new Error(`${p}: no ${CONFIG_FILE} — this instance does not instantiate cat-harness's archimate subgraph`);
@@ -57,7 +57,7 @@ export function readConfig(instanceRoot: string): ArchimateConfig {
 }
 
 /**
- * The directory the config names, resolved through the instance's own
+ * The directory the config names, resolved through the layer's own
  * declaration — never a path written in the config, so moving the directory
  * is one edit to `<instance>.json` and nothing else.
  */
@@ -72,7 +72,7 @@ export function archimateDir(instanceRoot: string, config: ArchimateConfig): str
   return join(instanceRoot, entry.path);
 }
 
-/** The archimate directory, instance-relative and in POSIX form — the graph's path under the instance's site. */
+/** The archimate directory, instance-relative and in POSIX form — the graph's path under the layer's site. */
 export const localDirOf = (instanceRoot: string, dir: string): string => relative(instanceRoot, dir).split("\\").join("/");
 
 /**

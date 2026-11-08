@@ -16,11 +16,11 @@
  * the site, and it runs each one's declared `writer`, sources before
  * consumers.
  *
- * ## Artefacts an instance declares it builds at publish
+ * ## Artefacts a layer declares it builds at publish
  *
- * An instance's `builtAtPublish` (`schemas/kg/built-at-publish.ts`) lists
+ * A layer's `builtAtPublish` (`schemas/kg/built-at-publish.ts`) lists
  * artefacts no commit of it can hold current — computed over the checkout's
- * other instances (`checkout`), or from a branch-kept graph (`state`) — and
+ * other layers (`checkout`), or from a branch-kept graph (`state`) — and
  * names each one's writer as a package script. After the branch-derived
  * artefacts, this runs every such writer once, in the order {@link writersOf}
  * works out (see "Writer order"), and then REFUSES an entry that came out
@@ -43,12 +43,12 @@
  *
  * ## Writer order: lowest layer first, plus the edges the declarations state
  *
- * The base order is the instances' dependency order (lowest layer first, a
- * function of the declared `needs` alone), each instance's entries in their
+ * The base order is the layers' dependency order (lowest layer first, a
+ * function of the declared `needs` alone), each layer's entries in their
  * declared order, and a writer named by several entries runs ONCE. On top of
  * that, two kinds of hard edge, both read from the declarations:
  *
- * - an instance's own declared order: each of its writers runs after the one
+ * - a layer's own declared order: each of its writers runs after the one
  *   it lists before it (`processes:viz` after `render:bpmn`, `navbar:include`
  *   after the `docs:harness` whose `harness.json` it renders). A route
  *   derived from a `builtOnHostSite` visualiser is not listed by its host and
@@ -56,7 +56,7 @@
  *   declares them;
  * - a READ EDGE (`reads` on an entry, `schemas/kg/built-at-publish.ts` in
  *   cat-harness): the entry's writers run after the writers of every OTHER
- *   instance's entry that fills (`directory`) a directory of one of those
+ *   layer's entry that fills (`directory`) a directory of one of those
  *   kinds. For example cat-harness's `docs/_data/harness.json` declares
  *   `reads: ["docs"]`, because it links an IG only when that IG's `docs/`
  *   exists.
@@ -153,7 +153,7 @@ export function publishPlan(repoRoot = REPO_ROOT): PublishArtefact[] {
   return [...j.publish].sort((a, b) => (rank.get(a.node) ?? 0) - (rank.get(b.node) ?? 0) || a.artefact.localeCompare(b.artefact));
 }
 
-/** One declared publish-time artefact, resolved: which instance, where on disk, who writes it. */
+/** One declared publish-time artefact, resolved: which layer, where on disk, who writes it. */
 export interface DeclaredArtefact {
   instance: string;
   /** Absolute. */
@@ -162,7 +162,7 @@ export interface DeclaredArtefact {
   path: string;
   writer: readonly string[];
   because: "checkout" | "state";
-  /** The kinds of directory, in other instances, its writers read (`reads`): the declared read edge. */
+  /** The kinds of directory, in other layers, its writers read (`reads`): the declared read edge. */
   reads?: readonly string[];
   /** The kinds of the declared directory this entry fills (`directory`), so a reader of those kinds is ordered after it. */
   fills?: readonly string[];
@@ -179,7 +179,7 @@ export interface DeclaredArtefact {
 }
 
 /**
- * The order instances' publish-time entries are read in: dependency order,
+ * The order layers' publish-time entries are read in: dependency order,
  * lowest layer first, a function of the declared `needs` alone. The base of
  * {@link writersOf}; the declared edges reorder writers on top of it.
  */
@@ -193,7 +193,7 @@ export function writingOrder(repoRoot = REPO_ROOT): string[] {
   return flat.order.map((s) => s.id);
 }
 
-/** Every instance's `builtAtPublish`, instances lowest layer first ({@link writingOrder}), entries as declared. */
+/** Every layer's `builtAtPublish`, layers lowest layer first ({@link writingOrder}), entries as declared. */
 export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state"): DeclaredArtefact[] {
   const order = writingOrder(repoRoot);
   const roots = new Map(readInstances(repoRoot).map((i) => [i.name, i.root] as const));
@@ -253,7 +253,7 @@ export function withHostSiteArtefacts(declared: readonly DeclaredArtefact[], der
   return out;
 }
 
-/** The locale directories every instance's `translation-sources` directory holds, the page locale aside. */
+/** The locale directories every layer's `translation-sources` directory holds, the page locale aside. */
 export function translatedLocales(repoRoot = REPO_ROOT): string[] {
   const out = new Set<string>();
   for (const i of readInstances(repoRoot)) {
@@ -273,7 +273,7 @@ export function translatedLocales(repoRoot = REPO_ROOT): string[] {
 /**
  * The routes visualisers build on the HOST site (`builtOnHostSite`; bean
  * folio-assistant-uldr, owner option "1", 2026-11-06), as plan entries of the
- * host instance, so the host lists none of them. One per locale the viewer
+ * host layer, so the host lists none of them. One per locale the viewer
  * writes: the page locale, and with `translated` each locale of
  * {@link translatedLocales}. The writer is the `renderedBy` Tool's
  * `invoke.shell` script; a Tool that does not resolve to one is refused, not
@@ -328,7 +328,7 @@ export interface WriterEdge {
 
 /**
  * The ordering edges the plan declares (see "Writer order" above): each
- * instance's writers in the order it lists them, each harness's host-site
+ * layer's writers in the order it lists them, each harness's host-site
  * viewers in the order it declares them, and every `reads` edge.
  *
  * A host-site route ({@link hostSiteArtefacts}) is not listed by its host, so

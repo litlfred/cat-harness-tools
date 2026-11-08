@@ -122,7 +122,7 @@ describe("declaredSources", () => {
   });
 });
 
-/** A throwaway instance: `docs/` plus whichever catalogues are given. */
+/** A throwaway layer: `docs/` plus whichever catalogues are given. */
 function fixture(pages: Record<string, string>, cats: Record<string, string>): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), "obsolete-po-"));
   // `siteRoot` CONFIRMS a site by finding `_config.yml` rather than trusting the

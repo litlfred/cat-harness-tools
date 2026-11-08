@@ -3,10 +3,10 @@
  * Every INSTANTIATED harness has an avatar of its own — the instance axis.
  *
  * @module scripts/check-avatar-instances
- * @covers cat-harness — the instance axis: it enumerates the instances each declaration names
+ * @covers cat-harness — the instance axis: it enumerates the layers each declaration names
  *   and asks which has no avatar of its own
  *
- * `harness-tiles.ts` gives an instance with no avatar of its own `GENERIC`,
+ * `harness-tiles.ts` gives a layer with no avatar of its own `GENERIC`,
  * which is to be **reported as a finding** rather than rendered as a blank;
  * this is that report.
  *
@@ -23,10 +23,10 @@
  *
  * ## EXEMPT carries a reason, and a stale entry is itself a finding
  *
- * An instance that replicates someone else's identity (an organisation's
+ * A layer that replicates someone else's identity (an organisation's
  * own mark) may be exempted in `EXEMPT`, WITH a reason, printed on every
- * clean run (as `check-invocation-parity` does). An exemption naming an
- * instance that no longer exists, or one that has since declared an avatar,
+ * clean run (as `check-invocation-parity` does). An exemption naming a
+ * layer that no longer exists, or one that has since declared an avatar,
  * fails.
  *
  * Exit codes: 0 clean · 1 an instantiated harness has no avatar, or an
@@ -50,7 +50,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * here does.
  *
  * It surfaced as the exemptions reading stale, not as a silent pass: with no
- * instances found, both were "gone", which is a
+ * layers found, both were "gone", which is a
  * finding. The guard caught the check's own misconfiguration before the
  * check could report a clean run over nothing — `dh4f`, avoided rather than
  * repeated.
@@ -61,7 +61,7 @@ const REPO = repoRootFor(HARNESS_ROOT);
  * Why an instantiated harness may carry no mark of its own.
  *
  * The IRIS replica LEFT THIS LIST on 2026-09-23, and the exemption's own rule is
- * what removed it: an entry naming an instance that has since declared an
+ * what removed it: an entry naming a layer that has since declared an
  * avatar fails, and this check reported exactly that before anyone noticed.
  *
  * The reason it carried — *"its mark is not this repository's to choose"* —
@@ -73,13 +73,13 @@ const REPO = repoRootFor(HARNESS_ROOT);
  * The DAK IG LEFT IT on 2026-10-04 (bean `2vpn`), on the same line. Its
  * entry was an agent's call, not a ruling, and the "art of its own" it
  * pointed at was the platform owner's shared operations card. Offered the
- * choice, the owner picked a WHO-blue glyph, so the list is empty — and an
- * instance that needs to join it now needs a stated reason, as before.
+ * choice, the owner picked a WHO-blue glyph, so the list is empty — and a
+ * layer that needs to join it now needs a stated reason, as before.
  */
 export const EXEMPT: Readonly<Record<string, string>> = {};
 
 /**
- * Every instantiated harness: `index.config.json`'s instances when the root
+ * Every instantiated harness: `index.config.json`'s layers when the root
  * has one, else each root `<name>.config.json` — `instantiatedHarnessNames`,
  * the one answer, rather than a sixth copy of the scan (which, re-implemented
  * here, would have read `index.config.json` as a harness called `index`).
@@ -91,7 +91,7 @@ export function instantiatedNames(root: string): string[] {
 export interface Report {
   missing: string[];
   exemptUsed: string[];
-  /** An exemption for an instance that is gone, or that now declares art. */
+  /** An exemption for a layer that is gone, or that now declares art. */
   staleExemptions: string[];
 }
 

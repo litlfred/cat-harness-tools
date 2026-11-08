@@ -7,7 +7,7 @@
  * ambiguous would otherwise resolve to whichever package a scan met first.
  *
  * The tests of this file that read the whole checkout (resolves every skill
- * reference across every instance in the checkout) live in
+ * reference across every layer in the checkout) live in
  * `test/skill-refs-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

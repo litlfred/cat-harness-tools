@@ -111,15 +111,15 @@ function finding(
 }
 
 /**
- * Carrier 1 — instance dependencies in an instance's `<name>.config.json`.
+ * Carrier 1 — layer dependencies in a layer's `<name>.config.json`.
  *
  * `major`: this is the reference a consumer resolves to obtain another whole
- * instance. It is the one the FHIR alignment is actually about.
+ * layer. It is the one the FHIR alignment is actually about.
  *
  * **The path is RESOLVED, not composed, and that is not a style preference.**
  * This read `join(root, "harness.config.json")` until 2026-09-21. The config
  * was renamed to `<name>.config.json` on the 21st, so `existsSync` went false
- * for every instance, every iteration `continue`d, and the carrier reported
+ * for every layer, every iteration `continue`d, and the carrier reported
  * *"no instance carries a harness.config.json — there are no declared
  * instance dependencies in this repository to check"* with `examined: 0`.
  *
@@ -130,7 +130,7 @@ function finding(
  * run is the `dh4f` shape**, and here it was hiding the only dependency edge
  * in the repository.
  *
- * `readEffectiveConfig()` reads the instance's `index.config.json` entry first
+ * `readEffectiveConfig()` reads the layer's `index.config.json` entry first
  * and its `<name>.config.json` only as a legacy fallback (bean `ymvt`).
  */
 export function dependencyRefs(repoRoot: string): CarrierReport {
@@ -139,7 +139,7 @@ export function dependencyRefs(repoRoot: string): CarrierReport {
   const seen: string[] = [];
 
   for (const root of instanceRootsIn(repoRoot)) {
-    // INDEX FIRST (bean `ymvt`): an instance an `index.config.json` lists is
+    // INDEX FIRST (bean `ymvt`): a layer an `index.config.json` lists is
     // configured by its entry; a `<name>.config.json` alone is the legacy
     // fallback, named as such in `seen`. `absent` with no `from` is "nothing
     // here declares an instance", which is not the same as "an instance with
@@ -190,7 +190,7 @@ export function dependencyRefs(repoRoot: string): CarrierReport {
  * ASKED, which means resolving it and comparing. A build stamp asks nothing.
  *
  * `minor` rather than `major`: resolving it obtains one file for a comparison,
- * not an instance a build depends on. It is the carrier that has entries
+ * not a layer a build depends on. It is the carrier that has entries
  * today, so it is what keeps this gate from being a check over nothing.
  */
 export function assetSourceRefs(repoRoot: string): CarrierReport {
@@ -242,7 +242,7 @@ export function assetSourceRefs(repoRoot: string): CarrierReport {
  * export WILL publish rather than what the last one did.
  *
  * **Nought today is a determined nought, and the note says which.** Every
- * instance is undecided (§6 Q1), so no instance emits the block at all — a
+ * layer is undecided (§6 Q1), so no layer emits the block at all — a
  * different fact from "the block is emitted and holds no references", and the
  * report distinguishes them.
  */

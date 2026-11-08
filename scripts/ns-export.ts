@@ -70,7 +70,7 @@ import {
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-// The instance that declares the `core` term layer's kinds — the content layer
+// The layer that declares the `core` term layer's kinds — the content layer
 // above the harness — read from where those kinds were declared, so this layer
 // does not carry its name (folio-assistant#2598). `undefined` when none is
 // composed, as when the tools stand alone.
@@ -121,7 +121,7 @@ export function vocabularyIri(): string {
   return `${LEGACY_FOLIO_NS.replace(/ns[#/]$/, "")}ns/vocabulary.jsonld`;
 }
 
-/** Find the platform or repository root holding sibling instances. */
+/** Find the platform or repository root holding sibling layers. */
 export function findPlatformRoot(start: string = ROOT): string {
   let curr = resolve(start);
   while (curr !== dirname(curr)) {
@@ -131,7 +131,7 @@ export function findPlatformRoot(start: string = ROOT): string {
   return repoRootFor(start);
 }
 
-/** The namespace a layer or instance's terms hang off. */
+/** The namespace a layer or layer's terms hang off. */
 export function namespaceForPrefixOrLayer(target: string): string {
   if (target === "bootstrap") return namespaceForLayer("bootstrap");
   if (target === "harness" || target === "cat-harness") return namespaceForLayer("harness");
@@ -146,7 +146,7 @@ export function namespaceForPrefixOrLayer(target: string): string {
 }
 
 /**
- * The concept scheme IRI for a layer or instance: the `skos:ConceptScheme` its
+ * The concept scheme IRI for a layer or layer: the `skos:ConceptScheme` its
  * terms belong to, which is the layer's OWN namespace document, not a fourth
  * IRI invented to hold them.
  *
@@ -164,12 +164,12 @@ export function conceptSchemeIriFor(target: string): string {
   return namespaceForPrefixOrLayer(target).replace(/#$/, "");
 }
 
-/** Instances that publish an ns document (have vocabulary terms or declare block-kinds). */
+/** Layers that publish an ns document (have vocabulary terms or declare block-kinds). */
 export function instancesPublishingNs(root = ROOT): string[] {
   const instances = new Set<string>();
   instances.add("cat-harness");
   const platform = findPlatformRoot(root);
-  // input-site: env FOLIO_FIXTURE_CHECKOUT #eac4c68c — a fixture checkout whose instances join the platform's when the variable is set
+  // input-site: env FOLIO_FIXTURE_CHECKOUT #eac4c68c — a fixture checkout whose layers join the platform's when the variable is set
   const fixture = process.env.FOLIO_FIXTURE_CHECKOUT;
   const roots = [...instanceRootsIn(platform), ...(fixture ? instanceRootsIn(fixture) : [])];
   for (const instRoot of roots) {
@@ -256,7 +256,7 @@ export function graphTypologyIndividuals(): Array<{ name: string; layer: TermLay
 
 /**
  * The prefix a kind's individual is written with: its layer's, or — for a
- * `core` kind — the prefix of the instance that declared it, which is the one
+ * `core` kind — the prefix of the layer that declared it, which is the one
  * whose namespace `graphTypologyIri` names it in.
  */
 function typologyPrefix(name: string, layer: TermLayer, def: object): string {
@@ -276,7 +276,7 @@ export interface VocabularyReport {
 }
 
 /** Assemble the vocabulary, and report what is missing rather than guessing. */
-/** Where bootstrap's own vocabulary is, whether `root` is the index/workspace root or an instance root under it. */
+/** Where bootstrap's own vocabulary is, whether `root` is the index/workspace root or a layer root under it. */
 export function bootstrapVocabularyPath(root = ROOT): string {
   const atRoot = join(root, "bootstrap", "ns.jsonld");
   if (existsSync(atRoot)) return atRoot;
@@ -297,7 +297,7 @@ export function bootstrapVocabulary(root = ROOT): { "@graph": Record<string, unk
 export function buildVocabulary(
   root = ROOT,
   /**
-   * Emit only this layer or instance and the ones BELOW it, or the whole vocabulary.
+   * Emit only this layer or layer and the ones BELOW it, or the whole vocabulary.
    *
    * "And below" rather than "only this": a harness consumer meets bootstrap's
    * terms constantly, so a harness slice that omitted them would document a
@@ -306,7 +306,7 @@ export function buildVocabulary(
    */
   target?: TermLayer | string,
   /**
-   * EXACTLY this layer or instance, rather than it and everything below.
+   * EXACTLY this layer or layer, rather than it and everything below.
    *
    * The two modes answer different questions and conflating them would publish
    * a lie. `--layer harness` is what a HARNESS CONSUMER wants: it meets
@@ -423,7 +423,7 @@ export function buildVocabulary(
   }
   for (const [name, g] of Object.entries(PROPERTY_GLOSSES)) emit(name, "property", g);
 
-  // Block kind classes: each instance generates its own ns document for the block-kind
+  // Block kind classes: each layer generates its own ns document for the block-kind
   // classes it mints (folio-assistant-2osx).
   const platform = findPlatformRoot(root);
   const blockKinds = blockKindsIn ?? discoverBlockKinds(platform);
@@ -665,7 +665,7 @@ if (import.meta.main) {
   const outDir = outDirIdx >= 0 ? argv[outDirIdx + 1] : undefined;
 
   const outIdx = argv.indexOf("--out");
-  // `repoRootFor`: `_kg/` is a repository build output, not an instance one.
+  // `repoRootFor`: `_kg/` is a repository build output, not a layer one.
   // Spelled `_kg/ns.jsonld` as ONE segment rather than `"_kg", "ns.jsonld"`,
   // which is why the grep that found the other four defaults missed this one —
   // a reminder that a scan for a path is a scan for a spelling.

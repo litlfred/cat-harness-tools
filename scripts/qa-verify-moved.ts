@@ -7,7 +7,7 @@
  *
  * ## What "moved" means — derived, never listed
  *
- * The moved set is every file under every directory an instance declares as a
+ * The moved set is every file under every directory a layer declares as a
  * `qa` graph — {@link resolveQaLocation}, the same answer `qa:publish` uses
  * for its roots, so the set verified is the set published by construction.
  * Nothing else is in it:

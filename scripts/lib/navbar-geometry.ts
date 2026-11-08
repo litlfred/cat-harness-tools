@@ -36,7 +36,7 @@
  *
  * So the constrained side sets the numbers and the free side adopts them. The
  * rail's mark grows 20px -> 32px, which also moves it the right way against
- * this instance's declared low-dexterity interaction profile: a 32px target is
+ * this layer's declared low-dexterity interaction profile: a 32px target is
  * the accommodation, and 20px was under it.
  *
  * ## The gutter is DERIVED, not re-picked

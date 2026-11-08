@@ -28,7 +28,7 @@ function repo(agentsMd: string, skills: Record<string, string>): string {
   // A mechanical pass over `join(ROOT, "AGENTS.md")` call sites rewrote this
   // to `repoRootFor(root)` on 2026-09-19 — correct for the ~57 real call sites
   // it was drained for, wrong here, because a fixture's root has no enclosing
-  // instance. It wrote `/tmp/AGENTS.md` while `auditXrefs` looked in the temp
+  // layer. It wrote `/tmp/AGENTS.md` while `auditXrefs` looked in the temp
   // directory, and three tests failed on a file the fixture had just written.
   //
   // The lesson is about the sweep rather than the line: `repoRootFor` means

@@ -92,7 +92,7 @@ export type ExternalIdentity = z.infer<typeof ExternalIdentitySchema>;
  * them `agent`, the subagent a memory entry is scoped to.
  *
  * CLOSED, by the owner's decision (2026-09-30, #1168 B9c: "Enum anyway"),
- * weighed against the cost this doc used to name: a downstream instance that
+ * weighed against the cost this doc used to name: a downstream layer that
  * adds a node kind cannot reference it until the kind is added HERE. That is
  * the price of `skil` failing to parse, and it is paid deliberately — the
  * platform, not the folio, is where a node kind is declared.
@@ -151,7 +151,7 @@ export const ArtefactRefSchema = z.object({
   kind: z.string().min(1),
   /** Its identifier within the provider: `203`, a SHA, a run id. */
   id: z.string().min(1),
-  /** `github`, `gitlab`, … Defaults to the instance's own forge when absent. */
+  /** `github`, `gitlab`, … Defaults to the layer's own forge when absent. */
   provider: z.string().optional(),
   /** `owner/repo`. Absent means **this** repository. */
   repo: z.string().optional(),

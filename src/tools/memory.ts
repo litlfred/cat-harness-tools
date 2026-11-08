@@ -6,7 +6,7 @@
  * can offer memory to an agent told nothing about processes or the work plan
  * (owner, 2026-11-03: *"would an agent still see it through the dependency
  * tree … in that case it needs to be own tool"*). Everything the agent reads
- * — names, descriptions, inputs, answers — is neutral: no instance, item,
+ * — names, descriptions, inputs, answers — is neutral: no layer, item,
  * store, process or role.
  *
  * Behind them (*"in reality a bean with metadata wrapped in the backend, just
@@ -14,9 +14,9 @@
  * `recall`, through the deployment's work-context store. The run's launcher
  * binds the session:
  *
- * - {@link WORK_INSTANCE_ENV}: the instance the agent works in. Its item is
+ * - {@link WORK_INSTANCE_ENV}: the layer the agent works in. Its item is
  *   the agent's own memory of the work, and the backend fills each entry's
- *   process, step and instance.
+ *   process, step and layer.
  * - {@link SHARED_SPACE_ENV}: a memory record a group of agents shares (a
  *   swarm, §4.14). `shared: true` reads and writes it.
  * - {@link AGENT_ID_ENV}: who the agent is, for the entries it keeps.
@@ -38,7 +38,7 @@ import { workContextFrom } from "../workflow/work-context.js";
 import { workPlanStoreFor } from "../workflow/work-plan-store-select.js";
 import type { MemoryStore } from "../workflow/work-plan-store.js";
 
-/** The instance a launcher bound this session to. */
+/** The layer a launcher bound this session to. */
 export const WORK_INSTANCE_ENV = "CAT_WORK_INSTANCE";
 /** The shared memory record a launcher opened for a group of agents. */
 export const SHARED_SPACE_ENV = "CAT_MEMORY_SHARED";
@@ -100,7 +100,7 @@ export async function memoryKeep(
   opts?: MemoryToolEnv,
 ): Promise<string> {
   const root = resolve(repoRoot);
-  // input-site: env CAT_WORK_INSTANCE #f4c974e2 — the instance, shared space and agent the run's launcher bound this session to
+  // input-site: env CAT_WORK_INSTANCE #f4c974e2 — the layer, shared space and agent the run's launcher bound this session to
   const env = opts?.env ?? process.env;
   const b = await bound(root, env, shared);
   if ("not" in b) return `Not kept: ${b.not}.`;
@@ -121,7 +121,7 @@ const SAID: Record<MemoryEntryKind, string> = {
 /** `memory_recall`: what was kept, newest last, in neutral words. */
 export async function memoryRecall(repoRoot: string, { shared = false }: { shared?: boolean }, opts?: MemoryToolEnv): Promise<string> {
   const root = resolve(repoRoot);
-  // input-site: env CAT_WORK_INSTANCE #f4c974e2 — the instance and shared space the run's launcher bound this session to
+  // input-site: env CAT_WORK_INSTANCE #f4c974e2 — the layer and shared space the run's launcher bound this session to
   const env = opts?.env ?? process.env;
   const b = await bound(root, env, shared);
   if ("not" in b) return `Nothing to recall: ${b.not}.`;

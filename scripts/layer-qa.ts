@@ -26,7 +26,7 @@ import { readMountLock } from "../schemas/kg/remote-mount.ts";
 import { type QaStoreOptions, type QaTreeRead, readQaTreeAtCommit } from "./qa-store.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
-/** Where a mounted instance came from: the lock's repository and pinned commit. */
+/** Where a mounted layer came from: the lock's repository and pinned commit. */
 export interface LayerQaSource {
   instance: string;
   repository: string;
@@ -35,8 +35,8 @@ export interface LayerQaSource {
 
 /**
  * The lock entry that put `instanceRoot` where it is, read from the lock at
- * `repoRoot`. `undefined` for an instance no lock mounted (the index's own
- * instances, a sibling clone) — its QA is the index's to read.
+ * `repoRoot`. `undefined` for a layer no lock mounted (the index's own
+ * layers, a sibling clone) — its QA is the index's to read.
  */
 export function layerQaSource(repoRoot: string, instanceRoot: string): LayerQaSource | undefined {
   const at = resolve(instanceRoot);
@@ -55,12 +55,12 @@ export function layerQaSource(repoRoot: string, instanceRoot: string): LayerQaSo
  * The remote a repository name is read from. `owner/name` is a GitHub
  * repository; anything else (a URL, a `file://` path) is used as given, which
  * is how the tests stand a store up locally. `QA_LAYER_REMOTE_<INSTANCE>`
- * (upper case, `-` as `_`) overrides one instance.
+ * (upper case, `-` as `_`) overrides one layer.
  */
 export function layerQaRemote(source: LayerQaSource, vars?: Record<string, string | undefined>): string {
   let env = vars;
   if (env === undefined) {
-    // input-site: traced #5c5cd616 — an override named after the instance, so no `env` verdict can list it: a run that reaches it records no hash; the tests pass their own variables
+    // input-site: traced #5c5cd616 — an override named after the layer, so no `env` verdict can list it: a run that reaches it records no hash; the tests pass their own variables
     inputSiteReached("layer-qa: QA_LAYER_REMOTE_<INSTANCE>");
     env = process.env;
   }

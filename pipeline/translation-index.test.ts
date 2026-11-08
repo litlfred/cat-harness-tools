@@ -17,7 +17,7 @@
  * Nothing here pins a count or a locale list. Both change the moment somebody
  * adds a translation, and a fixture that is a live verdict about the corpus is
  * not a fixture — every expectation below is either derived from the corpus at
- * test time or stated explicitly as a synthetic case in a temp instance.
+ * test time or stated explicitly as a synthetic case in a temp layer.
  */
 import { sourceForPermalink } from "../scripts/lib/jekyll-permalink.ts";
 import { describe, it, expect } from "bun:test";
@@ -54,11 +54,11 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 
 /**
- * A throwaway instance: a `harness.config.json`, and a `docs/` tree with the
+ * A throwaway layer: a `harness.config.json`, and a `docs/` tree with the
  * `_config.yml` that makes it a Jekyll site.
  *
  * The `_config.yml` is not decoration. `siteRoot` CONFIRMS the site rather
- * than assuming it, so an instance without one is reported as unreadable —
+ * than assuming it, so a layer without one is reported as unreadable —
  * and a fixture that omitted it would take every test below down the
  * could-not-determine path and pass for the wrong reason.
  */
@@ -320,7 +320,7 @@ describe("three states", () => {
   });
 
   it("a NAMED docs directory is read without a `_config.yml`, and an absent one is still unreadable", () => {
-    // An instance above the base renders its docs pages into a directory the
+    // A layer above the base renders its docs pages into a directory the
     // site build composes under its name: it is not a Jekyll site of its own,
     // so the caller names it (`gen-docs-pages.ts`). Named but absent stays the
     // third state rather than becoming "no translations".
@@ -471,10 +471,10 @@ describe("this repository's own corpus", () => {
     expect(translated).toBeGreaterThan(0);
   });
 
-  // A key's second segment is the instance whose page it is. The committed
-  // index also names pages a HIGHER instance builds into this site
+  // A key's second segment is the layer whose page it is. The committed
+  // index also names pages a HIGHER layer builds into this site
   // (`en/folio-assistant-core/glossary`), and a checkout without that
-  // instance has no such page to find (bean w1gy F18).
+  // layer has no such page to find (bean w1gy F18).
   const higherKeys = ((): string[] => {
     try {
       const pages = (JSON.parse(readFileSync(join(INSTANCE_ROOT, INDEX_PATH), "utf-8")) as { pages?: Record<string, unknown> }).pages ?? {};
@@ -487,7 +487,7 @@ describe("this repository's own corpus", () => {
     }
   })();
   // The index is regenerated from the pages this checkout holds, so a checkout
-  // without the instance that builds a committed key's page draws an index
+  // without the layer that builds a committed key's page draws an index
   // without that key, and the committed one reads as stale by exactly those
   // keys (bean w1gy F18).
   it.skipIf(

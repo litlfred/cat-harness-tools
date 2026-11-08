@@ -37,7 +37,7 @@
  * @module cat-harness/scripts/tests/lean-decl-starts-are-shared.test
  *
  * The tests here whose subject is folio-assistant-sci's contribution (the
- * `lean-lexer` pipeline plugin this instance contributes) live in
+ * `lean-lexer` pipeline plugin this layer contributes) live in
  * `folio-assistant-sci/scripts/tests/lean-decl-starts-are-shared.test.ts`
  * (bean `ho66`): standing alone, cat-harness has no such contribution to read.
  */

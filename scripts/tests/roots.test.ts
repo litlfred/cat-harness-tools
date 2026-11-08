@@ -125,11 +125,11 @@ describe("harnessFlag", () => {
 });
 
 /**
- * The instance being worked on (bean `j3ls`). Each layout is a fixture whose
+ * The layer being worked on (bean `j3ls`). Each layout is a fixture whose
  * `.git` is a plain directory: the resolver reads the marker, never git.
  */
 describe("resolveWorkingInstanceRoot: the instance worked on, not the one loaded from", () => {
-  /** A separated instance's repository, `<scratch>/<dir>/`, declaring `name` and mounting the harness. */
+  /** A separated layer's repository, `<scratch>/<dir>/`, declaring `name` and mounting the harness. */
   function separated(dir: string, name = "who-iris"): { repo: string; harness: string; tools: string } {
     const x = checkout(dir);
     mkdirSync(join(x.repo, ".git"), { recursive: true });

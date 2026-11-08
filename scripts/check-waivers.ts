@@ -33,7 +33,7 @@ import { WaiverNodeSchema, waiverState, type WaiverNode } from "../schemas/condu
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { gateDirectoriesForGraph } from "./lib/gate-own.ts";
 
-/** The INSTANCE root — this file lives at `<instance>/scripts/`. */
+/** The LAYER root — this file lives at `<instance>/scripts/`. */
 export const INSTANCE_ROOT = HARNESS_ROOT;
 
 /**

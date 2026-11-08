@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * pack-tarball — build an npm .tgz tarball of an instance using `bun pm pack`,
+ * pack-tarball — build an npm .tgz tarball of a layer using `bun pm pack`,
  * compute its size and SHA-256 digest, and emit a `folio-binary-release/v1` state node
  * conforming to `schemas/sdlc/binary-release.ts` (BinaryReleaseSchema).
  *
@@ -30,8 +30,8 @@ import {
 import { readDeclaration } from "../schemas/kg/cat-harness.js";
 
 // declared-path-literal: the pack-time exclusions for the binary assets a
-// PACKAGED instance may hold, written into that package's ignore list. They
-// name the conventional `library/` and `uploads/` trees of whatever instance
+// PACKAGED layer may hold, written into that package's ignore list. They
+// name the conventional `library/` and `uploads/` trees of whatever layer
 // is packed, not a directory of this checkout, so no declaration here
 // answers them.
 export const BINARY_ASSET_IGNORE_PATTERNS = [

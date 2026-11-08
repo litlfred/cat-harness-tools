@@ -1,6 +1,6 @@
 /**
  * Placement PR1 (bean `ybwt`): the content-type skill packages moved UP out of
- * `cat-harness/skills/` to the instance that owns them, and the role edges
+ * `cat-harness/skills/` to the layer that owns them, and the role edges
  * naming them moved with them as extensions by id (PR0b).
  *
  * Pinned against the live checkout, because the claim IS about this checkout:
@@ -17,7 +17,7 @@
  * Moved here from `cat-harness/scripts/tests/placement-pr1-content-up.test.ts`
  * to the checkout's own test home `test/` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): every test in it checks that content-type
- * packages sit in the instances above cat-harness that own them, which only
+ * packages sit in the layers above cat-harness that own them, which only
  * the whole checkout holds. Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. Paths are
  * composed from ORIGIN_DIR, the directory it was written in, so nothing it
@@ -118,7 +118,7 @@ describe("placement PR1: role edges point down", () => {
     // Through the OWNER: the harness's own graph carries none of these edges.
     // `lean-authoring-agent` is a role its owner DECLARES, so the harness does
     // not know the role at all; the other two are harness roles the owning
-    // instance extends, and the overlay records that instance as the one
+    // layer extends, and the overlay records that layer as the one
     // that added the skill.
     const own = roleGraphFor(PLATFORM, "instance")!;
     const ownSkillsOf = (id: string): string[] => own.roles.find((r) => r.id === id)?.skills ?? [];

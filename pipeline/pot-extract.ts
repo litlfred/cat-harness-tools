@@ -151,7 +151,7 @@ export const MD_KRAMDOWN_ATTR_RE = /^\{[:%][^}]*\}\s*$/;
  * `{:toc}` replaces the preceding list with a generated table of contents, so
  * that list's text **never reaches a reader in any language**. Every other
  * directive here attaches attributes and leaves the block rendering — a
- * measured distinction rather than a guessed one: across this instance's docs
+ * measured distinction rather than a guessed one: across this layer's docs
  * the directive vocabulary is `{: .note }` (232), `{: .fa-edit-source }` (276),
  * `{: .no_toc }` (38), `{: .fa-hx-dim }` (22) and others, and **only `{:toc}`
  * consumes.** Widening this regex to all of them would delete real prose from

@@ -42,7 +42,7 @@ import { isSyncedSkillDir } from "./sync-remote-skills.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** The INSTANCE root — this file lives at `<instance>/scripts/`. */
+/** The LAYER root — this file lives at `<instance>/scripts/`. */
 export const INSTANCE_ROOT = HARNESS_ROOT;
 
 /** A fenced block, with its info string. */
@@ -130,7 +130,7 @@ export interface CommandPathReport {
   held: { file: string; line: number; token: string; command: string }[];
   dead: { file: string; line: number; token: string; command: string }[];
   /**
-   * Paths that resolve only through a move some instance declares, in its
+   * Paths that resolve only through a move some layer declares, in its
    * window (sdlc skill `two-phase-move`): checked and passing, each still to
    * switch to the new path. Past `until` the same path is `dead`.
    */
@@ -199,7 +199,7 @@ export function aboutThisTree(repo: string, tok: string): boolean {
   //
   // The skill was never wrong. `docs/audits/…` is a FOLIO's audit output, and
   // the platform's own documentation is spelled `cat-harness/docs/…` with its
-  // instance prefix, so it still carries a head this tree does judge.
+  // layer prefix, so it still carries a head this tree does judge.
   if (SKILL_FOLIO_HEADS.has(first)) return false;
   try {
     return statSync(join(repo, first)).isDirectory();
@@ -334,13 +334,13 @@ export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT), own
  *
  * | | example | correct relative to |
  * |---|---|---|
- * | a cross-reference in prose | ``see `scripts/known-skills.ts` `` | the INSTANCE — and it resolves |
+ * | a cross-reference in prose | ``see `scripts/known-skills.ts` `` | the LAYER — and it resolves |
  * | a command in a header or a message | `bun run cat-harness-tools/scripts/lean-audit.ts` | the REPOSITORY — where a person stands |
  *
  * Only the second is wrong. `bun run`, `bunx`, `bash`, `npx`, `python3`,
  * `deno run` say a human is about to execute this, and nothing else does.
  *
- * **Second, the path must RESOLVE UNDER AN INSTANCE.** This is what the first
+ * **Second, the path must RESOLVE UNDER A LAYER.** This is what the first
  * draft got wrong and it gutted the check: it reused {@link aboutThisTree},
  * which judges a path only when its first segment exists at the repository
  * root — and `scripts/` does not exist there, *which is the entire defect*.
@@ -355,7 +355,7 @@ export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT), own
  *
  * A path that resolves nowhere is a folio's (`pipeline/qa-sweep.ts` is
  * correct in a folio and this repository carries none) and is COUNTED, never
- * failed. Instance roots are discovered as the directories carrying their own
+ * failed. Layer roots are discovered as the directories carrying their own
  * `harness.json`, not listed here — a list would rot on the next split, which
  * is the defect this whole check exists for.
  *
@@ -439,9 +439,9 @@ export function checkPrintedCommands(repo: string, report: CommandPathReport, ow
 }
 
 /**
- * The instance roots, DISCOVERED rather than listed.
+ * The layer roots, DISCOVERED rather than listed.
  *
- * A directory carrying its own `harness.json` is an instance by this
+ * A directory carrying its own `harness.json` is a layer by this
  * repository's own definition. Hardcoding the list would rot on the next
  * split — which is the exact defect this check exists to catch, and writing it
  * into the check would be a poor joke.
@@ -490,7 +490,7 @@ export const FOLIO_OWNED = new Set(["folio", "content", "uploads", "library", "l
  * | skill | an instruction to a folio author, run in THEIR folio | not this tree's to judge |
  *
  * An entry document describes this repository, so a bare `docs/` there is a
- * reference that lost its instance prefix and the finding carries its repair.
+ * reference that lost its layer prefix and the finding carries its repair.
  * A skill is executed by an agent working inside a folio, where `docs/` is
  * that folio's — `docs/audits/…` is its audit output and `docs/_site` its
  * rendered pages. Both readings are right for their corpus, which is what
@@ -518,7 +518,7 @@ export function instanceRoots(repo: string): string[] {
         out.push(name);
       }
     } catch {
-      /* unreadable entry: not an instance root as far as this can tell */
+      /* unreadable entry: not a layer root as far as this can tell */
     }
   }
   return out.sort();
@@ -526,9 +526,9 @@ export function instanceRoots(repo: string): string[] {
 
 /** Every `.ts` and `.sh` file whose printed commands are read. */
 export function sourceFiles(repo: string): string[] {
-  // DISCOVERED from the instance roots, not listed. The first draft named
+  // DISCOVERED from the layer roots, not listed. The first draft named
   // `cat-harness/{scripts,src,content,schemas}`, and a merge from `main`
-  // brought the IRIS replica instance with its own `scripts/` that the check
+  // brought the IRIS replica layer with its own `scripts/` that the check
   // then walked straight past — a hardcoded list going stale inside the check
   // whose whole subject is hardcoded paths going stale.
   const out: string[] = [];
@@ -596,7 +596,7 @@ function checkHostCommandFile(repo: string, file: string, report: CommandPathRep
   try {
     parsed = JSON.parse(readFileSync(join(repo, file), "utf8"));
   } catch {
-    return; // No such file is a determined absence: this instance has no hooks, or no MCP servers.
+    return; // No such file is a determined absence: this layer has no hooks, or no MCP servers.
   }
   report.filesRead++;
   const commands: string[] = [];
@@ -644,7 +644,7 @@ function checkHostCommandFile(repo: string, file: string, report: CommandPathRep
 export function corpus(repo: string): { file: string; corpus: Corpus }[] {
   const out: { file: string; corpus: Corpus }[] = [];
   for (const p of findEntryFiles(repo)) out.push({ file: p.slice(repo.length + 1), corpus: "entry" });
-  // declared-path-literal: the two ENTRY pages a newcomer copies commands from, named repo-relative because this check reads them as the reader does. One is the harness's onboarding guide; the script moved up to cat-harness-tools in 70lx B2b, so a path that was its own instance's is now its implementer's (downward).
+  // declared-path-literal: the two ENTRY pages a newcomer copies commands from, named repo-relative because this check reads them as the reader does. One is the harness's onboarding guide; the script moved up to cat-harness-tools in 70lx B2b, so a path that was its own layer's is now its implementer's (downward).
   for (const f of ["README.md", "cat-harness/docs/guides/agent-onboarding.md"]) {
     if (existsSync(join(repo, f))) out.push({ file: f, corpus: "entry" });
   }

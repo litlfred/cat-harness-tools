@@ -7,7 +7,7 @@
  * this, a reader with JavaScript off gets no note at all. It is an
  * accessibility floor, not a fallback: a board that cannot be read linearly
  * cannot be read by a screen reader, printed, or translated, and this
- * instance's declared interaction profile is **low-dexterity**.
+ * layer's declared interaction profile is **low-dexterity**.
  *
  * ## One function, two callers
  *

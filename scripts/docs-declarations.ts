@@ -11,7 +11,7 @@
  * Each entry is a graph TYPOLOGY (`library`) — the page documents every directory
  * of that kind — or one directory, `<instance>/<id>`, where the kind is too
  * general to claim (`cat-harness/tools`: `tool-graph.md` is about this
- * instance's tool graph, not every `tools` directory). The same two forms, and
+ * layer's tool graph, not every `tools` directory). The same two forms, and
  * the same reach rule, as a skill's `graph-typologies:` / `governs:`
  * (`skill-governance.ts`).
  *
@@ -26,7 +26,7 @@ import { frontMatterList } from "./skill-governance.js";
 export interface DocsPage {
   /** Repository-relative path of the page. */
   page: string;
-  /** The instance directory the page lives in (its first path segment). */
+  /** The layer directory the page lives in (its first path segment). */
   instance: string;
   /** Kinds, and `<instance>/<id>` directories. */
   documents: string[];
@@ -58,7 +58,7 @@ export function docsPages(repoRoot: string, files: readonly string[]): DocsPage[
 
 /**
  * The pages documenting one directory: those naming it (`<instance>/<id>`),
- * or naming one of its kinds from an instance in reach.
+ * or naming one of its kinds from a layer in reach.
  */
 export function documentingPages(
   dir: { instance: string; id: string; graphTypologies: readonly string[] },

@@ -54,7 +54,7 @@ export interface ConditionResult {
   summary: string;
   findings: string[];
   /**
-   * Findings inside a MOUNTED layer — an instance this repository does not
+   * Findings inside a MOUNTED layer — a layer this repository does not
    * track. Reported, never counted: a cutover is this repository's, and a
    * defect in a layer it mounts at a pin is fixed upstream and re-pinned.
    */
@@ -64,14 +64,14 @@ export interface ConditionResult {
 export interface CutoverReport {
   root: string;
   instance: string | undefined;
-  /** Instances this repository tracks — its own, as opposed to its mounts. */
+  /** Layers this repository tracks — its own, as opposed to its mounts. */
   own: string[];
   conditions: ConditionResult[];
 }
 
 /**
- * The instances a checkout TRACKS, by declared name. A remote mount is
- * gitignored, so an instance with no tracked file is a layer this repository
+ * The layers a checkout TRACKS, by declared name. A remote mount is
+ * gitignored, so a layer with no tracked file is a layer this repository
  * consumes rather than one it owns.
  */
 export function ownInstances(root: string): string[] {

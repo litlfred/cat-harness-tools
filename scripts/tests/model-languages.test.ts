@@ -35,7 +35,7 @@ const entry = (over: Partial<ModelEntry> = {}): ModelEntry => ({
   ...over,
 });
 
-/** A throwaway instance carrying one registry. */
+/** A throwaway layer carrying one registry. */
 function fixture(body: unknown): string {
   const dir = mkdtempSync(join(tmpdir(), "models-"));
   mkdirSync(join(dir, MODEL_REGISTRY_DIR), { recursive: true });

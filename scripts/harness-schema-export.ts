@@ -2,7 +2,7 @@
 /**
  * Publish the declaration's JSON Schema at a dereferenceable `$id`.
  *
- * `<stub>.jsonld` says what this instance contains; this says what a
+ * `<stub>.jsonld` says what this layer contains; this says what a
  * declaration *is*, and lives at the URL its own `$id` names — so a consumer
  * holding a declaration it does not understand has somewhere to go.
  *
@@ -44,16 +44,16 @@ import { withConcernGroupDirs } from "./concern-groups.ts";
 import { hostSchemaBase, hostSchemaPath, legacyHostSchemaPath, movedSchema } from "./lib/host-schema.ts";
 
 /**
- * Where an instance keeps its skills' I/O contracts: `<root>/schemas/skills/`.
+ * Where a layer keeps its skills' I/O contracts: `<root>/schemas/skills/`.
  *
  * declared-path-literal: the contract-ref convention itself. A skill names its
  * contract in front matter as `input: schemas/skills/<skill>/input.schema.json`,
- * RELATIVE TO ITS INSTANCE ROOT (`contractRefProblem` in `skill-contracts.ts`),
+ * RELATIVE TO ITS LAYER ROOT (`contractRefProblem` in `skill-contracts.ts`),
  * and `kg-export` mints an IRI only for a ref of that shape. So the directory is
  * fixed by the refs that name it, not by the declared `schemas` graph.
  *
  * It read the declared `schemas` directory (`instanceDirectoryForGraph`) until
- * bean `4ak5` item 1 generalised this to every instance, and for the host the
+ * bean `4ak5` item 1 generalised this to every layer, and for the host the
  * two agree. They do not agree elsewhere: the formal-math layer declares
  * `sources/` as its `schemas` graph (source descriptors) and keeps its six
  * contracts under `schemas/skills/`, where its skills' refs point; the FHIR IG
@@ -63,7 +63,7 @@ import { hostSchemaBase, hostSchemaPath, legacyHostSchemaPath, movedSchema } fro
  *
  * Bean `a02m`'s concern is not reopened: that was `directoriesForGraph(...)[0]`
  * picking up a DEPENDENCY's directory through the overlay. This joins onto the
- * instance root it is handed, so it cannot reach another instance.
+ * layer root it is handed, so it cannot reach another layer.
  */
 function contractsDir(root: string): string {
   return join(root, "schemas", "skills");
@@ -74,15 +74,15 @@ const ROOT = join(HARNESS_ROOT);
 export interface SchemaExportOptions {
   baseUrl?: string;
   /**
-   * The instance whose contracts are read. The host when absent, so every
+   * The layer whose contracts are read. The host when absent, so every
    * existing caller — and the host's published bytes — are unchanged.
    */
   root?: string;
   /**
    * The base a contract's `$id` is minted under, when it is not the host's.
    *
-   * Passed IN rather than derived here, because for a foreign instance it is
-   * {@link instanceSchemaBase} of that instance's published identity, and the
+   * Passed IN rather than derived here, because for a foreign layer it is
+   * {@link instanceSchemaBase} of that layer's published identity, and the
    * identity is `kg-export`'s answer (`publishedIdentity`). Deriving it a second
    * time in this module would be a second answer to "where does this instance
    * publish", free to disagree with the document's own `@id`.
@@ -109,7 +109,7 @@ export function buildDeclarationSchema(opts: SchemaExportOptions = {}): Record<s
       "The root declaration every instance carries as `<name>.json`: what it is called, " +
       "where it publishes, and which directories it scans for which kind of graph. " +
       "Generated from `CatHarnessDeclarationSchema` in schemas/kg/cat-harness.ts, which is authoritative.",
-    // Under the instance's own directory, the host's included, since #603
+    // Under the layer's own directory, the host's included, since #603
     // decision 1b (owner, 2026-10-23) — `kg-export`'s `exportIdentity`.
     ...(base ? { $comment: `Instance graph: ${renderingPath(base, decl?.name ?? stub, `${stub}.jsonld`)}` } : {}),
   };
@@ -118,10 +118,10 @@ export function buildDeclarationSchema(opts: SchemaExportOptions = {}): Record<s
 /**
  * The shared I/O type vocabulary Tool ports reference, as one `$defs` document.
  *
- * Named for what it DEFINES (`tool-types.schema.json`), not for the instance —
- * unlike `<stub>.schema.json`. The rule: an instance artefact takes the
- * instance's name; a vocabulary document takes the vocabulary's, because the
- * same vocabulary means the same thing in every instance and renaming it per
+ * Named for what it DEFINES (`tool-types.schema.json`), not for the layer —
+ * unlike `<stub>.schema.json`. The rule: a layer artefact takes the
+ * layer's name; a vocabulary document takes the vocabulary's, because the
+ * same vocabulary means the same thing in every layer and renaming it per
  * repo would make two copies of one type look like two types.
  */
 export function buildToolTypes(opts: SchemaExportOptions = {}): Record<string, unknown> {
@@ -238,7 +238,7 @@ export interface SkillIoContract {
   skill: string;
   /** `input` or `output` — the file stem before `.schema.json`. */
   io: string;
-  /** Source path relative to the INSTANCE root it was read from (`SchemaExportOptions.root`). */
+  /** Source path relative to the LAYER root it was read from (`SchemaExportOptions.root`). */
   source: string;
   /** Published path under the output directory. */
   published: string;
@@ -255,7 +255,7 @@ export interface SkillIoContract {
  */
 export function buildSkillIoContracts(opts: SchemaExportOptions = {}): SkillIoContract[] {
   const root = opts.root ?? ROOT;
-  // A foreign instance's base is passed in (`schemaBase`); the host's is its
+  // A foreign layer's base is passed in (`schemaBase`); the host's is its
   // own directory under the site, `hostSchemaBase` (#676).
   const base =
     opts.schemaBase !== undefined
@@ -358,7 +358,7 @@ const SELF_INVOCATION = "bun run cat kg:schema";
  *
  * Reads `maintains` off the `tools` graph — see {@link ToolMaintainsSchema} in
  * `schemas/tools/tool.ts`. The base is irrelevant here: the comparison is on the
- * path relative to the instance base, which is what the declaration carries.
+ * path relative to the layer base, which is what the declaration carries.
  */
 export function declaredArtefacts(): Map<string, { tool: string; source: string; producedBy?: string }> {
   const out = new Map<string, { tool: string; source: string; producedBy?: string }>();
@@ -386,7 +386,7 @@ export function declaredArtefacts(): Map<string, { tool: string; source: string;
  * new artefact nobody added a Tool node for — which is how the relation drifts
  * back into this script's local array, where it lived until 2026-09-19.
  * `unproduced` catches a declaration that rotted: a Tool still claiming an
- * artefact this instance no longer writes, which a consumer of the published
+ * artefact this layer no longer writes, which a consumer of the published
  * graph would follow to a 404.
  *
  * `missingSource` is the third finding and a different failure again: the
@@ -452,7 +452,7 @@ export function artefactDeclarationDrift(produced: readonly string[]): {
       unproduced.push({ artefact, tool: d.tool });
     }
     // The harness declares, the tools layer implements: a source is looked for
-    // in the declaring instance, then in the one that implements it — the
+    // in the declaring layer, then in the one that implements it — the
     // same rule `check:tools` applies to `invoke.*.module` (bean `8lcl` moved
     // the harness's schema modules to the tools layer).
     if (!existsSync(join(ROOT, d.source)) && !existsSync(join(TOOLS_ROOT, d.source))) {
@@ -485,7 +485,7 @@ export function writeSkillIoIds(opts: SchemaExportOptions = {}): string[] {
 }
 
 /**
- * The schema documents this instance publishes, and their published names.
+ * The schema documents this layer publishes, and their published names.
  *
  * Extracted so `--check` and the write path read the SAME list. It was a local
  * array inside the write branch, which meant the drift check below could only
@@ -493,7 +493,7 @@ export function writeSkillIoIds(opts: SchemaExportOptions = {}): string[] {
  * "what does this instance produce", which is the defect the declaration
  * exists to remove.
  *
- * Instance artefact takes the instance's name; vocabulary documents take the
+ * Layer artefact takes the layer's name; vocabulary documents take the
  * vocabulary's. See `buildToolTypes`.
  *
  * Each name is SITE-relative, `<name>/<file>`: the host's schemas sit under its
@@ -543,15 +543,15 @@ export function schemaTombstones(
   return out;
 }
 
-// ── EVERY OTHER INSTANCE'S SCHEMA — `<site>/<stub>/schema/` (bean `4ak5` item 1) ──
+// ── EVERY OTHER LAYER'S SCHEMA — `<site>/<stub>/schema/` (bean `4ak5` item 1) ──
 //
-// Owner ruling 2026-10-05, option B: every instance `instance-exports.ts`
+// Owner ruling 2026-10-05, option B: every layer `instance-exports.ts`
 // publishes ALSO publishes a schema directory beside its document. The
 // builders above stay the host's, byte for byte; what follows reuses them over
-// another instance's root. Policy: `instance-publication` §"The schema".
+// another layer's root. Policy: `instance-publication` §"The schema".
 
 /**
- * The part of an instance's PUBLISHED identity this module needs.
+ * The part of a layer's PUBLISHED identity this module needs.
  *
  * Structurally a subset of what `publishedIdentity` in `kg-export.ts` returns,
  * and it is always that function's answer — passed in, never re-derived here.
@@ -562,22 +562,22 @@ export function schemaTombstones(
  */
 export interface InstanceIdentity {
   stub: string;
-  /** The publication base the instance's `@id`s are minted under. Empty when none is known. */
+  /** The publication base the layer's `@id`s are minted under. Empty when none is known. */
   base: string;
-  /** The document's path under `base`: `<stub>/<stub>.jsonld`, or `<stub>.jsonld` for an instance with its own `canonicalUrl`. */
+  /** The document's path under `base`: `<stub>/<stub>.jsonld`, or `<stub>.jsonld` for a layer with its own `canonicalUrl`. */
   docPath: string;
   /** The document's `@id`, for the index's back-pointer. */
   docIri?: string;
 }
 
-/** The directory, beside an instance's document, that holds its schemas. */
+/** The directory, beside a layer's document, that holds its schemas. */
 export const INSTANCE_SCHEMA_DIR = "schema";
 
 /**
- * The base an instance's schema `$id`s are minted under — `schema/` BESIDE ITS
+ * The base a layer's schema `$id`s are minted under — `schema/` BESIDE ITS
  * DOCUMENT, at its publication identity.
  *
- * Beside the document, not at a second composed address: an instance with no
+ * Beside the document, not at a second composed address: a layer with no
  * `canonicalUrl` of its own sits at `<site>/<stub>/<stub>.jsonld`, so its schemas
  * are `<site>/<stub>/schema/…`; one that declares its own sits at
  * `<canonicalUrl>/<stub>.jsonld`, so its schemas are `<canonicalUrl>/schema/…`.
@@ -606,22 +606,22 @@ export function instanceSchemaIndexIri(id: InstanceIdentity): string | undefined
 // *Schema" — "Render all exported Zod *Schema consts per instance now; may
 // expose internal schemas." So the rule is mechanical and deliberately broad:
 //
-//   An instance's PUBLIC schemas are every EXPORTED const whose name ends in
+//   A layer's PUBLIC schemas are every EXPORTED const whose name ends in
 //   `Schema` and whose value is a Zod schema, in the `.ts` modules (not
-//   `*.test.ts`) directly inside that instance's schemas directory.
+//   `*.test.ts`) directly inside that layer's schemas directory.
 //
 // "Publishing" one is therefore NOT a stability promise; the owner accepted
 // that internal schemas are exposed. What the rule buys is that "which of this
 // instance's types can I fetch" has an answer nobody has to curate.
 
-/** The subdirectory of an instance's `schema/` that holds its rendered Zod schemas. */
+/** The subdirectory of a layer's `schema/` that holds its rendered Zod schemas. */
 export const ZOD_SCHEMA_DIR = "zod";
 
 /** The name half of the rule. One pattern, so the scan and the gate cannot spell it twice. */
 export const PUBLIC_SCHEMA_EXPORT = /Schema$/;
 
 /**
- * The directories an instance's public Zod schemas are read from.
+ * The directories a layer's public Zod schemas are read from.
  *
  * Its DECLARED `schemas` graph when it declares one, else `<root>/schemas/` by
  * convention — the fallback `schemasRoot` in `gen-schema-docs.ts` already uses.
@@ -629,15 +629,15 @@ export const PUBLIC_SCHEMA_EXPORT = /Schema$/;
  * declaration is the authority here. Measured 2026-10-05: the formal-math layer
  * and the IRIS replica declare `sources/` (source descriptors, JSON only), so they
  * are scanned there and hold none; the FHIR IG harness, a DAK base layer and the other
- * undeclared instances fall back to `schemas/`.
+ * undeclared layers fall back to `schemas/`.
  *
- * The PLURAL accessor, because the singular throws when an instance declares
+ * The PLURAL accessor, because the singular throws when a layer declares
  * two `schemas` directories (`large-datasets` does), and taking either one
  * alone is the `dh4f` shape — a declared directory nobody scans.
  */
 export function instanceZodSchemaDirs(root: string): string[] {
   const declared = instanceDirectoriesForGraph(root, "schemas");
-  // declared-path-literal: the convention fallback for an instance that declares no `schemas` graph, the same fallback `schemasRoot` uses for the host.
+  // declared-path-literal: the convention fallback for a layer that declares no `schemas` graph, the same fallback `schemasRoot` uses for the host.
   // With each one's concern groups (`schemas/<group>/`, bean `f8wp`).
   return withConcernGroupDirs(declared.length > 0 ? declared : [join(root, "schemas")], "schemas");
 }
@@ -657,7 +657,7 @@ export function isReexportShim(text: string): boolean {
 }
 
 /**
- * Whether {@link scanInstanceZodSchemas} would be DETERMINED for this instance
+ * Whether {@link scanInstanceZodSchemas} would be DETERMINED for this layer
  * — whether its schemas directories resolve — without importing anything.
  *
  * For the JSON-LD document's `omitted` (`kg-export.ts`), which must not stop
@@ -676,7 +676,7 @@ export function zodSchemaScanDetermined(root: string): boolean {
 
 /** One exported Zod `*Schema`, as found by {@link scanInstanceZodSchemas}. */
 export interface ZodSchemaExport {
-  /** Module path relative to the instance root, `/`-separated. */
+  /** Module path relative to the layer root, `/`-separated. */
   module: string;
   /** The module's basename without `.ts` — the published directory name. */
   name: string;
@@ -684,7 +684,7 @@ export interface ZodSchemaExport {
   schema: unknown;
 }
 
-/** What {@link scanInstanceZodSchemas} saw in one instance. */
+/** What {@link scanInstanceZodSchemas} saw in one layer. */
 export interface ZodSchemaScan {
   /**
    * False when the directories could not even be resolved (an unreadable
@@ -692,7 +692,7 @@ export interface ZodSchemaScan {
    * look" must never read as "there are none".
    */
   determined: boolean;
-  /** The directories scanned, relative to the instance root. */
+  /** The directories scanned, relative to the layer root. */
   dirs: string[];
   found: ZodSchemaExport[];
   /**
@@ -706,10 +706,10 @@ export interface ZodSchemaScan {
 }
 
 /**
- * Import every module in the instance's schemas directories and collect its
+ * Import every module in the layer's schemas directories and collect its
  * public Zod schemas ({@link PUBLIC_SCHEMA_EXPORT} + {@link isZodSchema}).
  *
- * A dynamic import of another instance's file is a RUNTIME read: it adds no
+ * A dynamic import of another layer's file is a RUNTIME read: it adds no
  * static import edge, so `check:import-direction` does not see it, and it
  * should not — this module does not depend on what it renders.
  *
@@ -734,7 +734,7 @@ export async function scanInstanceZodSchemas(root: string): Promise<ZodSchemaSca
   const rel = (p: string): string => relative(root, p).split("\\").join("/");
   const scan: ZodSchemaScan = { determined: true, dirs: dirs.map(rel), found: [], notZod: [], problems: [] };
   for (const dir of dirs) {
-    // Absent is a determined empty, not a failure: most instances keep no
+    // Absent is a determined empty, not a failure: most layers keep no
     // schema modules, and the declaration-or-convention rule was still applied.
     if (!existsSync(dir)) continue;
     for (const f of readdirSync(dir).sort()) {
@@ -743,7 +743,7 @@ export async function scanInstanceZodSchemas(root: string): Promise<ZodSchemaSca
       const module = rel(join(dir, f));
       let mod: Record<string, unknown>;
       try {
-        // input-site: imports */schemas/*.ts,schemas/*.ts,*/schemas/*/*.ts,schemas/*/*.ts #de77ba20 — each instance's Zod schema modules, top level and declared concern groups, as schemaModules reads them
+        // input-site: imports */schemas/*.ts,schemas/*.ts,*/schemas/*/*.ts,schemas/*/*.ts #de77ba20 — each layer's Zod schema modules, top level and declared concern groups, as schemaModules reads them
         mod = (await import(join(dir, f))) as Record<string, unknown>;
       } catch (e) {
         scan.problems.push(`${module}: could not be imported: ${e instanceof Error ? e.message : String(e)}`);
@@ -760,7 +760,7 @@ export async function scanInstanceZodSchemas(root: string): Promise<ZodSchemaSca
   return scan;
 }
 
-/** Where one rendered Zod schema is published, relative to the instance's `schema/`. */
+/** Where one rendered Zod schema is published, relative to the layer's `schema/`. */
 export function zodSchemaPath(moduleName: string, exportName: string): string {
   return posix.join(ZOD_SCHEMA_DIR, moduleName, `${exportName}.schema.json`);
 }
@@ -776,7 +776,7 @@ export interface RenderedZodSchema {
 
 /**
  * Render each scanned schema with `namedJsonSchema`, the wrapper every host
- * schema document already uses, and mint its `$id` under the instance's
+ * schema document already uses, and mint its `$id` under the layer's
  * schema base — the same publication-identity rule as its contracts.
  *
  * Every failure is returned, none swallowed: a value that is not a zod-4
@@ -831,16 +831,16 @@ export function renderZodSchemas(
   return { rendered, problems };
 }
 
-/** What one instance's `schema/` directory holds, by path relative to it. */
+/** What one layer's `schema/` directory holds, by path relative to it. */
 export interface InstanceSchemaExport {
   /** `[path under <stub>/schema/, document]`, index first. */
   files: Array<[string, Record<string, unknown>]>;
-  /** The instance's own skill I/O contracts, `$id` minted under its schema base. */
+  /** The layer's own skill I/O contracts, `$id` minted under its schema base. */
   contracts: SkillIoContract[];
-  /** The index's `$id`, when the instance has a base. */
+  /** The index's `$id`, when the layer has a base. */
   indexIri?: string;
   /**
-   * The instance's public Zod schemas, rendered (part 2, owner ruling
+   * The layer's public Zod schemas, rendered (part 2, owner ruling
    * 2026-10-05, option C). Empty when no scan was passed in — see
    * {@link buildInstanceSchemas}.
    */
@@ -856,15 +856,15 @@ export interface InstanceSchemaExport {
 }
 
 /**
- * One instance's schema directory: its own skill I/O contracts and an index.
+ * One layer's schema directory: its own skill I/O contracts and an index.
  *
  * ## The index
  *
- * `<stub>.schema.json` is the schema of the instance's DECLARATION — it
+ * `<stub>.schema.json` is the schema of the layer's DECLARATION — it
  * `$ref`s the shared declaration schema the host publishes
  * ({@link buildDeclarationSchema}, by its published `$id`, so a preview's
  * index names the preview's copy) — and it lists every contract in `$defs`
- * by `$id`. A consumer holding an instance's `<stub>.json` reaches both from
+ * by `$id`. A consumer holding a layer's `<stub>.json` reaches both from
  * one fetch.
  *
  * ## Public Zod schemas — listed when a scan is passed in
@@ -1005,7 +1005,7 @@ if (import.meta.main) {
   // `_kg/` is a REPOSITORY build output — gitignored at the repository root,
   // beside `node_modules/`, `_site/` and `test-results/`, and read from there
   // by the e2e specs and `test-server.mjs`, both of which run at that root.
-  // `ROOT` became the INSTANCE root with the move (bean `wggr`), so this
+  // `ROOT` became the LAYER root with the move (bean `wggr`), so this
   // default started writing `cat-harness/_kg/` while every reader still looked
   // one level up — and the stale pre-move copy at the old path made it look
   // fine locally.

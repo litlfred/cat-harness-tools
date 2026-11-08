@@ -28,7 +28,7 @@
  * A bare repository has no `cat-harness-tools/` to run from, and
  * `remote-mount.ts` needs `cat-harness` and `bootstrap-tools` beside it. So
  * this file, like `mount-from-lock.ts`, imports nothing but Node, and lays the
- * platform's own closure (the instances `cat-harness-tools` needs) into a
+ * platform's own closure (the layers `cat-harness-tools` needs) into a
  * temporary root, AT THE PINS THE REPOSITORY WILL MOUNT, to run the mount from
  * (the bootstrap). After the mount every later step runs from the repository's
  * own mounted `cat-harness-tools/`, and the temporary root is removed.
@@ -43,7 +43,7 @@
  *     `--plan` prints the closure and the steps, and stops.
  *  2. **branch** — the checkout must be clean; the work goes on `--branch`
  *     (default `harness/<harness>`), never on the default branch.
- *  3. **seed** — `remote-mount.ts --seed` for every instance of the closure,
+ *  3. **seed** — `remote-mount.ts --seed` for every layer of the closure,
  *     `--whole`, with the consent (`--consent-by`, and the evidence on stdin or
  *     `--evidence`); `index.config.json` gains `site.landing` (the harness),
  *     `site.agentRun`, and `mountApprovers` (the consenter).
@@ -52,7 +52,7 @@
  *     is rendered afterwards by the MOUNTED generators, so its links point at
  *     the repository's own mounts and not at the bootstrap root.
  *  5. **install** — a root `package.json` whose workspaces are the mounted
- *     instances that carry one and whose `cat` script is `bun .github/cat.ts`,
+ *     layers that carry one and whose `cat` script is `bun .github/cat.ts`,
  *     the two bootstrap files from `templates/root-bootstrap/` in `.github/`
  *     (so `bun run cat …` mounts the layers itself on a fresh clone), a
  *     hoisted `bunfig.toml` (the shape the harnessed IGs use), `node_modules/`
@@ -74,7 +74,7 @@
  *
  * A dirty checkout, the default branch, a repository whose `index.config.json`
  * already mounts the harness (re-pin with `remote-mount.ts --seed`), consent
- * with no evidence, a need whose declaration names another instance, and a
+ * with no evidence, a need whose declaration names another layer, and a
  * closure without `cat-harness-tools` (nothing of this platform to mount).
  */
 
@@ -83,7 +83,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
-/** One instance of the closure, pinned. */
+/** One layer of the closure, pinned. */
 export interface ClosureEntry {
   name: string;
   repository: string;
@@ -105,7 +105,7 @@ export interface Options {
   pr: boolean;
 }
 
-/** The platform's own instance: the bootstrap runs its mount. */
+/** The platform's own layer: the bootstrap runs its mount. */
 export const PLATFORM = "cat-harness-tools";
 const SHA = /^[0-9a-f]{40}$/;
 
@@ -171,12 +171,12 @@ export function parseArgs(argv: readonly string[]): Options {
   return o;
 }
 
-/** The instance name a harness repository declares by convention: its repository name. */
+/** The layer name a harness repository declares by convention: its repository name. */
 export function nameOf(repository: string): string {
   return repository.split("/")[1]!;
 }
 
-/** Where a need is looked for: `--repo-of`, else beside the instance that needs it. */
+/** Where a need is looked for: `--repo-of`, else beside the layer that needs it. */
 export function repositoryOfNeed(need: string, neededBy: string, repoOf: Record<string, string>): string {
   return repoOf[need] ?? `${neededBy.split("/")[0]}/${need}`;
 }
@@ -189,7 +189,7 @@ export interface Fetcher {
   declaration(repository: string, ref: string, name: string): { name?: unknown; needs?: unknown };
 }
 
-/** The closure of `root`, breadth first: every instance once, pinned, its declaration's name checked. */
+/** The closure of `root`, breadth first: every layer once, pinned, its declaration's name checked. */
 export function resolveClosure(root: { repository: string; ref?: string }, o: Pick<Options, "pins" | "repoOf">, f: Fetcher): ClosureEntry[] {
   const out: ClosureEntry[] = [];
   const queue: { name: string; repository: string; ref?: string; by?: string }[] = [{ name: nameOf(root.repository), repository: root.repository, ...(root.ref ? { ref: root.ref } : {}) }];
@@ -208,7 +208,7 @@ export function resolveClosure(root: { repository: string; ref?: string }, o: Pi
   return out;
 }
 
-/** The instances `name` reaches, itself included, within an already resolved closure. */
+/** The layers `name` reaches, itself included, within an already resolved closure. */
 export function subClosure(closure: readonly ClosureEntry[], name: string): ClosureEntry[] {
   const seen = new Set<string>();
   const walk = (n: string) => {
@@ -227,7 +227,7 @@ export function withSiteAndApprover(config: Record<string, unknown>, harness: st
   return { ...config, site, mountApprovers: approvers.includes(approver) ? approvers : [...approvers, approver] };
 }
 
-/** The root `package.json`: the mounted instances that carry one become its workspaces; the rest is kept. */
+/** The root `package.json`: the mounted layers that carry one become its workspaces; the rest is kept. */
 export function withWorkspaces(pkg: Record<string, unknown> | undefined, repoName: string, mounted: readonly string[]): Record<string, unknown> {
   const base = pkg ?? { name: `${repoName}-site`, private: true, type: "module" };
   const have = Array.isArray(base.workspaces) ? (base.workspaces as string[]) : [];

@@ -1,5 +1,5 @@
 /**
- * Every declared `qa` directory, in every instance, parses: bean `de9k`
+ * Every declared `qa` directory, in every layer, parses: bean `de9k`
  * (defect C1, merge `48aab0bd`).
  *
  * The falsifier is a PLANTED conflict marker of the width that merge actually

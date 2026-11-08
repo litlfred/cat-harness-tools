@@ -107,7 +107,7 @@ export async function resolveRenderTarget(
     };
   }
 
-  // Read from the instance that implements the declared path (ruling T1,
+  // Read from the layer that implements the declared path (ruling T1,
   // bean `70lx`): the declaration names it as written, the code may have moved.
   const abs = join(implementingRootFor(ROOT, decl.module), decl.module);
   if (!existsSync(abs)) {

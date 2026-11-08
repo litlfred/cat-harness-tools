@@ -149,7 +149,7 @@ export const HARNESS_ROOT_SOURCE: HarnessRootSource = resolved.source;
 /** The checkout holding both layers; `undefined` when this layer is standalone. */
 export const REPO_ROOT: string | undefined = repoRootFor(TOOLS_ROOT, HARNESS_ROOT);
 
-// ── The instance being worked on (bean `j3ls`) ──────────────────────────────
+// ── The layer being worked on (bean `j3ls`) ──────────────────────────────
 
 /**
  * The machine name `dir` declares, read the way {@link isHarnessRoot} reads the
@@ -201,7 +201,7 @@ export function mountingInstanceRoot(harnessRoot: string): string | undefined {
   }
 }
 
-/** Where the working instance came from — reported, as {@link HarnessRootSource} is. */
+/** Where the working layer came from — reported, as {@link HarnessRootSource} is. */
 export type InstanceRootSource = "flag" | "env" | "mount" | "harness";
 
 export interface InstanceRootInputs {
@@ -225,29 +225,29 @@ export function instanceFlag(argv: readonly string[]): string | undefined {
 }
 
 /**
- * The instance a tool is working ON — not the one it was loaded FROM.
+ * The layer a tool is working ON — not the one it was loaded FROM.
  *
  * Every tool here used to answer "this instance" with the harness, which is
  * right in the harness's own repository and in an index checkout, and wrong
- * in a separated instance's repository that remote-mounts the harness: there
+ * in a separated layer's repository that remote-mounts the harness: there
  * the harness is somebody else's tree at a pin, gitignored, and a report
- * written into it is lost (bean `j3ls`, measured from a separated content instance). In order:
+ * written into it is lost (bean `j3ls`, measured from a separated content layer). In order:
  *
  * 1. `--instance <dir>` — the caller said so.
  * 2. `$CAT_INSTANCE_ROOT` — the environment said so.
- * 3. The checkout the harness is MOUNTED in, when its root declares an
- *    instance ({@link mountingInstanceRoot}).
+ * 3. The checkout the harness is MOUNTED in, when its root declares a
+ *    layer ({@link mountingInstanceRoot}).
  * 4. The harness — every layout this resolver did not change.
  *
  * An explicit root must hold a declaration; a typo throws where it is made
- * rather than reading as an empty instance three calls later.
+ * rather than reading as an empty layer three calls later.
  *
  * A function, not a constant: `--instance` is parsed here, and a module-level
  * parse would throw in every importer whose own `--instance` means a NAME.
  */
 export function resolveWorkingInstanceRoot(inputs: InstanceRootInputs = {}): { root: string; source: InstanceRootSource } {
   const argv = inputs.argv ?? process.argv;
-  // input-site: env-unset CAT_INSTANCE_ROOT #861163c1 — names the instance being worked on; unset, it is the instance mounting the harness, else the harness
+  // input-site: env-unset CAT_INSTANCE_ROOT #861163c1 — names the layer being worked on; unset, it is the layer mounting the harness, else the harness
   const env = inputs.env ?? process.env;
   const harnessRoot = resolve(inputs.harnessRoot ?? HARNESS_ROOT);
 
@@ -273,11 +273,11 @@ export function resolveWorkingInstanceRoot(inputs: InstanceRootInputs = {}): { r
 }
 
 /**
- * The instance `--instance <dir>` names, validated as
+ * The layer `--instance <dir>` names, validated as
  * {@link resolveWorkingInstanceRoot} validates it — or `undefined` when the
  * flag is absent, so the caller keeps the root it always had.
  *
- * For a tool whose default is its OWN instance and that gains `--instance` as
+ * For a tool whose default is its OWN layer and that gains `--instance` as
  * an option: `resolveWorkingInstanceRoot` would also follow
  * `$CAT_INSTANCE_ROOT` and the mounting checkout, which would change what the
  * tool reads when nobody passed the flag.

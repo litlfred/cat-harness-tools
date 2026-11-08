@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Materialise every directory this instance declares or inherits.
+ * Materialise every directory this layer declares or inherits.
  *
  * The CLI face of {@link materialiseDeclaredDirectories}. Run by
  * `scripts/session-start-coord-sweep.sh` and by `init-folio`, so that a
@@ -25,7 +25,7 @@ const check = process.argv.includes("--check");
 const results = materialiseDeclaredDirectories(root, { dryRun: check });
 if (results.length === 0) {
   // Third state, reported as itself. No declaration is legitimate — an
-  // unmigrated instance falls back to today's conventions — and must not be
+  // unmigrated layer falls back to today's conventions — and must not be
   // rendered as "all directories present".
   console.log(
     "harness dirs: this instance declares no directories (no <name>.json, " +

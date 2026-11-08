@@ -20,7 +20,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * WHAT IS SERVED, not a restatement: the docs site's own `docs-ui.css` and
  * `docs-ui.js`, the GENERATED bottom region (`_includes/generated/
  * navbar-footer.html`, its Liquid resolved the way `relative_url` would), the
- * row this instance resolved (`_data/harness.json`), and a standalone viewer
+ * row this layer resolved (`_data/harness.json`), and a standalone viewer
  * page railed by the generators' own `withViewerNav` (`railed-fixture.ts`).
  * Only the theme's own
  * sidebar container is hand-built, as `navbar-row.e2e.ts` does, because the

@@ -11,7 +11,7 @@
  * cannot parse must not silently lose every voice check while reporting clean.
  *
  * The tests of this file that read the whole checkout (reads the voices
- * folio-assistant-sci, smart-base and who-iris ship, or the root instance's
+ * folio-assistant-sci, smart-base and who-iris ship, or the root layer's
  * voice configuration) live in `test/voice-gate-checkout.test.ts` (bean
  * `7zz1`): standing alone, cat-harness has none of it.
  */
@@ -136,19 +136,19 @@ describe("readActiveVoices", () => {
     // stopped being true on 2026-09-21, when the owner instantiated three
     // harnesses here — "boot strap, cat harness and folioasistant should be
     // instantaited" — so `folio-assistant.config.json` exists and the root now
-    // answers `[]` like any other configured instance. The PROPERTY is
-    // unchanged and still guarded; it is demonstrated on an instance that
+    // answers `[]` like any other configured layer. The PROPERTY is
+    // unchanged and still guarded; it is demonstrated on a layer that
     // genuinely has no config, which `check:instance-config` calls a
     // legitimate state.
     //
     // It also still says why `repoRootFor` is the wrong move here: with a
-    // config per instance, the repo root is a DIFFERENT instance's question.
+    // config per layer, the repo root is a DIFFERENT layer's question.
     //
     // THE SUBJECT CHANGED ON 2026-09-21, AND THE PROPERTY DID NOT. This used
-    // to point at `who-iris`, an instance that DECLARED and had no config —
+    // to point at `who-iris`, a layer that DECLARED and had no config —
     // a real state while a declaration (`harness.json`) and a config were two
     // files. `harness.json` was excised and they are one, so every declared
-    // instance has a config file and `who-iris` now answers `[]` like any
+    // layer has a config file and `who-iris` now answers `[]` like any
     // other. `[]` is a DETERMINED answer ("no voices are active") and the
     // whole point here is the UNDETERMINED one.
     //

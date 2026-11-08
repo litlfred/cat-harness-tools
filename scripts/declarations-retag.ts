@@ -14,12 +14,12 @@
  * is one line. A declaration that carries some other `$schema` is reported and
  * left alone.
  *
- * Which declarations: every instance `instanceRootsIn` finds under this
+ * Which declarations: every layer `instanceRootsIn` finds under this
  * checkout's repository root (in an index checkout, including mounted
- * instances of other repositories, which `--check` names rather than
+ * layers of other repositories, which `--check` names rather than
  * passes), or only the one named by `--instance <dir>`.
  *
- * Not tagged: the instances the harness is composed ON TOP of — every instance
+ * Not tagged: the layers the harness is composed ON TOP of — every layer
  * that does not reach cat-harness through `needs` (bootstrap, bootstrap-tools;
  * `scripts/lib/needs-reach.ts`, the rule `libraries.ts` uses). Nothing in them
  * may refer to a harness; they are reported as below the harness and left
@@ -112,7 +112,7 @@ function nameAndNeeds(text: string): { name: string; needs: string[] } | undefin
   }
 }
 
-/** The `needs` each declaration in `roots` states, by instance name. */
+/** The `needs` each declaration in `roots` states, by layer name. */
 export function needsOfRoots(roots: readonly string[]): Map<string, string[]> {
   const declared = new Map<string, string[]>();
   for (const root of roots) {
@@ -125,9 +125,9 @@ export function needsOfRoots(roots: readonly string[]): Map<string, string[]> {
 
 /**
  * Retag the declaration in each of `roots`. `write: false` changes nothing.
- * `needs` is the graph that says which instances are below the harness; by
+ * `needs` is the graph that says which layers are below the harness; by
  * default the one `roots` declare, and with `--instance` the whole checkout's,
- * so that one instance is judged by the layers around it.
+ * so that one layer is judged by the layers around it.
  */
 export function retagDeclarations(
   roots: readonly string[],

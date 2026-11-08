@@ -86,8 +86,8 @@ const VIEWER_TOOL = "lsi-viewer";
 /**
  * Every page this writes declares itself generated in its own front matter —
  * the `generated:` key `check:reference-direction` reads (bean `ws99`), as
- * `gen-processes-viz.ts` does. A page lists the declared prose graphs and the instances that own them, which belong to every
- * instance in the checkout, so without the key those names read as authored
+ * `gen-processes-viz.ts` does. A page lists the declared prose graphs and the layers that own them, which belong to every
+ * layer in the checkout, so without the key those names read as authored
  * prose in the committing layer naming the layers above it.
  */
 const GENERATED_FM = "generated: gen-lsi-viz.ts — do not hand-edit; run `bun run cat lsi:viz`";
@@ -350,7 +350,7 @@ if (import.meta.main) {
 
   // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The committed
   // page was "a function of the tree alone", and the tree is the CHECKOUT:
-  // `proseGraphs` reads every instance the index mounts, so the page moved
+  // `proseGraphs` reads every layer the index mounts, so the page moved
   // with the index's pins rather than with cat-harness's commit. cat-harness
   // declares the route `builtAtPublish` with this script as its writer, and
   // `derive:publish` runs it; under `--check` a declared page has no committed

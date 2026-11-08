@@ -343,7 +343,7 @@ describe("annotations hold to the data that chooses their targets", () => {
   const repo = join(dirname(HARNESS_ROOT));
   const globMatch = (glob: string, rel: string) => new Bun.Glob(glob).match(rel);
 
-  // The loaders reach an instance only through `instanceRootsIn` (one level
+  // The loaders reach a layer only through `instanceRootsIn` (one level
   // below the checkout) and its declared dependencies, so the claim is held
   // over exactly those roots. None found is a pass — standalone, a computed
   // load with no data loads nothing.
@@ -373,7 +373,7 @@ describe("annotations hold to the data that chooses their targets", () => {
   test("every qa-checker and pipeline-plugin ref is a module harness-config's `declared plugin-tables` names", () => {
     const named = new Set(pluginTableModules(repo));
     const all = roots();
-    // A ref is relative to the instance that owns the node: the deepest root holding it.
+    // A ref is relative to the layer that owns the node: the deepest root holding it.
     const ownerOf = (dir: string) => all.filter((r) => dir.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0]!;
     for (const graph of ["qa-checkers", "pipeline-plugins"]) {
       for (const dir of declaredDirectories(repo, graph)) {
@@ -398,7 +398,7 @@ describe("annotations hold to the data that chooses their targets", () => {
     const named = new Set(validatorModules(repo));
     const registry = defaultGraphTypologies;
     registry.ensureCheckout(repo);
-    // The loaders resolve an unqualified ref against the instance root their CALLER passes.
+    // The loaders resolve an unqualified ref against the layer root their CALLER passes.
     const callerRoots = [repo, ...roots()];
     let seen = 0;
     for (const kind of registry.names()) {
@@ -421,7 +421,7 @@ describe("annotations hold to the data that chooses their targets", () => {
     // declared-path-literal: the two modules that load the declared validator refs, whose `input-site` annotations are the subject of this assertion; no declaration answers where a module of this layer sits.
     for (const file of ["kind-validator.ts", "node-kind-index.ts"]) expect(declaredBy(relTo(join(TOOLS_ROOT, "schemas/kg", file)), "validator-refs"), file).toBe(true);
     // It loads the whole typology registry and resolves every validator ref from
-    // every instance root: 6-7 s on a composed checkout, over bun's 5 s default
+    // every layer root: 6-7 s on a composed checkout, over bun's 5 s default
     // whenever another test file ran first in the same process.
   }, 30_000);
 

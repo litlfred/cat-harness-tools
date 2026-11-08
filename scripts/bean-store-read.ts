@@ -69,7 +69,7 @@ export function isFoldedTitle(fm: string): boolean {
 }
 
 /**
- * Every bean in this instance's store, or `null` when there is no store.
+ * Every bean in this layer's store, or `null` when there is no store.
  *
  * **The archive is read too**, and that is not a convenience. `nvbr` is
  * *"blocked on bean `fsch`"*, and `fsch` is `scrapped` **in the archive** — a

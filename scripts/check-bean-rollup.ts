@@ -81,7 +81,7 @@ export interface SweepBucket {
 }
 
 export interface BeanRollupReport {
-  /** The store directory, or `null` when this instance declares none. */
+  /** The store directory, or `null` when this layer declares none. */
   store: string | null;
   /** Open beans considered. */
   open: number;

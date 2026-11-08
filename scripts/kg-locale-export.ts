@@ -24,7 +24,7 @@
  * ## A catalogue is scoped to the ASSET it was extracted from
  *
  * A `.po` is read only when its stem is the stem of an asset this graph
- * PROJECTS (a `.bpmn` this instance owns), so a docs page's translation (e.g.
+ * PROJECTS (a `.bpmn` this layer owns), so a docs page's translation (e.g.
  * `"yes"` in a table) is never applied to a diagram's gateway label. That is
  * provenance, not a path, so it survives a layout move.
  *
@@ -112,14 +112,14 @@ export function isIri(s: string): boolean {
 }
 
 /**
- * The instance's declared translations root — ONE answer, shared with
+ * The layer's declared translations root — ONE answer, shared with
  * `translate-bpmn`.
  *
  * Resolved from the declaration rather than spelled, because two copies of
  * this join is how a check passes over a directory the writer never used.
  */
 export function translationsHome(instanceRoot: string): ReturnType<typeof translationsHomeFor> {
-  // `ROOT` is this script's own instance and therefore the HOST when
+  // `ROOT` is this script's own layer and therefore the HOST when
   // `--instance` names another: bootstrap's templates live in cat-harness's
   // corpus under `<locale>/bootstrap/`. The host is a DEPENDENT, not a
   // dependency — bootstrap declares `needs: []` — so it cannot be derived from
@@ -132,15 +132,15 @@ export function translationsRootFor(instanceRoot: string): string {
   return translationsHome(instanceRoot).root;
 }
 
-/** Every locale directory under the instance's translations root. */
+/** Every locale directory under the layer's translations root. */
 export function knownLocales(instanceRoot: string): string[] {
   const home = translationsHome(instanceRoot);
   if (!existsSync(home.root)) return [];
   return readdirSync(home.root, { withFileTypes: true })
     .filter((e) => e.isDirectory())
-    // A hosted instance's locale set is a SUBSET of its host's: a locale the
-    // host translates but which carries nothing for this instance is not this
-    // instance's locale. Filtering on the scope directory rather than on the
+    // A hosted layer's locale set is a SUBSET of its host's: a locale the
+    // host translates but which carries nothing for this layer is not this
+    // layer's locale. Filtering on the scope directory rather than on the
     // host's locale list is what keeps the two apart — otherwise bootstrap
     // would claim every locale cat-harness has, and a per-locale document would
     // be emitted for each over an empty catalogue.
@@ -150,7 +150,7 @@ export function knownLocales(instanceRoot: string): string[] {
 }
 
 /**
- * Stems of the assets this graph PROJECTS — today, the instance's diagrams.
+ * Stems of the assets this graph PROJECTS — today, the layer's diagrams.
  *
  * A stem rather than a path, because that is the join a `.po` offers: the
  * extractor writes `<stem>.pot` beside the asset's own name.
@@ -366,7 +366,7 @@ export async function buildLocaleExports(opts: {
   baseUrl?: string;
   allLocales?: boolean;
   /**
-   * The core document `kg-export.ts` has just written for the same instance,
+   * The core document `kg-export.ts` has just written for the same layer,
    * base URL and scope (`--core <path>`), read instead of built again — bean
    * fwtz, the KG step: rebuilding it was this script's whole 19 s on `main`,
    * on runs that then wrote nothing. Its staging stamp is set aside, since the
@@ -402,7 +402,7 @@ export async function buildLocaleExports(opts: {
   // `config.translation.defaultLocale`, NOT `config.defaultLocale` — `tsc`
   // caught the second spelling, and it would have been the `dh4f` shape: a
   // read of a field that is not there, reporting the fallback as if it had
-  // been declared. It happens to be `"en"` in this instance, so nothing here
+  // been declared. It happens to be `"en"` in this layer, so nothing here
   // would have looked wrong; a folio declaring another source language would
   // have had every locale document claim English fall-through.
   const sourceLanguage = readHarnessConfig(instanceRoot)?.translation?.defaultLocale ?? "en";
@@ -481,9 +481,9 @@ if (import.meta.main) {
     // `6tkl`: a per-locale build over no locales asserts nothing, and
     // reporting it clean would be a pass over an empty set.
     //
-    // This briefly granted a DETERMINED EMPTY to an instance that declares no
+    // This briefly granted a DETERMINED EMPTY to a layer that declares no
     // `translation-sources`, and that was the wrong fix — reverted the same
-    // day. The premise was that such an instance has nothing to export; the
+    // day. The premise was that such a layer has nothing to export; the
     // actual state was that its templates had MOVED and this script was
     // looking in the wrong place. `translationsHomeFor` resolves the hosted
     // case now, so the empty this guards is once again the only empty there is.

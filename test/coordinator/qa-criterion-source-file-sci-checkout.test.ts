@@ -1,14 +1,14 @@
 /**
  * `qa-criterion-source-file` tests whose subject is folio-assistant-sci's
- * contribution — the checkers this instance contributes for criteria declared
+ * contribution — the checkers this layer contributes for criteria declared
  * `checker_contributed` — moved here from
  * `cat-harness/scripts/tests/qa-criterion-source-file.test.ts` (bean `ho66`).
  * The code under test is cat-harness's, imported DOWN; what it is held against
- * is this instance's, so standing alone cat-harness has nothing for these to
+ * is this layer's, so standing alone cat-harness has nothing for these to
  * read. The rest of that file's tests stay there.
  *
  * Then moved up again, to the aggregate's `test/` (bean `7zz1`, owner ruling
- * 2026-10-06 "Top-level instance"): it walks EVERY instance in the checkout
+ * 2026-10-06 "Top-level instance"): it walks EVERY layer in the checkout
  * and the repository root's dependency tree, which also carries the `dak-*`
  * checkers smart-base contributes, so standing alone folio-assistant-sci has
  * neither (`seed:ready --layer folio-assistant-sci --rehearse`, 2026-10-07).
@@ -44,7 +44,7 @@ const CHECKER_DIR = "pipeline";
  * The dependency tree, so a CONTRIBUTED checker is found where it lives.
  *
  * Criteria declaring `checker_contributed` have their checkers in another
- * instance: `proof-compile-cost` and `proof-no-cost-regression` in
+ * layer: `proof-compile-cost` and `proof-no-cost-regression` in
  * `folio-assistant-sci`, the five `dak-*` in `smart-base` (bean `1335`). Without
  * this the test would report them as having no checker anywhere — which is
  * what it says a defect looks like, so it would fail loudly rather than pass
@@ -56,13 +56,13 @@ const registry = await loadContributions<FolioContribution, ContributionRegistry
 );
 
 /**
- * Every `qa-checkers-*.ts` in EVERY instance, discovered rather than listed.
+ * Every `qa-checkers-*.ts` in EVERY layer, discovered rather than listed.
  *
  * Globbing one directory was the previous version, and it stopped being
- * enough the moment a checker moved into another instance. Widening it to a
+ * enough the moment a checker moved into another layer. Widening it to a
  * second hardcoded directory would reproduce the exact defect this test's own
  * header describes — an allow-list that falls through silently — so the
- * instance list comes from the declarations, and a checker file added in a
+ * layer list comes from the declarations, and a checker file added in a
  * future contributor is covered without anyone remembering.
  *
  * Keys are the same labels `resolveCriterionSource` produces: bare and
@@ -137,7 +137,7 @@ describe("getCriterionSourceFile — declared source must host the checker", () 
       }
       // Compared by the file the resolver READS — its `root` joined to its
       // `sourceFile` — not by label: a core criterion's label stays the path
-      // as declared while its bytes are read from the implementing instance
+      // as declared while its bytes are read from the implementing layer
       // (owner ruling T7, bean `70lx`), so a label match would need this test
       // to know which layer implements core's checkers.
       const declared = located.label;
@@ -172,7 +172,7 @@ describe("a contributed checker cannot fall through to the default", () => {
       const located = resolveCriterionSource(def.id, ROOT, registry);
       expect(isCriterionSourceMiss(located)).toBe(false);
       const src = located as { root: string; label: string };
-      // Not this instance: that is what "contributed" has to mean, or the flag
+      // Not this layer: that is what "contributed" has to mean, or the flag
       // is decoration and the move never happened.
       expect(src.root).not.toBe(ROOT);
       // Labelled `<contributor>/<path>` by the contributor that supplied it —

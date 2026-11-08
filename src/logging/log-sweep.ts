@@ -75,7 +75,7 @@ export interface SweepResult {
   kept: KeptFile[];
   /** How many files were looked at — the vacuity guard for any count above. */
   scanned: number;
-  /** Directories consulted. Empty means the instance declares no trashcan. */
+  /** Directories consulted. Empty means the layer declares no trashcan. */
   directories: string[];
 }
 

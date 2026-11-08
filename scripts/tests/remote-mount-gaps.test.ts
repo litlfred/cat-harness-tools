@@ -7,7 +7,7 @@
  * (b) A mounted layer with a `package.json` gets its dependencies installed,
  *     its code then RUNS, and `--check` still passes: `node_modules/` is not a
  *     pinned byte and the lockfile is left as it was.
- * (c) Seeding a remote instance writes its `trust.consent` for that pin.
+ * (c) Seeding a remote layer writes its `trust.consent` for that pin.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";

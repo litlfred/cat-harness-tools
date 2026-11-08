@@ -2,7 +2,7 @@
  * Cross-instance figure edit URLs must be repo-root-relative with no `..` segment.
  *
  * Bean `folio-assistant-4z5o`. Generated pages compose GitHub URLs by joining
- * an instance-relative path that leaves the instance root, producing broken links
+ * an instance-relative path that leaves the layer root, producing broken links
  * with `/main/../` in them (e.g. `https://github.com/.../edit/main/../folio-assistant-core/...`).
  * GitHub does not normalise `..` in that position.
  *

@@ -1,8 +1,8 @@
 /**
  * The order `derive:publish` runs the declared publish-time writers in (owner,
- * 2026-10-15, "A1"): lowest layer first, each instance's entries in their
+ * 2026-10-15, "A1"): lowest layer first, each layer's entries in their
  * declared order, a shared writer once, and a writer that DECLARES it reads a
- * kind of directory (`reads`) after the writers of other instances' entries
+ * kind of directory (`reads`) after the writers of other layers' entries
  * that fill one. A cycle is refused.
  *
  * The case that failed (2026-10-15): cat-harness's `docs/_data/harness.json`
@@ -23,7 +23,7 @@ import { declaredPlan, writerEdges, writersOf, writingOrder, type DeclaredArtefa
 
 let tmp: string;
 
-// declared-path-literal: a fixture instance's own builtAtPublish entry, written into a temp tree, not a path of this checkout
+// declared-path-literal: a fixture layer's own builtAtPublish entry, written into a temp tree, not a path of this checkout
 const PLATFORM_DATA = "docs/_data/harness.json";
 
 type Entry = { path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string };

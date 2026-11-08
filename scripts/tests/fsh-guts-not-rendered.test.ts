@@ -41,7 +41,7 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 // THE REPOSITORY root. `fsh-guts/` is declared `scope: "repository"` — it sits
-// at the top of the checkout, beside the instance rather than inside it, which
+// at the top of the checkout, beside the layer rather than inside it, which
 // is what the first assertion below says in words and what `join(REPO_ROOT, GUTS)`
 // stopped meaning at the move (bean `wggr`).
 const REPO_ROOT = repoRootFor(ROOT);

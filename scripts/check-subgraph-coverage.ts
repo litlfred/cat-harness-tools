@@ -145,8 +145,8 @@ export interface InstanceCoverage {
  * The layer exempt from `visualiser`, and the layer only.
  *
  * A NAME rather than a path, because the exemption is about what bootstrap IS
- * — the floor that owns no renderer — not about where it happens to sit. An
- * instance that relocated would keep its exemption; a different instance that
+ * — the floor that owns no renderer — not about where it happens to sit. A
+ * layer that relocated would keep its exemption; a different layer that
  * moved into `bootstrap/` would not inherit one.
  *
  * BOTH NAMES, and the old one is not dead weight. `bootstrap` was renamed to
@@ -155,7 +155,7 @@ export interface InstanceCoverage {
  * firing, bootstrap is asked for a visualiser it is exempt from, and the
  * only symptom is one extra minor finding among fifty. Keeping the old name
  * costs nothing and means a half-finished rename in either direction does not
- * quietly revoke a ruling. The test below pins the set against the instances
+ * quietly revoke a ruling. The test below pins the set against the layers
  * discovery actually finds, so a name that matches nothing is a failure rather
  * than a silence.
  */
@@ -168,7 +168,7 @@ export const VISUALISER_EXEMPT_INSTANCES = new Set(["bootstrap", "bootstrap"]);
  * {@link resolveCoveragePath} — the owner's ruling of 2026-09-21 on bean
  * `yt7j`, and one call site rather than a `resolve()` per consumer.
  *
- * This tried the instance root first and fell back to the repository root,
+ * This tried the layer root first and fell back to the repository root,
  * accepting either. That reads as tolerance and is the opposite: a path
  * incorrect in its declared base passed anyway through the other, so this
  * check could not enforce the convention its own schema documents. Measured
@@ -186,7 +186,7 @@ function targetExists(repoRoot: string, target: string): boolean {
 }
 
 /**
- * Does this instance have a STARTING README of its own?
+ * Does this layer have a STARTING README of its own?
  *
  * The owner, 2026-09-20: *"each harness kind needs readme, it is added as a
  * reference to repo's root readme.md to explain what is in it"*. Bean `ie9l`.
@@ -202,14 +202,14 @@ function targetExists(repoRoot: string, target: string): boolean {
  * answer mixed in.
  *
  * So this asks a question the resolve-check structurally cannot: does the
- * README live INSIDE the instance it describes? A repository-scoped README on
- * a non-root instance is a borrowed one, and that is the finding.
+ * README live INSIDE the layer it describes? A repository-scoped README on
+ * a non-root layer is a borrowed one, and that is the finding.
  *
- * MAJOR rather than minor, unlike the subgraph criteria: an instance with no
- * starting README is not a gap somebody has not filled in yet, it is an
- * instance a reader cannot enter. The subgraph criteria are minor because 2 of
+ * MAJOR rather than minor, unlike the subgraph criteria: a layer with no
+ * starting README is not a gap somebody has not filled in yet, it is a
+ * layer a reader cannot enter. The subgraph criteria are minor because 2 of
  * 22 directories have a renderer and a wall of findings gets switched off;
- * there are four instances and three have a README, so this one can be sharp
+ * there are four layers and three have a README, so this one can be sharp
  * from the start.
  */
 export function readmeFinding(
@@ -225,8 +225,8 @@ export function readmeFinding(
  *
  * Added 2026-09-20 (issue #592) because the axis had only ever asked about the
  * README, and the number that argument rests on is the measurement: ten of
- * eleven instances declared `instance-readme` and **two** declared
- * `agent-instructions`. Nine instances were readable by a person and mute to
+ * eleven layers declared `instance-readme` and **two** declared
+ * `agent-instructions`. Nine layers were readable by a person and mute to
  * an agent, and nothing said so — not because the check disagreed, but because
  * it was never asked.
  *
@@ -251,7 +251,7 @@ export function agentInstructionsFinding(
  * Written generically rather than copied because the three failure modes are
  * identical for both roles and the copy is where they drift: the `scope`
  * clause in particular is subtle enough that a second hand-written version
- * would plausibly omit it, and its absence reads as a clean instance.
+ * would plausibly omit it, and its absence reads as a clean layer.
  */
 export function assetRoleFinding(
   root: string,
@@ -268,7 +268,7 @@ export function assetRoleFinding(
     };
   }
   // The repository root legitimately owns the repository's files; every other
-  // instance reaching for a repository-scoped one is borrowing it.
+  // layer reaching for a repository-scoped one is borrowing it.
   if (asset.scope === "repository" && !isRepositoryRoot) {
     return {
       severity: "major",
@@ -284,7 +284,7 @@ export function assetRoleFinding(
 }
 
 /**
- * Does this instance have documentation OF ITS OWN, at `<instance>/docs/`?
+ * Does this layer have documentation OF ITS OWN, at `<instance>/docs/`?
  *
  * A DIRECTORY question, which is why it is not another `assetRoleFinding`:
  * README and `agent-instructions` are declared assets, and this is a tree.
@@ -295,25 +295,25 @@ export function assetRoleFinding(
  *
  * (paraphrased) `<base>/cat-harness/docs/` is where all harness user
  * documentation is, so documentation at `<base>/cat-harness/docs/<instance>/`
- * is documentation ABOUT a content instance — how it is ingested and so on —
- * **not that instance's content**, whose source is `<instance>/docs` at the
+ * is documentation ABOUT a content layer — how it is ingested and so on —
+ * **not that layer's content**, whose source is `<instance>/docs` at the
  * repository root.
  *
  * Two different things, and an axis that conflated them would pass a
  * repository where half the documentation is missing. This asks only the
- * first: the instance's own source tree. A handler's rendering of a subject
+ * first: the layer's own source tree. A handler's rendering of a subject
  * is not the subject having documentation.
  *
  * ## Minor, and NOT in the `--strict` gate — on purpose
  *
- * Measured 2026-09-21 across the 12 instances discovery finds: **2 have a
+ * Measured 2026-09-21 across the 12 layers discovery finds: **2 have a
  * `docs/`**. A check that fires on ten of twelve subjects on the day it lands
  * is one people learn to skim, and this repository's own rule is that a check
  * firing on every one of its subjects is a check that is wrong. It reports and
  * ranks; the count is meant to fall first. That is the staging `2krx` asked
  * for, for the same reason.
  *
- * @param root      the instance root
+ * @param root      the layer root
  * @param decl      its declaration, already parsed
  * @returns the finding, or `undefined` when it has `docs/` or is exempt
  */
@@ -326,7 +326,7 @@ export function ownDocsFinding(
   // bootstrap's visualiser exemption dying to a rename.
   if (decl !== undefined && isExemptFrom(decl, "own-docs")) return undefined;
   // `siteDirFor` rather than the string, and it is not merely to dodge the
-  // literal: an instance's own documentation IS its site root. The first
+  // literal: a layer's own documentation IS its site root. The first
   // draft hardcoded `"docs"` and two guards objected — `check:declared-paths`
   // ("a DIRECTORY the declaration already answers") and the site-root test,
   // which forbids the literal because getting that string wrong once
@@ -335,7 +335,7 @@ export function ownDocsFinding(
   //
   // It also supplies the third state for free: `siteDirFor` THROWS when it
   // cannot determine a site root, and "unreadable" is not "has no
-  // documentation". An instance that will not resolve has not been shown to
+  // documentation". A layer that will not resolve has not been shown to
   // lack docs; it has been shown to be undeterminable, which is a different
   // answer and belongs in `verdict`, not here.
   let siteDir: string;
@@ -343,7 +343,7 @@ export function ownDocsFinding(
     siteDir = siteDirFor(root);
   } catch {
     // NOT `undefined`. Returning nothing here would mean "has documentation",
-    // and an instance whose site root cannot be resolved has not been shown to
+    // and a layer whose site root cannot be resolved has not been shown to
     // have any — it has been shown to be undeterminable. The first draft
     // returned undefined and the tests caught it, which is the three-state
     // rule this file states elsewhere being broken in the act of citing it.
@@ -369,7 +369,7 @@ function trackedFiles(repoRoot: string): string[] {
   let files = trackedCache.get(repoRoot);
   if (!files) {
     // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
-    // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
+    // layer is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
     // by the index repository's git, so `ls-files` at the root lists none of
     // their files. `gitCorpus` counts a mount's files as it counted a
     // submodule's, and is tracked-plus-untracked exactly as before elsewhere.
@@ -389,7 +389,7 @@ function trackedFiles(repoRoot: string): string[] {
  * The `.bpmn` index, built at most once per repository per run.
  *
  * It reads every diagram in the repository, and `auditAll` calls
- * `auditInstance` once per instance — sixteen here — so building it inside
+ * `auditInstance` once per layer — sixteen here — so building it inside
  * the audit would read the corpus sixteen times over. Cached on the repo root
  * for the same reason `trackedFiles` above is.
  */
@@ -403,7 +403,7 @@ function processes(repoRoot: string): ProcessIndex {
   return idx;
 }
 
-/** The roots an instance depends on; none when its graph cannot be resolved. */
+/** The roots a layer depends on; none when its graph cannot be resolved. */
 function dependencyRoots(root: string): string[] {
   try {
     return orderedDependencies(root).map((d) => d.rootPath);
@@ -446,9 +446,9 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
   const exempted: InstanceCoverage["exempted"] = [];
   const dirs = decl.directories ?? [];
   // Who governs what, read from the skills; and how far a kind claim reaches —
-  // this instance, every instance it depends on, and the PLATFORM instance
-  // this checker belongs to, whose skills govern every instance it serves.
-  // Without the last, an instance declaring no dependencies (`agent-skills`)
+  // this layer, every layer it depends on, and the PLATFORM layer
+  // this checker belongs to, whose skills govern every layer it serves.
+  // Without the last, a layer declaring no dependencies (`agent-skills`)
   // was out of reach of the platform's own `library-ingestion`.
   const skills = skillGovernance(repoRoot, trackedFiles(repoRoot));
   const pages = docsPages(repoRoot, trackedFiles(repoRoot));
@@ -489,11 +489,11 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
       if (declared === undefined) {
         // An UNMET OBLIGATION outranks an unanswered question.
         //
-        // The owner, 2026-09-20: a directory an instance declares or initiates
+        // The owner, 2026-09-20: a directory a layer declares or initiates
         // and then writes to — `beans/`, `todos/`, `fsh-guts/` — owes a
         // visualiser "as requiement of handler". So for those kinds a missing
         // one is not "nobody has said yet", it is a thing the declaring
-        // instance promised and did not deliver.
+        // layer promised and did not deliver.
         //
         // Ranked, not gated, and the axis stays advisory: 0 of 20 such
         // directories have one today, and a hard gate on day one is the wall
@@ -581,9 +581,9 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
 
   // `resolve(root) === resolve(repoRootFor(root))` — a directory compared with
   // its own PARENT, which can only be equal at the filesystem root. So this was
-  // false for every instance including the repository root itself, and the
+  // false for every layer including the repository root itself, and the
   // guard below ("the repository root legitimately owns the repository's
-  // files") could never fire for the one instance it exists for. Latent rather
+  // files") could never fire for the one layer it exists for. Latent rather
   // than visible today: the root declaration's two assets carry no `scope`, so
   // nothing was being wrongly accused yet. Found while building
   // `resolveCoveragePath` (bean `yt7j`); the repository root is now passed in
@@ -646,7 +646,7 @@ export function formatReport(rs: InstanceCoverage[]): string {
   const noAgents = rs.filter((r) => r.agentInstructions !== undefined).length;
   // Counted and reported as its OWN axis. It was argued for on the grounds
   // that the README and docs sets were disjoint; measured 2026-09-21 they are
-  // not — every instance now declares a README, so docs is a strict subset.
+  // not — every layer now declares a README, so docs is a strict subset.
   // The axes stay separate anyway, for the reason that survives the
   // measurement: they are different questions. "Can a reader enter this
   // instance" and "is there anything to read once inside" do not collapse into
@@ -714,7 +714,7 @@ if (import.meta.main) {
   // is zero at the moment of promotion — this repository's rule for every
   // ratchet, and the only moment it costs nothing.
   //
-  // It runs BEFORE the `undetermined` exit below on purpose. An instance whose
+  // It runs BEFORE the `undetermined` exit below on purpose. A layer whose
   // declaration will not parse is `2`, and a wrong ref inside one that parses
   // fine is a different repair; reporting the softer one first would hide it.
   const unresolvable = rs.flatMap((r) => r.findings.filter((f) => f.unmet === "unresolvable"));

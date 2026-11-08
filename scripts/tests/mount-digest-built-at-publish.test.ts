@@ -1,9 +1,9 @@
 /**
- * A remote mount's integrity digest leaves out what the instance declares it
+ * A remote mount's integrity digest leaves out what the layer declares it
  * builds at publish (`builtAtPublish`), in EVERY directory the lock pins of
- * it, not only when the lock pins the instance root.
+ * it, not only when the lock pins the layer root.
  *
- * Found 2026-11-06 (bean `cat-tools-sm8r`): an IG instance is pinned as seven
+ * Found 2026-11-06 (bean `cat-tools-sm8r`): an IG layer is pinned as seven
  * directories (`<ig>/fhir-artifact-index`, `<ig>/document-kinds`,
  * …) and declares `fhir-artifact-index/index.json` built by `ig-index:build`.
  * The declaration was looked for inside each pinned directory and its
@@ -32,7 +32,7 @@ const decl = (builtAtPublish: unknown[]) =>
   JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "ig", builtAtPublish });
 
 spawnSync("git", ["init", "-q"], { cwd: ROOT });
-// An index checkout: the instance `ig` is mounted under it, pinned as several directories.
+// An index checkout: the layer `ig` is mounted under it, pinned as several directories.
 put("index.lock.json", "{}\n");
 put(
   "ig/ig.json",
@@ -47,7 +47,7 @@ put(
 put("ig/fhir-artifact-index/pinned.json", "{}\n");
 put("ig/document-kinds/k.json", "{}\n");
 put("ig/built-whole/a.txt", "a\n");
-// An instance that declares nothing, next to it: it must borrow no entries.
+// A layer that declares nothing, next to it: it must borrow no entries.
 put("plain/notes/index.json", "{}\n");
 
 describe("builtAtPublishOf", () => {

@@ -195,7 +195,7 @@ describe("the writer is a fixpoint over the real data", () => {
 // the folio instance". The model that shipped is one section per INSTANTIATED
 // harness (`603s`, `b5f0`), so the gate is stated in those terms. Asserted on
 // `render` rather than on the committed file, so the two cases the gate names
-// — several instances, and none — are tested whatever the repository holds.
+// — several layers, and none — are tested whatever the repository holds.
 describe("one navbar section per instantiated harness (bean `nvbr`)", () => {
   const h = (name: string, instantiated: boolean): Harness => ({ name, label: name, instantiated });
   const sections = (s: string) => [...s.matchAll(/data-fa-harness-config="([^"]+)"/g)].map((m) => m[1]);
@@ -284,7 +284,7 @@ describe("instanceView — an instance's own site", () => {
   ];
   const v = instanceView(rows, "ig", "https://main.example/site/");
   test("the instance first, then only what it needs, transitively", () => {
-    // After the instance, the rows keep harness.json's order (the main navbar's).
+    // After the layer, the rows keep harness.json's order (the main navbar's).
     expect(v.map((h) => h.name)).toEqual(["ig", "core", "base"]);
   });
   test("the instance's own pages move to this site's root; every other link is the main site's", () => {

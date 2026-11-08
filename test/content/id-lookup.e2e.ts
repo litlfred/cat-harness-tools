@@ -21,7 +21,7 @@ import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 const REPO = repoRootFor(join(import.meta.dirname, "..", ".."));
 const NODES = join(REPO, "who-iris", "catalogue", "nodes");
 // The generic reader page, told which index to open: who-iris hosts its own
-// generated index (D3, bean `j7ql`), and the page names no instance.
+// generated index (D3, bean `j7ql`), and the page names no layer.
 const PAGE = "/cat-harness-tools/id-lookup/index.html?index=" + encodeURIComponent("../../who-iris/id-lookup/");
 
 const referenced = readdirSync(NODES)

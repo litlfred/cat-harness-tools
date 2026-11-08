@@ -26,7 +26,7 @@
  *
  * - **A harness** is its declared `title`, else its `name` ({@link harnessTitle}).
  * - **A kind's destination** is the kind's registered display name
- *   ({@link kindTitle}). Where several kinds of one instance share a page,
+ *   ({@link kindTitle}). Where several kinds of one layer share a page,
  *   every one of them takes the name of the kind its directory declares
  *   FIRST: `schemas/` declares `["schemas", "cat-harness"]`, so both rows say
  *   "Schemas" ({@link labelVisualisations}).
@@ -101,18 +101,18 @@ export function tileLabel(
 }
 
 /**
- * Give each of one instance's visualisation rows its label, in place.
+ * Give each of one layer's visualisation rows its label, in place.
  *
  * A row is a KIND, and its destination is its `path`. Two kinds of one
- * instance may share a path — the schema viewer draws both `schemas` and
+ * layer may share a path — the schema viewer draws both `schemas` and
  * `cat-harness` — and then both take the name of whichever of them the
- * instance's directories declare first, so the page has one name. A row with
+ * layer's directories declare first, so the page has one name. A row with
  * no path is a kind with no destination and is named for its own kind.
  *
  * A row whose page is named for ANOTHER kind gets `sameAs` set to that kind,
  * and every list of destinations skips it.
  *
- * @param dirs the instance's directories, in declaration order
+ * @param dirs the layer's directories, in declaration order
  */
 export function labelVisualisations<V extends { kind: string; path?: string | null; label?: string; sameAs?: string }>(
   rows: V[],
@@ -136,7 +136,7 @@ export function labelVisualisations<V extends { kind: string; path?: string | nu
     const named = r.path ? byPath.get(r.path)! : r.kind;
     r.label = kindTitle(named);
     // The SECOND kind on a shared page is the same destination again. It is
-    // marked rather than dropped: the data still says the instance declares
+    // marked rather than dropped: the data still says the layer declares
     // it, and a surface that lists destinations skips it, so "Schemas" is not
     // printed twice one row apart.
     if (named !== r.kind) r.sameAs = named;
@@ -146,7 +146,7 @@ export function labelVisualisations<V extends { kind: string; path?: string | nu
 }
 
 /**
- * A viewer row whose page IS the instance's own root is the harness's
+ * A viewer row whose page IS the layer's own root is the harness's
  * destination again, so it takes the harness's name and is listed once.
  *
  * Stage C of #1767 made each ingested IG's generated landing declare itself
@@ -154,7 +154,7 @@ export function labelVisualisations<V extends { kind: string; path?: string | nu
  * row opened the DAK base layer's root — the page the harness row already opens as
  * "SMART Base". One page was then "SMART Base" on the harness row and "FHIR
  * artefact index" one row below it, on the sidebar, the landing and the rail.
- * The harness name wins because the page is the instance's front door first:
+ * The harness name wins because the page is the layer's front door first:
  * a harness row never takes a graph's name (bean `ob3m` finding 6), and the
  * converse — renaming the harness after one of its graphs — would make the
  * harness's name depend on which viewer happens to live at its root.
@@ -162,7 +162,7 @@ export function labelVisualisations<V extends { kind: string; path?: string | nu
  * `sameAs` is set to the harness's NAME (not a kind) so every list of
  * destinations skips the row exactly as it skips a kind sharing a page.
  *
- * @param root the instance's own root as published (`folio`), or undefined
+ * @param root the layer's own root as published (`folio`), or undefined
  *   when it has none — then no row can be it and nothing changes.
  */
 export function nameInstanceRoot<V extends { path?: string | null; label?: string; sameAs?: string }>(

@@ -3,10 +3,10 @@
  * User scenario translation templates: one `.pot` per scenario per locale.
  *
  * A user scenario (the `user-scenario` kind) is JSON, so neither the page
- * extractor nor `translate-bpmn` reaches it, and an instance's journeys were
+ * extractor nor `translate-bpmn` reaches it, and a layer's journeys were
  * the one part of its site a translator was never handed. This writes
  * `<translations>/<locale>/user-scenarios/<name>.pot` from every file in the
- * directory the instance declares for the `user-scenario` graph, with the
+ * directory the layer declares for the `user-scenario` graph, with the
  * fields `pipeline/pot-for-user-scenarios.ts` lists. A translator merges it
  * into a `.po` beside it the way they do every other template.
  *
@@ -14,7 +14,7 @@
  *
  * As `translate-bpmn:check`: a template that is absent, differs (the
  * `POT-Creation-Date` header aside) or is left from a scenario that is gone
- * fails. A locale is one the instance already translates (a directory under
+ * fails. A locale is one the layer already translates (a directory under
  * its translations root), so adding the first template is `--extract`, not a
  * failure of every locale at once.
  *
@@ -44,7 +44,7 @@ export interface ScenarioTemplatePlan {
   text: string;
 }
 
-/** The templates the instance at `root` should hold, per locale and scenario; `undefined` when it declares no user-scenario directory. */
+/** The templates the layer at `root` should hold, per locale and scenario; `undefined` when it declares no user-scenario directory. */
 export function planScenarioTemplates(root: string): { plan: ScenarioTemplatePlan[]; scenarios: number; locales: string[] } | undefined {
   const dir = directoryForGraph(root, "user-scenario");
   if (dir === undefined || !existsSync(dir)) return undefined;

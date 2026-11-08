@@ -73,7 +73,7 @@ export interface DeployStamp {
 /** `state:mount`'s marker for one branch-mounted subgraph (`<git-dir>/branch-mounts/<key>.json`). */
 export interface MountMarker {
   id: string;
-  /** `locationKey`: `<instance>.<id>` when an instance owns the mount (`state:mount`). */
+  /** `locationKey`: `<instance>.<id>` when a layer owns the mount (`state:mount`). */
   key?: string;
   branch: string;
   /** The checkout path declared on the directory. */

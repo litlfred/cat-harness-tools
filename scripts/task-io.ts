@@ -1,6 +1,6 @@
 /**
  * What a check script reads and writes. This layer's rows are declared here;
- * an instance above it declares its own under `taskIo` in its
+ * a layer above it declares its own under `taskIo` in its
  * `<instance>.json`, and {@link collectTaskIo} reads both.
  *
  * @module scripts/task-io
@@ -89,9 +89,9 @@ const READ_ONLY: ScriptIO = { outputs: [] };
 const TREE_READER: ScriptIO = { inputs: [TRACKED], outputs: [] };
 
 /**
- * This layer's own rows. A task owned by an instance ABOVE this one is not
- * listed here: that instance declares it in its own `<instance>.json` under
- * `taskIo`, and {@link collectTaskIo} reads it from whatever instances are
+ * This layer's own rows. A task owned by a layer ABOVE this one is not
+ * listed here: that layer declares it in its own `<instance>.json` under
+ * `taskIo`, and {@link collectTaskIo} reads it from whatever layers are
  * present (bean `0r7u`, owner ruling 2026-10-06 — "each instance declares its
  * own tasks"). Twenty rows moved out on that day; naming them here would be
  * the upward reference that breaks this layer when it stands alone.
@@ -99,7 +99,7 @@ const TREE_READER: ScriptIO = { inputs: [TRACKED], outputs: [] };
 const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
   // ── regen's slowest pairs, by measured wall time (seconds, both passes) ──
   "translation:block-qa:check": TREE_READER, //   456 s — `--check` compares `substantive()`, which drops commit SHAs and timestamps
-  "kg:audit:all:check": TREE_READER, //            335 s — spawns `kg-audit.ts --check` per instance; the spawned source is in the tree
+  "kg:audit:all:check": TREE_READER, //            335 s — spawns `kg-audit.ts --check` per layer; the spawned source is in the tree
   // 107 s (2026-10-05). Read-only since bean `bo44`: `writesReport` is false
   // under `--check`, so this said "writes its registration report" a week after
   // it stopped (bean `8qyc`). Re-measured under strace on a clean tree: no
@@ -345,13 +345,13 @@ const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
 };
 
 /**
- * {@link OWN_TASK_IO} plus every present instance's declared `taskIo`.
+ * {@link OWN_TASK_IO} plus every present layer's declared `taskIo`.
  *
- * A key declared twice — by two instances, or by an instance and this table —
+ * A key declared twice — by two layers, or by a layer and this table —
  * THROWS rather than letting one win: two owners of one task is a placement
  * defect, and silently picking either would make `outputs: []` a claim nobody
- * owns. An instance whose `taskIo` is absent contributes nothing; standalone,
- * with no instance above this layer present, the result is the own rows alone.
+ * owns. A layer whose `taskIo` is absent contributes nothing; standalone,
+ * with no layer above this layer present, the result is the own rows alone.
  */
 export function collectTaskIo(
   repoRoot: string,
@@ -360,8 +360,8 @@ export function collectTaskIo(
   const out: Record<string, ScriptIO> = { ...own };
   const ownerOf = new Map<string, string>(Object.keys(own).map((k) => [k, "cat-harness-tools/scripts/task-io.ts"]));
   for (const instance of instanceRootsIn(repoRoot)) {
-    // A REMOTE-MOUNTED instance's `taskIo` names scripts in ITS repository's
-    // package.json, not this checkout's (bean `hupw`: a retired instance's
+    // A REMOTE-MOUNTED layer's `taskIo` names scripts in ITS repository's
+    // package.json, not this checkout's (bean `hupw`: a retired layer's
     // gates leave with it), so it contributes nothing here.
     if (mountScopeFor(instance) !== undefined) continue;
     const declared = readDeclaration(instance)?.taskIo;
@@ -388,11 +388,11 @@ export function collectTaskIo(
 
 /**
  * The committed files each task WRITES, declared as globs (litlfred/cat-harness#693,
- * owner 2026-10-29): bare is relative to the declaring instance,
- * `<instance>:<glob>` names another instance's file. `check:generated-writers`
+ * owner 2026-10-29): bare is relative to the declaring layer,
+ * `<instance>:<glob>` names another layer's file. `check:generated-writers`
  * warns on every matched file that carries no generated marker.
  *
- * This layer's own writers are {@link OWN_WRITES}; an instance above declares
+ * This layer's own writers are {@link OWN_WRITES}; a layer above declares
  * its own as `taskIo.<task>.writes`. Kept apart from {@link TASK_IO}, whose
  * rows decide how a task RUNS: a writer named here gains no `inputs` or
  * `outputs` claim by being listed.
@@ -406,12 +406,12 @@ export const OWN_WRITES: Readonly<Record<string, readonly string[]>> = {
 
 export interface TaskWrites {
   task: string;
-  /** The instance root bare globs are relative to. */
+  /** The layer root bare globs are relative to. */
   instance: string;
   globs: readonly string[];
 }
 
-/** {@link OWN_WRITES} plus every present instance's `taskIo.<task>.writes`. */
+/** {@link OWN_WRITES} plus every present layer's `taskIo.<task>.writes`. */
 export function collectTaskWrites(repoRoot: string, own: Readonly<Record<string, readonly string[]>> = OWN_WRITES): TaskWrites[] {
   const toolsRoot = dirname(import.meta.dir);
   const out: TaskWrites[] = Object.entries(own).map(([task, globs]) => ({ task, instance: toolsRoot, globs }));

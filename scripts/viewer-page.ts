@@ -81,7 +81,7 @@ export function isStandalonePage(html: string): boolean {
 
 /** Where a page sits, and whose graphs its rail should list. */
 export interface ViewerNav {
-  /** The built instance's directory name, e.g. `cat-harness`. */
+  /** The built layer's directory name, e.g. `cat-harness`. */
   built: string;
   /** Absolute path of the published docs directory this page is written under. */
   docsRoot: string;
@@ -89,7 +89,7 @@ export interface ViewerNav {
    * Whose graphs the rail lists. Defaults to {@link built}.
    *
    * A generator that knows better PASSES it — `gen-library-viz` writes
-   * `library/<instance>/` and has the instance in hand. What no caller does is
+   * `library/<instance>/` and has the layer in hand. What no caller does is
    * INFER it from the path: `auto-docs/index/skills/<instance>-skills/` would
    * have to be un-suffixed to yield `<instance>`, and a rule that strips
    * `-skills` here is a second answer to a question the generator already
@@ -120,7 +120,7 @@ export interface ViewerNav {
  * per subject page, with this page's own regions under the row it is.
  *
  * Every handler viewer here (`folio`, `schemas`, `uploads`, `voices`) has the
- * same two-level shape — one page over every instance, one page per subject —
+ * same two-level shape — one page over every layer, one page per subject —
  * so the shape is written once. The current page's row carries no href (a
  * link to here is a control that does nothing) and holds its regions, which
  * are the page's static containers: they are what exists to be scrolled to
@@ -142,7 +142,7 @@ export function subjectSection(
    * is the bare segment, as before.
    *
    * Called with `undefined`, it names the WHOLE-VIEW page. That page is a
-   * destination too: an instance with a graph of this kind but no subject page
+   * destination too: a layer with a graph of this kind but no subject page
    * of its own (the IRIS replica's and the formal-math layer's `schemas`, since bean
    * `j7ql`) links it, and the sidebar and landing call it "Schemas". Naming it
    * "all" here was a second name for that one page. Omitted, it is "all".
@@ -211,7 +211,7 @@ export function withViewerNav(html: string, pageAbs: string, o: ViewerNav): stri
   const toRoot = toRootForPage(o.docsRoot, pageAbs);
   const here = sitePathForPage(o.docsRoot, pageAbs);
 
-  // `linked` is empty because this is not a mount pass: there is no instance
+  // `linked` is empty because this is not a mount pass: there is no layer
   // route to prefer. `publishedGraphs` is the right and only witness here —
   // these pages ARE the handler's viewers, so `harness.json`'s visualisation
   // paths point at the family this page belongs to.
@@ -244,7 +244,7 @@ export function withViewerNav(html: string, pageAbs: string, o: ViewerNav): stri
   });
 
   const harnesses = instantiatedHarnesses(o.built, toRoot);
-  // No current row — a page whose graph this instance does not itself declare,
+  // No current row — a page whose graph this layer does not itself declare,
   // `/todos/` under cat-harness — is still a visualiser, and its section is
   // named for the page rather than called "Contents".
   visualiserLabel ??= here.split("/").filter(Boolean).pop();

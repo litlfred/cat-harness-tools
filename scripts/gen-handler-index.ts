@@ -6,8 +6,8 @@
  * @covers docs
  * @graphNode none — a generator over the tiles model, not a schema itself
  *
- * `/<handler>/` is where this instance publishes every graph it renders, as
- * `<base>/<handler>/<kind>/[<subject>/]`. Where that meets the instance's own
+ * `/<handler>/` is where this layer publishes every graph it renders, as
+ * `<base>/<handler>/<kind>/[<subject>/]`. Where that meets the layer's own
  * `<base>/<instance>/` route, **the handler wins**: the root is this
  * generated index.
  *
@@ -19,7 +19,7 @@
  * ## Derived from the tiles model, not from the filesystem
  *
  * It renders `harnessTiles` (which declared kinds have a published path, per
- * instance), the model the navbar and the board read, so the page and the
+ * layer), the model the navbar and the board read, so the page and the
  * navbar cannot disagree, and it need not run after the other generators: a
  * `coverage.visualiser` declaration makes a kind appear, not a file on disk.
  *
@@ -60,7 +60,7 @@ const check = process.argv.includes("--check");
  */
 const PAGE_FILE = "published-graphs.md";
 
-/** One row of the page: an instance, and one kind this handler renders for it. */
+/** One row of the page: a layer, and one kind this handler renders for it. */
 export interface HandlerRow {
   instance: string;
   label: string;
@@ -70,11 +70,11 @@ export interface HandlerRow {
 }
 
 /**
- * Every (instance, kind) this handler renders, sorted by kind then instance.
+ * Every (instance, kind) this handler renders, sorted by kind then layer.
  *
  * By KIND first, because the question a reader arrives with is "where are the
  * schemas" far more often than "what does that instance have" — and the navbar
- * already answers the second, one tile per instance.
+ * already answers the second, one tile per layer.
  */
 export function handlerRows(tiles: readonly HarnessTile[]): HandlerRow[] {
   const out: HandlerRow[] = [];
@@ -221,7 +221,7 @@ if (import.meta.main) {
   const repoRoot = repoRootFor(ROOT);
   const decl = readDeclaration(ROOT);
   if (!decl?.name) {
-    // Not a pass. An instance with no declared name has no handler segment, so
+    // Not a pass. A layer with no declared name has no handler segment, so
     // there is no namespace to index — and saying so is different from saying
     // the index is fine.
     console.log("  · this instance declares no name — no handler namespace to index");

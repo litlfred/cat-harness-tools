@@ -168,7 +168,7 @@ export default tseslint.config(
     // — hence a pattern that names the relationship rather than the location.
     //
     // Originally `docs/**/_includes/` rather than `docs/_includes/`: the site moved under
-    // its instance stub (`docs/<stub>/`) to package it for the repo split, and
+    // its layer stub (`docs/<stub>/`) to package it for the repo split, and
     // a glob pinned to the old depth silently stops matching — which is a lint
     // rule that quietly covers nothing rather than one that fails loudly.
     // Now `**/_includes/`: the chrome left `docs/` for `site-chrome/`, the

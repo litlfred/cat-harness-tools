@@ -1,5 +1,5 @@
 /**
- * Artefacts an instance must NOT commit, because no commit of it can hold them
+ * Artefacts a layer must NOT commit, because no commit of it can hold them
  * current: they are built when the site is published, and only then.
  *
  * @module schemas/built-at-publish
@@ -7,12 +7,12 @@
  *
  * ## The rule
  *
- * An artefact may be committed in an instance only if every input it is
- * computed from is pinned BY THAT INSTANCE'S OWN COMMIT: its own tree, plus the
- * instances it `needs` at the pins its own lock names. Two ways to fail it,
+ * An artefact may be committed in a layer only if every input it is
+ * computed from is pinned BY THAT LAYER'S OWN COMMIT: its own tree, plus the
+ * layers it `needs` at the pins its own lock names. Two ways to fail it,
  * and {@link BuiltAtPublishSchema} names which one each entry fails:
  *
- * - `checkout` — computed over every instance the checkout stacks on this one.
+ * - `checkout` — computed over every layer the checkout stacks on this one.
  *   Those are ABOVE it (they `need` it), so it cannot pin them, and the bytes
  *   are a function of the consuming index's lock, not of this commit.
  * - `state` — computed from a graph kept on a branch (`beans`, `todos`, `qa`),
@@ -30,20 +30,20 @@
  *
  * ## Writer order
  *
- * `derive:publish` runs every instance's writers lowest layer first
- * (dependency order), each instance's entries in their declared order, a
+ * `derive:publish` runs every layer's writers lowest layer first
+ * (dependency order), each layer's entries in their declared order, a
  * writer named twice running once, at its first mention. A writer that reads
- * another instance's publish-time output declares it (`reads`, the kinds of
+ * another layer's publish-time output declares it (`reads`, the kinds of
  * directory it reads) and is ordered AFTER that writer. `derive:publish`
  * sorts by those edges and refuses a cycle.
  */
 import { z } from "zod";
 
-/** Why an artefact cannot be current in a commit of the instance that serves it. */
+/** Why an artefact cannot be current in a commit of the layer that serves it. */
 export const BuiltAtPublishCauseSchema = z.enum(["checkout", "state"]);
 export type BuiltAtPublishCause = z.infer<typeof BuiltAtPublishCauseSchema>;
 
-/** A path relative to the instance root: a file, or a directory ending in `/`. No `..`, no leading `/`. */
+/** A path relative to the layer root: a file, or a directory ending in `/`. No `..`, no leading `/`. */
 const InstancePath = z
   .string()
   .min(1)
@@ -67,10 +67,10 @@ export const BuiltAtPublishSchema = z
     directory: z.string().min(1).optional(),
     /**
      * The graph typologies (directory kinds) whose directories, in OTHER
-     * instances, this entry's writers read: the declared READ EDGE that orders
+     * layers, this entry's writers read: the declared READ EDGE that orders
      * them (see "Writer order" above). `derive:publish` runs these writers after
-     * the writers of every other instance's entry that fills (`directory`) a
-     * directory of one of these kinds. Kinds, never instance names: a lower
+     * the writers of every other layer's entry that fills (`directory`) a
+     * directory of one of these kinds. Kinds, never layer names: a lower
      * layer reading what the layers above it build cannot name them.
      */
     reads: z
@@ -115,7 +115,7 @@ export const BuiltAtPublishListSchema = z.array(BuiltAtPublishSchema).superRefin
   }
 });
 
-/** The `.gitignore` line that keeps one entry out of a commit: anchored at the instance root. */
+/** The `.gitignore` line that keeps one entry out of a commit: anchored at the layer root. */
 export function ignoreLineFor(entry: Pick<BuiltAtPublish, "path">): string {
   return `/${entry.path}`;
 }

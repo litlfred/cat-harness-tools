@@ -12,8 +12,8 @@
  * The tree is laid out like the checkout (`<instance>/test/results/**`), the
  * layout every `qa-reports` entry keeps. Inside it, this walks:
  *
- * - every directory any instance DECLARES as a `qa` graph, mapped into the tree;
- * - every instance's kg-qa home as `kgQaHomeFor` resolves it — `own`,
+ * - every directory any layer DECLARES as a `qa` graph, mapped into the tree;
+ * - every layer's kg-qa home as `kgQaHomeFor` resolves it — `own`,
  *   `hosted` (`cat-harness/test/results/bootstrap/`, `bootstrap-tools/`,
  *   `cat-harness-tools/`) or `convention`.
  *
@@ -247,7 +247,7 @@ function kgQaFilesUnder(dir: string): string[] {
 
 /**
  * The repository-relative directories to walk: every declared `qa` directory
- * and every instance's kg-qa home. Derived from THIS checkout's declarations,
+ * and every layer's kg-qa home. Derived from THIS checkout's declarations,
  * because a fetched tree carries results, not declarations.
  */
 export function corpusLayout(repoRoot: string = REPO, harness: string = join(repoRoot, "cat-harness")): {

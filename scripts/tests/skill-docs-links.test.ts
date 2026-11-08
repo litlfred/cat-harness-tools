@@ -188,7 +188,7 @@ describe("orphanPages", () => {
  * relation.
  *
  * `kg-navigation` sat that way from `pve3` — which ruled bootstrap's skills
- * out of this instance — until 2026-09-27. The live page carried *"A stub of
+ * out of this layer — until 2026-09-27. The live page carried *"A stub of
  * the same name is published as [Reading a knowledge graph before you have
  * anything (bootstrap)](local-kg-navigation.html)"*, and that page does not
  * exist and cannot: the `local-` prefix comes from `.claude/skills/local/`,

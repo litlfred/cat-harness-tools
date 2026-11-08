@@ -15,7 +15,7 @@ import { dirname } from "node:path";
 const REPO = resolve(dirname(HARNESS_ROOT));
 /**
  * The "on this checkout" measurements are about the IGs, so they need the
- * instances that hold them. Standing alone (check:cat-harness-standalone)
+ * layers that hold them. Standing alone (check:cat-harness-standalone)
  * those are absent: skipped and named as skipped, never passed over nothing.
  */
 // smart-immunizations declares no directories since the owner's B1 ruling

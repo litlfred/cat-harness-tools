@@ -6,7 +6,7 @@
  * @covers none — it reads `THEMES`, the PLATFORM's themes, which are declared
  * in code (`schemas/ui/themes.ts`) rather than in a graph directory — the same
  * reason `gen-avatars-css` declares none. It resolves no `themes` directory;
- * an instance's own `themes` declaration is a different thing.
+ * a layer's own `themes` declaration is a different thing.
  *
  * **The knowledge graph is the source; the stylesheet is a rendering of it**,
  * so a colour has one place to change. `--check` fails when the committed file
@@ -14,16 +14,16 @@
  *
  * ## Instance-declared sticky themes are emitted too
  *
- * An instance may declare its own sticky theme in a `themes` graph directory.
+ * A layer may declare its own sticky theme in a `themes` graph directory.
  * They are found through `instanceStickyThemes` — the same declaration-driven
- * discovery `themeByRef` uses — so this file names no instance and holds no
- * instance's colour: the values arrive from the instance's own `themes.ts`
- * when the generator runs. An instance theme id that collides with a platform
- * id or another instance's is REFUSED with a finding (exit 1), because a card
+ * discovery `themeByRef` uses — so this file names no layer and holds no
+ * layer's colour: the values arrive from the layer's own `themes.ts`
+ * when the generator runs. A layer theme id that collides with a platform
+ * id or another layer's is REFUSED with a finding (exit 1), because a card
  * writes the bare id and one selector cannot serve two themes.
  *
- * Exit codes: 0 written or up to date · 1 stale under `--check`, or an
- * instance sticky theme id collides.
+ * Exit codes: 0 written or up to date · 1 stale under `--check`, or a
+ * layer sticky theme id collides.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -41,7 +41,7 @@ import { DEFAULT_THEME_ID, THEMES } from "../schemas/ui/themes.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
- * Where the stylesheet goes, for the instance rooted at `root`.
+ * Where the stylesheet goes, for the layer rooted at `root`.
  *
  * **Derived, never written down.** The site root is `siteDirFor`'s answer and
  * nobody else's — a literal here would be one more place to fix when the tree
@@ -56,13 +56,13 @@ export function themesCssPath(root: string): string {
 }
 
 /**
- * Where an instance's WEBPAGE theme reaches the site — a `_data` file, not CSS.
+ * Where a layer's WEBPAGE theme reaches the site — a `_data` file, not CSS.
  *
- * Bean `7h3u`. A webpage theme dresses ONE instance's pages, so it has to be
+ * Bean `7h3u`. A webpage theme dresses ONE layer's pages, so it has to be
  * scoped by URL — and **CSS cannot select on a URL**. The scope therefore has
  * to be applied by whatever knows which page is rendering, which here is
  * Jekyll: `_includes/head_custom.html` matches `page.url` and emits the
- * matching instance's declarations inline.
+ * matching layer's declarations inline.
  *
  * That is also the owner's own instruction for this work — *"reuse all existing
  * justthedocs infra (see sibling work on variable substitution)"*. `_data/` is
@@ -110,18 +110,18 @@ function stickyBlock(t: Extract<ResolvedTheme, { kind: "sticky" }>, owner?: stri
 }
 
 /**
- * @param instanceThemes sticky themes declared by instances rather than the
+ * @param instanceThemes sticky themes declared by layers rather than the
  *   platform, already collision-checked by `instanceStickyThemes`. Emitted
  *   AFTER the platform's, each labelled with its owner.
  */
 /**
- * Instance webpage themes, as the data `head_custom.html` scopes by `page.url`.
+ * Layer webpage themes, as the data `head_custom.html` scopes by `page.url`.
  *
- * `prefix` is the instance's own name with slashes either side, because an
- * instance's docs answer at `/<name>/` — `smart-trust-docs` carries
+ * `prefix` is the layer's own name with slashes either side, because a
+ * layer's docs answer at `/<name>/` — `smart-trust-docs` carries
  * `instanceRoot: true`, which is what makes that the root of its pages rather
  * than the choice falling to sort order. Derived rather than declared a second
- * time: a prefix field would be a second answer to where an instance's pages
+ * time: a prefix field would be a second answer to where a layer's pages
  * live, free to disagree with the declaration.
  */
 export function renderInstanceThemesData(themes: readonly OwnedWebpageTheme[]): string {
@@ -194,14 +194,14 @@ export function renderThemesCss(instanceThemes: readonly OwnedStickyTheme[] = []
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
-  // THE INSTANCE this script belongs to — the one it lives in — not whatever
+  // THE LAYER this script belongs to — the one it lives in — not whatever
   // directory the gate was invoked from. Those were the same until the move
   // (bean `wggr`), after which `siteDirFor(cwd)` threw on a `harness.json`
   // that is one directory down.
   const root = HARNESS_ROOT;
   const rel = themesCssPath(root);
   const path = join(root, rel);
-  // Every instance's sticky themes, by declaration. A collision is refused
+  // Every layer's sticky themes, by declaration. A collision is refused
   // rather than resolved by order — see `instanceStickyThemes`.
   const platformName = readDeclaration(root)?.name ?? "cat-harness";
   const found = instanceStickyThemes(repoRootFor(root), platformName, new Set(THEMES.map((t) => t.id)));
@@ -211,8 +211,8 @@ if (import.meta.main) {
   }
   const next = renderThemesCss(found.themes);
   // WEBPAGE themes, the second artefact and a different surface. No collision
-  // check: a webpage theme is scoped by the instance whose pages it dresses, so
-  // two instances sharing an id never meet — see `instanceWebpageThemes`.
+  // check: a webpage theme is scoped by the layer whose pages it dresses, so
+  // two layers sharing an id never meet — see `instanceWebpageThemes`.
   const webpage = instanceWebpageThemes(repoRootFor(root), platformName);
   const dataRel = instanceThemesDataPath(root);
   const dataPath = join(root, dataRel);

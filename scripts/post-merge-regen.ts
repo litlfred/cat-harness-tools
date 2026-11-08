@@ -22,7 +22,7 @@
  * 4. Honest reporting: if a check has no writer or its writer fails, it is
  *    reported as unrepaired/defect (exit 1), not claimed as a repair.
  * 5. A `builtAtPublish` output is never stale:
- *    a check whose writer moved only paths an instance declares it builds at
+ *    a check whose writer moved only paths a layer declares it builds at
  *    publish is reported in `builtAtPublishChecks`, not as stale or repaired.
  *    Those paths are gitignored, so no repair of them could ever land.
  */
@@ -60,7 +60,7 @@ const ROOT = join(HARNESS_ROOT);
 /**
  * Gates that judge FIXITY, not staleness, so post-merge regen never asks them.
  *
- * Each says whether a mounted instance still holds exactly the bytes its lock
+ * Each says whether a mounted layer still holds exactly the bytes its lock
  * names. Here that cannot hold, and no writer can make it hold:
  *
  * - in a LAYER's run (`layer-post-merge-regen.yml`) the caller's own checkout
@@ -85,7 +85,7 @@ export function postMergePairs<P extends { check: string }>(pairs: readonly P[])
   return pairs.filter((p) => FIXITY_CHECKS[p.check] === undefined);
 }
 
-/** One instance's root and what it declares it builds at publish. */
+/** One layer's root and what it declares it builds at publish. */
 export interface PublishTimeDeclaration {
   /** Absolute. */
   root: string;
@@ -93,7 +93,7 @@ export interface PublishTimeDeclaration {
 }
 
 /**
- * Every instance under `repoRoot` that declares `builtAtPublish` or an
+ * Every layer under `repoRoot` that declares `builtAtPublish` or an
  * off-checkout `storage` directory such as `test/results/` on `qa-reports`
  * (beans `p7mb`, `ksek`).
  */
@@ -119,7 +119,7 @@ export function publishTimeDeclarations(repoRoot: string): PublishTimeDeclaratio
 export const PREREQUISITE_WRITERS: readonly string[] = ["ig-index:build"];
 
 /**
- * The prerequisite writers that some declaring instance needs run: one of
+ * The prerequisite writers that some declaring layer needs run: one of
  * its `builtAtPublish` entries names the writer and its path is absent.
  */
 export function missingPrerequisiteWriters(decls: readonly PublishTimeDeclaration[]): string[] {
@@ -171,8 +171,8 @@ export function inTargetScope(repoRoot: string, instance?: string): (rel: string
 }
 
 /**
- * Whether `rel` (repo-relative) is declared `builtAtPublish` by the instance
- * that holds it: the deepest instance root containing it, asked through
+ * Whether `rel` (repo-relative) is declared `builtAtPublish` by the layer
+ * that holds it: the deepest layer root containing it, asked through
  * {@link isBuiltAtPublish} with the path relative to that root.
  */
 export function builtAtPublishIn(rel: string, decls: readonly PublishTimeDeclaration[], repoRoot: string): boolean {
@@ -369,9 +369,9 @@ export interface GhExecutor {
 export interface PostMergeRegenOptions {
   repoRoot?: string;
   /**
-   * In a layer run (`layer-post-merge-regen.yml`), the caller instance's mount
+   * In a layer run (`layer-post-merge-regen.yml`), the caller layer's mount
    * path in the composed index (e.g. `"cat-harness"`). Only files inside this
-   * instance's tree are committed to the caller repository; another layer's
+   * layer's tree are committed to the caller repository; another layer's
    * changes are that layer's to repair.
    */
   instance?: string;
@@ -535,7 +535,7 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
 
   // Bean `p7mb`: `post-merge:regen` already checks and repairs every QA writer
   // (`kg:audit:all`, `kg:detangle`, `translation:block-qa`, `skill:register`,
-  // `readme:subgraphs`, etc.) as its own pair over the mounted instances'
+  // `readme:subgraphs`, etc.) as its own pair over the mounted layers'
   // committed QA working copy (`test/results/`). Setting `BUILDING_ENV = "1"`
   // prevents `uml:overview:check` (`publish-check.ts uml:overview` ->
   // `gen-uml-overview.ts` -> `requireCurrentWorkingCopy`) from recursively
@@ -558,8 +558,8 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   // execute `<writer>` on disk inside the check call itself.
   const decls = opts.tracker === undefined && opts.runner === undefined ? publishTimeDeclarations(repoRoot) : [];
   // An IG's artefact index is read by the checks below, and it is built at
-  // publish rather than committed. Build it first when an instance that
-  // declares it lacks it. Which instances those are is read from their
+  // publish rather than committed. Build it first when a layer that
+  // declares it lacks it. Which layers those are is read from their
   // declarations, so this layer names none of them (it sits below them).
   if (opts.runner === undefined) {
     for (const w of missingPrerequisiteWriters(decls.length > 0 ? decls : publishTimeDeclarations(repoRoot))) {

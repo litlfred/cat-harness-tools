@@ -166,7 +166,7 @@ describe("mustReadGraph", () => {
 // it can report are what each of them acts on. Asserted against a real
 // repository and a real marker.
 describe("readBeanStore relocates, and refuses", () => {
-  /** A repository whose root instance declares `beans`, with a bean graph in it. */
+  /** A repository whose root layer declares `beans`, with a bean graph in it. */
   function beansRepo(storage?: Record<string, unknown>): string {
     const root = repo([{ id: "beans", path: "beans/", graphTypologies: ["beans"], ...(storage ? { storage } : {}) }]);
     mkdirSync(join(root, "beans", "defs"), { recursive: true });

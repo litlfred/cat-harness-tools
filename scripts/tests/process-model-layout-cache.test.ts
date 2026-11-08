@@ -1,14 +1,14 @@
 /**
- * The instance layout `loadProcessModel` resolves calls against is computed
- * once per instance root — and is resolved AGAIN when the layout changes.
+ * The layer layout `loadProcessModel` resolves calls against is computed
+ * once per layer root — and is resolved AGAIN when the layout changes.
  *
- * Bean `sff8`. Resolving an instance's `processes` directories and its
+ * Bean `sff8`. Resolving a layer's `processes` directories and its
  * dependencies' was redone for every diagram, which was half of a corpus pass;
- * it is now memoised by instance root (`instanceLayout` in
+ * it is now memoised by layer root (`instanceLayout` in
  * `src/workflow/process-model.ts`). A memo is only as good as its key, so
  * these pin the two changes a fixture actually makes to one checkout without
  * moving it: a declaration rewritten to need a dependency, and a dependency's
- * instance root appearing beside it. A stale layout leaves the call opaque, so
+ * layer root appearing beside it. A stale layout leaves the call opaque, so
  * each case asserts the call was opaque first — otherwise a pass would prove
  * nothing about invalidation.
  *
@@ -29,7 +29,7 @@ afterAll(() => {
 
 const NS = `xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="urn:t"`;
 
-/** An instance root `name` under `checkout`, declaring one `processes/` directory holding `file`. */
+/** A layer root `name` under `checkout`, declaring one `processes/` directory holding `file`. */
 function instance(checkout: string, name: string, file: string, xml: string): string {
   const root = join(checkout, name);
   mkdirSync(join(root, "processes"), { recursive: true });

@@ -5,7 +5,7 @@
  * Scripts are declared in the layer each one runs (`schemas/sdlc/script-table.ts`).
  * `bun run` reads only the manifest in the directory it starts in, so the root
  * keeps this one entry, `cat`, and this finds the script by asking the declared
- * instances.
+ * layers.
  *
  * A `.ts`/`.js` path in place of a name runs that file, as `bun run <file>`
  * does, so a caller whose list mixes names and files needs no second spelling.
@@ -57,8 +57,8 @@ export interface LayerScriptEntry {
 
 /**
  * Look up a script declared under `scripts` (layer-relative) of a mounted
- * instance when it is not in the checkout-root `scriptTable`. Throws if two
- * mounted instances declare the same `scripts[name]`.
+ * layer when it is not in the checkout-root `scriptTable`. Throws if two
+ * mounted layers declare the same `scripts[name]`.
  */
 export function layerScript(repoRoot: string, name: string): LayerScriptEntry | undefined {
   const root = resolve(repoRoot);

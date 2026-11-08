@@ -573,7 +573,7 @@ export function probeRepoSize(repoRoot: string): Probe<RepoSizeEvidence> {
 /** Resolve a declared store directory, falling back to the documented default. */
 /**
  * Does the repository at `repoRoot` declare a graph of `kind` anywhere — its
- * store's own graph file, or a directory of that kind in its instance
+ * store's own graph file, or a directory of that kind in its layer
  * declaration? `false` is the determined answer "this repository has none".
  */
 function declaresStore(repoRoot: string, graphFile: string, kind: string): boolean {
@@ -991,7 +991,7 @@ export interface SpecialBranchDecl {
 
 /**
  * The branch prefix a directory of graph typology `typology` declares as its
- * `storage`, read from every instance in `repoRoot` (the folio itself first);
+ * `storage`, read from every layer in `repoRoot` (the folio itself first);
  * `undefined` when none declares one. The same reading as `state:drift`'s
  * `declaredBranches`, keyed by the kind instead of the directory's id.
  */

@@ -50,7 +50,7 @@ function serve(decl: Record<string, unknown>): RootFetcher {
 
 /**
  * A checkout: `<repo>/host/host.json` is the subscriber, with a snapshot
- * directory; `extraInstances` adds further local instances by name.
+ * directory; `extraInstances` adds further local layers by name.
  */
 function checkout(extraInstances: string[] = []): { repo: string; host: string; file: string } {
   const repo = tmp("kg-inst-repo-");
@@ -206,8 +206,8 @@ describe("instantiate: the state home is its own state directory, never the snap
 
   test("a staged instance directory carrying the harness's name at the root is left untouched", async () => {
     const c = checkout();
-    // A staged instance's directory: no declaration of its own, so it is not
-    // a local instance and the name-taken refusal does not fire.
+    // A staged layer's directory: no declaration of its own, so it is not
+    // a local layer and the name-taken refusal does not fire.
     mkdirSync(join(c.repo, "ihris-kb", "beans"), { recursive: true });
     writeFileSync(join(c.repo, "ihris-kb", "beans", "keep.md"), "staged\n");
     await subscribed(c);

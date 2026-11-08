@@ -1,6 +1,6 @@
 /**
  * Device screens in the journeys viewer, over a fixture checkout: one
- * instance holding actors (one with an avatar), two journeys, a workshop that
+ * layer holding actors (one with an avatar), two journeys, a workshop that
  * still names an app to frame, and `device-screen` nodes for its steps.
  *
  * What is asserted is what the owner asked for (2026-11-06): the screens are

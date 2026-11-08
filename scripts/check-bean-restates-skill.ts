@@ -106,7 +106,7 @@ export const PHASE_CELL = /^\**\s*(?:p|phase|stage|step)\s*-?\d+\b/i;
  */
 export const EXIT_CODE_CELL = /^\**\s*`?\d+`?\s*\**$/;
 
-/** A path into any instance's `skills/` directory, as a bean writes one. */
+/** A path into any layer's `skills/` directory, as a bean writes one. */
 export const SKILL_PATH = /(?:[\w.-]+\/)*skills\/[\w./-]+\.md/g;
 
 /** One markdown table, as it sits in a bean body. */
@@ -179,7 +179,7 @@ export interface Restatement {
 }
 
 export interface RestatesSkillReport {
-  /** False when this instance has no bean store at all. Legitimate. */
+  /** False when this layer has no bean store at all. Legitimate. */
   store: boolean;
   /** Open beans read. Zero is `could not check`, never a pass. */
   examined: number;

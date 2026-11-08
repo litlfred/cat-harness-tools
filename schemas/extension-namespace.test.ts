@@ -158,7 +158,7 @@ describe("nothing matches our elements by the text folio: again", () => {
 
 describe("every diagram writes each element under the Subgraph that defines it (stage 3)", () => {
   // `gitCorpus`, not a bare `git ls-files`: in the composed checkout every
-  // instance is a REMOTE MOUNT, ignored by the index repository's git, so
+  // layer is a REMOTE MOUNT, ignored by the index repository's git, so
   // `ls-files` from the root listed no diagram, and split("\n") on the empty
   // answer handed the loop below one empty path (EISDIR). `gitCorpus` counts
   // a mount's files as a submodule's were counted.

@@ -74,7 +74,7 @@ describe("checkMaintainedArtefacts", () => {
   });
 
   test("every claim names a source module and a relative artefact path", () => {
-    // `maintains.artefact` is relative to the instance base; a leading slash
+    // `maintains.artefact` is relative to the layer base; a leading slash
     // would name the domain root and resolve outside the published tree.
     const dir = mkdtempSync(join(tmpdir(), "artefacts-shape-"));
     try {

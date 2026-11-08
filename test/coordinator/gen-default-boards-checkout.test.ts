@@ -41,8 +41,8 @@ describe("who owes a board", () => {
     // the checkout does; it fails loudly rather than drifting quietly.
     //
     // `folio-assistant` left the list when the owner removed the root
-    // declaration (3d4caf6, 2026-10-08): the checkout root is an index, not an
-    // instance, so it is owed nothing. Instantiation is read from the index
+    // declaration (3d4caf6, 2026-10-08): the checkout root is an index, not a
+    // layer, so it is owed nothing. Instantiation is read from the index
     // now (cat-harness#21), not from `<name>.config.json` files.
     const owed = harnessesOwedABoard(REPO, names());
     expect(owed).toEqual(["cat-harness", "who-iris"]);
@@ -50,8 +50,8 @@ describe("who owes a board", () => {
 
   test("bootstrap is excluded BY ITS DECLARATION, not by its name", () => {
     // Its own `renderExemption` says why: it produces nothing a human browses,
-    // so it has nothing to put on a board. A checker naming one instance
-    // states a rule true only for the instance somebody remembered (`hfkl`).
+    // so it has nothing to put on a board. A checker naming one layer
+    // states a rule true only for the layer somebody remembered (`hfkl`).
     const boot = readDeclaration(join(REPO, "bootstrap"))!;
     expect(isExemptFrom(boot, "visualiser")).toBe(true);
     expect(harnessesOwedABoard(REPO, names())).not.toContain("bootstrap");

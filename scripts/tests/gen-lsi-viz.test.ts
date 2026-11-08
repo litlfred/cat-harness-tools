@@ -12,7 +12,7 @@
  * the branch and says UNKNOWN on a miss — and it is not re-asked here.
  *
  * The tests of this file that read the whole checkout (reads the LSI indexes
- * every instance in the checkout publishes) live in
+ * every layer in the checkout publishes) live in
  * `test/gen-lsi-viz-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

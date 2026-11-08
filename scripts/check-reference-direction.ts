@@ -1,16 +1,16 @@
 #!/usr/bin/env bun
 /**
- * Nothing names an instance that depends on it: if sub1 depends (directly or
+ * Nothing names a layer that depends on it: if sub1 depends (directly or
  * through a chain) on stub0, no reference or context points stub0 → sub1.
  *
  * The rule is `schemas/kg/reference-direction.ts`; the direction is
  * `schemas/kg/layer-direction.ts`, the same computation `check:partition`
- * uses. What is here is discovery, this instance's exemptions, and the
+ * uses. What is here is discovery, this layer's exemptions, and the
  * report.
  *
  * ## The repository-name collision ({@link collisionOf})
  *
- * The root instance's name is also the repository's name. Each occurrence is
+ * The root layer's name is also the repository's name. Each occurrence is
  * classified by its shape (inside a URL, after an owner, before a path segment
  * into a directory the root DECLARES): `names-repository` for the repository
  * case, `undetermined` for the ambiguous residue. A file cannot exempt itself
@@ -27,7 +27,7 @@
  *  - **File** counts (skipped, generator output, walked) are a census:
  *    printed, never recorded.
  *
- * The `wrong-direction` family records ONE entry per file and per instance
+ * The `wrong-direction` family records ONE entry per file and per layer
  * above it that the file names. It is in `failOnNew`, so `--check` is a
  * one-way ratchet: a pair the baseline does not hold fails, a pair that
  * disappears is resolved. The fix is to reword in place.
@@ -35,7 +35,7 @@
  * ## `--check`
  *
  * Fails only on a graded **state** that is NEW against the baseline: a new
- * wrong-direction pair, an entry that no longer qualifies, an instance that
+ * wrong-direction pair, an entry that no longer qualifies, a layer that
  * declares no `needs`. It never grades the verdict counts
  * ({@link comparableDirection} enforces this) and does not fail on the
  * backlog; the `✗` lines still print. The baseline is the `qa-reports` entry
@@ -100,9 +100,9 @@ import {
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
 /**
- * The INSTANCE root, which is where the sidecar goes — never {@link REPO_ROOT}.
+ * The LAYER root, which is where the sidecar goes — never {@link REPO_ROOT}.
  *
- * `qaResultPath` mirrors this instance's `qa-results` declaration, and
+ * `qaResultPath` mirrors this layer's `qa-results` declaration, and
  * `audit-coverage.ts` paid for getting this wrong: its first version wrote to
  * `<repo>/test/results/`, a directory no declaration names, so every consumer
  * scanning the declared graphs read a clean run over the one file it exists to
@@ -112,7 +112,7 @@ const INSTANCE_ROOT = HARNESS_ROOT;
 
 // ── What is scanned ─────────────────────────────────────────────
 //
-// Instance roots come from `instanceRootsIn`, never from a glob and never
+// Layer roots come from `instanceRootsIn`, never from a glob and never
 // from a list here: a literal written for this purpose on 2026-09-21 was
 // silently missing six nodes (64 where the declaration resolves 70), and the
 // run over it looked exactly like a complete one.
@@ -144,7 +144,7 @@ const SKIP_DIRS = new Set([".git", "node_modules", "translations", ".claude"]);
  * Its caution applies too — *"only an explicit marker counts. Inferring
  * 'generated' from a path or a naming convention would silently exempt
  * authored content"* — and a declaration is a stronger warrant than a marker,
- * not a weaker one: the instance SAYS what a process does with the directory,
+ * not a weaker one: the layer SAYS what a process does with the directory,
  * and `check:graph-typology-work` already gates that it said something.
  *
  * Asked through `isStateGraph`/`isDerivedGraph` rather than by reading
@@ -292,7 +292,7 @@ const EXTENSIONS = new Set([".ts", ".tsx", ".md", ".json", ".jsonld", ".bpmn", "
  * exemption for the 3 layering specifications").
  *
  * Each of these files has the instance graph as its SUBJECT: it is the
- * document or the code that DEFINES which instance sits on which layer, so it
+ * document or the code that DEFINES which layer sits on which layer, so it
  * cannot do its job without naming the layers above it. Moved to any one
  * layer it could no longer describe the others — the 2026-09-24 PENDING
  * rationale, now ruled rather than held. A named list, never a pattern: a
@@ -318,7 +318,7 @@ const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
  * X5 — a DATED DECISION RECORD (owner, 2026-10-14, Q1 of the #2529
  * reference-direction review: "Exempt as records").
  *
- * A proposal under an instance's `docs/proposals/` whose file name ends in the
+ * A proposal under a layer's `docs/proposals/` whose file name ends in the
  * date it was written (`<topic>-YYYY-MM-DD.md`, or the `.json` measurement it
  * carries) is a RECORD: it states the options, the measurements and the
  * layering as they stood on that day, and the owner answered it as written.
@@ -333,7 +333,7 @@ const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
  *    without a date) are living documents, edited as the answer changes, and
  *    stay `wrong-direction` — except the generated index's ROW for a dated
  *    record, which {@link DATED_PROPOSAL_INDEX_ROW} reads as the record.
- *  - **a proposal** — directly under `docs/proposals/` of an instance root,
+ *  - **a proposal** — directly under `docs/proposals/` of a layer root,
  *    not in a sub-directory and not in any other `docs/` section.
  *
  * A pattern rather than a named list, unlike X3, because the owner ruled on
@@ -410,9 +410,9 @@ export function declaresSubgraphIndex(abs: string): boolean {
  * file of that layer; the hosting service resolves the address.
  *
  * Why an exemption and not `names-repository`: that verdict is what
- * {@link analyse}'s `collisionOf` returns for the ROOT instance's name, the one
+ * {@link analyse}'s `collisionOf` returns for the ROOT layer's name, the one
  * that collides with the checkout's own repository, and it is consulted for no
- * other target. Widening the resolver to every instance would change what it
+ * other target. Widening the resolver to every layer would change what it
  * answers (and what its tests hold) for a carve the owner ruled on one shape
  * of; an exemption carries the ruling as its reason and is counted on its own
  * line, as X3/X4/X5 are.
@@ -420,7 +420,7 @@ export function declaresSubgraphIndex(abs: string): boolean {
  * Narrow on three axes, and each edge is held by a test:
  *
  *  - **file** — a GitHub Actions workflow: a `.yml`/`.yaml` file directly in
- *    a `.github/workflows/` directory (of any instance, or of the repository
+ *    a `.github/workflows/` directory (of any layer, or of the repository
  *    root). Not a composite action's `action.yml`, not a workflow template
  *    under `templates/`, and not Markdown that QUOTES a `uses:` line.
  *  - **key** — the line is the `uses:` key of a job or of a step (`uses:` or
@@ -591,15 +591,15 @@ export const DEFINITION_POINTS_TO_IMPLEMENTATION_JSON: ReferenceExemption = {
   reason: POINTS_REASON("a JSON prose field"),
 };
 
-// ── This instance's exemptions ──────────────────────────────────
+// ── This layer's exemptions ──────────────────────────────────
 //
 // Same contract as `iwtn`'s `ALLOW`: each entry states WHY the text is not a
-// reference to the instance whose name it contains. A regex with no reason is
+// reference to the layer whose name it contains. A regex with no reason is
 // a hole, and these are COUNTED in the summary rather than disappearing, so
 // an exemption doing more work than anyone intended is visible.
 
 /**
- * An instance's `uploads/` is its data store, not part of the KG (owner,
+ * A layer's `uploads/` is its data store, not part of the KG (owner,
  * 2026-11-03, bean folio-assistant-djj5), so its intakes are not references.
  */
 export const INSTANCE_UPLOADS_DATA: ReferenceExemption = {
@@ -662,8 +662,8 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  *
  * `iwtn`'s `PENDING`, generalised: a leak nobody has ruled on yet is made
  * VISIBLE rather than silent. Every entry is a FILE, with the number of
- * distinct instances it names, and it earns its place by ONE property —
- * **it names more than one instance above it, so "move it up" has no single
+ * distinct layers it names, and it earns its place by ONE property —
+ * **it names more than one layer above it, so "move it up" has no single
  * destination.**
  *
  * That is the whole membership rule, and it is mechanical: `names > 1`. It
@@ -672,9 +672,9 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  *
  * ## Why these are pending rather than exempt
  *
- * The owner ruled on 2026-09-24 that naming is naming: a lower instance may
+ * The owner ruled on 2026-09-24 that naming is naming: a lower layer may
  * not name a higher one, and the fix is to move the file up. For the 117
- * files that name exactly one instance that is a well-defined instruction.
+ * files that name exactly one layer that is a well-defined instruction.
  * For these 50 it is not, and the reasons differ by kind:
  *
  *  - **Declarations and registries** — `cat-harness.json` names
@@ -700,7 +700,7 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  *
  * That half fired on bean `ws99`, which is the first evidence it works.
  * `cat-harness/docs/fhir/ig-publisher.md` and `cat-harness/docs/process/publication-workflow.md`
- * were held here as prose naming two or three instances with no single
+ * were held here as prose naming two or three layers with no single
  * destination. They are not prose: `gen-docs-pages.ts` writes both, and once it
  * began saying so in their front matter they stopped being read at all. Their
  * entries were DELETED rather than left, because an entry recording a choice
@@ -708,7 +708,7 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * Neither file was edited to earn that — the generator was.
  *
  * The second time: `cat-harness/docs/en/cat-harness/processes/index.md`,
- * held here naming four instances, is `gen-processes-viz.ts`'s, and left when
+ * held here naming four layers, is `gen-processes-viz.ts`'s, and left when
  * that generator began writing `generated:` into every page it draws
  * (folio-assistant#2529, PR 3 of the reference-direction batch).
  *
@@ -771,24 +771,24 @@ interface Instance {
   root: string;
   name: string;
   needs: readonly string[] | undefined;
-  /** Absolute paths this instance declares as holding machine-written graphs. */
+  /** Absolute paths this layer declares as holding machine-written graphs. */
   machineWritten: string[];
   /**
-   * The directory paths this instance DECLARES, exactly as declared — relative
+   * The directory paths this layer DECLARES, exactly as declared — relative
    * segments like `uploads/` or `tools/`, not absolute and not resolved.
    *
    * Unresolved on purpose, because what they answer is a question about TEXT:
-   * given an occurrence of this instance's name, does the text go on to name
-   * one of the instance's own directories? That is the one test that
-   * distinguishes `<name>/uploads/x.pdf` — a reference to the instance — from
+   * given an occurrence of this layer's name, does the text go on to name
+   * one of the layer's own directories? That is the one test that
+   * distinguishes `<name>/uploads/x.pdf` — a reference to the layer — from
    * `<name>/docs/guides/x.md`, which is a path in the repository. The root
-   * instance's own name is written `<name>` here rather than spelled out, for
+   * layer's own name is written `<name>` here rather than spelled out, for
    * the reason the module docblock gives about this file's own text: an
    * example that spells it out is itself a wrong-direction reference, and a
    * gate whose documentation breaches it is the shape this repository already
    * carves `declared-path-literal` for. Resolving them to absolute paths
    * would answer a different
-   * question (does this file exist), and for the root instance every relative
+   * question (does this file exist), and for the root layer every relative
    * path in the tree resolves inside its root, so that question answers yes
    * for everything.
    */
@@ -832,7 +832,7 @@ function instances(repoRoot: string): Instance[] {
     };
     // `rootForScope`, NEVER `join(root, path)`. A directory entry may carry
     // `scope: "repository"`, and it then resolves against the REPO ROOT
-    // rather than against the declaring instance — 23 of the 45 entries in
+    // rather than against the declaring layer — 23 of the 45 entries in
     // `cat-harness.json` do, more than half, including `beans/`, `todos/`,
     // `issue-marks/` and six `*/library/` trees.
     //
@@ -850,9 +850,9 @@ function instances(repoRoot: string): Instance[] {
       // A `builtAtPublish` path is machine-written by declaration too: each
       // entry names the `writer` that builds it at publish, and nothing there
       // is committed or authored. The checkout-built ones project OTHER
-      // instances by design — `docs/assets/library/` holds byte copies of
-      // sub-graphs declared inside another instance's entry (bean `8pzh`) — so
-      // a name they carry is the projected instance's, not this one reaching up
+      // layers by design — `docs/assets/library/` holds byte copies of
+      // sub-graphs declared inside another layer's entry (bean `8pzh`) — so
+      // a name they carry is the projected layer's, not this one reaching up
       // (folio-assistant#2611: 27 findings once the pages were restored).
       .concat(
         (decl.builtAtPublish ?? [])
@@ -861,7 +861,7 @@ function instances(repoRoot: string): Instance[] {
       );
     // A declaration with no `name` cannot be a reference TARGET (nothing to
     // match) and cannot own files by name either, so it is skipped rather
-    // than given a fallback that would invent an instance.
+    // than given a fallback that would invent a layer.
     const declaredPaths = (decl.directories ?? [])
       .map((d) => d.path)
       .filter((d): d is string => d !== undefined && d !== "");
@@ -870,9 +870,9 @@ function instances(repoRoot: string): Instance[] {
 }
 
 /**
- * The instance a file belongs to: the INNERMOST declaring root containing it.
+ * The layer a file belongs to: the INNERMOST declaring root containing it.
  *
- * The root instance's directory contains every other one, so "which instance
+ * The root layer's directory contains every other one, so "which instance
  * is this file in" has 17 true answers by containment and exactly one useful
  * one. Longest matching root wins.
  */
@@ -908,12 +908,12 @@ export interface ReferenceReport {
   skippedMachineWritten: number;
   /** Files that declare THEMSELVES generator output — by `$schema`, by a top-level `_generated`, or by `generated:` front matter. Counted separately from the directory rule: a different declaration, at a different granularity. */
   skippedGeneratorWritten: number;
-  /** Instances whose `needs` nobody has declared. Reported, never assumed. */
+  /** Layers whose `needs` nobody has declared. Reported, never assumed. */
   undeclared: string[];
 }
 
 /**
- * The routes a harness's visualisers build on ANOTHER instance's site
+ * The routes a harness's visualisers build on ANOTHER layer's site
  * (`builtOnHostSite`), as absolute directories: `derive:publish`'s own
  * derivation ({@link hostSiteArtefacts}), so this check and the publish plan
  * agree on what is built where. They sit inside the host's root, e.g.
@@ -944,7 +944,7 @@ export function analyse(root = REPO_ROOT, hostSite: readonly string[] = hostSite
   const anc = ancestorsOf(flat.order);
   const rule: LayerRule = { allowed: allowedFromNeeds(needs, anc) };
 
-  /** Who sits ABOVE `name`: every instance with `name` among its ancestors. */
+  /** Who sits ABOVE `name`: every layer with `name` among its ancestors. */
   const above = new Map<string, string[]>(
     all.map((i) => [i.name, all.filter((u) => anc.get(u.name)?.has(i.name)).map((u) => u.name)]),
   );
@@ -953,27 +953,27 @@ export function analyse(root = REPO_ROOT, hostSite: readonly string[] = hostSite
    * actually names.
    *
    * `undefined` for the ordinary case — the target's name is not the
-   * repository's, so nothing here applies and the arrow decides. Only an
-   * instance rooted AT the repository root collides, because only then is the
-   * instance's name the repository's name.
+   * repository's, so nothing here applies and the arrow decides. Only a
+   * layer rooted AT the repository root collides, because only then is the
+   * layer's name the repository's name.
    *
    * The three answers, in the order they are tested, and the order is the
    * substance:
    *
    *  1. **`"instance"`** — the text carries `<name>/<declared directory>`, so
-   *     it points into a directory this instance actually DECLARES. Tested
-   *     FIRST, so `https://…/<name>/uploads/x.pdf` is the instance rather than
-   *     an address: a URL into an instance's own directory is still a
-   *     reference to that instance, and putting the URL test first would have
+   *     it points into a directory this layer actually DECLARES. Tested
+   *     FIRST, so `https://…/<name>/uploads/x.pdf` is the layer rather than
+   *     an address: a URL into a layer's own directory is still a
+   *     reference to that layer, and putting the URL test first would have
    *     excused it. (`<name>` rather than the root's actual name, for the
    *     reason {@link Instance}'s `declaredPaths` gives: the spelled-out
    *     example would be a wrong-direction reference in this very file.)
    *  2. **`"repository"`** — the name sits inside an `http(s)` URL (an
    *     ADDRESS), or appears as `<owner>/<name>` (a repository slug), or as
    *     `<name>/` followed by any other path segment (a path in the
-   *     repository, not in the instance).
+   *     repository, not in the layer).
    *  3. **`"unknown"`** — a bare prose mention: no path, no URL, nothing to
-   *     tell the repository from the instance. Still `undetermined`, and that
+   *     tell the repository from the layer. Still `undetermined`, and that
    *     is the honest residue rather than a case to be eliminated.
    *
    * It reads the DECLARATION rather than a path literal, which is this
@@ -989,7 +989,7 @@ export function analyse(root = REPO_ROOT, hostSite: readonly string[] = hostSite
     const name = occ.to.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     // Bounded at BOTH ends, for the reason `occurrencesOf` is: an unbounded
     // `<name>/tools` also matches `<name>/toolsmiths`, and an unbounded left
-    // edge matches a longer instance name ending in the target's.
+    // edge matches a longer layer name ending in the target's.
     for (const declared of target.declaredPaths) {
       const seg = declared.replace(/^\.?\/+/, "").replace(/\/+$/, "");
       if (seg === "") continue;
@@ -1005,8 +1005,8 @@ export function analyse(root = REPO_ROOT, hostSite: readonly string[] = hostSite
     return "unknown";
   };
 
-  // Every declared machine-written directory, across every instance. Flat
-  // rather than per-instance because an instance may declare a directory
+  // Every declared machine-written directory, across every layer. Flat
+  // rather than per-instance because a layer may declare a directory
   // inside another's root (`cat-harness.json` declares
   // `folio-assistant-core/schemas/`), and the file is machine-written either
   // way — the declaration is about the DIRECTORY, not about who scans it.
@@ -1091,7 +1091,7 @@ export interface PendingEntry {
  *
  * Every field here moves when a RULING moves, never when somebody writes a
  * paragraph: a file acquires or loses a second destination, an entry stops
- * qualifying, an instance starts or stops declaring `needs`. That is the
+ * qualifying, a layer starts or stops declaring `needs`. That is the
  * property that makes grading them worth doing, and it is the property the
  * verdict counts do not have.
  */
@@ -1100,17 +1100,17 @@ export interface DirectionStates {
   pendingHeld: PendingEntry[];
   /** Entries that no longer qualify — the half that makes `PENDING` honest. */
   pendingStale: { file: string; why: string }[];
-  /** Files naming several instances above them that nobody has listed. This is what exits 1. */
+  /** Files naming several layers above them that nobody has listed. This is what exits 1. */
   multiDestinationUnlisted: { file: string; names: number }[];
-  /** Instances that declare no `needs`, so nothing about their layer is known. */
+  /** Layers that declare no `needs`, so nothing about their layer is known. */
   undeclaredInstances: string[];
   /**
    * A.10 (owner, Q-B 2026-10-01): EVERY file holding a wrong-direction
    * reference, single- and multi-destination alike — one entry per file and
-   * per instance above it that the file names.
+   * per layer above it that the file names.
    *
    * Per (file, target) rather than per file, so that a file already in the
-   * baseline which starts naming a FURTHER instance above it is a new entry
+   * baseline which starts naming a FURTHER layer above it is a new entry
    * too; a count per file could not see a file trading one target for
    * another. Graded under `--check` as NEW-against-the-baseline only: the
    * backlog is inherited, a new pair fails, a fixed pair is resolved.
@@ -1334,7 +1334,7 @@ export function directionSidecarState(
  *
  *  1. **Between layers** — the rule `rewrite-moved-paths.ts` applies (bean
  *     `70lx`): the baseline's file `<A>/<rest>` is gone, and `<B>/<rest>`
- *     exists under exactly one other instance root.
+ *     exists under exactly one other layer root.
  *  2. **A visualiser page** — the page's address is DECLARED
  *     (`visualisers` in the harness's `<instance>.json`, route by
  *     `schemas/kg/visualiser-route.ts`): a page now at its localised route was,
@@ -1347,12 +1347,12 @@ export function directionSidecarState(
  * different file) and the new one must, and there must be exactly ONE
  * candidate — an ambiguous move is not re-keyed, so it reads as resolved plus
  * new, the conservative direction for a gate. The target is never touched: a
- * moved file that now names a FURTHER instance above it is still new.
+ * moved file that now names a FURTHER layer above it is still new.
  */
 export interface MoveEvidence {
   /** Does this repo-relative path exist in the checkout? */
   exists: (path: string) => boolean;
-  /** Every instance root, repo-relative (`cat-harness`, `smart-base/…`). */
+  /** Every layer root, repo-relative (`cat-harness`, `smart-base/…`). */
   instanceRoots: readonly string[];
   /** Declared page moves: a page under `now` was at the same path under each of `before`. Repo-relative prefixes ending in `/`. */
   pageMoves: readonly { now: string; before: readonly string[] }[];
@@ -1476,7 +1476,7 @@ const GATE = "check:reference-direction";
  */
 // `multi-destination-unlisted` is RECORDED and no longer in this list:
 // A.10's `wrong-direction` subsumes it. A file newly naming several
-// instances above it newly holds at least one (file, instance) pair, and
+// layers above it newly holds at least one (file, instance) pair, and
 // that pair is what fails, whatever PENDING says — the ruling (Q1:
 // reword in place) retired "list it pending" as the answer to a new one.
 // Grading both would fail one defect twice, and would fail a PR on files
@@ -1502,9 +1502,9 @@ export function exemptionCounts(exempt: readonly { verdict: ReferenceVerdict }[]
 
 /**
  * The part of a report a caller is judged on: occurrences in files it owns,
- * and its own instances among those declaring no `needs` (owner ruling
+ * and its own layers among those declaring no `needs` (owner ruling
  * 2026-11-05, "Move the checks"). `ownInstances` undefined keeps every
- * instance.
+ * layer.
  */
 export function scopeReport(
   report: ReferenceReport,
@@ -1530,9 +1530,9 @@ function main(): number {
   }
   const { against, exit: badRef } = againstOrUsage(GATE, args);
   if (badRef !== undefined) return badRef;
-  // In a layer's PR checks, only the caller's own files and instances are
+  // In a layer's PR checks, only the caller's own files and layers are
   // judged (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`):
-  // a lower layer's file naming an instance above it is that layer's to fix,
+  // a lower layer's file naming a layer above it is that layer's to fix,
   // in its own CI. A scoped run writes no working copy, which covers the
   // whole corpus and is the owning repository's.
   const scoped = gateOwnsFile(".") !== undefined;
@@ -1650,9 +1650,9 @@ function main(): number {
       `\n    recorded, NOT graded — the verdict counts, which move whenever the corpus does`,
   );
   // `--check` answers ONE question, and since bean `0dav` it is: did THIS
-  // change add a graded state? — a file newly naming an instance above it
-  // (A.10, single or multi destination), a `PENDING` entry newly no longer qualifying, an
-  // instance newly declaring no `needs`. Against a baseline: the committed
+  // change add a graded state? — a file newly naming a layer above it
+  // (A.10, single or multi destination), a `PENDING` entry newly no longer qualifying, a
+  // layer newly declaring no `needs`. Against a baseline: the committed
   // working copy until QA leaves `main`, `--against <ref>` (a `qa-reports`
   // ref) after. It used to be "is the committed ruling what this run
   // computed", and that question has no subject once nothing is committed —

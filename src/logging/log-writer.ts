@@ -114,7 +114,7 @@ function newId(at: Date): string {
  *
  * EVERY directory, not the first. `logDirs` returns a list for the reason
  * `kgRoots` does: a consumer that takes the first reports a clean run over the
- * ones it never visited. In practice an instance declares one trashcan, so the
+ * ones it never visited. In practice a layer declares one trashcan, so the
  * loop runs once — but the failure of writing to one of two and reporting
  * success is silent, and the loop costs nothing.
  *
@@ -161,7 +161,7 @@ export function writeLogEntry(
 
   const dirs = logDirs(root);
   if (dirs.length === 0) {
-    // The third state, and the reason this is not an error: an instance that
+    // The third state, and the reason this is not an error: a layer that
     // declares no trashcan has nowhere to log, which is a fact about its
     // declaration rather than a fault in this call.
     return {

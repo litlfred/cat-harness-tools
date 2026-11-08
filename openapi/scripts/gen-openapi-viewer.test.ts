@@ -1,7 +1,7 @@
 /**
  * `gen-openapi-viewer.ts`: the `openapi` viewer's pages, written into a site.
  *
- * A scratch checkout of three instances. `harness` declares the visualiser
+ * A scratch checkout of three layers. `harness` declares the visualiser
  * (`renderedBy: openapi-pages`, `subgraphs: "instance"`). `api` declares a
  * served `openapi` graph holding one ingested document. `broken` declares an
  * `openapi` directory with no config, which the hub must call unknown rather

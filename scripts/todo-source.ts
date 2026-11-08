@@ -22,7 +22,7 @@ export const TODO_SOURCE_BRANCH = "cat/cat-harness/todos";
 
 /**
  * Every todo to publish, each with the file it came from (repo-relative to the
- * cat-harness instance, as `readTodoFiles` reports it).
+ * cat-harness layer, as `readTodoFiles` reports it).
  *
  * TODAY: the working tree on `main`. The switch to {@link TODO_SOURCE_BRANCH}
  * is a change to this body only.

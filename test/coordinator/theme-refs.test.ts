@@ -15,7 +15,7 @@
  * Moved here from `cat-harness/scripts/tests/theme-refs.test.ts` to the
  * checkout's own test home `test/` (bean `7zz1`, owner ruling 2026-10-06
  * "Top-level instance"): every test in it resolves every theme reference every
- * instance in the checkout declares, which only the whole checkout holds.
+ * layer in the checkout declares, which only the whole checkout holds.
  * Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. Paths are
  * composed from ORIGIN_DIR, the directory it was written in, so nothing it

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Mount every instance's rendered content under the built site.
+ * Mount every layer's rendered content under the built site.
  *
  * @module scripts/mount-instance-docs
  *
@@ -13,13 +13,13 @@
  *     <base-url>/<kind>/<instance>/
  *
  * so a folio with both a library and its own docs publishes both. Each
- * instance's content is reachable two ways, and the difference is **which
+ * layer's content is reachable two ways, and the difference is **which
  * handler produced it**:
  *
  * | route | handler | what it is |
  * |---|---|---|
- * | `/<kind>/<instance>/` | the KIND's handler, cat-harness's | the default rendering any instance declaring that kind gets |
- * | `/<instance>/` | the INSTANCE itself | its own themed root — "default harness behaviour, themed" |
+ * | `/<kind>/<instance>/` | the KIND's handler, cat-harness's | the default rendering any layer declaring that kind gets |
+ * | `/<instance>/` | the LAYER itself | its own themed root — "default harness behaviour, themed" |
  *
  * The root of the site stays the main docs pipeline, unchanged.
  *
@@ -29,7 +29,7 @@
  * root and stops at the first handler that claims it: a handler mounted at
  * `/docs/` owns everything beneath it, and a second handler claiming
  * `/docs/<instance>/` is not consulted. A mount point is a claim on a
- * SUBTREE, so the outer instance's index can be trusted to describe what is
+ * SUBTREE, so the outer layer's index can be trusted to describe what is
  * under it.
  *
  * **A losing claim is REFUSED and reported, never silently dropped and never
@@ -38,12 +38,12 @@
  *
  * ## Declaration-driven, not a list
  *
- * Jekyll builds one hardcoded source directory, so any other instance's
- * `docs` graph is built by nothing unless mounted here. The instances are
+ * Jekyll builds one hardcoded source directory, so any other layer's
+ * `docs` graph is built by nothing unless mounted here. The layers are
  * read from their own `harness.json` declarations — any directory whose
  * graphs include the renderable `docs` kind.
  *
- * The instance whose docs Jekyll already built is SKIPPED: it is the root of
+ * The layer whose docs Jekyll already built is SKIPPED: it is the root of
  * the site, and copying it under its own name would give one page two IRIs.
  *
  * ## What it does not do
@@ -87,9 +87,9 @@ import { isPublished } from "../schemas/kg/url-space.js";
 import { instanceSitePath } from "./instance-exports.ts";
 
 /**
- * An instance's route — `<instance>` or `<instance>/<path>`, no slash at
+ * A layer's route — `<instance>` or `<instance>/<path>`, no slash at
  * either end — composed by cat-harness's `publishedPath` (`case: "instance"`),
- * through the same helper `instance-exports.ts` uses, so the instance as
+ * through the same helper `instance-exports.ts` uses, so the layer as
  * itself and its served directories sit where the URL-space ruling puts them
  * (bean `cat-tools-sthf`) and nowhere a hand-written path could drift to.
  */
@@ -137,10 +137,10 @@ function countFiles(dir: string): number {
 }
 
 /**
- * Every (instance, kind, directory) an instance declares that has rendered
+ * Every (instance, kind, directory) a layer declares that has rendered
  * content to mount.
  *
- * Read from each instance's own `harness.json`. A hardcoded list is the
+ * Read from each layer's own `harness.json`. A hardcoded list is the
  * `check:declared-assets` defect, whose own doc comment describes itself being
  * "fixed" last time by writing down a list of two while the repository had
  * grown to eight.
@@ -174,7 +174,7 @@ export interface Mountable {
    */
   visualiser?: string;
   /**
-   * The instance's own directory, absolute — the boundary a page's embedded
+   * The layer's own directory, absolute — the boundary a page's embedded
    * asset may be published from (see {@link referencedAssets}). Optional so a
    * routing test need not invent one; `mountable()` always sets it.
    */
@@ -182,12 +182,12 @@ export interface Mountable {
 }
 
 /**
- * Both routes per mountable, and which instance roots nobody chose.
+ * Both routes per mountable, and which layer roots nobody chose.
  *
- * An instance's content publishes at `/<kind>/<instance>/` for every
+ * A layer's content publishes at `/<kind>/<instance>/` for every
  * renderable kind it declares, and ONCE at `/<instance>/` — its themed root,
  * per the owner's 2026-09-20 ruling quoted at the top of this file: the
- * kind route is the cat-harness handler's default, the instance root is themed.
+ * kind route is the cat-harness handler's default, the layer root is themed.
  *
  * **Which kind answers at the root is now DECLARED.** This used to take the
  * first by sort order while the comment doing it claimed the choice was "the
@@ -197,11 +197,11 @@ export interface Mountable {
  * very ruling it implemented. `instanceRoot: true` on the directory decides it.
  *
  * **A declared root YIELDS ITS KIND ROUTE to a same-kind sibling** (bean
- * `2b5s`). Two directories of one instance may share a kind — a themed
+ * `2b5s`). Two directories of one layer may share a kind — a themed
  * replica in `site/` and plain documentation in `docs/`, both `docs` — and
  * both would claim `/<kind>/<instance>/`, which the walk refuses as a
  * collision. The owner's table already says which is which: the kind route
- * is the kind handler's default rendering and the root is the instance
+ * is the kind handler's default rendering and the root is the layer
  * presenting itself. So the root directory answers at `/<instance>/` only,
  * and the sibling keeps the kind route. With no same-kind sibling nothing
  * changes — a lone root still publishes at both routes.
@@ -219,7 +219,7 @@ export interface Mountable {
  * third-state rule the rest of this repository keeps: could-not-determine is
  * never rendered as a choice.
  *
- * **A root already TAKEN is not up for grabs** (`rootTaken`). An instance whose
+ * **A root already TAKEN is not up for grabs** (`rootTaken`). A layer whose
  * IG site is built at `/<instance>/` by `stage-ig-sites.ts` (bean `mftp`) has
  * its root served by Jekyll, so its `igSite` directory never reaches `found`
  * — and without this the next renderable kind inherited the root. That is how
@@ -250,7 +250,7 @@ export function withRoutes<T extends Mountable>(
   // declares the same kind — see the rule above.
   const yieldsKindRoute = (m: T): boolean =>
     m.instanceRoot && found.some((o) => o !== m && o.name === m.name && o.kind === m.kind && !o.instanceRoot);
-  // Several directories of one instance that still share a kind route after
+  // Several directories of one layer that still share a kind route after
   // the yield above would all claim `/<kind>/<instance>/`, and the walk
   // refuses every one but the first. Each then takes its own sub-route,
   // `/<kind>/<instance>/<directory>/`, and none takes the shared one: picking
@@ -319,14 +319,14 @@ export function railDataWriter(siteAbs: string): (file: string, body: string) =>
 /**
  * Where the Jekyll-built pages come from, repo-relative — e.g. `cat-harness/docs`.
  *
- * Read off the built instance's own declaration (its non-repository-scoped
+ * Read off the built layer's own declaration (its non-repository-scoped
  * `docs` directory) rather than written down here. The workflows pass that
  * same directory as Jekyll's `source:`, so a page committed at
  * `<prefix>/x/y/index.html` is published at `/x/y/`; hardcoding the prefix
  * would be a second copy of a fact the declaration already carries, free to
  * disagree with it the day the directory moves.
  *
- * `undefined` when the built instance declares no docs directory. That is the
+ * `undefined` when the built layer declares no docs directory. That is the
  * third state and it is not the same as "the visualiser does not resolve" —
  * the caller reports it and falls back, rather than treating an unanswerable
  * question as a no.
@@ -345,7 +345,7 @@ export function publishedDocsPrefix(repo: string, built: string): string | undef
   );
   // More than one `docs` layer since slice 1 of the semantic subgraphs: the
   // site CHROME (`site-chrome/`) is declared first as the base. The pages are
-  // published from the instance's SITE directory, `siteDirFor`'s answer.
+  // published from the layer's SITE directory, `siteDirFor`'s answer.
   let site: string | undefined;
   try {
     site = siteDirFor(join(repo, built));
@@ -362,7 +362,7 @@ export function publishedDocsPrefix(repo: string, built: string): string | undef
  * **This is what the rail's per-kind link should point at, and pointing it at
  * the mount route instead is the defect this function exists for.** The owner,
  * looking at the deployed rail, reported (paraphrased) that clicking doc/ or
- * library/ under a content instance's navbar did nothing, though library/
+ * library/ under a content layer's navbar did nothing, though library/
  * listed its three assets, and asked whether those interfaces were not done. They were done. `/library/<instance>/` mounts the
  * replica's `library/` verbatim, and that directory's `index.html` is the IRIS
  * replica home — the very page `/<instance>/` already serves. So the link
@@ -398,7 +398,7 @@ export function visualiserHref(visualiser: string, docsPrefix: string): string |
 }
 
 /**
- * EVERY graph this instance declares — the navbar's scrollable middle.
+ * EVERY graph this layer declares — the navbar's scrollable middle.
  *
  * Owner, 2026-09-21: *"there shuold be all the harness controlled dirs/graphs"*.
  *
@@ -428,7 +428,7 @@ export function visualiserHref(visualiser: string, docsPrefix: string): string |
  * ## TWO WITNESSES, AND THE MOUNT TABLE IS ASKED FIRST (`pk2s`)
  *
  * `linked` still wins wherever it has an answer, and that order is the
- * owner's rather than a tie-break: a mount is the instance PRESENTING ITSELF
+ * owner's rather than a tie-break: a mount is the layer PRESENTING ITSELF
  * (`/<instance>/`), and the handler's viewer is cat-harness's default rendering
  * of the same graph (`/cat-harness/library/<instance>/`). *"cliking shoud go to
  * folio view, not the schema viweer."*
@@ -441,7 +441,7 @@ export function visualiserHref(visualiser: string, docsPrefix: string): string |
  * measurement.
  *
  * @param linked  href per kind from the MOUNT TABLE, already relative to the
- *   page being rendered. The instance's own route, and preferred.
+ *   page being rendered. The layer's own route, and preferred.
  * @param site  what the published site knows for the kinds the mount table
  *   says nothing about — a handler's href, or the reason there is none.
  */
@@ -464,7 +464,7 @@ export function declaredGraphs(
   } catch {
     // Not this script's finding — `kg:schema:check` owns an unparseable
     // declaration. Here it is an empty middle, and the caller still renders
-    // the instance root and the harnesses.
+    // the layer root and the harnesses.
     return [];
   }
   const seen = new Set<string>();
@@ -511,7 +511,7 @@ export function declaredGraphs(
  * Read from `<built>/docs/_data/harness.json`, which `sync-docs-harness.ts`
  * generates from the declarations and `docs:harness:check` gates. A hardcoded
  * list here would be the `check:declared-assets` defect, and it would go stale
- * the first time an instance is instantiated — which happened twice this week.
+ * the first time a layer is instantiated — which happened twice this week.
  *
  * `undefined`, not `[]`, when the file is missing or will not parse. The
  * caller then OMITS the region rather than rendering an empty disclosure
@@ -539,7 +539,7 @@ export type GraphFallback = {
 };
 
 /**
- * WHAT THE PUBLISHED SITE KNOWS about each of an instance's declared kinds —
+ * WHAT THE PUBLISHED SITE KNOWS about each of a layer's declared kinds —
  * where it opens, or why it does not.
  *
  * Read from the same `harness.json` {@link instantiatedHarnesses} reads, and
@@ -556,8 +556,8 @@ export type GraphFallback = {
  * A missing file costs the reasons, not the rows, and a row with no reason is
  * exactly what this surface shipped until today.
  *
- * Keyed by kind within one instance, because that is how `declaredGraphs`
- * asks. Two harnesses may both declare `library`, so the instance is part of
+ * Keyed by kind within one layer, because that is how `declaredGraphs`
+ * asks. Two harnesses may both declare `library`, so the layer is part of
  * the question and never assumed.
  *
  * ## Why it carries the HREF too, as of `pk2s`
@@ -574,7 +574,7 @@ export type GraphFallback = {
  *
  * | producer | answers | `catalogue` |
  * |---|---|---|
- * | the mount table | did we copy this instance's own RENDERED directory? | no |
+ * | the mount table | did we copy this layer's own RENDERED directory? | no |
  * | `harness-tiles` | is there a PUBLISHED VIEWER for this kind? | yes |
  *
  * `mountable()` requires an `index.html`, rightly — a directory with no
@@ -586,7 +586,7 @@ export type GraphFallback = {
  * construction.
  *
  * That is the split `harness_details.html` already states: `/<instance>/` is
- * the instance presenting itself, `/library/<instance>/` is the cat-harness
+ * the layer presenting itself, `/library/<instance>/` is the cat-harness
  * handler's default rendering of its library. The rail's graph
  * rows are meant to reach the second, and until now reached it only where a
  * mount happened to coincide — which is the whole of why `library` linked and
@@ -656,8 +656,8 @@ export function instantiatedHarnesses(built: string, toRoot: string): NavItem[] 
       // root. `/<instance>/` from `/docs/<instance>/index.html` is `../../<instance>/`.
       const href = h.href ? `${toRoot}${h.href}` : undefined;
       // The row's RESOLVED mark, never its `icon` (bean `2vpn`): reading
-      // `icon` here dropped every theme avatar and every glyph, so only an
-      // instance with a declared image ever drew one on a mounted page.
+      // `icon` here dropped every theme avatar and every glyph, so only a
+      // layer with a declared image ever drew one on a mounted page.
       return {
         label,
         ...(href ? { href } : {}),
@@ -687,9 +687,9 @@ export function navbarRowData(built: string): unknown {
 }
 
 /**
- * The instances whose folio pages a page can be INSIDE (`railScopes` in
+ * The layers whose folio pages a page can be INSIDE (`railScopes` in
  * `_data/harness.json`, sorted longest href first by `sync-docs-harness.ts`;
- * issue #1902). The rail of a page under one of them lists that instance's
+ * issue #1902). The rail of a page under one of them lists that layer's
  * Pages and Folders, as the theme sidebar's client did with `#fa-rail-scope`.
  */
 export function railScopesOf(built: string): { name: string; href: string }[] {
@@ -855,7 +855,7 @@ export const PINNED_CHROME_FILES: readonly string[] = [
  * from the same renderer its writer uses; `undefined` for any other file.
  *
  * `themes.css` is rendered from the PLATFORM's themes only. The writer also
- * folds in the sticky themes of the instances in the harness's own checkout,
+ * folds in the sticky themes of the layers in the harness's own checkout,
  * and those dress the harness's own boards; scanning for them from a site
  * would read whatever that site happens to mount instead.
  */
@@ -922,13 +922,13 @@ export function railNames(built: string, instance: string): { harness?: string; 
 }
 
 /**
- * An instance's MARK for the navbar header — its declared avatar and tone,
+ * A layer's MARK for the navbar header — its declared avatar and tone,
  * read off the same `_data/harness.json` as {@link instantiatedHarnesses}.
  *
  * Any harness row named `instance` answers, instantiated or not: the header
- * names the instance whose page this is, which is a different question from
+ * names the layer whose page this is, which is a different question from
  * whether it belongs in the harnesses list. Absent, the header draws the
- * instance's initial — never a `☰` (#1757).
+ * layer's initial — never a `☰` (#1757).
  */
 export function instanceMark(
   built: string,
@@ -948,8 +948,8 @@ export function instanceMark(
   const h = d.harnesses?.find((x) => x.name === instance);
   // The same resolved mark the sidebar row draws (bean `2vpn`): theme
   // avatar, then declared icon, then registry glyph — resolved ONCE, in
-  // `harness-tiles.ts`. Only an instance with NO row falls back to the site's
-  // own `icon`, and only when the site is that instance.
+  // `harness-tiles.ts`. Only a layer with NO row falls back to the site's
+  // own `icon`, and only when the site is that layer.
   const fields = h
     ? navMarkFields(h.mark, h.tone, (src) => `${toRoot}${src}`)
     : d.name === instance
@@ -961,9 +961,9 @@ export function instanceMark(
 /**
  * Inject the harness rail into every mounted HTML page.
  *
- * The rail's LINKS ARE DERIVED FROM THE MOUNT TABLE, never listed: an instance
+ * The rail's LINKS ARE DERIVED FROM THE MOUNT TABLE, never listed: a layer
  * that declares a third renderable kind gets a third entry with no edit here,
- * and an instance whose route changes cannot end up with a rail pointing at
+ * and a layer whose route changes cannot end up with a rail pointing at
  * the old one. That is the same rule `mountable()` follows one function down,
  * and for the same reason its own comment gives — a hardcoded list is the
  * `check:declared-assets` defect.
@@ -1017,7 +1017,7 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
   const unpublished: { route: string; visualiser: string }[] = [];
   const target = new Map<string, string>();
   for (const o of mounts) {
-    if (o.route === o.name) continue; // the instance's own themed root is itself
+    if (o.route === o.name) continue; // the layer's own themed root is itself
     if (o.visualiser === undefined || docsPrefix === undefined) continue;
     const href = visualiserHref(o.visualiser, docsPrefix);
     if (href === undefined) {
@@ -1035,10 +1035,10 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
 
     for (const file of htmlUnder(mountAbs)) {
       const toRoot = toRootFor(m.route, file.slice(mountAbs.length + 1));
-      // Every route this instance answers at, so the rail can move between
-      // them -- the owner's ask to link the instance's docs from the side of
+      // Every route this layer answers at, so the rail can move between
+      // them -- the owner's ask to link the layer's docs from the side of
       // the navbar. Rebuilt per file because `toRoot` is per file.
-      // The instance's own themed root, first — it is the instance rather
+      // The layer's own themed root, first — it is the layer rather
       // than one of its graphs, so it is not inside the graphs group.
       const own = (byInstance.get(m.name) ?? []).filter((o) => o.route === o.name);
       // Called what the harness row calls the same page (its title, not its
@@ -1064,8 +1064,8 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       const named = railNames(built, m.name);
       // THE FOLIO'S OWN SITE (owner, 2026-10-15, on the IRIS replica: the rail's Graphs
       // group was empty, then linked pages the site does not hold). In the
-      // checkout that declares this instance, the site being built is the
-      // instance's own, not the platform's: `harness.json`'s paths name the
+      // checkout that declares this layer, the site being built is the
+      // layer's own, not the platform's: `harness.json`'s paths name the
       // platform's handler viewers, so composed against this site most of them
       // are 404s. The standalone pass already answers this with
       // `ownSiteGraphs` and `instanceHarnesses` (bean `mftp`); the mount pass
@@ -1242,10 +1242,10 @@ export interface ForeignSiteRail {
   /** What the home row is called — the folio's name, not the platform's. */
   homeLabel?: string;
   /**
-   * The instance whose OWN site this is — an IG repository that instantiates
+   * The layer whose OWN site this is — an IG repository that instantiates
    * a harness and builds its own site (bean `mftp`, owner 2026-10-05:
    * "harnesses in bottom LHS navbar link back to folio-assist, not
-   * smart-immz"). Given, the navbar is that instance's: its name and mark in
+   * smart-immz"). Given, the navbar is that layer's: its name and mark in
    * the header, its graphs, and a Harnesses list of IT and the harnesses it
    * is built on (its `needs`, transitively) — itself linking to this site's
    * root, the others to their own pages. Absent, the rail is the platform's.
@@ -1268,7 +1268,7 @@ export interface ForeignSiteRail {
 }
 
 /**
- * An instance and the harnesses it is built on, as navbar rows: the instance
+ * A layer and the harnesses it is built on, as navbar rows: the layer
  * first, linking to `ownHref`, then every harness reachable through `needs`,
  * in `harness.json`'s order, each linking to its own page re-based on
  * `linkRoot`. A harness with no page is listed without a link rather than
@@ -1278,9 +1278,9 @@ export function instanceHarnesses(
   built: string,
   instance: string,
   linkRoot: string,
-  /** Where the instance's row links; `undefined` links it to its own page on `linkRoot`, as the others. */
+  /** Where the layer's row links; `undefined` links it to its own page on `linkRoot`, as the others. */
   ownHref: string | undefined,
-  /** Where the instance's OWN mark resolves; default `linkRoot`. See {@link ownsCheckout}. */
+  /** Where the layer's OWN mark resolves; default `linkRoot`. See {@link ownsCheckout}. */
   ownMarkRoot: string = linkRoot,
 ): NavItem[] | undefined {
   const prefix = publishedDocsPrefix(REPO, built);
@@ -1319,7 +1319,7 @@ export function instanceHarnesses(
  * whose OWN site this is, with its harness data generated from it?
  *
  * Then its mark is a path on its own site, not the platform's (issue #46, gap
- * 4): `harness-tiles.ts` places the root instance's declared icon at `/` +
+ * 4): `harness-tiles.ts` places the root layer's declared icon at `/` +
  * its path under its site directory (`siteDirMount`), and composed against
  * the platform's address it 404'd on the folio's site. The same rule
  * `rootOwnPages` applies to the folio's pages.
@@ -1329,8 +1329,8 @@ export function ownsCheckout(instance: string | undefined): boolean {
 }
 
 /**
- * Where an instance's declaration lives: `<checkout>/<name>/` for a mounted
- * instance, and the checkout itself for the folio whose own site this is
+ * Where a layer's declaration lives: `<checkout>/<name>/` for a mounted
+ * layer, and the checkout itself for the folio whose own site this is
  * ({@link ownsCheckout}). Looking only under `<checkout>/<name>/` found no
  * declaration for smart-ra's `dpi-h-ra` — declared at the repository root —
  * so every page of that site carried an EMPTY "Graphs" group (owner,
@@ -1380,7 +1380,7 @@ export function ownSiteGraphs(
     const { href, note: _note, ...named } = f;
     // `harness.json` names the platform's routes: the folio's own pages are under
     // `/<instance>/` there and at this site's root here (`/<instance>/catalogue/` is
-    // the instance's own `/catalogue/`). Scoped the way compose-docs scopes the shell's
+    // the layer's own `/catalogue/`). Scoped the way compose-docs scopes the shell's
     // copy of the same file (`siteHref`), so the rail and the sidebar agree.
     const scopedHref = href !== undefined ? siteHref(href, { instance, platformBase: PLATFORM_BASE }) : undefined;
     const at = (href !== undefined ? (held(href) ?? (scopedHref !== href ? held(scopedHref!) : undefined)) : undefined) ?? declared.get(kind);
@@ -1392,7 +1392,7 @@ export function ownSiteGraphs(
 }
 
 /**
- * The landing's graphs that a site whose checkout declares no instance HOLDS
+ * The landing's graphs that a site whose checkout declares no layer HOLDS
  * ({@link ForeignSiteRail.landing}), by kind, each href relative to the site
  * root. Every other graph of the landing is published on the platform's site,
  * not this one, and is left out rather than listed as this site's.
@@ -1431,7 +1431,7 @@ export function railStandalonePages(
   // The theme's search, where the site publishes it: the top bar of a page
   // the theme did not lay out searches the same index (`lib/site-bar.ts`).
   const themeSearch = THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s))) ? THEME_SEARCH_SCRIPTS : undefined;
-  // A page inside an instance's folio pages is railed as that instance's (#1902).
+  // A page inside a layer's folio pages is railed as that layer's (#1902).
   const scopes = pageTree && !foreign ? railScopesOf(built) : [];
 
   const owned = (rel: string): boolean =>
@@ -1440,7 +1440,7 @@ export function railStandalonePages(
     rel === "STAGING" ||
     rel.startsWith("STAGING/");
 
-  // A site whose checkout declares no instance: computed once, it is the same on every page.
+  // A site whose checkout declares no layer: computed once, it is the same on every page.
   const landed = foreign?.landing === true && foreign.instance !== undefined ? landedSiteGraphs(siteAbs, built, foreign.instance) : undefined;
 
   const railContext = new Map<string, { named: ReturnType<typeof railNames>; linkRoot: string; links: NavItem[]; homeLabel: string | undefined; harnesses: NavItem[] | undefined; mark: ReturnType<typeof instanceMark> }>();
@@ -1515,8 +1515,8 @@ export function railStandalonePages(
       // `..` per directory the page sits under; the filename is not one.
       const depth = rel.split("/").length - 1;
       const toRoot = depth === 0 ? "." : new Array(depth).fill("..").join("/");
-      // A page of an `igSite` instance's own IG site (bean `mftp`) is THAT
-      // instance's page: its name, mark and graphs, not the platform's.
+      // A page of an `igSite` layer's own IG site (bean `mftp`) is THAT
+      // layer's page: its name, mark and graphs, not the platform's.
       const here = `/${rel.replace(/(^|\/)index\.html$/, "$1")}`;
       const scope = scopes.find((s) => here.startsWith(s.href));
       const owner = foreign ? (foreign.instance ?? instanceName) : (igOwnerOf(rel.split("/")[0]!) ?? scope?.name ?? instanceName);
@@ -1563,7 +1563,7 @@ export function railStandalonePages(
         railContext.set(ctxKey, ctx);
       }
       const { named, linkRoot, links, homeLabel, harnesses, mark } = ctx;
-      // The page tree, cut to the instance's own pages when the page is inside one.
+      // The page tree, cut to the layer's own pages when the page is inside one.
       const pages = pagesFor(toRoot, pageLangOf(before), scope?.href);
       const railed = injectRailOnce(before, {
         instance: landed ? (homeLabel ?? named.harness ?? owner) : (named.harness ?? owner),
@@ -1628,7 +1628,7 @@ export function railStandalonePages(
 }
 
 /**
- * The instance whose own IG site is served at `/<segment>/`, when that
+ * The layer whose own IG site is served at `/<segment>/`, when that
  * directory's declaration marks a docs directory `igSite` (bean `mftp`):
  * its IG pages are built by `stage-ig-sites`, and railed here as ITS pages.
  */
@@ -1649,11 +1649,11 @@ export function igSiteOwner(segment: string): string | undefined {
  *
  * `rail-standalone-pages.ts` must leave these alone, because {@link injectRails}
  * has already railed them with a PER-INSTANCE model; a second rail there would
- * carry the ROOT instance's graphs instead of the mounted instance's.
+ * carry the ROOT layer's graphs instead of the mounted layer's.
  *
  * It is derived rather than guessed, and the first version guessed. It took a
  * directory in the site to be a mount when a same-named `<name>/<name>.json`
- * existed in the repository — which is true of `bootstrap`, an instance that
+ * existed in the repository — which is true of `bootstrap`, a layer that
  * declares no renderable docs and is therefore **never mounted**. The guess
  * excluded exactly the ten pages the pass was extended to reach.
  *
@@ -1693,14 +1693,14 @@ export interface ResolvedEntry {
 
 type ParsedDeclaration = Record<string, unknown> & { name?: string; enabled?: boolean; directories?: DeclaredEntry[] };
 
-/** Every instance declaration at `repo`'s top level, parsed — an unparseable one is skipped, since `kg:schema:check` owns it. */
+/** Every layer declaration at `repo`'s top level, parsed — an unparseable one is skipped, since `kg:schema:check` owns it. */
 function topLevelDeclarations(repo: string): { dirName: string; dir: string; decl: ParsedDeclaration }[] {
   const out: { dirName: string; dir: string; decl: ParsedDeclaration }[] = [];
-  // THE CHECKOUT ROOT'S OWN DECLARATION, when the repository IS an instance
+  // THE CHECKOUT ROOT'S OWN DECLARATION, when the repository IS a layer
   // (the IRIS replica after its cutover, bean g8jp; the owner, 2026-10-09: "index.html
-  // should follow cat-harness and folio-asst"). In the monorepo every instance
+  // should follow cat-harness and folio-asst"). In the monorepo every layer
   // was a subdirectory and the root declared nothing, so the scan below found
-  // them all; a separated instance's own repository has its declaration at
+  // them all; a separated layer's own repository has its declaration at
   // the root, and without this its replica and docs were mounted nowhere.
   const rootDecl = declarationPathIn(repo);
   if (rootDecl !== undefined && existsSync(rootDecl)) {
@@ -1724,7 +1724,7 @@ function topLevelDeclarations(repo: string): { dirName: string; dir: string; dec
     }
   }
   // A REMOTE MOUNT an override placed below the top level (bean `0mpw`) is
-  // published like any other instance; its lock says where it landed. One at
+  // published like any other layer; its lock says where it landed. One at
   // its default home path is already a top-level directory above.
   const seen = new Set(out.map((o) => resolve(o.dir)));
   for (const [, root] of mountedInstanceRoots(repo)) {
@@ -1744,20 +1744,20 @@ type SubscribedRead = { entries: ResolvedEntry[]; problems: string[]; shadowed: 
 const subscribedCache = new Map<string, SubscribedRead>();
 
 /**
- * The declared directories of every SUBSCRIBED instance whose tree this
+ * The declared directories of every SUBSCRIBED layer whose tree this
  * checkout holds, and every chosen one it cannot vouch for (bean `g8jp`).
  *
- * The walk below finds an instance only when it is a top-level directory, so
- * an instance read back by subscription — the IRIS replica after its cutover — would
+ * The walk below finds a layer only when it is a top-level directory, so
+ * a layer read back by subscription — the IRIS replica after its cutover — would
  * publish nothing and exit 0. This reads the subscriptions instead, through
  * `subscribedTrees`, the seam a remote mount shares: a `held` subgraph is an
  * ordinary declared entry whose files sit under the part's `tree/`, laid out
- * at the instance's own paths by `layoutSubscribedInstances` so a page's
+ * at the layer's own paths by `layoutSubscribedInstances` so a page's
  * `../library/x.png` resolves as it would in-tree.
  *
  * A chosen subgraph that is not held is in `problems` — could-not-determine,
  * which fails the build rather than publishing an absence. A subscribed
- * instance that is ALSO staged in the tree is `shadowed`: the staged copy is
+ * layer that is ALSO staged in the tree is `shadowed`: the staged copy is
  * what gets published, and the overlap is said out loud rather than resolved
  * by timing. A subscribed directory has no `viewer` here: a declared
  * visualiser ref is relative to the substrate's repository, not this checkout.
@@ -1819,17 +1819,17 @@ function readSubscribedMountEntries(repo: string): SubscribedRead {
 }
 
 /**
- * Every instance declaration at the repository's top level, with each entry's
+ * Every layer declaration at the repository's top level, with each entry's
  * directory resolved — the one walk {@link mountable} and
  * {@link kindRouteRedirects} both read, so the two cannot disagree about which
- * instances exist or what a directory is called. Since bean `g8jp` it includes
- * the held directories of subscribed instances ({@link subscribedMountEntries}).
+ * layers exist or what a directory is called. Since bean `g8jp` it includes
+ * the held directories of subscribed layers ({@link subscribedMountEntries}).
  */
 export function declaredEntries(repo = REPO): ResolvedEntry[] {
   const out: ResolvedEntry[] = [];
   for (const { dirName, dir, decl: d } of topLevelDeclarations(repo)) {
     // Not publishing is a declaration (`"enabled": false`), so a disabled
-    // instance mounts nothing and redirects nothing; it is not a gap.
+    // layer mounts nothing and redirects nothing; it is not a gap.
     if (!isPublished(d)) continue;
     for (const entry of d.directories ?? []) {
       if (!entry.path) continue;
@@ -1845,7 +1845,7 @@ export function declaredEntries(repo = REPO): ResolvedEntry[] {
 }
 
 /**
- * The instances whose root, `/<instance>/`, is their own IG site — any
+ * The layers whose root, `/<instance>/`, is their own IG site — any
  * directory declared `igSite` (bean `mftp`). `stage-ig-sites.ts` composes that
  * site into the Jekyll source at `_docs/<instance>/`, so the root is served
  * before this script runs and no mount may claim it ({@link withRoutes}).
@@ -1864,7 +1864,7 @@ export interface Served {
 
 /**
  * Every directory declared `served`, with its route — `/<instance>/<path>`,
- * the same place the instance's composed pages sit under, so a page reaches
+ * the same place the layer's composed pages sit under, so a page reaches
  * the data with a path that does not depend on where the site is hosted
  * (`visualizer-loading` §"How to fetch").
  */
@@ -1896,7 +1896,7 @@ export function mountable(repo = REPO): Mountable[] {
     // composed directory that happened to carry an `index.html` would be
     // double-published while looking fine.
     if (entry.composed === true) continue;
-    // Built into the instance's own IG site by `stage-ig-sites.ts` (bean `mftp`); mounting it too would publish it twice.
+    // Built into the layer's own IG site by `stage-ig-sites.ts` (bean `mftp`); mounting it too would publish it twice.
     if (entry.igSite === true) continue;
     if (!existsSync(abs) || !statSync(abs).isDirectory()) continue;
     if (!existsSync(join(abs, "index.html"))) continue;
@@ -1921,7 +1921,7 @@ export function mountable(repo = REPO): Mountable[] {
 // ── Embedded assets from outside the mounted directory — bean `2b5s` ──────
 //
 // A mount copies ONE directory. A page in it may embed a file that lives
-// elsewhere in the same instance — a catalogue replica shows each item's
+// elsewhere in the same layer — a catalogue replica shows each item's
 // cover, and the covers stay in `library/` where the catalogue names them. Copying `library/` to make the `<img>` resolve is exactly the wholesale
 // copy this rule replaces: 1,367 corpus files published to serve one image.
 //
@@ -1934,7 +1934,7 @@ export interface ReferencedAsset {
   page: string;
   /** The reference exactly as the page writes it. */
   ref: string;
-  /** The asset's path relative to the instance directory, `/`-separated. */
+  /** The asset's path relative to the layer directory, `/`-separated. */
   underInstance: string;
   /** The asset, absolute. */
   abs: string;
@@ -1963,15 +1963,15 @@ const NOT_A_FILE = /^(?:[a-z][a-z0-9+.-]*:|\/|#)/i;
  * Every embedded asset under `mountDir` that lives outside it but inside
  * `instanceDir`, and every such reference that cannot be honoured.
  *
- * **Bounded by the instance, not the repository.** A reference that climbs out
- * of the instance would publish another instance's bytes under this one's
+ * **Bounded by the layer, not the repository.** A reference that climbs out
+ * of the layer would publish another layer's bytes under this one's
  * route — a page choosing, by `..`, what somebody else's declaration never
  * offered. It is a problem, not an asset.
  *
  * **`withheld.json` still governs.** A mounted directory's list stopped a
  * wholesale copy from publishing a refused work (bean `cw35`); with no
  * wholesale copy the same list must stop a REFERENCE doing it, so each
- * directory between the asset and the instance root is asked. A page
+ * directory between the asset and the layer root is asked. A page
  * embedding a withheld file is a problem to fix in its generator, and it is
  * refused rather than served.
  */
@@ -2048,15 +2048,15 @@ function withheldAncestor(instanceDir: string, abs: string): string | undefined 
 /**
  * Where an embedded asset is published, and what the page must now call it.
  *
- * Beneath the route, at the asset's path RELATIVE TO THE INSTANCE — so
- * an instance's `library/<slug>-cover.png` lands at
+ * Beneath the route, at the asset's path RELATIVE TO THE LAYER — so
+ * a layer's `library/<slug>-cover.png` lands at
  * `/<instance>/library/<slug>-cover.png`. The published tree then mirrors the
  * repository's, restricted to what a page embeds, which is the one layout a
  * reader can check against the checkout without being told a mapping.
  *
  * The page's reference is rewritten to match, because the committed page's
  * `../library/…` is right in the checkout and climbs past the route on the
- * site. The rewrite happens on the PUBLISHED copy only, so the instance's own
+ * site. The rewrite happens on the PUBLISHED copy only, so the layer's own
  * gate still checks the page its generator wrote.
  */
 export function publishedAsset(route: string, a: ReferencedAsset): { dest: string; ref: string } {
@@ -2175,10 +2175,10 @@ export { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js"
  *
  * A mounted directory is copied AFTER Jekyll, so nothing renders what it
  * holds: measured on the IRIS replica's published site, `style-guide.md` answered as
- * raw markdown and `style-guide.html` was a 404 — the instance's only
+ * raw markdown and `style-guide.html` was a 404 — the layer's only
  * hand-written pages, reachable only as source. Each `x.md` under `dest` with
  * no `x.html` beside it gets one, rendered as `publish-instance-files.ts`
- * renders an instance's own files; `README.md` also becomes `index.html` when
+ * renders a layer's own files; `README.md` also becomes `index.html` when
  * the directory has none. The `.md` stays, so a link to it keeps working.
  *
  * NOT rendered: a file with front matter. That is a Jekyll page (the IRIS replica's
@@ -2195,12 +2195,12 @@ export { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js"
  * stripped, so a mounted directory's generated README keeps its README.html.
  *
  * **A link that leaves the mounted directory** resolves nowhere on the site —
- * the rest of the instance is not published beside it. Given `source`, such a
- * link that stays inside the instance becomes a repository URL,
+ * the rest of the layer is not published beside it. Given `source`, such a
+ * link that stays inside the layer becomes a repository URL,
  * `https://github.com/<repository>/blob/HEAD/<path>`, the form bean `vj2p`
  * gives prose that cites outside its directory; `<repository>` is the
  * declaration's own `repository`, so nothing names an owner. One that climbs
- * OUT of the instance is returned in `unresolved` rather than published as a
+ * OUT of the layer is returned in `unresolved` rather than published as a
  * dead link: it is a source defect, and the caller fails on it.
  */
 /**
@@ -2219,11 +2219,11 @@ export function generatedOnlyFrontMatter(text: string): string | undefined {
 }
 
 /**
- * Whether `instanceAbs`, which exists in the instance, is left unpublished at
+ * Whether `instanceAbs`, which exists in the layer, is left unpublished at
  * `destAbs` — the place the mount's copy would have put it. Not copied (held
  * or withheld), or a `.md` page with Jekyll front matter and no `.html`
  * beside it, which {@link renderMountedMarkdown} never renders. A target that
- * does not exist in the instance is not judged here.
+ * does not exist in the layer is not judged here.
  */
 function unpublishedHere(instanceAbs: string, destAbs: string): boolean {
   if (!existsSync(instanceAbs)) return false;
@@ -2254,7 +2254,7 @@ export async function renderMountedMarkdown(
       if (generated === undefined && /^---\r?\n/.test(raw)) continue;
       const text = generated === undefined ? raw : raw.slice(generated.length);
       const rel = relative(dest, abs).split(sep).join("/");
-      // Where this file sits in the INSTANCE, so a relative link can be resolved there.
+      // Where this file sits in the LAYER, so a relative link can be resolved there.
       const fileDir = posix.dirname(posix.join(mountRel, rel));
       const linkFor = source
         ? (href: string): string | undefined => {
@@ -2300,7 +2300,7 @@ export async function renderMountedMarkdown(
   return { rendered, unresolved };
 }
 
-/** The `repository` an instance's declaration names (`owner/name`), if any. */
+/** The `repository` a layer's declaration names (`owner/name`), if any. */
 function repositoryOf(instanceDir: string): string | undefined {
   const p = declarationPathIn(instanceDir);
   if (!p || !existsSync(p)) return undefined;
@@ -2352,12 +2352,12 @@ async function main(): Promise<number> {
     console.error(`--site ${site} does not exist. Run the site build first.`);
     return 1;
   }
-  // Which instance Jekyll already rendered AT THE ROOT. Named rather than
+  // Which layer Jekyll already rendered AT THE ROOT. Named rather than
   // guessed: the workflows pass `source: ./cat-harness/docs`, and a script
   // that inferred "the first one" would silently double-publish the day the
-  // root instance changes.
+  // root layer changes.
   // Non-optional: `arg` returns `string | undefined` even with a fallback, and
-  // an undefined instance name would make `publishedDocsPrefix` unanswerable
+  // an undefined layer name would make `publishedDocsPrefix` unanswerable
   // for a reason that is a typing artefact rather than a fact about the repo.
   const built = arg("built", "cat-harness") ?? "cat-harness";
 
@@ -2369,7 +2369,7 @@ async function main(): Promise<number> {
     return true;
   });
 
-  // SUBSCRIBED INSTANCES — bean `g8jp`. A chosen subgraph this checkout
+  // SUBSCRIBED LAYERS — bean `g8jp`. A chosen subgraph this checkout
   // cannot vouch for fails the build: publishing without it would read as
   // "nothing to publish" when the truth is "could not tell".
   const subscribedRead = subscribedMountEntries();
@@ -2398,7 +2398,7 @@ async function main(): Promise<number> {
     const withheld = withheldPaths(m.dir);
     // `realpathSync`: a subscribed directory is a link to its held tree, and copying a link copies a link.
     const src = realpathSync(m.dir);
-    // A visualiser page the instance holds in this directory is published at
+    // A visualiser page the layer holds in this directory is published at
     // its declared route by compose-docs, through Jekyll; copied here too it
     // would go out a second time, raw (`heldVisualiserPaths`).
     const held = heldVisualiserPaths(REPO, m.dir);
@@ -2479,10 +2479,10 @@ async function main(): Promise<number> {
   // Jekyll (see the note above), so they inherit no `side-bar` — measured on
   // the published site: the root `index.html` has one, the IRIS replica's and
   // a DAK IG's roots have none. The rail is injected here rather than emitted
-  // by each instance's generator because it is the HARNESS's navigation: one
-  // implementation, and a new instance gets it without writing any.
+  // by each layer's generator because it is the HARNESS's navigation: one
+  // implementation, and a new layer gets it without writing any.
   //
-  // Injected AFTER the copy, never into the committed source, so an instance's
+  // Injected AFTER the copy, never into the committed source, so a layer's
   // own gate still checks the page its generator produced.
   const docsPrefix = publishedDocsPrefix(REPO, built);
   if (docsPrefix === undefined) {
@@ -2569,7 +2569,7 @@ async function main(): Promise<number> {
   for (const m of mounts) {
     // SOURCE count, said as such: since bean `cw35` a mount may withhold paths,
     // and printing the source total beside the route read as "this many were
-    // published" (1,377 printed for an instance root that received 131).
+    // published" (1,377 printed for a layer root that received 131).
     const w = withheldPaths(m.dir).length;
     console.log(
       `  ${m.dir.startsWith(REPO) ? m.dir.slice(REPO.length + 1) : m.dir}  ->  /${m.route}/  (${countFiles(m.dir)} file(s) in source` +

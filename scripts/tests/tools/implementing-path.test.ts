@@ -2,7 +2,7 @@
  * Owner rulings T1 and T7 (2026-10-01, bean `70lx`): a path the harness
  * DECLARES — a Tool's `invoke.inProcess.module`, a criterion's `source_file`,
  * a render target's `module` — stays as written, and is resolved against the
- * instance that IMPLEMENTS the declarer, found through that instance's own
+ * layer that IMPLEMENTS the declarer, found through that layer's own
  * `needs`. These tests pin the resolver the code move relies on, so that every
  * later batch is a pure `git mv`.
  *
@@ -142,7 +142,7 @@ describe("in this checkout", () => {
 
   test("every Tool module and every check:tools path resolves today", () => {
     // Each Tool's module is instance-relative, so it resolves from the
-    // instance that DECLARES the node — the harness's from cat-harness, sci's
+    // layer that DECLARES the node — the harness's from cat-harness, sci's
     // `lean-formal-edges` from folio-assistant-sci (bean riit, 3c). Resolving
     // every one from the harness asked a question no server asks.
     let count = 0;

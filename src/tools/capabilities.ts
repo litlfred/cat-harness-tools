@@ -67,17 +67,17 @@ export interface CapabilityStatus {
 
 /**
  * Load every declared capability: the platform's, then those the checkout's
- * higher instances add in their own `scenarios/capabilities/`
+ * higher layers add in their own `scenarios/capabilities/`
  * (`checkoutCapabilities`, the scenario overlay). A probe whose subject is a
  * higher layer's toolchain is declared by that layer, never down here, and is
  * still run. Returns `[]` when the platform declares no capability directory.
  */
 export function loadCapabilities(repoRoot: string): Capability[] {
-  // The declared home inside `scenarios` (bean rqao). An instance with no
+  // The declared home inside `scenarios` (bean rqao). A layer with no
   // platform `scenarios` graph declares no capabilities: `[]`, as before.
   const dir = capabilitiesDir(repoRoot);
   if (dir === undefined || !existsSync(dir)) return [];
-  // `<platform>/<scenarios>/capabilities` → the platform instance's root.
+  // `<platform>/<scenarios>/capabilities` → the platform layer's root.
   const platformRoot = resolve(dir, "..", "..");
   let records: Record<string, unknown>[];
   try {

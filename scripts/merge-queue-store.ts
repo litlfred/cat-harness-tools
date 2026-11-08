@@ -124,7 +124,7 @@ export function entryFileName(repository: string, pr: number): string {
 
 export function readQueueStore(root: string): QueueStore {
   const found = locate(root);
-  // No instance declares the kind at all. An unmigrated folio has no queue,
+  // No layer declares the kind at all. An unmigrated folio has no queue,
   // which is fine rather than wrong.
   if (!found) return { state: "absent", dir: null };
   const { id, where } = found;

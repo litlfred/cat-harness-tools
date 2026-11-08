@@ -240,7 +240,7 @@ export const TodoItemSchema = z.object({
    * todo a dependency on the palette. Unknown values are a rendering finding,
    * not a parse error.
    *
-   * ## Absent means the instance's own theme, and that is the safe default
+   * ## Absent means the layer's own theme, and that is the safe default
    *
    * A wrong theme is worse than no theme: a plain card says nothing, while a
    * card themed `operations` asserts the todo is operations work. So the
@@ -297,7 +297,7 @@ export const AuthorNoteSchema = z.object({
 export const BlockBaseSchema = z.object({
   title: z.string().optional(),
   /**
-   * Role ids from the instance's KG — see `BlockBase.audience` in
+   * Role ids from the layer's KG — see `BlockBase.audience` in
    * `schemas/types.ts`. Declared HERE as well as there because Zod strips
    * what it does not know: a field TypeScript accepts and Zod drops is
    * written by an author, type-checks, and vanishes (bean `zdrf`).

@@ -8,7 +8,7 @@
  * to notice it.
  *
  * The tests here whose subject is folio-assistant-sci's contribution (the two
- * cost checkers this instance contributes) live in
+ * cost checkers this layer contributes) live in
  * the checkout's `test/contributions-root-sci-checkout.test.ts` (bean
  * `ho66`): standing alone, cat-harness has no such contribution to read.
  */

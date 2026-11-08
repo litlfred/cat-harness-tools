@@ -122,7 +122,7 @@ const SOURCE_SKIP = [/\.test\.ts$/, /\.e2e\.ts$/, /(^|\/)tests?\//, /(^|\/)docs\
 
 function trackedFiles(repoRoot: string): string[] {
   // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
-  // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
+  // layer is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
   // by the index repository's git, so `ls-files` at the root lists none of
   // their files. `gitCorpus` counts a mount's files as it counted a
   // submodule's, and is tracked-plus-untracked exactly as before elsewhere.

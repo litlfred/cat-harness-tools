@@ -116,8 +116,8 @@ describe("a record set against the check's current answer", () => {
 });
 
 describe("check:term-mapping reads the files beside the schemes", () => {
-  // The glossary is found through its DECLARATION, as in a real checkout: an
-  // instance that declares a `glossary` graph. The fixture used to plant files
+  // The glossary is found through its DECLARATION, as in a real checkout: a
+  // layer that declares a `glossary` graph. The fixture used to plant files
   // at the literal `folio-assistant-core/glossary`, the upward path the reader
   // no longer follows (bean `0r7u` step 0).
   const GLOSSARY = join("acme", "glossary");

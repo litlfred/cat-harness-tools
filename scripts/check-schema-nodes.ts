@@ -25,7 +25,7 @@ import { auditSchemaNodes } from "./schema-nodes.js";
 const ROOT = HARNESS_ROOT;
 
 if (import.meta.main) {
-  // In a layer's PR checks, only the caller's own instances' `schemas/`
+  // In a layer's PR checks, only the caller's own layers' `schemas/`
   // (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`). A lower
   // layer's are judged by that layer's own CI.
   const own = gateOwnInstances();

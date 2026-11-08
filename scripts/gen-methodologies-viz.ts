@@ -56,8 +56,8 @@ const VIEWER_TOOL = "methodologies-viewer";
 /**
  * Every page this writes declares itself generated in its own front matter —
  * the `generated:` key `check:reference-direction` reads (bean `ws99`), as
- * `gen-processes-viz.ts` does. A page lists the methodologies and the instances that adopt them, which belong to every
- * instance in the checkout, so without the key those names read as authored
+ * `gen-processes-viz.ts` does. A page lists the methodologies and the layers that adopt them, which belong to every
+ * layer in the checkout, so without the key those names read as authored
  * prose in the committing layer naming the layers above it.
  */
 const GENERATED_FM = "generated: gen-methodologies-viz.ts — do not hand-edit; run `bun run cat methodologies:viz`";
@@ -75,10 +75,10 @@ export interface MethodologyRow {
   readonly origin: string;
   readonly appliesWhen: string;
   /**
-   * WHICH instance declared it — `cat-harness`, or a layer above it such as a DAK base layer.
+   * WHICH layer declared it — `cat-harness`, or a layer above it such as a DAK base layer.
    *
    * The graph spans all three, and a page that did not say which would make
-   * `grade` read as this instance's own adoption when it is the WHO material's.
+   * `grade` read as this layer's own adoption when it is the WHO material's.
    * See {@link instanceOf} for why this is resolved rather than split.
    */
   readonly instance: string;
@@ -89,19 +89,19 @@ export interface MethodologyRow {
 }
 
 /**
- * Which instance declared a node, from its path.
+ * Which layer declared a node, from its path.
  *
  * RESOLVED, not split. `methodologyNodes` spells every path relative to the
- * INSTANCE root, so a sibling instance's node arrives as
+ * LAYER root, so a sibling layer's node arrives as
  * `../<instance>/methodologies/diig.md` — and taking the first segment of that
  * gives `..`, which is what the first version of this page printed in the
- * "declared by" column for two of its nine rows, and what made its instance
+ * "declared by" column for two of its nine rows, and what made its layer
  * count say 2 where the graph spans 3. Found by reading the rendered page, not
  * the code.
  *
- * So the path is resolved against the instance root and re-expressed against
+ * So the path is resolved against the layer root and re-expressed against
  * the repository root, which is the only spelling in which the first segment
- * IS an instance. Pure path arithmetic — nothing here touches the filesystem,
+ * IS a layer. Pure path arithmetic — nothing here touches the filesystem,
  * so the join stays testable without one.
  */
 export function instanceOf(node: string, instanceRoot: string, repoRoot: string): string {
@@ -114,7 +114,7 @@ export function instanceOf(node: string, instanceRoot: string, repoRoot: string)
   const rel = relative(repoRoot, resolved);
   const seg = rel.split("/")[0] ?? "";
   // Still `..` means the node sits OUTSIDE the repository, which no declared
-  // graph should. Reported as itself rather than guessed at: a wrong instance
+  // graph should. Reported as itself rather than guessed at: a wrong layer
   // name on a row is worse than a visibly impossible one.
   return seg === "" ? "?" : seg;
 }
@@ -132,9 +132,9 @@ export function methodologyRows(
   instanceRoot = INSTANCE_ROOT,
   repoRoot = REPO,
 ): MethodologyRow[] {
-  // Indexed by NODE PATH, not by name. Two instances may adopt methods with
+  // Indexed by NODE PATH, not by name. Two layers may adopt methods with
   // the same name — `raci` and `rasci` already differ by one letter — and a
-  // name-keyed join would silently attribute one instance's evidence to
+  // name-keyed join would silently attribute one layer's evidence to
   // another's node.
   const dangling = new Set(report.unresolved.map((f) => f.node));
   const none = new Set(report.noEvidence.map((f) => f.node));
@@ -346,7 +346,7 @@ export interface AppliedBy {
 
 /**
  * Which skills apply each methodology, by name: every skill in the checkout's
- * instances that declares `uses-methodology` (cat-harness `schemas/process/methodology.ts`).
+ * layers that declares `uses-methodology` (cat-harness `schemas/process/methodology.ts`).
  * The edge is the skill's; the methodology's page reads it back.
  */
 export function appliedByIndex(repoRoot = REPO, nodeHref?: (path: string) => string | undefined): Map<string, AppliedBy[]> {
@@ -585,7 +585,7 @@ if (import.meta.main) {
   // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The page joins
   // every methodology node the checkout's composition declares to every
   // declared library (`libraryResolver` reads the library projection and each
-  // instance's READMEs), so it moved with the index's pins. The instance
+  // layer's READMEs), so it moved with the index's pins. The layer
   // declares the route `builtAtPublish` with this script as its writer, and
   // `derive:publish` runs it; under `--check` a declared page has no committed
   // bytes to compare, so it is skipped there (the `folio:viz` rule).
@@ -616,7 +616,7 @@ if (import.meta.main) {
   } else {
     mkdirSync(join(out, ".."), { recursive: true });
     writeFileSync(out, rendered);
-    // One page per node under the list page. Each instance's directory is
+    // One page per node under the list page. Each layer's directory is
     // this writer's alone, so it is cleared first: a node renamed or removed
     // leaves no page behind.
     const links = libraryResolver(REPO, INSTANCE_ROOT);

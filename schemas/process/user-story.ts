@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { RoleRefSchema, type RoleGraph } from "./role-graph";
 
-/** The file holding an instance's user stories, inside its `scenarios` graph. */
+/** The file holding a layer's user stories, inside its `scenarios` graph. */
 export const USER_STORIES_FILENAME = "stories.json";
 
 /** One user story: as <role>, I want <want>. */
@@ -76,8 +76,8 @@ export function readUserStories(scenariosDir: string): UserStoryGraph | undefine
 /**
  * The stories whose role is not declared in `graph`.
  *
- * Only stories naming THIS instance's roles (no `instance`) are judged; a
- * story pointing into another instance is that instance's role graph's
+ * Only stories naming THIS layer's roles (no `instance`) are judged; a
+ * story pointing into another layer is that layer's role graph's
  * question, and answering it from here would report a sibling's role as
  * missing.
  */

@@ -24,7 +24,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * `docs-ui.js` owns it, and the IG site build is one page writer that stamps
  * it (its own unit test asserts the stamp carries it). So the fixture writes
  * the attribute itself rather than reaching into the IG build: a platform
- * test that read a dependant instance's source would point the wrong way.
+ * test that read a dependant layer's source would point the wrong way.
  */
 const ROOT = join(HARNESS_ROOT);
 const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");

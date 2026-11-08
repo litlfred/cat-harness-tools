@@ -20,7 +20,7 @@ import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
  * itself at count 0, which is right for todos and would be wrong here — and
  * a spec that only exercised the happy path would never notice.
  *
- * The accessibility half is not decoration. This instance's interaction
+ * The accessibility half is not decoration. This layer's interaction
  * profile is low-dexterity, `gjli` is a standing rule, and a dialog is the
  * control most often shipped without keyboard handling. So: the accessible
  * name carries the COUNT rather than leaving it to the badge, the name is

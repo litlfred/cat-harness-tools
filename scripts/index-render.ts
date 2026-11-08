@@ -4,27 +4,27 @@
  * `GEMINI.md` — RENDERED, never hand-written.
  *
  * @module scripts/index-render
- * @covers cat-harness — the instance axis: the four entry files at the root of an index checkout are the current output of this renderer over `index.config.json` and the declarations of the instances it names
+ * @covers cat-harness — the instance axis: the four entry files at the root of an index checkout are the current output of this renderer over `index.config.json` and the declarations of the layers it names
  *
- * The root of an index checkout declares no instance, so these files are
+ * The root of an index checkout declares no layer, so these files are
  * written from:
  *
- * - `index.config.json` — which instances, in which order, and the
+ * - `index.config.json` — which layers, in which order, and the
  *   checkout's own `title` and `description`;
- * - each instance's DECLARED `agent-instructions` and `instance-readme`
+ * - each layer's DECLARED `agent-instructions` and `instance-readme`
  *   assets — linked, and the README's lead paragraph quoted;
  * - bootstrap's `AGENTS.md`, quoted as the cold start for a checkout that
  *   is not yet set up;
  * - the README section generators (`pipeline/readme-sections.ts`):
  *   `cat-harness:cold-start`, `cat-harness:instances` and `readme:toc`.
  *
- * A file that says what every instance is cannot belong to any one of them.
- * Adding an instance to the index adds it here on the next render, and
+ * A file that says what every layer is cannot belong to any one of them.
+ * Adding a layer to the index adds it here on the next render, and
  * `--check` fails the commit that forgot.
  *
  * ## Could-not-determine is a failure, never a shorter file
  *
- * An instance the index names that is not on disk, or whose declaration
+ * A layer the index names that is not on disk, or whose declaration
  * will not parse, makes the run exit 2 having written NOTHING (the rule
  * `root-index.ts` holds for the published meta-skeleton). A declared asset
  * that is missing is a known gap, rendered as an em dash and counted, never a
@@ -35,12 +35,12 @@
  *   bun run cat index:render:check      # fail when any is not current
  *   … [--root <dir>]                    # default: this checkout
  *
- * Both build the declared pages first (`lib/index-pages.ts`): an instance's
+ * Both build the declared pages first (`lib/index-pages.ts`): a layer's
  * `<instance>:pages`, for each docs directory it builds that is not on disk.
  *
  * Exit codes: 0 written or current, or no `index.config.json` (not an index
  * checkout: its root files are a folio's own) · 1 `--check` found a stale or
- * missing file · 2 the index or an instance it names could not be read.
+ * missing file · 2 the index or a layer it names could not be read.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, posix, relative, resolve, sep } from "node:path";
@@ -52,7 +52,7 @@ import { loadReadmeConfig } from "../pipeline/readme-toc.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { buildPages, pagesBuildsFor } from "./lib/index-pages.ts";
 
-/** This instance's root — whatever directory it is mounted at. */
+/** This layer's root — whatever directory it is mounted at. */
 const HERE = resolve(HARNESS_ROOT);
 
 /** The files this renderer owns at an index root, in the order it reports them. */
@@ -60,7 +60,7 @@ export const INDEX_RENDERED_FILES = ["AGENTS.md", "README.md", "CLAUDE.md", "GEM
 export type IndexRenderedFile = (typeof INDEX_RENDERED_FILES)[number];
 
 /**
- * The instance whose `AGENTS.md` is the cold start for a checkout not yet set
+ * The layer whose `AGENTS.md` is the cold start for a checkout not yet set
  * up. Named, because the owner named it: bootstrap is what an agent reads
  * before anything is installed, and an index that does not mount it simply
  * renders without that subsection.
@@ -97,7 +97,7 @@ function rel(root: string, abs: string): string {
 }
 
 /**
- * Where an instance the index names sits in the checkout: a local entry's
+ * Where a layer the index names sits in the checkout: a local entry's
  * `at`, else a remote mount's path — the same answer `remoteMountPathOf`
  * gives the `.gitignore` block — else `<name>`.
  */
@@ -111,7 +111,7 @@ export function indexInstancePath(entry: IndexInstance): string {
 }
 
 /**
- * Read every instance the index names. Any that cannot be read is a PROBLEM,
+ * Read every layer the index names. Any that cannot be read is a PROBLEM,
  * and the caller writes nothing.
  */
 export function indexRows(root: string, config: IndexConfig): { rows: IndexInstanceRow[]; problems: string[] } {
@@ -440,7 +440,7 @@ export function renderIndex(root: string): IndexRender {
   if (idx.state === "unreadable") return { state: "undetermined", problems: [`${idx.file} is ${idx.why}`] };
   const { rows, problems } = indexRows(root, idx.config);
   if (problems.length > 0) return { state: "undetermined", problems };
-  // Built pages first (owner, 2026-10-14: "Build pages first"): the instance
+  // Built pages first (owner, 2026-10-14: "Build pages first"): the layer
   // table links a declared docs directory by its presence, and an IG's docs
   // are built, so the render reads a built tree in every setting.
   const failedBuilds = buildPages(root, pagesBuildsFor(root, rows));

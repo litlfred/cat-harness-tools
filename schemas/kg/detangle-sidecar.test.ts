@@ -50,7 +50,7 @@ describe("the direction counts survive the round trip", () => {
 
   test("`undeterminedDirection` is pinned SEPARATELY, so the third state cannot hide in the first", () => {
     // An edge moving wrong-direction -> undetermined is not a fix: it means
-    // the source instance stopped declaring `needs`. Pinning only
+    // the source layer stopped declaring `needs`. Pinning only
     // `wrongDirection` would read that as 1 -> 0 and call it progress.
     const before = sidecarFor(metrics);
     const after = sidecarFor({ ...metrics, wrongDirection: 0, undeterminedDirection: 1 });

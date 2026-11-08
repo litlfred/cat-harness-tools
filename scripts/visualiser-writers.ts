@@ -81,7 +81,7 @@ type ToolLike = Pick<ToolDefinition, "id" | "invoke" | "io">;
 
 /**
  * The writers of the given visualisers, one per Tool (and per harness, for a
- * Tool run for one instance at a time), each with what the Tool declares about
+ * Tool run for one layer at a time), each with what the Tool declares about
  * pointing it at a site.
  */
 export function visualiserWriters(
@@ -160,14 +160,14 @@ export function writerArgv(root: string, w: VisualiserWriter, site?: string): st
  * The writers of the expected pages in `pages`: each writer once, with only the
  * visualisers it owes.
  *
- * A writer run for one instance at a time (an `instance` input) is keyed on the
+ * A writer run for one layer at a time (an `instance` input) is keyed on the
  * harness that DECLARES the visualiser, so by itself it draws that harness's
  * pages only. A visualiser with `subgraphs: "instance"` also owes a page to
- * every OTHER instance with entries of the kinds it covers: the DAK base
+ * every OTHER layer with entries of the kinds it covers: the DAK base
  * layer's `artifact-index` owes `en/<dak-base>/artifact-index/<dak-ig>/` on
  * that DAK IG's site (2026-10-15), and `ig-pages --instance <dak-base>`
- * never drew it. So for each such owed page whose instance `rootOf` can place,
- * the writer runs once more, pointed at that instance.
+ * never drew it. So for each such owed page whose layer `rootOf` can place,
+ * the writer runs once more, pointed at that layer.
  */
 export function writersFor(
   writers: readonly VisualiserWriter[],
@@ -193,7 +193,7 @@ export function writersFor(
   return out;
 }
 
-/** The root of each instance in the checkout at `root`, by name: where a writer run for that instance is pointed. */
+/** The root of each layer in the checkout at `root`, by name: where a writer run for that layer is pointed. */
 export function instanceRoots(root: string): Map<string, string> {
   const out = new Map<string, string>();
   for (const d of checkoutDirectories(root)) {
@@ -243,7 +243,7 @@ export function runVisualiserWriters(
 
 /**
  * The site build's step: run the writer of every expected page `site` does
- * not hold yet — the checkout's own visualisers and every instance it needs.
+ * not hold yet — the checkout's own visualisers and every layer it needs.
  * A page a recipe step already wrote (smart-ra's `site:archimate`) is not
  * written twice.
  */

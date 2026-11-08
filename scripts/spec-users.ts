@@ -87,7 +87,7 @@ export function boundNamespaces(xml: string): string[] {
 
 /**
  * The module file a registry ref names: `module#Export`, optionally prefixed
- * by the instance that holds it (`folio-assistant-core:schemas/x.ts#X`).
+ * by the layer that holds it (`folio-assistant-core:schemas/x.ts#X`).
  * Unprefixed refs are relative to `defaultInstance`.
  */
 export function refModule(ref: string, defaultInstance: string): string {
@@ -103,7 +103,7 @@ export function refModule(ref: string, defaultInstance: string): string {
  * @param files repository-relative files to read (the tracked set)
  * @param specs the external-schema records
  * @param kinds the graph-typology registry
- * @param kindsInstance the instance directory the registry's unprefixed refs are relative to
+ * @param kindsInstance the layer directory the registry's unprefixed refs are relative to
  */
 export function specUsers(
   repo: string,

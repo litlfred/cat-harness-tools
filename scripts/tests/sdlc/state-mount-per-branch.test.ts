@@ -78,7 +78,7 @@ function fixture(subs: Subgraph[]) {
   const work = join(base, "work");
   mkdirSync(work);
   git(work, "init", "-q", "-b", "main");
-  // The instance declaration IS the authority on which directory lives where.
+  // The layer declaration IS the authority on which directory lives where.
   writeFileSync(
     join(work, "fixture.json"),
     JSON.stringify(

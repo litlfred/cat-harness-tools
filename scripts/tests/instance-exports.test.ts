@@ -1,5 +1,5 @@
 /**
- * One graph per declared instance — bean `4ak5` items 1 and 5.
+ * One graph per declared layer — bean `4ak5` items 1 and 5.
  *
  * The workflow literals below are fixture text on purpose (bean `jijc`): a
  * matcher fed a constant it was built from asserts nothing.
@@ -131,7 +131,7 @@ describe("completeness — bean 4ak5 item 5", () => {
   });
 
   test("the host publisher is accepted with the default scope and with `instance`, never `checkout`", () => {
-    // Bean `4ak5` item 2: `checkout` would publish every stacked instance's
+    // Bean `4ak5` item 2: `checkout` would publish every stacked layer's
     // nodes under the host's name again — the state the split ended.
     const host = (flags: string, out = "./_site/\${STUB}/\${STUB}.jsonld"): string[] =>
       incompleteExports(
@@ -181,7 +181,7 @@ describe("completeness — bean 4ak5 item 5", () => {
 
 // ── The schema half — bean `4ak5` item 1 ───────────────────────────────────
 //
-// Reads other instances' real contracts and skills, so only where they are
+// Reads other layers' real contracts and skills, so only where they are
 // checked out together (standalone rule, bean `ho66`).
 describe.skipIf(!inAggregate())("every contract a planned instance's skills name reaches its schema/", () => {
   const plan = instanceExportPlan(REPO);
@@ -198,7 +198,7 @@ describe.skipIf(!inAggregate())("every contract a planned instance's skills name
   });
 
   test("FALSIFIED: a publisher that drops a contract fails the gate, naming it", () => {
-    // The gate reads what the instance HAS from its skills' front matter and
+    // The gate reads what the layer HAS from its skills' front matter and
     // what the publisher WRITES from the publisher, so a publisher that loses
     // a file is seen — the shape `folio-assistant-sci` would have had if the
     // contracts were read from its declared `schemas` graph (`sources/`).
@@ -223,7 +223,7 @@ describe.skipIf(!inAggregate())("every contract a planned instance's skills name
 
   test("the document links an index exactly for the planned instances — the plan is the one answer", () => {
     for (const p of plan) expect(publishesInstanceSchema(resolve(REPO, p.path), REPO)).toBe(true);
-    // The exempt instances keep their own publishers and get no schema/ from this one.
+    // The exempt layers keep their own publishers and get no schema/ from this one.
     expect(publishesInstanceSchema(REPO, REPO)).toBe(false); // the checkout root, `folio-assistant`
     expect(publishesInstanceSchema(join(REPO, "cat-harness"), REPO)).toBe(false);
     expect(publishesInstanceSchema(join(REPO, "bootstrap"), REPO)).toBe(false);
@@ -232,7 +232,7 @@ describe.skipIf(!inAggregate())("every contract a planned instance's skills name
 
 // ── The Zod half — owner ruling 2026-10-05, option C ("every exported *Schema") ──
 //
-// A fixture instance, so the falsification does not depend on the corpus: the
+// A fixture layer, so the falsification does not depend on the corpus: the
 // gate reads what a module DECLARES from its text and confirms it Zod by
 // importing it; what is WRITTEN comes from the publisher it is handed.
 describe("an exported Zod *Schema the publisher would not write fails the gate", () => {
@@ -373,7 +373,7 @@ describe("an instance's published files are placed by cat-harness's resolver", (
 
   test("no published address moved: every planned instance's name is its stub today", () => {
     // The switch from `<stub>/` to `<name>/` is safe only while they agree;
-    // an instance whose stub differs would move its `@id`s, which `blv9` gates.
+    // a layer whose stub differs would move its `@id`s, which `blv9` gates.
     for (const p of instanceExportPlan(REPO)) expect(instanceDocPath(p)).toBe(`${p.stub}/${p.stub}.jsonld`);
   });
 });

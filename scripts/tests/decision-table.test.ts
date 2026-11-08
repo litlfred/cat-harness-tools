@@ -22,7 +22,7 @@ import { loadProcessModel, UnsupportedBpmn } from "../../src/workflow/process-mo
  * The tests over SHIPPED tables and processes live with their owners (bean
  * `ho66`): `draft-qa-gate.dmn` in folio-assistant-core, `lean-build-gate.dmn`
  * and `authoring-a-paper.bpmn` in folio-assistant-sci, each in that
- * instance's `scripts/tests/decision-table.test.ts`. Standing alone,
+ * layer's `scripts/tests/decision-table.test.ts`. Standing alone,
  * cat-harness has none of them to read.
  */
 

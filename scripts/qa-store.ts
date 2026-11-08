@@ -241,7 +241,7 @@ export function parseQaRef(s: string): QaRefSpec {
 // ── Location (the declaration) ───────────────────────────────────────────
 
 export interface QaDirectory {
-  /** The declaring instance's root, absolute. */
+  /** The declaring layer's root, absolute. */
   instance: string;
   id: string;
   /** Repository-relative, no trailing slash — the path on the branch too. */
@@ -262,7 +262,7 @@ export interface QaLocation {
 
 /**
  * Where QA results live: every declared `qa` directory across the checkout's
- * instances, and the branch their `storage` names.
+ * layers, and the branch their `storage` names.
  *
  * Two directories naming DIFFERENT branches is refused rather than resolved by
  * order: one store per checkout is the design, and picking one would hand half
@@ -287,7 +287,7 @@ export function resolveQaLocation(repoRoot: string = gitTopLevel()): QaLocation 
         });
       }
     } catch {
-      // An instance in the checkout might declare typologies from unimported packages (e.g. an IG instance needing the IG pipeline layer's typologies)
+      // A layer in the checkout might declare typologies from unimported packages (e.g. an IG layer needing the IG pipeline layer's typologies)
       continue;
     }
   }

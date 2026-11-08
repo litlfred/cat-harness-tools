@@ -37,7 +37,7 @@ const OUTPUT_FILE = join(DATA_DIR, "translation-qa.json");
 const GENERATED_BY = "pipeline/translation-qa-sweep.ts — do not hand-edit; rerun the sweep";
 
 /**
- * The instance's own answer, not a literal — `translation-index.ts` reads the
+ * The layer's own answer, not a literal — `translation-index.ts` reads the
  * config once and every consumer asks it.
  *
  * TWO lists, because they answer two questions and collapsing them is the
@@ -185,7 +185,7 @@ export function runTranslationQaSweep(): TranslationQaSweepResult {
     const stem = basename(relPath, ".md");
     const poLocales = availableLocales(INSTANCE_ROOT, stem);
     const hasLangField = "lang" in fm;
-    // The page's OWN declared language, not the instance default: a page under
+    // The page's OWN declared language, not the layer default: a page under
     // a locale subtree is authored in that locale and is available in it.
     const pageSource = fm.lang || SOURCE_LOCALE;
     const locales = localesAvailableFor(INSTANCE_ROOT, [pageSource, ...poLocales]);

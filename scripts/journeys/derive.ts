@@ -11,7 +11,7 @@
  * | derived | from | authored instead |
  * |---|---|---|
  * | the DAK `personas` (roles) | each persona actor's `roles`; a persona that is a role, as it is | never |
- * | a role persona's actors | the actors whose `roles` name it, the journey's instance first | — |
+ * | a role persona's actors | the actors whose `roles` name it, the journey's layer first | — |
  * | a parent's `personas`, when absent | its parts' personas, in order | when the parent has people of its own |
  * | a step's `experiences` and `lead`, when absent | the actors among the personas who play the lanes of its `realisedBy` tasks, each "doing" those tasks | the narrative: who is there and how they feel |
  * | a part's parent, and which part it follows | the parent's `parts`, in order | never (0.4.0 refuses `partOf`; a listed part carries no `follows`) |
@@ -32,7 +32,7 @@ import { relative, resolve } from "node:path";
 import type { DakUserScenario, Experience, Part, Scenario, ScenarioStep, UserScenario } from "../../schemas/process/user-scenario.ts";
 import type { Actor, Journey, JourneyCorpus } from "./read.ts";
 
-/** Look a key up in the instance's own map first, then in every other instance's. */
+/** Look a key up in the layer's own map first, then in every other layer's. */
 export function lookup<T>(per: Map<string, Map<string, T>>, instance: string, id: string): T | undefined {
   const own = per.get(instance)?.get(id);
   if (own !== undefined) return own;
@@ -40,12 +40,12 @@ export function lookup<T>(per: Map<string, Map<string, T>>, instance: string, id
   return undefined;
 }
 
-/** A path a journey names, relative to its instance's root: absolute when the file exists. */
+/** A path a journey names, relative to its layer's root: absolute when the file exists. */
 export function instanceFile(corpus: Pick<JourneyCorpus, "instances">, instance: string, path: string): string | undefined {
   const info = corpus.instances.get(instance);
   if (info === undefined) return undefined;
   const p = resolve(info.root, path);
-  // Never outside the instance: `../` in a journey is not a reference into another repository.
+  // Never outside the layer: `../` in a journey is not a reference into another repository.
   if (relative(info.root, p).startsWith("..")) return undefined;
   return existsSync(p) && statSync(p).isFile() ? p : undefined;
 }
@@ -151,7 +151,7 @@ export function laneRole(corpus: JourneyCorpus, instance: string, lane: { ref?: 
   return byName(corpus.roles.get(instance)) ?? [...corpus.roles.keys()].filter((n) => n !== instance).map((n) => byName(corpus.roles.get(n))).find((r) => r !== undefined);
 }
 
-/** The actors who play a role: the instance's own first, else the checkout's. */
+/** The actors who play a role: the layer's own first, else the checkout's. */
 export function actorsPlaying(corpus: JourneyCorpus, instance: string, role: string): Actor[] {
   const plays = (m: Map<string, Actor> | undefined) => [...(m ?? new Map<string, Actor>()).values()].filter((a) => a.roles?.includes(role));
   const own = plays(corpus.actors.get(instance));
@@ -165,7 +165,7 @@ export function isRolePersona(corpus: JourneyCorpus, instance: string, id: strin
 
 // ── composition ──────────────────────────────────────────────────────────
 
-/** A journey by id: the instance's own first. */
+/** A journey by id: the layer's own first. */
 export function journeyById(corpus: Pick<JourneyCorpus, "journeys">, instance: string, id: string): Journey | undefined {
   return corpus.journeys.find((j) => j.instance === instance && j.scenario.id === id) ?? corpus.journeys.find((j) => j.scenario.id === id);
 }

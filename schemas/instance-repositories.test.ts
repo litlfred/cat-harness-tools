@@ -1,5 +1,5 @@
 /**
- * The tests of this file that read the whole checkout (reads every instance
+ * The tests of this file that read the whole checkout (reads every layer
  * this checkout stages and the repository each declares) live in
  * `test/instance-repositories-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
@@ -17,7 +17,7 @@ import { dirname } from "node:path";
 
 const CHECKOUT = resolve(dirname(HARNESS_ROOT));
 
-// The references are those of every instance a COMPOSED checkout stages,
+// The references are those of every layer a COMPOSED checkout stages,
 // read from its corpus. Standing alone, cat-harness's checkout is its own
 // clone and holds none of the others, so these are not applicable there.
 const COMPOSED_ABSENT = notApplicableAlone(
@@ -26,9 +26,9 @@ const COMPOSED_ABSENT = notApplicableAlone(
 
 describe.skipIf(COMPOSED_ABSENT)("instance references are owner/repo and resolve (bean 6rmv, phase 2)", () => {
   const map = instanceRepositories(CHECKOUT);
-  // Every committed voice and instance declaration — the files whose
-  // `instance` fields name another instance. Read through `gitCorpus`, not a
-  // bare `git ls-files`: in the index checkout every instance is a REMOTE
+  // Every committed voice and layer declaration — the files whose
+  // `instance` fields name another layer. Read through `gitCorpus`, not a
+  // bare `git ls-files`: in the index checkout every layer is a REMOTE
   // MOUNT, ignored by the index's git, so `ls-files` listed none of them and
   // this set came back empty. The corpus counts a mount's files as a
   // submodule's were.
@@ -36,7 +36,7 @@ describe.skipIf(COMPOSED_ABSENT)("instance references are owner/repo and resolve
     .map((abs) => relative(CHECKOUT, abs))
     .filter((f) => f.endsWith("voice.json") || /^([^/]+)\/\1\.json$/.test(f));
   // Each reference keeps the `url` of the object that names it, when there is
-  // one: a voice source that names an instance this checkout does not compose
+  // one: a voice source that names a layer this checkout does not compose
   // and says where it is held is HELD ELSEWHERE (owner, 2026-10-31, fa#2781:
   // "report as held elsewhere"). It is listed, not failed. With no `url`,
   // nothing says where it is, so it must resolve here.

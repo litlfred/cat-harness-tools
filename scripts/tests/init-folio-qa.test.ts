@@ -1,7 +1,7 @@
 /**
  * QA on init (bean `tw61`, the owner's "setup proper QA on init"): a folio
  * scaffolded by init-folio is swept by the command its own AGENTS.md
- * documents, the verdicts land at the INSTANCE root, and the preview's QA
+ * documents, the verdicts land at the LAYER root, and the preview's QA
  * summary reads them, including for a folio kept in a subfolder, as the
  * ojcx run's `handbook/` is.
  */

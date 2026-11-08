@@ -27,14 +27,14 @@ const INSTANCE = HARNESS_ROOT;
 const REPO = repoRootFor(INSTANCE);
 
 /**
- * A throwaway INSTANCE, declaring its own directories.
+ * A throwaway LAYER, declaring its own directories.
  *
  * The declaration is not scaffolding — it is the thing under test. `scan`
  * reads where to sweep from `harness.json` rather than from a list, so a
  * fixture without one exercises the fallback and not the path the real run
  * takes. `declare: false` is how the "resolved to nothing" case is reached.
  */
-// Tests call `scan(root, root)`: the fixture IS both the instance and the
+// Tests call `scan(root, root)`: the fixture IS both the layer and the
 // repository, and letting `repoRootFor` guess would report findings relative
 // to the system temp directory.
 function fixture(files: Record<string, string>, declare = true): string {

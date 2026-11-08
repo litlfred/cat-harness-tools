@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * dmn-check: run the DMN table checks (src/workflow/dmn-qa.ts) over an
- * instance's decision tables, wherever they sit.
+ * dmn-check: run the DMN table checks (src/workflow/dmn-qa.ts) over a
+ * layer's decision tables, wherever they sit.
  *
- * Usage, from an instance root that mounts cat-harness-tools:
+ * Usage, from a layer root that mounts cat-harness-tools:
  *
  *   bun run cat-harness-tools/scripts/dmn-check.ts [paths…] [--root DIR]
  *       [--json] [--no-require-unknown] [--strict]

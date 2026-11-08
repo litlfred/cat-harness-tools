@@ -40,7 +40,7 @@ function voice(id: string, rules: string[], rest: Partial<VoiceProfile> = {}): V
   });
 }
 
-/** A lookup over a fixed set, as an instance's declaration would supply. */
+/** A lookup over a fixed set, as a layer's declaration would supply. */
 function lookupOver(vs: Record<string, VoiceProfile>) {
   return (ref: VoiceRef, citing: string) => {
     const v = vs[ref.voiceId];

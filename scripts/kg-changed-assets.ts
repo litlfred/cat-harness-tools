@@ -23,7 +23,7 @@
  *   could not be read. Could-not-determine is never "nothing changed": an
  *   empty `changedAssets` means the graphs were compared and agree.
  *
- * An instance that declares its own `canonicalUrl` (the DAK base layer, the FHIR IG harness)
+ * A layer that declares its own `canonicalUrl` (the DAK base layer, the FHIR IG harness)
  * is exported with no `--base-url` (`instance-exports.ts`), so its staged
  * document is not a preview and is skipped, said in the log: it has no
  * staging identity to link a node to.
@@ -186,7 +186,7 @@ export function diffGraphs(staged: GraphDoc, main: GraphDoc, b: Bases): NodeChan
 /** The keys a node names its file under, in `kg-export`'s own order (`stampSubgraph`). */
 const PATH_KEYS = ["instructionsPath", "module", "sourcePath", "path"] as const;
 
-/** The node's file, relative to the instance it was exported from; undefined when it names none. */
+/** The node's file, relative to the layer it was exported from; undefined when it names none. */
 export function nodePath(n: Node | undefined): string | undefined {
   if (n === undefined) return undefined;
   for (const k of PATH_KEYS) {
@@ -338,7 +338,7 @@ if (import.meta.main) {
   }
   const mainDir = flag(argv, "--main");
   // Dynamic: `kg-export` is the exporter's whole import graph, needed only to
-  // name where each instance's document is published (`exportIdentity`).
+  // name where each layer's document is published (`exportIdentity`).
   const { exportIdentity } = await import("./kg-export.ts");
   const { HARNESS_ROOT } = await import("./lib/roots.ts");
   const { instanceDocPath, instanceExportPlan } = await import("./instance-exports.ts");
@@ -347,7 +347,7 @@ if (import.meta.main) {
   const render = docsRenderer(repo);
 
   // Where the deploy writes each document: the host's at its `docPath`
-  // (`feature-staging.yml`), every other instance's at `<name>/<stub>.jsonld`
+  // (`feature-staging.yml`), every other layer's at `<name>/<stub>.jsonld`
   // (`instanceDocPath`, from the same plan `instance-exports.ts` exports by).
   const docs: { at: string; instanceDir: string }[] = [{ at: exportIdentity({}).docPath, instanceDir: HARNESS_ROOT }];
   for (const p of instanceExportPlan(repo)) docs.push({ at: instanceDocPath(p), instanceDir: resolve(repo, p.path) });

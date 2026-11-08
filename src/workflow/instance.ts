@@ -621,7 +621,7 @@ function outcomesOf(model: ProcessModel, node: ProcessNode): string[] {
 /**
  * What is enabled now.
  *
- * `roles` is optional so that the interpreter keeps working in an instance that
+ * `roles` is optional so that the interpreter keeps working in a layer that
  * declares no role graph — an unmigrated repo is not an error. When it IS
  * supplied, every enabled step reports the role its lane binds and the skills
  * that role carries, which is the whole point of declaring roles: an agent
@@ -637,7 +637,7 @@ export interface SubprocessScopeContext {
 /**
  * What is enabled now.
  *
- * `roles` is optional so that the interpreter keeps working in an instance that
+ * `roles` is optional so that the interpreter keeps working in a layer that
  * declares no role graph — an unmigrated repo is not an error. When it IS
  * supplied, every enabled step reports the role its lane binds and the skills
  * that role carries, which is the whole point of declaring roles: an agent

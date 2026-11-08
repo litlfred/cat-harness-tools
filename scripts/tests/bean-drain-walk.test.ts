@@ -4,10 +4,10 @@
  * work → CLOSE, then refill.
  *
  * The drain is the one caller that reaches OPEN and CLOSE more than once in
- * an instance, so it rests on two engine properties no other walk asserts:
+ * a layer, so it rests on two engine properties no other walk asserts:
  * a call activity reached again by a gateway loop RE-ENTERS its process
  * (`enterSubprocesses`), and a CLOSE with more of the caller still ahead does
- * not leave the instance believing it is finished — the drain is not done
+ * not leave the layer believing it is finished — the drain is not done
  * when one bean is.
  */
 import { describe, expect, test } from "bun:test";
@@ -39,7 +39,7 @@ describe("Process_BeanDrain runs OPEN → work → CLOSE per bean, then refills"
     openNewBean(model, state, {}, GATEWAY);
     complete(model, state, "Drain_Work");
     walkSteps(model, state, CLOSE_DONE);
-    // More of the drain follows CLOSE, so the instance is not "only archive left".
+    // More of the drain follows CLOSE, so the layer is not "only archive left".
     expect(onlyArchiveLeft(model, state)).toBe(false);
     expect(state.status).toBe("running");
     expect(enabled(model, state).map((e) => e.node)).toEqual(["Drain_More"]);

@@ -107,7 +107,7 @@ export const FOLIO_PATHS: FolioPath[] = [
   //
   // So these are not "waiting for a folio tree we happen not to carry".
   // They `cd content` — a directory the convention has moved off. The
-  // instance's own declaration already says so: `cat-harness/harness.json`
+  // layer's own declaration already says so: `cat-harness/harness.json`
   // declares `folio/` holding the `folio` graph, and there is no `content`
   // entry anywhere in it.
   //

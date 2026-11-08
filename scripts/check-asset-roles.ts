@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * check-asset-roles.ts — every required asset role has decided its layer, and
- * no instance restates on an asset what the ROLE already answers.
+ * no layer restates on an asset what the ROLE already answers.
  *
  * Two halves of one rule: `ASSET_ROLES` is the single place a role says what
  * it is for, which layer it belongs to and how it reaches its reader. This
@@ -9,7 +9,7 @@
  *
  * ## Stray keys
  *
- * `KgAssetSchema` is a non-strict `z.object` (so a downstream instance can
+ * `KgAssetSchema` is a non-strict `z.object` (so a downstream layer can
  * carry a key this layer does not know), which drops an unknown key without
  * a word. A key restated on an asset would vanish silently, so the RAW
  * declaration is what gets asked.
@@ -19,11 +19,11 @@
  * `AssetRoleDef.layer` is required, and `tsc` refuses a role that does not
  * say. This half catches the other direction: a role in
  * `REQUIRED_ASSET_ROLES` that `ASSET_ROLES` does not govern at all. The two
- * lists are separate (what every instance must declare; what a role means),
+ * lists are separate (what every layer must declare; what a role means),
  * and only this gate makes them agree.
  *
  * @module scripts/check-asset-roles
- * @covers cat-harness — `ASSET_ROLES` against what each instance's declaration restates on an
+ * @covers cat-harness — `ASSET_ROLES` against what each layer's declaration restates on an
  *   asset
  */
 
@@ -38,13 +38,13 @@ import {
 } from "../schemas/kg/cat-harness.js";
 
 export interface AssetRoleReport {
-  /** Roles every instance must declare that `ASSET_ROLES` does not govern. */
+  /** Roles every layer must declare that `ASSET_ROLES` does not govern. */
   ungoverned: string[];
   /** Governed roles a running process would be permitted to write. */
   writable: string[];
   /** Asset declarations restating a role-owned key. */
   stray: Array<{ root: string; asset: string; key: string }>;
-  /** How many instance declarations were read. */
+  /** How many layer declarations were read. */
   instances: number;
 }
 

@@ -29,13 +29,13 @@
  *
  * ## Scope
  *
- * INSTANCE DECLARATIONS ONLY. `library/<slug>/images.json` files carry their
+ * LAYER DECLARATIONS ONLY. `library/<slug>/images.json` files carry their
  * own roles (`page-scan`, `logo`, `decorative`, `figure`), a different graph
  * with different consumers. They are REPORTED as out of scope rather than
  * silently skipped.
  *
  * @module scripts/check-image-roles
- * @covers cat-harness — the `role` keys it grades are on the instance DECLARATIONS, and the
+ * @covers cat-harness — the `role` keys it grades are on the layer DECLARATIONS, and the
  *   question is whether each is read by anything that can reach it
  */
 import { readFileSync } from "node:fs";
@@ -350,7 +350,7 @@ if (import.meta.main) {
     console.error(`✗ permitted orphan \`${k}\` is no longer a finding — remove it from PERMITTED_ORPHANS`);
   }
   // An unreadable declaration outranks a clean finding: a sweep blind on one
-  // instance has not cleared the others.
+  // layer has not cleared the others.
   if (unreadable.length > 0) process.exit(1);
   const byId = findings.filter((f) => f.verdict === "by-id");
   const declined = findings.filter((f) => f.verdict === "declined");

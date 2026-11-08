@@ -1,5 +1,5 @@
 /**
- * Graph typologies declared as nodes (bean dmx1): loaded from each instance's
+ * Graph typologies declared as nodes (bean dmx1): loaded from each layer's
  * `typologies/` graph on first use, refused when two files claim one name.
  */
 import { afterAll, describe, expect, test } from "bun:test";
@@ -34,7 +34,7 @@ function thrownMessage(f: () => unknown): string {
   return "";
 }
 
-/** A checkout whose instances each declare a typologies/ graph holding `typologies`. */
+/** A checkout whose layers each declare a typologies/ graph holding `typologies`. */
 function checkout(instances: Record<string, Record<string, unknown>[]>): string {
   const root = mkdtempSync(join(tmpdir(), "kinds-"));
   made.push(root);
@@ -104,7 +104,7 @@ describe("this checkout", () => {
 });
 
 describe("validators as nodes (bean riit): the validator names the family", () => {
-  /** A checkout with one instance declaring kinds/ and validators/. */
+  /** A checkout with one layer declaring kinds/ and validators/. */
   function withValidators(kinds: Record<string, unknown>[], validators: Record<string, unknown>[]): string {
     const root = mkdtempSync(join(tmpdir(), "validators-"));
     made.push(root);
@@ -193,7 +193,7 @@ describe("several checkouts, in precedence order (kg-separation lesson 6)", () =
     expect(defaultTypologyRoots({ REPO_ROOT: inspected }, own, moduleDir)).toEqual([inspected]);
     expect(defaultTypologyRoots({}, inspected, moduleDir)).toEqual([inspected, own]);
     expect(defaultTypologyRoots({}, own, moduleDir)).toEqual([own]);
-    // A cwd that holds no instance is not a checkout under inspection.
+    // A cwd that holds no layer is not a checkout under inspection.
     const empty = mkdtempSync(join(tmpdir(), "no-instance-"));
     made.push(empty);
     expect(defaultTypologyRoots({}, empty, moduleDir)).toEqual([own]);

@@ -1,6 +1,6 @@
 /**
  * Publish the identifier lookup into a BUILT site: the client page and every
- * declared instance's index, under `<site>/id-lookup/`.
+ * declared layer's index, under `<site>/id-lookup/`.
  *
  * The lookup client is JavaScript that never sits under the plain docs
  * pipeline, so it is not in the Jekyll source: it is copied into the built
@@ -11,9 +11,9 @@
  * `remote` scope in the search manifest:
  *
  *   <site>/id-lookup/index.html, lookup.js        the client (`?index=<source>/`)
- *   <site>/id-lookup/<source>/manifest.json, ...  one directory per instance
+ *   <site>/id-lookup/<source>/manifest.json, ...  one directory per layer
  *
- * Each index is copied byte for byte from the instance's own declared
+ * Each index is copied byte for byte from the layer's own declared
  * `id-lookup` directory — `gen-id-lookup.ts` writes it and `id-lookup:check`
  * gates it — minus that directory's generated README, which is a repository
  * file and not part of the index.

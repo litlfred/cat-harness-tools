@@ -5,7 +5,7 @@
  * `tsc --noEmit` reports success, and its denominator is reported nowhere: a
  * pass over 1443 files and a pass over 1555 look identical, and moving a file
  * into a directory `include` does not name quietly drops it from the program
- * (bean `lvoa`, found when a whole instance's `scripts/` had fallen out). So
+ * (bean `lvoa`, found when a whole layer's `scripts/` had fallen out). So
  * each file is put in one of three states:
  *
  *   - **covered** — named by an `include` glob and not by an `exclude`;

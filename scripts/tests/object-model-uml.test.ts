@@ -35,7 +35,7 @@ describe.skipIf(GLOSSARY_NOT_BUILT)("arrows run from the dependent to the genera
 describe("every class links to its glossary definition", () => {
   test.skipIf(GLOSSARY_NOT_BUILT)("in the PlantUML", () => {
     expect(classes.length).toBeGreaterThan(0);
-    // On the owning instance's page, glossary/instance/<instance>/ (6c7adce), which the anchor's first segment names.
+    // On the owning layer's page, glossary/instance/<instance>/ (6c7adce), which the anchor's first segment names.
     const linked = classes.map((l) => l.match(/\[\[\.\.\/\.\.\/\.\.\/([\w/-]+)\/instance\/([\w-]+)\/#(([\w-]+?)--[\w-]+)\]\]/));
     expect(classes.filter((_, i) => !linked[i])).toEqual([]);
     for (const m of linked) expect(m![2]).toBe(m![4]);

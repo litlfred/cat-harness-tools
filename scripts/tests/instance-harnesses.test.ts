@@ -1,5 +1,5 @@
 /**
- * An instance's OWN site lists the instance and what it is built on — never
+ * A layer's OWN site lists the layer and what it is built on — never
  * the platform's other harnesses (bean `mftp`, owner 2026-10-05: "harnesses
  * in bottom LHS navbar link back to folio-assist, not smart-immz").
  */

@@ -2,7 +2,7 @@
 /**
  * No declared directory sits inside another declared directory.
  *
- * An instance's assets live at `<stub>/<asset>` — `cat-harness/skills/`,
+ * A layer's assets live at `<stub>/<asset>` — `cat-harness/skills/`,
  * `<content>/library/`, `<ig>/methodologies/`. A root declaration reaching
  * down a multi-level path is not allowed. Nesting declared from within (a
  * sub-graph node in the first subdirectory labelling the ones inside it) is
@@ -77,8 +77,8 @@ const BASELINE = join(TOOLS_ROOT, "scripts", "layout-norms-baseline.json");
  * `<instance>: <outer path> contains <inner path>` — the stable spelling of a pair.
  *
  * KEYED ON PATHS, NOT IDS, and that is a correction rather than a preference.
- * `resolveDirectories` merges an instance's DECLARED directories with the
- * conventional ones, existence-filtered. Where an instance declares a
+ * `resolveDirectories` merges a layer's DECLARED directories with the
+ * conventional ones, existence-filtered. Where a layer declares a
  * directory the convention also supplies — `agent-skills` declares
  * `skills/voices/` while `skills/` arrives as the default `cat-harness` entry
  * — the same physical nesting surfaces under more than one id, and an

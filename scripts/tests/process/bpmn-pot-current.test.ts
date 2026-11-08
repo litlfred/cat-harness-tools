@@ -44,11 +44,11 @@ describe("BPMN translation templates", () => {
     // pass over the exact defect being guarded against.
     // RESOLVED from the declaration, not composed. This read
     // `join(root, "translations")`, and `wggr` moved that directory under the
-    // instance stub — which made this very guard vacuous in the way its own
+    // layer stub — which made this very guard vacuous in the way its own
     // comment above warns about, except by RELOCATION rather than deletion.
     // A guard against a vacuous pass that is itself addressed by convention
     // can be silenced by a `git mv`.
-    // declared-path-literal: the convention fallback for an instance that
+    // declared-path-literal: the convention fallback for a layer that
     // declares nothing, matching `translationSourcesDir` in
     // src/tools/translation.ts.
     const dir = directoryForGraph(root, "translation-sources") ?? join(root, "translations");
@@ -71,12 +71,12 @@ describe("BPMN translation templates", () => {
 });
 
 /**
- * The checker's OWN behaviour, on a throwaway instance.
+ * The checker's OWN behaviour, on a throwaway layer.
  *
  * The test above proves the committed tree is fresh; it cannot prove the
  * checker would notice if it were not — a `--check` that always exits 0
  * passes it too. These run the real script with `--instance <tmp>` against an
- * undeclared instance (so the conventional `processes/` and `translations/`
+ * undeclared layer (so the conventional `processes/` and `translations/`
  * apply) and walk every state: missing, fresh, timestamp-only, stale,
  * orphaned, and nothing-examined. Bean `0hd6`.
  */

@@ -4,7 +4,7 @@
  * `renderedBy: openapi-pages`, at that visualiser's route.
  *
  * @module cat-harness-tools/openapi/scripts/gen-openapi-viewer
- * @covers openapi — every directory of that kind any instance in the checkout declares
+ * @covers openapi — every directory of that kind any layer in the checkout declares
  *
  * ```sh
  * bun run cat openapi:viz [--root <checkout>] [--site <dir>] [--check]
@@ -12,7 +12,7 @@
  *
  * ## The gap this closes
  *
- * An instance's `openapi` graph is `served`, so the main site publishes it
+ * A layer's `openapi` graph is `served`, so the main site publishes it
  * VERBATIM at `/<instance>/<path>`: the ingested document and its
  * provenance, and nothing else. The pages `gen-openapi-pages.ts` draws for it
  * (one per document and per operation) are written only on an IG repository's
@@ -24,16 +24,16 @@
  *
  * | path under the route | what |
  * |---|---|
- * | `index.html` | the hub: every instance declaring an `openapi` directory, with the documents each holds |
- * | `<instance>/…` | that instance's graph exactly as {@link pagesFor} draws it: its index, a page per document and per operation, their JSON-LD nodes, and the shared loader |
+ * | `index.html` | the hub: every layer declaring an `openapi` directory, with the documents each holds |
+ * | `<instance>/…` | that layer's graph exactly as {@link pagesFor} draws it: its index, a page per document and per operation, their JSON-LD nodes, and the shared loader |
  * | `<instance>/<file>` | each document, copied beside the pages, since a page fetches it from `../<file>`; never its provenance node, which is a materialization record and stays in the graph |
  *
  * The renderer is `gen-openapi-pages.ts`, imported, never restated: a second
  * drawing of the same graph could disagree with the IG site's. The IRIs the
- * nodes carry are unchanged, and still extend the instance's graph path. An IRI is
+ * nodes carry are unchanged, and still extend the layer's graph path. An IRI is
  * the asset's identity, and this route is a rendering of it.
  *
- * An instance that declares the directory but whose config or documents do
+ * A layer that declares the directory but whose config or documents do
  * not read gets a page that says so, with the error. It is never left out:
  * leaving it out would make an unreadable graph look like an empty one.
  *
@@ -67,11 +67,11 @@ import { openapiDir, readConfig } from "./ingest-openapi.ts";
 export const TOOL_ID = "openapi-pages";
 const KIND = "openapi";
 
-/** One instance declaring an `openapi` directory, and what reading it gave. */
+/** One layer declaring an `openapi` directory, and what reading it gave. */
 export interface OpenApiSubject {
   name: string;
   root: string;
-  /** Repository-relative paths of the instance's `openapi` directories. */
+  /** Repository-relative paths of the layer's `openapi` directories. */
   directories: string[];
   /** The documents its config names, when the graph reads. */
   documents?: Array<{ id: string; title: string; file: string }>;
@@ -79,7 +79,7 @@ export interface OpenApiSubject {
   error?: string;
 }
 
-/** Every instance in the checkout declaring a directory of `kinds`, sorted by name. */
+/** Every layer in the checkout declaring a directory of `kinds`, sorted by name. */
 export function openapiSubjects(repoRoot: string, kinds: readonly string[] = [KIND]): OpenApiSubject[] {
   const out: OpenApiSubject[] = [];
   for (const root of checkoutInstanceRoots(repoRoot)) {
@@ -120,7 +120,7 @@ function jekyllPage(title: string, body: string): string {
   );
 }
 
-/** `<route>/`: every instance holding an `openapi` graph, and its documents. */
+/** `<route>/`: every layer holding an `openapi` graph, and its documents. */
 export function hubPage(v: Pick<DeclaredVisualiser, "title">, all: readonly OpenApiSubject[]): string {
   const title = v.title ?? "OpenAPI documents";
   const holds = (s: OpenApiSubject): string =>

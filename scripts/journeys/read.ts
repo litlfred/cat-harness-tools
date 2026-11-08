@@ -9,15 +9,15 @@
  * ## Where the journeys are: the declarations say
  *
  * A journey is a node of the `user-scenario` kind, a workshop of the
- * `workshop` kind, and a directory of either is DECLARED by its instance
+ * `workshop` kind, and a directory of either is DECLARED by its layer
  * (`<instance>.json` `directories`). So the reader asks the checkout for every
  * declared directory of those kinds (`checkoutDirectories`), across every
- * instance the checkout mounts — the root's own and each layer below it — and
+ * layer the checkout mounts — the root's own and each layer below it — and
  * reads the files whose `$schema` names a family of the kind. Nothing is found
- * by path convention: a folder named `user-scenarios/` that no instance
+ * by path convention: a folder named `user-scenarios/` that no layer
  * declares is not read, and one declared under another name is.
  *
- * The edges are resolved the same way, through the owning instance's
+ * The edges are resolved the same way, through the owning layer's
  * declared directories, then the rest of the checkout:
  *
  * | edge | resolved against |
@@ -28,11 +28,11 @@
  * | `stories` | `stories.json` in a `scenarios` directory |
  * | `uses[].block` | a `building-blocks/0.1.0` file (its blocks, layers and big ideas) in a directory declaring the `building-blocks` kind, wherever it is (typically `archimate/building-blocks/`, beside the ArchiMate model) |
  * | `trustLadder` | a `folio-code-list/v1` file in a `code-list` directory |
- * | `realisedBy[].process` | the BPMN file, relative to the instance root, and its drawing `<stem>.svg` beside it; `tasks` are flow-node ids in that file |
- * | `illustration.src` | the image, relative to the instance root |
+ * | `realisedBy[].process` | the BPMN file, relative to the layer root, and its drawing `<stem>.svg` beside it; `tasks` are flow-node ids in that file |
+ * | `illustration.src` | the image, relative to the layer root |
  * | `requirements` | a `req:` node (`<dir>/requirements/<id>.json`) in any declared directory |
  * | `examples` | the `index.json` of a `fhir-artifact-index` directory |
- * | a persona's `avatar` | the image, relative to the actor's instance root |
+ * | a persona's `avatar` | the image, relative to the actor's layer root |
  *
  * A device screen (`device-screen` kind, `device-screen.ts`) is read the same
  * way, from a directory declaring that kind; its `owner`, person cards, steps
@@ -76,7 +76,7 @@ export const BUILDING_BLOCKS_KIND = "building-blocks";
 /** Where device screens are kept: any directory declaring this kind. */
 export const DEVICE_SCREEN_KIND = "device-screen";
 
-/** An instance of the checkout, as the viewer needs it. */
+/** A layer of the checkout, as the viewer needs it. */
 export interface InstanceInfo {
   name: string;
   root: string;
@@ -113,7 +113,7 @@ export interface ScreenEntry {
 
 export interface Actor {
   id: string;
-  /** The instance whose `scenarios` directory holds it. */
+  /** The layer whose `scenarios` directory holds it. */
   instance: string;
   /** Instance-relative path of its file. */
   file: string;
@@ -172,18 +172,18 @@ export interface JourneyCorpus {
   instances: Map<string, InstanceInfo>;
   journeys: Journey[];
   workshops: WorkshopEntry[];
-  /** Device screens, every instance's. */
+  /** Device screens, every layer's. */
   screens: ScreenEntry[];
-  /** Per instance: actors by id. */
+  /** Per layer: actors by id. */
   actors: Map<string, Map<string, Actor>>;
   stories: Map<string, Map<string, Story>>;
-  /** Per instance: the roles of its `scenarios` directories (`roles.json`), by id: what a lane is, and what the DAK calls a persona. */
+  /** Per layer: the roles of its `scenarios` directories (`roles.json`), by id: what a lane is, and what the DAK calls a persona. */
   roles: Map<string, Map<string, { title?: string; otherNames?: string[] }>>;
-  /** Per instance: the catalogues' layers and blocks. */
+  /** Per layer: the catalogues' layers and blocks. */
   blocks: Map<string, { layers: BuildingBlocks["layers"]; blocks: Map<string, BuildingBlock>; ideas: NonNullable<BuildingBlocks["ideas"]> }>;
-  /** Per instance: its code lists (trust ladders), by id. */
+  /** Per layer: its code lists (trust ladders), by id. */
   ladders: Map<string, Map<string, { code: string; label: string; definition?: string }[]>>;
-  /** Per instance: each code list's title and description, by id. */
+  /** Per layer: each code list's title and description, by id. */
   ladderInfo: Map<string, Map<string, { title?: string; description?: string }>>;
   /** Requirement ids, upper-cased without `req:`, across the checkout. */
   requirements: Map<string, Requirement>;
@@ -233,7 +233,7 @@ function jsonFilesUnder(dir: string, depth = 4): string[] {
 
 const upper = (id: string): string => id.replace(/^req:/, "").toUpperCase();
 
-/** An example's JSON from the index's local copy: only inside the instance, only JSON, only up to {@link EXAMPLE_JSON_MAX_BYTES}. */
+/** An example's JSON from the index's local copy: only inside the layer, only JSON, only up to {@link EXAMPLE_JSON_MAX_BYTES}. */
 function exampleJson(root: string, local: string): string | undefined {
   const p = resolve(root, local);
   if (relative(root, p).startsWith("..") || !existsSync(p) || !statSync(p).isFile() || statSync(p).size > EXAMPLE_JSON_MAX_BYTES) return undefined;

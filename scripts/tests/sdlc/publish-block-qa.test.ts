@@ -82,7 +82,7 @@ describe("the corpus itself (bean `tfqf`, R60)", () => {
   /** A folio root with one block and, optionally, its results tree. */
   function folio(withResults: boolean): { root: string; folioDir: string } {
     // Nested one level: the voice registry scans the root's SIBLINGS for
-    // instances, and a sibling in the shared tmpdir is somebody else's fixture.
+    // layers, and a sibling in the shared tmpdir is somebody else's fixture.
     const root = join(mkdtempSync(join(tmpdir(), "pbqa-")), "repo");
     const chapter = join(root, "folio", "demo", "ch");
     mkdirSync(chapter, { recursive: true });

@@ -50,7 +50,7 @@ import { existsSync, statSync } from "node:fs";
 import { findDeclarationFile } from "../schemas/kg/cat-harness.ts";
 import { manifestPath } from "./json-manifest.ts";
 
-/** Where block verdicts live now, relative to the instance root. */
+/** Where block verdicts live now, relative to the layer root. */
 export const BLOCK_QA_RESULTS_DIR = join("test", "results", "block-qa");
 
 /** The sidecar suffix. One spelling, so a scan and a compose cannot disagree. */
@@ -59,7 +59,7 @@ export const BLOCK_QA_SUFFIX = ".qa.json";
 /**
  * The canonical write location for a block's verdict.
  *
- * @param repoRoot  absolute instance root
+ * @param repoRoot  absolute layer root
  * @param blockRoot absolute block path prefix — the `.ts` manifest without its
  *                  extension, i.e. `block.root`
  */
@@ -124,7 +124,7 @@ export function translationQaSuffix(locale: string): string {
 /**
  * The canonical write location for one (subject, locale) translation verdict.
  *
- * @param repoRoot     absolute instance root
+ * @param repoRoot     absolute layer root
  * @param subjectRoot  absolute subject path prefix — the `.md` without its
  *                     extension, whether that is a block or a docs page
  */
@@ -203,7 +203,7 @@ export function blockOfQaPath(repoRoot: string, qaPath: string): string | undefi
  * Root of the CONTENT repo that owns the swept blocks, discovered by
  * walking up from the sweep target until a directory containing `.git`
  * (a dir in a normal checkout, a file in a git worktree) or its own
- * instance declaration (`<name>.json`, `findDeclarationFile`) is found.
+ * layer declaration (`<name>.json`, `findDeclarationFile`) is found.
  *
  * Sidecar `paths` must be anchored HERE, not at the platform checkout:
  * anchoring there bakes the content
@@ -227,12 +227,12 @@ export function findContentRepoRoot(startAbs: string, fallback: string): string 
     ? startAbs
     : dirname(startAbs);
   while (true) {
-    // THIS directory declares an instance, or holds `.git`. Not
+    // THIS directory declares a layer, or holds `.git`. Not
     // `resolveHarnessConfigPath(dir)`: that climbs to ancestors itself, so it
     // succeeded at the very first directory tried whenever any ancestor had a
     // config, and a sweep of `folio/` anchored at `folio/`. Its verdicts then
     // landed at `folio/test/results/block-qa/…`, where `blockQaPath` (relative
-    // to the instance root) never looks. Bean `s3p2`, owner ruling 2026-09-23.
+    // to the layer root) never looks. Bean `s3p2`, owner ruling 2026-09-23.
     if (existsSync(join(dir, ".git")) || findDeclarationFile(dir) !== undefined) {
       return dir;
     }

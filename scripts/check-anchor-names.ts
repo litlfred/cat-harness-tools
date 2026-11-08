@@ -9,7 +9,7 @@
  * > `harness.json`. `PLATFORM`, `platformRoot` and `platformDir` name neither
  * > and are refused** — rename to whichever is meant.
  *
- * The repository root is found by walking up to `.git`, and an instance by its
+ * The repository root is found by walking up to `.git`, and a layer by its
  * `harness.json`, so neither anchor is a literal this check could get wrong.
  *
  * It does NOT judge whether a hand-rolled ascent (`"../.."`) has the right
@@ -30,12 +30,12 @@ import { findDeclarationFile, repoRootFor } from "../schemas/kg/cat-harness.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** The INSTANCE root — this file lives at `<instance>/scripts/`. */
+/** The LAYER root — this file lives at `<instance>/scripts/`. */
 export const INSTANCE_ROOT = HARNESS_ROOT;
 
 /** Names that claim the repository root. */
 export const REPO_NAMES = /^(REPO_ROOT|REPO|repoRoot)$/;
-/** Names that claim an instance root — a directory with its own `harness.json`. */
+/** Names that claim a layer root — a directory with its own `harness.json`. */
 export const INSTANCE_NAMES = /^(INSTANCE_ROOT|instanceRoot)$/;
 /**
  * Names that claim neither, and are refused for it.
@@ -58,14 +58,14 @@ export const AMBIGUOUS_NAMES = /^(PLATFORM|platformRoot|platformDir)$/;
  * check reported **429** ascents and *"✓ every name that claims an anchor lands
  * on it"*: extending the base takes it to **504**, so **75** ascents were invisible,
  * and **9** of those were FINDINGS — `REPO_ROOT`/`REPO` landing on `cat-harness/`,
- * which is an INSTANCE root. (A first pass here said 25 rather than 75. That count
+ * which is a LAYER root. (A first pass here said 25 rather than 75. That count
  * came from a probe over only the files declaring an anchor-NAMED const, while the
  * check reads all 1465 and matches every name — the narrower population was the
  * measurement's, not the defect's.)
  *
  * All nine were name-wrong rather than depth-wrong, so all nine are pure renames;
  * `gen-docs-pages.ts` proved it by calling `repoRootFor(REPO_ROOT)` on its own
- * anchor, which only makes sense if its author knew the value was an instance root.
+ * anchor, which only makes sense if its author knew the value was a layer root.
  *
  * **This is the check's own defect class turned on itself.** An ENUMERATION that
  * has to be edited when a new spelling appears is one that will be wrong — the
@@ -122,7 +122,7 @@ export interface AnchorReport {
   findings: AnchorFinding[];
 }
 
-/** Directories carrying their own `harness.json` — an instance, by definition. */
+/** Directories carrying their own `harness.json` — a layer, by definition. */
 export function instanceDirs(repo: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(repo)) {
@@ -130,7 +130,7 @@ export function instanceDirs(repo: string): string[] {
     try {
       if (statSync(join(repo, name)).isDirectory() && findDeclarationFile(join(repo, name)) !== undefined) out.push(name);
     } catch {
-      /* unreadable entry: not an instance as far as this can tell */
+      /* unreadable entry: not a layer as far as this can tell */
     }
   }
   return out;

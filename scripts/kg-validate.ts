@@ -65,13 +65,13 @@ export function kindForPath(
 }
 
 /**
- * The declared instance that OWNS a path: the deepest instance root in the
+ * The declared layer that OWNS a path: the deepest layer root in the
  * checkout that contains it, or `fallback` when none does (bean `676g`).
  *
  * ## Why this exists
  *
- * `kg:validate` resolved every path against ONE root — its own instance,
- * `cat-harness/` — so a file inside a NESTED instance was refused rather than
+ * `kg:validate` resolved every path against ONE root — its own layer,
+ * `cat-harness/` — so a file inside a NESTED layer was refused rather than
  * validated. Measured on `main` `cf3e624`:
  *
  * ```
@@ -81,15 +81,15 @@ export function kindForPath(
  *
  * `smart-dak.json` declares `test/results/` as `qa` — one kind — so the
  * failing branch was "no directory owns it": the resolver never read that
- * instance's declaration at all. ~150 committed sidecars across 13 instances
+ * layer's declaration at all. ~150 committed sidecars across 13 layers
  * sat in that gap, which is why `kg:audit:all:check` could prove them current
  * but nothing could prove they PARSE for a consumer.
  *
  * ## Why the deepest, not the first
  *
- * Instances nest inside the checkout, and the instance declared AT the
+ * Layers nest inside the checkout, and the layer declared AT the
  * checkout root contains every other one. Answering with the outer one would
- * resolve a nested instance's path against the root's declaration — the same
+ * resolve a nested layer's path against the root's declaration — the same
  * refusal, one level up. Longest-prefix is the rule `kindForPath` already
  * applies to directories, for the same reason.
  */
@@ -109,18 +109,18 @@ export function owningInstanceRoot(filePath: string, fallback: string): string {
  *
  * Two roots, because they answer two questions (bean `676g`):
  *
- * - `root` — the instance whose DECLARATION says which directory owns the
- *   path, and therefore its graph typology. For a nested instance's file that is
- *   the nested instance (see {@link owningInstanceRoot}).
+ * - `root` — the layer whose DECLARATION says which directory owns the
+ *   path, and therefore its graph typology. For a nested layer's file that is
+ *   the nested layer (see {@link owningInstanceRoot}).
  * - `schemaRoot` — what the kind's unqualified `module#Export` validator refs
- *   resolve against: the instance whose registry DEFINES the kind. The
- *   registry here is `defaultGraphTypologies`, defined in this instance, so its
+ *   resolve against: the layer whose registry DEFINES the kind. The
+ *   registry here is `defaultGraphTypologies`, defined in this layer, so its
  *   refs (`schemas/sdlc/kg-qa.ts#…`) are relative to `cat-harness/`. Resolving them
  *   against `smart-dak/` instead reported "schemas/sdlc/kg-qa.ts does not exist"
  *   for every nested sidecar — the second half of the same refusal.
  *
  * `schemaRoot` defaults to `root`, so a caller validating the registry's own
- * instance is unchanged.
+ * layer is unchanged.
  */
 export async function validatePath(filePath: string, root: string, schemaRoot: string = root): Promise<Verdict> {
   if (!existsSync(filePath)) {
@@ -215,7 +215,7 @@ async function main(): Promise<number> {
   let bad = 0;
   let undetermined = 0;
   for (const p of args) {
-    // Against the instance that OWNS the path, not this script's own (bean
+    // Against the layer that OWNS the path, not this script's own (bean
     // `676g`) — see `owningInstanceRoot`.
     const abs = resolve(p);
     const v = await validatePath(abs, owningInstanceRoot(abs, instanceRoot), instanceRoot);

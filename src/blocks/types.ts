@@ -100,7 +100,7 @@ export interface BlockModuleEntry {
   displayName: string;
   /** Lazy loader — returns the full module on first access. */
   loader: () => Promise<BlockModule>;
-  /** Cached module instance (populated after first load). */
+  /** Cached module layer (populated after first load). */
   _cached?: BlockModule;
   /** Dependencies needed by the viewer (for preloading). */
   viewerDependencies?: string[];

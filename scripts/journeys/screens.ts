@@ -12,7 +12,7 @@
  * ({@link demoScreensOf}). When the checkout declares `device-screen` nodes
  * for any of those steps, the screens are those nodes, drawn here; only when
  * it declares none does the workshop's `presentation.deviceDemo` (an app of
- * the instance's own, framed) stand in. One list either way, so the step
+ * the layer's own, framed) stand in. One list either way, so the step
  * pages' "See what X sees", the map's "Open screen" and the demo pages read
  * the same screens.
  *
@@ -44,7 +44,7 @@ const e = escHtml;
 
 // ── the model ─────────────────────────────────────────────────────────────
 
-/** A screen of a workshop's Device Demo, drawn from a node or framed from the instance's app. */
+/** A screen of a workshop's Device Demo, drawn from a node or framed from the layer's app. */
 export interface DemoScreen {
   id: string;
   title: string;

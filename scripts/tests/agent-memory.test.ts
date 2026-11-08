@@ -702,7 +702,7 @@ describe("Repo-wide AGENTS.md section and per-target budgets (bean 31ni)", () =>
       expect(readFileSync(join(indexRoot, ".agents", "rules", "agent-memory.md"), "utf8")).toContain(
         "mounted lesson summary",
       );
-      // Nothing inside the mounted instance is rewritten or created.
+      // Nothing inside the mounted layer is rewritten or created.
       expect(readFileSync(mountedMemoryPath, "utf8")).toBe(staleMemoryMd);
       expect(readFileSync(mountedRulePath, "utf8")).toBe(staleRuleMd);
       expect(existsSync(join(mountedDir, ".agents", "skills"))).toBe(false);

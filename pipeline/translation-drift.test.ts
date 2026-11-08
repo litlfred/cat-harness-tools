@@ -38,7 +38,7 @@ import {
 } from "./translation-drift.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
-/** The INSTANCE root — `translations/` and the site live under it. */
+/** The LAYER root — `translations/` and the site live under it. */
 const ROOT = resolve(HARNESS_ROOT);
 
 const FRONT_MATTER_WITH_COMMENTS = `---
@@ -163,10 +163,10 @@ describe("the backlogs are reviewable, not a policy", () => {
 });
 
 describe("the glossary pages are recorded at their DECLARED routes", () => {
-  // They used to be written down with the declaring instance's name spelled
-  // out, which made this lower layer name an instance above it
+  // They used to be written down with the declaring layer's name spelled
+  // out, which made this lower layer name a layer above it
   // (check:reference-direction). The route is now read from whichever
-  // instance declares a visualiser the glossary renderer draws.
+  // layer declares a visualiser the glossary renderer draws.
   test("a declared glossary visualiser yields one entry per locale at its route", () => {
     const repo = mkdtempSync(join(tmpdir(), "drift-glossary-"));
     try {
@@ -196,7 +196,7 @@ describe("the glossary pages are recorded at their DECLARED routes", () => {
 
   test("standing alone, a glossary page the site holds is recorded at its route", () => {
     // check-standalone lays out this layer and its `needs` only, so the
-    // instance declaring the glossary visualiser may be absent while the site
+    // layer declaring the glossary visualiser may be absent while the site
     // still holds the page its generator wrote.
     const repo = mkdtempSync(join(tmpdir(), "drift-glossary-site-"));
     try {

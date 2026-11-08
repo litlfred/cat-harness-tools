@@ -1,5 +1,5 @@
 /**
- * The cat-harness instance's Tool nodes — its `tools` graph.
+ * The cat-harness layer's Tool nodes — its `tools` graph.
  *
  * The harness holds no code, so its tools directory is folders of
  * `<id>/<id>.json` and nothing else; this is their loader. Discovery

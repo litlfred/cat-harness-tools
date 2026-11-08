@@ -4,7 +4,7 @@
  * The owner's words, and the site they were said about, are on issue #2263 and
  * in the `harness-tiles` skill: an IG repository's own site showed the
  * PLATFORM's bean and todo counts, and its bean and todo links 404'd. This
- * module names no instance -- the platform does not know its dependents.
+ * module names no layer -- the platform does not know its dependents.
  *
  * ## What went wrong
  *
@@ -39,13 +39,13 @@
  *
  * ## The rule this applies
  *
- * **A page's tiles describe the instance whose site the page is on.**
+ * **A page's tiles describe the layer whose site the page is on.**
  *
  * - A tile, icon or folder over a graph the FOLIO declares stays, and resolves
  *   on the folio's own site (`/<instance>/x` → `/x`).
  * - A tile over a **`state`** graph the folio does not declare (beans, todos,
  *   QA, health, uploads …) is NOT borrowed: no link and no count. State is a
- *   fact about one instance's work, and another instance's number is not this
+ *   fact about one layer's work, and another layer's number is not this
  *   folio's — `zero` would be a lie too, because the folio has not said
  *   (`schemas/ui/tile-count.ts`: absent is a third state). The icon row says why
  *   in words (`harness-tiles` §"An inert row SAYS why").
@@ -53,7 +53,7 @@
  *   processes, tools, schemas, docs …) is re-based to the platform's
  *   published site, absolute, with its qualifier SHOWN so it reads as the
  *   platform's — and its count dropped, because a count beside another
- *   site's link is still another instance's number on this page.
+ *   site's link is still another layer's number on this page.
  * - A kind this module cannot classify is treated as state: the
  *   conservative direction, since a missing link is visible and a wrong
  *   number is not.
@@ -79,7 +79,7 @@ import { generatedPageOf, isGeneratedSite, publishedUrlOf } from "../harness-til
 
 /** What the scoping needs to know about the site and the declarations. */
 export interface ForeignScope {
-  /** The folio instance whose site this is, or undefined when the caller cannot say. */
+  /** The folio layer whose site this is, or undefined when the caller cannot say. */
   instance?: string;
   /** The platform's published root, no trailing slash: `https://litlfred.github.io/folio-assistant`. */
   platformBase: string;
@@ -131,7 +131,7 @@ export function isOwnPath(p: string, scope: Pick<ForeignScope, "instance" | "own
 
 /**
  * Is a graph of these kinds one a folio's site must not borrow from another
- * instance? A STATE graph is a fact about one instance's work; a kind this
+ * layer? A STATE graph is a fact about one layer's work; a kind this
  * module cannot classify is treated the same way, the conservative direction.
  * Ownership is decided by WHERE the link points (`isOwnPath`), never by the
  * folio declaring a kind of the same name: an IG folio declares a `qa`
@@ -233,7 +233,7 @@ export function scopeNavbarRow(row: unknown, scope: ForeignScope): unknown {
 
 /**
  * The rail scopes, scoped: only the folio's own, at this site's root. Every
- * other instance's scope names a route that does not exist here, and the
+ * other layer's scope names a route that does not exist here, and the
  * platform's root scope would have listed the platform's folders on every
  * folio page ("FOLDERS 29" on an IG folio's pages).
  */
@@ -310,11 +310,11 @@ const escHtml = (s: string): string =>
  * The platform's `_config.yml` `footer_content` describes the PLATFORM — its
  * name and the licences of its code and documentation. Shipped in a shell it
  * was printed on every page of a folio's site as if it described the folio,
- * which is the same defect as a borrowed tile: another instance's facts on
+ * which is the same defect as a borrowed tile: another layer's facts on
  * this site's page.
  *
  * A declaration carries no footer or licence field, so there is no folio text
- * to prefer here; the line names the folio (its `title`, else its instance
+ * to prefer here; the line names the folio (its `title`, else its layer
  * name) and says what built it, linking the platform's site absolutely. It
  * states NO licence: absent is not zero, and a licence the folio has not
  * declared is not one the platform may print for it.
@@ -456,7 +456,7 @@ export function rootRelativeLeft(data: unknown, at = ""): string[] {
 /**
  * Build a {@link ForeignScope} from the declarations a checkout holds: the
  * folio's OWN directories and kinds, and every declared directory's kinds.
- * An instance this checkout does not declare yields empty own sets — every
+ * A layer this checkout does not declare yields empty own sets — every
  * state tile is then unlinked, which is the conservative direction.
  */
 export function foreignScopeFor(

@@ -2,7 +2,7 @@
  * The `external-registry` role held to its contract,
  * `skills/kg/kg-core/external-registry-contract.md`.
  *
- * The registry is played by a party this instance does not run, so what a test
+ * The registry is played by a party this layer does not run, so what a test
  * here can hold is the side of the contract that is ours: which lane relies on
  * the registry, and what the verifier does when the registry does not answer.
  * The contract says so itself ("This side of the contract is ours, and it is

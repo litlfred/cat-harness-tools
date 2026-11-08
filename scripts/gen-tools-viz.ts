@@ -19,20 +19,20 @@
  * calling `defineTool`, so a malformed one fails at `tsc`, and a second reader
  * could disagree with the server's.
  *
- * ## One page per instance
+ * ## One page per layer
  *
  * It reads every declared `tools` graph through auto-discovery
  * (`tools/discover.ts`, the reader `check:tools` gates), and draws the full KG
- * at `<locale>/<harness>/tools/` and one sub-graph page per instance at
+ * at `<locale>/<harness>/tools/` and one sub-graph page per layer at
  * `<locale>/<harness>/tools/<instance>/`. The visualiser covers the KIND with
  * `subgraphs: "instance"`, and `viewersOf` covers a directory by kind only
- * where its sub-graph page exists — so an instance whose graph yields no Tool
+ * where its sub-graph page exists — so a layer whose graph yields no Tool
  * gets no page and stays reported.
  *
  * ## Built at publish, not committed
  *
  * Every page is a function of the checkout: the Tools of every mounted
- * instance, the skills each `satisfies` resolves against, and whether that
+ * layer, the skills each `satisfies` resolves against, and whether that
  * skill's published page (a `skills:docs` output) is on disk. cat-harness
  * declares the route `builtAtPublish` with this script as its writer, and
  * `derive:publish` runs it; under `--check` a declared page has no committed
@@ -70,8 +70,8 @@ const VIEWER_TOOL = "tools-viewer";
 /**
  * Every page this writes declares itself generated in its own front matter —
  * the `generated:` key `check:reference-direction` reads (bean `ws99`), as
- * `gen-processes-viz.ts` does. A page lists the Tool nodes and the instances that declare them, which belong to every
- * instance in the checkout, so without the key those names read as authored
+ * `gen-processes-viz.ts` does. A page lists the Tool nodes and the layers that declare them, which belong to every
+ * layer in the checkout, so without the key those names read as authored
  * prose in the committing layer naming the layers above it.
  */
 const GENERATED_FM = "generated: gen-tools-viz.ts — do not hand-edit; run `bun run cat tools:viz`";
@@ -218,7 +218,7 @@ function toolQaResolver(
       }
       pairs.push({ ...p, qaTree, storedOn });
     } catch {
-      // Skip instance whose QA home cannot be resolved.
+      // Skip layer whose QA home cannot be resolved.
     }
   }
   const repoWeb = repoWebFor(repo, existsSync(harnessRoot) ? harnessRoot : pairs[0]?.inst);
@@ -245,7 +245,7 @@ function toolQaResolver(
 
 /**
  * Where a Tool's provenance log is, and its rendering: `<tools dir>/<id>/<id>.prov.jsonld`
- * in the instance named, or in any instance of the checkout. The owner chose
+ * in the layer named, or in any layer of the checkout. The owner chose
  * the provenance footer on 2026-11-05 ("2B"); a Tool has no page of its own,
  * so its log is shown on the tools page, under the tool's id.
  */
@@ -337,7 +337,7 @@ export function skillIds(repo = REPO): Set<string> {
   };
   // Every directory declaring a `kg` or `skills` graph, read from the
   // declarations — a hardcoded list here is the `check:declared-assets` shape,
-  // and it would go stale the first time an instance is added.
+  // and it would go stale the first time a layer is added.
   for (const declPath of instanceDeclarations(repo)) {
     const d = JSON.parse(readFileSync(declPath, "utf-8")) as {
       directories?: { path?: string; scope?: string; graphTypologies?: string[] }[];
@@ -350,8 +350,8 @@ export function skillIds(repo = REPO): Set<string> {
       walk(join(entry.scope === "repository" ? repo : instanceRoot, entry.path));
     }
   }
-  // And every skills root the checkout RESOLVES, which includes a directory an
-  // instance holds by inheritance and does not restate (option A, bean
+  // And every skills root the checkout RESOLVES, which includes a directory a
+  // layer holds by inheritance and does not restate (option A, bean
   // `1g4s`): sci's `skills/` is a member of the harness's `skills` graph, and
   // since placement PR1 (bean `ybwt`) it holds the paper skills harness tools
   // satisfy. Reading declarations alone missed it.
@@ -361,7 +361,7 @@ export function skillIds(repo = REPO): Set<string> {
 }
 
 /**
- * Every INSTANCE declaration in the checkout.
+ * Every LAYER declaration in the checkout.
  *
  * `declarationPathIn`, never a "does it have `directories`?" heuristic. That
  * heuristic sweeps in `beans/beans.json` and `todos/todos.json`, whose stem is
@@ -399,19 +399,19 @@ export function pageRelPath(repo = REPO, subgraph?: string): string | undefined 
   }
 }
 
-/** One instance's slice of the tools graph: its declared name and its Tool rows. */
+/** One layer's slice of the tools graph: its declared name and its Tool rows. */
 export interface ToolSubject {
   readonly name: string;
   readonly rows: ToolRow[];
 }
 
 /**
- * Every instance that declares a `tools` graph, with the Tools it yields, in
+ * Every layer that declares a `tools` graph, with the Tools it yields, in
  * the order `instanceRootsIn` lists them. `empty` names the ones whose graph
  * yields no Tool: they get no page, and are reported rather than drawn.
  *
  * Read through auto-discovery (`toolsOf`), which THROWS on a declared graph
- * that does not load — a partial list would draw an instance as having fewer
+ * that does not load — a partial list would draw a layer as having fewer
  * Tools than it declares.
  */
 export function toolSubjects(repo = REPO): { subjects: ToolSubject[]; empty: string[] } {
@@ -431,7 +431,7 @@ export function toolSubjects(repo = REPO): { subjects: ToolSubject[]; empty: str
 
 /** How {@link page} titles and introduces the slice it draws. */
 export interface PageScope {
-  /** `undefined` for the full KG; else the instance whose Tools the page shows. */
+  /** `undefined` for the full KG; else the layer whose Tools the page shows. */
   readonly instance?: string;
   /** The per-instance pages, for the full view's index of them. */
   readonly subjects?: readonly { name: string; count: number; href: string }[];
@@ -736,7 +736,7 @@ if (import.meta.main) {
     pages.set(rel, publishedPage(x.rows, known, REPO, { instance: x.name, upHref: "../" }));
   }
 
-  // ORPHANS: a sub-graph page this viewer drew for an instance that no
+  // ORPHANS: a sub-graph page this viewer drew for a layer that no
   // longer declares Tools. Only a page that says it is ours is touched.
   const viewDir = join(site, PAGE, "..");
   const drawn = new Set(subjects.map((x) => x.name));
@@ -816,7 +816,7 @@ if (import.meta.main) {
     for (const x of subjects) console.log(`  ${x.name}: ${x.rows.length} tool(s) → ${pageRelPath(REPO, x.name)}`);
     console.log(bad.length === 0 ? "  every satisfies resolves" : `  ${bad.length} unresolved — shown on the page`);
   }
-  // An instance that declares a `tools` graph yielding no Tool gets no page —
+  // A layer that declares a `tools` graph yielding no Tool gets no page —
   // and is said, so its tile's "no viewer yet" is explained rather than silent.
   for (const n of empty) console.log(`  · ${n} declares a tools graph with no Tool nodes — no page drawn`);
 }

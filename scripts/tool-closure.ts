@@ -6,7 +6,7 @@
  * @graphNode none — a library under `remote-mount.ts`: it resolves and judges nothing on its own
  *
  * 1. **A mounted Tool brings BOTH halves** — its definition
- *    (`<tools dir>/<id>/<id>.ts` in the instance that declares it, the folder
+ *    (`<tools dir>/<id>/<id>.ts` in the layer that declares it, the folder
  *    convention of cat-harness `schemas/tools/tool-folders.ts`) AND its
  *    implementation (the module its `invoke` names), each with its import
  *    closure: a Tool that runs, never a definition whose code is absent or a
@@ -15,7 +15,7 @@
  *    (`scripts/check-closure.ts`), the same one `check:tools-closure` runs;
  *    this module only supplies where it reads (a {@link ClosureHost} over the
  *    pinned trees, in the DOWNSTREAM's layout) and which packages are source
- *    (`resolveBare`, by each instance's `package.json` name and `exports`).
+ *    (`resolveBare`, by each layer's `package.json` name and `exports`).
  * 3. **Directory granularity.** Every DECLARED directory the closure touches
  *    is mounted whole — the most specific one, so a nested directory mounts
  *    alone — and a closure file in no declared directory is refused, never
@@ -26,7 +26,7 @@
  * The plan runs before the trust gate, so a definition is never EXECUTED to
  * learn what it invokes (that would run a pin's code before anyone consented),
  * and static parsing fails where a definition builds its `shell` through a
- * helper. The Tool's node in its instance's published `tools/`
+ * helper. The Tool's node in its layer's published `tools/`
  * `index.hydrated.jsonld` carries `invoke` as data (`@json`), at the same pin,
  * from the same tree or package a hydrated mount reads. The caller hands this
  * module those nodes.
@@ -34,12 +34,12 @@
  * ## How the implementation is found
  *
  * - `invoke.<arm>.module` (`inProcess`, `container`, `mcp`): in the declaring
- *   instance, else in the one instance whose `needs` names it — the rule of
+ *   layer, else in the one layer whose `needs` names it — the rule of
  *   cat-harness `resolveImplementingPath`, applied to the pinned trees. Two
  *   holders is refused, never resolved by order.
  * - `invoke.shell`: `bun run cat <key>` (or `bun run <key>`) is looked up in
- *   the instances' `checkoutScripts`, and the script path its command runs is
- *   the entry. A command that runs no file of a mounted instance (`gh pr
+ *   the layers' `checkoutScripts`, and the script path its command runs is
+ *   the entry. A command that runs no file of a mounted layer (`gh pr
  *   list`, `beans`, a workflow path) brings no code: it is a runtime
  *   dependency, reported as such.
  * - `manual`: no code.
@@ -57,7 +57,7 @@ export const MOUNT_ROOT = "/__downstream__";
 const strip = (p: string): string => p.replace(/^\.\//, "").replace(/\/+$/, "");
 const joinRel = (...ps: string[]): string => ps.map(strip).filter(Boolean).join("/");
 
-/** One instance the closure may reach: where it lands downstream, what it declares, and where its bytes are read. */
+/** One layer the closure may reach: where it lands downstream, what it declares, and where its bytes are read. */
 export interface ClosureInstance {
   instance: string;
   /** Checkout-relative path its root lands at (or is at, for a local one). */
@@ -71,7 +71,7 @@ export interface ClosureInstance {
   files: readonly string[];
   /** Its `package.json`, when it has one: the package name source imports use, `exports`, and `checkoutScripts`. */
   manifest?: { name?: unknown; exports?: unknown; checkoutScripts?: unknown };
-  /** Read at a pin (`tree`, under `root` in it), or from this checkout's disk (a local instance). */
+  /** Read at a pin (`tree`, under `root` in it), or from this checkout's disk (a local layer). */
   source: { tree: RemoteTree; root: string } | { disk: string };
 }
 
@@ -82,7 +82,7 @@ export interface ChosenTool {
 }
 
 export interface ToolChoice {
-  /** The instance that declares the Tools. */
+  /** The layer that declares the Tools. */
   instance: string;
   /** Its tools directories (graph typology `tools`), instance-relative. */
   toolDirs: readonly string[];
@@ -96,7 +96,7 @@ export interface ResolvedTool {
   definition: string;
   /** Checkout-relative entry files of the implementation; empty for a runtime command or `manual`. */
   implementation: string[];
-  /** What it runs that no mounted instance holds — a runtime dependency, not code to bring. */
+  /** What it runs that no mounted layer holds — a runtime dependency, not code to bring. */
   runtime?: string;
 }
 
@@ -104,9 +104,9 @@ export interface ToolClosure {
   tools: ResolvedTool[];
   /** Every file the closure reaches, checkout-relative, sorted. */
   files: string[];
-  /** Per mounted instance, the ids of the declared directories to mount (an ancestor's descendants dropped). Whole and local instances are absent. */
+  /** Per mounted layer, the ids of the declared directories to mount (an ancestor's descendants dropped). Whole and local layers are absent. */
   directories: Map<string, string[]>;
-  /** Bare packages left to each instance's `bun install`. */
+  /** Bare packages left to each layer's `bun install`. */
   external: string[];
   /** Why the chosen set cannot be brought runnable. Empty means it can. */
   problems: string[];
@@ -179,7 +179,7 @@ export function toolClosure(instances: readonly ClosureInstance[], choices: read
     },
   };
 
-  /** A package the closure's instances hold as source, by `package.json` `name` and `exports`. */
+  /** A package the closure's layers hold as source, by `package.json` `name` and `exports`. */
   const external = new Set<string>();
   const resolveBare = (spec: string): string | null | undefined => {
     for (const inst of instances) {

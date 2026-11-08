@@ -34,16 +34,16 @@
  * Same shape as `SCRIPT_EXEMPTIONS` in `scripts/gates.ts`, for the same
  * reason — an exemption nobody can review is one somebody added to get green.
  *
- * ## `--instance <dir>`: another instance, and its catalogues
+ * ## `--instance <dir>`: another layer, and its catalogues
  *
- * With `--instance`, the instance at `<dir>` is read through its own
+ * With `--instance`, the layer at `<dir>` is read through its own
  * declaration: its Jekyll site ({@link instanceSiteRoot}) for the page
  * comparison above, and its `translation-sources` directory for a second
- * comparison every instance can have, site or not — {@link catalogueDriftFor},
+ * comparison every layer can have, site or not — {@link catalogueDriftFor},
  * each locale's `.po` against the `.pot` template beside it. A string the
  * template gained and the catalogue does not carry, or one the catalogue still
  * offers that the template dropped, is a catalogue that has not been refreshed
- * since its source changed. An instance with no site has its catalogues
+ * since its source changed. A layer with no site has its catalogues
  * compared and its pages reported unreadable, never passed.
  *
  * @module pipeline/translation-drift
@@ -223,7 +223,7 @@ export interface DriftResult {
  * Resolved from the `translation-sources` DECLARATION, not from the
  * convention. `harness.json` is the list, and hardcoding the path is how a
  * consumer comes to scan a directory that is not there — this repository has
- * already relocated its whole instance under `cat-harness/` once. Caught here
+ * already relocated its whole layer under `cat-harness/` once. Caught here
  * by `check:declared-paths`, which reported the literal on the commit that
  * introduced it.
  */
@@ -236,7 +236,7 @@ export function catalogueFor(instanceRoot: string, locale: string, page: string)
 
 /** One catalogue compared with the template beside it. */
 export interface CatalogueDrift {
-  /** The catalogue, relative to the instance root. */
+  /** The catalogue, relative to the layer root. */
   po: string;
   /** Strings the `.pot` offers and the `.po` does not carry at all. */
   missing: string[];
@@ -251,9 +251,9 @@ function entryKey(e: { context?: string; msgid: string }): string {
 
 /**
  * Every locale's `.po` compared with the `.pot` template beside it, in the
- * `translation-sources` directory the instance DECLARES.
+ * `translation-sources` directory the layer DECLARES.
  *
- * `undefined` when the instance declares none — a state, reported by the caller,
+ * `undefined` when the layer declares none — a state, reported by the caller,
  * never an empty list: no declaration is not the same answer as no drift. A
  * `.po` with no `.pot` beside it (a hand-authored terminology file) has no
  * template to drift from and is not compared; `templates` counts what was.
@@ -314,7 +314,7 @@ export const GLOSSARY_RENDERER = "glossary-page";
 const GLOSSARY_LOCALES = ["ar", "es", "fr", "ru", "zh"] as const;
 
 /**
- * The GLOSSARY pages, at the route each instance DECLARES for a visualiser
+ * The GLOSSARY pages, at the route each layer DECLARES for a visualiser
  * {@link GLOSSARY_RENDERER} draws (since 2026-10-09; the content core declares
  * one). They never had a page catalogue: at their old path, `glossary`, this
  * gate found `translations/<locale>/glossary.po` — the hand-authored
@@ -323,10 +323,10 @@ const GLOSSARY_LOCALES = ["ar", "es", "fr", "ru", "zh"] as const;
  * `translations/<locale>/glossary/`, which `glossary-page.ts` writes and
  * `check:glossary` gates. Recorded rather than given a fake page catalogue.
  *
- * Derived rather than written down, so this tool names no instance above it
+ * Derived rather than written down, so this tool names no layer above it
  * (check:reference-direction): a route is `<locale>/<declaring instance>/<visualiser id>`,
  * the same {@link visualiserRoute} every generator writes to. The routes come
- * from the declarations, and — for a checkout where the declaring instance is
+ * from the declarations, and — for a checkout where the declaring layer is
  * not mounted, as when this layer stands alone — from the glossary pages the
  * `site` itself holds ({@link routesRecordedInSite}).
  */
@@ -378,7 +378,7 @@ export function driftFor(
   instanceRoot: string,
   opts: { ignoreKnownDrift?: boolean; site?: string } = {},
 ): DriftResult {
-  // `site` is named by a caller that resolved ANOTHER instance's site from its
+  // `site` is named by a caller that resolved ANOTHER layer's site from its
   // declaration (`--instance`); a key present with `undefined` means it has none.
   const site = "site" in opts ? opts.site : siteRoot(instanceRoot);
   const findings: DriftFinding[] = [];
@@ -495,7 +495,7 @@ export class NothingCompared extends Error {
 }
 
 /**
- * `--instance <dir>`: the instance's pages, if it declares a site, and its
+ * `--instance <dir>`: the layer's pages, if it declares a site, and its
  * catalogues against their templates. Exit 2 when neither could be compared,
  * 1 on any drift, else 0.
  */

@@ -838,7 +838,7 @@ export interface StoreRows {
   store: string;
   rows: readonly ProcessedRow[];
   unplaced: readonly UnplacedBean[];
-  /** The instances this store's instance `needs` (its declaration): the stores it depends on. */
+  /** The layers this store's layer `needs` (its declaration): the stores it depends on. */
   needs?: readonly string[];
 }
 

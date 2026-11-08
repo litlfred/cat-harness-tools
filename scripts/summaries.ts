@@ -162,10 +162,10 @@ export function entryItems(entryDir: string, sidecar = readSidecar(entryDir)): S
 }
 
 /**
- * The declared `library` directories whose OWNING instance declares
+ * The declared `library` directories whose OWNING layer declares
  * `summaries: "held"` (bean `x80s`), and the entry directories it names in
  * `heldEntries` (bean `j7ql`). Read from the owner's declaration — the
- * nearest ancestor holding one — never from a mirror another instance
+ * nearest ancestor holding one — never from a mirror another layer
  * declares, so the hold is stated once, where the directory is held.
  */
 export function heldLibraries(root = ROOT): string[] {

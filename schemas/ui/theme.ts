@@ -237,12 +237,12 @@ export type ThemePalette = z.infer<typeof ThemePaletteSchema>;
  *
  * A literal path would give every folio depending on this platform a theme
  * pointing at three `.webp`s that exist only here — a guaranteed 404 in any
- * instance that did not happen to copy them, and the *same* defect class as
+ * layer that did not happen to copy them, and the *same* defect class as
  * bean `blv9` (link-shaped values nothing checks resolve).
  *
  * Naming a role instead inverts it. The theme says *"my backdrop is whatever
  * this instance declares as its `landing` art"*; `harness.json` says what that
- * is. An instance with its own art gets its own; an instance with none gets no
+ * is. A layer with its own art gets its own; a layer with none gets no
  * backdrop and renders palette-only, which is an already-tested state rather
  * than a broken one. `5oai` resolved exactly this before the field existed:
  * *"reuse `images[].role` rather than invent an avatar vocabulary … a new
@@ -268,9 +268,9 @@ export const ThemeBackdropSchema = z
   .object({
     /**
      * The declared image `role` this theme's art comes from — `landing` for the
-     * three `landing-*` entries an instance declares.
+     * three `landing-*` entries a layer declares.
      *
-     * Resolved against the instance's own `images[]` at render time by
+     * Resolved against the layer's own `images[]` at render time by
      * {@link resolveThemeBackdrop}, never composed into a path here.
      */
     imageRole: z.string().min(1),
@@ -298,16 +298,16 @@ export type ThemeBackdrop = z.infer<typeof ThemeBackdropSchema>;
 export const THEME_SCHEMA_TAG = "folio-theme/v1";
 
 /**
- * A pointer to another theme, possibly in another instance.
+ * A pointer to another theme, possibly in another layer.
  *
- * Same shape and same reasoning as `LibraryRef`: an instance NAME, not a path,
- * because the citing instance cannot know where a sibling's checkout sits. A
- * bare `themeId` resolves against the citing instance, which is the common
+ * Same shape and same reasoning as `LibraryRef`: a layer NAME, not a path,
+ * because the citing layer cannot know where a sibling's checkout sits. A
+ * bare `themeId` resolves against the citing layer, which is the common
  * case and the one that must stay cheap to write.
  *
  * Owner, 2026-09-20, paraphrased: the IRIS replica inherits the WHO style-guide theme. The WHO house
  * style is the authority and the repository site is the deviation, so the
- * inheritance runs FROM the site TO the style guide and crosses an instance
+ * inheritance runs FROM the site TO the style guide and crosses a layer
  * boundary to do it.
  */
 /** A palette fragment — what an inheriting theme states when it changes one colour. */
@@ -315,7 +315,7 @@ export const ThemePartialPaletteSchema = z.object(themePaletteShape).strict().pa
 
 export const ThemeRefSchema = z
   .object({
-    /** The owning instance, as `owner/repo` (bean `6rmv`). Absent means the citing instance's own. */
+    /** The owning layer, as `owner/repo` (bean `6rmv`). Absent means the citing layer's own. */
     instance: RepoFullNameSchema.optional(),
     themeId: z.string().regex(/^[a-z][a-z0-9-]*$/, "a theme id is lowercase kebab-case"),
   })
@@ -518,7 +518,7 @@ export const ResolvedThemeSchema = z
   ]);
 export type ResolvedTheme = z.infer<typeof ResolvedThemeSchema>;
 
-/** How a theme is keyed once ids are no longer unique across instances. */
+/** How a theme is keyed once ids are no longer unique across layers. */
 export function themeKey(instance: string, id: string): string {
   return `${instance}:${id}`;
 }
@@ -652,7 +652,7 @@ export function missingLayouts(value: unknown): ThemeLayout[] {
  *
  * Bean `v8n5`. A harness tile and its navbar entry are toned by a hue angle
  * (`--fa-tile-tone`), and a theme's palette is hex. This is the one bridge
- * between the two, so a tile can take its tone from its instance's own theme
+ * between the two, so a tile can take its tone from its layer's own theme
  * accent rather than from a hue written down a second time. A grey has no hue
  * to take, which is a different answer from red (0°), hence `undefined`.
  */
@@ -693,9 +693,9 @@ export function themeCssVars(theme: ResolvedTheme): string {
 /**
  * A WEBPAGE theme's roles, as the custom properties the docs site already reads.
  *
- * Bean `7h3u`, on the owner's 2026-09-30 ruling to wire instance webpage themes
+ * Bean `7h3u`, on the owner's 2026-09-30 ruling to wire layer webpage themes
  * at the PLATFORM layer so every ingested IG gets one, rather than in one
- * instance's page generator.
+ * layer's page generator.
  *
  * ## Why this is not {@link themeCssVars} with a different prefix
  *
@@ -802,7 +802,7 @@ export interface ResolvedBackdrop {
   /** The art per layout. Complete, or empty — never partial; see below. */
   art: Map<ThemeLayout, DeclaredImage>;
   /**
-   * The layouts the instance does not supply for this theme's role.
+   * The layouts the layer does not supply for this theme's role.
    *
    * Non-empty means `art` is **empty**: an incomplete backdrop is refused
    * wholesale rather than served partially, because the failure of a partial
@@ -817,19 +817,19 @@ export interface ResolvedBackdrop {
 }
 
 /**
- * Resolve a theme's backdrop against an instance's declared images.
+ * Resolve a theme's backdrop against a layer's declared images.
  *
  * Three outcomes, and the third is why this returns a record rather than a map:
  *
  * | | meaning |
  * |---|---|
  * | `none` | the theme declares no backdrop. Palette-only, and ordinary. |
- * | `missing` non-empty | the theme wants art this instance does not declare. |
+ * | `missing` non-empty | the theme wants art this layer does not declare. |
  * | `art` complete | all three layouts resolved. |
  *
  * **`none` and `missing` are different facts and must not collapse.** A
  * palette-only theme is a choice; a theme whose role resolves to two of three
- * crops is a declaration bug in the *instance*. Returning a bare empty map for
+ * crops is a declaration bug in the *layer*. Returning a bare empty map for
  * both would make the second unreportable — the shape of the `targetLabel`
  * conflation `note-anchor.ts` was written to undo.
  */
@@ -874,7 +874,7 @@ export function resolveThemeBackdrop(
  * silently keep the old one.
  *
  * The id is validated for SHAPE here and not for existence: whether a theme is
- * installed is a question about the instance's theme set, which a todo cannot
+ * installed is a question about the layer's theme set, which a todo cannot
  * see. {@link themeById} answers it at render time, where a missing theme
  * degrades to the default rather than failing the page.
  */

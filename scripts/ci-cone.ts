@@ -120,7 +120,7 @@ export const MAX_WRITER_PATHS = 200000;
 /**
  * A trace file larger than this is not parsed: the check is recorded as
  * undetermined. Measured 2026-10-07: `kg:audit:all:check` spawns a process
- * per instance, and parsing its whole trace in memory aborted the recorder
+ * per layer, and parsing its whole trace in memory aborted the recorder
  * (exit 134) after the check itself had passed.
  */
 export const MAX_TRACE_BYTES = 512 * 1024 * 1024;
@@ -1262,7 +1262,7 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   // (as `run-script.ts` does) instead of spawning `bun run cat <script>` under
   // `strace`: `run-script.ts` calls `scriptTable(REPO)` -> `instanceRootsIn(REPO)`
   // to look up the script name `main()` already resolved in `o.scripts`, which
-  // polluted every traced check's read set with every instance directory and
+  // polluted every traced check's read set with every layer directory and
   // declaration in the checkout (cat-harness-tools#634).
   const scriptCmd = o.scripts[o.script];
   // A test file runs as `bun test ./<path>` itself, not under `sh`, so the

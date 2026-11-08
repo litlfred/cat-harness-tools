@@ -1,6 +1,6 @@
 /**
  * The ✍ suggest editor's profiles: found through the declaration, bundled
- * under the runtime's roles, and refused when a code ref leaves its instance
+ * under the runtime's roles, and refused when a code ref leaves its layer
  * (bean folio-assistant-4dx7).
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";

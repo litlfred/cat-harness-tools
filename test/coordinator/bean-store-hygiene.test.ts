@@ -20,7 +20,7 @@
  * Moved again, from `cat-harness-tools/scripts/tests/` to the checkout's own
  * test home `test/` (bean `7zz1`, owner ruling 2026-10-06 "Top-level
  * instance"): what it reads belongs to the whole checkout, which the root
- * instance declares, not to any one layer — so cat-harness-tools stays green
+ * layer declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
@@ -35,9 +35,9 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 // The `bean-defs` node of the bean graph (schemas/sdlc/bean-graph.ts), not the
 // graph root — `beans/` itself holds only `beans.json`.
 //
-// The REPOSITORY's, reached from this instance. `beans/` is declared
+// The REPOSITORY's, reached from this layer. `beans/` is declared
 // `scope: "repository"` because the work plan belongs to the checkout rather
-// than to any instance in it; `"../../beans/defs"` was written when the two
+// than to any layer in it; `"../../beans/defs"` was written when the two
 // roots were one directory, and after the move it named a path that has never
 // existed — so `beanFiles()` returned `[]` and every hygiene assertion below
 // passed over an empty set. The emptiness guard is the only reason that was

@@ -67,7 +67,7 @@ const KIND = "external-schema";
 /** Every declared user of every spec, read from the users (bean `u63y`). */
 export function declaredUsers(specs: readonly ExternalSchema[], repoRoot = REPO): SpecUsers {
   // The checkout's corpus, mounts included. A bare `git ls-files` listed only
-  // what the checkout's own git tracks; in the index checkout every instance
+  // what the checkout's own git tracks; in the index checkout every layer
   // is a remote mount that git ignores, so no declaration was found and every
   // specification read as unused.
   const files = (gitCorpus(repoRoot) ?? []).map((f) => relative(repoRoot, f).split(sep).join("/")).sort();
@@ -181,10 +181,10 @@ export function page(
   fileHref: (repoPath: string) => string | undefined = () => undefined,
   broaderInUse: readonly string[] = [],
   /**
-   * Set for ONE INSTANCE'S page (`<route>/instance/<name>/`): that instance's
+   * Set for ONE LAYER'S page (`<route>/instance/<name>/`): that layer's
    * own records, under its own title. The namespace reconciliation is left
    * out there and linked to instead. It compares the corpus against the
-   * REGISTRY, so over a single instance's records it would report every
+   * REGISTRY, so over a single layer's records it would report every
    * namespace the corpus uses as undeclared.
    */
   subject?: { instance: string; title: string; directory: string; fullHref: string },
@@ -417,8 +417,8 @@ export function page(
 
 /**
  * The pages the visualiser's `instance` sub-graph owes: one per OTHER
- * instance in the checkout that declares an `external-schema` directory, at
- * `<route>/<subgraphUnder>/<instance>/index.md`, holding that instance's own
+ * layer in the checkout that declares an `external-schema` directory, at
+ * `<route>/<subgraphUnder>/<instance>/index.md`, holding that layer's own
  * records. The harness's own directory is the full page and gets none.
  *
  * Built at publish (the harness's `builtAtPublish`): each reads a layer above
@@ -506,7 +506,7 @@ if (import.meta.main) {
   // declared user of every specification in the CHECKOUT (`declaredUsers`
   // reads the whole corpus, mounts included), so it moves with the index's
   // pins: a layer above adding one BPMN file made cat-harness's committed page
-  // stale. When the instance declares the route
+  // stale. When the layer declares the route
   // `builtAtPublish` with this script as its writer, `derive:publish` runs it
   // and `--check` has no committed bytes to compare (the `methodologies:viz`
   // rule).

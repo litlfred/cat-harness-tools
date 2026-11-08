@@ -60,7 +60,7 @@ describe("expectedPages over this checkout", () => {
 describe("subjectInstances: the guard asks the writer's own reader which instances have a page", () => {
   // smart-immunizations, 2026-10-15: smart-base's `tools` declaration reached
   // the IG's own `tools/` folder (FHIR scripts, sub-directories and all) as a
-  // member. The tools writer draws a page per instance with Tool NODES, so it
+  // member. The tools writer draws a page per layer with Tool NODES, so it
   // drew none there, and the guard, counting folders, failed the build.
   const at = mkdtempSync(join(tmpdir(), "site-coverage-"));
   const igTools = join(at, "smart-immunizations", "tools");

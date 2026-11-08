@@ -31,7 +31,7 @@ export function sha256(data: string | Uint8Array): string {
 
 // ── The tree digest ──────────────────────────────────────────────────────────
 
-/** The part of an `index.lock.json` instance the digest reads (mount-from-lock.ts `LockInstance`). */
+/** The part of an `index.lock.json` layer the digest reads (mount-from-lock.ts `LockInstance`). */
 export interface LockEntry {
   instance: string;
   repository?: string;
@@ -45,7 +45,7 @@ export interface IndexLock {
   instances: LockEntry[];
 }
 
-/** Who the caller is (its instance name, or its `owner/name` repository) and the git tree of its PR. */
+/** Who the caller is (its layer name, or its `owner/name` repository) and the git tree of its PR. */
 export interface CallerTree {
   caller: string;
   tree: string;
@@ -54,8 +54,8 @@ export interface CallerTree {
 const GIT_TREE = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 
 /**
- * The canonical listing the digest hashes: one line per lock instance, sorted
- * by name, each the instance's locked fixity digests (the declaration's
+ * The canonical listing the digest hashes: one line per lock layer, sorted
+ * by name, each the layer's locked fixity digests (the declaration's
  * sha256 as `scripts/mount-from-lock.ts` checks it, each directory's
  * `treeDigest`, each asset's sha256), except the caller's, whose line is its
  * git tree instead. A caller absent from the lock (index mode: the root is

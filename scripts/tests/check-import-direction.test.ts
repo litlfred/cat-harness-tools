@@ -2,12 +2,12 @@
  * `check:import-direction` — tested with PLANTED violations, because a boundary
  * check never seen failing checks nothing (`4j3h`, `q2wn`, `p11x`).
  *
- * The fixture is a checkout of four instances: `low` needs nothing, `high`
+ * The fixture is a checkout of four layers: `low` needs nothing, `high`
  * needs `low`, `side` is a sibling of `low` (also needs nothing), and `odd`
  * declares no `needs` at all. Every edge kind the gate distinguishes is planted
  * once, alongside the look-alikes it must NOT count.
  *
- * The tests of this file that read the whole checkout (reads every instance's
+ * The tests of this file that read the whole checkout (reads every layer's
  * declaration and code in the checkout) live in
  * `test/check-import-direction-checkout.test.ts` (bean `7zz1`): standing
  * alone, cat-harness has none of it.
@@ -44,15 +44,15 @@ beforeAll(() => {
   put("side/s.ts", "export const s = 1;\n");
   put("high/y.ts", "export const y = 1;\n");
 
-  // Allowed: down the arrow, and within one instance.
+  // Allowed: down the arrow, and within one layer.
   put("high/ok.ts", 'import { x } from "../low/x.ts";\nimport { y } from "./y.ts";\nexport { x, y };\n');
   // Wrong-direction: up the arrow, by static import and by re-export.
   put("low/up.ts", 'import { y } from "../high/y.ts";\nexport * from "../high/y.ts";\nexport { y };\n');
-  // Wrong-direction: a sibling this instance does not declare needing.
+  // Wrong-direction: a sibling this layer does not declare needing.
   put("low/sibling.ts", 'import { s } from "../side/s.ts";\nexport { s };\n');
   // Wrong-direction: the `builtin-adapters.ts` shape — a module path handed to a variable import.
   put("low/src/table.ts", 'export const T = [{ module: "../high/y.ts" }];\nexport const load = (p: string) => import(p);\n');
-  // NOT counted: a docblock quoting an import, and a `../` literal naming no instance.
+  // NOT counted: a docblock quoting an import, and a `../` literal naming no layer.
   put("low/quiet.ts", '/** import { y } from "../high/y.ts"; */\n// require("../high/y.ts")\nexport const p = "../fixtures/x.ts";\n');
   // By PACKAGE name: wrong-direction up to `high`, allowed down to `low`, and a
   // third-party package skipped (bean `7pvn`).
@@ -60,7 +60,7 @@ beforeAll(() => {
   put("low/package.json", JSON.stringify({ name: "@fx/low" }));
   put("low/pkg-up.ts", 'import { y } from "@fx/high/y.js";\nimport { z } from "zod";\nexport { y, z };\n');
   put("high/pkg-down.ts", 'import { x } from "@fx/low/x.js";\nexport { x };\n');
-  // Undetermined: an importer whose instance declares no `needs`.
+  // Undetermined: an importer whose layer declares no `needs`.
   put("odd/o.ts", 'import { x } from "../low/x.ts";\nexport { x };\n');
 
   r = analyse(tmp);
@@ -120,7 +120,7 @@ describe("check:import-direction", () => {
 /**
  * The split's boundary (bean `pyds`, stage 0): `cat-harness` must not load
  * `cat-harness-tools`, which is built on it. The fixture copies the REAL `needs`
- * of the four instances involved, so the test goes red if either declaration
+ * of the four layers involved, so the test goes red if either declaration
  * drifts — and plants the import in a scratch tree, never in this checkout.
  */
 describe("check:import-direction — the cat-harness / cat-harness-tools boundary", () => {

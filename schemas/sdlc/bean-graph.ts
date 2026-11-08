@@ -41,7 +41,7 @@
  * graph typologies found there (`BASE_GRAPH_TYPOLOGIES`). Same schema, same
  * open registry, same JSON-LD projection. Only what is SPECIFIC to the bean
  * graph is here: paths resolve against this file's own directory rather than
- * the instance root, and at most one directory may hold `workflow-state`.
+ * the layer root, and at most one directory may hold `workflow-state`.
  *
  * @module schemas/bean-graph
  * @graphNode schema
@@ -98,7 +98,7 @@ export const BeanGraphNodeSchema = GraphNodeDirectorySchema;
 export type BeanGraphNode = GraphNodeDirectory;
 
 export const BeanGraphSchema = z.object({
-  /** Display name — which instance's work plan this is. */
+  /** Display name — which layer's work plan this is. */
   name: z.string().min(1),
   /** Named `directories`, like the harness declaration, not `nodes`. */
   directories: z.array(BeanGraphNodeSchema).min(1),

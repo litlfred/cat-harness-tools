@@ -21,8 +21,8 @@ import { TOOLS_ROOT } from "./lib/roots.ts";
 
 import { PYTHON_DEPS, importNameOf, type PythonDep } from "../schemas/sdlc/python-deps.ts";
 
-// THE INSTANCE root — this module scans `scripts/**/*.py`, and those scripts
-// are the instance's. Distinct from the root `gen-python-deps.ts` uses for
+// THE LAYER root — this module scans `scripts/**/*.py`, and those scripts
+// are the layer's. Distinct from the root `gen-python-deps.ts` uses for
 // `requirements.txt`, which lives in this layer's `python/` directory (bean
 // `ar1s`), though CI installs it from the checkout root. One constant answered both while the two roots were one
 // directory; pointing it at the repository made the glob match nothing and

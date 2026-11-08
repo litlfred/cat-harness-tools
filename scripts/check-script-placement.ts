@@ -8,7 +8,7 @@
  * `needs`, transitively); one naming none, or naming layers no single one
  * needs, belongs to the root, the aggregate.
  *
- * The layers and their order are READ from each instance's declaration, never
+ * The layers and their order are READ from each layer's declaration, never
  * listed here. A submodule (another repository's checkout) is not a layer of
  * this one: a script running its code stays at the root.
  *
@@ -72,7 +72,7 @@ if (import.meta.main) {
   const wrong: string[] = [];
   for (const e of table.values()) {
     if (e.name === "cat" && e.manifest === "package.json") continue; // the runner itself
-    // A mounted instance's manifest is its own repository's to keep (bean `nn8e`):
+    // A mounted layer's manifest is its own repository's to keep (bean `nn8e`):
     // its scripts sit where that repository put them, and this checkout cannot move them.
     if (e.manifest !== "package.json" && mountScopeFor(dirname(join(REPO, e.manifest))) !== undefined) continue;
     const want = ownerOf(e.command, layers, foreign);

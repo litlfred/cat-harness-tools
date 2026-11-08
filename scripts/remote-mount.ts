@@ -19,11 +19,11 @@
  *   bun run cat mount:remote --no-health  # a re-pin that moves cat-harness-tools does not regenerate the health report (lib/repin-health.ts)
  *   bun run cat mount:remote --help       # print this header; run nothing
  *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
- *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
+ *                                          # create or re-pin a remote layer in index.config.json, WITH its consent
  *   bun run cat mount:remote --choose <harness>[:<instance>] [--directories a,b] [--tools x,y]
  *                                          # write a review's choice into overrides.<instance>, so a fresh clone replays it
  *   bun run cat mount:repin:standing [--dry-run]
- *                                          # re-pin every instance a STANDING consent covers (repin-standing.ts)
+ *                                          # re-pin every layer a STANDING consent covers (repin-standing.ts)
  *
  * `state:mount` runs the mount after the branch mounts, so the session-start
  * hook needs no second entry point.
@@ -32,18 +32,18 @@
  *
  * A downstream names a harness, its repository and a 40-character pin. The
  * harness's declaration is read FROM THAT TREE; each name in its `needs` is
- * looked for in the same tree (an instance whose `<name>.json` agrees with its
+ * looked for in the same tree (a layer whose `<name>.json` agrees with its
  * own `name`), and failing that as a GITLINK at that tree — a submodule entry
  * is itself a pin. A need found in neither is `missing`, never dropped. A
- * need the downstream already holds as a local instance is `local` —
+ * need the downstream already holds as a local layer is `local` —
  * supplied, not mounted over.
  *
  * ## Three states, never two
  *
- * Every instance comes back `mounted`, `missing` or `could-not-determine`. A
+ * Every layer comes back `mounted`, `missing` or `could-not-determine`. A
  * fetch that failed is the third, not an empty layer; a lock that cannot be
  * read is the third, not "nothing mounted". The process exits 0 only when
- * every instance is mounted or local (or nothing is declared), 1 when any is
+ * every layer is mounted or local (or nothing is declared), 1 when any is
  * missing, 2 when any could not be determined.
  *
  * ## A changed lock re-renders the agent surface
@@ -65,7 +65,7 @@
  *
  * ## A mount is runnable, and an install does not make it modified
  *
- * After the bytes are locked, each mounted instance that carries a
+ * After the bytes are locked, each mounted layer that carries a
  * `package.json` gets `bun install --no-save --omit dev` (`--install-all`
  * keeps devDependencies, `--no-install` skips it). `node_modules/` is outside
  * every mount digest and the lockfile is put back byte-for-byte, so `--check`
@@ -76,16 +76,16 @@
  * ## Seeding writes consent
  *
  * `--seed <name>=<owner/repo>@<sha> --consent-by <who> --evidence "<…>"`
- * creates or re-pins a remote instance in `index.config.json` and writes its
+ * creates or re-pins a remote layer in `index.config.json` and writes its
  * `trust.consent` bound to that pin in the same write, so a pin and its
  * consent cannot be committed apart.
  *
  * ## Hydrated: metadata, no files
  *
- * `hydrated: true` on a mount entry (every instance it reaches) or on
+ * `hydrated: true` on a mount entry (every layer it reaches) or on
  * `overrides.<instance>` (that one; `false` opts back out) lays each chosen
  * directory down as ONE file — the subgraph's `index.hydrated.jsonld`, read at
- * the pin from where the instance publishes it,
+ * the pin from where the layer publishes it,
  * `<docs>/subgraph/<HARNESS>/<path>/` (`publishedSubgraphDir`), and checked
  * against `SubgraphHydratedSchema` and the IRI it must declare before it
  * lands, as `kg:materialize`'s metadata mode does. Each such directory's
@@ -97,7 +97,7 @@
  * declared in-checkout directory whose hydrated file the pin HOLDS — the
  * others are named in the detail, and a pin that holds none is `missing`,
  * never an empty "mounted". No `<name>.json` is laid down and the lock marks
- * the instance `hydrated` (`schemas/kg/remote-mount.ts` says why).
+ * the layer `hydrated` (`schemas/kg/remote-mount.ts` says why).
  *
  * Absent, it is NOT `mountDefaults.directories`: that list answers which
  * FILES a downstream wants, while a hydrated mount shows everything there is
@@ -106,7 +106,7 @@
  * ## Named ids: declared, or declared FROM WITHIN
  *
  * An id in `overrides.<instance>.directories` or `mountDefaults.directories`
- * is looked up in the instance's `<name>.json` first, and — only when it is
+ * is looked up in the layer's `<name>.json` first, and — only when it is
  * not there — among the directories it declares from within one of its own
  * (`skills/skills.json` naming `voices/`), resolved at the pin by
  * `upstream-directories.ts` through cat-harness's `instanceDirectories`, so a
@@ -122,36 +122,36 @@
  *
  * An id that is neither, but is a concern group's code (`sdlc`, `kg`, `ui`
  * …, from `code-lists/concern-group.json`), names that concern across kinds:
- * it expands to every kind-first member the instance declares —
+ * it expands to every kind-first member the layer declares —
  * `processes/sdlc/`, `skills/sdlc/`, `schemas/sdlc/` — read from each
  * grouping kind's own declaration file at the pin (`processes.json`
  * `groups`, `skills.json` `topics`; the walk `concern-groups.ts` owns). Each
  * member is locked under the id `<directory id>/<code>`. A code no kind of
- * the instance declares is refused like any other unknown id.
+ * the layer declares is refused like any other unknown id.
  *
  * ## Tools: chosen by id, mounted runnable
  *
- * `overrides.<instance>.tools` names Tools that instance declares. Each is
+ * `overrides.<instance>.tools` names Tools that layer declares. Each is
  * brought RUNNABLE — its definition, its implementation and their import
  * closure — as the declared directories that closure touches, and with
- * `tools` named anywhere in an entry, that entry's instances mount those
+ * `tools` named anywhere in an entry, that entry's layers mount those
  * directories (plus any their override names) instead of their default list.
- * A `whole` instance stays whole. An instance of ANOTHER entry the closure
+ * A `whole` layer stays whole. A layer of ANOTHER entry the closure
  * reaches shrinks too, to the directories the closures need from it, unless
  * its own entry mounts it whole or names its `directories`: then that list
  * stands, and must already bring what the closure needs. The rules and why
  * each is so are in `tool-closure.ts`, which computes it; this file only
  * plans with it:
  *
- * - each chosen Tool's `invoke` is read from the declaring instance's
+ * - each chosen Tool's `invoke` is read from the declaring layer's
  *   published `tools` metadata (`index.hydrated.jsonld`) at the pin — the
  *   tree, else the pin's subgraph index package, exactly as a hydrated mount
  *   reads it — because the plan runs before the trust gate and must not
  *   execute a definition to learn what it runs;
  * - a Tool that cannot be brought whole (not declared, not in the metadata,
  *   an import that names nothing, a closure file in no declared directory)
- *   makes the declaring instance `missing` (`could-not-determine` when a
- *   fetch failed) and every instance of its entry unmounted with it: a
+ *   makes the declaring layer `missing` (`could-not-determine` when a
+ *   fetch failed) and every layer of its entry unmounted with it: a
  *   half-brought Tool is never mounted.
  *
  * ## It never discards work
@@ -370,20 +370,20 @@ export interface PlannedInstance {
   notPublished?: string[];
   /** Hydrated: what the pin's subgraph index package answered, when it was looked for and held nothing usable. */
   packageNote?: string;
-  /** The Tools this instance's override chose, as brought (bean `mo75` G3): said in its outcome. */
+  /** The Tools this layer's override chose, as brought (bean `mo75` G3): said in its outcome. */
   tools?: ResolvedTool[];
 }
 
 export type InstanceOutcome =
   | { instance: string; state: "mounted"; path: string; detail: string }
-  /** The downstream holds this instance itself; nothing was mounted over it. */
+  /** The downstream holds this layer itself; nothing was mounted over it. */
   | { instance: string; state: "local"; path: string; detail: string }
   /** An override said `skip`. */
   | { instance: string; state: "skipped"; detail: string }
   /**
-   * `edited`: on disk at the pinned instance, but some pinned bytes changed
+   * `edited`: on disk at the pinned layer, but some pinned bytes changed
    * (every bad directory or asset is `modified`, none `absent`). A mount
-   * leaves such an instance untouched unless `--fresh`, so a fetch cannot
+   * leaves such a layer untouched unless `--fresh`, so a fetch cannot
    * change its verdict (bean `cat-tools-sm8r`).
    */
   | { instance: string; state: "missing"; path?: string; detail: string; edited?: true }
@@ -394,7 +394,7 @@ export type InstanceOutcome =
   | { instance: string; state: "could-not-determine"; path?: string; detail: string };
 
 export interface Plan {
-  /** Absolute root of the declaring (downstream) instance. */
+  /** Absolute root of the declaring (downstream) layer. */
   instanceRoot: string;
   downstream: string;
   mounts: RemoteMount[];
@@ -405,7 +405,7 @@ export interface Plan {
 }
 
 export interface RemoteMountOptions {
-  /** The downstream instance root; defaults to the checkout's root instance. */
+  /** The downstream layer root; defaults to the checkout's root layer. */
   instanceRoot?: string;
   /**
    * `--fresh`: replace a mount whose bytes no longer hash to the lock instead
@@ -430,7 +430,7 @@ export interface RemoteMountOptions {
   purpose?: "staging" | "mount";
   /**
    * After the bytes are down and locked, `bun install` in each mounted
-   * instance that carries a `package.json`, so its tools run (task #10, gap b).
+   * layer that carries a `package.json`, so its tools run (task #10, gap b).
    * `production` (default) skips devDependencies; `false` lays bytes only.
    * The install writes only `node_modules/`, which no digest covers, so it
    * never makes a mount read modified.
@@ -470,7 +470,7 @@ function repositoryOf(url: string): string {
 }
 
 /**
- * Find instance `name` in a tree: the root's own `<name>.json`, else a
+ * Find layer `name` in a tree: the root's own `<name>.json`, else a
  * top-level directory's — each accepted only when the file's `name` agrees,
  * the rule `findDeclarationFile` applies on disk.
  */
@@ -514,10 +514,10 @@ function downstreamOf(opts: RemoteMountOptions): { instanceRoot: string; name: s
 }
 
 /**
- * H8 for one instance of a closure. The declared mount's own trust covers the
- * harness and anything in the same tree; an instance reached through a GITLINK
+ * H8 for one layer of a closure. The declared mount's own trust covers the
+ * harness and anything in the same tree; a layer reached through a GITLINK
  * is another repository at another commit, so it ALSO needs consent of its
- * own, on the mount's override for that instance (roast `1ygp` L4.2). Staging
+ * own, on the mount's override for that layer (roast `1ygp` L4.2). Staging
  * needs neither, and is recorded as such.
  */
 export function trustFor(
@@ -538,7 +538,7 @@ export function trustFor(
     };
 }
 
-/** The outcome a successful trust verdict gives a mounted instance. */
+/** The outcome a successful trust verdict gives a mounted layer. */
 function mountedState(v: TrustVerdict): "mounted" | "unverified-approver" {
   return v.ok && v.basis === "consent" && v.approver === "unverified" ? "unverified-approver" : "mounted";
 }
@@ -546,7 +546,7 @@ function mountedState(v: TrustVerdict): "mounted" | "unverified-approver" {
 /**
  * The id → directory map a planner resolves named ids through (bean `mo75`
  * G3): `<name>.json`'s own entries, and — only when a named id is not among
- * them — the entries the instance declares FROM WITHIN, read at the pin by
+ * them — the entries the layer declares FROM WITHIN, read at the pin by
  * {@link upstreamDirectories} through cat-harness's `instanceDirectories`.
  * An id that is in neither, or a nesting that could not be read, comes back
  * as the refusal's wording, never as a silently shorter list.
@@ -583,7 +583,7 @@ function directoriesById(
 }
 
 /**
- * Plan one instance as HYDRATED metadata (bean `mo75` G2): each chosen
+ * Plan one layer as HYDRATED metadata (bean `mo75` G2): each chosen
  * directory becomes its published `index.hydrated.jsonld` at the pin. See the
  * module header, §"Hydrated". Its `needs` are not followed: metadata imports
  * nothing, so there is no closure to bring.
@@ -715,15 +715,15 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
   const plan: Plan = { instanceRoot: ds.instanceRoot, downstream: ds.name, mounts: ds.mounts, approvers: ds.approvers, instances: [], outcomes: [] };
   if (ds.mounts.length === 0) return plan;
 
-  // Instances the downstream checkout ALREADY holds and did not get from a
+  // Layers the downstream checkout ALREADY holds and did not get from a
   // previous mount: those are local, and a mount never lands on them.
   const prior = readMountLock(mountLockPathFor(ds.instanceRoot, ds.name));
-  // A refused instance's old mount, left on disk, is still this mount's — not local.
+  // A refused layer's old mount, left on disk, is still this mount's — not local.
   const previouslyMounted = new Set(
     prior.ok ? [...prior.lock.instances.map((i) => i.instance), ...prior.lock.unmounted.flatMap((u) => (u.leftOnDisk ? [u.instance] : []))] : [],
   );
   const local = new Map<string, string>();
-  // An instance directory in a git checkout with NO tracked file is not the
+  // A layer directory in a git checkout with NO tracked file is not the
   // checkout's own: it is what something else left behind (a removed
   // submodule, a lock deleted by hand). It is a mount target, adopted only if
   // it is exactly the pinned bytes (folio-assistant#2467, decision 2).
@@ -764,7 +764,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
     return f;
   };
 
-  /** Every instance laid down as files, with the tree and declaration it was planned from — for the Tool closure. */
+  /** Every layer laid down as files, with the tree and declaration it was planned from — for the Tool closure. */
   const reached = new Map<string, { tree: RemoteTree; found: { root: string; file: string; text: string; decl: UpstreamDeclaration }; whole: boolean; via: RemoteMount }>();
   const seen = new Map<string, { repository: string; sha: string }>();
   for (const m of ds.mounts) {
@@ -845,7 +845,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
       }
 
       const whole = override?.whole ?? decl.mountDefaults?.whole === true;
-      // The entry's own `hydrated` is its harness's; an override decides for any instance.
+      // The entry's own `hydrated` is its harness's; an override decides for any layer.
       const hydrated = override?.hydrated ?? (q.name === m.harness && m.hydrated === true);
       if (hydrated) {
         const h = planHydrated({ q, via: m.harness, tree, found, path, named: override?.directories, whole: override?.whole, pkgFor: pkgAt(q.repository, q.sha), tools: override?.tools, enabled: dsEnabled });
@@ -889,7 +889,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
       const directories: PlannedDirectory[] = [];
       if (!whole) for (const id of lookup.ids) {
         const d = byId.get(id)!;
-        if (strip(d.path).split("/").includes("..")) continue; // a path that climbs out is not this instance's to give
+        if (strip(d.path).split("/").includes("..")) continue; // a path that climbs out is not this layer's to give
         directories.push({ id, path: joinRel(path, d.path), upstreamPath: joinRel(found.root, d.path) });
       }
       if (!whole)
@@ -976,7 +976,7 @@ function toolDirectoriesOf(decl: UpstreamDeclaration): UpstreamDeclaration["dire
 
 /**
  * Each chosen Tool's published node at the pin, by id: the declaring
- * instance's `tools` metadata (`index.hydrated.jsonld`), from the tree when a
+ * layer's `tools` metadata (`index.hydrated.jsonld`), from the tree when a
  * commit carries it, else from the pin's subgraph index package — the reading
  * {@link planHydrated} does, held to the same schema and IRI.
  */
@@ -1032,7 +1032,7 @@ function toolNodesAt(
  * Bring each override's chosen `tools` runnable (module note, §"Tools"):
  * read each Tool's `invoke` from its published metadata, walk the closure of
  * definition and implementation with bootstrap-tools' `importClosure`
- * (`tool-closure.ts`), and narrow each instance of the entry to the declared
+ * (`tool-closure.ts`), and narrow each layer of the entry to the declared
  * directories that closure touches plus the ones its override names.
  */
 function applyToolChoices(
@@ -1046,7 +1046,7 @@ function applyToolChoices(
   /** Instances of other entries that shrink to Tool closures, and the directory ids those closures need. */
   const shrunk = new Map<string, Set<string>>();
 
-  // Every instance the closure may reach: those laid down as files, and the ones this checkout holds.
+  // Every layer the closure may reach: those laid down as files, and the ones this checkout holds.
   const instances: ClosureInstance[] = [];
   for (const [name, r] of reached) {
     const p = plan.instances.find((i) => i.instance === name);
@@ -1135,7 +1135,7 @@ function applyToolChoices(
     /** What this entry's closure asks of instances of OTHER entries that shrink to it (owner, 2026-10-29, option B). */
     const asks = new Map<string, string[]>();
     if (result) {
-      // An instance of ANOTHER entry the closure touches shrinks to what the
+      // A layer of ANOTHER entry the closure touches shrinks to what the
       // closure needs from it, unless its own entry says otherwise: an
       // explicit `directories` list or `whole` wins, and then it must already
       // bring what the closure needs.
@@ -1195,7 +1195,7 @@ function applyToolChoices(
     }
   }
 
-  // Each shrinking instance mounts the union of what every closure asked of it.
+  // Each shrinking layer mounts the union of what every closure asked of it.
   // An entry that chooses Tools itself already started from its own closure, so
   // what others ask is added to it; any other entry's default list is replaced.
   for (const [name, ids] of shrunk) {
@@ -1216,13 +1216,13 @@ function applyToolChoices(
   }
 }
 
-/** Whether a mount entry names `tools` for any of its instances. */
+/** Whether a mount entry names `tools` for any of its layers. */
 function entryChoosesTools(m: RemoteMount): boolean {
   return Object.values(m.overrides ?? {}).some((o) => o.tools?.length);
 }
 
 /**
- * Whether an instance reached through another entry shrinks to a Tool
+ * Whether a layer reached through another entry shrinks to a Tool
  * closure's needs (owner, 2026-10-29, option B): yes, unless its entry mounts
  * it whole or as metadata, or names its directories explicitly.
  */
@@ -1252,7 +1252,7 @@ function sha256Text(s: string | Buffer): string {
 function digestOf(abs: string, skip: readonly string[] = []): { treeDigest: string; files: number } {
   // Install artefacts (`node_modules/`) are never pinned bytes: see
   // `installDependencies` in mount-from-lock.ts for why they are outside fixity.
-  // Neither are the paths the instance declares `builtAtPublish`: the publish
+  // Neither are the paths the layer declares `builtAtPublish`: the publish
   // writes them into the mount, so the lock's digest (mount-from-lock.ts
   // `digestOf`) leaves them out and this one must too, or a mount whose site
   // was built reads as modified.
@@ -1264,7 +1264,7 @@ function digestOf(abs: string, skip: readonly string[] = []): { treeDigest: stri
 }
 
 /**
- * Whether the bytes already at a planned instance's target ARE the pinned
+ * Whether the bytes already at a planned layer's target ARE the pinned
  * bytes (folio-assistant#2467, decision 2, "adopt if identical"): every
  * declared directory holds exactly the pinned files (none absent, none
  * extra, none different, install artefacts and state mounts aside), the
@@ -1341,7 +1341,7 @@ function ensureIgnored(base: string, rel: string, indexed = false): "ignored" | 
   if (gitIn(base, ["check-ignore", "-q", "--no-index", `${rel}/`]).status === 0) return "ignored";
   if (indexed) return "not-ignored";
   // `info/exclude` patterns are relative to the top of the worktree, and the
-  // downstream instance may sit below it.
+  // downstream layer may sit below it.
   const prefix = gitIn(base, ["rev-parse", "--show-prefix"]).stdout.trim();
   const file = resolve(base, gitIn(base, ["rev-parse", "--git-path", "info/exclude"]).stdout.trim());
   mkdirSync(dirname(file), { recursive: true });
@@ -1349,7 +1349,7 @@ function ensureIgnored(base: string, rel: string, indexed = false): "ignored" | 
   return "excluded";
 }
 
-/** Directories of a previously locked instance whose bytes no longer match the lock. */
+/** Directories of a previously locked layer whose bytes no longer match the lock. */
 function modifiedSince(base: string, locked: LockedInstance): string[] {
   const out = locked.directories
     .filter((d) => existsSync(join(base, d.path)) && digestOf(join(base, d.path), stateMountedDirs(base)).treeDigest !== d.treeDigest)
@@ -1391,7 +1391,7 @@ export interface MountReport {
   excluded: string[];
 }
 
-/** Plan, fetch, lay each planned instance down, write the lock. */
+/** Plan, fetch, lay each planned layer down, write the lock. */
 export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
   const trees = new Map<string, RemoteTree>();
   const packages = new Map<string, SubgraphIndexFetch>();
@@ -1409,7 +1409,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
     // before anything lands, and `info/exclude` is never written.
     const idx = readIndexConfig(plan.instanceRoot);
     const index = idx.state === "ok" ? idx.config : undefined;
-    // The PLANNED closure, so an instance the mount brings in transitively is
+    // The PLANNED closure, so a layer the mount brings in transitively is
     // ignored before its bytes land; re-synced from the lock once written.
     //
     // WITHOUT an index the same committed block is written from the lock
@@ -1421,7 +1421,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
     syncIgnoreBlock(plan.instanceRoot, blockConfig, [...lockedMountPaths(plan.instanceRoot), ...plan.instances.map((i) => i.path)]);
 
     const prior = readMountLock(lockFile);
-    // A refused instance's left-on-disk record counts as "this mount put it
+    // A refused layer's left-on-disk record counts as "this mount put it
     // there", so consent restored later can re-mount over it.
     const priorBy = new Map(
       (prior.ok ? [...prior.lock.unmounted.flatMap((u) => (u.leftOnDisk ? [u.leftOnDisk] : [])), ...prior.lock.instances] : []).map((i) => [i.instance, i]),
@@ -1556,7 +1556,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           continue;
         }
 
-        // A STATE mount inside the instance (its `health`, say) is not this
+        // A STATE mount inside the layer (its `health`, say) is not this
         // mount's to replace: its files come from a state branch, may hold
         // unpushed edits, and a re-lay that deleted them left the marker
         // describing files that were gone — the next `state:push` would have
@@ -1584,7 +1584,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           mkdirSync(target, { recursive: true });
           declText = readFileSync(join(work, p.declarationFile));
           // Hydrated: recorded in the lock (it fixed the paths), never laid
-          // down — a `<name>.json` here would be an instance with no files.
+          // down — a `<name>.json` here would be a layer with no files.
           if (!p.hydrated) writeFileSync(join(target, `${p.instance}.json`), declText);
           const built = builtAtPublishDirectories(declText);
           if (p.hydrated) for (const d of p.directories) {
@@ -1693,10 +1693,10 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
       }
     }
 
-    // Install each mounted instance's dependencies AFTER every instance is
+    // Install each mounted layer's dependencies AFTER every layer is
     // down, so a manifest's `workspaces` that names a sibling mount
     // (`../cat-harnes[s]`) finds it. A failed install is reported against the
-    // instance and fails the run, but is not written into the lock: the lock
+    // layer and fails the run, but is not written into the lock: the lock
     // records which pinned bytes are on disk, and they are.
     const installFailed = new Set<string>();
     if (opts.install !== false) {
@@ -1748,7 +1748,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
   }
 }
 
-// ── Seeding: create or re-pin a remote instance, WITH its consent ────────────
+// ── Seeding: create or re-pin a remote layer, WITH its consent ────────────
 
 /** One `--seed <name>=<owner/repo>@<sha>`: what to write into the index. */
 export interface SeedSpec {
@@ -1767,10 +1767,10 @@ export function parseSeed(arg: string): SeedSpec {
 }
 
 /**
- * Create or re-pin remote instances in `index.config.json`, and write each
+ * Create or re-pin remote layers in `index.config.json`, and write each
  * one's `trust.consent {by, on, ref, evidence}` from `grant` as part of the
  * same write (task #10, gap c). Until 2026-10-12 nothing seeded an index with
- * remote instances, so every entry was hand-written and its consent typed in
+ * remote layers, so every entry was hand-written and its consent typed in
  * after — and a re-pin that forgot to move `consent.ref` was refused at the
  * next mount (H8: a moved pin asks again). Here the consent is bound to the
  * pin being written, by `withConsent`, so the two cannot disagree.
@@ -1784,7 +1784,7 @@ export function parseSeed(arg: string): SeedSpec {
 export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], grant: ConsentGrant, opts: { discardEdits?: boolean } = {}): { file: string; mounts: RemoteMount[] } {
   if (specs.length === 0) throw new Error("nothing to seed");
   // folio-assistant#2682: re-pinning over edited mounts moved the pin while
-  // the next mount left the edited instances at their old commit. Refuse up
+  // the next mount left the edited layers at their old commit. Refuse up
   // front, unless the caller will replace them (`--fresh`).
   const edited = opts.discardEdits ? [] : editedMounts(instanceRoot, specs.map((s) => s.harness));
   if (edited.length) {
@@ -1806,7 +1806,7 @@ export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], gra
   return { file, mounts: next.filter((m) => specs.some((s) => s.harness === m.harness)) };
 }
 
-/** Locked instances reached through `harnesses` whose bytes on disk no longer hash to the lock, as `<instance>: <paths>`. */
+/** Locked layers reached through `harnesses` whose bytes on disk no longer hash to the lock, as `<instance>: <paths>`. */
 export function editedMounts(instanceRoot: string, harnesses: readonly string[]): string[] {
   let lockFile: string;
   try {
@@ -1830,7 +1830,7 @@ export function editedMounts(instanceRoot: string, harnesses: readonly string[])
 export interface ChoiceSpec {
   /** The mount entry, by its harness name. */
   harness: string;
-  /** The instance of that entry's closure the choice is for; the harness itself when omitted. */
+  /** The layer of that entry's closure the choice is for; the harness itself when omitted. */
   instance?: string;
   directories?: string[];
   tools?: string[];
@@ -1850,7 +1850,7 @@ export function parseChoose(arg: string): { harness: string; instance?: string }
  * proposal's "the choice, never the state"). The pin and its consent are not
  * touched: a choice moves no commit. The choice replaces the override's
  * `whole` and `skip`, and ends the review: the chosen set is mounted as files,
- * so a `hydrated` the instance had is dropped (set `false` where the entry
+ * so a `hydrated` the layer had is dropped (set `false` where the entry
  * itself is hydrated). Nothing is fetched or checked here; the next
  * `mount:remote` resolves the choice at the pin, refuses an id the pin does
  * not declare, and records what it resolved to in `index.lock.json`.
@@ -1879,7 +1879,7 @@ export function chooseRemote(instanceRoot: string, spec: ChoiceSpec): { file: st
 
 export interface CheckResult {
   /**
-   * `unverified-approver`: every instance is mounted and verified, but at
+   * `unverified-approver`: every layer is mounted and verified, but at
    * least one on consent no declared `mountApprovers` list checked. It exits
    * 0 (the bytes are the pinned bytes) and is reported as its own state,
    * never rendered as clean (roast `1ygp` L4.2).
@@ -1919,9 +1919,9 @@ export function checkRemote(opts: { instanceRoot?: string } = {}): CheckResult {
   if (want !== have) {
     return { state: "missing", reason: "the lock was written for different pins than the declaration names — run `bun run cat mount:remote`", outcomes: [] };
   }
-  // A pin's own instances were mounted from that pin (folio-assistant#2682):
+  // A pin's own layers were mounted from that pin (folio-assistant#2682):
   // `mount:remote --seed` in a checkout whose mounts had drifted rewrote the
-  // top-level `ref` and left the instance entries at the old commit, and CI,
+  // top-level `ref` and left the layer entries at the old commit, and CI,
   // which mounts from the entries, kept testing the old layer.
   const stale = r.lock.instances.flatMap((inst) => {
     const m = r.lock.mounts.find((x) => x.harness === inst.via && x.repository === inst.repository);
@@ -2042,9 +2042,9 @@ export function reportOutcomes(title: string, state: CheckResult["state"], reaso
   return L.join("\n");
 }
 
-// ── Every declaring instance in a checkout (the session-start fan-out) ───────
+// ── Every declaring layer in a checkout (the session-start fan-out) ───────
 
-/** The instances in `checkout` that declare remote mounts (index or `remoteMounts`). An unreadable declaration or index is reported, not skipped. */
+/** The layers in `checkout` that declare remote mounts (index or `remoteMounts`). An unreadable declaration or index is reported, not skipped. */
 export function declaringInstances(checkout: string): { roots: string[]; unreadable: Array<{ root: string; why: string }> } {
   const roots: string[] = [];
   const unreadable: Array<{ root: string; why: string }> = [];
@@ -2062,9 +2062,9 @@ export function declaringInstances(checkout: string): { roots: string[]; unreada
 }
 
 /**
- * The lock check of `root` when it says every instance is already mounted at
+ * The lock check of `root` when it says every layer is already mounted at
  * its pinned bytes, else undefined. Only a clean verdict counts: a missing,
- * refused or undetermined instance anywhere sends the root to the full mount.
+ * refused or undetermined layer anywhere sends the root to the full mount.
  */
 export function currentPerLock(root: string): CheckResult | undefined {
   const c = checkRemote({ instanceRoot: root });
@@ -2074,7 +2074,7 @@ export function currentPerLock(root: string): CheckResult | undefined {
 }
 
 /**
- * The lock check of `root` when every instance not at its pinned bytes is one
+ * The lock check of `root` when every layer not at its pinned bytes is one
  * a mount would leave untouched (`edited`: present, but its bytes changed),
  * and at least one is; else undefined. Then a fetch cannot change the
  * verdict, so `remoteFanOut` reports it without fetching.
@@ -2093,7 +2093,7 @@ export function editedOnlyPerLock(root: string): CheckResult | undefined {
   return c;
 }
 
-/** One mount whose bytes no longer hash to its lock: which root's lock, which instance, where, and what differs. */
+/** One mount whose bytes no longer hash to its lock: which root's lock, which layer, where, and what differs. */
 export interface EditedMount {
   root: string;
   instance: string;
@@ -2137,7 +2137,7 @@ export function relayAdvice(checkout: string, edited: readonly EditedMount[], o:
 
 /**
  * What the full mount's install step would do for a current root, without
- * the fetch: `bun install` in a mounted instance that has a manifest and no
+ * the fetch: `bun install` in a mounted layer that has a manifest and no
  * `node_modules/` yet. node_modules is outside every digest, so the lock check
  * cannot see it; a mount laid with `--no-install` is runnable after this.
  */
@@ -2154,8 +2154,8 @@ function installMissingDependencies(root: string, outcomes: readonly InstanceOut
 }
 
 /**
- * Mount (or, with `check`, verify) every declaring instance in `checkout` —
- * what `state:mount` and the session-start hook call. An instance whose
+ * Mount (or, with `check`, verify) every declaring layer in `checkout` —
+ * what `state:mount` and the session-start hook call. A layer whose
  * declaration cannot be read is could-not-determine for the whole fan-out:
  * it may be the one that declares mounts.
  */
@@ -2194,8 +2194,8 @@ export function remoteFanOut(checkout: string, opts: { check?: boolean; plan?: b
         parts.push(reportOutcomes(`Remote mounts — ${root} (current per the lock; nothing fetched)`, sum.state, sum.reason, current.outcomes));
         continue;
       }
-      // Bean `cat-tools-sm8r`: every instance off the lock is edited, and a
-      // mount leaves an edited instance untouched (only `--fresh` replaces
+      // Bean `cat-tools-sm8r`: every layer off the lock is edited, and a
+      // mount leaves an edited layer untouched (only `--fresh` replaces
       // it), so the fetch below could not change a single verdict.
       const edited = opts.discardEdits ? undefined : editedOnlyPerLock(root);
       if (edited !== undefined) {

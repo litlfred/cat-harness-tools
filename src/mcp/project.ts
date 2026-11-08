@@ -170,7 +170,7 @@ export function buildArgv(t: ToolDefinition, inputs: Record<string, unknown>): {
   if (command === undefined) {
     // An `inProcess` Tool is runnable and has no command line at all, so the
     // absence of a command is not a defect in the node. Said explicitly because
-    // most of this instance's Tools are now in-process, and a bare "no runnable
+    // most of this layer's Tools are now in-process, and a bare "no runnable
     // arm" reads as a broken record rather than as "call the function".
     const why =
       t.invoke.inProcess !== undefined

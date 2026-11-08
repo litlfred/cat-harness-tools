@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Write a JSON-LD node and a thin page for every OpenAPI document an instance
+ * Write a JSON-LD node and a thin page for every OpenAPI document a layer
  * holds, and for every OPERATION in each — the "page + IRI for each operation"
  * the owner asked for (2026-10-03, bean `s4ta`).
  *
@@ -11,7 +11,7 @@
  * Usage:
  *   bun run cat-harness-tools/openapi/scripts/gen-openapi-pages.ts --instance <instance-dir> [--check]
  *
- * ## What is written, INSIDE the instance's `openapi` graph
+ * ## What is written, INSIDE the layer's `openapi` graph
  *
  * | path (under the graph's directory) | what |
  * |---|---|
@@ -26,7 +26,7 @@
  * operation is a node OF the openapi graph, so its IRI sits under that
  * graph's path (`<base>/<instance>/openapi/<doc>/<op>.jsonld`). It also keeps
  * this generator out of a directory another one owns: `gen-ig-pages.ts`
- * treats every file under an IG instance's `docs/` as its own output and
+ * treats every file under an IG layer's `docs/` as its own output and
  * reports anything else there as an orphan — measured on the first version of
  * this harness, which wrote `docs/api/` and had the two generators deleting
  * each other's files. The graph is `served`, so its bytes publish verbatim at
@@ -79,7 +79,7 @@ export const CONTEXT = {
   dcterms: "http://purl.org/dc/terms/",
 };
 
-/** A site-relative path under the instance, as an absolute IRI. */
+/** A site-relative path under the layer, as an absolute IRI. */
 const iri = (instance: string, sitePath: string): string => `${DOCS_SITE_BASE}${instance}/${sitePath}`;
 
 export interface Written {
@@ -87,14 +87,14 @@ export interface Written {
   content: string;
 }
 
-/** Every file a run writes for one instance, keyed by its path under the instance's docs. */
+/** Every file a run writes for one layer, keyed by its path under the layer's docs. */
 export function pagesFor(instanceRoot: string): Written[] {
   const config = readConfig(instanceRoot);
   const dir = openapiDir(instanceRoot, config);
-  // The declaration is FOUND, and the instance is its DECLARED name, never the
+  // The declaration is FOUND, and the layer is its DECLARED name, never the
   // directory's: in an IG fork the directory is the base IG's checkout name and the
-  // instance the fork's own (n3ni stage E), and the name is what every IRI below
-  // extends, so the published IRIs stay the same wherever the instance lives.
+  // layer the fork's own (n3ni stage E), and the name is what every IRI below
+  // extends, so the published IRIs stay the same wherever the layer lives.
   const declFile = findDeclarationFile(instanceRoot);
   if (declFile === undefined) throw new Error(`no instance declaration in ${resolve(instanceRoot)}`);
   const decl = JSON.parse(readFileSync(join(instanceRoot, declFile), "utf8")) as {
@@ -117,7 +117,7 @@ export function pagesFor(instanceRoot: string): Written[] {
  * The same files for a graph named directly rather than through a
  * declaration: `instance` is the name every IRI extends, `dir` holds the
  * documents and their provenance, `graphPath` is where the graph is served
- * under the instance. An IG repository's own site uses it (`ig-site-openapi.ts`),
+ * under the layer. An IG repository's own site uses it (`ig-site-openapi.ts`),
  * since such a repository has no declaration (owner, 2026-10-14).
  */
 export function pagesForGraph(o: { instance: string; config: ReturnType<typeof readConfig>; dir: string; graphPath: string }): Written[] {
@@ -213,7 +213,7 @@ export function pagesForGraph(o: { instance: string; config: ReturnType<typeof r
   // THE GRAPH'S OWN INDEX — `openapi/index.html`. An IG's pages link it the
   // way the Publisher's vendored Swagger UI is linked, often deep:
   // `openapi/index.html#/<tag>/<operationId>`. Nothing wrote it, so 43 links
-  // on the first instance's pages led nowhere (#2235). It lists the documents held,
+  // on the first layer's pages led nowhere (#2235). It lists the documents held,
   // and sends a Swagger-style deep link to that operation's own page.
   out.push({
     path: "index.html",

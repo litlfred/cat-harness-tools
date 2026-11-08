@@ -17,8 +17,8 @@
  *
  * ## The declaring harness is not written down
  *
- * It is the instance the validator ref names — `core:schemas/x.ts#XKind` is
- * declared by `core` — or, for an unqualified ref, the instance the ref
+ * It is the layer the validator ref names — `core:schemas/x.ts#XKind` is
+ * declared by `core` — or, for an unqualified ref, the layer the ref
  * resolves against (cat-harness).
  *
  * ## UNKINDED is a third state, not a failure
@@ -29,10 +29,10 @@
  *
  * ## One baseline per layer
  *
- * Each family is OWNED by the instance that declares its typology
- * ({@link typologyOwner}), each instance keeps its own families in a declared
+ * Each family is OWNED by the layer that declares its typology
+ * ({@link typologyOwner}), each layer keeps its own families in a declared
  * asset of role `unkinded-baseline` ({@link UnkindedBaselineKind}), and
- * {@link ratchet} judges each instance against its own. The combined table
+ * {@link ratchet} judges each layer against its own. The combined table
  * for the node-kind pages is built at publish (cat-harness's
  * `builtAtPublish`), never committed.
  */
@@ -61,7 +61,7 @@ export interface NodeKindEntry {
   /** Direct subclasses, by id, sorted: the kinds that name this one as a parent. */
   subclasses: string[];
   /**
-   * The instance that declares it: the one whose code holds the `nodeKind()`.
+   * The layer that declares it: the one whose code holds the `nodeKind()`.
    * Absent for a kind reached only as an ANCESTOR (a mixin such as `themed`):
    * no typology names it, so nothing here says where it lives, and guessing
    * from a child would file it under whichever child was read first.
@@ -79,8 +79,8 @@ export interface NodeKindEntry {
   holdings: { typology: string; family?: string }[];
   /**
    * How its nodes are found when no typology holds them: by a NAME RULE
-   * ({@link NAME_RULE_KINDS}). `instance-declaration` is each instance's own
-   * `<instance>.json`, which sits at an instance root rather than in a
+   * ({@link NAME_RULE_KINDS}). `instance-declaration` is each layer's own
+   * `<instance>.json`, which sits at a layer root rather than in a
    * declared directory, so no typology can name it. Absent: found through
    * `holdings`.
    */
@@ -90,10 +90,10 @@ export interface NodeKindEntry {
 /**
  * The rules that find a kind's nodes WITHOUT a typology. Two today.
  *
- * An instance declaration is a node (bean `ujiv`, issue #88: *"harness
+ * A layer declaration is a node (bean `ujiv`, issue #88: *"harness
  * declarations become node kinds by tagging the files"*), but it is not IN a
  * directory any typology describes. It is the file that DECLARES the
- * directories, at the instance's root, found by `findDeclarationFile`. Filing
+ * directories, at the layer's root, found by `findDeclarationFile`. Filing
  * it under a typology would invent a directory; the rule names where it is.
  *
  * A work plan (`process-tag`, work item folio-assistant-exrp) is a work item
@@ -114,14 +114,14 @@ export interface NameRuleKind {
 /**
  * Kinds found by a name rule. Imported, not named by a validator ref: a ref
  * resolves against the `instanceRoot` the caller passes, and these are this
- * module's OWN instance's kinds wherever the index is built from.
+ * module's OWN layer's kinds wherever the index is built from.
  */
 export const NAME_RULE_KINDS: readonly NameRuleKind[] = [
   { kind: CatHarnessDeclarationKind, file: join(import.meta.dir, "cat-harness.ts"), exportName: "CatHarnessDeclarationKind", rule: "instance-declaration" },
   { kind: WorkPlanKind, file: join(import.meta.dir, "..", "sdlc", "work-plan.ts"), exportName: "WorkPlanKind", rule: "process-tag" },
 ];
 
-/** The instance this module belongs to: the one whose code holds {@link NAME_RULE_KINDS}. */
+/** The layer this module belongs to: the one whose code holds {@link NAME_RULE_KINDS}. */
 //
 // The harness, found rather than walked to: this module moved to
 // cat-harness-tools (bean `8lcl`) but the kinds it names are still the harness's.
@@ -151,7 +151,7 @@ export interface NodeKindIndex {
  * so the file that records node kinds is itself one, and the gate that refuses
  * a new unkinded family does not start by refusing its own. Built at publish
  * since 2026-10-15; its `unkinded` is a report, and the baselines the gate
- * reads are each instance's own ({@link UnkindedBaselineKind}).
+ * reads are each layer's own ({@link UnkindedBaselineKind}).
  */
 export const NodeKindIndexFileKind = nodeKind("node-kind-index/1.1.0", [], {
   kinds: z.array(z.object({
@@ -217,7 +217,7 @@ export async function nodeKindIndex(
     } catch {
       return { declaredBy: "", reason: "unresolvable" };
     }
-    // The implementing instance when the module is code that moved out of the declaring one (bean 8lcl).
+    // The implementing layer when the module is code that moved out of the declaring one (bean 8lcl).
     const base = moduleRootOf(ref, instanceRoot);
     if (base === undefined) return { declaredBy: ref.instance ?? "", reason: "unresolvable" };
     const declaredBy = ref.instance ?? readDeclaration(instanceRoot)?.name ?? "";
@@ -315,12 +315,12 @@ export function kindAndSubclasses(index: Pick<NodeKindIndex, "kinds">, id: strin
 }
 
 /**
- * The instance that OWNS a typology's families, and so keeps them in its
- * baseline: the instance whose `typologies/` graph declares the typology, or,
+ * The layer that OWNS a typology's families, and so keeps them in its
+ * baseline: the layer whose `typologies/` graph declares the typology, or,
  * for one declared in code here (`BASE_GRAPH_TYPOLOGIES`, or a registration
- * `REGISTRATION_MODULE` names), this module's own instance.
+ * `REGISTRATION_MODULE` names), this module's own layer.
  *
- * The DECLARER, not the validator's instance: a family is a `nodeSchemas` key
+ * The DECLARER, not the validator's layer: a family is a `nodeSchemas` key
  * of the typology, so it appears and disappears with that declaration, and a
  * validator node another layer adds later moves no family between baselines.
  *
@@ -338,25 +338,25 @@ export function typologyOwner(registry: GraphTypologyRegistry, typology: string)
   const roots = [...new Set(registry.roots().flatMap((r) => instanceRootsIn(r)))].sort((a, b) => b.length - a.length);
   const root = roots.find((r) => abs.startsWith(resolve(r) + "/"));
   if (root === undefined) return undefined;
-  // The NEAREST declaring instance inside that root, not the root itself: the
+  // The NEAREST declaring layer inside that root, not the root itself: the
   // standalone fixture (`test/fixtures/standalone-checkout/`, which
   // `FOLIO_FIXTURE_CHECKOUT` adds to discovery) holds copies of other layers'
-  // instances, and a typology one of them declares is that instance's — not
-  // the instance whose directory happens to contain the fixture (bean `w1gy`).
-  // For a typology an instance root declares directly the two agree.
+  // layers, and a typology one of them declares is that layer's — not
+  // the layer whose directory happens to contain the fixture (bean `w1gy`).
+  // For a typology a layer root declares directly the two agree.
   const nearest = findInstanceRoot(dirname(abs));
   const owner = nearest !== undefined && (resolve(nearest) + "/").startsWith(resolve(root) + "/") ? nearest : root;
   return readDeclaration(owner)?.name;
 }
 
 /**
- * Whether a typology is owned by an instance this checkout does not hold — a
+ * Whether a typology is owned by a layer this checkout does not hold — a
  * layer outside `checkout`, whose families that layer judges against its own
  * baseline and whose validators it declares. A typology with no owner is
  * NOT outside: it stays unattributed, and the gate reports it.
  *
  * Standalone, the only such typologies are the fixture's (bean `w1gy`); in a
- * composed checkout every instance is held and this is always false.
+ * composed checkout every layer is held and this is always false.
  */
 export function ownedOutside(registry: GraphTypologyRegistry, typology: string, checkout: string): boolean {
   const owner = typologyOwner(registry, typology);
@@ -383,19 +383,19 @@ function checkoutNames(checkout: string): Set<string> {
   return names;
 }
 
-/** One family an instance's baseline admits: the key, nothing that can drift with another layer. */
+/** One family a layer's baseline admits: the key, nothing that can drift with another layer. */
 export const UnkindedBaselineEntrySchema = z.object({ typology: z.string().min(1), family: z.string().min(1).optional() }).strict();
 export type UnkindedBaselineEntry = z.infer<typeof UnkindedBaselineEntrySchema>;
 
 /**
- * An instance's ratchet baseline: the families IT owns ({@link typologyOwner})
+ * A layer's ratchet baseline: the families IT owns ({@link typologyOwner})
  * that may stay unkinded. Declared as an asset of role `unkinded-baseline`, so
- * where it lives is the instance's declaration and not a convention here.
+ * where it lives is the layer's declaration and not a convention here.
  *
  * Keys only — `typology` and `family`. The reason and the validator ref are in
  * the publish-time table: a ref names the validator's layer, which may sit
  * above this one, and a reason changes when ANOTHER layer adds a validator
- * node, which must not make this instance's commit stale.
+ * node, which must not make this layer's commit stale.
  */
 export const UnkindedBaselineKind = nodeKind("unkinded-baseline/1.0.0", [], {
   unkinded: z.array(UnkindedBaselineEntrySchema),
@@ -409,28 +409,28 @@ export function renderBaseline(unkinded: readonly Pick<Unkinded, "typology" | "f
   return JSON.stringify({ $schema: UnkindedBaselineKind.tag!, unkinded: entries }, null, 2) + "\n";
 }
 
-/** Where an instance declares its baseline, absolute; `undefined` when it declares none (an empty baseline). */
+/** Where a layer declares its baseline, absolute; `undefined` when it declares none (an empty baseline). */
 export function baselinePath(instanceRoot: string, registry?: GraphTypologyRegistry): string | undefined {
   return declaredAssetPath(instanceRoot, UNKINDED_BASELINE_ROLE, registry);
 }
 
-/** One instance's verdict against its own baseline. */
+/** One layer's verdict against its own baseline. */
 export interface LayerRatchet {
   instance: string;
   /** Unkinded now, owned here, and not in the baseline: the gate's finding. */
   fresh: string[];
   /** In the baseline and no longer an unkinded family here: a stale baseline, shrunk by the writer. */
   gone: string[];
-  /** In the baseline and unkinded, but OWNED by another instance: a baseline may name only its own. */
+  /** In the baseline and unkinded, but OWNED by another layer: a baseline may name only its own. */
   foreign: string[];
   /** What the writer leaves in the baseline (what it held and still owns unkinded, plus `fresh` when accepted). */
   keep: Unkinded[];
 }
 
 /**
- * The per-layer ratchet. `owners` maps each typology to its owning instance;
- * `baselines` maps each instance to what its baseline admits (`undefined`: it
- * declares none). Every instance that owns an unkinded family, or declares a
+ * The per-layer ratchet. `owners` maps each typology to its owning layer;
+ * `baselines` maps each layer to what its baseline admits (`undefined`: it
+ * declares none). Every layer that owns an unkinded family, or declares a
  * baseline, gets a verdict. An unkinded family whose typology has no owner is
  * returned as `unattributed`, never filed under a guess.
  */

@@ -7,7 +7,7 @@
  * most recently in the CRDM relocation guard that filtered on an id the move
  * had deleted and would have passed over nothing forever.
  *
- * So the load-bearing test here is the NEGATIVE one: a synthetic instance that
+ * So the load-bearing test here is the NEGATIVE one: a synthetic layer that
  * nests a declared directory must be reported and must fail.
  */
 import { describe, expect, it } from "bun:test";
@@ -23,7 +23,7 @@ import { checkLayoutNorms, pairKey, readBaseline } from "../../check-layout-norm
 const INSTANCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const REPO_ROOT = resolve(INSTANCE_ROOT, "..");
 
-/** A throwaway repository with one instance declaring `dirs`. */
+/** A throwaway repository with one layer declaring `dirs`. */
 function fixture(dirs: Array<{ id: string; path: string; graphTypologies?: string[] }>): string {
   const repo = mkdtempSync(join(tmpdir(), "layout-norms-"));
   const inst = join(repo, "thing");
@@ -185,7 +185,7 @@ describe("the real corpus", () => {
     // another declared graph. Corpus-wide nesting stays the baselined ratchet
     // above, which is the mechanism built for exactly the case where somebody
     // else's layout is outstanding work.
-    // SCOPED TO THIS INSTANCE'S OWN `methodologies/`, and the narrowing was
+    // SCOPED TO THIS LAYER'S OWN `methodologies/`, and the narrowing was
     // forced twice in one sitting. First by `main` declaring `test/`; then by
     // `main` again — #881 landed `smart-base`, whose `methodologies/` contains
     // a declared `methodologies/processes/`, so a filter on /methodolog/
@@ -227,7 +227,7 @@ describe("the real corpus", () => {
 
 describe("it asks the schema rather than computing geometry", () => {
   it("does not flag a two-segment path that is not inside a declared directory", () => {
-    // `test/results/` is two segments from its instance root and is correct:
+    // `test/results/` is two segments from its layer root and is correct:
     // `test/` is not a graph. Depth is the wrong test, and this pins that the
     // check does not use it.
     const repo = fixture([

@@ -20,14 +20,14 @@
  * | a journey names | it must resolve to |
  * |---|---|
  * | `personas` | an actor, or (from 0.4.0) a role (`roles.json` of a `scenarios` directory) |
- * | a step's `lead`, `experiences[].actor`, `illustrationStyle.cast[].actor`, and `handoff.from`/`to` when spelled as an id (lower-case kebab; words such as "Thai hospital" are a place or a system, not checked) | an actor (`scenarios` directory, `actors/<id>.json`), the journey's own instance first |
+ * | a step's `lead`, `experiences[].actor`, `illustrationStyle.cast[].actor`, and `handoff.from`/`to` when spelled as an id (lower-case kebab; words such as "Thai hospital" are a place or a system, not checked) | an actor (`scenarios` directory, `actors/<id>.json`), the journey's own layer first |
  * | `stories` | a user story (`stories.json` of a `scenarios` directory) |
- * | `realisedBy[].process` | a BPMN file, relative to the instance root |
+ * | `realisedBy[].process` | a BPMN file, relative to the layer root |
  * | `realisedBy[].tasks` | an element id in that file |
  * | `uses[].block` | a block of a catalogue in a directory declaring `building-blocks` |
  * | `requirements`, `preconditions[].requirements` | a `req:` node |
  * | `examples`, `fhirChanges[].examples`, `dak[].key` | an entry of a `fhir-artifact-index` (could-not-determine while the index is built at publish) |
- * | `illustration.src` | a file, relative to the instance root |
+ * | `illustration.src` | a file, relative to the layer root |
  * | `follows`, `partOf`, `parts[].scenario`, a step's `includes` | a journey; parts and includes form no cycle |
  *
  * ## A journey is a DAK user scenario, and says nothing twice
@@ -47,7 +47,7 @@
  * | an actor a step names who is no persona (0.4.0; the schema checks earlier files) | as before |
  * | `includes` on a step whose `realisedBy` names a call activity of another process | the two disagree (could-not-determine when the call names no process, or the included journey has no BPMN) |
  * | `trustLadder`, `record.state` | a code list in a `code-list` directory, and a code of it |
- * | `views` | a view of a model the instance's ArchiMate config names |
+ * | `views` | a view of a model the layer's ArchiMate config names |
  *
  * | a workshop names | it must resolve to |
  * |---|---|
@@ -55,18 +55,18 @@
  * | `steps[]` `{scenario, step}` | that journey, and a step of it |
  * | `discussion[].steps`, `resources[].steps` (`<scenario>#<step>`) | the same |
  * | `presentation.recordOf` | an actor |
- * | `presentation.views` | a view of a model the instance's ArchiMate config names |
+ * | `presentation.views` | a view of a model the layer's ArchiMate config names |
  * | `presentation.deviceDemo.screens[].steps` | a step of a journey the workshop teaches (or of a sub-journey of one) |
  *
  * | a device screen names | it must resolve to |
  * |---|---|
- * | `owner`, a `personCard` block's `actor` | an actor, the screen's own instance first |
+ * | `owner`, a `personCard` block's `actor` | an actor, the screen's own layer first |
  * | `steps[]` `{scenario, step}` | that journey, and a step of it |
  * | a `qr` or `recordList` block's `example` | an entry of a `fhir-artifact-index` (could-not-determine while the index is built at publish) |
  *
  * | an actor's persona names | it must resolve to |
  * |---|---|
- * | `avatar` | a file, relative to the actor's instance root |
+ * | `avatar` | a file, relative to the actor's layer root |
  *
  * A file of any of these kinds that does not parse is a finding too: the viewer
  * reports it and draws nothing of it, so nothing of it was checked.
@@ -304,7 +304,7 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
     for (const k of new Set(screenExamples(sc))) example(x.instance, x.file, "blocks", k);
   }
 
-  // A persona's avatar is a file of the actor's instance.
+  // A persona's avatar is a file of the actor's layer.
   for (const actors of corpus.actors.values()) {
     for (const a of actors.values()) {
       if (a.persona?.avatar === undefined) continue;

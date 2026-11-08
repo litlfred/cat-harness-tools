@@ -89,7 +89,7 @@ function marker(root: string, id: string, into: string): void {
   );
 }
 
-/** An instance (at a fresh repository root) declaring exactly `dirs`. */
+/** A layer (at a fresh repository root) declaring exactly `dirs`. */
 function instance(dirs: Array<Record<string, unknown>>): string {
   const root = mkdtempSync(join(tmpdir(), "dir-storage-"));
   made.push(root);
@@ -142,7 +142,7 @@ describe("the schema", () => {
 // both halves: that the value survives the resolver, and that each consumer has
 // DECIDED what to do with it rather than inheriting a `!== "tip"` arm.
 describe("a route-keyed directory is TWO-valued, and the missing third is deliberate", () => {
-  /** A route-keyed instance whose files are still tracked — the pre-cutover state. */
+  /** A route-keyed layer whose files are still tracked — the pre-cutover state. */
   function notCutOver(): string {
     const root = gitInstance([{ id: "uml", path: "uml/", graphTypologies: ["docs"], storage: ROUTE }]);
     mkdirSync(join(root, "uml"));

@@ -199,7 +199,7 @@ function run(): void {
     //
     // Anchored at the block's own CONTENT repo, found the way qa-sweep finds it
     // (bean `8wj1`). This was the git top level, which in a checkout holding
-    // more than one instance — this one: the verdicts live under
+    // more than one layer — this one: the verdicts live under
     // `cat-harness/test/results/` — named a results tree nothing reads, so a
     // merged finding started a fresh report there instead of joining the real
     // one. The attestation store is anchored at the same root, so the sweep

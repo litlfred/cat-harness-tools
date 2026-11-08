@@ -126,7 +126,7 @@ export interface PanelTask {
   type: string;
   /**
    * The step's own page: its subject IRI `…/process/P/node/T` (#603). Absent
-   * when its instance's graph publishes no subject pages.
+   * when its layer's graph publishes no subject pages.
    */
   href?: string;
   lane?: string;

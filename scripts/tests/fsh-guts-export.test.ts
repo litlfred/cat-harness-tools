@@ -44,10 +44,10 @@ const ROOT = resolve(HARNESS_ROOT);
 const MAIN_EXPORT = await buildExport();
 
 /**
- * A throwaway instance that declares a trashcan.
+ * A throwaway layer that declares a trashcan.
  *
- * A REPOSITORY holding an instance, which is the live shape: `fsh-guts/` is
- * declared `scope: "repository"`, so the directory sits beside the instance
+ * A REPOSITORY holding a layer, which is the live shape: `fsh-guts/` is
+ * declared `scope: "repository"`, so the directory sits beside the layer
  * rather than inside it. The fixture makes its own repository directory
  * instead of letting `repoRootFor` reach `/tmp` — that was shared, so every
  * fixture in this file wrote into one trashcan and the isolation each `try`

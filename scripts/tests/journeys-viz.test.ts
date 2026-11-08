@@ -1,11 +1,11 @@
 /**
- * The journeys viewer over a fixture checkout of two instances: `lower`, a
+ * The journeys viewer over a fixture checkout of two layers: `lower`, a
  * layer holding journeys of its own, and `top`, which needs it, holds a
  * journey group, a workshop, and declares the visualiser.
  *
  * What is asserted is what the owner asked the viewer to show (2026-11-05):
  * every journey in the checkout, each journey alone, journeys in sub-graphs
- * (per instance, and by `partOf` within one), and the didactic layer on top.
+ * (per layer, and by `partOf` within one), and the didactic layer on top.
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -876,8 +876,8 @@ describe("the check over a staged site: every DAK link resolves to a file", () =
 });
 
 describe("composition (user-scenario 0.4.0): a parent's parts, in its order, and a step that is a journey", () => {
-  // A checkout of its own: one instance, every journey of it 0.4.0. The
-  // instance sits one level down, as `lower` and `top` do: an instance at
+  // A checkout of its own: one layer, every journey of it 0.4.0. The
+  // layer sits one level down, as `lower` and `top` do: a layer at
   // the temporary directory's top would make the system temporary directory
   // its checkout, read with every other test's fixtures in it.
   const ROOT = mkdtempSync(join(tmpdir(), "journeys-compose-"));

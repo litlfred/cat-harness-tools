@@ -54,7 +54,7 @@ describe("the walk stops at the first handler that wants the path", () => {
   it("OUTERMOST wins: a handler at `docs` owns `docs/who-iris`", () => {
     // The direction that matters, and the opposite of longest-prefix routing.
     // A mount point is a claim on a SUBTREE: if a deeper handler could punch
-    // through, the outer instance's own index could not be trusted to describe
+    // through, the outer layer's own index could not be trusted to describe
     // what sits under it.
     const { mounts, refused } = resolve_([r("docs/who-iris"), r("docs")]);
     expect(mounts.map((m) => m.route)).toEqual(["docs"]);
@@ -64,7 +64,7 @@ describe("the walk stops at the first handler that wants the path", () => {
   it("refuses regardless of the order the claims arrive in", () => {
     // Directory-read order varies by filesystem. A collision report that
     // depended on it would be irreproducible, and the two runs would disagree
-    // about which instance is at fault.
+    // about which layer is at fault.
     const a = resolve_([r("docs"), r("docs/who-iris")]);
     const b = resolve_([r("docs/who-iris"), r("docs")]);
     expect(a.mounts.map((m) => m.route)).toEqual(b.mounts.map((m) => m.route));
@@ -72,7 +72,7 @@ describe("the walk stops at the first handler that wants the path", () => {
   });
 
   it("an exact duplicate is a collision too, not a harmless re-mount", () => {
-    // Two instances declaring the same name is not hypothetical here: #477
+    // Two layers declaring the same name is not hypothetical here: #477
     // records TWO silent name collisions in one merge, and `instanceRoots` is
     // keyed on the declared name, so "the stub won" with nothing reported.
     const { mounts, refused } = resolve_([r("docs/who-iris"), r("docs/who-iris")]);
@@ -83,7 +83,7 @@ describe("the walk stops at the first handler that wants the path", () => {
   it("a shared PREFIX that is not a path segment is not a collision", () => {
     // `docs/who-iris` must not be treated as owning `docs/who-iris-extra`.
     // A naive `startsWith` says it does, and the site would then refuse a
-    // perfectly distinct instance on a string coincidence.
+    // perfectly distinct layer on a string coincidence.
     const { mounts, refused } = resolve_([r("docs/who-iris"), r("docs/who-iris-extra")]);
     expect(mounts.map((m) => m.route)).toEqual(["docs/who-iris", "docs/who-iris-extra"]);
     expect(refused).toEqual([]);
@@ -230,7 +230,7 @@ describe("which kind answers at the instance's own route", () => {
 
   it("with NO same-kind sibling the root still publishes at both routes", () => {
     // One docs directory, marked root. The yield rule must not take a URL
-    // away from an instance it does not concern.
+    // away from a layer it does not concern.
     const { candidates } = withRoutes([m("lone", "docs", true)]);
     expect(candidates.map((c) => c.route).sort()).toEqual(["docs/lone", "lone"]);
   });
@@ -435,7 +435,7 @@ describe("a served directory's bytes publish at /<instance>/<path> — bean 680p
 });
 
 describe("the URL space: several instances, each under its own name — bean cat-tools-sthf", () => {
-  // Three instances in one repository: two published, one declaring
+  // Three layers in one repository: two published, one declaring
   // `"enabled": false`. The layout is the plan the mount walk would build.
   const repo = mkdtempSync(join(tmpdir(), "url-space-"));
   const instance = (name: string, decl: Record<string, unknown>, dirs: string[]) => {

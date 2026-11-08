@@ -10,7 +10,7 @@
  * family that already has one.
  *
  * `id`, not `name`: a JSON file whose `name` equals its stem is how
- * `findDeclarationFile` recognises an INSTANCE declaration.
+ * `findDeclarationFile` recognises a LAYER declaration.
  *
  * A LEAF: Zod only.
  *

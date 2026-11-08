@@ -16,7 +16,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * The page is the COMMITTED overview page's figure markup (its Liquid
  * `relative_url` resolved, as Jekyll would on a root site), with the
  * committed `uml.css`, `kg-graph.js`, vendored Graphviz and DOT served from
- * the COMPOSED site: every path is resolved through the instance's site
+ * the COMPOSED site: every path is resolved through the layer's site
  * layers (`siteFileFor`, top-most layer wins), as `compose-docs` lays them
  * down. Since cat-harness's semantic-subgraphs slice 1 (19e5d6b) the
  * stylesheet, the script and the vendored Graphviz are the site CHROME's

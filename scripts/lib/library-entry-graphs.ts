@@ -11,7 +11,7 @@
  * entry's own nodes are its manifest, sections and blocks (the `library`
  * typology); a directory of other files inside it was in the repository and
  * named by no typology, so nothing published it. The fix is a declaration, not
- * a list of filenames here: an instance declares the directory inside the
+ * a list of filenames here: a layer declares the directory inside the
  * entry, with a typology that is `within: "library"` (a content layer's
  * `l1-extraction`, say), and this module finds every such declaration. So the rule
  * the publisher follows is the owner's own — declared KG content is published —
@@ -55,7 +55,7 @@ export interface EntryGraphFile {
   jsonld: boolean;
 }
 
-/** The nearest directory at or above `dir` that holds an instance declaration, or `undefined`. */
+/** The nearest directory at or above `dir` that holds a layer declaration, or `undefined`. */
 function declaringInstanceRoot(dir: string): string | undefined {
   for (let d = resolve(dir); ; d = dirname(d)) {
     if (findDeclarationFile(d) !== undefined) return d;
@@ -66,10 +66,10 @@ function declaringInstanceRoot(dir: string): string | undefined {
 type DeclaredDirectories = ReturnType<typeof instanceDirectories>;
 
 /**
- * One instance's declared directories, read once per declaration text.
+ * One layer's declared directories, read once per declaration text.
  *
  * `check:l1-complete` asks {@link entrySubgraphDirs} once per library entry,
- * and every entry of a library has the same declaring instance. Re-reading and
+ * and every entry of a library has the same declaring layer. Re-reading and
  * re-resolving that declaration for each one made `checkAll` over the corpus
  * slow enough to time a test out (`ingest-and-l1`, 5.8 s against bun's 5 s).
  * The key is the declaration's TEXT as well as its root, and the registry's
@@ -136,7 +136,7 @@ export interface EntrySubgraphDir {
  * `library` (`within: "library"`) and exists on disk — published or not. The
  * one declaration lookup {@link entryGraphFiles} publishes from and
  * `check:l1-complete` accepts as entry contents, so the two cannot disagree.
- * Empty when the entry holds none, or its instance cannot be read — an
+ * Empty when the entry holds none, or its layer cannot be read — an
  * unreadable declaration is `check:harness-dirs`'s finding, not this one's.
  */
 export function entrySubgraphDirs(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntrySubgraphDir[] {
@@ -161,7 +161,7 @@ export function entrySubgraphDirs(entryDir: string, registry: GraphTypologyRegis
 /**
  * Every file of every directory DECLARED inside `entryDir` whose typology is a
  * sub-graph of `library` (`within: "library"`) and is published. Sorted by
- * `rel`. Empty when the entry holds none, or its instance cannot be read.
+ * `rel`. Empty when the entry holds none, or its layer cannot be read.
  */
 export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryGraphFile[] {
   const entry = resolve(entryDir);
@@ -183,7 +183,7 @@ export function entryGraphSitePath(instance: string, docId: string, rel: string)
 }
 
 /**
- * The directories directly inside the library `lib` that its instance
+ * The directories directly inside the library `lib` that its layer
  * declares with kinds that do not include `library` — absolute, without a
  * trailing separator. They are other graphs kept in the library, not entries:
  * a DAK IG keeps its L1 scenario worked example at

@@ -10,7 +10,7 @@
  *
  * From the page's site-relative URL and two DECLARED facts:
  *
- *   - an INSTANCE scope when the first path segment is a declared instance's
+ *   - a LAYER scope when the first path segment is a declared layer's
  *     name (`/<instance>/…`), or the second is and the first is not (`/<kind>/
  *     <instance>/…`, the kind route `mount-instance-docs.ts` also publishes);
  *   - a LOCALE scope when the first segment is one of the platform's declared
@@ -96,8 +96,8 @@ export interface ManifestScope extends Scope {
 }
 
 /**
- * A searchable thing that is NOT a lunr scope: the identifier lookup an
- * instance publishes under `<site>/id-lookup/<id>/` (bean `1br0`, issue
+ * A searchable thing that is NOT a lunr scope: the identifier lookup a
+ * layer publishes under `<site>/id-lookup/<id>/` (bean `1br0`, issue
  * #1972 step 3). The search box links to it rather than loading it — the
  * owner's ruling on `4pm8` keeps it a page of its own.
  */
@@ -147,7 +147,7 @@ export function publishedLookups(site: string): RemoteScope[] {
   return out;
 }
 
-/** The id the platform scope uses. Not a possible instance or locale name, so it cannot collide. */
+/** The id the platform scope uses. Not a possible layer or locale name, so it cannot collide. */
 export const PLATFORM = "_platform";
 
 /**
@@ -394,7 +394,7 @@ export function render(
   return files;
 }
 
-/** The declared instance names in this checkout: each declaration's `name`, else its directory's. */
+/** The declared layer names in this checkout: each declaration's `name`, else its directory's. */
 export function declaredInstanceNames(repo: string): Set<string> {
   const names = new Set<string>();
   for (const root of instanceRootsIn(repo)) {
@@ -405,7 +405,7 @@ export function declaredInstanceNames(repo: string): Set<string> {
       name = undefined;
     }
     const n = name ?? basename(root);
-    // The checkout-root instance has no route of its own under the site.
+    // The checkout-root layer has no route of its own under the site.
     if (resolve(root) !== resolve(repo)) names.add(n);
   }
   return names;

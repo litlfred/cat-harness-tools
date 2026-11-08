@@ -1,5 +1,5 @@
 /**
- * `scripts/publish-instance-context.ts` — build one instance's context, judged
+ * `scripts/publish-instance-context.ts` — build one layer's context, judged
  * on its own findings only, and put it on `gh-pages` through a REST API that is
  * faked here, so no test reaches the network (bean folio-assistant-63q4).
  */

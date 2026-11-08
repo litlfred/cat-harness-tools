@@ -1,6 +1,6 @@
 /**
  * Contribution registry — what a folio-assistant *dependency* may add to the
- * root instance: block kinds, adapters and MCP tools, not only translations.
+ * root layer: block kinds, adapters and MCP tools, not only translations.
  *
  * ## Shape: load-time registration
  *
@@ -249,10 +249,10 @@ export interface PipelinePluginContribution {
 }
 
 export interface FolioContribution {
-  /** The contributing instance's name, as declared in the dependency entry. */
+  /** The contributing layer's name, as declared in the dependency entry. */
   name: string;
   /**
-   * The contributing instance's root directory, absolute.
+   * The contributing layer's root directory, absolute.
    *
    * Pinned by `loadContributions` from the dependency entry, for the same
    * reason `name` is: a contributor that could name its own root could point
@@ -321,7 +321,7 @@ export type ContributedKind = Readonly<Omit<KindEntry, "contributor">>;
 /**
  * Accumulates contributions as the dependency tree is walked.
  *
- * Deliberately an instance rather than module-level state: tests, and a root
+ * Deliberately a layer rather than module-level state: tests, and a root
  * that resolves more than one folio in a process, must not leak registrations
  * into each other. Module-level mutable state is also how load order becomes
  * un-debuggable, which this shape is already paying enough for.

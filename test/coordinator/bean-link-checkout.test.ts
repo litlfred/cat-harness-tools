@@ -21,7 +21,7 @@ import { WORK_PLAN_OPS } from "../../src/workflow/bean-link.ts";
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 /**
- * `beans/` says what is being worked on; an instance says where it got to.
+ * `beans/` says what is being worked on; a layer says where it got to.
  * Kept apart they diverge. These tests are about the operations that keep them
  * one record — and about the one that deliberately refuses to fire.
  *
