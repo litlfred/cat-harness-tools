@@ -1272,7 +1272,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     const seg = /^\\/([A-Za-z0-9._-]+)\\//.exec(location.pathname || "");
     return h && seg && seg[1] !== "." && seg[1] !== ".." ? h[1] + "/" + seg[1] : "";
   };
-  // An IG page (fhir-harness's thin layout) says where each heading's text
+  // An IG page (the FHIR layer's thin layout) says where each heading's text
   // is in its markdown source: <script id="ig-source-lines">, the IG's own
   // repository and, per heading, its line and, for an included file, that
   // file. Its sections take the same right-gutter box as any plain page's

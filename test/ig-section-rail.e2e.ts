@@ -7,7 +7,7 @@
  *
  * Owner, 2026-11-08, on /smart-trust/: "edit feedback on IGs like rest of
  * documents should be on right grill not touching section title ...
- * consolidate infrastructure". fhir-harness's thin IG layout used to append
+ * consolidate infrastructure". The FHIR layer's thin IG layout used to append
  * its own ✎ 📣 to each heading; it now only writes the page's
  * `<script id="ig-source-lines">`, and `EDIT_LINKS_RUNTIME` draws the boxes.
  * This drives the runtime over a page shaped like that layout's output.
@@ -68,7 +68,7 @@ test("each IG heading gets one right-gutter box, nothing inside the heading", as
   await expect(page.locator(".fa-block-panel.open a[data-fa-link=edit]")).toHaveAttribute("href", "https://github.com/o/ig/edit/main/input/pagecontent/overview.md");
 });
 
-// Owner, 2026-11-08, on fhir-harness/fhir/publishing.html: "Suggest is now
+// Owner, 2026-11-08, on a FHIR-layer docs page (publishing.html): "Suggest is now
 // redundant with right grill icons. QA and TR should be in right grill."
 const DOC = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Doc</title></head><body>
 <div class="main-content" id="main-content">
