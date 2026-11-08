@@ -86,7 +86,7 @@ import {
 // `existsSync` on a path it spelled itself would be a second, and the two
 // would drift the first time the marker moved — which it already did once,
 // from `--git-common-dir` to the per-worktree git dir (review on #1957).
-import { markerAtPath, readMarker } from "./branch-store.ts";
+import { absenceAt, BranchStoreUsageError, markerAtPath, readMarker } from "./branch-store.ts";
 // The `folio` graph typology is registered by CORE as a load-time side effect, so
 // the harness alone does not know it exists and `readDeclaration` throws on a
 // perfectly valid declaration that uses it. Same import, same reason, as
@@ -201,7 +201,18 @@ export function tipPresence(
     // Only where the mount lives is used below (`path`, `into`): read as a location (`read-projections.ts`).
     marker = markerAtPath(repoRoot, rel, "location");
     if (!marker) {
-      const byId = readMarker(repoRoot, markerId, "location");
+      // The path lookup above already answered for a marker at THIS path, so
+      // an id several mounts share (`health`: cat-harness-tools, core and
+      // who-iris each mount their own) is not ambiguous for this entry: none
+      // of them is its graph. Refusing here reported cat-harness's own
+      // `health` as "could not determine" in every joined instance run
+      // (smart-ips-pilgrimage#13, cat-harness-tools#1701).
+      let byId: ReturnType<typeof readMarker>;
+      try {
+        byId = readMarker(repoRoot, markerId, "location");
+      } catch (err) {
+        if (!(err instanceof BranchStoreUsageError)) throw err;
+      }
       if (byId && (byId.path === undefined || byId.path === rel)) marker = byId;
     }
     if (!marker && abs) {
@@ -320,6 +331,14 @@ const isBuiltAtPublishDir = (dirs: ReadonlySet<string>, abs: string): boolean =>
  *   checkout's root instance) is not "other" for this purpose — every path is
  *   inside it.
  */
+/**
+ * Entries this run found NOT APPLICABLE to this checkout, with the reason:
+ * platform state a mounted layer declares for every checkout, which this root
+ * neither declares nor carries (cat-harness-tools#1701). Neither a pass nor a
+ * finding: printed, and counted apart from both.
+ */
+export const notApplicable: Array<{ instance: string; id: string; path: string; reason: string }> = [];
+
 export function auditInstance(
   instanceRoot: string,
   repoRoot: string,
@@ -359,7 +378,18 @@ export function auditInstance(
       findings.push(...offCheckoutFindings(e, abs, instanceRoot, repoRoot, e.id));
       continue;
     }
-    if (!present && !e.absent) {
+    if (!present && !e.absent && e.scope === "repository" && resolve(instanceRoot) !== resolve(repoRoot)) {
+      // Checkout-level state a MOUNTED layer declares for every checkout
+      // (cat-harness's `uploads/`), and this checkout's root did not declare
+      // or create it. Not this root's defect; it says so instead of failing
+      // (cat-harness-tools#1701). A root that wants it declares or creates it.
+      notApplicable.push({
+        instance: instanceRoot,
+        id: e.id,
+        path: e.path,
+        reason: `checkout-level state declared for every checkout by ${basename(instanceRoot)}, not by this root, and not on disk here; declare it at the root to keep it here`,
+      });
+    } else if (!present && !e.absent) {
       findings.push({
         instance: instanceRoot,
         id: e.id,
@@ -634,7 +664,22 @@ function offCheckoutFindings(
     ];
   }
   const t = tipPresence(src, abs, repoRoot, mountId);
-  return t.state === "mounted" ? [] : [{ instance: instanceRoot, id: e.id, path: e.path, kind: t.state, detail: t.detail }];
+  if (t.state === "mounted") return [];
+  // Not applicable here, and determined so rather than assumed: `state:mount`
+  // recorded that this checkout does not keep the graph (declared for every
+  // checkout by a mounted layer, not by this root, and its remote carries no
+  // such branch). An instance that never declared the platform's state is not
+  // missing it (cat-harness-tools#1701). A root that declares it, or a remote
+  // that carries the branch, has no such record and is judged as before.
+  if (t.state === "unmounted") {
+    // By path only: an id several mounts share must not borrow another graph's record.
+    const absent = absenceAt(repoRoot, relative(repoRoot, abs).split(sep).join("/"));
+    if (absent) {
+      notApplicable.push({ instance: instanceRoot, id: e.id, path: e.path, reason: absent.reason });
+      return [];
+    }
+  }
+  return [{ instance: instanceRoot, id: e.id, path: e.path, kind: t.state, detail: t.detail }];
 }
 
 export function auditNested(
@@ -749,13 +794,16 @@ if (import.meta.main) {
   for (const f of findings) {
     console.error(`  ✗ ${basename(f.instance) || f.instance}/${f.id} (${f.path}): ${f.kind} — ${f.detail}`);
   }
+  for (const n of notApplicable) {
+    console.log(`  · ${basename(n.instance) || n.instance}/${n.id} (${n.path}): not applicable here — ${n.reason}`);
+  }
   console.log(
     // NAMED, not just counted — `check:declared-assets` records why: a bare
     // count reads as success until you know how many instances there were.
     `${declared} declared director(ies) across ${instances.length} instance(s) ` +
       `(${instances.map((p) => basename(p) || p).sort().join(", ")}) ` +
       `plus ${nestedCount} declared FROM WITHIN one of them; ` +
-      `${exempt} declared absent with a reason; ${findings.length} finding(s)`,
+      `${exempt} declared absent with a reason; ${notApplicable.length} not applicable here; ${findings.length} finding(s)`,
   );
   process.exit(findings.length > 0 ? 1 : 0);
 }
