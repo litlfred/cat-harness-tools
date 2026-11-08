@@ -247,8 +247,8 @@ export function scanForeignPaths(repo: string): ForeignScan {
  *
  * In a content instance's joined checkout (smart-ips-pilgrimage) the ROOT
  * declares `docs/`, `translations/`, `fhir-artifact-index/`, and every literal
- * in a MOUNTED layer's code that spells one of those names (bootstrap-tools,
- * cat-harness-tools, fhir-harness — 39 sites) was counted against that layer's
+ * in a MOUNTED layer's code that spells one of those names (three
+ * mounted layers, 39 sites) was counted against that layer's
  * baseline, which is kept in the platform index where the root declares
  * nothing. The root does not own that code and cannot change it.
  *

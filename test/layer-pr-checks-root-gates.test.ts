@@ -125,7 +125,9 @@ describe("compare-gates.py with diagnostics", () => {
       expect(r.status).toBe(0);
       expect(r.stdout).toContain(`not applicable here; not counted (main exited ${b})`);
     }
-    expect(compare({}, plain(78)).status).toBe(0);
+    const absent = compare({}, plain(78));
+    expect(absent.status).toBe(0);
+    expect(absent.stdout).toContain("main did not run it, so not counted");
   });
 
   test("a gate without diagnostics is judged by its exit, as before", () => {

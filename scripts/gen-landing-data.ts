@@ -127,7 +127,7 @@ const OUT = join(ROOT, siteDirFor(ROOT), "_data/stickies.json");
 const check = process.argv.includes("--check");
 
 // cat-harness-tools#1701: a content instance whose landing is a MOUNTED layer
-// (smart-ips-pilgrimage → smart-base) cannot commit that layer's data file, so
+// (an IG instance whose landing is a base layer) cannot commit that layer's data file, so
 // the committed-currency check is not applicable there. The writer still runs.
 if (check) {
   const landing = resolveLandingInstance(CHECKOUT);

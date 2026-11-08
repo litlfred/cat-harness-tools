@@ -293,7 +293,7 @@ export function accountedRootPaths(repoRoot: string): Map<string, string> {
 
   // THE ROOT INDEX'S CONTENT-TYPE SECTIONS name root paths too
   // (cat-harness-tools#1701). An IG repository that is its own index declares
-  // `contentTypes.ig.include` in `index.config.json` (fhir-harness's `ig`
+  // `contentTypes.ig.include` in `index.config.json` (the IG layer's `ig`
   // type, owner 2026-10-30: "harness declares what it pays attention to in
   // the repo"), listing `sushi-config.yaml` and `ig.ini` among the paths it
   // reads. A path a declaration lists is accounted for by that declaration,

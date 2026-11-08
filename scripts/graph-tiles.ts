@@ -251,7 +251,7 @@ export function graphTiles(
   /**
    * The name the harness rows already give a destination (`href`), when they
    * give one. Consulted ONLY for a tile with no declared title, in place of
-   * the directory's first kind (cat-harness-tools#1701): smart-base's
+   * the directory's first kind (cat-harness-tools#1701): a base layer's
    * `schemas/` declares `["code", "schemas"]` and opens the schema viewer, so
    * the rows, FOLDERS and the sidebar call that page "Schemas" while the
    * first-kind fallback made its tile "Code" — two names for one destination,

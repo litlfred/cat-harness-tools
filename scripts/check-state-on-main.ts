@@ -174,15 +174,15 @@ function instanceOfKey(key: string): string {
  * (cat-harness-tools#1701).
  *
  * The baseline is cat-harness-tools' own, written in the platform index, so it
- * names instances (`folio-assistant-sci`) that a content instance's joined
- * checkout never mounts. In smart-ips-pilgrimage's run the `sci` line was
+ * names instances (a layer above this one) that a content instance's joined
+ * checkout never mounts. In smart-ips-pilgrimage's run that line was
  * reported stale — "no longer a state directory on `main`" — which is not
  * true: the gate simply could not see it. An instance is only excused when the
  * checkout says so twice over: an `index.lock.json` that parses and does not
  * list it (by name or mount path), AND no directory of that path on disk. A
  * checkout with no lock, an unreadable lock, or the instance locked but
  * missing on disk is judged exactly as before, so the platform index — whose
- * lock lists `folio-assistant-sci` — still fails a genuinely stale line.
+ * lock lists that layer — still fails a genuinely stale line.
  */
 export function instancesNotInCheckout(repoRoot: string, baseline: Baseline): Map<string, string> {
   const out = new Map<string, string>();

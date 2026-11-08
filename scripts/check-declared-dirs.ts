@@ -202,8 +202,8 @@ export function tipPresence(
     marker = markerAtPath(repoRoot, rel, "location");
     if (!marker) {
       // The path lookup above already answered for a marker at THIS path, so
-      // an id several mounts share (`health`: cat-harness-tools, core and
-      // who-iris each mount their own) is not ambiguous for this entry: none
+      // an id several mounts share (`health`: several layers each mount
+      // their own) is not ambiguous for this entry: none
       // of them is its graph. Refusing here reported cat-harness's own
       // `health` as "could not determine" in every joined instance run
       // (smart-ips-pilgrimage#13, cat-harness-tools#1701).

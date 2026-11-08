@@ -95,7 +95,11 @@ def main():
             # instance, cat-harness-tools#1701; dth-phc#7, where
             # check:qa-reviewer-permission went 0 -> 78) is listed, so the
             # lost answer shows, and not counted.
-            verdict = "not applicable here; not counted" + (f" (main exited {b})" if b is not None else "")
+            verdict = (
+                "not applicable here; main did not run it, so not counted"
+                if b is None
+                else f"not applicable here; not counted (main exited {b})"
+            )
         elif b is None and h in UNDETERMINED:
             verdict = f"{UNDETERMINED[h]}; main did not run it, so not counted"
         elif h == 2 and b in (0, 1):

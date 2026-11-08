@@ -5,9 +5,9 @@
  * @graphNode none — one predicate shared by the landing writers' `--check`
  *
  * cat-harness-tools#1701. smart-ips-pilgrimage's `index.config.json` names
- * `site.landing: "smart-base"`, a lock-mounted layer, so `landing:data:check`
- * compared `smart-base/docs/_data/stickies.json` — inside a mount, in a
- * directory (`smart-base-docs`, `ig-pages`) that is BUILT, not committed —
+ * `site.landing` as a lock-mounted base layer, so `landing:data:check`
+ * compared that layer's `docs/_data/stickies.json` — inside a mount, in a
+ * directory (its built pages) that is BUILT, not committed —
  * and called it stale. The root cannot commit into a mount, so that file is
  * not this checkout's to judge.
  *
