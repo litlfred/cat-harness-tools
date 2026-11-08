@@ -16,19 +16,46 @@
  *   heading the extraction found — the section's own title for a section
  *   keyword, any TOC title or figure caption for a document keyword.
  *
- * Derived and deterministic: re-running on an unchanged library writes
- * nothing. `--check` reports a missing or stale file and exits 1.
+ * ## Built at publish, outside the ingest record (cat-harness#1144)
  *
- * Usage: bun run cat library:keywords [--check]
+ * The owner (2026-11-08): keywords are EXTRACTED content, so they do not live
+ * in the original ingest record. The writer no longer touches
+ * `library/<slug>/`; it writes the derived keywords graph
+ * (`folio-keywords/v2`, {@link keywordsGraphs}) to
+ * `<site>/assets/keywords/<instance>/<slug>.jsonld`, one node per entry linked
+ * to it by `about`, plus an `index.json` of every node. The route is declared
+ * `builtAtPublish`, so `--check` has nothing committed to compare. Readers
+ * (the library viewer, the keyword viewer) compute the same graph in memory
+ * rather than depend on the write order. A committed `keywords.json` from
+ * before the move is LEGACY: the `library-keywords` health check lists each
+ * one for removal.
+ *
+ * Every node is keyed by VARIANT ({@link KEYWORD_VARIANTS}), so methods can
+ * be compared side by side; today there is one, the weighting the LSI index
+ * uses, scored on the surface matrix.
+ *
+ * Usage: bun run cat library:keywords [--site <dir>] [--check]
  *
  * @covers library
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { buildTermMatrix, keywordsOf, tokenize, type Keyword } from "../pipeline/lsi.ts";
+import { buildLsi, buildTermMatrix, keywordsOf, latentTermScores, tokenize, type Keyword, type KeywordScoring, type LsiUnit, type TermMatrix } from "../pipeline/lsi.ts";
+import { buildCa } from "../pipeline/ca.ts";
 import { readStructure } from "../schemas/content/document-structure.ts";
-import { KEYWORDS_FILE, KEYWORDS_SCHEMA_ID, type KeywordsFile, type ScoredKeyword } from "../schemas/library/library-keywords.ts";
+import {
+  KEYWORDS_FILE,
+  KEYWORDS_GRAPH_DIR,
+  KEYWORDS_GRAPH_SCHEMA_ID,
+  type KeywordVariant,
+  type KeywordsGraph,
+  type ScoredKeyword,
+} from "../schemas/library/library-keywords.ts";
+import { baseDocsDir } from "./compose-docs.js";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
+import { siteTarget } from "./lib/site-target.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { libraryEntryDir, libraryOfEntry } from "./lib/library-entry-graphs.ts";
 export { KEYWORDS_FILE };
@@ -50,12 +77,98 @@ function withEvidence(ks: Keyword[], headings: string[]): ScoredKeyword[] {
   return ks.map((k) => ({ ...k, evidence: headings.some((h) => namedBy(k.term, h)) ? ["heading" as const] : [] }));
 }
 
-/** keywords.json for every entry under one library root. */
-export function libraryKeywords(libRoot: string, repoRoot = ROOT): Map<string, KeywordsFile> {
+/**
+ * The variants every node carries, in display order (owner, 2026-11-08: compare
+ * LSI keyword algorithms, option B — the weighting × space grid plus
+ * correspondence analysis). The first is the default the library viewer shows,
+ * and the keywords this platform wrote before the comparison.
+ *
+ * - `surface`: the weighted term matrix itself; a keyword is a word the text uses.
+ * - `latent`: the rank-k reconstruction (Deerwester et al. 1990); a keyword may
+ *   be a word the text never uses but its co-occurrence structure implies.
+ * - `latent-rerank`: latent scores, restricted to words the text uses.
+ * - CA: the reconstituted departure from independence (Qi et al. 2023), with
+ *   length and frequency margins removed.
+ */
+export const LATENT_K = 100;
+/** How many top latent terms a unit's keywords are chosen from. */
+const LATENT_CANDIDATES = 300;
+export const KEYWORD_VARIANTS: readonly KeywordVariant[] = [
+  { id: "lsi-log-entropy-surface", method: "lsi", weighting: "log-entropy", space: "surface" },
+  { id: "lsi-tfidf-surface", method: "lsi", weighting: "tfidf", space: "surface" },
+  { id: "lsi-log-entropy-latent", method: "lsi", weighting: "log-entropy", space: "latent", k: LATENT_K },
+  { id: "lsi-tfidf-latent", method: "lsi", weighting: "tfidf", space: "latent", k: LATENT_K },
+  { id: "lsi-log-entropy-latent-rerank", method: "lsi", weighting: "log-entropy", space: "latent-rerank", k: LATENT_K },
+  { id: "ca-latent", method: "correspondence-analysis", weighting: "raw", space: "latent", k: LATENT_K },
+];
+
+/** One entry's keywords in every variant, before it is a graph node. */
+export interface EntryKeywords {
+  corpus: { library: string; sections: number; terms: number };
+  document: Record<string, ScoredKeyword[]>;
+  sections: Record<string, Record<string, ScoredKeyword[]>>;
+}
+
+/** A variant's scorer: the matrix its phrases are read from, and the scores for a set of units. */
+interface Scorer {
+  m: TermMatrix;
+  opts: (cols: number[], headings: string[]) => KeywordScoring;
+}
+
+function scorers(units: LsiUnit[], variants: readonly KeywordVariant[]): Map<string, Scorer> {
+  const matrices = new Map<string, TermMatrix>();
+  const matrix = (w: KeywordVariant["weighting"]): TermMatrix => {
+    if (!matrices.has(w)) matrices.set(w, buildTermMatrix(units, { weighting: w }));
+    return matrices.get(w)!;
+  };
+  const out = new Map<string, Scorer>();
+  for (const v of variants) {
+    if (v.space === "surface") {
+      out.set(v.id, { m: matrix(v.weighting), opts: () => ({}) });
+      continue;
+    }
+    const index = v.method === "correspondence-analysis" ? buildCa(units, { k: v.k ?? LATENT_K }) : buildLsi(units, { weighting: v.weighting, k: v.k ?? LATENT_K });
+    // Phrases and the words a text uses are read from a weighted matrix; CA's
+    // own is raw counts, so its phrases come from the log-entropy matrix, by term.
+    const m = matrix(v.method === "correspondence-analysis" ? "log-entropy" : v.weighting);
+    const row = new Map(m.terms.map((t, i) => [t, i]));
+    const remap = index.terms === m.terms ? undefined : index.terms.map((t) => row.get(t));
+    const anyTerm = v.space === "latent";
+    const back = remap ? new Map(remap.flatMap((r, i) => (r === undefined ? [] : [[r, i] as [number, number]]))) : undefined;
+    out.set(v.id, {
+      m,
+      opts: (cols, headings) => {
+        // A re-rank scores only the words the units use (their rows in `m`)
+        // and the words their headings name, which may not be in the body;
+        // a latent variant takes the top few hundred of the whole vocabulary.
+        let rows: number[] | undefined;
+        if (!anyTerm) {
+          const seen = new Set<number>();
+          for (const j of cols) for (let p = m.A.colPtr[j]; p < m.A.colPtr[j + 1]; p++) seen.add(m.A.rowIdx[p]);
+          for (const w of headings.flatMap((h) => tokenize(h))) if (row.has(w)) seen.add(row.get(w)!);
+          rows = [...seen].flatMap((r) => (back ? (back.has(r) ? [back.get(r)!] : []) : [r]));
+        }
+        const raw = latentTermScores(index, cols, rows ? { rows } : { top: LATENT_CANDIDATES });
+        if (!remap) return { scores: raw, anyTerm };
+        const scores = new Map<number, number>();
+        for (const [i, w] of raw) {
+          const r = remap[i];
+          if (r !== undefined) scores.set(r, w);
+        }
+        return { scores, anyTerm };
+      },
+    });
+  }
+  return out;
+}
+
+/** Every entry's keywords under one library root, in every variant. */
+export function libraryKeywords(libRoot: string, repoRoot = ROOT, variants: readonly KeywordVariant[] = KEYWORD_VARIANTS): Map<string, EntryKeywords> {
   const units = unitsOf(libRoot, ["library"]);
-  const out = new Map<string, KeywordsFile>();
+  const out = new Map<string, EntryKeywords>();
   if (units.length < 3) return out;
-  const m = buildTermMatrix(units);
+  const score = scorers(units, variants);
+  const terms = score.get(variants[0]!.id)!.m.terms.length;
   const libRel = relative(repoRoot, libRoot);
   // Column indices per entry, and per section id.
   const bySlug = new Map<string, { cols: number[]; sections: Map<string, number> }>();
@@ -81,74 +194,137 @@ export function libraryKeywords(libRoot: string, repoRoot = ROOT): Map<string, K
       ...(raw?.figures ?? []).map((f) => f.title),
       ...(raw ? [] : [...titleOf.values()]),
     ];
-    const sections: Record<string, ScoredKeyword[]> = {};
-    for (const [sid, j] of [...e.sections].sort(([a], [b]) => a.localeCompare(b))) {
-      const own = titleOf.has(sid) ? [titleOf.get(sid)!] : [];
-      const ks = keywordsOf(m, [j], [units[j].text], SECTION_TOP, own);
-      sections[sid] = withEvidence(ks, own);
+    const sections: Record<string, Record<string, ScoredKeyword[]>> = {};
+    const document: Record<string, ScoredKeyword[]> = {};
+    for (const v of variants) {
+      const sc = score.get(v.id)!;
+      for (const [sid, j] of [...e.sections].sort(([a], [b]) => a.localeCompare(b))) {
+        const own = titleOf.has(sid) ? [titleOf.get(sid)!] : [];
+        (sections[sid] ??= {})[v.id] = withEvidence(keywordsOf(sc.m, [j], [units[j].text], SECTION_TOP, own, sc.opts([j], own)), own);
+      }
+      document[v.id] = withEvidence(keywordsOf(sc.m, e.cols, e.cols.map((j) => units[j].text), DOC_TOP, [], sc.opts(e.cols, [])), docHeadings);
     }
-    const docKs = keywordsOf(m, e.cols, e.cols.map((j) => units[j].text), DOC_TOP);
-    out.set(slug, {
-      $schema: KEYWORDS_SCHEMA_ID,
-      entry: slug,
-      corpus: { library: libRel, sections: units.length, terms: m.terms.length, weighting: m.weighting },
-      document: withEvidence(docKs, docHeadings),
-      sections,
-    });
+    out.set(slug, { corpus: { library: libRel, sections: units.length, terms }, document, sections });
   }
   return out;
 }
 
-/** One entry's keywords.json against what the writer would write now. */
-export interface KeywordsState {
-  /** The file, relative to the repository root. */
-  path: string;
-  state: "current" | "stale" | "missing";
+/** One library entry, as the library graph names it. */
+interface EntryRef {
+  id: string;
+  instance: string;
+  dir: string;
+}
+
+function entriesOf(repoRoot: string): EntryRef[] {
+  // Discovery starts from the cat-harness declaration, as gen-library-viz does.
+  const g = readLibraryGraph([join(repoRoot, "cat-harness"), repoRoot], repoRoot);
+  return (g?.entries ?? []).map((e) => ({ id: e.id, instance: e.instance, dir: e.dir }));
 }
 
 /**
- * Every entry of every declared library (under `within`, when given), with
- * whether its keywords.json is current, stale or missing. Writes nothing.
- * Also the reader the `library-keywords` health check uses (cat-harness#1144):
- * a report, never a gate, for the reason `gates.ts` gives — the weights derive
- * from the WHOLE library, so one sibling's ingest re-weights every entry.
+ * The derived keywords graph: one `folio-keywords/v2` node per library entry
+ * that has keywords, under `within` when given. Writes nothing.
  */
-export function keywordsStates(within?: string, repoRoot = ROOT): { libraries: number; entries: KeywordsState[]; files: Map<string, string> } {
-  // Discovery starts from the cat-harness declaration, as gen-library-viz does.
-  const g = readLibraryGraph([join(repoRoot, "cat-harness"), repoRoot], repoRoot);
+export function keywordsGraphs(within?: string, repoRoot = ROOT, variants: readonly KeywordVariant[] = KEYWORD_VARIANTS): KeywordsGraph[] {
+  const entries = entriesOf(repoRoot).filter((e) => {
+    const abs = join(repoRoot, e.dir);
+    return within === undefined || abs === resolve(within) || abs.startsWith(resolve(within) + "/");
+  });
   // The LIBRARY each entry is in, not its parent: a filed entry's parent is a
   // concern group (bean `6fez`), and weighting keywords over one group alone
   // would change every entry's scores.
-  const roots = [...new Set((g?.entries ?? []).map((e) => libraryOfEntry(join(repoRoot, e.dir))))]
-    .filter((r) => within === undefined || r === resolve(within) || r.startsWith(resolve(within) + "/"))
-    .sort();
-  const entries: KeywordsState[] = [];
-  const files = new Map<string, string>();
-  for (const root of roots) {
-    for (const [slug, kf] of libraryKeywords(root, repoRoot)) {
-      const path = join(libraryEntryDir(root, slug) ?? join(root, slug), KEYWORDS_FILE);
-      const text = JSON.stringify(kf, null, 2) + "\n";
-      files.set(path, text);
-      const state = !existsSync(path) ? "missing" : readFileSync(path, "utf8") === text ? "current" : "stale";
-      entries.push({ path: relative(repoRoot, path), state });
+  const byRoot = new Map<string, EntryRef[]>();
+  for (const e of entries) {
+    const root = libraryOfEntry(join(repoRoot, e.dir));
+    byRoot.set(root, [...(byRoot.get(root) ?? []), e]);
+  }
+  const out: KeywordsGraph[] = [];
+  for (const [root, es] of [...byRoot].sort(([a], [b]) => a.localeCompare(b))) {
+    const kws = libraryKeywords(root, repoRoot, variants);
+    for (const e of es.sort((a, b) => a.id.localeCompare(b.id))) {
+      const k = kws.get(e.id);
+      if (k === undefined) continue;
+      out.push({
+        $schema: KEYWORDS_GRAPH_SCHEMA_ID,
+        "@type": "cat-harness:DerivedKeywords",
+        entry: e.id,
+        instance: e.instance,
+        about: `library/${e.id}`,
+        corpus: k.corpus,
+        variants: [...variants],
+        document: k.document,
+        sections: k.sections,
+      });
     }
   }
-  return { libraries: roots.length, entries, files };
+  return out;
+}
+
+/** One entry's keywords, for the health check: how many, and whether a legacy committed file is still there. */
+export interface KeywordsState {
+  /** The entry's directory, relative to the repository root. */
+  entry: string;
+  /** Document keywords in the default variant; 0 is an entry the extraction gave nothing. */
+  keywords: number;
+  /** A `keywords.json` still committed inside the entry — the pre-#1144 location. */
+  legacy: boolean;
+}
+
+/** Every library entry under `within`, with its keyword count and legacy-file state. Writes nothing. */
+export function keywordsStates(within?: string, repoRoot = ROOT): { libraries: number; entries: KeywordsState[] } {
+  const all = entriesOf(repoRoot).filter((e) => {
+    const abs = join(repoRoot, e.dir);
+    return within === undefined || abs === resolve(within) || abs.startsWith(resolve(within) + "/");
+  });
+  // The default variant only: the count is the question, not the comparison.
+  const graphs = new Map(keywordsGraphs(within, repoRoot, KEYWORD_VARIANTS.slice(0, 1)).map((g) => [`${g.instance}/${g.entry}`, g]));
+  const v = KEYWORD_VARIANTS[0]!.id;
+  const libraries = new Set(all.map((e) => libraryOfEntry(join(repoRoot, e.dir)))).size;
+  const entries = all
+    .map((e) => ({
+      entry: e.dir,
+      keywords: graphs.get(`${e.instance}/${e.id}`)?.document[v]?.length ?? 0,
+      legacy: existsSync(join(repoRoot, e.dir, KEYWORDS_FILE)),
+    }))
+    .sort((a, b) => a.entry.localeCompare(b.entry));
+  return { libraries, entries };
+}
+
+/** Where a node is written, relative to the site's base docs directory. */
+export function keywordsGraphPath(g: Pick<KeywordsGraph, "instance" | "entry">): string {
+  return `${KEYWORDS_GRAPH_DIR}/${encodeURIComponent(g.instance)}/${encodeURIComponent(g.entry)}.jsonld`;
 }
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
-  const { libraries, entries, files } = keywordsStates();
-  let written = 0;
-  const bad = entries.filter((e) => e.state !== "current");
+  const harnessRoot = join(ROOT, "cat-harness");
+  const docsBase = siteTarget(baseDocsDir(ROOT));
+  const builtHere =
+    !process.argv.includes("--site") &&
+    isBuiltAtPublish(readDeclaration(harnessRoot)?.builtAtPublish ?? [], relative(harnessRoot, join(baseDocsDir(ROOT), KEYWORDS_GRAPH_DIR) + "/").split("\\").join("/"));
+  if (check && builtHere) {
+    console.log(`library:keywords: ${KEYWORDS_GRAPH_DIR}/ is built at publish (builtAtPublish), not committed — nothing to compare; \`bun run cat library:keywords\` writes it`);
+    process.exit(0);
+  }
+  const graphs = keywordsGraphs();
+  const files = new Map<string, string>(graphs.map((g) => [keywordsGraphPath(g), JSON.stringify(g, null, 2) + "\n"]));
+  files.set(
+    `${KEYWORDS_GRAPH_DIR}/index.json`,
+    JSON.stringify({ $schema: "folio-keywords-index/v1", variants: KEYWORD_VARIANTS, nodes: graphs.map((g) => ({ instance: g.instance, entry: g.entry, href: keywordsGraphPath(g) })) }, null, 2) + "\n",
+  );
   if (check) {
-    for (const e of bad) console.error(`  ✗ ${e.path} is ${e.state}`);
-    console.log(bad.length ? `${bad.length} keywords.json file(s) stale — run \`bun run cat library:keywords\`` : `${entries.length} keywords.json file(s) current`);
-    process.exit(bad.length ? 1 : 0);
+    const stale = [...files].filter(([p, t]) => !existsSync(join(docsBase, p)) || readFileSync(join(docsBase, p), "utf8") !== t);
+    for (const [p] of stale) console.error(`  ✗ ${p} is missing or stale`);
+    console.log(stale.length ? `${stale.length} keywords node(s) stale — run \`bun run cat library:keywords\`` : `${graphs.length} keywords node(s) current`);
+    process.exit(stale.length ? 1 : 0);
   }
-  for (const e of bad) {
-    writeFileSync(join(ROOT, e.path), files.get(join(ROOT, e.path))!);
-    written++;
+  // The directory is this writer's alone: cleared first, so an entry removed
+  // or renamed leaves no node behind.
+  rmSync(join(docsBase, KEYWORDS_GRAPH_DIR), { recursive: true, force: true });
+  for (const [p, t] of files) {
+    mkdirSync(dirname(join(docsBase, p)), { recursive: true });
+    writeFileSync(join(docsBase, p), t);
   }
-  console.log(`${entries.length} entr(ies) over ${libraries} librar(ies); wrote ${written}.`);
+  console.log(`library:keywords: ${graphs.length} keywords node(s) → ${relative(ROOT, join(docsBase, KEYWORDS_GRAPH_DIR))}/ (built at publish; nothing written inside any entry)`);
 }

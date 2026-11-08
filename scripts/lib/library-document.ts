@@ -19,7 +19,9 @@
  *   numbering gaps, page-label conflicts.
  * - `summaries.json` (`folio-block-summaries/v1`) — a section's summary, matched
  *   by the section FILE it summarises (`source`), never by position.
- * - `keywords.json` (`folio-keywords/v1`, `scripts/library-keywords.ts`) — the
+ * - keywords (`scripts/library-keywords.ts`) — from the derived keywords graph
+ *   the caller passes (`folio-keywords/v2`, built at publish), else a legacy
+ *   `keywords.json` (`folio-keywords/v1`) in the entry — the
  *   document's and each section's keywords, from the LSI term weights, with
  *   `heading` evidence where a heading also names the term.
  * - `sections/<id>.md` — an EXTRACT (the opening of the section's text) where
@@ -161,6 +163,8 @@ interface RawStructure {
 }
 interface RawKeyword { term: string; evidence?: string[] }
 interface RawKeywords { document?: RawKeyword[]; sections?: Record<string, RawKeyword[]> }
+/** One variant's keywords for an entry: the document's, and each section's by id. */
+export type EntryKeywordLists = RawKeywords;
 const kw = (ks: RawKeyword[] | undefined): DocKeyword[] =>
   (ks ?? []).map((k) => ({ term: k.term, heading: (k.evidence ?? []).includes("heading") }));
 // `narrative` is one narrative or one per language (bean `cat-tools-e1lo`); read
@@ -261,7 +265,11 @@ export function plainHeading(t: string): string {
     .trim();
 }
 
-export function readEntryDocument(dir: string, id: string, opts: { withheld?: boolean; links?: EntryLinks } = {}): DocumentView | null {
+export function readEntryDocument(
+  dir: string,
+  id: string,
+  opts: { withheld?: boolean; links?: EntryLinks; keywords?: EntryKeywordLists } = {},
+): DocumentView | null {
   // Through the shared accessor (bean rkqp): it knows every structure
   // variant. A pdf structure carries the TOC, pages and figures this view
   // shows; a notebook or text structure shows its sections only.
@@ -299,7 +307,10 @@ export function readEntryDocument(dir: string, id: string, opts: { withheld?: bo
 
   // Keywords are derived terms, not the document's text, so a withheld entry
   // shows them too — as it shows its captions.
-  const kj = readJson<RawKeywords>(join(dir, "keywords.json"));
+  // From the derived keywords graph the caller computed (cat-harness#1144:
+  // built at publish, outside the ingest record), else a legacy keywords.json
+  // still committed in the entry.
+  const kj = opts.keywords ?? readJson<RawKeywords>(join(dir, "keywords.json"));
 
   const sections: DocSection[] = (s.sections ?? []).map((x) => {
     const text = withheld ? null : sectionText(join(dir, "sections", `${x.id}.md`), markdownIds.has(x.id));

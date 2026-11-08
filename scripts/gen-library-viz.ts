@@ -43,7 +43,8 @@ import { readLibraryGraph, type LibraryGraph, type LibraryBlock, type LibraryEnt
 } from "./library-graph.ts";
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
-import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
+import { DOCUMENT_VIEW_JS, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
+import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
@@ -1755,14 +1756,26 @@ if (import.meta.main) {
   // entry of every instance gets it. Written for every entry: one with no
   // structure.json gets `{absent: true}`, a determined answer rather than a
   // 404 the viewer would have to tell apart from a failure.
+  // The default variant of the derived keywords graph (cat-harness#1144),
+  // computed here rather than read from the site, so the panel does not
+  // depend on `library:keywords` having run first.
+  const kwVariant = KEYWORD_VARIANTS[0]!.id;
+  const keywordsOf = new Map<string, EntryKeywordLists>(
+    keywordsGraphs(undefined, repoRoot, KEYWORD_VARIANTS.slice(0, 1)).map((k) => [
+      `${k.instance}/${k.entry}`,
+      { document: k.document[kwVariant] ?? [], sections: Object.fromEntries(Object.entries(k.sections).map(([sid, v]) => [sid, v[kwVariant] ?? []])) },
+    ]),
+  );
   for (const e of g.entries) {
     // [source] and [feedback] on the document and each section (bean zcak).
     // No [edit]: an entry is frozen, and this instance materialises none.
     // In the repository that HOLDS the entry, at its path there — never this
     // harness's repository plus the checkout path (owner, 2026-10-15: a 404).
     const at = forgeAt(repoRoot, e.dir, checkoutRepo);
+    const kws = keywordsOf.get(`${e.instance}/${e.id}`);
     const doc = readEntryDocument(join(repoRoot, e.dir), e.id, {
       withheld: !!e.withheld,
+      ...(kws ? { keywords: kws } : {}),
       ...(at ? { links: { repo: at.repo, dir: at.path } } : {}),
     });
     // The entry's resolved title, not the page-1 guess in structure.json

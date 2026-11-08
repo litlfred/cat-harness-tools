@@ -2052,43 +2052,57 @@ export function lsiIndexHealthCheck(ctx: HealthContext): HealthCheckResult {
 
 export const LIBRARY_KEYWORD_THRESHOLDS: HealthThreshold[] = [
   {
-    metric: "library-keywords-not-current",
+    metric: "library-keywords-entries-without",
     value: 0,
     unit: "count",
     severity: "minor",
     basis:
-      "an entry whose keywords.json is missing or stale shows old or no keywords in the library viewer and in " +
-      "anything that reads the file. A report and never a gate (`gates.ts`): log-entropy weights derive from the " +
-      "WHOLE library, so one sibling's ingest re-weights every entry, and a gate would go red on a merge this diff " +
-      "did not make (folio-assistant#2302). `minor`: keywords are derived, and `bun run cat library:keywords` " +
-      "rewrites them all (owner, 2026-11-08, cat-harness#1144).",
+      "a library entry the keyword extraction gives nothing has no keywords on the library viewer, the keyword " +
+      "viewer or in the derived keywords graph — usually a scanned page with no text layer, or sections under the " +
+      "LSI tool's minimum length. `minor`: keywords are derived proposals; nothing waits on them (cat-harness#1144).",
+  },
+  {
+    metric: "library-keywords-legacy-files",
+    value: 0,
+    unit: "count",
+    severity: "minor",
+    basis:
+      "keywords are EXTRACTED content, so they are built at publish into the derived keywords graph and do not live " +
+      "in the ingest record (owner, 2026-11-08, cat-harness#1144). A `keywords.json` still committed inside an entry " +
+      "is the old location: nothing reads it once the move lands, and it goes stale on every ingest.",
   },
 ];
 
 export function libraryKeywordsHealthCheck(ctx: HealthContext): HealthCheckResult {
   const id = "library-keywords";
-  const summary = "Each library entry's LSI keywords (keywords.json): present, and what `library:keywords` would write now.";
+  const summary = "Each library entry's LSI keywords: whether the extraction gives any, and any keywords.json still committed inside an entry.";
   const probe = ctx.libraryKeywords ?? { state: "absent" as const, reason: "no library-keywords probe ran" };
   if (probe.state === "absent") return absentResult(id, summary, LIBRARY_KEYWORD_THRESHOLDS, probe.reason);
   if (probe.state === "unknown") return unknownResult(id, summary, LIBRARY_KEYWORD_THRESHOLDS, probe.reason);
   const entries = probe.value;
-  const command = "bun run cat library:keywords:check";
-  const missing = entries.filter((e) => e.state === "missing");
-  const stale = entries.filter((e) => e.state === "stale");
+  const command = "bun run cat library:keywords";
+  const without = entries.filter((e) => e.keywords === 0);
+  const legacy = entries.filter((e) => e.legacy);
+  const list = (es: KeywordsState[]): string => es.slice(0, 5).map((e) => e.entry).join(", ") + (es.length > 5 ? ", …" : "");
   const measurements: HealthMeasurement[] = [
     { metric: "library-keywords-entries", value: entries.length, unit: "count", command },
-    { metric: "library-keywords-missing", value: missing.length, unit: "count", command },
-    { metric: "library-keywords-stale", value: stale.length, unit: "count", command },
+    { metric: "library-keywords-entries-without", value: without.length, unit: "count", command },
+    { metric: "library-keywords-legacy-files", value: legacy.length, unit: "count", command: "ls library/*/keywords.json" },
   ];
   const findings: HealthFinding[] = [];
-  if (missing.length + stale.length > 0)
+  if (without.length)
     findings.push({
-      metric: "library-keywords-not-current",
+      metric: "library-keywords-entries-without",
       severity: "minor",
-      summary:
-        `${missing.length} keywords.json missing, ${stale.length} stale` +
-        (missing.length ? ` — missing: ${missing.slice(0, 5).map((e) => e.path).join(", ")}${missing.length > 5 ? ", …" : ""}` : ""),
-      action: "Run `bun run cat library:keywords` and commit the files it writes; it rewrites every entry of the library together.",
+      summary: `${without.length} entr(ies) the keyword extraction gives nothing: ${list(without)}`,
+      action: "Open the entry's sections: a page with no text layer needs OCR at ingest (`l1-document-ingestion`); a very short entry has nothing to extract.",
+    });
+  if (legacy.length)
+    findings.push({
+      metric: "library-keywords-legacy-files",
+      severity: "minor",
+      summary: `${legacy.length} keywords.json still committed inside an entry: ${list(legacy)}`,
+      action: "Remove them in one PR per repository: keywords are built at publish now (`assets/keywords/`), and the ingest record keeps only what was ingested.",
     });
   return settle(id, summary, LIBRARY_KEYWORD_THRESHOLDS, measurements, findings);
 }
@@ -2261,8 +2275,8 @@ export const HEALTH_CHECKS: readonly {
   {
     id: "library-keywords",
     summary:
-      "Each library entry's LSI keywords.json: missing or stale against `library:keywords` (cat-harness#1144). " +
-      "A report, never a gate: the weights derive from the whole library.",
+      "Each library entry's LSI keywords: entries the extraction gives nothing, and keywords.json files still " +
+      "committed inside an entry now that keywords are built at publish (cat-harness#1144).",
     run: libraryKeywordsHealthCheck,
   },
   {
