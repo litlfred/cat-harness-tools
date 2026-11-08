@@ -16,6 +16,9 @@
  *                                                    # content moves inline into its index entry, the file goes
  *   bun run cat index-config:migrate --inline --check
  *                                                    # exit 1 while any imported `<name>.config.json` remains
+ *   bun run cat index-config:migrate --harnesses --write
+ *                                                    # ALSO say which harnesses are instantiated here: the
+ *                                                    # new form, `layers` + `harnesses` (cat-harness#1138)
  *   bun run cat index-config:migrate --write --prefer-declaration
  *                                                    # a remoteMounts entry that DIFFERS from the index's wins
  *                                                    # (a re-pin merged from main); without it, a difference throws
@@ -56,6 +59,7 @@ import {
   importedConfigFilename,
   inlineOverrides,
   lockedMountPaths,
+  withDeclaredHarnesses,
   withIgnoreBlock,
   type IndexConfig,
   type IndexInstance,
@@ -112,8 +116,9 @@ export function inlineEntries(root: string, config: IndexConfig): { config: Inde
 }
 
 /** Plan the conversion of `root`; writes nothing. */
-export function planMigration(root: string, opts: { preferDeclaration?: boolean; inline?: boolean } = {}): MigrateResult {
+export function planMigration(root: string, opts: { preferDeclaration?: boolean; inline?: boolean; harnesses?: boolean } = {}): MigrateResult {
   const migration = buildIndexConfig(root, opts);
+  if (opts.harnesses) migration.config = withDeclaredHarnesses(root, migration.config);
   let retire: string[] | undefined;
   if (opts.inline) {
     const inlined = inlineEntries(root, migration.config);
@@ -188,14 +193,15 @@ if (import.meta.main) {
   const check = process.argv.includes("--check");
   let plan: MigrateResult;
   try {
-    plan = planMigration(root, { preferDeclaration: process.argv.includes("--prefer-declaration"), inline: process.argv.includes("--inline") });
+    plan = planMigration(root, { preferDeclaration: process.argv.includes("--prefer-declaration"), inline: process.argv.includes("--inline"), harnesses: process.argv.includes("--harnesses") });
   } catch (e) {
     console.error(`index-config:migrate: could not convert ${root}: ${(e as Error).message}`);
     process.exit(2);
   }
   const { migration } = plan;
   console.log(`index-config:migrate — ${root}`);
-  console.log(`  instances: ${migration.config.instances.map((i) => `${i.name}${i.source && "remote" in i.source ? " (remote)" : ""}`).join(", ")}`);
+  console.log(`  layers:    ${migration.config.instances.map((i) => `${i.name}${i.source && "remote" in i.source ? " (remote)" : ""}`).join(", ")}`);
+  console.log(`  harnesses: ${migration.config.harnesses?.map((h) => h.name).join(", ") ?? "(not declared — every layer is read as instantiated)"}`);
   console.log(`  landing:   ${migration.config.site?.landing ?? "(none — the sole instance, or undetermined)"}`);
   if (migration.moved.length) console.log(`  moved from ${migration.movedFrom}: remoteMounts ${migration.moved.join(", ")}`);
   if (plan.lockRename) console.log(`  lock:      ${plan.lockRename.from} → ${plan.lockRename.to}`);

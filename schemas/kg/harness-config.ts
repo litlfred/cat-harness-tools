@@ -395,6 +395,7 @@ import { enabledSubgraphs as enabledSubgraphs_, type EnabledSubgraphs } from "./
 import {
   HUB_LANDING,
   importedConfigFilename,
+  indexHarnessNames,
   inlineOverrides,
   readIndexConfig,
   type IndexConfig,
@@ -828,7 +829,8 @@ export type LandingInstance =
 /**
  * Every instantiated harness at `repoRoot`, sorted.
  *
- * - `index.config.json` present: its `instances[].name` — AUTHORITATIVE, and
+ * - `index.config.json` present: its `harnesses[].name`, or in the old form
+ *   (no `harnesses`) every `instances[].name` — AUTHORITATIVE, and
  *   an unreadable index THROWS rather than falling back to the file scan it
  *   was written to replace.
  * - absent: the stem of each root `<name>.config.json` (`rootConfigStems`),
@@ -843,7 +845,7 @@ export type LandingInstance =
 export function instantiatedHarnessNames(repoRoot: string): string[] {
   const idx = readIndexConfig(repoRoot);
   if (idx.state === "unreadable") throw new Error(`${idx.file} is ${idx.why}`);
-  if (idx.state === "ok") return idx.config.instances.map((e) => e.name).sort();
+  if (idx.state === "ok") return indexHarnessNames(idx.config);
   return rootConfigStems(repoRoot);
 }
 
@@ -908,12 +910,12 @@ export function resolveLandingInstance(repoRoot: string): LandingInstance {
   const idx = readIndexConfig(repoRoot);
   if (idx.state === "unreadable") return { kind: "invalid", names: [], file: idx.file, reason: idx.why };
   const index = idx.state === "ok" ? idx.config : undefined;
-  const names = index ? index.instances.map((e) => e.name).sort() : instantiatedHarnessNames(repoRoot);
+  const names = index ? indexHarnessNames(index) : instantiatedHarnessNames(repoRoot);
   const landing = index?.site?.landing;
   if (landing !== undefined) {
     if (landing === HUB_LANDING) return { kind: "hub", names, flagged: [] };
     if (!names.includes(landing)) {
-      return { kind: "invalid", names, file: idx.file, reason: `site.landing names \`${landing}\`, which ${idx.file} does not list as an instance (${names.join(", ") || "none"})` };
+      return { kind: "invalid", names, file: idx.file, reason: `site.landing names \`${landing}\`, which ${idx.file} does not list as ${index?.harnesses ? "a harness" : "an instance"} (${names.join(", ") || "none"})` };
     }
     return { kind: "instance", name: landing, by: "index", names };
   }

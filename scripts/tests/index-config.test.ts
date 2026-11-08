@@ -36,6 +36,8 @@ import {
   readMountFields,
   syncIgnoreBlock,
   writeDeclaredMounts,
+  formatIndexConfig,
+  withDeclaredHarnesses,
   type IndexConfig,
 } from "../../schemas/kg/index-config.ts";
 import { readDeclaration } from "../../schemas/kg/cat-harness.ts";
@@ -432,4 +434,60 @@ describe("the generated .gitignore block", () => {
     expect(text.split(IGNORE_BLOCK_BEGIN)).toHaveLength(2);
   });
 
+});
+
+describe("the new form: layers + harnesses (cat-harness#1138)", () => {
+  const layers = [{ name: "base" }, { name: "dep", source: { remote: remote("o/dep") } }, { name: "me" }];
+  const newForm = (harnesses: object[], site?: object): object => ({ $schema: INDEX_CONFIG_SCHEMA, layers, harnesses, ...(site ? { site } : {}) });
+
+  test("only the declared harnesses are instantiated; every layer is still mounted", () => {
+    const r = root({ "index.config.json": newForm([{ name: "base" }], { landing: "base" }) });
+    expect(instantiatedHarnessNames(r)).toEqual(["base"]);
+    const idx = readIndexConfig(r);
+    expect(idx.state).toBe("ok");
+    if (idx.state === "ok") expect(idx.config.instances.map((e) => e.name)).toEqual(["base", "dep", "me"]);
+    expect(resolveLandingInstance(r)).toMatchObject({ kind: "instance", name: "base", by: "index", names: ["base"] });
+  });
+
+  test("the landing must be a harness, not a layer only mounted", () => {
+    expect(IndexConfigSchema.safeParse(newForm([{ name: "base" }], { landing: "dep" })).success).toBe(false);
+  });
+
+  test("a harness must be a listed layer, and so must its definedBy", () => {
+    expect(IndexConfigSchema.safeParse(newForm([{ name: "nowhere" }])).success).toBe(false);
+    expect(IndexConfigSchema.safeParse(newForm([{ name: "me", definedBy: "nowhere" }])).success).toBe(false);
+    expect(IndexConfigSchema.safeParse(newForm([{ name: "me", definedBy: "base" }])).success).toBe(true);
+  });
+
+  test("`layers` needs `harnesses`, and `layers` with `instances` is refused", () => {
+    expect(IndexConfigSchema.safeParse({ $schema: INDEX_CONFIG_SCHEMA, layers }).success).toBe(false);
+    expect(IndexConfigSchema.safeParse({ $schema: INDEX_CONFIG_SCHEMA, layers, instances: layers, harnesses: [] }).success).toBe(false);
+  });
+
+  test("a file keeps its form: the new one is written back as layers + harnesses, the old one as instances", () => {
+    const fresh = IndexConfigSchema.parse(newForm([{ name: "base" }]));
+    const text = formatIndexConfig(fresh);
+    expect(JSON.parse(text)).toMatchObject({ layers: [{ name: "base" }, { name: "dep" }, { name: "me" }], harnesses: [{ name: "base" }] });
+    expect(JSON.parse(text).instances).toBeUndefined();
+    expect(formatIndexConfig(IndexConfigSchema.parse(JSON.parse(text)))).toBe(text);
+    const old = formatIndexConfig(IndexConfigSchema.parse(index(layers)));
+    expect(JSON.parse(old).layers).toBeUndefined();
+    expect(JSON.parse(old).instances).toHaveLength(3);
+  });
+
+  test("migration lists only what is instantiated: the landing, entries with config, nothing only mounted", () => {
+    const r = root({ "me.config.json": {} });
+    const cfg = IndexConfigSchema.parse(index([{ name: "base" }, { name: "dep", source: { remote: remote("o/dep") } }, { name: "styled", theme: "x" }, { name: "me" }], { landing: "base" }));
+    expect(withDeclaredHarnesses(r, cfg).harnesses).toEqual([{ name: "base" }, { name: "styled" }, { name: "me" }]);
+    const sole = IndexConfigSchema.parse(index([{ name: "only" }]));
+    expect(withDeclaredHarnesses(r, sole).harnesses).toEqual([{ name: "only" }]);
+    const done = IndexConfigSchema.parse(newForm([{ name: "me" }]));
+    expect(withDeclaredHarnesses(r, done)).toBe(done);
+  });
+
+  test("addIndexInstance records a new harness in both lists in the new form", () => {
+    const r = root({ "index.config.json": newForm([{ name: "base" }]) });
+    expect(addIndexInstance(r, { name: "fresh" })).toBe(true);
+    expect(instantiatedHarnessNames(r)).toEqual(["base", "fresh"]);
+  });
 });
