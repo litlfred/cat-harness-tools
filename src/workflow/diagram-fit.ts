@@ -35,6 +35,7 @@
  * | `edge-through-shape` | a flow is drawn through a task, event or gateway that is neither its source nor its target |
  * | `edge-through-own-end` | a flow starts inside the box it leaves or runs on inside the box it enters (waypoints laid for a box of another size) |
  * | `edge-detached` | a flow's first or last waypoint is more than 6 from its own shape |
+ * | `edge-shared-port` | a flow ends on a shape at the point another flow leaves it, so the two read as one line passing through (owner, 2026-11-08: *"output and input arrows shouldn't be at same point"*) |
  * | `shape-outside-pool` | a step is drawn outside every pool of a diagram that has pools |
  * | `lane-order` | another order of the lanes makes the cross-lane flows shorter |
  *
@@ -276,6 +277,38 @@ export function edgesThroughOwnEnds(di: DiLayout): [string, string][] {
       const b = di.shapes.get(sid);
       if (!b) continue;
       if (segments(e.points).some(([p, q]) => segmentHitsBox(p, q, b, OWN_INSET))) out.push([eid, sid]);
+    }
+  }
+  return out;
+}
+
+/** How close a flow's end and another flow's start may sit on one shape before they read as one point. */
+export const PORT_SLACK = 2;
+
+/**
+ * Every shape where a flow ENDS at the point another flow STARTS, as
+ * `[incoming flow, outgoing flow, shape]`. Two arrows meeting on one spot of
+ * a box read as one line passing through it, and a reader cannot tell which
+ * way the work goes. Flows that only arrive may share a point (a join), and
+ * so may flows that only leave.
+ */
+export function sharedPorts(di: DiLayout): [string, string, string][] {
+  const ins = new Map<string, [string, Pt][]>();
+  const outs = new Map<string, [string, Pt][]>();
+  for (const [eid, e] of di.edges) {
+    const f = di.flows.get(eid);
+    if (!f || e.points.length < 2) continue;
+    if (!outs.has(f.source)) outs.set(f.source, []);
+    outs.get(f.source)!.push([eid, e.points[0]!]);
+    if (!ins.has(f.target)) ins.set(f.target, []);
+    ins.get(f.target)!.push([eid, e.points[e.points.length - 1]!]);
+  }
+  const out: [string, string, string][] = [];
+  for (const [sid, arriving] of ins) {
+    for (const [a, p] of arriving) {
+      for (const [b, r] of outs.get(sid) ?? []) {
+        if (a !== b && Math.abs(p.x - r.x) <= PORT_SLACK && Math.abs(p.y - r.y) <= PORT_SLACK) out.push([a, b, sid]);
+      }
     }
   }
   return out;
@@ -1020,6 +1053,7 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     "edge-through-shape": [],
     "edge-through-own-end": [],
     "edge-detached": [],
+    "edge-shared-port": [],
     "shape-outside-pool": [],
     "shape-overlap": [],
     "lane-order": [],
@@ -1128,6 +1162,13 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     out["edge-detached"]!.push({
       where: `${eid}/${sid}`,
       detail: `flow ${eid} ${di.flows.get(eid)?.source === sid ? "starts" : "ends"} more than ${END_SLACK} from ${q(di.names.get(sid) ?? sid)}. Move that waypoint onto the box's edge.`,
+    });
+  }
+  for (const [a, b, sid] of sharedPorts(di)) {
+    out["edge-shared-port"]!.push({
+      where: `${a}+${b}/${sid}`,
+      detail: `flow ${a} ends on ${q(di.names.get(sid) ?? sid)} at the point flow ${b} leaves it, so the two read as one line. ` +
+        `Give the outgoing flow another side of the box (bpmn-processes §"Edge routing").`,
     });
   }
   for (const id of shapesOutsidePools(di)) {
