@@ -26,6 +26,7 @@ function load(): View {
   const esc = (s: unknown): string =>
     String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
   const summaryPanel = (s: { text?: string }): string => `<div class="sum"><p>${esc(s.text ?? "")}</p></div>`;
+  // input-site: inert #b429a5e6 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   return new Function("esc", "summaryPanel", "SITE_ROOT", `${WITHHELD_VIEW_JS}\nreturn { blockBody, withheldBanner };`)(
     esc,
     summaryPanel,

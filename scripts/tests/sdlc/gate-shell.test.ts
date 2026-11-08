@@ -186,6 +186,7 @@ describe("gate-shell.sh — the CI cone hook", () => {
     );
     const script = join(dir, "step.sh");
     writeFileSync(script, body);
+    // input-site: inert #0062835b — sets the test's own variables, or hands the environment whole to a child; no value is read here
     const env: Record<string, string> = { ...(process.env as Record<string, string>), GITHUB_JOB: "gates" };
     delete env.GITHUB_STEP_SUMMARY;
     if (mode === undefined) delete env.CI_CONE_MODE;

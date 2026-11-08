@@ -108,6 +108,7 @@ function fixture(): Fixture {
 /** A full clone of the branch, edited and pushed — how a test damages the store. */
 function tamper(f: Fixture, edit: (dir: string) => void): void {
   clearQaCache();
+  // input-site: inert #af82d745 — a unique scratch name or throwaway token; no assertion depends on its value
   const dir = join(f.base, `tamper-${Math.random().toString(36).slice(2)}`);
   git(f.base, "clone", "-q", "-b", "cat/cat-harness/qa-reports", f.url, dir);
   edit(dir);

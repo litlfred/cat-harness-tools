@@ -66,6 +66,7 @@ describe("this repository, right now", () => {
     // its address carries that instance's name (`lib/docs-sources.ts`).
     const scratch = mkdtempSync(join(tmpdir(), "proc-pres-trace-"));
     const trace = openTrace(scratch);
+    // input-site: inert #01b64b17 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const prev = process.env[TRACE_ENV];
     process.env[TRACE_ENV] = trace.env[TRACE_ENV];
     try {

@@ -89,14 +89,17 @@ describe("joinSegments checks EVERY segment, not the first", () => {
 
 describe("resolveWithin — lexical containment for a URL path", () => {
   it("resolves a normal path inside the root", () => {
+    // input-site: inert #47db5173 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(resolveWithin("/root", "/a/b.html")).toBe(resolve("/root/a/b.html"));
   });
 
   it("absorbs traversal against the root rather than escaping", () => {
+    // input-site: inert #88a518d0 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(resolveWithin("/root", "/../../etc/passwd")).toBe(resolve("/root/etc/passwd"));
   });
 
   it("decodes percent-escapes BEFORE normalising", () => {
+    // input-site: inert #cc61c8e9 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(resolveWithin("/root", "/%2e%2e/%2e%2e/etc")).toBe(resolve("/root/etc"));
   });
 
@@ -112,6 +115,7 @@ describe("resolveWithin — lexical containment for a URL path", () => {
   it("does NOT accept a sibling whose name merely starts with the root's", () => {
     // The `startsWith(base)` bug this module's check avoids by comparing
     // against `base + sep`: `/rootevil` starts with `/root`.
+    // input-site: inert #854f9524 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(resolveWithin("/root", "/../rootevil/x")).toBe(resolve("/root/rootevil/x"));
   });
 });

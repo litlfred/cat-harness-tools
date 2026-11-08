@@ -190,6 +190,7 @@ export function resolveRun(argv, root = process.cwd()) {
 /** Render every candidate at both viewports; write the screenshots and report.json. Returns the fail count. */
 export async function runChecks(run, root = process.cwd()) {
   const { chromium } = await import("playwright");
+  // input-site: env CHROMIUM #5df7212a — a Chromium binary to use when the pre-installed one is absent
   const exe = ["/opt/pw-browsers/chromium", process.env.CHROMIUM].find((p) => p && existsSync(p));
   const browser = await chromium.launch({ args: ["--no-sandbox"], ...(exe ? { executablePath: exe } : {}) });
   mkdirSync(run.out, { recursive: true });

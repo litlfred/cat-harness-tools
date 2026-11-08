@@ -191,6 +191,7 @@ describe("two sessions editing the SAME bean — bean 2h76's measurement", () =>
       LOCATION,
       f.container("mine", {
         beforePush: () => {
+          // input-site: inert #ed28659d — a unique scratch name or throwaway token; no assertion depends on its value
           StateStore.at(LOCATION, f.container(`sib-${Math.random()}`)).write([{ path: "a.md", content: `${Math.random()}\n` }], "sibling");
         },
       }),

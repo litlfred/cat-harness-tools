@@ -303,6 +303,7 @@ describe("prebuilt indexes for scopes over the token budget — bean lrzn", () =
     const body = js.slice(js.indexOf("function setSearchSeparator()"), js.indexOf("// 2tfy: the reader focused"));
     // @ts-expect-error -- lunr ships no types (see search-split.ts).
     const lunr = (await import("lunr")).default;
+    // input-site: inert #ac6c3af7 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     const theme = new Function("lunr", `${body}; return { build: buildSearchIndex, load: loadSearchIndex };`)(lunr) as {
       build(d: unknown): { toJSON(): unknown; search(q: string): { ref: string }[] };
       load(s: unknown): { search(q: string): { ref: string }[] };

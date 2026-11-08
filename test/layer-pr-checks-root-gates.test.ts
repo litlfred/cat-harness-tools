@@ -89,6 +89,7 @@ describe("compare-gates.py with diagnostics", () => {
     writeFileSync(join(dir, "head.json"), JSON.stringify(head));
     return spawnSync("python3", ["-I", join(DIR, "compare-gates.py"), join(dir, "base.json"), join(dir, "head.json")], {
       encoding: "utf-8",
+      // input-site: env PATH #34b0985f — PATH handed to a child process, which decides which binaries it runs
       env: { PATH: process.env.PATH ?? "" },
     });
   };

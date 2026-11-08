@@ -25,6 +25,7 @@ import { kindHeading } from "./content/translation";
  * about an EMPTY or planted checkout must not see.
  */
 function withoutFixture<T>(fn: () => T): T {
+  // input-site: inert #7361076d — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
   const saved = process.env.FOLIO_FIXTURE_CHECKOUT;
   delete process.env.FOLIO_FIXTURE_CHECKOUT;
   try {
