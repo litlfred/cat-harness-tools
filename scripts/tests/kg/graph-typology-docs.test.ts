@@ -46,7 +46,7 @@ import { defaultGraphTypologies } from "../../../schemas/kg/cat-harness.js";
 // (bean `uoij`). This file keeps the ASSERTIONS and owns none of the reading —
 // which is why `readFileSync`, `join`, `BASE_GRAPH_TYPOLOGIES` and
 // `GRAPH_TYPOLOGY_ALIASES` are gone from it, and so is the document path.
-import { documentedKinds, validKinds } from "../../kind-table.ts";
+import { documentedKinds, rebaseKindLinks, validKinds } from "../../kind-table.ts";
 describe("the graph-typology table and the registry name the same kinds", () => {
   test("the table is found, and is not empty", () => {
     // Without this the two assertions below pass vacuously over `[]` — which is
@@ -69,5 +69,19 @@ describe("the graph-typology table and the registry name the same kinds", () => 
     const documented = new Set(documentedKinds());
     const undocumented = defaultGraphTypologies.names().filter((k) => !documented.has(k));
     expect(undocumented).toEqual([]);
+  });
+});
+
+describe("a kind description's links are rebased onto the table's page", () => {
+  test("a link written from skills/kg/kg-core/ names the same file from docs/cat-harness/", () => {
+    expect(rebaseKindLinks("see [`qa-witness`](../../../sdlc/skills/sdlc-core/qa-witness.md#scope)")).toBe(
+      "see [`qa-witness`](../../sdlc/skills/sdlc-core/qa-witness.md#scope)",
+    );
+    expect(rebaseKindLinks("[`x`](../kg-core/schema-management.md)")).toBe("[`x`](../../skills/kg/kg-core/schema-management.md)");
+  });
+
+  test("an absolute URL, a site-rooted path and an anchor are left as they are", () => {
+    const text = "[a](https://example.org/x.md) [b](/cat-harness/kind-table/) [c](#node-schemas)";
+    expect(rebaseKindLinks(text)).toBe(text);
   });
 });

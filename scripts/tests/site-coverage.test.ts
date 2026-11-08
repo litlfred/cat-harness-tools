@@ -125,6 +125,23 @@ describe("expectedPages over this checkout: tools", () => {
   });
 });
 
+describe("expectedPages over this checkout: schemas", () => {
+  // smart-ips-pilgrimage#25's root publish (2026-11-07): smart-trust-tools'
+  // `schemas/` holds only JSON contracts in `skills/`, the writer draws no page
+  // for it, and the sub-directory test owed one, so the build refused.
+  test("the guard reads the schemas writer's own subjects", async () => {
+    const { schemaSubjects } = await import("../gen-schema-viz.ts");
+    expect(SUBJECT_READERS["schemas-viewer"]).toBeDefined();
+    const root = repoRootFor(HARNESS_ROOT);
+    const drawn = schemaSubjects(root);
+    expect(SUBJECT_READERS["schemas-viewer"]!(root, [])).toEqual(drawn);
+    const pages = expectedPages(root).filter((p) => p.visualiser === "schemas");
+    if (pages.length === 0) return; // no `schemas` visualiser declared in this checkout
+    const expected = pages.filter((p) => p.instance !== undefined).map((p) => p.instance!).sort();
+    expect(expected).toEqual(drawn);
+  });
+});
+
 describe("instanceSubgraph: subgraphUnder nests the per-instance page, as the tiles and the writer do", () => {
   test("the glossary's per-instance page is at instance/<instance>/", () => {
     expect(instanceSubgraph("folio-assistant-core", [{ instance: "folio-assistant-core", under: "instance" }])).toBe("instance/folio-assistant-core");

@@ -1,5 +1,6 @@
 /**
- * `merge:watch`'s verdict: rule 1 of merge-manager-watcher §"Merge-sweep rules".
+ * `merge:watch`'s verdict: rule 1 of merge-manager-watcher §"Merge-sweep rules",
+ * with the owner's "every judge" ruling of 2026-11-07.
  *
  * Each fixture case is one head SHA's check runs and workflow runs, with the
  * verdict the rule gives. Every "green" case has a sibling that must not be
@@ -17,6 +18,8 @@ interface Case {
   pr: { draft: boolean };
   checkRuns: CheckRun[];
   workflowRuns: WorkflowRun[];
+  /** Job logs by check run id; `null`: could not be read. */
+  logs?: Record<string, string | null>;
   expected: string;
 }
 
@@ -25,14 +28,26 @@ const { cases } = JSON.parse(readFileSync(join(import.meta.dir, "..", "fixtures"
 describe("merge:watch verdict per rule 1", () => {
   test("the fixture covers the named cases", () => {
     const names = cases.map((c) => c.name);
-    for (const n of ["fast-tier-only", "cancelled-then-superseded", "queued-judge", "red-shard-no-judge", "red-shard-judge-passes"]) {
+    for (const n of [
+      "fast-tier-only",
+      "cancelled-then-superseded",
+      "queued-judge",
+      "red-shard-no-judge",
+      "red-shard-judge-passes",
+      "red-shard-judge-passes-no-table",
+      "shard-table-lists-new-failures",
+      "red-check-no-judge-names",
+      "one-of-two-judges-red",
+      "ready-for-review-run-queued",
+    ]) {
       expect(names).toContain(n);
     }
   });
 
   for (const c of cases) {
     test(c.name, () => {
-      expect(formatVerdict(verdictOf(c.pr, c.checkRuns, c.workflowRuns))).toBe(c.expected);
+      const logs = new Map(Object.entries(c.logs ?? {}).map(([id, log]) => [Number(id), log]));
+      expect(formatVerdict(verdictOf(c.pr, c.checkRuns, c.workflowRuns, logs))).toBe(c.expected);
     });
   }
 

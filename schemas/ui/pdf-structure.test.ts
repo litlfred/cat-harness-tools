@@ -119,6 +119,23 @@ describe("pdf-structure/v1", () => {
     const d = minimal();
     const src = { ...(d.source as object), mimetype_sniffed: null, mimetype_source: "unrecognised" };
     expect(PdfStructureSchema.safeParse({ ...d, source: src }).success).toBe(true);
+    // The reason is required: a null with no source says nothing about why.
+    const { mimetype_source: _reason, ...noReason } = src;
+    expect(PdfStructureSchema.safeParse({ ...d, source: noReason }).success).toBe(false);
+    // A guess is not a reason: no source names the file extension.
+    for (const guess of ["extension", "file-extension", "guessed"]) {
+      expect(PdfStructureSchema.safeParse({ ...d, source: { ...src, mimetype_source: guess } }).success).toBe(false);
+    }
+    // The two fields are one fact: null exactly when nothing was recognised.
+    const pair = (mimetype_sniffed: string | null, mimetype_source: string) =>
+      PdfStructureSchema.safeParse({ ...d, source: { ...src, mimetype_sniffed, mimetype_source } }).success;
+    expect(pair(null, "unreadable")).toBe(true);
+    expect(pair("application/pdf", "magic-bytes")).toBe(true);
+    expect(pair("application/vnd.openxmlformats-officedocument.presentationml.presentation", "zip-package")).toBe(true);
+    expect(pair(null, "magic-bytes")).toBe(false);
+    expect(pair(null, "zip-package")).toBe(false);
+    expect(pair("application/pdf", "unrecognised")).toBe(false);
+    expect(pair("application/pdf", "unreadable")).toBe(false);
   });
   test("a duplicate copy names its preferred entry; the preferred entry lists its copies", () => {
     const d = minimal();

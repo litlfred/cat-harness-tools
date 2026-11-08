@@ -53,6 +53,8 @@ describe("state-manifest/v1", () => {
   test("a route-keyed manifest without its writer or gate is refused — those are what make it regenerable", () => {
     const { writer: _w, ...noWriter } = route;
     expect(StateManifestSchema.safeParse(noWriter).success).toBe(false);
+    const { gate: _g, ...noGate } = route;
+    expect(StateManifestSchema.safeParse(noGate).success).toBe(false);
   });
 
   test("a status outside the four is refused", () => {

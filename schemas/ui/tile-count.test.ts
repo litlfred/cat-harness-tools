@@ -65,11 +65,9 @@ describe("ABSENT is not ZERO — every one of these must yield nothing", () => {
     ["a tile field that is a string", { [TILE_COUNT_FIELD]: "12" }],
   ];
 
-  for (const [name, value] of nothing) {
-    test(name, () => {
-      expect([...readTileCounts(value)]).toEqual([]);
-    });
-  }
+  test.each(nothing)("%s — no counts at all", (_name, value) => {
+    expect([...readTileCounts(value)]).toEqual([]);
+  });
 });
 
 describe("a malformed entry is dropped, and never rounded to zero", () => {
@@ -86,12 +84,10 @@ describe("a malformed entry is dropped, and never rounded to zero", () => {
     ["the entry is null", null],
   ];
 
-  for (const [name, entry] of bad) {
-    test(name + " — no entry at all", () => {
-      const got = readTileCounts({ [TILE_COUNT_FIELD]: { beans: entry } });
-      expect(got.has("beans")).toBe(false);
-    });
-  }
+  test.each(bad)("%s — no entry at all", (_name, entry) => {
+    const got = readTileCounts({ [TILE_COUNT_FIELD]: { beans: entry } });
+    expect(got.has("beans")).toBe(false);
+  });
 
   test("NaN in particular does not slip through a `typeof` check", () => {
     // `typeof NaN === "number"` is true, so a reader checking only the type

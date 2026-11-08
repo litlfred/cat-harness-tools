@@ -107,11 +107,34 @@ describe("checking a model against the rules", () => {
   it("counts what follows each rule, and leaves groupings and placeholders out", () => {
     expect(c.checked).toBe(3);
     expect(c.used.map((u) => u.count)).toEqual([1, 0]);
+    // The grouping's aggregation (id-r4) and the influence on the placeholder "Goal" (id-r5) are not checked:
+    // no uncovered pattern holds them, and rules naming them count nothing.
+    expect(c.uncovered.flatMap((p) => p.relationships)).toEqual(["id-r2", "id-r3"]);
+    const withThem = RelationshipRulesSchema.parse({
+      ...RULES,
+      relationships: [...RULES.relationships, { type: "Aggregation", name: "Aggregation" }, { type: "Influence", name: "Influence" }],
+      rules: [
+        ...RULES.rules,
+        { source: "Grouping", relationship: "Aggregation", target: "ApplicationComponent", note: "A grouping aggregates a component" },
+        { source: "ApplicationComponent", relationship: "Influence", target: "Goal", note: "A component influences a goal" },
+      ],
+    });
+    const c2 = checkRules(model, "tiny", withThem, relationshipTable());
+    expect(c2.checked).toBe(3);
+    expect(c2.used.map((u) => u.count)).toEqual([1, 0, 0, 0]);
   });
 
   it("reports the patterns no rule covers, most used first", () => {
     expect(c.uncovered.map((p) => `${p.source} ${p.relationship} ${p.target} ${p.count}`)).toEqual(["ApplicationService Serving ApplicationComponent 2"]);
     expect(c.uncoveredCount).toBe(2);
+    // With the realisation rule gone, the realisation (once) is reported after the serving (twice).
+    const fewer = RelationshipRulesSchema.parse({ ...RULES, rules: RULES.rules.filter((x) => x.relationship !== "Realization") });
+    const c2 = checkRules(model, "tiny", fewer, relationshipTable());
+    expect(c2.uncovered.map((p) => `${p.source} ${p.relationship} ${p.target} ${p.count}`)).toEqual([
+      "ApplicationService Serving ApplicationComponent 2",
+      "ApplicationComponent Realization ApplicationService 1",
+    ]);
+    expect(c2.uncoveredCount).toBe(3);
   });
 
   it("flags a rule ArchiMate does not allow, and a relationship type the document never explains", () => {

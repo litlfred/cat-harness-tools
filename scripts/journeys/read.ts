@@ -23,6 +23,8 @@
  * | edge | resolved against |
  * |---|---|
  * | `personas`, `lead`, `experiences[].actor` | `actors/<id>.json` in a `scenarios` directory |
+ * | a persona that is a role, a BPMN lane | `roles.json` in a `scenarios` directory (`derive.ts` derives what the file leaves out from them) |
+ * | `parts[].scenario`, a step's `includes` | a journey |
  * | `stories` | `stories.json` in a `scenarios` directory |
  * | `uses[].block` | a `building-blocks/0.1.0` file (its blocks, layers and big ideas) in a directory declaring the `building-blocks` kind, wherever it is (typically `archimate/building-blocks/`, beside the ArchiMate model) |
  * | `trustLadder` | a `folio-code-list/v1` file in a `code-list` directory |
@@ -56,10 +58,14 @@ import {
   type BuildingBlock,
   type BuildingBlocks,
   type JourneyPersona,
+  type Scenario,
   type UserScenario,
 } from "../../schemas/process/user-scenario.ts";
 import { parseWorkshop, WORKSHOP_V01, type Workshop } from "../../schemas/process/workshop.ts";
 import { DEVICE_SCREEN_V01, parseDeviceScreen, type DeviceScreen } from "../../schemas/process/device-screen.ts";
+import { instanceFile, journeyById, lookup, resolveScenario } from "./derive.ts";
+
+export { instanceFile, journeyById, lookup };
 
 export const SCENARIO_KIND = "user-scenario";
 export const WORKSHOP_KIND = "workshop";
@@ -84,7 +90,10 @@ export interface Journey {
   instance: string;
   /** Instance-relative path of its file. */
   file: string;
-  scenario: UserScenario;
+  /** As the viewer draws it: the derived values filled in (`derive.ts`, `resolveScenario`). */
+  scenario: Scenario;
+  /** As its file says it: what `check:journey-refs` holds against the derived values. */
+  authored: UserScenario;
 }
 
 export interface WorkshopEntry {
@@ -135,6 +144,8 @@ export interface Requirement {
 export interface FhirExample {
   key: string;
   title?: string;
+  /** The index's description of it, in a sentence or two. */
+  description?: string;
   code?: string;
   /** Its published page (`published.html`, else `.json`). */
   url?: string;
@@ -166,6 +177,8 @@ export interface JourneyCorpus {
   /** Per instance: actors by id. */
   actors: Map<string, Map<string, Actor>>;
   stories: Map<string, Map<string, Story>>;
+  /** Per instance: the roles of its `scenarios` directories (`roles.json`), by id: what a lane is, and what the DAK calls a persona. */
+  roles: Map<string, Map<string, { title?: string; otherNames?: string[] }>>;
   /** Per instance: the catalogues' layers and blocks. */
   blocks: Map<string, { layers: BuildingBlocks["layers"]; blocks: Map<string, BuildingBlock>; ideas: NonNullable<BuildingBlocks["ideas"]> }>;
   /** Per instance: its code lists (trust ladders), by id. */
@@ -251,6 +264,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     screens: [],
     actors: new Map(),
     stories: new Map(),
+    roles: new Map(),
     blocks: new Map(),
     ladders: new Map(),
     ladderInfo: new Map(),
@@ -289,7 +303,9 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
         try {
           if (kinds.includes(SCENARIO_KIND) && isUserScenario(raw)) {
             seenFiles.add(p);
-            corpus.journeys.push({ instance, file: rel(p), scenario: parseUserScenario(raw, rel(p)) });
+            const authored = parseUserScenario(raw, rel(p));
+            // Resolved once every actor, role and BPMN of the checkout is read, below.
+            corpus.journeys.push({ instance, file: rel(p), authored, scenario: authored as Scenario });
           } else if (kinds.includes(BUILDING_BLOCKS_KIND) && tag === BUILDING_BLOCKS_V01) {
             seenFiles.add(p);
             const c = BuildingBlocksSchema.parse(raw);
@@ -344,10 +360,18 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
         stories.set(st.id, { id: st.id, role: st.role?.role ?? "", want: st.want, ...(st.soThat ? { soThat: st.soThat } : {}) });
       }
       corpus.stories.set(instance, stories);
+      const r = readJson(join(d.absPath, "roles.json")) as { roles?: { id?: unknown; title?: unknown; otherNames?: unknown }[] } | undefined;
+      const roles = corpus.roles.get(instance) ?? new Map<string, { title?: string; otherNames?: string[] }>();
+      for (const x of r?.roles ?? []) {
+        if (typeof x.id !== "string") continue;
+        const other = Array.isArray(x.otherNames) ? x.otherNames.filter((o): o is string => typeof o === "string") : [];
+        roles.set(x.id, { ...(typeof x.title === "string" ? { title: x.title } : {}), ...(other.length ? { otherNames: other } : {}) });
+      }
+      corpus.roles.set(instance, roles);
     }
     if (kinds.includes("fhir-artifact-index")) {
       const idx = readJson(join(d.absPath, "index.json")) as { artifacts?: unknown[]; entries?: unknown[] } | undefined;
-      type Entry = { key?: string; title?: string; code?: { text?: string }; published?: Record<string, { url?: string }>; profiles?: unknown; materialization?: { localPath?: unknown } };
+      type Entry = { key?: string; title?: string; description?: string; code?: { text?: string }; published?: Record<string, { url?: string }>; profiles?: unknown; materialization?: { localPath?: unknown } };
       for (const a of (idx?.artifacts ?? idx?.entries ?? []) as Entry[]) {
         if (typeof a.key !== "string") continue;
         const url = a.published?.html?.url ?? a.published?.json?.url;
@@ -358,6 +382,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
         corpus.examples.set(a.key, {
           key: a.key,
           ...(a.title ? { title: a.title } : {}),
+          ...(typeof a.description === "string" && a.description ? { description: a.description } : {}),
           ...(a.code?.text ? { code: a.code.text } : {}),
           ...(url ? { url } : {}),
           ...(jsonUrl ? { jsonUrl } : {}),
@@ -382,19 +407,13 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
       }
     }
   }
+  for (const j of corpus.journeys) j.scenario = resolveScenario(corpus, j);
   corpus.journeys.sort((a, b) => a.instance.localeCompare(b.instance) || a.scenario.id.localeCompare(b.scenario.id));
   corpus.workshops.sort((a, b) => a.instance.localeCompare(b.instance) || a.workshop.id.localeCompare(b.workshop.id));
   corpus.screens.sort((a, b) => a.instance.localeCompare(b.instance) || a.screen.id.localeCompare(b.screen.id, undefined, { numeric: true }));
   return corpus;
 }
 
-/** Look a key up in the instance's own map first, then in every other instance's. */
-export function lookup<T>(per: Map<string, Map<string, T>>, instance: string, id: string): T | undefined {
-  const own = per.get(instance)?.get(id);
-  if (own !== undefined) return own;
-  for (const [name, m] of per) if (name !== instance && m.has(id)) return m.get(id);
-  return undefined;
-}
 
 /** A building block for a step of `instance`'s journey: its own catalogue first. */
 export function blockFor(corpus: JourneyCorpus, instance: string, id: string): { block: BuildingBlock; layer?: string } | undefined {
@@ -412,10 +431,6 @@ export function blockFor(corpus: JourneyCorpus, instance: string, id: string): {
   return undefined;
 }
 
-/** A journey by id: the instance's own first. */
-export function journeyById(corpus: JourneyCorpus, instance: string, id: string): Journey | undefined {
-  return corpus.journeys.find((j) => j.instance === instance && j.scenario.id === id) ?? corpus.journeys.find((j) => j.scenario.id === id);
-}
 
 /** A requirement by the id a step names (`STT-VER-008`, `req:stt-ver-008`). */
 export function requirementFor(corpus: JourneyCorpus, id: string): Requirement | undefined {
@@ -428,15 +443,6 @@ export function avatarFile(corpus: JourneyCorpus, actor: Actor): string | undefi
   return src === undefined ? undefined : instanceFile(corpus, actor.instance, src);
 }
 
-/** A path a journey names, relative to its instance's root: absolute when the file exists. */
-export function instanceFile(corpus: JourneyCorpus, instance: string, path: string): string | undefined {
-  const info = corpus.instances.get(instance);
-  if (info === undefined) return undefined;
-  const p = resolve(info.root, path);
-  // Never outside the instance: `../` in a journey is not a reference into another repository.
-  if (relative(info.root, p).startsWith("..")) return undefined;
-  return existsSync(p) && statSync(p).isFile() ? p : undefined;
-}
 
 /** The ids of every element of a BPMN file a step names; undefined when the file does not exist. */
 export function processElementIds(corpus: JourneyCorpus, instance: string, process: string): Set<string> | undefined {

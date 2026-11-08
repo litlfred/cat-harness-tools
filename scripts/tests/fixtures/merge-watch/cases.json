@@ -321,7 +321,10 @@
           }
         }
       ],
-      "expected": "green"
+      "expected": "green",
+      "logs": {
+        "1": "2026-11-07T08:00:00Z **New failures: 0** · fixed by this PR: 0 · failing on both: 3"
+      }
     },
     {
       "name": "red-judge",
@@ -491,6 +494,378 @@
       "workflowRuns": [],
       "checkRuns": [],
       "expected": "draft"
+    },
+    {
+      "name": "red-shard-judge-passes-no-table",
+      "pr": {
+        "draft": false
+      },
+      "workflowRuns": [
+        {
+          "id": 101,
+          "workflow_id": 7,
+          "check_suite_id": 900,
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request"
+        }
+      ],
+      "checkRuns": [
+        {
+          "id": 1,
+          "name": "checks / head — tests and gates, shard 1/2",
+          "status": "completed",
+          "conclusion": "failure",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 2,
+          "name": "checks / head — tests and gates, shard 2/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 3,
+          "name": "checks / No new failures (tests and gates)",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        }
+      ],
+      "logs": {
+        "1": "bun test exited 1"
+      },
+      "expected": "red: checks / head — tests and gates, shard 1/2 (no Q-PIPE-1 table)"
+    },
+    {
+      "name": "shard-table-lists-new-failures",
+      "pr": {
+        "draft": false
+      },
+      "workflowRuns": [
+        {
+          "id": 101,
+          "workflow_id": 7,
+          "check_suite_id": 900,
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request"
+        }
+      ],
+      "checkRuns": [
+        {
+          "id": 1,
+          "name": "checks / head — tests and gates, shard 1/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 2,
+          "name": "checks / head — tests and gates, shard 2/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 3,
+          "name": "checks / No new failures (tests and gates)",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        }
+      ],
+      "logs": {
+        "2": "| Q-PIPE-1 | count |\n|---|---|\n| New failures | 2 |"
+      },
+      "expected": "red: checks / head — tests and gates, shard 2/2 (2 new failures)"
+    },
+    {
+      "name": "red-check-no-judge-names",
+      "pr": {
+        "draft": false
+      },
+      "workflowRuns": [
+        {
+          "id": 101,
+          "workflow_id": 7,
+          "check_suite_id": 900,
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request"
+        }
+      ],
+      "checkRuns": [
+        {
+          "id": 1,
+          "name": "checks / head — tests and gates, shard 1/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 2,
+          "name": "checks / head — tests and gates, shard 2/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 3,
+          "name": "checks / No new failures (tests and gates)",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 4,
+          "name": "checks / lint",
+          "status": "completed",
+          "conclusion": "failure",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        }
+      ],
+      "expected": "red: checks / lint"
+    },
+    {
+      "name": "one-of-two-judges-red",
+      "pr": {
+        "draft": false
+      },
+      "workflowRuns": [
+        {
+          "id": 101,
+          "workflow_id": 7,
+          "check_suite_id": 900,
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request"
+        }
+      ],
+      "checkRuns": [
+        {
+          "id": 1,
+          "name": "checks / head — tests and gates, shard 1/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 2,
+          "name": "checks / head — tests and gates, shard 2/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 3,
+          "name": "Tests (no new failures)",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 4,
+          "name": "Index gates (no new failures)",
+          "status": "completed",
+          "conclusion": "failure",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        }
+      ],
+      "expected": "red: Index gates (no new failures)"
+    },
+    {
+      "name": "ready-for-review-run-queued",
+      "pr": {
+        "draft": false
+      },
+      "workflowRuns": [
+        {
+          "id": 101,
+          "workflow_id": 7,
+          "check_suite_id": 900,
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request"
+        },
+        {
+          "id": 102,
+          "workflow_id": 7,
+          "check_suite_id": 901,
+          "name": "PR tests",
+          "status": "queued",
+          "conclusion": null,
+          "event": "pull_request"
+        }
+      ],
+      "checkRuns": [
+        {
+          "id": 1,
+          "name": "checks / head — tests and gates, shard 1/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 2,
+          "name": "checks / head — tests and gates, shard 2/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 3,
+          "name": "checks / No new failures (tests and gates)",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        }
+      ],
+      "expected": "pending: run PR tests (queued, pull_request)"
+    },
+    {
+      "name": "shard-log-unreadable",
+      "pr": {
+        "draft": false
+      },
+      "workflowRuns": [
+        {
+          "id": 101,
+          "workflow_id": 7,
+          "check_suite_id": 900,
+          "status": "completed",
+          "conclusion": "success",
+          "event": "pull_request"
+        }
+      ],
+      "checkRuns": [
+        {
+          "id": 1,
+          "name": "checks / head — tests and gates, shard 1/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 2,
+          "name": "checks / head — tests and gates, shard 2/2",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        },
+        {
+          "id": 3,
+          "name": "checks / No new failures (tests and gates)",
+          "status": "completed",
+          "conclusion": "success",
+          "check_suite": {
+            "id": 900
+          },
+          "app": {
+            "slug": "github-actions"
+          }
+        }
+      ],
+      "logs": {
+        "1": null
+      },
+      "expected": "unknown: log not read: checks / head — tests and gates, shard 1/2"
     }
   ]
 }

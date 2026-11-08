@@ -30,10 +30,17 @@ describe("renderToolOutput", () => {
 
   it("url — links a safe scheme, and SHOWS a refused one as text", () => {
     expect(renderToolOutput("https://example.org/a", { as: "url" })).toContain('href="https://example.org/a"');
-    for (const bad of ["javascript:alert(1)", "java\tscript:alert(1)", "data:text/html,<b>x</b>"]) {
+    const refused: Array<[string, string]> = [
+      ["javascript:alert(1)", "javascript:alert(1)"],
+      ["java\tscript:alert(1)", "java\tscript:alert(1)"],
+      ["data:text/html,<b>x</b>", "data:text/html,&lt;b&gt;x&lt;/b&gt;"],
+    ];
+    for (const [bad, shown] of refused) {
       const out = renderToolOutput(bad, { as: "url" });
       expect(out).not.toContain("<a");
       expect(out).not.toContain("href=");
+      // Shown, as escaped text — not dropped.
+      expect(out).toBe(shown);
     }
   });
 
@@ -61,7 +68,12 @@ describe("the hint's own rules", () => {
   const port = (schema: string, render?: object) => ({ name: "o", schema: `https://x.test/tool-types/${schema}.schema.json`, ...(render ? { render } : {}) });
 
   it("absent is allowed, and means text", () => {
-    expect(ToolOutputSchema.safeParse(port("Markdown")).success).toBe(true);
+    const parsed = ToolOutputSchema.safeParse(port("Markdown"));
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.render).toBeUndefined();
+    // No hint renders exactly as the `text` hint does.
+    expect(renderToolOutput(SCRIPT)).toBe(renderToolOutput(SCRIPT, { as: "text" }));
+    expect(renderToolOutput("**bold**")).toBe("**bold**");
   });
 
   it("anything but text needs a stated reason", () => {
@@ -74,6 +86,10 @@ describe("the hint's own rules", () => {
     expect(ToolOutputSchema.safeParse(port("Url", { as: "url", reason: "r" })).success).toBe(true);
     expect(ToolOutputSchema.safeParse(port("Text", { as: "url", reason: "r" })).success).toBe(false);
     expect(ToolOutputSchema.safeParse(port("Text", { as: "markdown", reason: "r" })).success).toBe(false);
+    expect(ToolOutputSchema.safeParse(port("Markdown", { as: "markdown", reason: "r" })).success).toBe(true);
+    // Each hint is for its own type only, not for the other's.
+    expect(ToolOutputSchema.safeParse(port("Url", { as: "markdown", reason: "r" })).success).toBe(false);
+    expect(ToolOutputSchema.safeParse(port("Markdown", { as: "url", reason: "r" })).success).toBe(false);
   });
 });
 
@@ -192,6 +208,9 @@ describe("lazy window content fetch on open — bean q2wm", () => {
         jsonldHref: "/todos/lazy.jsonld",
       }),
     ).toBe("/todos/lazy.jsonld");
+    const inlineHtml = renderWindowDetail({ comment: "Already inline" });
+    expect(inlineHtml).toContain("<p>Already inline</p>");
+    expect(inlineHtml).not.toContain("No detail recorded.");
     const emptyHtml = renderWindowDetail({});
     expect(emptyHtml).toContain("No detail recorded.");
   });
@@ -215,5 +234,11 @@ describe("lazy window content fetch on open — bean q2wm", () => {
     expect(openEnd).toBeGreaterThan(openStart);
     const openBlock = docsUi.slice(openStart, openEnd);
     expect(openBlock).toContain("fetchCardDetail(todo");
+    // Each window output is rendered through renderToolOutput with its own hint.
+    const outStart = docsUi.indexOf("function renderWindowOutputs(outputs)");
+    expect(outStart).toBeGreaterThan(0);
+    const outEnd = docsUi.indexOf("\n  function ", outStart + 1);
+    expect(outEnd).toBeGreaterThan(outStart);
+    expect(docsUi.slice(outStart, outEnd)).toContain("renderToolOutput(item.value, item.render)");
   });
 });

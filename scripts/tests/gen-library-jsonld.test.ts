@@ -690,6 +690,34 @@ describe("the instance a GROUPED entry belongs to (bean 6fez)", () => {
   });
 });
 
+describe("the instance an entry belongs to when its library sits BELOW the instance (cat-harness#1032)", () => {
+  test("library/corpus/<group>/<id> and library/corpus/<id> name the instance that declares the corpus", () => {
+    // Measured 2026-11-07: cat-harness moved its corpus to `library/corpus/`,
+    // the folder above the library was no instance, and every manifest IRI
+    // fell back to the relative form — 5611 nodes stale.
+    const root = mkdtempSync(join(tmpdir(), "nested-"));
+    const corpus = join(root, "inst", "library", "corpus");
+    mkdirSync(join(corpus, "ui", "d"), { recursive: true });
+    mkdirSync(join(corpus, "e"), { recursive: true });
+    mkdirSync(join(root, "inst", "library", "other", "f"), { recursive: true });
+    writeFileSync(join(corpus, "library.json"), JSON.stringify({ $schema: "concern-groups/v1", groups: ["ui"] }));
+    writeDeclaration(join(root, "inst"), {
+      name: "inst",
+      directories: [{ id: "library", path: "library/corpus/", graphTypologies: ["library"] }],
+    });
+    clearGroupCache();
+    try {
+      expect(libraryInstanceOf(join(corpus, "ui", "d"))).toBe("inst");
+      expect(libraryInstanceOf(join(corpus, "e"))).toBe("inst");
+      // A folder the instance does not declare a library is not one: no guess.
+      expect(libraryInstanceOf(join(root, "inst", "library", "other", "f"))).toBeUndefined();
+    } finally {
+      clearGroupCache();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("an argument run() would not read is refused before anything is written", () => {
   test("--help, a typo, or a stray value is named; the real flags and their values pass", () => {
     expect(unknownArgument(["--help"])).toBe("--help");

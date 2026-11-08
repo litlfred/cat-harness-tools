@@ -140,43 +140,61 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
   const browser = hasBrowser();
   // Every check and writer runs as `bun run cat <script>` from the checkout root.
   const noCatAlias = noRootManifest(REPO, "the `cat` alias every check and writer here runs through");
-  for (const c of CASES) {
-    test.skipIf(noCatAlias || (c.needsBrowser === true && !browser))(
-      `${c.check}: red on a staled artefact, green after regen runs \`${writerFor(SCRIPTS, c.check) ?? "(none)"}\``,
-      async () => {
-        const writer = writerFor(SCRIPTS, c.check);
-        expect(writer, `${c.check} has no writer regen can run`).toBeDefined();
-        const rel = c.artefact();
-        const abs = join(REPO, rel);
-        // A derived QA artefact may be absent — the committed corpus is
-        // leaving `main` (bean `cxcn`, reader audit F7). Then the WRITER
-        // produces it fresh first, and the directory it had to create is
-        // removed afterwards, so the test asserts on a fresh run rather than
-        // on the committed copy, and leaves the checkout as it found it.
-        const createdDir = existsSync(abs) ? undefined : firstMissingAncestor(abs);
-        if (createdDir !== undefined) expect(runner(writer!), `${writer} could not produce ${rel}`).toBe(true);
-        const original = readFileSync(abs, "utf-8");
-        const staled = c.stale(original);
-        expect(staled, `the fixture did not change ${rel}`).not.toBe(original);
-        try {
-          writeFileSync(abs, staled);
-          // The control: without it a check that is ALWAYS green would pass this test.
-          expect(runner(c.check), `${c.check} did not go red on a staled ${rel}`).toBe(false);
-          const { results } = await regenPass([{ check: c.check, writer }], runner);
-          // A check routed through publish-check runs the writer itself, so the
-          // red run above already redrew the artefact and regen finds it
-          // current. Either way the effect asserted below is the same: the
-          // staled bytes are gone and the check is green.
-          const repaired = checkRunsItsWriter(c.check) ? ["regenerated", "current"] : ["regenerated"];
-          expect(repaired).toContain(results[0]?.outcome);
-          expect(results[0]).toMatchObject({ check: c.check, writer });
-          expect(readFileSync(abs, "utf-8"), `${writer} left ${rel} staled`).not.toBe(staled);
-        } finally {
-          if (createdDir !== undefined) rmSync(createdDir, { recursive: true, force: true });
-          else writeFileSync(abs, original);
-        }
-      },
-      120_000,
-    );
-  }
+  /** The case for one check, staled, judged red, repaired by regen, judged green. */
+  const run = (check: string) => async () => {
+    const c = CASES.find((x) => x.check === check)!;
+    const writer = writerFor(SCRIPTS, c.check);
+    expect(writer, `${c.check} has no writer regen can run`).toBeDefined();
+    const rel = c.artefact();
+    const abs = join(REPO, rel);
+    // A derived QA artefact may be absent — the committed corpus is
+    // leaving `main` (bean `cxcn`, reader audit F7). Then the WRITER
+    // produces it fresh first, and the directory it had to create is
+    // removed afterwards, so the test asserts on a fresh run rather than
+    // on the committed copy, and leaves the checkout as it found it.
+    const createdDir = existsSync(abs) ? undefined : firstMissingAncestor(abs);
+    if (createdDir !== undefined) expect(runner(writer!), `${writer} could not produce ${rel}`).toBe(true);
+    const original = readFileSync(abs, "utf-8");
+    const staled = c.stale(original);
+    expect(staled, `the fixture did not change ${rel}`).not.toBe(original);
+    try {
+      writeFileSync(abs, staled);
+      // The control: without it a check that is ALWAYS green would pass this test.
+      expect(runner(c.check), `${c.check} did not go red on a staled ${rel}`).toBe(false);
+      const { results } = await regenPass([{ check: c.check, writer }], runner);
+      // A check routed through publish-check runs the writer itself, so the
+      // red run above already redrew the artefact and regen finds it
+      // current. Either way the effect asserted below is the same: the
+      // staled bytes are gone and the check is green.
+      const repaired = checkRunsItsWriter(c.check) ? ["regenerated", "current"] : ["regenerated"];
+      expect(repaired).toContain(results[0]?.outcome);
+      expect(results[0]).toMatchObject({ check: c.check, writer });
+      expect(readFileSync(abs, "utf-8"), `${writer} left ${rel} staled`).not.toBe(staled);
+    } finally {
+      if (createdDir !== undefined) rmSync(createdDir, { recursive: true, force: true });
+      else writeFileSync(abs, original);
+    }
+  };
+  const skip = (check: string): boolean => noCatAlias || (CASES.find((x) => x.check === check)?.needsBrowser === true && !browser);
+
+  test.skipIf(skip("translate-bpmn:bootstrap:check"))(
+    "translate-bpmn:bootstrap:check: red on a staled artefact, green after regen runs its writer",
+    run("translate-bpmn:bootstrap:check"),
+    120_000,
+  );
+  test.skipIf(skip("translate-bpmn:check"))(
+    "translate-bpmn:check: red on a staled artefact, green after regen runs its writer",
+    run("translate-bpmn:check"),
+    120_000,
+  );
+  test.skipIf(skip("bat:sync:check"))(
+    "bat:sync:check: red on a staled artefact, green after regen runs its writer",
+    run("bat:sync:check"),
+    120_000,
+  );
+  test.skipIf(skip("render:bpmn:check"))(
+    "render:bpmn:check: red on a staled artefact, green after regen runs its writer",
+    run("render:bpmn:check"),
+    120_000,
+  );
 });
