@@ -137,7 +137,8 @@ describe("the rail pass with --theme-source: one rail on every page (option A)",
     expect(labels).toContain(RAIL_SECTION_LABELS.pages);
     expect(labels[0]).toBe(RAIL_SECTION_LABELS.onThisPage);
     expect(html).toMatch(/aria-label="Hide Guide's 1 page"/);
-    expect(html).toMatch(/<span class="fa-nav-dead"[^>]*>[\s\S]*?Install/);
+    // Marked, and still a link (owner, 2026-11-08: a page's own row must navigate).
+    expect(html).toMatch(/<a href="[^"]*install\.html"[^>]*aria-current="page"[^>]*>[\s\S]*?Install/);
     expect(drawn("replica/page.html")).toContain('href="../guide/install.html"');
   });
   test("every page has the same top bar, and the layout it is drawn by is shipped", () => {

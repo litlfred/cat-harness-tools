@@ -46,7 +46,7 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { GROUP_GLYPHS, NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
@@ -187,7 +187,7 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
   const harnesses: NavGroup | undefined =
     o.harnesses === undefined
       ? undefined
-      : { label: RAIL_SECTION_LABELS.harnesses, icon: "\u25A6", items: o.harnesses, collapsible: true };
+      : { label: RAIL_SECTION_LABELS.harnesses, icon: "H", glyphPath: GROUP_GLYPHS.harnesses, items: o.harnesses, collapsible: true };
   return {
     instance: o.instance,
     ...(o.mark ? { mark: o.mark } : {}),
@@ -207,8 +207,8 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
     // one of its rows is the current page, so the reader's place stays visible.
     // "Folders", not "Graphs" (owner, 2026-10-15): the theme sidebar's word
     // for the same rows, so the section reads the same on every site.
-    ...(o.pages && o.pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "\u25A5", items: o.pages, collapsible: true, open: false } } : {}),
-    graphs: { label: RAIL_SECTION_LABELS.folders, icon: "\u25A4", items: o.links, collapsible: true, open: false },
+    ...(o.pages && o.pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "P", glyphPath: GROUP_GLYPHS.pages, items: o.pages, collapsible: true, open: false } } : {}),
+    graphs: { label: RAIL_SECTION_LABELS.folders, icon: "F", glyphPath: GROUP_GLYPHS.folders, items: o.links, collapsible: true, open: false },
     ...(harnesses ? { harnesses } : {}),
     // No home row (owner, 2026-10-30: "dont need home on bottomof harnes
     // navbars"): the header's mark and name are the link to the landing page.
@@ -543,14 +543,18 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
           const { href: _here, ...rest } = item;
           return { ...rest, current: true };
         });
-  // The same for the page tree, at any depth.
+  // The page tree, at any depth, marks the page too — but KEEPS its link.
+  // Owner, 2026-11-08, on a section landing page: *"you should be able to navigate
+  // to pages like [that one] by click on Page name on LHS navbar but it doesnt
+  // work"*. A page that has children is a section's landing page; as a dead,
+  // dimmed row it read as broken. It stays a link, drawn as current
+  // (`aria-current="page"`), so a click reloads it the way a reader expects.
   const markHere = (items: readonly NavItem[]): NavItem[] =>
     items.map((item) => {
       const kids = item.children ? { children: markHere(item.children) } : {};
       // The site's own pages are linked from the page's own root.
       if (page.here === undefined || item.href !== `${page.toRoot}${page.here}`) return { ...item, ...kids };
-      const { href: _here, ...rest } = item;
-      return { ...rest, ...kids, current: true };
+      return { ...item, ...kids, current: true };
     });
   return navbarRegionsHtml(
     railModel({

@@ -38,6 +38,7 @@ import {
 import { isZodSchema } from "../schemas/kg/kind-validator.js";
 import { isExternalContract, skillContracts } from "./skill-contracts.js";
 import { termIri } from "../schemas/kg/namespaces.js";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const WORKFLOW_DIR = join(REPO_ROOT, ".github", "workflows");
@@ -176,6 +177,11 @@ export interface PublishedExportReport {
   sidecarSubjectsUnknown?: string;
   /** The `--against` ref the committed sidecars were read from, when one was given. */
   against?: string;
+  /**
+   * Why this root publishes no instance graph at all, when that is DETERMINED
+   * ({@link publishesNoInstanceGraph}); the gate then exits not applicable.
+   */
+  notApplicable?: string;
 }
 
 /**
@@ -774,6 +780,25 @@ export function incompleteExports(
   return out;
 }
 
+/**
+ * Why this root's workflows publish no instance graph, or `undefined` when
+ * that cannot be determined (cat-harness-tools#1701).
+ *
+ * "Examined nothing" means either nothing publishes or the pattern stopped
+ * matching. In a root that has NO {@link DEPLOY_WORKFLOW} and whose workflows
+ * name none of the publishers anywhere (not even in a line the patterns miss)
+ * the first is determined: an IG repository that is its own index
+ * (smart-ips-pilgrimage) builds its IG with the IG Publisher and deploys no
+ * folio site. A root with the deploy, or with any line naming a publisher,
+ * is judged exactly as before.
+ */
+export function publishesNoInstanceGraph(workflows: ReadonlyMap<string, string>): string | undefined {
+  if (workflows.has(DEPLOY_WORKFLOW)) return undefined;
+  const named = /kg-export|instance-exports|export-graph/;
+  if ([...workflows.values()].some((t) => named.test(t))) return undefined;
+  return `this root has no ${DEPLOY_WORKFLOW}, and none of its ${workflows.size} workflow file(s) names kg-export, instance-exports or export-graph: it publishes no instance graph`;
+}
+
 export async function checkPublishedInstanceExports(opts: { against?: string } = {}): Promise<PublishedExportReport> {
   let files: string[];
   try {
@@ -826,7 +851,10 @@ export async function checkPublishedInstanceExports(opts: { against?: string } =
     ...(incomplete.length > 0 ? { incomplete } : {}),
     ...(unpublishedSchemas.length > 0 ? { unpublishedSchemas } : {}),
   };
-  if (invocations.length === 0) return base;
+  if (invocations.length === 0) {
+    const why = unreadable.length === 0 ? publishesNoInstanceGraph(texts) : undefined;
+    return why === undefined ? base : { ...base, notApplicable: why };
+  }
 
   const { subjects: sidecarSubjects, unknown } = sidecarSubjectsFrom(invocations, { against: opts.against });
   const outDir = mkdtempSync(join(tmpdir(), "published-instance-export-"));
@@ -945,6 +973,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   const report = await checkPublishedInstanceExports({ against });
+  if (report.notApplicable !== undefined) exitNotApplicable("check:published-instance-exports", report.notApplicable);
   const clean =
     report.unreadable === undefined &&
     report.invocations.length > 0 &&
