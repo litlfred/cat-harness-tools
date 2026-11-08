@@ -890,6 +890,36 @@ def findings(text, root=None):
     return diagnostics(text, root)
 
 
+# cat-harness-tools#1701: the gates that judge the mounts AS LAID DOWN from
+# the root's lock. In the shards they ran over the prepared tree, i.e. after
+# the prepare job's derive:publish (and the qa:refresh it runs) had written
+# pages and QA results into the mounted layers, and those writes reached the
+# shards in the snapshot. Measured on smart-ips-pilgrimage run 42455839636 by
+# replaying derive:publish over its lock: 962 files in 7 layers, 899 of them
+# ignored by the layer's own .gitignore (test/results/**, built pages,
+# sidecars), so every mount but bootstrap-tools read "modified" and
+# separation:cutover:check failed on its `mounts` condition. The prepare job
+# now runs these right after the state mount, before anything is built on the
+# tree (`--as-mounted`), and every shard takes that answer (`--as-mounted-record`)
+# instead of judging the built-on tree. Nothing is excused: a lock that does
+# not lay down, or a mount that is edited, is just as red, only judged on the
+# tree the lock produced.
+AS_MOUNTED_SCRIPTS = ("mount:remote:check", "mount:lock:check", "separation:cutover:check")
+
+
+def as_mounted(gates):
+    """The derived gates judged on the tree as mounted, name -> command."""
+    return {k: v for k, v in gates.items() if k.split(":", 1)[-1] in AS_MOUNTED_SCRIPTS}
+
+
+def gate_env(root, own):
+    """The environment every gate inherits (see `main`)."""
+    os.environ.setdefault(GATE_OWN_ENV, ",".join(own))
+    known = instances_in(root)
+    os.environ.setdefault(GATE_OWN_PATHS_ENV, ",".join(known.get(n, n) for n in own))
+    os.environ.setdefault(GATE_FOREIGN_PATHS_ENV, ",".join(d for n, d in sorted(known.items()) if n not in own and d != "."))
+
+
 def run(root, name, command):
     start = time.monotonic()
     try:
@@ -1073,6 +1103,29 @@ def main():
             listed["shard"] = {"shard": shard, "of": shards, "total": len(gates)}
         json.dump(listed, sys.stdout, indent=1)
         sys.exit(0 if own else 2)
+    if len(args) >= 2 and args[1] == "--as-mounted":
+        # `run-gates.py <root> --as-mounted <out.json> [--instance <name>]...`:
+        # run only AS_MOUNTED_SCRIPTS, now, and record them in the shape
+        # `--record` reads (cat-harness-tools#1701). Exit 2 with no own instance.
+        if len(args) < 3:
+            print("usage: run-gates.py <root> --as-mounted <out.json> [--instance <name>]...", file=sys.stderr)
+            sys.exit(2)
+        root, out_path = args[0], args[2]
+        own, _harness, _runner, gates, _skipped = derive(root, given, tmp)
+        if not own:
+            sys.exit(2)
+        gate_env(root, own)
+        results = {}
+        for name, command in sorted(as_mounted(gates).items()):
+            name, command, code, text, seconds = run(root, name, command)
+            print(f"::group::{name} (as mounted): exit {code} in {seconds} s — {command}", flush=True)
+            print(text[-4000:], flush=True)
+            print("::endgroup::", flush=True)
+            results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds,
+                             "diagnostics": diagnostics(text, root)}
+        with open(out_path, "w") as f:
+            json.dump(results, f, indent=1)
+        sys.exit(0)
     root, out_path = args[0], args[1]
     records = [args[i + 1] for i, a in enumerate(args) if a == "--record" and i + 1 < len(args)]
     own, harness, runner, gates, skipped = derive(root, given, tmp)
@@ -1084,13 +1137,24 @@ def main():
     # The instances whose committed files this run judges (scripts/lib/gate-own.ts;
     # owner ruling 2026-11-05, "Move the checks"). A check that honours it leaves
     # the mounted layers' files to their own CI. Every gate inherits it.
-    os.environ.setdefault(GATE_OWN_ENV, ",".join(own))
     # The same by directory, for a check whose subjects are files rather than
     # declared directories (`gateOwnsFile`): the own instances' and every
     # other instance's, so a file is the caller's when its deepest instance is.
-    known = instances_in(root)
-    os.environ.setdefault(GATE_OWN_PATHS_ENV, ",".join(known.get(n, n) for n in own))
-    os.environ.setdefault(GATE_FOREIGN_PATHS_ENV, ",".join(d for n, d in sorted(known.items()) if n not in own and d != "."))
+    gate_env(root, own)
+    # The mount gates the prepare job judged on the tree as mounted
+    # (cat-harness-tools#1701): taken from its record in place of a run over
+    # the built-on tree, dropped from every shard before the split so the
+    # shards still agree on it, and carried by shard 1 like the other records.
+    # No record (an older prepare job, or a step that failed): run as before.
+    mounted_at = [args[i + 1] for i, a in enumerate(args) if a == "--as-mounted-record" and i + 1 < len(args)]
+    for path in mounted_at:
+        got = read_json(path)
+        if isinstance(got, dict) and got:
+            for name in got:
+                gates.pop(name, None)
+            records.append(path)
+        else:
+            print(f"::warning::{path} is missing or unreadable: the mount gates run over the prepared tree", flush=True)
     skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
     os.environ.setdefault("CAT_SKILL_REGISTER_VERIFIED_BY_GATES", verified_by_gates(gates))
     timings = read_timings(os.environ.get("GATE_TIMINGS"))
