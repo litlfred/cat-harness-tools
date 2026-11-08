@@ -7,8 +7,9 @@
  * so on a fresh clone it is not on disk. This file breaks that loop: when the
  * runner is missing it runs `.github/mount-from-lock.sh` (which fetches the
  * replayer at the commit `index.lock.json` pins and verifies every tree
- * digest), then runs the runner with the same arguments. When the runner is
- * already there it only hands over, so the cost is one `existsSync`.
+ * digest), then runs the runner with the same arguments. A root with a
+ * `package.json` and no `node_modules/` gets one `bun install` first. When
+ * both are already there it only hands over, so the cost is two `existsSync`.
  *
  * Written into each downstream root by `instantiate-harness.ts` from
  * `cat-harness-tools/templates/root-bootstrap/`. Imports only `node:*`.
@@ -27,6 +28,17 @@ if (!existsSync(runner)) {
   if (m.status !== 0 || !existsSync(runner)) {
     console.error(`cat: mounting failed (exit ${m.status ?? m.signal}); run \`bash .github/mount-from-lock.sh\` to see why`);
     process.exit(m.status || 2);
+  }
+}
+
+// The root's own dependencies (its workspaces and libraries), once: the same
+// `[ -d node_modules ] || bun install --frozen-lockfile` the session-start hooks run.
+if (existsSync(join(root, "package.json")) && !existsSync(join(root, "node_modules"))) {
+  const frozen = existsSync(join(root, "bun.lock")) ? ["--frozen-lockfile"] : [];
+  const i = spawnSync(process.execPath, ["install", ...frozen], { cwd: root, stdio: ["ignore", 2, 2] });
+  if (i.status !== 0) {
+    console.error(`cat: \`bun install\` at the root failed (exit ${i.status ?? i.signal})`);
+    process.exit(i.status || 2);
   }
 }
 
