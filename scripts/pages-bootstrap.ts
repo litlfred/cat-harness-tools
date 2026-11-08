@@ -65,6 +65,7 @@ import { join, resolve } from "node:path";
 
 import { checkoutRootFor } from "../schemas/kg/cat-harness.js";
 import { readEffectiveConfig } from "../schemas/kg/harness-config.js";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 export type Probe = "ok" | "not-found" | "error" | "unchecked";
 export type PagesOutcome = "live" | "not-yet" | "unknown" | "unprovisioned";
@@ -152,6 +153,8 @@ export function parseRemote(remote: string): { owner: string; repo: string } | u
 }
 
 function gitRemote(root: string): string | undefined {
+  // input-site: traced #ae81c49b — origin's URL, from this clone's git config: no fingerprint names it, so a run that reaches it records no hash
+  inputSiteReached("pages-bootstrap: origin's URL");
   const r = spawnSync("git", ["-C", root, "remote", "get-url", "origin"], { encoding: "utf-8" });
   if (r.status !== 0) return undefined;
   const url = r.stdout.trim();

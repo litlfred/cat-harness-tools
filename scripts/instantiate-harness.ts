@@ -52,8 +52,11 @@
  *     is rendered afterwards by the MOUNTED generators, so its links point at
  *     the repository's own mounts and not at the bootstrap root.
  *  5. **install** — a root `package.json` whose workspaces are the mounted
- *     instances that carry one, a hoisted `bunfig.toml` (the shape the
- *     harnessed IGs use), `node_modules/` ignored, `bun install`.
+ *     instances that carry one and whose `cat` script is `bun .github/cat.ts`,
+ *     the two bootstrap files from `templates/root-bootstrap/` in `.github/`
+ *     (so `bun run cat …` mounts the layers itself on a fresh clone), a
+ *     hoisted `bunfig.toml` (the shape the harnessed IGs use), `node_modules/`
+ *     ignored, `bun install`.
  *  6. **harness steps** — the checkout script `instantiate:<harness>`, when a
  *     mounted layer declares it: the harness's own files (an IG's identity,
  *     its publish workflows). Then everything is committed.
@@ -76,7 +79,7 @@
  */
 
 import { spawnSync, type SpawnSyncOptions } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
@@ -231,6 +234,35 @@ export function withWorkspaces(pkg: Record<string, unknown> | undefined, repoNam
   return { ...base, workspaces: [...have, ...mounted.filter((m) => !have.includes(m))] };
 }
 
+/** The root's `cat` script: the bootstrap that mounts the layers when they are missing, then runs `run-script.ts`. */
+export const CAT_SCRIPT = "bun .github/cat.ts";
+
+/** The files `templates/root-bootstrap/` holds, written into the root's `.github/`. */
+export const ROOT_BOOTSTRAP_FILES = ["cat.ts", "mount-from-lock.sh"] as const;
+
+/**
+ * The root `package.json` with `cat` pointing at the bootstrap. A `cat` that
+ * runs the bare runner (`bun cat-harness-tools/scripts/run-script.ts`, or
+ * cat-harness's before bean 70lx) is replaced; any other `cat` is the root's
+ * own and is kept.
+ */
+export function withCatScript(pkg: Record<string, unknown>): Record<string, unknown> {
+  const scripts = { ...((pkg.scripts as Record<string, string> | undefined) ?? {}) };
+  const cat = scripts.cat;
+  if (cat === undefined || /^bun (run )?cat-harness(-tools)?\/scripts\/run-script\.ts$/.test(cat.trim())) scripts.cat = CAT_SCRIPT;
+  return { ...pkg, scripts };
+}
+
+/** Copy the bootstrap files into `<repo>/.github/`, executable. */
+export function writeRootBootstrap(repo: string): void {
+  const from = join(import.meta.dir, "..", "templates", "root-bootstrap");
+  mkdirSync(join(repo, ".github"), { recursive: true });
+  for (const f of ROOT_BOOTSTRAP_FILES) {
+    copyFileSync(join(from, f), join(repo, ".github", f));
+    chmodSync(join(repo, ".github", f), 0o755);
+  }
+}
+
 /** `bunfig.toml` with the hoisted linker: ONE root node_modules every mount resolves from. */
 export function withHoistedLinker(text: string | undefined): string {
   if (text === undefined || text.trim() === "") return `[install]\nlinker = "hoisted"\n`;
@@ -254,7 +286,7 @@ export function planLines(o: Options, closure: readonly ClosureEntry[], branch: 
     ...closure.map((e) => `  ${e.name.padEnd(22)} ${e.repository}@${e.ref.slice(0, 12)}${e.needs.length ? `  needs ${e.needs.join(", ")}` : ""}`),
     `seed      remote-mount --seed ×${closure.length} --whole, consent by ${o.consentBy ?? "(missing: --consent-by)"}; site.landing ${h}, site.agentRun, mountApprovers`,
     "mount     remote-mount: the closure, index.lock.json, the .gitignore mounts block; then the agent surface, from the mounted generators",
-    "install   package.json workspaces, bunfig.toml (hoisted), node_modules/ ignored, bun install",
+    "install   package.json workspaces and `cat` (bun .github/cat.ts), .github/cat.ts + mount-from-lock.sh, bunfig.toml (hoisted), node_modules/ ignored, bun install",
     `harness   instantiate:${h}, when a mounted layer declares it; then commit`,
     o.local ? "publish   (--local: nothing pushed)" : `publish   push ${branch}, provision gh-pages when absent, ${o.pr ? "open the setup-only PR" : "no PR (--no-pr)"}`,
     `prepare   prepare:${h}, when a mounted layer declares it`,
@@ -370,7 +402,8 @@ export async function main(argv: readonly string[]): Promise<number> {
     // 5. install
     const mounted = closure.map((e) => e.name).filter((n) => existsSync(join(repo, n, "package.json")));
     const pkgFile = join(repo, "package.json");
-    writeFileSync(pkgFile, `${JSON.stringify(withWorkspaces(readJson(pkgFile), basename(repo), mounted), null, 2)}\n`);
+    writeFileSync(pkgFile, `${JSON.stringify(withCatScript(withWorkspaces(readJson(pkgFile), basename(repo), mounted)), null, 2)}\n`);
+    writeRootBootstrap(repo);
     const bunfig = join(repo, "bunfig.toml");
     writeFileSync(bunfig, withHoistedLinker(existsSync(bunfig) ? readFileSync(bunfig, "utf-8") : undefined));
     const ignore = join(repo, ".gitignore");
