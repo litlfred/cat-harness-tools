@@ -70,18 +70,16 @@ describe("the four shipped voices each have a criterion", () => {
   // block is where it is checked — `voice-criteria.test.ts` checks the
   // derivation itself.
   const byId = qaCriteriaByIdFor(join(ORIGIN_DIR, "../.."));
-  for (const id of [
-    "voice-overlay-who-editorial",
-    "voice-overlay-who-guideline-development",
-    "voice-overlay-who-publication-design",
-    "voice-overlay-milnor",
-  ]) {
-    test(`${id} is registered, voice-scoped and agent-adjudicated`, () => {
-      const def = byId[id];
-      expect(def).toBeDefined();
-      expect(def!.domain).toBe("voice");
-      expect(def!.voices).toHaveLength(1);
-      expect(def!.automated).toBe(false);
-    });
-  }
+  test.each([
+    ["voice-overlay-who-editorial"],
+    ["voice-overlay-who-guideline-development"],
+    ["voice-overlay-who-publication-design"],
+    ["voice-overlay-milnor"],
+  ])("%s is registered, voice-scoped and agent-adjudicated", (id) => {
+    const def = byId[id];
+    expect(def).toBeDefined();
+    expect(def!.domain).toBe("voice");
+    expect(def!.voices).toHaveLength(1);
+    expect(def!.automated).toBe(false);
+  });
 });

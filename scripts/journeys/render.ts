@@ -37,8 +37,10 @@ import remarkHtml from "remark-html";
 
 import { escHtml, DEFAULT_ICON } from "../thin-page.ts";
 import { NAVBAR_LINKED } from "../lib/harness-rail.ts";
+import { PANEL_CLIENT, PANEL_CSS, PANEL_SCRIPT } from "../lib/task-panel.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
-import type { ScenarioStep, UserScenario } from "../../schemas/process/user-scenario.ts";
+import type { Part, ScenarioStep } from "../../schemas/process/user-scenario.ts";
+import { parentsOf, partsOf } from "./derive.ts";
 import type { Workshop, WorkshopStep } from "../../schemas/process/workshop.ts";
 import {
   blockFor,
@@ -55,7 +57,7 @@ import {
   type WorkshopEntry,
 } from "./read.ts";
 import { igProcessPage, PRESENT_ASSETS, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
-import { artifactPage, DAK_ATTR, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
+import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
 
 export const TOOL_ID = "journeys-viewer";
 const ASSET_DIR = join(import.meta.dir, "assets");
@@ -76,6 +78,8 @@ export interface SiteLinks extends StepPageLinks {
   route: string;
   /** Site-relative page of each process drawing's viewer, by instance; absent when no processes viewer is declared. */
   processesPage?: (instance: string) => string | undefined;
+  /** Site-relative ⓘ panel sidecar of a BPMN file (instance-relative) the processes viewer draws; absent when no processes viewer is declared. */
+  processPanel?: (instance: string, bpmn: string) => string | undefined;
   /** An ArchiMate view's drawing and page, site-relative; absent when it cannot be placed. */
   archimateView?: (instance: string, model: string, view: string) => { svg: string; page: string; name: string } | undefined;
   /** Title of the site's declaring instance, for the index heading. */
@@ -194,6 +198,7 @@ function codeRange(corpus: JourneyCorpus, j: Journey, seen = new Set<string>()):
 }
 
 export function allSteps(corpus: JourneyCorpus, j: Journey, seen = new Set<string>()): ScenarioStep[] {
+  // A part of two parents is reached twice, and a cycle of parts would never end: each journey once.
   if (seen.has(`${j.instance}/${j.scenario.id}`)) return [];
   seen.add(`${j.instance}/${j.scenario.id}`);
   return [...j.scenario.steps, ...childrenOf(corpus, j).flatMap((c) => allSteps(corpus, c, seen))];
@@ -221,14 +226,34 @@ export function orderByFollows(journeys: readonly Journey[]): Journey[] {
   return out;
 }
 
-export function childrenOf(corpus: JourneyCorpus, j: Journey): Journey[] {
-  const partOf = (c: Journey) => (c.scenario as UserScenario & { partOf?: string }).partOf;
-  return orderByFollows(corpus.journeys.filter((c) => c.instance === j.instance && partOf(c) === j.scenario.id));
+/**
+ * A journey's parts in story order: its `parts` (each with whether it is
+ * optional or repeats), then, from an older file, the journeys whose `partOf`
+ * names it, ordered along `follows`. A part that names no journey is left
+ * out here; `check:journey-refs` reports it.
+ */
+export function partEntries(corpus: JourneyCorpus, j: Journey): { journey: Journey; part?: Part }[] {
+  const listed = partsOf(j.scenario).flatMap((part) => {
+    const k = journeyById(corpus, j.instance, part.scenario);
+    return k ? [{ journey: k, part }] : [];
+  });
+  const legacy = orderByFollows(corpus.journeys.filter((c) => c.instance === j.instance && c.scenario.partOf === j.scenario.id && !listed.some((x) => x.journey === c)));
+  return [...listed, ...legacy.map((journey) => ({ journey }))];
 }
 
+export function childrenOf(corpus: JourneyCorpus, j: Journey): Journey[] {
+  return partEntries(corpus, j).map((x) => x.journey);
+}
+
+/** The first journey `j` is a part of; `parentsOf` (`derive.ts`) has every one. */
 export function parentOf(corpus: JourneyCorpus, j: Journey): Journey | undefined {
-  const p = (j.scenario as UserScenario & { partOf?: string }).partOf;
-  return p === undefined ? undefined : corpus.journeys.find((c) => c.instance === j.instance && c.scenario.id === p);
+  return parentsOf(corpus, j).find((p) => p.instance === j.instance) ?? parentsOf(corpus, j)[0];
+}
+
+/** "optional", "repeats": how a part sits in its parent's story, as a small mark. */
+function partMarks(part: Part | undefined): string {
+  const marks = [part?.optional ? ["optional", "The story may skip it"] : undefined, part?.repeats ? ["repeats", "It may happen more than once"] : undefined].filter((m): m is string[] => m !== undefined);
+  return marks.map(([w, t]) => `<span class="jv-part-mark" title="${e(t!)}">${e(w!)}</span>`).join("");
 }
 
 /** The journeys of one instance at the top of its `partOf` tree. */
@@ -304,6 +329,7 @@ function page(o: { title: string; up: string; crumbs: Crumb[]; body: string; kin
 ${NAVBAR_LINKED}
 <link rel="stylesheet" href="${o.up}assets/journeys.css">
 <script src="${o.up}assets/journeys.js" defer></script>
+${panelHead(o.body, `${o.up}assets/`)}
 </head>
 <body class="jv jv-${o.kind}${o.print ? ` jv-print-${o.print}` : ""}">
 <nav class="jv-crumbs" aria-label="Breadcrumb">${crumbs}</nav>
@@ -334,20 +360,21 @@ function sparkline(steps: readonly ScenarioStep[]): string {
   return `<svg class="jv-spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-label="How the lead feels across the steps"><line x1="0" x2="${w}" y1="${h / 2}" y2="${h / 2}" class="jv-spark-zero"/><polyline points="${pts}"/></svg>`;
 }
 
-function journeyCard(corpus: JourneyCorpus, j: Journey, up: string, depth = 0): string {
+function journeyCard(corpus: JourneyCorpus, j: Journey, up: string, depth = 0, part?: Part, path: readonly Journey[] = []): string {
   const s = j.scenario;
   const personas = personasOf(corpus, j);
-  const kids = childrenOf(corpus, j);
+  // A cycle of parts is drawn once round, never forever (check:journey-refs reports it).
+  const kids = path.includes(j) ? [] : partEntries(corpus, j);
   const steps = allSteps(corpus, j);
   const meta = [s.when, s.where].filter(Boolean).map((x) => e(x!)).join(" · ");
   const text = [s.title, s.description, ...s.steps.map((x) => `${x.id} ${x.title}`)].join(" ").toLowerCase();
   return `<li class="jv-node">
 <a class="jv-card" href="${e(journeyHref(j, up))}" data-jv-text="${e(text)}">
 <span class="jv-card-code">${e(codeRange(corpus, j) || s.id)}</span>
-<span class="jv-card-title">${e(s.title)}</span>
+<span class="jv-card-title">${e(s.title)}${partMarks(part)}</span>
 ${meta ? `<span class="jv-card-meta">${meta}</span>` : ""}
-<span class="jv-card-foot"><span class="jv-avs">${personas.map((p) => avatar(p, "s")).join("")}</span>${sparkline(steps)}<span class="jv-card-count">${s.steps.length ? `${s.steps.length} step${s.steps.length === 1 ? "" : "s"}` : `${kids.length} sub-journey${kids.length === 1 ? "" : "s"}`}</span></span>
-</a>${kids.length ? `\n<ol class="jv-tree jv-tree-sub">${kids.map((k) => journeyCard(corpus, k, up, depth + 1)).join("\n")}</ol>` : ""}
+<span class="jv-card-foot"><span class="jv-avs">${personas.map((p) => avatar(p, "s")).join("")}</span>${sparkline(steps)}<span class="jv-card-count">${s.steps.length ? `${s.steps.length} step${s.steps.length === 1 ? "" : "s"}` : kids.length ? `${kids.length} part${kids.length === 1 ? "" : "s"}` : "DAK user scenario"}</span></span>
+</a>${kids.length ? `\n<ol class="jv-tree jv-tree-sub">${kids.map((k) => journeyCard(corpus, k.journey, up, depth + 1, k.part, [...path, j])).join("\n")}</ol>` : ""}
 </li>`;
 }
 
@@ -387,7 +414,7 @@ function indexPage(corpus: JourneyCorpus, links: SiteLinks, declaring: string): 
   const body = `<header class="jv-hero">
 <p class="jv-kicker">Journeys</p>
 <h1>Every journey in ${e(links.title)}</h1>
-<p class="jv-lede">${total} journey${total === 1 ? "" : "s"} and ${steps} step${steps === 1 ? "" : "s"} across ${names.length} instance${names.length === 1 ? "" : "s"} of this checkout, the mounted layers' included. Each journey is a user scenario told as a journey map; sub-journeys sit under the journey they are part of, in the order the story follows.</p>
+<p class="jv-lede">${total} journey${total === 1 ? "" : "s"} and ${steps} step${steps === 1 ? "" : "s"} across ${names.length} instance${names.length === 1 ? "" : "s"} of this checkout, the mounted layers' included. Each journey is a user scenario told as a journey map; a journey's parts sit under it, in the order the story follows.</p>
 <label class="jv-filter"><span>Filter</span><input type="search" data-jv-filter placeholder="a title, a step code, a word" aria-label="Filter journeys"></label>
 </header>
 ${names.length ? names.map((n) => instanceSection(corpus, n, "", true)).join("\n") : `<p class="jv-empty">No instance in this checkout declares a <code>user-scenario</code> or <code>workshop</code> directory with anything in it.</p>`}`;
@@ -489,22 +516,34 @@ ${[head, ...lanes, curve, pain, enabler, record, handoff].join("\n")}
 let figureSeq = 0;
 
 /**
- * A process drawing with the step's flow nodes highlighted: the SVG inlined,
- * its XML prologue and doctype dropped. Comments are left as they are: they
- * are harmless inside inline SVG, and a one-pass strip could JOIN the pieces
- * of a nested one (`<!<!---->--`) into a `<!--` that swallows the page.
+ * A process drawing as every page of the site shows one: `render:bpmn`'s
+ * linked drawing, inlined, in the common BPMN block (`bpmn-figure
+ * pt-diagram`, `scripts/lib/task-panel.ts`). The step's flow nodes are named
+ * in `data-pt-highlight` and the task panel's client marks them; `panel` is
+ * the processes viewer's sidecar for the drawing, so its ⓘ markers and [+]
+ * links come too, and without one the drawing is highlighted only. The
+ * scroll box takes keyboard focus, so a wide drawing scrolls from the keys.
+ *
+ * The XML prologue and doctype are dropped. Comments are left as they are:
+ * they are harmless inside inline SVG, and a one-pass strip could JOIN the
+ * pieces of a nested one (`<!<!---->--`) into a `<!--` that swallows the page.
  */
-export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, caption: string): string {
+export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, caption: string, panel?: string): string {
   const id = `jv-fig-${++figureSeq}`;
-  let body = svg
+  const body = svg
     .replace(/<\?xml[^>]*\?>/g, "")
     .replace(/<!DOCTYPE[^>]*>/gi, "")
     .trim();
-  const hl = new Set(tasks ?? []);
-  if (hl.size) {
-    body = body.replace(/data-element-id="([^"]+)"/g, (m, elementId: string) => (hl.has(elementId) ? `${m} data-jv-hl=""` : m));
-  }
-  return `<figure class="jv-bpmn${hl.size ? " jv-has-hl" : ""}" id="${id}"><div class="jv-bpmn-scroll">${body}</div><figcaption>${caption}</figcaption></figure>`;
+  const hl = [...new Set(tasks ?? [])];
+  const attrs = `${panel ? ` data-panel="${e(panel)}"` : ""}${hl.length ? ` data-pt-highlight="${e(hl.join(" "))}"` : ""}`;
+  return `<figure class="bpmn-figure pt-diagram jv-bpmn" id="${id}"${attrs}><div class="jv-bpmn-scroll" tabindex="0" role="group" aria-label="Process drawing, scrolls with the arrow keys">${body}</div><figcaption>${caption}</figcaption></figure>`;
+}
+
+/** The task panel's client and styles, for a page that carries a {@link bpmnFigure}; nothing for one that does not. */
+export function panelHead(body: string, assets: string): string {
+  return body.includes("pt-diagram")
+    ? `<link rel="stylesheet" href="${e(`${assets}${PANEL_CLIENT.style}`)}">\n<script src="${e(`${assets}${PANEL_CLIENT.script}`)}" defer></script>`
+    : "";
 }
 
 function assessmentGrid(w: WorkshopEntry, s: WorkshopStep): string {
@@ -649,18 +688,33 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
         })
         .join("")}</ul>`
     : "";
+  const dak = dakGroups(corpus, igOf(corpus, j.instance), s.dak, toSite);
+  const dakHtml = dak.length
+    ? `<h4>DAK assets</h4><dl class="jv-dl jv-dak">${dak
+        .map(
+          (g) =>
+            `<dt>${e(g.label)}</dt><dd>${g.assets
+              .map((a) => {
+                const tip = e(a.description ? `${a.key} — ${a.description}` : a.key);
+                return a.href ? `<a href="${e(a.href)}" class="jv-code" ${DAK_ATTR} title="${tip}">${e(a.label)}</a>` : `<span class="jv-code" title="${tip}">${e(a.label)}</span>`;
+              })
+              .join(" ")}</dd>`,
+        )
+        .join("")}</dl>`
+    : "";
   const refsHtml = st.references?.length ? `<h4>References</h4><ul>${st.references.map((r) => `<li><a href="${e(fromSite(r.href, toSite))}">${e(r.label)}</a>${r.rel ? ` <span class="jv-muted">${e(r.rel)}</span>` : ""}</li>`).join("")}</ul>` : "";
   const handoffHtml =
     s.handoff && (s.handoff.carrier || s.handoff.payload)
       ? `<h4>What travels</h4><dl class="jv-dl">${s.handoff.carrier ? `<dt>Carrier</dt><dd>${e(s.handoff.carrier)}</dd>` : ""}${s.handoff.payload ? `<dt>Payload</dt><dd>${e(s.handoff.payload)}</dd>` : ""}</dl>`
       : "";
-  const hood = [s.technicalSummary ? `<p class="jv-tech">${e(s.technicalSummary)}</p>` : "", usesHtml, handoffHtml, storiesHtml, reqHtml, exHtml, refsHtml].join("\n");
+  const hood = [s.technicalSummary ? `<p class="jv-tech">${e(s.technicalSummary)}</p>` : "", usesHtml, handoffHtml, storiesHtml, reqHtml, exHtml, dakHtml, refsHtml].join("\n");
   const processes = (s.realisedBy ?? [])
     .map((r) => {
       const d = linkedProcessDrawing(corpus, links, j.instance, r.process, toSite, igProcessPage(corpus, igOf(corpus, j.instance), j.instance, r.process, toSite));
       const page = links.processesPage?.(j.instance);
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted: ${r.tasks.map((t) => `<code>${e(t)}</code>`).join(" ")}` : " · the whole process"}${page ? ` · <a href="${e(page)}">processes viewer</a>` : ""}`;
-      return d ? bpmnFigure(d.svg, r.tasks, caption) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
+      const panel = links.processPanel?.(j.instance, r.process);
+      return d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite)) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
     })
     .join("\n");
   const prev = steps[i - 1];
@@ -670,7 +724,7 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
 <header class="jv-step-head">
 <span class="jv-code jv-code-l">${e(s.id)}</span>
 <div><h3>${e(s.title)}</h3>${s.headline ? `<p class="jv-headline">${e(s.headline)}</p>` : ""}
-<p class="jv-muted">${[s.when, s.where, s.touchpoint].filter(Boolean).map((x) => e(x!)).join(" · ")}${lead ? ` · told through ${avatar(lead, "s")} ${e(lead.name)}` : ""}</p></div>
+<p class="jv-muted">${[s.when, s.where, s.touchpoint].filter(Boolean).map((x) => e(x!)).join(" · ")}${lead ? ` · told through ${avatar(lead, "s")} ${e(lead.name)}` : ""}</p>${includesHtml(corpus, j, s, up)}</div>
 </header>
 ${illustrationHtml(corpus, j, s, personas)}
 <div class="jv-step-body">
@@ -683,15 +737,26 @@ ${ws}
 </article>`;
 }
 
+/** A step that IS another journey (`includes`): a link to it, or the id, marked unresolved, when it names none. */
+function includesHtml(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, up: string): string {
+  if (s.includes === undefined) return "";
+  const k = journeyById(corpus, j.instance, s.includes);
+  return `<p class="jv-includes">This step is the journey ${k ? `<a href="${e(journeyHref(k, up))}"><b>${e(k.scenario.title)}</b></a>` : `<span class="jv-unresolved"><code>${e(s.includes)}</code></span>`}.</p>`;
+}
+
 function journeyPage(corpus: JourneyCorpus, j: Journey, links: SiteLinks): string {
   figureSeq = 0;
   const up = "../../";
-  const s = j.scenario as UserScenario & { views?: { model: string; view: string; label?: string }[]; references?: { label: string; href: string }[] };
+  const s = j.scenario;
   const personas = personasOf(corpus, j);
   const parent = parentOf(corpus, j);
-  const kids = childrenOf(corpus, j);
-  const prev = s.follows ? journeyById(corpus, j.instance, s.follows) : undefined;
-  const nexts = orderByFollows(corpus.journeys.filter((x) => x.instance === j.instance && x.scenario.follows === s.id));
+  const parents = parentsOf(corpus, j);
+  const kids = partEntries(corpus, j);
+  // A part's neighbours are its parent's parts; outside a parent, `follows` says it.
+  const siblings = parent ? childrenOf(corpus, parent) : [];
+  const at = siblings.indexOf(j);
+  const prev = siblings[at - 1] ?? (s.follows ? journeyById(corpus, j.instance, s.follows) : undefined);
+  const nexts = siblings[at + 1] ? [siblings[at + 1]!] : orderByFollows(corpus.journeys.filter((x) => x.instance === j.instance && x.scenario.follows === s.id));
   const ladder = s.trustLadder ? lookup(corpus.ladders, j.instance, s.trustLadder) : undefined;
   const description = /\.md$/.test(s.description.trim())
     ? (() => {
@@ -721,9 +786,9 @@ function journeyPage(corpus: JourneyCorpus, j: Journey, links: SiteLinks): strin
 <div class="jv-lede">${description}</div>
 <dl class="jv-facts">${s.when ? `<div><dt>When</dt><dd>${e(s.when)}</dd></div>` : ""}${s.where ? `<div><dt>Where</dt><dd>${e(s.where)}</dd></div>` : ""}${s.country ? `<div><dt>Country</dt><dd>${e(s.country)}</dd></div>` : ""}<div><dt>Steps</dt><dd>${s.steps.length}</dd></div></dl>
 <ul class="jv-people">${personas.map((p) => `<li>${avatar(p)}<span><b>${personaName(corpus, j, p, toSite)}</b>${p.role || p.country ? `<span class="jv-muted">${[p.role, p.country].filter(Boolean).map((x) => e(x!)).join(" · ")}</span>` : ""}${p.goal ? `<span class="jv-goal">${e(p.goal)}</span>` : ""}</span></li>`).join("")}</ul>
-<nav class="jv-seq" aria-label="The story">${prev ? `<a href="${e(journeyHref(prev, up))}" rel="prev">← follows <b>${e(prev.scenario.title)}</b></a>` : "<span></span>"}${parent ? `<a href="${e(journeyHref(parent, up))}" rel="up">↑ part of <b>${e(parent.scenario.title)}</b></a>` : ""}${nexts.map((n) => `<a href="${e(journeyHref(n, up))}" rel="next">followed by <b>${e(n.scenario.title)}</b> →</a>`).join("")}</nav>
+<nav class="jv-seq" aria-label="The story">${prev ? `<a href="${e(journeyHref(prev, up))}" rel="prev">← follows <b>${e(prev.scenario.title)}</b></a>` : "<span></span>"}${parents.map((p) => `<a href="${e(journeyHref(p, up))}" rel="up">↑ part of <b>${e(p.scenario.title)}</b></a>`).join("")}${nexts.map((n) => `<a href="${e(journeyHref(n, up))}" rel="next">followed by <b>${e(n.scenario.title)}</b> →</a>`).join("")}</nav>
 </header>
-${kids.length ? `<section class="jv-kids"><h2>Sub-journeys</h2><ol class="jv-tree">${kids.map((k) => journeyCard(corpus, k, up)).join("\n")}</ol></section>` : ""}
+${kids.length ? `<section class="jv-kids"><h2>Parts, in story order</h2><ol class="jv-tree">${kids.map((k) => journeyCard(corpus, k.journey, up, 0, k.part, [j])).join("\n")}</ol></section>` : ""}
 ${s.steps.length ? journeyMap(corpus, j, personas, ladder) : ""}
 ${s.steps.length ? `<section class="jv-steps" data-jv-stepper aria-labelledby="jv-steps-h"><div class="jv-steps-bar"><h2 id="jv-steps-h">Step by step</h2><span class="jv-actions"><button type="button" class="jv-btn" data-jv-print>Print (A3)</button></span></div>${stepNav}\n${s.steps.map((x, i) => stepSection(corpus, j, x, i, personas, links, up)).join("\n")}</section>` : ""}
 ${views ? `<section class="jv-views"><h2>Architecture</h2><ul class="jv-views-list">${views}</ul></section>` : ""}
@@ -956,6 +1021,9 @@ export function renderJourneyPages(corpus: JourneyCorpus, links: SiteLinks, decl
     }
   }
   for (const a of ASSETS) out.push({ path: posix.join("assets", a), content: readFileSync(join(ASSET_DIR, a), "utf8") });
+  // The common task panel's client and styles, the text the processes viewer writes beside its sidecars.
+  out.push({ path: posix.join("assets", PANEL_CLIENT.script), content: `${PANEL_SCRIPT}\n` });
+  out.push({ path: posix.join("assets", PANEL_CLIENT.style), content: `${PANEL_CSS}\n` });
   for (const f of FONT_FILES) out.push({ path: posix.join("assets", "fonts", f), content: new Uint8Array(readFileSync(join(ASSET_DIR, FONT_BUNDLE, f))) });
   return out;
 }

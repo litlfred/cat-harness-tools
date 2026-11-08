@@ -16,6 +16,7 @@
  *   bun run cat mount:repin:standing                 # resolve, re-pin, re-mount (writes index.config.json + index.lock.json)
  *   bun run cat mount:repin:standing --dry-run       # resolve and print what WOULD move; write nothing
  *   bun run cat mount:repin:standing --no-mount      # write index.config.json only; run mount:remote yourself
+ *   bun run cat mount:repin:standing --extend-from <old index.config.json>   # step 4a ONLY, after the pins moved
  *   ... --instance <root>   --depth <n>   --consent-on <YYYY-MM-DD>   --summary-file <f>   --no-install
  *
  * ## What it does, per instance
@@ -37,6 +38,16 @@
  *    --seed` makes — with the rule's grant (`standingGrantOf`), so the consent
  *    for each new pin is written in the same write, by the rule's person,
  *    marked `standing`.
+ * 4a. A NEWLY DECLARED directory ({@link extendExplicitDirectories}): where
+ *    the site's override names the instance's directories explicitly, an id
+ *    the new pin declares in the checkout and the old pin did not is added to
+ *    that list, and the summary says so. The standing consent follows the
+ *    branch, and a directory the layer adds comes with it. Without this a
+ *    layer that declared a directory could never be re-pinned: the old list
+ *    left the new directory absent (`check:declared-dirs`), and naming it
+ *    before the move was refused at the old pin (folio-assistant#3023, a
+ *    content layer that added three). Ids are only ever ADDED: one the site left out on
+ *    purpose stays out, and nothing the site wrote is removed.
  * 5. Re-mounts with `mountRemote`, which rewrites `index.lock.json` and runs
  *    the trust check over every instance of the closure, and re-renders the
  *    agent surface when the lock changed (`afterMount`). A transitive instance
@@ -52,6 +63,7 @@
 import { appendFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { contentIsOffCheckout, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { standingCovers, standingGrantOf, type StandingCandidate, type StandingConsent } from "../schemas/kg/mount-trust.js";
 import type { RemoteMount } from "../schemas/kg/remote-mount.js";
 
@@ -71,6 +83,12 @@ export interface GitHubApi {
    * without it applies no cascade ({@link alignToHeldPins}).
    */
   lockPinsAt?(repository: string, sha: string): Promise<Record<string, string> | undefined>;
+  /**
+   * The parsed `<instance>.json` at the root of `repository` at `sha`;
+   * `undefined` when there is none. Optional: an API without it adds no
+   * newly declared directory ({@link extendExplicitDirectories}).
+   */
+  declarationAt?(repository: string, sha: string, instance: string): Promise<unknown | undefined>;
 }
 
 /** The raw shapes {@link verdictOf} reads: GitHub's combined status and check-runs responses, reduced to what matters. */
@@ -134,6 +152,17 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
       if (!file.content || file.encoding !== "base64") return undefined;
       return lockPinsOf(JSON.parse(Buffer.from(file.content, "base64").toString("utf-8")));
     },
+    async declarationAt(repository, sha, instance) {
+      let file: { content?: string; encoding?: string };
+      try {
+        file = await get(`/repos/${repo(repository)}/contents/${encodeURIComponent(`${instance}.json`)}?ref=${sha}`);
+      } catch (e) {
+        if (/HTTP 404/.test((e as Error).message)) return undefined;
+        throw e;
+      }
+      if (!file.content || file.encoding !== "base64") return undefined;
+      return JSON.parse(Buffer.from(file.content, "base64").toString("utf-8"));
+    },
   };
 }
 
@@ -193,6 +222,8 @@ export interface PlannedMove {
   skipped: Array<{ sha: string; verdict: CommitVerdict }>;
   /** Set when the cascade chose `to`: the layer(s) whose own lock holds it. */
   alignedTo?: string;
+  /** Directory ids `to` newly declares, added to the override that lists them explicitly ({@link extendExplicitDirectories}). */
+  addDirectories?: string[];
 }
 
 export interface RepinPlan {
@@ -201,6 +232,87 @@ export interface RepinPlan {
   held: Array<{ harness: string; reason: string }>;
   /** Instances whose branch or verdict could not be determined. */
   unknown: Array<{ harness: string; reason: string }>;
+}
+
+/**
+ * The directory ids a declaration puts IN THE CHECKOUT: neither kept off it
+ * (`source`/`storage`) nor an opt-in sub-graph. These are the ids a mount's
+ * explicit list can name and the presence checks look for on disk.
+ */
+export function inCheckoutDirectoryIds(declaration: unknown): string[] {
+  const dirs = (declaration as { directories?: unknown } | undefined)?.directories;
+  if (!Array.isArray(dirs)) return [];
+  return dirs
+    .filter((d): d is { id: string; source?: SubgraphSource; storage?: unknown; optIn?: unknown } => typeof (d as { id?: unknown })?.id === "string")
+    .filter((d) => d.optIn !== true && !contentIsOffCheckout(d))
+    .map((d) => d.id);
+}
+
+/** The in-checkout ids `after` declares that `before` did not, in `after`'s order. */
+export function newlyDeclaredDirectoryIds(before: unknown, after: unknown): string[] {
+  const had = new Set(inCheckoutDirectoryIds(before));
+  return inCheckoutDirectoryIds(after).filter((id) => !had.has(id));
+}
+
+/**
+ * The moves already MADE between `before` (an `index.config.json` as it was
+ * before the pins moved) and `mounts` (as they are now): each remote instance
+ * whose ref changed and that carries a standing rule. The train freezes its
+ * pins with the tools the site had BEFORE the move, so a step those tools do
+ * not have (4a, here) runs afterwards from the tools the move brought, given
+ * this diff (`--extend-from`). Pure.
+ */
+export function movesSince(before: unknown, mounts: readonly RemoteMount[]): PlannedMove[] {
+  const was = new Map<string, string>();
+  const instances = (before as { instances?: unknown } | undefined)?.instances;
+  for (const i of Array.isArray(instances) ? instances : []) {
+    const name = (i as { name?: unknown }).name;
+    const ref = (i as { source?: { remote?: { ref?: unknown } } }).source?.remote?.ref;
+    if (typeof name === "string" && typeof ref === "string") was.set(name, ref);
+  }
+  const out: PlannedMove[] = [];
+  for (const m of mounts) {
+    const from = was.get(m.harness);
+    const rule = m.trust?.standing;
+    if (!from || !rule || from === m.ref) continue;
+    out.push({ harness: m.harness, repository: m.repository, from, to: m.ref, rule, skipped: [] });
+  }
+  return out;
+}
+
+/**
+ * Step 4a: for each move whose site override lists the instance's
+ * `directories` explicitly, the ids the new pin newly declares in the
+ * checkout, less those the list already names. Reads the two declarations
+ * through `api.declarationAt`; a declaration it cannot read is could-not-
+ * determine (the move is withdrawn, never made with a list that may be short).
+ */
+export async function extendExplicitDirectories(plan: RepinPlan, mounts: readonly RemoteMount[], api: GitHubApi): Promise<RepinPlan> {
+  if (!api.declarationAt) return plan;
+  const moves: PlannedMove[] = [];
+  const unknown = [...plan.unknown];
+  for (const mv of plan.moves) {
+    const listed = mounts.find((m) => m.harness === mv.harness)?.overrides?.[mv.harness]?.directories;
+    if (!listed) {
+      moves.push(mv);
+      continue;
+    }
+    let before: unknown;
+    let after: unknown;
+    try {
+      [before, after] = await Promise.all([api.declarationAt(mv.repository, mv.from, mv.harness), api.declarationAt(mv.repository, mv.to, mv.harness)]);
+    } catch (e) {
+      unknown.push({ harness: mv.harness, reason: `could not read \`${mv.harness}.json\` to compare the directories it declares: ${(e as Error).message}` });
+      continue;
+    }
+    if (before === undefined || after === undefined) {
+      unknown.push({ harness: mv.harness, reason: `no \`${mv.harness}.json\` at the root of ${mv.repository}@${(before === undefined ? mv.from : mv.to).slice(0, 10)}, so whether it declares new directories cannot be told` });
+      continue;
+    }
+    const add = newlyDeclaredDirectoryIds(before, after).filter((id) => !listed.includes(id));
+    moves.push(add.length ? { ...mv, addDirectories: add } : mv);
+  }
+  return { ...plan, moves, unknown };
 }
 
 /** Resolve what each standing rule among `mounts` would move. Reads the network only through `api`; writes nothing. */
@@ -300,6 +412,8 @@ export interface ApplyOptions {
   /** Passed to `mountRemote` — tests serve fixture repositories. */
   urlFor?: (repository: string) => string;
   install?: "production" | "all" | false;
+  /** Write each move's pin and consent. Default true; `--extend-from` passes false — the pins already moved. */
+  seed?: boolean;
 }
 
 export interface ApplyResult {
@@ -320,8 +434,19 @@ export async function applyRepin(instanceRoot: string, plan: RepinPlan, opts: Ap
   if (plan.moves.length === 0) return { exit: 0 };
   const rm = await import("./remote-mount.ts");
   let configFile: string | undefined;
-  for (const mv of plan.moves) {
+  for (const mv of opts.seed === false ? [] : plan.moves) {
     configFile = rm.seedRemote(instanceRoot, [{ harness: mv.harness, repository: mv.repository, ref: mv.to }], standingGrantOf(mv.rule, opts.on)).file;
+  }
+  const adding = plan.moves.filter((mv) => mv.addDirectories?.length);
+  if (adding.length) {
+    const { readDeclaredMounts, writeDeclaredMounts } = await import("../schemas/kg/index-config.js");
+    const next = readDeclaredMounts(instanceRoot).mounts.map((m) => {
+      const add = adding.find((mv) => mv.harness === m.harness)?.addDirectories;
+      const o = m.overrides?.[m.harness];
+      if (!add || !o?.directories) return m;
+      return { ...m, overrides: { ...m.overrides, [m.harness]: { ...o, directories: [...o.directories, ...add.filter((id) => !o.directories!.includes(id))] } } };
+    });
+    configFile = writeDeclaredMounts(instanceRoot, next).file;
   }
   if (opts.mount === false) return { configFile, exit: 0 };
   const before = rm.lockBytes(instanceRoot);
@@ -347,6 +472,12 @@ export function summaryOf(plan: RepinPlan, dryRun: boolean): string {
     L.push("");
     for (const m of plan.moves.filter((x) => x.skipped.length > 0)) L.push(`- ${m.harness}: passed over ${m.skipped.map((s) => `\`${s.sha.slice(0, 10)}\` (${s.verdict})`).join(", ")}`);
     if (plan.moves.some((x) => x.skipped.length > 0)) L.push("");
+    const adding = plan.moves.filter((x) => x.addDirectories?.length);
+    if (adding.length) {
+      L.push("Newly declared directories, added to the mount's explicit list (the standing consent follows the branch, and these came with it):");
+      for (const m of adding) L.push(`- ${m.harness}: ${m.addDirectories!.map((id) => `\`${id}\``).join(", ")}`);
+      L.push("");
+    }
   }
   if (plan.held.length) L.push("Held:", ...plan.held.map((h) => `- ${h.harness}: ${h.reason}`), "");
   if (plan.unknown.length) L.push("**Could not determine:**", ...plan.unknown.map((h) => `- ${h.harness}: ${h.reason}`), "");
@@ -367,7 +498,29 @@ if (import.meta.main) {
     const depth = Number(valueOf("--depth") ?? 30);
     const api = githubApi();
     const mounts = readDeclaredMounts(root).mounts;
-    const plan = await alignToHeldPins(await planRepin(mounts, api, Number.isFinite(depth) && depth > 0 ? depth : 30), mounts, api, await cascadeOf(root));
+    const extendFrom = valueOf("--extend-from");
+    if (extendFrom !== undefined) {
+      const { readFileSync } = await import("node:fs");
+      const done = await extendExplicitDirectories({ moves: movesSince(JSON.parse(readFileSync(extendFrom, "utf-8")), mounts), held: [], unknown: [] }, mounts, api);
+      const plan: RepinPlan = { ...done, moves: done.moves.filter((m) => m.addDirectories?.length) };
+      const adding = plan.moves.map((m) => `- ${m.harness}: ${m.addDirectories!.map((id) => `\`${id}\``).join(", ")}`);
+      const text = [
+        ...(adding.length ? ["Newly declared directories, added to the mount's explicit list (the standing consent follows the branch, and these came with it):", ...adding, ""] : []),
+        ...(plan.unknown.length ? ["**Could not determine:**", ...plan.unknown.map((h) => `- ${h.harness}: ${h.reason}`), ""] : []),
+      ].join("\n");
+      console.log(text || "No moved instance newly declares a directory its explicit list leaves out.");
+      const summaryFile = valueOf("--summary-file");
+      if (summaryFile && text) appendFileSync(summaryFile, `\n${text}\n`);
+      let exit = plan.unknown.length > 0 ? 2 : 0;
+      if (!dryRun && plan.moves.length > 0) {
+        const r = await applyRepin(root, plan, { seed: false, mount: !argv.includes("--no-mount"), install: argv.includes("--no-install") ? false : "production" });
+        if (r.mountText) console.log(`\n${r.mountText}`);
+        exit = Math.max(exit, r.exit);
+      }
+      process.exit(exit);
+    }
+    const aligned = await alignToHeldPins(await planRepin(mounts, api, Number.isFinite(depth) && depth > 0 ? depth : 30), mounts, api, await cascadeOf(root));
+    const plan = await extendExplicitDirectories(aligned, mounts, api);
     const text = summaryOf(plan, dryRun);
     console.log(text);
     const summaryFile = valueOf("--summary-file");

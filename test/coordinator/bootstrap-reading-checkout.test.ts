@@ -23,11 +23,12 @@ const REPO_ROOT = join(ORIGIN_DIR, "..", "..");
 describe("every declaration in this repository is a Knowledge Graph declaration", () => {
   const roots = instanceRootsIn(REPO_ROOT);
   test("there are declarations to check", () => expect(roots.length).toBeGreaterThan(3));
-  for (const root of roots) {
-    test(root.slice(REPO_ROOT.length) || "/", () => {
+  test.each(roots.map((root): [string, string] => [root.slice(REPO_ROOT.length) || "/", root]))(
+    "the declaration at %s parses as a Knowledge Graph declaration",
+    (_at, root) => {
       const file = join(root, findDeclarationFile(root)!);
       const r = KnowledgeGraphDeclarationSchema.safeParse(JSON.parse(readFileSync(file, "utf-8")));
       expect(r.success ? "ok" : JSON.stringify(r.error.issues.slice(0, 2))).toBe("ok");
-    });
-  }
+    },
+  );
 });

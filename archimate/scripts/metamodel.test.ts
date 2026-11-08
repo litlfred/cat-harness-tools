@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 import { parseArchimate } from "../schemas/archimate.ts";
-import { RelationshipTableSchema, categorySubsets, drawnCategories, isAllowed, metamodelSvgName, isPlaceholder, metamodelDot, metamodelMermaid, metamodelOf, relationshipTable, type Metamodel, type MetamodelPattern } from "../schemas/metamodel.ts";
+import { RELATIONSHIP_TABLE_TAG, RelationshipTableSchema, categorySubsets, drawnCategories, isAllowed, metamodelSvgName, isPlaceholder, metamodelDot, metamodelMermaid, metamodelOf, relationshipTable, type Metamodel, type MetamodelPattern } from "../schemas/metamodel.ts";
 import { parseArchiTable, tableJson } from "./import-archi-relationships.ts";
 import { report } from "./archimate-metamodel.ts";
 
@@ -40,8 +43,17 @@ describe("the relationship table", () => {
   });
 
   it("is checked by its own schema, the validator of its $schema family", () => {
+    expect(t.$schema).toBe(RELATIONSHIP_TABLE_TAG);
     expect(RelationshipTableSchema.safeParse(t).success).toBe(true);
     expect(RelationshipTableSchema.safeParse({ ...t, keys: { r: "Realization" } }).success).toBe(false);
+    expect(RelationshipTableSchema.safeParse({ ...t, $schema: "archimate-relationship-table/v2" }).success).toBe(false);
+    // The validator node of the table's $schema family names this schema.
+    const validator = JSON.parse(readFileSync(join(HARNESS_ROOT, "validators", "archimate-relationship-table.json"), "utf8")) as {
+      validates: { kind: string; family: string };
+      schema: string;
+    };
+    expect(validator.validates).toEqual({ kind: "schemas", family: t.$schema });
+    expect(validator.schema).toBe("cat-harness-tools:archimate/schemas/metamodel.ts#RelationshipTableSchema");
   });
 
   it("allows, refuses, and does not guess", () => {
@@ -97,6 +109,19 @@ describe("the metamodel in use", () => {
     const mmd = metamodelMermaid(mm);
     expect(mmd.startsWith("classDiagram\n")).toBe(true);
     expect(mmd).toContain("ApplicationComponent ..> DataObject : accesses ×1");
+    // The same result: every pattern the DOT draws is a Mermaid line with the same label.
+    const dotEdges = [...dot.matchAll(/^ {2}"(\w+)" -> "(\w+)" \[label="([^"]+)", class=/gm)].map(([, s, t, l]) => `${s} ${t} ${l}`);
+    const mmdEdges = [...mmd.matchAll(/^ {2}(\w+) \S+ (\w+) : (.+)$/gm)].map(([, s, t, l]) => `${s} ${t} ${l}`);
+    expect(dotEdges.sort()).toEqual([
+      "ApplicationComponent DataObject accesses ×1",
+      "ApplicationService ApplicationComponent serves ×1",
+      "DataObject Goal ✗ serves ×1",
+    ]);
+    expect(dotEdges.every((e) => mmdEdges.includes(e))).toBe(true);
+    // Only the refused pattern is red.
+    const red = dot.split("\n").filter((l) => l.includes(`color="#c0392b"`));
+    expect(red).toHaveLength(1);
+    expect(red[0]).toContain(`"DataObject" -> "Goal"`);
   });
 
   it("keeps the picture readable: one line per pair, self-relationships in the box, no associations or groupings", () => {
@@ -145,5 +170,11 @@ describe("the metamodel in use", () => {
     expect(text).toContain("✗ 1 relationship(s) in 1 pattern(s) ArchiMate does not allow");
     expect(text).toContain("Data Object serves Goal ×1: id-r3");
     expect(text).toContain("2 placeholder element(s)");
+    // The refusal comes straight after the heading, before the placeholders.
+    const lines = text.split("\n");
+    expect(lines[0]).toStartWith("1.0.0 (Tiny): ");
+    expect(lines[1]).toContain("✗ 1 relationship(s)");
+    expect(lines[2]).toContain("Data Object serves Goal ×1: id-r3");
+    expect(lines.findIndex((l) => l.includes("placeholder element(s)"))).toBe(3);
   });
 });

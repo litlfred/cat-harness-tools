@@ -157,7 +157,7 @@ describe("checked against the plan it claims to execute", () => {
     version: "1",
     scope: { kind: "skill", versionRange: "*" },
     requirements: ["req:crdm-detect"],
-    testCases: ["a", "b", "c"].map((id) => ({ id, assertions: [{ id: `crit-${id}`, type: "required" }] })),
+    testCases: ["a", "b", "c"].map((id) => ({ id, assertions: [{ id: `crit-${id}`, type: "required" }], feature: `${id}.feature` })),
     exitCriteria: { decision: "certify.dmn#Decision_Certify" },
   });
 

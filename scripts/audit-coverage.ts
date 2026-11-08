@@ -91,7 +91,7 @@ import { contentIsOffCheckout, resolveSubgraphSource, type SubgraphSource } from
 // The same single reader `check:declared-dirs` uses, so the two gates cannot
 // disagree about whether a tip-keyed graph is readable here (bean `9ofm`).
 import { routePresence, tipPresence } from "./check-declared-dirs.ts";
-import { loadGatesCiRuns } from "./gates.js";
+import { type Gate, SCRIPT_EXEMPTIONS, loadGatesCiRuns } from "./gates.js";
 import {
   againstOrUsage,
   buildQaResult,
@@ -483,7 +483,7 @@ export function coversIn(text: string): string[] | undefined {
   return out;
 }
 
-export function gateCoverage(root: string, repo: string): GateCoverage[] {
+export function gateCoverage(root: string, repo: string, given?: readonly Gate[]): GateCoverage[] {
   let scripts: Record<string, string> = {};
   try {
     scripts = scriptsOf(repo);
@@ -509,7 +509,7 @@ export function gateCoverage(root: string, repo: string): GateCoverage[] {
   // kind regardless of this tool's ability to invoke it. Using the runner's
   // list here made the census 209 and the "all N have declared" verdict narrower
   // than reality.
-  const gates = loadGatesCiRuns(repo, { all: true });
+  const gates = given ?? loadGatesCiRuns(repo, { all: true });
   const out: GateCoverage[] = [];
   const byCommand = new Map<string, GateCoverage>();
   for (const g of gates) {
@@ -736,7 +736,20 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
   }
 
   const gatesByKind = new Map<string, string[]>();
-  for (const g of gates) {
+  // A check exempted as `covered-by` (`gateExemptions`, bean `0r7u`) is run
+  // by its own layer's CI at every pin this checkout mounts, so the kinds its
+  // script declares in `@covers` are judged, by that run. It is not one of
+  // THIS checkout's gates, so it joins the kind's judges and nothing else: the
+  // gate census and `gates-undeclared` stay what CI here runs.
+  const ran = new Set(gates.map((g) => g.command));
+  const elsewhere = gateCoverage(
+    ROOT,
+    repo,
+    SCRIPT_EXEMPTIONS.filter((e) => e.kind === "covered-by")
+      .map((e) => ({ job: "covered-by", step: e.script, command: `bun run cat ${e.script}` }))
+      .filter((g) => !ran.has(g.command)),
+  );
+  for (const g of [...gates, ...elsewhere]) {
     for (const k of g.covers) {
       const list = gatesByKind.get(k) ?? [];
       if (!list.includes(g.command)) list.push(g.command);

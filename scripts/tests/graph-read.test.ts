@@ -47,7 +47,9 @@ function mount(root: string, id: string, into: string): void {
   mkdirSync(into, { recursive: true });
   const p = markerPath(root, id);
   mkdirSync(join(p, ".."), { recursive: true });
-  writeFileSync(p, JSON.stringify({ $schema: MOUNT_MARKER_SCHEMA, id, branch: TIP.branch, path: "beans", into, tip: "0".repeat(40), files: {} }));
+  // The declared path of the graph `id` (every fixture here declares `<id>/`): a marker
+  // naming another path is another graph's, and `tipPresence` refuses it.
+  writeFileSync(p, JSON.stringify({ $schema: MOUNT_MARKER_SCHEMA, id, branch: TIP.branch, path: id, into, tip: "0".repeat(40), files: {} }));
 }
 
 describe("a directory that never moved", () => {
@@ -476,6 +478,18 @@ describe("resolveBeanGraphNode and the workflow instance store", () => {
     // never started; `saveInstance` would write where nothing looks.
     expect(() => workflowDir(cut)).toThrow(/cannot resolve the workflow instance directory/);
     clearWorkflowDirCache();
+  });
+
+  test("`workflowStateAbsent`: only a mount's recorded ABSENCE is not-applicable; unreachable is not", async () => {
+    const { workflowStateAbsent } = await import("../../src/workflow/store.ts");
+    const { recordAbsence } = await import("../branch-store.ts");
+    expect(workflowStateAbsent(graphRepo())).toBeUndefined();
+
+    const cut = repo([{ id: "beans", path: "beans/", graphTypologies: ["beans"], storage: TIP }]);
+    expect(workflowStateAbsent(cut)).toBeUndefined();
+
+    recordAbsence(cut, { id: "beans", path: "beans" }, "cat-harness", "declared for every checkout by cat-harness, not by this root, and this checkout's remote carries no cat/cat-harness/* branch");
+    expect(workflowStateAbsent(cut)).toContain("carries no cat/cat-harness/* branch");
   });
 });
 

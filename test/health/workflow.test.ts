@@ -112,6 +112,13 @@ describe("the issue body", () => {
     expect(md).toContain("staging:cleanup");
     // The preview whose PR is open is not proposed for anything.
     expect(md).not.toContain("STAGING/claude-one` (");
+    // Every finding of every check, with its severity, summary and action.
+    const findings = report.checks.flatMap((c) => c.findings);
+    expect(findings.length).toBeGreaterThan(0);
+    for (const f of findings) {
+      expect(md).toContain(`- **${f.severity}** — ${f.summary}`);
+      expect(md).toContain(`  - *What to do:* ${f.action}`);
+    }
   });
 
   it("shows every threshold with the basis it was chosen on", () => {
@@ -120,6 +127,13 @@ describe("the issue body", () => {
     expect(md).toContain("owner's explicit instruction");
     // The honest-arbitrary ones say so in those words rather than implying a standard.
     expect(md).toContain("NO EXTERNAL STANDARD");
+    // Every threshold of every check, named by its metric and carrying its basis.
+    const thresholds = report.checks.flatMap((c) => c.thresholds);
+    expect(thresholds.length).toBeGreaterThan(0);
+    for (const t of thresholds) {
+      expect(md).toContain(`- \`${t.metric}\` > `);
+      expect(md).toContain(`→ *${t.severity}*. ${t.basis}`);
+    }
   });
 
   it("gates on a major finding, and not on a minor one alone", () => {

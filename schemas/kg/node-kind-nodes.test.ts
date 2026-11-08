@@ -41,6 +41,9 @@ describe("nodesOfKind", () => {
   });
 
   test("an earlier minor is accepted; another major, no tag and a plain README are not nodes", () => {
+    // deep/b is tagged sub-todo/1.1.0 while the kind is at 1.2.0: an earlier minor, accepted.
+    expect(index.kinds.find((k) => k.id === "sub-todo")!.version).toBe("1.2.0");
+    expect(nodes.find((n) => n.path === "items/deep/b")).toMatchObject({ kind: "sub-todo", node: { $schema: "sub-todo/1.1.0" } });
     expect(nodes.some((n) => n.path === "items/c" || n.path === "items/d" || n.path === "items/README")).toBe(false);
   });
 

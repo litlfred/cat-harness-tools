@@ -206,8 +206,18 @@ export function tipPresence(
     }
     if (!marker && abs) {
       try {
-        marker = readMarker(dirname(abs), markerId, "location");
-        if (marker) markerRoot = dirname(abs);
+        // The same rule as the id lookup above: a marker for another declared
+        // path is another graph's. Without it, a checkout-level graph
+        // (cat-harness's `beans`, at `beans/`) took a mounted layer's own
+        // graph of that id (`smart-trust-tools.beans`, at
+        // `smart-trust-tools/beans/`) as its mount, and that layer's work plan
+        // became the downstream checkout's (smart-ips-pilgrimage#25).
+        const fromWithin = readMarker(dirname(abs), markerId, "location");
+        const relWithin = relative(dirname(abs), abs).split(sep).join("/");
+        if (fromWithin && (fromWithin.path === undefined || fromWithin.path === relWithin || fromWithin.path === rel)) {
+          marker = fromWithin;
+          markerRoot = dirname(abs);
+        }
       } catch {
         // fallback failed
       }

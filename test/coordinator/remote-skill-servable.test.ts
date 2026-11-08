@@ -49,9 +49,9 @@
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
-import { knownSkills, remotePackageDeclarations } from "../../scripts/known-skills.js";
+import { kgRoots, knownSkills, remotePackageDeclarations } from "../../scripts/known-skills.js";
 import { syncedPackageDir, wrapperSkillsDirs } from "../../scripts/sync-remote-skills.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
@@ -140,9 +140,17 @@ describe("remote-package declarations vs what this instance can serve", () => {
 
   test("every declared skill names a wrapper that exists, so a finding is actionable", () => {
     // A finding keyed on a file nobody can open is a finding nobody acts on.
+    // The wrapper is a file in a declared skills root's `remote-packages/`, the
+    // same directories the declarations were read from.
+    const wrapperDirs = [...new Set(kgRoots(ROOT).map((d) => resolve(d, "remote-packages")))];
     for (const d of declared) {
       expect(d.file.endsWith(".json")).toBe(true);
       expect(d.skill.length).toBeGreaterThan(0);
+      const at = wrapperDirs.map((dir) => join(dir, d.file)).filter((p) => existsSync(p));
+      expect(at.length, `${d.file}, which declares ${d.skill}, is in no remote-packages directory`).toBeGreaterThan(0);
+      // And opening it shows the skill the finding would name.
+      const named = at.some((p) => ((JSON.parse(readFileSync(p, "utf-8")) as { wrapper?: { skills?: string[] } }).wrapper?.skills ?? []).includes(d.skill));
+      expect(named, `${d.file} does not list ${d.skill}`).toBe(true);
     }
   });
 

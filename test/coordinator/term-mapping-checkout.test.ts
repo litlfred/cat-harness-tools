@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { TermMappingsFileSchema } from "../../schemas/content/term-mapping.ts";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -53,7 +53,15 @@ describe("corpus — the real glossary, asserting scope rather than a count", ()
     const p = pinnedTerminology(process.cwd());
     // A snapshot of one version labelled another is the single way this could
     // assert something false, so it is refused rather than reported.
-    if (typeof p !== "string") expect(p.version).toMatch(/^v\d/);
+    if (typeof p === "string") {
+      // Not loaded, for a reason of its own — never the disagreement.
+      expect(p).not.toMatch(/ holds \S+ while .* pins /);
+    } else {
+      expect(p.version).toMatch(/^v\d/);
+      // The version the snapshot holds IS the one the pin record names.
+      const pinned = (JSON.parse(readFileSync(join(process.cwd(), FHIR_PIN), "utf-8")) as { version?: string }).version;
+      expect(p.version).toBe(pinned as string);
+    }
   });
 
   // A review bot on #1633 found `pinnedTerminology` casting the snapshot with

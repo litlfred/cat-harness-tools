@@ -106,7 +106,8 @@ const Sha256 = z.string().regex(/^[0-9a-f]{64}$/);
  * The file the artefact was built from. `file`, `sha256`, `bytes`, `mtime` and
  * the SNIFFED mimetype are `_tech_meta.py`'s vocabulary (bean `nso8`). The
  * mimetype is `null` with `mimetype_source: "unrecognised"` when the leading
- * bytes are not recognised, and never guessed from the extension. `pages` and
+ * bytes are not recognised, and never guessed from the extension; the schema
+ * holds the two fields to that (`unreadable` is null too). `pages` and
  * `extractor` are written by `pdf-structure.py` only; `text_source` by both rungs.
  */
 export const PdfSourceSchema = z
@@ -146,7 +147,16 @@ export const PdfSourceSchema = z
      */
     runContext: RunContextRefSchema.optional(),
   })
-  .strict();
+  .strict()
+  // The two fields are one fact: `_tech_meta.sniff_effective_mimetype` returns
+  // a mimetype exactly when it recognised the bytes (`magic-bytes`) or the
+  // package declared one (`zip-package`), and `null` otherwise. A record
+  // pairing a mimetype with `unrecognised`, or `null` with `magic-bytes`,
+  // claims two different things about one sniff.
+  .refine((s) => (s.mimetype_sniffed === null) === (s.mimetype_source === "unrecognised" || s.mimetype_source === "unreadable"), {
+    message: "mimetype_sniffed is null exactly when mimetype_source is `unrecognised` or `unreadable`",
+    path: ["mimetype_sniffed"],
+  });
 
 /**
  * Front matter parsed from the first pages, plus the PDF's own docinfo. Its keys
