@@ -9,6 +9,8 @@
  * in, so nothing they read changed.
  */
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import {
@@ -17,6 +19,7 @@ import {
 } from "../../schemas/kg/cat-harness.ts";
 import { scanSubgraphs } from "../../scripts/check-subgraphs.ts";
 import { checkoutDirectories } from "../../schemas/kg/harness-config.ts";
+import { writeDeclaration } from "../support/instance-fixture.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -61,6 +64,23 @@ describe("the entanglement report", () => {
     // happens to contain today.
     const probe = REAL.dangling;
     expect(Array.isArray(probe), "the category is absent, not merely empty").toBe(true);
+    // The synthetic file: a link to nothing, in a declared directory of a
+    // throwaway instance, swept by the same `scanSubgraphs`. It must come back
+    // in the dangling category, by file and target.
+    const fixture = mkdtempSync(join(tmpdir(), "subgraphs-dangling-"));
+    try {
+      mkdirSync(join(fixture, "notes"), { recursive: true });
+      writeDeclaration(fixture, JSON.stringify({
+        name: "t",
+        stub: "t",
+        canonicalUrl: "https://example.invalid/t",
+        directories: [{ id: "notes", path: "notes/", description: "notes", graphTypologies: ["code"] }],
+      }));
+      writeFileSync(join(fixture, "notes", "n.md"), "# n\n\n[x](./no-such-file.md)\n");
+      expect(scanSubgraphs(fixture).dangling.map((d) => `${d.from} → ${d.target}`)).toEqual(["notes/n.md → ./no-such-file.md"]);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
     // And the corpus itself is clean — stated as its own assertion so that
     // "clean" and "not computed" can never be the same passing test.
     expect(probe.map((d) => `${d.from} → ${d.target}`)).toEqual([]);

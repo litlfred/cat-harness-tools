@@ -1,9 +1,28 @@
 import { describe, expect, it } from "bun:test";
-import { parseArchimate } from "../schemas/archimate.ts";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { ArchimateConfigSchema, parseArchimate, type ArchimateView } from "../schemas/archimate.ts";
+import { blocksOf } from "./archimate-blocks.ts";
 import { fillOfType, layerClass, LAYER_FILL, TABLE_CSS } from "./figure-theme.ts";
 import { noteItems, posterFits, renderPosterSvg, wrapWords } from "./render-poster.ts";
 import { LAYER_FILL as VIEW_FILL, renderViewSvg } from "./render-view.ts";
-import { bandColours, HANDBOOK } from "./figure-theme.ts";
+import { bandColours, HANDBOOK, THEME } from "./figure-theme.ts";
+
+interface Box { x: number; y: number; w: number; h: number; fill: string; line: string }
+const boxOf = (line: string): Box => {
+  const n = (k: string) => Number(new RegExp(` ${k}="([0-9.-]+)"`).exec(line)![1]);
+  return { x: n("x"), y: n("y"), w: n("width"), h: n("height"), fill: /fill="([^"]+)"/.exec(line)![1]!, line };
+};
+/** The rect drawn nearest before the text `label`: a card's, a band's, a panel's or the side column's own. */
+const rectBefore = (svg: string, label: string): Box => {
+  const lines = svg.split("\n");
+  const at = lines.findIndex((l) => l.startsWith("<text ") && l.endsWith(`>${label}</text>`));
+  expect(at).toBeGreaterThan(0);
+  for (let i = at - 1; i >= 0; i--) if (lines[i]!.startsWith("<rect ")) return boxOf(lines[i]!);
+  throw new Error(`no rect before ${label}`);
+};
+const within = (a: Box, b: Box): boolean => a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
 
 /** Two bands (goals, components with a panel), a side column, a frame of two stacked bands. */
 const XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -75,6 +94,21 @@ describe("render-poster", () => {
   const svg = renderPosterSvg(m, view, { starLabel: "Core component", marks: true, elementHref: (id) => `../elements/${id}/` });
   it("colours every card by its ArchiMate layer, never by its band", () => {
     for (const f of ["#ccccff", "#b5ffff", "#c9e7b7"]) expect(svg).toContain(`fill="${f}"`);
+    expect(rectBefore(svg, "Trusted data").fill).toBe(fillOfType("Goal"));
+    expect(rectBefore(svg, "Decision engine").fill).toBe(fillOfType("ApplicationComponent"));
+    expect(rectBefore(svg, "Cloud").fill).toBe(fillOfType("Node"));
+    // A node among two application components: the band takes the application hue, the node's card keeps its own.
+    const mixed: ArchimateView = {
+      ...view,
+      nodes: [
+        ...view.nodes.map((n) => (n.id === "d-n1" ? { ...n, parent: "d-dc", x: 200 } : n)),
+        { id: "d-a1b", kind: "element", ref: "a1", x: 100, y: 30, w: 170, h: 55, parent: "d-dc" },
+      ],
+    };
+    const ms = renderPosterSvg(m, mixed);
+    expect(rectBefore(ms, "COMPONENTS").fill).toBe(bandColours(fillOfType("ApplicationComponent")).ground);
+    expect(rectBefore(ms, "Cloud").fill).toBe(fillOfType("Node"));
+    expect(rectBefore(ms, "Decision engine").fill).toBe(fillOfType("ApplicationComponent"));
   });
   it("draws bands in the view's order, a panel inside a band, and a frame round stacked bands", () => {
     const at = (s: string) => svg.indexOf(s);
@@ -84,12 +118,31 @@ describe("render-poster", () => {
     expect(svg).toContain("At the point of care");
     expect(svg).toContain(">PLATFORM LAYER<");
     expect(svg).toContain('stroke-width="2.2"');
+    // Positions: bands top to bottom in the view's order; the panel inside its band; the frame round its two bands.
+    const goals = rectBefore(svg, "GOALS"), components = rectBefore(svg, "COMPONENTS");
+    expect(goals.y + goals.h).toBeLessThanOrEqual(components.y);
+    expect(within(rectBefore(svg, "Clinical"), components)).toBe(true);
+    const frames = svg.split("\n").filter((l) => l.startsWith("<rect ") && l.includes('stroke-width="2.2"'));
+    expect(frames).toHaveLength(1);
+    const frame = boxOf(frames[0]!);
+    const shared = rectBefore(svg, "SHARED"), tech = rectBefore(svg, "TECH");
+    expect(within(shared, frame) && within(tech, frame)).toBe(true);
+    expect(shared.y + shared.h).toBeLessThanOrEqual(tech.y);
+    expect(components.y + components.h).toBeLessThanOrEqual(frame.y);
   });
   it("puts a group to the right of the stack in a dashed side column, a list note as pills", () => {
     expect(svg).toContain(">INTEROP<");
     expect(svg).toContain('stroke-dasharray="8 5"');
     expect(svg).toContain('rx="9.5"');
     expect(svg).toContain(">openEHR<");
+    // The column is the dashed rect, to the right of every band of the stack, and the pills are inside it.
+    const column = rectBefore(svg, "INTEROP");
+    expect(column.line).toContain('stroke-dasharray="8 5"');
+    const frame = boxOf(svg.split("\n").find((l) => l.startsWith("<rect ") && l.includes('stroke-width="2.2"'))!);
+    for (const b of [rectBefore(svg, "GOALS"), rectBefore(svg, "COMPONENTS"), frame]) expect(column.x).toBeGreaterThan(b.x + b.w);
+    const pill = rectBefore(svg, "openEHR");
+    expect(pill.line).toContain('rx="9.5"');
+    expect(within(pill, column)).toBe(true);
   });
   it("stars a starred card, marks renamed and new elements, and keys both", () => {
     expect(svg).toContain(">★<");
@@ -123,6 +176,34 @@ describe("poster theme on drawn views", () => {
   it("draws a banded view without lines as a poster", () => {
     expect(posterFits(m, view)).toBe(true);
     expect(posterFits(m, { ...view, connections: [{ id: "c", source: "d-g1", target: "d-a2", bendpoints: [] } as never] })).toBe(false);
+    // A document's figure of the view is the poster; with a line added, it is render-view's drawing.
+    const lined = XML.replace(
+      `<bounds x="10" y="30" width="170" height="55"/></child>\n      </child>\n      <child xsi:type="archimate:DiagramObject" id="d-lc"`,
+      `<bounds x="10" y="30" width="170" height="55"/><sourceConnection xsi:type="archimate:Connection" id="c1" source="d-g1" target="d-a2"/></child>\n      </child>\n      <child xsi:type="archimate:DiagramObject" id="d-lc"`,
+    );
+    expect(lined).not.toBe(XML);
+    const figureOf = (xml: string): string => {
+      const root = mkdtempSync(join(tmpdir(), "archimate-poster-"));
+      try {
+        mkdirSync(join(root, "archimate"));
+        writeFileSync(join(root, "tiny.json"), JSON.stringify({ name: "tiny", directories: [{ id: "archimate", path: "archimate/", graphTypologies: ["archimate"] }] }));
+        writeFileSync(join(root, "archimate", "model.archimate"), xml);
+        const config = ArchimateConfigSchema.parse({
+          $schema: "cat-archimate-config/v1",
+          directory: "archimate",
+          models: [{ id: "m", file: "model.archimate", title: "M" }],
+          figures: [{ block: "doc/f.md", label: "Figure 1", model: "m", view: "v", basis: "same-elements", svg: "doc/media/f.svg" }],
+        });
+        return blocksOf(root, config).outputs[0]!.content;
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    };
+    expect(figureOf(XML)).toBe(renderPosterSvg(m, view));
+    const lm = parseArchimate(lined);
+    expect(lm.views[0]!.connections).toHaveLength(1);
+    expect(figureOf(lined)).toBe(renderViewSvg(lm, lm.views[0]!));
+    expect(figureOf(lined)).not.toBe(renderPosterSvg(lm, lm.views[0]!));
   });
   it("gives render-view a title banner and tinted groupings by default, and keeps the plain look on request", () => {
     const poster = renderViewSvg(m, view);
@@ -200,6 +281,11 @@ describe("render-poster, one frame round the stack", () => {
   const yOf = (name: string) => Number(new RegExp(`<text x="[0-9.]+" y="([0-9.]+)"[^>]*>${name}</text>`).exec(svg)?.[1]);
   it("fits when the frame holds three or more groupings", () => {
     expect(posterFits(fm, fv)).toBe(true);
+    const without = (ids: string[]): ArchimateView => ({ ...fv, nodes: fv.nodes.filter((n) => !ids.includes(n.id) && !ids.includes(n.parent ?? "")) });
+    // Three groupings in the frame (Data and its card gone): still fits.
+    expect(posterFits(fm, without(["d-gd"]))).toBe(true);
+    // Two (Shared and Data, and what they hold, gone): does not.
+    expect(posterFits(fm, without(["d-gd", "d-gh", "d-gf"]))).toBe(false);
   });
   it("puts bands that share a row in the view side by side", () => {
     expect(yOf("SHARED")).toBe(yOf("DATA"));
@@ -214,5 +300,6 @@ describe("render-poster, one frame round the stack", () => {
     expect(svg).toMatch(/fill="#ffffff"[^>]*>OUTSIDE</);
     expect(svg).toMatch(/>ECOSYSTEM</);
     expect(svg).not.toMatch(/fill="#ffffff"[^>]*>ECOSYSTEM</);
+    expect(svg).toMatch(new RegExp(`fill="${THEME.ink}"[^>]*>ECOSYSTEM<`));
   });
 });

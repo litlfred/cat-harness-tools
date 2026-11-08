@@ -29,6 +29,7 @@ import { join, relative } from "node:path";
 import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 
 function gitList(root: string, args: string[]): string[] {
+  // input-site: tree #0a400405 — ls-files of a tree, tracked and untracked-not-ignored: git's view of the work tree
   const proc = Bun.spawnSync(["git", ...args], { cwd: root });
   return new TextDecoder()
     .decode(proc.stdout)

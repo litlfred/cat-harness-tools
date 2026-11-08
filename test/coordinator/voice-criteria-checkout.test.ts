@@ -48,17 +48,15 @@ describe("the derivation reproduces the hand-written criteria", () => {
     expect(derived.length).toBeGreaterThan(0);
   });
 
-  for (const [id, want] of Object.entries(AS_HAND_WRITTEN)) {
-    test(`${id} keeps its severity, domain, voices, deps and automated flag`, () => {
-      const c = byId.get(id);
-      expect(c).toBeDefined();
-      expect(c!.default_severity).toBe(want.severity as never);
-      expect(c!.domain).toBe("voice");
-      expect(c!.voices).toEqual([id.replace("voice-overlay-", "")]);
-      expect(c!.depends_on).toEqual(["md"]);
-      expect(c!.automated).toBe(false);
-    });
-  }
+  test.each(Object.entries(AS_HAND_WRITTEN))("%s keeps its severity, domain, voices, deps and automated flag", (id, want) => {
+    const c = byId.get(id);
+    expect(c).toBeDefined();
+    expect(c!.default_severity).toBe(want.severity as never);
+    expect(c!.domain).toBe("voice");
+    expect(c!.voices).toEqual([id.replace("voice-overlay-", "")]);
+    expect(c!.depends_on).toEqual(["md"]);
+    expect(c!.automated).toBe(false);
+  });
 
   test("no criterion appeared that was not registered before", () => {
     // The derivation is allowed to produce MORE as voices are added; what it

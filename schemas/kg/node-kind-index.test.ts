@@ -82,8 +82,22 @@ describe("nodeKindIndex", async () => {
     expect(index.unkinded.some((u) => u.typology === "prose" || u.family?.startsWith("https:"))).toBe(false);
   });
 
-  test("no collisions when one kind is reached twice", () => {
+  test("no collisions when one kind is reached twice", async () => {
+    // base/v1 is reached twice here: as solo's kind-level validator and as
+    // child/v1's parent. It is one entry, and no collision.
+    expect(index.kinds.filter((k) => k.id === "base/v1")).toHaveLength(1);
+    expect(byId.get("base/v1")?.holdings).toEqual([{ typology: "solo" }]);
+    expect(byId.get("child/v1")?.parents).toEqual(["base/v1"]);
     expect(index.collisions).toEqual([]);
+    // And one kind held by two typologies is one entry holding both.
+    const twice = new GraphTypologyRegistry({
+      left: def({ validator: "kinds.ts#Child" }),
+      right: def({ validator: "kinds.ts#Child" }),
+    });
+    const both = await nodeKindIndex(twice, dir, dir);
+    expect(both.kinds.filter((k) => k.id === "child/v1")).toHaveLength(1);
+    expect(both.kinds.find((k) => k.id === "child/v1")?.holdings).toEqual([{ typology: "left" }, { typology: "right" }]);
+    expect(both.collisions).toEqual([]);
   });
 });
 

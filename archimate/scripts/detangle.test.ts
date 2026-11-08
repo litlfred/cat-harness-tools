@@ -78,23 +78,42 @@ describe("detangle", () => {
     expect(scoreOf(view).throughBox).toBe(1);
     const r = detangle(view, { passes: 1 });
     expect(r.after.throughBox).toBe(0);
-    // m is not the size of a or b, so no swap: it slides (or the line is re-routed round it).
-    expect(r.changes.some((c) => c.kind === "slide" || c.kind === "route")).toBe(true);
-    expect(r.changes.some((c) => c.kind === "swap")).toBe(false);
-    // Inside a parent, a slide never leaves it.
-    const inParent = parseArchimate(XML).views[0]!;
-    inParent.nodes = [
-      { id: "id-p", kind: "group", text: "P", x: 0, y: 0, w: 600, h: 120 },
-      { id: "id-na", kind: "element", ref: "id-a", x: 10, y: 40, w: 120, h: 55, parent: "id-p" },
-      { id: "id-nb", kind: "element", ref: "id-b", x: 470, y: 40, w: 120, h: 55, parent: "id-p" },
-      { id: "id-nm", kind: "element", ref: "id-c", x: 240, y: 40, w: 120, h: 55, parent: "id-p" },
-    ];
-    inParent.connections = [{ id: "id-c1", source: "id-na", target: "id-nb", relationship: "id-r1", bendpoints: [] }];
-    const r2 = detangle(inParent, { noSlide: false, passes: 1 });
-    const p = r2.view.nodes.find((n) => n.id === "id-p")!;
-    for (const n of r2.view.nodes.filter((n) => n.parent === "id-p")) {
-      expect(n.x >= p.x && n.y >= p.y && n.x + n.w <= p.x + p.w && n.y + n.h <= p.y + p.h).toBe(true);
-    }
+    // m is not the size of a or b, so no swap: a slides, and no line is re-routed.
+    expect(r.changes).toEqual([{ kind: "slide", ids: ["id-na"] }]);
+    expect(r.rerouted.size).toBe(0);
+    // Into free space: the slid box overlaps no other box.
+    const free = (v: typeof view, id: string): boolean => {
+      const n = v.nodes.find((x) => x.id === id)!;
+      return v.nodes.every((o) => o.id === id || o.id === n.parent || n.x >= o.x + o.w || n.x + n.w <= o.x || n.y >= o.y + o.h || n.y + n.h <= o.y);
+    };
+    expect(free(r.view, "id-na")).toBe(true);
+    // Inside a parent with room below, a slide stays inside it.
+    const inParent = (h: number) => {
+      const v = parseArchimate(XML).views[0]!;
+      v.nodes = [
+        { id: "id-p", kind: "group", text: "P", x: 0, y: 0, w: 600, h },
+        { id: "id-na", kind: "element", ref: "id-a", x: 10, y: 40, w: 120, h: 55, parent: "id-p" },
+        { id: "id-nb", kind: "element", ref: "id-b", x: 470, y: 40, w: 120, h: 55, parent: "id-p" },
+        { id: "id-nm", kind: "element", ref: "id-c", x: 240, y: 30, w: 100, h: 75, parent: "id-p" },
+      ];
+      v.connections = [{ id: "id-c1", source: "id-na", target: "id-nb", relationship: "id-r1", bendpoints: [] }];
+      return v;
+    };
+    const inside = (v: typeof view) => {
+      const p = v.nodes.find((n) => n.id === "id-p")!;
+      return v.nodes.filter((n) => n.parent === "id-p").every((n) => n.x >= p.x && n.y >= p.y && n.x + n.w <= p.x + p.w && n.y + n.h <= p.y + p.h);
+    };
+    const roomy = detangle(inParent(300), { passes: 1 });
+    expect(roomy.changes).toEqual([{ kind: "slide", ids: ["id-na"] }]);
+    expect(roomy.after.throughBox).toBe(0);
+    expect(free(roomy.view, "id-na")).toBe(true);
+    expect(inside(roomy.view)).toBe(true);
+    // In a parent with no room, the free space outside it (where a slid above, unparented) is not used.
+    const tight = inParent(120);
+    const r2 = detangle(tight, { passes: 1 });
+    expect(r2.changes.some((c) => c.kind === "slide")).toBe(false);
+    expect(r2.view.nodes.map((n) => [n.id, n.x, n.y])).toEqual(tight.nodes.map((n) => [n.id, n.x, n.y]));
+    expect(inside(r2.view)).toBe(true);
   });
 
   it("leaves a clean view as it is", () => {

@@ -59,6 +59,20 @@ import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, 
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
+/**
+ * `input-trace.ts`'s hook, restated here because this script imports only
+ * `node:*` (above): CI and the session-start hook check out THIS FILE ALONE
+ * from the pinned cat-harness-tools commit and run it, so a relative import
+ * fails before anything is mounted. Keep it equal to `inputSiteReached` there:
+ * append the site to the trace file `INPUT_HASH_TRACE` (`read-projections.ts`
+ * `TRACE_ENV`) names, when a recording run named one.
+ */
+function inputSiteReached(what: string): void {
+  // input-site: inert #2ac4c84b — names the trace file of the recording run; what is written there is never part of an answer
+  const path = process.env.INPUT_HASH_TRACE;
+  if (path) appendFileSync(path, `${what}\n`);
+}
+
 /** The lock's shape, read structurally — this file may not import the schema (see the header). */
 export interface LockDir {
   id: string;
@@ -143,6 +157,8 @@ const sha256 = (b: string | Buffer): string => createHash("sha256").update(b).di
  * header gives: this file imports nothing but `node:*`.
  */
 export function stateMountedDirs(root: string): string[] {
+  // input-site: traced #aa4aaef6 — the state-mount markers inside .git, which no fingerprint sees: a run that reads them records no hash
+  inputSiteReached("mount-from-lock: state-mount markers");
   const r = spawnSync("git", ["rev-parse", "--git-path", "branch-mounts"], { cwd: root, encoding: "utf-8" });
   if (r.status !== 0) return [];
   const dir = resolve(root, r.stdout.trim());
@@ -433,6 +449,8 @@ export function installDependencies(dir: string, mode: InstallMode = "production
   // this mounter lost its tools (smart-ra#48). The lockfile is put back
   // byte-for-byte below either way, so not freezing it costs nothing.
   const args = ["install", "--no-save", ...(mode === "production" ? ["--omit", "dev"] : [])];
+  // input-site: traced #b13c07a8 — bun install from the registry into a mount: the network, and a write: a run that installs records no hash
+  inputSiteReached("mount-from-lock: bun install");
   const r = spawnSync(bun, args, { cwd: dir, encoding: "utf-8", maxBuffer: 1 << 26 });
   for (const [f, bytes] of before) {
     const abs = join(dir, f);
@@ -519,12 +537,15 @@ function safeRel(p: string): boolean {
 // ── git ──────────────────────────────────────────────────────────────────────
 
 function git(cwd: string, args: string[]): { status: number; stdout: string; stderr: string } {
+  // input-site: traced #46b21c90 — git for the mounts: fetches and pushes over the network, .git paths and history: a run that reaches it records no hash
+  inputSiteReached("mount-from-lock: git");
   const r = spawnSync("git", args, { cwd, encoding: "utf-8", maxBuffer: 1 << 28 });
   return { status: r.status ?? 128, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
 
 export function urlFor(repository: string): string {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(repository) || repository.startsWith("/")) return repository;
+  // input-site: env CAT_MOUNT_URL_PREFIX #ef16af8d — the mirror a mount is fetched from
   const prefix = process.env.CAT_MOUNT_URL_PREFIX;
   return prefix ? `${prefix.replace(/\/+$/, "")}/${repository}` : `https://github.com/${repository}.git`;
 }
@@ -550,6 +571,7 @@ function ensureIgnored(root: string, rel: string): void {
  * `https://github.com`, as it does for a repository (tests serve `file://`).
  */
 export function packageFetchUrl(url: string): string {
+  // input-site: env CAT_MOUNT_URL_PREFIX #ef16af8d — the mirror a package is fetched from
   const prefix = process.env.CAT_MOUNT_URL_PREFIX;
   return prefix && url.startsWith("https://github.com/") ? `${prefix.replace(/\/+$/, "")}/${url.slice("https://github.com/".length)}` : url;
 }
@@ -562,6 +584,8 @@ export function packageFetchUrl(url: string): string {
  */
 export function download(url: string, dest: string): { ok: true } | { ok: false; absent: boolean; error: string } {
   mkdirSync(dirname(dest), { recursive: true });
+  // input-site: traced #5bf8756b — a download over the network: a run that downloads records no hash
+  inputSiteReached("mount-from-lock: download");
   const r = spawnSync("curl", ["-fsSL", "--retry", "2", "-o", dest, url], { encoding: "utf-8" });
   if (r.error) return { ok: false, absent: false, error: `curl could not run: ${r.error.message}` };
   if (r.status === 0) return { ok: true };
@@ -576,6 +600,7 @@ export function download(url: string, dest: string): { ok: true } | { ok: false;
  * it. Returns the package root (npm's `package/`); the caller removes `dir`.
  */
 export function fetchPackage(url: string, expectSha256: string): { ok: true; dir: string; root: string } | { ok: false; absent: boolean; refused: boolean; error: string } {
+  // input-site: inert #65ff2faf — the scratch directory a fetched package is unpacked in
   const dir = mkdtempSync(join(tmpdir(), "mount-package-"));
   const tgz = join(dir, "package.tgz");
   const got = download(packageFetchUrl(url), tgz);
@@ -590,6 +615,7 @@ export function fetchPackage(url: string, expectSha256: string): { ok: true; dir
   }
   const out = join(dir, "x");
   mkdirSync(out);
+  // input-site: inert #3fba2e57 — unpacks the tarball the traced download fetched and its sha-256 checked, into that scratch directory
   const t = spawnSync("tar", ["-xzf", tgz, "-C", out], { encoding: "utf-8" });
   if (t.status !== 0) {
     rmSync(dir, { recursive: true, force: true });
@@ -600,6 +626,7 @@ export function fetchPackage(url: string, expectSha256: string): { ok: true; dir
 
 /** Shallow, blobless fetch of one commit, then a sparse checkout of `paths`. Returns the work tree. */
 function fetchAt(repository: string, sha: string, paths: string[]): string {
+  // input-site: inert #bb194b68 — the scratch directory a fetched commit is checked out in
   const dir = mkdtempSync(join(tmpdir(), "mount-from-lock-"));
   const steps: string[][] = [
     ["init", "-q"],
@@ -763,8 +790,10 @@ export function checkInstance(root: string, inst: LockInstance, prior?: () => Pr
  * asset blob is keyed by its `sha256` and re-verified on restore.
  */
 function mountCacheDir(): string | undefined {
+  // input-site: env CAT_MOUNT_CACHE_DIR #23fa0fe5 — where fetched mounts are cached
   const dir = process.env.CAT_MOUNT_CACHE_DIR?.trim();
   if (!dir) return undefined;
+  // input-site: env CAT_MOUNT_URL_PREFIX,CAT_MOUNT_CACHE_FORCE #dd8edd4b — whether the mount cache is used under a mirror
   if (process.env.CAT_MOUNT_URL_PREFIX && process.env.CAT_MOUNT_CACHE_FORCE !== "1") return undefined;
   return resolve(dir);
 }
@@ -1079,7 +1108,9 @@ export const layersRef = (key: string): string => `${LAYERS_REF_PREFIX}${key}`;
  * `CAT_LAYERS_CACHE=0` turns the fast path off.
  */
 export function layersUrl(root: string): string | undefined {
+  // input-site: env CAT_LAYERS_CACHE #7372dc86 — whether the layers cache is used
   if (process.env.CAT_LAYERS_CACHE === "0") return undefined;
+  // input-site: env CAT_LAYERS_URL #fd0cb617 — the remote the layers cache is fetched from
   const env = process.env.CAT_LAYERS_URL?.trim();
   if (env) return env;
   const r = git(root, ["remote", "get-url", "origin"]);
@@ -1111,6 +1142,7 @@ export function openLayersCache(url: string | undefined, key: string): LayersCac
         cache.miss = "no index remote (set CAT_LAYERS_URL, or CAT_LAYERS_CACHE=0 to stop looking)";
         return undefined;
       }
+      // input-site: inert #a4a83a8c — the scratch directory a cached layer set is fetched into
       dir = mkdtempSync(join(tmpdir(), "mount-layers-"));
       if (git(dir, ["init", "-q"]).status !== 0) return undefined;
       for (const ref of [layersRef(key), LAYERS_MAIN_REF]) {
@@ -1192,6 +1224,8 @@ export interface PublishResult {
 const IDENTITY = { GIT_AUTHOR_NAME: "cat layers", GIT_AUTHOR_EMAIL: "cat-layers@users.noreply.github.com", GIT_COMMITTER_NAME: "cat layers", GIT_COMMITTER_EMAIL: "cat-layers@users.noreply.github.com" };
 
 function gitEnv(cwd: string, args: string[], env: Record<string, string>, input?: string): { status: number; stdout: string; stderr: string } {
+  // input-site: traced #ac10aa1b — git publishing or pruning the layers cache over the network: a run that reaches it records no hash
+  inputSiteReached("mount-from-lock: git (layers)");
   const r = spawnSync("git", args, { cwd, encoding: "utf-8", maxBuffer: 1 << 28, env: { ...process.env, ...env }, input });
   return { status: r.status ?? 128, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
@@ -1214,6 +1248,7 @@ export function publishLayers(root: string, opts: { url?: string; main?: boolean
   const url = opts.url ?? layersUrl(root);
   if (opts.push !== false && !url) return { ok: false, key, detail: "no index remote to push to (pass --url or set CAT_LAYERS_URL)" };
   const entries = overlayEntries(root, instances);
+  // input-site: inert #b3e2b40b — the scratch index and object store a layers commit is built in
   const scratch = mkdtempSync(join(tmpdir(), "layers-publish-"));
   try {
     // Every object goes to a SCRATCH object directory (the root's own is only
@@ -1223,6 +1258,7 @@ export function publishLayers(root: string, opts: { url?: string; main?: boolean
     mkdirSync(join(scratch, "objects"), { recursive: true });
     const env = {
       ...IDENTITY,
+      // input-site: env GIT_AUTHOR_NAME,GIT_AUTHOR_EMAIL,GIT_COMMITTER_NAME,GIT_COMMITTER_EMAIL #e467a25a — the identity a layers commit is made under
       ...pick(process.env, Object.keys(IDENTITY)),
       GIT_INDEX_FILE: join(scratch, "index"),
       GIT_OBJECT_DIRECTORY: join(scratch, "objects"),
@@ -1272,6 +1308,7 @@ function pick(env: NodeJS.ProcessEnv, keys: string[]): Record<string, string> {
  * open PR still pins). Reads only commits, no trees or blobs.
  */
 export function pruneLayers(url: string, keep: number, keepKeys: readonly string[] = []): string[] {
+  // input-site: inert #64bca8de — the scratch repository the layers refs are listed in
   const dir = mkdtempSync(join(tmpdir(), "layers-prune-"));
   try {
     git(dir, ["init", "-q"]);
@@ -1400,6 +1437,7 @@ if (import.meta.main) {
   for (const o of outcomes) console.log(`  ${o.state.padEnd(20)} ${o.instance.padEnd(22)} ${o.detail}`);
   for (const l of layers) {
     const line = layersSummaryLine(l);
+    // input-site: inert #ab4c9ec1 — the job summary is where the result is shown, never an input
     const summary = process.env.GITHUB_STEP_SUMMARY;
     if (line && summary) {
       try {

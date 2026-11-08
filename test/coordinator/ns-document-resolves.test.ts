@@ -91,22 +91,20 @@ function segmentOf(layer: Layer): string {
 }
 
 describe("a layer's namespace document is published where its terms say it is", () => {
-  for (const workflow of WORKFLOWS) {
-    test(`${workflow} publishes each layer under its own IRI segment`, () => {
-      const pairs = pairsIn(workflow);
+  test.each(WORKFLOWS.map((w): [string] => [w]))("%s publishes each layer under its own IRI segment", (workflow) => {
+    const pairs = pairsIn(workflow);
 
-      // Vacuity guard FIRST. `check-declared-assets` shipped the version
-      // without one and reported "0 across 0 instances, exit 0" (bean `6tkl`);
-      // a regex that stops matching would otherwise turn this into a test that
-      // asserts nothing and passes forever.
-      expect(pairs.length).toBeGreaterThanOrEqual(3);
+    // Vacuity guard FIRST. `check-declared-assets` shipped the version
+    // without one and reported "0 across 0 instances, exit 0" (bean `6tkl`);
+    // a regex that stops matching would otherwise turn this into a test that
+    // asserts nothing and passes forever.
+    expect(pairs.length).toBeGreaterThanOrEqual(3);
 
-      const mismatched = pairs
-        .filter((p) => p.dir !== segmentOf(p.layer))
-        .map((p) => `${p.layer}: published to ${p.dir}, but its terms name ${segmentOf(p.layer)}`);
-      expect(mismatched).toEqual([]);
-    });
-  }
+    const mismatched = pairs
+      .filter((p) => p.dir !== segmentOf(p.layer))
+      .map((p) => `${p.layer}: published to ${p.dir}, but its terms name ${segmentOf(p.layer)}`);
+    expect(mismatched).toEqual([]);
+  });
 
   test("the two workflows agree with each other", () => {
     // They publish the same documents into two different trees, so a fix

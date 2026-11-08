@@ -90,7 +90,17 @@ describe("comparePrediction", () => {
   test("could-not-determine is carried, never read as no change", () => {
     const p = RenderedImpactSchema.parse({ $schema: RENDERED_IMPACT_TAG, renderer: "r", method: "cone", files: [], undetermined: [{ input: "sushi-config.yaml", reason: "site-wide", scope: "all" }] });
     expect(p.files).toEqual([]);
-    expect(p.undetermined).toHaveLength(1);
+    expect(p.undetermined).toEqual([{ input: "sushi-config.yaml", reason: "site-wide", scope: "all" }]);
+    // Carried through pinning, and pinned rather than dropped.
+    const pinnedP = pinImpact(p, () => "blob");
+    expect(pinnedP.undetermined).toHaveLength(1);
+    expect(pinnedP.undetermined[0]!.input).toBe("sushi-config.yaml");
+    expect(pinnedP.undetermined[0]!.hash).toMatch(/^[0-9a-f]{64}$/);
+    // An empty cone with an undetermined input is not a clean "no change":
+    // what the build did change is reported as missed.
+    const c = comparePrediction(p, impact("build-diff", [["other.html", "content"]]));
+    expect(c.missed).toEqual(["other.html"]);
+    expect(c.confirmed).toEqual([]);
   });
 });
 
@@ -127,7 +137,11 @@ describe("pinImpact", () => {
   });
   test("a removed input pins as absent, which differs from any version of it", () => {
     const gone = pinImpact(base, (p) => (p === "a.md" ? undefined : blobs.get(p)));
-    expect(pin(gone, "p.html")).not.toBe(pin(pinned, "p.html"));
+    for (const version of ["1", "1b", "", "0".repeat(40)]) {
+      const at = pinImpact(base, (p) => (p === "a.md" ? version : blobs.get(p)));
+      expect(pin(gone, "p.html")).not.toBe(pin(at, "p.html"));
+      expect(pin(gone, "q.html")).not.toBe(pin(at, "q.html"));
+    }
   });
 });
 

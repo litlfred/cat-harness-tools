@@ -35,6 +35,7 @@ import { checkoutDirectories } from "../schemas/kg/harness-config.js";
 import { ROUTE_SEGMENT, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { toolSubjects } from "./gen-tools-viz.ts";
 import { processSubjects } from "./gen-processes-viz.ts";
+import { schemaSubjects } from "./gen-schema-viz.ts";
 import { readJourneyCorpus } from "./journeys/read.ts";
 import { declaredVisualisers, forwardingParts, pageParts, type DeclaredVisualiser } from "./viewer-declarations.ts";
 
@@ -110,6 +111,9 @@ export const SUBJECT_READERS: Readonly<Record<string, SubjectReader>> = {
   // still owes a page; a folder of DMN tables or global tasks owes none.
   "processes-viewer": (root) => [...processSubjects(root).keys()],
   "ig-pages": igIndexSubjects,
+  // A schema MODULE or source descriptor, not a sub-folder: a `schemas`
+  // directory holding only JSON contracts in `skills/` owes no page.
+  "schemas-viewer": (root) => schemaSubjects(root),
   // A journey or a workshop is a FILE in a declared directory, not a
   // sub-folder, and the writer draws an instance's page when it holds one.
   "journeys-viewer": (root) => {

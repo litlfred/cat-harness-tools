@@ -79,6 +79,21 @@ export function workflowDir(repoRoot: string): string {
   return dir;
 }
 
+/**
+ * Whether this checkout keeps NO workflow instances, by determination: the
+ * bean graph is declared by another instance on a branch family this
+ * checkout's remote does not carry, and a mount recorded it ABSENT (bean
+ * `x5e0`; owner, 2026-10-14: "Report as absent"). Returns the reason then,
+ * and `undefined` otherwise — including for an UNREACHABLE graph, which
+ * {@link workflowDir} still refuses. A reader that would list instances asks
+ * this first and reports itself not applicable, as `sweep:mark:check` does;
+ * it never reads "absent" as "no instances started".
+ */
+export function workflowStateAbsent(repoRoot: string): string | undefined {
+  const r = resolveBeanGraphNode(repoRoot, "workflow-state");
+  return r.unreachable && r.absent ? r.unreachable : undefined;
+}
+
 /** Drop the memo — for tests that move a graph under a root they reuse. */
 export function clearWorkflowDirCache(): void {
   dirCache.clear();

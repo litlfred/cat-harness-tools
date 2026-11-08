@@ -108,19 +108,23 @@ describe("a file whose producer reads it back is NOT marked", () => {
 });
 
 describe("every -merge path is gated in CI", () => {
-  test("a wrong resolution reddens rather than ships", () => {
+  test("each path git marks -merge has its covering gate named in CI", () => {
     // This is what makes the whole entry safe rather than clever. The files
     // are covered by `check:glossary`, `auto:docs:check` and
     // `docs:pages:check`, so taking the wrong side cannot ship. (The gates of
     // the retired `test/results/` entries, `audit:coverage:require-all` and
     // `lsi:skills:check`, guarded files nobody commits now; bean `7mwa`.)
     const wf = readFileSync(join(REPO, ".github", "workflows", "code-quality-gates.yml"), "utf-8");
-    for (const gate of [
-      "check:glossary",
-      "auto:docs:check",
-      "docs:pages:check",
-    ]) {
-      expect(wf, `${gate} is not in CI, so a -merge path it covers is unguarded`).toContain(gate);
+    const gateOf: Record<string, string> = {
+      "cat-harness/docs/en/folio-assistant-core/glossary/index.md": "check:glossary",
+      "cat-harness/docs/folio-assistant-core/glossary/index.md": "check:glossary",
+      "cat-harness/docs/cat-harness/auto-docs/index/index.html": "auto:docs:check",
+      "cat-harness/docs/assets/beans/index.json": "docs:pages:check",
+    };
+    for (const [p, gate] of Object.entries(gateOf)) {
+      // Each path really is `-merge` (asked of git), so its gate is load-bearing.
+      expect(mergeAttr(p), `${p} is not marked -merge`).toBe("unset");
+      expect(wf, `${gate} is not in CI, so ${p}, marked -merge, is unguarded`).toContain(gate);
     }
   });
 });

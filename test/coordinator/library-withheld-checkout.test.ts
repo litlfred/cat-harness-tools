@@ -109,20 +109,18 @@ describe("the viewer data honours who-iris's withheld list — over a declared f
     expect(index.entries.map((e) => e.id)).toContain(SLUG);
   });
 
-  for (const slug of slugs) {
-    test(`${slug}: flagged, no prose excerpt, no avatar`, () => {
-      const e = index.entries.find((x) => x.id === slug);
-      expect(e?.withheld).toBeTruthy();
-      expect(e?.avatar).toBeUndefined();
+  test.each(slugs.map((slug): [string] => [slug]))("%s: flagged, no prose excerpt, no avatar", (slug) => {
+    const e = index.entries.find((x) => x.id === slug);
+    expect(e?.withheld).toBeTruthy();
+    expect(e?.avatar).toBeUndefined();
 
-      const data = { blocks: blocks.get(slug) ?? [] };
-      // Non-vacuous: the entry HAS prose blocks; only their excerpt is gone.
-      expect(data.blocks.some((b) => b.kind === "prose")).toBe(true);
-      expect(data.blocks.filter((b) => b.kind === "prose" && b.content !== null)).toEqual([]);
-      expect(avatars.has(join(site, "assets", "library", "avatars", "who-iris", `${slug}.png`))).toBe(false);
-      expect(existsSync(join(site, "assets", "library", "avatars", "who-iris", `${slug}.png`))).toBe(false);
-    });
-  }
+    const data = { blocks: blocks.get(slug) ?? [] };
+    // Non-vacuous: the entry HAS prose blocks; only their excerpt is gone.
+    expect(data.blocks.some((b) => b.kind === "prose")).toBe(true);
+    expect(data.blocks.filter((b) => b.kind === "prose" && b.content !== null)).toEqual([]);
+    expect(avatars.has(join(site, "assets", "library", "avatars", "who-iris", `${slug}.png`))).toBe(false);
+    expect(existsSync(join(site, "assets", "library", "avatars", "who-iris", `${slug}.png`))).toBe(false);
+  });
 
   test("the fixture is what is tested: the same entry, NOT withheld, publishes all three", () => {
     // The mutation check, kept as a test so it runs on every run: the

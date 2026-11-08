@@ -31,6 +31,7 @@ import { entryItems } from "./summaries.ts";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -329,6 +330,8 @@ export function reviewer(opts: { interactive?: boolean } = {}): { kind: "human";
         "decision a person already made.",
     );
   }
+  // input-site: traced #f04a15fe — git config user.name, the reviewer a confirmation is recorded under: config outside the checkout, so a run that reads it records no hash
+  inputSiteReached("narratives: git config user.name");
   const r = Bun.spawnSync(["git", "config", "user.name"], { cwd: ROOT });
   const name = new TextDecoder().decode(r.stdout).trim();
   if (!name) {
@@ -380,6 +383,7 @@ export function decide(
   // supplies it. The CLI never does: it goes through `reviewer()`, which
   // refuses outside a terminal.
   const by = opts.by ?? reviewer();
+  // input-site: inert #b1397800 — the time a confirmation is stamped with when the caller gives none: written, never read back
   const at = (opts.now ?? new Date()).toISOString().replace(/\.\d{3}Z$/, "Z");
   const next: Narrative =
     outcome === "confirm"

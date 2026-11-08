@@ -253,6 +253,29 @@ describe("`running` is never a pass", () => {
       } as Partial<QaReport>),
     );
     expect(qaReportVerdict(failed)).toBe("finding");
+
+    const running = QaReportSchema.parse(
+      report({
+        status: "running",
+        summary: {
+          total_successes: 0,
+          total_warnings: 0,
+          total_errors: 0,
+          files_processed_count: 0,
+          files_expected_count: 0,
+          files_missing_count: 0,
+        },
+        details: {
+          successes: [],
+          warnings: [],
+          errors: [],
+          files_processed: [],
+          files_expected: [],
+          files_missing: [],
+        },
+      } as Partial<QaReport>),
+    );
+    expect(qaReportVerdict(running)).toBe("unknown");
     expect(isTerminal("failed")).toBe(true);
     expect(isTerminal("running")).toBe(false);
   });

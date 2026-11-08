@@ -23,7 +23,7 @@
  * | `testCases[].id` | `testCase.sequence` | an id rather than an ordinal: a verdict must name its case, and renumbering must not reassign verdicts |
  * | `testCases[].assertions[]` | `testCase.assertion` | the assertion's id IS a criterion id, so a test case and a QA criterion are one vocabulary; `type` keeps FHIR's `required` / `informative` |
  * | `testCases[].testData[]` | `testCase.testData` | FHIR's `content` / `source[x]` split becomes FIXED vs GENERATED — see below |
- * | `testCases[].feature` | `testCase.testRun.script` (`language: gherkin`) | only the Gherkin case is carried, as a path |
+ * | `testCases[].feature` | `testCase.testRun.script` (`language: gherkin`) | only the Gherkin case is carried, as a path — and since v1.1 it is REQUIRED (see below) |
  * | `testCases[].dependsOn[]` | `testCase.dependency` | resolved to sibling case ids, and refused when it does not resolve |
  * | `dependencies[]` | `dependency` (`description`, `predecessor`) | verbatim in shape |
  * | `exitCriteria` | `exitCriteria` (markdown) | FHIR's is NARRATIVE; here it is a DMN reference, because a certification rule a person reads and a different person applies is two rules |
@@ -59,7 +59,21 @@
  *    dependencies are acyclic — a cycle is a plan nobody can execute;
  * 3. a plan-level `predecessor` is not the plan itself;
  * 4. `exitCriteria.decision` has the `file.dmn#Decision_Id` shape the BPMN
- *    gateways here already use.
+ *    gateways here already use;
+ * 5. under `test-plan/v1.1`, every case names its `.feature`.
+ *
+ * ## v1.1: every case names its Gherkin
+ *
+ * Owner, 2026-11-06: "A test should always have a Gherkin." A case is the
+ * plan's unit of specification, and the tests that execute it are found
+ * through the `@test:` tags of its `.feature` (skill `test-engineer`), so a
+ * case with no `.feature` has no way to reach a test at all. v1.1 makes
+ * `feature` required; that is the whole difference from v1.
+ *
+ * A MINOR version, because every v1.1 plan is a valid v1 plan. A `test-plan/v1`
+ * plan still parses, so a plan written before the rule stays readable, and
+ * {@link testPlanDeprecations} lists what it lacks. The kg-audit criterion
+ * `test-has-gherkin` reports those cases until they name a `.feature`.
  *
  * NOT enforced here: that a `req:` ref, an assertion's criterion id, a DMN
  * file or a fixed data path RESOLVES. Those are facts about the rest of the
@@ -71,8 +85,18 @@ import { z } from "zod";
 import { RequirementRefSchema } from "@litlfred/bootstrap-tools/schemas/requirement.ts";
 import { ATTRIBUTION_KINDS } from "../content/attribution";
 
-/** The tag a test plan carries, so it is identified by declaration. */
-export const TEST_PLAN_SCHEMA_ID = "test-plan/v1";
+/** The tag a test plan carries, so it is identified by declaration. The current version: a new plan writes this. */
+export const TEST_PLAN_SCHEMA_ID = "test-plan/v1.1";
+/** The version before `feature` was required. Still read; {@link testPlanDeprecations} says what it lacks. */
+export const TEST_PLAN_SCHEMA_ID_V1 = "test-plan/v1";
+/** Every tag a plan may declare, oldest first. */
+export const TEST_PLAN_SCHEMA_IDS = [TEST_PLAN_SCHEMA_ID_V1, TEST_PLAN_SCHEMA_ID] as const;
+export type TestPlanSchemaId = (typeof TEST_PLAN_SCHEMA_IDS)[number];
+
+/** Does this `$schema` value declare a test plan, of any readable version? */
+export function isTestPlanSchemaId(v: unknown): v is TestPlanSchemaId {
+  return (TEST_PLAN_SCHEMA_IDS as readonly unknown[]).includes(v);
+}
 
 /** A lowercase slug — plan and case ids, used verbatim in report paths. */
 const SLUG = /^[a-z0-9][a-z0-9-]*$/;
@@ -182,7 +206,11 @@ export const TestPlanCaseSchema = z.strictObject({
   assertions: z.array(TestAssertionSchema).min(1),
   /** May be empty: a case can test behaviour on no input. Absent and empty are the same here. */
   testData: z.array(TestDataRefSchema).default([]),
-  /** Optional Gherkin `.feature` file the case is written in. */
+  /**
+   * The Gherkin `.feature` file the case is written in. Required under
+   * `test-plan/v1.1` — enforced on the plan, since a case does not know its
+   * plan's version — and optional only in a `test-plan/v1` plan.
+   */
   feature: z
     .string()
     .regex(/\.feature$/, "a Gherkin link names a `.feature` file")
@@ -212,7 +240,7 @@ export const TestPlanExitCriteriaSchema = z.strictObject({
 
 export const TestPlanSchema = z
   .strictObject({
-    $schema: z.literal(TEST_PLAN_SCHEMA_ID),
+    $schema: z.enum(TEST_PLAN_SCHEMA_IDS),
     id: TestPlanIdSchema,
     title: z.string().min(1),
     status: TestPlanStatusSchema,
@@ -276,6 +304,19 @@ export const TestPlanSchema = z
       });
     }
 
+    // 5. Under v1.1, every case names its `.feature`.
+    if (p.$schema === TEST_PLAN_SCHEMA_ID) {
+      p.testCases.forEach((c, i) => {
+        if (c.feature === undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["testCases", i, "feature"],
+            message: `case \`${c.id}\` names no \`.feature\` — under ${TEST_PLAN_SCHEMA_ID} every case is written in Gherkin`,
+          });
+        }
+      });
+    }
+
     // 3. A plan is not its own predecessor.
     p.dependencies.forEach((d, i) => {
       if (d.predecessor === p.id) {
@@ -284,6 +325,20 @@ export const TestPlanSchema = z
     });
   });
 export type TestPlan = z.infer<typeof TestPlanSchema>;
+
+/**
+ * What a parsed plan still carries from an older version — empty for a
+ * current plan. Today that is one thing: a `test-plan/v1` case with no
+ * `.feature`. Warnings, not errors: the plan parsed.
+ */
+export function testPlanDeprecations(plan: TestPlan): string[] {
+  if (plan.$schema === TEST_PLAN_SCHEMA_ID) return [];
+  const missing = plan.testCases.filter((c) => c.feature === undefined).map((c) => c.id);
+  return [
+    `declares ${plan.$schema}, which is deprecated — write ${TEST_PLAN_SCHEMA_ID}`,
+    ...(missing.length > 0 ? [`case(s) ${missing.map((m) => `\`${m}\``).join(", ")} name no \`.feature\` — required from ${TEST_PLAN_SCHEMA_ID}`] : []),
+  ];
+}
 
 /** A cycle in `edges`, as the ids along it, or `undefined`. */
 function findCycle(edges: Map<string, string[]>): string[] | undefined {

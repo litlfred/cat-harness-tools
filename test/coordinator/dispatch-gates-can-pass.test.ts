@@ -69,6 +69,13 @@ describe("the catalogue gate can pass on a non-pull_request event", () => {
     // script's two-dot path, which needs no merge base of its own.
     expect(wf).toContain('bun run cat translation:catalogue:check -- --base "$base"');
     expect(wf).toContain("git merge-base origin/main HEAD");
+    // And in that order, with no catalogue run between them: the base is
+    // found FIRST and then handed over, so the no-base branch never reaches a
+    // call that falls back to the script's own three-dot range.
+    const found = wf.indexOf("git merge-base origin/main HEAD");
+    const passed = wf.indexOf('bun run cat translation:catalogue:check -- --base "$base"');
+    expect(found).toBeLessThan(passed);
+    expect(wf.slice(found, passed)).not.toContain("translation:catalogue:check");
   });
 
   test("a base that still cannot be found stays exit 2, never a pass", () => {

@@ -158,87 +158,99 @@ describe("the reference a report carries (C1: by sha256)", () => {
 
   test("run and report schemas accept optional `runContext: { sha256 }` and reject inline context objects (C1 = a)", () => {
     const ref = { sha256: SHA };
-    expect(
-      ToolRunRecordSchema.safeParse({
-        $schema: TOOL_RUN_SCHEMA_ID,
-        tool: "plantuml-render",
-        target: "cat-harness/uml",
-        outcome: "succeeded",
-        inputFingerprint: "abcdef012345",
-        releases: [{ state: "provisioned", release: "plantuml@1.2026.9", digest: { algorithm: "sha256", digest: SHA } }],
-        runContext: ref,
-      }).success,
-    ).toBe(true);
-
-    expect(
-      TestRunSchema.safeParse({
-        $schema: TEST_RUN_SCHEMA_ID,
-        skill: "crdm-detect",
-        subject: "crdm",
-        data: { hash: "abcdef012345", inputs: ["a.md"] },
-        process: { hash: "fedcba543210", inputs: ["b.ts"] },
-        outcome: { pass: 1 },
-        updated_at: "2026-10-07T00:00:00Z",
-        runContext: ref,
-      }).success,
-    ).toBe(true);
-
-    expect(
-      TestReportSchema.safeParse({
-        $schema: TEST_REPORT_SCHEMA_ID,
-        plan: { id: "crdm-detect", version: "1" },
-        sut: { kind: "agent" as const, model: "claude-opus-5", configuration: "harness", actor: "claude-code", version: "1.0", reach: "internet" },
-        run: { id: "r1", data: "abcdef012345", process: "fedcba543210" },
-        status: "completed",
-        started_at: "2026-10-07T00:00:00Z",
-        completed_at: "2026-10-07T00:01:00Z",
-        cases: { c1: [{ result: "pass", reviewer: { kind: "script", id: "eval.ts" }, reviewed_at: "2026-10-07T00:01:00Z" }] },
-        rollup: { pass: 1, fail: 0, warn: 0, "n/a": 0, skipped: 0 },
-        runContext: ref,
-      }).success,
-    ).toBe(true);
-
-    expect(
-      QaReportSchema.safeParse({
-        $schema: QA_REPORT_SCHEMA_TAG,
-        producer: "dak-script",
-        source: { tool: "gen.py" },
-        phase: "postprocessing",
-        timestamp: "2026-10-07T00:00:00Z",
-        status: "completed",
-        summary: {
-          total_successes: 0,
-          total_warnings: 0,
-          total_errors: 0,
-          files_processed_count: 0,
-          files_expected_count: 0,
-          files_missing_count: 0,
-          completion_timestamp: "2026-10-07T00:00:01Z",
+    const inline = RunContextSchema.parse(ctx());
+    const records: [string, { safeParse: (v: unknown) => { success: boolean } }, Record<string, unknown>][] = [
+      [
+        "tool run",
+        ToolRunRecordSchema,
+        {
+          $schema: TOOL_RUN_SCHEMA_ID,
+          tool: "plantuml-render",
+          target: "cat-harness/uml",
+          outcome: "succeeded",
+          inputFingerprint: "abcdef012345",
+          releases: [{ state: "provisioned", release: "plantuml@1.2026.9", digest: { algorithm: "sha256", digest: SHA } }],
         },
-        details: { successes: [], warnings: [], errors: [], files_processed: [], files_expected: [], files_missing: [] },
-        runContext: ref,
-      }).success,
-    ).toBe(true);
-
-    expect(
-      KgQaManifestSchema.safeParse({
-        $schema: KG_QA_MANIFEST_SCHEMA,
-        auditor: { script: "scripts/kg-audit.ts", script_hash: "abcdef012345", engine_version: "1" },
-        runContext: ref,
-      }).success,
-    ).toBe(true);
-
-    expect(
-      HealthReportSchema.safeParse({
-        $schema: HEALTH_REPORT_SCHEMA,
-        producer: { script: "test/health/run.ts", script_hash: "abcdef012345" },
-        subject: { kind: "repository", id: "litlfred/cat-harness" },
-        updated_at: "2026-10-07T00:00:00Z",
-        verdict: "clean",
-        checks: [{ id: "c1", state: "ok", summary: "s", thresholds: [], measurements: [], findings: [] }],
-        runContext: ref,
-      }).success,
-    ).toBe(true);
+      ],
+      [
+        "test run",
+        TestRunSchema,
+        {
+          $schema: TEST_RUN_SCHEMA_ID,
+          skill: "crdm-detect",
+          subject: "crdm",
+          data: { hash: "abcdef012345", inputs: ["a.md"] },
+          process: { hash: "fedcba543210", inputs: ["b.ts"] },
+          outcome: { pass: 1 },
+          updated_at: "2026-10-07T00:00:00Z",
+        },
+      ],
+      [
+        "test report",
+        TestReportSchema,
+        {
+          $schema: TEST_REPORT_SCHEMA_ID,
+          plan: { id: "crdm-detect", version: "1" },
+          sut: { kind: "agent" as const, model: "claude-opus-5", configuration: "harness", actor: "claude-code", version: "1.0", reach: "internet" },
+          run: { id: "r1", data: "abcdef012345", process: "fedcba543210" },
+          status: "completed",
+          started_at: "2026-10-07T00:00:00Z",
+          completed_at: "2026-10-07T00:01:00Z",
+          cases: { c1: [{ result: "pass", reviewer: { kind: "script", id: "eval.ts" }, reviewed_at: "2026-10-07T00:01:00Z" }] },
+          rollup: { pass: 1, fail: 0, warn: 0, "n/a": 0, skipped: 0 },
+        },
+      ],
+      [
+        "qa report",
+        QaReportSchema,
+        {
+          $schema: QA_REPORT_SCHEMA_TAG,
+          producer: "dak-script",
+          source: { tool: "gen.py" },
+          phase: "postprocessing",
+          timestamp: "2026-10-07T00:00:00Z",
+          status: "completed",
+          summary: {
+            total_successes: 0,
+            total_warnings: 0,
+            total_errors: 0,
+            files_processed_count: 0,
+            files_expected_count: 0,
+            files_missing_count: 0,
+            completion_timestamp: "2026-10-07T00:00:01Z",
+          },
+          details: { successes: [], warnings: [], errors: [], files_processed: [], files_expected: [], files_missing: [] },
+        },
+      ],
+      [
+        "kg qa manifest",
+        KgQaManifestSchema,
+        {
+          $schema: KG_QA_MANIFEST_SCHEMA,
+          auditor: { script: "scripts/kg-audit.ts", script_hash: "abcdef012345", engine_version: "1" },
+        },
+      ],
+      [
+        "health report",
+        HealthReportSchema,
+        {
+          $schema: HEALTH_REPORT_SCHEMA,
+          producer: { script: "test/health/run.ts", script_hash: "abcdef012345" },
+          subject: { kind: "repository", id: "litlfred/cat-harness" },
+          updated_at: "2026-10-07T00:00:00Z",
+          verdict: "clean",
+          checks: [{ id: "c1", state: "ok", summary: "s", thresholds: [], measurements: [], findings: [] }],
+        },
+      ],
+    ];
+    for (const [name, schema, record] of records) {
+      const verdict = (runContext?: unknown) =>
+        `${name}: ${schema.safeParse(runContext === undefined ? record : { ...record, runContext }).success}`;
+      expect(verdict()).toBe(`${name}: true`);
+      expect(verdict(ref)).toBe(`${name}: true`);
+      expect(verdict(inline)).toBe(`${name}: false`);
+      expect(verdict({ ...ref, context: inline })).toBe(`${name}: false`);
+    }
   });
 
   test("addressBook resolves tool-release refs (`<name>@<version>`) as `prov:Entity` IRIs for `prov:used` (Step 3)", () => {

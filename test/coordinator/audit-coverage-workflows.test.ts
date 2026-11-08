@@ -25,7 +25,7 @@ const INSTANCE = join(ORIGIN_DIR, "..", "..");
 const REPO = repoRootFor(INSTANCE);
 
 describe("the report is a fixpoint", () => {
-  test("running it once is enough to satisfy the gate", () => {
+  test("two runs over one checkout report the same rows, and the `qa` row is among them", () => {
     // Its own sidecar lives in the `qa-results` graph, so the `qa` row counts
     // it, and writing it changed the next run's answer — for ever. The first
     // version could only be satisfied by running the writer TWICE, which is not

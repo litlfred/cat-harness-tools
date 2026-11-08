@@ -52,7 +52,7 @@ import { loadAccessContext, type AccessContext, type Principal } from "../src/co
 import { authorizeTask, type TaskAuthVerdict } from "../src/workflow/authorize.js";
 import type { HistoryEntry, InstanceState } from "../src/workflow/instance.js";
 import { isActivity, isDecision, loadProcessModel, processDiagrams, type ProcessModel } from "../src/workflow/process-model.js";
-import { listInstances } from "../src/workflow/store.js";
+import { listInstances, workflowStateAbsent } from "../src/workflow/store.js";
 import { roleGraphFor, workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { exportIdentity, publishedIdentity } from "./kg-export.ts";
@@ -514,6 +514,15 @@ export function staleness(files: Map<string, string>, assets: string = ASSETS): 
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
+  // A checkout that keeps no work plan, by determination, has no instances to
+  // report on: not applicable, as `sweep:mark:check` says for its marks. It
+  // writes and deletes nothing — the committed report belongs to a checkout
+  // that has the instances. An UNREACHABLE graph is still refused below.
+  const absent = workflowStateAbsent(REPO);
+  if (absent !== undefined) {
+    console.log(`✓ prov-qaqc: not applicable — ${absent}`);
+    process.exit(0);
+  }
   let r: Report;
   try {
     r = await buildReport();
