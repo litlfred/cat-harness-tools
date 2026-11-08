@@ -19,6 +19,7 @@ import {
   invariantTokens,
   measureBlock,
   mergeCriteria,
+  notOwnLine,
   readPrior,
 } from "./translation-block-qa.ts";
 import { clearQaCache, publishQa, type QaStoreOptions } from "../scripts/qa-store.ts";
@@ -492,4 +493,44 @@ describe("readPrior (bean 8wj1)", () => {
     },
     60_000,
   );
+});
+
+// Owner ruling 2026-11-05, "Move the checks": a content repository's PR checks
+// must not fail on the harness's own translations (smart-immunizations#118).
+describe("judge only the caller's own instance", () => {
+  function instance(dir: string, name: string): string {
+    const root = join(dir, name);
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, `${name}.json`), JSON.stringify({ name }));
+    return root;
+  }
+
+  test("unscoped (a local run): judges, as before", () => {
+    inTmp((dir) => {
+      expect(notOwnLine(instance(dir, "cat-harness"), {}, dir)).toBeUndefined();
+    });
+  });
+
+  test("the caller is another instance: nothing of its own, a pass", () => {
+    inTmp((dir) => {
+      const line = notOwnLine(instance(dir, "cat-harness"), { CAT_GATE_OWN_INSTANCES: "smart-immunizations" }, dir);
+      expect(line).toContain("smart-immunizations");
+      expect(line).toContain("judged by their own CI");
+    });
+  });
+
+  test("the caller is the harness: judges", () => {
+    inTmp((dir) => {
+      expect(notOwnLine(instance(dir, "cat-harness"), { CAT_GATE_OWN_INSTANCES: "cat-harness" }, dir)).toBeUndefined();
+    });
+  });
+
+  test("own paths only: an instance outside them is not judged", () => {
+    inTmp((dir) => {
+      const env = { CAT_GATE_OWN_PATHS: "smart-immunizations", CAT_GATE_FOREIGN_PATHS: "fa/cat-harness" };
+      mkdirSync(join(dir, "fa"), { recursive: true });
+      expect(notOwnLine(instance(join(dir, "fa"), "cat-harness"), env, dir)).toBeDefined();
+      expect(notOwnLine(instance(dir, "smart-immunizations"), env, dir)).toBeUndefined();
+    });
+  });
 });
