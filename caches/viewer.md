@@ -171,11 +171,11 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 - **Holds:** fa/build/writer-cone
 - **Derived inputs:** the main commit the records were taken at; each record is matched against the PR's reads by writer-cone.ts
 - **Producer:** record-writers (push, RECORD_WRITERS)
-- **Consumers:** prepare-head/prepare-base on PRs
+- **Consumers:** prepare-head/prepare-base on PRs; record-writers on push (an incremental record starts from the newest one, #1702)
 - **Save policy:** push only (RECORD_WRITERS env set only in record-writers)
 - **Verify:** writer-cone.ts re-checks each recorded read before a writer is skipped
 - **Uses:** `.github/workflows/layer-pr-checks.yml:921`, `.github/workflows/layer-pr-checks.yml:1052`, `.github/workflows/layer-pr-checks.yml:1415`, `.github/workflows/layer-pr-checks.yml:1418`, `.github/workflows/layer-pr-checks.yml:1466`
-- **Notes:** Saved on push only.
+- **Notes:** Saved on every push to main (#1702): a full record once per writer-record-hours window, an incremental one otherwise, which carries each matching writer's record forward and traces only the rest.
 
 ### lpc-writer-stamp
 
@@ -184,7 +184,7 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 - **Holds:** stamp file
 - **Derived inputs:** a time bucket: a rate limiter, not content
 - **Producer:** record-writers
-- **Consumers:** prepare-base (decides whether to record)
+- **Consumers:** prepare-base (decides whether this push records every writer or only the changed ones)
 - **Save policy:** push only
 - **Verify:** none needed: it holds no output
 - **Uses:** `.github/workflows/layer-pr-checks.yml:1198`, `.github/workflows/layer-pr-checks.yml:1475`

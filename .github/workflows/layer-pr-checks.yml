@@ -279,10 +279,10 @@ on:
         type: boolean
         default: false
       writer-record-hours:
-        description: "How often, at most, a push to main re-records the page-build writers under strace (bean fwtz). The record takes 40-85 minutes and every run waits for it at its end; a PR uses the newest record and checks it path by path, so an older one still serves. 0 records on every push."
+        description: "How often, at most, a push to main re-records EVERY page-build writer under strace (bean fwtz). Every other push records incrementally (cat-harness-tools#1702): it restores the newest records, skips each writer whose recorded reads still match and keeps its record, and traces only the writers whose inputs moved. The full record takes 70-120 minutes; it bounds how long a carried record lives. 0 records fully on every push."
         required: false
         type: number
-        default: 6
+        default: 24
       writer-skip:
         description: "Skip a derive:publish writer whose recorded reads are unchanged, putting back what it wrote (bean fwtz). A push to the caller's main records each writer under strace; a PR restores the newest record and skips. Off: every writer runs."
         required: false
@@ -1052,9 +1052,18 @@ jobs:
           # Reuse on (cat-harness-tools#400): derive:publish keeps reuse off under
           # CI unless a cache directory is named.
           export CAT_DERIVE_CACHE_DIR="$PWD/build/derive-cache"
-          # Writer records (bean fwtz): recorded on a push, used on a PR.
+          # Writer records (bean fwtz): recorded on a push, used on a PR. A
+          # push outside a full window records incrementally: skip a writer
+          # whose reads match and keep its record, trace the rest (#1702).
           if [ "$WRITER_SKIP" = "true" ]; then
-            if [ "${RECORD_WRITERS:-}" = "true" ]; then export CAT_WRITER_RECORD=1
+            if [ "${RECORD_WRITERS:-}" = "true" ]; then
+              export CAT_WRITER_RECORD=1
+              if [ "${WRITER_RECORD_FULL:-true}" != "true" ] && [ -f build/writer-cone/records.json ]; then
+                export CAT_WRITER_SKIP=1
+                echo "writer records: incremental, against the newest records kept"
+              else
+                echo "writer records: full, every writer traced"
+              fi
             elif [ -f build/writer-cone/records.json ]; then export CAT_WRITER_SKIP=1
             else echo "writer skip: no records restored, every writer runs"; fi
           fi
@@ -1280,17 +1289,20 @@ jobs:
       # True on the first harness PR: main had no lock, so main's side is
       # the PR's own tree (see the base-root step).
       first-setup: ${{ steps.base-root.outputs.first-setup == 'true' }}
-      # Whether this push re-records the page-build writers (writer-record-hours).
-      record-writers: ${{ steps.writer-stamp.outputs.record }}
+      # Whether this push re-records every page-build writer (writer-record-hours);
+      # otherwise it records incrementally (cat-harness-tools#1702).
+      writer-record-full: ${{ steps.writer-stamp.outputs.full }}
       writer-bucket: ${{ steps.writer-bucket.outputs.bucket }}
     steps:
       # The same matrix as prepare-head's; a push has no prepare-head.
       - *shards
       - *tools-lock
-      # Has a push recorded the page-build writers in this window? (bean fwtz;
+      # Has a push recorded every page-build writer in this window? (bean fwtz;
       # owner, 2026-11-01, card Q-CIS-2 A: off the main path.) A cache key per
       # window of `writer-record-hours`: the first push in a window records
-      # and saves the stamp, the rest skip the 40-85 minute job.
+      # every writer and saves the stamp; the rest record incrementally, tracing
+      # only the writers whose reads moved (cat-harness-tools#1702, option D of
+      # the 2026-11-08 CI bottleneck analysis: records from every main batch).
       - name: Is a writer record due? (a push)
         id: writer-bucket
         if: github.event_name == 'push' && inputs.writer-skip
@@ -1308,17 +1320,17 @@ jobs:
           path: ${{ runner.temp }}/writer-stamp
           key: writer-record-stamp-v1-${{ github.repository }}-${{ steps.writer-bucket.outputs.bucket }}
           lookup-only: true
-      - name: Record the writers on this push?
+      - name: Record every writer on this push, or only the ones whose reads moved?
         id: writer-stamp
         if: steps.writer-bucket.outcome == 'success'
         env:
           HIT: ${{ steps.writer-stamp-lookup.outputs.cache-hit == 'true' }}
         run: |
           if [ "$HIT" = "true" ]; then
-            echo "the page-build writers were recorded in this ${{ inputs.writer-record-hours }}-hour window: not recorded again"
-            echo "record=false" >> "$GITHUB_OUTPUT"
+            echo "every page-build writer was recorded in this ${{ inputs.writer-record-hours }}-hour window: this push records incrementally"
+            echo "full=false" >> "$GITHUB_OUTPUT"
           else
-            echo "record=true" >> "$GITHUB_OUTPUT"
+            echo "full=true" >> "$GITHUB_OUTPUT"
           fi
       - *judging-scripts
       - *pin-restore
@@ -1536,14 +1548,17 @@ jobs:
   record-writers:
     name: Record main's page-build scripts (bean fwtz)
     needs: [prepare-base]
+    # Every push (cat-harness-tools#1702): a full record once per
+    # `writer-record-hours` window, an incremental one otherwise.
     if: >-
       !cancelled() && inputs.writer-skip && github.event_name == 'push' &&
-      needs.prepare-base.outputs.record-writers == 'true'
+      needs.prepare-base.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       SIDE: base
       RECORD_WRITERS: "true"
+      WRITER_RECORD_FULL: ${{ needs.prepare-base.outputs.writer-record-full != 'false' }}
     steps:
       - id: skip-prep
         run: echo "hit=false" >> "$GITHUB_OUTPUT"
@@ -1569,16 +1584,25 @@ jobs:
       - *install
       - *chromium
       - *state-mount
+      # An incremental record starts from the newest records a push kept, and
+      # the outputs entries beside them, which a skipped writer is put back from.
+      - name: Restore the newest writer records (an incremental record)
+        if: env.WRITER_RECORD_FULL != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fa/build/writer-cone
+          key: writer-cone-v1-${{ github.repository }}-${{ github.sha }}
+          restore-keys: writer-cone-v1-${{ github.repository }}-
       - *strace
       - *derive
       - *writer-cone-save
       - name: Stamp this window's writer record (writer-record-hours)
-        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        if: env.WRITER_RECORD_FULL == 'true' && steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
         run: |
           mkdir -p "$RUNNER_TEMP/writer-stamp"
           printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/writer-stamp/sha"
       - name: Keep the stamp
-        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        if: env.WRITER_RECORD_FULL == 'true' && steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
         continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:

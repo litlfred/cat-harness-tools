@@ -119,7 +119,9 @@ import {
 import { openTrace } from "../schemas/sdlc/input-trace.ts";
 import { BUILDING_ENV, STAMP_PATH, workingCopyState } from "./qa-working-copy.ts";
 import {
+  carryRecord,
   decideWriter,
+  entryShaOf,
   churnReport,
   renderChurn,
   WRITER_CHURN_FILE,
@@ -568,8 +570,11 @@ if (import.meta.main) {
   const declaredOutput = underOutputs(allOutputs);
   // Previews skip a writer whose recorded reads all match, and put back the
   // outputs the recording run kept (owner 2026-10-31 14:32Z: "dont wait for
-  // clean deploys to skip. we can fix aftermath"). Never while recording.
-  const skipOn = env[WRITER_SKIP_ENV] === "1" && !recordOn;
+  // clean deploys to skip. we can fix aftermath"). With recording on too, the
+  // record is INCREMENTAL (cat-harness-tools#1702): a writer whose reads all
+  // match is skipped and its record carried forward; only the rest run traced.
+  const skipOn = env[WRITER_SKIP_ENV] === "1";
+  const incremental = skipOn && recordOn;
   // A PREVIEW build does not rebuild a whole-corpus index: it puts back main's
   // copy from the same recording the skip reads (owner 2026-11-01, "preview" =
   // no reindex, only changes). A full build, and a recording run, run them.
@@ -585,7 +590,7 @@ if (import.meta.main) {
   const recScripts = recordOn || skipOn ? (cacheOn.on ? scripts : scriptsOf(REPO_ROOT)) : {};
   if (env[WRITER_RECORD_ENV] === "1" && !recordOn) console.log("  writer records: OFF (strace does not run here)");
   console.log(`  build type: ${bt.type} (${bt.why})${borrowOn ? `; indexes from main: ${prevRecords ? prevRecords.sha.slice(0, 12) : "no recording here, so they are built"}` : ""}`);
-  if (skipOn) console.log(`  writer skip: ON (${prevRecords ? `records of ${prevRecords.sha.slice(0, 12)}, ${Object.keys(prevRecords.writers).length} writer(s)` : "no records: every writer runs"})`);
+  if (skipOn) console.log(`  writer skip: ON${incremental ? ", recording incrementally (a skipped writer keeps its record; the rest run traced)" : ""} (${prevRecords ? `records of ${prevRecords.sha.slice(0, 12)}, ${Object.keys(prevRecords.writers).length} writer(s)` : "no records: every writer runs"})`);
   console.log(
     `  ${jobs} job(s); reuse ${cacheOn.on ? `ON (${cacheDir}${treeBefore && "undetermined" in treeBefore ? `; tree undetermined: ${treeBefore.undetermined}` : ""})` : `OFF (${cacheOn.why})`}`,
   );
@@ -623,7 +628,10 @@ if (import.meta.main) {
       if ("none" in snap) records.unrecorded[w] = snap.none;
       else if (!("none" in rec)) {
         records.writers[w] = rec;
-        if ("rewritten" in readSet && readSet.rewritten) rewrittenBy.set(w, readSet.rewritten);
+        if ("rewritten" in readSet && readSet.rewritten?.length) {
+          rewrittenBy.set(w, readSet.rewritten);
+          rec.rewritten = [...readSet.rewritten].sort();
+        }
         // Keep what it actually wrote, declared or not, so a preview that skips it puts all of it back.
         const keep = nestedForeign(w, byWriter);
         commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, snap.paths, keep));
@@ -646,9 +654,10 @@ if (import.meta.main) {
     const t0 = performance.now();
     const secs = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`;
     if (borrowOn && prevRecords !== undefined && isIndexWriter(w, declared)) {
-      if (hasEntry(outDir, w, prevRecords.sha) && restoreOutputs(outDir, w, prevRecords.sha, REPO_ROOT, keep)) {
-        reused.set(w, prevRecords.sha);
-        console.log(`  borrowed ${w}: a preview build does not reindex; put back main's copy from ${prevRecords.sha.slice(0, 12)} [${secs()}]`);
+      const from = entryShaOf(prevRecords, w);
+      if (hasEntry(outDir, w, from) && restoreOutputs(outDir, w, from, REPO_ROOT, keep)) {
+        reused.set(w, from);
+        console.log(`  borrowed ${w}: a preview build does not reindex; put back main's copy from ${from.slice(0, 12)} [${secs()}]`);
         return { kind: "ran" };
       }
       console.log(`  ${w} runs: an index, but main's recording holds no copy of it [decided in ${secs()}]`);
@@ -661,9 +670,13 @@ if (import.meta.main) {
       const fresh = decideDigests;
       fresh.tree = undefined;
       const d = decideWriter(prevRecords, w, writerBase(REPO_ROOT, recScripts, w, fresh), REPO_ROOT, fresh);
-      if (d.skip && hasEntry(outDir, w, prevRecords.sha) && restoreOutputs(outDir, w, prevRecords.sha, REPO_ROOT, keep)) {
-        reused.set(w, prevRecords.sha);
-        console.log(`  skipped ${w}: ${d.why}; put back its outputs from ${prevRecords.sha.slice(0, 12)}${d.proof ? "" : " (evidence, not proof)"} [${secs()}]`);
+      if (d.skip && hasEntry(outDir, w, d.sha) && restoreOutputs(outDir, w, d.sha, REPO_ROOT, keep)) {
+        reused.set(w, d.sha);
+        if (incremental && carryRecord(records, prevRecords, w)) {
+          const rw = prevRecords.writers[w]!.rewritten;
+          if (rw?.length) rewrittenBy.set(w, rw);
+        }
+        console.log(`  skipped ${w}: ${d.why}; put back its outputs from ${d.sha.slice(0, 12)}${d.proof ? "" : " (evidence, not proof)"}${incremental ? "; its record is kept" : ""} [${secs()}]`);
         churn.push({ writer: w, did: "skipped", why: d.why, seconds: (performance.now() - t0) / 1000 });
         return { kind: "ran" };
       }
@@ -695,6 +708,7 @@ if (import.meta.main) {
     // preview can borrow them: borrowing needs main's bytes, not its reads.
     if (recordOn && outcome.kind === "ran" && isIndexWriter(w, declared) && !hasEntry(outDir, w, records.sha)) {
       commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, byWriter.get(w) ?? [], keep));
+      (records.kept ??= {})[w] = records.sha;
       console.log(`  kept ${w}'s outputs for previews to borrow (an index${records.unrecorded[w] ? `; not recorded: ${records.unrecorded[w]}` : ""})`);
     }
     if (outcome.kind === "ran" && key !== undefined) staged.set(w, { key, path: stageOutputs(cacheDir, w, key, REPO_ROOT, byWriter.get(w) ?? [], keep) });

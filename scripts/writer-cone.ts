@@ -44,8 +44,8 @@ import { gitKey, gitState, MAX_TRACE_BYTES, parseTrace, pathState, readState, st
 import { fingerprint, FileDigests, toolsLine } from "./input-hash.ts";
 import { projectedReads, type ProjectionName } from "../schemas/sdlc/read-projections.ts";
 
-/** Bump when the record's meaning changes; a record from another version is ignored, so every writer runs. */
-export const WRITER_RECORD_VERSION = 1;
+/** Bump when the record's meaning changes; a record from another version is ignored, so every writer runs. 2: each record names its own commit and keeps its rewritten files, so it can be carried forward (#1702). */
+export const WRITER_RECORD_VERSION = 2;
 // input-site: inert #f12d34f1 — names the build-output directory the records live in; no writer reads it
 export const WRITER_CONE_DIR = join("build", "writer-cone");
 export const WRITER_RECORD_FILE = join(WRITER_CONE_DIR, "records.json");
@@ -58,7 +58,12 @@ export const WRITER_RECORD_ENV = "CAT_WRITER_RECORD";
 
 /** One writer's traced run. */
 export interface WriterRecord {
-  /** The main commit whose deploy recorded it. */
+  /**
+   * The main commit whose run traced it, and whose outputs entry
+   * ({@link WRITER_OUTPUTS_DIR}) holds what it wrote. A record carried forward
+   * by an incremental record ({@link carryRecord}) keeps its own commit, so it
+   * can differ from the file's {@link WriterRecords.sha}.
+   */
   sha: string;
   /** The fingerprint WITHOUT the tree: script closure, audited environment, tool versions ({@link writerBase}). */
   base: string;
@@ -70,6 +75,8 @@ export interface WriterRecord {
   git: Record<string, string>;
   /** Every path it wrote that exists after the run, with its state. */
   outputs: Record<string, string>;
+  /** Files it read and then rewrote, kept as its reads; carried with the record so a later run can still check them against other writers' outputs. */
+  rewritten?: string[];
 }
 
 export interface WriterRecords {
@@ -80,6 +87,29 @@ export interface WriterRecords {
   writers: Record<string, WriterRecord>;
   /** Writers that ran and recorded nothing, with why: they always run. */
   unrecorded: Record<string, string>;
+  /** Index writers kept for previews to borrow without a record: the commit whose outputs entry holds them. Absent: {@link sha}. */
+  kept?: Record<string, string>;
+}
+
+/** The commit whose outputs entry holds `writer`'s outputs: its record's, else the commit it was kept at, else the file's. */
+export function entryShaOf(records: WriterRecords, writer: string): string {
+  return records.writers[writer]?.sha ?? records.kept?.[writer] ?? records.sha;
+}
+
+/**
+ * An incremental record (bean fwtz; cat-harness-tools#1702): `writer` was
+ * skipped against `prev` because every read it recorded still matches, so its
+ * record is still a true record of a run over this tree. It is kept as it is,
+ * with its own commit, and its outputs entry stays where it is. Only writers
+ * whose reads moved are traced again, so a push to main pays for strace on what
+ * changed, not on the whole build. False when `prev` holds no record for it.
+ */
+export function carryRecord(records: WriterRecords, prev: WriterRecords, writer: string): boolean {
+  const rec = prev.writers[writer];
+  if (rec === undefined) return false;
+  records.writers[writer] = rec;
+  delete records.unrecorded[writer];
+  return true;
 }
 
 export function emptyRecords(sha: string): WriterRecords {

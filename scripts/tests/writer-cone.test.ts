@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { parseTrace } from "../ci-cone.ts";
 import { FileDigests } from "../input-hash.ts";
-import { changedWhy, churnReport, decideWriter, renderChurn, emptyRecords, snapshotPaths, tracedArgv, underOutputs, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
+import { carryRecord, changedWhy, churnReport, decideWriter, entryShaOf, renderChurn, emptyRecords, snapshotPaths, tracedArgv, underOutputs, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
 
 const ROOT = "/work/repo";
 
@@ -282,5 +282,33 @@ describe("changedWhy (bean fwtz, S-CI3)", () => {
     expect(changedWhy([".", ".git", "a"])).toBe(". changed (+2 more: .git, a)");
     const many = Array.from({ length: 12 }, (_, i) => `f${i}`);
     expect(changedWhy(many)).toBe("f0 changed (+11 more: f1, f2, f3, f4, f5, f6, f7, and 4 others)");
+  });
+});
+
+describe("incremental records (cat-harness-tools#1702)", () => {
+  const rec = (sha: string) => ({ sha, base: "b", audit: "clean", reads: { "a.md": "f:1" }, git: {}, outputs: { "out/a.html": "f:2" }, rewritten: ["r.json"] });
+
+  test("a carried record keeps its own commit, so its outputs entry is found under it", () => {
+    const prev = emptyRecords("old");
+    prev.writers["w"] = rec("older");
+    const next = emptyRecords("new");
+    next.unrecorded["w"] = "stale";
+    expect(carryRecord(next, prev, "w")).toBe(true);
+    expect(next.writers["w"]).toEqual(rec("older"));
+    expect(next.unrecorded["w"]).toBeUndefined();
+    expect(entryShaOf(next, "w")).toBe("older");
+  });
+
+  test("nothing to carry for a writer the previous records do not hold", () => {
+    const next = emptyRecords("new");
+    expect(carryRecord(next, emptyRecords("old"), "w")).toBe(false);
+    expect(next.writers["w"]).toBeUndefined();
+  });
+
+  test("an index kept without a record is found at the commit it was kept at; anything else at the file's commit", () => {
+    const r = emptyRecords("new");
+    r.kept = { idx: "kept-at" };
+    expect(entryShaOf(r, "idx")).toBe("kept-at");
+    expect(entryShaOf(r, "other")).toBe("new");
   });
 });
