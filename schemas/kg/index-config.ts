@@ -29,8 +29,8 @@
  * instantiated. The new form says the two apart:
  *
  * ```json
- * { "layers":    [{ "name": "smart-base", "source": { "remote": { … } } }, …],
- *   "harnesses": [{ "name": "smart-base" }] }
+ * { "layers":    [{ "name": "guide-base", "source": { "remote": { … } } }, …],
+ *   "harnesses": [{ "name": "guide-base" }] }
  * ```
  *
  * Parsed, both forms give `instances` (the layers, under the old name until
@@ -168,7 +168,7 @@ export type IndexInstance = z.infer<typeof IndexInstanceSchema>;
  * mounted. `name` must be a layer this index lists, because its config is
  * the one that layer's entry imports and overlays (`effectiveInstanceConfig`).
  * `definedBy`, when given, names the layer whose Harness this instantiates —
- * `dth-hrh` instantiates the document harness `folio-assistant-core` defines.
+ * a content layer instantiates the document harness a lower layer defines.
  */
 export const IndexHarnessSchema = z
   .object({
