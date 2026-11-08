@@ -93,10 +93,18 @@ export function kindForPath(
  * refusal, one level up. Longest-prefix is the rule `kindForPath` already
  * applies to directories, for the same reason.
  */
+const checkoutRootsCache = new Map<string, string[]>();
+
 export function owningInstanceRoot(filePath: string, fallback: string): string {
   const abs = resolve(filePath);
+  const checkout = checkoutRootFor(fallback);
+  let roots = checkoutRootsCache.get(checkout);
+  if (!roots) {
+    roots = instanceRootsIn(checkout);
+    checkoutRootsCache.set(checkout, roots);
+  }
   let best: string | undefined;
-  for (const r of instanceRootsIn(checkoutRootFor(fallback))) {
+  for (const r of roots) {
     const rel = relative(r, abs);
     if (rel.startsWith("..") || resolve(r, rel) !== abs) continue;
     if (best === undefined || r.length > best.length) best = r;
@@ -138,15 +146,23 @@ export async function validatePath(filePath: string, root: string, schemaRoot: s
  * checkout once the working copy is not committed (bean `7mwa`,
  * cat-harness#857), and it is judged by the same rule as one on disk.
  */
+const instanceDirsCache = new Map<string, ReturnType<typeof instanceDirectories>>();
+
 export async function validateText(filePath: string, text: string, root: string, schemaRoot: string = root): Promise<Verdict> {
-  const decl = readDeclaration(root);
-  if (!decl) {
-    return { path: filePath, state: "undetermined", reason: `no declaration under ${root}` };
+  const absRoot = resolve(root);
+  let dirs = instanceDirsCache.get(absRoot);
+  if (!dirs) {
+    const decl = readDeclaration(root);
+    if (!decl) {
+      return { path: filePath, state: "undetermined", reason: `no declaration under ${root}` };
+    }
+    // Own entries AND those declared from within (bean `cmsl`): a voice file
+    // under `skills/voices/` classified as `skills`, or as nothing, the moment
+    // `voices` moved into `skills/skills.json` (measured 2026-09-30, bean `2j2r`).
+    dirs = instanceDirectories(root, decl);
+    instanceDirsCache.set(absRoot, dirs);
   }
-  // Own entries AND those declared from within (bean `cmsl`): a voice file
-  // under `skills/voices/` classified as `skills`, or as nothing, the moment
-  // `voices` moved into `skills/skills.json` (measured 2026-09-30, bean `2j2r`).
-  const kind = kindForPath(filePath, root, instanceDirectories(root, decl));
+  const kind = kindForPath(filePath, root, dirs);
   if (!kind) {
     return {
       path: filePath,
