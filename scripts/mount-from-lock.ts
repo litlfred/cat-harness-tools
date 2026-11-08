@@ -40,6 +40,8 @@
  *   bun run cat mount:lock -- --no-layers-cache # skip the shared layers cache ref, fetch each repository
  *   bun run cat layers:publish             # (= --publish) build the overlay of the verified mounts, push refs/cat/layers/<key>
  *   bun run cat layers:publish -- --main --prune 20 [--keep <key>]… [--url <index remote>] [--no-push]
+ *   bun run cat layers:check               # (= --check-layers) gate: refs/cat/layers/<key> for THIS lock exists at the index remote
+ *   bun run cat layers:check -- --changed-from <base> # the same, only when index.lock.json differs from <base> (a re-pin)
  *
  * The FAST PATH: before fetching instance by instance, the replay tries ONE
  * shallow fetch of the index's layers cache ref (`refs/cat/layers/<key>`, then
@@ -1117,6 +1119,52 @@ export function layersUrl(root: string): string | undefined {
   return r.status === 0 && r.stdout.trim() ? r.stdout.trim() : undefined;
 }
 
+/** What `layers:check` found. */
+export interface LayersCheck {
+  ok: boolean;
+  /** `skipped` when `--changed-from` was given and the lock did not change. */
+  state: "published" | "missing" | "skipped" | "error";
+  key?: string;
+  detail: string;
+}
+
+/**
+ * The gate behind "whoever re-pins publishes": the layers ref for THIS lock
+ * (`refs/cat/layers/<key>`) must exist at the index remote. It only asks
+ * (`git ls-remote`); it never builds or pushes, so it is cheap on a CI runner,
+ * and the publish stays on the re-pinner's machine (`layers:publish`, which
+ * `mount:remote` already runs after it changes the lock). With `changedFrom`,
+ * a lock identical to that revision's is `skipped`: only a re-pin owes a ref.
+ */
+export function checkLayers(root: string, opts: { url?: string; changedFrom?: string } = {}): LayersCheck {
+  const locks = readLocks(root);
+  if (locks.length === 0) return { ok: true, state: "skipped", detail: `no ${INDEX_LOCK} in ${root}` };
+  if (locks.length !== 1) return { ok: false, state: "error", detail: "more than one lock — check one index at a time" };
+  const lock = locks[0]!;
+  if (lock.error) return { ok: false, state: "error", detail: lock.error };
+  if (opts.changedFrom) {
+    const rel = relative(root, lock.file);
+    const before = git(root, ["show", `${opts.changedFrom}:${rel}`]);
+    if (before.status === 0 && before.stdout === readFileSync(lock.file, "utf-8")) {
+      return { ok: true, state: "skipped", detail: `${rel} is unchanged from ${opts.changedFrom}; no re-pin, no ref owed` };
+    }
+  }
+  const key = layersKey(lock.instances!);
+  const ref = layersRef(key);
+  // input-site: env CAT_LAYERS_URL #fd0cb617 — the remote the layers cache is fetched from
+  const url = opts.url ?? process.env.CAT_LAYERS_URL?.trim() ?? layersUrl(root);
+  if (!url) return { ok: false, state: "error", key, detail: "no index remote to ask (pass --url or set CAT_LAYERS_URL)" };
+  const ls = git(root, ["ls-remote", url, ref]);
+  if (ls.status !== 0) return { ok: false, state: "error", key, detail: `git ls-remote ${url} failed: ${ls.stderr.trim().split("\n").pop()}` };
+  if (ls.stdout.trim()) return { ok: true, state: "published", key, detail: `${ref.slice(0, LAYERS_REF_PREFIX.length + 12)}… is at ${url}` };
+  return {
+    ok: false,
+    state: "missing",
+    key,
+    detail: `${ref.slice(0, LAYERS_REF_PREFIX.length + 12)}… is not at ${url}. Whoever changed ${INDEX_LOCK} publishes it from their own checkout: \`bun run cat layers:publish\` (a fresh clone of the IG takes every layer from that one fetch)`,
+  };
+}
+
 /** A lazily fetched layers cache: fetched the first time an instance needs it, at most once. */
 export interface LayersCache {
   /** The ref that served, once fetched; `undefined` on a miss. */
@@ -1421,6 +1469,11 @@ if (import.meta.main) {
     const i = argv.indexOf(flag);
     return i >= 0 ? argv[i + 1] : undefined;
   };
+  if (argv.includes("--check-layers")) {
+    const r = checkLayers(root, { url: val("--url"), changedFrom: val("--changed-from") });
+    console.log(`layers:check: ${r.ok ? "OK" : "FAILED"} (${r.state}) — ${r.detail}`);
+    process.exit(r.ok ? 0 : 1);
+  }
   if (argv.includes("--publish")) {
     const prune = val("--prune");
     const keep = argv.flatMap((a, i) => (a === "--keep" && argv[i + 1] ? [argv[i + 1]!] : []));

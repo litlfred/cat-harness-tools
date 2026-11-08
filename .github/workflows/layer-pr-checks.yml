@@ -2273,3 +2273,52 @@ jobs:
             echo "::error::draft: typecheck failed (full tier skipped)"
             exit 1
           fi
+
+  # Whoever re-pins publishes the layers cache ref (owner, 2026-11-08 09:42Z:
+  # "make it responsibility of whoever repinned. gate"). A PR that changes
+  # the index's `index.lock.json` must find `refs/cat/layers/<key>` for its
+  # new lock at this repository: `mount:remote` pushes it after a re-pin, and
+  # `bun run cat layers:publish` pushes it by hand. This job only asks
+  # (`git ls-remote`, seconds); the build and the push never run on a runner.
+  # A PR that leaves the lock alone owes nothing and passes.
+  layers-ref:
+    name: Layers cache ref for a re-pinned lock
+    if: inputs.mode == 'index' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 2
+          path: fa
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.4
+      - name: Is this lock's layers ref published?
+        run: |
+          set -euo pipefail
+          [ -f fa/index.lock.json ] || { echo "no index.lock.json: nothing to check"; exit 0; }
+          base='HEAD^1'
+          git -C fa rev-parse -q --verify 'HEAD^2' >/dev/null || base='HEAD~1'
+          if git -C fa diff --quiet "$base" HEAD -- index.lock.json 2>/dev/null; then
+            echo "index.lock.json is unchanged by this PR: no layers ref owed"
+            exit 0
+          fi
+          read -r repo sha < <(bun -e '
+            const l = JSON.parse(require("node:fs").readFileSync("fa/index.lock.json", "utf-8"));
+            const i = (l.instances ?? []).find((x) => x.instance === "cat-harness-tools");
+            console.log(i ? `${i.repository} ${i.sha}` : "- -");
+          ')
+          [ "$repo" != "-" ] || { echo "::notice::the lock pins no cat-harness-tools: the gate is not enabled"; exit 0; }
+          work="$(mktemp -d)" && git -C "$work" init -q
+          git -C "$work" fetch -q --depth 1 --filter=blob:none "https://github.com/${repo}.git" "$sha"
+          git -C "$work" checkout -q FETCH_HEAD -- scripts/mount-from-lock.ts
+          # A pin older than the gate has no --check-layers, and an unknown
+          # flag there would run a full mount instead: report and pass.
+          if ! grep -q -- '--check-layers' "$work/scripts/mount-from-lock.ts"; then
+            echo "::notice::the pinned cat-harness-tools (${sha:0:12}) predates layers:check; the gate starts with the next re-pin"
+            exit 0
+          fi
+          CAT_LAYERS_URL="https://github.com/${{ github.repository }}.git" \
+            bun "$work/scripts/mount-from-lock.ts" --check-layers --root fa --changed-from "$base" \
+            || { echo "::error::this PR re-pins index.lock.json but its layers cache ref is not published. Whoever re-pinned runs \`bun run cat layers:publish\` from their checkout (mount:remote does it after a re-pin)."; exit 1; }
