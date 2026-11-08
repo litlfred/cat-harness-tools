@@ -379,8 +379,16 @@ function renderReadme(root: string, config: IndexConfig, rows: IndexInstanceRow[
     `- [\`${INDEX_CONFIG_FILENAME}\`](${INDEX_CONFIG_FILENAME}) names every instance and where it comes from.` +
       (lock ? " [`index.lock.json`](index.lock.json) records the commit each remote mount resolved to, with a digest of its tree." : ""),
   );
+  const catBootstrap = existsSync(join(root, ".github", "cat.ts"));
+  if (catBootstrap) {
+    lines.push("- On a fresh clone the first `bun run cat <script>` mounts every layer the lock pins and runs `bun install` once (`.github/cat.ts`), then runs the script.");
+  }
   if (mountScript) {
-    lines.push("- `bash .github/mount-from-lock.sh --root .` lays every mount down on a fresh clone, and reports one already on disk as current.");
+    lines.push(
+      catBootstrap
+        ? "- `bash .github/mount-from-lock.sh --root .` refreshes the mounts after a re-pin, and reports one already on disk as current."
+        : "- `bash .github/mount-from-lock.sh --root .` lays every mount down on a fresh clone, and reports one already on disk as current.",
+    );
   }
   lines.push(
     "- `bun install` installs every instance's dependencies at once; `bun run cat <script>` finds a script in the instance that declares it (`checkoutScripts`).",
