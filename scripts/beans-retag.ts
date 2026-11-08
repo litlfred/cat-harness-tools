@@ -48,6 +48,7 @@ import { acceptsSchemaTag } from "../schemas/kg/node-kind.ts";
 
 import { NOT_BEANS, readBeanStore } from "./bean-store-read.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 /**
  * The command a person runs to fix what `--check` finds, named once.
@@ -149,7 +150,7 @@ export function retagDir(dir: string, opts: { write: boolean }): RetagReport {
 }
 
 /** Where the store is, or why it cannot be reached. */
-export type StoreLocation = { dir: string } | { absent: true } | { cannot: string };
+export type StoreLocation = { dir: string } | { absent: true } | { notHere: string } | { cannot: string };
 
 /** The `defs/` directory this checkout's bean graph resolves to. */
 export function locateStore(root: string): StoreLocation {
@@ -162,6 +163,9 @@ export function locateStore(root: string): StoreLocation {
     case "declared-but-absent":
       return { cannot: `the bean graph declares ${store.dir} and it is not there` };
     case "unreachable":
+      // Determined absent from this checkout (an instance with no bean store):
+      // not applicable, never "could not determine" (smart-ips-pilgrimage#13).
+      if (store.absent) return { notHere: store.reason };
       return { cannot: `${store.reason} Run \`bun run cat state:mount\`` };
   }
 }
@@ -193,6 +197,7 @@ function main(argv: readonly string[]): void {
       if (!quiet) console.log("Bean tags — no bean store in this repository, nothing to check");
       process.exit(0);
     }
+    if ("notHere" in where) exitNotApplicable("beans:retag", `this checkout has no bean store (${where.notHere})`);
     if ("cannot" in where) {
       console.error(`::error::beans-retag: ${where.cannot}. NOT a pass — nothing was checked`);
       process.exit(2);

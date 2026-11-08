@@ -35,7 +35,8 @@
 import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { readArchivedBeans, resolveBeanArchive, type BeanNode } from "./beans.ts";
+import { readArchivedBeans, resolveBeanArchive, resolveBeanDefs, type BeanNode } from "./beans.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 export const ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -63,6 +64,9 @@ export function nonTerminal(beans: readonly BeanNode[]): ArchiveFinding[] {
 }
 
 function main(): number {
+  // An instance with no bean store has no archive to check (smart-ips-pilgrimage#13).
+  const where = resolveBeanDefs(ROOT);
+  if (where.absent) exitNotApplicable("check:bean-archive", `this checkout has no bean store (${where.unreachable})`);
   const { dir, declared } = resolveBeanArchive(ROOT);
 
   if (!declared || dir === null) {

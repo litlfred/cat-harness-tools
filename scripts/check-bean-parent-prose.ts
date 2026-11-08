@@ -42,6 +42,7 @@
  * into this count. Re-globbing the directory here would have picked it up.
  */
 import { readBeans } from "./beans.ts";
+import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 const BEAN_ID = "folio-assistant-[a-z0-9]{4}";
 
@@ -97,6 +98,7 @@ function main(): number {
   try {
     store = readBeans(repoRoot);
   } catch (e) {
+    exitIfBeanStoreAbsent("check:bean-parent-prose", e);
     console.error("✗ cannot read the bean store:");
     console.error(`  ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`);
     return 2;
