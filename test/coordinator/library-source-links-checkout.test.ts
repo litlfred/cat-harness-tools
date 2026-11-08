@@ -10,7 +10,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, relative, resolve } from "node:path";
+import { basename, join, relative, resolve, sep } from "node:path";
 
 import { entrySources, instanceSubgraphFile, librarySubgraphs } from "../../scripts/gen-library-viz.ts";
 import { subgraphOutDir } from "../../scripts/gen-subgraph-jsonld.ts";
@@ -27,7 +27,13 @@ const TOOL = resolve(import.meta.dir, "../../scripts/gen-library-viz.ts");
 const HARNESS = resolve(import.meta.dir, "../../../cat-harness");
 const REPO = resolve(HARNESS, "..");
 const SITE = join(HARNESS, siteDirFor(HARNESS));
-const SEG = basename(corpusDirectoriesForGraph(HARNESS, "library")[0]!);
+// The segment the writer publishes under: the TOP-LEVEL declared directory, so
+// a corpus declared from within a named sub-graph (cat-harness#1032:
+// `library/corpus/`) publishes under `library` (gen-library-viz.ts `topOf`).
+const SEG = ((d: string) => {
+  const first = relative(HARNESS, d).split(sep)[0]!;
+  return first === "" || first === ".." ? basename(d) : first;
+})(corpusDirectoriesForGraph(HARNESS, "library")[0]!);
 const { pageDir, dataDir } = viewerPlacement(SITE, declaredPageRoute(HARNESS, "library-viewer")!, SEG);
 /**
  * The library projection and the viewer's pages are written at publish and
