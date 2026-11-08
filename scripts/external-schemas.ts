@@ -78,16 +78,11 @@ export function loadSpecs(dir = REGISTRY): ExternalSchema[] {
 /** XML namespaces the corpus declares, read from the files that declare them. */
 export function namespacesInUse(root = ROOT): string[] {
   const out: string[] = [];
-  const dir = join(root, "processes");
-  if (!existsSync(dir)) return out;
-  // RECURSIVE since 2026-09-27: the DMN tables live in `processes/decisions/`,
-  // and reading only the top level left their namespaces unseen, so DMN 1.3
-  // went unregistered while nine files conformed to it.
-  const files = (readdirSync(dir, { recursive: true }) as string[])
-    .filter((f) => f.endsWith(".bpmn") || f.endsWith(".dmn"))
-    .sort();
-  for (const f of files) {
-    const src = readFileSync(join(dir, f), "utf-8");
+  // The DECLARED workflow graph, recursively (the DMN tables sit in
+  // `processes/decisions/`), not a literal `processes/`: a sub-graph's diagrams
+  // (cat-harness#1032: `library/processes/`) are this instance's too.
+  for (const f of workflowFiles(root, "instance")) {
+    const src = readFileSync(f, "utf-8");
     for (const m of src.matchAll(/xmlns(?::[a-zA-Z0-9]+)?="([^"]+)"/g)) out.push(m[1]!);
   }
   return [...new Set(out)].sort();
@@ -197,13 +192,12 @@ function isOwn(iri: string): boolean {
  * thirteenth, and goes stale silently.
  */
 export function bpmnTermsInUse(root = ROOT): string[] {
-  const dir = join(root, "processes");
-  if (!existsSync(dir)) return [];
   const out = new Set<string>();
-  // Recursive since placement PR3 (bean `63wl`): the diagrams sit in
-  // `processes/<group>/`, so a top-level read saw none of them.
-  for (const f of (readdirSync(dir, { recursive: true }) as string[]).filter((f) => f.endsWith(".bpmn"))) {
-    for (const m of readFileSync(join(dir, f), "utf-8").matchAll(/<(bpmn:[a-zA-Z]+)/g)) {
+  // The declared workflow graph, as {@link namespacesInUse} reads it: a literal
+  // `processes/` missed the diagrams a sub-graph declares (cat-harness#1032
+  // moved the library's to `library/processes/`).
+  for (const f of workflowFiles(root, "instance").filter((f) => f.endsWith(".bpmn"))) {
+    for (const m of readFileSync(f, "utf-8").matchAll(/<(bpmn:[a-zA-Z]+)/g)) {
       out.add(m[1]!);
     }
   }
