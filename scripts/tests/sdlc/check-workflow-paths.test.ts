@@ -9,11 +9,15 @@
  * @module scripts/tests/check-workflow-paths.test
  */
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   FOLIO_PATHS,
   Verdict,
   allWorkDirs,
+  allowlistsNotOursReason,
   cdTarget,
   cwdFlag,
   invocationsFrom,
@@ -673,5 +677,27 @@ describe("the baseline is a RATCHET", () => {
     // being vacuous, so this one does not also have to.
     const live = allWorkDirs().filter((w) => w.verdict === Verdict.Missing);
     expect(live.every((w) => workDirBaseline().has(workDirKey(w)))).toBe(true);
+  });
+});
+
+describe("the allowlist ratchets are the harness root's (cat-harness-tools#1701)", () => {
+  test("a content root (no gates workflow) excuses them, with a reason", () => {
+    const root = mkdtempSync(join(tmpdir(), "wp-content-"));
+    try {
+      expect(allowlistsNotOursReason(root)).toContain("content root");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a harness root judges them as before", () => {
+    const root = mkdtempSync(join(tmpdir(), "wp-harness-"));
+    try {
+      mkdirSync(join(root, ".github", "workflows"), { recursive: true });
+      writeFileSync(join(root, ".github", "workflows", "code-quality-gates.yml"), "jobs: {}\n");
+      expect(allowlistsNotOursReason(root)).toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
