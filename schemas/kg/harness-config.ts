@@ -1851,6 +1851,10 @@ export function declaredSubgraph(start: string, id: string): DeclaredSubgraph | 
  * checkout's scope: anything else naming a repository path is either another
  * instance's directory (the wrong-way arrow) or checkout-level state that
  * belongs to the root. Returned as `<instance>#<id>` so a finding names both.
+ *
+ * Checkout-level state a mounted platform instance declares for EVERY
+ * checkout (cat-harness's `beans`, `todos`, ...) is not one: see the rooted
+ * branch below (cat-harness-tools#1701).
  */
 export function repositoryMirrors(start: string): string[] {
   const root = checkoutRootFor(start);
@@ -1879,8 +1883,20 @@ export function repositoryMirrors(start: string): string[] {
     for (const claims of byPath.values()) if (claims.length > 1) out.push(...claims);
     return out.sort();
   }
-  for (const inst of instanceRootsIn(root)) {
-    if (resolve(inst) === root) continue;
+  // A ROOTED CHECKOUT (an IG repository that is its own index, e.g.
+  // smart-ips-pilgrimage, cat-harness-tools#1701) mounts cat-harness too, and
+  // gets the same checkout-level state the index does: cat-harness declares
+  // `beans/`, `todos/`, `health`, ... "for every checkout", and `state:mount`
+  // reads exactly those entries at this root (absent, or overridden by a root
+  // declaration of the same id). Such an entry is no mirror. What still is:
+  // a non-root entry whose path lies inside ANOTHER instance's directory (the
+  // wrong-way arrow the ruling retired), or two non-root instances claiming
+  // the same repository path. The root's own entries are its own and an
+  // override, never a claim against these.
+  const instances = instanceRootsIn(root).map((r) => resolve(r));
+  const others = instances.filter((r) => r !== root);
+  const byPath = new Map<string, string[]>();
+  for (const inst of others) {
     let decl: ReturnType<typeof readDeclaration>;
     try {
       decl = readDeclaration(inst);
@@ -1888,9 +1904,18 @@ export function repositoryMirrors(start: string): string[] {
       continue;
     }
     for (const d of decl?.directories ?? []) {
-      if (d.scope === "repository") out.push(`${decl!.name}#${d.id}`);
+      if (d.scope !== "repository") continue;
+      const claim = `${decl!.name}#${d.id}`;
+      const abs = resolve(root, d.path);
+      if (others.some((o) => abs === o || abs.startsWith(o + sep))) {
+        out.push(claim);
+        continue;
+      }
+      const key = d.path.replace(/\/+$/, "");
+      byPath.set(key, [...(byPath.get(key) ?? []), claim]);
     }
   }
+  for (const claims of byPath.values()) if (claims.length > 1) out.push(...claims);
   return out.sort();
 }
 

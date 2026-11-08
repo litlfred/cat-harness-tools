@@ -15,7 +15,8 @@
   "holds": "fa/build/writer-cone",
   "producer": "record-writers (push, RECORD_WRITERS)",
   "consumers": [
-    "prepare-head/prepare-base on PRs"
+    "prepare-head/prepare-base on PRs",
+    "record-writers on push (an incremental record starts from the newest one, #1702)"
   ],
   "savePolicy": "push only (RECORD_WRITERS env set only in record-writers)",
   "verify": "writer-cone.ts re-checks each recorded read before a writer is skipped",
@@ -27,7 +28,7 @@
     ".github/workflows/layer-pr-checks.yml:1418",
     ".github/workflows/layer-pr-checks.yml:1466"
   ],
-  "notes": "Saved on push only.",
+  "notes": "Saved on every push to main (#1702): a full record once per writer-record-hours window, an incremental one otherwise, which carries each matching writer's record forward and traces only the rest.",
   "stateInputs": {
     "reads": "unmeasured",
     "how": "not yet derived from a recorded read set; the producer may read state:mount graphs"

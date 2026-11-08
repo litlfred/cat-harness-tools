@@ -1509,6 +1509,15 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "layers:check",
+    kind: "covered-by",
+    reason:
+      "runs in the CALLER'S CI, not this layer's: job `layers-ref` of `layer-pr-checks.yml` runs the replayer at the " +
+      "commit the caller's lock pins with `--check-layers`, on an index-mode pull request that changes `index.lock.json` " +
+      "(owner, 2026-11-08: the re-pinner publishes the layers ref, and a gate checks it). This layer has no lock of its " +
+      "own to judge, so `bun run cat layers:check` here would only report `skipped`",
+  },
+  {
     script: "translate-user-scenarios:check",
     kind: "no-folio",
     reason:
@@ -1533,6 +1542,15 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "`.github/workflows/*`, and every layer still calls `litlfred/*@main` until its index.lock.json is re-pinned past the " +
       "commit that adds this script and `bun run cat workflow-pins` is run there. Wiring it now would red every PR in every " +
       "layer on refs this commit does not change; it becomes a gate in each repository's own CI once that repository is pinned",
+  },
+  {
+    script: "check:lock-consistency",
+    kind: "report",
+    reason:
+      "RED UNTIL THE PINS ARE ALIGNED (bean `cat-tools-sm8r`, cat-harness-tools#1571): it judges whether an index and the " +
+      "layers it mounts pin one commit of each shared lower layer, and on the composed checkout it exits 1 on the skews the " +
+      "bottom-up re-pin clears. Wiring it now would red every PR on pins this commit does not change; it becomes a gate in " +
+      "the index's CI once that re-pin lands, a folio-assistant workflow change for the owner",
   },
   {
     script: "jsonld:contexts:check",

@@ -52,6 +52,7 @@ import { resolve } from "node:path";
 // single answer; this check keeps only the RULE.
 import { OPEN_STATUSES, beanDefsDir, readBeans, readStoreBeans, type BeanNode } from "./beans.ts";
 import { beanStores } from "./unlinked-beans.ts";
+import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 // Re-exported because it was exported from here before the reader existed, and
 // a consumer outside this repository would break on the move.
@@ -364,6 +365,7 @@ if (import.meta.main) {
   try {
     report = checkBeanParents(resolve("."));
   } catch (e) {
+    exitIfBeanStoreAbsent("check:bean-parents", e);
     console.error(`Could not check bean parents: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
     process.exit(2);

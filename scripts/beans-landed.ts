@@ -43,6 +43,7 @@ import { resolve } from "node:path";
 import { listBeans } from "./beans-fallback.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
@@ -107,6 +108,8 @@ export interface Merge {
 export function merges(ref = "origin/main", days = 30, repo = REPO): Merge[] | undefined {
   let log: string;
   try {
+    // input-site: traced #f2b6df11 — merges on a ref within the last N days: the ref and the clock, which no fingerprint names, so a run that reaches it records no hash
+    inputSiteReached("beans-landed: merges in the window");
     log = execFileSync("git", ["log", ref, "--merges", `--since=${days} days ago`, "--format=%H%x00%s%x00%b%x01"], {
       cwd: repo,
       encoding: "utf8",

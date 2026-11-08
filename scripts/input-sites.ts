@@ -41,6 +41,7 @@
  * | `declared <source>,…` | a computed `import()` / `require()` whose targets are the modules these DECLARATION SOURCES name (`declared-imports.ts`): what the site itself reads to choose them | adds the modules the declarations name NOW, resolved at fingerprint time, as IMPORTED modules; a source that does not resolve is undetermined |
  * | `scripts <name>,…` | a spawned `bun run <name>` of these package.json scripts, with this process's environment | adds each script's entry files (`entryFiles`) as ENTRIES; a name that does not resolve is undetermined |
  * | `runs <glob>,…` | a spawned `bun` script whose entry files all lie under these globs, run with this process's environment | adds the globs' files to the closure as ENTRIES — their `import.meta.main` blocks run |
+ * | `spawned` | a spawn of `bun` (or `process.execPath`) or `python3` — inline code (`-c`, `-e`) or a script — and of nothing else on the line; implicit in a test file ({@link testSpawnVerdict}) | is undetermined unless the run is traced: the cone audits the child from its read set (`ci-cone.ts` `childInputsOf`) |
  *
  * ## A computed load is audited in full, and hashed only where no trace is
  *
@@ -96,7 +97,7 @@ export type SiteVerdict =
   | { kind: "env"; names: string[] }
   | { kind: "env-unset"; names: string[] }
   | { kind: "tree" }
-  /** Implicit only, in a test file (see {@link testSpawnVerdict}): it runs a `bun` child, which only the cone audits, from its trace. */
+  /** It runs a `bun` or `python3` child, which only the cone audits, from its trace. Implicit in a test file (see {@link testSpawnVerdict}). */
   | { kind: "spawned" }
   | { kind: "head" }
   | { kind: "store" }
@@ -180,6 +181,13 @@ const CHILD_SPAWN_RE = new RegExp(`${SPAWN_CALL}(?:["'](?:bun|python3?)["']|proc
  * A fingerprint that does not replay a trace answers neither, so it stays
  * undetermined.
  */
+/** Does `raw` spawn `bun` or `python3` — and, besides `git`, nothing else? What an explicit `spawned` verdict may annotate. */
+export function isChildSpawn(raw: string): boolean {
+  const noGit = raw.replace(GIT_SPAWN_RE, "");
+  const rest = noGit.replace(CHILD_SPAWN_RE, "");
+  return rest !== noGit && !RISKS.spawn!.test(rest);
+}
+
 export function testSpawnVerdict(file: string, risks: readonly string[], raw: string): SiteVerdict[] | undefined {
   if (!TEST_FILE_RE.test(file)) return undefined;
   if (risks.length !== 1 || risks[0] !== "spawn") return undefined;
@@ -261,6 +269,7 @@ export function parseVerdicts(text: string): SiteVerdict[] | { error: string } {
         out.push({ kind: word, globs: args });
         break;
       case "tree":
+      case "spawned":
       case "head":
       case "store":
       case "traced":
@@ -517,6 +526,8 @@ export function scanSource(file: string, text: string): Site[] {
       if ("error" in parsed) malformed = parsed.error;
       else if (parsed.some((v) => v.kind === "traced") !== hook) {
         malformed = hook ? "a site behind inputSiteReached() must be annotated `traced`" : "`traced` needs an inputSiteReached() call on the line directly above the site";
+      } else if (parsed.some((v) => v.kind === "spawned") && !isChildSpawn(raw)) {
+        malformed = "`spawned` is for a spawn of `bun`, `process.execPath` or `python3`, and of nothing else on the line";
       } else verdicts = m[2] === pin ? parsed : "stale";
       break;
     }

@@ -24,6 +24,7 @@ import { join, relative, resolve } from "node:path";
 import { lockFilesIn } from "../schemas/kg/instance-roots.ts";
 import { readMountLock } from "../schemas/kg/remote-mount.ts";
 import { type QaStoreOptions, type QaTreeRead, readQaTreeAtCommit } from "./qa-store.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** Where a mounted instance came from: the lock's repository and pinned commit. */
 export interface LayerQaSource {
@@ -56,7 +57,13 @@ export function layerQaSource(repoRoot: string, instanceRoot: string): LayerQaSo
  * is how the tests stand a store up locally. `QA_LAYER_REMOTE_<INSTANCE>`
  * (upper case, `-` as `_`) overrides one instance.
  */
-export function layerQaRemote(source: LayerQaSource, env: Record<string, string | undefined> = process.env): string {
+export function layerQaRemote(source: LayerQaSource, vars?: Record<string, string | undefined>): string {
+  let env = vars;
+  if (env === undefined) {
+    // input-site: traced #5c5cd616 — an override named after the instance, so no `env` verdict can list it: a run that reaches it records no hash; the tests pass their own variables
+    inputSiteReached("layer-qa: QA_LAYER_REMOTE_<INSTANCE>");
+    env = process.env;
+  }
   const override = env[`QA_LAYER_REMOTE_${source.instance.toUpperCase().replace(/-/g, "_")}`];
   if (override) return override;
   return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(source.repository) ? `https://github.com/${source.repository}.git` : source.repository;
