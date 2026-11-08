@@ -74,6 +74,10 @@ describe("the page", () => {
     expect(page).toContain("author keywords: Decision Table, Sweep algorithm");
     expect(page).toContain("| 1 | decision table | notation \\| pipe |");
   });
+  test("a backslash in a term is escaped, so it cannot unescape the cell bar after it", () => {
+    const one = { ...MODEL.entries[1]!, document: { a: [k("back\\")], b: [k("x")] } };
+    expect(keywordsPage({ ...MODEL, entries: [one] }, "generated: fixture")).toContain("| 1 | back\\\\ | x |");
+  });
   test("every table row has as many cells as its header", () => {
     let cols = 0;
     for (const line of page.split("\n")) {

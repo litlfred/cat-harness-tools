@@ -129,7 +129,8 @@ export function agreement(model: KeywordsPageModel): Agreement {
   return out;
 }
 
-const cell = (s: string): string => s.replace(/\|/g, "\\|").replace(/</g, "&lt;");
+/** A table cell: backslashes first, so a trailing `\` cannot unescape the `\|` after it. */
+const cell = (s: string): string => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const code = (s: string): string => "`" + s.replace(/`/g, "'") + "`";
 
 function entryLink(e: KeywordsPageEntry): string {
