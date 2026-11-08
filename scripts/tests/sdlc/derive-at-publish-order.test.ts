@@ -52,6 +52,7 @@ beforeAll(() => {
     ],
     [{ id: "b-ig-docs", path: "docs/", graphTypologies: ["docs", "ig-pages"] }],
   );
+  // declared-path-literal: the same published context path, declared by the fixture base layer.
   instance("c-base", ["a-platform"], [{ path: "ns/context/v1.jsonld", writer: ["shared:contexts"], because: "checkout" }]);
 });
 
