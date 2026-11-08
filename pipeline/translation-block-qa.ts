@@ -1187,7 +1187,7 @@ function settleSidecar(
  * Owner ruling 2026-11-05, "Move the checks" (`scripts/lib/gate-own.ts`): in a
  * layer's PR checks a gate judges only what the caller commits. With no
  * `--instance`, this sweep reads the harness's blocks and docs site, so in a
- * content repository's checks (smart-immunizations#118) it judged
+ * content repository's pin PR it judged
  * cat-harness's `docs/concepts/architecture` and `docs/index` translations,
  * which the caller neither commits nor can fix. The harness's own CI judges
  * those. Unscoped (a local run, the index's own gates) it judges as before.

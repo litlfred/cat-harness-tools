@@ -496,7 +496,7 @@ describe("readPrior (bean 8wj1)", () => {
 });
 
 // Owner ruling 2026-11-05, "Move the checks": a content repository's PR checks
-// must not fail on the harness's own translations (smart-immunizations#118).
+// must not fail on the harness's own translations (cat-harness-tools#1684).
 describe("judge only the caller's own instance", () => {
   function instance(dir: string, name: string): string {
     const root = join(dir, name);
@@ -513,8 +513,8 @@ describe("judge only the caller's own instance", () => {
 
   test("the caller is another instance: nothing of its own, a pass", () => {
     inTmp((dir) => {
-      const line = notOwnLine(instance(dir, "cat-harness"), { CAT_GATE_OWN_INSTANCES: "smart-immunizations" }, dir);
-      expect(line).toContain("smart-immunizations");
+      const line = notOwnLine(instance(dir, "cat-harness"), { CAT_GATE_OWN_INSTANCES: "content-ig" }, dir);
+      expect(line).toContain("content-ig");
       expect(line).toContain("judged by their own CI");
     });
   });
@@ -527,10 +527,10 @@ describe("judge only the caller's own instance", () => {
 
   test("own paths only: an instance outside them is not judged", () => {
     inTmp((dir) => {
-      const env = { CAT_GATE_OWN_PATHS: "smart-immunizations", CAT_GATE_FOREIGN_PATHS: "fa/cat-harness" };
+      const env = { CAT_GATE_OWN_PATHS: "content-ig", CAT_GATE_FOREIGN_PATHS: "index/cat-harness" };
       mkdirSync(join(dir, "fa"), { recursive: true });
       expect(notOwnLine(instance(join(dir, "fa"), "cat-harness"), env, dir)).toBeDefined();
-      expect(notOwnLine(instance(dir, "smart-immunizations"), env, dir)).toBeUndefined();
+      expect(notOwnLine(instance(dir, "content-ig"), env, dir)).toBeUndefined();
     });
   });
 });
