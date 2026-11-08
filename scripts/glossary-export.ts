@@ -94,6 +94,8 @@ import { HARNESS_NAME, HARNESS_ROOT } from "./lib/roots.ts";
 import { nodeKindIndex } from "../schemas/kg/node-kind-index.js";
 import { isNodeKind, type NodeKind } from "../schemas/kg/node-kind.js";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
+import { rootProfile } from "./lib/root-gate-set.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const SKOS = "http://www.w3.org/2004/02/skos/core#";
@@ -1036,6 +1038,28 @@ function glossaryRepoRoot(): string {
   return [repoRootFor(ROOT), join(repoRootFor(ROOT), "..", "..")].find((d) => existsSync(join(d, ".git"))) ?? repoRootFor(ROOT);
 }
 
+/**
+ * Why the committed ledger of `instanceDir` is not `repoRoot`'s to judge
+ * stale, or null when it is (cat-harness-tools#1701).
+ *
+ * The ledger is derived from every role, kind and diagram the CHECKOUT holds,
+ * so its expected bytes depend on what is mounted. It is kept by the harness
+ * index (the root carrying the gates workflow, `rootProfile` "harness"). In a
+ * CONTENT root judging a MOUNTED layer's ledger (cat-harness's, from an IG such
+ * as smart-ips-pilgrimage#13), the difference is that root's own roles minted
+ * into a file it cannot commit, and the harness's unmounted layers' roles
+ * "retired"; neither is a defect of the ledger. A content root's OWN ledger
+ * (`--instance` at the root) and every harness root are judged as before.
+ */
+export function ledgerNotOursReason(instanceDir: string, repoRoot: string): string | null {
+  if (rootProfile(repoRoot) !== "content" || resolve(instanceDir) === resolve(repoRoot)) return null;
+  return (
+    `${relative(repoRoot, ledgerPath(instanceDir))} is a mounted layer's ledger and this is a content root ` +
+    `(no .github/workflows/code-quality-gates.yml); its terms are derived from what the harness index mounts, ` +
+    `so this checkout's differing roles and kinds say nothing about whether it is stale`
+  );
+}
+
 /** {@link buildGlossary} with the node kinds asked for: what the CLI writes and `--check` compares. */
 export async function buildFullGlossary(opts: Omit<Parameters<typeof buildGlossary>[0] & object, "nodeKinds"> = {}): Promise<GlossaryBuild> {
   const instanceRoot = resolve(opts.instanceRoot ?? ROOT);
@@ -1106,6 +1130,11 @@ if (import.meta.main) {
 
   if (check) {
     if (report.ledgerStale) {
+      // cat-harness-tools#1701: a mounted layer's ledger, judged from a content
+      // root, is not applicable rather than stale — see ledgerNotOursReason. A
+      // PROBLEM above is still this run's finding and still fails.
+      const notOurs = ledgerNotOursReason(instanceDir, repoRootFor(ROOT));
+      if (notOurs !== null && report.problems.length === 0) exitNotApplicable("glossary:check", notOurs);
       console.error(`\n${relative(repoRootFor(ROOT), ledgerPath(instanceDir))} is stale — run the generator and commit it.`);
       process.exit(1);
     }

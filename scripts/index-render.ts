@@ -49,8 +49,9 @@ import { AGENT_INSTRUCTIONS_ROLE, INSTANCE_README_ROLE, declaredAssets, readDecl
 import { INDEX_CONFIG_FILENAME, readIndexConfig, remoteMountPathOf, type IndexConfig, type IndexInstance } from "../schemas/kg/index-config.js";
 import { README_TOC_MARKER, syncSections } from "../pipeline/readme-sections.js";
 import { loadReadmeConfig } from "../pipeline/readme-toc.js";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, declaredInstanceName } from "./lib/roots.ts";
 import { buildPages, pagesBuildsFor } from "./lib/index-pages.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 /** This instance's root — whatever directory it is mounted at. */
 const HERE = resolve(HARNESS_ROOT);
@@ -468,6 +469,24 @@ export function renderIndex(root: string): IndexRender {
   }
 }
 
+/**
+ * The instance the checkout's ROOT declares, when it declares one — and then
+ * the four entry files are that instance's own, not this renderer's
+ * (cat-harness-tools#1701).
+ *
+ * The renderer's premise is the header's first line: an index root declares
+ * no instance. A content instance's joined checkout (smart-ips-pilgrimage)
+ * has an `index.config.json` too — it is how its layers are mounted — but its
+ * root declares `smart-ips-pilgrimage`, and its `AGENTS.md`/`README.md` are
+ * that folio's hand-written entry files. `--check` called them stale and
+ * `CLAUDE.md`/`GEMINI.md` missing, and the plain run would have overwritten
+ * them. Such a root is DETERMINED not to be an index root: not applicable.
+ * A root that declares nothing (the platform index) is rendered as before.
+ */
+export function rootDeclaredInstance(root: string): string | undefined {
+  return declaredInstanceName(root);
+}
+
 export type IndexRenderCheck =
   | { state: "absent"; file: string }
   | { state: "undetermined"; problems: string[] }
@@ -490,6 +509,15 @@ if (import.meta.main) {
   const i = argv.indexOf("--root");
   const root = i >= 0 && argv[i + 1] !== undefined ? resolve(argv[i + 1]!) : repoRootFor(HERE);
   const check = argv.includes("--check");
+
+  const own = existsSync(join(root, INDEX_CONFIG_FILENAME)) ? rootDeclaredInstance(root) : undefined;
+  if (own !== undefined) {
+    exitNotApplicable(
+      check ? "index:render:check" : "index:render",
+      `this root declares its own instance \`${own}\`, so its AGENTS.md, README.md, CLAUDE.md and GEMINI.md are that instance's own, ` +
+        `not an index root's rendered files (${INDEX_CONFIG_FILENAME} here only mounts its layers; cat-harness-tools#1701)`,
+    );
+  }
 
   const r = renderIndex(root);
   if (r.state === "absent") {

@@ -525,3 +525,31 @@ describe("resolveGlassStrip — pinned tiles first, plus '+N more'", () => {
     expect(GlassStripSchema.safeParse([{ chrome: "todos" }, { kind: "tools" }]).success).toBe(true);
   });
 });
+
+// cat-harness-tools#1701: an undeclared tile takes the name the harness rows
+// give its page, so the glass and FOLDERS/the sidebar say one name.
+describe("labelFor — an undeclared tile is named as its page's rows name it", () => {
+  const SITE = "cat-harness/docs";
+  const schemas = (): TiledDirectory => ({
+    ...dir("smart-base-schemas", { visualiser: "cat-harness/docs/en/cat-harness/schemas/smart-base/index.html" }),
+    graphTypologies: ["code", "schemas"],
+  });
+  const rows = (href: string) => (href === "/en/cat-harness/schemas/smart-base/" ? "Schemas" : undefined);
+
+  test("the row's name replaces the first-kind fallback", () => {
+    expect(graphTiles([schemas()], SITE)[0]?.title).toBe("Code");
+    expect(graphTiles([schemas()], SITE, undefined, [], rows)[0]?.title).toBe("Schemas");
+  });
+
+  test("a declared title still wins over the row's name", () => {
+    const d: TiledDirectory = {
+      ...dir("x", { visualiser: [{ ref: "cat-harness/docs/en/cat-harness/schemas/smart-base/index.html", title: "Declared" }] }),
+      graphTypologies: ["code"],
+    };
+    expect(graphTiles([d], SITE, undefined, [], rows)[0]?.title).toBe("Declared");
+  });
+
+  test("no row for the page keeps the fallback", () => {
+    expect(graphTiles([schemas()], SITE, undefined, [], () => undefined)[0]?.title).toBe("Code");
+  });
+});

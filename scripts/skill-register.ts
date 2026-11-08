@@ -79,6 +79,7 @@ import { buildQaResult, writeQaResult } from "./qa-results.js";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, REPO_ROOT, resolveWorkingInstanceRoot, runnerRootFor } from "./lib/roots.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 import { BUILD_TYPE_ENV, buildTypeOf } from "./lib/build-type.ts";
 
 /**
@@ -822,11 +823,14 @@ async function main(): Promise<number> {
   const na = notApplicable();
   if (na !== undefined) {
     // Not a pass and not a finding: nothing here is of the kind judged. Says
-    // so, writes nothing (no sidecar: there is no subject to record a verdict
-    // about), and exits 0 so a content index's gates are not red over it.
+    // so and writes nothing (no sidecar: there is no subject to record a
+    // verdict about). Exits 78, not 0 (cat-harness-tools#1701): `qa:refresh`
+    // read the silent 0 as a writer that "produced nothing" and failed the QA
+    // working copy in an IG repository that is its own index; 78 is the
+    // convention every runner reads as not applicable, and no gate turns red
+    // over it (`lib/not-applicable.ts`).
     if (flags.json) console.log(JSON.stringify({ notApplicable: na }, null, 2));
-    else console.log(`skill-register: not applicable — ${na}. Nothing judged, nothing written.`);
-    return 0;
+    exitNotApplicable("skill-register", na);
   }
 
   const f = audit();

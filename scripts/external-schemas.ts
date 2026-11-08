@@ -32,6 +32,7 @@ import { directoriesForGraph, instanceDirectoriesForGraph } from "../schemas/kg/
 import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import { workflowFiles } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { rootProfile } from "./lib/root-gate-set.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 // Read from the DECLARATION rather than hardcoded, and the reason this
@@ -365,6 +366,34 @@ const DERIVERS: Record<string, () => string[]> = {
   "w3c-skos": () => skosTermsInUse(),
 };
 
+/**
+ * The derivers that read the WHOLE CHECKOUT (every instance's catalogue
+ * records, every instance's declared `schemas`), not only the record's own
+ * instance. `omg-bpmn-2.0` reads the harness's own `processes/` and is judged
+ * everywhere; these two give a different answer per composition.
+ */
+export const COMPOSED_DERIVERS: ReadonlySet<string> = new Set(["dcmi-terms", "w3c-skos"]);
+
+/**
+ * Why a composed record's terms ({@link COMPOSED_DERIVERS}) are not
+ * `repoRoot`'s to judge stale, or null when they are (cat-harness-tools#1701).
+ *
+ * The records live in a mounted layer's registry (cat-harness) and are written
+ * by the harness index (the root carrying the gates workflow, `rootProfile`
+ * "harness"), from what IT mounts. In a CONTENT root (smart-ips-pilgrimage#13)
+ * a term only an unmounted layer uses reads as "no longer used", and one only a
+ * layer this root mounts at another pin reads as new; neither is a defect of the
+ * record. A registry at the root itself, and every harness root, are judged as before.
+ */
+export function composedTermsNotOursReason(registry: string, repoRoot: string): string | null {
+  if (rootProfile(repoRoot) !== "content") return null;
+  if (!relative(repoRoot, registry).includes("/")) return null;
+  return (
+    `a content root (no .github/workflows/code-quality-gates.yml) and the record is a mounted layer's ` +
+    `(${relative(repoRoot, registry)}); its terms are derived from every instance the harness index mounts, not this checkout's`
+  );
+}
+
 function run(argv: string[]): number {
   const write = argv.includes("--write");
   const check = argv.includes("--check");
@@ -426,6 +455,12 @@ function run(argv: string[]): number {
     const missing = found.filter((t) => !have.has(t));
     const gone = [...have].filter((t) => !found.includes(t));
     if (missing.length === 0 && gone.length === 0) continue;
+    // cat-harness-tools#1701: excused, and said so, where the record is not ours.
+    const notOurs = COMPOSED_DERIVERS.has(s.id) ? composedTermsNotOursReason(REGISTRY, resolve(ROOT, "..")) : null;
+    if (notOurs !== null) {
+      console.log(`· ${s.id}: ${missing.length} new term(s), ${gone.length} no longer used — not applicable here — ${notOurs}`);
+      continue;
+    }
     stale++;
     console.log(`${s.id}: ${missing.length} new term(s), ${gone.length} no longer used`);
     for (const t of missing.slice(0, 6)) console.log(`    + ${t}`);

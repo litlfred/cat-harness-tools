@@ -921,6 +921,21 @@ jobs:
           if python3 -c 'import json,sys; sys.exit(0 if "smart:pages" in json.load(open("package.json")).get("scripts", {}) else 1)'; then
             bun run cat smart:pages
           fi
+      - &as-mounted
+        name: Judge the mounts as the lock laid them down, before anything is built on them
+        # cat-harness-tools#1701: mount:remote:check, mount:lock:check and
+        # separation:cutover:check ask whether the pinned bytes are on disk.
+        # In the shards they ran over the prepared tree, after derive:publish
+        # had written pages and QA results into the mounted layers, so every
+        # layer it wrote into read "modified" (smart-ips-pilgrimage run
+        # 42455839636, 8 of 9). Judged here, on the tree the lock produced;
+        # the shards take this answer (run-gates.py `--as-mounted-record`).
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        working-directory: fa
+        env:
+          OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
+        # shellcheck disable=SC2086 -- OWN is empty or one flag and its value
+        run: python3 ../ci/.github/scripts/layer-pr-checks/run-gates.py . --as-mounted "$RUNNER_TEMP/as-mounted.json" $OWN || true
       - &root-gates
         name: The index's own gates over the composed root (layer mode)
         # After the state mount and the IG pages, before derive:publish, which
@@ -1236,6 +1251,7 @@ jobs:
           python3 ci/.github/scripts/layer-pr-checks/snapshot.py save fa "$RUNNER_TEMP/mounted.txt" "$RUNNER_TEMP/prepared/root"
           cp "$RUNNER_TEMP/derive-publish.json" "$RUNNER_TEMP/prepared/"
           if [ -f "$RUNNER_TEMP/root-gates.json" ]; then cp "$RUNNER_TEMP/root-gates.json" "$RUNNER_TEMP/prepared/"; fi
+          if [ -f "$RUNNER_TEMP/as-mounted.json" ]; then cp "$RUNNER_TEMP/as-mounted.json" "$RUNNER_TEMP/prepared/"; fi
           # The previous run's gate seconds, so the shards balance by time.
           if [ -f "$RUNNER_TEMP/timings/gates.json" ]; then cp "$RUNNER_TEMP/timings/gates.json" "$RUNNER_TEMP/prepared/timings.json"; fi
           zstd -q -T0 --rm "$RUNNER_TEMP/prepared/root.tar"
@@ -1591,6 +1607,7 @@ jobs:
       - *install
       - *chromium
       - *state-mount
+      - *as-mounted
       - *root-gates
       - *derive-cache
       - *writer-ref
@@ -1743,6 +1760,7 @@ jobs:
           python3 ci/.github/scripts/layer-pr-checks/snapshot.py apply fa "$p/root"
           cp "$p/derive-publish.json" "$RUNNER_TEMP/derive-publish.json"
           if [ -f "$p/root-gates.json" ]; then cp "$p/root-gates.json" "$RUNNER_TEMP/root-gates.json"; fi
+          if [ -f "$p/as-mounted.json" ]; then cp "$p/as-mounted.json" "$RUNNER_TEMP/as-mounted.json"; fi
           # The same seconds in every shard of this side, so they agree on the split.
           if [ -f "$p/timings.json" ]; then echo "GATE_TIMINGS=$p/timings.json" >> "$GITHUB_ENV"; fi
       # The CI cone's records (bean `4rbc`, cat-harness-tools#398): the newest
@@ -1869,7 +1887,7 @@ jobs:
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
           MODE: ${{ inputs.mode }}
           SIDE: ${{ env.SIDE }}
-        # shellcheck disable=SC2086 -- OWN and ROOT_GATES are empty or one flag and its value
+        # shellcheck disable=SC2086 -- OWN, ROOT_GATES and AS_MOUNTED are empty or one flag and its value
         run: |
           set -euo pipefail
           export GATE_JUNIT="$RUNNER_TEMP/junit.xml"
@@ -1887,7 +1905,11 @@ jobs:
           # passed there, so a side that wrote none is recorded as exit 2.
           ROOT_GATES=""
           [ "$MODE" = "layer" ] && ROOT_GATES="--record $RUNNER_TEMP/root-gates.json"
-          python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES
+          # The mount gates, judged by the prepare job on the tree as mounted
+          # (cat-harness-tools#1701); with no record they run here as before.
+          AS_MOUNTED=""
+          [ -f "$RUNNER_TEMP/as-mounted.json" ] && AS_MOUNTED="--as-mounted-record $RUNNER_TEMP/as-mounted.json"
+          python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES $AS_MOUNTED
       # The artefact's own name, inside it: when the compare job's download
       # matches ONE artefact (one shard, one side), the action unpacks it into
       # `results/` itself rather than `results/<name>/`, and this file is how
