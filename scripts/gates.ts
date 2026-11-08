@@ -659,9 +659,9 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     match: "run cat library:keywords",
     kind: "covered-by",
     reason:
-      "the site build runs the writer at deploy, so nothing PUBLISHED goes stale; " +
-      "`library:keywords:check` is intentionally not gated, for `library:viz:check`'s reason — " +
-      "keywords derive from a WHOLE library's term weights (issue #2302)",
+      "the site build runs the writer at deploy (`derive:publish`, route `docs/assets/keywords/`, builtAtPublish), " +
+      "so nothing PUBLISHED goes stale and nothing is committed; keywords derive from a WHOLE library's " +
+      "term weights (issue #2302, cat-harness#1144)",
   },
   {
     match: "run cat uploads:viz",
@@ -1679,7 +1679,7 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     script: "library:keywords:check",
     kind: "covered-by",
     reason:
-      "same as `library:viz:check`: the writer runs at deploy (`docs-site.yml`, before the projection that reads it), and log-entropy weights derive from the WHOLE library, so one sibling ingesting an entry reweights every keywords.json in it — a red here means a sibling merged rather than that this diff forgot (issue #2302). Run it by hand, or from `/prepare-merge`",
+      "the keywords graph (`docs/assets/keywords/`) is builtAtPublish, so in the harness `--check` has nothing committed to compare and exits 0; `derive:publish` writes it at deploy. Its term weights derive from the WHOLE library, so one sibling ingesting an entry reweights every node (issue #2302, cat-harness#1144). Missing keywords and legacy keywords.json files are reported by the `library-keywords` health check",
   },
   {
     script: "uploads:viz:check",
