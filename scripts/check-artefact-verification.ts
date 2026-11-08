@@ -39,6 +39,7 @@ import { join } from "node:path";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { TOOLS_ROOT } from "./lib/roots.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
+import { findDeclarationFile } from "../schemas/kg/cat-harness.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const DECL = join(TOOLS_ROOT, "scripts", "artefact-verification.json");
@@ -165,21 +166,53 @@ export interface Report {
   uncheckedUndeclared: string[];
   /** An `unchecked` entry naming a script that now HAS a `--check`, or is gone. */
   uncheckedStale: string[];
+  /**
+   * Entries that would read stale, excused because this checkout's script
+   * table is not the one the declaration describes ({@link report}'s
+   * `partialTable`). Printed, never counted as a pass or a failure.
+   */
+  excusedStale: string[];
 }
 
-export function report(checks: ArtefactCheck[], d: Declaration, unchecked: string[] = []): Report {
+/**
+ * `partialTable`: why this checkout's script table cannot show a declaration
+ * stale (cat-harness-tools#1701). The declaration describes the folio-assistant
+ * index's table: every layer's `checkoutScripts` PLUS the index root's own
+ * `package.json` (it keeps `bootstrap-tools`' commands and the index's own).
+ * A content repository that is its own index has its own root manifest, so a
+ * check missing here may still be the index's; only `undeclared` (a check
+ * present here with no declaration) is decidable. Unset, judged as before.
+ */
+export function report(checks: ArtefactCheck[], d: Declaration, unchecked: string[] = [], partialTable?: string): Report {
   const names = new Set(checks.map((c) => c.check));
   const declared = new Set([...Object.keys(d.verified), ...Object.keys(d.none)]);
+  const stale = [...declared].filter((n) => !names.has(n));
+  const uncheckedStale = Object.keys(d.unchecked ?? {}).filter((g) => !unchecked.includes(g));
+  const partial = partialTable !== undefined;
   return {
     checks,
     undeclared: checks.map((c) => c.check).filter((n) => !declared.has(n)),
     reasonless: [...Object.entries(d.none), ...Object.entries(d.unchecked ?? {})]
       .filter(([, why]) => String(why ?? "").trim() === "")
       .map(([n]) => n),
-    stale: [...declared].filter((n) => !names.has(n)),
+    stale: partial ? [] : stale,
     uncheckedUndeclared: unchecked.filter((g) => !Object.hasOwn(d.unchecked ?? {}, g)),
-    uncheckedStale: Object.keys(d.unchecked ?? {}).filter((g) => !unchecked.includes(g)),
+    uncheckedStale: partial ? [] : uncheckedStale,
+    excusedStale: partial ? [...stale, ...uncheckedStale] : [],
   };
+}
+
+/**
+ * Why the checkout at `root` holds only part of the table the declaration
+ * describes, or `undefined` when it holds all of it: its root carries an
+ * instance declaration of its own (an IG repository that is its own index,
+ * cat-harness-tools#1701). The folio-assistant index declares no instance at
+ * its root, and is judged exactly as before.
+ */
+export function partialScriptTable(root: string): string | undefined {
+  const own = findDeclarationFile(root);
+  if (own === undefined) return undefined;
+  return `this checkout's root is the instance declared by ${own}, so its package.json is its own, not the folio-assistant index's this declaration describes`;
 }
 
 if (import.meta.main) {
@@ -228,7 +261,7 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  const r = report(checks, d, generators);
+  const r = report(checks, d, generators, partialScriptTable(ROOT));
   const noParse = checks.filter((c) => c.classification === "no-parsing").length;
   console.log(
     `Artefact verification (${checks.length} generated-artefact check(s); ` +
@@ -248,6 +281,9 @@ if (import.meta.main) {
   for (const n of r.stale) {
     console.log(`  ✗ stale declaration, remove it: ${n}`);
     bad = true;
+  }
+  for (const n of r.excusedStale) {
+    console.log(`  · ${n}: stale-or-not is not applicable here — ${partialScriptTable(ROOT)}`);
   }
   // Bean `v556`: the generators the `--check` inventory above cannot contain.
   for (const g of r.uncheckedUndeclared) {

@@ -127,6 +127,34 @@ describe("the gate catches what v8gh measured", () => {
     expect(findings).toEqual([]);
   });
 
+  test("a link into a declared directory this checkout does not mount is not checked, not dead", () => {
+    // dth-hrh mounts a chosen list of smart-base's directories, leaving out
+    // `smart-base-site-docs`, and smart-base's README links into it.
+    const root = mkdtempSync(join(tmpdir(), "assets-unmounted-"));
+    writeDeclaration(
+      root,
+      JSON.stringify({ name: "t", assets: [{ id: "readme", src: "README.md" }], directories: [{ id: "t-site-docs", path: "site-docs/", graphTypologies: ["docs"] }] }),
+    );
+    writeFileSync(join(root, "README.md"), "[guide](site-docs/source/guide/)\n[gone](elsewhere/x.md)\n");
+    const r = auditInstance(root);
+    rmSync(root, { recursive: true, force: true });
+    expect(r.findings.map((f) => [f.kind, f.detail])).toEqual([["dead-link", "elsewhere/x.md"]]);
+    expect(r.notChecked).toBe(1);
+  });
+
+  test("a dead link inside a declared directory that IS mounted is still a finding", () => {
+    const root = mkdtempSync(join(tmpdir(), "assets-mounted-"));
+    writeDeclaration(
+      root,
+      JSON.stringify({ name: "t", assets: [{ id: "readme", src: "README.md" }], directories: [{ id: "t-site-docs", path: "site-docs/", graphTypologies: ["docs"] }] }),
+    );
+    mkdirSync(join(root, "site-docs"), { recursive: true });
+    writeFileSync(join(root, "README.md"), "[guide](site-docs/missing.md)\n");
+    const { findings } = auditInstance(root);
+    rmSync(root, { recursive: true, force: true });
+    expect(findings.map((f) => f.kind)).toEqual(["dead-link"]);
+  });
+
   test("an instance declaring no assets is clean, not an error", () => {
     const root = instance([]);
     expect(auditInstance(root).findings).toEqual([]);

@@ -44,6 +44,8 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { declaredInstanceName } from "./lib/roots.ts";
+
 const TOOLS_ROOT = resolve(import.meta.dir, "..");
 const ROOT = join(import.meta.dir, "..", "..");
 const WORKFLOWS = join(ROOT, ".github", "workflows");
@@ -400,6 +402,36 @@ export function baselineKey(i: Injection): string {
   return `${i.workflow} (${i.surface}): ${i.expression}`;
 }
 
+/**
+ * Stale baseline entries that are not THIS root's to judge, each with why
+ * (cat-harness-tools#1701).
+ *
+ * The baseline describes the workflows of the root it is written in: the
+ * platform index, whose root declares no instance of its own (decision (b)).
+ * A content instance's joined checkout (smart-ips-pilgrimage) scans ITS OWN
+ * `.github/workflows/`, has no `feature-staging.yml` or `publish.yml`, and
+ * every line was reported stale. An entry is excused only when both hold:
+ * the root declares an instance of its own (so it is not the index the
+ * baseline was written in), and the workflow file the entry names is absent
+ * from this root. A root that has the file is judged as before, and so is the
+ * index, so a really stale line there still fails.
+ */
+export function staleNotThisRoots(
+  stale: readonly string[],
+  root: string = ROOT,
+  workflows: string = join(root, ".github", "workflows"),
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const self = declaredInstanceName(root);
+  if (self === undefined) return out;
+  for (const k of stale) {
+    const file = k.split(" (")[0] ?? "";
+    if (file === "" || existsSync(join(workflows, file))) continue;
+    out.set(k, `${self} has no .github/workflows/${file}; the line describes the platform index's workflow`);
+  }
+  return out;
+}
+
 function readBaseline(): string[] {
   if (!existsSync(BASELINE)) return [];
   return (JSON.parse(readFileSync(BASELINE, "utf-8")) as { known: string[] }).known;
@@ -481,7 +513,13 @@ if (import.meta.main) {
     console.log("      Shape-constrained, so not a break today — but decide it rather than inherit it.");
     bad = true;
   }
+  const notHere = staleNotThisRoots(stale);
   for (const k of stale) {
+    const why = notHere.get(k);
+    if (why !== undefined) {
+      console.log(`  · ${k} not applicable here — ${why}`);
+      continue;
+    }
     console.log(`  ✗ stale baseline entry, remove it: ${k}`);
     bad = true;
   }

@@ -16,6 +16,7 @@ import { join } from "node:path";
 
 export { beanDefsDir } from "./check-bean-parents.ts";
 import { resolveBeanDefs } from "./beans.ts";
+import { BeanStoreAbsentError } from "./lib/bean-store-absent.ts";
 
 /** One bean, as it sits on disk. */
 export interface BeanFile {
@@ -97,7 +98,10 @@ export function isFoldedTitle(fm: string): boolean {
  */
 export function readBeanFiles(root: string): BeanFile[] | null {
   const store = readBeanStore(root);
-  if (store.state === "unreachable") throw new Error(`cannot read the bean store: ${store.reason}`);
+  if (store.state === "unreachable") {
+    if (store.absent) throw new BeanStoreAbsentError(store.reason);
+    throw new Error(`cannot read the bean store: ${store.reason}`);
+  }
   return store.state === "read" ? store.beans : null;
 }
 
@@ -168,7 +172,13 @@ export type BeanStore =
    * print the wrong remedy for the state the cutover actually produces, and a
    * person acting on it would "fix" the declaration that is correct.
    */
-  | { state: "unreachable"; dir: null; reason: string }
+  | {
+      state: "unreachable";
+      dir: null;
+      reason: string;
+      /** A mount DETERMINED the store absent from this checkout, rather than nobody having mounted it (`graphReadPath`'s `absent`). */
+      absent?: true;
+    }
   | { state: "read"; dir: string; beans: BeanFile[]; skipped: SkippedFile[]; filesSeen: number };
 
 export function readBeanStore(root: string): BeanStore {
@@ -176,11 +186,11 @@ export function readBeanStore(root: string): BeanStore {
   // where `defs` is within it — so this reader no longer asks `graphReadPath`
   // itself. One implementation of the question, which is the point: the two
   // would otherwise be able to disagree.
-  const { dir, declared, unreachable } = resolveBeanDefs(root);
+  const { dir, declared, unreachable, absent } = resolveBeanDefs(root);
   if (unreachable) {
     // Never a path that merely happens not to exist: that reads as
     // `declared-but-absent` and sends the reader to fix a correct declaration.
-    return { state: "unreachable", dir: null, reason: unreachable };
+    return { state: "unreachable", dir: null, reason: unreachable, ...(absent ? { absent: true as const } : {}) };
   }
   // The graph declares no `bean-defs` node at all.
   if (dir === null) return { state: "absent", dir: null };

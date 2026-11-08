@@ -729,7 +729,7 @@ export function fingerprint(
     return { undetermined: "a source reads the working tree through git (`tree` site), which only a {tracked} declaration covers" };
   }
   if (audit.spawnsChildren && opts.treeReplayed !== true) {
-    return { undetermined: "a test runs a `bun` child (`spawned` site), whose reads only a traced run shows" };
+    return { undetermined: "a source runs a `bun` or `python3` child (`spawned` site), whose reads only a traced run shows" };
   }
   for (const name of audit.envUnset) {
     // input-site: traced #87c9a17e — the fingerprint machinery

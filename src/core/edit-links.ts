@@ -1041,7 +1041,11 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // inside it (owner, 2026-11-06: "need bit padding to left of text and
     // buttons"), then the right gutter the icons sit in. The 📣's margin is
     // the panel's 1rem padding plus the anchor's 2.25rem, so both line up.
-    "@media (min-width:50rem){html.fa-bp .main-content-wrap{padding-left:.75rem;padding-right:2.5rem}" +
+    // Owner, 2026-11-08: "i dont wnat the left grill between LHS navbar and
+    // dsiplay content" — the .75rem of backdrop on the LEFT showed as a grey
+    // strip under the blue bar. It is gone: the white panel now meets the
+    // navbar, and its own 1rem keeps the text off the edge.
+    "@media (min-width:50rem){html.fa-bp .main-content-wrap{padding-left:0;padding-right:2.5rem}" +
     "html.fa-bp .main-content{position:relative;padding-left:1rem;padding-right:1rem}" +
     "html.fa-bp .main-content :is(h1,h2,h3,h4,h5,h6):has(>.anchor-heading){position:static}" +
     "html.fa-bp .main-content .anchor-heading{left:auto;right:-2.25rem;top:auto;height:auto;width:1.5rem}" +
@@ -1071,6 +1075,12 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     "html.fa-bp .block-actions>.ba-trigger .ba-n{top:-4px;right:-6px;font-size:9px;padding:0 3px}" +
     "html.fa-bp .block-actions:hover>.ba-trigger,html.fa-bp .ba-trigger:focus-visible,html.fa-bp .ba-trigger[aria-expanded=true],html.fa-bp :hover>.block-actions>.ba-trigger,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-trigger" + ON +
     "html.fa-bp .block-actions:hover>.ba-bookmark,html.fa-bp .ba-bookmark:focus-visible,html.fa-bp .ba-bookmark[aria-pressed=true],html.fa-bp :hover>.block-actions>.ba-bookmark,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-bookmark" + ON +
+    // Owner, 2026-11-08: "pin icon does not get highlighted on hover". A
+    // pressed 🔖 is always in full colour, so hovering it changed nothing.
+    // Every gutter icon now lights a tinted tile under the pointer, pressed
+    // or not, so the one you are about to press is always the one that shows.
+    "html.fa-bp .block-actions>.ba-trigger,html.fa-bp .block-actions>.ba-bookmark,html.fa-bp .main-content .anchor-heading{border-radius:5px;transition:background-color .12s}" +
+    "html.fa-bp .block-actions>.ba-trigger:hover,html.fa-bp .block-actions>.ba-bookmark:hover,html.fa-bp .main-content .anchor-heading:hover{opacity:1;filter:none;background:color-mix(in srgb,var(--link,#0b5cad) 18%,transparent)}" +
     "html.fa-bp .main-content .anchor-heading svg{visibility:visible;opacity:.35;filter:grayscale(1)}" +
     "html.fa-bp .main-content .fa-hot>.anchor-heading svg,html.fa-bp .main-content :hover>.anchor-heading svg,html.fa-bp .main-content .anchor-heading:focus svg" + ON +
     ".fa-block-panel .bp-copy{font:inherit;font-size:.82rem;margin:.1rem .35rem .3rem 0;padding:.3rem .6rem;border:1px solid #8886;border-radius:6px;background:none;color:inherit;cursor:pointer}" +

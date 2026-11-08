@@ -14,7 +14,7 @@
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { harnessLayout } from "../lib/harness-layout.ts";
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { declaredDiagrams, diagramPath, framedInstances, publishedProcesses, unframedProcesses } from "../check-process-index.ts";
@@ -193,10 +193,12 @@ describe("the committed subgraph JSON-LD", () => {
   });
   // The viewer reads each root's top `processes` subgraphs, and those one
   // level inside a named sub-graph: `sdlc/processes/` since cat-harness#1014
-  // (cat-harness#991 step 23.2).
+  // (cat-harness#991 step 23.2), and `library/processes/` since
+  // cat-harness#1032 moved the library diagrams into the `library` sub-graph.
   const VIEWED = [
     "cat-harness/processes",
     ...(harnessLayout(HARNESS) === "subgraphs" ? ["cat-harness/sdlc/processes"] : []),
+    ...(existsSync(join(HARNESS, "library", "processes")) ? ["cat-harness/library/processes"] : []),
     "folio-assistant-core/processes",
   ];
   // Standing alone the hydrated subgraphs are not built: `subgraph:jsonld`

@@ -22,6 +22,7 @@
 
 import { markdownEditLink, repoOf } from "../src/core/edit-links.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
+import { orphanPages } from "./doc-orphans.ts";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "fs";
 import { join, resolve, basename, dirname, relative, isAbsolute, sep } from "path";
 
@@ -176,21 +177,7 @@ export function indexSummary(line: string, max = 100): string {
   return close === -1 ? cut : line.slice(0, close + 1);
 }
 
-/**
- * Pages sitting in the output directory that THIS RUN did not produce.
- *
- * `index.md` is the generator's own, so it is never an orphan.
- *
- * Pure and exported so the guard can be falsified without a corpus: on the real
- * tree the answer is now the empty set, and an empty set is exactly what a
- * guard that computes nothing also returns.
- */
-export function orphanPages(onDisk: readonly string[], produced: Iterable<string>): string[] {
-  const made = new Set(produced);
-  return onDisk
-    .filter((f) => f.endsWith(".md") && f !== "index.md" && !made.has(f.slice(0, -".md".length)))
-    .sort();
-}
+export { orphanPages };
 
 /**
  * A committed page no source produces is a STALE DOCUMENT, and it is the one

@@ -25,7 +25,7 @@
  * `check:declared-dirs` and `audit:coverage`. A checkout where `state:mount`
  * has not run is not a finding, so the gate is safe before the mount step.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { findDeclarationFile, instanceRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.js";
@@ -157,7 +157,56 @@ export interface Baseline {
 
 export type Finding =
   | { kind: "new-on-main"; key: string; dir: StateDirectory }
-  | { kind: "baseline-stale"; key: string };
+  | { kind: "baseline-stale"; key: string }
+  // Not a failure: the line names an instance this checkout does not hold at
+  // all, so whether that directory is on `main` is not this root's to judge
+  // (cat-harness-tools#1701). Printed, never counted.
+  | { kind: "not-applicable"; key: string; why: string };
+
+/** The instance part of a baseline key (`.` for the repository root). */
+function instanceOfKey(key: string): string {
+  const at = key.indexOf("::");
+  return at < 0 ? key : key.slice(0, at);
+}
+
+/**
+ * Baseline instances DETERMINED not to be in this checkout, each with why
+ * (cat-harness-tools#1701).
+ *
+ * The baseline is cat-harness-tools' own, written in the platform index, so it
+ * names instances (a layer above this one) that a content instance's joined
+ * checkout never mounts. In smart-ips-pilgrimage's run that line was
+ * reported stale — "no longer a state directory on `main`" — which is not
+ * true: the gate simply could not see it. An instance is only excused when the
+ * checkout says so twice over: an `index.lock.json` that parses and does not
+ * list it (by name or mount path), AND no directory of that path on disk. A
+ * checkout with no lock, an unreadable lock, or the instance locked but
+ * missing on disk is judged exactly as before, so the platform index — whose
+ * lock lists that layer — still fails a genuinely stale line.
+ */
+export function instancesNotInCheckout(repoRoot: string, baseline: Baseline): Map<string, string> {
+  const out = new Map<string, string>();
+  const lockFile = join(resolve(repoRoot), "index.lock.json");
+  if (!existsSync(lockFile)) return out;
+  let lock: { instances?: { instance?: unknown; path?: unknown }[] };
+  try {
+    lock = JSON.parse(readFileSync(lockFile, "utf8")) as typeof lock;
+  } catch {
+    return out;
+  }
+  const locked = new Set<string>();
+  for (const i of lock.instances ?? []) {
+    if (typeof i.instance === "string") locked.add(i.instance);
+    if (typeof i.path === "string") locked.add(i.path.replace(/\\/g, "/").replace(/\/+$/, ""));
+  }
+  for (const key of baseline.onMain) {
+    const inst = instanceOfKey(key);
+    if (inst === "." || locked.has(inst) || out.has(inst)) continue;
+    if (existsSync(join(resolve(repoRoot), inst))) continue;
+    out.set(inst, `\`${inst}\` is not in this checkout: index.lock.json does not mount it and no \`${inst}/\` exists`);
+  }
+  return out;
+}
 
 /**
  * The two directions, and both of them fail.
@@ -166,7 +215,11 @@ export type Finding =
  * debt is paid: the line stays, and the next directory declared with that id
  * inherits an exemption nobody granted.
  */
-export function compare(dirs: readonly StateDirectory[], baseline: Baseline): Finding[] {
+export function compare(
+  dirs: readonly StateDirectory[],
+  baseline: Baseline,
+  notHere: ReadonlyMap<string, string> = new Map(),
+): Finding[] {
   const recorded = new Set(baseline.onMain);
   const findings: Finding[] = [];
   const live = new Set<string>();
@@ -177,7 +230,9 @@ export function compare(dirs: readonly StateDirectory[], baseline: Baseline): Fi
     if (!recorded.has(key)) findings.push({ kind: "new-on-main", key, dir: d });
   }
   for (const key of baseline.onMain) {
-    if (!live.has(key)) findings.push({ kind: "baseline-stale", key });
+    if (live.has(key)) continue;
+    const why = notHere.get(instanceOfKey(key));
+    findings.push(why === undefined ? { kind: "baseline-stale", key } : { kind: "not-applicable", key, why });
   }
   return findings;
 }
@@ -240,9 +295,13 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  const findings = compare(dirs, readBaseline(repoRoot));
-  for (const f of findings) {
-    if (f.kind === "new-on-main") {
+  const baseline = readBaseline(repoRoot);
+  const all = compare(dirs, baseline, instancesNotInCheckout(repoRoot, baseline));
+  const findings = all.filter((f) => f.kind !== "not-applicable");
+  for (const f of all) {
+    if (f.kind === "not-applicable") {
+      console.log(`  · ${f.key} not applicable here — ${f.why}`);
+    } else if (f.kind === "new-on-main") {
       console.error(
         `  ✗ ${f.key} (${f.dir.path}) holds ${f.dir.stateKinds.map((k) => `\`${k}\``).join(" + ")} ` +
           `and its content is on \`main\`, with no \`source\` declared. ` +
