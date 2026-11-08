@@ -159,6 +159,7 @@ describe("a committed instance records its diagram REPO-RELATIVELY — bean `chq
     // somewhere, differently on every machine, and looks deliberate. An
     // absolute path at least fails honestly and says whose checkout it is.
     const repo = mkdtempSync(join(tmpdir(), "wf-rel-"));
+    // input-site: inert #d0b1b04c — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     const outside = resolve("/etc/elsewhere/x.bpmn");
     saveInstance(repo, inst(outside));
     const back = loadInstance(repo, "t--subject");

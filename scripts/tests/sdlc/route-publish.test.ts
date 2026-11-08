@@ -130,6 +130,7 @@ function fixture(
     remote,
     tip: () => git(bare, "rev-parse", `refs/heads/${BRANCH}`).trim(),
     pushToBranch: (name, text) => {
+      // input-site: inert #8140d8da — a unique scratch name or throwaway token; no assertion depends on its value
       const w = join(base, `w-${Math.random().toString(36).slice(2)}`);
       mkdirSync(w);
       git(w, "init", "-q", "-b", "x");

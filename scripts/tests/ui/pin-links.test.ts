@@ -64,6 +64,7 @@ describe("the browser side", () => {
   });
 
   it("the browser script and pinnedHref agree", () => {
+    // input-site: inert #73305a71 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     const faPinnedHref = new Function("document", `${PIN_LINKS_JS}\nreturn faPinnedHref;`)(undefined) as typeof pinnedHref;
     const pins = pinsJson(PINS);
     for (const [href, key] of [

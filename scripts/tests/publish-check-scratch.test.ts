@@ -58,6 +58,7 @@ describe("scratchCopy that fails partway", () => {
     // have been written: the shape of a copy that runs out of disk.
     const src = mkdtempSync(join(tmpdir(), "publish-check-fail-src-"));
     const tmp = mkdtempSync(join(tmpdir(), "publish-check-fail-tmp-"));
+    // input-site: inert #54f96ef0 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const before = process.env.TMPDIR;
     try {
       writeFileSync(join(src, "a.txt"), "a");

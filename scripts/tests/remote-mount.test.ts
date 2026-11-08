@@ -31,6 +31,7 @@ import { subgraphIndexPackage } from "../../schemas/kg/subgraph-manifest.ts";
 import { packSubgraphIndex } from "../subgraph-index-package.ts";
 
 function git(cwd: string, ...args: string[]): string {
+  // input-site: tree #7150efbd — git in the test's own scratch repository, with the environment handed whole plus a fixed identity: git's answer, which the cone replays or records
   const r = spawnSync("git", args, { cwd, encoding: "utf-8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
   return r.stdout.trim();
@@ -582,6 +583,7 @@ describe("whole-instance mounts and replaying the lock (bean `nn8e`, #2462)", ()
     mkdirSync(srv, { recursive: true });
     spawnSync("ln", ["-s", up.bare, join(srv, "up")]);
     spawnSync("ln", ["-s", boot.bare, join(srv, "boot")]);
+    // input-site: inert #865c95f3 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const prev = process.env.CAT_MOUNT_URL_PREFIX;
     process.env.CAT_MOUNT_URL_PREFIX = `file://${dirname(srv)}`;
     try {
@@ -1074,6 +1076,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     const srv = join(base, `hsrv-${n}`, "o");
     mkdirSync(srv, { recursive: true });
     spawnSync("ln", ["-s", hy.bare, join(srv, "hy")]);
+    // input-site: inert #865c95f3 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const prev = process.env.CAT_MOUNT_URL_PREFIX;
     process.env.CAT_MOUNT_URL_PREFIX = `file://${dirname(srv)}`;
     try {
@@ -1164,6 +1167,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     const rel = join(srv, "o", "np", "releases", "download", pkg.tag);
     mkdirSync(rel, { recursive: true });
     writeFileSync(join(rel, pkg.tarball), readFileSync(join(out, pkg.tarball)));
+    // input-site: inert #865c95f3 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const prev = process.env.CAT_MOUNT_URL_PREFIX;
     process.env.CAT_MOUNT_URL_PREFIX = `file://${srv}`;
     try {
