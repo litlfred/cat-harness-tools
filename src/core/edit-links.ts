@@ -1048,7 +1048,10 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     "html.fa-bp .main-content .block-actions{float:right;clear:right;width:1.5rem;margin:0 -3.25rem 6px 0;text-align:center}" +
     // A section's box hangs under its heading's 🔗, placed like the 🔗 against
     // .main-content so a heading inside a bordered box still uses the gutter.
-    "html.fa-bp .main-content .fa-sec-actions{position:absolute;float:none;right:-2.25rem;margin:0}}" +
+    "html.fa-bp .main-content .fa-sec-actions{position:absolute;float:none;right:-2.25rem;margin:0}" +
+    // A standalone page (an IG's thin layout) has no .main-content-wrap to
+    // pad, so its column leaves the same gutter itself.
+    "html.fa-bp .fa-page-main.main-content:has(>.fa-sec-actions){margin-right:2.5rem}}" +
     "html.fa-bp .fa-hot+.fa-sec-actions>.ba-ic" + ON +
     // Its feedback link is the panel's content, not a second icon on the page.
     "html.fa-bp .fa-sec-actions>a{display:none}html.fa-bp .fa-block-panel .fa-sec-actions>a{display:block;margin:.5rem 0;padding:.55rem .7rem;border:1px solid #8885;border-radius:8px;text-decoration:none}" +
@@ -1257,26 +1260,69 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     const seg = /^\\/([A-Za-z0-9._-]+)\\//.exec(location.pathname || "");
     return h && seg && seg[1] !== "." && seg[1] !== ".." ? h[1] + "/" + seg[1] : "";
   };
+  // An IG page (fhir-harness's thin layout) says where each heading's text
+  // is in its markdown source: <script id="ig-source-lines">, the IG's own
+  // repository and, per heading, its line and, for an included file, that
+  // file. Its sections take the same right-gutter box as any plain page's
+  // (owner, 2026-11-08: "edit feedback on IGs like rest of documents should
+  // be on right grill not touching section title ... consolidate
+  // infrastructure"), with the ✎ to the section's own source line beside the
+  // 📣, both in the panel. Its headings carry no theme anchor, so each is
+  // matched by its id instead, and its 📣 goes to the IG's repository, not
+  // the site's.
+  const igLines = () => {
+    const d = document.getElementById("ig-source-lines");
+    if (!d) return null;
+    try { const m = JSON.parse(d.textContent); return m && m.blob ? m : null; } catch { return null; }
+  };
+  const norm = (s) => String(s).toLowerCase().replace(/&[a-z]+;/g, " ").replace(/[^a-z0-9]+/g, " ").trim();
   const sectionBoxes = () => {
     const main = document.querySelector(".main-content");
     if (!main || main.querySelector(".fa-doc, .block-actions")) return;
-    const repo = siteRepo();
+    const ig = igLines();
+    const ghRepo = ig ? (/^https:\\/\\/github\\.com\\/([^/]+\\/[^/]+)/.exec(ig.blob) || [])[1] || "" : "";
+    const repo = ig ? (ig.repo || ghRepo) : siteRepo();
+    const used = {};
     let made = false;
-    for (const h of main.querySelectorAll("h1[id], h2[id], h3[id], h4[id]")) {
-      if (!h.querySelector(":scope > .anchor-heading") || h.closest(".fa-block-panel, nav")) continue;
+    for (const h of main.querySelectorAll("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]")) {
+      if (h.closest(".fa-block-panel, nav")) continue;
+      if (ig ? !/^H[1-6]$/.test(h.tagName) : (!h.querySelector(":scope > .anchor-heading") || /^H[56]$/.test(h.tagName))) continue;
       const sec = h.textContent.trim();
       const box = el("span", { className: "block-actions fa-sec-actions" });
       box.dataset.block = h.id;
       box.dataset.sec = sec;
+      let src = "";
+      if (ig) {
+        const k = norm(sec);
+        const lines = Array.isArray(ig.lines) ? ig.lines : [];
+        for (let i = 0; i < lines.length; i++) if (!used[i] && norm(lines[i].t) === k) {
+          used[i] = 1;
+          src = (lines[i].b || ig.blob) + "#L" + lines[i].l;
+          break;
+        }
+        if (src) {
+          const e = el("a", { className: "ba-edit", href: src, textContent: "\\u270e edit", title: "Edit this section's source on GitHub" });
+          e.dataset.faLink = "edit";
+          box.append(e);
+        }
+      }
       if (repo) {
+        const here = location.href.split("#")[0] + "#" + encodeURIComponent(h.id);
         const q = new URLSearchParams();
-        q.set("title", "Feedback: " + (document.title ? document.title + " \\u2014 " : "") + sec);
-        q.set("body", ["**Section:** " + sec, "**On the site:** " + location.href.split("#")[0] + "#" + encodeURIComponent(h.id),
-          "", "**Type:** general | technical | editorial", "", "**Comment:**", "", ""].join("\\n"));
+        if (ig) {
+          const pt = document.title.split(/ [|\\u2014] /)[0].trim();
+          q.set("title", "Feedback on \\u201c" + sec + "\\u201d" + (pt && norm(pt) !== norm(sec) ? " (page: " + pt + ")" : ""));
+          q.set("body", ["**Page:** " + here, "**Section:** " + sec + " (#" + h.id + ")", "**Source:** " + (src || ig.blob), "", "**Feedback:**", "", ""].join("\\n"));
+        } else {
+          q.set("title", "Feedback: " + (document.title ? document.title + " \\u2014 " : "") + sec);
+          q.set("body", ["**Section:** " + sec, "**On the site:** " + here,
+            "", "**Type:** general | technical | editorial", "", "**Comment:**", "", ""].join("\\n"));
+        }
         const a = el("a", { className: "ba-feedback", href: "https://github.com/" + repo + "/issues/new?" + q, textContent: "\\ud83d\\udce3 feedback", title: "Give feedback on this section (opens a GitHub issue)" });
         a.dataset.faLink = "feedback";
         box.append(a);
       }
+      h.classList.add("fa-sec-h");
       h.after(box);
       made = true;
     }
@@ -1311,7 +1357,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     let h = null;
     if (n && !n.closest(".fa-block-panel, nav, .side-bar")) {
       while (n.parentElement && !n.parentElement.matches(".fa-doc, .main-content, main")) n = n.parentElement;
-      for (let x = n; x && !h; x = x.previousElementSibling) if (/^H[1-6]$/.test(x.tagName) && x.querySelector(":scope > .anchor-heading")) h = x;
+      for (let x = n; x && !h; x = x.previousElementSibling) if (/^H[1-6]$/.test(x.tagName) && (x.classList.contains("fa-sec-h") || x.querySelector(":scope > .anchor-heading"))) h = x;
     }
     if (h === hot) return;
     if (hot) hot.classList.remove("fa-hot");
