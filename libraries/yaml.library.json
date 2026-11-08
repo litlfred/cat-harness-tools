@@ -50,6 +50,7 @@
     "src/workflow/ci-health.ts",
     "test/coordinator/gate-shell-workflow.test.ts",
     "test/coordinator/gates-workflows.test.ts",
-    "test/layer-ready-reuse.test.ts"
+    "test/layer-ready-reuse.test.ts",
+    "test/release-gated-ci.test.ts"
   ]
 }
