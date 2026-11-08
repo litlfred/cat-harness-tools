@@ -67,3 +67,30 @@ test("each IG heading gets one right-gutter box, nothing inside the heading", as
   await expect(page.locator(".fa-block-panel.open a[data-fa-link=feedback]")).toBeVisible();
   await expect(page.locator(".fa-block-panel.open a[data-fa-link=edit]")).toHaveAttribute("href", "https://github.com/o/ig/edit/main/input/pagecontent/overview.md");
 });
+
+// Owner, 2026-11-08, on fhir-harness/fhir/publishing.html: "Suggest is now
+// redundant with right grill icons. QA and TR should be in right grill."
+const DOC = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Doc</title></head><body>
+<div class="main-content" id="main-content">
+<h2 id="lands"><a href="#lands" class="anchor-heading"></a> Where it lands</h2><p><a href="https://github.com/o/layer/edit/main/docs/lands.md" class="fa-node-edit" data-fa-link="edit" data-src="docs/lands.md" data-repo="o/layer">✎ Edit</a> <span class="fa-qa-badges"><span class="fa-qa-badge fa-qa-unswept" title="Content QA: not available in this build"><span class="fa-qa-tag">QA</span></span> <span class="fa-qa-badge fa-qa-unswept" title="Translation QA: not available in this build"><span class="fa-qa-tag">TR</span></span></span></p>
+<p>Body text.</p>
+<script>${EDIT_LINKS_RUNTIME}</script></div></body></html>`;
+
+test("a docs section's ✎ and QA / TR leave the line under its heading for the gutter box", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.setContent(DOC);
+  const box = page.locator("#lands + .fa-sec-actions");
+  await expect(box).toHaveCount(1);
+  // The line under the heading is gone: no inline ✍ suggest, ✎ or badges.
+  await expect(page.locator("#lands + .fa-sec-actions + p")).toHaveText("Body text.");
+  await expect(page.locator(".main-content > p .fa-qa-badges, .main-content > p a.ba-suggest, .main-content > p a.fa-node-edit")).toHaveCount(0);
+  await expect(box.locator(".fa-sec-qa .fa-qa-badge")).toHaveCount(2);
+  // 📣 goes to the section's own repository and names its source.
+  const fb = new URL((await box.locator("a[data-fa-link=feedback]").getAttribute("href"))!);
+  expect(fb.pathname).toBe("/o/layer/issues/new");
+  expect(fb.searchParams.get("body")).toContain("**Source:** https://github.com/o/layer/blob/main/docs/lands.md");
+  // A QA chip opens the section's panel, which says what each badge found.
+  await box.locator(".fa-sec-qa .fa-qa-badge").first().click();
+  await expect(page.locator(".fa-block-panel.open .fa-sec-qa .fa-qa-badge")).toHaveCount(2);
+  await expect(page.locator(".fa-block-panel.open a[data-fa-link=edit]")).toHaveCount(1);
+});

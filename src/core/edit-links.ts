@@ -1052,6 +1052,18 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // A standalone page (an IG's thin layout) has no .main-content-wrap to
     // pad, so its column leaves the same gutter itself.
     "html.fa-bp .fa-page-main.main-content:has(>.fa-sec-actions){margin-right:2.5rem}}" +
+    // A section's QA / TR chips, under its 📣 and 🔖 in the gutter; pressed,
+    // they open the section's panel, where each badge says what it found.
+    "html.fa-bp .main-content .fa-sec-actions>.fa-sec-qa{order:9;margin:0;display:flex;flex-direction:column;align-items:center;gap:2px}" +
+    "html.fa-bp .main-content .fa-sec-actions>.fa-sec-qa .fa-qa-badges{display:flex;flex-direction:column;gap:2px;margin:0}" +
+    "html.fa-bp .main-content .fa-sec-actions>.fa-sec-qa .fa-qa-badge{min-height:0;padding:1px 2px;font-size:9px;cursor:pointer}" +
+    "html.fa-bp .main-content .fa-sec-actions>.fa-sec-qa .fa-qa-panel{display:none}" +
+    "html.fa-bp .fa-block-panel .fa-sec-qa{display:block;margin:1rem 0 0;text-align:left}" +
+    "html.fa-bp .fa-block-panel .fa-sec-qa::before{content:'Quality checks';display:block;font-weight:600;font-size:.9rem;margin-bottom:.3rem}" +
+    "html.fa-bp .fa-block-panel .fa-sec-qa .fa-qa-badges{display:flex;flex-direction:column;align-items:stretch;gap:.3rem;margin:0}" +
+    "html.fa-bp .fa-block-panel .fa-sec-qa .fa-qa-badge{display:flex;width:100%;box-sizing:border-box;text-align:left;font-size:.8rem}" +
+    "html.fa-bp .fa-block-panel .fa-sec-qa span.fa-qa-badge{cursor:default;opacity:.85}" +
+    "html.fa-bp .fa-block-panel .fa-sec-qa span.fa-qa-badge::after{content:attr(title);margin-left:.5em}" +
     "html.fa-bp .fa-hot+.fa-sec-actions>.ba-ic" + ON +
     // Its feedback link is the panel's content, not a second icon on the page.
     "html.fa-bp .fa-sec-actions>a{display:none}html.fa-bp .fa-block-panel .fa-sec-actions>a{display:block;margin:.5rem 0;padding:.55rem .7rem;border:1px solid #8885;border-radius:8px;text-decoration:none}" +
@@ -1138,7 +1150,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       }
       const links = Array.from(box.querySelectorAll(":scope > a[data-fa-link]"));
       links.sort((a, b) => ORDER.indexOf(a.dataset.faLink) - ORDER.indexOf(b.dataset.faLink)).forEach((a) => box.append(a));
-      box.querySelectorAll(":scope > .ba-existing").forEach((s) => box.append(s));
+      box.querySelectorAll(":scope > .ba-existing, :scope > .fa-sec-qa").forEach((s) => box.append(s));
       home = el("span", { hidden: true });
       box.parentNode.insertBefore(home, box);
       moved = box;
@@ -1281,7 +1293,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     if (!main || main.querySelector(".fa-doc, .block-actions")) return;
     const ig = igLines();
     const ghRepo = ig ? (/^https:\\/\\/github\\.com\\/([^/]+\\/[^/]+)/.exec(ig.blob) || [])[1] || "" : "";
-    const repo = ig ? (ig.repo || ghRepo) : siteRepo();
+    const site = ig ? (ig.repo || ghRepo) : siteRepo();
     const used = {};
     let made = false;
     for (const h of main.querySelectorAll("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]")) {
@@ -1291,7 +1303,28 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       const box = el("span", { className: "block-actions fa-sec-actions" });
       box.dataset.block = h.id;
       box.dataset.sec = sec;
-      let src = "";
+      let src = "", from = null;
+      // A generated docs page writes each section's own ✎ Edit and its QA /
+      // TR badges in a paragraph under the heading (cat-harness-tools
+      // gen-docs-pages). Owner, 2026-11-08: "Suggest is now redundant with
+      // right grill icons. QA and TR should be in right grill." So that
+      // paragraph moves into the box: its ✎ (and the ✍ beside it) become the
+      // panel's links, its badges the box's chips, and the empty line goes.
+      const nx = h.nextElementSibling;
+      if (!ig && nx && nx.tagName === "P" && nx.children.length && Array.from(nx.children).every((c) => c.matches("a.fa-node-edit, a.ba-suggest, .fa-qa-badges"))
+        && nx.textContent.replace(/\\s/g, "") === Array.from(nx.children, (c) => c.textContent).join("").replace(/\\s/g, "")) {
+        from = nx.querySelector("a.fa-node-edit[data-fa-link]");
+        if (from) {
+          for (const a of nx.querySelectorAll("a.fa-node-edit, a.ba-suggest")) box.append(a);
+          if (from.dataset.src) {
+            const r = from.dataset.repo || siteRepo();
+            src = r ? "https://github.com/" + r + "/blob/" + (from.dataset.branch || config().branch || "main") + "/" + from.dataset.src : "";
+          }
+        }
+        const qa = nx.querySelector(".fa-qa-badges");
+        if (qa) box.append(el("p", { className: "fa-sec-qa" }, [qa]));
+        nx.remove();
+      }
       if (ig) {
         const k = norm(sec);
         const lines = Array.isArray(ig.lines) ? ig.lines : [];
@@ -1306,6 +1339,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
           box.append(e);
         }
       }
+      const repo = (from && from.dataset.repo) || site;
       if (repo) {
         const here = location.href.split("#")[0] + "#" + encodeURIComponent(h.id);
         const q = new URLSearchParams();
@@ -1315,8 +1349,8 @@ export const EDIT_LINKS_RUNTIME = `(() => {
           q.set("body", ["**Page:** " + here, "**Section:** " + sec + " (#" + h.id + ")", "**Source:** " + (src || ig.blob), "", "**Feedback:**", "", ""].join("\\n"));
         } else {
           q.set("title", "Feedback: " + (document.title ? document.title + " \\u2014 " : "") + sec);
-          q.set("body", ["**Section:** " + sec, "**On the site:** " + here,
-            "", "**Type:** general | technical | editorial", "", "**Comment:**", "", ""].join("\\n"));
+          q.set("body", ["**Section:** " + sec, "**On the site:** " + here].concat(src ? ["**Source:** " + src] : []).concat([
+            "", "**Type:** general | technical | editorial", "", "**Comment:**", "", ""]).join("\\n"));
         }
         const a = el("a", { className: "ba-feedback", href: "https://github.com/" + repo + "/issues/new?" + q, textContent: "\\ud83d\\udce3 feedback", title: "Give feedback on this section (opens a GitHub issue)" });
         a.dataset.faLink = "feedback";
@@ -1377,6 +1411,17 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     }
     if (panel && panel.classList.contains("open") && !panel.contains(e.target) && !e.target.closest(".fa-suggest, dialog")) close();
   });
+  // A QA chip in the gutter opens its section's panel; docs-ui opens a
+  // badge's own detail only once it is in the panel, with room for it.
+  document.addEventListener("click", (e) => {
+    const q = e.target.closest && e.target.closest(".fa-sec-qa");
+    if (!q || (panel && panel.contains(q))) return;
+    const box = q.closest(".block-actions");
+    if (!box) return;
+    e.preventDefault();
+    e.stopPropagation();
+    open(box, "edit", box.querySelector(":scope > .ba-trigger"));
+  }, true);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && panel && panel.classList.contains("open") && !document.querySelector("dialog[open]")) close(); });
   if (typeof document.documentElement === "object" && document.documentElement && document.documentElement.classList) {
     document.documentElement.classList.add("fa-bp");
