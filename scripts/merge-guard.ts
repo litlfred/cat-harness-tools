@@ -49,6 +49,11 @@
  *    never from judging: a workflow in {@link NOT_WAITED_FOR_WORKFLOW_FILES}
  *    (Feature Staging) that is still in flight or has not started is not a
  *    refusal; once finished, red refuses.
+ *    **Check 5 gates a RELEASE only** (owner, card Q-CIB-4 A, 2026-11-08:
+ *    "CI not gate on non-release merge to main"). A merge is a release when
+ *    run with `--release` or when the PR carries the `release` label. On any
+ *    other merge the same judgement is made and reported, and the check
+ *    passes as advisory ({@link advisoryCi}).
  * 6. `checklist` — no unticked `- [ ]` item in the body.
  * 7. `open-question` — no comment newer than the ready marker asks the owner
  *    or the Merge Manager an open question. A heuristic; its limits are on
@@ -266,6 +271,12 @@ export interface GuardOptions {
    * still applies. CLI: `--no-merge-manager`.
    */
   noMergeManager?: boolean;
+  /**
+   * This merge is a RELEASE (owner, card Q-CIB-4 A, 2026-11-08): check 5
+   * gates it. Without it, and without the {@link RELEASE_LABEL} label on the
+   * PR, check 5 is advisory. CLI: `--release`.
+   */
+  release?: boolean;
   /** For a fixture's clock; defaults to {@link READY_WINDOW_MS}. */
   readyWindowMs?: number;
 }
@@ -873,13 +884,36 @@ function checkMergeable(s: GuardSnapshot): CheckResult {
 }
 
 /** Run the eight checks. Pure: everything it reads is in `s`. */
+/** The label that makes a merge a release, so CI gates it (check 5). */
+export const RELEASE_LABEL = "release";
+
+const ADVISORY_RULING = 'owner, card Q-CIB-4 A, 2026-11-08: "CI not gate on non-release merge to main"';
+
+/** A release merge: `--release`, or the PR carries {@link RELEASE_LABEL}. */
+export function isRelease(s: GuardSnapshot, o: GuardOptions = {}): boolean {
+  return o.release === true || s.pr.labels.some((l) => l.name === RELEASE_LABEL);
+}
+
+/**
+ * Check 5 on a NON-release merge: reported, never a refusal. The full suite
+ * gates the release instead (release-gated CI, cat-harness
+ * `release-lifecycle`). What CI said is kept in the detail, so the verdict
+ * still shows a red or unread head.
+ */
+export function advisoryCi(c: CheckResult): CheckResult {
+  if (c.status === "pass") return { ...c, detail: `${c.detail} (advisory: not a gate on a non-release merge)` };
+  const what = c.status === "unknown" ? "could not be judged" : "is not green";
+  return R(5, "ci", "pass", `advisory, not a gate: CI ${what} (${c.detail}). A non-release merge does not wait for CI (${ADVISORY_RULING}); \`--release\` or the \`${RELEASE_LABEL}\` label makes it a gate`);
+}
+
 export function evaluate(s: GuardSnapshot, o: GuardOptions = {}): GuardVerdict {
+  const ci = checkCi(s);
   const checks = [
     checkBase(s),
     checkReadyForReview(s, o),
     checkReadyMarker(s),
     checkLabels(s),
-    checkCi(s),
+    isRelease(s, o) ? ci : advisoryCi(ci),
     checkChecklist(s),
     checkOpenQuestion(s),
     checkMergeable(s),
@@ -1106,7 +1140,7 @@ export function render(v: GuardVerdict): string {
   return lines.join("\n");
 }
 
-const USAGE = "usage: bun run cat merge:guard <pr> [--merge --session <id> [--no-merge-manager]] [--actor <login>] [--repo owner/repo] [--status] [--json]";
+const USAGE = "usage: bun run cat merge:guard <pr> [--merge --session <id> [--no-merge-manager]] [--release] [--actor <login>] [--repo owner/repo] [--status] [--json]";
 
 async function main(argv: string[]): Promise<number> {
   const args = [...argv];
@@ -1127,6 +1161,7 @@ async function main(argv: string[]): Promise<number> {
   const asJson = flag("--json");
   const doStatus = flag("--status");
   const noMergeManager = flag("--no-merge-manager");
+  const release = flag("--release");
   const sessionArg = opt("--session");
   const actor = opt("--actor");
   const root = repoRootFor(resolve(HARNESS_ROOT));
@@ -1149,7 +1184,7 @@ async function main(argv: string[]): Promise<number> {
     console.error(`merge-guard #${n}: COULD NOT DETERMINE — ${e instanceof Error ? e.message : String(e)}`);
     return 2;
   }
-  const v = evaluate(snapshot, { mergingSession, mergingActor: actor, noMergeManager });
+  const v = evaluate(snapshot, { mergingSession, mergingActor: actor, noMergeManager, release });
   console.log(asJson ? JSON.stringify(v, null, 2) : render(v));
   if (doStatus) {
     try {

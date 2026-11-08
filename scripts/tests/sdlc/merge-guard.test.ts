@@ -26,7 +26,10 @@ import { join } from "node:path";
 
 import {
   CannotAsk,
-  evaluate,
+  evaluate as evaluateAny,
+  advisoryCi,
+  isRelease,
+  RELEASE_LABEL,
   fetchPull,
   getAll,
   isBotMerge,
@@ -85,6 +88,10 @@ function real(n: 1937 | 1957 | 1960): GuardSnapshot {
   return s;
 }
 
+// The checks below judge CI as it gates a RELEASE merge (owner, card Q-CIB-4 A,
+// 2026-11-08). A non-release merge gets the same judgement as advisory; that
+// is tested on its own at the end of this file.
+const evaluate = (s: GuardSnapshot, o: GuardOptions = {}) => evaluateAny(s, { release: true, ...o });
 const status = (s: GuardSnapshot, id: CheckId, o: GuardOptions = {}) => evaluate(s, o).checks.find((c) => c.id === id)!;
 
 const STEWARD = "session_01StewardStewardSteward";
@@ -911,5 +918,47 @@ describe("fetchPull — re-asks while GitHub has not computed `mergeable`", () =
     const b = serve([{ mergeable: null, state: "closed" }]);
     await fetchPull("litlfred/folio-assistant", 1898, { fetchImpl: b.impl, sleep: b.sleep, waitsMs: [1, 2] });
     expect(b.asked()).toBe(1);
+  });
+});
+
+describe("check 5 gates a release only (owner, card Q-CIB-4 A, 2026-11-08)", () => {
+  const red = () => real(1937);
+  const nonRelease = (s: GuardSnapshot) => evaluateAny(s, {}).checks.find((c) => c.id === "ci")!;
+
+  test("a non-release merge: red CI is reported, and the check passes as advisory", () => {
+    const c = nonRelease(red());
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain("advisory, not a gate");
+    expect(c.detail).toContain("is not green");
+  });
+
+  test("a release merge: the same red CI still refuses", () => {
+    expect(evaluateAny(red(), { release: true }).checks.find((c) => c.id === "ci")!.status).toBe("refuse");
+  });
+
+  test("the `release` label makes it a release without the flag", () => {
+    const s = red();
+    s.pr.labels.push({ name: RELEASE_LABEL });
+    expect(isRelease(s)).toBe(true);
+    expect(nonRelease(s).status).toBe("refuse");
+  });
+
+  test("CI that could not be read is advisory on a non-release merge, never a silent pass", () => {
+    const c = advisoryCi({ n: 5, id: "ci", status: "unknown", detail: "could not read the head's runs: HTTP 502" });
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain("could not be judged");
+    expect(c.detail).toContain("HTTP 502");
+  });
+
+  test("green CI says it was advisory", () => {
+    const c = advisoryCi({ n: 5, id: "ci", status: "pass", detail: "3 workflows green" });
+    expect(c.detail).toBe("3 workflows green (advisory: not a gate on a non-release merge)");
+  });
+
+  test("advisory CI lifts only check 5: every other refusal still stands", () => {
+    const v = evaluateAny(red(), {});
+    expect(v.checks.filter((c) => c.id !== "ci" && c.status === "refuse").length).toBe(
+      evaluateAny(red(), { release: true }).checks.filter((c) => c.id !== "ci" && c.status === "refuse").length,
+    );
   });
 });
