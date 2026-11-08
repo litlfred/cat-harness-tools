@@ -633,7 +633,8 @@ const SV_CSS = `.sv-page a:not(.fa-workplan a) { color: inherit; text-decoration
 .sv-counts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.6rem 0 0; padding: 0; list-style: none; }
 .sv-count { border: 1px solid rgba(127,127,127,0.4); border-radius: 6px; padding: 0.4rem 0.7rem; min-width: 4.5rem; }
 .sv-count-v { display: block; font-size: 1.1rem; font-weight: 600; line-height: 1.25; }
-.sv-count-k { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }`;
+.sv-count-k { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.sv-page td { vertical-align: top; }`;
 
 /**
  * The sibling dashboards, listed on every page.
@@ -2511,7 +2512,12 @@ export function beansSubjectPage(
       )
       .join("");
     body =
-      `<h2 class="sv-h2">Open — ${open.length} of ${all.length} bean(s)</h2>` +
+      // Says WHOSE store, beside the navbar's Beans badge: that badge counts
+      // the folio's own work plan, so 48 there and 2 here read as a
+      // contradiction when the page did not name its scope (owner, 2026-11-08).
+      `<h2 class="sv-h2">Open in ${esc(s.name)}'s own store — ${open.length} of ${all.length} bean(s)</h2>` +
+      `<p class="sv-sub">Only the beans in ${esc(s.name)}'s own store. The Beans badge in the navbar counts ` +
+      `<a href="../">the repository work plan</a>, which is a different store.</p>` +
       (open.length === 0
         ? `<p class="sv-sub">Every bean in this store is completed or scrapped.</p>`
         : `<table><thead><tr><th>id</th><th>title</th><th>status</th><th>type</th><th>priority</th></tr></thead>` +
