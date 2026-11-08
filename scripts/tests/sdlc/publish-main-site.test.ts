@@ -66,6 +66,7 @@ describe("publish-main-site (bean 5uuf)", () => {
 
   test("own paths exclude escapes and reserved names", () => {
     expect(isOwnPath("doc/a.html")).toBe(true);
+    // input-site: inert #46ee0ca7 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     for (const p of ["", "/etc/x", "../x", "a/../b", "./a", "STAGING/x", "_render-log/x", MANIFEST, ".git/config"]) {
       expect(isOwnPath(p)).toBe(false);
     }

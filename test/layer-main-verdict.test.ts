@@ -39,6 +39,7 @@ function run(declared?: unknown): { verdict: string; failures: Record<string, un
   const out = join(d, "out"), sum = join(d, "summary");
   writeFileSync(out, ""); writeFileSync(sum, "");
   const r = spawnSync("python3", ["-I", SCRIPT, d, decl], {
+    // input-site: env PATH #72f0f068 — PATH handed to a child process, which decides which binaries it runs
     encoding: "utf-8", env: { PATH: process.env.PATH ?? "", GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: sum },
   });
   if (r.status !== 0) throw new Error(r.stderr);

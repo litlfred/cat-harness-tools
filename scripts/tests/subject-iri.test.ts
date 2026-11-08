@@ -192,8 +192,10 @@ describe("every subject loads: its own .jsonld and page", () => {
   });
   test("a preview's stamp is in each subject's .jsonld but not in its page (bean g196, Q-S1-1 A)", () => {
     const dir = mkdtempSync(join(tmpdir(), "subject-stamp-"));
+    // input-site: inert #ffead03e — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const keep = { GITHUB_SHA: process.env.GITHUB_SHA, KG_BRANCH: process.env.KG_BRANCH, GITHUB_RUN_ID: process.env.GITHUB_RUN_ID };
     try {
+      // input-site: inert #8a0b229e — sets the test's own variables, or hands the environment whole to a child; no value is read here
       Object.assign(process.env, { GITHUB_SHA: "feedc0de1234", KG_BRANCH: "feat/x", GITHUB_RUN_ID: "4242" });
       const stamped = { ...published, staging: { branch: "feat/x", sha: "feedc0de1234", pr: "1/merge", run: "4242" } };
       writeSubjectDocuments(stamped, join(dir, "folio-assistant-core.jsonld"));

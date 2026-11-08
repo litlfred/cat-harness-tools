@@ -55,6 +55,7 @@ describe("snapshotsFromGit", () => {
     const dir = mkdtempSync(join(tmpdir(), "burndown-"));
     try {
       const git = (...a: string[]) => {
+        // input-site: tree #58a92f79 — git in the test's own scratch repository, with the environment handed whole plus a fixed identity: git's answer, which the cone replays or records
         const r = spawnSync("git", a, { cwd: dir, encoding: "utf-8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
         if (r.status !== 0) throw new Error(r.stderr);
       };

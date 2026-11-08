@@ -128,6 +128,33 @@ export function isTestScratchDir(file: string, risks: readonly string[], code: s
   return /\btmpdir\s*\(/.test(code) && !RISKS.host!.test(code.replace(/\btmpdir\s*\(/g, ""));
 }
 
+/** `process.env` written, deleted, or spread whole into a child's environment: no value of it is read here. */
+const ENV_WRITE_RE = /\bprocess\.env(?:\.[A-Za-z_$][\w$]*|\[[^\]\n]+\])\s*=(?!=)|\bdelete\s+process\.env(?:\.[A-Za-z_$][\w$]*|\[[^\]\n]+\])|\.\.\.process\.env\b(?![.[])/g;
+
+/**
+ * The third and fourth sites that need no annotation in a TEST file (a test
+ * is only ever fingerprinted as a cone gate, `ci-cone.ts` `test:`):
+ *
+ * - `env`, when every `process.env` on the line is written (`process.env.X =`),
+ *   deleted, or spread whole into a child's environment (`{ ...process.env }`).
+ *   None of those reads a value into the test; a child's own reads are audited
+ *   from the trace (`childInputsOf`) or carry their spawn's own verdict.
+ * - `build`, a build-output directory named in a string. That risk exists
+ *   because the f017 tree digest leaves those directories out; the cone's read
+ *   set records every path a test opens under them, as any other.
+ *
+ * Both are `inert`. A read such as `const prev = process.env.X` still needs a
+ * reviewed annotation, as does any line with another risk beside these.
+ */
+export function isTestInertWrite(file: string, risks: readonly string[], code: string): boolean {
+  if (!TEST_FILE_RE.test(file)) return false;
+  // input-site: inert #6add3b6e — the risk's name, compared; no path is read
+  if (risks.length === 1 && risks[0] === "build") return true;
+  if (risks.length !== 1 || risks[0] !== "env") return false;
+  const rest = code.replace(ENV_WRITE_RE, "");
+  return rest !== code && !RISKS.env!.test(rest);
+}
+
 /** The call that starts a process, then its command or argv[0]. */
 const SPAWN_CALL = String.raw`(?:\bBun\.spawn(?:Sync)?|\bspawnSync|(?<!\w)spawn|\bexecFileSync|(?<!\w)execFile)\s*\(\s*\[?\s*`;
 /** A spawn of a literal `git`. */
@@ -511,6 +538,7 @@ export function scanSource(file: string, text: string): Site[] {
       else verdicts = parsed;
     }
     if (verdicts === undefined && malformed === undefined && isTestScratchDir(file, [...risks], c)) verdicts = [{ kind: "inert" }];
+    if (verdicts === undefined && malformed === undefined && isTestInertWrite(file, [...risks], c)) verdicts = [{ kind: "inert" }];
     if (verdicts === undefined && malformed === undefined) verdicts = testSpawnVerdict(file, [...risks], raw);
     sites.push({ file, line: i + 1, risks: [...risks], pin, verdicts, ...(malformed ? { malformed } : {}), ...(main.has(i) ? { inMain: true } : {}) });
   }

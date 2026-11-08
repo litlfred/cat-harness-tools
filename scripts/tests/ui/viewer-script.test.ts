@@ -98,6 +98,7 @@ describe("the viewer's Lean helpers read both shapes", () => {
     if (!m) throw new Error(`viewer/index.html no longer defines ${name}(l)`);
     return m[0];
   });
+  // input-site: inert #026b2ca6 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   const { hasLean, leanDeclName, leanSourceHref } = new Function(
     `${src.join("\n")}; return { hasLean, leanDeclName, leanSourceHref };`,
   )() as {
@@ -141,6 +142,7 @@ describe("the viewer's route recogniser takes every block label, not a hand-kept
   // Evaluated from the page, so this tests what ships.
   const m = PAGE.match(/const LABEL_RE = (\/.*\/[a-z]*);/);
   if (!m) throw new Error("viewer/index.html no longer defines LABEL_RE");
+  // input-site: inert #2cb163d1 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   const LABEL_RE = new Function(`return ${m[1]};`)() as RegExp;
 
   test("tables, algorithms and the other prefixes qou uses are labels", () => {

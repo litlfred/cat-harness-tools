@@ -67,6 +67,7 @@ describe("a path is checked by VALUE, not trusted by provenance", () => {
     );
   });
 
+  // input-site: inert #03ba8569 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
   test.each([["/etc/passwd"], ["a\\b"], ["a//b"], [".."], ["./x"], ["a/./b"]])(
     "refuses %s",
     (p) => {

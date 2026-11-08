@@ -108,6 +108,7 @@ function judge(f: Fx, ref: string): { reuse: string; out: string } {
     encoding: "utf8",
     env: {
       ...process.env,
+      // input-site: env PATH #be46e52e — PATH handed to a child process, which decides which binaries it runs
       PATH: `${f.bin}:${process.env.PATH}`,
       FX: f.fx,
       REPO: "o/r",

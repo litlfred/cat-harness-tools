@@ -178,6 +178,7 @@ describe("refusals — every way of writing a precondition that lies", () => {
 
   test("an absolute ref", async () => {
     await refuses(
+      // input-site: inert #8cbc72f7 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
       '<bootstrap.processes:precondition id="a" kind="checkable" check="file-exists" ref="/etc/hosts" text="t"/>',
       true,
     );
