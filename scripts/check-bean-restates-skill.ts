@@ -73,6 +73,7 @@ import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { OPEN_STATUSES, readBeanStore, type BeanFile } from "./bean-store-read.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { BeanStoreAbsentError, exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 /**
  * A column header naming an exit condition or a criterion.
@@ -199,6 +200,7 @@ export function checkBeanRestatesSkill(root: string): RestatesSkillReport {
     // Same reason one state over (bean `9ofm` row D): a store this checkout
     // could not reach is not an empty corpus, and the vacuity guard below
     // would read it as one. Different remedy, so a different message.
+    if (store.absent) throw new BeanStoreAbsentError(store.reason);
     throw new Error(`the bean store could not be reached: ${store.reason}`);
   }
   const open: BeanFile[] = store.beans.filter((b) => !b.archived && OPEN_STATUSES.has(b.status));
@@ -252,6 +254,7 @@ if (import.meta.main) {
       process.exit(2);
     }
   } catch (e) {
+    exitIfBeanStoreAbsent("check:bean-restates-skill", e);
     console.error(`Could not check whether a bean restates a skill: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
     process.exit(2);

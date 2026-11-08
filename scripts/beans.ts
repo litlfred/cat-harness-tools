@@ -48,6 +48,7 @@ import {
 // Bean `9ofm` row D. No cycle: `graph-read` reads the declaration, git and the
 // mount marker, and knows nothing about beans.
 import { graphReadPath } from "./graph-read.ts";
+import { BeanStoreAbsentError } from "./lib/bean-store-absent.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 export const ROOT = resolve(HARNESS_ROOT);
@@ -199,7 +200,10 @@ function sequence(fm: string, key: string): string[] {
  */
 export function beanDefsDir(root: string): string | null {
   const r = resolveBeanDefs(root);
-  if (r.unreachable) throw new Error(`cannot resolve the bean store: ${r.unreachable}`);
+  if (r.unreachable) {
+    if (r.absent) throw new BeanStoreAbsentError(r.unreachable);
+    throw new Error(`cannot resolve the bean store: ${r.unreachable}`);
+  }
   return r.dir;
 }
 
@@ -249,7 +253,7 @@ export function resolveBeanDefs(root: string): BeanDefsResolution {
   if (where.state === "refused") {
     // Not a path that merely happens not to exist: that reads as "no store"
     // one level up, which is the whole defect.
-    return { dir: null, declared: true, unreachable: where.reason };
+    return { dir: null, declared: true, unreachable: where.reason, ...(where.absent ? { absent: true as const } : {}) };
   }
   // `undeclared` keeps the convention: an unmigrated folio with no `beans`
   // entry at all has no store, which is fine rather than wrong.

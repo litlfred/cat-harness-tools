@@ -26,6 +26,7 @@ import { relative, resolve } from "node:path";
 
 import { beanDefsDir, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { isAncestor } from "./git-ancestry.ts";
+import { BeanStoreAbsentError, exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 /** A defect found: a draft decision bean reachable from no ancestor of the default branch. */
 export interface DraftBeanFinding {
@@ -139,6 +140,7 @@ export function checkDraftBeans(
 ): DraftBeansReport {
   const storeRes = resolveBeanDefs(root);
   if (storeRes.unreachable) {
+    if (storeRes.absent) throw new BeanStoreAbsentError(storeRes.unreachable);
     return {
       store: null,
       total: 0,
@@ -301,6 +303,7 @@ if (import.meta.main) {
   try {
     report = checkDraftBeans(resolve("."));
   } catch (e) {
+    exitIfBeanStoreAbsent("check:draft-beans", e);
     console.error(`Could not check draft beans: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
     process.exit(2);
