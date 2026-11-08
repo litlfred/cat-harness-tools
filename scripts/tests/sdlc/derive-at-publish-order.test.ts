@@ -174,7 +174,7 @@ describe("an entry fills the kinds of the declared directory that holds it", () 
     expect(enclosingKinds(dirs, "docs/")).toEqual(["docs"]);
     expect(enclosingKinds(dirs, "./fhir-artifact-index/menu.json")).toEqual(["fhir-artifact-index"]);
     expect(enclosingKinds(dirs, "fhir-artifact-indexes/x.json")).toEqual([]);
-    expect(enclosingKinds(dirs, "ns/context/v1.jsonld")).toEqual([]);
+    expect(enclosingKinds(dirs, "elsewhere/outside.json")).toEqual([]);
     expect(declaredPlan(tmp).find((a) => a.instance === "b-ig" && a.path === "docs/")?.fills).toEqual(["docs", "ig-pages"]);
   });
 });
