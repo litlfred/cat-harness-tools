@@ -69,6 +69,7 @@ import {
 } from "./bean-store-read.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { BeanStoreAbsentError, exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 /**
  * The two beans whose front matter carries a duplicate key today.
@@ -469,6 +470,7 @@ function main(): void {
   try {
     report = checkBeanFrontMatter(root);
   } catch (err) {
+    exitIfBeanStoreAbsent("check:bean-front-matter", err);
     // COULD NOT CHECK is its own exit, never a pass. An unreadable store is
     // exactly the condition this gate exists for, so reporting it as clean
     // would be the defect wearing the fix's clothes.
@@ -494,6 +496,8 @@ function main(): void {
   // and with a message that sends the reader to look for a store that is
   // exactly where its declaration says.
   if (report.storeState === "unreachable") {
+    const store = readBeanStore(root);
+    if (store.state === "unreachable" && store.absent) exitIfBeanStoreAbsent("check:bean-front-matter", new BeanStoreAbsentError(store.reason));
     console.error(
       "::error::check-bean-front-matter: the bean store is kept on its branch and is not mounted here, " +
         "so nothing scanned it and nothing here was checked. Run `bun run cat state:mount`. NOT a pass",

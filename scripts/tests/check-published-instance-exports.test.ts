@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import {
+  publishesNoInstanceGraph,
   COMMITTED_SIDECAR,
   committedSidecarSubjects,
   sidecarSubjectsFrom,
@@ -83,6 +84,23 @@ describe("publishedInstances", () => {
 
   test("this instance's own export carries no --instance and is not counted", () => {
     expect(publishedInstances('bun run cat-harness/scripts/kg-export.ts             --scope instance --out "./_site/${STUB}/${STUB}.jsonld"', "w.yml")).toEqual([]);
+  });
+});
+
+// cat-harness-tools#1701: an IG repository that is its own index deploys no
+// folio site, so "examined nothing" there is determined, not a pattern drift.
+describe("publishesNoInstanceGraph", () => {
+  test("no deploy workflow and no publisher named anywhere: determined, with a reason", () => {
+    const wf = new Map([["ghbuild.yml", "run: ./_genonce.sh"], ["release.yml", "run: echo"]]);
+    expect(publishesNoInstanceGraph(wf)).toContain("publishes no instance graph");
+  });
+
+  test("the deploy workflow present: not determined, judged as before", () => {
+    expect(publishesNoInstanceGraph(new Map([["docs-site.yml", "run: echo"]]))).toBeUndefined();
+  });
+
+  test("a publisher named in a line the patterns miss: not determined (the pattern may have drifted)", () => {
+    expect(publishesNoInstanceGraph(new Map([["x.yml", "run: bun kg-export.ts\\\n  --instance ./a"]]))).toBeUndefined();
   });
 });
 

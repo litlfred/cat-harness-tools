@@ -38,7 +38,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { baseDocsDir } from "./compose-docs.js";
-import { skillPagesOf } from "./lib/skill-pages.ts";
+import { skillLinksOf, skillSourceFilesOf, skillTarget, sourceSkillPage, type SkillPages } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { businessProcessFiles, workflowFiles, kgRoots } from "./known-skills.js";
 import { loadProcessModel, isActivity, isDecision, branchesOf, isGlobalTasksFile, type NotRunElement } from "../src/workflow/process-model.js";
@@ -75,6 +75,9 @@ import {
   type PanelData,
   type PanelLink,
   type PanelTask,
+  unlinkedPanelRefs,
+  panelLinksReport,
+  type UnlinkedRef,
 } from "./lib/task-panel.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
 import { subjectHref } from "./lib/subject-pages.ts";
@@ -332,7 +335,7 @@ const uniq = (xs: string[]): string[] => [...new Set(xs.filter((x) => x))].sort(
  * declares its own three diagrams and `cat-harness` does not reach them, so a
  * single-root index would omit them silently rather than group them.
  */
-function instanceRoots(repo: string): string[] {
+export function instanceRoots(repo: string): string[] {
   const out: string[] = [];
   for (const e of readdirSync(repo, { withFileTypes: true })) {
     if (!e.isDirectory() || e.name.startsWith(".") || e.name === "node_modules") continue;
@@ -650,10 +653,63 @@ export interface PanelContext {
   usesMethodology: (skill: string) => readonly string[] | undefined;
 }
 
+/** Where the pages rendered from skills' source files go, below the processes index. */
+export const SOURCE_SKILLS_DIR = "skills";
+
+/**
+ * The page for a skill with no instruction page, rendered from its source
+ * file (`sourceSkillPage`), with the processes that name it. It sits one
+ * directory below the process pages.
+ */
+export function sourceSkillPageMd(
+  name: string,
+  text: string,
+  url: string,
+  file: string,
+  localNames: ReadonlySet<string>,
+  rows: readonly ProcessRow[],
+): string {
+  const p = sourceSkillPage(name, text, url, localNames);
+  const users = rows.filter(
+    (r) => r.loadError === undefined && (r.skills.includes(name) || (r.laneDetails ?? []).some((l) => l.roleSkills.some((x) => x.skill === name))),
+  );
+  const L: string[] = ["---", `title: '${name.replace(/'/g, "''")} (skill)'`, "nav_exclude: true", GENERATED_FM, "---", ""];
+  L.push("{: .note }");
+  L.push(
+    `> The skill \`${name}\` as its source file [\`${file}\`](${url}) writes it, rendered by \`gen-processes-viz.ts\` because ` +
+      "it has no instruction page on this site — do not edit here. [All processes](../index.html)",
+  );
+  L.push("");
+  const rawFrom = L.length;
+  // The skill's own title first, then what it is and who names it, then the rest of its body.
+  const lines = p.body.trimEnd().split("\n");
+  const h1 = lines.findIndex((l) => /^# /.test(l));
+  if (h1 >= 0) L.push(...lines.splice(0, h1 + 1), "");
+  else L.push(`# ${name}`, "");
+  if (p.description) L.push(`**Skill \`${name}\`:** ${p.description}`, "");
+  if (users.length) L.push(`**Named by:** ${users.map((r) => `[${esc(r.name)}](../${r.stem}.html)`).join(", ")}`, "");
+  L.push(...lines);
+  L.push(...wrapRaw(L.splice(rawFrom).join("\n")));
+  return `${L.join("\n")}\n`;
+}
+
+/** The QA page of panel names that link nowhere, beside the processes index. */
+export const PANEL_LINKS_QA = "panel-links-qa.md";
+
+/**
+ * The anchor of a step's row in its process page's step table: where the ⓘ
+ * panel's task title goes (owner, 2026-11-08: "title of task should skip to
+ * description thats below"). BPMN ids are NCNames, so they need no escaping.
+ */
+export const stepAnchor = (id: string): string => `step-${id}`;
+/** The anchor of a lane's row in the page's lanes table. */
+export const laneAnchor = (id: string): string => `lane-${id}`;
+
 /**
  * The links, from the declarations that own them:
  *
- * - skills: the instruction pages that exist (`skillPagesOf`), as the step
+ * - skills: the instruction page where one exists, else the skill's source
+ *   file on the forge (`skillTarget`), as the step
  *   table already links them;
  * - methodologies: `<methodologies route>/<instance>/<name>/`, the per-node
  *   pages of cat-harness-tools #422, from the declared `methodologies-viewer`
@@ -665,7 +721,7 @@ export interface PanelContext {
  *   the `roles.json` that declares the role;
  * - steps, lanes and processes: their own pages, `<doc dir>/process/P…` (#603).
  */
-export function panelContext(repo = REPO, skillPages: ReadonlySet<string> = skillPagesOf(repo)): PanelContext {
+export function panelContext(repo = REPO, skillPages: SkillPages = skillLinksOf(repo, instanceRoots(repo))): PanelContext {
   const root = up(repo);
   const harness = join(repo, "cat-harness");
   const methPage = methodologiesPageRel(repo);
@@ -688,7 +744,7 @@ export function panelContext(repo = REPO, skillPages: ReadonlySet<string> = skil
   }
   const edges = skillEdgeIndex(instanceRoots(repo));
   return {
-    skillHref: (s) => (skillPages.has(s) ? `${root}reference/skill-instructions/${s}.html` : undefined),
+    skillHref: (s) => skillTarget(s, root, skillPages),
     methodologyHref: (name) => {
       const inst = methInstance.get(name);
       return inst && methPage ? `${root}${dirname(methPage)}/${methodologyPageDir(inst, name)}` : undefined;
@@ -728,12 +784,17 @@ export function taskPanelData(
     const roleId = lane?.roleId;
     const called = st.calledElement ? byId.get(st.calledElement) : undefined;
     const href = ctx.subjectHref(row.file, "process", `${row.id}/node/${st.id}`);
-    const laneHref = lane ? ctx.subjectHref(row.file, "process", `${row.id}/lane/${lane.id}`) : undefined;
+    // A lane with no page of its own lands on its row in the lanes table.
+    const laneHref = lane
+      ? (ctx.subjectHref(row.file, "process", `${row.id}/lane/${lane.id}`) ?? `${row.stem}.html#${laneAnchor(lane.id)}`)
+      : undefined;
     tasks[st.id] = {
       id: st.id,
       name: st.name,
       type: st.type,
       ...(href ? { href } : {}),
+      // The step's description on its process page, which the title opens.
+      stepHref: `${row.stem}.html#${stepAnchor(st.id)}`,
       ...(st.lane ? { lane: st.lane } : {}),
       ...(laneHref ? { laneHref } : {}),
       skills: (skillsOn ? st.skills : []).map((s) => {
@@ -765,7 +826,7 @@ export function taskPanelData(
           : {}),
     };
   }
-  const processHref = ctx.subjectHref(row.file, "process", row.id);
+  const processHref = ctx.subjectHref(row.file, "process", row.id) ?? `${row.stem}.html`;
   return {
     $schema: "process-task-panel/v1",
     process: row.id,
@@ -806,7 +867,7 @@ export interface PageScope {
  */
 export function page(
   rows: readonly ProcessRow[],
-  skillPages: ReadonlySet<string> = new Set(),
+  skillPages: SkillPages = new Set(),
   instances: InstancesRead = NO_INSTANCES,
   scope: PageScope = {},
 ): string {
@@ -910,13 +971,17 @@ export function page(
   // links — found by FILE, the key `skillToProcesses` joins on. A file with no
   // loaded row publishes no page, so it stays code.
   const pageOf = new Map(ok.map((r) => [r.file, r.stem]));
-  const skillCell = (s: string): string =>
-    skillPages.has(s) ? `[\`${esc(s)}\`](${root}reference/skill-instructions/${s}.html)` : `\`${esc(s)}\``;
+  const skillCell = (s: string): string => {
+    const to = skillTarget(s, root, skillPages);
+    return to ? `[\`${esc(s)}\`](${to})` : `\`${esc(s)}\``;
+  };
   const runBy = (f: string): string => {
     const stem = pageOf.get(f);
     return stem === undefined ? `\`${esc(basename(f))}\`` : `[\`${esc(basename(f))}\`](${base}${stem}.html)`;
   };
   for (const [s, fs] of join) L.push(`| ${skillCell(s)} | ${fs.map(runBy).join(", ")} |`);
+  L.push("");
+  L.push(`Names an ⓘ task panel shows without a link are listed on [Task panel links: QA](${base}${PANEL_LINKS_QA.replace(/\.md$/, ".html")}).`);
   L.push("");
 
   L.push("## Who appears in a process?");
@@ -1091,7 +1156,7 @@ export function instancesCell(instances: InstancesRead, id: string, root: string
 export function processPage(
   row: ProcessRow,
   rows: readonly ProcessRow[],
-  skillPages: ReadonlySet<string>,
+  skillPages: SkillPages,
   presentedOn: readonly Presentation[] = [],
   instances: InstancesRead = NO_INSTANCES,
   unlinked: (ref: string) => void = () => {},
@@ -1102,13 +1167,15 @@ export function processPage(
     const r = linkProse(
       t,
       (id) => (byId.get(id) ? `${byId.get(id)!.stem}.html` : undefined),
-      (n) => (skillPages.has(n) ? `${up()}reference/skill-instructions/${n}.html` : undefined),
+      (n) => skillTarget(n, up(), skillPages),
     );
     r.unlinked.forEach(unlinked);
     return escapeAngles(r.text);
   };
-  const skill = (s: string): string =>
-    skillPages.has(s) ? `[\`${s}\`](${up()}reference/skill-instructions/${s}.html)` : `\`${s}\``;
+  const skill = (s: string): string => {
+    const to = skillTarget(s, up(), skillPages);
+    return to ? `[\`${s}\`](${to})` : `\`${s}\``;
+  };
   const proc = (r: ProcessRow): string => `[${esc(r.name)}](${r.stem}.html)`;
   /**
    * A `<bpmn:documentation>` body inside a MARKDOWN TABLE CELL.
@@ -1219,7 +1286,7 @@ export function processPage(
         : "no docs page section shows this diagram"
     }`,
   );
-  if (skillPages.has(row.stem)) L.push(`- **Skill:** ${skill(row.stem)}`);
+  if (skillTarget(row.stem, up(), skillPages)) L.push(`- **Skill:** ${skill(row.stem)}`);
   L.push(`- **Running instances:** ${instancesCell(instances, row.id)}`);
   L.push("");
 
@@ -1230,7 +1297,7 @@ export function processPage(
   } else {
     L.push("| lane | role | what it does here |");
     L.push("|---|---|---|");
-    for (const l of row.laneDetails) L.push(`| ${esc(l.name)} | ${l.roleRef ? `\`${l.roleRef}\`` : "—"} | ${cell(l.documentation)} |`);
+    for (const l of row.laneDetails) L.push(`| <a id="${laneAnchor(l.id)}"></a>${esc(l.name)} | ${l.roleRef ? `\`${l.roleRef}\`` : "—"} | ${cell(l.documentation)} |`);
   }
   L.push("");
 
@@ -1260,7 +1327,7 @@ export function processPage(
         ? `${st.documentation ? "<br><br>" : ""}${cell(st.narrative.text)}`
         : `${st.documentation ? "<br>" : ""}_narrative \`${esc(st.narrative.href)}\` not found_`
       : "";
-    L.push(`| **${esc(st.name)}**<br>\`${st.id}\` | ${cell(st.lane)} | ${how} | ${st.documentation || !st.narrative ? cell(st.documentation) : ""}${narr} |`);
+    L.push(`| <a id="${stepAnchor(st.id)}"></a>**${esc(st.name)}**<br>\`${st.id}\` | ${cell(st.lane)} | ${how} | ${st.documentation || !st.narrative ? cell(st.documentation) : ""}${narr} |`);
   }
   L.push("");
 
@@ -1336,7 +1403,7 @@ export function indexScope(rows: readonly ProcessRow[]): PageScope {
 export function publishedIndex(
   rows: Parameters<typeof page>[0],
   repo = REPO,
-  skillPages: ReadonlySet<string> = skillPagesOf(repo),
+  skillPages: SkillPages = skillLinksOf(repo, instanceRoots(repo)),
   // Read by default, as `skillPages` is: the committed instances are an input
   // of the page, so a caller that omits them gets the page the generator writes.
   instances: InstancesRead = instancesRead(workflowInstanceLinks()),
@@ -1366,7 +1433,17 @@ if (import.meta.main) {
     console.error("✗ no BPMN diagrams found — refusing to write an index over nothing");
     process.exit(1);
   }
-  const skillPages = skillPagesOf(REPO);
+  // A skill the diagrams name with no instruction page gets a page rendered
+  // from its source, in this viewer's `skills/` (owner, 2026-11-08: "fill in
+  // missing"); one with no source either stays code.
+  const sourceFiles = skillSourceFilesOf(REPO, instanceRoots(REPO));
+  const linked = skillLinksOf(REPO, instanceRoots(REPO));
+  const named = new Set(rows.flatMap((r) => [...r.skills, ...(r.laneDetails ?? []).flatMap((l) => l.roleSkills.map((x) => x.skill))]));
+  const localSkills = [...named].filter((n) => !linked.has(n) && sourceFiles.has(n)).sort();
+  const skillPages: SkillPages = Object.assign(new Set(linked), {
+    sources: linked.sources ?? new Map<string, string>(),
+    local: new Map(localSkills.map((n) => [n, `${dirname(rel)}/${SOURCE_SKILLS_DIR}/${n}.html`])),
+  });
   // The workflow instances each diagram runs in (bean `v49e`): links to their
   // pages, read from the committed instance files the state visualiser draws.
   const instances = instancesRead(workflowInstanceLinks());
@@ -1389,9 +1466,15 @@ if (import.meta.main) {
     if (sub !== undefined) pages.set(join(into ?? baseDocsDir(REPO), sub), publishedIndex(x.rows, REPO, skillPages, instances, { instance: x.name }));
   }
   const ctx = panelContext(REPO, skillPages);
+  const localSet = new Set(localSkills);
+  for (const n of localSkills) {
+    const src = sourceFiles.get(n)!;
+    pages.set(join(dirname(out), SOURCE_SKILLS_DIR, `${n}.md`), sourceSkillPageMd(n, readFileSync(src.file, "utf-8"), src.url, relative(REPO, src.file), localSet, rows));
+  }
   // Whether the ⓘ panel shows skills: the site's declaration, on unless it
   // says `site.taskSkills: false` (`taskSkillsDeclared`).
   const skills = taskSkillsDeclared(REPO);
+  const unlinked = new Map<string, { title: string; refs: UnlinkedRef[] }>();
   for (const r of rows.filter((x) => x.loadError === undefined)) {
     const refs = new Set<string>();
     pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, rows, skillPages, presented.get(r.file), instances, (x) => refs.add(x)));
@@ -1401,7 +1484,23 @@ if (import.meta.main) {
       console.error(`⚠ ${r.file}: documentation names ${x.startsWith("skill:") ? `skill \`${x.slice(6)}\`, which has no instruction page` : `\`${x}\`, which no loaded diagram declares`}`);
     }
     // The ⓘ panel's data, fetched by the page only when a marker is opened.
-    if (r.markers) pages.set(join(dirname(out), panelFile(r.stem)), `${JSON.stringify(taskPanelData(r, rows, ctx, { skills }), null, 1)}\n`);
+    if (r.markers) {
+      const data = taskPanelData(r, rows, ctx, { skills });
+      pages.set(join(dirname(out), panelFile(r.stem)), `${JSON.stringify(data, null, 1)}\n`);
+      unlinked.set(r.stem, { title: r.name, refs: unlinkedPanelRefs(data) });
+    }
+  }
+  // QA (owner, 2026-11-08: "need QA report"): every name a panel shows as
+  // "no page for this one", on a page of its own and here, once per name.
+  pages.set(join(dirname(out), PANEL_LINKS_QA), panelLinksReport(unlinked, GENERATED_FM));
+  const seenRef = new Set<string>();
+  for (const [stem, p] of unlinked) {
+    for (const x of p.refs) {
+      const key = `${x.kind}\0${x.name}`;
+      if (seenRef.has(key)) continue;
+      seenRef.add(key);
+      console.error(`⚠ task panel: ${x.kind} \`${x.name}\` links nowhere (first on ${stem}${x.task ? ` at ${x.task}` : ""}) — see ${PANEL_LINKS_QA}`);
+    }
   }
   // The panel's client and styles as files beside the sidecars, the same text
   // each process page carries inline, so any page of the site that shows a

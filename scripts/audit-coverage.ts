@@ -73,7 +73,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import {
   type ResolvedDirectory,
@@ -107,6 +107,7 @@ import { readQaTree } from "./qa-store.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";
+import { absenceAt } from "./branch-store.ts";
 
 /** The LAYER root — this file lives at `<instance>/scripts/`. */
 const ROOT = resolve(HARNESS_ROOT);
@@ -179,7 +180,17 @@ export type KindState =
    * which of the two cases it is and how to fix it; this report's job is only
    * to refuse to put a number on what it could not read.
    */
-  | "undetermined";
+  | "undetermined"
+  /**
+   * Every directory of this kind that is not `stored` was DETERMINED absent
+   * from this checkout by `state:mount` (an `.absent` record, `absenceAt`):
+   * declared for every checkout by a mounted instance, not by this root, and
+   * not on this checkout's remote — an IG repository that is its own index
+   * (cat-harness-tools#1701). Not a lower bound like `undetermined`: the
+   * graph is not this checkout's, so there is nothing here to count. Not a
+   * finding, and not covered either.
+   */
+  | "absent";
 
 export type AdversarialCoverageState = "reviewed" | "stale" | "never";
 
@@ -356,12 +367,13 @@ export function censusDirectories(
   dirs: ReadonlyArray<{ id?: string; absPath: string; storage?: unknown; source?: SubgraphSource }>,
   skip?: ReadonlySet<string>,
   repoRoot: string = process.cwd(),
-): { files: number; sidecars: number; stored: number; undetermined: number; uncounted: number } {
+): { files: number; sidecars: number; stored: number; undetermined: number; uncounted: number; absent: number } {
   let files = 0;
   let sidecars = 0;
   let stored = 0;
   let undetermined = 0;
   let uncounted = 0;
+  let absent = 0;
   for (const d of dirs) {
     let at = d.absPath;
     if (contentIsOffCheckout(d)) {
@@ -389,6 +401,13 @@ export function censusDirectories(
       }
       const t = tipPresence(src, d.absPath, repoRoot);
       if (t.state !== "mounted") {
+        // Determined NOT this checkout's at mount time (cat-harness-tools#1701):
+        // nothing to count, and no lower bound either. Only an unmounted tip
+        // with that record; a not-cut-over one stays undetermined.
+        if (t.state === "unmounted" && absenceAt(repoRoot, relative(repoRoot, d.absPath).split(sep).join("/"), d.id)) {
+          absent++;
+          continue;
+        }
         undetermined++;
         continue;
       }
@@ -402,7 +421,7 @@ export function censusDirectories(
     files += c.files;
     sidecars += c.sidecars;
   }
-  return { files, sidecars, stored, undetermined, uncounted };
+  return { files, sidecars, stored, undetermined, uncounted, absent };
 }
 
 /**
@@ -782,7 +801,7 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
       }
     }
     const dirs = new Set(resolved.keys());
-    const { files, sidecars, stored, undetermined, uncounted } = censusDirectories([...resolved.values()], undefined, repo);
+    const { files, sidecars, stored, undetermined, uncounted, absent } = censusDirectories([...resolved.values()], undefined, repo);
     const crit = criteriaByGraph.get(kind);
     const gs = gatesByKind.get(kind) ?? [];
     const def = defaultGraphTypologies.get(kind);
@@ -798,6 +817,8 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
         // for the same reason it always had it.
         : undetermined > 0
           ? "undetermined"
+          : absent > 0 && absent + stored === dirs.size
+            ? "absent"
           : stored === dirs.size
             ? "stored"
             : files === 0 && uncounted > 0

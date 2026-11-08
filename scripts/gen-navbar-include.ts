@@ -43,6 +43,7 @@ import { kindTitle } from "./lib/nav-label.js";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
 import {
+  GROUP_GLYPHS,
   RAIL_SECTION_LABELS,
   navbarOpenInputHtml,
   navbarRegionsHtml,
@@ -222,7 +223,8 @@ function model(
   const shown = harnesses.filter((h) => h.instantiated === true);
   const group: NavGroup = {
     label: RAIL_SECTION_LABELS.harnesses,
-    icon: "▦",
+    icon: "H",
+    glyphPath: GROUP_GLYPHS.harnesses,
     items: shown.map((h) => harnessRow(h, staging)),
     collapsible: true,
   };
@@ -235,7 +237,7 @@ function model(
     // The site's page tree, server-built (owner, 2026-10-15, "folio rail
     // everywhere"). Given only with `--pages`: while the theme's own
     // `site-nav` is on the page, a second copy here would be the tree twice.
-    ...(pages && pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "\u25A5", items: pages, collapsible: true, open: false } } : {}),
+    ...(pages && pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "P", glyphPath: GROUP_GLYPHS.pages, items: pages, collapsible: true, open: false } } : {}),
     ...(shown.length > 0 ? { harnesses: group } : {}),
     // fsh-guts in the FIXED top (#1925, owner 2026-10-02: *"also add fsh-guts
     // icon to LHS top navbar"*), only when this layer DECLARES the

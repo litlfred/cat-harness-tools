@@ -248,6 +248,16 @@ export function graphTiles(
   qualifierFor?: (d: TiledDirectory) => string | undefined,
   /** Harness names a declared title may end with, as "Docs — cat-harness". Stripped from the label. */
   harnessNames: readonly string[] = [],
+  /**
+   * The name the harness rows already give a destination (`href`), when they
+   * give one. Consulted ONLY for a tile with no declared title, in place of
+   * the directory's first kind (cat-harness-tools#1701): a base layer's
+   * `schemas/` declares `["code", "schemas"]` and opens the schema viewer, so
+   * the rows, FOLDERS and the sidebar call that page "Schemas" while the
+   * first-kind fallback made its tile "Code" — two names for one destination,
+   * which `check:nav-names` fails. A declared title still wins, unchanged.
+   */
+  labelFor?: (href: string) => string | undefined,
 ): GraphTile[] {
   const tiles: GraphTile[] = [];
   // ONE TILE PER PAGE (#1168 B7a-2b, owner 2026-09-29: "tiles for all, one
@@ -271,22 +281,19 @@ export function graphTiles(
       // as "not declared" and the kind's display name is used instead.
       const declared = v.title === d.id ? undefined : v.title;
       const qualifier = qualifierFor?.(d);
+      const href = siteDirFromRepoRoot === undefined ? undefined : publishedHref(siteDirFromRepoRoot, v.ref);
+      const rowName = declared === undefined && href !== undefined ? labelFor?.(href) : undefined;
       tiles.push({
         // The index is part of the id only where it has to be. A directory
         // with one visualisation gets its own name, which is what a reader
         // sees in a URL fragment and what a test addresses it by.
         id: vis.length === 1 ? d.id : `${d.id}/${i + 1}`,
         directory: d.id,
-        title: tileLabel(d, declared, harnessNames),
+        title: rowName ?? tileLabel(d, declared, harnessNames),
         ...(qualifier ? { qualifier } : {}),
         ref: v.ref,
         surfaces: TILE_SURFACES.filter((s) => showsOn(v, s)),
-        ...(siteDirFromRepoRoot === undefined
-          ? {}
-          : (() => {
-              const href = publishedHref(siteDirFromRepoRoot, v.ref);
-              return href === undefined ? {} : { href };
-            })()),
+        ...(href === undefined ? {} : { href }),
         hidden: v.hidden === true,
         // FROM THE DIRECTORY, NOT THE VISUALISATION. Read-only is a property of
         // the CONTENT — several visualisations of one directory are several

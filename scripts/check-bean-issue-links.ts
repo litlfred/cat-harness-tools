@@ -32,6 +32,7 @@ import { OPEN_STATUSES, readBeanFiles } from "./bean-store-read.ts";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 /** The LAYER root — this file lives at `<instance>/scripts/`. */
 export const INSTANCE_ROOT = HARNESS_ROOT;
@@ -241,6 +242,7 @@ if (import.meta.main) {
         : { state: "unknown", orphans: [], read: 0, because: asked.because };
     report = checkBeanIssueLinks(INSTANCE_ROOT, reverse);
   } catch (e) {
+    exitIfBeanStoreAbsent("check:bean-issue-links", e);
     console.error(`Could not check bean/issue links: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
     process.exit(2);

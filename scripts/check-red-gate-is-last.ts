@@ -29,6 +29,10 @@ import { join, resolve } from "node:path";
 
 import { parse } from "yaml";
 
+import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
+import { rootProfile } from "./lib/root-gate-set.ts";
+
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = resolve(INSTANCE_ROOT, "..");
 const WORKFLOW = join(REPO_ROOT, ".github", "workflows", "code-quality-gates.yml");
@@ -199,7 +203,26 @@ export function redGateIsLast(
   return report;
 }
 
+/**
+ * Why this gate has nothing to judge in `repoRoot`, or null when it does.
+ *
+ * Its whole subject is {@link WORKFLOW}, the HARNESS's gates workflow. A
+ * CONTENT root (`rootProfile`, the generic rule: no such file at the root) runs
+ * the shared `layer-pr-checks.yml` instead and declares no deliberately-red
+ * placement, so the file's absence there is not a renamed workflow but one this
+ * root never had (cat-harness-tools#1701; smart-ips-pilgrimage#13 read it as
+ * ENOENT). A harness root carries the file by definition and is judged as before.
+ */
+export function notApplicableHere(repoRoot: string): string | null {
+  return rootProfile(repoRoot) === "content"
+    ? `${GATES_WORKFLOW} is absent at the root, so this is a content root ` +
+        "(its CI is the shared layer-pr-checks.yml); the deliberately-red placement is the harness gates workflow's, not this root's"
+    : null;
+}
+
 if (import.meta.main) {
+  const na = notApplicableHere(REPO_ROOT);
+  if (na !== null) exitNotApplicable("check:red-gate-is-last", na);
   const doc = parse(readFileSync(WORKFLOW, "utf-8"));
   const report = redGateIsLast(doc);
 

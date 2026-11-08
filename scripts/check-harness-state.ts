@@ -38,7 +38,8 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { directoriesForGraph, instanceRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { directoriesForGraph, directoryEntriesForGraph, instanceRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { absenceAt } from "./branch-store.ts";
 // The producer's OWN hash, not a re-derivation. See `healthProducerCurrent`.
 import { checkerHash } from "../test/health/run.js";
 import {
@@ -78,6 +79,14 @@ export interface Family {
   walked?: string[];
   /** Set when the graph could not be read at all. */
   unreadable?: string;
+  /**
+   * Set instead of `unreadable` when the graph that would hold this family's
+   * nodes was DETERMINED absent from this checkout by `state:mount` (its
+   * `.absent` record): platform state a mounted layer declares for every
+   * checkout, which this root neither declares nor carries
+   * (cat-harness-tools#1701). Neither a pass nor a blind spot, and not gated.
+   */
+  notApplicable?: string;
   /**
    * Set when the subject is a STORED record that is not here — the health
    * report once it leaves `main` for the `qa-reports` branch (bean `0dav`) —
@@ -976,7 +985,9 @@ export function harnessStateDocument(families: readonly Family[]): QaResult {
         {
           summary: f.unreadable
             ? `${f.summary} COULD NOT DETERMINE: ${f.unreadable}`
-            : f.stored
+            : f.notApplicable
+              ? `${f.summary} NOT APPLICABLE here: ${f.notApplicable}`
+              : f.stored
               ? `${f.summary} UNKNOWN (stored record not here): ${f.stored}`
               : `${f.summary} Examined ${f.examined}${f.walked ? ` across ${walkedLabel(f.walked)}` : ""}.`,
           entries: f.findings,
@@ -999,6 +1010,56 @@ export function judgeHarnessState(families: readonly Family[]): Judgement {
   });
 }
 
+/**
+ * The graph each family's nodes live in, when that is not the family's own
+ * kind: `merge-queue` and `session-survey` are declared from within `beans`,
+ * and the three todo kinds from within `todos`. When that graph is absent from
+ * this checkout, its nested declarations are too, so the kind resolves to no
+ * directory for a reason that is known.
+ */
+export const FAMILY_CONTAINERS: Readonly<Record<string, readonly string[]>> = {
+  "issue-mark-accounts-for-edits": ["issue-marks"],
+  "merge-queue-entry-is-named-for-its-pr": ["beans"],
+  "survey-is-filed-under-its-upper-edge": ["beans"],
+  "todo-item-bean-references-resolve": ["todos"],
+  "feedback-file-reads-back-as-a-list": ["todos"],
+  "board-positions-point-at-declared-boards": ["todos"],
+  "todo-process-references-resolve": ["todos"],
+};
+
+/**
+ * Why `graphs` are not this checkout's, when `state:mount` recorded one of
+ * them absent here; `undefined` when none was (so the family stays blind).
+ * Matched by declared PATH only: an id several mounts share (`health`) must
+ * not borrow another graph's record.
+ */
+export function absentContainer(graphs: readonly string[], repo: string = REPO, roots: readonly string[] = declaringRoots()): string | undefined {
+  for (const root of roots) {
+    for (const g of graphs) {
+      for (const d of directoryEntriesForGraph(root, g)) {
+        const rel = relative(repo, d.absPath).split(sep).join("/").replace(/\/+$/, "");
+        if (rel.startsWith("..")) continue;
+        const a = absenceAt(repo, rel);
+        if (a) return `\`${g}\` (${rel}/) is absent from this checkout: ${a.reason}`;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** A blind family whose container graph is determined absent becomes not applicable. */
+export function excuseAbsent(families: Family[], why: (graphs: readonly string[]) => string | undefined = absentContainer): Family[] {
+  for (const f of families) {
+    const graphs = FAMILY_CONTAINERS[f.id];
+    if (!f.unreadable || !graphs) continue;
+    const reason = why(graphs);
+    if (reason === undefined) continue;
+    f.notApplicable = reason;
+    delete f.unreadable;
+  }
+  return families;
+}
+
 function main(): number {
   const check = judging();
   if (check) {
@@ -1007,7 +1068,7 @@ function main(): number {
   }
   const { against, exit: badRef } = againstOrUsage("check:harness-state", process.argv.slice(2));
   if (badRef !== undefined) return badRef;
-  const families = [
+  const families = excuseAbsent([
     healthProducerCurrent({ against }),
     todoProcessRefs(),
     issueMarkEdits(),
@@ -1017,7 +1078,7 @@ function main(): number {
     todoBeanRefs(),
     feedbackFilesReadable(),
     boardPositionsPointAtBoards(),
-  ];
+  ]);
 
   const unreadable = families.filter((f) => f.unreadable);
   const total = families.reduce((a, f) => a + f.findings.length, 0);
@@ -1033,6 +1094,10 @@ function main(): number {
     }
     if (f.stored) {
       console.log(`  ? ${f.id}: UNKNOWN — ${f.stored}`);
+      continue;
+    }
+    if (f.notApplicable) {
+      console.log(`  · ${f.id}: not applicable here — ${f.notApplicable}`);
       continue;
     }
     // The denominator, always — a family that examined nothing has not passed.

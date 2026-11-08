@@ -85,3 +85,29 @@ describe("the digest of a pinned sub-directory", () => {
     expect(digestOf(dir).treeDigest).not.toBe(before);
   });
 });
+
+// cat-harness-tools#1701: bootstrap declares itself the way bootstrap's own
+// layers do, `name` and `needs` with no `$schema`, and declares
+// `ns.context.v1.jsonld` built at publish. Only the harness's `$schema` was
+// read, so that entry never applied and derive:publish writing the file made
+// every later mount check read `bootstrap/ modified`.
+describe("a bare `<name>.json` declaration (bootstrap's form)", () => {
+  put("boot/boot.json", JSON.stringify({ name: "boot", needs: [], builtAtPublish: [{ path: "ns.context.v1.jsonld", writer: ["jsonld:contexts"] }] }));
+  put("boot/pinned.json", "{}\n");
+  // A JSON file whose `name` is not its own is not a declaration.
+  put("other/data.json", JSON.stringify({ name: "something-else", builtAtPublish: [{ path: "pinned.json" }] }));
+  put("other/pinned.json", "{}\n");
+
+  test("its builtAtPublish entries are read", () => {
+    expect(builtAtPublishOf(join(ROOT, "boot"))).toEqual(["ns.context.v1.jsonld"]);
+  });
+  test("so the digest is the same before and after the declared file is built", () => {
+    const dir = join(ROOT, "boot");
+    const before = digestOf(dir);
+    put("boot/ns.context.v1.jsonld", '{"@context":{}}\n');
+    expect(digestOf(dir)).toEqual(before);
+  });
+  test("a JSON file that does not name itself declares nothing", () => {
+    expect(builtAtPublishOf(join(ROOT, "other"))).toEqual([]);
+  });
+});

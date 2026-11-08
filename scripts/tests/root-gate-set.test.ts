@@ -133,6 +133,59 @@ describe("which gate set a root is measured against", () => {
   });
 });
 
+/**
+ * cat-harness-tools#1701: bootstrap-tools' committed-tree gates in an index
+ * root whose git ignores the bootstrap mounts (smart-ips-pilgrimage) have an
+ * empty corpus there, so they are skipped with their reason; a root whose git
+ * tracks bootstrap runs them as before. `merge:request:check` needs a request
+ * file this runner never has.
+ */
+describe("gates whose subject this root's git does not hold", () => {
+  function git(root: string, ...args: string[]): void {
+    const r = Bun.spawnSync(["git", "-C", root, ...args], { stdout: "ignore", stderr: "pipe" });
+    if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${new TextDecoder().decode(r.stderr)}`);
+  }
+  function indexRoot(ignoreMounts: boolean): string {
+    const root = mkdtempSync(join(tmpdir(), "gate-set-index-"));
+    made.push(root);
+    write(root, "doc.json", { $schema: "cat-harness-declaration/v1", name: "doc", needs: ["bootstrap-tools", "cat-harness-tools"] });
+    write(root, "package.json", { name: "doc", scripts: { cat: "bun cat-harness-tools/scripts/run-script.ts" } });
+    write(root, "bootstrap/bootstrap.json", { name: "bootstrap", needs: [] });
+    write(root, "bootstrap/README.md", "# bootstrap\n");
+    write(root, "bootstrap-tools/bootstrap-tools.json", { name: "bootstrap-tools", needs: ["bootstrap"] });
+    write(root, "bootstrap-tools/package.json", {
+      name: "bootstrap-tools",
+      scripts: { "book:check": "bun book.ts --check", "check:standalone": "bun standalone.ts", "check:closure": "bun closure.ts" },
+    });
+    write(root, "cat-harness-tools/cat-harness-tools.json", { $schema: "cat-harness-declaration/v1", name: "cat-harness-tools" });
+    write(root, "cat-harness-tools/package.json", { name: "cat-harness-tools", scripts: { "merge:request:check": "bun mr.ts" } });
+    if (ignoreMounts) write(root, ".gitignore", "/bootstrap/\n/bootstrap-tools/\n/cat-harness-tools/\n");
+    git(root, "init", "-q");
+    git(root, "add", "-A");
+    return root;
+  }
+
+  test("in a root that ignores the mounts, bootstrap-tools' committed-tree gates are skipped with their reason", () => {
+    const set = rootGateSet(indexRoot(true));
+    expect(set.skipped["bootstrap-tools:book:check"]?.kind).toBe("untracked-corpus");
+    expect(set.skipped["bootstrap-tools:book:check"]?.skipped).toContain("cat-harness-tools#1701");
+    expect(set.skipped["bootstrap-tools:check:standalone"]?.kind).toBe("untracked-corpus");
+    // a bootstrap-tools gate that is not about the committed tree still runs
+    expect(Object.keys(set.gates)).toContain("bootstrap-tools:check:closure");
+  });
+
+  test("in a root whose git tracks bootstrap, they run exactly as before", () => {
+    const set = rootGateSet(indexRoot(false));
+    expect(Object.keys(set.gates)).toContain("bootstrap-tools:book:check");
+    expect(Object.keys(set.gates)).toContain("bootstrap-tools:check:standalone");
+    expect(set.skipped["bootstrap-tools:book:check"]).toBeUndefined();
+  });
+
+  test("merge:request:check needs a request file, so it is skipped as needs-input", () => {
+    expect(rootGateSet(indexRoot(true)).skipped["cat-harness-tools:merge:request:check"]?.kind).toBe("needs-input");
+  });
+});
+
 describe("qa:refresh in a content root", () => {
   const writers: QaWriter[] = [
     { id: "check:declared", run: ["check:declared"], writes: ["x/test/results/a.json"], because: "t" },

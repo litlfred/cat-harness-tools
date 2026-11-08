@@ -139,6 +139,38 @@ describe("0a — the checkout aggregates", () => {
     expect(collectInstanceGraph(root).problems.map((p) => p.problem.kind)).toContain("repository-mirror");
   });
 
+  // cat-harness-tools#1701: a rooted checkout (an IG repository that is its
+  // own index) mounts the platform, which declares checkout-level state for
+  // every checkout. That is no mirror; naming another instance's directory,
+  // or two platform instances claiming one path, still is.
+  test("checkout-level state a platform instance declares for every checkout is not a mirror", () => {
+    const root = checkout((r) =>
+      put(r, "base/base.json", {
+        name: "base",
+        needs: [],
+        directories: [{ id: "todos", path: "todos/", scope: "repository", graphTypologies: ["todos"] }],
+      }),
+    );
+    expect(repositoryMirrors(root)).toEqual([]);
+    expect(collectInstanceGraph(root).problems.map((p) => p.problem.kind)).not.toContain("repository-mirror");
+  });
+
+  test("two non-root instances claiming one repository path are both reported", () => {
+    const root = checkout((r) => {
+      put(r, "base/base.json", {
+        name: "base",
+        needs: [],
+        directories: [{ id: "todos", path: "todos/", scope: "repository", graphTypologies: ["todos"] }],
+      });
+      put(r, "b/b.json", {
+        name: "b",
+        needs: ["base"],
+        directories: [{ id: "todos-too", path: "todos", scope: "repository", graphTypologies: ["todos"] }],
+      });
+    });
+    expect(repositoryMirrors(root)).toEqual(["b#todos-too", "base#todos"]);
+  });
+
   test("an instance the root does not reach is unstaged, and the gate refuses it", () => {
     const root = checkout((r) => put(r, "top.json", { name: "top", needs: ["a"], directories: [] }));
     const kinds = collectInstanceGraph(root).problems.filter((p) => p.problem.kind === "unstaged");

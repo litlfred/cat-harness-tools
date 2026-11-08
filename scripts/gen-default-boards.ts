@@ -39,6 +39,8 @@ import { TODO_GRAPH_FILE, parseTodoGraph } from "../schemas/sdlc/todo-graph.js";
 import { checkoutTopLevelDirs } from "../schemas/sdlc/git-corpus.ts";
 import { TODO_ROOT } from "./todos.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { graphReadPath } from "./graph-read.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const REPO_ROOT = resolve(ROOT, "..");
@@ -96,6 +98,14 @@ export function defaultBoard(name: string, title: string): string {
 }
 
 if (import.meta.main) {
+  // The boards live INSIDE the todo graph. Where `state:mount` determined that
+  // graph absent from this checkout (declared for every checkout by a mounted
+  // instance, not by this root, and not on this remote — an IG repository that
+  // is its own index), there is no board directory to judge: not applicable,
+  // never "missing" (cat-harness-tools#1701). A refusal for any other reason
+  // still throws below, exactly as before.
+  const todos = graphReadPath("todos", REPO_ROOT);
+  if (todos.state === "refused" && todos.absent) exitNotApplicable("boards:default", todos.reason);
   const dir = boardsDir(REPO_ROOT);
   // ASKED OF GIT (bean `qrlc`). The hand-written filter below admitted **26**
   // top-level names on this container and `_kg` was the first: a gitignored

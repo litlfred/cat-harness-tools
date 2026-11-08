@@ -417,9 +417,14 @@ describe("compare-gates.py with a gate main did not run", () => {
     expect(r.out).toContain("NEW FAILURE");
   });
 
-  test("not applicable (78) on head where base passed is still NEW", () => {
+  test("not applicable (78) on head where base passed is listed with main's answer, not counted (#1701)", () => {
+    // Was NEW. A gate that learns it does not apply to an instance root then
+    // failed that instance's next PR (dth-phc#7, check:qa-reviewer-permission
+    // 0 -> 78), while main-verdict.py never counts 78 red. The lost answer
+    // still shows in the table.
     const r = compare({ g: { command: "c", exit: 0, tail: "" } }, { g: { command: "c", exit: 78, tail: "" } });
-    expect(r.status).toBe(1);
+    expect(r.status).toBe(0);
+    expect(r.out).toContain("not applicable here; not counted (main exited 0)");
   });
 });
 

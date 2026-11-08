@@ -132,6 +132,37 @@ describe("the ROOT may itself be an instance", () => {
   });
 });
 
+// cat-harness-tools#1701: an IG repository that is its own index declares the
+// root files its harness reads in `index.config.json` `contentTypes.ig.include`.
+describe("a root index's content-type `include` accounts for the paths it lists", () => {
+  const withIndex = (contentTypes: unknown): string => {
+    const root = repo();
+    writeFileSync(join(root, "sushi-config.yaml"), "id: x\n");
+    writeFileSync(join(root, "ig.ini"), "[IG]\n");
+    writeFileSync(join(root, "_genonce.sh"), "#!/bin/sh\n");
+    writeFileSync(join(root, "index.config.json"), JSON.stringify({ contentTypes }));
+    return root;
+  };
+
+  test("a listed file is accounted for, and the reason names the section", () => {
+    const root = withIndex({ ig: { include: ["sushi-config.yaml", "ig.ini", "input/fsh/"] } });
+    const found = undeclaredAtRoot(root).map((e) => e.path);
+    expect(found).not.toContain("sushi-config.yaml");
+    expect(found).not.toContain("ig.ini");
+    expect(accountedRootPaths(root).get("sushi-config.yaml")).toContain("contentTypes.ig.include");
+  });
+
+  test("a file the section does not list is still a finding", () => {
+    const root = withIndex({ ig: { include: ["sushi-config.yaml"] } });
+    expect(undeclaredAtRoot(root).map((e) => e.path)).toContain("_genonce.sh");
+  });
+
+  test("a section with no `include` accounts for nothing", () => {
+    const root = withIndex({ dak: { id: "x" } });
+    expect(undeclaredAtRoot(root).map((e) => e.path)).toContain("sushi-config.yaml");
+  });
+});
+
 describe("the check can fire — which is the whole point", () => {
   test("a stray file at the root IS reported", () => {
     const root = repo();

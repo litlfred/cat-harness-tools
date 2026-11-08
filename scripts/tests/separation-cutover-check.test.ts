@@ -55,6 +55,11 @@ describe("the verdict", () => {
   test("a site not built is NOT complete: exit 2, never 0", () => {
     expect(cutoverExitCode(report(["pass", "pass", "pass", "pass", "pass", "not-run"]))).toBe(2);
   });
+  test("a site not applicable to an instance root does not block complete (Q-NA-1 B, #1701)", () => {
+    expect(cutoverExitCode(report(["pass", "pass", "pass", "pass", "pass", "not-applicable"]))).toBe(0);
+    expect(cutoverExitCode(report(["pass", "fail", "pass", "pass", "pass", "not-applicable"]))).toBe(1);
+    expect(cutoverExitCode(report(["could-not-determine", "pass", "pass", "pass", "pass", "not-applicable"]))).toBe(2);
+  });
   test("a failure wins over anything undetermined", () => {
     expect(cutoverExitCode(report(["could-not-determine", "fail", "pass", "pass", "pass", "not-run"]))).toBe(1);
   });

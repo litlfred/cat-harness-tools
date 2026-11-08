@@ -1,381 +1,380 @@
 #!/usr/bin/env bun
 /**
- * The latent-semantic-index viewer: one page for every committed LSI index,
- * and for which declared prose graphs need one.
+ * The Indexing evidence page: which held papers back each indexing method, and
+ * which skills, Tools and processes apply it.
  *
  * @covers qa
  *
- * The page names the `qa` directory it renders and its Tool (`lsi-viewer`) in
- * front matter, so the navbar row, the harness tile and the published-graphs
- * row appear with no further wiring (skill `harness-tiles`). The indexes are
- * sidecars under `test/results/lsi/`, inside that directory, so the page
- * renders it rather than declaring a nested graph.
+ * ## Why the page is this, and not an index report
  *
- * ## What it renders, and what it refuses to
+ * Until cat-harness#1144 this route drew every LSI index — its dimensions, its
+ * findings, and which prose graphs need one. The owner (2026-11-08): the papers
+ * the platform ingested about indexing are there as EVIDENCE for the
+ * processes, skills and tools that add indexing to a document or a graph —
+ * extracting a glossary, extracting keywords, keyword and latent search — and
+ * the health half belongs in the existing repository health report. So the
+ * health half moved to `scripts/lsi-health.ts` and the `lsi-indexes` check of
+ * `bun run cat health`, and this page draws the evidence chain.
  *
- * For each index: its size, the retained share, the pole terms of its first
- * dimensions, and its two findings (narrow dimensions, near-duplicates). A
- * dimension is shown as TWO poles and never given a name — method `lsi`,
- * refusal 2: a dimension is not a topic until a person names it. A dimension 1
- * with no negative pole is flagged as a probable margin (document length and
- * term frequency), the effect `correspondence-analysis` exists to remove.
+ * ## The chain, read from the graph's own edges
  *
- * The need-an-index table shows each graph's VERDICT without its unit and word
- * counts (`GraphVerdict.stableDetail`), so the page changes only when a
- * verdict does.
+ * | edge | from | to | declared by |
+ * |---|---|---|---|
+ * | `evidence` | a methodology node | a held library entry | the methodology |
+ * | `uses-methodology` | a skill | a methodology node | the skill |
+ * | `satisfies` | a Tool | a skill | the Tool |
+ * | `<…:skill ref>` | a BPMN activity | a skill | the process |
  *
- *   bun run cat lsi:viz            # write cat-harness/docs/lsi/index.md
- *   bun run cat lsi:viz:check      # exit 1 if the committed page is stale
- *   ... --ref main|<sha>|pr/<n> # with no index in the checkout: which qa-reports entry to read
+ * Nothing is hand-listed except WHICH methods are indexing methods
+ * ({@link INDEXING_METHODS}, all four this layer's own nodes) and which skills
+ * do indexing without applying any of them: a skill whose graph typology is
+ * `glossary`, and the lexical search skill ({@link LEXICAL_SEARCH_SKILLS}).
+ * Those are drawn as **no evidence yet** — the gap is the point of the page.
  *
- * With no `test/results/lsi/` in the checkout, both read the indexes from the
- * `qa-reports` branch ({@link readIndexes}). When that read is not a hit, both
- * exit 2 (could not determine) and write nothing.
+ *   bun run cat lsi:viz            # write the page
+ *   bun run cat lsi:viz:check      # the page is built at publish: says so and exits 0
  *
- * ## Two pages from one generator: the committed one, and `--detail`
- *
- * The split is by **what a value is a function of**:
- *
- * | part | a function of | committed |
- * |---|---|---|
- * | front matter, prose, the method links | this file | yes |
- * | which graphs NEED an index | the TREE (`needOf`) | yes |
- * | each index's freshness verdict | the STORE | no |
- * | units, terms, retained, σ, pole terms, cosines | an index's CONTENT | no |
- *
- * The committed page reads **no index at all**. `needOf` counts a graph's
- * units and words against the thresholds and reads nothing else. Freshness is
- * about the store: recomputing an index in the run would make it fresh by
- * construction, and reading `qa-reports` (which `qa-store` resolves to the
- * LATEST entry) would depend on when the gate ran.
- *
- * `--detail` adds the per-index sections and is run by the docs-site build,
- * after that workflow's `qa:fetch` pins the entry to the build's own sha, the
- * same shape as `state:visualizer`.
- *
- * `--check` asks whether the committed page is current and fails when it is
- * not. `--detail --check` additionally reports whether the detail could be
- * drawn at all; anything but a hit is exit 2, never a pass.
+ * `--detail` and `--ref` are accepted and ignored: the docs-site build passed
+ * them when this page drew stored indexes, and still does until it is told
+ * otherwise.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
-import {
-  CHECKOUT_SOURCE,
-  graphVerdict,
-  INDEX_DIR,
-  indexesInCheckout,
-  needOf,
-  proseGraphs,
-  RUN_RECORD_DIR,
-  sourceFromFiles,
-  VIEWER_DIR,
-  type IndexSource,
-  type LsiSidecar,
-} from "./lsi.ts";
-import { readQaTree } from "./qa-store.ts";
-import { JUDGEMENT_EXIT } from "./qa-results.ts";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, posix, relative, resolve } from "node:path";
+import { parse as parseYaml } from "yaml";
+
+import { VIEWER_DIR } from "./lsi.ts";
 import { withRenderedByFrontMatter } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteArg } from "./lib/site-target.ts";
-import { readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { declaredGraphs, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
+import { checkMethodologyEvidence, frontMatterOf, methodologyNodes } from "./check-methodology-evidence.ts";
+import {
+  appliedByIndex,
+  evidenceLine,
+  methodologyRows,
+  nodePageDir,
+  pageRelPath as methodologiesPageRel,
+  short,
+  type MethodologyRow,
+} from "./gen-methodologies-viz.ts";
+import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
+import { isSkillMd, skillMdDirs } from "./known-skills.ts";
+import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
+import { discoverTools } from "../tools/discover.ts";
+import { activityRefs, skillName } from "./check-process-bindings.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "lsi-viewer";
 /**
  * Every page this writes declares itself generated in its own front matter —
- * the `generated:` key `check:reference-direction` reads (bean `ws99`), as
- * `gen-processes-viz.ts` does. A page lists the declared prose graphs and the layers that own them, which belong to every
- * layer in the checkout, so without the key those names read as authored
- * prose in the committing layer naming the layers above it.
+ * the `generated:` key `check:reference-direction` reads (bean `ws99`). The page
+ * names skills, Tools and processes of every layer in the checkout, so
+ * without the key those names read as authored prose in this layer naming the
+ * layers above it.
  */
 const GENERATED_FM = "generated: gen-lsi-viz.ts — do not hand-edit; run `bun run cat lsi:viz`";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
-// declared-path-literal: the LSI run records under cat-harness's `qa` graph. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
-const RESULTS = join(REPO, "cat-harness/test/results/lsi");
+const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 /** `--site <dir>`: the same route under a site being built (`visualiser-writers.ts`). */
 const SITE = siteArg();
 const OUT = SITE === undefined ? join(VIEWER_DIR, "index.md") : join(SITE, relative(join(REPO, "cat-harness/docs"), VIEWER_DIR), "index.md");
-const DIMS_SHOWN = 8;
+/** The page's own path under the base docs layer, for relative links. */
+const PAGE_REL = relative(join(REPO, "cat-harness/docs"), join(VIEWER_DIR, "index.md")).split("\\").join("/");
 
-function sidecars(dir = RESULTS, out: string[] = []): string[] {
-  if (!existsSync(dir)) return out;
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, e.name);
-    if (e.isDirectory()) sidecars(p, out);
-    else if (e.name.endsWith(".lsi.json")) out.push(p);
+/**
+ * The methods that add an index to a text: latent retrieval, its parallel
+ * track, assigning controlled-vocabulary terms, and judging an assignment.
+ * Each is a cat-harness methodology node, so naming them here names nothing
+ * above this layer. In page order.
+ */
+export const INDEXING_METHODS = ["lsi", "correspondence-analysis", "skill-pipeline-subject-indexing", "consensus-grounded-subject-evaluation"] as const;
+/** Skills that index without a method node: lexical keyword search. A cat-harness skill. */
+export const LEXICAL_SEARCH_SKILLS = ["corpus-grep"] as const;
+/** A skill over this graph typology adds glossary terms to a document or graph — indexing work. */
+const GLOSSARY_KIND = "glossary";
+
+/** One skill, reduced to what the page shows. */
+export interface SkillRow {
+  name: string;
+  instance: string;
+  description: string;
+  methods: string[];
+  /** Tool ids that `satisfies` it, sorted. */
+  tools: string[];
+  /** Processes (BPMN file stems) with an activity bound to it, sorted. */
+  processes: string[];
+}
+
+/** Everything the page draws, so the drawing is testable without a checkout. */
+export interface EvidenceModel {
+  methods: (Pick<MethodologyRow, "name" | "title" | "appliesWhen" | "instance" | "evidence" | "state"> & { skills: SkillRow[] })[];
+  /** Indexing skills that apply no indexing method. */
+  unbacked: SkillRow[];
+}
+
+/** Every skill document in the checkout: name, instance, description, typologies, methods. */
+function skillCatalogue(repo = REPO): Map<string, { instance: string; description: string; typologies: string[]; methods: string[] }> {
+  const out = new Map<string, { instance: string; description: string; typologies: string[]; methods: string[] }>();
+  for (const root of instanceRootsIn(repo)) {
+    const instance = readDeclaration(root)?.name ?? posix.basename(root);
+    for (const parts of skillMdDirs(root)) {
+      const dir = join(root, ...parts);
+      if (!existsSync(dir)) continue;
+      for (const f of readdirSync(dir).sort()) {
+        const abs = join(dir, f);
+        if (!f.endsWith(".md") || !isSkillMd(abs)) continue;
+        const fm = frontMatterOf(readFileSync(abs, "utf-8"));
+        if (fm === undefined) continue;
+        let p: Record<string, unknown> | undefined;
+        try {
+          p = parseYaml(fm) as Record<string, unknown>;
+        } catch {
+          continue; // unparseable front matter is the skill gates' finding
+        }
+        const name = typeof p?.name === "string" ? p.name : f.replace(/\.md$/, "");
+        if (out.has(name)) continue; // the first instance holding the name owns it, as `skillHolders` reads it
+        const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : typeof v === "string" ? [v] : []);
+        out.set(name, {
+          instance,
+          description: typeof p?.description === "string" ? p.description : "",
+          typologies: list(p?.["graph-typologies"]),
+          methods: list(p?.["uses-methodology"]),
+        });
+      }
+    }
   }
-  return out.sort();
+  return out;
 }
 
-const code = (s: string): string => "`" + s + "`";
-const esc = (s: string): string => s.replace(/[\\|]/g, "\\$&").replace(/</g, "&lt;");
+/** skill → Tool ids that `satisfies` it. */
+function toolsBySkill(repo = REPO): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const t of discoverTools(repo).tools as unknown as { id: string; satisfies?: unknown[] }[]) {
+    for (const s of t.satisfies ?? []) {
+      const id = typeof s === "string" ? s : ((s as { skill?: string; ref?: string })?.skill ?? (s as { ref?: string })?.ref);
+      if (id) out.set(id, [...(out.get(id) ?? []), t.id].sort());
+    }
+  }
+  return out;
+}
 
-/**
- * The indexes the page draws, and where they came from.
- *
- * ## The checkout first, then the store by ref, and a miss is never a page
- *
- * Bean `oq1j` (arc `3fva`, reader `R14`). The page draws the INDEXES, so it
- * needs them. With `test/results/lsi/` in the checkout it draws those, as it
- * always has. Without it, the indexes are on the `qa-reports` branch, and this
- * reads them by ref through `qa-store`, together with the run records the
- * verdict table needs. Anything but a hit is returned AS the answer: an
- * absent directory must not render as "0 committed indexes". That would be
- * a page about nothing, and in write mode it would replace the real page.
- *
- * It does not recompute the indexes, as `lsi:skills:check` does. A recomputed
- * page would change with every edit to any graph that needs an index (seven,
- * including all of `cat-harness/docs/`), and so every docs PR would stale a
- * committed page.
- */
-export type IndexesRead =
-  | { state: "hit"; from: string; files: string[]; src: IndexSource }
-  | { state: "miss" | "corrupt" | "unknown"; reason: string };
+function bpmnFiles(dir: string, out: string[] = []): string[] {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+    const p = join(dir, e.name);
+    if (e.isDirectory()) bpmnFiles(p, out);
+    else if (e.name.endsWith(".bpmn")) out.push(p);
+  }
+  return out;
+}
 
-export function readIndexes(ref = "main"): IndexesRead {
-  if (indexesInCheckout()) return { state: "hit", from: "the checkout", files: sidecars(), src: CHECKOUT_SOURCE };
-  const tree = readQaTree(ref, INDEX_DIR);
-  if (tree.state !== "hit") return { state: tree.state, reason: `${INDEX_DIR}/ is not in the checkout, and the qa-reports branch at ${ref}: ${tree.reason}` };
-  // The run records are optional on the branch as on disk: none is a
-  // `not-run` verdict, which is never green. A corrupt or unknown read is
-  // not "none", so it stops the page.
-  const runs = readQaTree(ref, RUN_RECORD_DIR);
-  if (runs.state === "corrupt" || runs.state === "unknown") return { state: runs.state, reason: `run records at ${ref}: ${runs.reason}` };
-  const files = new Map([...tree.files, ...(runs.state === "hit" ? runs.files : [])]);
-  return {
-    state: "hit",
-    from: `qa-reports ${tree.key}`,
-    files: [...tree.files.keys()].filter((p) => p.endsWith(".lsi.json")).map((p) => join(REPO, p)).sort(),
-    src: sourceFromFiles(files),
+/** skill → processes (BPMN file stems) with an activity bound to it. */
+function processesBySkill(repo = REPO): Map<string, string[]> {
+  const out = new Map<string, Set<string>>();
+  const seen = new Set<string>();
+  for (const root of instanceRootsIn(repo)) {
+    for (const g of declaredGraphs(root)) {
+      if (!g.absPath || seen.has(g.absPath) || !g.graphTypologies.some((k) => k === "processes" || k === "business-processes")) continue;
+      seen.add(g.absPath);
+      if (!existsSync(g.absPath) || !statSync(g.absPath).isDirectory()) continue;
+      for (const f of bpmnFiles(g.absPath)) {
+        const stem = posix.basename(f).replace(/\.bpmn$/, "");
+        for (const r of activityRefs(readFileSync(f, "utf-8"))) {
+          const s = skillName(r.ref);
+          out.set(s, (out.get(s) ?? new Set()).add(stem));
+        }
+      }
+    }
+  }
+  return new Map([...out].map(([k, v]) => [k, [...v].sort()]));
+}
+
+/** The model, from the checkout. */
+export function evidenceModel(repo = REPO): EvidenceModel {
+  const rows = methodologyRows(methodologyNodes(INSTANCE_ROOT), checkMethodologyEvidence(INSTANCE_ROOT));
+  const applied = appliedByIndex(repo);
+  const skills = skillCatalogue(repo);
+  const tools = toolsBySkill(repo);
+  const procs = processesBySkill(repo);
+  const row = (name: string): SkillRow => {
+    const s = skills.get(name);
+    return {
+      name,
+      instance: s?.instance ?? "?",
+      description: s?.description ?? "",
+      methods: s?.methods ?? [],
+      tools: tools.get(name) ?? [],
+      processes: procs.get(name) ?? [],
+    };
   };
-}
-
-/** The DETAIL page, or why it could not be drawn. */
-export function renderFrom(read: IndexesRead): { state: "hit"; page: string } | { state: "miss" | "corrupt" | "unknown"; reason: string } {
-  if (read.state !== "hit") return read;
-  return { state: "hit", page: draw(read) };
-}
-
-/**
- * The COMMITTED page. It reads no index, so it cannot fail for want of one and
- * takes no `ref`: everything on it is derived from this tree.
- */
-export function renderCommitted(): string {
-  return draw();
-}
-
-/** The detail page over whatever indexes are reachable. Throws when it cannot be drawn: a test or a caller must not get an empty page back. */
-export function render(): string {
-  const r = renderFrom(readIndexes());
-  if (r.state !== "hit") throw new Error(`lsi viewer: ${r.state.toUpperCase()} — ${r.reason}`);
-  return r.page;
-}
-
-function draw(read?: Extract<IndexesRead, { state: "hit" }>): string {
-  // No index is read unless `--detail` supplied one. The verdict table is
-  // computed from the tree either way, so the committed page and the built
-  // page agree on it line for line and differ only by the detail sections.
-  const indexes = (read?.files ?? []).map((f) => ({ file: f, s: JSON.parse(read!.src.read(relative(REPO, f).split("\\").join("/"))!) as LsiSidecar }));
-  // Committed: `needOf` only — the tree. With `--detail`: `graphVerdict` over
-  // the indexes that were read, which adds the freshness column. See the
-  // module docblock for why those are two questions and not one.
-  const rows = proseGraphs().map((t) => {
-    const need = needOf(t);
-    return { t, need, v: read ? graphVerdict(t, read.src) : undefined };
+  const methods = INDEXING_METHODS.flatMap((m) => {
+    const r = rows.find((x) => x.name === m);
+    if (r === undefined) return [];
+    return [{ name: r.name, title: r.title, appliesWhen: r.appliesWhen, instance: r.instance, evidence: r.evidence, state: r.state, skills: (applied.get(m) ?? []).map((a) => row(a.skill)) }];
   });
-  const needing = read ? rows.filter((r) => r.v!.result === "fail").length : rows.filter((r) => r.need.needed).length;
+  const indexing = new Set<string>(INDEXING_METHODS);
+  const unbacked = [...skills]
+    .filter(([name, s]) => (s.typologies.includes(GLOSSARY_KIND) || (LEXICAL_SEARCH_SKILLS as readonly string[]).includes(name)) && !s.methods.some((m) => indexing.has(m)))
+    .map(([name]) => row(name))
+    .sort((a, b) => a.name.localeCompare(b.name, "en"));
+  return { methods, unbacked };
+}
 
+const cell = (v: string): string => v.replace(/[\\|]/g, "\\$&").replace(/</g, "&lt;").replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
+const code = (s: string): string => "`" + cell(s) + "`";
+
+/** Links the page can make; each absent one leaves plain code, never a link that 404s. */
+export interface EvidenceLinks {
+  library?: LibraryResolver;
+  /** The methodologies list page, relative to the base docs layer. */
+  methodologiesPage?: string;
+  skillPages?: ReadonlySet<string>;
+}
+
+function skillCell(s: SkillRow, links: EvidenceLinks): string {
+  const href = links.skillPages ? skillPageHref(s.name, PAGE_REL, links.skillPages) : undefined;
+  const name = href ? `[${code(s.name)}](${href})` : code(s.name);
+  return `${name}<br><small>${cell(s.instance)}</small>`;
+}
+
+function skillTable(rows: readonly SkillRow[], links: EvidenceLinks): string[] {
+  const L = ["| skill | what it does | Tools | processes |", "|---|---|---|---|"];
+  for (const s of rows) {
+    L.push(
+      `| ${skillCell(s, links)} | ${short(s.description, 180) || "—"} | ${s.tools.length ? s.tools.map(code).join("<br>") : "—"} | ` +
+        `${s.processes.length ? s.processes.map(code).join("<br>") : "—"} |`,
+    );
+  }
+  return L;
+}
+
+/** The page, from a model. Pure. */
+export function evidencePage(model: EvidenceModel, links: EvidenceLinks = {}): string {
+  const papers = new Set(model.methods.flatMap((m) => m.evidence));
+  const applying = new Set(model.methods.flatMap((m) => m.skills.map((s) => s.name)));
   const L: string[] = [];
   L.push("---");
-  L.push('title: "Latent semantic indexes"');
-  L.push('description: "Every published LSI index over a declared prose graph — its latent dimensions, its findings, and which graphs still need one."');
+  L.push('title: "Indexing evidence"');
+  L.push('description: "The papers held in the library that back each indexing method, and the skills, Tools and processes that apply it — keywords, glossary terms, search and near-duplicates."');
   L.push(GENERATED_FM);
   L.push("---");
   L.push("<style>");
-  L.push(".lv-grid{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}");
-  L.push(".lv-stat{flex:1 1 8rem;border:1px solid rgba(128,128,128,.35);border-radius:6px;padding:.5rem .7rem}");
-  L.push(".lv-stat b{display:block;font-size:1.25rem;line-height:1.2}");
-  L.push(".lv-stat span{font-size:.75rem;opacity:.75}");
-  // Light tints for the site's DARK scheme (#27262b): #5fd3b8 is ~8:1 and
-  // #ff9486 ~6.9:1. The methodologies viewer's #0d6e5e / #a8200f measured
-  // 2.4 / 2.1:1 there (its wireframe, finding 6), so they are not reused; the
-  // word carries the state either way.
-  L.push(".lv-pass{color:#5fd3b8;font-weight:600}.lv-fail{color:#ff9486;font-weight:600}.lv-na{opacity:.8}");
+  L.push(".ie-grid{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}");
+  L.push(".ie-stat{flex:1 1 8rem;border:1px solid rgba(128,128,128,.35);border-radius:6px;padding:.5rem .7rem}");
+  L.push(".ie-stat b{display:block;font-size:1.25rem;line-height:1.2}");
+  L.push(".ie-stat span{font-size:.75rem;opacity:.75}");
   L.push("</style>");
   L.push("");
-  L.push("A **latent semantic index** places every unit of a prose graph — a library");
-  L.push("section, a skill, a bean — in a space built from which words occur");
-  L.push("together, so units that discuss the same thing in *different words* sit");
-  L.push("close. It is a retrieval aid: every neighbour and finding it reports is a");
-  L.push("**proposal**, never a relation the graph asserts.");
+  L.push("**Indexing** is adding an index to a document or a graph: keywords for each");
+  L.push("section, glossary terms, subject terms from a controlled vocabulary, a search");
+  L.push("that finds what is said in other words, and near-duplicate proposals.");
   L.push("");
-  L.push("The method is [Latent Semantic Indexing](../methodologies/) (node " + code("lsi") + "), with");
-  L.push("[correspondence analysis](../methodologies/) (node " + code("correspondence-analysis") + ") as its parallel track;");
-  L.push("how to build, query and audit an index is the skill " + code("lsi-indexing") + ".");
+  L.push("Each indexing **method** rests on papers held in the library. A **skill** applies");
+  L.push("the method (`uses-methodology`), **Tools** carry the skill out (`satisfies`),");
+  L.push("and **processes** call the skill from an activity. Read a row left to right and");
+  L.push("you have the evidence for that piece of indexing work. A skill with no method");
+  L.push("has no held evidence yet, and is listed at the end.");
   L.push("");
-  // ONE tile, and the two that went are the point of bean `tqjj`: "committed
-  // indexes" and "units indexed" both move when any file is added to any
-  // indexed graph, which is the `y7b3` class. What is left is a verdict count
-  // — it moves when a graph crosses the threshold or a verdict flips, which is
-  // a change worth seeing in a diff.
-  L.push('<div class="lv-grid">');
-  L.push('<div class="lv-stat"><b>' + needing + "</b><span>" + (read ? "graphs that need an index and lack a fresh one" : "graphs that need an index") + "</span></div>");
+  L.push('<div class="ie-grid">');
+  L.push(`<div class="ie-stat"><b>${model.methods.length}</b><span>indexing methods</span></div>`);
+  L.push(`<div class="ie-stat"><b>${papers.size}</b><span>papers cited as their evidence</span></div>`);
+  L.push(`<div class="ie-stat"><b>${applying.size}</b><span>skills applying them</span></div>`);
+  L.push(`<div class="ie-stat"><b>${model.unbacked.length}</b><span>indexing skills with no evidence yet</span></div>`);
   L.push("</div>");
   L.push("");
-  L.push("## Which graphs need an index");
+  L.push("## Evidence by method");
   L.push("");
-  L.push("A graph needs one at 100 units and 20,000 words — a house threshold, with its");
-  L.push("basis in " + code("scripts/lsi.ts") + ". Below it a graph is **not judged**, which is not");
-  L.push("the same as fine. The same verdict is " + code("kg:audit") + "'s " + code("tool-downstream-fresh") + " for the " + code("lsi-index") + " Tool.");
-  L.push("");
-  if (!read) {
-    L.push("Whether an index is **fresh** is a question about the store, not about");
-    L.push("this tree, so it is not on this committed page — the published one carries");
-    L.push("it, drawn from the evidence that build fetched.");
+  for (const m of model.methods) {
+    L.push(`### ${cell(m.title)} {#${m.name}}`);
+    L.push("");
+    const node = links.methodologiesPage
+      ? `[${code(m.name)}](${posix.relative(posix.dirname(PAGE_REL), posix.join(posix.dirname(links.methodologiesPage), nodePageDir(m)))}/)`
+      : code(m.name);
+    L.push(`Method ${node}, declared by ${code(m.instance)}.`);
+    L.push("");
+    L.push(`**Applies when.** ${short(m.appliesWhen, 400)}`);
+    L.push("");
+    if (m.evidence.length) {
+      L.push(m.state === "dangling" ? "**Evidence — at least one citation does not resolve:**" : "**Evidence, held in the library:**");
+      L.push("");
+      for (const e of m.evidence) L.push(evidenceLine(e, links.library, PAGE_REL));
+    } else {
+      L.push("**No held evidence.** The method names an origin that nothing in this checkout holds; `literature-search` is the skill that closes one.");
+    }
+    L.push("");
+    if (m.skills.length) {
+      L.push("**Applied by:**");
+      L.push("");
+      L.push(...skillTable(m.skills, links));
+    } else {
+      L.push("**Applied by no skill yet.** The evidence is held, and nothing declares `uses-methodology: " + m.name + "`.");
+    }
     L.push("");
   }
-  L.push(read ? "| graph | needs one | verdict | detail |" : "| graph | needs one |");
-  L.push(read ? "|---|---|---|---|" : "|---|---|");
-  for (const { t, need, v } of rows) {
-    // `needOf` returns the n/a verdict itself when a graph does not need one,
-    // so its own words are used rather than restated here.
-    // Plain bold, NOT `lv-fail`. Needing an index is not a failure — the
-    // failure is needing one and lacking a fresh one, which is the `verdict`
-    // column and only exists with `--detail`. Colouring this one red would
-    // read as 8 defects on a page whose own threshold prose says a graph below
-    // it is *not judged*, which is not the same as fine.
-    const needs = need.needed ? "**yes**" : '<span class="lv-na">' + esc(need.verdict.stableDetail) + "</span>";
-    const cells = [code(t.instance + "/" + t.id), needs];
-    if (v) {
-      const cls = v.result === "pass" ? "lv-pass" : v.result === "fail" ? "lv-fail" : "lv-na";
-      cells.push('<span class="' + cls + '">' + v.result + "</span>", esc(v.stableDetail));
-    }
-    L.push("| " + cells.join(" | ") + " |");
-  }
+  L.push("## Indexing work with no evidence yet");
   L.push("");
-  for (const { file, s } of indexes) {
-    L.push("## " + s.instance + " / " + s.graph + (s.docs ? " — " + s.docs.join(", ") : ""));
-    L.push("");
-    L.push(
-      "**" + s.units + "** units · **" + s.terms + "** terms · k = **" + s.k + "** · retains **" +
-        (s.retained * 100).toFixed(1) + " %** of the weighted matrix · weighting " + code(String(s.options.weighting)) +
-        " · sidecar " + code(relative(REPO, file)),
-    );
-    L.push("");
-    const d1 = s.dimensions[0];
-    if (d1 && d1.negative.length === 0)
-      L.push("> Dimension 1 has **no negative pole**: it most likely measures unit length and term frequency (a margin), not a theme. Read the themes from dimension 2 on.\n");
-    L.push("Each dimension is a **contrast** between two poles, shown by their highest-loading terms. It is not named here: naming it is a reader's act.");
-    L.push("");
-    L.push("| dim | σ | one pole | the other pole |");
-    L.push("|---|---|---|---|");
-    for (const d of s.dimensions.slice(0, DIMS_SHOWN))
-      L.push("| " + d.dim + " | " + d.sigma.toFixed(2) + " | " + esc(d.positive.join(", ")) + " | " + (d.negative.length ? esc(d.negative.join(", ")) : "*(none)*") + " |");
-    L.push("");
-    const nd = s.findings.narrowDimensions;
-    const dup = s.findings.nearDuplicates;
-    L.push("**Findings** — " + nd.length + " narrow dimension(s), " + dup.length + " near-duplicate pair(s).");
-    L.push("");
-    if (nd.length) {
-      L.push("*Narrow dimensions* — carried by very few units; usually boilerplate, specimen text or a bad page:");
-      L.push("");
-      for (const n of nd) L.push("- dimension " + n.dim + ": " + n.units.map((u) => code(u)).join(", "));
-      L.push("");
-    }
-    if (dup.length) {
-      L.push("*Near-duplicates* (cosine ≥ 0.95) — similar is not duplicate; read both:");
-      L.push("");
-      for (const p of dup.slice(0, 15)) L.push("- " + p.cosine.toFixed(3) + " — " + code(p.a) + " ~ " + code(p.b));
-      if (dup.length > 15) L.push("- … and " + (dup.length - 15) + " more in the sidecar");
-      L.push("");
-    }
-  }
+  L.push("These skills add glossary terms or search a corpus, and apply none of the methods");
+  L.push("above, so no held paper backs them. To give one evidence: adopt a method from a held");
+  L.push("source (`adopt-methodology-from-source`), then declare `uses-methodology` in the skill.");
+  L.push("");
+  if (model.unbacked.length) L.push(...skillTable(model.unbacked, links));
+  else L.push("None — every indexing skill applies a method with held evidence.");
+  L.push("");
+  L.push("## Index health");
+  L.push("");
+  L.push("Which prose graphs need a latent semantic index, whether each stored index is fresh,");
+  L.push("and what each index found (narrow dimensions, near-duplicate pairs) are in the");
+  L.push("repository health report: `bun run cat health`, check `lsi-indexes`.");
+  L.push("");
   L.push("---");
   L.push("");
-  // Named from the READ rather than hardcoded: the page says which evidence the
-  // detail came from, because "the checkout" and a `qa-reports` entry are
-  // different claims and a reader cannot tell them apart from the prose.
-  if (read) {
-    L.push(
-      "Generated by " + code("bun run cat lsi:viz -- --detail") + " during the docs-site build, with each index's freshness and detail read from " + read.from + ". " +
-        "The committed page in the repository carries the first two columns only — those are a function of the tree, and these are a function of the store. Bean " + code("tqjj") + ".",
-    );
-  } else {
-    L.push(
-      "Generated by " + code("bun run cat lsi:viz") + ", and this is the committed half: the front matter, the prose, and which graphs need an index — every part of it a function of the TREE. " +
-        "Each index's freshness is a question about the store, and its size, retained share, dimension poles and findings are a function of the index's CONTENT, which a one-sentence edit to any indexed graph moves. " +
-        "The docs-site build adds both with " + code("--detail") + ", from the evidence it fetched for its own commit. Bean " + code("tqjj") + ".",
-    );
-  }
-  // The page names the directory it draws and the Tool that drew it (#1168
-  // B7a-2b): the `qa` tree the sidecars live in, read from the declaration
-  // rather than spelled here. The directory no longer names this page; a
-  // reader derives the viewer from these two lines.
+  L.push(
+    "Generated by " + code("bun run cat lsi:viz") + " from the graph's own edges: each method's " + code("evidence") + ", each skill's " +
+      code("uses-methodology") + ", each Tool's " + code("satisfies") + " and each process activity's skill binding (cat-harness#1144).",
+  );
   return withRenderedByFrontMatter(L.join("\n") + "\n", VIEWER_TOOL);
 }
 
+/** The page over this checkout. */
+export function render(repo = REPO): string {
+  const methodologies = methodologiesPageRel(repo);
+  return evidencePage(evidenceModel(repo), {
+    library: libraryResolver(repo, INSTANCE_ROOT),
+    ...(methodologies ? { methodologiesPage: methodologies } : {}),
+    skillPages: skillPagesOf(repo),
+  });
+}
+
 if (import.meta.main) {
-  const refAt = process.argv.indexOf("--ref");
-  const ref = refAt > 0 ? process.argv[refAt + 1] : undefined;
-  if (refAt > 0 && !ref) {
-    console.error("usage: gen-lsi-viz.ts [--check] [--detail] [--ref main|<sha>|pr/<n>]");
-    process.exit(JUDGEMENT_EXIT.error);
-  }
   const check = process.argv.includes("--check");
-  const detail = process.argv.includes("--detail");
+  if (process.argv.includes("--detail") || process.argv.includes("--ref"))
+    console.log("lsi viewer: --detail and --ref are ignored — the page draws no stored index; index health is `bun run cat health` (lsi-indexes)");
 
-  let page: string;
-  if (detail) {
-    const read = readIndexes(ref);
-    const drawn = renderFrom(read);
-    if (drawn.state !== "hit") {
-      // Neither "stale" nor "current", and never a page written from nothing.
-      console.error(
-        `lsi viewer: ${drawn.state.toUpperCase()} — could not determine; this is NOT a pass, and nothing was written.\n` +
-          `  ${drawn.reason}\n` +
-          "  `--detail` draws the indexes, and none could be read. `bun run cat qa:fetch` materialises them, or `bun run cat lsi index` rebuilds them.",
-      );
-      process.exit(JUDGEMENT_EXIT.unknown);
-    }
-    page = drawn.page;
-    if (read.state === "hit") console.log(`lsi viewer: per-index detail read from ${read.from}`);
-  } else {
-    // No index is read, so there is nothing to be unavailable: the committed
-    // page is a function of the tree alone (module docblock).
-    page = renderCommitted();
-  }
-
-  // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The committed
-  // page was "a function of the tree alone", and the tree is the CHECKOUT:
-  // `proseGraphs` reads every layer the index mounts, so the page moved
-  // with the index's pins rather than with cat-harness's commit. cat-harness
+  // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). cat-harness
   // declares the route `builtAtPublish` with this script as its writer, and
   // `derive:publish` runs it; under `--check` a declared page has no committed
   // bytes to compare, so it is skipped there (the `folio:viz` rule).
   const harnessRoot = join(REPO, "cat-harness");
   const builtHere =
-    SITE === undefined &&
-    isBuiltAtPublish(readDeclaration(harnessRoot)?.builtAtPublish ?? [], relative(harnessRoot, OUT).split("\\").join("/"));
-  if (check && builtHere && !detail) {
+    SITE === undefined && isBuiltAtPublish(readDeclaration(harnessRoot)?.builtAtPublish ?? [], relative(harnessRoot, OUT).split("\\").join("/"));
+  if (check && builtHere) {
     console.log("lsi viewer: " + relative(REPO, OUT) + " is built at publish (builtAtPublish), not committed — nothing to compare; `bun run cat lsi:viz` writes it");
-  } else if (check) {
+    process.exit(0);
+  }
+  const page = render();
+  if (check) {
     const cur = existsSync(OUT) ? readFileSync(OUT, "utf8") : "";
     if (cur !== page) {
-      console.error(
-        relative(REPO, OUT) +
-          (detail
-            ? " differs from the DETAIL page — that is expected: the detail is added by the docs-site build and is not committed."
-            : " is stale — run `bun run cat lsi:viz` and commit it."),
-      );
-      process.exit(detail ? JUDGEMENT_EXIT.ok : 1);
+      console.error(relative(REPO, OUT) + " is stale — run `bun run cat lsi:viz` and commit it.");
+      process.exit(1);
     }
     console.log("lsi viewer: " + relative(REPO, OUT) + " is current");
   } else {
     mkdirSync(dirname(OUT), { recursive: true });
     writeFileSync(OUT, page);
-    console.log("lsi viewer → " + relative(REPO, OUT) + (detail ? " (with per-index detail)" : ""));
+    console.log("lsi viewer → " + relative(REPO, OUT));
   }
 }

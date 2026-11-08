@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { digestOf, LAYERS_MAIN_REF, layersKey, layersRef, layersSummaryLine, publishLayers, pruneLayers, run, type LockInstance } from "../mount-from-lock.ts";
+import { checkLayers, digestOf, LAYERS_MAIN_REF, layersKey, layersRef, layersSummaryLine, publishLayers, pruneLayers, run, type LockInstance } from "../mount-from-lock.ts";
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 function git(cwd: string, ...args: string[]): string {
@@ -246,5 +246,22 @@ describe("layers cache: publish and the fast path", () => {
     expect(left).toContain(layersRef(extra[0]!));
     expect(pruned.length).toBeGreaterThanOrEqual(1);
     expect(left.length).toBe(5 - pruned.length);
+  });
+});
+
+describe("layers:check — the re-pinner's gate", () => {
+  test("missing until the re-pinner publishes, then published; an unchanged lock owes nothing", () => {
+    const { work } = index([a.inst(), b.inst()]);
+    replay(work);
+    const before = checkLayers(work);
+    expect(before.ok).toBe(false);
+    expect(before.state).toBe("missing");
+    expect(before.detail).toContain("layers:publish");
+    expect(checkLayers(work, { changedFrom: "HEAD" }).state).toBe("skipped");
+    expect(publishLayers(work).ok).toBe(true);
+    const after = checkLayers(work);
+    expect(after.ok).toBe(true);
+    expect(after.state).toBe("published");
+    expect(after.key).toBe(layersKey([a.inst(), b.inst()]));
   });
 });

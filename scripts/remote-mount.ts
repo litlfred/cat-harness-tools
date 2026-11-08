@@ -61,7 +61,8 @@
  * `publishLayers`), so the committer who changed the lock is its writer and CI
  * only fetches and verifies it. It is time only: a refusal (a mount not
  * `current`), no remote, or a push the credential cannot make is reported and
- * never changes the exit code. `--no-layers-publish` skips it.
+ * never changes the exit code here; the PR gate does (`layers:check`, job
+ * `layers-ref` of `layer-pr-checks.yml`). `--no-layers-publish` skips it.
  *
  * ## A mount is runnable, and an install does not make it modified
  *

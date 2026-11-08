@@ -42,6 +42,8 @@ import { readLandingStickies } from "./ensure-landing-sticky.js";
 import { isExternalLink } from "../schemas/content/landing-sticky.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { landingMountedNotOwned } from "./lib/mounted-landing.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 /**
  * The layer whose landing stickies these are: the site's LANDING layer,
@@ -123,6 +125,15 @@ const SOURCE_BRANCH = "main";
 
 const OUT = join(ROOT, siteDirFor(ROOT), "_data/stickies.json");
 const check = process.argv.includes("--check");
+
+// cat-harness-tools#1701: a content instance whose landing is a MOUNTED layer
+// (an IG instance whose landing is a base layer) cannot commit that layer's data file, so
+// the committed-currency check is not applicable there. The writer still runs.
+if (check) {
+  const landing = resolveLandingInstance(CHECKOUT);
+  const why = landingMountedNotOwned(CHECKOUT, landing.kind === "instance" ? landing.name : undefined);
+  if (why !== undefined) exitNotApplicable("landing:data:check", why);
+}
 const decl = readDeclaration(ROOT);
 
 /**

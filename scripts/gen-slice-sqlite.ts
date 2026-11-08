@@ -117,6 +117,8 @@ import { auditPayloadTree, payloadOutDir, planPayloads, renderPayloadFiles, type
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { nodeKind } from "../schemas/kg/node-kind.ts";
 import { z } from "zod";
+import { StoreAbsentError } from "./lib/bean-store-absent.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 /** Where a LOCAL build lands — gitignored. The deploy writes into `_site/` instead. */
@@ -1122,9 +1124,20 @@ if (import.meta.main) {
   const defs = wanted.length ? SLICES.filter((s) => wanted.includes(s.slice)) : SLICES;
   let failed = false;
   const manifests: SliceManifest[] = [];
+  const notApplicable: string[] = [];
   for (const def of defs) {
     const t0 = performance.now();
-    const data = await def.load(REPO_ROOT);
+    let data: Awaited<ReturnType<typeof def.load>>;
+    try {
+      data = await def.load(REPO_ROOT);
+    } catch (e) {
+      // A store this checkout does not have at all (an instance with no todo
+      // graph) builds no slice and fails nothing (smart-ips-pilgrimage#13).
+      if (!(e instanceof StoreAbsentError)) throw e;
+      console.log(`  · ${def.slice}: not applicable here — ${e.message}`);
+      notApplicable.push(def.slice);
+      continue;
+    }
     if (data === null) {
       // No source is not an empty source: say so, and build nothing.
       console.error(`  ✗ ${def.slice}: no source at ${def.source.path} — could not determine the slice`);
@@ -1168,4 +1181,7 @@ if (import.meta.main) {
     writeFileSync(join(outDir, "index.json"), sliceIndexText(all));
   }
   if (failed) process.exit(1);
+  if (notApplicable.length === defs.length) {
+    exitNotApplicable("slice:sqlite", `no slice's source is in this checkout (${notApplicable.join(", ")})`);
+  }
 }

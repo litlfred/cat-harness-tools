@@ -1087,7 +1087,7 @@ describe("adjacent graph rows cannot be confused (bean yag0)", () => {
 
 describe("the rail's Graphs group starts closed (#2150)", () => {
   // Owner, 2026-10-05: "also have the "Graphs" section start closed on LHS navbar".
-  const graphsSummary = /<details class="fa-nav-group"( open)?><summary><span class="fa-nav-glyph" aria-hidden="true">▤<\/span>/;
+  const graphsSummary = /<details class="fa-nav-group"( open)?><summary><span class="fa-nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 6\.5h6\.5l2 2H21V19H3z"/;
 
   it("is folded on arrival on a page with no section of its own", () => {
     const html = navbarRegionsHtml(railModel({ instance: "x", toRoot: "..", links: [{ href: "../a/", label: "a" }] }));

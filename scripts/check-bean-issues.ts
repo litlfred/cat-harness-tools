@@ -31,6 +31,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { beanDefsDir, isOpen, readBeans, type BeanNode } from "./beans.ts";
+import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 export { beanDefsDir };
 
@@ -255,6 +256,7 @@ if (import.meta.main) {
       openOnly: process.argv.includes("--open-only"),
     });
   } catch (e) {
+    exitIfBeanStoreAbsent("check:bean-issues", e);
     console.error(`Could not check bean issues: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
     process.exit(2);

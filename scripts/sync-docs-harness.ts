@@ -40,7 +40,7 @@ import { harnessTiles, instanceDirs } from "./harness-tiles.js";
 import { harnessPanel, skillPageIn } from "./harness-panel.js";
 import { siteLinks } from "./site-links.js";
 import { siteDirectories, withViewers } from "./viewer-declarations.js";
-import { harnessTitle } from "./lib/nav-label.js";
+import { harnessTitle, normaliseDestination } from "./lib/nav-label.js";
 import { checkoutDirectories, resolveLandingInstance } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -548,6 +548,22 @@ const tiles = withTileCounts(
       return owner ? harnessTitle(owner) : undefined;
     },
     allHarnesses.map((h) => h.name),
+    // One name per destination (cat-harness-tools#1701): an undeclared tile
+    // takes the name the harness rows give its page, so the glass cannot
+    // disagree with FOLDERS, the sidebar and the landing viewers.
+    (() => {
+      const byDest = new Map<string, string>();
+      for (const h of allHarnesses) {
+        for (const r of h.visualisations ?? []) {
+          const at = r.path ? normaliseDestination(r.path) : undefined;
+          if (at !== undefined && r.label && !byDest.has(at)) byDest.set(at, r.label);
+        }
+      }
+      return (href: string) => {
+        const at = normaliseDestination(href);
+        return at === undefined ? undefined : byDest.get(at);
+      };
+    })(),
   ),
   scanTileCounts(join(ROOT, siteDirFor(ROOT), "assets")),
 );

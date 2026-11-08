@@ -1509,6 +1509,15 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "layers:check",
+    kind: "covered-by",
+    reason:
+      "runs in the CALLER'S CI, not this layer's: job `layers-ref` of `layer-pr-checks.yml` runs the replayer at the " +
+      "commit the caller's lock pins with `--check-layers`, on an index-mode pull request that changes `index.lock.json` " +
+      "(owner, 2026-11-08: the re-pinner publishes the layers ref, and a gate checks it). This layer has no lock of its " +
+      "own to judge, so `bun run cat layers:check` here would only report `skipped`",
+  },
+  {
     script: "translate-user-scenarios:check",
     kind: "no-folio",
     reason:

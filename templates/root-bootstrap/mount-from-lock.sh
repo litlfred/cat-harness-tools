@@ -62,6 +62,17 @@ done <<< "$candidates"
 [ -n "$found" ] || { echo "mount-from-lock: no pinned commit carries scripts/mount-from-lock.ts" >&2; exit 2; }
 
 export CAT_MOUNT_CACHE_DIR="${CAT_MOUNT_CACHE_DIR:-$HOME/.cache/cat-mount}"
+# The layers cache: the replayer reads it from `CAT_LAYERS_URL`, else from the
+# root's own origin. An IG's origin usually carries no `refs/cat/layers/*`, so
+# when it has none and the root names a shared cache in `.github/layers-url`
+# (one URL on one line), that remote is used instead. The replayer still
+# verifies each layer's digest and fetches any layer the cache lacks.
+if [ -z "${CAT_LAYERS_URL:-}" ] && [ "${CAT_LAYERS_CACHE:-1}" != "0" ] && [ -f "$root/.github/layers-url" ]; then
+  if [ -z "$(git -C "$root" ls-remote origin 'refs/cat/layers/*' 2>/dev/null | head -1)" ]; then
+    shared="$(head -1 "$root/.github/layers-url" | tr -d '[:space:]')"
+    [ -n "$shared" ] && export CAT_LAYERS_URL="$shared"
+  fi
+fi
 status=0
 bun "$found" --root "$root" "$@" || status=$?
 exit "$status"

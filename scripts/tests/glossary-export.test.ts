@@ -36,6 +36,7 @@ import {
   buildGlossary,
   glossaryIri,
   kindsDeclaredBy,
+  ledgerNotOursReason,
   ledgerPath,
   liveLedgerEntry,
   pendingKind,
@@ -64,6 +65,12 @@ const REPO =
     existsSync(join(d, "AGENTS.md")) || (existsSync(join(d, ".git")) && existsSync(join(d, "bootstrap"))),
   ) ?? resolve(dirname(HARNESS_ROOT));
 const HARNESS = resolve(HARNESS_ROOT);
+/**
+ * A content root (an IG mounting cat-harness, cat-harness-tools#1701): the
+ * ledger is the harness index's, and `glossary:check` reports not applicable
+ * there, so the "is current" corpus assertions have nothing to assert.
+ */
+const LEDGER_NOT_OURS = ledgerNotOursReason(HARNESS, resolve(dirname(HARNESS_ROOT))) !== null;
 const BOOTSTRAP = join(REPO, "bootstrap");
 
 type Node = Record<string, unknown>;
@@ -311,7 +318,7 @@ describe("retirement — reported, never deleted", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  test.skipIf(NO_HIGHER_ROLES)("the committed ledger is CURRENT — this is the staleness gate", () => {
+  test.skipIf(NO_HIGHER_ROLES || LEDGER_NOT_OURS)("the committed ledger is CURRENT — this is the staleness gate", () => {
     expect(buildGlossary({ today: () => "2026-09-21" }).report.ledgerStale).toBe(false);
     expect(buildGlossary({ instanceRoot: BOOTSTRAP, today: () => "2026-09-21" }).report.ledgerStale).toBe(false);
   });
@@ -522,7 +529,7 @@ describe("graph kinds, node kinds and the harness are glossary terms", () => {
     expect([...new Set(dupes)]).toEqual([]);
   });
 
-  test.skipIf(NO_KIND_TABLES || NO_HIGHER_ROLES)("the committed ledger is current with every family built", async () => {
+  test.skipIf(NO_KIND_TABLES || NO_HIGHER_ROLES || LEDGER_NOT_OURS)("the committed ledger is current with every family built", async () => {
     expect((await buildFullGlossary({ today: () => "2026-09-21" })).report.ledgerStale).toBe(false);
   });
 });
@@ -591,5 +598,44 @@ describe("pending — a graph kind defined in code, not yet in the ledger", () =
     expect(pendingKind(def)).toBe(true);
     expect(pendingKind({ ...def, [DECLARED_BY]: { prefix: "x", name: "x", root: "/x", namespace: "https://x/" } })).toBe(false);
     expect(pendingKind(undefined)).toBe(false);
+  });
+});
+
+describe("a mounted layer's ledger, judged from a content root (cat-harness-tools#1701)", () => {
+  const tree = (gatesWorkflow: boolean): string => {
+    const root = mkdtempSync(join(tmpdir(), "glossary-na-"));
+    mkdirSync(join(root, "cat-harness"));
+    if (gatesWorkflow) {
+      mkdirSync(join(root, ".github", "workflows"), { recursive: true });
+      writeFileSync(join(root, ".github", "workflows", "code-quality-gates.yml"), "jobs: {}\n");
+    }
+    return root;
+  };
+
+  test("content root + a mounted layer's ledger: not applicable, with a reason", () => {
+    const root = tree(false);
+    try {
+      expect(ledgerNotOursReason(join(root, "cat-harness"), root)).toContain("content root");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a content root's OWN ledger is still judged", () => {
+    const root = tree(false);
+    try {
+      expect(ledgerNotOursReason(root, root)).toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a harness root judges the mounted ledger as before", () => {
+    const root = tree(true);
+    try {
+      expect(ledgerNotOursReason(join(root, "cat-harness"), root)).toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -52,6 +52,8 @@ import {
 import { instanceRootsIn, nestedDirectories, readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
 import { checkRemote } from "../../scripts/remote-mount.ts";
+import { lsiHealthEvidence, readIndexes, type LsiHealthEvidence } from "../../scripts/lsi-health.ts";
+import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 import {
   stagingSlug,
   type BranchEvidence,
@@ -1162,6 +1164,7 @@ export async function gatherContext(o: GatherOptions): Promise<HealthContext> {
     }),
     pagesServing: probePagesServing({ repoRoot: o.repoRoot }),
     remoteMounts: probeRemoteMounts(o.repoRoot),
+    lsiIndexes: probeLsiIndexes(o.repoRoot),
   };
 }
 
@@ -1177,5 +1180,21 @@ export function probeRemoteMounts(repoRoot: string): StoreProbe<RemoteMountEvide
     };
   } catch (e) {
     return { state: "unknown", reason: `mount:remote:check threw: ${(e as Error).message}` };
+  }
+}
+
+/**
+ * The LSI indexes as evidence (cat-harness#1144). They live under the HARNESS's
+ * `qa` graph, so another repository's report has nothing to check: absent.
+ * A read that is not a hit is `unknown`, never "no index is missing".
+ */
+export function probeLsiIndexes(repoRoot: string, harnessRoot: string = HARNESS_ROOT): StoreProbe<LsiHealthEvidence> {
+  if (resolve(repoRoot) !== resolve(harnessRoot)) return { state: "absent", reason: "the LSI indexes are cat-harness's; this repository holds none" };
+  try {
+    const read = readIndexes();
+    if (read.state !== "hit") return { state: "unknown", reason: `the stored LSI indexes could not be read (${read.state}): ${read.reason}` };
+    return { state: "ok", value: lsiHealthEvidence(read) };
+  } catch (e) {
+    return { state: "unknown", reason: `the LSI read threw: ${(e as Error).message}` };
   }
 }

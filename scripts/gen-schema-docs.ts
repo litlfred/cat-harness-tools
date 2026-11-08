@@ -19,6 +19,7 @@
 
 import { markdownEditLink } from "../src/core/edit-links.js";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "fs";
+import { orphanPages } from "./doc-orphans.ts";
 import { join, relative, resolve } from "path";
 import { readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { instanceDirectories, instanceDirectoryForGraph } from "../schemas/kg/cat-harness.js";
@@ -134,6 +135,30 @@ function emit(path: string, content: string): void {
     return;
   }
   writeFileSync(path, content);
+}
+
+/**
+ * A committed schema page no contract produces: the contract moved to another
+ * layer or was removed, and the page still says "generated from" it. Reported
+ * and never deleted, for `gen-skill-docs.ts`' `reportOrphans` reason
+ * (`deletion-requires-confirmation`).
+ *
+ * Reported, not yet failed: 13 such pages were already committed when this
+ * check arrived, and this repository promotes a ratchet to a hard failure only
+ * once its count is zero. Raise it to `process.exit(1)` then, as
+ * `gen-skill-docs.ts` did.
+ */
+function reportOrphans(produced: Iterable<string>): void {
+  const orphans = orphanPages(readdirSync(OUT_DIR), produced);
+  if (orphans.length === 0) return;
+  console.error(
+    `\n⚠ ${orphans.length} schema page(s) in the output directory were produced by NO contract:\n`,
+  );
+  for (const f of orphans) console.error(`  ${join(OUT_DIR, f)}`);
+  console.error(
+    `\n  The contract moved to another layer or was removed. Check which; if it is gone\n` +
+      `  from this instance, a person deletes the page (\`deletion-requires-confirmation\`).`,
+  );
 }
 
 function reportDrift(): void {
@@ -334,6 +359,7 @@ function main(): void {
     .sort();
 
   const indexRows: string[] = [];
+  const produced: string[] = [];
 
   for (const skill of skills) {
     const input = readSchema(join(SKILLS_DIR, skill, "input.schema.json"));
@@ -344,6 +370,7 @@ function main(): void {
     }
     const page = renderSkillPage(skill, input, output);
     emit(join(OUT_DIR, `${skill}.md`), page);
+    produced.push(skill);
     const title = (input?.title || output?.title || skill).replace(/ (Input|Output)$/i, "");
     const desc = (input?.description || output?.description || "").replace(/[\\|]/g, "\\$&");
     indexRows.push(`| [${title}](${skill}.html) | \`${skill}\` | ${desc} |`);
@@ -376,6 +403,7 @@ function main(): void {
   index.push("");
   emit(join(OUT_DIR, "index.md"), index.join("\n"));
   console.log(`  ✓ index.md (${indexRows.length} skills)`);
+  reportOrphans(produced);
   reportDrift();
   console.log(`\nWrote schema docs to ${OUT_DIR}`);
 }

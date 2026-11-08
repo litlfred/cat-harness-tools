@@ -129,7 +129,7 @@ describe("ob3m finding 1 — tooltips on icon-only controls, ▦ Harnesses at re
   });
 
   it("flags a rail with no ▦ Harnesses disclosure at all", () => {
-    const gone = real().replace(/<details class="fa-nav-group"><summary><span class="fa-nav-glyph"[^>]*>[^<]*<\/span><span class="fa-nav-label">Harnesses<\/span>/, "<details><summary>");
+    const gone = real().replace(/<details class="fa-nav-group"><summary><span class="fa-nav-glyph"[^>]*>(?:[^<]*|<svg[\s\S]*?<\/svg>)<\/span><span class="fa-nav-label">Harnesses<\/span>/, "<details><summary>");
     expect(gone).not.toBe(real());
     expect(layoutFlags(gone)).toContain("harnesses-at-rest");
   });

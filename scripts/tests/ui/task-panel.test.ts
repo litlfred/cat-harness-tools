@@ -26,10 +26,13 @@ import {
   PANEL_CLIENT,
   panelFile,
   PANEL_SCRIPT,
+  panelLinksReport,
   svgViewBox,
   taskSkillsDeclared,
+  unlinkedPanelRefs,
 } from "../../lib/task-panel.ts";
-import { panelContext, processPage, processRows, taskPanelData, type PanelContext, type ProcessRow } from "../../gen-processes-viz.ts";
+import { instanceRoots, panelContext, processPage, processRows, taskPanelData, type PanelContext, type ProcessRow } from "../../gen-processes-viz.ts";
+import { skillLinksOf, skillTarget, sourceSkillPage } from "../../lib/skill-pages.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 // A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
@@ -214,6 +217,36 @@ describe("the object view", () => {
     expect(off.tasks["C1"]!.calls).toEqual(data.tasks["C1"]!.calls);
   });
 
+  test("the title opens the step's description on its process page; the subject page stays on the id", () => {
+    // Owner, 2026-11-08: "title of task should skip to description thats below".
+    expect(data.tasks["T1"]!.stepHref).toBe("p.html#step-T1");
+    expect(data.tasks["T1"]!.href).toBe("https://e.org/i/process/P/node/T1");
+    expect(processPage({ ...row, decisions: [] } as ProcessRow, [row, called, elsewhere], new Set())).toContain('<a id="step-T1"></a>');
+  });
+
+  test("with no subject pages, the lane lands on its row and the process on its page", () => {
+    const boot = { ...row, file: "boot/p.bpmn" } as ProcessRow;
+    const d = taskPanelData(boot, [boot], ctx);
+    expect(d.processHref).toBe("p.html");
+    expect(d.tasks["T1"]!.href).toBeUndefined();
+    expect(d.tasks["T1"]!.laneHref).toBe("p.html#lane-L1");
+    expect(processPage({ ...boot, decisions: [] } as ProcessRow, [boot], new Set())).toContain('<a id="lane-L1"></a>');
+  });
+
+  test("the QA report names every panel name that links nowhere, once per kind", () => {
+    const refs = unlinkedPanelRefs(data);
+    expect(refs).toContainEqual({ kind: "skill", name: "unpaged", task: "T1" });
+    expect(refs).toContainEqual({ kind: "methodology", name: "unknown-method", task: "T1" });
+    // Linked names are not reported.
+    expect(refs.some((x) => x.name === "review" || x.name === "lead")).toBe(false);
+    const page = panelLinksReport(new Map([["p", { title: "P", refs }]]), "generated: x");
+    expect(page).toContain("## skill");
+    expect(page).toContain("[P](p.html#step-T1)");
+    expect(panelLinksReport(new Map([["p", { title: "P", refs: [] }]]), "generated: x")).toContain("Every name in every panel links");
+    // Skills switched off: none are shown, so none are reported.
+    expect(unlinkedPanelRefs(taskPanelData(row, [row, called, elsewhere], ctx, { skills: false })).some((x) => x.kind === "skill")).toBe(false);
+  });
+
   test("the markers travel with the data, so another page can draw them", () => {
     const m = [{ id: "T1", name: "Review", left: 10, top: 20 }];
     expect(taskPanelData({ ...row, markers: m } as ProcessRow, [row], ctx).markers).toEqual(m);
@@ -270,6 +303,36 @@ describe("the client, for a page other than the process page", () => {
   });
 });
 
+describe("a skill's link", () => {
+  test("its instruction page, else its source file, else nothing", () => {
+    const pages = Object.assign(new Set(["paged"]), { sources: new Map([["sourced", "https://github.com/o/r/blob/main/skills/sourced.md"]]) });
+    expect(skillTarget("paged", "../../", pages)).toBe("../../reference/skill-instructions/paged.html");
+    expect(skillTarget("sourced", "../../", pages)).toBe("https://github.com/o/r/blob/main/skills/sourced.md");
+    expect(skillTarget("nowhere", "../../", pages)).toBeUndefined();
+    expect(skillTarget("sourced", "../../", new Set())).toBeUndefined();
+  });
+
+  test("a page rendered on this site wins over the source link", () => {
+    const pages = Object.assign(new Set<string>(), {
+      sources: new Map([["s", "https://github.com/o/r/blob/main/skills/s.md"]]),
+      local: new Map([["s", "en/h/processes/skills/s.html"]]),
+    });
+    expect(skillTarget("s", "../../", pages)).toBe("../../en/h/processes/skills/s.html");
+  });
+
+  test("a skill rendered from its source keeps its body, and its relative links resolve", () => {
+    const text = "---\nname: s\ndescription: >\n  Does a\n  thing.\n---\n\n# S\n\nSee [t](t.md#x), [u](u.md), [schema](../schemas/a.json), [web](https://e.org/) and [here](#y).\n";
+    const p = sourceSkillPage("s", text, "https://github.com/o/r/blob/main/skills/s.md", new Set(["t"]));
+    expect(p.description).toBe("Does a thing.");
+    expect(p.body).not.toContain("description:");
+    expect(p.body).toContain("[t](t.html#x)");
+    expect(p.body).toContain("[u](https://github.com/o/r/blob/main/skills/u.md)");
+    expect(p.body).toContain("[schema](https://github.com/o/r/blob/main/schemas/a.json)");
+    expect(p.body).toContain("[web](https://e.org/)");
+    expect(p.body).toContain("[here](#y)");
+  });
+});
+
 describe("the real corpus", () => {
   const REPO = resolve(dirname(HARNESS_ROOT));
   test("a rendered diagram gets markers, and its page carries the panel", async () => {
@@ -290,5 +353,27 @@ describe("the real corpus", () => {
     expect(d.processHref).toMatch(new RegExp(`^https?://[^#]+/process/${host!.id}$`));
     const st = host!.steps[0]!;
     expect(d.tasks[st.id]!.href).toBe(`${d.processHref}/node/${st.id}`);
+  }, CORPUS_TIMEOUT);
+
+  test("every skill a panel names links somewhere — bootstrap's confirm-harness to its source (owner, 2026-11-08)", async () => {
+    const rows = (await processRows(REPO)).filter((r) => r.loadError === undefined);
+    const ctx = panelContext(REPO);
+    // What this checkout can link: a page, or a source file the forge can
+    // place. Standing alone (no index lock, no origin) the forge places
+    // nothing, and a skill whose layer is not here has no file at all; the
+    // QA page reports those, and this guards the rest.
+    const links = skillLinksOf(REPO, instanceRoots(REPO));
+    const linkable = (s: string): boolean => links.has(s) || (links.sources?.has(s) ?? false);
+    const discussion = rows.find((r) => r.id === "Process_Discussion");
+    if (discussion && linkable("confirm-harness")) {
+      const s = taskPanelData(discussion, rows, ctx).tasks["A_ListHarnesses"]!.skills.find((x) => x.name === "confirm-harness");
+      expect(s?.href).toMatch(/confirm-harness\.(html|md)$/);
+    }
+    const unlinked = rows.flatMap((r) =>
+      unlinkedPanelRefs(taskPanelData(r, rows, ctx))
+        .filter((x) => (x.kind === "skill" || x.kind === "role-skill") && linkable(x.name))
+        .map((x) => `${r.file}: ${x.kind} ${x.name} at ${x.task}`),
+    );
+    expect(unlinked).toEqual([]);
   }, CORPUS_TIMEOUT);
 });
