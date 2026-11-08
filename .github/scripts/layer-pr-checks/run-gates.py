@@ -235,6 +235,61 @@ LAYER_MODE_SCRIPTS = {
     "readme-sections:check": "reads the COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so every section reads empty",
     "readmes:check": "reads the COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so every directory reads empty",
 }
+# cat-harness-tools#1701: the same four bootstrap-tools gates in INDEX mode,
+# when the corpus they read is a lock mount the root's git does not account
+# for. Each lists its subjects with git (`git-files.ts`: `gitFiles` /
+# `committedFiles`), and smart-ips-pilgrimage's index root gitignores its
+# mounts, so in its main run (42455839636) git listed nothing under
+# `bootstrap/`: book:check "has no README.md" (exit 2), readme-sections:check
+# and readmes:check judged every generated section/README against an empty
+# corpus (exit 1), and check:standalone copied nothing and its `git init` ran
+# in a directory never made (exit 1). None of it is this root's: the mounted
+# bytes are pinned by the lock (and checked by `mount:lock:check`), and
+# bootstrap/bootstrap-tools' own CI judges their READMEs. Skipped only when
+# git DETERMINES it holds none of the subject's files and the subject is not
+# one of the caller's own instances; a root that tracks them (bootstrap's own
+# checkout, an index that commits it) runs them exactly as before, and a root
+# git cannot answer for runs them too. Keyed by the declaring instance, so a
+# script of the same name another instance declares is untouched.
+UNTRACKED_CORPUS_SCRIPTS = {
+    ("bootstrap-tools", "book:check"): ("bootstrap",),
+    ("bootstrap-tools", "readme-sections:check"): ("bootstrap",),
+    ("bootstrap-tools", "readmes:check"): ("bootstrap", "bootstrap-tools"),
+    ("bootstrap-tools", "check:standalone"): ("bootstrap", "bootstrap-tools"),
+}
+
+
+def untracked_by_root(root, rel):
+    """True when `rel` exists under `root` and the root's git accounts for none
+    of its files (`git ls-files --cached --others --exclude-standard`, the set
+    `git-files.ts` reads); None when git cannot answer; False otherwise."""
+    if not os.path.isdir(os.path.join(root, rel)):
+        return None
+    try:
+        r = subprocess.run(
+            ["git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", rel],
+            capture_output=True, timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    return r.stdout.strip(b"\0") == b""
+
+
+def untracked_corpus_reason(root, declarer, script, own):
+    """The reason a committed-tree gate has no subject in this root, or None."""
+    subjects = UNTRACKED_CORPUS_SCRIPTS.get((declarer, script))
+    if not subjects or own is None or any(s in own for s in subjects):
+        return None
+    if not all(untracked_by_root(root, s) is True for s in subjects):
+        return None
+    return (f"reads the files git accounts for under {', '.join(f'{s}/' for s in subjects)}, and in this root "
+            f"{'they are' if len(subjects) > 1 else 'it is'} a lock mount git does not track, so it would judge an "
+            f"empty corpus; the pinned bytes are mount:lock:check's, and {', '.join(subjects)}' own CI judges them "
+            "(cat-harness-tools#1701)")
+
+
 # `check:<layer>-standalone` rehearses <layer> with only its own closure laid
 # out beside it, so in another layer's index nothing the caller holds reaches
 # it: its answer is a function of the lower layers' pins and the runner. That
@@ -260,6 +315,9 @@ NEEDS_INPUT_SCRIPTS = {
     "check:qa-corpus": "needs one of --dir <tree>, --ref <ref> or --github; bare, it prints its usage and exits 2",
     "check:session-staleness": "reads a session's state as JSON on stdin; bare, it reads nothing and cannot determine",
     "check:maintained-artefacts": "needs a built site directory; bare, it prints its usage and exits 2",
+    # cat-harness-tools#1701: a merge-steward check of ONE six-line merge
+    # request, given as a file or on stdin; bare it prints its usage and exits 2.
+    "merge:request:check": "needs a merge request file (or - for stdin); bare, it prints its usage and exits 2",
     "folio:shim:check": "needs a folio root with a folio/schema/builders.ts shim; the index root has none, so it cannot determine",
     "ingest:ig-chrome:check": "needs --layer <dir> checkouts of each fhir.template in the chain; bare, it prints could not determine and exits 2",
     "publish:check": "needs the name of a package script that writes; bare, it exits 2",
@@ -334,11 +392,12 @@ def gate_args(script, env=None):
     return fn(os.environ if env is None else env) if fn else ([], None)
 
 
-def skip_reason(root, script, env=None, own=None):
+def skip_reason(root, script, env=None, own=None, declarer=None):
     """(kind, why) a declared gate cannot determine anything in this run, or (None, None) to run it.
 
     `own` is the caller's own instances; None means unknown, and then no
-    standalone gate is skipped."""
+    standalone gate is skipped. `declarer` is the instance whose package.json
+    declares the script (None: unknown)."""
     if script in LIVE_STATE_SCRIPTS:
         return "live-state", "judges the remote's live state, not the checkout"
     if script in NEEDS_INPUT_SCRIPTS:
@@ -349,6 +408,9 @@ def skip_reason(root, script, env=None, own=None):
         return "sweep-only", SWEEP_ONLY_SCRIPTS[script]
     if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
         return "layer-mode", LAYER_MODE_SCRIPTS[script]
+    why = untracked_corpus_reason(root, declarer, script, own)
+    if why:
+        return "untracked-corpus", why
     m = STANDALONE_GATE.match(script)
     if m and own is not None and m.group(1) not in own:
         return "other-layer", (f"rehearses {m.group(1)} with only its own closure, which holds nothing of this caller; "
@@ -437,7 +499,7 @@ def declared_gates(root, name, path, runner, env=None, own=None):
         command = " ".join([runner, s, *(shlex.quote(a) for a in extra or [])])
         kind = "input-absent" if why else None
         if not why:
-            kind, why = skip_reason(root, s, env, own)
+            kind, why = skip_reason(root, s, env, own, name)
         if why:
             skipped[f"{name}:{s}"] = (command, why, kind)
         else:
@@ -845,7 +907,7 @@ def derive(root, given, tmp, env=None):
     Returns (own, harness, runner, gates, skipped): gate name -> command for
     the gates this runner runs, and gate name -> {command, skipped, kind} for
     the declared ones it does not. `kind` says why: `live-state`,
-    `needs-input`, `runner-state`, `sweep-only`, `layer-mode`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
+    `needs-input`, `runner-state`, `sweep-only`, `layer-mode`, `untracked-corpus`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
     on a side that holds no such input -- CI runs it where the input exists).
 
     `--list` prints this as JSON, and it is what `gates.ts` `loadGates` reads
