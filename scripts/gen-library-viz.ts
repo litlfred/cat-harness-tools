@@ -35,6 +35,7 @@
  *   bun run cat library:viz          # write
  *   bun run cat library:viz:check    # fail if either artefact is stale
  */
+import { inScope as siteInScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
@@ -1542,6 +1543,16 @@ if (import.meta.main) {
   g.entries = g.entries.filter((e) => inComposition(scope, repoRoot, e.dir));
   g.queues = g.queues.filter((q) => inComposition(scope, repoRoot, q.dir));
   g.uploads = g.uploads.filter((u) => inComposition(scope, repoRoot, u.path));
+  // A scoped site (`--scope`, owner 2026-11-08 Q-SZ-2 "B") publishes its scope's
+  // entries only; every other layer's library stays on that layer's own site.
+  const siteOnly = siteScope();
+  if (siteOnly !== undefined) {
+    const before = g.entries.length;
+    g.entries = g.entries.filter((e) => siteInScope(siteOnly, e.instance));
+    g.queues = g.queues.filter((q) => siteInScope(siteOnly, q.instance));
+    g.uploads = g.uploads.filter((u) => siteInScope(siteOnly, u.instance));
+    console.log(`  · scope ${scopeArg(siteOnly)}: ${g.entries.length} of ${before} entr(ies)`);
+  }
   const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   // ── Who references a slug — bean `jbx2`'s third ask ───────────────────
   //

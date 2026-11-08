@@ -130,7 +130,7 @@ import {
 import { decide, readTip } from "./staging-push-gate.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
-import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
+import { buildInstanceSite, recipeFromConfig, siteFields, siteScopeOf, type SiteRecipe } from "./build-instance-site.ts";
 import { makeRecord, RECORD_FILE } from "./preview-record.ts";
 import { isPreviewPath, PREVIEW_PREFIX, previewPath } from "./lib/preview-prefix.ts";
 import { ensurePublishBranch } from "./lib/publish-branch.ts";
@@ -931,6 +931,8 @@ export async function stageDeclared(
   log(`plan: ${d.instance}'s declared site (site.build) → ${target === "main" ? "the publish root" : `${PREVIEW_PREFIX}/ preview of ${branch}`}`);
   log(agentRunLine(agentRunOf(repo)).trimStart());
   log(`via         build-instance-site.ts --instance ${d.instance}${target === "preview" ? ` --staging ${branch}` : ""}${publish ? " --publish" : ""}`);
+  const scope = siteScopeOf(repo, d.instance);
+  log(`scope       ${scope ? `${scope.join(", ")}: the other layers' pages are linked on their own sites, not written here` : "every instance the checkout mounts"}`);
   log(`pre         ${d.recipe.pre.join(", ") || "(none)"}`);
   log(`source      ${d.recipe.sourceSteps.join(", ") || "(none)"}`);
   log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
@@ -965,6 +967,7 @@ export async function stageDeclared(
       previewData(repo, { instance: d.instance, branch, sha, base, owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log);
       writePreviewRecord(repo, site, { slug: branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, ""), sha, base, log });
     } } : {}),
+    ...(scope ? { scope } : {}),
     mount: true,
     fresh: false,
     publish,

@@ -45,6 +45,7 @@ import { runWriter, type WriterOutcome } from "./derive-at-publish.ts";
 import { writerCommand } from "./lib/script-command.ts";
 import { expectedPages, missingPages, type ExpectedPage } from "./site-coverage.ts";
 import { declaredVisualisers, type DeclaredVisualiser } from "./viewer-declarations.ts";
+import { SCOPE_INPUT, scopeArg } from "./lib/site-scope.ts";
 
 /** The Tool input names this runner fills with the site being built. */
 export const SITE_INPUTS = ["site", "out"] as const;
@@ -68,6 +69,8 @@ export interface VisualiserWriter {
   invoke?: string[];
   /** The flag of the Tool's site input ({@link SITE_INPUTS}). */
   siteFlag?: string;
+  /** The flag of the Tool's `scope` input, when it declares one ({@link SCOPE_INPUT}). */
+  scopeFlag?: string;
   /** For a Tool with an `instance` input: its flag and the harness root it is run for. */
   instance?: { flag: string; root: string };
   /** Why it cannot be run into a site, when it cannot. */
@@ -123,12 +126,13 @@ export function visualiserWriters(
     }
     w.invoke = shell.trim().split(/\s+/);
     w.siteFlag = SITE_INPUTS.map(flagOf).find((f) => f !== undefined);
+    w.scopeFlag = flagOf(SCOPE_INPUT);
     if (instanceInput) {
       const flag = flagOf(INSTANCE_INPUT);
       if (flag === undefined) w.unrunnable = `Tool ${t.id}'s \`instance\` input declares no flag`;
       else w.instance = { flag, root: ref.harnessRoot };
     }
-    const owed = inputs.filter((i) => i.required && i.name !== INSTANCE_INPUT && !(SITE_INPUTS as readonly string[]).includes(i.name));
+    const owed = inputs.filter((i) => i.required && i.name !== INSTANCE_INPUT && i.name !== SCOPE_INPUT && !(SITE_INPUTS as readonly string[]).includes(i.name));
     if (owed.length > 0 && w.unrunnable === undefined) {
       w.unrunnable = `Tool ${t.id} requires input(s) ${owed.map((i) => `\`${i.name}\``).join(", ")}, which a site build has no value for`;
     }
@@ -141,7 +145,7 @@ export function visualiserWriters(
  * goes through `writerCommand`, so a checkout with no `cat` script still
  * runs it. Throws when the writer cannot be run that way.
  */
-export function writerArgv(root: string, w: VisualiserWriter, site?: string): string[] {
+export function writerArgv(root: string, w: VisualiserWriter, site?: string, scope?: readonly string[]): string[] {
   if (w.unrunnable !== undefined) throw new Error(w.unrunnable);
   if (w.invoke === undefined) throw new Error(`Tool ${w.tool} has no shell invocation`);
   if (site !== undefined && w.siteFlag === undefined) throw new Error(`Tool ${w.tool} declares no \`site\` input, so it cannot be pointed at a site being built`);
@@ -153,6 +157,8 @@ export function writerArgv(root: string, w: VisualiserWriter, site?: string): st
     ...base,
     ...(w.instance ? [w.instance.flag, w.instance.root] : []),
     ...(site !== undefined ? [w.siteFlag!, resolve(site)] : []),
+    // A scope reaches only a writer that declares one: the others still write every instance.
+    ...(scope !== undefined && w.scopeFlag !== undefined ? [w.scopeFlag, scopeArg(scope)] : []),
   ];
 }
 
@@ -221,12 +227,13 @@ export function runVisualiserWriters(
   writers: readonly VisualiserWriter[],
   site?: string,
   runOne: (argv: readonly string[], cwd: string) => WriterOutcome = runWriter,
+  scope?: readonly string[],
 ): WriterRun[] {
   const runs: WriterRun[] = [];
   for (const w of writers) {
     let argv: string[];
     try {
-      argv = writerArgv(root, w, site);
+      argv = writerArgv(root, w, site, scope);
     } catch (e) {
       console.error(`  ✗ visualiser writer ${label(w)} not run: ${(e as Error).message}`);
       runs.push({ writer: w, outcome: { kind: "unrunnable", why: (e as Error).message } });
@@ -245,13 +252,14 @@ export function runVisualiserWriters(
  * The site build's step: run the writer of every expected page `site` does
  * not hold yet — the checkout's own visualisers and every instance it needs.
  * A page a recipe step already wrote (smart-ra's `site:archimate`) is not
- * written twice.
+ * written twice. With `opts.scope`, only the scope's instances' pages are
+ * owed, and each writer that declares a `scope` input is told it.
  */
-export function writeMissingVisualisers(root: string, site: string, opts: { staging?: boolean } = {}, runOne?: (argv: readonly string[], cwd: string) => WriterOutcome): WriterRun[] {
+export function writeMissingVisualisers(root: string, site: string, opts: { staging?: boolean; scope?: readonly string[] } = {}, runOne?: (argv: readonly string[], cwd: string) => WriterOutcome): WriterRun[] {
   const missing = missingPages(expectedPages(root, opts), (p) => existsSync(join(site, p)));
   if (missing.length === 0) return [];
   const roots = instanceRoots(root);
-  return runVisualiserWriters(root, writersFor(visualiserWriters(root), missing, (name) => roots.get(name)), site, runOne);
+  return runVisualiserWriters(root, writersFor(visualiserWriters(root), missing, (name) => roots.get(name)), site, runOne, opts.scope);
 }
 
 if (import.meta.main) {

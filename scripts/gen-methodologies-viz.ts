@@ -27,6 +27,7 @@
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts --check
  */
+import { inScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, posix } from "node:path";
 
@@ -563,11 +564,16 @@ if (import.meta.main) {
     process.exit(2);
   }
 
-  const rows = methodologyRows(methodologyNodes(INSTANCE_ROOT), report);
-  if (rows.length === 0) {
+  const allRows = methodologyRows(methodologyNodes(INSTANCE_ROOT), report);
+  if (allRows.length === 0) {
     console.error("::error::gen-methodologies-viz: the methodology graph yielded no valid nodes");
     process.exit(1);
   }
+  // A scoped site (`--scope`, owner 2026-11-08 Q-SZ-2 "B") lists and writes its
+  // scope's methodologies only; the others are on their own layer's site.
+  const scope = siteScope();
+  const rows = allRows.filter((r) => inScope(scope, r.instance));
+  if (scope !== undefined) console.log(`  scope ${scopeArg(scope)}: ${rows.length} of ${allRows.length} methodolog(ies)`);
 
   const PAGE = pageRelPath(REPO);
   if (PAGE === undefined) {

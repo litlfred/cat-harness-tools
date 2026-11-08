@@ -109,7 +109,7 @@ export const THEME_SIDEBAR_RULING: DroppedByRuling = {
   feature: "siteNav",
   ruling: 'owner, 2026-10-15, "Replace sidebar after build": the rail pass replaces the theme\'s side bar on every page (one rail everywhere)',
 };
-import { siteCoverageShortfall } from "./site-coverage.ts";
+import { expectedPages, siteCoverageShortfall } from "./site-coverage.ts";
 import { writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
@@ -185,7 +185,32 @@ export interface BuildOptions {
   /** Root files the built site must hold before it is published (a step's promise, checked). */
   require?: string[];
   /** The visualiser-writer step, replaceable in a test; {@link writeMissingVisualisers} by default. */
-  writeVisualisers?: (root: string, source: string, opts: { staging?: boolean }) => unknown;
+  writeVisualisers?: (root: string, source: string, opts: { staging?: boolean; scope?: readonly string[] }) => unknown;
+  /**
+   * The instances whose visualiser pages this site writes and owes ({@link siteScopeOf}).
+   * Absent: every instance the checkout mounts, as a folio's own site carries them.
+   */
+  scope?: readonly string[];
+}
+
+/**
+ * An IG repository's site scope (owner, 2026-11-08, Q-SZ-2 "B"): the IG's own
+ * instance and the layer it lands on (`index.config.json` `site.landing`). Every
+ * other layer's pages stay on that layer's own site and are linked, not copied.
+ * Undefined when the checkout lands on itself or names no landing: a folio's
+ * site still carries every instance it mounts.
+ */
+export function siteScopeOf(root: string, instance: string): string[] | undefined {
+  const file = join(root, "index.config.json");
+  if (!existsSync(file)) return undefined;
+  let landing: unknown;
+  try {
+    landing = (JSON.parse(readFileSync(file, "utf-8")) as { site?: { landing?: unknown } }).site?.landing;
+  } catch {
+    return undefined;
+  }
+  if (typeof landing !== "string" || landing === "hub" || landing === instance) return undefined;
+  return [...new Set([instance, landing])].sort();
 }
 
 /** The `require`d root files a built site does not hold. */
@@ -494,6 +519,50 @@ function served(site: string, rel: string): boolean {
   if (rel === "" || rel.endsWith("/")) return existsSync(join(p, "index.html"));
   if (existsSync(p)) return statSync(p).isFile() || existsSync(join(p, "index.html"));
   return existsSync(`${p}.html`);
+}
+
+/**
+ * A scoped site's links into another layer's pages (owner, 2026-11-08, Q-SZ-2
+ * "B": refer to other harnesses' documentation, do not copy it). The writers
+ * wrote the scope's pages only ({@link siteScopeOf}), so a page that names an
+ * out-of-scope instance's page (a process another layer declares, a term of
+ * its glossary) points at a page this site does not carry. Such a link, and
+ * only such a link, is pointed at the same route on `linkRoot`, where that
+ * layer's pages are published: its target is unserved here AND lies under a
+ * declared visualiser route (`routes`, from `expectedPages`). Any other dead
+ * link is left for {@link checkLinks} to refuse. Returns the links rewritten.
+ */
+export async function relinkOutOfScope(site: string, base: string, linkRoot: string, routes: readonly string[]): Promise<{ links: number; pages: number }> {
+  const root = linkRoot.replace(/\/$/, "");
+  const under = [...new Set(routes)].filter((r) => r !== "");
+  let links = 0;
+  let pages = 0;
+  for (const page of htmlFiles(site)) {
+    const rel = relative(site, page).split(sep).join("/");
+    const html = readFileSync(page, "utf-8");
+    let n = 0;
+    const out = await new HTMLRewriter()
+      .on("*", {
+        element(el) {
+          for (const a of ["href", "src"]) {
+            const v = el.getAttribute(a);
+            if (!v) continue;
+            const t = targetOf(v, rel, base);
+            if (typeof t !== "string" || t === "outside-base" || served(site, t) || !under.some((r) => t.startsWith(r))) continue;
+            const hash = v.indexOf("#");
+            el.setAttribute(a, `${root}/${t}${hash >= 0 ? v.slice(hash) : ""}`);
+            n++;
+          }
+        },
+      })
+      .transform(new Response(html))
+      .text();
+    if (n === 0) continue;
+    writeFileSync(page, out);
+    links += n;
+    pages++;
+  }
+  return { links, pages };
 }
 
 /**
@@ -809,7 +878,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // step already wrote are not written twice ({@link writeMissingVisualisers}). A writer
     // that fails or cannot be pointed at a site is said here, and its pages are judged
     // below by the coverage guard, which refuses or reports as the recipe says.
-    writeVisualisers(root, docs, { staging: Boolean(staging) });
+    writeVisualisers(root, docs, { staging: Boolean(staging), ...(o.scope ? { scope: o.scope } : {}) });
 
     // The Gemfile is the mounted harness's, in its site CHROME (semantic subgraphs, slice 1).
     const harness = join(root, "cat-harness");
@@ -861,7 +930,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   // `en/cat-harness/library/`, and nothing noticed). The parity guard below
   // only compares with the root being replaced, so it cannot miss a page that
   // was never published.
-  const uncovered = siteCoverageShortfall(root, site, { staging: Boolean(staging), ownInstance: o.instance });
+  const uncovered = siteCoverageShortfall(root, site, { staging: Boolean(staging), ownInstance: o.instance, ...(o.scope ? { scope: o.scope } : {}) });
   if (uncovered.length > 0) {
     for (const m of uncovered) console.error(`  ✗ coverage: ${m.route} (${m.harness} declares \`${m.visualiser}\`${m.instance ? `; ${m.instance} has entries` : ""})`);
     if (o.coverage !== "report") throw new Error(`the built site lacks ${uncovered.length} declared visualiser page(s): the site is not published`);
@@ -887,6 +956,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     }
   }
 
+  if (o.scope) {
+    const r = await relinkOutOfScope(site, `${baseurl}/`, o.linkRoot, expectedPages(root, { staging: Boolean(staging) }).map((p) => p.route));
+    console.log(`scope ${o.scope.join(", ")}: ${r.links} link(s) on ${r.pages} page(s) point at another layer's pages on ${o.linkRoot}`);
+  }
   const upstream = readUpstreamPages(upstreamFile);
   const links = await checkLinks(site, `${baseurl}/`, upstream);
   console.log(`links: ${links.pages} html pages, ${links.misses.length} unresolved; ${links.files} files`);

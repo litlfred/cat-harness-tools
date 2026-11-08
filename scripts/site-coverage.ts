@@ -180,7 +180,9 @@ export function instanceSubgraph(instance: string, dirs: readonly { instance: st
  * trashcan kept but not published) is expected in a preview and never on a
  * root publish.
  */
-export function expectedPages(root: string, opts: { staging?: boolean; ownInstance?: string } = {}): ExpectedPage[] {
+export function expectedPages(root: string, opts: { staging?: boolean; ownInstance?: string; scope?: readonly string[] } = {}): ExpectedPage[] {
+  // A scoped site owes the per-instance pages of its scope only; the rest live on their layers' own sites.
+  const scoped = opts.scope === undefined ? undefined : new Set(opts.scope);
   const out: ExpectedPage[] = [];
   const own = (harness: string, legacy: string): { ownSiteRoute?: string } =>
     opts.ownInstance !== undefined && harness === opts.ownInstance && legacy.startsWith(`${harness}/`) ? { ownSiteRoute: legacy.slice(harness.length + 1) } : {};
@@ -202,6 +204,7 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
     for (const instance of instances) {
+      if (scoped !== undefined && !scoped.has(instance)) continue;
       const sub = { ...parts, subgraph: instanceSubgraph(instance, dirs) };
       const subLegacy = visualiserRoute(forwardingParts(sub));
       out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance });
@@ -227,7 +230,7 @@ export function legacyOnlyPages(expected: readonly ExpectedPage[], has: (path: s
 }
 
 /** The guard as `build-instance-site.ts` calls it: the missing pages of a built site directory. */
-export function siteCoverageShortfall(root: string, site: string, opts: { staging?: boolean; ownInstance?: string } = {}): ExpectedPage[] {
+export function siteCoverageShortfall(root: string, site: string, opts: { staging?: boolean; ownInstance?: string; scope?: readonly string[] } = {}): ExpectedPage[] {
   return missingPages(expectedPages(root, opts), (p) => existsSync(join(site, p)));
 }
 
