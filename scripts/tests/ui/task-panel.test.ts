@@ -32,7 +32,7 @@ import {
   unlinkedPanelRefs,
 } from "../../lib/task-panel.ts";
 import { panelContext, processPage, processRows, taskPanelData, type PanelContext, type ProcessRow } from "../../gen-processes-viz.ts";
-import { skillTarget } from "../../lib/skill-pages.ts";
+import { skillTarget, sourceSkillPage } from "../../lib/skill-pages.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 // A real-corpus sweep: about five seconds on a loaded runner, past bun's 5s default.
@@ -309,6 +309,26 @@ describe("a skill's link", () => {
     expect(skillTarget("sourced", "../../", pages)).toBe("https://github.com/o/r/blob/main/skills/sourced.md");
     expect(skillTarget("nowhere", "../../", pages)).toBeUndefined();
     expect(skillTarget("sourced", "../../", new Set())).toBeUndefined();
+  });
+
+  test("a page rendered on this site wins over the source link", () => {
+    const pages = Object.assign(new Set<string>(), {
+      sources: new Map([["s", "https://github.com/o/r/blob/main/skills/s.md"]]),
+      local: new Map([["s", "en/h/processes/skills/s.html"]]),
+    });
+    expect(skillTarget("s", "../../", pages)).toBe("../../en/h/processes/skills/s.html");
+  });
+
+  test("a skill rendered from its source keeps its body, and its relative links resolve", () => {
+    const text = "---\nname: s\ndescription: >\n  Does a\n  thing.\n---\n\n# S\n\nSee [t](t.md#x), [u](u.md), [schema](../schemas/a.json), [web](https://e.org/) and [here](#y).\n";
+    const p = sourceSkillPage("s", text, "https://github.com/o/r/blob/main/skills/s.md", new Set(["t"]));
+    expect(p.description).toBe("Does a thing.");
+    expect(p.body).not.toContain("description:");
+    expect(p.body).toContain("[t](t.html#x)");
+    expect(p.body).toContain("[u](https://github.com/o/r/blob/main/skills/u.md)");
+    expect(p.body).toContain("[schema](https://github.com/o/r/blob/main/schemas/a.json)");
+    expect(p.body).toContain("[web](https://e.org/)");
+    expect(p.body).toContain("[here](#y)");
   });
 });
 

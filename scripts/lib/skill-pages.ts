@@ -17,6 +17,7 @@ import { isSkillMd, skillMdDirs } from "../known-skills.ts";
 import { blobUrl, forgeAt } from "./library-source.ts";
 import { repoOf } from "../../src/core/edit-links.ts";
 import { detectRepoUrl } from "../../src/core/git-refs.ts";
+import { parse as parseYaml } from "yaml";
 
 /** Where the instruction pages sit, relative to the base docs layer. */
 export const SKILL_PAGES_DIR = "reference/skill-instructions";
@@ -54,6 +55,12 @@ export function skillPageHref(skill: string, fromPage: string, pages: ReadonlySe
 export type SkillPages = ReadonlySet<string> & {
   /** skill → its source file's URL on the forge, for a skill with no instruction page. */
   readonly sources?: ReadonlyMap<string, string>;
+  /**
+   * skill → a page this site renders from its source file, relative to the
+   * base docs layer, for a skill with no instruction page (owner,
+   * 2026-11-08: "fill in missing"). Wins over `sources`.
+   */
+  readonly local?: ReadonlyMap<string, string>;
 };
 
 /**
@@ -62,7 +69,12 @@ export type SkillPages = ReadonlySet<string> & {
  * forge cannot place (no mount, no origin) is left out, so no wrong link is drawn.
  */
 export function skillSourcesOf(repo: string, roots: readonly string[]): Map<string, string> {
-  const out = new Map<string, string>();
+  return new Map([...skillSourceFilesOf(repo, roots)].map(([n, x]) => [n, x.url]));
+}
+
+/** {@link skillSourcesOf}, keeping each skill's file as well as its URL. */
+export function skillSourceFilesOf(repo: string, roots: readonly string[]): Map<string, { file: string; url: string }> {
+  const out = new Map<string, { file: string; url: string }>();
   const checkoutRepo = repoOf(detectRepoUrl(repo), "") || undefined;
   for (const root of roots) {
     let dirs: string[][];
@@ -79,7 +91,7 @@ export function skillSourcesOf(repo: string, roots: readonly string[]): Map<stri
         const name = f.slice(0, -3);
         if (!f.endsWith(".md") || out.has(name) || !isSkillMd(abs)) continue;
         const at = forgeAt(repo, relative(repo, abs).split(sep).join("/"), checkoutRepo);
-        if (at) out.set(name, blobUrl(at));
+        if (at) out.set(name, { file: abs, url: blobUrl(at) });
       }
     }
   }
@@ -99,5 +111,63 @@ export function skillLinksOf(repo: string, roots: readonly string[]): SkillPages
  * nothing — code, never a guessed link.
  */
 export function skillTarget(skill: string, root: string, pages: SkillPages): string | undefined {
-  return pages.has(skill) ? `${root}${SKILL_PAGES_DIR}/${skill}.html` : pages.sources?.get(skill);
+  if (pages.has(skill)) return `${root}${SKILL_PAGES_DIR}/${skill}.html`;
+  const local = pages.local?.get(skill);
+  return local !== undefined ? `${root}${local}` : pages.sources?.get(skill);
+}
+
+/** The text after a leading YAML front matter block, and that block's `description`, folded. */
+function splitFrontMatter(text: string): { body: string; description?: string } {
+  if (!text.startsWith("---")) return { body: text };
+  const end = text.indexOf("\n---", 3);
+  if (end === -1) return { body: text };
+  const fm = text.slice(text.indexOf("\n", 3) + 1, end + 1);
+  const body = text.slice(text.indexOf("\n", end + 4) + 1);
+  let description: string | undefined;
+  try {
+    const d = (parseYaml(fm) as { description?: unknown } | null)?.description;
+    if (typeof d === "string" && d.trim()) description = d.replace(/\s+/g, " ").trim();
+  } catch {
+    // Unparseable front matter is the skill gates' finding; the page shows the body.
+  }
+  return { body, ...(description ? { description } : {}) };
+}
+
+/**
+ * A page for a skill that has no instruction page on this site, rendered from
+ * its source file: its description, its body, and a link to the source.
+ *
+ * Owner, 2026-11-08, on the ⓘ panel's skill links: "fill in missing". The
+ * page sits in the processes viewer's own `skills/` directory, so the skill
+ * stays out of this site's graph and out of `reference/skill-instructions/`
+ * (ruling `pve3` in `gen-skill-docs.ts`); it is a rendering of the file, as
+ * the source link is.
+ *
+ * A relative link in the body is rewritten: to a sibling skill's page here
+ * when `localNames` has one, else to the file on the forge, so the page links
+ * nothing that 404s. `body` is returned unwrapped; the caller escapes Liquid.
+ */
+export function sourceSkillPage(
+  name: string,
+  text: string,
+  sourceUrl: string,
+  localNames: ReadonlySet<string>,
+): { title: string; description?: string; body: string } {
+  const { body, description } = splitFrontMatter(text);
+  const base = sourceUrl.slice(0, sourceUrl.lastIndexOf("/") + 1);
+  const rewrite = (target: string): string => {
+    if (/^(?:[a-z][a-z0-9+.-]*:|#|\/)/i.test(target)) return target;
+    const [path, frag] = target.split("#", 2) as [string, string | undefined];
+    const sib = /^(?:\.\/)?([A-Za-z0-9_.-]+)\.md$/.exec(path);
+    if (sib && localNames.has(sib[1]!)) return `${sib[1]}.html${frag ? `#${frag}` : ""}`;
+    try {
+      return new URL(target, base).href;
+    } catch {
+      return target;
+    }
+  };
+  const out = body
+    .replace(/(\]\()([^)\s]+)(\))/g, (_m, a: string, t: string, b: string) => `${a}${rewrite(t)}${b}`)
+    .replace(/(\bhref=")([^"]+)(")/g, (_m, a: string, t: string, b: string) => `${a}${rewrite(t)}${b}`);
+  return { title: name, ...(description ? { description } : {}), body: out };
 }

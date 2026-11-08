@@ -38,7 +38,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { baseDocsDir } from "./compose-docs.js";
-import { skillLinksOf, skillTarget, type SkillPages } from "./lib/skill-pages.ts";
+import { skillLinksOf, skillSourceFilesOf, skillTarget, sourceSkillPage, type SkillPages } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { businessProcessFiles, workflowFiles, kgRoots } from "./known-skills.js";
 import { loadProcessModel, isActivity, isDecision, branchesOf, isGlobalTasksFile, type NotRunElement } from "../src/workflow/process-model.js";
@@ -651,6 +651,46 @@ export interface PanelContext {
   subjectHref: (file: string, kind: string, id: string) => string | undefined;
   /** skill → its `uses-methodology`, when its front matter says it. */
   usesMethodology: (skill: string) => readonly string[] | undefined;
+}
+
+/** Where the pages rendered from skills' source files go, below the processes index. */
+export const SOURCE_SKILLS_DIR = "skills";
+
+/**
+ * The page for a skill with no instruction page, rendered from its source
+ * file (`sourceSkillPage`), with the processes that name it. It sits one
+ * directory below the process pages.
+ */
+export function sourceSkillPageMd(
+  name: string,
+  text: string,
+  url: string,
+  file: string,
+  localNames: ReadonlySet<string>,
+  rows: readonly ProcessRow[],
+): string {
+  const p = sourceSkillPage(name, text, url, localNames);
+  const users = rows.filter(
+    (r) => r.loadError === undefined && (r.skills.includes(name) || (r.laneDetails ?? []).some((l) => l.roleSkills.some((x) => x.skill === name))),
+  );
+  const L: string[] = ["---", `title: '${name.replace(/'/g, "''")} (skill)'`, "nav_exclude: true", GENERATED_FM, "---", ""];
+  L.push("{: .note }");
+  L.push(
+    `> The skill \`${name}\` as its source file [\`${file}\`](${url}) writes it, rendered by \`gen-processes-viz.ts\` because ` +
+      "it has no instruction page on this site — do not edit here. [All processes](../index.html)",
+  );
+  L.push("");
+  const rawFrom = L.length;
+  // The skill's own title first, then what it is and who names it, then the rest of its body.
+  const lines = p.body.trimEnd().split("\n");
+  const h1 = lines.findIndex((l) => /^# /.test(l));
+  if (h1 >= 0) L.push(...lines.splice(0, h1 + 1), "");
+  else L.push(`# ${name}`, "");
+  if (p.description) L.push(`**Skill \`${name}\`:** ${p.description}`, "");
+  if (users.length) L.push(`**Named by:** ${users.map((r) => `[${esc(r.name)}](../${r.stem}.html)`).join(", ")}`, "");
+  L.push(...lines);
+  L.push(...wrapRaw(L.splice(rawFrom).join("\n")));
+  return `${L.join("\n")}\n`;
 }
 
 /** The QA page of panel names that link nowhere, beside the processes index. */
@@ -1393,7 +1433,17 @@ if (import.meta.main) {
     console.error("✗ no BPMN diagrams found — refusing to write an index over nothing");
     process.exit(1);
   }
-  const skillPages = skillLinksOf(REPO, instanceRoots(REPO));
+  // A skill the diagrams name with no instruction page gets a page rendered
+  // from its source, in this viewer's `skills/` (owner, 2026-11-08: "fill in
+  // missing"); one with no source either stays code.
+  const sourceFiles = skillSourceFilesOf(REPO, instanceRoots(REPO));
+  const linked = skillLinksOf(REPO, instanceRoots(REPO));
+  const named = new Set(rows.flatMap((r) => [...r.skills, ...(r.laneDetails ?? []).flatMap((l) => l.roleSkills.map((x) => x.skill))]));
+  const localSkills = [...named].filter((n) => !linked.has(n) && sourceFiles.has(n)).sort();
+  const skillPages: SkillPages = Object.assign(new Set(linked), {
+    sources: linked.sources ?? new Map<string, string>(),
+    local: new Map(localSkills.map((n) => [n, `${dirname(rel)}/${SOURCE_SKILLS_DIR}/${n}.html`])),
+  });
   // The workflow instances each diagram runs in (bean `v49e`): links to their
   // pages, read from the committed instance files the state visualiser draws.
   const instances = instancesRead(workflowInstanceLinks());
@@ -1416,6 +1466,11 @@ if (import.meta.main) {
     if (sub !== undefined) pages.set(join(into ?? baseDocsDir(REPO), sub), publishedIndex(x.rows, REPO, skillPages, instances, { instance: x.name }));
   }
   const ctx = panelContext(REPO, skillPages);
+  const localSet = new Set(localSkills);
+  for (const n of localSkills) {
+    const src = sourceFiles.get(n)!;
+    pages.set(join(dirname(out), SOURCE_SKILLS_DIR, `${n}.md`), sourceSkillPageMd(n, readFileSync(src.file, "utf-8"), src.url, relative(REPO, src.file), localSet, rows));
+  }
   // Whether the ⓘ panel shows skills: the site's declaration, on unless it
   // says `site.taskSkills: false` (`taskSkillsDeclared`).
   const skills = taskSkillsDeclared(REPO);
