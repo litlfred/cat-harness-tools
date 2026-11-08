@@ -29,6 +29,7 @@
     "scripts/check-workflows.ts",
     "scripts/compose-docs.ts",
     "scripts/gates.ts",
+    "scripts/gen-lsi-viz.ts",
     "scripts/kg-audit.ts",
     "scripts/lib/default-scope-globs.ts",
     "scripts/lib/jekyll-pages-nav.ts",
