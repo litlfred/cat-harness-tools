@@ -129,8 +129,18 @@ export interface PanelTask {
    * when its instance's graph publishes no subject pages.
    */
   href?: string;
+  /**
+   * The step's row in its process page's step table, `<stem>.html#step-T`:
+   * where the panel's title goes, so a reader lands on the step's description
+   * (owner, 2026-11-08: "title of task should skip to description thats
+   * below"). The subject page, when there is one, stays on the `id` line.
+   */
+  stepHref?: string;
   lane?: string;
-  /** The lane's own page, `…/process/P/lane/L`. Absent as `href` is. */
+  /**
+   * The lane's own page, `…/process/P/lane/L`; where its instance publishes
+   * none, its row in the process page's lanes table.
+   */
   laneHref?: string;
   skills: PanelSkill[];
   /**
@@ -171,7 +181,7 @@ export interface PanelData {
    * data rather than a second copy of the placement.
    */
   markers?: Marker[];
-  /** The process's own page, `…/process/P` (#603). Absent as {@link PanelTask.href} is. */
+  /** The process's own page, `…/process/P` (#603); where none is published, the process page itself. */
   processHref?: string;
   tasks: Record<string, PanelTask>;
 }
@@ -313,8 +323,14 @@ export const PANEL_SCRIPT = `(function () {
     panel.textContent = "";
     var close = el("button", "pt-close", "\\u00d7"); close.type = "button"; close.setAttribute("aria-label", "Close");
     close.onclick = function () { hide(); }; panel.appendChild(close);
-    var task = obj(t.type.replace(/^bpmn:/, ""), link({ name: t.name, href: t.href }), "task");
-    task.appendChild(el("div", "pt-attr", "id = " + t.id));
+    // The title opens the step's description below the drawing; the step's
+    // own page, where it has one, is its id.
+    var title = link({ name: t.name, href: t.stepHref || t.href });
+    if (t.stepHref) title.onclick = function () { hide(); };
+    var task = obj(t.type.replace(/^bpmn:/, ""), title, "task");
+    var idl = el("div", "pt-attr", "id = ");
+    if (t.stepHref && t.href) idl.appendChild(link({ name: t.id, href: t.href })); else idl.appendChild(document.createTextNode(t.id));
+    task.appendChild(idl);
     if (t.lane) {
       var ln = el("div", "pt-attr", "lane = "); ln.appendChild(link({ name: t.lane, href: t.laneHref }));
       // The lane is a partition; the Role it names is who acts (owner,
@@ -534,4 +550,87 @@ export function diagramBlock(opts: { img: string; alt: string; markers: readonly
   L.push(`</div>`);
   L.push(`<script>${PANEL_SCRIPT}</script>`);
   return L;
+}
+
+/** One name in a panel that links nowhere: what kind it is, and the step that shows it. */
+export interface UnlinkedRef {
+  kind: "task" | "lane" | "process" | "skill" | "methodology" | "role" | "role-skill" | "calls";
+  name: string;
+  task: string;
+}
+
+/**
+ * Every name `data`'s panels show as code rather than a link — the "no page
+ * for this one" a reader meets (owner, 2026-11-08: "need QA report"). Read
+ * off the sidecar the reader is served, so the report and the panel cannot
+ * disagree. A `skills: false` site shows no skills, so reports none.
+ */
+export function unlinkedPanelRefs(data: PanelData): UnlinkedRef[] {
+  const out: UnlinkedRef[] = [];
+  const skillsOn = data.skills !== false;
+  if (!data.processHref) out.push({ kind: "process", name: data.process, task: "" });
+  for (const t of Object.values(data.tasks)) {
+    const add = (kind: UnlinkedRef["kind"], l: PanelLink | undefined): void => {
+      if (l && !l.href) out.push({ kind, name: l.name, task: t.id });
+    };
+    if (!t.href && !t.stepHref) out.push({ kind: "task", name: t.name, task: t.id });
+    if (t.lane && !t.laneHref) out.push({ kind: "lane", name: t.lane, task: t.id });
+    add("calls", t.calls);
+    add("role", t.role);
+    if (!skillsOn) continue;
+    for (const s of t.skills) {
+      add("skill", s);
+      for (const m of s.methodologies ?? []) add("methodology", m);
+    }
+    for (const s of t.role?.skills ?? []) add("role-skill", s);
+  }
+  return out;
+}
+
+/**
+ * The QA report page: every unlinked panel name, grouped by kind, with the
+ * process pages that show it. `pages` maps a process page's stem to its
+ * unlinked names.
+ */
+export function panelLinksReport(pages: ReadonlyMap<string, { title: string; refs: readonly UnlinkedRef[] }>, frontMatter: string): string {
+  const byKind = new Map<string, Map<string, Set<string>>>();
+  let total = 0;
+  for (const [stem, p] of pages) {
+    for (const r of p.refs) {
+      total++;
+      const names = byKind.get(r.kind) ?? new Map<string, Set<string>>();
+      byKind.set(r.kind, names);
+      const at = names.get(r.name) ?? new Set<string>();
+      names.set(r.name, at);
+      at.add(r.task ? `[${p.title.replace(/[\\[\]|]/g, "\\$&")}](${stem}.html#step-${r.task})` : `[${p.title.replace(/[\\[\]|]/g, "\\$&")}](${stem}.html)`);
+    }
+  }
+  const L: string[] = ["---", "title: 'Task panel links: QA'", "nav_exclude: true", frontMatter, "---", ""];
+  L.push("{: .note }");
+  L.push("> Generated by `gen-processes-viz.ts` from the ⓘ task panels' data — do not edit here. [All processes](index.html)");
+  L.push("");
+  L.push("# Task panel links: QA");
+  L.push("");
+  L.push(
+    "Every name an ⓘ task panel shows as plain text, with the tooltip \"no page for this one\", because nothing it " +
+      "could link to was found: no instruction page or source file for a skill, no page for a role, methodology, lane or step.",
+  );
+  L.push("");
+  if (total === 0) {
+    L.push("**Every name in every panel links to a page.**");
+    return `${L.join("\n")}\n`;
+  }
+  L.push(`**${total}** unlinked name(s) across **${[...pages.values()].filter((p) => p.refs.length > 0).length}** process page(s).`);
+  L.push("");
+  for (const [kind, names] of [...byKind].sort((a, b) => a[0].localeCompare(b[0], "en"))) {
+    L.push(`## ${kind}`);
+    L.push("");
+    L.push("| name | shown on |");
+    L.push("|---|---|");
+    for (const [name, at] of [...names].sort((a, b) => a[0].localeCompare(b[0], "en"))) {
+      L.push(`| \`${name.replace(/[|`]/g, "")}\` | ${[...at].sort().join(", ")} |`);
+    }
+    L.push("");
+  }
+  return `${L.join("\n")}\n`;
 }

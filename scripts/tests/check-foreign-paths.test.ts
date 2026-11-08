@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { foreignTargets, judge, scanText, type InstanceDirs } from "../check-foreign-paths.ts";
+import { foreignTargets, judge, notThisCheckouts, scanText, type InstanceDirs } from "../check-foreign-paths.ts";
 
 const ROOT: InstanceDirs = { name: "root", root: "", dirs: ["beans", "fsh-guts", "themes", "uploads"] };
 const HARNESS: InstanceDirs = { name: "harness", root: "harness", dirs: ["harness/themes", "harness/skills"] };
@@ -74,5 +74,37 @@ describe("the ratchet is one way", () => {
     const j = judge({}, { "a.ts": 3 });
     expect(j.exit).toBe(0);
     expect(j.under).toEqual([{ file: "a.ts", was: 3, now: 0 }]);
+  });
+});
+
+// cat-harness-tools#1701: a content instance's root declares `docs/` etc., and
+// a MOUNTED layer's literal spelling it is not the root's to judge.
+describe("notThisCheckouts — mounted code spelling the root's own directories", () => {
+  const root: InstanceDirs = { name: "smart-ips-pilgrimage", root: "", dirs: ["docs", "translations"] };
+  const fhir: InstanceDirs = { name: "fhir-harness", root: "fhir-harness", dirs: ["fhir-harness/ig-site"] };
+  const site = (file: string, owner: string, target = "docs") => ({ file, line: 1, literal: target, target, owner });
+  const scan = {
+    counted: [
+      site("cat-harness-tools/scripts/sync-docs-harness.ts", "smart-ips-pilgrimage"),
+      site("scripts/local.ts", "smart-ips-pilgrimage"),
+      site("cat-harness-tools/scripts/x.ts", "fhir-harness", "fhir-harness/ig-site"),
+    ],
+    marked: [],
+  };
+
+  test("a mounted layer's site on the root's directory is excused; the rest still count", () => {
+    const r = notThisCheckouts(scan, [root, fhir], ["cat-harness-tools", "fhir-harness"]);
+    expect(r.excused.map((e) => e.file)).toEqual(["cat-harness-tools/scripts/sync-docs-harness.ts"]);
+    expect(r.scan.counted.map((s) => s.file)).toEqual(["scripts/local.ts", "cat-harness-tools/scripts/x.ts"]);
+  });
+
+  test("nothing is excused where the root declares no instance (the platform index)", () => {
+    const idx = notThisCheckouts(scan, [fhir], ["cat-harness-tools", "fhir-harness"]);
+    expect(idx.excused).toHaveLength(0);
+    expect(idx.scan.counted).toHaveLength(3);
+  });
+
+  test("nothing is excused when the file's layer is not mounted by the lock", () => {
+    expect(notThisCheckouts(scan, [root, fhir], []).excused).toHaveLength(0);
   });
 });

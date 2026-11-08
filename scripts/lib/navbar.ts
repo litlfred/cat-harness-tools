@@ -208,6 +208,14 @@ export interface NavItem {
 export interface NavGroup {
   label: string;
   icon?: string;
+  /**
+   * SVG path data in a 24×24 box, drawn as the group's mark instead of
+   * {@link icon}. Owner, 2026-11-08: *"why weird grid icons in left navbar?
+   * use letters if nothing better but i am sure you get a good page and
+   * folder icon"* — the `▥ ▤ ▦` glyphs read as grids, not as pages,
+   * folders and harnesses. {@link GROUP_GLYPHS} holds the three.
+   */
+  glyphPath?: string;
   items: readonly NavItem[];
   /**
    * Render as a `<details>` the reader opens.
@@ -869,12 +877,31 @@ function graphsOnArrival(g: NavGroup, hasOwnSection: boolean): NavGroup {
   return g.items.some(holdsCurrent) ? { ...g, open: true } : g;
 }
 
+/**
+ * The marks of the navbar's three section groups (owner, 2026-11-08, see
+ * {@link NavGroup.glyphPath}): a ruled page, a folder, and a cat's framed
+ * face for the harnesses — the same "framed face with ears" the cat-harness
+ * avatar reads as.
+ */
+export const GROUP_GLYPHS = {
+  pages: "M6 3h12v18H6z M9 8h6 M9 12h6 M9 16h4",
+  folders: "M3 6.5h6.5l2 2H21V19H3z",
+  harnesses: "M4 20V4.5l5 5h6l5-5V20z M8.5 14h1.5 M14 14h1.5 M11 17.5h2",
+} as const;
+
+function groupMark(g: NavGroup): string {
+  if (g.glyphPath) {
+    return `<span class="fa-nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${esc(g.glyphPath)}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+  }
+  return `<span class="fa-nav-glyph" aria-hidden="true">${esc(g.icon ?? "▸")}</span>`;
+}
+
 function groupHtml(g: NavGroup, c: Ctx): string {
   const items = g.items.map((i) => itemHtml(i, c)).join("");
   if (!g.collapsible) return items;
   return (
     `<details class="fa-nav-group"${g.open ? " open" : ""}>` +
-    `<summary><span class="fa-nav-glyph" aria-hidden="true">${esc(g.icon ?? "▸")}</span>` +
+    `<summary>${groupMark(g)}` +
     `<span class="fa-nav-label">${esc(g.label)}</span></summary>` +
     `<div class="fa-nav-sub">${items}</div></details>`
   );
