@@ -321,8 +321,7 @@ export function hostSiteArtefacts(repoRoot = REPO_ROOT, declared: readonly Decla
   let translated: string[] | undefined;
   const out: DeclaredArtefact[] = [];
   for (const v of vis) {
-    const tool = discoverTools(repoRoot, undefined, v.harnessRoot).tools.find((t) => t.id === v.renderedBy);
-    const shell = (tool as { invoke?: { shell?: string } } | undefined)?.invoke?.shell;
+    const shell = rendererShell(repoRoot, v);
     const writer = /^bun run (?:cat )?(\S+)$/.exec(shell?.trim() ?? "")?.[1];
     if (writer === undefined) {
       throw new Error(`derive:publish: visualiser ${v.harness}/${v.id} is builtOnHostSite, but its Tool ${v.renderedBy} has no \`bun run cat <script>\` invoke.shell (got ${JSON.stringify(shell)})`);
@@ -346,6 +345,21 @@ export function hostSiteArtefacts(repoRoot = REPO_ROOT, declared: readonly Decla
     }
   }
   return out;
+}
+
+/**
+ * The `invoke.shell` of the Tool that renders a visualiser: the declaring
+ * layer's own Tool of that id when it has one, else the one another layer
+ * holds. A layer above the harness declares a page the harness's Tool draws
+ * (cat-harness#1150: folio-assistant-sci's Editor checkers page, drawn by
+ * cat-harness's state-viewer), so looking only in the declaring layer refused
+ * every such page.
+ */
+export function rendererShell(repoRoot: string, v: { renderedBy: string; harnessRoot: string }): string | undefined {
+  const shellOf = (t: unknown) => (t as { invoke?: { shell?: string } } | undefined)?.invoke?.shell;
+  const own = discoverTools(repoRoot, undefined, v.harnessRoot).tools.find((t) => t.id === v.renderedBy);
+  if (own !== undefined) return shellOf(own);
+  return shellOf(discoverTools(repoRoot).tools.find((t) => t.id === v.renderedBy));
 }
 
 /** One ordering edge: `before` runs before `after`, and why the declarations say so. */

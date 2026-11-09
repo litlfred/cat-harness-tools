@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { translatedLocales, withHostSiteArtefacts, writerEdges, writersOf, type DeclaredArtefact } from "../../derive-at-publish.ts";
+import { rendererShell, translatedLocales, withHostSiteArtefacts, writerEdges, writersOf, type DeclaredArtefact } from "../../derive-at-publish.ts";
 
 const entry = (instance: string, path: string, writer: string, extra: Partial<DeclaredArtefact> = {}): DeclaredArtefact => ({
   instance,
@@ -103,5 +103,36 @@ describe("the locales a translated viewer writes", () => {
 
   test("every layer's translation-sources locales, once each, the page locale and non-locale folders aside", () => {
     expect(translatedLocales(tmp)).toEqual(["ar", "fr"]);
+  });
+});
+
+describe("the Tool that draws a host-site page (cat-harness#1150)", () => {
+  let tmp: string;
+  const shell = "bun run cat state:visualizer";
+  beforeAll(() => {
+    tmp = mkdtempSync(join(tmpdir(), "host-site-renderer-"));
+    const write = (p: string, body: unknown) => {
+      mkdirSync(dirname(join(tmp, p)), { recursive: true });
+      writeFileSync(join(tmp, p), JSON.stringify(body));
+    };
+    write("base/base.json", { name: "base", needs: [], directories: [{ id: "base-tools", path: "tools/", graphTypologies: ["tools"] }] });
+    write("base/tools/state-viewer/state-viewer.json", {
+      $schema: "tool-definition/v1",
+      tool: { id: "state-viewer", title: "State graph viewer", description: "Draws state pages.", install: { none: true }, invoke: { shell }, io: { inputs: [], outputs: [] }, satisfies: ["graph-rendering"], renders: ["editor-checkers"] },
+    });
+    write("top/top.json", { name: "top", needs: ["base"], directories: [] });
+  });
+  afterAll(() => rmSync(tmp, { recursive: true, force: true }));
+
+  test("a page declared above the layer that holds its Tool resolves to that Tool's script", () => {
+    expect(rendererShell(tmp, { renderedBy: "state-viewer", harnessRoot: join(tmp, "top") })).toBe(shell);
+  });
+
+  test("the declaring layer's own Tool still resolves", () => {
+    expect(rendererShell(tmp, { renderedBy: "state-viewer", harnessRoot: join(tmp, "base") })).toBe(shell);
+  });
+
+  test("a Tool no layer holds resolves to nothing, so the page is refused", () => {
+    expect(rendererShell(tmp, { renderedBy: "no-such-tool", harnessRoot: join(tmp, "top") })).toBeUndefined();
   });
 });
