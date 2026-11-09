@@ -54,6 +54,7 @@ import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
 import { checkRemote } from "../../scripts/remote-mount.ts";
 import { lsiHealthEvidence, readIndexes, type LsiHealthEvidence } from "../../scripts/lsi-health.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { keywordsStates, type KeywordsState } from "../../scripts/library-keywords.ts";
 import {
   stagingSlug,
   type BranchEvidence,
@@ -1165,6 +1166,7 @@ export async function gatherContext(o: GatherOptions): Promise<HealthContext> {
     pagesServing: probePagesServing({ repoRoot: o.repoRoot }),
     remoteMounts: probeRemoteMounts(o.repoRoot),
     lsiIndexes: probeLsiIndexes(o.repoRoot),
+    libraryKeywords: probeLibraryKeywords(o.repoRoot),
   };
 }
 
@@ -1196,5 +1198,19 @@ export function probeLsiIndexes(repoRoot: string, harnessRoot: string = HARNESS_
     return { state: "ok", value: lsiHealthEvidence(read) };
   } catch (e) {
     return { state: "unknown", reason: `the LSI read threw: ${(e as Error).message}` };
+  }
+}
+
+/**
+ * Every library entry under `repoRoot` with its keywords.json state
+ * (cat-harness#1144). No library under it is `absent`. Writes nothing.
+ */
+export function probeLibraryKeywords(repoRoot: string, states: typeof keywordsStates = keywordsStates): StoreProbe<KeywordsState[]> {
+  try {
+    const { libraries, entries } = states(repoRoot);
+    if (libraries === 0) return { state: "absent", reason: "this repository declares no library with entries" };
+    return { state: "ok", value: entries };
+  } catch (e) {
+    return { state: "unknown", reason: `library:keywords could not be computed: ${(e as Error).message}` };
   }
 }

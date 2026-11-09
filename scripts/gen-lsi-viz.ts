@@ -46,7 +46,9 @@ import { parse as parseYaml } from "yaml";
 import { VIEWER_DIR } from "./lsi.ts";
 import { withRenderedByFrontMatter } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { siteArg } from "./lib/site-target.ts";
+import { siteArg, siteTarget } from "./lib/site-target.ts";
+import { baseDocsDir } from "./compose-docs.js";
+import { KEYWORDS_GRAPH_DIR, KeywordsGraphSchema, type KeywordsGraph } from "../schemas/library/library-keywords.ts";
 import { declaredGraphs, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { checkMethodologyEvidence, frontMatterOf, methodologyNodes } from "./check-methodology-evidence.ts";
@@ -64,6 +66,8 @@ import { isSkillMd, skillMdDirs } from "./known-skills.ts";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
 import { discoverTools } from "../tools/discover.ts";
 import { activityRefs, skillName } from "./check-process-bindings.ts";
+import { entriesOf, KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
+import { keywordsPage, keywordsPageModel } from "./lib/keywords-page.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "lsi-viewer";
@@ -83,6 +87,9 @@ const SITE = siteArg();
 const OUT = SITE === undefined ? join(VIEWER_DIR, "index.md") : join(SITE, relative(join(REPO, "cat-harness/docs"), VIEWER_DIR), "index.md");
 /** The page's own path under the base docs layer, for relative links. */
 const PAGE_REL = relative(join(REPO, "cat-harness/docs"), join(VIEWER_DIR, "index.md")).split("\\").join("/");
+/** The keyword viewer, a page under this one (cat-harness#1144, owner card "B"). */
+const KEYWORDS_OUT = join(dirname(OUT), "keywords", "index.md");
+const KEYWORDS_PAGE_REL = posix.join(posix.dirname(PAGE_REL), "keywords", "index.md");
 
 /**
  * The methods that add an index to a text: latent retrieval, its parallel
@@ -338,6 +345,33 @@ export function evidencePage(model: EvidenceModel, links: EvidenceLinks = {}): s
   return withRenderedByFrontMatter(L.join("\n") + "\n", VIEWER_TOOL);
 }
 
+/**
+ * The keywords graph `library:keywords` already wrote into `site`, when it is
+ * there and carries exactly this layer's variants. At publish it is: the
+ * `docs/assets/keywords/` route is declared before this page's, and
+ * `derive:publish` runs writers in that order. Otherwise the graph is
+ * computed here, so the page never depends on write order for correctness.
+ */
+export function builtKeywordsGraphs(site: string): KeywordsGraph[] | undefined {
+  const dir = join(site, KEYWORDS_GRAPH_DIR);
+  const indexFile = join(dir, "index.json");
+  if (!existsSync(indexFile)) return undefined;
+  try {
+    const index = JSON.parse(readFileSync(indexFile, "utf8")) as { variants?: { id: string }[]; nodes?: { href: string }[] };
+    if (JSON.stringify((index.variants ?? []).map((v) => v.id)) !== JSON.stringify(KEYWORD_VARIANTS.map((v) => v.id))) return undefined;
+    return (index.nodes ?? []).map((n) => KeywordsGraphSchema.parse(JSON.parse(readFileSync(join(site, n.href), "utf8"))));
+  } catch {
+    return undefined;
+  }
+}
+
+/** The keyword viewer over this checkout: the derived keywords graph, its variants side by side. */
+export function renderKeywords(repo = REPO, site = siteTarget(baseDocsDir(repo))): string {
+  const dirs = new Map(entriesOf(repo).map((e) => [`${e.instance}/${e.id}`, join(repo, e.dir)]));
+  const model = keywordsPageModel(builtKeywordsGraphs(site) ?? keywordsGraphs(undefined, repo), repo, (g) => dirs.get(`${g.instance}/${g.entry}`), libraryResolver(repo, INSTANCE_ROOT), KEYWORDS_PAGE_REL, KEYWORD_VARIANTS);
+  return withRenderedByFrontMatter(keywordsPage(model, GENERATED_FM), VIEWER_TOOL);
+}
+
 /** The page over this checkout. */
 export function render(repo = REPO): string {
   const methodologies = methodologiesPageRel(repo);
@@ -364,17 +398,22 @@ if (import.meta.main) {
     console.log("lsi viewer: " + relative(REPO, OUT) + " is built at publish (builtAtPublish), not committed — nothing to compare; `bun run cat lsi:viz` writes it");
     process.exit(0);
   }
-  const page = render();
-  if (check) {
-    const cur = existsSync(OUT) ? readFileSync(OUT, "utf8") : "";
-    if (cur !== page) {
-      console.error(relative(REPO, OUT) + " is stale — run `bun run cat lsi:viz` and commit it.");
-      process.exit(1);
+  const pages: [string, string][] = [
+    [OUT, render()],
+    [KEYWORDS_OUT, renderKeywords()],
+  ];
+  for (const [out, page] of pages) {
+    if (check) {
+      const cur = existsSync(out) ? readFileSync(out, "utf8") : "";
+      if (cur !== page) {
+        console.error(relative(REPO, out) + " is stale — run `bun run cat lsi:viz` and commit it.");
+        process.exit(1);
+      }
+      console.log("lsi viewer: " + relative(REPO, out) + " is current");
+    } else {
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, page);
+      console.log("lsi viewer → " + relative(REPO, out));
     }
-    console.log("lsi viewer: " + relative(REPO, OUT) + " is current");
-  } else {
-    mkdirSync(dirname(OUT), { recursive: true });
-    writeFileSync(OUT, page);
-    console.log("lsi viewer → " + relative(REPO, OUT));
   }
 }

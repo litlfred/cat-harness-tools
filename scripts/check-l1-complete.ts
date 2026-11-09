@@ -211,7 +211,10 @@ export const ENTRY_SIDECARS: readonly string[] = [
   VECTOR_FIGURES_FILE,
   "manifest.jsonld",
   SUMMARIES_FILE,
-  // The entry's LSI keywords, written by `library-keywords.ts` (issue #2302).
+  // LEGACY: the entry's LSI keywords, once written here by `library-keywords.ts`
+  // (issue #2302). Keywords are now built at publish into docs/assets/keywords/
+  // (cat-harness#1144); still allowed until the committed files are removed,
+  // and the `library-keywords` health check counts any that remain.
   KEYWORDS_FILE,
   // Authored, not produced by an arm: the licence record gen-library-jsonld
   // carries into manifest.jsonld as dcterms:license + licenceRecord (#1492, D4).

@@ -37,6 +37,7 @@ import {
   pagesPublishHealthCheck,
   remoteMountHealthCheck,
   lsiIndexHealthCheck,
+  libraryKeywordsHealthCheck,
   ORPHAN_THRESHOLDS,
   RECENT_COMMIT_MINUTES,
   TRACKED_MAJOR_BYTES,
@@ -59,7 +60,7 @@ import {
   type SpecialBranchMeasure,
   type StagingPreview,
 } from "./checks.ts";
-import { declaredFamilyPrefix, hasRenderedDecision, membersFor, probeBeans, probeLsiIndexes, probePagesServing, probeTodos, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
+import { declaredFamilyPrefix, hasRenderedDecision, membersFor, probeBeans, probeLibraryKeywords, probeLsiIndexes, probePagesServing, probeTodos, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
 
 const MB = 1024 * 1024;
 
@@ -125,6 +126,34 @@ describe("lsi-indexes (cat-harness#1144: the LSI page's health half)", () => {
     expect(r.measurements.find((m) => m.metric === "lsi-graphs-needing-index")!.value).toBe(2);
     expect(r.measurements.find((m) => m.metric === "lsi-near-duplicate-pairs:inst/g0")!.value).toBe(5);
     expect(HealthCheckResultSchema.safeParse(r).success).toBe(true);
+  });
+});
+
+describe("library-keywords (cat-harness#1144)", () => {
+  const ev = (rows: [number, boolean][]): HealthContext["libraryKeywords"] => ({
+    state: "ok",
+    value: rows.map(([keywords, legacy], i) => ({ entry: `lib/e${i}`, keywords, legacy })),
+  });
+
+  it("every entry with keywords and no legacy file is ok; no probe is not applicable; an error is unknown", () => {
+    expect(libraryKeywordsHealthCheck(healthyContext({ libraryKeywords: ev([[12, false], [3, false]]) })).state).toBe("ok");
+    expect(libraryKeywordsHealthCheck(healthyContext()).reason).toContain("not applicable");
+    expect(libraryKeywordsHealthCheck(healthyContext({ libraryKeywords: { state: "unknown", reason: "x" } })).state).toBe("unknown");
+  });
+
+  it("an entry with no keywords and a committed keywords.json are separate minor findings naming the entries", () => {
+    const r = libraryKeywordsHealthCheck(healthyContext({ libraryKeywords: ev([[12, false], [0, false], [5, true]]) }));
+    expect(r.state).toBe("finding");
+    expect(r.findings.map((f) => f.metric)).toEqual(["library-keywords-entries-without", "library-keywords-legacy-files"]);
+    expect(r.findings.every((f) => f.severity === "minor")).toBe(true);
+    expect(r.findings[0]!.summary).toContain("lib/e1");
+    expect(r.findings[1]!.summary).toContain("lib/e2");
+    expect(HealthCheckResultSchema.safeParse(r).success).toBe(true);
+  });
+
+  it("the probe: no library is absent, a throw is unknown", () => {
+    expect(probeLibraryKeywords("/x", () => ({ libraries: 0, entries: [] })).state).toBe("absent");
+    expect(probeLibraryKeywords("/x", () => { throw new Error("boom"); }).state).toBe("unknown");
   });
 });
 

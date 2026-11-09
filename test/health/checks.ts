@@ -51,6 +51,7 @@ import type {
 } from "../../schemas/sdlc/health-report.ts";
 import { isPreviewName, MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
 import type { LsiHealthEvidence } from "../../scripts/lsi-health.ts";
+import type { KeywordsState } from "../../scripts/library-keywords.ts";
 import { PREVIEW_PREFIX } from "../../schemas/sdlc/preview-prefix.ts";
 import {
   EXPIRY_BASIS,
@@ -258,6 +259,11 @@ export interface HealthContext {
    * Optional: a context built before this probe existed reads as `absent`.
    */
   lsiIndexes?: StoreProbe<LsiHealthEvidence>;
+  /**
+   * Each library entry's `keywords.json` against what `library:keywords` would
+   * write now (cat-harness#1144). Optional: absent without a probe.
+   */
+  libraryKeywords?: StoreProbe<KeywordsState[]>;
 }
 
 /** One declared remote layer as the mount check left it. */
@@ -2044,6 +2050,63 @@ export function lsiIndexHealthCheck(ctx: HealthContext): HealthCheckResult {
   return settle(id, summary, LSI_INDEX_THRESHOLDS, measurements, findings);
 }
 
+export const LIBRARY_KEYWORD_THRESHOLDS: HealthThreshold[] = [
+  {
+    metric: "library-keywords-entries-without",
+    value: 0,
+    unit: "count",
+    severity: "minor",
+    basis:
+      "a library entry the keyword extraction gives nothing has no keywords on the library viewer, the keyword " +
+      "viewer or in the derived keywords graph — usually a scanned page with no text layer, or sections under the " +
+      "LSI tool's minimum length. `minor`: keywords are derived proposals; nothing waits on them (cat-harness#1144).",
+  },
+  {
+    metric: "library-keywords-legacy-files",
+    value: 0,
+    unit: "count",
+    severity: "minor",
+    basis:
+      "keywords are EXTRACTED content, so they are built at publish into the derived keywords graph and do not live " +
+      "in the ingest record (owner, 2026-11-08, cat-harness#1144). A `keywords.json` still committed inside an entry " +
+      "is the old location: nothing reads it once the move lands, and it goes stale on every ingest.",
+  },
+];
+
+export function libraryKeywordsHealthCheck(ctx: HealthContext): HealthCheckResult {
+  const id = "library-keywords";
+  const summary = "Each library entry's LSI keywords: whether the extraction gives any, and any keywords.json still committed inside an entry.";
+  const probe = ctx.libraryKeywords ?? { state: "absent" as const, reason: "no library-keywords probe ran" };
+  if (probe.state === "absent") return absentResult(id, summary, LIBRARY_KEYWORD_THRESHOLDS, probe.reason);
+  if (probe.state === "unknown") return unknownResult(id, summary, LIBRARY_KEYWORD_THRESHOLDS, probe.reason);
+  const entries = probe.value;
+  const command = "bun run cat library:keywords";
+  const without = entries.filter((e) => e.keywords === 0);
+  const legacy = entries.filter((e) => e.legacy);
+  const list = (es: KeywordsState[]): string => es.slice(0, 5).map((e) => e.entry).join(", ") + (es.length > 5 ? ", …" : "");
+  const measurements: HealthMeasurement[] = [
+    { metric: "library-keywords-entries", value: entries.length, unit: "count", command },
+    { metric: "library-keywords-entries-without", value: without.length, unit: "count", command },
+    { metric: "library-keywords-legacy-files", value: legacy.length, unit: "count", command: "ls library/*/keywords.json" },
+  ];
+  const findings: HealthFinding[] = [];
+  if (without.length)
+    findings.push({
+      metric: "library-keywords-entries-without",
+      severity: "minor",
+      summary: `${without.length} entr(ies) the keyword extraction gives nothing: ${list(without)}`,
+      action: "Open the entry's sections: a page with no text layer needs OCR at ingest (`l1-document-ingestion`); a very short entry has nothing to extract.",
+    });
+  if (legacy.length)
+    findings.push({
+      metric: "library-keywords-legacy-files",
+      severity: "minor",
+      summary: `${legacy.length} keywords.json still committed inside an entry: ${list(legacy)}`,
+      action: "Remove them in one PR per repository: keywords are built at publish now (`assets/keywords/`), and the ingest record keeps only what was ingested.",
+    });
+  return settle(id, summary, LIBRARY_KEYWORD_THRESHOLDS, measurements, findings);
+}
+
 export function todoStoreCheck(ctx: HealthContext): HealthCheckResult {
   const id = "todo-store";
   const summary = "The human todo store: how many items are open, and whether any have gone stale.";
@@ -2208,6 +2271,13 @@ export const HEALTH_CHECKS: readonly {
       "Each declared prose graph that needs a latent semantic index, whether its stored index is fresh, " +
       "and each index's narrow-dimension and near-duplicate counts (cat-harness#1144). Builds nothing.",
     run: lsiIndexHealthCheck,
+  },
+  {
+    id: "library-keywords",
+    summary:
+      "Each library entry's LSI keywords: entries the extraction gives nothing, and keywords.json files still " +
+      "committed inside an entry now that keywords are built at publish (cat-harness#1144).",
+    run: libraryKeywordsHealthCheck,
   },
   {
     id: "staging-preview-orphans",
