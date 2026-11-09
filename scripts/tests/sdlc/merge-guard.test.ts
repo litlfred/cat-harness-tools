@@ -43,6 +43,8 @@ import {
   SELF_WORKFLOW_FILE,
   NOT_WAITED_FOR_WORKFLOW_FILES,
   DEPLOY_ONLY_STEP,
+  AGENT_BUILD_CONTEXT,
+  agentBuildStatus,
   type CheckId,
   type GuardOptions,
   type GuardRun,
@@ -788,6 +790,79 @@ describe("check 5 — Feature Staging is judged once finished, never waited for"
     const c = status(s, "ci");
     expect(c.status).toBe("refuse");
     expect(c.detail).toContain("Code-quality gates: in_progress");
+  });
+});
+
+/**
+ * folio-assistant#2881: when Feature Staging defers to an agent-built preview,
+ * its run builds and checks nothing and goes green; the verify rebuild reports
+ * the built-site checks only as the `preview/agent-build` status. Check 5
+ * judges that status as it judges Feature Staging: red refuses, pending is not
+ * waited for.
+ */
+describe("check 5 — the agent-built preview's verify status (folio-assistant#2881)", () => {
+  const green = () => {
+    const s = real(1937);
+    if (s.runs.state !== "has-run") throw new Error("fixture");
+    for (const r of s.runs.runs) if (r.event === "pull_request") r.conclusion = "success";
+    return s;
+  };
+  const withStatus = (state: string, description = "") => {
+    const s = green();
+    s.agentBuild = { context: AGENT_BUILD_CONTEXT, state, description };
+    return s;
+  };
+
+  test("control: every run green and no agent build passes", () => {
+    const s = green();
+    s.agentBuild = null;
+    expect(status(s, "ci").status).toBe("pass");
+  });
+
+  test("verify red: refused as a defect, with its description", () => {
+    const c = status(withStatus("failure", "3 paths differ"), "ci");
+    expect(c.status).toBe("refuse");
+    expect(c.kind).toBe("defect");
+    expect(c.detail).toContain(`${AGENT_BUILD_CONTEXT}: failure (3 paths differ)`);
+  });
+
+  test("verify errored: refused too", () => {
+    expect(status(withStatus("error"), "ci").status).toBe("refuse");
+  });
+
+  test("verify pending: passes, and says it did not wait", () => {
+    const c = status(withStatus("pending"), "ci");
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain(`${AGENT_BUILD_CONTEXT} (pending: the verify rebuild has not reported)`);
+  });
+
+  test("verify green: passes", () => {
+    expect(status(withStatus("success"), "ci").status).toBe("pass");
+  });
+
+  test("the statuses could not be read: unknown, never a pass", () => {
+    const s = green();
+    s.agentBuild = { unknown: "HTTP 502" };
+    expect(status(s, "ci").status).toBe("unknown");
+  });
+
+  test("a non-release merge reports the red verify as advisory", () => {
+    const c = evaluateAny(withStatus("failure")).checks.find((x) => x.id === "ci")!;
+    expect(c.status).not.toBe("refuse");
+  });
+
+  test("agentBuildStatus takes the newest status of that context, ignoring others", () => {
+    expect(agentBuildStatus([{ context: "merge-guard", state: "failure" }])).toBeNull();
+    const got = agentBuildStatus([
+      { context: AGENT_BUILD_CONTEXT, state: "pending", created_at: "2026-11-09T10:00:00Z" },
+      { context: "merge-guard", state: "failure", created_at: "2026-11-09T12:00:00Z" },
+      { context: AGENT_BUILD_CONTEXT, state: "success", created_at: "2026-11-09T11:00:00Z" },
+    ]);
+    expect(got?.state).toBe("success");
+    expect(agentBuildStatus([
+      { context: AGENT_BUILD_CONTEXT, state: "failure" },
+      { context: AGENT_BUILD_CONTEXT, state: "pending" },
+    ])?.state).toBe("failure");
   });
 });
 

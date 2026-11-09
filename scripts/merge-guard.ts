@@ -48,7 +48,12 @@
  *    that file's dispatch line cannot be parsed. One exemption from WAITING,
  *    never from judging: a workflow in {@link NOT_WAITED_FOR_WORKFLOW_FILES}
  *    (Feature Staging) that is still in flight or has not started is not a
- *    refusal; once finished, red refuses.
+ *    refusal; once finished, red refuses. The same holds for the
+ *    {@link AGENT_BUILD_CONTEXT} commit status (folio-assistant#2881): when
+ *    Feature Staging defers to an agent-built preview its own run judges
+ *    nothing, and the verify rebuild reports the built-site checks only
+ *    there. `failure` or `error` refuses as a defect; `pending` is not
+ *    waited for.
  *    **Check 5 gates a RELEASE only** (owner, card Q-CIB-4 A, 2026-11-08:
  *    "CI not gate on non-release merge to main"). A merge is a release when
  *    run with `--release` or when the PR carries the `release` label. On any
@@ -123,6 +128,14 @@ export const BASE = "main";
 export const READY_LABEL = "ready-to-merge";
 export const HUMAN_LABEL = "needs-merge-human";
 export const BOT_LOGIN = "github-actions[bot]";
+/**
+ * The commit status an agent-built preview's verify rebuild posts on the head
+ * (folio-assistant#2881, `feature-staging.yml`). A deferred Feature Staging run
+ * builds and checks nothing, so it is green over a site it never examined;
+ * this status is where its checks reach the PR. Check 5 judges it the way it
+ * judges Feature Staging: once it has an answer, never waiting for one.
+ */
+export const AGENT_BUILD_CONTEXT = "preview/agent-build";
 /** The first line of every comment `merge-main.yml` writes. */
 export const MERGE_MAIN_MARKER = "<!-- merge-main-bot -->";
 /** This guard's own workflow. Its runs are never evidence about the head: they are the guard. */
@@ -256,6 +269,21 @@ export interface GuardSnapshot {
    * means not fetched, which refuses as before.
    */
   failedSteps?: Record<number, string[] | { unknown: string }>;
+  /**
+   * The newest {@link AGENT_BUILD_CONTEXT} status on the head: `null` when the
+   * head has none (no agent build), `unknown` when the statuses could not be
+   * read. Absent means not fetched, and nothing is judged.
+   */
+  agentBuild?: GhStatus | null | { unknown: string };
+}
+
+/** A commit status as `GET /repos/{repo}/commits/{ref}/statuses` returns it (newest first). */
+export interface GhStatus {
+  context: string;
+  state: string;
+  description?: string | null;
+  target_url?: string | null;
+  created_at?: string;
 }
 
 export interface GuardOptions {
@@ -781,6 +809,21 @@ function checkCi(s: GuardSnapshot): CheckResult {
     }
   }
 
+  // The agent-built preview's verify (folio-assistant#2881): judged once it
+  // has an answer, never waited for, as Feature Staging is.
+  const ab = s.agentBuild;
+  if (ab !== undefined && ab !== null) {
+    if ("unknown" in ab) {
+      return R(5, "ci", "unknown", `could not read the head's \`${AGENT_BUILD_CONTEXT}\` status: ${ab.unknown}`);
+    }
+    const why = ab.description ? ` (${ab.description})` : "";
+    if (ab.state === "failure" || ab.state === "error") {
+      problem(AGENT_BUILD_CONTEXT, `${AGENT_BUILD_CONTEXT}: ${ab.state}${why}`, "defect");
+    } else if (ab.state === "pending") {
+      notWaited.push(`${AGENT_BUILD_CONTEXT} (pending: the verify rebuild has not reported)`);
+    }
+  }
+
   // Coverage applies the same substitution: a required workflow whose only
   // `pull_request` runs were held is satisfied by its stand-in, per the rules above.
   const scan: TriggerScan = { ...s.scan, triggers: s.scan.triggers.filter((t) => t.file !== SELF_WORKFLOW_FILE) };
@@ -1047,6 +1090,18 @@ export async function fetchPull(
 }
 
 /** Read everything {@link evaluate} needs. Throws {@link CannotAsk} when a required fact is unreadable. */
+/**
+ * The newest {@link AGENT_BUILD_CONTEXT} status, or `null` for none. GitHub
+ * lists a ref's statuses newest first, and every update is a new entry, so
+ * the first match is the current one; `created_at` orders them when present.
+ */
+export function agentBuildStatus(statuses: readonly GhStatus[]): GhStatus | null {
+  const mine = statuses.filter((x) => x.context === AGENT_BUILD_CONTEXT);
+  if (mine.length === 0) return null;
+  if (mine.every((x) => x.created_at)) return [...mine].sort((a, b) => b.created_at!.localeCompare(a.created_at!))[0]!;
+  return mine[0]!;
+}
+
 export async function fetchSnapshot(repo: string, n: number, root: string): Promise<GuardSnapshot> {
   const pr = await fetchPull(repo, n);
   const [comments, timeline, commits] = await Promise.all([
@@ -1093,7 +1148,13 @@ export async function fetchSnapshot(repo: string, n: number, root: string): Prom
       }
     }
   }
-  return { pr, comments, timeline, commits, baseMergedAsHeadOf, runs, scan, mergeMainDispatches, failedSteps };
+  let agentBuild: GuardSnapshot["agentBuild"];
+  try {
+    agentBuild = agentBuildStatus(await getJson<GhStatus[]>(`repos/${repo}/commits/${pr.head.sha}/statuses?per_page=100`));
+  } catch (e) {
+    agentBuild = { unknown: e instanceof Error ? e.message : String(e) };
+  }
+  return { pr, comments, timeline, commits, baseMergedAsHeadOf, runs, scan, mergeMainDispatches, failedSteps, agentBuild };
 }
 
 export type MergeOutcome = { merged: true; sha: string } | { merged: false; refused: boolean; reason: string };
