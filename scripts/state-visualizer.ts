@@ -165,6 +165,7 @@ import {
   withRenderedBy,
   withRenderedByFrontMatter,
   visualiserSitePath,
+  declaredVisualisers,
   withViewers,
 } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -2343,6 +2344,18 @@ export function instanceSubjectsOf(
 }
 
 /**
+ * Every OTHER layer's visualiser this Tool draws on the host site: declared
+ * `renderedBy: state-viewer`, `subgraphs: "instance"` and `builtOnHostSite`, by
+ * a layer that is not `own`. Each keeps its declaring layer's name, which is
+ * the harness segment of its route.
+ */
+export function hostedVisualisers(repoRoot: string, own: string): ReturnType<typeof declaredVisualisers> {
+  return declaredVisualisers(repoRoot).filter(
+    (v) => v.harness !== own && v.renderedBy === VIEWER_TOOL && v.subgraphs === "instance" && (v as { builtOnHostSite?: unknown }).builtOnHostSite !== undefined,
+  );
+}
+
+/**
  * What a per-instance visualiser (`subgraphs: "instance"`) draws in the
  * checkout at `root`: its kinds, the kinds it has no reader for, and the
  * layers that get a page. One home for the selection, because the page
@@ -3081,9 +3094,23 @@ let combinedParts: StoreRows[] = [];
 const ownName = readDeclaration(ROOT)?.name ?? basename(ROOT);
 const SITE_SCOPE = siteScope();
 if (SITE_SCOPE !== undefined) console.log(`  scope ${scopeArg(SITE_SCOPE)}: instance pages of these only`);
-for (const v of mine.filter((x) => x.subgraphs === "instance")) {
+/**
+ * The per-instance visualisers this run draws: this layer's own, and every
+ * OTHER layer's `renderedBy: state-viewer` visualiser that is `builtOnHostSite`
+ * (cat-harness#1150, item 3, owner card Q-CGI-1 A, 2026-11-09). A layer above
+ * this one declares the page for a kind only it registers, and this Tool draws
+ * it on the host site under THAT layer's name — so the harness never names a
+ * kind from a layer above it. A hosted page is built at publish (a derived
+ * host-site route), so `--check` never judges it.
+ */
+const perInstance: { v: (typeof mine)[number]; harness: string; hosted: boolean }[] = [
+  ...mine.filter((x) => x.subgraphs === "instance").map((v) => ({ v, harness: harnessOf(), hosted: false })),
+  ...hostedVisualisers(REPO_ROOT, ownName).map((v) => ({ v: v as (typeof mine)[number], harness: v.harness, hosted: true })),
+];
+for (const { v, harness: vh, hosted } of perInstance) {
   combinedParts = [];
-  const found = perInstanceSubjects(v, ROOT, harnessOf());
+  const pageDirFor = (vis: string) => (hosted ? visualiserPageDir(SITE, pageParts({ harness: vh, visualiser: vis })) : pageDirOf(vis));
+  const found = perInstanceSubjects(v, ROOT, vh);
   const { kinds, beans, code, memory, unread, candidates, unrouted } = found;
   // A scoped site (`--scope`, owner 2026-11-08 Q-SZ-2 "B") draws its scope's
   // instance pages only; the hub still stands at the visualiser's route.
@@ -3099,7 +3126,7 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
     console.error(`  ! visualiser \`${v.id}\`: \`${s.path}\` is declared by ${s.name}, which is not an instance with a route — no page`);
   }
   for (const s of subjects) {
-    const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));
+    const dir = visualiserPageDir(SITE, pageParts({ harness: vh, visualiser: v.id, subgraph: s.name }));
     const models = beans ? await workflowModelsOf(s) : undefined;
     const html = beans
       ? beansSubjectPage(v, s, subjects, readSubjectBeans(s.instanceRoot), { now: NOW, ends: endsOf(models!), unlinked: unlinkedSection(s) })
@@ -3111,18 +3138,18 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
     // ANOTHER layer's page depends on which layers the checkout mounts,
     // so it is built at publish wherever this layer is mounted, listed or not:
     // a downstream index adds layers no list here can name (Uganda #15).
-    if (!(check && s.name !== ownName)) emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
+    if (!(check && (hosted || s.name !== ownName))) emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
     if (beans) subjectOrphans.push(...drawWorkflows(v.id, s, dir, models!));
   }
   // No state graph draws this visualiser's own page (a registry kind is not
   // state, and neither is `code`), so its hub is drawn here, listing the
   // layer pages. Without it `code/` had a page per layer and none at
   // its own route, which the site-coverage gate refuses (dth-hrh, 2026-10-15).
-  if (drawsInstanceHub(kinds, graphs.some((g) => g.vis === v.id), found.subjects.length)) {
-    hubs.push(v.id);
-    emit(join(pageDirOf(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
+  if (drawsInstanceHub(kinds, !hosted && graphs.some((g) => g.vis === v.id), found.subjects.length)) {
+    if (!hosted) hubs.push(v.id);
+    if (!(check && hosted)) emit(join(pageDirFor(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
   }
-  const parent = pageDirOf(v.id);
+  const parent = pageDirFor(v.id);
   // Every store's beans by process on one page, beside the store pages
   // (owner, 2026-11-03). A store named like that page would be overwritten by
   // it, so such a store is refused, by name, and the combined page not drawn.
@@ -3139,7 +3166,7 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   for (const name of foreign) console.error(`  ! ${relative(SITE, join(parent, name))} is not an instance page and does not identify itself — left in place`);
   // Under a built-at-publish route a stale local copy is not a committed
   // orphan, so `--check` does not report it; a write run still prunes it.
-  if (!(check && builtAtPublishHere(join(parent, "x", "index.html")))) {
+  if (!hosted && !(check && builtAtPublishHere(join(parent, "x", "index.html")))) {
     subjectOrphans.push(...owned.map((name) => relative(SITE, join(parent, name))));
   }
 }
