@@ -44,6 +44,7 @@ import {
   memorySubjectPage,
   drawsInstanceHub,
   perInstanceSubjects,
+  hostedVisualisers,
   MERGE_REVIEWS_KIND,
   mergeReviewsPage,
   mergeReviewsSection,
@@ -1616,3 +1617,51 @@ describe("the workflow view: per-instance pages and the store's stuck column (be
     }
   });
 });
+
+/**
+ * cat-harness#1150, item 3 (owner card Q-CGI-1 A, 2026-11-09): a layer above
+ * the harness declares the page for a kind only it registers, and this Tool
+ * draws it on the host site under that layer's name. Before, cat-harness
+ * declared the Editor checkers page itself, naming a kind only
+ * folio-assistant-sci registers.
+ */
+describe("hostedVisualisers: another layer's state-viewer page, built on the host site", () => {
+  test("picks only another layer's builtOnHostSite, per-instance, state-viewer visualisers", async () => {
+    const { clearDeclaredVisualisers } = await import("../viewer-declarations.ts");
+    const repo = mkdtempSync(join(tmpdir(), "hosted-vis-"));
+    const files: Record<string, unknown> = {
+      "base/cat-harness.json": {
+        name: "cat-harness",
+        directories: [],
+        visualisers: [{ id: "validators", renderedBy: "state-viewer", coversKinds: ["validators"], subgraphs: "instance" }],
+      },
+      "top/top.json": {
+        name: "top",
+        needs: ["cat-harness"],
+        directories: [{ id: "top-editor-checkers", path: "editor-checkers/", graphTypologies: ["editor-checkers"] }],
+        visualisers: [
+          { id: "editor-checkers", renderedBy: "state-viewer", coversKinds: ["editor-checkers"], subgraphs: "instance", builtOnHostSite: {} },
+          { id: "not-hosted", renderedBy: "state-viewer", coversKinds: ["editor-checkers"], subgraphs: "instance" },
+          { id: "other-tool", renderedBy: "glossary-page", coversKinds: ["glossary"], subgraphs: "instance", builtOnHostSite: {} },
+          { id: "a-dashboard", renderedBy: "state-viewer", covers: ["top-editor-checkers"], builtOnHostSite: {} },
+        ],
+      },
+    };
+    for (const [f, body] of Object.entries(files)) {
+      mkdirSync(join(repo, dirname(f)), { recursive: true });
+      writeFileSync(join(repo, f), JSON.stringify(body));
+    }
+    mkdirSync(join(repo, "top/editor-checkers"), { recursive: true });
+    clearDeclaredVisualisers();
+    try {
+      const got = hostedVisualisers(repo, "cat-harness").map((v) => `${v.harness}/${v.id}`);
+      expect(got).toEqual(["top/editor-checkers"]);
+      // The harness's own visualisers are never "hosted": it draws them as before.
+      expect(hostedVisualisers(repo, "top").map((v) => `${v.harness}/${v.id}`)).toEqual([]);
+    } finally {
+      clearDeclaredVisualisers();
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
