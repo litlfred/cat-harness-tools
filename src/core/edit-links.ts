@@ -421,6 +421,10 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // the page loads that also contains this page (a page can load another
   // site's chrome from the same origin, /folio-assistant/assets/…).
   const vendorBase = () => {
+    // A site that loads its shared assets from a host names the bundle's
+    // address in a meta (cat-harness-tools scripts/lib/shared-assets.ts).
+    const shared = document.querySelector('meta[name="fa-shared-asset"][data-dir="assets/vendor/crepe/"]');
+    if (shared && shared.getAttribute("content")) return shared.getAttribute("content");
     let best = null;
     for (const e of document.querySelectorAll("script[src], link[href]")) {
       let u;

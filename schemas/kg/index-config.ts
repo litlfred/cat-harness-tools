@@ -219,6 +219,19 @@ export const IndexSiteSchema = z
      */
     taskSkills: z.boolean().optional(),
     /**
+     * Where this site loads the assets every IG site shares, instead of
+     * carrying its own copy (owner, 2026-11-09, Q-SZ-7 "A"): a site on the same
+     * github.io origin that publishes them, such as
+     * `https://litlfred.github.io/smart-html-jtd/`. Each shared directory is
+     * served at `<sharedAssets>shared/<dir>/<digest>/`, so a site keeps
+     * loading the exact bytes it was built with. A build whose copy the host
+     * does not serve keeps it local (`scripts/lib/shared-assets.ts`).
+     */
+    sharedAssets: z
+      .string()
+      .regex(/^https:\/\/[^/]+\/(?:[^\s]*\/)?$/, "an https URL ending in /")
+      .optional(),
+    /**
      * The workflow files that publish this repository's site and stage a
      * preview of it, by file name under `.github/workflows/`. The
      * `pages-publish` and `feature-staging` Tools run them through
