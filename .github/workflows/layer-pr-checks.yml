@@ -287,6 +287,11 @@ on:
         required: false
         type: number
         default: 24
+      writer-record-on-runners:
+        description: "Record the page-build writers under strace on a runner after each push to main (layer mode). Off by default (cat-harness-tools#1702, measured 2026-11-09): every full record of cat-harness, fhir-harness and core was cancelled at the 120-minute limit with nothing saved, ~1,700 runner minutes a day, and a layer takes the lower layers at main, so each lower-layer merge moves every writer's code and forces a full record again. Records come from `writer-records-ref.ts publish` instead."
+        required: false
+        type: boolean
+        default: false
       writer-skip:
         description: "Skip a derive:publish writer whose recorded reads are unchanged, putting back what it wrote (bean fwtz). A push to the caller's main records each writer under strace; a PR restores the newest record and skips. Off: every writer runs."
         required: false
@@ -1675,7 +1680,7 @@ jobs:
     # it re-pins, so its re-pinner publishes the records
     # (`writer-records-ref.ts publish`) and no runner records them.
     if: >-
-      !cancelled() && inputs.writer-skip && inputs.mode == 'layer' && github.event_name == 'push' &&
+      !cancelled() && inputs.writer-skip && inputs.writer-record-on-runners && inputs.mode == 'layer' && github.event_name == 'push' &&
       needs.prepare-base.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 120
