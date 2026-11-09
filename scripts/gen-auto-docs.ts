@@ -46,6 +46,7 @@ import { isSkillMd, kgRoots, skillMdDirs, corpusScopeFor } from "./known-skills.
 import { readRoleGraph } from "../schemas/process/role-graph.ts";
 import {
   findDeclarationFile,
+  findInstanceRoot,
   instanceRootsIn,
   isExemptFrom,
   readDeclaration,
@@ -65,6 +66,7 @@ import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { themedPage as sharedThemedPage } from "./lib/themed-page.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { inScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import { isGlobalTasksFile } from "../src/workflow/process-model.ts";
 
 function decodeEntities(s: string): string {
@@ -1492,9 +1494,24 @@ if (import.meta.main) {
   /** Each sub-graph page and its own item count, for the tile counts below. */
   const counted: Array<{ page: string; count: number; unit: readonly [string, string] }> = [];
 
+  const SITE_SCOPE = siteScope();
+  if (SITE_SCOPE !== undefined) console.log(`  scope ${scopeArg(SITE_SCOPE)}: items of these instances only`);
+  const ownerOf = new Map<string, string>();
+  /** The declared name of the instance whose directory holds `repoRel` (the deepest one). */
+  const ownerName = (repoRel: string): string => {
+    const dir = dirname(join(REPO, repoRel.split("#")[0]!));
+    const hit = ownerOf.get(dir);
+    if (hit !== undefined) return hit;
+    const inst = findInstanceRoot(join(REPO, repoRel.split("#")[0]!));
+    const name = inst === undefined ? "" : (readDeclaration(inst)?.name ?? basename(inst));
+    ownerOf.set(dir, name);
+    return name;
+  };
   for (const type of TYPES) {
     const dirs = (type.directories ?? (() => declaredDirectories(type.graph)))();
-    const items = type.collect();
+    // A scoped site (`--scope`, owner 2026-11-08 Q-SZ-2 "B") indexes its
+    // scope's items only; the other layers' indexes are on their own sites.
+    const items = type.collect().filter((i) => inScope(SITE_SCOPE, ownerName(i.path)));
     // Attribute each item to its most specific declared sub-graph, then keep
     // only the sub-graphs that actually have something. An empty one gets no
     // page: `dh4f` as a nav entry.

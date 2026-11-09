@@ -77,6 +77,7 @@
  *
  * Exit: 0 written or up to date, 1 stale under `--check`.
  */
+import { inScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import {
   existsSync,
   mkdirSync,
@@ -3078,9 +3079,15 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
 let combinedParts: StoreRows[] = [];
 
 const ownName = readDeclaration(ROOT)?.name ?? basename(ROOT);
+const SITE_SCOPE = siteScope();
+if (SITE_SCOPE !== undefined) console.log(`  scope ${scopeArg(SITE_SCOPE)}: instance pages of these only`);
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   combinedParts = [];
-  const { kinds, beans, code, memory, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
+  const found = perInstanceSubjects(v, ROOT, harnessOf());
+  const { kinds, beans, code, memory, unread, candidates, unrouted } = found;
+  // A scoped site (`--scope`, owner 2026-11-08 Q-SZ-2 "B") draws its scope's
+  // instance pages only; the hub still stands at the visualiser's route.
+  const subjects = found.subjects.filter((s) => inScope(SITE_SCOPE, s.name));
   if (kinds.length === 0 || unread.length > 0) {
     console.error(
       `  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; ` +
@@ -3111,7 +3118,7 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   // state, and neither is `code`), so its hub is drawn here, listing the
   // layer pages. Without it `code/` had a page per layer and none at
   // its own route, which the site-coverage gate refuses (dth-hrh, 2026-10-15).
-  if (drawsInstanceHub(kinds, graphs.some((g) => g.vis === v.id), subjects.length)) {
+  if (drawsInstanceHub(kinds, graphs.some((g) => g.vis === v.id), found.subjects.length)) {
     hubs.push(v.id);
     emit(join(pageDirOf(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
   }

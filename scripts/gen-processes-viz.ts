@@ -32,6 +32,7 @@
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts --check
  */
+import { inScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import { escapeAngles, linkProse } from "./lib/link-prose.ts";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
@@ -1423,7 +1424,13 @@ if (import.meta.main) {
   }
   const into = siteArg();
   const out = join(into ?? baseDocsDir(REPO), rel);
-  const rows = await processRows();
+  // A scoped site (`--scope`, owner 2026-11-08 Q-SZ-2 "B") writes the pages of
+  // its scope's diagrams only. Every diagram still resolves the links a page
+  // makes; one out of scope is linked on its own layer's site.
+  const scope = siteScope();
+  const all = await processRows();
+  const rows = all.filter((r) => inScope(scope, r.instance ?? ""));
+  if (scope !== undefined) console.log(`  scope ${scopeArg(scope)}: ${rows.length} of ${all.length} diagram(s)`);
   // VACUITY GUARD. A sweep that found nothing reports a clean corpus, which is
   // the `dh4f` shape this page's own Findings section exists to raise — and the
   // first run of this generator did it: 0 diagrams, exit 0, over a corpus of 62.
@@ -1477,7 +1484,7 @@ if (import.meta.main) {
   const unlinked = new Map<string, { title: string; refs: UnlinkedRef[] }>();
   for (const r of rows.filter((x) => x.loadError === undefined)) {
     const refs = new Set<string>();
-    pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, rows, skillPages, presented.get(r.file), instances, (x) => refs.add(x)));
+    pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, all, skillPages, presented.get(r.file), instances, (x) => refs.add(x)));
     // QA (owner, 2026-10-31): a reference the prose makes that no page can
     // answer is reported, never left as silent plain text.
     for (const x of refs) {
@@ -1485,7 +1492,7 @@ if (import.meta.main) {
     }
     // The ⓘ panel's data, fetched by the page only when a marker is opened.
     if (r.markers) {
-      const data = taskPanelData(r, rows, ctx, { skills });
+      const data = taskPanelData(r, all, ctx, { skills });
       pages.set(join(dirname(out), panelFile(r.stem)), `${JSON.stringify(data, null, 1)}\n`);
       unlinked.set(r.stem, { title: r.name, refs: unlinkedPanelRefs(data) });
     }
