@@ -121,6 +121,8 @@ export function isZodSchema(v: unknown): v is z.ZodTypeAny {
  * parted company when `#437` moved this layer under `cat-harness/`, and
  * nothing noticed because nothing read these paths.
  */
+const kindValidatorCache = new WeakMap< object, Map<string, Promise<KindValidator>> >();
+
 export async function resolveKindValidator(
   kind: string,
   instanceRoot: string,
@@ -140,8 +142,17 @@ export async function resolveKindValidator(
         `cannot be checked. Not a failure and not a pass.`,
     };
   }
-
-  return loadValidator(def.validator, canonical, instanceRoot);
+  let byRoot = kindValidatorCache.get(def);
+  if (!byRoot) {
+    byRoot = new Map();
+    kindValidatorCache.set(def, byRoot);
+  }
+  const key = resolve(instanceRoot);
+  const cached = byRoot.get(key);
+  if (cached) return cached;
+  const pending = loadValidator(def.validator, canonical, instanceRoot);
+  byRoot.set(key, pending);
+  return pending;
 }
 
 /**
@@ -391,6 +402,8 @@ export function readShape(instanceRoot: string, shape: string): { ref: Validator
   return { ref, fields };
 }
 
+const nodeSchemasCache = new WeakMap< object, Map<string, Promise<NodeSchemaResolution[]>> >();
+
 /**
  * Every `$schema` family a kind declares, resolved. Empty when the kind
  * declares none — the caller then falls back to the kind-level validator.
@@ -401,24 +414,38 @@ export async function resolveNodeSchemas(
   registry: GraphTypologyRegistry = defaultGraphTypologies,
 ): Promise<NodeSchemaResolution[]> {
   const canonical = resolveGraphTypology(kind).kind;
-  const map = (registry.get(canonical)?.nodeSchemas ?? {}) as Record<string, NodeSchemaRef>;
-  const out: NodeSchemaResolution[] = [];
-  for (const [tag, ref] of Object.entries(map)) {
-    const at = out.length;
-    if (ref.validator) {
-      const v = await loadValidator(ref.validator, canonical, instanceRoot);
-      out.push(
-        v.state === "resolved"
-          ? { tag, state: "resolved", ref: v.ref, schema: v.schema }
-          : { tag, state: "unresolvable", reason: v.reason },
-      );
-    } else if (ref.shape) {
-      const r = readShape(instanceRoot, ref.shape);
-      out.push(typeof r === "string" ? { tag, state: "unresolvable", reason: r } : { tag, state: "shape", ...r });
-    } else if (ref.external) {
-      out.push({ tag, state: "external", spec: ref.external });
-    }
-    if (ref.derived && out.length > at) out[at] = { ...out[at], derived: true };
+  const def = registry.get(canonical);
+  if (!def?.nodeSchemas) return [];
+  let byRoot = nodeSchemasCache.get(def);
+  if (!byRoot) {
+    byRoot = new Map();
+    nodeSchemasCache.set(def, byRoot);
   }
-  return out;
+  const key = resolve(instanceRoot);
+  const cached = byRoot.get(key);
+  if (cached) return cached;
+  const pending = (async (): Promise<NodeSchemaResolution[]> => {
+    const map = (def.nodeSchemas ?? {}) as Record<string, NodeSchemaRef>;
+    const out: NodeSchemaResolution[] = [];
+    for (const [tag, ref] of Object.entries(map)) {
+      const at = out.length;
+      if (ref.validator) {
+        const v = await loadValidator(ref.validator, canonical, instanceRoot);
+        out.push(
+          v.state === "resolved"
+            ? { tag, state: "resolved", ref: v.ref, schema: v.schema }
+            : { tag, state: "unresolvable", reason: v.reason },
+        );
+      } else if (ref.shape) {
+        const r = readShape(instanceRoot, ref.shape);
+        out.push(typeof r === "string" ? { tag, state: "unresolvable", reason: r } : { tag, state: "shape", ...r });
+      } else if (ref.external) {
+        out.push({ tag, state: "external", spec: ref.external });
+      }
+      if (ref.derived && out.length > at) out[at] = { ...out[at], derived: true };
+    }
+    return out;
+  })();
+  byRoot.set(key, pending);
+  return pending;
 }
