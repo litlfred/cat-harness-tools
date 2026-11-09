@@ -1085,6 +1085,12 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // or not, so the one you are about to press is always the one that shows.
     "html.fa-bp .block-actions>.ba-trigger,html.fa-bp .block-actions>.ba-bookmark,html.fa-bp .main-content .anchor-heading{border-radius:5px;transition:background-color .12s}" +
     "html.fa-bp .block-actions>.ba-trigger:hover,html.fa-bp .block-actions>.ba-bookmark:hover,html.fa-bp .main-content .anchor-heading:hover{opacity:1;filter:none;background:color-mix(in srgb,var(--link,#0b5cad) 18%,transparent)}" +
+    // Owner, 2026-11-09: "no indication if a bookmark has been selected or
+    // not". Hovering a block lights every gutter icon in full colour, so a
+    // pressed 🔖 looked the same as one that was not. A pressed 🔖 now keeps
+    // a tinted tile with an accent ring at all times, hovered or not.
+    "html.fa-bp .block-actions>.ba-bookmark[aria-pressed=true]{opacity:1;filter:none;background:color-mix(in srgb,var(--link,#0b5cad) 24%,transparent);box-shadow:inset 0 0 0 1.5px var(--link,#0b5cad)}" +
+    "html.fa-bp .block-actions>.ba-bookmark[aria-pressed=true]:hover{background:color-mix(in srgb,var(--link,#0b5cad) 34%,transparent)}" +
     "html.fa-bp .main-content .anchor-heading svg{visibility:visible;opacity:.35;filter:grayscale(1)}" +
     "html.fa-bp .main-content .fa-hot>.anchor-heading svg,html.fa-bp .main-content :hover>.anchor-heading svg,html.fa-bp .main-content .anchor-heading:focus svg" + ON +
     ".fa-block-panel .bp-copy{font:inherit;font-size:.82rem;margin:.1rem .35rem .3rem 0;padding:.3rem .6rem;border:1px solid #8886;border-radius:6px;background:none;color:inherit;cursor:pointer}" +
