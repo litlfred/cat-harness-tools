@@ -302,6 +302,17 @@ export function declaredEditLocation(target: string): { source: string; repo?: s
   return { source: relative(owner.root, abs).replace(/\\/g, "/"), repo: owner.repository };
 }
 
+/**
+ * The base layer's own forge: the repository its declaration names, found the
+ * way {@link declaredEditLocation} finds an owner, so the answer does not
+ * depend on which checkout the layer is mounted in. `REPO_WEB` when nothing
+ * declares one (a bare checkout of the layer itself, where the two agree).
+ */
+export function baseLayerWeb(): string {
+  const repo = declaredEditLocation(".").repo;
+  return repo ? `https://github.com/${repo}` : REPO_WEB;
+}
+
 let instanceEntries: InstanceRepository[] | undefined;
 function instanceRepositoryEntries(): InstanceRepository[] {
   instanceEntries ??= instanceRepositories(repoRootFor(INSTANCE_ROOT)).entries;
@@ -1071,11 +1082,19 @@ function renderPage(page: WebPage): string {
   lines.push("{:toc}");
   lines.push("</details>");
   lines.push("");
-  // The forge the source sits in: this checkout's for the base layer, as
-  // always; the DECLARING layer's repository for one above it, from the
-  // same declarations the per-node edit links read.
+  // The forge the source sits in: the DECLARING layer's repository, from the
+  // same declarations the per-node edit links read. For the base layer that
+  // is the layer's own repository, never the checkout's: in a composed root
+  // the checkout is the index (or an instance such as smart-ips-pilgrimage),
+  // so `REPO_WEB` named a different repository in every root that ran this
+  // and `derive:publish` rewrote the committed pages (cat-harness#1150, 4).
+  // `REPO_WEB` is the fallback only when no declaration names a repository.
   const owner = CUR.base ? undefined : declaredEditLocation(manifestRef(page));
-  const web = owner?.repo ? `https://github.com/${owner.repo}` : REPO_WEB;
+  const web = owner?.repo
+    ? `https://github.com/${owner.repo}`
+    : CUR.base
+      ? baseLayerWeb()
+      : REPO_WEB;
   const srcPath = owner?.repo ? owner.source.replace(/\/+$/, "") : `${srcRel()}/${page.slug.replace(/\//g, "-")}`;
   lines.push(
     `_This page is generated from [\`${manifestRef(page)}\`](${web}/tree/main/${srcPath}) — ` +
