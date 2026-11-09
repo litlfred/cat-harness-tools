@@ -111,6 +111,7 @@ export const THEME_SIDEBAR_RULING: DroppedByRuling = {
 };
 import { expectedPages, siteCoverageShortfall } from "./site-coverage.ts";
 import { pagesEmbedPdf, pruneUnreferencedImages } from "./lib/site-prune.ts";
+import { servedOverHttp, shareAssets } from "./lib/shared-assets.ts";
 import { writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
@@ -201,6 +202,21 @@ export interface BuildOptions {
  * Undefined when the checkout lands on itself or names no landing: a folio's
  * site still carries every instance it mounts.
  */
+/**
+ * The host this checkout's site loads its shared assets from (`site.sharedAssets`
+ * in `index.config.json`; Q-SZ-7 "A"), or undefined when it names none.
+ */
+export function sharedAssetsOf(root: string): string | undefined {
+  const file = join(root, "index.config.json");
+  if (!existsSync(file)) return undefined;
+  try {
+    const v = (JSON.parse(readFileSync(file, "utf-8")) as { site?: { sharedAssets?: unknown } }).site?.sharedAssets;
+    return typeof v === "string" && /^https:\/\/[^/]+\/(?:\S*\/)?$/.test(v) ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function siteScopeOf(root: string, instance: string): string[] | undefined {
   const file = join(root, "index.config.json");
   if (!existsSync(file)) return undefined;
@@ -915,6 +931,12 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (o.scope) {
       const pruned = pruneUnreferencedImages(site);
       console.log(`scope: ${pruned.files.length} image(s) no page shows left out (${(pruned.bytes / 1e6).toFixed(1)} MB)`);
+    }
+    const host = sharedAssetsOf(root);
+    if (host) {
+      const sh = await shareAssets(site, host, servedOverHttp);
+      for (const x of sh.shared) console.log(`shared assets: ${x.dir} from ${x.url} (${(x.bytes / 1e6).toFixed(1)} MB, ${x.refs} reference(s))`);
+      for (const k of sh.kept) console.log(`shared assets: ${k.dir} ${k.why}`);
     }
     // The forwarding pages at the old addresses (folio-assistant#2527). The
     // chrome step composes with `--shell`, which writes none, so a visualiser
