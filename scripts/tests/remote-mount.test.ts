@@ -23,7 +23,7 @@ import { declarationChain } from "../../schemas/kg/harness-config.ts";
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { RemoteSourceSchema, resolveSubgraphSource } from "../../schemas/kg/subgraph-source.ts";
 import { MountLockSchema, mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
-import { AGENT_SURFACE_GENERATORS, checkRemote, editedOnlyPerLock, exitCode, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise } from "../remote-mount.ts";
+import { AGENT_SURFACE_GENERATORS, checkRemote, editedOnlyPerLock, exitCode, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise, switchedOffOptInPaths } from "../remote-mount.ts";
 import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "../../schemas/kg/index-config.ts";
 import { run as replayLocks } from "../mount-from-lock.ts";
 import { gitCorpus } from "../../schemas/sdlc/git-corpus.ts";
@@ -628,6 +628,73 @@ describe("whole-instance mounts and replaying the lock (bean `nn8e`, #2462)", ()
     const r = replayLocks(fresh, false);
     expect(r.outcomes[0]!.state).toBe("could-not-determine");
     expect(existsSync(join(fresh, "boot"))).toBe(false);
+  });
+});
+
+describe("a whole mount leaves out the opt-in sub-graphs the downstream has not switched on (Q-SG-1)", () => {
+  test("W1. the paths: top-level and from-within, outermost only, enabled ones kept", () => {
+    const top = [
+      { id: "skills", path: "skills/" },
+      { id: "sdlc", path: "sdlc/", optIn: true },
+      { id: "library-graph", path: "library/" },
+    ];
+    const nested = [
+      { id: "library-corpus", path: "library/corpus/", optIn: true },
+      { id: "sdlc-skills", path: "sdlc/skills/", optIn: true },
+      { id: "climbs", path: "../x/", optIn: true },
+    ];
+    expect(switchedOffOptInPaths("ch", top, nested, new Set())).toEqual(["library/corpus", "sdlc"]);
+    expect(switchedOffOptInPaths("ch", top, nested, new Set(["ch.sdlc"]))).toEqual(["library/corpus", "sdlc/skills"]);
+    expect(switchedOffOptInPaths("ch", top, nested, new Set(["ch.sdlc", "ch.sdlc-skills", "ch.library-corpus"]))).toEqual([]);
+    expect(switchedOffOptInPaths("ch", top, nested, "all")).toEqual([]);
+  });
+
+  test("W2. mounted, locked with `except`, checked clean, and replayed without them; enabling brings them back", () => {
+    const opt = bareRepo(base, "opt", {
+      "opt.json": decl("opt", {
+        directories: [
+          { id: "opt-schemas", path: "schemas/", graphTypologies: ["code"] },
+          { id: "extra", path: "extra/", optIn: true, graphTypologies: ["code"] },
+        ],
+      }),
+      "package.json": '{"name":"opt"}\n',
+      "schemas/a.ts": "export const a = 1;\n",
+      "extra/big.txt": "big\n",
+    });
+    const local = (r: string): string => (r === "o/opt" ? `file://${opt.bare}` : urlFor(r));
+    const root = join(base, `down-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, { "down.json": decl("down", { mountApprovers: ["test"], remoteMounts: [{ harness: "opt", repository: "o/opt", ref: opt.sha, ...consentFor(opt.sha), overrides: { opt: { whole: true } } }] }) });
+    const r = mountRemote({ instanceRoot: root, urlFor: local });
+    expect(summarise(r.plan.outcomes).state).toBe("mounted");
+    expect(existsSync(join(root, "opt/package.json"))).toBe(true);
+    expect(existsSync(join(root, "opt/schemas/a.ts"))).toBe(true);
+    expect(existsSync(join(root, "opt/extra"))).toBe(false);
+    const lock = MountLockSchema.parse(JSON.parse(readFileSync(join(root, "index.lock.json"), "utf-8")));
+    expect(lock.instances.find((i) => i.instance === "opt")!.directories).toMatchObject([{ id: "*", path: "opt", upstreamPath: ".", except: ["extra"] }]);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+
+    // A fresh clone replays the lock and leaves the same paths out.
+    const fresh = join(base, `fresh-${++n}`);
+    mkdirSync(fresh, { recursive: true });
+    git(fresh, "init", "-q", "-b", "main");
+    const replayLock = JSON.parse(readFileSync(join(root, "index.lock.json"), "utf-8"));
+    for (const i of replayLock.instances) i.repository = `file://${opt.bare}`;
+    writeFileSync(join(fresh, "index.lock.json"), JSON.stringify(replayLock));
+    const first = replayLocks(fresh, false);
+    expect(first.outcomes.map((o) => o.state)).toEqual(["mounted"]);
+    expect(existsSync(join(fresh, "opt/schemas/a.ts"))).toBe(true);
+    expect(existsSync(join(fresh, "opt/extra"))).toBe(false);
+    expect(replayLocks(fresh, true).outcomes.every((o) => o.state === "current")).toBe(true);
+
+    // The downstream switches it on: the next mount brings it.
+    write(root, { "down.json": decl("down", { enableSubgraphs: ["opt.extra"], mountApprovers: ["test"], remoteMounts: [{ harness: "opt", repository: "o/opt", ref: opt.sha, ...consentFor(opt.sha), overrides: { opt: { whole: true } } }] }) });
+    const again = mountRemote({ instanceRoot: root, urlFor: local });
+    expect(summarise(again.plan.outcomes).state).toBe("mounted");
+    expect(readFileSync(join(root, "opt/extra/big.txt"), "utf-8")).toBe("big\n");
+    const lock2 = MountLockSchema.parse(JSON.parse(readFileSync(join(root, "index.lock.json"), "utf-8")));
+    expect(lock2.instances.find((i) => i.instance === "opt")!.directories[0]!.except).toBeUndefined();
   });
 });
 

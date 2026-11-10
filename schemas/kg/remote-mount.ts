@@ -288,6 +288,13 @@ export const LockedDirectorySchema = z
     treeDigest: z.string().regex(/^[0-9a-f]{64}$/),
     files: z.number().int().nonnegative(),
     /**
+     * A whole-layer mount (`id: "*"`) only: the opt-in sub-graphs the
+     * downstream has not switched on, relative to the layer root, no trailing
+     * slash. Not checked out, not copied, not in the digest
+     * (`switchedOffOptInPaths` in scripts/remote-mount.ts).
+     */
+    except: z.array(z.string().min(1).refine((p) => !p.split("/").includes("..") && !p.startsWith("/"), "an except path stays inside the layer")).optional(),
+    /**
      * A hydrated directory whose `index.hydrated.jsonld` came from the pin's
      * subgraph index PACKAGE rather than its git tree (bean `mo75` G2b; the
      * contract is `subgraphIndexPackage` in `subgraph-manifest.ts`): the
@@ -473,7 +480,7 @@ export function mountChoiceOf(instanceRoot: string, absDir: string): { chosen: b
     const entry = r.lock.instances.find((i) => resolve(scope, i.path) === inst);
     if (entry === undefined) continue;
     const chosen = entry.directories.some((d) => {
-      if (d.id === WHOLE_INSTANCE_ID) return true;
+      if (d.id === WHOLE_INSTANCE_ID) return !(d.except ?? []).some((e) => within(dir, resolve(scope, d.path, e)));
       const locked = resolve(scope, d.path);
       return within(dir, locked) || within(locked, dir);
     });

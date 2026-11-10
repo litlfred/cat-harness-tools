@@ -135,9 +135,10 @@ export class RemoteTree {
   /**
    * Check out exactly `paths` (directories end in `/`, files do not) and
    * return the working tree they are in. One sparse checkout for all of them.
+   * `except` (directories, ending in `/`) are left out of what `paths` brings.
    */
-  checkout(paths: readonly string[]): string {
-    git(["sparse-checkout", "set", "--no-cone", ...paths.map((p) => `/${p}`)], this.dir);
+  checkout(paths: readonly string[], except: readonly string[] = []): string {
+    git(["sparse-checkout", "set", "--no-cone", ...paths.map((p) => `/${p}`), ...except.map((p) => `!/${p}`)], this.dir);
     git(["checkout", "-q", "FETCH_HEAD"], this.dir);
     return this.dir;
   }

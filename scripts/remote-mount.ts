@@ -330,6 +330,52 @@ export function defaultMountDirectoryIds(
   return ids.filter((id) => !off.has(id));
 }
 
+/**
+ * What a WHOLE-layer mount leaves out: every opt-in sub-graph of `name` the
+ * downstream has not switched on, top-level or declared from within, as a
+ * layer-relative path (no trailing slash), outermost only.
+ *
+ * A whole mount exists for a layer a downstream reads as a checkout (its
+ * `package.json` is a workspace), not to bring every graph: before this, a
+ * content layer that never enabled `cat-harness.sdlc` or the library corpus
+ * still received their files (123 MB of corpus for every IG). Switched off is
+ * invisible to the agent (`opt-in-subgraphs.ts`), so it need not be on disk
+ * either. A downstream that enables one gets it, as with the default list.
+ *
+ * When the nested declarations cannot be read at the pin, only the
+ * top-level opt-in entries are left out: a mount that brings more than it
+ * must is safe, one that silently brings less is not.
+ */
+export function switchedOffOptInPaths(
+  name: string,
+  topLevel: ReadonlyArray<{ id: string; path: string; optIn?: unknown }>,
+  nested: ReadonlyArray<{ id: string; path: string; optIn?: boolean }>,
+  enabled: EnabledSubgraphs,
+): string[] {
+  const seen = new Set(topLevel.map((d) => d.id));
+  const all = [...topLevel, ...nested.filter((d) => !seen.has(d.id))];
+  const off = all
+    .filter((d) => d.optIn === true && !isSubgraphEnabled(enabled, qualifiedSubgraphId(name, d.id)))
+    .map((d) => strip(d.path).replace(/^\.\//, ""))
+    .filter((p) => p !== "" && p !== "." && !p.split("/").includes(".."));
+  const sorted = [...new Set(off)].sort((a, b) => a.length - b.length || a.localeCompare(b));
+  return sorted.filter((p, i) => !sorted.slice(0, i).some((q) => p.startsWith(`${q}/`))).sort();
+}
+
+/** {@link switchedOffOptInPaths} at a pin, as the planned directory's `except` field (absent when nothing is left out). */
+function wholeExcept(
+  name: string,
+  tree: RemoteTree,
+  found: { root: string; file: string; decl: UpstreamDeclaration },
+  enabled: EnabledSubgraphs,
+): { except?: string[] } {
+  if (enabled === "all") return {};
+  const top = found.decl.directories as Array<{ id: string; path: string; optIn?: unknown }>;
+  const nested = upstreamDirectories(tree, found.root, found.file);
+  const except = switchedOffOptInPaths(name, top, nested.ok ? nested.directories : [], enabled);
+  return except.length ? { except } : {};
+}
+
 // ── The plan ─────────────────────────────────────────────────────────────────
 
 export interface PlannedDirectory {
@@ -338,6 +384,12 @@ export interface PlannedDirectory {
   path: string;
   /** Upstream-relative, no trailing slash. For a hydrated directory, the directory its `index.hydrated.jsonld` is published in. */
   upstreamPath: string;
+  /**
+   * A whole-layer mount only: the opt-in sub-graphs the downstream has not
+   * switched on, relative to `upstreamPath`, no trailing slash. Left out of
+   * the checkout, the copy and the digest (see {@link switchedOffOptInPaths}).
+   */
+  except?: string[];
   /** Set when the directory is mounted as hydrated metadata: its per-directory source (bean `mo75` G2). */
   hydrated?: HydratedSource;
   /**
@@ -865,7 +917,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
           via: m.harness,
           pinnedBy: q.pinnedBy,
           declarationFile: found.file,
-          directories: [{ id: WHOLE_INSTANCE_ID, path, upstreamPath: found.root || "." }],
+          directories: [{ id: WHOLE_INSTANCE_ID, path, upstreamPath: found.root || ".", ...wholeExcept(q.name, tree, found, dsEnabled) }],
           assets: [],
         });
       }
@@ -1491,7 +1543,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
           // From the package (G2b): not in the tree, so not checked out.
           ...p.directories.filter((d) => !d.package).map((d) => (p.hydrated ? `${d.upstreamPath}/${SUBGRAPH_HYDRATED_FILE}` : d.upstreamPath === "." ? "*" : `${d.upstreamPath}/`)),
           ...(p.assets ?? []).map((a) => joinRel(p.upstreamRoot, a)),
-        ]);
+        ], p.directories.flatMap((d) => (d.except ?? []).map((e) => `${d.upstreamPath === "." ? e : joinRel(d.upstreamPath, e)}/`)));
         // The digest leaves `node_modules/` out so an install cannot make a
         // mount read modified. That is only sound while no upstream PINS a
         // file there, so a tree that does is refused rather than half-verified.
@@ -1532,6 +1584,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
               upstreamPath: d.upstreamPath,
               ...digestOf(join(plan.instanceRoot, d.path), stateMountedDirs(plan.instanceRoot)),
               ...(d.package ? { package: { url: d.package.url, sha256: d.package.sha256, member: d.package.member } } : {}),
+              ...(d.except?.length ? { except: d.except } : {}),
             }));
           const assets = (p.assets ?? []).filter((a) => existsSync(join(target, a))).map((a) => ({ src: a, sha256: sha256Text(readFileSync(join(target, a))) }));
           ensureIgnored(plan.instanceRoot, p.path, true);
@@ -1642,6 +1695,7 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
               upstreamPath: d.upstreamPath,
               ...digestOf(join(plan.instanceRoot, d.path)),
               ...(d.package ? { package: { url: d.package.url, sha256: d.package.sha256, member: d.package.member } } : {}),
+              ...(d.except?.length ? { except: d.except } : {}),
             });
           }
           for (const a of p.assets ?? []) {
