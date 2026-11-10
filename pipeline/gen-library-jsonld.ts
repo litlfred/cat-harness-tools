@@ -418,9 +418,18 @@ export function libraryInstanceOf(entryDir: string): string | undefined {
  * from there, the several layers declaring it are ambiguous.
  */
 export function librarySubgraphStart(locatedAt: string): string {
-  const root = dirname(dirname(locatedAt));
-  const decl = libraryInstanceOf(locatedAt) !== undefined ? readDeclaration(root) : undefined;
-  return decl && instanceDirectories(root, decl).some((d) => d.id === "library") ? root : findContentRepoRoot();
+  if (libraryInstanceOf(locatedAt) === undefined) return findContentRepoRoot();
+  // The layer is the nearest declaration above the entry, not always two
+  // folders up: a library declared from within (`library/corpus/<id>`,
+  // core#702) sits one folder deeper, and reading `library/` as the layer
+  // found no declaration and fell back to the content repo root, so in an
+  // index every such manifest named cat-harness's library.
+  for (let at = dirname(locatedAt); at !== dirname(at); at = dirname(at)) {
+    const decl = readDeclaration(at);
+    if (decl === undefined) continue;
+    return instanceDirectories(at, decl).some((d) => d.id === "library") ? at : findContentRepoRoot();
+  }
+  return findContentRepoRoot();
 }
 
 /** Everything one document contributes, as files to write. */
