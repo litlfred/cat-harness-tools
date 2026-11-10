@@ -112,6 +112,7 @@ export const THEME_SIDEBAR_RULING: DroppedByRuling = {
 import { expectedPages, siteCoverageShortfall } from "./site-coverage.ts";
 import { pagesEmbedPdf, pruneUnreferencedImages } from "./lib/site-prune.ts";
 import { servedOverHttp, shareAssets } from "./lib/shared-assets.ts";
+import { scopeArg } from "./lib/site-scope.ts";
 import { writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
@@ -927,7 +928,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     );
 
     for (const st of o.siteSteps ?? []) run(`site: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
-    if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
+    if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}${o.scope ? ` --scope ${shellQuote(scopeArg(o.scope))}` : ""}`, root);
     // A scoped site installs the viewer only when one of its pages embeds it (Q-SZ-6 "A").
     if (has.has("pdf") && o.scope && !pagesEmbedPdf(site)) console.log("pdf viewer: no page of this scoped site embeds a PDF; not installed");
     else if (has.has("pdf")) run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow ${shellQuote(`https://cdn.jsdelivr.net/gh/${gh.owner}/`)} --allow ${shellQuote(`https://raw.githubusercontent.com/${gh.owner}/`)}`, root);

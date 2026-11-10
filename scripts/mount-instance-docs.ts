@@ -85,6 +85,7 @@ import { renderThemesCss } from "./gen-themes-css.ts";
 import { DOCS_SITE_BASE } from "../schemas/kg/jsonld.js";
 import { isPublished } from "../schemas/kg/url-space.js";
 import { instanceSitePath } from "./instance-exports.ts";
+import { inScope, siteScope } from "./lib/site-scope.ts";
 
 /**
  * A layer's route — `<instance>` or `<instance>/<path>`, no slash at
@@ -2344,7 +2345,7 @@ export function resolve_<T extends { route: string }>(
 async function main(): Promise<number> {
   const site = arg("site");
   if (!site) {
-    console.error("usage: mount-instance-docs.ts --site <dir> [--built <instance-name>]");
+    console.error("usage: mount-instance-docs.ts --site <dir> [--built <instance-name>] [--scope <instance,...>]");
     return 2;
   }
   const siteAbs = resolve(REPO, site);
@@ -2361,9 +2362,16 @@ async function main(): Promise<number> {
   // for a reason that is a typing artefact rather than a fact about the repo.
   const built = arg("built", "cat-harness") ?? "cat-harness";
 
+  // A scoped site (an IG's) mounts only its scope's layers: every other layer
+  // is linked on its own site, not copied (owner, 2026-11-10).
+  const scope = siteScope();
   const found = mountable().filter((m) => {
     if (m.name === built && m.kind === "docs") {
       console.log(`  skip ${m.kind}/${m.name} — already built at the site root`);
+      return false;
+    }
+    if (!inScope(scope, m.name)) {
+      console.log(`  skip ${m.kind}/${m.name} — outside this site's scope, linked on its own site`);
       return false;
     }
     return true;
