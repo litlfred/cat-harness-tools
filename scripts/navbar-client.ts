@@ -25,6 +25,8 @@ function draw(): void {
       ...(JSON.parse(block.textContent || "{}") as Omit<RailPage, "root" | "toRoot">),
       root: block.getAttribute("data-fa-root") ?? ".",
       toRoot: block.getAttribute("data-fa-to-root") ?? ".",
+      // Set by a site that composes this one into a larger site (smart-html-jtd).
+      ...(block.getAttribute("data-fa-home") ? { home: block.getAttribute("data-fa-home")! } : {}),
     };
   } catch {
     console.warn("navbar: #fa-rail is not valid JSON; the rail keeps its Home link only.");
