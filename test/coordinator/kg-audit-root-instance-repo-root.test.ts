@@ -43,8 +43,11 @@ describe("kg:audit over the instance declared at the repository root (bean `pgzn
   });
 
   test("every instance the root's index lists is declared below it — the cases kg:audit does reach", () => {
-    const index = JSON.parse(readFileSync(join(REPO, "index.config.json"), "utf-8")) as { instances?: { name: string }[] };
-    const names = (index.instances ?? []).map((i) => i.name);
+    const index = JSON.parse(readFileSync(join(REPO, "index.config.json"), "utf-8")) as {
+      instances?: { name: string }[];
+      layers?: { name: string }[];
+    };
+    const names = (index.instances ?? index.layers ?? []).map((i) => i.name);
     expect(names.length).toBeGreaterThan(0);
     const roots = instanceRootsIn(REPO).filter((r) => r !== REPO);
     const declared = new Set(roots.map((r) => readDeclaration(r)?.name));

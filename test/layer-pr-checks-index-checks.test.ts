@@ -101,6 +101,24 @@ describe("index-gates.json", () => {
     for (const [name, script] of Object.entries(gates)) expect(derived[name]).toBe(`bun run cat ${script}`);
     expect(derived["low:check:own"]).toBe("bun run cat check:own");
   });
+
+  test("run-gates.py own_instances reads both `instances` and the migrated `layers` + `harnesses` form of index.config.json (cat-harness#1138)", () => {
+    const root = mkdtempSync(join(tmpdir(), "own-layers-"));
+    mkdirSync(join(root, "ig"));
+    writeFileSync(join(root, "ig", "ig.json"), JSON.stringify({ $schema: "cat-harness-declaration/v1", name: "ig", needs: [] }));
+    writeFileSync(
+      join(root, "index.config.json"),
+      JSON.stringify({
+        $schema: "folio-index-config/v1",
+        layers: [{ name: "ig" }, { name: "unmounted" }],
+        harnesses: [{ name: "ig" }],
+      }),
+    );
+    const known = py("run-gates.py", `m.instances_in(${JSON.stringify(root)})`) as Record<string, string>;
+    expect(known).toEqual({ ig: "ig" });
+    const own = py("run-gates.py", `m.own_instances(${JSON.stringify(root)}, [], ${JSON.stringify(known)})`) as string[];
+    expect(own).toEqual(["ig"]);
+  });
 });
 
 describe("reader-tests.py: other instances' tests that name the layer", () => {

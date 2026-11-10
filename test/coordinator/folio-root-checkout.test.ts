@@ -34,8 +34,12 @@ describe("FOLIO_ROOT detection", () => {
     // `index.config.json` there, listing this platform layer.
     const root = repoRootFor(INSTANCE_ROOT);
     expect(readDeclaration(root)).toBeUndefined();
-    const index = JSON.parse(readFileSync(join(root, "index.config.json"), "utf-8")) as { $schema?: string; instances?: { name?: string }[] };
+    const index = JSON.parse(readFileSync(join(root, "index.config.json"), "utf-8")) as {
+      $schema?: string;
+      instances?: { name?: string }[];
+      layers?: { name?: string }[];
+    };
     expect(index.$schema).toBe("folio-index-config/v1");
-    expect((index.instances ?? []).map((i) => i.name)).toContain(basename(INSTANCE_ROOT));
+    expect((index.instances ?? index.layers ?? []).map((i) => i.name)).toContain(basename(INSTANCE_ROOT));
   });
 });
