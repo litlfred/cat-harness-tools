@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { inScope, scopeArg, siteScope } from "../lib/site-scope.ts";
-import { relinkOutOfScope, siteScopeOf } from "../build-instance-site.ts";
+import { relinkOutOfScope, SCOPE_RULING, scopeDropped, siteScopeOf } from "../build-instance-site.ts";
 import { writerArgv, type VisualiserWriter } from "../visualiser-writers.ts";
 
 describe("site-scope — the --scope flag", () => {
@@ -85,5 +85,31 @@ describe("relinkOutOfScope — another layer's page is linked on its own site", 
     expect(html).toContain(`href="https://example.org/platform/en/h/processes/theirs.html#step"`);
     expect(html).toContain(`href="../../../other/missing.html"`);
     rmSync(site, { recursive: true, force: true });
+  });
+});
+
+describe("scopeDropped — the parity guard lets a scoped site leave other layers' pages out", () => {
+  const mk = (files: string[]): string => {
+    const d = mkdtempSync(join(tmpdir(), "scope-drop-"));
+    for (const f of files) {
+      mkdirSync(join(d, f, ".."), { recursive: true });
+      writeFileSync(join(d, f), "x");
+    }
+    return d;
+  };
+  test("only directories that hold nothing but out-of-scope layers' pages", () => {
+    const current = mk([
+      "who-iris/index.html", // an out-of-scope layer, as the directory
+      "docs/who-iris/README.html", // one level down
+      "ar/core/glossary/index.html", // a locale route of an out-of-scope layer
+      "catalogue/index.html", // its own-site route
+      "mixed/core/a.html", // ...but this directory also holds the IG's page
+      "mixed/ig-page.html",
+      "artifact/x.html", // still in the candidate: not considered
+    ]);
+    const candidate = mk(["artifact/x.html"]);
+    const dropped = scopeDropped(current, candidate, ["ig"], ["ig", "who-iris", "core"], ["who-iris/catalogue/", "en/who-iris/catalogue/"]);
+    expect(dropped.map((d) => d.dir).sort()).toEqual(["ar", "catalogue", "docs", "who-iris"]);
+    expect(dropped.every((d) => d.ruling === SCOPE_RULING)).toBe(true);
   });
 });
