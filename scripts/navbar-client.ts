@@ -27,6 +27,7 @@ function draw(): void {
       toRoot: block.getAttribute("data-fa-to-root") ?? ".",
       // Set by a site that composes this one into a larger site (smart-html-jtd).
       ...(block.getAttribute("data-fa-home") ? { home: block.getAttribute("data-fa-home")! } : {}),
+      ...(block.getAttribute("data-fa-home-name") ? { homeName: block.getAttribute("data-fa-home-name")! } : {}),
     };
   } catch {
     console.warn("navbar: #fa-rail is not valid JSON; the rail keeps its Home link only.");
