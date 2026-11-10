@@ -3,33 +3,38 @@ import { test, expect } from "@playwright/test";
 /**
  * End-to-end tests for WHO-IRIS static catalogue search and faceted filtering.
  *
- * Verifies the client-side KG metadata search on who-iris/site/index.html:
- * 1. Text search with multi-word terms & instant highlighting (<mark>)
- * 2. Facet chips (quick MeSH subject filtering)
- * 3. Advanced faceted filters: Dublin Core subjects, Community, Year ranges, and Open Access gates
+ * Verifies the client-side KG metadata search on who-iris/site/index.html and
+ * the IRIS-style dynamic faceted search page on who-iris/site/search.html (who-iris#197):
+ * 1. Landing page search bar & instant typing preview with highlighting (<mark>)
+ * 2. Dedicated search page (`search.html`) with dynamic facets computed from Dublin Core records
+ * 3. Facet selection (Subject MeSH, Has files, Date issued year range) & applied filter chips
  * 4. Verification that search operates purely on structured KG metadata and not raw text blobs
- * 5. Multi-lingual availability on translated replicas (e.g. /fr/index.html)
+ * 5. Multi-lingual availability on translated replicas (e.g. /fr/index.html and /fr/search.html)
  */
 
 test.describe("WHO-IRIS search & faceted exploration", () => {
-  test("landing page renders search bar, facet chips, and advanced filter controls", async ({ page }) => {
+  test("landing page renders search bar forwarding to search.html, and search.html renders dynamic facets", async ({ page }) => {
     const res = await page.goto("/who-iris/site/index.html");
     expect(res?.status()).toBe(200);
 
+    const searchForm = page.locator("#iris-search-form");
+    await expect(searchForm).toHaveAttribute("action", "search.html");
+
     const searchInput = page.locator("#iris-search-input");
     await expect(searchInput).toBeVisible();
+    await expect(searchInput).toHaveAttribute("name", "query");
 
-    const chips = page.locator(".iris-chip");
-    expect(await chips.count()).toBeGreaterThanOrEqual(4);
+    // Navigate to the IRIS-style search page (who-iris#197)
+    const searchRes = await page.goto("/who-iris/site/search.html");
+    expect(searchRes?.status()).toBe(200);
 
-    const details = page.locator("#iris-adv-filters");
-    await expect(details).toBeVisible();
+    await expect(page.locator("#iris-search-input")).toBeVisible();
+    await expect(page.locator("#is-facets")).toBeVisible();
+    await expect(page.locator("#is-sort")).toBeVisible();
+    await expect(page.locator("#is-rpp")).toBeVisible();
 
-    await expect(page.locator("#iris-filter-subject")).toBeAttached();
-    await expect(page.locator("#iris-filter-community")).toBeAttached();
-    await expect(page.locator("#iris-filter-year-from")).toBeAttached();
-    await expect(page.locator("#iris-filter-year-to")).toBeAttached();
-    await expect(page.locator("#iris-filter-open-access")).toBeAttached();
+    const facets = page.locator("#is-facets details.is-facet");
+    expect(await facets.count()).toBeGreaterThanOrEqual(4);
   });
 
   test("instant keyword search highlights matching terms and displays results panel", async ({ page }) => {
@@ -55,77 +60,54 @@ test.describe("WHO-IRIS search & faceted exploration", () => {
     await expect(mark).toHaveText("handbook");
   });
 
-  test("clicking a subject facet chip triggers faceted search filter", async ({ page }) => {
-    await page.goto("/who-iris/site/index.html");
+  test("clicking a dynamic subject facet on search.html filters results and renders an applied filter chip", async ({ page }) => {
+    await page.goto("/who-iris/site/search.html");
 
-    const chip = page.locator('button.iris-chip[data-facet-type="subject"][data-facet-val="Guidelines as Topic"]');
-    await expect(chip).toBeVisible();
-    await chip.click();
+    const facetLink = page
+      .locator('#is-facets a[data-facet="mesh"]')
+      .filter({ hasText: "Guidelines as Topic" })
+      .first();
+    await expect(facetLink).toBeVisible();
+    await facetLink.click();
 
-    const results = page.locator("#iris-search-results");
-    await expect(results).toBeVisible();
-
-    // Filter dropdown should be updated
-    const subjSelect = page.locator("#iris-filter-subject");
-    await expect(subjSelect).toHaveValue("Guidelines as Topic");
+    // Applied filter chip and reset link appear
+    const chips = page.locator("#is-chips .is-chip");
+    expect(await chips.count()).toBeGreaterThanOrEqual(2);
+    await expect(page.locator("#is-chips")).toContainText("Guidelines as Topic");
 
     // Guideline items tagged with "Guidelines as Topic" should match
-    const resultItems = results.locator(".search-result-item");
-    expect(await resultItems.count()).toBeGreaterThanOrEqual(2);
+    const cards = page.locator("#is-results .is-card");
+    expect(await cards.count()).toBeGreaterThanOrEqual(2);
 
-    const textContent = await results.textContent();
+    const textContent = await page.locator("#is-results").textContent();
     expect(textContent).toContain("Publication and information products style guide");
     expect(textContent).toContain("WHO handbook for guideline development");
   });
 
-  test("complex boolean filtering combines community, access rights, and year", async ({ page }) => {
-    await page.goto("/who-iris/site/index.html");
+  test("complex faceted filtering on search.html combines query, subject facet, and date issued range", async ({ page }) => {
+    await page.goto("/who-iris/site/search.html");
 
-    // THE FIXTURE, declared here rather than assumed of the catalogue. This
-    // step used to rely on Headquarters' PDFs being refused by their copyright
-    // gate; the owner cleared every who-iris entry on 2026-10-08 ("special
-    // development authorization for WHO staff in development environment",
-    // recorded on each bitstream's gates), so the catalogue no longer holds a
-    // refused PDF and the open-access filter had nothing to exclude. The
-    // filter is what is under test, so the refusal is put into the page's
-    // own index — the array `update` reads — before any filter is applied.
-    const refused = await page.evaluate(() => {
-      const g = window as unknown as { __irisSearch?: { index: Array<{ community?: string; hasPdf?: boolean; copyrightGate?: string }> } };
-      let n = 0;
-      for (const e of g.__irisSearch?.index ?? []) {
-        if (e.hasPdf && e.community?.includes("Headquarters")) {
-          e.copyrightGate = "refused";
-          n++;
-        }
-      }
-      return n;
-    });
-    expect(refused).toBeGreaterThanOrEqual(2);
+    // Apply MeSH facet "Guidelines as Topic"
+    const meshLink = page
+      .locator('#is-facets a[data-facet="mesh"]')
+      .filter({ hasText: "Guidelines as Topic" })
+      .first();
+    await meshLink.click();
+    expect(await page.locator("#is-results .is-card").count()).toBeGreaterThanOrEqual(2);
 
-    // Open advanced filter details
-    await page.locator("#iris-adv-filters summary").click();
+    // Narrow by Date issued year range to 2014..2014 (WHO handbook for guideline development, 2nd ed. is 2014)
+    const rangeForm = page.locator("#is-facets form.is-range");
+    await rangeForm.locator('input[name="min"]').fill("2014");
+    await rangeForm.locator('input[name="max"]').fill("2014");
+    await rangeForm.locator('button[type="submit"]').click();
 
-    // Filter by Community: Western Pacific
-    await page.locator("#iris-filter-community").selectOption("Western Pacific");
-    const results = page.locator("#iris-search-results");
-    await expect(results).toBeVisible();
-    expect(await results.locator(".search-result-item").count()).toBe(1);
-    await expect(results).toContainText("Publication and information products style guide");
+    const cards = page.locator("#is-results .is-card");
+    expect(await cards.count()).toBe(1);
+    await expect(page.locator("#is-results")).toContainText("WHO handbook for guideline development");
 
-    // Require Open Access PDF
-    await page.locator("#iris-filter-open-access").check();
-    expect(await results.locator(".search-result-item").count()).toBe(1);
-    await expect(results.locator(".state.materialized")).toHaveText("PDF Permitted");
-
-    // Switch community to Headquarters with Open Access required -> No open access PDF held for HQ items
-    await page.locator("#iris-filter-community").selectOption("Headquarters");
-    await expect(results).toContainText("No materialized items or collections matched");
-
-    // Uncheck Open Access -> HQ items now appear
-    await page.locator("#iris-filter-open-access").uncheck();
-    expect(await results.locator(".search-result-item").count()).toBeGreaterThanOrEqual(2);
-    await expect(results).toContainText("WHO handbook for guideline development");
-    await expect(results).toContainText("WHO editorial style manual");
+    // Reset all filters -> full item list returns
+    await page.locator("#is-chips a.is-reset").click();
+    expect(await page.locator("#is-results .is-card").count()).toBeGreaterThanOrEqual(3);
   });
 
   test("search index payload operates purely on structured KG metadata without full text blobs", async ({ page }) => {
@@ -168,8 +150,10 @@ test.describe("WHO-IRIS search & faceted exploration", () => {
     await expect(searchInput).toBeVisible();
     await expect(searchInput).toHaveAttribute("placeholder", /Rechercher parmi les .* documents du dépôt/);
 
-    // Advanced search control is present and functional
-    const detailsSummary = page.locator("#iris-adv-filters summary");
-    await expect(detailsSummary).toContainText("Complex Search & KG Filters");
+    const searchRes = await page.goto("/who-iris/site/fr/search.html");
+    expect(searchRes?.status()).toBe(200);
+    await expect(page.locator("#is-filters-h")).toBeVisible();
+    expect(await page.locator("#is-facets details.is-facet").count()).toBeGreaterThanOrEqual(4);
   });
 });
+
