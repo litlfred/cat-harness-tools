@@ -88,6 +88,12 @@ export interface LockDir {
    * the file's path inside it.
    */
   package?: { url: string; sha256: string; member: string };
+  /**
+   * A whole-layer mount (`id: "*"`) only: the opt-in sub-graphs the
+   * downstream has not switched on, relative to the layer root. Not fetched,
+   * so not copied and not in the digest.
+   */
+  except?: string[];
 }
 export interface LockAsset {
   src: string;
@@ -997,6 +1003,10 @@ function layDown(root: string, inst: LockInstance, absent: readonly string[], la
       inst.hydrated ? `/${d.upstreamPath.replace(/\/+$/, "")}/${HYDRATED_FILE}` : d.upstreamPath === "." ? "/*" : `/${d.upstreamPath.replace(/\/+$/, "")}/`,
     ),
     ...assetPaths,
+    // A whole mount's switched-off opt-in sub-graphs: excluded after the `/*` that would bring them.
+    ...inst.directories.flatMap((d) =>
+      (d.except ?? []).filter((e) => !e.split("/").includes("..")).map((e) => (d.upstreamPath === "." ? `!/${e}/` : `!/${d.upstreamPath.replace(/\/+$/, "")}/${e}/`)),
+    ),
   ];
   /** Unpacked packages, by URL: one fetch per tarball, removed below. */
   const packages = new Map<string, string>();

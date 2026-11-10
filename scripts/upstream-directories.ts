@@ -39,6 +39,8 @@ export interface UpstreamDirectory {
   storage?: unknown;
   /** The id of the directory that declared this one from within; absent for an entry of `<name>.json`. */
   within?: string;
+  /** An opt-in sub-graph (`opt-in-subgraphs.ts`): off for a downstream that has not enabled it. */
+  optIn?: boolean;
 }
 
 export type UpstreamDirectories = { ok: true; directories: UpstreamDirectory[] } | { ok: false; detail: string };
@@ -85,6 +87,7 @@ export function upstreamDirectories(
         ...(d.source !== undefined ? { source: d.source } : {}),
         ...(d.storage !== undefined ? { storage: d.storage } : {}),
         ...(d.within !== undefined ? { within: d.within } : {}),
+        ...((d as { optIn?: unknown }).optIn === true ? { optIn: true } : {}),
       })),
     };
   } catch (e) {
