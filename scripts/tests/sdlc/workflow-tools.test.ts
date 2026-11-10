@@ -96,3 +96,40 @@ describe("assess", () => {
     expect(processesOf(tool("t", "x", ["nope"]), bySkill)).toEqual([]);
   });
 });
+
+describe("QC checks need no Tool", () => {
+  test("a gate key, a --check run or a check-* file is exempt; a producing run of the same file is not", () => {
+    const root = tree({
+      ".github/workflows/w.yml": [
+        "jobs:",
+        "  a:",
+        "    steps:",
+        "      - run: bun run cat check:thing",
+        "      - run: bun run lay/scripts/gen-a.ts --check",
+        "      - run: bun run lay/scripts/gen-b.ts --check",
+        "      - run: bun run lay/scripts/gen-b.ts --out x",
+        "      - run: bun run lay/scripts/check-c.ts",
+      ].join("\n"),
+      "lay/scripts/thing.ts": "",
+      "lay/scripts/gen-a.ts": "",
+      "lay/scripts/gen-b.ts": "",
+      "lay/scripts/check-c.ts": "",
+      "package.json": JSON.stringify({ name: "root", scripts: { "check:thing": "bun run lay/scripts/thing.ts" } }),
+    });
+    const r = assess(invocations(root, [".github/workflows/w.yml"]), toolReach([], root), [], new Map());
+    expect(r.findings.map((f) => f.subject)).toEqual(["lay/scripts/gen-b.ts"]);
+    expect(r.qc).toBe(3);
+  });
+
+  test("a step a Tool's own script runs is covered by that Tool", () => {
+    const root = tree({
+      ".github/workflows/w.yml": "jobs:\n  a:\n    steps:\n      - run: bun run lay/scripts/step.ts\n",
+      "lay/scripts/step.ts": "",
+      "lay/scripts/main.ts": 'const STEP = "lay/scripts/step.ts";\n',
+    });
+    const defs = [tool("main", "bun run lay/scripts/main.ts", [], ["proc"])];
+    const r = assess(invocations(root, [".github/workflows/w.yml"]), toolReach(defs, root), defs, new Map());
+    expect(r.findings).toEqual([]);
+    expect(r.ok.map((o) => o.tools)).toEqual([["main"]]);
+  });
+});

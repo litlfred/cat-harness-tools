@@ -19,6 +19,18 @@
  *   task in a `.bpmn` of the checkout (`<…processes:skill ref="…"/>`), or when
  *   it declares `subprocesses`.
  *
+ * ## What needs no Tool
+ *
+ * - **QC checks** (owner, 2026-11-10: "we dont need Tools/Skills for QC checks
+ *   actions"): a run through a gate key (`check:*`, `*:check`), a run with
+ *   `--check` or `--verify`, or a file named for a check (`check-*`,
+ *   `audit-*`, `validate-*`, `verify-*`, `*-links`, a `test/` file; see
+ *   {@link isQcScript}). A generator a workflow also runs to WRITE is still
+ *   judged on that run.
+ * - **A step of a Tool**: a script a Tool's own implementation runs (a
+ *   `bun run cat <key>` or a script path literal in it) is covered by that
+ *   Tool, so a workflow that runs the step directly needs no second Tool.
+ *
  * ## What counts as "run"
  *
  * Read out of the `run:` blocks of `.github/workflows/*.yml` and of composite
@@ -100,6 +112,8 @@ export interface Invocation {
   keys?: string[];
   /** Whether the key is declared in a manifest of this checkout. */
   declared?: boolean;
+  /** Run as a quality check, not as a step that makes something: see {@link isQcScript}. */
+  qc: boolean;
   /** The file it runs, relative to the root; undefined when none resolves. */
   script?: string;
 }
@@ -226,13 +240,41 @@ export function keyChain(
   return { keys, files: [...files], declared: table.has(key) };
 }
 
+/**
+ * Quality checks need no Tool (owner, 2026-11-10: "we dont need Tools/Skills
+ * for QC checks actions"). A run is a QC check when it is reached through a
+ * gate key (`check:*`, `*:check`, the set `run-gates.py` derives), passes
+ * `--check` or `--verify`, or runs a file named `check-*`, `audit-*`,
+ * `validate-*` or `verify-*`. A script that a workflow ALSO runs as a
+ * producing step (a generator run once to write and once with `--check`) is
+ * still judged, on its producing runs.
+ */
+export const QC_KEY = /(?:^|:)check(?::|$)|^check-|^audit:|^qa:/;
+const CHECK_FLAG = /\s--(?:check|verify)\b/;
+export function isQcScript(path: string): boolean {
+  if (/(?:^|\/)tests?\//.test(path)) return true;
+  const base = (path.split("/").pop() ?? "").replace(/\.[a-z]+$/, "");
+  return (
+    /^(?:check|audit|validate|verify|qa|typecheck|lint)(?:[-_]|$)/.test(base) ||
+    /[-_](?:check|verify|verdict|dryrun|links|dead-links|qa)$/.test(base) ||
+    /^verdict[-_]/.test(base)
+  );
+}
+
+/** The whole line of `text` that holds `index`. */
+function lineAround(text: string, index: number): string {
+  const start = text.lastIndexOf("\n", index) + 1;
+  const end = text.indexOf("\n", index);
+  return text.slice(start, end === -1 ? undefined : end);
+}
+
 /** Every script the workflows under `root` run. */
 export function invocations(root: string = ROOT, files: readonly string[] = workflowFiles(root)): Invocation[] {
   const table = scriptTable(root);
   const out: Invocation[] = [];
   const seen = new Set<string>();
   const push = (i: Invocation) => {
-    const k = `${i.workflow}\0${i.raw}`;
+    const k = `${i.workflow}\0${i.raw}\0${i.qc}`;
     if (seen.has(k)) return;
     seen.add(k);
     out.push(i);
@@ -244,14 +286,19 @@ export function invocations(root: string = ROOT, files: readonly string[] = work
         for (const m of block.matchAll(rx)) {
           const raw = m[1]!;
           if (raw.includes("$")) continue; // a path built at run time names no file here
-          push({ workflow, raw, script: resolvePath(raw, layer, root) });
+          const script = resolvePath(raw, layer, root);
+          push({ workflow, raw, script, qc: isQcScript(script ?? raw) || CHECK_FLAG.test(lineAround(block, m.index!)) });
         }
       }
       for (const m of block.matchAll(KEYED)) {
         const key = (m[1] ?? m[2])!;
         if (/\.(?:m?[jt]s)$/.test(key)) continue; // `bun run cat x.ts` is a path, read above
         const chain = keyChain(key, table, root);
-        push({ workflow, raw: `bun run cat ${key}`, key, keys: chain.keys, script: chain.files[0], declared: chain.declared });
+        const qc =
+          chain.keys.some((k) => QC_KEY.test(k)) ||
+          (chain.files.length > 0 && chain.files.every(isQcScript)) ||
+          CHECK_FLAG.test(lineAround(block, m.index!));
+        push({ workflow, raw: `bun run cat ${key}`, key, keys: chain.keys, script: chain.files[0], declared: chain.declared, qc });
       }
     }
   }
@@ -288,7 +335,43 @@ export function toolReach(defs: readonly ToolDefinition[], root: string = ROOT):
       for (const l of layers) if (existsSync(join(root, l, mod))) add(byFile, join(l, mod), t.id);
     }
   }
+  // A step a Tool's own implementation runs is part of that Tool: a workflow
+  // that runs the step directly does not need a second Tool for it.
+  const direct = new Map([...byFile].map(([f, ids]) => [f, [...ids]]));
+  for (const [file, ids] of direct) {
+    for (const f of stepsRunBy(file, table, root)) for (const id of ids) add(byFile, f, id);
+  }
   return { byFile, byKey };
+}
+
+/**
+ * The scripts a file runs as steps, one level deep: a `bun run cat <key>` it
+ * names, or a script path in a string literal (`"cat-harness-tools/scripts/x.ts"`,
+ * `join(..., "set-html-lang.ts")` is not read). Comment lines are skipped,
+ * so a file that only MENTIONS a script does not claim it.
+ */
+export function stepsRunBy(file: string, table: ReturnType<typeof scriptTable>, root: string = ROOT): string[] {
+  let text: string;
+  try {
+    text = readFileSync(join(root, file), "utf-8");
+  } catch {
+    return [];
+  }
+  const code = text
+    .split("\n")
+    .filter((l) => !/^\s*(?:\/\/|\*|\/\*|#)/.test(l))
+    .join("\n");
+  const layer = layerOf(file, root);
+  const out = new Set<string>();
+  for (const m of code.matchAll(/["'`]((?:\.{1,2}\/)?[\w.@-]+(?:\/[\w.@-]+)+\.(?:ts|sh|py))["'`]/g)) {
+    if (/^\.{1,2}\//.test(m[1]!)) continue; // a relative import is a library, not a step
+    const p = resolvePath(m[1]!, layer, root);
+    if (p !== undefined && p !== file) out.add(p);
+  }
+  for (const m of code.matchAll(/["'`\s]bun run cat ([A-Za-z0-9:_.-]+)/g)) {
+    for (const f of keyChain(m[1]!, table, root).files) if (f !== file) out.add(f);
+  }
+  return [...out];
 }
 
 /** Skill name → the process ids (`.bpmn` stems) with a task naming it. */
@@ -337,9 +420,11 @@ export function baselineKey(f: Pick<Finding, "kind" | "subject">): string {
 export function assess(invs: readonly Invocation[], reach: Reach, defs: readonly ToolDefinition[], bySkill: Map<string, Set<string>>) {
   const byId = new Map(defs.map((t) => [t.id, t]));
   const subjects = new Map<string, { invs: Invocation[] }>();
+  const producing = new Set(invs.filter((i) => !i.qc).map((i) => i.script ?? (i.key !== undefined ? `key ${i.key}` : i.raw)));
   for (const i of invs) {
     const s = i.script ?? (i.key !== undefined ? `key ${i.key}` : i.raw);
     // A key whose command runs no file (`lint` → eslint) is judged as the key.
+    if (!producing.has(s)) continue; // a QC check: no Tool needed
     if (!subjects.has(s)) subjects.set(s, { invs: [] });
     subjects.get(s)!.invs.push(i);
   }
@@ -362,7 +447,7 @@ export function assess(invs: readonly Invocation[], reach: Reach, defs: readonly
     if (processes.length === 0) findings.push({ kind: "no-process", subject, workflows, tools: ids });
     else ok.push({ subject, tools: ids, processes });
   }
-  return { findings, ok, subjects: new Set(subjects.keys()) };
+  return { findings, ok, subjects: new Set(subjects.keys()), qc: new Set(invs.filter((i) => !producing.has(i.script ?? (i.key !== undefined ? `key ${i.key}` : i.raw))).map((i) => i.script ?? i.raw)).size };
 }
 
 /**
@@ -427,13 +512,13 @@ if (import.meta.main) {
   let total = 0;
   let linked = 0;
   for (const [layer, own] of [...byLayer].sort(([a], [b]) => a.localeCompare(b))) {
-    const { findings, ok, subjects } = assess(invocations(ROOT, own), reach, discovery.tools, bySkill);
+    const { findings, ok, subjects, qc } = assess(invocations(ROOT, own), reach, discovery.tools, bySkill);
     total += subjects.size;
     linked += ok.length;
     const keys = new Set(findings.map(baselineKey));
     const known = baseline.layers[layer];
     console.log(
-      `${layer}: ${own.length} workflow/action file(s), ${subjects.size} script(s) run, ` +
+      `${layer}: ${own.length} workflow/action file(s), ${qc} QC check(s) exempt, ${subjects.size} producing script(s), ` +
         `${ok.length} a Tool linked to a process, ${findings.length} not yet` +
         (known === undefined ? " — not yet ratcheted, reported only" : ""),
     );
