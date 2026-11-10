@@ -1199,6 +1199,19 @@ describe("per-instance registry pages (bean folio-assistant-k7ro)", () => {
     expect(html).not.toContain("Nodes —");
   });
 
+  test("a QA page whose layer keeps its results on a branch loads them in the browser", () => {
+    const [s] = instanceSubjectsOf(
+      [{ id: "qa", path: "test/results/", absPath: "/x/a/test/results", declaredBy: "a", graphTypologies: ["qa"], storage: { branch: "cat/cat-harness/qa-reports", keyedBy: "commit" } }],
+      ["qa"],
+    );
+    expect(s!.storage).toBe("cat/cat-harness/qa-reports");
+    const live = { repository: "o/a", ref: "a".repeat(40), branch: "cat/cat-harness/qa-reports", root: "a/test/results" };
+    const html = instanceSubjectPage({ id: "qa", coversKinds: ["qa"] }, s!, [s!], { $schema: "folio-qa-graph/v1", availability: "unknown", reason: "x" } as never, live);
+    expect(html).toContain('class="sv-qa-live"');
+    expect(html).toContain("render_with_liquid: false");
+    expect(html).not.toContain("Not available in this build");
+  });
+
   test("the hub lists every instance page", () => {
     const html = instanceHubPage({ id: "validators", title: "Validators" }, [
       { name: "a", path: "validators/", absPath: "/x/a/validators", instanceRoot: "/x/a" },
