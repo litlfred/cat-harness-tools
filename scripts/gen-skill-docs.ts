@@ -464,6 +464,14 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   "sdlc-core": "Software delivery practice — review, merge, CI, coordination (sdlc-core)",
   // Split out of `sdlc-core` into the opt-in `work-plan` sub-graph of cat-harness (cat-harness#991 step 23.2).
   "work-plan": "The work plan — beans, claiming, blocking, draining, the store (work-plan)",
+  // The opt-in sub-graphs of card Q-SG-1 C (2026-11-10): packages moved out of
+  // always-on ones so a layer that does not enable them mounts less.
+  "editorial-audits": "Editorial audits — voice, readability, watchers (editorial-audits)",
+  "kg-ops": "Knowledge graph operations — N-Quads, named queries, fencing (kg-ops)",
+  "platform-ui": "Platform UI — theming checks, viewers, render QC (platform-ui)",
+  dsa: "Data Sharing Agreements — DCAT records, checksums, ODRL (dsa)",
+  board: "The board — diagram interchange and windows (board)",
+  "library-extras": "Library extras — transcription, photo ingestion, catalogue search (library-extras)",
   theming: "Theming (theming)",
   // Keyed by basename: a package subdirectory of the declared `skills/`,
   // like `theming` above. Bean `6bhf`, owner 2026-09-25 — "bean as
