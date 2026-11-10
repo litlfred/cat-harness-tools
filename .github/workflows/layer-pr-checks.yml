@@ -334,8 +334,12 @@ permissions:
 # closing run joined main's group and, being a pull_request run, cancelled
 # main's running push run and the new one (a downstream layer's run 41395643928,
 # "higher priority waiting request"). pr-tests.yml is keyed the same way.
+# A push run is keyed by its commit as well: even with cancel-in-progress off,
+# GitHub keeps only ONE pending run per group and cancels the older pending
+# one, so three quick merges cancelled the middle main run (fhir-harness run
+# 42917495047, 2026-11-10) and mailed "Some jobs were not successful".
 concurrency:
-  group: layer-pr-checks-${{ github.repository }}-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  group: layer-pr-checks-${{ github.repository }}-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.ref, github.event_name == 'push' && github.sha || 'run') }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The instance, once: the input when given, else (layer mode) the calling
