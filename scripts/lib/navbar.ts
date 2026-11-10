@@ -433,6 +433,15 @@ export {
 } from "./navbar-geometry.js";
 export { NAV_MARK_PX as NAV_GLYPH_PX } from "./navbar-geometry.js";
 
+/** One nesting level in the rail, px (owner, 2026-11-10: a whole 40px mark per level was too much). */
+export const NAV_DEPTH_STEP_PX = 16;
+/** How far a section's listed rows (Folders' kinds) sit in from its own row, px. */
+export const NAV_KIND_INDENT_PX = 8;
+/** The drag edge's limits on the open bar's width, px, and where the width is remembered. */
+export const NAV_RESIZE_MIN_PX = 200;
+export const NAV_RESIZE_MAX_PX = 600;
+export const NAV_WIDTH_KEY = "fa-nav-w";
+
 /**
  * The navbar's stylesheet, scoped to `.fa-nav` so a host page keeps its own.
  *
@@ -466,14 +475,14 @@ export function navbarCss(): string {
     `.fa-nav{position:fixed;top:0;left:0;bottom:0;width:${NAV_COLLAPSED_PX}px;z-index:2147483000;`,
     `background:var(--fa-nav-bg);color:var(--fa-nav-ink);overflow:hidden;transition:width .14s ease;`,
     `font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}`,
-    `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:${NAV_OPEN_PX}px}`,
+    `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_PX}px)}`,
     `.fa-nav:not(:hover):not(:has(:focus-visible)):not(:has(.fa-nav-open:checked)) .fa-glass-handle__label{opacity:0}`,
     `@media(min-width:${NAV_STRIP_MQ_PX}px){`,
-    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:${NAV_OPEN_PX}px}}`,
+    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:var(--fa-nav-w,${NAV_OPEN_PX}px)}}`,
     `@media(min-width:${NAV_WIDE_MQ_PX}px){`,
-    `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:${NAV_OPEN_WIDE_PX}px}`,
-    `.fa-nav-in{width:${NAV_OPEN_WIDE_PX}px}`,
-    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:${NAV_OPEN_WIDE_PX}px}}`,
+    `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}`,
+    `.fa-nav-in{width:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}`,
+    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}}`,
     `@media(prefers-reduced-motion:no-preference){body{transition:padding-left .14s ease}}`,
     // Clipped in place, never parked at `left:-9999px`: on a right-to-left
     // page that is the scrollable side, and it widened the page ~10,000px
@@ -483,7 +492,7 @@ export function navbarCss(): string {
     // child defaults to `min-height:auto`, which refuses to shrink below its
     // content, so the column grows past the viewport and the FIXED BOTTOM
     // scrolls off the screen -- taking the harnesses and home with it.
-    `.fa-nav-in{width:${NAV_OPEN_PX}px;height:100%;display:flex;flex-direction:column}`,
+    `.fa-nav-in{width:var(--fa-nav-w,${NAV_OPEN_PX}px);height:100%;display:flex;flex-direction:column}`,
     `.fa-nav-top{flex:0 0 auto}`,
     `.fa-nav-graphs{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}`,
     `.fa-nav-bottom{flex:0 0 auto;border-top:1px solid var(--fa-nav-line)}`,
@@ -521,8 +530,8 @@ export function navbarCss(): string {
     `.fa-nav-crop{position:relative;overflow:hidden;height:${NAV_GLYPH_PX}px}`,
     `.fa-nav-crop img{position:absolute;width:auto;height:auto;max-width:none}`,
     `.fa-nav-name{font-weight:600}`,
-    `.fa-nav a{display:flex;align-items:center;gap:8px;padding:8px ${NAV_PAD_PX}px;`,
-    `color:var(--fa-nav-ink);text-decoration:none;white-space:nowrap}`,
+    `.fa-nav a{display:flex;align-items:center;gap:8px;padding:6px ${NAV_PAD_PX}px;`,
+    `color:var(--fa-nav-ink);text-decoration:none}`,
     `.fa-nav a:hover{background:var(--fa-nav-hover)}`,
     `.fa-nav a[aria-current="page"]{background:var(--fa-nav-hover);font-weight:600}`,
     // An item with nowhere to go is NOT a link -- `pb04`: a dead link is worse
@@ -534,7 +543,7 @@ export function navbarCss(): string {
     // ONLY signal, so "declared and not built" was carried by contrast alone
     // with no words anywhere on this surface. `.fa-nav-note` is the words.
     // `cursor:default` so the pointer does not promise a click either.
-    `.fa-nav-dead{display:flex;align-items:center;gap:8px;padding:8px ${NAV_PAD_PX}px;`,
+    `.fa-nav-dead{display:flex;align-items:center;gap:8px;padding:6px ${NAV_PAD_PX}px;`,
     `opacity:var(--fa-nav-dim);cursor:default}`,
     // The reason sits BESIDE the label, not under it: the strip is one row per
     // item, and a second line would make these the only rows in the navbar
@@ -563,7 +572,7 @@ export function navbarCss(): string {
     // every other control here.
     `.fa-nav-row--fold{grid-template-columns:1fr auto auto}`,
     `.fa-nav-row--fold>a,.fa-nav-row--fold>.fa-nav-dead{overflow:hidden}`,
-    `.fa-nav-row--fold>a .fa-nav-label,.fa-nav-row--fold>.fa-nav-dead .fa-nav-label{overflow:hidden;text-overflow:ellipsis}`,
+    `.fa-nav-row--fold>a .fa-nav-label,.fa-nav-row--fold>.fa-nav-dead .fa-nav-label{overflow:hidden}`,
     `.fa-nav-twisty{display:none;align-items:center;justify-content:center;min-width:24px;min-height:24px;`,
     `margin-right:${NAV_PAD_PX - 4}px;padding:0;background:none;border:0;border-radius:4px;color:inherit;cursor:pointer;opacity:.75}`,
     `.fa-nav-twisty:hover,.fa-nav-twisty:focus-visible{opacity:1;background:var(--fa-nav-hover)}`,
@@ -594,7 +603,9 @@ export function navbarCss(): string {
     // row's was not — measured on a built IRIS replica page — so the strip showed
     // marks only for the rows that do not open.
     `.fa-nav-group .fa-nav-sub .fa-nav-dead{padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8}px}`,
-    `.fa-nav-group .fa-nav-sub a.fa-nav-kind,.fa-nav-group .fa-nav-sub .fa-nav-dead.fa-nav-kind{padding-left:${NAV_PAD_PX}px}`,
+    // Slightly in from the section's own row (owner, 2026-11-10: "lists of
+    // folders should be slightly indented"), and the mark still inside the strip.
+    `.fa-nav-group .fa-nav-sub a.fa-nav-kind,.fa-nav-group .fa-nav-sub .fa-nav-dead.fa-nav-kind{padding-left:${NAV_PAD_PX + NAV_KIND_INDENT_PX}px}`,
     `.fa-nav-tone{border-radius:3px}`,
     // A TONED MARK CARRIES ITS OWN INK. Its glyph strokes in `currentColor`,
     // which was the rail's ink: light on the dark rail, but #1f2328 on a 28%
@@ -608,7 +619,21 @@ export function navbarCss(): string {
     // is a geometry argument, and a host stylesheet moves where a label starts
     // without touching any of these numbers. `opacity`, not `display:none` --
     // a screen reader should still reach them.
-    `.fa-nav-label{white-space:nowrap;opacity:0;transition:opacity .12s ease}`,
+    // LONG NAMES WRAP (owner, 2026-11-10, option D): a second line rather
+    // than an ellipsis, a hover or a sideways scroll. The column is
+    // `.fa-nav-in`'s fixed width at rest and open alike, so a row's height
+    // does not change when the bar opens.
+    `.fa-nav-label{min-width:0;white-space:normal;overflow-wrap:anywhere;opacity:0;transition:opacity .12s ease}`,
+    // A bullet is a dot, not a 32px mark: its column is the dot's width.
+    `.fa-nav-glyph.fa-nav-bullet{flex-basis:8px}`,
+    `.fa-nav-glyph.fa-nav-bullet:empty{flex-basis:0;margin-right:-8px}`,
+    // THE DRAG EDGE (owner, 2026-11-10, option D): the open bar's right edge
+    // widens it; `wireNavResize` sets `--fa-nav-w` and remembers it.
+    `.fa-nav-resize{position:absolute;top:0;right:0;bottom:0;width:6px;cursor:ew-resize;z-index:1;display:none;touch-action:none}`,
+    `.fa-nav-resize:hover,.fa-nav-resize:focus-visible,.fa-nav-resize[data-active]{background:#58a6ff;outline:none}`,
+    `.fa-nav:hover .fa-nav-resize,.fa-nav:has(:focus-visible) .fa-nav-resize,.fa-nav:has(.fa-nav-open:checked) .fa-nav-resize{display:block}`,
+    `:root[data-fa-nav-resizing],:root[data-fa-nav-resizing] *{cursor:ew-resize!important;user-select:none!important}`,
+    `:root[data-fa-nav-resizing] .fa-nav,:root[data-fa-nav-resizing] body{transition:none!important}`,
     `.fa-nav:hover .fa-nav-label,.fa-nav:has(:focus-visible) .fa-nav-label,`,
     `.fa-nav:has(.fa-nav-open:checked) .fa-nav-label{opacity:1}`,
     `@media print{.fa-nav{display:none}body{padding-left:0}}`,
@@ -664,9 +689,9 @@ function railTipCss(): string[] {
     // Beyond the strip at whatever width it has: open, the controls it names
     // sit inside a wider rail and the tooltip moves out with its edge.
     `.fa-nav:hover [data-fa-tip]::after,.fa-nav:has(:focus-visible) [data-fa-tip]::after,`,
-    `.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:${at(NAV_OPEN_PX)}}`,
+    `.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:calc(var(--fa-nav-w,${NAV_OPEN_PX}px) + 8px)}`,
     `@media(min-width:${NAV_WIDE_MQ_PX}px){.fa-nav:hover [data-fa-tip]::after,`,
-    `.fa-nav:has(:focus-visible) [data-fa-tip]::after,.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:${at(NAV_OPEN_WIDE_PX)}}}`,
+    `.fa-nav:has(:focus-visible) [data-fa-tip]::after,.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:calc(var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px) + 8px)}}`,
     `@media(prefers-reduced-motion:no-preference){.fa-nav [data-fa-tip]::after{transition:opacity .12s ease}}`,
   ];
 }
@@ -739,7 +764,9 @@ function mark(i: NavItem, c: Ctx): string {
     );
   }
   const glyph = i.icon ?? i.label.slice(0, 1).toUpperCase();
-  return `<span class="fa-nav-glyph fa-nav-tone"${tone} aria-hidden="true">${esc(glyph)}</span>`;
+  // A bullet (or no mark at all) takes a dot's width, not a 32px mark's.
+  const bullet = glyph === "\u00b7" || glyph === "" ? " fa-nav-bullet" : "";
+  return `<span class="fa-nav-glyph fa-nav-tone${bullet}"${tone} aria-hidden="true">${esc(glyph)}</span>`;
 }
 
 function itemHtml(i: NavItem, c: Ctx): string {
@@ -760,9 +787,10 @@ function itemHtml(i: NavItem, c: Ctx): string {
   // Indent by PADDING rather than by a nested list: a nested `<ul>` would make
   // the document index a different shape from every other group here, and the
   // rows are links either way.
-  // `depth + 1`: these rows sit in a group, whose rows are already one step
-  // in. `depth` alone gave a child exactly its parent's indent (#1757).
-  const d = i.depth && i.depth > 0 ? ` style="padding-left:${NAV_PAD_PX + (NAV_GLYPH_PX + 8) * (i.depth + 1)}px"` : "";
+  // One NAV_DEPTH_STEP_PX per level past the group's own rows, which sit at
+  // the glyph column already. 40px a level (a whole mark) was "too much space"
+  // (owner, 2026-11-10); a child still sits right of its parent (#1757).
+  const d = i.depth && i.depth > 0 ? ` style="padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8 + NAV_DEPTH_STEP_PX * i.depth}px"` : "";
   let row: string;
   if (i.href === undefined) {
     // The note is part of the row's TEXT, inside the same element, so an
@@ -859,9 +887,91 @@ export function wireNavFolds(doc: Document): void {
   });
 }
 
-/** {@link wireNavFolds} as an inline script, for a rail rendered into the page. */
+/**
+ * THE DRAG EDGE (owner, 2026-11-10, option D: "wrap and drag to widen"). A
+ * thin handle on the open bar's right edge: drag it, or focus it and use the
+ * arrow keys, to set `--fa-nav-w` on the root, which every open-width rule
+ * reads. The width is remembered in this browser (`fa-nav-w`); a double click
+ * or Home forgets it. Self-contained, since it is inlined as text as well as
+ * bundled: the limits are written here, and {@link NAV_RESIZE_MIN_PX} and
+ * {@link NAV_RESIZE_MAX_PX} say the same (a test holds them equal).
+ */
+export function wireNavResize(doc: Document): void {
+  const MIN = 200;
+  const MAX = 600;
+  const KEY = "fa-nav-w";
+  const root = doc.documentElement;
+  const clamp = (w: number) => Math.max(MIN, Math.min(MAX, Math.min(w, (doc.defaultView?.innerWidth ?? MAX) - 160)));
+  const apply = (w: number | undefined) => {
+    if (w === undefined) root.style.removeProperty("--fa-nav-w");
+    else root.style.setProperty("--fa-nav-w", `${Math.round(clamp(w))}px`);
+  };
+  let saved: number | undefined;
+  try {
+    const v = Number(doc.defaultView?.localStorage.getItem(KEY));
+    if (v > 0) saved = v;
+  } catch {
+    /* storage blocked: the default width */
+  }
+  apply(saved);
+  const remember = (w: number | undefined) => {
+    try {
+      if (w === undefined) doc.defaultView?.localStorage.removeItem(KEY);
+      else doc.defaultView?.localStorage.setItem(KEY, String(Math.round(clamp(w))));
+    } catch {
+      /* storage blocked: this page only */
+    }
+  };
+  doc.querySelectorAll("nav.fa-nav").forEach((nav) => {
+    if (nav.querySelector(":scope > .fa-nav-resize")) return;
+    const h = doc.createElement("div");
+    h.className = "fa-nav-resize";
+    h.setAttribute("role", "separator");
+    h.setAttribute("aria-orientation", "vertical");
+    h.setAttribute("aria-label", "Drag to widen or narrow the navigation");
+    h.setAttribute("data-fa-tip", "Drag to widen or narrow the navigation");
+    h.tabIndex = 0;
+    const width = () => (nav as HTMLElement).getBoundingClientRect().width;
+    h.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      h.setPointerCapture(e.pointerId);
+      h.setAttribute("data-active", "");
+      root.setAttribute("data-fa-nav-resizing", "");
+      const move = (m: PointerEvent) => apply(m.clientX);
+      const up = () => {
+        h.removeEventListener("pointermove", move);
+        h.removeEventListener("pointerup", up);
+        h.removeEventListener("pointercancel", up);
+        h.removeAttribute("data-active");
+        root.removeAttribute("data-fa-nav-resizing");
+        remember(width());
+      };
+      h.addEventListener("pointermove", move);
+      h.addEventListener("pointerup", up);
+      h.addEventListener("pointercancel", up);
+    });
+    h.addEventListener("dblclick", () => {
+      apply(undefined);
+      remember(undefined);
+    });
+    h.addEventListener("keydown", (e) => {
+      const step = e.key === "ArrowRight" ? 16 : e.key === "ArrowLeft" ? -16 : 0;
+      if (e.key === "Home") {
+        apply(undefined);
+        remember(undefined);
+      } else if (step) {
+        apply(width() + step);
+        remember(width() + step);
+      } else return;
+      e.preventDefault();
+    });
+    nav.appendChild(h);
+  });
+}
+
+/** {@link wireNavFolds} and {@link wireNavResize} as an inline script, for a rail rendered into the page. */
 export function navFoldsScript(): string {
-  return `<script data-fa-nav-folds>(${wireNavFolds.toString()})(document);</script>`;
+  return `<script data-fa-nav-folds>(${wireNavFolds.toString()})(document);(${wireNavResize.toString()})(document);</script>`;
 }
 
 /** Does this row, or any row beneath it, stand for the page being read? */
@@ -1077,7 +1187,8 @@ export function injectNavbar(html: string, m: NavbarModel, o: { cssHref?: string
   const style = o.cssHref ? `<link rel="stylesheet" href="${o.cssHref}">` : `<style>${navbarCss()}</style>`;
   const nav = navbarHtml(m);
   // The fold toggles need their few lines of script where no `navbar.js` runs.
-  const folds = nav.includes("fa-nav-twisty") ? navFoldsScript() : "";
+  // The fold toggles and the drag edge need their few lines of script where no `navbar.js` runs.
+  const folds = navFoldsScript();
   return html.slice(0, at) + style + nav + folds + html.slice(at);
 }
 
