@@ -5,9 +5,9 @@
  * own client against fakes of the DOM and fetch.
  */
 import { describe, expect, test } from "bun:test";
-import { FRAGMENT } from "../../staging-banner.ts";
+import { CLIENT } from "../../staging-banner.ts";
 
-const js = FRAGMENT.match(/<script>([\s\S]*)<\/script>/)![1];
+const js = CLIENT;
 
 type Node = { t?: string; text?: string; attrs: Record<string, string>; kids: Node[] };
 function run(pathname: string, exists: string[]) {
