@@ -285,6 +285,45 @@ export function evidenceLine(e: string, links?: LibraryResolver, fromPage = ""):
 }
 
 /**
+ * Code spans in a node's prose (`applies-when`, `origin`) that name something
+ * the page can place become links (owner, 2026-11-10: the DIIG entry's
+ * `grade`, `kepner-tregoe`, `madr` and `who-iris/library/9789240010567-eng/`
+ * read as cross-references but were plain text).
+ *
+ * - a methodology on this site → its section on the list page, `#<name>`
+ *   (`listHref` is the list page relative to where the text sits: `""` on the
+ *   list page itself, `../../` on a node page);
+ * - `[<layer>/]library/<slug>[/]` → the library viewer, the same target an
+ *   `evidence:` line links (`evidenceLine`), relative to `fromPage`.
+ *
+ * Anything it cannot place stays code, never a link that 404s.
+ */
+export function linkProse(
+  text: string,
+  names: ReadonlySet<string>,
+  listHref = "",
+  links?: LibraryResolver,
+  fromPage = "",
+): string {
+  return text.replace(/(\[?)`([^`]+)`(\]\()?/g, (all, open: string, inner: string, close: string | undefined) => {
+    // Already link text: leave it as written.
+    if (open && close) return all;
+    const span = `\`${inner}\``;
+    let href: string | undefined;
+    if (names.has(inner)) href = `${listHref}#${inner}`;
+    else {
+      const m = /^(?:([^/\s]+)\/)?library\/([^/#\s]+)\/?$/.exec(inner);
+      const l = m && links ? (links.links(m[2]!, m[1]) ?? links.links(m[2]!)) : undefined;
+      if (l?.viewer !== undefined) {
+        const [path, hash] = l.viewer.split("#");
+        href = `${posix.relative(posix.dirname(fromPage), path!) || "."}/#${hash}`;
+      }
+    }
+    return href === undefined ? all : `${open}[${span}](${href})${close ?? ""}`;
+  });
+}
+
+/**
  * Where a node's full method is read: the file on its repository host, through
  * the same mount-aware `forgeAt` the library's source links use. The page draws
  * only each node's front matter; the method an agent extracted from the source
@@ -370,8 +409,10 @@ export function nodePage(
   fromPage = "",
   nodeHref?: (path: string) => string | undefined,
   appliedBy: readonly AppliedBy[] = [],
+  names: ReadonlySet<string> = new Set(),
 ): string {
   const q = (v: string): string => JSON.stringify(cell(v));
+  const prose = (v: string): string => linkProse(cell(v), names, "../../", links, fromPage);
   const file = r.path && nodeHref ? nodeHref(r.path) : undefined;
   const b: string[] = [
     "---",
@@ -386,9 +427,9 @@ export function nodePage(
     "",
     `\`${cell(r.name)}\` — declared by \`${cell(r.instance)}\` — ${BADGE[r.state]}`,
     "",
-    `**Applies when.** ${cell(r.appliesWhen)}`,
+    `**Applies when.** ${prose(r.appliesWhen)}`,
     "",
-    `**Origin.** ${cell(r.origin)}`,
+    `**Origin.** ${prose(r.origin)}`,
     "",
   ];
   if (r.evidence.length > 0) {
@@ -421,6 +462,8 @@ export function page(
 ): string {
   const byState = (s: MethodologyRow["state"]): number => rows.filter((r) => r.state === s).length;
   const instances = [...new Set(rows.map((r) => r.instance))].sort();
+  const names = new Set(rows.map((r) => r.name));
+  const prose = (v: string): string => linkProse(v, names, "", links, fromPage);
 
   const b: string[] = [
     "---",
@@ -461,7 +504,7 @@ export function page(
 
   for (const r of rows) {
     b.push(
-      `| **[${cell(r.title)}](#${r.name})**<br>\`${cell(r.name)}\` | ${cell(r.appliesWhen)} | ` +
+      `| **[${cell(r.title)}](#${r.name})**<br>\`${cell(r.name)}\` | ${prose(cell(r.appliesWhen))} | ` +
         `${BADGE[r.state]} | \`${cell(r.instance)}\` |`,
     );
   }
@@ -490,9 +533,9 @@ export function page(
       "",
       `\`${cell(r.name)}\` — declared by \`${cell(r.instance)}\` — ${BADGE[r.state]}`,
       "",
-      `**Applies when.** ${cell(r.appliesWhen)}`,
+      `**Applies when.** ${prose(cell(r.appliesWhen))}`,
       "",
-      `**Origin.** ${cleanOrigin}`,
+      `**Origin.** ${prose(cleanOrigin)}`,
       "",
     );
     if (r.path && nodeHref) b.push(`**The method, as extracted:** [read it](${nodePageDir(r)})`, "");
@@ -573,6 +616,8 @@ if (import.meta.main) {
   // scope's methodologies only; the others are on their own layer's site.
   const scope = siteScope();
   const rows = allRows.filter((r) => inScope(scope, r.instance));
+  // The methodologies this site lists: a code span naming one links to it.
+  const names = new Set(rows.map((r) => r.name));
   if (scope !== undefined) console.log(`  scope ${scopeArg(scope)}: ${rows.length} of ${allRows.length} methodolog(ies)`);
 
   const PAGE = pageRelPath(REPO);
@@ -581,11 +626,11 @@ if (import.meta.main) {
     process.exit(1);
   }
 
+  const docsBase = siteTarget(localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO));
   const rendered = withRenderedByFrontMatter(
-    page(rows, report, libraryResolver(REPO, INSTANCE_ROOT), PAGE, nodeHrefResolver(REPO)),
+    page(rows, report, libraryResolver(REPO, INSTANCE_ROOT, docsBase), PAGE, nodeHrefResolver(REPO)),
     VIEWER_TOOL,
   );
-  const docsBase = siteTarget(localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO));
   const out = join(docsBase, PAGE);
 
   // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The page joins
@@ -605,13 +650,13 @@ if (import.meta.main) {
       console.error(`::error::gen-methodologies-viz: ${PAGE} is stale — run \`bun run cat methodologies:viz\``);
       process.exit(1);
     }
-    const links = libraryResolver(REPO, INSTANCE_ROOT);
+    const links = libraryResolver(REPO, INSTANCE_ROOT, docsBase);
     const hrefOf = nodeHrefResolver(REPO);
     const applied = appliedByIndex(REPO, hrefOf);
     for (const r of rows) {
       if (!r.path) continue;
       const rel = nodePageRel(PAGE, r);
-      const want = withRenderedByFrontMatter(nodePage(r, bodyOf(readFileSync(join(REPO, r.path), "utf-8")), links, rel, hrefOf, applied.get(r.name)), VIEWER_TOOL);
+      const want = withRenderedByFrontMatter(nodePage(r, bodyOf(readFileSync(join(REPO, r.path), "utf-8")), links, rel, hrefOf, applied.get(r.name), names), VIEWER_TOOL);
       const dest = join(docsBase, rel);
       if ((existsSync(dest) ? readFileSync(dest, "utf-8") : "") !== want) {
         console.error(`::error::gen-methodologies-viz: ${rel} is stale — run \`bun run cat methodologies:viz\``);
@@ -625,7 +670,7 @@ if (import.meta.main) {
     // One page per node under the list page. Each layer's directory is
     // this writer's alone, so it is cleared first: a node renamed or removed
     // leaves no page behind.
-    const links = libraryResolver(REPO, INSTANCE_ROOT);
+    const links = libraryResolver(REPO, INSTANCE_ROOT, docsBase);
     const hrefOf = nodeHrefResolver(REPO);
     const applied = appliedByIndex(REPO, hrefOf);
     for (const inst of new Set(rows.map((r) => r.instance))) rmSync(join(out, "..", inst), { recursive: true, force: true });
@@ -635,7 +680,7 @@ if (import.meta.main) {
       const dest = join(docsBase, rel);
       mkdirSync(join(dest, ".."), { recursive: true });
       const body = bodyOf(readFileSync(join(REPO, r.path), "utf-8"));
-      writeFileSync(dest, withRenderedByFrontMatter(nodePage(r, body, links, rel, hrefOf, applied.get(r.name)), VIEWER_TOOL));
+      writeFileSync(dest, withRenderedByFrontMatter(nodePage(r, body, links, rel, hrefOf, applied.get(r.name), names), VIEWER_TOOL));
     }
     console.log(`methodologies viewer: ${rows.length} node(s) → ${PAGE}, and one page each under it`);
     console.log(

@@ -41,7 +41,7 @@ import { checkoutDirectories, instanceConfigFor } from "../schemas/kg/harness-co
 import type { ToolDefinition } from "../schemas/tools/tool.js";
 
 import { discoverTools } from "../tools/discover.ts";
-import { runWriter, type WriterOutcome } from "./derive-at-publish.ts";
+import { declaredPlan, runWriter, writersOf, type WriterOutcome } from "./derive-at-publish.ts";
 import { writerCommand } from "./lib/script-command.ts";
 import { expectedPages, missingPages, type ExpectedPage } from "./site-coverage.ts";
 import { declaredVisualisers, type DeclaredVisualiser } from "./viewer-declarations.ts";
@@ -259,7 +259,39 @@ export function writeMissingVisualisers(root: string, site: string, opts: { stag
   const missing = missingPages(expectedPages(root, opts), (p) => existsSync(join(site, p)));
   if (missing.length === 0) return [];
   const roots = instanceRoots(root);
-  return runVisualiserWriters(root, writersFor(visualiserWriters(root), missing, (name) => roots.get(name)), site, runOne, opts.scope);
+  const writers = writersFor(visualiserWriters(root), missing, (name) => roots.get(name));
+  return runVisualiserWriters(root, inPublishOrder(writers, publishOrder(root)), site, runOne, opts.scope);
+}
+
+/** The publish-time writers in the order `derive:publish` runs them; empty when the plan cannot be read. */
+function publishOrder(root: string): string[] {
+  try {
+    return writersOf(declaredPlan(root));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The writers, with those `derive:publish` also runs put in its order.
+ *
+ * A viewer can read what another viewer writes: the methodologies page links
+ * an ingested source only when the library's projection and pages are already
+ * in the site (owner, 2026-11-10). The declarations order them (`cat-harness`
+ * lists `library:viz` before `methodologies:viz`), but this step ran writers in
+ * VISUALISER order, where `methodologies` comes first, so on every IG site the
+ * page was written before the pages it links and linked none of them. Writers
+ * the plan does not name keep their place; the named ones are reordered among
+ * the slots they hold.
+ */
+export function inPublishOrder(writers: readonly VisualiserWriter[], order: readonly string[]): VisualiserWriter[] {
+  const rank = new Map(order.map((w, k) => [w, k] as const));
+  const rankOf = (w: VisualiserWriter): number | undefined => rank.get(w.invoke?.at(-1) ?? "");
+  const slots = writers.flatMap((w, k) => (rankOf(w) === undefined ? [] : [k]));
+  const sorted = slots.map((k) => writers[k]!).sort((a, b) => rankOf(a)! - rankOf(b)!);
+  const out = [...writers];
+  slots.forEach((k, i) => (out[k] = sorted[i]!));
+  return out;
 }
 
 if (import.meta.main) {

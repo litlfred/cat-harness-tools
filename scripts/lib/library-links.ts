@@ -56,12 +56,21 @@ export interface LibraryResolver {
 /** The branch a README link views. The same answer the landing data uses. */
 const SOURCE_BRANCH = "main";
 
-export function libraryResolver(repo: string, instanceRoot: string): LibraryResolver {
-  let base: string | undefined;
-  try {
-    base = baseDocsDir(repo);
-  } catch {
-    base = undefined;
+/**
+ * `site`: the site the linking page is written into, when a writer is pointed
+ * at one (`--site`, `lib/site-target.ts`). The library's projection and pages
+ * are written there too, not into the harness's own docs, so a resolver that
+ * looked only in `baseDocsDir` found nothing on an IG site and linked nothing
+ * (owner, 2026-11-10).
+ */
+export function libraryResolver(repo: string, instanceRoot: string, site?: string): LibraryResolver {
+  let base: string | undefined = site;
+  if (base === undefined) {
+    try {
+      base = baseDocsDir(repo);
+    } catch {
+      base = undefined;
+    }
   }
   const handler = readDeclaration(instanceRoot)?.name;
   const libs = corpusDirectoriesForGraph(instanceRoot, "library");
