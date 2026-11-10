@@ -11,8 +11,8 @@
  * chooses), and each level names one or more LIBRARIES whose members belong
  * there. A library is reached one of three ways:
  *
- * - **`library`** — a layer's own library catalogue (who-iris), all of it or
- *   the items listed by their ids (IRIS handles);
+ * - **`library`** — a layer's own library catalogue, all of it or the items
+ *   listed by their ids (such as IRIS handles);
  * - **`discover`** — the repositories of an owner whose names start with one
  *   of `prefixes`, found when the portfolio is read, so a new repository joins
  *   without an edit here;
@@ -34,7 +34,7 @@
  * ## Subclasses
  *
  * A harness that fixes what its levels mean declares a child kind with this
- * one as its parent and a `refine` over `levels`: smart-base's
+ * one as its parent and a `refine` over `levels`: a guidelines layer's
  * `guideline-portfolio` pins the WHO SMART Guidelines levels L1 to L4.
  */
 import { z } from "zod";
