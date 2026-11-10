@@ -87,6 +87,7 @@ import {
 // would drift the first time the marker moved — which it already did once,
 // from `--git-common-dir` to the per-worktree git dir (review on #1957).
 import { absenceAt, BranchStoreUsageError, markerAtPath, readMarker } from "./branch-store.ts";
+import { mountChoiceOf } from "../schemas/kg/remote-mount.js";
 // The `folio` graph typology is registered by CORE as a load-time side effect, so
 // the harness alone does not know it exists and `readDeclaration` throws on a
 // perfectly valid declaration that uses it. Same import, same reason, as
@@ -389,6 +390,12 @@ export function auditInstance(
         path: e.path,
         reason: `checkout-level state declared for every checkout by ${basename(instanceRoot)}, not by this root, and not on disk here; declare it at the root to keep it here`,
       });
+    } else if (!present && !e.absent && mountChoiceOf(instanceRoot, abs)?.chosen === false) {
+      // The mount that placed this layer did not take this directory: a
+      // whole mount leaves out an opt-in sub-graph this checkout has not
+      // enabled (its lock's `except`), or a partial mount never chose it.
+      // Nothing is missing here; the upstream keeps it.
+      notApplicable.push({ instance: instanceRoot, id: e.id, path: e.path, reason: "not taken by the mount that placed this layer (its lock leaves it out)" });
     } else if (!present && !e.absent) {
       findings.push({
         instance: instanceRoot,
@@ -738,6 +745,9 @@ export function auditNested(
     }
     const present = existsSync(abs) && statSync(abs).isDirectory();
     const where = { file: declaringFile(n.parentId, byId), parentId: n.parentId };
+    // Left out by the mount that placed this layer (an opt-in sub-graph this
+    // checkout has not enabled, in the lock's `except`): not missing here.
+    if (!present && !e.absent && mountChoiceOf(instanceRoot, abs)?.chosen === false) continue;
     if (!present && !e.absent) {
       findings.push({
         instance: instanceRoot,
