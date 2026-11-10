@@ -550,6 +550,8 @@ export interface Probe {
   /** Arabic-script words, and how many carry a reversed lam-alef or lam-yeh ligature. */
   arabicWords?: number;
   arabicLigatureReversed?: number;
+  /** Letters by script (latin, arabic, cyrillic, han), for the wrong-script check in {@link textLayerUnreadable}. */
+  scriptLetters?: Partial<Record<Script, number>>;
   error?: string;
 }
 
@@ -557,6 +559,16 @@ export interface Probe {
 export const MIN_LETTER_RATIO = 0.55;
 /** Above this share of Arabic words with a reversed ligature, the text layer is not trusted. */
 export const MAX_ARABIC_LIGATURE_REVERSED = 0.02;
+/** Below this share of letters in the script the document's languages are written in, the text layer is in the wrong script. */
+export const MIN_EXPECTED_SCRIPT_RATIO = 0.2;
+
+export type Script = "latin" | "arabic" | "cyrillic" | "han";
+/** The script each non-Latin language is written in. A language absent here is not checked. */
+const LANGUAGE_SCRIPT: Record<string, Script> = {
+  ar: "arabic", fa: "arabic", ur: "arabic", ps: "arabic",
+  ru: "cyrillic", uk: "cyrillic", bg: "cyrillic", sr: "cyrillic", kk: "cyrillic", mn: "cyrillic",
+  zh: "han", ja: "han",
+};
 
 /**
  * Why a text layer with plenty of characters is still not text, or `undefined`. Pure.
@@ -579,12 +591,25 @@ export const MAX_ARABIC_LIGATURE_REVERSED = 0.02;
  * Either sends the document to the OCR rung, which reads the page image in
  * the hinted language.
  */
-export function textLayerUnreadable(p: Probe): string | undefined {
+export function textLayerUnreadable(p: Probe, langs: readonly string[] = []): string | undefined {
   if (p.nonspace && p.letters !== undefined && p.nonspace >= OCR_THRESHOLD_CHARS && p.letters / p.nonspace < MIN_LETTER_RATIO) {
     return `${p.letters} letters in ${p.nonspace} non-space characters (< ${MIN_LETTER_RATIO}): the text layer is mojibake, a font with no Unicode mapping`;
   }
   if (p.arabicWords && p.arabicWords >= 50 && (p.arabicLigatureReversed ?? 0) / p.arabicWords > MAX_ARABIC_LIGATURE_REVERSED) {
     return `${p.arabicLigatureReversed} of ${p.arabicWords} Arabic words carry a reversed lam-alef or lam-yeh ligature (> ${MAX_ARABIC_LIGATURE_REVERSED * 100}%): the text layer scrambles right-to-left ligatures`;
+  }
+  // Wrong script. The Arabic edition of "Preparing for the introduction of HPV
+  // vaccines" (10665/69384) maps its Arabic glyphs onto Latin-1 code points:
+  // plenty of letters, so neither check above fires, but they read
+  // "¤EG 14 øe IóàªŸG". Checked only when every language the document is
+  // known to be in is written in one non-Latin script.
+  const scripts = [...new Set(langs.map((l) => LANGUAGE_SCRIPT[l.toLowerCase().split(/[-_]/)[0] ?? ""]))];
+  const want = scripts.length === 1 ? scripts[0] : undefined;
+  if (want && p.scriptLetters && p.letters && p.letters >= OCR_THRESHOLD_CHARS) {
+    const got = p.scriptLetters[want] ?? 0;
+    if (got / p.letters < MIN_EXPECTED_SCRIPT_RATIO) {
+      return `${got} of ${p.letters} letters are ${want} (< ${MIN_EXPECTED_SCRIPT_RATIO * 100}%), but the document is in ${langs.join(", ")}: the text layer maps its glyphs to the wrong script`;
+    }
   }
   return undefined;
 }
@@ -682,6 +707,18 @@ try:
     LAM, YEH = chr(0x644), chr(0x649)
     arabic = [w for w in text.split() if any(0x600 <= ord(c) <= 0x6FF for c in w)]
     reversed_lig = sum(1 for w in arabic if (len(w) > 2 and w[0] == ALEFS[0] and w[1] in ALEFS and w[2] == LAM) or w.endswith(YEH + LAM))
+    def script_of(c):
+        o = ord(c)
+        if o < 0x250: return "latin"
+        if 0x600 <= o <= 0x6FF or 0x750 <= o <= 0x77F or 0xFB50 <= o <= 0xFEFF: return "arabic"
+        if 0x400 <= o <= 0x52F: return "cyrillic"
+        if 0x3400 <= o <= 0x9FFF or 0x3040 <= o <= 0x30FF: return "han"
+        return None
+    scripts = {}
+    for c in text:
+        if c.isalpha():
+            k = script_of(c)
+            if k: scripts[k] = scripts.get(k, 0) + 1
     toc = d.get_toc()
     # Facts only. Whether an entry can carry a chapter is decided ONCE, by
     # usableOutlineEntries() above, rather than restated here: a rule spelled
@@ -701,6 +738,7 @@ try:
         "nonspace": nonspace,
         "arabicWords": len(arabic),
         "arabicLigatureReversed": reversed_lig,
+        "scriptLetters": scripts,
     }))
 except Exception as e:
     print(json.dumps({"error": str(e)}))
@@ -827,6 +865,8 @@ export function planFor(
   mimetype: string | null | undefined = undefined,
   /** `--text`: the caller says the source is text (Markdown, MDX, XML). */
   text = false,
+  /** The languages the document is known to be in (`--lang-hint`, else `dc.language.iso`). */
+  langs: readonly string[] = [],
 ): Plan {
   // CONTENT decides the rung, before anything opens the file as a PDF.
   //
@@ -937,10 +977,10 @@ export function planFor(
       steps: [["python3", pyHelper("archive-contents.py"), "-o", lib, pdf]],
     };
   }
-  return planForPdf(pdf, p ?? probe(pdf), lib);
+  return planForPdf(pdf, p ?? probe(pdf), lib, langs);
 }
 
-function planForPdf(pdf: string, p: Probe, lib: string): Plan {
+function planForPdf(pdf: string, p: Probe, lib: string, langs: readonly string[] = []): Plan {
   if (p.error || p.outline === null || p.chars === null) {
     return {
       rung: "undetermined",
@@ -985,7 +1025,7 @@ function planForPdf(pdf: string, p: Probe, lib: string): Plan {
       ? `an outline of ${p.outline} entries, none of which can carry a chapter ` +
         `(page labels and entries with no destination) — present, but not a structure. `
       : "";
-  const unreadable = textLayerUnreadable(p);
+  const unreadable = textLayerUnreadable(p, langs);
   if (unreadable) {
     return {
       rung: "pdf-ocr+pdf-pages",
@@ -1355,7 +1395,7 @@ if (import.meta.main) {
           steps: [["python3", pyHelper("referenced-source.py"), "-o", stagingRoot, pdf, "--identity", reference]],
         }
       : withLanguageHint(
-          withKnownTitle(planFor(pdf, undefined, stagingRoot, undefined, argv.includes("--text")), known?.title),
+          withKnownTitle(planFor(pdf, undefined, stagingRoot, undefined, argv.includes("--text"), languages?.langs), known?.title),
           languages?.langs,
         ),
     pdf,

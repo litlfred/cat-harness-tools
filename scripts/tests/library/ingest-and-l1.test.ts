@@ -936,6 +936,20 @@ describe("refuse to promote — the gate between the arms and the library", () =
     expect(textLayerUnreadable({ outline: 0, chars: 900 })).toBeUndefined();
   });
 
+  test("a text layer in the wrong script for the document's language is not text", () => {
+    // 10665/69384 (Arabic): Arabic glyphs mapped onto Latin-1 code points.
+    const latin1 = { outline: 0, chars: 9000, letters: 6000, nonspace: 7000, scriptLetters: { latin: 5900, arabic: 12 } };
+    expect(textLayerUnreadable(latin1, ["ar"])).toContain("wrong script");
+    // No language known, or a Latin-script language, decides nothing.
+    expect(textLayerUnreadable(latin1)).toBeUndefined();
+    expect(textLayerUnreadable(latin1, ["fr"])).toBeUndefined();
+    // Mixed scripts among the languages: not judged.
+    expect(textLayerUnreadable(latin1, ["ar", "en"])).toBeUndefined();
+    expect(textLayerUnreadable({ ...latin1, scriptLetters: { latin: 900, arabic: 5100 } }, ["ar"])).toBeUndefined();
+    expect(textLayerUnreadable({ ...latin1, scriptLetters: { latin: 4000, cyrillic: 2000 } }, ["ru-RU"])).toBeUndefined();
+    expect(textLayerUnreadable({ ...latin1, scriptLetters: { latin: 5900, han: 100 } }, ["zh"])).toContain("han");
+  });
+
   test("--qa-later lets ONLY the QA-only requirements stay unmet", () => {
     // Owner, 2026-11-10 (who-iris#207): bulk derivation of referenced items;
     // image narratives are written afterwards, as QA_ONLY already says.
