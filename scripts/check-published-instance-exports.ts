@@ -447,13 +447,12 @@ function runExport(inv: Invocation, outDir: string, against?: string): ExportRes
     // ── THE SCHEMA HALF (bean `4ak5` item 1) ────────────────────────────
     //
     // A planned layer's document must link the index the deploy writes for
-    // it, and must list no public `Schema` node the publisher would leave
-    // out. The second is a standing tripwire, not a present failure: the
-    // schema-node collector is instance-bound (`COLLECTOR_SCOPE`), so no
-    // foreign export lists one today. The index renders Zod schemas per
-    // EXPORT under `zod/` (owner ruling 2026-10-05), but a Schema node names a
-    // MODULE, and nothing maps one to the other yet — so the day an export
-    // lists nodes, they would point at nothing. This fails then.
+    // it, and each `Schema` node it lists must link only renderings that sit
+    // in that index's `zod/<module>/` directory. The schema-node collector is
+    // generic now (`COLLECTOR_SCOPE`), so foreign exports list their layer's
+    // modules; `kg-export` maps each MODULE to its EXPORTS' renderings with
+    // the publisher's own `scannedInstanceSchemas`, and this checks the link
+    // lands where the publisher writes.
     if (inv.planned === true) {
       const gap = schemaLinkGap(inv, join(outDir, `${stub}.jsonld`));
       if (gap !== undefined) return { ...inv, nodes, ok: false, qaSidecar, detail: gap };
@@ -536,11 +535,18 @@ function schemaLinkGap(inv: Invocation, docPath: string): string | undefined {
   }
   const schemaType = termIri("Schema");
   const listed = (doc["@graph"] ?? []).filter((n) => n["@type"] === schemaType || (Array.isArray(n["@type"]) && n["@type"].includes(schemaType)));
-  if (listed.length > 0) {
+  const zodDir = built.indexIri === undefined ? undefined : built.indexIri.replace(/[^/]*$/, "zod/");
+  const stray: string[] = [];
+  for (const n of listed) {
+    const links = Array.isArray(n.jsonSchema) ? n.jsonSchema.map(String) : typeof n.jsonSchema === "string" ? [n.jsonSchema] : [];
+    for (const l of links) {
+      if (zodDir === undefined || !l.startsWith(`${zodDir}${String(n.name)}/`) || !l.endsWith(".schema.json")) stray.push(`${String(n.name ?? n["@id"])} → ${l}`);
+    }
+  }
+  if (stray.length > 0) {
     return (
-      `its graph lists ${listed.length} public Schema node(s) (${listed.map((n) => String(n.name ?? n["@id"])).join(", ")}), ` +
-      "and the index maps no Schema NODE (a module) to its renderings — `zod/` is keyed by export, not by node. " +
-      "Link the nodes to their renderings before publishing them"
+      `its graph links ${stray.length} Schema rendering(s) outside the index's \`zod/<module>/\` (${stray.join(", ")}) — ` +
+      "the link and the file must come from one identity"
     );
   }
   return undefined;

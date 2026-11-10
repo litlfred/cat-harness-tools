@@ -21,6 +21,7 @@ import { join, resolve } from "node:path";
 
 import { COLLECTOR_SCOPE, collectInstanceNodes } from "../../kg-export.js";
 import { repoRootFor } from "../../../schemas/kg/cat-harness.js";
+import { termIri } from "../../../schemas/kg/namespaces.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
@@ -97,8 +98,26 @@ describe("what was not looked for is not reported as clean", () => {
     // different facts. Collapsing them is the `dh4f` defect.
     const { omitted } = await collectInstanceNodes(join(repoRootFor(ROOT), "bootstrap"), DOC, BASE, []);
     // `tools` left this list with bean `tdir`: discovery reads every
-    // layer's declared `tools` graph, so it IS looked for now.
-    expect([...omitted].sort()).toEqual(["packages", "registry", "schemas"]);
+    // layer's declared `tools` graph, so it IS looked for now. `schemas` left
+    // it the same way: `collectSchemas` reads the layer's own `schemas` graph.
+    expect([...omitted].sort()).toEqual(["packages", "registry"]);
+  });
+
+  test("a layer's own schema modules are Schema nodes in its export", async () => {
+    // A content layer's declared `schemas/` had no nodes, so no pages, while
+    // `schemas` was instance-bound: only the harness's own modules were read.
+    const root = mkdtempSync(join(tmpdir(), "kgx-schemas-"));
+    mkdirSync(join(root, "schemas"), { recursive: true });
+    writeFileSync(join(root, "schemas", "record.ts"), "/**\n * A record.\n *\n * @graphNode schema\n */\nexport const x = 1;\n");
+    writeFileSync(join(root, "schemas", "helper.ts"), "/**\n * Helpers.\n *\n * @graphNode none — helpers, not a schema\n */\nexport const y = 1;\n");
+    writeDeclaration(root, JSON.stringify({
+        name: "schemalayer",
+        directories: [{ id: "layer-schemas", path: "schemas/", graphTypologies: ["schemas"] }],
+      }));
+    const { nodes } = await collectInstanceNodes(root, DOC, BASE, []);
+    rmSync(root, { recursive: true, force: true });
+    const schemas = nodes.filter((n) => n["@type"] === termIri("Schema"));
+    expect(schemas.map((n) => [n.name, n.module, n.summary])).toEqual([["record", "schemas/record.ts", "A record."]]);
   });
 
   test("a declared directory holding no diagrams is a NOTE, not a crash and not a problem", async () => {
@@ -203,5 +222,10 @@ describe("the scope table says what it means", () => {
     // `--instance ./smart-base` published none of its 11 Tools.
     expect(COLLECTOR_SCOPE.generic).toContain("tools");
     expect(COLLECTOR_SCOPE.instanceBound).not.toContain("tools");
+  });
+
+  test("`schemas` is generic: `collectSchemas` reads the exported layer's declared graph", () => {
+    expect(COLLECTOR_SCOPE.generic).toContain("schemas");
+    expect(COLLECTOR_SCOPE.instanceBound).not.toContain("schemas");
   });
 });

@@ -73,3 +73,11 @@ describe("the Indexing evidence page", () => {
     }
   });
 });
+
+describe("the evidence page links the keyword viewer", () => {
+  test("a reader on the LSI page can reach the Keywords page beneath it", () => {
+    const model: EvidenceModel = { methods: [], unbacked: [] };
+    const page = evidencePage(model);
+    expect(page).toContain("[Keywords](keywords/)");
+  });
+});

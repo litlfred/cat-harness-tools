@@ -19,8 +19,13 @@
  * the publisher of the file (`gen-library-viz`), so the IRI and the place the
  * file lands cannot disagree.
  *
+ * It holds no Zod type: the rule it publishes is the address, not a shape.
+ * It is a graph node anyway (owner, 2026-11-10) so the rule has a page beside
+ * the library schemas a reader is directed to (`library-nodes`,
+ * `document-structure`), instead of being findable only in the source.
+ *
  * @module schemas/library-iri
- * @graphNode none — a mint rule, not a schema
+ * @graphNode schema
  */
 import { ownNamespace } from "../kg/namespaces.ts";
 
