@@ -74,6 +74,13 @@ export interface RailOptions {
    */
   pages?: readonly NavItem[];
   /**
+   * Where the header's home link goes, when the page's site is one part of a
+   * larger site: an IG composed into smart-html-jtd is a subgraph of that
+   * site's KG, so its home is the composed site's landing page (owner,
+   * 2026-11-10). Default `${toRoot}/`, the page's own site root.
+   */
+  homeHref?: string;
+  /**
    * Where the PLATFORM's site root is from this page, when it is not `toRoot`
    * — a folio's own Pages site, whose platform links and row files live on the
    * platform's site (`platformBase`). Default `toRoot`. Bean `lhvt`.
@@ -212,7 +219,7 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
     ...(harnesses ? { harnesses } : {}),
     // No home row (owner, 2026-10-30: "dont need home on bottomof harnes
     // navbars"): the header's mark and name are the link to the landing page.
-    headHref: `${o.toRoot}/`,
+    headHref: o.homeHref ?? `${o.toRoot}/`,
   };
 }
 
@@ -466,6 +473,11 @@ export interface RailPage {
   root: string;
   here?: string;
   documentIndex?: NavGroup;
+  /**
+   * The header's home link, from the block's `data-fa-home`, when the site is
+   * composed into a larger one (smart-html-jtd sets it). Absent, home is `toRoot`.
+   */
+  home?: string;
 }
 
 /** cyrb53 — a short, stable, dependency-free name for shared content. Not security. */
@@ -562,6 +574,7 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
       links,
       ...(shared.pages ? { pages: markHere(shared.pages) } : {}),
       toRoot: page.toRoot,
+      ...(page.home ? { homeHref: page.home } : {}),
       ...((page.documentIndex ?? shared.documentIndex) ? { documentIndex: page.documentIndex ?? shared.documentIndex } : {}),
     }),
   );
@@ -616,10 +629,15 @@ export function railDataJson(body: string): string {
 
 /** Read a page's own rail block back, or `undefined` when it has none. */
 export function railPageOf(html: string): RailPage | undefined {
-  const m = new RegExp(`<script type="application/json" id="${RAIL_PAGE_ID}" data-fa-root="([^"]*)" data-fa-to-root="([^"]*)">([^<]*)</script>`).exec(html);
+  const m = new RegExp(`<script type="application/json" id="${RAIL_PAGE_ID}" data-fa-root="([^"]*)" data-fa-to-root="([^"]*)"(?: data-fa-home="([^"]*)")?>([^<]*)</script>`).exec(html);
   if (!m) return undefined;
   const unesc = (v: string) => v.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&amp;/g, "&");
-  return { ...(JSON.parse(m[3]!) as Omit<RailPage, "root" | "toRoot">), root: unesc(m[1]!), toRoot: unesc(m[2]!) };
+  return {
+    ...(JSON.parse(m[4]!) as Omit<RailPage, "root" | "toRoot" | "home">),
+    root: unesc(m[1]!),
+    toRoot: unesc(m[2]!),
+    ...(m[3] !== undefined ? { home: unesc(m[3]) } : {}),
+  };
 }
 
 /**

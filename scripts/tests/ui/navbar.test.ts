@@ -374,6 +374,24 @@ describe("the rail is an adapter, not a second navbar", () => {
     expect(m.headHref).toBe("../");
   });
 
+  it("sends home to the composed site when the page names one (data-fa-home)", () => {
+    // Owner, 2026-11-10: an IG composed into smart-html-jtd is a subgraph of
+    // that site's KG, so the rail's home is the composed site's landing page.
+    expect(railModel({ ...opts, homeHref: "/smart-html-jtd/" }).headHref).toBe("/smart-html-jtd/");
+    const files = new Map<string, string>();
+    const railed = injectRailOnce(`<html><body><h2 id="a">A</h2></body></html>`, { ...opts, emitRailData: (f: string, b: string) => void files.set(f, b) })!;
+    const read = (n: string) => railDataJson(files.get(`assets/navbar/${n}.js`)!);
+    const own = expandRail(railed, read);
+    expect(own).toContain('<a class="fa-nav-head-link" href="../"');
+    const composed = railed.replace(/(id="fa-rail" data-fa-root="[^"]*" data-fa-to-root="[^"]*")/, '$1 data-fa-home="/smart-html-jtd/"');
+    expect(railPageOf(composed)!.home).toBe("/smart-html-jtd/");
+    expect(railPageOf(railed)!.home).toBeUndefined();
+    const home = expandRail(composed, read);
+    expect(home).toContain('<a class="fa-nav-head-link" href="/smart-html-jtd/"');
+    // Only home moves: the rest of the rail is the same.
+    expect(home.replace('href="/smart-html-jtd/"', 'href="../"').replace(' data-fa-home="/smart-html-jtd/"', "")).toBe(own);
+  });
+
   it("OMITS the harnesses region when it could not be read", () => {
     // Third state, said by absence: `[]` would render an empty "Harnesses"
     // disclosure, which reads as a site with no harnesses rather than as a
