@@ -42,6 +42,8 @@ import {
   OCR_THRESHOLD_CHARS,
   ingestMode,
   mayPromote,
+  qaLater,
+  textLayerUnreadable,
   planFor,
   promoteCommand,
   usableOutlineEntries,
@@ -921,6 +923,29 @@ describe("refuse to promote — the gate between the arms and the library", () =
         { name: "b", state: "unmet", detail: "" },
       ]),
     ).toBe(false);
+  });
+
+  test("a text layer of mojibake or reversed Arabic ligatures is not text", () => {
+    // Owner, 2026-11-10: "rules may assume LTR languages". Both shapes measured on the IRIS pilot.
+    expect(textLayerUnreadable({ outline: 0, chars: 5000, letters: 4000, nonspace: 4200 })).toBeUndefined();
+    expect(textLayerUnreadable({ outline: 0, chars: 5000, letters: 300, nonspace: 4200 })).toContain("mojibake");
+    expect(textLayerUnreadable({ outline: 0, chars: 90000, letters: 70000, nonspace: 75000, arabicWords: 12798, arabicLigatureReversed: 967 })).toContain("right-to-left");
+    expect(textLayerUnreadable({ outline: 0, chars: 90000, letters: 70000, nonspace: 75000, arabicWords: 12798, arabicLigatureReversed: 10 })).toBeUndefined();
+    // Too few Arabic words to judge, and an old probe with no counts, decide nothing.
+    expect(textLayerUnreadable({ outline: 0, chars: 900, letters: 700, nonspace: 750, arabicWords: 20, arabicLigatureReversed: 5 })).toBeUndefined();
+    expect(textLayerUnreadable({ outline: 0, chars: 900 })).toBeUndefined();
+  });
+
+  test("--qa-later lets ONLY the QA-only requirements stay unmet", () => {
+    // Owner, 2026-11-10 (who-iris#207): bulk derivation of referenced items;
+    // image narratives are written afterwards, as QA_ONLY already says.
+    const images = { name: "image-descriptions", state: "unmet" as const, detail: "" };
+    const structure = { name: "structure", state: "unmet" as const, detail: "" };
+    expect(mayPromote([images])).toBe(false);
+    expect(mayPromote([images], true)).toBe(true);
+    expect(mayPromote([images, structure], true)).toBe(false);
+    expect(qaLater(["x.pdf", "--promote", "--qa-later"])).toBe(true);
+    expect(qaLater(["x.pdf", "--promote"])).toBe(false);
   });
 
   test("`not-derivable` does NOT refuse — that is the third state's whole job", () => {
