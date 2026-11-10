@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { FRAGMENT } from "../../scripts/staging-banner.ts";
+import { BANNER_SCRIPT, CLIENT, FRAGMENT } from "../../scripts/staging-banner.ts";
 
 /**
  * The staging banner's CLIENT half, in a browser. Bean `g196`.
@@ -67,6 +67,7 @@ const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"></head>
 async function serve(page: import("@playwright/test").Page, path: string, json: object | null) {
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith(`/${BANNER_SCRIPT}`)) return route.fulfill({ status: 200, contentType: "text/javascript", body: CLIENT });
     if (url.pathname.endsWith("staging.json")) {
       if (json === null) return route.fulfill({ status: 404, body: "not found" });
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(json) });
@@ -129,6 +130,7 @@ test("on an Arabic page it reads left to right, as the English it is — bean `g
   // The order and arrow assertions are guards; the 🔀 is the one that failed.
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith(`/${BANNER_SCRIPT}`)) return route.fulfill({ status: 200, contentType: "text/javascript", body: CLIENT });
     if (url.pathname.endsWith("staging.json")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(FACTS) });
     }
@@ -264,6 +266,7 @@ const BARE_PAGE =
 async function serveBare(page: import("@playwright/test").Page, path: string) {
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith(`/${BANNER_SCRIPT}`)) return route.fulfill({ status: 200, contentType: "text/javascript", body: CLIENT });
     if (url.pathname.endsWith("staging.json")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(FACTS) });
     }
@@ -314,6 +317,7 @@ test("it is at the top ON LOAD on a page that pads body's top, and nothing sits 
   // before the fix: [56, 36] at load, [56, 0] scrolled.
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith(`/${BANNER_SCRIPT}`)) return route.fulfill({ status: 200, contentType: "text/javascript", body: CLIENT });
     if (url.pathname.endsWith("staging.json")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(FACTS) });
     }
