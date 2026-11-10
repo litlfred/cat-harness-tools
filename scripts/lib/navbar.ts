@@ -347,6 +347,13 @@ export interface NavbarModel {
    */
   headHref?: string;
   /**
+   * What the header is CALLED when home is a larger site than this one: an IG
+   * composed into smart-html-jtd shows "SMART Guidelines" and the house
+   * (owner, 2026-11-10), not its own name and mark. Absent, the
+   * header is the instance's.
+   */
+  headName?: string;
+  /**
    * HOW an href is written — the difference between the two surfaces, DECLARED.
    *
    * `sjic`'s last box asks for one renderer for a Jekyll page and a mounted
@@ -971,6 +978,7 @@ export const HOME_GLYPH = "M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5";
 
 /** The header's mark: the declared one, or {@link HOME_GLYPH} when there is none. */
 export function headMark(m: NavbarModel): NavItem {
+  if (m.headName !== undefined) return { label: m.headName, glyphPath: HOME_GLYPH };
   const declared = m.mark ?? {};
   const own = declared.avatar !== undefined || declared.icon !== undefined ||
     (declared.glyphPath !== undefined && declared.glyphPath !== BLANK_AVATAR.glyph);
@@ -980,7 +988,8 @@ export function headMark(m: NavbarModel): NavItem {
 
 export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
   const item = headMark(m);
-  const inner = mark(item, c) + `<span class="fa-nav-name fa-nav-label">${esc(m.instance)}</span>`;
+  const name = m.headName ?? m.instance;
+  const inner = mark(item, c) + `<span class="fa-nav-name fa-nav-label">${esc(name)}</span>`;
   if (m.headHref === undefined) {
     return `<label class="fa-nav-head" for="fa-nav-open" title="Open or close navigation">` + inner + `</label>`;
   }
@@ -991,7 +1000,7 @@ export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
   // become the link to the landing page.
   return (
     `<div class="fa-nav-head fa-nav-head--home">` +
-    `<a class="fa-nav-head-link" href="${href(m.headHref, c)}" title="${esc(m.instance)}: landing page">` +
+    `<a class="fa-nav-head-link" href="${href(m.headHref, c)}" title="${esc(name)}: landing page">` +
     inner +
     `</a>` +
     `<label class="fa-nav-head-toggle" for="fa-nav-open" aria-label="Open or close navigation" data-fa-tip="Open or close navigation">` +

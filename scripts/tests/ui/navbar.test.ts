@@ -392,6 +392,22 @@ describe("the rail is an adapter, not a second navbar", () => {
     expect(home.replace('href="/smart-html-jtd/"', 'href="../"').replace(' data-fa-home="/smart-html-jtd/"', "")).toBe(own);
   });
 
+  it("names the header for a LARGER home: SMART Guidelines on a composed IG (2026-11-10)", () => {
+    const files = new Map<string, string>();
+    const emit = { ...opts, emitRailData: (f: string, b: string) => void files.set(f, b) };
+    const read = (n: string) => railDataJson(files.get(`assets/navbar/${n}.js`)!);
+    const head = (html: string) => /<div class="fa-nav-head fa-nav-head--home">[\s\S]*?<\/div>/.exec(html)![0];
+    // From the page's block — a composing site (`data-fa-home-name`).
+    const own = injectRailOnce(`<html><body><h2 id="a">A</h2></body></html>`, emit)!;
+    const composed = own.replace(/(id="fa-rail" data-fa-root="[^"]*" data-fa-to-root="[^"]*")/, '$1 data-fa-home="/smart-html-jtd/" data-fa-home-name="SMART Guidelines"');
+    expect(railPageOf(composed)!.homeName).toBe("SMART Guidelines");
+    const h = head(expandRail(composed, read));
+    expect(h).toContain('href="/smart-html-jtd/" title="SMART Guidelines: landing page"');
+    expect(h).toContain('<span class="fa-nav-name fa-nav-label">SMART Guidelines</span>');
+    expect(h).toContain(`d="${HOME_GLYPH}"`);
+    expect(head(expandRail(own, read))).toContain('title="who-iris: landing page"');
+  });
+
   it("OMITS the harnesses region when it could not be read", () => {
     // Third state, said by absence: `[]` would render an empty "Harnesses"
     // disclosure, which reads as a site with no harnesses rather than as a
