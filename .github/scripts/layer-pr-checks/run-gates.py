@@ -867,7 +867,7 @@ def run_traced(root, cli, traced, jobs, tmp, alone):
         touched = {n: read_json(files[n][0]) or {"undetermined": "it reported nothing"} for n in pool_names}
         for n, t in touched.items():
             if isinstance(t, dict) and t.get("writes"):
-                print(f"::warning::{n} wrote inside the checkout while judging ({', '.join(t['writes'][:3])}): a gate should write nothing", flush=True)
+                print(f"::warning::{n} wrote inside the checkout while judging ({', '.join(t['writes'][:3])}; a rewrite with the same content counts): a gate should write nothing", flush=True)
         clashes = cone_clashes(touched, spans)
         keep = [files[n][1] for n in pool_names if n not in clashes and os.path.isfile(files[n][1])]
         if keep:

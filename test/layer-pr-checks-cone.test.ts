@@ -315,12 +315,13 @@ describe("run-gates.py GATE_CONE=record", () => {
       fixture(),
       "record",
       {
-        decisions: { "check:b-one": CANDIDATE("x"), "check:b-two": CANDIDATE("x"), "check:c-three": CANDIDATE("x") },
-        record: ["check:b-one", "check:b-two", "check:c-three"],
+        decisions: { "check:b-one": CANDIDATE("x"), "check:b-two": CANDIDATE("x"), "check:c-three": CANDIDATE("x"), "check:c-one": CANDIDATE("x") },
+        record: ["check:b-one", "check:b-two", "check:c-three", "check:c-one"],
         touched: {
           "check:b-one": { reads: ["b/x.json"], listed: [], writes: [], git: 0 },
           "check:b-two": { reads: ["b"], listed: ["b"], writes: [], git: 0 },
-          "check:c-three": { reads: ["c/a"], listed: [], writes: ["b/x.json"], git: 0 },
+          "check:c-three": { reads: ["c/a"], listed: [], writes: ["b/x.json", "b/new.json"], git: 0 },
+          "check:c-one": { reads: ["b/new.json"], listed: [], writes: [], git: 0 },
         },
         sleep: 0.5,
       },
@@ -330,15 +331,17 @@ describe("run-gates.py GATE_CONE=record", () => {
     const runs = r.log.filter((l) => l.startsWith("run "));
     // Three side by side, then b-one (read what c-three wrote) and b-two
     // (listed the directory c-three wrote into) again alone.
-    expect(runs.sort()).toEqual(["run check:b-one", "run check:b-one", "run check:b-two", "run check:b-two", "run check:c-three"]);
+    expect(runs.sort()).toEqual(["run check:b-one", "run check:b-one", "run check:b-two", "run check:b-two", "run check:c-one", "run check:c-one", "run check:c-three"]);
     const keep = r.log.filter((l) => l.startsWith("keep "));
     expect(keep).toHaveLength(1);
     expect(keep[0]!.split(" ")).toHaveLength(2); // c-three's record only
     expect(r.stdout).toContain("b:check:b-one runs again alone: c:check:c-three wrote b/x.json, which it read");
-    expect(r.stdout).toContain("b:check:b-two runs again alone: c:check:c-three wrote b/x.json into a directory it listed");
+    expect(r.stdout).toContain("b:check:b-two runs again alone: c:check:c-three wrote b/new.json into a directory it listed");
+    // c-one probed b/new.json before it existed; c-three created it beside it.
+    expect(r.stdout).toContain("c:check:c-one runs again alone: c:check:c-three wrote b/new.json, which it read");
     expect(r.stdout).toContain("check:c-three wrote inside the checkout while judging");
     const cone = JSON.parse(readFileSync(join(r.out, "cone-records.json"), "utf-8"));
-    expect(Object.keys(cone.checks).sort()).toEqual(["check:b-one", "check:b-two", "check:c-three"]);
+    expect(Object.keys(cone.checks).sort()).toEqual(["check:b-one", "check:b-two", "check:c-one", "check:c-three"]);
   });
 
   test.if(strace)("a neighbour whose writes are not known disturbs every run beside it; runs that did not overlap are kept", () => {

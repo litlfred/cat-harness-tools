@@ -47,6 +47,11 @@ describe("touchedOf — what a run touched, for a runner that traces several at 
     expect(t).toMatchObject({ reads: ["a.json", "d"], writes: ["a.json"] });
   });
 
+  test("a probe of a path that does not exist yet is a read, so a neighbour creating it is caught", () => {
+    const t = touchedOf(`10 newfstatat(AT_FDCWD</work/repo>, "x/new.json", 0x7ffc, 0) = -1 ENOENT (No such file or directory)`, ROOT);
+    expect(t).toMatchObject({ reads: ["x/new.json"], writes: [] });
+  });
+
   test("no trace is undetermined, with the reason", () => {
     expect(touchedOf(undefined, ROOT, "not traced — x")).toEqual({ undetermined: "not traced — x" });
   });
