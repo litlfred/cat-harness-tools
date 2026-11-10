@@ -6,7 +6,7 @@
  * built-at-publish pages were validated (folio-assistant#2611).
  */
 import { describe, expect, test } from "bun:test";
-import { SchemaGraphIndexSchema, TranslationStatusSchema } from "./ui/site-indexes.ts";
+import { LibraryIndexEntrySchema, SchemaGraphIndexSchema, TranslationStatusSchema } from "./ui/site-indexes.ts";
 
 const counts = { entries: 4, translated: 3, fuzzy: 0, untranslated: 1 };
 
@@ -79,3 +79,58 @@ describe("folio-schema-graph/v1 carries the source-descriptor rows", () => {
     expect(r.success).toBe(false);
   });
 });
+
+describe("folio-library-index/v1 entries carry catalogue and upstream links (#1752, #1765)", () => {
+  const baseEntry = {
+    id: "wpr-rdo-2020-003-eng",
+    instance: "who-iris",
+    dir: "who-iris/library/wpr-rdo-2020-003-eng",
+    title: "WHO Western Pacific Region",
+    provenance: "ingested",
+    rung: "paged" as const,
+    docId: "wpr-rdo-2020-003-eng",
+    sourceFile: "wpr.pdf",
+    sourceSha256: "a".repeat(64),
+    arxiv: "",
+    doi: "",
+    documentClass: "report",
+    sections: 3,
+    blocks: 10,
+    images: 1,
+    ocrPages: 0,
+    hasOcr: false,
+    hasManifest: true,
+    hasStructure: true,
+    hasImagesJson: true,
+    pageStart: 1,
+    pageEnd: 10,
+    words: 1000,
+    chars: 6000,
+    bytes: 50000,
+    upload: "absent" as const,
+    uploadInstance: "",
+  };
+
+  test("an entry with catalogue and upstream metadata parses", () => {
+    const r = LibraryIndexEntrySchema.safeParse({
+      ...baseEntry,
+      catalogue: {
+        record: "who-iris/catalogue/records/wpr-rdo-2020-003-eng.dc.json",
+        handle: "10665/332098",
+        xml: "who-iris/dublin-core/wpr-rdo-2020-003-eng.dc.xml",
+        node: "who-iris/catalogue/nodes/wpr-rdo-2020-003-eng.json",
+      },
+      upstream: [{ label: "wpr.pdf", href: "https://iris.who.int/bitstream/10665/332098/1/wpr.pdf" }],
+    });
+    expect(r.error?.issues ?? []).toEqual([]);
+  });
+
+  test("an unknown key inside catalogue is refused", () => {
+    const r = LibraryIndexEntrySchema.safeParse({
+      ...baseEntry,
+      catalogue: { record: "who-iris/catalogue/records/x.dc.json", extra: true },
+    });
+    expect(r.success).toBe(false);
+  });
+});
+

@@ -438,6 +438,32 @@ export const LibraryIndexEntrySchema = z
       })
       .strict()
       .optional(),
+    /**
+     * The catalogue record behind this entry (`library-graph.ts` `catalogueInfo`
+     * / `referencedCatalogueEntries`, #1752 / #1765).
+     */
+    catalogue: z
+      .object({
+        record: z.string().min(1).optional(),
+        handle: z.string().min(1).optional(),
+        xml: z.string().min(1).optional(),
+        node: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+    /**
+     * Original file URLs upstream for an entry catalogued by reference (#1765).
+     */
+    upstream: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1),
+            href: z.string().url(),
+          })
+          .strict(),
+      )
+      .optional(),
     avatar: z.object({ href: z.string(), src: z.string(), source: z.enum(["cover", "figure"]) }).strict().optional(),
     summaries: z
       .object({
