@@ -319,9 +319,14 @@ export function hostSiteArtefacts(repoRoot = REPO_ROOT, declared: readonly Decla
   if (host === undefined) throw new Error(`derive:publish: no instance holds the host site ${site}`);
   const covered = (abs: string) => declared.some((a) => (a.path.endsWith("/") ? (resolve(abs) + sep).startsWith(resolve(a.abs) + sep) : resolve(abs) === resolve(a.abs)));
   let translated: string[] | undefined;
+  let allTools: ReturnType<typeof discoverTools>["tools"] | undefined;
   const out: DeclaredArtefact[] = [];
   for (const v of vis) {
-    const tool = discoverTools(repoRoot, undefined, v.harnessRoot).tools.find((t) => t.id === v.renderedBy);
+    // A visualiser may be renderedBy a Tool declared in its own layer or in a
+    // lower layer it builds on (cat-harness#1150, item 3).
+    const tool =
+      discoverTools(repoRoot, undefined, v.harnessRoot).tools.find((t) => t.id === v.renderedBy) ??
+      (allTools ??= discoverTools(repoRoot).tools).find((t) => t.id === v.renderedBy);
     const shell = (tool as { invoke?: { shell?: string } } | undefined)?.invoke?.shell;
     const writer = /^bun run (?:cat )?(\S+)$/.exec(shell?.trim() ?? "")?.[1];
     if (writer === undefined) {

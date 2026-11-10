@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { translatedLocales, withHostSiteArtefacts, writerEdges, writersOf, type DeclaredArtefact } from "../../derive-at-publish.ts";
+import { hostSiteArtefacts, translatedLocales, withHostSiteArtefacts, writerEdges, writersOf, type DeclaredArtefact } from "../../derive-at-publish.ts";
 
 const entry = (instance: string, path: string, writer: string, extra: Partial<DeclaredArtefact> = {}): DeclaredArtefact => ({
   instance,
@@ -105,3 +105,75 @@ describe("the locales a translated viewer writes", () => {
     expect(translatedLocales(tmp)).toEqual(["ar", "fr"]);
   });
 });
+
+describe("hostSiteArtefacts resolves a renderedBy Tool declared in a lower layer (cat-harness#1150)", () => {
+  test("a visualiser declared in an upper layer with renderedBy naming the host layer's Tool derives its route", async () => {
+    const { clearDeclaredVisualisers } = await import("../../viewer-declarations.ts");
+    const tmp = mkdtempSync(join(tmpdir(), "host-site-cross-tool-"));
+    try {
+      mkdirSync(join(tmp, "cat-harness/site"), { recursive: true });
+      mkdirSync(join(tmp, "cat-harness/tdefs/shared-viewer"), { recursive: true });
+      writeFileSync(
+        join(tmp, "cat-harness/cat-harness.json"),
+        JSON.stringify({
+          name: "cat-harness",
+          canonicalUrl: "https://example.org/cat-harness",
+          needs: [],
+          directories: [
+            { id: "host-docs", path: "site/", graphTypologies: ["docs"] },
+            { id: "host-tools", path: "tdefs/", graphTypologies: ["tools"] },
+          ],
+        }),
+      );
+      writeFileSync(
+        join(tmp, "cat-harness/tdefs/shared-viewer/shared-viewer.json"),
+        JSON.stringify({
+          $schema: "tool-definition/v1",
+          tool: {
+            id: "shared-viewer",
+            title: "Shared viewer",
+            description: "Render each declared state graph with a projection as a dashboard page.",
+            install: { none: true },
+            invoke: { shell: "bun run cat state:visualizer" },
+            io: { inputs: [], outputs: [] },
+            satisfies: ["graph-rendering"],
+            requires: { runtime: ["bun"], network: false },
+          },
+        }),
+      );
+      mkdirSync(join(tmp, "upper/checkers"), { recursive: true });
+      writeFileSync(
+        join(tmp, "upper/upper.json"),
+        JSON.stringify({
+          name: "upper",
+          needs: ["cat-harness"],
+          directories: [{ id: "upper-checkers", path: "checkers/", graphTypologies: ["editor-checkers"] }],
+          visualisers: [
+            {
+              id: "editor-checkers",
+              renderedBy: "shared-viewer",
+              coversKinds: ["editor-checkers"],
+              subgraphs: "instance",
+              builtOnHostSite: {},
+              title: "Editor checkers",
+            },
+          ],
+        }),
+      );
+      clearDeclaredVisualisers();
+      const got = hostSiteArtefacts(tmp);
+      expect(got.map((a) => ({ instance: a.instance, path: a.path, writer: a.writer, hostSiteOf: a.hostSiteOf }))).toEqual([
+        {
+          instance: "cat-harness",
+          path: "docs/en/upper/editor-checkers/",
+          writer: ["state:visualizer"],
+          hostSiteOf: "upper",
+        },
+      ]);
+    } finally {
+      clearDeclaredVisualisers();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
