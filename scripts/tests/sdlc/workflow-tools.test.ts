@@ -133,3 +133,23 @@ describe("QC checks need no Tool", () => {
     expect(r.ok.map((o) => o.tools)).toEqual([["main"]]);
   });
 });
+
+describe("a workflow Tool", () => {
+  test("`gh workflow run <file>` covers the workflow's scripts and those of the reusable workflows it calls", () => {
+    const root = tree({
+      "lay/lay.json": "{}",
+      "app/.github/workflows/caller.yml": "jobs:\n  c:\n    uses: org/lay/.github/workflows/reusable.yml@main\n",
+      "lay/.github/workflows/reusable.yml": "jobs:\n  r:\n    steps:\n      - run: python3 lay/.github/scripts/helper.py\n",
+      "lay/.github/scripts/helper.py": "",
+    });
+    const defs = [tool("ci-x", "gh workflow run caller.yml", [], ["proc"])];
+    const r = assess(
+      invocations(root, ["lay/.github/workflows/reusable.yml"]),
+      toolReach(defs, root),
+      defs,
+      new Map(),
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.ok.map((o) => [o.subject, o.tools])).toEqual([["lay/.github/scripts/helper.py", ["ci-x"]]]);
+  });
+});

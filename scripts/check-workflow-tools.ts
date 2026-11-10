@@ -26,11 +26,14 @@
  *   `--check` or `--verify`, or a file named for a check (`check-*`,
  *   `audit-*`, `validate-*`, `verify-*`, `*-links`, a `test/` file; see
  *   {@link isQcScript}). A generator a workflow also runs to WRITE is still
- *   judged on that run. The CI's own machinery under `.github/` counts as QC
- *   too: it runs and judges the checks.
+ *   judged on that run.
  * - **A step of a Tool**: a script a Tool's own implementation runs (a
  *   `bun run cat <key>` or a script path literal in it) is covered by that
  *   Tool, so a workflow that runs the step directly needs no second Tool.
+ * - **A step of a workflow Tool**: a Tool whose `invoke.shell` is
+ *   `gh workflow run <file>` covers every script that workflow runs,
+ *   following the reusable workflows it calls ({@link scriptsOfWorkflow}).
+ *   One Tool per workflow, not one per helper script.
  *
  * ## What counts as "run"
  *
@@ -254,10 +257,6 @@ export const QC_KEY = /(?:^|:)check(?::|$)|^check-|^audit:|^qa:/;
 const CHECK_FLAG = /\s--(?:check|verify)\b/;
 export function isQcScript(path: string): boolean {
   if (/(?:^|\/)tests?\//.test(path)) return true;
-  // The CI's own machinery (`.github/scripts/…`, `.github/mount-from-lock.sh`):
-  // it runs and judges the checks, and nobody runs it as a step of their own
-  // (owner card, 2026-11-10, option A).
-  if (/(?:^|\/)\.github\//.test(path)) return true;
   const base = (path.split("/").pop() ?? "").replace(/\.[a-z]+$/, "");
   return (
     /^(?:check|audit|validate|verify|qa|typecheck|lint)(?:[-_]|$)/.test(base) ||
@@ -328,6 +327,8 @@ export function toolReach(defs: readonly ToolDefinition[], root: string = ROOT):
     const shell = t.invoke.shell;
     if (shell !== undefined) {
       for (const f of filesInCommand(shell, ".", root)) add(byFile, f, t.id);
+      const wf = /\bgh workflow run ([\w.-]+\.ya?ml)\b/.exec(shell)?.[1];
+      if (wf !== undefined) for (const f of scriptsOfWorkflow(wf, root)) add(byFile, f, t.id);
       const k = /^\s*bun run (?:cat )?([A-Za-z0-9:_.-]+)/.exec(shell)?.[1];
       if (k !== undefined && !/\.(?:m?[jt]s)$/.test(k)) {
         const chain = keyChain(k, table, root);
@@ -347,6 +348,37 @@ export function toolReach(defs: readonly ToolDefinition[], root: string = ROOT):
     for (const f of stepsRunBy(file, table, root)) for (const id of ids) add(byFile, f, id);
   }
   return { byFile, byKey };
+}
+
+/**
+ * Every script a workflow runs, by the workflow's file name, with the
+ * reusable workflows it calls (`uses: <owner>/<repo>/.github/workflows/x.yml@…`
+ * or `./.github/workflows/x.yml`) followed. A Tool that dispatches a workflow
+ * (`gh workflow run <file>`, standard GitHub CLI, no schema of our own) is the
+ * workflow as a whole, so the scripts it runs are its steps (owner, 2026-11-10,
+ * option B "one Tool per workflow", "just didnt want custom schemas").
+ * Every layer's copy of a file of that name is read: the callers share names
+ * (`harness-pr-checks.yml`, `publish-context.yml`).
+ */
+export function scriptsOfWorkflow(name: string, root: string = ROOT, files: readonly string[] = workflowFiles(root)): string[] {
+  const out = new Set<string>();
+  const seen = new Set<string>();
+  const queue = files.filter((f) => f.endsWith(`/workflows/${name}`) || f === `.github/workflows/${name}`);
+  while (queue.length > 0) {
+    const f = queue.shift()!;
+    if (seen.has(f)) continue;
+    seen.add(f);
+    for (const i of invocations(root, [f])) if (i.script !== undefined) out.add(i.script);
+    const text = readFileSync(join(root, f), "utf-8");
+    for (const m of text.matchAll(/^\s*(?:-\s+)?uses:\s*["']?(?:([\w.-]+)\/([\w.-]+)|\.)\/\.github\/workflows\/([\w.-]+\.ya?ml)/gm)) {
+      const repo = m[2];
+      const called = m[3]!;
+      const own = layerOf(f, root);
+      const want = repo !== undefined && isDir(join(root, repo)) ? `${repo}/.github/workflows/${called}` : own === "." ? `.github/workflows/${called}` : `${own}/.github/workflows/${called}`;
+      if (files.includes(want)) queue.push(want);
+    }
+  }
+  return [...out];
 }
 
 /**
