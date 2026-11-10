@@ -1,7 +1,8 @@
 /**
  * Assets every IG site carries, loaded once from a shared host instead
  * (owner, 2026-11-09, Q-SZ-7 "A"): the LHC-Forms build, the ✍ editor bundle
- * (Crepe) and the harness's landing images, about 15 MB per site.
+ * (Crepe) and the harness's landing images, about 15 MB per site, and the
+ * NLM Form Builder's bundle, about 10 MB more (owner, 2026-11-10).
  *
  * The host is a site on the SAME github.io origin as the IG sites (the
  * owner: "shared assets ... as part of smart-html"), so a frame or a service
@@ -24,11 +25,20 @@ import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-/** The directories a site may share: fixed ones, and every version under `assets/lhc-forms/`. */
+/**
+ * The parents whose every version directory a site may share: the LHC-Forms
+ * build, and the NLM Form Builder's bundle (fhir-harness writes it beside the
+ * builder's own pages, which stay on the site; owner, 2026-11-10).
+ */
+export const VERSIONED_SHARED: readonly string[] = ["assets/lhc-forms/", "assets/formbuilder-bundle/"];
+
+/** The directories a site may share: fixed ones, and every version under {@link VERSIONED_SHARED}. */
 export function sharedDirsIn(site: string): string[] {
   const out = ["assets/img/harness/", "assets/vendor/crepe/"].filter((d) => existsSync(join(site, d)));
-  const lhc = join(site, "assets/lhc-forms");
-  if (existsSync(lhc)) for (const v of readdirSync(lhc).sort()) if (statSync(join(lhc, v)).isDirectory()) out.push(`assets/lhc-forms/${v}/`);
+  for (const parent of VERSIONED_SHARED) {
+    const abs = join(site, parent);
+    if (existsSync(abs)) for (const v of readdirSync(abs).sort()) if (statSync(join(abs, v)).isDirectory()) out.push(`${parent}${v}/`);
+  }
   return out;
 }
 
