@@ -16,7 +16,8 @@
  * - `qa` (`test/results/`): QA witness files and attestations are machine sidecars and branch-store records (on `qa-reports`), not published standalone Subgraph documents.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { declaredSubgraphNode, exportIdentity, makeIri } from "../../kg-export.ts";
@@ -134,6 +135,23 @@ describe("converted publishers follow the declared subgraph pattern", () => {
     const nodes = buildDocumentNodes("doc-sample", { doc_id: "doc-sample", sections: [] }, undefined, () => false, undefined, undefined, undefined, undefined, ROOT);
     const manifest = JSON.parse(nodes.find((n) => n.path === "manifest.jsonld")!.content) as Record<string, unknown>;
     expect(manifest["inSubgraph"]).toBe(sub!.iri);
+  });
+
+  test("members publisher: a corpus declared one folder deeper is looked up from its own layer", () => {
+    // core#702 moved core's library to `library/corpus/<id>`. Taking the
+    // layer as two folders up read `library/`, found no declaration, and in
+    // an index every core manifest named cat-harness's library instead.
+    const layer = mkdtempSync(join(tmpdir(), "libstart-"));
+    try {
+      writeFileSync(join(layer, "probe.json"), JSON.stringify({
+        name: "probe",
+        directories: [{ id: "library", path: "library/corpus/", graphTypologies: ["library"] }],
+      }));
+      mkdirSync(join(layer, "library", "corpus", "doc-x"), { recursive: true });
+      expect(librarySubgraphStart(join(layer, "library", "corpus", "doc-x"))).toBe(layer);
+    } finally {
+      rmSync(layer, { recursive: true, force: true });
+    }
   });
 
   test("members publisher: docs site pages carry inSubgraph pointing to declared Subgraph", () => {
