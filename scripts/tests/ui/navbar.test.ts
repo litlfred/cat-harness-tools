@@ -33,7 +33,7 @@ import {
 } from "../../lib/navbar.js";
 import { NAVBAR_LINKED, NAVBAR_ROW_CSS, NAVBAR_ROW_INLINE, NAVBAR_ROW_JS, declinesNavbar, expandRail, injectRail, railDataJson, railPageOf, wantsLinkedRail, railModel, withNavbarRow } from "../../lib/harness-rail.js";
 import { injectRailOnce } from "../../lib/rail-once.js";
-import { HOME_GLYPH, NAVBAR_CSS, documentIndexOf, numberedHeading, visualiserLabelOf } from "../../lib/navbar.js";
+import { HOME_GLYPH, NAVBAR_CSS, NAV_RESIZE_MAX_PX, NAV_RESIZE_MIN_PX, NAV_WIDTH_KEY, documentIndexOf, numberedHeading, visualiserLabelOf, wireNavResize } from "../../lib/navbar.js";
 import { BLANK_AVATAR } from "../../../schemas/ui/blank-avatar.js";
 import { thinPageHtml } from "../../thin-page.js";
 import {
@@ -272,8 +272,23 @@ describe("at rest it is a strip, and opens three ways", () => {
 
   it("opens on hover, on keyboard focus, and on the pinned checkbox", () => {
     expect(css).toContain(
-      `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:${NAV_OPEN_PX}px}`,
+      `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_PX}px)}`,
     );
+  });
+
+  it("opens to the width the reader dragged it to, else the default (owner, 2026-11-10, option D)", () => {
+    // Every open width reads `--fa-nav-w`: the bar, its column and the page's padding.
+    expect(css).not.toMatch(new RegExp(`(?<!--fa-nav-w,)\\b${NAV_OPEN_PX}px`));
+    expect(css).toContain(`.fa-nav-in{width:var(--fa-nav-w,${NAV_OPEN_PX}px)`);
+    expect(css).toContain(`padding-left:var(--fa-nav-w,${NAV_OPEN_PX}px)`);
+    // The drag edge's limits and key are stated once: the inlined function says the same.
+    const src = wireNavResize.toString();
+    expect(src).toContain(String(NAV_RESIZE_MIN_PX));
+    expect(src).toContain(String(NAV_RESIZE_MAX_PX));
+    expect(src).toContain(`"${NAV_WIDTH_KEY}"`);
+    // Long names wrap rather than being cut.
+    expect(css).toContain(".fa-nav-label{min-width:0;white-space:normal");
+    expect(css).not.toContain("text-overflow:ellipsis");
   });
 
   it("renders no [x] and no ☰ — the header is the one control (#1757)", () => {
@@ -1419,10 +1434,11 @@ describe("a fold opens from its parent's row — owner, 2026-10-15: \"what is 26
   it("no row in any rail is a bare count", () => {
     expect(html).not.toMatch(/<span class="fa-nav-label">\d+ (?:pages?|sub-sections?)<\/span>/);
   });
-  it("a rail rendered INTO a page carries the toggle's script; one with no fold does not", () => {
+  it("a rail rendered INTO a page carries its script: the fold toggles and the drag edge", () => {
     const page = "<!doctype html><html><head></head><body><p>x</p></body></html>";
     expect(injectNavbar(page, { instance: "x", pages: { label: "Pages", items, collapsible: true } })!).toContain("<script data-fa-nav-folds>");
-    expect(injectNavbar(page, { instance: "x" })!).not.toContain("data-fa-nav-folds");
+    // With no fold the drag edge still needs it (owner, 2026-11-10, option D).
+    expect(injectNavbar(page, { instance: "x" })!).toContain("wireNavResize");
   });
 });
 
