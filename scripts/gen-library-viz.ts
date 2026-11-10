@@ -39,7 +39,7 @@ import { inScope as siteInScope, scopeArg, siteScope } from "./lib/site-scope.ts
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { readLibraryGraph, type LibraryGraph, type LibraryBlock, type LibraryEntry,
+import { readLibraryGraph, referencedCatalogueEntries, type LibraryGraph, type LibraryBlock, type LibraryEntry,
   readEntryBlocks, instanceOf,
 } from "./library-graph.ts";
 import { tally } from "./summaries.ts";
@@ -894,7 +894,7 @@ fetch(DATA_HREF).then(function(r){
       " prose block(s) not yet summarised" + (sd ? ", <b>" + sd + "</b> agent draft(s) awaiting a person" : "") + "</span>";
   }
   if (G.refScan) {
-    var none = scoped.filter(function(e){ return e.refCount === 0; }).length;
+    var none = scoped.filter(function(e){ return e.refCount === 0 && e.provenance !== "catalogued"; }).length;
     $("badges").innerHTML += '<span class="badge">' +
       (none ? '<b>'+none+"</b> entr(ies) referenced by nothing" : "references scanned") +
       (G.refScan.unreadable.length
@@ -1222,11 +1222,22 @@ export function recordHtml(links: readonly SourceLink[]): string {
 export function catalogueRecordLinks(o: {
   repoRoot: string;
   checkoutRepo: string | undefined;
-  catalogue?: { record?: string; handle?: string };
+  catalogue?: { record?: string; handle?: string; node?: string };
+  /**
+   * The record's Dublin Core XML rendering on this site, page-relative. When
+   * given it IS the Dublin Core link (owner, 2026-11-10: *"dublic core sould
+   * be the XML"*); the GitHub JSON is the fallback for a record with none.
+   */
+  xmlHref?: string;
 }): SourceLink[] {
   const out: SourceLink[] = [];
   const at = o.catalogue?.record ? forgeAt(o.repoRoot, o.catalogue.record, o.checkoutRepo) : undefined;
-  if (at && o.catalogue?.record) out.push({ label: `Dublin Core — ${basename(o.catalogue.record)}`, href: blobUrl(at), what: "the item's metadata record, on GitHub" });
+  if (o.xmlHref && o.catalogue?.record) {
+    const stem = basename(o.catalogue.record).replace(/\.dc\.json$/, "");
+    out.push({ label: `Dublin Core XML — ${stem}.dc.xml`, href: o.xmlHref, what: "the item's metadata record" });
+  } else if (at && o.catalogue?.record) out.push({ label: `Dublin Core — ${basename(o.catalogue.record)}`, href: blobUrl(at), what: "the item's metadata record, on GitHub" });
+  const node = o.catalogue?.node ? forgeAt(o.repoRoot, o.catalogue.node, o.checkoutRepo) : undefined;
+  if (node && o.catalogue?.node) out.push({ label: `KG node — ${basename(o.catalogue.node)}`, href: blobUrl(node), what: "the item's catalogue node, on GitHub" });
   const h = o.catalogue?.handle;
   if (h && /^\d+(\.\d+)*\/\S+$/.test(h)) out.push({ label: `hdl:${h}`, href: `https://hdl.handle.net/${h.split("/").map(encodeURIComponent).join("/")}`, what: "the item upstream" });
   return out;
@@ -1594,6 +1605,18 @@ if (import.meta.main) {
     g.uploads = g.uploads.filter((u) => siteInScope(siteOnly, u.instance));
     console.log(`  · scope ${scopeArg(siteOnly)}: ${g.entries.length} of ${before} entr(ies)`);
   }
+  // Items the catalogue holds BY REFERENCE get an entry and a page too
+  // (owner, 2026-11-10: a referenced item's link goes to "our ingested record
+  // in linbrary and associated KG", not IRIS). Pages only — see
+  // `referencedCatalogueEntries` for why the graph itself leaves them out.
+  {
+    const taken = new Set(g.entries.map((e) => `${e.instance}/${e.id}`));
+    const extra = referencedCatalogueEntries([ROOT, repoRoot], repoRoot, taken).filter(
+      (e) => inComposition(scope, repoRoot, e.dir) && (siteOnly === undefined || siteInScope(siteOnly, e.instance)),
+    );
+    if (extra.length) console.log(`  · ${extra.length} entr(ies) catalogued by reference`);
+    g.entries.push(...extra);
+  }
   const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   // ── Who references a slug — bean `jbx2`'s third ask ───────────────────
   //
@@ -1628,7 +1651,9 @@ if (import.meta.main) {
     // reported on the line below instead, where a statistic about a run
     // belongs.
     g.refScan = { unreadable: scan.unreadable };
-    const orphans = g.entries.filter((e) => (e.referencedBy?.length ?? 0) === 0).map((e) => e.id);
+    // An entry catalogued by reference is not an L1 source, so nothing is
+    // expected to cite it: it is not counted as an orphan.
+    const orphans = g.entries.filter((e) => e.provenance !== "catalogued" && (e.referencedBy?.length ?? 0) === 0).map((e) => e.id);
     console.log(
       `  · references: ${scan.filesRead} json file(s) read, ` +
         `${Object.keys(scan.bySlug).length} slug(s) referenced, ` +
@@ -1988,11 +2013,14 @@ if (import.meta.main) {
             // No viewable source held, and the entry names one: say so where the panel would be.
             const held = sourceFileOf(repoRoot, e, g.uploads);
             return !held && e.sourceFile && e.provenance !== "referenced"
-              ? { notHeld: { file: e.sourceFile, elsewhere: elsewhereLinks(e) } }
+              ? { notHeld: { file: e.sourceFile, elsewhere: [...elsewhereLinks(e), ...(e.upstream ?? [])] } }
               : {};
           })(),
           ...(() => {
-            const record = catalogueRecordLinks({ repoRoot, checkoutRepo, ...(e.catalogue ? { catalogue: e.catalogue } : {}) });
+            const record = catalogueRecordLinks({
+              repoRoot, checkoutRepo, ...(e.catalogue ? { catalogue: e.catalogue } : {}),
+              ...(e.catalogue?.xml ? { xmlHref: hrefFrom(shellDir, join(site, e.catalogue.xml)) } : {}),
+            });
             return record.length ? { record } : {};
           })(),
           sources: entrySources({

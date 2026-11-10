@@ -35,10 +35,10 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 import type { LibraryRef } from "./library-refs.ts";
-import { dirname, extname, join, relative } from "node:path";
+import { basename, dirname, extname, join, relative } from "node:path";
 import { createHash } from "node:crypto";
 
-import { checkoutRootFor, directoriesForGraph, repoRootFor, sourceLinks } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, directoriesForGraph, readDeclaration, repoRootFor, sourceLinks } from "../schemas/kg/cat-harness.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { arxivId } from "./library-readmes.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -184,7 +184,15 @@ export interface LibraryEntry {
    * records one. Owner, 2026-11-10: a library entry page *"should have dublin
    * core linked at top"*. Absent when no catalogue node names the entry.
    */
-  catalogue?: { record?: string; handle?: string };
+  catalogue?: { record?: string; handle?: string; xml?: string; node?: string };
+  /**
+   * Set on an entry CATALOGUED BY REFERENCE ({@link referencedCatalogueEntries}):
+   * the catalogue holds its record but this site holds no bytes, and these are
+   * where its files are upstream (each `referenced` ORIGINAL bitstream's
+   * `provenance.upstream`). Owner, 2026-11-10: a referenced item's title links
+   * *"our ingested record in library and associated KG"*, not IRIS.
+   */
+  upstream?: { label: string; href: string }[];
   /**
    * The block-summary drain's counts for this entry — owner, 2026-09-24.
    *
@@ -712,6 +720,38 @@ interface CatalogueEntryInfo {
   /** Absolute path of the node's Dublin Core record, when the file exists. */
   record?: string;
   handle?: string;
+  /**
+   * The record's Dublin Core XML rendering, SITE-relative
+   * (`<instance>/dublin-core/<stem>.dc.xml`), when the layer's published root
+   * holds it. Owner, 2026-11-10: *"dublic core sould be the XML"*.
+   */
+  xml?: string;
+  /** Absolute path of the catalogue node itself — the item's node in the KG. */
+  node?: string;
+}
+
+/**
+ * The directory a layer serves at `/<instance>/` — the one its declaration
+ * marks `instanceRoot` (what `mount-instance-docs` publishes there), or
+ * undefined when it marks none.
+ */
+function publishedRootOf(instanceRoot: string): string | undefined {
+  const decl = readDeclaration(instanceRoot) as { directories?: { path?: string; instanceRoot?: boolean }[] } | undefined;
+  const dir = decl?.directories?.find((d) => d.instanceRoot === true && typeof d.path === "string")?.path;
+  return dir === undefined || dir.includes("..") ? undefined : join(instanceRoot, dir);
+}
+
+/**
+ * The site path of a record's Dublin Core XML rendering, when the layer's
+ * published root holds one: `<published root>/dublin-core/<stem>.dc.xml`
+ * (the content core's `dc-render`) is served at `<instance>/dublin-core/…`.
+ */
+function dcXmlSitePath(instanceRoot: string, record: string): string | undefined {
+  const root = publishedRootOf(instanceRoot);
+  const stem = basename(record).replace(/\.dc\.json$/, "");
+  if (root === undefined || stem === basename(record)) return undefined;
+  const file = `${stem}.dc.xml`;
+  return existsSync(join(root, "dublin-core", file)) ? `${basename(instanceRoot)}/dublin-core/${file}` : undefined;
 }
 const catalogueInfoCache = new Map<string, Map<string, CatalogueEntryInfo>>();
 function catalogueInfo(instanceRoot: string): Map<string, CatalogueEntryInfo> {
@@ -728,9 +768,12 @@ function catalogueInfo(instanceRoot: string): Map<string, CatalogueEntryInfo> {
       const record = typeof node.metadataRef === "string" && node.metadataRef && !node.metadataRef.includes("..")
         ? join(instanceRoot, node.metadataRef)
         : undefined;
+      const xml = record && existsSync(record) ? dcXmlSitePath(instanceRoot, record) : undefined;
       out.set(node.libraryId, {
         ...(typeof node.title === "string" && node.title.trim() ? { title: node.title.trim() } : {}),
         ...(record && existsSync(record) ? { record } : {}),
+        ...(xml ? { xml } : {}),
+        node: join(nodes, f),
         ...(typeof node.handle === "string" && node.handle.trim() ? { handle: node.handle.trim() } : {}),
       });
     }
@@ -882,7 +925,7 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
           const info = catalogueInfo(dirname(libDir)).get(slug);
           const record = info?.record ? relative(repoRoot, info.record).split("\\").join("/") : undefined;
           return info && (record || info.handle)
-            ? { catalogue: { ...(record ? { record } : {}), ...(info.handle ? { handle: info.handle } : {}) } }
+            ? { catalogue: { ...(record ? { record } : {}), ...(info.handle ? { handle: info.handle } : {}), ...(info.xml ? { xml: info.xml } : {}), ...(info.node ? { node: relative(repoRoot, info.node).split("\\").join("/") } : {}) } }
             : {};
         })(),
         provenance: manifest?.provenance ?? "",
@@ -1079,4 +1122,85 @@ if (import.meta.main) {
   for (const q of g.queues) {
     console.log(`  ${q.dir.padEnd(22)} ${q.total} file(s), ${q.ingested} ingested, ${q.uningested} UNINGESTED`);
   }
+}
+
+/**
+ * Library entries for the items a layer's catalogue holds BY REFERENCE —
+ * owner, 2026-11-10: *"i dont wnat this this link to go to iris, but our
+ * ingested record in linbrary and associated KG"*.
+ *
+ * A `referenced` catalogue item has a Dublin Core record here and its files
+ * upstream; it has no `<library>/<slug>/` directory, and the catalogue schema
+ * forbids it a `libraryId` (that names materialized bytes). So it is listed
+ * from the catalogue instead: one entry per `referenced` item whose
+ * `metadataRef` resolves, id the record's stem (`10665-360869`, the name its
+ * Dublin Core renderings carry), counts zero, and `upstream` naming its files.
+ *
+ * NOT part of {@link readLibraryGraph}: the L1 checks, the narrative queue and
+ * the MCP roots read that graph as "what was ingested", and an entry with no
+ * structure would read to them as a failed ingest. Only the library's pages
+ * add these. An id a held entry already uses is skipped.
+ */
+export function referencedCatalogueEntries(roots: string[], repoRoot: string, taken: ReadonlySet<string>): LibraryEntry[] {
+  const libDirs = new Set<string>();
+  for (const r of roots) for (const d of corpusDirectoriesForGraph(r, "library")) libDirs.add(d);
+  const out: LibraryEntry[] = [];
+  const seen = new Set<string>();
+  for (const libDir of [...libDirs].sort()) {
+    if (!existsSync(libDir)) continue;
+    const instanceRoot = dirname(libDir);
+    const instance = instanceOf(libDir, repoRoot);
+    for (const cat of directoriesForGraph(instanceRoot, "catalogue")) {
+      const nodes = join(cat, "nodes");
+      if (!existsSync(nodes)) continue;
+      for (const f of readdirSync(nodes).filter((n) => n.endsWith(".json")).sort()) {
+        const node = readJson<{
+          flavour?: unknown; title?: unknown; handle?: unknown; libraryId?: unknown; metadataRef?: unknown;
+          materialization?: { state?: unknown };
+          bitstreams?: { name?: unknown; bundle?: unknown; materialization?: { state?: unknown; provenance?: { upstream?: unknown } } }[];
+        }>(join(nodes, f));
+        if (!node || node.flavour !== "item" || node.libraryId !== undefined) continue;
+        if (node.materialization?.state !== "referenced") continue;
+        if (typeof node.metadataRef !== "string" || node.metadataRef.includes("..") || !node.metadataRef.endsWith(".dc.json")) continue;
+        const record = join(instanceRoot, node.metadataRef);
+        if (!existsSync(record)) continue;
+        const id = basename(record).replace(/\.dc\.json$/, "");
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) continue;
+        const key = `${instance}/${id}`;
+        if (taken.has(key) || seen.has(key)) continue;
+        seen.add(key);
+        const files = (node.bitstreams ?? []).filter(
+          (b) => b.bundle === "ORIGINAL" && b.materialization?.state === "referenced" &&
+            typeof b.materialization.provenance?.upstream === "string" && /^https:\/\//.test(b.materialization.provenance.upstream as string),
+        );
+        const upstream = files.map((b) => ({
+          label: typeof b.name === "string" && b.name ? b.name : "the file",
+          href: b.materialization!.provenance!.upstream as string,
+        }));
+        const handle = typeof node.handle === "string" && node.handle.trim() ? node.handle.trim() : undefined;
+        const xml = dcXmlSitePath(instanceRoot, record);
+        const title = typeof node.title === "string" && node.title.trim() ? node.title.trim() : id;
+        const sourceFile = typeof files[0]?.name === "string" ? (files[0].name as string) : "";
+        out.push({
+          id, instance,
+          dir: relative(repoRoot, join(libDir, id)).split("\\").join("/"),
+          title,
+          provenance: "catalogued",
+          rung: "none",
+          docId: id, sourceFile, sourceSha256: "", arxiv: "", doi: "", documentClass: "",
+          sections: 0, blocks: 0, images: 0, ocrPages: 0,
+          hasOcr: false, hasManifest: false, hasStructure: false, hasImagesJson: false,
+          pageStart: null, pageEnd: null, words: 0, chars: 0, bytes: 0,
+          upload: "unknown", uploadInstance: "",
+          catalogue: { record: relative(repoRoot, record).split("\\").join("/"), ...(handle ? { handle } : {}), ...(xml ? { xml } : {}), node: relative(repoRoot, join(nodes, f)).split("\\").join("/") },
+          ...(upstream.length ? { upstream } : {}),
+          ...(() => {
+            const avatar = avatarOf(libDir, instance, id, null, repoRoot, sourceFile);
+            return avatar ? { avatar } : {};
+          })(),
+        } as LibraryEntry);
+      }
+    }
+  }
+  return out;
 }
