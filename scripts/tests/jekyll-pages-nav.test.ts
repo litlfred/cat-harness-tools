@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { jekyllNavPages, harnessOfUrl, pagesNav } from "../lib/jekyll-pages-nav.ts";
+import { jekyllNavPages, harnessOfUrl, labelUnder, pagesNav } from "../lib/jekyll-pages-nav.ts";
 import { expandRail, injectRail, railDataJson } from "../lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS } from "../lib/navbar.ts";
 import { pageLangOf } from "../mount-instance-docs.ts";
@@ -223,5 +223,35 @@ describe("#1261 — Bibliography: … and Tools — … pages fold under one par
     expect(tools.href).toBe("../tools/");
     expect(tools.children!.map((i) => i.label)).toEqual(["cat-harness", "who-iris"]);
     expect(tools.children![1]!.current).toBe(true);
+  });
+});
+
+describe("bibliography pages nest under Bibliography by parent (owner, 2026-11-10)", () => {
+  // A reference's own page was listed at the top level of the Pages list.
+  const BIB = {
+    "index.md": fm({ title: "Home" }),
+    "bibliography/index.md": fm({ title: "Bibliography" }),
+    "bibliography/cat/index.md": fm({ title: "Bibliography: si-catalogue", parent: "Bibliography" }),
+    "bibliography/cat/openhie/index.md": fm({ title: "Open Health Information Exchange", parent: "Bibliography: si-catalogue", grand_parent: "Bibliography" }),
+    "bibliography/lib/index.md": fm({ title: "Bibliography: library", parent: "Bibliography" }),
+    "bibliography/lib/knot/index.md": fm({ title: "Bibliography: library/knot", parent: "Bibliography: library", grand_parent: "Bibliography" }),
+  };
+  const { items, orphans } = pagesNav(jekyllNavPages(site(BIB)));
+  test("only Home and Bibliography at the top; entries two levels down", () => {
+    expect(orphans).toEqual([]);
+    expect(items.map((i) => i.label)).toEqual(["Bibliography", "Home"]);
+    const bib = items.find((i) => i.label === "Bibliography")!;
+    expect(bib.children!.map((i) => [i.label, i.depth])).toEqual([
+      ["library", 1],
+      ["si-catalogue", 1],
+    ]);
+    expect(bib.children![1]!.children!.map((i) => [i.label, i.depth])).toEqual([["Open Health Information Exchange", 2]]);
+    expect(bib.children![0]!.children!.map((i) => i.label)).toEqual(["knot"]);
+  });
+  test("labelUnder drops only what the parent already says", () => {
+    expect(labelUnder("Bibliography: x", "Bibliography")).toBe("x");
+    expect(labelUnder("Bibliography: x/y", "Bibliography: x")).toBe("y");
+    expect(labelUnder("WHO: a handbook", "Bibliography: x")).toBe("WHO: a handbook");
+    expect(labelUnder("Plain", "Bibliography")).toBe("Plain");
   });
 });
