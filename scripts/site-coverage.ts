@@ -201,6 +201,10 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
       ? subjectInstances(v, root, dirs).filter((i) => ROUTE_SEGMENT.test(i))
       : [];
     if (INDEX_PAGE_NEEDS_SUBJECTS.has(v.renderedBy) && instances.length === 0) continue;
+    // A scoped site owes a layer's visualiser only when the layer is in scope or
+    // one of its subjects is: the platform's own pages (its processes, skills,
+    // tools, schemas) are linked on the platform's site, not copied (owner, 2026-11-10).
+    if (scoped !== undefined && !scoped.has(v.harness) && !instances.some((i) => scoped.has(i))) continue;
     out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
     for (const instance of instances) {

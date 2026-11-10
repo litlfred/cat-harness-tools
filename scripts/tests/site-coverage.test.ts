@@ -55,6 +55,15 @@ describe("expectedPages over this checkout", () => {
     expect(onlyInPreview.every((p) => p.harness !== undefined)).toBe(true);
     expect(staging.length).toBeGreaterThanOrEqual(pages.length);
   });
+
+  test("a scoped site owes no page of a layer outside its scope (owner, 2026-11-10)", () => {
+    const scoped = expectedPages(root, { scope: ["no-such-instance"] });
+    expect(pages.length).toBeGreaterThan(0);
+    expect(scoped).toEqual([]);
+    const own = expectedPages(root, { scope: ["cat-harness"] });
+    expect(own.length).toBeGreaterThan(0);
+    expect(own.every((p) => p.harness === "cat-harness" || p.instance === "cat-harness")).toBe(true);
+  });
 });
 
 describe("subjectInstances: the guard asks the writer's own reader which instances have a page", () => {

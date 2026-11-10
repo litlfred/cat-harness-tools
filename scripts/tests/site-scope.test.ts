@@ -43,8 +43,8 @@ describe("siteScopeOf — an IG lands on a layer", () => {
     return dir;
   };
 
-  test("the IG and its landing layer", () => {
-    expect(siteScopeOf(cfg({ landing: "smart-base" }), "smart-immunizations")).toEqual(["smart-base", "smart-immunizations"]);
+  test("the IG only: its landing layer lends chrome, not pages", () => {
+    expect(siteScopeOf(cfg({ landing: "smart-base" }), "smart-immunizations")).toEqual(["smart-immunizations"]);
   });
 
   test("a checkout that lands on itself, on the hub, or names no landing has no scope", () => {

@@ -217,6 +217,14 @@ export function sharedAssetsOf(root: string): string | undefined {
   }
 }
 
+/**
+ * The instances whose pages a site writes: its own only, when it lands on
+ * another layer. The landing layer lends the site its chrome and theme, not
+ * its pages; those, and every other layer's, are linked on the platform's
+ * site (owner, 2026-11-10: "smart-base etc should not be in
+ * smart-immunizations... only cross referenced", superseding Q-SZ-2 "B",
+ * which kept the landing layer's pages).
+ */
 export function siteScopeOf(root: string, instance: string): string[] | undefined {
   const file = join(root, "index.config.json");
   if (!existsSync(file)) return undefined;
@@ -227,7 +235,7 @@ export function siteScopeOf(root: string, instance: string): string[] | undefine
     return undefined;
   }
   if (typeof landing !== "string" || landing === "hub" || landing === instance) return undefined;
-  return [...new Set([instance, landing])].sort();
+  return [instance];
 }
 
 /** The `require`d root files a built site does not hold. */
