@@ -44,8 +44,9 @@ describe("qaLivePanel", () => {
 });
 
 /** Runs the page script over one panel with `fetch` answered from `answers` (URL substring → JSON or a status). */
-async function runScript(answers: Array<[string, unknown | number]>): Promise<string> {
+async function runScript(answers: Array<[string, unknown | number]>, click?: string): Promise<string> {
   const texts: string[] = [];
+  const rows: Array<{ text: string; fire: () => void }> = [];
   const node = (tag: string): Record<string, unknown> => {
     const kids: Array<Record<string, unknown>> = [];
     const n: Record<string, unknown> = {
@@ -59,6 +60,15 @@ async function runScript(answers: Array<[string, unknown | number]>): Promise<st
       appendChild(c: Record<string, unknown>) {
         kids.push(c);
         return c;
+      },
+      insertBefore(c: Record<string, unknown>) {
+        kids.push(c);
+        return c;
+      },
+      removeChild() {},
+      setAttribute() {},
+      addEventListener(type: string, fn: () => void) {
+        if (type === "click") rows.push({ text: texts.slice(-6).join(" "), fire: fn });
       },
     };
     return n;
@@ -88,13 +98,21 @@ async function runScript(answers: Array<[string, unknown | number]>): Promise<st
   };
   runInNewContext(QA_LIVE_JS, { document, fetch, Promise, Error, String, Object });
   for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+  if (click) {
+    const before = texts.length;
+    rows.find((r) => r.text.includes(click))!.fire();
+    return texts.slice(before).join("\n");
+  }
   return texts.join("\n") + "\nURLS\n" + urls.join("\n");
 }
 
 const RECORD = (id: string, fail: number) => ({
   $schema: "kg-qa/v1",
-  subject: { kind: "tool", id },
-  criteria: { "tool-a": { result: fail ? "fail" : "pass" }, "tool-b": { result: "n/a" } },
+  subject: { kind: "tool", id, path: `tools/${id}.json` },
+  criteria: {
+    "tool-b": { result: "n/a", findings: [] },
+    "tool-a": { result: fail ? "fail" : "pass", findings: fail ? [{ where: "Task_X", detail: "names no tool" }] : [] },
+  },
   totals: { pass: fail ? 0 : 1, fail, "n/a": 1, unknown: 0 },
 });
 
@@ -111,6 +129,20 @@ describe("the page script", () => {
     expect(out).toContain("1 other file(s)");
     expect(out.indexOf("\nb\n")).toBeLessThan(out.indexOf("\na\n"));
     expect(out).not.toContain("ANOTHER commit");
+  });
+  test("clicking a row shows its checks, failures first, with their findings", async () => {
+    const out = await runScript(
+      [
+        [`main/${MOUNT.ref}/manifest.json`, { written_at: "x" }],
+        ["api.github.com", { tree: [{ type: "blob", path: "kg-qa/tools/b.kg-qa.json" }] }],
+        ["b.kg-qa.json", RECORD("b", 1)],
+      ],
+      "tool-a",
+    );
+    expect(out).toContain("tools/b.json");
+    expect(out).toContain("Full record");
+    expect(out).toContain("Task_X: names no tool");
+    expect(out.indexOf("tool-a")).toBeLessThan(out.indexOf("tool-b"));
   });
   test("falls back to the newest main entry and says it is another commit's", async () => {
     const out = await runScript([

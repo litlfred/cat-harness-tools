@@ -71,9 +71,17 @@ export function qaLivePanel(src: QaLiveSource): string {
     `<noscript><p class="sv-sub">These results are read in the browser. ` +
     `Without JavaScript, see <a href="${attr(branchUrl)}">the <code>${attr(src.branch)}</code> branch</a>.</p></noscript>` +
     `</div>` +
+    `<style>${QA_LIVE_CSS}</style>` +
     `<script>${QA_LIVE_JS}</script>`
   );
 }
+
+/** Rows read as clickable; an open row's checks sit under it. */
+const QA_LIVE_CSS =
+  ".sv-qa-live-row{cursor:pointer}.sv-qa-live-row:hover,.sv-qa-live-row:focus{background:rgba(127,127,127,.12)}" +
+  ".sv-qa-live-row[aria-expanded=true] td:nth-child(2)::before{content:'\\25BE  '}" +
+  ".sv-qa-live-row[aria-expanded=false] td:nth-child(2)::before{content:'\\25B8  '}" +
+  ".sv-qa-live-detail td{background:rgba(127,127,127,.06)}";
 
 /**
  * The page script. Plain ES5, no Liquid-like `{{`/`{%` (the page is also
@@ -159,7 +167,7 @@ export const QA_LIVE_JS = String.raw`(function () {
               });
             }),
           ).then(function (docs) {
-            render(box, { repo: repo, ref: ref, branch: branch, root: root }, hit, docs, others, t.truncated === true);
+            render(box, { repo: repo, ref: ref, branch: branch, root: root }, hit, docs, files, others, t.truncated === true);
           });
         });
       })
@@ -168,7 +176,7 @@ export const QA_LIVE_JS = String.raw`(function () {
       });
   }
 
-  function render(box, src, hit, docs, others, truncated) {
+  function render(box, src, hit, docs, files, others, truncated) {
     box.textContent = "";
     var head = el("p", null, "sv-sub");
     head.appendChild(document.createTextNode("Entry "));
@@ -211,6 +219,8 @@ export const QA_LIVE_JS = String.raw`(function () {
         na: t["n/a"] || 0,
         unknown: t.unknown || 0,
         failing: failing,
+        doc: d,
+        record: "https://github.com/" + src.repo + "/blob/" + src.branch + "/" + hit.key + "/" + src.root + "/" + files[i].path.split("/").map(encodeURIComponent).join("/"),
       };
       sum.pass += row.pass;
       sum.fail += row.fail;
@@ -244,13 +254,83 @@ export const QA_LIVE_JS = String.raw`(function () {
     table.appendChild(thead);
     var tbody = el("tbody");
     rows.forEach(function (r) {
-      var tr = el("tr");
+      var tr = el("tr", null, "sv-qa-live-row");
+      tr.setAttribute("tabindex", "0");
+      tr.setAttribute("role", "button");
+      tr.setAttribute("aria-expanded", "false");
+      tr.title = "Show this subject's checks";
       [r.kind, r.id, r.pass, r.fail, r.na, r.unknown, r.failing.join(", ")].forEach(function (v) {
         tr.appendChild(el("td", v));
       });
       tbody.appendChild(tr);
+      var detail = null;
+      function toggle() {
+        if (detail) {
+          tbody.removeChild(detail);
+          detail = null;
+          tr.setAttribute("aria-expanded", "false");
+          return;
+        }
+        detail = details(src, r);
+        tbody.insertBefore(detail, tr.nextSibling);
+        tr.setAttribute("aria-expanded", "true");
+      }
+      tr.addEventListener("click", toggle);
+      tr.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          toggle();
+        }
+      });
     });
     table.appendChild(tbody);
     box.appendChild(table);
+  }
+
+  var ORDER = { fail: 0, unknown: 1, pass: 2, "n/a": 3 };
+
+  /** One subject's checks, drawn under its row: each result, then each finding's place and detail. */
+  function details(src, r) {
+    var tr = el("tr", null, "sv-qa-live-detail");
+    var td = el("td");
+    td.colSpan = 7;
+    var p = el("p", null, "sv-sub");
+    var path = r.doc.subject && r.doc.subject.path;
+    if (typeof path === "string" && /^[\w.\/-]+$/.test(path)) {
+      p.appendChild(document.createTextNode("Source: "));
+      p.appendChild(link("https://github.com/" + src.repo + "/blob/" + src.ref + "/" + path, path));
+      p.appendChild(document.createTextNode(". "));
+    }
+    p.appendChild(link(r.record, "Full record"));
+    p.appendChild(document.createTextNode("."));
+    td.appendChild(p);
+    var crit = r.doc.criteria || {};
+    var names = [];
+    for (var k in crit) if (Object.prototype.hasOwnProperty.call(crit, k) && crit[k]) names.push(k);
+    names.sort(function (a, b) {
+      var oa = ORDER[crit[a].result], ob = ORDER[crit[b].result];
+      return (oa == null ? 4 : oa) - (ob == null ? 4 : ob) || a.localeCompare(b);
+    });
+    var ul = el("ul");
+    names.forEach(function (n) {
+      var c = crit[n];
+      var li = el("li");
+      li.appendChild(el("strong", String(c.result || "?")));
+      li.appendChild(document.createTextNode(" " + n));
+      var fs = Array.isArray(c.findings) ? c.findings : [];
+      if (fs.length) {
+        var inner = el("ul");
+        fs.forEach(function (f) {
+          var where = f && f.where ? f.where + ": " : "";
+          var what = f && f.detail != null ? f.detail : JSON.stringify(f);
+          inner.appendChild(el("li", where + what));
+        });
+        li.appendChild(inner);
+      }
+      ul.appendChild(li);
+    });
+    td.appendChild(ul);
+    tr.appendChild(td);
+    return tr;
   }
 })();`;
