@@ -458,7 +458,8 @@ def own_instances(root, given, known):
     if at_root:
         return at_root
     config = read_json(os.path.join(root, "index.config.json")) or {}
-    return [i["name"] for i in config.get("instances", []) if i.get("name") in known]
+    entries = config.get("instances") or config.get("layers", [])
+    return [i["name"] for i in entries if i.get("name") in known]
 
 
 def closure(own, known, root):
