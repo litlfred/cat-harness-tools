@@ -473,7 +473,14 @@ export function buildConfig(configYml: string): string {
   return lines.join("\n");
 }
 
-/** The override layered on top: what the declaration and the remote say, never a guess. */
+/**
+ * The override layered on top: what the declaration and the remote say, never a guess.
+ *
+ * And no Sass source maps: jekyll-sass-converter 3 writes a `.css.map` beside
+ * each compiled stylesheet by default (the theme's three colour schemes, about
+ * 0.3 MB on every site) and a `sourceMappingURL` comment naming it. A published
+ * site has no use for either, so neither is written.
+ */
 export function overrideConfig(o: { title: string; description?: string; baseurl: string; url: string }): string {
   const q = (s: string) => JSON.stringify(s);
   return [
@@ -482,6 +489,8 @@ export function overrideConfig(o: { title: string; description?: string; baseurl
     `baseurl: ${q(o.baseurl)}`,
     `url: ${q(o.url)}`,
     "theme: just-the-docs",
+    "sass:",
+    "  sourcemap: never",
     "",
   ].join("\n");
 }
