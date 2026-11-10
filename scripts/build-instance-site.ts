@@ -222,9 +222,9 @@ export function sharedAssetsOf(root: string): string | undefined {
  * The instances whose pages a site writes: its own only, when it lands on
  * another layer. The landing layer lends the site its chrome and theme, not
  * its pages; those, and every other layer's, are linked on the platform's
- * site (owner, 2026-11-10: "smart-base etc should not be in
- * smart-immunizations... only cross referenced", superseding Q-SZ-2 "B",
- * which kept the landing layer's pages).
+ * site (owner, 2026-11-10: the base IG's pages should not be in an IG's
+ * site, only cross referenced; this supersedes Q-SZ-2 "B", which kept the
+ * landing layer's pages).
  */
 export function siteScopeOf(root: string, instance: string): string[] | undefined {
   const file = join(root, "index.config.json");
@@ -795,7 +795,7 @@ export function siteStepEnv(v: { instance: string; title: string; baseurl: strin
  */
 /** The ruling a scoped site's parity guard quotes for a directory of another layer's pages. */
 export const SCOPE_RULING =
-  "owner, 2026-11-10: \"smart-base etc should not be in smart-immunizations... only cross referenced\" — another layer's pages are linked on its own site, not copied into a scoped (IG) site";
+  "owner, 2026-11-10: the base IG's pages should not be in an IG's site, only cross referenced — another layer's pages are linked on its own site, not copied into a scoped (IG) site";
 
 /** The routes, current and old, of the pages an unscoped build owes and a scoped one does not. */
 export function notOwedInScope(root: string, scope: readonly string[], staging: boolean): string[] {
@@ -807,13 +807,13 @@ export function notOwedInScope(root: string, scope: readonly string[], staging: 
  * The top-level directories of the published root that this scoped build
  * leaves out BECAUSE they hold only other layers' pages: every file lies under
  * an out-of-scope instance's name (as the directory, or one level down:
- * `docs/who-iris/`, `ar/folio-assistant-core/`) or under a page route the
+ * `docs/<layer>/`, `ar/<layer>/`) or under a page route the
  * scope no longer owes. Anything else stays a shortfall for the guard.
  */
 export function scopeDropped(current: string, candidate: string, scope: readonly string[], instances: readonly string[], notOwed: readonly string[]): DroppedByRuling[] {
   const inScope = new Set(scope);
   const others = new Set(instances.filter((i) => !inScope.has(i)));
-  // An out-of-scope layer's page at its own-site route (`who-iris/catalogue/` served at `catalogue/`)
+  // An out-of-scope layer's page at its own-site route (`<layer>/catalogue/` served at `catalogue/`)
   // is that layer's too: the unscoped build put it at the root for the layer, not for this site.
   const ownSite = notOwed.flatMap((r) => {
     const seg = r.split("/").filter(Boolean);
