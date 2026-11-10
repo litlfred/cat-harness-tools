@@ -10,7 +10,7 @@
  * ## What it emits
  *
  * PROV-JSONLD's shape (W3C Member Submission 2024-08-25, held at
- * `cat-harness/library/kg/w3c-2024-prov-jsonld/`): an `Activity` node, and
+ * `cat-harness/library/corpus/kg/w3c-2024-prov-jsonld/`): an `Activity` node, and
  * each qualified association as its own `Association` node whose `activity`,
  * `agent`, `role` and `plan` are the context's TERMS — so its coercions and
  * its `@reverse` mapping to `prov:qualifiedAssociation` apply (rule
