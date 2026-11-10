@@ -436,3 +436,34 @@ describe("the command", () => {
     expect(bad.stderr).toContain('story "ghost-story"');
   });
 });
+
+describe("overview gaps: what a workshop's VaxLink overview would leave out", () => {
+  const gaps = (files: Files) => checkJourneyRefsAt(checkout(files)).warnings.map((f) => `${f.at}: ${f.message}`);
+
+  test("the clean fixture names each part its journeys do not declare, and never fails on it", () => {
+    const r = checkJourneyRefsAt(checkout(clean()));
+    expect(r.findings).toEqual([]);
+    const w = r.warnings.map((f) => `${f.at}: ${f.message}`);
+    expect(w).toContain("presentation.story: overview-gap: no story in one sentence; the overview's hero shows the workshop description instead");
+    expect(w).toContain("scenarios: overview-gap: no scene (the icon strip under a moment) on p3-ill, p4-scanned");
+    expect(w).toContain('scenarios: overview-gap: no trustLadder ("Follow the record") on p3-ill');
+    expect(w).toContain("scenarios: overview-gap: no illustration on step(s) P3");
+    expect(w).toContain("presentation.recordOf: overview-gap: a trust ladder is declared but not whose record it follows");
+    expect(w).toContain("scenarios: overview-gap: no device screen shows any step it teaches (the Device Demo is empty)");
+  });
+
+  test("declaring the parts clears their warnings", () => {
+    const files = clean();
+    edit(files, "demo/workshops/w.json", (x) => {
+      x.scenarios = ["p4-scanned"];
+      x.steps = [];
+      x.discussion = [];
+      x.resources = [];
+      x.presentation = { story: "Kamal is treated abroad.", recordOf: "kamal", deviceDemo: { href: "https://example.org/demo/" } };
+    });
+    edit(files, "demo/journeys/p4.json", (x) => {
+      x.scene = [{ icon: "qr", label: "Shows his code" }];
+    });
+    expect(gaps(files)).toEqual([]);
+  });
+});
