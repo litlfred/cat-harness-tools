@@ -588,6 +588,16 @@ export const IgCacheActionSchema = z
   ])
   .describe("An ig-cache verb: restore AST, seed it, or diagnose.");
 
+/**
+ * A change-set verb of a public review: write the records (`seed`, `propose`,
+ * `add`, `adopt`), read them (`list`, `body`), check them, bring them back in
+ * line with GitHub (`reconcile`), handle one issue event (`github`), or
+ * install the workflow templates. Read from the script's own command switch.
+ */
+export const ChangeSetActionSchema = z
+  .enum(["seed", "propose", "add", "list", "body", "adopt", "check", "reconcile", "github", "install"])
+  .describe("A change-set verb: check or reconcile the records, or handle one GitHub issue event.");
+
 export const NamespaceLayerSchema = z
   .enum(NAMESPACE_LAYERS)
   .describe("A namespace layer: bootstrap resolves before anything else, then harness, then core.");
@@ -776,6 +786,7 @@ export const TOOL_TYPES = {
   LinkMode: LinkModeSchema,
   LakeCacheAction: LakeCacheActionSchema,
   IgCacheAction: IgCacheActionSchema,
+  ChangeSetAction: ChangeSetActionSchema,
   NamespaceLayer: NamespaceLayerSchema,
   PreferenceAction: PreferenceActionSchema,
   ArchimateModelId: ArchimateModelIdSchema,
@@ -968,6 +979,7 @@ export const INJECTION_SAFE: ReadonlySet<ToolTypeName> = new Set<ToolTypeName>([
   "LinkMode",
   "LakeCacheAction",
   "IgCacheAction",
+  "ChangeSetAction",
   "NamespaceLayer",
   "PreferenceAction",
   "ArchimateMetamodelFormat",
