@@ -39,6 +39,7 @@ import { resolve } from "node:path";
 import {
   evidenceLine,
   instanceOf,
+  linkProse,
   methodologyRows,
   page,
   nodePage,
@@ -236,5 +237,39 @@ describe("ingested sources link what resolves (qgjh)", () => {
   it("leaves an unknown item, or no resolver, as code", () => {
     expect(evidenceLine("library/unknown", links, "methodologies/index.md")).toBe("- `library/unknown`");
     expect(evidenceLine("library/known-item")).toBe("- `library/known-item`");
+  });
+});
+
+describe("code spans in prose that name a methodology or library item are links (owner, 2026-11-10)", () => {
+  const names = new Set(["grade", "madr"]);
+  const links = {
+    links: (id: string, instance?: string) =>
+      id === "9789240010567-eng" && (instance === undefined || instance === "who-iris")
+        ? { viewer: "en/cat-harness/library/who-iris/#who-iris%2F9789240010567-eng" }
+        : undefined,
+  };
+
+  it("links a methodology on this site to its section, and leaves others as code", () => {
+    expect(linkProse("that is `grade`, not `kepner-tregoe`", names)).toBe("that is [`grade`](#grade), not `kepner-tregoe`");
+    expect(linkProse("(`madr`)", names, "../../")).toBe("([`madr`](../../#madr))");
+  });
+
+  it("links a <layer>/library/<slug>/ reference to the library viewer, relative to the page", () => {
+    expect(linkProse("Ingested at `who-iris/library/9789240010567-eng/`;", names, "", links, "en/cat-harness/methodologies/index.md")).toBe(
+      "Ingested at [`who-iris/library/9789240010567-eng/`](../library/who-iris/#who-iris%2F9789240010567-eng);",
+    );
+    expect(linkProse("`library/unknown`", names, "", links)).toBe("`library/unknown`");
+  });
+
+  it("does not re-link a span that is already link text", () => {
+    expect(linkProse("[`grade`](x)", names)).toBe("[`grade`](x)");
+  });
+
+  it("is applied on the list page and on a node page", () => {
+    const r = { name: "diig", title: "DIIG", origin: "o", appliesWhen: "not `grade`", instance: "smart-base", evidence: [], state: "cited-only" as const };
+    const g = { ...r, name: "grade", title: "GRADE", appliesWhen: "a" };
+    const report = { undetermined: false, nodes: 2, invalid: [], unresolved: [], noEvidence: [], untagged: [], resolved: [] };
+    expect(page([r, g], report)).toContain("**Applies when.** not [`grade`](#grade)");
+    expect(nodePage(r, "# D\n", undefined, "", undefined, [], names)).toContain("**Applies when.** not [`grade`](../../#grade)");
   });
 });

@@ -13,7 +13,7 @@ import { repoRootFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { RUN_SCRIPT, writerCommand } from "../../lib/script-command.ts";
 import { siteArg, siteTarget } from "../../lib/site-target.ts";
-import { runVisualiserWriters, visualiserWriters, writerArgv, writersFor, type VisualiserWriter } from "../../visualiser-writers.ts";
+import { inPublishOrder, runVisualiserWriters, visualiserWriters, writerArgv, writersFor, type VisualiserWriter } from "../../visualiser-writers.ts";
 import { writerFilesFor, type DeclaredVisualiser } from "../../viewer-declarations.ts";
 import type { ExpectedPage } from "../../site-coverage.ts";
 
@@ -175,5 +175,24 @@ describe("over this checkout", () => {
       const text = readFileSync(join(root, files[0]!), "utf-8");
       expect({ tool: w.tool, reads: /lib\/site-target/.test(text) }).toEqual({ tool: w.tool, reads: true });
     }
+  });
+});
+
+describe("inPublishOrder — a viewer runs after the viewers whose pages it links (owner, 2026-11-10)", () => {
+  const w = (tool: string, script?: string): VisualiserWriter => ({
+    tool,
+    visualisers: [],
+    ...(script ? { invoke: ["bun", "run", "cat", script] } : {}),
+  });
+
+  test("puts library:viz before methodologies:viz, as derive:publish does, and leaves the others in place", () => {
+    const writers = [w("methodologies-viewer", "methodologies:viz"), w("other", "other:viz"), w("library-viewer", "library:viz"), w("unrunnable")];
+    const out = inPublishOrder(writers, ["library:viz", "methodologies:viz"]);
+    expect(out.map((x) => x.tool)).toEqual(["library-viewer", "other", "methodologies-viewer", "unrunnable"]);
+  });
+
+  test("changes nothing when the plan names none of them", () => {
+    const writers = [w("a", "a:viz"), w("b", "b:viz")];
+    expect(inPublishOrder(writers, [])).toEqual(writers);
   });
 });
