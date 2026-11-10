@@ -116,6 +116,7 @@ import { scopeArg } from "./lib/site-scope.ts";
 import { instanceRoots, writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
+import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
 import { PREVIEW_PREFIX, PREVIEW_PREFIXES, previewPath } from "./lib/preview-prefix.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
@@ -472,7 +473,14 @@ export function buildConfig(configYml: string): string {
   return lines.join("\n");
 }
 
-/** The override layered on top: what the declaration and the remote say, never a guess. */
+/**
+ * The override layered on top: what the declaration and the remote say, never a guess.
+ *
+ * And no Sass source maps: jekyll-sass-converter 3 writes a `.css.map` beside
+ * each compiled stylesheet by default (the theme's three colour schemes, about
+ * 0.3 MB on every site) and a `sourceMappingURL` comment naming it. A published
+ * site has no use for either, so neither is written.
+ */
 export function overrideConfig(o: { title: string; description?: string; baseurl: string; url: string }): string {
   const q = (s: string) => JSON.stringify(s);
   return [
@@ -481,6 +489,8 @@ export function overrideConfig(o: { title: string; description?: string; baseurl
     `baseurl: ${q(o.baseurl)}`,
     `url: ${q(o.url)}`,
     "theme: just-the-docs",
+    "sass:",
+    "  sourcemap: never",
     "",
   ].join("\n");
 }
@@ -1026,8 +1036,9 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
 
   // The root's guard: the built site carries everything the root it replaces carries.
   const keep = [...new Set([...PREVIEW_PREFIXES, PC_PREFIX, "_render-log", ...(o.keep ?? [])])];
+  let publishedTree: string | undefined;
   if (!staging && (o.parity ?? "refuse") !== "off") {
-    const against = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined);
+    const against = (publishedTree = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined));
     if (against === undefined) console.log("parity: no published root to compare with — nothing to lose");
     else {
       const outOfScope = o.scope ? scopeDropped(against, site, o.scope, [...instanceRoots(root).keys()], notOwedInScope(root, o.scope, Boolean(staging))) : [];
@@ -1083,6 +1094,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   for (const p of anchors.problems.slice(0, 20)) console.log(`  · ${p.page}: ${p.reason}`);
 
   o.beforePublish?.(site);
+
+  // The size review (owner, 2026-11-10: "add size review as part of authoring process"):
+  // advisory, printed on every build, its report beside the build and never in the site.
+  reviewSiteSize({ site, out: join(out, SITE_SIZE_FILE), repo: root, self: [o.instance], exclude: keep.map((k) => `${k}/`), ...(publishedTree ? { againstDir: publishedTree } : {}), log: (l) => console.log(l) });
 
   if (o.publish) {
     if (!o.remote) throw new Error("--publish needs --remote <git url>");
