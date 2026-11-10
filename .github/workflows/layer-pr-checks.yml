@@ -2384,6 +2384,13 @@ jobs:
             echo "::notice::the pinned cat-harness-tools (${sha:0:12}) predates layers:check; the gate starts with the next re-pin"
             exit 0
           fi
-          CAT_LAYERS_URL="https://github.com/${{ github.repository }}.git" \
-            bun "$work/scripts/mount-from-lock.ts" --check-layers --root fa --changed-from "$base" \
-            || { echo "::error::this PR re-pins index.lock.json but its layers cache ref is not published. Whoever re-pinned runs \`bun run cat layers:publish\` from their checkout (mount:remote does it after a re-pin)."; exit 1; }
+          # A sandbox's publish waits on its claude/cat-layers/<key> branch
+          # until layers-move.yml moves it (state `pending`): wait for it.
+          for i in $(seq 1 30); do
+            out="$(CAT_LAYERS_URL="https://github.com/${{ github.repository }}.git" \
+              bun "$work/scripts/mount-from-lock.ts" --check-layers --root fa --changed-from "$base" 2>&1)" && { echo "$out"; exit 0; }
+            echo "$out"
+            case "$out" in *"(pending)"*) sleep 20 ;; *) break ;; esac
+          done
+          echo "::error::this PR re-pins index.lock.json but its layers cache ref is not published. Whoever re-pinned runs \`bun run cat layers:publish\` from their checkout (mount:remote does it after a re-pin); from a sandbox it lands on a claude/cat-layers/ branch that layers-move.yml moves."
+          exit 1
