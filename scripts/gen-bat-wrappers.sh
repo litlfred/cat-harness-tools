@@ -60,6 +60,7 @@ WRAPPED=(
   cat-harness-tools/scripts/render-pre-commit.sh
   cat-harness-tools/scripts/sage-mcp.sh
   cat-harness-tools/scripts/session-start-coord-sweep.sh
+  cat-harness-tools/scripts/sign.sh
   cat-harness-tools/scripts/start-folio-assistant.sh
   cat-harness-tools/scripts/start-viewer.sh
   cat-harness-tools/scripts/tests/run-tests.sh
