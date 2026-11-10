@@ -26,7 +26,8 @@
  *   `--check` or `--verify`, or a file named for a check (`check-*`,
  *   `audit-*`, `validate-*`, `verify-*`, `*-links`, a `test/` file; see
  *   {@link isQcScript}). A generator a workflow also runs to WRITE is still
- *   judged on that run.
+ *   judged on that run. The CI's own machinery under `.github/` counts as QC
+ *   too: it runs and judges the checks.
  * - **A step of a Tool**: a script a Tool's own implementation runs (a
  *   `bun run cat <key>` or a script path literal in it) is covered by that
  *   Tool, so a workflow that runs the step directly needs no second Tool.
@@ -253,6 +254,10 @@ export const QC_KEY = /(?:^|:)check(?::|$)|^check-|^audit:|^qa:/;
 const CHECK_FLAG = /\s--(?:check|verify)\b/;
 export function isQcScript(path: string): boolean {
   if (/(?:^|\/)tests?\//.test(path)) return true;
+  // The CI's own machinery (`.github/scripts/…`, `.github/mount-from-lock.sh`):
+  // it runs and judges the checks, and nobody runs it as a step of their own
+  // (owner card, 2026-11-10, option A).
+  if (/(?:^|\/)\.github\//.test(path)) return true;
   const base = (path.split("/").pop() ?? "").replace(/\.[a-z]+$/, "");
   return (
     /^(?:check|audit|validate|verify|qa|typecheck|lint)(?:[-_]|$)/.test(base) ||
