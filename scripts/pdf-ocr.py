@@ -339,8 +339,14 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
     cache = ocr_cache_dir(root, pdf)
     os.makedirs(cache, exist_ok=True)
     done = sorted(glob.glob(os.path.join(cache, "page-*.txt")))
-    if done and not force:
+    # A cache counts only once a run has finished it. Pages are written one
+    # at a time, so a run stopped part way left a few `page-*.txt` behind and
+    # the next run reported them as the whole document (measured 2026-11-10:
+    # 4 of 38 pages "cached" after an interrupted bulk ingest).
+    if done and not force and len(done) == pdf_pages(pdf):
         return len(done), "cached"
+    for f in done:
+        os.remove(f)
 
     # A context left by an earlier run would describe software that did not
     # make the pages about to be written; remove it before they are.
@@ -388,6 +394,16 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
         models = use.split("+") + ([] if lang else ["osd"])
         write_ocr_run_context(pdf, root, cache, models)
         return len(pngs), use
+
+
+def pdf_pages(pdf: str) -> int | None:
+    """The PDF's page count from `pdfinfo` (poppler, already required), or None."""
+    try:
+        out = subprocess.run(["pdfinfo", pdf], capture_output=True, text=True, timeout=60).stdout
+    except Exception:
+        return None
+    m = re.search(r"^Pages:\s+(\d+)", out, re.M)
+    return int(m.group(1)) if m else None
 
 
 def read_cache(root: str, pdf: str) -> list[str]:

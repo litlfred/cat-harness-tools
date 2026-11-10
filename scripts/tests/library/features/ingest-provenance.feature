@@ -50,6 +50,7 @@ Feature: Ingest provenance
     Then a Latin page of a French and English record reads as fra+eng, an Arabic page as ara+eng, a Persian record's page as fas+eng
     And a hinted pack that is missing is reported rather than swapped for English
     And Arabic and Persian pages are marked right to left
+    And a partial OCR cache, fewer pages than the PDF has, is OCR'd again rather than served
 
   @test:scripts/tests/library/ingest-provenance.test.ts::which_software_ran,_as_a_folio-run-context/v1_(turh,_gap_2)::the_Python_writer_produces_a_context_the_schema_accepts,_with_runContextRef's_digest
   Scenario: The Python run-context writer agrees with the TypeScript schema and digest

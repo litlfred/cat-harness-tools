@@ -19,6 +19,9 @@ narrows each page to the hinted languages in the script it shows.
    refuses), never swapped for English.
 5. With no hints, the script-only rule is unchanged.
 6. Arabic and Persian pages are marked right to left.
+7. An OCR cache counts as complete only when it holds a page per PDF page:
+   an interrupted run left 4 of 38 pages, which were then served as the
+   whole document.
 """
 import importlib.util
 import os
@@ -74,6 +77,33 @@ def main() -> int:
     check("Arabic is right to left", o.direction_of("ara+eng") == "rtl")
     check("Persian is right to left", o.direction_of("fas") == "rtl")
     check("French is left to right", o.direction_of("fra+eng") == "ltr")
+
+    import shutil, tempfile
+    try:
+        import pymupdf
+    except Exception:
+        pymupdf = None
+    if pymupdf and shutil.which("pdfinfo"):
+        with tempfile.TemporaryDirectory() as td:
+            pdf = os.path.join(td, "three.pdf")
+            d = pymupdf.open()
+            for _ in range(3):
+                d.new_page()
+            d.save(pdf)
+            check("pdf_pages reads the page count", o.pdf_pages(pdf) == 3)
+            cache = o.ocr_cache_dir(td, pdf)
+            os.makedirs(cache)
+            open(os.path.join(cache, "page-001.txt"), "w").write("x")
+            o.tools_present = lambda: {"tesseract": None, "pdftoppm": None}
+            try:
+                n, how = o.ocr_pdf(pdf, td, "eng", 50, False)
+                partial_served = how == "cached"
+            except Exception:
+                partial_served = False  # it tried to OCR again, which is right
+            check("a partial OCR cache is not served as the whole document", not partial_served)
+            check("and its stale pages are removed", not os.path.exists(os.path.join(cache, "page-001.txt")) or not partial_served)
+    else:
+        print("  skip  pdf_pages (needs pymupdf and pdfinfo)")
 
     print()
     print("  all checks passed" if rc == 0 else "  FAILURES above")
