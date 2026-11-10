@@ -63,11 +63,11 @@ describe("instanceOf (bean t5dm)", () => {
  * `referenced` items are listed as entries with no bytes.
  */
 describe("referencedCatalogueEntries", () => {
-  function layer(): { root: string; inst: string } {
+  function layer(dir = "iris"): { root: string; inst: string } {
     const root = mkdtempSync(join(tmpdir(), "refent-"));
     made.push(root);
     writeDeclaration(root, { name: "host", directories: [] });
-    const inst = join(root, "iris");
+    const inst = join(root, dir);
     for (const d of ["library/held-1", "catalogue/nodes", "catalogue/records", "site/dublin-core"]) mkdirSync(join(inst, d), { recursive: true });
     writeDeclaration(inst, {
       name: "iris",
@@ -110,6 +110,12 @@ describe("referencedCatalogueEntries", () => {
     });
     expect(e.upstream).toEqual([{ label: "a.pdf", href: "https://iris.example/bitstreams/a/download" }]);
     expect(e.sourceFile).toBe("a.pdf");
+  });
+
+  test("the XML's site path names the DECLARED layer, not the checkout directory (a clone at iris-217/ serves /iris/)", () => {
+    const { root, inst } = layer("iris-217");
+    const got = referencedCatalogueEntries([inst], root, new Set());
+    expect(got[0]?.catalogue?.xml).toBe("iris/dublin-core/10665-1.dc.xml");
   });
 
   test("an id a held entry already uses is skipped", () => {
