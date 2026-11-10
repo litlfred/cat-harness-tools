@@ -132,6 +132,7 @@ import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
 import { buildInstanceSite, recipeFromConfig, siteFields, siteScopeOf, type SiteRecipe } from "./build-instance-site.ts";
 import { makeRecord, RECORD_FILE } from "./preview-record.ts";
+import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
 import { isPreviewPath, PREVIEW_PREFIX, previewPath } from "./lib/preview-prefix.ts";
 import { ensurePublishBranch } from "./lib/publish-branch.ts";
 import { editedMountsIn, relayAdvice } from "./remote-mount.ts";
@@ -720,6 +721,8 @@ export interface PublisherHost {
   run: typeof run;
   git: typeof git;
   platformScript: typeof platformScript;
+  /** The advisory size review a publisher runs on its built site before the push ({@link sizeReview}). */
+  sizeReview?: typeof sizeReview;
 }
 
 /** A site publisher a layer above declares: its workflows, and how it stages a repository that calls one. */
@@ -727,7 +730,19 @@ export interface SitePublisher extends PublisherWorkflows {
   stage(run: PublisherRun, host: PublisherHost): Promise<StageResult>;
 }
 
-const HOST: PublisherHost = { formatPlan, pushLoop, writeArtifact, listSite, run, git, platformScript };
+const HOST: PublisherHost = { formatPlan, pushLoop, writeArtifact, listSite, run, git, platformScript, sizeReview };
+
+/**
+ * The size review (`site-size.ts`; owner, 2026-11-10: "add size review as part
+ * of authoring process"): printed before the push, compared with the local
+ * `origin/gh-pages`, its report written to `<repo>/../<name>-site/site-size.json`,
+ * beside the build and never in the published site. Advisory: it never stops a publish.
+ */
+export function sizeReview(repo: string, site: string, name: string, log: (s: string) => void): void {
+  const out = join(resolve(repo), "..", `${name}-site`);
+  mkdirSync(out, { recursive: true });
+  reviewSiteSize({ site, out: join(out, SITE_SIZE_FILE), repo, log });
+}
 
 /**
  * Mounts an earlier attempt left "modified" (an IG's first agent publish, 2026-11-06): a
@@ -861,6 +876,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   }
 
   if (target === "preview") writePreviewRecord(repo, site, { slug, sha, base, log });
+  sizeReview(repo, site, name, log);
 
   if (o.artifact) return done({ bundle: writeArtifact(site, o.artifact, platform, { slug, branch, sha }, log) });
 
