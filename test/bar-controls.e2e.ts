@@ -29,7 +29,7 @@ const page = (lang: string): string => `<!doctype html><html lang="${lang}"><hea
 <script type="application/json" id="fa-translation-meta">${JSON.stringify({ lang, supportedLocales: ["ar", "zh", "en", "fr", "ru", "es"], availableLocales: ["en", "fr"] })}</script>
 <link rel="stylesheet" href="/assets/css/docs-ui.css">
 <style>
-.ig-topbar{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem 1rem;padding:.5rem 1.5rem;background:#1c4b7c;color:#fff}
+.ig-topbar{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem 1rem;padding:.5rem 1.5rem;background:#2d4271;color:#fff}
 .ig-topbar a{color:#fff;text-decoration:none}
 .ig-search{position:relative;margin-left:auto;flex:0 1 18rem}
 </style>
