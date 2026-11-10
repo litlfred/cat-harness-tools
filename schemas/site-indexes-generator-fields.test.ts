@@ -125,6 +125,16 @@ describe("folio-library-index/v1 entries carry catalogue and upstream links (#17
     expect(r.error?.issues ?? []).toEqual([]);
   });
 
+  test("a catalogued entry whose id has capitals has a view that parses", () => {
+    const r = LibraryIndexEntrySchema.safeParse({ ...baseEntry, view: "/library/who-iris/WHO-2019-nCoV-eng/" });
+    expect(r.error?.issues ?? []).toEqual([]);
+  });
+
+  test("a view without its leading or trailing slash is refused", () => {
+    expect(LibraryIndexEntrySchema.safeParse({ ...baseEntry, view: "library/who-iris/x/" }).success).toBe(false);
+    expect(LibraryIndexEntrySchema.safeParse({ ...baseEntry, view: "/library/who-iris/x" }).success).toBe(false);
+  });
+
   test("an unknown key inside catalogue is refused", () => {
     const r = LibraryIndexEntrySchema.safeParse({
       ...baseEntry,
