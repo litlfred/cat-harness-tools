@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { dirDigest, dirKey, rewriteRefs, shareAssets, sharedDirsIn, sharedUrl, stageShared, withMeta } from "../lib/shared-assets.ts";
+import { dirDigest, dirKey, pagesBranchUrl, rewriteRefs, shareAssets, sharedDirsIn, sharedUrl, stageShared, withMeta } from "../lib/shared-assets.ts";
 import { sharedAssetsOf } from "../build-instance-site.ts";
 
 const HOST = "https://o.github.io/hub/";
@@ -132,5 +132,16 @@ describe("sharedAssetsOf — the IG opts in", () => {
     expect(sharedAssetsOf(cfg({ sharedAssets: "https://x/no-slash" }))).toBeUndefined();
     expect(sharedAssetsOf(cfg({}))).toBeUndefined();
     rmSync(d, { recursive: true });
+  });
+});
+
+describe("pagesBranchUrl — a Pages address read through its gh-pages branch", () => {
+  test("a project site maps to its repository's gh-pages branch", () => {
+    expect(pagesBranchUrl("https://litlfred.github.io/smart-html-jtd/shared/assets/img/harness/abc/.shared.json")).toBe(
+      "https://raw.githubusercontent.com/litlfred/smart-html-jtd/gh-pages/shared/assets/img/harness/abc/.shared.json",
+    );
+  });
+  test("any other host has no branch", () => {
+    expect(pagesBranchUrl("https://example.org/shared/x/.shared.json")).toBeUndefined();
   });
 });

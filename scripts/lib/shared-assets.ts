@@ -143,14 +143,36 @@ export async function shareAssets(site: string, host: string, served: (url: stri
   return r;
 }
 
-/** A served check over HTTPS: the host answers 200 for the directory's `.shared.json`. */
-export async function servedOverHttp(url: string): Promise<boolean> {
+/**
+ * Where a GitHub Pages address is committed: a project site
+ * `https://<owner>.github.io/<repo>/<path>` is the `<path>` of `<repo>`'s
+ * gh-pages branch, the branch every site of this platform publishes from
+ * (`publish-gh-pages.sh`). Undefined for any other host.
+ */
+export function pagesBranchUrl(url: string, branch = "gh-pages"): string | undefined {
+  const m = /^https:\/\/([A-Za-z0-9-]+)\.github\.io\/([^/]+)\/(.+)$/.exec(url);
+  return m ? `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${branch}/${m[3]}` : undefined;
+}
+
+async function headOk(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { method: "HEAD", redirect: "follow" });
-    return res.ok;
+    return (await fetch(url, { method: "HEAD", redirect: "follow" })).ok;
   } catch {
     return false;
   }
+}
+
+/**
+ * A served check: the host answers 200 for the directory's `.shared.json`,
+ * or, when the host is a GitHub Pages site that cannot be reached from here
+ * (a sandbox whose proxy refuses github.io, 2026-11-10), its gh-pages branch
+ * holds the file. Pages serves that branch as committed, so the branch is the
+ * same answer read through GitHub (owner, 2026-11-10: "C").
+ */
+export async function servedOverHttp(url: string): Promise<boolean> {
+  if (await headOk(url)) return true;
+  const raw = pagesBranchUrl(url);
+  return raw ? headOk(raw) : false;
 }
 
 /**
