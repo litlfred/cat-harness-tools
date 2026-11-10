@@ -749,6 +749,23 @@ describe("the document index — `documentIndexOf`", () => {
     expect(graphs).not.toContain('href="#a"');
   });
 
+  it("folds a declared entry's items under its row, open only where the page is (IG menu, 2026-11-10)", () => {
+    const decl = `<script type="application/json" data-fa-visualiser-nav>` +
+      `[{"label":"Home","items":[{"label":"Summary","href":"./index.html"},{"label":"Changes","href":"./changes.html"}]},` +
+      `{"label":"Indices","items":[{"label":"Artifacts","href":"./artifacts.html"}]}]</script>`;
+    const files = new Map<string, string>();
+    const opts = { instance: "ig", toRoot: ".", links: [], emitRailData: (f: string, b: string) => void files.set(f, b) };
+    const read = (n: string) => railDataJson(files.get(`assets/navbar/${n}.js`)!);
+    const html = expandRail(injectRailOnce(page(decl), { ...opts, here: "/changes.html" })!, read);
+    const graphs = region(html, "fa-nav-graphs");
+    // Each group is a row with a twisty, and its pages sit inside the fold.
+    const twisties = [...graphs.matchAll(/<button type="button" class="fa-nav-twisty" aria-expanded="(true|false)" aria-controls="([^"]+)"/g)];
+    expect(twisties.map((m) => m[1])).toEqual(["true", "false"]);
+    expect(graphs).toMatch(new RegExp(`<div class="fa-nav-kids" id="${twisties[0]![2]}">[\\s\\S]*?href="./changes.html"[^>]*aria-current="page"`));
+    expect(graphs).toMatch(new RegExp(`<div class="fa-nav-kids" id="${twisties[1]![2]}" hidden>[\\s\\S]*?href="./artifacts.html"`));
+    expect(graphs).toContain('data-fa-fold="2 pages"');
+  });
+
   it("injectRailOnce drops the declaration once the rail has read it, and keeps a malformed one (gp2f)", () => {
     const decl = `<script type="application/json" data-fa-visualiser-nav>[{"label":"node-x","href":"#node-x"}]</script>`;
     const opts = { instance: "cat-harness", toRoot: "..", links: [] };

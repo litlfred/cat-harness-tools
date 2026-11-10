@@ -575,7 +575,14 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
       ...(shared.pages ? { pages: markHere(shared.pages) } : {}),
       toRoot: page.toRoot,
       ...(page.home ? { homeHref: page.home } : {}),
-      ...((page.documentIndex ?? shared.documentIndex) ? { documentIndex: page.documentIndex ?? shared.documentIndex } : {}),
+      // A page's own index is already its own; a SHARED one (a guide's
+      // declared menu) is marked here like the page tree, so the fold that
+      // holds the page arrives open.
+      ...(page.documentIndex
+        ? { documentIndex: page.documentIndex }
+        : shared.documentIndex
+          ? { documentIndex: { ...shared.documentIndex, items: markHere(shared.documentIndex.items) } }
+          : {}),
     }),
   );
 }

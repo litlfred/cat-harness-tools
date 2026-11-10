@@ -1273,6 +1273,16 @@ export function visualiserNavDeclaration(entries: readonly VisualiserNavEntry[])
 }
 
 /**
+ * A declared entry's fold, named for what it holds: "9 pages" when every
+ * child is a page of its own, "3 entries" when they are places on this one.
+ */
+function foldedEntries(kids: readonly NavItem[]): string {
+  const n = kids.length;
+  const pages = kids.every((k) => k.href !== undefined && !k.href.startsWith("#"));
+  return pages ? (n === 1 ? "1 page" : `${n} pages`) : n === 1 ? "1 entry" : `${n} entries`;
+}
+
+/**
  * A visualiser's DECLARED navigation, read off the page it is injected into.
  *
  * Owner, 2026-10-01 (#1757): *"make a qa flag to define LHS navbar for any
@@ -1316,22 +1326,27 @@ export function visualiserNavOf(html: string, label: string): NavGroup | undefin
           // A BULLET, not the row's initial. A letter per row read as a
           // column of unrelated marks (B, T, P, D — #1757 screenshot); the
           // initial is the mark for a harness, which these rows are not.
-          icon: depth > 0 ? "·" : "▸",
+          // No ▸ here: a ▸ in the glyph column read as a toggle that did
+          // nothing (2026-11-10). A row with items gets the fold's own ▸
+          // button below; a row without is a plain bullet.
+          icon: "·",
           ...(typeof e.href === "string" && e.href ? { href: e.href } : {}),
           ...(depth > 0 ? { depth } : {}),
         }
       : undefined;
+  // An entry's items are its CHILDREN, folded under the entry's own row, so
+  // the ▸ beside a group opens and closes it (owner, 2026-11-10, on an IG's
+  // "Home" and "Business Requirements": *"expand collapse on LHS navbar not
+  // working"*). Laid out flat after the row, the ▸ was a picture of a toggle
+  // over a list that was always open.
   const items: NavItem[] = [];
   for (const e of raw as Entry[]) {
     const r = row(e, 0);
     if (!r) continue;
-    items.push(r);
-    if (Array.isArray(e.items)) {
-      for (const k of e.items as Entry[]) {
-        const kr = row(k, 1);
-        if (kr) items.push(kr);
-      }
-    }
+    const kids = Array.isArray(e.items)
+      ? (e.items as Entry[]).map((k) => row(k, 1)).filter((k): k is NavItem => k !== undefined)
+      : [];
+    items.push(kids.length ? { ...r, icon: "", children: kids, fold: foldedEntries(kids) } : r);
   }
   if (items.length === 0) return undefined;
   return { label, icon: "§", items, collapsible: true, open: true };
