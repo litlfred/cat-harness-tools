@@ -187,6 +187,7 @@
     "scripts/test-run-conformance.ts",
     "scripts/tests/block-base-fields.test.ts",
     "scripts/tests/gen-kind-json-schemas.test.ts",
+    "scripts/tests/kg/schema-page.test.ts",
     "scripts/tests/store-tool-results.test.ts",
     "scripts/tests/ui/gen-node-kind-pages.test.ts",
     "scripts/tests/workflow-tool-results.test.ts",
