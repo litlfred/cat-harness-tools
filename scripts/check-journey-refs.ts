@@ -39,6 +39,7 @@ if (import.meta.main) {
   } else {
     for (const f of report.findings) console.error(`✗ ${f.instance}/${f.file} · ${f.at}: ${f.message}`);
     for (const f of report.couldNotDetermine) console.error(`? ${f.instance}/${f.file} · ${f.at}: ${f.message}`);
+    for (const f of report.warnings) console.warn(`⚠ ${f.instance}/${f.file} · ${f.at}: ${f.message}`);
     if (report.undetermined !== undefined) {
       console.error(`? journey-refs: could not read the checkout's declarations (${report.undetermined}). Not a pass.`);
     } else if (report.findings.length === 0 && report.couldNotDetermine.length > 0) {
