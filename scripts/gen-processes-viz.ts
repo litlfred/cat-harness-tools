@@ -1401,10 +1401,28 @@ export function indexScope(rows: readonly ProcessRow[]): PageScope {
   return { subjects: subgraphPages(rows).map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })) };
 }
 
+export function defaultSkillPages(
+  rows: readonly ProcessRow[],
+  repo = REPO,
+  rel = pageRelPath(repo),
+): SkillPages {
+  const roots = instanceRoots(repo);
+  const sourceFiles = skillSourceFilesOf(repo, roots);
+  const linked = skillLinksOf(repo, roots);
+  const named = new Set(rows.flatMap((r) => [...r.skills, ...(r.laneDetails ?? []).flatMap((l) => l.roleSkills.map((x) => x.skill))]));
+  const localSkills = [...named].filter((n) => !linked.has(n) && sourceFiles.has(n)).sort();
+  return Object.assign(new Set(linked), {
+    sources: linked.sources ?? new Map<string, string>(),
+    ...(rel !== undefined
+      ? { local: new Map(localSkills.map((n) => [n, `${dirname(rel)}/${SOURCE_SKILLS_DIR}/${n}.html`])) }
+      : {}),
+  });
+}
+
 export function publishedIndex(
   rows: Parameters<typeof page>[0],
   repo = REPO,
-  skillPages: SkillPages = skillLinksOf(repo, instanceRoots(repo)),
+  skillPages: SkillPages = defaultSkillPages(rows, repo),
   // Read by default, as `skillPages` is: the committed instances are an input
   // of the page, so a caller that omits them gets the page the generator writes.
   instances: InstancesRead = instancesRead(workflowInstanceLinks()),
@@ -1447,10 +1465,7 @@ if (import.meta.main) {
   const linked = skillLinksOf(REPO, instanceRoots(REPO));
   const named = new Set(rows.flatMap((r) => [...r.skills, ...(r.laneDetails ?? []).flatMap((l) => l.roleSkills.map((x) => x.skill))]));
   const localSkills = [...named].filter((n) => !linked.has(n) && sourceFiles.has(n)).sort();
-  const skillPages: SkillPages = Object.assign(new Set(linked), {
-    sources: linked.sources ?? new Map<string, string>(),
-    local: new Map(localSkills.map((n) => [n, `${dirname(rel)}/${SOURCE_SKILLS_DIR}/${n}.html`])),
-  });
+  const skillPages = defaultSkillPages(rows, REPO, rel);
   // The workflow instances each diagram runs in (bean `v49e`): links to their
   // pages, read from the committed instance files the state visualiser draws.
   const instances = instancesRead(workflowInstanceLinks());
