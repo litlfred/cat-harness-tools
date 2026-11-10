@@ -751,7 +751,11 @@ function dcXmlSitePath(instanceRoot: string, record: string): string | undefined
   const stem = basename(record).replace(/\.dc\.json$/, "");
   if (root === undefined || stem === basename(record)) return undefined;
   const file = `${stem}.dc.xml`;
-  return existsSync(join(root, "dublin-core", file)) ? `${basename(instanceRoot)}/dublin-core/${file}` : undefined;
+  // The site serves the layer at its DECLARED name, not at whatever the
+  // checkout directory is called (a clone at `who-iris-217/` is still `/who-iris/`).
+  const name = (readDeclaration(instanceRoot) as { name?: unknown } | undefined)?.name;
+  const served = typeof name === "string" && name ? name : basename(instanceRoot);
+  return existsSync(join(root, "dublin-core", file)) ? `${served}/dublin-core/${file}` : undefined;
 }
 const catalogueInfoCache = new Map<string, Map<string, CatalogueEntryInfo>>();
 function catalogueInfo(instanceRoot: string): Map<string, CatalogueEntryInfo> {
