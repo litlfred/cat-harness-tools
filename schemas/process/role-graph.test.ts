@@ -589,6 +589,23 @@ describe("readRoleGraph — a role inherits a role of an instance it needs", () 
     }
   });
 
+  test("a self-mounting checkout: the needed layer is mounted INSIDE the layer's own root", () => {
+    // who-iris on 2026-11-10: `who-iris/cat-harness/` held the role it
+    // inherits, and the search looked only beside `who-iris/`.
+    const top = mkdtempSync(join(tmpdir(), "role-graph-self-"));
+    try {
+      mkdirSync(join(top, "scenarios"), { recursive: true });
+      writeFileSync(join(top, "top.json"), JSON.stringify({ name: "top", needs: ["base"] }));
+      writeFileSync(join(top, "scenarios", ROLE_GRAPH_FILENAME), JSON.stringify({ name: "top", roles: [role("checker", ["reviewer"])] }));
+      mkdirSync(join(top, "base", "scenarios"), { recursive: true });
+      writeFileSync(join(top, "base", "base.json"), JSON.stringify({ name: "base" }));
+      writeFileSync(join(top, "base", "scenarios", ROLE_GRAPH_FILENAME), JSON.stringify({ name: "base", roles: [role("reviewer")] }));
+      expect(readRoleGraph(join(top, "scenarios"))?.roles.map((r) => r.id)).toEqual(["checker"]);
+    } finally {
+      rmSync(top, { recursive: true, force: true });
+    }
+  });
+
   test("never from an instance it does not need — a sibling or a dependent stays refused", () => {
     const repo = instances([
       { name: "base", roles: [role("reviewer")] },

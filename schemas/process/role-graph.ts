@@ -840,7 +840,10 @@ export function lowerRoleIds(kgRoot: string): ReadonlySet<string> {
     for (const need of needsOf(root)) {
       if (visited.has(need)) continue;
       visited.add(need);
-      const lowerRoot = instanceRootNamed(repo, need);
+      // A self-mounting checkout (`bun .github/cat.ts`) holds its `needs`
+      // INSIDE its own root (`who-iris/cat-harness/`), not beside it, so the
+      // layer's own root is searched first and its parent second.
+      const lowerRoot = instanceRootNamed(own, need) ?? instanceRootNamed(repo, need);
       if (lowerRoot === undefined) continue;
       visit(lowerRoot);
       let scenarios: string | undefined;
