@@ -352,6 +352,22 @@ describe("an entry page links its catalogue record at the top", () => {
     expect(links[0].label).toContain("Dublin Core");
   });
 
+  test("the Dublin Core link is the published XML when there is one, and the KG node is linked", () => {
+    mkdirSync(join(repo, "catalogue", "nodes"), { recursive: true });
+    writeFileSync(join(repo, "catalogue", "nodes", "item-e1.json"), "{}");
+    const links = catalogueRecordLinks({
+      repoRoot: repo, checkoutRepo: "o/host",
+      catalogue: { record: "catalogue/records/e1.dc.json", node: "catalogue/nodes/item-e1.json", handle: "10665/332098" },
+      xmlHref: "../../../../inst/dublin-core/e1.dc.xml",
+    });
+    expect(links.map((l) => l.href)).toEqual([
+      "../../../../inst/dublin-core/e1.dc.xml",
+      "https://github.com/o/host/blob/main/catalogue/nodes/item-e1.json",
+      "https://hdl.handle.net/10665/332098",
+    ]);
+    expect(links[0].label).toBe("Dublin Core XML — e1.dc.xml");
+  });
+
   test("nothing recorded, nothing linked; a malformed Handle is not linked", () => {
     expect(catalogueRecordLinks({ repoRoot: repo, checkoutRepo: "o/host" })).toEqual([]);
     expect(catalogueRecordLinks({ repoRoot: repo, checkoutRepo: "o/host", catalogue: { handle: "javascript:x" } })).toEqual([]);
