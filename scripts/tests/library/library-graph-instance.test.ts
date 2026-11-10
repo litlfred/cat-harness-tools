@@ -4,7 +4,7 @@
  * `t5dm`: a worktree named `pr1290` published `"uploadInstance": "pr1290"`.
  */
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { instanceOf, referencedCatalogueEntries } from "../../library-graph.ts";
@@ -115,5 +115,27 @@ describe("referencedCatalogueEntries", () => {
   test("an id a held entry already uses is skipped", () => {
     const { root, inst } = layer();
     expect(referencedCatalogueEntries([inst], root, new Set(["iris/10665-1"]))).toEqual([]);
+  });
+
+  test("an id held in ANOTHER layer is skipped too: the site has one entry per id", () => {
+    const { root, inst } = layer();
+    expect(referencedCatalogueEntries([inst], root, new Set(["who-iris/10665-1"]))).toEqual([]);
+  });
+
+  test("a record two layers' catalogues both hold is listed once", () => {
+    const { root, inst } = layer();
+    const twin = join(root, "iris2");
+    cpSync(inst, twin, { recursive: true });
+    rmSync(join(twin, "iris.json"));
+    writeDeclaration(twin, {
+      name: "iris2",
+      directories: [
+        { id: "library", path: "library/", graphTypologies: ["library"] },
+        { id: "catalogue", path: "catalogue/", graphTypologies: ["catalogue"] },
+        { id: "site", path: "site/", graphTypologies: ["docs"], instanceRoot: true },
+      ],
+    });
+    const got = referencedCatalogueEntries([inst, twin], root, new Set());
+    expect(got.map((e) => `${e.instance}/${e.id}`)).toEqual(["iris/10665-1"]);
   });
 });
