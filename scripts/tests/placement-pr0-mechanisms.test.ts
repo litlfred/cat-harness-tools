@@ -428,7 +428,7 @@ describe("this checkout", () => {
   test("the five libraries the mirrors named are all in the corpus", () => {
     // Six until bean `j7ql`: agent-skills/library dissolved into cat-harness/library (#1787).
     const libs = corpusDirectoriesForGraph(PLATFORM, "library").map((p) => relative(REPO, p));
-    for (const l of [`cat-harness/${harnessRel("library/corpus", join(REPO, "cat-harness"))}`, "folio-assistant-core/library", "folio-assistant-sci/library", "smart-base/library", "who-iris/library"]) {
+    for (const l of [`cat-harness/${harnessRel("library/corpus", join(REPO, "cat-harness"))}`, `folio-assistant-core/${harnessRel("library/corpus", join(REPO, "folio-assistant-core"))}`, "folio-assistant-sci/library", "smart-base/library", "who-iris/library"]) {
       expect(libs).toContain(l);
     }
   });

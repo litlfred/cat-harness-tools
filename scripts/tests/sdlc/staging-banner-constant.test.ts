@@ -292,6 +292,14 @@ describe("the banner goes in the BODY, not in a comment that mentions one", () =
     expect(out).toContain(`<body>${FRAGMENT}`);
   });
 
+  test("a Liquid-commented `<body>` in an unrendered include does not absorb the banner", () => {
+    const page = "<html><head>{%- comment -%} hoists a stray div into <body> {%- endcomment -%}</head><body>x</body></html>";
+    const { html: out, outcome } = injectInto(page);
+    expect(outcome).toBe("injected");
+    expect(out.indexOf(FRAGMENT)).toBeGreaterThan(out.indexOf("endcomment -%}"));
+    expect(out).toContain(`<body>${FRAGMENT}`);
+  });
+
   test("THE WITNESS — the real head_custom.html, which is what actually broke", () => {
     // A matcher proven only against fixtures is proven against its author's
     // idea of the file. This reads the include that shipped the defect and
