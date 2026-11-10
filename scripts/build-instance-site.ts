@@ -112,7 +112,8 @@ export const THEME_SIDEBAR_RULING: DroppedByRuling = {
 import { expectedPages, siteCoverageShortfall } from "./site-coverage.ts";
 import { pagesEmbedPdf, pruneUnreferencedImages } from "./lib/site-prune.ts";
 import { servedOverHttp, shareAssets } from "./lib/shared-assets.ts";
-import { writeMissingVisualisers } from "./visualiser-writers.ts";
+import { scopeArg } from "./lib/site-scope.ts";
+import { instanceRoots, writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
 import { PREVIEW_PREFIX, PREVIEW_PREFIXES, previewPath } from "./lib/preview-prefix.ts";
@@ -217,6 +218,14 @@ export function sharedAssetsOf(root: string): string | undefined {
   }
 }
 
+/**
+ * The instances whose pages a site writes: its own only, when it lands on
+ * another layer. The landing layer lends the site its chrome and theme, not
+ * its pages; those, and every other layer's, are linked on the platform's
+ * site (owner, 2026-11-10: "smart-base etc should not be in
+ * smart-immunizations... only cross referenced", superseding Q-SZ-2 "B",
+ * which kept the landing layer's pages).
+ */
 export function siteScopeOf(root: string, instance: string): string[] | undefined {
   const file = join(root, "index.config.json");
   if (!existsSync(file)) return undefined;
@@ -227,7 +236,7 @@ export function siteScopeOf(root: string, instance: string): string[] | undefine
     return undefined;
   }
   if (typeof landing !== "string" || landing === "hub" || landing === instance) return undefined;
-  return [...new Set([instance, landing])].sort();
+  return [instance];
 }
 
 /** The `require`d root files a built site does not hold. */
@@ -784,6 +793,55 @@ export function siteStepEnv(v: { instance: string; title: string; baseurl: strin
  * yet. Read with `git fetch --depth 1` + `git archive`: nothing is cloned
  * into the checkout and nothing is written to the remote.
  */
+/** The ruling a scoped site's parity guard quotes for a directory of another layer's pages. */
+export const SCOPE_RULING =
+  "owner, 2026-11-10: \"smart-base etc should not be in smart-immunizations... only cross referenced\" — another layer's pages are linked on its own site, not copied into a scoped (IG) site";
+
+/** The routes, current and old, of the pages an unscoped build owes and a scoped one does not. */
+export function notOwedInScope(root: string, scope: readonly string[], staging: boolean): string[] {
+  const owed = new Set(expectedPages(root, { staging, scope }).flatMap((p) => [p.route, p.legacyRoute]));
+  return [...new Set(expectedPages(root, { staging }).flatMap((p) => [p.route, p.legacyRoute]))].filter((r) => r !== "" && !owed.has(r));
+}
+
+/**
+ * The top-level directories of the published root that this scoped build
+ * leaves out BECAUSE they hold only other layers' pages: every file lies under
+ * an out-of-scope instance's name (as the directory, or one level down:
+ * `docs/who-iris/`, `ar/folio-assistant-core/`) or under a page route the
+ * scope no longer owes. Anything else stays a shortfall for the guard.
+ */
+export function scopeDropped(current: string, candidate: string, scope: readonly string[], instances: readonly string[], notOwed: readonly string[]): DroppedByRuling[] {
+  const inScope = new Set(scope);
+  const others = new Set(instances.filter((i) => !inScope.has(i)));
+  // An out-of-scope layer's page at its own-site route (`who-iris/catalogue/` served at `catalogue/`)
+  // is that layer's too: the unscoped build put it at the root for the layer, not for this site.
+  const ownSite = notOwed.flatMap((r) => {
+    const seg = r.split("/").filter(Boolean);
+    const at = others.has(seg[0]!) ? 1 : seg[0] === "en" && others.has(seg[1]!) ? 2 : -1;
+    return at > 0 && seg.length > at ? [`${seg.slice(at).join("/")}/`] : [];
+  });
+  const routes = [...notOwed, ...ownSite];
+  const out: DroppedByRuling[] = [];
+  for (const d of readdirSync(current, { withFileTypes: true })) {
+    if (!d.isDirectory() || existsSync(join(candidate, d.name))) continue;
+    const files: string[] = [];
+    const walk = (dir: string, rel: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const r = `${rel}/${e.name}`;
+        if (e.isDirectory()) walk(join(dir, e.name), r);
+        else files.push(r);
+      }
+    };
+    walk(join(current, d.name), d.name);
+    const theirs = (f: string): boolean => {
+      const seg = f.split("/");
+      return others.has(seg[0]!) || (seg.length > 2 && others.has(seg[1]!)) || routes.some((r) => f.startsWith(r));
+    };
+    if (files.length > 0 && files.every(theirs)) out.push({ dir: d.name, ruling: SCOPE_RULING });
+  }
+  return out;
+}
+
 export function publishedRoot(remote: string, branch: string, exclude: readonly string[]): string | undefined {
   const dir = mkdtempSync(join(tmpdir(), "published-root-"));
   const git = join(dir, "git");
@@ -919,7 +977,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     );
 
     for (const st of o.siteSteps ?? []) run(`site: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
-    if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
+    if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}${o.scope ? ` --scope ${shellQuote(scopeArg(o.scope))}` : ""}`, root);
     // A scoped site installs the viewer only when one of its pages embeds it (Q-SZ-6 "A").
     if (has.has("pdf") && o.scope && !pagesEmbedPdf(site)) console.log("pdf viewer: no page of this scoped site embeds a PDF; not installed");
     else if (has.has("pdf")) run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow ${shellQuote(`https://cdn.jsdelivr.net/gh/${gh.owner}/`)} --allow ${shellQuote(`https://raw.githubusercontent.com/${gh.owner}/`)}`, root);
@@ -972,7 +1030,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     const against = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined);
     if (against === undefined) console.log("parity: no published root to compare with — nothing to lose");
     else {
-      const dropped = [...(o.parityDropped ?? []), ...((o.parityDropped ?? []).some((x) => x.feature === "siteNav") ? [] : [THEME_SIDEBAR_RULING])];
+      const outOfScope = o.scope ? scopeDropped(against, site, o.scope, [...instanceRoots(root).keys()], notOwedInScope(root, o.scope, Boolean(staging))) : [];
+      const dropped = [...(o.parityDropped ?? []), ...outOfScope, ...((o.parityDropped ?? []).some((x) => x.feature === "siteNav") ? [] : [THEME_SIDEBAR_RULING])];
       const cur = siteFeatures(against, keep);
       const cand = siteFeatures(site, keep);
       console.log(`parity: ${describeFeatures("current root", cur)}`);
