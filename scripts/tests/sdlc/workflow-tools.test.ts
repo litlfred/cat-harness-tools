@@ -121,6 +121,29 @@ describe("QC checks need no Tool", () => {
     expect(r.qc).toBe(3);
   });
 
+  test("a lint key, a `verify` subcommand and an audit/verify/gates segment are QC too", () => {
+    const root = tree({
+      ".github/workflows/w.yml": [
+        "jobs:",
+        "  a:",
+        "    steps:",
+        "      - run: bun run cat lint",
+        "      - run: bash lay/scripts/sign.sh verify",
+        "      - run: bash lay/scripts/determinism-audit.sh",
+        "      - run: python3 lay/scripts/run-root-gates.py .",
+        "      - run: bash lay/scripts/sign.sh file x",
+      ].join("\n"),
+      "lay/scripts/l.ts": "",
+      "lay/scripts/sign.sh": "",
+      "lay/scripts/determinism-audit.sh": "",
+      "lay/scripts/run-root-gates.py": "",
+      "package.json": JSON.stringify({ name: "root", scripts: { lint: "bun run lay/scripts/l.ts" } }),
+    });
+    const r = assess(invocations(root, [".github/workflows/w.yml"]), toolReach([], root), [], new Map());
+    expect(r.findings.map((f) => f.subject)).toEqual(["lay/scripts/sign.sh"]);
+    expect(r.qc).toBe(3); // sign.sh also has a producing run, so it is judged
+  });
+
   test("a step a Tool's own script runs is covered by that Tool", () => {
     const root = tree({
       ".github/workflows/w.yml": "jobs:\n  a:\n    steps:\n      - run: bun run lay/scripts/step.ts\n",

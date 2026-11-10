@@ -51,26 +51,31 @@
  * until the rest names a file at the root or in the workflow's own layer. A
  * path that resolves to no file is reported as `unresolved`, never dropped.
  *
- * ## A ratchet, one list per layer
+ * ## A ratchet, one baseline per layer, kept in that layer
  *
  * `.github/workflows/` is not a declared graph typology (see
  * `check-ci-invocations.ts`), and on the day this landed most scripts the
- * workflows run had no Tool. So existing findings are recorded in
- * `workflow-tools-baseline.json`, one list per layer whose workflows run them,
- * and only a NEW one fails. The fix for a new finding is a Tool node (and a
- * process link), never a wider baseline.
+ * workflows run had no Tool. So existing findings are recorded, and only a
+ * NEW one fails. The fix for a new finding is a Tool node (and a process
+ * link), never a wider baseline.
  *
- * - A layer with NO list is not yet ratcheted: its findings are reported and
- *   do not fail, so the gate can land before every repository that runs it
- *   (every IG repo through `layer-pr-checks`) has been measured. Seeding it is
- *   `--write-baseline` in a checkout that holds that layer's workflows.
+ * Each layer keeps its own list in `.github/workflow-tools-baseline.json`
+ * (the index root in its own `.github/`), never in this layer: a list here
+ * of another layer's scripts would name the layers above this one, which
+ * `check:reference-direction` refuses.
+ *
+ * - A layer with NO baseline file is not yet ratcheted: its findings are
+ *   reported and do not fail, so the gate can land before every repository
+ *   that runs it (every IG repo through `layer-pr-checks`) has been measured.
+ *   Seeding one is `--write-baseline <layer directory>` (`.` for the root).
  * - A listed finding that is gone is reported as fixed, not failed: the Tool
  *   that fixes it usually lands in another layer, and a checkout pinned on
  *   either side of that change must not go red on a line it cannot change.
  * - In a layer's PR checks only the caller's own workflows are judged
  *   (`lib/gate-own.ts`), as `check-ci-invocations.ts` does.
  *
- * Usage:  bun run cat check:workflow-tools [--list] [--write-baseline]
+ * Usage:  bun run cat check:workflow-tools [--list] [--write-baseline [<layer dir> ...]]
+ *         `--write-baseline` alone rewrites the layers that already have one.
  * Exit:   0 no new finding · 1 a new finding in a ratcheted layer
  *         2 no workflow found: could not determine
  *
@@ -86,9 +91,11 @@ import { scriptTable } from "../schemas/sdlc/script-table.ts";
 import { gateOwnsFile } from "./lib/gate-own.ts";
 import { declaredInstanceName } from "./lib/roots.ts";
 
-const TOOLS_ROOT = resolve(import.meta.dir, "..");
 const ROOT = resolve(import.meta.dir, "..", "..");
-export const BASELINE = join(TOOLS_ROOT, "scripts", "workflow-tools-baseline.json");
+/** A layer's baseline, inside that layer: `<layer dir>/.github/workflow-tools-baseline.json`. */
+export function baselinePath(layerDir: string, root: string = ROOT): string {
+  return join(root, layerDir, ".github", "workflow-tools-baseline.json");
+}
 
 const SCRIPT_EXT = "(?:ts|mts|sh|py|mjs|cjs|js)";
 const PATH = `((?:\\.{1,2}/)*[\\w.@-]+(?:/[\\w.@-]+)*\\.${SCRIPT_EXT})`;
@@ -247,21 +254,24 @@ export function keyChain(
 /**
  * Quality checks need no Tool (owner, 2026-11-10: "we dont need Tools/Skills
  * for QC checks actions"). A run is a QC check when it is reached through a
- * gate key (`check:*`, `*:check`, the set `run-gates.py` derives), passes
- * `--check` or `--verify`, or runs a file named `check-*`, `audit-*`,
- * `validate-*` or `verify-*`. A script that a workflow ALSO runs as a
+ * gate key (`check:*`, `*:check`, `lint`, the set `run-gates.py` derives),
+ * passes `--check`, `--verify` or a `verify` subcommand, or runs a file whose
+ * name begins `check-`, `validate-`, `lint-` and the like, or carries an
+ * `audit`, `verify` or `gates` segment (`determinism-audit.sh`,
+ * `run-root-gates.py`). A script that a workflow ALSO runs as a
  * producing step (a generator run once to write and once with `--check`) is
  * still judged, on its producing runs.
  */
-export const QC_KEY = /(?:^|:)check(?::|$)|^check-|^audit:|^qa:/;
-const CHECK_FLAG = /\s--(?:check|verify)\b/;
+export const QC_KEY = /(?:^|:)check(?::|$)|^check-|^audit:|^qa:|^lint(?::|$)/;
+const CHECK_FLAG = /\s(?:--(?:check|verify)\b|verify(?:\s|$))/;
 export function isQcScript(path: string): boolean {
   if (/(?:^|\/)tests?\//.test(path)) return true;
   const base = (path.split("/").pop() ?? "").replace(/\.[a-z]+$/, "");
   return (
     /^(?:check|audit|validate|verify|qa|typecheck|lint)(?:[-_]|$)/.test(base) ||
     /[-_](?:check|verify|verdict|dryrun|links|dead-links|qa)$/.test(base) ||
-    /^verdict[-_]/.test(base)
+    /^verdict[-_]/.test(base) ||
+    /(?:^|[-_])(?:audit|verify|gates)(?:[-_]|$)/.test(base)
   );
 }
 
@@ -488,19 +498,18 @@ export function assess(invs: readonly Invocation[], reach: Reach, defs: readonly
 }
 
 /**
- * The baseline, one list per layer. A layer with no list is not yet ratcheted:
- * its findings are reported and do not fail, so the gate can land before
- * every repository that runs it has been measured. Seeding a layer is
- * `--write-baseline` in a checkout that holds that layer's workflows.
+ * One layer's baseline. Absent means the layer is not yet ratcheted: its
+ * findings are reported and do not fail.
  */
 export interface Baseline {
   _comment?: string;
-  layers: Record<string, string[]>;
+  findings: string[];
 }
 
-function readBaseline(): Baseline {
-  if (!existsSync(BASELINE)) return { layers: {} };
-  return JSON.parse(readFileSync(BASELINE, "utf-8")) as Baseline;
+export function readBaseline(layerDir: string, root: string = ROOT): Baseline | undefined {
+  const p = baselinePath(layerDir, root);
+  if (!existsSync(p)) return undefined;
+  return JSON.parse(readFileSync(p, "utf-8")) as Baseline;
 }
 
 /** The layer a workflow file belongs to, by name: its directory, or the root's own name. */
@@ -517,11 +526,11 @@ export function layerName(workflow: string, root: string = ROOT): string {
 }
 
 const COMMENT =
-  "Scripts GitHub workflows run that are not yet a Tool linked to a process (check:workflow-tools), one list per " +
-  "layer whose workflows run them. A ratchet: only a finding NOT listed fails, and a layer with no list is reported " +
-  "and not failed until it is seeded. The fix for a finding is a Tool node in the tools graph of the layer that owns " +
+  "Scripts this layer's GitHub workflows run that are not yet a Tool linked to a process (check:workflow-tools). " +
+  "A ratchet: only a finding NOT listed fails, and a layer with no file is reported and not failed until it is " +
+  "seeded. The fix for a finding is a Tool node in the tools graph of the layer that owns " +
   "the script, whose `satisfies` names a skill a BPMN task names (or which declares `subprocesses`), never a new " +
-  "line here. Keyed by finding and script, never by workflow or line. Refresh with --write-baseline.";
+  "line here. Keyed by finding and script, never by workflow or line. Refresh with --write-baseline <layer dir>.";
 
 if (import.meta.main) {
   const all = workflowFiles(ROOT);
@@ -534,26 +543,29 @@ if (import.meta.main) {
   for (const f of discovery.failures) console.log(`  ! tools graph ${f.dir ?? f.instance}: ${f.reason}`);
   const reach = toolReach(discovery.tools, ROOT);
   const bySkill = skillProcesses(ROOT);
-  const baseline = readBaseline();
   const list = process.argv.includes("--list");
-  const write = process.argv.includes("--write-baseline");
+  const wi = process.argv.indexOf("--write-baseline");
+  const write = wi >= 0;
+  const seed = new Set(write ? process.argv.slice(wi + 1).filter((a) => !a.startsWith("--")).map((a) => a.replace(/\/+$/, "") || ".") : []);
+  let written = 0;
 
   // Judged per layer: a script two layers' workflows run is a finding of each.
   const byLayer = new Map<string, string[]>();
   for (const f of files) {
-    const l = layerName(f, ROOT);
+    const l = layerOf(f, ROOT);
     byLayer.set(l, [...(byLayer.get(l) ?? []), f]);
   }
 
   let bad = false;
   let total = 0;
   let linked = 0;
-  for (const [layer, own] of [...byLayer].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [dir, own] of [...byLayer].sort(([a], [b]) => a.localeCompare(b))) {
+    const layer = layerName(own[0]!, ROOT);
     const { findings, ok, subjects, qc } = assess(invocations(ROOT, own), reach, discovery.tools, bySkill);
     total += subjects.size;
     linked += ok.length;
     const keys = new Set(findings.map(baselineKey));
-    const known = baseline.layers[layer];
+    const known = readBaseline(dir, ROOT)?.findings;
     console.log(
       `${layer}: ${own.length} workflow/action file(s), ${qc} QC check(s) exempt, ${subjects.size} producing script(s), ` +
         `${ok.length} a Tool linked to a process, ${findings.length} not yet` +
@@ -566,7 +578,12 @@ if (import.meta.main) {
       }
     }
     if (write) {
-      baseline.layers[layer] = [...keys].sort();
+      if (known !== undefined || seed.has(dir)) {
+        const p = baselinePath(dir, ROOT);
+        writeFileSync(p, JSON.stringify({ _comment: COMMENT, findings: [...keys].sort() }, null, 2) + "\n");
+        console.log(`  ✓ baseline written: ${relative(ROOT, p)} (${keys.size})`);
+        written++;
+      }
       continue;
     }
     if (known === undefined) continue;
@@ -593,9 +610,7 @@ if (import.meta.main) {
   }
 
   if (write) {
-    const sorted = Object.fromEntries(Object.entries(baseline.layers).sort(([a], [b]) => a.localeCompare(b)));
-    writeFileSync(BASELINE, JSON.stringify({ _comment: COMMENT, layers: sorted }, null, 2) + "\n");
-    console.log(`  ✓ baseline written for ${byLayer.size} layer(s)`);
+    console.log(`  ✓ ${written} baseline(s) written`);
     process.exit(0);
   }
   if (byLayer.size === 0) {
