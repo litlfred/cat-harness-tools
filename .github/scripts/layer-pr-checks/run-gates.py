@@ -81,7 +81,9 @@ before any gate runs:
   `unchanged: <sha>`, never an `exit`, so it can never read as a pass.
 - `record` (a push to the caller's main): the same, and then every candidate
   that did not skip runs under `strace` by `ci-cone.ts run`, after every other
-  gate and one at a time, so no neighbour writes under its trace. The shard's
+  gate: the pooled ones GATE_JOBS at once, a record a neighbour's writes may
+  have met dropped and its gate run again alone (`run_traced`), the alone ones
+  one at a time. The shard's
   records go to `cone-records.json` beside <out.json>. A gate that skipped
   keeps the record it matched, so main traces only what changed (bean `4rbc`,
   "a cheaper record on main").
@@ -583,9 +585,10 @@ def shard_names(names, i, n, timings=None, alone=(), jobs=1):
 def gate_jobs():
     """`GATE_JOBS`, the gates run at once within one shard; 1 when unset.
 
-    For the split, 1 under `GATE_CONE=record` too: a push traces its gates one
-    at a time (the `traced` loop), so there they cost their whole seconds and
-    the summed-seconds split is the wall-time split."""
+    For the split, 1 under `GATE_CONE=record` too: a push traces its alone
+    gates one at a time, and a pooled one met by a neighbour's writes runs
+    again alone (`run_traced`), so the summed-seconds split stays the safe
+    split there."""
     if os.environ.get("GATE_CONE", "").strip() == "record":
         return 1
     return max(1, int(os.environ.get("GATE_JOBS", "1") or "1"))
@@ -747,6 +750,138 @@ def cone_scripts(gates, runner):
         if command == f"{CONE_RUNNER} {script}":
             out[name] = script
     return out
+
+
+# ── Tracing several gates at once (owner pick Q-ACT-1 A, 2026-11-10) ─────
+#
+# A push traced its gates one at a time, so a shard of a main run took the SUM
+# of its gates (who-iris run 42885346093: 69 gates, 1,064 s, 948 s wall) though
+# GATE_JOBS=4. The pooled candidates are now traced GATE_JOBS at once; the
+# `alone` (tree-tool) ones still run last and one at a time. What makes a
+# record taken beside neighbours sound: every traced run reports what it
+# touched inside the checkout (`CI_CONE_TOUCHED_OUT`: its reads, the
+# directories it listed, its writes, creates, deletes and renames, and whether
+# it ran git) and writes its record to its own file (`CI_CONE_RECORD_OUT`). A
+# run whose time overlapped a neighbour that wrote a path it read, wrote into a
+# directory it listed, wrote anything while it ran git, or whose writes are not
+# known, keeps NO record and is run again alone, and that alone run is its
+# verdict and its record. Records hash a path's state after the run, so a
+# neighbour's write would otherwise be stored as a state the gate never read.
+# The other records are kept with `ci-cone.ts keep`, which stores them exactly
+# as a lone run would. A side whose ci-cone.ts predates this traces one at a
+# time, as before; `GATE_CONE_PARALLEL=0` does too.
+CONE_PARALLEL_MARKS = ("CI_CONE_TOUCHED_OUT", "CI_CONE_RECORD_OUT", '"keep"')
+
+
+def cone_parallel(root, env):
+    """Whether this side's ci-cone.ts can trace gates side by side."""
+    if (env.get("GATE_CONE_PARALLEL") or "").strip() == "0":
+        return False
+    if (env.get("GATE_CONE_CLI") or "").strip():
+        return (env.get("GATE_CONE_PARALLEL") or "").strip() == "1"
+    try:
+        with open(os.path.join(root, CONE_CLI)) as f:
+            src = f.read()
+    except OSError:
+        return False
+    return all(m in src for m in CONE_PARALLEL_MARKS)
+
+
+def _dirs_above(path):
+    """The directories a write to `path` changes the listing of: its parent, up to the root ("")."""
+    head = path
+    while "/" in head:
+        head = head.rsplit("/", 1)[0]
+        yield head
+    yield ""
+
+
+def cone_clashes(touched, spans):
+    """name -> why, for each traced run a neighbour may have disturbed.
+
+    `touched`: name -> what ci-cone.ts reported the run touched, or
+    {"undetermined": why}. `spans`: name -> (start, end) on one clock; two runs
+    are neighbours when their spans overlap."""
+    def known(t):
+        return isinstance(t, dict) and "undetermined" not in t
+    out = {}
+    names = sorted(touched)
+    for a in names:
+        ta = touched[a]
+        a0, a1 = spans[a]
+        for b in names:
+            if b == a:
+                continue
+            b0, b1 = spans[b]
+            if b1 <= a0 or a1 <= b0:
+                continue
+            tb = touched[b]
+            if not known(tb):
+                out[a] = f"{b} ran beside it and what it wrote is not known ({(tb or {}).get('undetermined', 'no report')})"
+                break
+            w = set(tb.get("writes") or [])
+            if not w:
+                continue
+            if not known(ta):
+                out[a] = f"what it read is not known, and {b} wrote beside it"
+                break
+            reads = set(ta.get("reads") or [])
+            listed = set(ta.get("listed") or [])
+            hit = sorted(w & reads)
+            if hit:
+                out[a] = f"{b} wrote {hit[0]}, which it read"
+                break
+            hit = sorted(p for p in w if any(d in listed for d in _dirs_above(p)))
+            if hit:
+                out[a] = f"{b} wrote {hit[0]} into a directory it listed"
+                break
+            if ta.get("git"):
+                out[a] = f"it ran git, and {b} wrote {sorted(w)[0]} beside it"
+                break
+    return out
+
+
+def run_traced(root, cli, traced, jobs, tmp, alone):
+    """Run the traced gates: side by side when the cone allows it, else one at a
+    time. Returns the outcomes, as `run` gives them, keyed by gate name."""
+    outcomes = {}
+    pool_names = [n for n in traced if n not in alone]
+    lone = [n for n in traced if n not in pool_names]
+    if jobs > 1 and len(pool_names) > 1 and cone_parallel(root, os.environ):
+        work = os.path.join(tmp, "cone-parallel")
+        os.makedirs(work, exist_ok=True)
+        files = {n: (os.path.join(work, f"{i}.touched.json"), os.path.join(work, f"{i}.record.json")) for i, n in enumerate(pool_names)}
+        spans = {}
+
+        def one(name):
+            touched_out, record_out = files[name]
+            env = {**os.environ, "CI_CONE_TOUCHED_OUT": touched_out, "CI_CONE_RECORD_OUT": record_out}
+            t0 = time.monotonic()
+            got = run(root, name, shlex.join([*cli, "run", traced[name]]), env=env)
+            spans[name] = (t0, time.monotonic())
+            return got
+
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            for got in pool.map(one, pool_names):
+                outcomes[got[0]] = got
+        touched = {n: read_json(files[n][0]) or {"undetermined": "it reported nothing"} for n in pool_names}
+        for n, t in touched.items():
+            if isinstance(t, dict) and t.get("writes"):
+                print(f"::warning::{n} wrote inside the checkout while judging ({', '.join(t['writes'][:3])}): a gate should write nothing", flush=True)
+        clashes = cone_clashes(touched, spans)
+        keep = [files[n][1] for n in pool_names if n not in clashes and os.path.isfile(files[n][1])]
+        if keep:
+            k = run(root, "cone:keep", shlex.join([*cli, "keep", *keep]))
+            print(k[3], flush=True)
+        print(f"ci cone: traced {len(pool_names)} gate(s) {jobs} at a time; {len(clashes)} met a neighbour's writes and run again alone", flush=True)
+        for n, why in sorted(clashes.items()):
+            print(f"ci cone: {n} runs again alone: {why}", flush=True)
+            lone.append(n)
+    else:
+        lone = list(traced)
+    for name in lone:
+        outcomes[name] = run(root, name, shlex.join([*cli, "run", traced[name]]))
+    return outcomes
 
 
 def strace_works():
@@ -921,10 +1056,10 @@ def gate_env(root, own):
     os.environ.setdefault(GATE_FOREIGN_PATHS_ENV, ",".join(d for n, d in sorted(known.items()) if n not in own and d != "."))
 
 
-def run(root, name, command):
+def run(root, name, command, env=None):
     start = time.monotonic()
     try:
-        p = subprocess.run(shlex.split(command), cwd=root, capture_output=True, text=True, timeout=TIMEOUT_S)
+        p = subprocess.run(shlex.split(command), cwd=root, capture_output=True, text=True, timeout=TIMEOUT_S, env=env)
         code, text = p.returncode, (p.stdout + p.stderr).strip()
     except subprocess.TimeoutExpired:
         # Harness convention: exit 2 is "could not determine", never a pass.
@@ -1186,14 +1321,19 @@ def main():
     with ThreadPoolExecutor(max_workers=jobs) as pool:
         outcomes = list(pool.map(lambda kv: run(root, kv[0], kv[1]), pooled))
     outcomes += [run(root, k, v) for k, v in serial]
-    # Traced last and one at a time, so no other gate writes under a trace: a
-    # record holds the state each path had when ITS run read it. ci-cone.ts
-    # `run` exits with the check's own status; a traced run that failed is
-    # re-run untraced, and that is the verdict (bean `4rbc`).
+    # Traced last, after every untraced gate, so no untraced gate writes
+    # under a trace: a record holds the state each path had when ITS run read
+    # it. The pooled ones are traced side by side, guarded as `run_traced`
+    # says; the alone ones one at a time. ci-cone.ts `run` exits with the
+    # check's own status; a traced run that failed is re-run untraced, and
+    # that is the verdict (bean `4rbc`).
     cli = cone_cli(root, os.environ) if traced else None
-    for name, script in traced.items():
-        n, _, code, text, seconds = run(root, name, shlex.join([*cli, "run", script]))
-        outcomes.append((n, gates[name], code, text, seconds))
+    if traced:
+        with tempfile.TemporaryDirectory(prefix="cone-parallel-") as ctmp:
+            done = run_traced(root, cli, traced, jobs, ctmp, alone)
+        for name in traced:
+            n, _, code, text, seconds = done[name]
+            outcomes.append((n, gates[name], code, text, seconds))
     for name, command, code, text, seconds in outcomes:
         print(f"::group::{name}: exit {code} in {seconds} s — {command}", flush=True)
         print(text[-4000:], flush=True)
