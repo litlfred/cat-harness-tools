@@ -104,6 +104,7 @@ import { parseFrontMatter } from "../schemas/kg/front-matter.js";
 import { ROUTE_SEGMENT, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
+import { qaLivePanel, qaLiveSourceOf, type QaLiveSource } from "./qa-live.ts";
 import { isOpen, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";
 import { allInstances, beanInputs, beanStores, declaredDiagramIds, unlinkedReport, unlinkedSectionHtml } from "./unlinked-beans.ts";
 import { MergeQueueEntrySchema } from "../schemas/sdlc/merge-queue.ts";
@@ -2312,6 +2313,15 @@ export interface InstanceSubject {
   path: string;
   absPath: string;
   instanceRoot: string;
+  /** The branch the directory's records are kept on (`storage`/`source` `branch`), when it declares one. */
+  storage?: string;
+}
+
+/** A declared `storage`/`source` that names one branch, as `qaStorageOf` reads it; anything else is no branch. */
+function branchOf(x: unknown): string | undefined {
+  if (x === null || typeof x !== "object" || !("branch" in x)) return undefined;
+  const b = (x as { branch: unknown }).branch;
+  return typeof b === "string" && b.length > 0 ? b : undefined;
 }
 
 /**
@@ -2328,7 +2338,7 @@ export interface InstanceSubject {
  * tile would have nowhere to go.
  */
 export function instanceSubjectsOf(
-  dirs: ReadonlyArray<{ id: string; path: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[] }>,
+  dirs: ReadonlyArray<{ id: string; path: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[]; storage?: unknown; source?: unknown }>,
   kinds: readonly string[],
 ): InstanceSubject[] {
   const out = new Map<string, InstanceSubject>();
@@ -2338,7 +2348,8 @@ export function instanceSubjectsOf(
     if (out.has(name)) continue;
     const up = d.path.split("/").filter((x) => x.length > 0 && x !== ".").length;
     const instanceRoot = resolve(d.absPath, ...Array.from({ length: up }, () => ".."));
-    out.set(name, { name, path: d.path, absPath: d.absPath, instanceRoot });
+    const storage = branchOf(d.source) ?? branchOf(d.storage);
+    out.set(name, { name, path: d.path, absPath: d.absPath, instanceRoot, ...(storage ? { storage } : {}) });
   }
   return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -2431,6 +2442,7 @@ export function instanceSubjectPage(
   s: InstanceSubject,
   subjects: readonly InstanceSubject[],
   ix: QaGraphProjection = projectInstanceSubject(s, vis.coversKinds ?? []),
+  live?: QaLiveSource,
 ): string {
   const title = vis.title ?? vis.id;
   const others = subjects
@@ -2442,13 +2454,17 @@ export function instanceSubjectPage(
     .join("");
   const qaFamilies = (vis.coversKinds ?? []).includes("qa");
   const registry = (vis.coversKinds ?? []).length > 0 && (vis.coversKinds ?? []).every((k) => REGISTRY_KINDS.has(k));
+  // The build holds no corpus, but the layer publishes one: the browser reads
+  // it from the layer's qa-reports branch at view time (owner card, 2026-11-10:
+  // "Load in the browser"), so a publish never fetches or copies results.
+  const loadsLive = qaFamilies && live !== undefined && (ix as { availability?: string }).availability === "unknown";
   return page({
     title: `${s.name} — ${title}`,
-    ...(registry ? { noLiquid: true } : {}),
+    ...(registry || loadsLive ? { noLiquid: true } : {}),
     body:
       `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
       `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's ${esc(title)}</a></p>` +
-      qaPanelsOf(ix, undefined, { qaFamilies }) +
+      (loadsLive ? qaLivePanel(live!) : qaPanelsOf(ix, undefined, { qaFamilies })) +
       (registry ? registryTable(registryRowsOf(s.absPath)) : "") +
       `<h2 class="sv-h2">Instances holding ${esc(title)}</h2>` +
       `<ul class="sv-list">${others}</ul>`,
@@ -2630,13 +2646,19 @@ export function listCodeFiles(absPath: string, limit: number = CODE_FILE_LIMIT):
  * names without links rather than guess a ref.
  */
 export function pinnedBlobBase(repoRoot: string, instance: string): string | undefined {
+  const m = pinnedMount(repoRoot, instance);
+  return m === undefined ? undefined : `https://github.com/${m.repository}/blob/${m.ref}/`;
+}
+
+/** The repository and commit `index.lock.json` pins a layer at, or `undefined` when the lock does not name it plainly. */
+export function pinnedMount(repoRoot: string, instance: string): { repository: string; ref: string } | undefined {
   try {
     const lock = JSON.parse(readFileSync(join(repoRoot, "index.lock.json"), "utf-8")) as {
       mounts?: Array<{ harness?: string; repository?: string; ref?: string }>;
     };
     const m = (lock.mounts ?? []).find((x) => x.harness === instance);
     if (!m?.repository || !m.ref || !/^[\w.-]+\/[\w.-]+$/.test(m.repository) || !/^[0-9a-f]{7,40}$/.test(m.ref)) return undefined;
-    return `https://github.com/${m.repository}/blob/${m.ref}/`;
+    return { repository: m.repository, ref: m.ref };
   } catch {
     return undefined;
   }
@@ -3134,7 +3156,7 @@ for (const { v, harness: vh, hosted } of perInstance) {
         ? codeSubjectPage(v, s, subjects, codeDirectoriesOf(candidates, s.name, kinds), pinnedBlobBase(REPO_ROOT, s.name))
         : memory
           ? memorySubjectPage(v, s, subjects, pinnedBlobBase(REPO_ROOT, s.name))
-          : instanceSubjectPage(v, s, subjects);
+          : instanceSubjectPage(v, s, subjects, undefined, qaLiveSourceOf(s, pinnedMount(REPO_ROOT, s.name)));
     // ANOTHER layer's page depends on which layers the checkout mounts,
     // so it is built at publish wherever this layer is mounted, listed or not:
     // a downstream index adds layers no list here can name (Uganda #15).
