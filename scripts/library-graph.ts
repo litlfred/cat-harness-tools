@@ -82,7 +82,7 @@ export interface LibraryEntry {
   /**
    * The title a reader is shown. A catalogue record's title when a catalogue
    * node names this slug (`libraryId`), else the manifest's, else the slug —
-   * see `catalogueTitles` for why the order is that way round (bean `gnqa`).
+   * see `catalogueInfo` for why the order is that way round (bean `gnqa`).
    */
   title: string;
   /**
@@ -176,6 +176,15 @@ export interface LibraryEntry {
     gates?: { gate: string; verdict: string }[];
     record?: { id?: string; page?: string; uri?: string };
   };
+  /**
+   * The CATALOGUE RECORD behind this entry, when a node of the layer's
+   * declared `catalogue` graph names the slug in `libraryId`. `record` is the
+   * node's `metadataRef` (its Dublin Core record) as a repo-relative path,
+   * present only when the file exists; `handle` is the node's Handle, when it
+   * records one. Owner, 2026-11-10: a library entry page *"should have dublin
+   * core linked at top"*. Absent when no catalogue node names the entry.
+   */
+  catalogue?: { record?: string; handle?: string };
   /**
    * The block-summary drain's counts for this entry — owner, 2026-09-24.
    *
@@ -697,22 +706,36 @@ export function readEntryBlocks(dir: string, opts: { verbatim?: boolean } = {}):
  * Read from the layer's DECLARED `catalogue` graph, the same lookup
  * `intakeTitle` uses — never a hardcoded `catalogue/nodes` path.
  */
-const catalogueTitleCache = new Map<string, Map<string, string>>();
-function catalogueTitles(instanceRoot: string): Map<string, string> {
-  const hit = catalogueTitleCache.get(instanceRoot);
+/** What a catalogue node says about the library entry it names. */
+interface CatalogueEntryInfo {
+  title?: string;
+  /** Absolute path of the node's Dublin Core record, when the file exists. */
+  record?: string;
+  handle?: string;
+}
+const catalogueInfoCache = new Map<string, Map<string, CatalogueEntryInfo>>();
+function catalogueInfo(instanceRoot: string): Map<string, CatalogueEntryInfo> {
+  const hit = catalogueInfoCache.get(instanceRoot);
   if (hit) return hit;
-  const out = new Map<string, string>();
+  const out = new Map<string, CatalogueEntryInfo>();
   for (const cat of directoriesForGraph(instanceRoot, "catalogue")) {
     const nodes = join(cat, "nodes");
     if (!existsSync(nodes)) continue;
     for (const f of readdirSync(nodes).filter((n) => n.endsWith(".json")).sort()) {
-      const node = readJson<{ libraryId?: unknown; title?: unknown }>(join(nodes, f));
-      if (typeof node?.libraryId === "string" && typeof node.title === "string" && node.title.trim()) {
-        if (!out.has(node.libraryId)) out.set(node.libraryId, node.title.trim());
-      }
+      const node = readJson<{ libraryId?: unknown; title?: unknown; metadataRef?: unknown; handle?: unknown }>(join(nodes, f));
+      if (typeof node?.libraryId !== "string" || out.has(node.libraryId)) continue;
+      // `metadataRef` is relative to the layer root (`catalogue/records/<x>.dc.json`).
+      const record = typeof node.metadataRef === "string" && node.metadataRef && !node.metadataRef.includes("..")
+        ? join(instanceRoot, node.metadataRef)
+        : undefined;
+      out.set(node.libraryId, {
+        ...(typeof node.title === "string" && node.title.trim() ? { title: node.title.trim() } : {}),
+        ...(record && existsSync(record) ? { record } : {}),
+        ...(typeof node.handle === "string" && node.handle.trim() ? { handle: node.handle.trim() } : {}),
+      });
     }
   }
-  catalogueTitleCache.set(instanceRoot, out);
+  catalogueInfoCache.set(instanceRoot, out);
   return out;
 }
 
@@ -850,10 +873,17 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
         dir: relative(repoRoot, dir).split("\\").join("/"),
         ...(() => {
           const extracted = manifest?.title ?? slug;
-          const catalogued = catalogueTitles(dirname(libDir)).get(slug);
+          const catalogued = catalogueInfo(dirname(libDir)).get(slug)?.title;
           return catalogued && catalogued !== extracted
             ? { title: catalogued, extractedTitle: extracted }
             : { title: extracted };
+        })(),
+        ...(() => {
+          const info = catalogueInfo(dirname(libDir)).get(slug);
+          const record = info?.record ? relative(repoRoot, info.record).split("\\").join("/") : undefined;
+          return info && (record || info.handle)
+            ? { catalogue: { ...(record ? { record } : {}), ...(info.handle ? { handle: info.handle } : {}) } }
+            : {};
         })(),
         provenance: manifest?.provenance ?? "",
         rung: ingestRungOf(has),

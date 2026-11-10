@@ -49,7 +49,7 @@ import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
-import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
+import { blobUrl, elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
 import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "../schemas/library/library-iri.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
@@ -236,6 +236,8 @@ html[data-fa-scheme="light"] .lib-page {
 .lib-page .lib-view .pdf-viewer { margin:.6rem 0 0 !important; }
 .lib-page .lib-view img { display:block; max-width:100%; height:auto; border:1px solid var(--line); border-radius:6px; }
 .lib-page .lib-view-absent p { margin:0; }
+.lib-page .lib-record { padding:6px 0; border-bottom:1px solid var(--line); }
+.lib-page .lib-record p { margin:0; }
 .lib-page .toolbar { padding:10px 0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
 .lib-page input, .lib-page select, .lib-page button { font:inherit; color:var(--fg); background:var(--box);
   border:1px solid var(--line); border-radius:6px; padding:6px 9px; }
@@ -932,6 +934,8 @@ export interface ShellEntry {
   sources?: SourceLink[];
   /** Set when the entry names a source file this site does not hold — {@link notHeldHtml}. */
   notHeld?: { file: string; elsewhere: { label: string; href: string }[] };
+  /** The entry's catalogue record (its Dublin Core) and upstream Handle — {@link recordHtml}. */
+  record?: readonly SourceLink[];
 }
 
 // ── WHAT A PAGE IS RENDERED FROM, LINKED ON THE PAGE (owner, 2026-10-15) ──
@@ -1195,6 +1199,39 @@ export function notHeldHtml(n: { file: string; elsewhere: readonly { label: stri
 </section>`;
 }
 
+/**
+ * The entry's CATALOGUE RECORD, at the top of its page — owner, 2026-11-10:
+ * library entry pages *"should have dublin core linked at top"*. The links
+ * come from {@link catalogueRecordLinks}; an entry no catalogue node names
+ * gets nothing here.
+ */
+export function recordHtml(links: readonly SourceLink[]): string {
+  if (links.length === 0) return "";
+  return `<section class="lib-record" id="lib-record">
+<p><strong>Catalogue record:</strong> ${links
+    .map((l) => `<a href="${escHtml(l.href)}"${/^https?:/.test(l.href) ? ' rel="noopener"' : ""}>${escHtml(l.label)}</a> <span class="note">${escHtml(l.what)}</span>`)
+    .join(" &middot; ")}</p>
+</section>`;
+}
+
+/**
+ * The links {@link recordHtml} draws for one entry: its Dublin Core record on
+ * the repository host, and its Handle at the global resolver. Only what the
+ * catalogue node records, and only a record file that exists.
+ */
+export function catalogueRecordLinks(o: {
+  repoRoot: string;
+  checkoutRepo: string | undefined;
+  catalogue?: { record?: string; handle?: string };
+}): SourceLink[] {
+  const out: SourceLink[] = [];
+  const at = o.catalogue?.record ? forgeAt(o.repoRoot, o.catalogue.record, o.checkoutRepo) : undefined;
+  if (at && o.catalogue?.record) out.push({ label: `Dublin Core — ${basename(o.catalogue.record)}`, href: blobUrl(at), what: "the item's metadata record, on GitHub" });
+  const h = o.catalogue?.handle;
+  if (h && /^\d+(\.\d+)*\/\S+$/.test(h)) out.push({ label: `hdl:${h}`, href: `https://hdl.handle.net/${h.split("/").map(encodeURIComponent).join("/")}`, what: "the item upstream" });
+  return out;
+}
+
 /** The config block's id — how a library page names itself, and how this generator recognises its own output. */
 export const LIBRARY_CONFIG_ID = "fa-library-config";
 
@@ -1250,6 +1287,8 @@ interface LibraryPage {
   sources?: string;
   /** The primary asset's view panel, as HTML — {@link viewPanelHtml}. Drawn under the head. */
   view?: string;
+  /** The entry's catalogue record line, as HTML — {@link recordHtml}. Drawn right under the head. */
+  record?: string;
 }
 
 /**
@@ -1289,7 +1328,7 @@ function libraryPageHtml(p: LibraryPage): string {
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
 <div class="lib-page" data-fa-no-filter>
 ${VIEWER_HEAD}
-${p.view ? `${p.view}\n` : ""}${VIEWER_BODY}
+${p.record ? `${p.record}\n` : ""}${p.view ? `${p.view}\n` : ""}${VIEWER_BODY}
 ${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>
@@ -1355,6 +1394,7 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     ...(entry.jsonld ? { alternate: entry.jsonld } : {}),
     sources: sourcesHtml(entry.sources ?? []),
     view: viewPanelHtml(entry.sources ?? []) || (entry.notHeld ? notHeldHtml(entry.notHeld) : ""),
+    record: recordHtml(entry.record ?? []),
     searchExclude: true,
   });
 }
@@ -1950,6 +1990,10 @@ if (import.meta.main) {
             return !held && e.sourceFile && e.provenance !== "referenced"
               ? { notHeld: { file: e.sourceFile, elsewhere: elsewhereLinks(e) } }
               : {};
+          })(),
+          ...(() => {
+            const record = catalogueRecordLinks({ repoRoot, checkoutRepo, ...(e.catalogue ? { catalogue: e.catalogue } : {}) });
+            return record.length ? { record } : {};
           })(),
           sources: entrySources({
             site, dataDir, shellDir, instance: subject, entry: e, manifest: jsonld !== undefined, files,

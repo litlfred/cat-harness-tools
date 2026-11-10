@@ -19,6 +19,7 @@ import { join, relative, resolve } from "node:path";
 
 import {
   avatarCopies,
+  catalogueRecordLinks,
   composedInstanceRoots,
   entryDataFiles,
   entryPageHtml,
@@ -28,6 +29,7 @@ import {
   sourcesHtml,
   viewerHtml,
   notHeldHtml,
+  recordHtml,
   VIEWER_JS,
   viewPanelHtml,
 } from "../../gen-library-viz.ts";
@@ -329,5 +331,40 @@ describe("an unknown page count is not zero (owner, 2026-10-15: \"(0 pages)\")",
     const d = readEntryDocument(dir, "x")!;
     expect(d.pages).toBeNull();
     expect(d.pagesCovered).toBe(3);
+  });
+});
+
+/**
+ * Owner, 2026-11-10: a library entry page *"should have dublin core linked at
+ * top"*. The catalogue node that names the entry gives its record and Handle.
+ */
+describe("an entry page links its catalogue record at the top", () => {
+  const repo = mkdtempSync(join(tmpdir(), "lib-record-"));
+  mkdirSync(join(repo, "catalogue", "records"), { recursive: true });
+  writeFileSync(join(repo, "catalogue", "records", "e1.dc.json"), "{}");
+
+  test("the Dublin Core record on the repository host, and the Handle at its resolver", () => {
+    const links = catalogueRecordLinks({ repoRoot: repo, checkoutRepo: "o/host", catalogue: { record: "catalogue/records/e1.dc.json", handle: "10665/332098" } });
+    expect(links.map((l) => l.href)).toEqual([
+      "https://github.com/o/host/blob/main/catalogue/records/e1.dc.json",
+      "https://hdl.handle.net/10665/332098",
+    ]);
+    expect(links[0].label).toContain("Dublin Core");
+  });
+
+  test("nothing recorded, nothing linked; a malformed Handle is not linked", () => {
+    expect(catalogueRecordLinks({ repoRoot: repo, checkoutRepo: "o/host" })).toEqual([]);
+    expect(catalogueRecordLinks({ repoRoot: repo, checkoutRepo: "o/host", catalogue: { handle: "javascript:x" } })).toEqual([]);
+    expect(recordHtml([])).toBe("");
+  });
+
+  test("the record line sits under the head, above the view panel and the listing", () => {
+    const record = catalogueRecordLinks({ repoRoot: repo, checkoutRepo: "o/host", catalogue: { record: "catalogue/records/e1.dc.json" } });
+    const html = entryPageHtml("i.json", "inst", "../../", { id: "e1", record, notHeld: { file: "w.pdf", elsewhere: [] } });
+    const at = (needle: string): number => html.indexOf(needle);
+    expect(at('id="lib-record"')).toBeGreaterThan(at('id="lib-title"'));
+    expect(at('id="lib-record"')).toBeLessThan(at('id="lib-view"'));
+    expect(at('id="lib-record"')).toBeLessThan(at('id="listing"'));
+    expect(entryPageHtml("i.json", "inst", "../../", { id: "e1" })).not.toContain('id="lib-record"');
   });
 });
