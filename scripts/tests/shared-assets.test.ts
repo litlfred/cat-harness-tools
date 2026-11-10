@@ -27,6 +27,19 @@ describe("shared-assets — which directories, and their addresses", () => {
     rmSync(d, { recursive: true });
   });
 
+  test("the Form Builder's bundle, but not the builder's own pages", () => {
+    const d = site({ "assets/formbuilder-bundle/12.9.0/main.js": "m", "assets/formbuilder/12.9.0/index.html": "<html>" });
+    expect(sharedDirsIn(d)).toEqual(["assets/formbuilder-bundle/12.9.0/"]);
+    rmSync(d, { recursive: true });
+  });
+
+  test("the builder's worker finds a shared bundle through its percent-encoded query value", () => {
+    const url = "https://o.github.io/hub/shared/assets/formbuilder-bundle/12.9.0/k/";
+    const w = rewriteRefs('register("fa-terminology-sw.js?v=44.1.0&bundle=..%2F..%2Fformbuilder-bundle%2F12.9.0%2F")', "assets/formbuilder-bundle/12.9.0/", url);
+    expect(w.n).toBe(1);
+    expect(w.text).toContain(`bundle=${encodeURIComponent(url)}`);
+  });
+
   test("the key is the content, or the build record when the bundle carries one", () => {
     const a = site({ "x/f.js": "1" });
     const b = site({ "x/f.js": "1" });
