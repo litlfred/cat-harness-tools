@@ -1143,13 +1143,16 @@ if (import.meta.main) {
  * NOT part of {@link readLibraryGraph}: the L1 checks, the narrative queue and
  * the MCP roots read that graph as "what was ingested", and an entry with no
  * structure would read to them as a failed ingest. Only the library's pages
- * add these. An id a held entry already uses is skipped.
+ * add these. An id a held entry already uses, in any layer, is skipped, and
+ * an id two layers' catalogues both hold is listed once (first layer by path).
  */
 export function referencedCatalogueEntries(roots: string[], repoRoot: string, taken: ReadonlySet<string>): LibraryEntry[] {
   const libDirs = new Set<string>();
   for (const r of roots) for (const d of corpusDirectoriesForGraph(r, "library")) libDirs.add(d);
   const out: LibraryEntry[] = [];
   const seen = new Set<string>();
+  // `taken` is keyed `<instance>/<id>`; an id held in ANY layer is taken.
+  const takenIds = new Set([...taken].map((k) => k.slice(k.lastIndexOf("/") + 1)));
   for (const libDir of [...libDirs].sort()) {
     if (!existsSync(libDir)) continue;
     const instanceRoot = dirname(libDir);
@@ -1170,9 +1173,11 @@ export function referencedCatalogueEntries(roots: string[], repoRoot: string, ta
         if (!existsSync(record)) continue;
         const id = basename(record).replace(/\.dc\.json$/, "");
         if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) continue;
-        const key = `${instance}/${id}`;
-        if (taken.has(key) || seen.has(key)) continue;
-        seen.add(key);
+        // By id alone: the site publishes one `entries/<id>.json` per id and
+        // the library slice keys on it, and several layers' catalogues hold the
+        // same record (each smart-* layer cites `who-smart-guidelines`).
+        if (takenIds.has(id) || seen.has(id)) continue;
+        seen.add(id);
         const files = (node.bitstreams ?? []).filter(
           (b) => b.bundle === "ORIGINAL" && b.materialization?.state === "referenced" &&
             typeof b.materialization.provenance?.upstream === "string" && /^https:\/\//.test(b.materialization.provenance.upstream as string),
