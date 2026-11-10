@@ -1606,7 +1606,7 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
  * owner-approved 2026-10-05. Three links, each minted by the function that
  * mints the file it names, so the link and the file cannot disagree:
  *
- * - a planned layer's `omitted` drops `schemas` once its document links
+ * - a planned layer's document links
  *   the `<stub>/schema/` index, which says where they ARE;
  * - a skill held by a planned layer links its contract's published `$id`
  *   (`publishedInstanceSchemas`), where it used to be left unset;
@@ -1639,9 +1639,14 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
     }
   });
 
-  test("an exempt instance publishes no schema/ here, so it still says `schemas` was not looked for", () => {
+  test("an exempt instance publishes no schema/ here: no index link, and no Schema node links a rendering", () => {
+    // `schemas` is generic now (`COLLECTOR_SCOPE`): the layer's own schema
+    // modules were looked for, so it is not `omitted`. With no `schema/`
+    // published here, a node it lists must not link a `zod/` file nobody writes.
     expect(EXPORT_ALT_BOOT.conformsTo).toBeUndefined();
-    expect([...(EXPORT_ALT_BOOT.omitted ?? [])].sort()).toEqual(["packages", "registry", "schemas"]);
+    expect([...(EXPORT_ALT_BOOT.omitted ?? [])].sort()).toEqual(["packages", "registry"]);
+    const linked = (EXPORT_ALT_BOOT["@graph"] as Array<Record<string, unknown>>).filter((n) => n.jsonSchema !== undefined);
+    expect(linked).toEqual([]);
   });
 
   test.skipIf(!inAggregate())("a planned instance's skills link the contract $id its publisher writes", () => {

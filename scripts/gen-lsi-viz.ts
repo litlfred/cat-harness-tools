@@ -285,6 +285,11 @@ export function evidencePage(model: EvidenceModel, links: EvidenceLinks = {}): s
   L.push("you have the evidence for that piece of indexing work. A skill with no method");
   L.push("has no held evidence yet, and is listed at the end.");
   L.push("");
+  // The keyword viewer is a page under this one (cat-harness#1144); a reader
+  // who lands here had no way to reach it but its URL.
+  L.push("The keywords these methods extract from every library entry are on the");
+  L.push("[Keywords](keywords/) page, with the extraction variants side by side.");
+  L.push("");
   L.push('<div class="ie-grid">');
   L.push(`<div class="ie-stat"><b>${model.methods.length}</b><span>indexing methods</span></div>`);
   L.push(`<div class="ie-stat"><b>${papers.size}</b><span>papers cited as their evidence</span></div>`);

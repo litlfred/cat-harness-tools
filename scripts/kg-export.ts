@@ -107,13 +107,14 @@ import {
   buildDeclarationSchema,
   buildInstanceSchemas,
   instanceSchemaIndexIri,
+  renderZodSchemas,
   scanInstanceZodSchemas,
   skillIoIri,
-  zodSchemaScanDetermined,
   type InstanceSchemaExport,
   type ZodSchemaScan,
 } from "./harness-schema-export.js";
 import { stagingContextTerm, stagingFields } from "./staging-stamp.js";
+import { schemaPageDetails, schemaSectionHtml } from "./lib/schema-page.ts";
 import {
   QA_RESULTS_DIR,
   buildQaResult,
@@ -397,6 +398,9 @@ export function buildContext(): Record<string, unknown> {
     // The inverse of `maintains`, on a Schema node. A LINK: it names a Tool
     // node in this same document.
     maintainedBy: { "@id": termIri("maintainedBy"), ...link },
+    // A LINK, on a Schema node: the published JSON Schema rendering of each of
+    // its module's public `*Schema` exports (`<stub>/schema/zod/…`).
+    jsonSchema: { "@id": termIri("jsonSchema"), ...link },
     // A LITERAL: a repo-relative module path, for the same reason
     // `maintainsFrom` is one.
     module: termIri("module"),
@@ -2216,16 +2220,19 @@ function collectTools(
  * Tool keeps an artefact true; this says which Tool keeps THIS module's
  * artefact true, which is the question a reader of a schema node actually has.
  */
-function collectSchemas(doc: string, base: string, scope: CorpusScope = "checkout"): Node[] {
+function collectSchemas(doc: string, base: string, scope: CorpusScope = "checkout", layerRoot?: string): Node[] {
   // Bean `8lcl`: the harness's schema modules live in the layer that implements
   // it, so the Schema nodes are read there; their module paths are unchanged.
+  // Another layer's export (`--instance`) reads that layer's own declared
+  // `schemas` graph instead, so its modules (core's `dublin-core`,
+  // `catalogue`, ...) get nodes and pages of their own.
   // declared-path-literal: a probe for which layer implements the harness, not a read of the file.
-  const audit = auditSchemaNodes(implementingRootFor(ROOT, "schemas/kg/cat-harness.ts"), scope);
+  const audit = auditSchemaNodes(layerRoot ?? implementingRootFor(ROOT, "schemas/kg/cat-harness.ts"), scope);
 
   // Tool → artefact, inverted once so each schema node can name its keeper.
   const keeper = new Map<string, string[]>();
   try {
-    for (const t of toolsOf(ROOT, base)) {
+    for (const t of toolsOf(layerRoot ?? ROOT, base)) {
       for (const m of t.maintains ?? []) {
         keeper.set(m.source, (keeper.get(m.source) ?? []).concat(toolIri(doc, t.id)));
       }
@@ -2645,7 +2652,7 @@ const LINK_TERMS = [
  */
 export const COLLECTOR_SCOPE = {
   /** Reads only DECLARED directories, so any layer with a declaration works. */
-  generic: ["skills", "processes", "declaredRoles", "declaration", "tools"],
+  generic: ["skills", "processes", "declaredRoles", "declaration", "tools", "schemas"],
   /** Reads nothing instance-specific at all — the global graph-typology registry. */
   universal: ["graphTypologies"],
   /**
@@ -2653,7 +2660,10 @@ export const COLLECTOR_SCOPE = {
    *
    * - `registry` — `.claude/skills/<group>` as a path literal.
    * - `packages` — `package-manifest.json` plus directories named in code.
-   * - `schemas` — `auditSchemaNodes`, which audits this repo's `schemas/`.
+   *
+   * `schemas` WAS listed here: `collectSchemas` audited only the harness's own
+   * `schemas/`. `auditSchemaNodes` takes a root, so `collectSchemas` now reads
+   * the exported layer's declared `schemas` graph and it is generic.
    *
    * `tools` WAS listed here as import-bound: a compile-time `import` of
    * `tools/index.ts`, which a root could not redirect. Discovery (bean
@@ -2662,7 +2672,7 @@ export const COLLECTOR_SCOPE = {
    * generic now. The stale entry is what let `--instance` exports publish no
    * Tools while `omitted` said only that they had not been looked for.
    */
-  instanceBound: ["registry", "packages", "schemas"],
+  instanceBound: ["registry", "packages"],
 } as const;
 
 /**
@@ -2714,6 +2724,10 @@ export async function collectInstanceNodes(
     // (bean `tdir`). The type vocabulary is the harness's: `baseUrl`, the
     // deploy's own `--base-url`, or the harness's declared base when none.
     ...collectTools(doc, base, problems, corpusScopeFor(root), root, baseUrl),
+    // The layer's own declared `schemas` graph, read the way the host's is
+    // (`auditSchemaNodes` takes the root), so a layer's schema modules are
+    // published as nodes. `buildExport` links each to its `zod/` renderings.
+    ...collectSchemas(doc, base, "instance", root),
   ];
   // A LINK TO AN OMITTED COLLECTOR'S NODES MUST NOT BE EMITTED.
   //
@@ -3398,16 +3412,22 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
       : undefined
     : (buildDeclarationSchema({ baseUrl: opts.baseUrl }).$id as string | undefined);
 
-  // `schemas` leaves `omitted` once the document links where the schemas ARE
-  // published (follow-up, owner-approved 2026-10-05) — see `Export.omitted`.
-  // Not with no link (a consumer told "looked for" must be able to follow it),
-  // and not when the index itself would still say `omitted: ["schemas"]`.
-  const omitted =
-    instanceOnly === undefined
-      ? undefined
-      : foreign && schemaIndex !== undefined && zodSchemaScanDetermined(exportedInstance)
-        ? instanceOnly.omitted.filter((c) => c !== "schemas")
-        : instanceOnly.omitted;
+  // Each Schema node of a layer that publishes `<stub>/schema/` names the
+  // JSON Schema renderings of its exports — minted by the publisher's own
+  // function, so the link and the file come from one identity. A layer that
+  // publishes none gets nodes without the link, never a link to nothing.
+  if (foreign && schemaIndex !== undefined && graph.some((n) => n["@type"] === termIri("Schema"))) {
+    const zod = (await scannedInstanceSchemas(opts.instanceRoot!, opts.baseUrl)).zod;
+    for (const n of graph) {
+      if (n["@type"] !== termIri("Schema") || typeof n.module !== "string") continue;
+      const links = zod.filter((r) => r.module === n.module).map((r) => String(r.schema.$id ?? r.published));
+      if (links.length > 0) n.jsonSchema = links;
+    }
+  }
+
+  // `schemas` is no longer instance-bound (`COLLECTOR_SCOPE`): every export
+  // reads its own layer's `schemas` graph, so it is never in `omitted`.
+  const omitted = instanceOnly === undefined ? undefined : instanceOnly.omitted;
 
   return {
     "@context": buildContext(),
@@ -3798,6 +3818,8 @@ export function writeSubjectDocuments(
   servedDocIri?: string,
   diagrams: ReadonlyMap<string, string> = new Map(),
   sourceRoots: readonly string[] = [],
+  /** Extra HTML for a subject's page, by its `@id` (a Schema node's description and fields). */
+  extras: ReadonlyMap<string, string> = new Map(),
 ): string[] {
   const docIri = String(published["@id"]);
   // The provenance footer (owner, 2026-11-05, "2B"): a subject whose node
@@ -3878,12 +3900,12 @@ export function writeSubjectDocuments(
     const pageView = Object.fromEntries(Object.entries(doc).filter(([k]) => !(k in stamp)));
     const page = join(dir, `${stem}.html`);
     const provenance = provenanceOf(node);
-    writeFileSync(page, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram, labels, provenance));
+    writeFileSync(page, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram, labels, provenance, extras.get(id) ?? ""));
     written.push(page);
     if (parentStems.has(stem)) {
       const index = join(dir, stem, "index.html");
       mkdirSync(dirname(index), { recursive: true });
-      writeFileSync(index, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram, labels, provenance));
+      writeFileSync(index, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram, labels, provenance, extras.get(id) ?? ""));
       written.push(index);
     }
   }
@@ -3970,6 +3992,39 @@ const SUBJECT_NODE_KIND: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The readable section of each Schema node's page: its module's description
+ * and a fields table per public `*Schema` export (`scripts/lib/schema-page.ts`).
+ *
+ * The exports are rendered by the publisher's own `renderZodSchemas`, so the
+ * table and the published `zod/` file are one rendering. A module that fails
+ * to import still gets its description; the scan's problems are the deploy's
+ * Zod gate's to report, not this page's.
+ */
+export async function schemaPageExtras(published: Record<string, unknown>, instanceRoot?: string): Promise<Map<string, string>> {
+  const nodes = ((published["@graph"] ?? []) as Node[]).filter(
+    (n): n is Node & { "@id": string; module: string } => n["@type"] === termIri("Schema") && typeof n.module === "string",
+  );
+  if (nodes.length === 0) return new Map();
+  // declared-path-literal: a probe for which layer implements the harness, as `collectSchemas` makes it.
+  const root = instanceRoot !== undefined ? resolve(instanceRoot) : implementingRootFor(ROOT, "schemas/kg/cat-harness.ts");
+  const scan = await scanInstanceZodSchemas(root);
+  const { rendered } = renderZodSchemas(scan.found, "");
+  const linked = new Set(nodes.filter((n) => Array.isArray(n.jsonSchema) && n.jsonSchema.length > 0).map((n) => n.module));
+  const details = schemaPageDetails(
+    root,
+    nodes,
+    rendered.map((r) => ({
+      module: r.module,
+      exportName: r.exportName,
+      schema: r.schema,
+      // The page sits in `<stub>/schema/`, beside the `zod/` the layer publishes.
+      ...(linked.has(r.module) ? { href: r.published } : {}),
+    })),
+  );
+  return new Map([...details].map(([id, d]) => [id, schemaSectionHtml(d)]));
+}
+
+/**
  * One subject's page: its fields, its flows (each at the `id` its fragment
  * names, so `…/process/P#flow/F` lands on it), and the same JSON-LD as the
  * `.jsonld` beside it, embedded. Self-contained: no script, no stylesheet.
@@ -3983,6 +4038,7 @@ export function subjectPage(
   diagram?: string,
   labels: ReadonlyMap<string, string> = new Map(),
   provenance = "",
+  extra = "",
 ): string {
   const id = String(node["@id"]);
   const title = String(node.title ?? node.name ?? id.split("/").pop());
@@ -4032,6 +4088,8 @@ code, .iri { font-family: ui-monospace, monospace; font-size: 0.9em; overflow-wr
 table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; table-layout: fixed; }
 th, td { text-align: left; vertical-align: top; padding: 0.3rem 0.5rem; border-top: 1px solid var(--fa-pl-line, var(--line)); overflow-wrap: anywhere; }
 th { width: 10rem; font-weight: 600; }
+.schema-fields th, .schema-fields td { width: auto; }
+.schema-prose pre { overflow-x: auto; padding: 0.5rem; border: 1px solid var(--fa-pl-line, var(--line)); }
 td .iri { font-size: 0.8em; }
 @media (max-width: 40rem) { th { width: 6.5rem; } }${provenance === "" ? "" : PROVENANCE_INLINE_STYLE}
 </style>
@@ -4047,7 +4105,7 @@ ${parent === undefined ? "" : `<p>Part of <a href="${escHtml(parent)}">${escHtml
 <table class="fa-page-wide">
 ${rows(node)}
 </table>
-${flows === "" ? "" : `<h2>Flows</h2>\n${flows}`}
+${extra === "" ? "" : `${extra}\n`}${flows === "" ? "" : `<h2>Flows</h2>\n${flows}`}
 ${provenance}</main>
 </body>
 </html>
@@ -4141,7 +4199,14 @@ if (import.meta.main) {
   // (an own-canonical layer published on this site, #638). Its subject
   // documents are then copies named by where they are served.
   const servedAt = arg("--served-at");
-  const subjectDocs = writeSubjectDocuments(published, out, servedAt, diagramPages(published), [instanceRoot ?? ROOT, repoRootFor(ROOT)]);
+  const subjectDocs = writeSubjectDocuments(
+    published,
+    out,
+    servedAt,
+    diagramPages(published),
+    [instanceRoot ?? ROOT, repoRootFor(ROOT)],
+    await schemaPageExtras(published, instanceRoot),
+  );
 
   console.log(`KG export → ${relative(ROOT, out)}\n  @id  ${data["@id"]}`);
   if (toolDocs.length > 0) console.log(`  + ${toolDocs.length} Tool document(s) → ${relative(ROOT, join(dirname(out), "tools"))}/`);

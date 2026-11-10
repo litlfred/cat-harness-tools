@@ -870,8 +870,9 @@ export interface InstanceSchemaExport {
  * ## Public Zod schemas — listed when a scan is passed in
  *
  * Until 2026-10-05 none were, because no rule said which exports are public:
- * the JSON-LD's schema-node collector is instance-bound (`COLLECTOR_SCOPE` in
- * `kg-export.ts`) and yields MODULES, not Zod values. The owner then made the
+ * the JSON-LD's schema-node collector yields MODULES, not Zod values (it was
+ * instance-bound then; since 2026-11-10 it reads every exported layer, and
+ * `kg-export.ts` links each module's node to these renderings). The owner then made the
  * rule (option C, "every exported *Schema" — see the section above): every
  * exported `*Schema` const that is a Zod schema, rendered under `zod/` and
  * listed in `$defs` by `$id` beside the contracts.
