@@ -12,8 +12,11 @@
 # with that verdict (`.github/scripts/layer-main-qa/report.py`):
 #   - red: the open issue is updated, or one is opened, naming the failing
 #     gates, tests and jobs and the commits since the last green main (the
-#     newest successful push run of the gate workflow on main). This job is
-#     then red too.
+#     newest successful push run of the gate workflow on main). The issue is
+#     the signal: this job stays green and only adds a warning (owner,
+#     2026-11-10: a red job here mailed "Some jobs were not successful" for
+#     every push to a red main, even when every gate of that push passed;
+#     under release-gated CI a red main blocks nothing but releases).
 #   - green: the open issue is closed.
 #   - the gate run was cancelled, or main's answer could not be read: nothing
 #     is touched.
@@ -122,4 +125,7 @@ jobs:
           CHECKS_RESULT: ${{ inputs.checks-result }}
           GATE_RUN_ID: ${{ inputs.gate-run-id != '' && inputs.gate-run-id || github.run_id }}
           SHA: ${{ inputs.sha != '' && inputs.sha || github.sha }}
+        # The pinned report.py may still exit 1 on a red main (before the
+        # caller re-pins cat-harness-tools): keep the job green either way.
+        continue-on-error: true
         run: python3 -I qa/.github/scripts/layer-main-qa/report.py

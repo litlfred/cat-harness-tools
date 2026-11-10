@@ -180,7 +180,7 @@ def main():
     if head != sha:
         summary(f"main is **{verdict}** at `{sha[:12]}`, but main has moved on to `{head[:12]}`: "
                 f"that push's run reports, and the `{LABEL}` issue is not touched.")
-        return 1 if verdict == "red" else 0
+        return 0
     gh(f"repos/{REPO}/labels", "POST",
        {"name": LABEL, "color": "b60205", "description": "main is red after a merge (post-merge QA)"}, ok_codes=(422,))
     open_issues = [i for i in gh(f"repos/{REPO}/issues?labels={LABEL}&state=open&per_page=10")
@@ -213,7 +213,9 @@ def main():
     else:
         made = gh(f"repos/{REPO}/issues", "POST", {"title": title, "body": body, "labels": [LABEL]})
         summary(f"main is red at `{sha[:12]}`: opened #{made['number']}.")
-    return 1
+    # The issue is the signal; a red job would mail every push (owner, 2026-11-10).
+    print(f"::warning::main is red at {sha[:12]}: see the {LABEL} issue")
+    return 0
 
 
 if __name__ == "__main__":
