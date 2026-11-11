@@ -585,7 +585,9 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     const s2 = at(`${base}/demo/S2/index.html`);
     expect(s2).toContain('<iframe class="jp-device jp-device-tablet" src="../../../../../../../../app/#/demo/S2"');
     expect(s2).toContain('href="../../walkthrough/P2/"');
-    expect(s2).toContain("Screen S2 — Flip the toggle");
+    // The note names the stage and its title; what to try sits in the Moments card.
+    expect(s2).toContain("Stage P2 (");
+    expect(s2).toContain("Flip the toggle");
   });
   test("JV-01: each view lists its ArchiMate elements, and a block's page the elements that deploy it, each linked", () => {
     const pagesOf = (html: string, page: string) => hrefsOf(html, DAK_ATTR).map((h) => landsAt(sitePath(page), h));

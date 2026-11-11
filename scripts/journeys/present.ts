@@ -271,6 +271,7 @@ const ICON: Record<string, string> = {
   play: '<path d="M6 3l14 9-14 9z"/>',
   arrow: '<path d="M5 12h14M13 5l7 7-7 7"/>',
   left: '<path d="M15 18l-6-6 6-6"/>',
+  expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
   right: '<path d="M9 18l6-6-6-6"/>',
   package: '<path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>',
   ext: '<path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
@@ -316,6 +317,7 @@ export const GLYPH: Record<string, string> = {
   paper: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"/>',
   "wifi-off": ICON.wifioff!,
   wifi: ICON.wifi!,
+  battery: '<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2M5 10h9v4H5z"/>',
   "shield-check": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   "calendar-check": '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/>',
   stethoscope: '<path d="M5 3v6a4 4 0 0 0 8 0V3M9 13v2a5 5 0 0 0 10 0v-2"/><circle cx="19" cy="11" r="2"/>',
@@ -538,6 +540,8 @@ export interface FrameOpts {
   bodyClass?: string;
   /** What sits under the page, fixed at the foot (the payload drawer). */
   foot?: string;
+  /** A band under the app bar, above the presenter's note (the device demo's journey stages). */
+  band?: string;
 }
 
 /** The step range and the scope: "J1 → J4.1 (Thailand ⇄ Lao PDR)". */
@@ -606,6 +610,7 @@ ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="n
 <div class="jp-links">${links}<button type="button" class="jp-btn-link jp-reset" data-jp-reset="${e(ws.id)}" data-jp-reset-to="${e(`${o.toWorkshop}overview/`)}" title="Forget this workshop's answers and the presenter's choices in this browser, and go back to the overview">${icon("reset")}<span>Reset Simulation</span></button></div>
 </div>
 </header>
+${o.band ?? ""}
 ${o.note ? `<div class="jp-note jp-presenter-only"><div><span class="jp-note-tag">PRESENTER NOTE</span><span>${e(o.note)}</span></div><button type="button" data-jp-dismiss>Dismiss</button></div>` : ""}
 <main class="jp-main"><div class="jp-wrap">
 ${o.view === "demo" ? "" : `<nav class="jp-tabs" aria-label="Views">${nav}</nav>`}

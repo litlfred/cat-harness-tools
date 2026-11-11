@@ -449,6 +449,17 @@
   function init() {
     oldAddress();
     each("[data-jp-reset]", reset);
+    // The device demo's Expand: the device, full screen.
+    each("[data-jp-expand]", function (b) {
+      var stage = doc.querySelector("[data-jp-stage]");
+      if (!stage || !stage.requestFullscreen) {
+        b.hidden = true;
+        return;
+      }
+      b.addEventListener("click", function () {
+        stage.requestFullscreen();
+      });
+    });
     each("[data-jp-presenter]", function (b) {
       b.addEventListener("click", function () {
         setPresenter(root.getAttribute("data-presenter") !== "on");

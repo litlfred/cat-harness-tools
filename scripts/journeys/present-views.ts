@@ -31,7 +31,7 @@ import { escHtml } from "../thin-page.ts";
 import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
 import { moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
-import { DEVICE_LABEL, renderDevice, type DemoScreen, type ScreenContext } from "./screens.ts";
+import { DEVICE_FORM, DEVICE_LABEL, renderDevice, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
 import {
   avatar,
@@ -659,11 +659,19 @@ function sheetsPageFramed(corpus: JourneyCorpus, p: Presentation, links: SiteLin
 
 // ── the device demo ──────────────────────────────────────────────────────
 
+/**
+ * The device demo's journey stages (JV-15): a pill per screen, labelled by
+ * the steps it shows and its title, the current one filled; it sits in the
+ * page's header band, above the presenter's note.
+ */
 function stageBar(p: Presentation, current: string | undefined): string {
   const toDemo = current ? "../" : "";
-  return `<nav class="jp-card jp-stages" aria-label="Screens">${p.screens
-    .map((x) => `<a href="${e(`${toDemo}${x.id}/`)}"${x.id === current ? ' class="is-on" aria-current="page"' : ""}><b class="jp-mono">${e(x.id)}</b><span>${e(x.title)}</span><small>${e([...x.steps.map((s) => s.step.id), ...x.unresolved].join(", "))}</small></a>`)
-    .join("")}</nav>`;
+  return `<nav class="jp-stagebar" aria-label="Journey stage"><span class="jp-stagebar-l">Journey stage:</span>${p.screens
+    .map(
+      (x) =>
+        `<a class="jp-stage-pill${x.id === current ? " is-on" : ""}" href="${e(`${toDemo}${x.id}/`)}" title="${e(`${x.id}: ${x.title}`)}"${x.id === current ? ' aria-current="page"' : ""}><code>${e([...x.steps.map((s) => s.step.id), ...x.unresolved].join(", ") || x.id)}</code> ${e(x.title)}</a>`,
+    )
+    .join(`<span class="jp-stage-sep" aria-hidden="true">›</span>`)}</nav>`;
 }
 
 /** Whose device a drawn screen is: the cast's view of its owner, else the owner's own persona. */
@@ -716,38 +724,46 @@ function demoPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, i: n
   const a = at(2, links);
   const pr = p.w.workshop.presentation ?? {};
   const x = p.screens[i]!;
-  const back = [
-    ...x.steps.map((s) => `<a class="jp-btn-line" href="${e(walkHref(a, s))}">${icon("left")} Back to the user journey: <b>${e(s.step.id)}</b> ${e(s.step.title)}</a>`),
-    ...x.unresolved.map((r) => `<span class="jp-btn-line jp-unresolved" title="no such step in this walkthrough">${e(r)}</span>`),
-  ].join("");
+  // JV-16: VaxLink's compact header; the title and description move to the note and the Moments card.
+  const first = x.steps[0];
+  const back = first ? `<a class="jp-back" href="${e(walkHref(a, first))}">${icon("left")} Back to the user journey</a>` : "";
+  const who = ownerOf(corpus, p, x);
+  const role = who?.role?.split(" · ")[0];
+  const looking = who ? `<span class="jp-looking">You are looking at what ${e(who.name)}${role ? ` (${e(role)})` : ""} sees at this moment.</span>` : "";
   const prev = p.screens[i - 1];
   const next = p.screens[i + 1];
   let device: string;
   let open = "";
   if (x.node) {
-    device = `<div class="ds-stage">${renderDevice(x.node.screen, screenContext(corpus, p, x.node.instance, a.siteRoot))}</div>`;
+    device = `<div class="ds-stage" data-jp-stage>${renderDevice(x.node.screen, screenContext(corpus, p, x.node.instance, a.siteRoot), { caption: false })}</div>`;
     const src = sourceHref(corpus, x.node.instance, x.node.file);
-    if (src) open = ext(src, "Screen source", "jp-btn-line");
+    if (src) open = ext(src, "Screen source", "jp-devline-src");
   } else {
     const src = screenHref(pr, x.id, a.siteRoot)!;
     device = `<div class="jp-device-wrap"><iframe class="jp-device jp-device-${x.device}" src="${e(src)}" title="${e(`${x.id}: ${x.title}`)}" loading="lazy"></iframe></div>`;
-    open = ext(src, "Open in a new tab", "jp-btn-line");
+    open = ext(src, "Open in a new tab", "jp-devline-src");
   }
-  const moments = x.steps.length
-    ? `<section class="jp-card ds-moments"><h3 class="jp-h">${icon("route")} Moments this screen shows</h3><ul>${x.steps.map((s) => `<li><a href="${e(walkHref(a, s))}"><b class="jp-mono">${e(s.step.id)}</b> ${e(s.step.title)}</a>${s.step.headline ? `<p>${personaText(s.step.headline, p.cast)}</p>` : ""}</li>`).join("")}</ul></section>`
-    : "";
-  const desc = x.node?.screen.description ? `<p>${e(x.node.screen.description)}</p>` : "";
-  const body = `${stageBar(p, x.id)}
-<section class="jp-screen-h"><div><span class="jp-small"><b class="jp-mono">${e(x.id)}</b> · ${e(DEVICE_LABEL[x.device])}</span><h2>${e(x.title)}</h2>${desc}${x.try ? `<p class="jp-try">${icon("sparkles", "jp-amber")} ${e(x.try)}</p>` : ""}</div><div class="jp-screen-act">${back}${open}</div></section>
+  const desc = x.node?.screen.description;
+  const config = x.node?.screen.client?.config;
+  const moments = `<section class="jp-card ds-moments"><div class="ds-moments-h"><span class="jp-small"><b class="jp-mono">${e(x.id)}</b> · ${e(DEVICE_LABEL[x.device])}</span><h3>${e(x.title)}</h3>${desc ? `<p>${e(desc)}</p>` : ""}${x.try ? `<p class="jp-try">${icon("sparkles", "jp-amber")} ${e(x.try)}</p>` : ""}</div>${
+    x.steps.length || x.unresolved.length
+      ? `<h4 class="jp-h">${icon("route")} Moments this screen shows</h4><ul>${x.steps.map((s) => `<li><a href="${e(walkHref(a, s))}"><b class="jp-mono">${e(s.step.id)}</b> ${e(s.step.title)}</a>${s.step.headline ? `<p>${personaText(s.step.headline, p.cast)}</p>` : ""}</li>`).join("")}${x.unresolved.map((r) => `<li class="jp-unresolved" title="no such step in this walkthrough">${e(r)}</li>`).join("")}</ul>`
+      : ""
+  }</section>`;
+  const body = `<section class="jp-screen-h"><div class="jp-screen-row">${back}${looking}</div>
+<div class="jp-devline"><span>${deviceGlyph(x)} ${e(DEVICE_FORM[x.device])}${config ? ` <code>(${e(config)})</code>` : ""}</span><span class="jp-devline-r">${open}<button type="button" class="jp-expand" data-jp-expand>${icon("expand")} Expand</button></span></div></section>
 ${device}
 ${moments}`;
+  const stage = [...x.steps.map((s) => s.step.id), ...x.unresolved].join(", ") || x.id;
   return frame({
     p,
     root: a.root,
     toWorkshop: a.toWorkshop,
     view: "demo",
     title: `${x.id} ${x.title} — ${presentationName(p)}`,
-    ...(x.try ? { note: `Screen ${x.id} — ${x.try}` } : note(p, "demo")),
+    // VaxLink's note: the stage, its title, and what the screen is about.
+    note: `Stage ${stage} (${x.title})${desc ? ` — ${desc}` : x.try ? ` — ${x.try}` : ""}`,
+    band: stageBar(p, x.id),
     ...(prev ? { prev: `../${prev.id}/` } : {}),
     ...(next ? { next: `../${next.id}/` } : {}),
     body,
