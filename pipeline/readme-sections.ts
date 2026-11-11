@@ -74,6 +74,7 @@ import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declar
 import { generatedBanner } from "@litlfred/bootstrap-tools/scripts/generated-by.ts";
 import { frontMatter, nodeSummary } from "../scripts/front-matter.ts";
 import { isSkillMd, skillMdDirs } from "../scripts/known-skills.ts";
+import { groupOf, optInRootsOf } from "../schemas/kg/opt-in-roots.ts";
 import { filesSection, processesSection, rolesSection } from "@litlfred/bootstrap-tools/scripts/readme-graph-sections.ts";
 
 // ── Section contract ────────────────────────────────────────────────────────
@@ -999,9 +1000,10 @@ export const AGENTS_MD_BYTE_BUDGET = 32_768;
 export const SKILLS_INDEX_FILE = "SKILLS.md";
 
 /** The layer's own skills, grouped by declared directory. */
-export function ownSkillIndex(root: string): { packages: { dir: string; rows: string[] }[]; total: number; notes: string[] } {
+export function ownSkillIndex(root: string): { packages: { dir: string; rows: string[]; optIn?: string }[]; total: number; notes: string[] } {
   const notes: string[] = [];
-  const packages: { dir: string; rows: string[] }[] = [];
+  const packages: { dir: string; rows: string[]; optIn?: string }[] = [];
+  const groups = optInRootsOf(root);
   let total = 0;
   for (const parts of skillMdDirs(root, "instance")) {
     const abs = join(root, ...parts);
@@ -1011,15 +1013,19 @@ export function ownSkillIndex(root: string): { packages: { dir: string; rows: st
       .sort();
     if (files.length === 0) continue;
     const dir = parts.join("/");
+    // A skill inside an opt-in sub-graph is absent wherever the group is
+    // switched off, so the list names it without linking it.
+    const optIn = groupOf(abs.replace(/[\\/]+$/, ""), groups)?.id;
     const rows = files.map((f) => {
       const text = readFileSync(join(abs, f), "utf-8");
       const name = frontMatter(text).name ?? f.slice(0, -3);
       const { summary, from } = skillPurpose(text, name);
       if (from !== "description") notes.push(`${dir}/${f}: no \`description:\` in front matter (summary from ${from})`);
-      return `| [\`${cell(name)}\`](${dir}/${f}) | ${summary === undefined ? "_(no description)_" : cell(summary)} |`;
+      const label = `\`${cell(name)}\``;
+      return `| ${optIn === undefined ? `[${label}](${dir}/${f})` : label} | ${summary === undefined ? "_(no description)_" : cell(summary)} |`;
     });
     total += rows.length;
-    packages.push({ dir, rows });
+    packages.push(optIn === undefined ? { dir, rows } : { dir, rows, optIn });
   }
   return { packages, total, notes };
 }
@@ -1027,6 +1033,11 @@ export function ownSkillIndex(root: string): { packages: { dir: string; rows: st
 const INDEX_FOOTER =
   "`bun run cat readme:sync` rewrites this list and `readme:sync:check` fails when it is stale. " +
   "Skills this repository inherits are listed by the repositories that publish them.";
+
+/** The marker after a directory in an opt-in sub-graph: its skills are unlinked, since the group may be switched off. */
+function optInNote(p: { optIn?: string }): string {
+  return p.optIn === undefined ? "" : ` (opt-in \`${p.optIn}\`)`;
+}
 
 /** The full list: every skill with its one-line purpose. */
 export function renderFullSkillIndex(idx: ReturnType<typeof ownSkillIndex>): string {
@@ -1036,7 +1047,7 @@ export function renderFullSkillIndex(idx: ReturnType<typeof ownSkillIndex>): str
     "",
   ];
   for (const p of idx.packages) {
-    lines.push(`**\`${p.dir}/\`** (${p.rows.length})`, "", "| Skill | What it is for |", "|---|---|", ...p.rows, "");
+    lines.push(`**\`${p.dir}/\`** (${p.rows.length})${optInNote(p)}`, "", "| Skill | What it is for |", "|---|---|", ...p.rows, "");
   }
   return lines.join("\n");
 }
@@ -1051,7 +1062,7 @@ export function renderCompactSkillIndex(idx: ReturnType<typeof ownSkillIndex>, b
     "",
     "| Directory | Skills |",
     "|---|---|",
-    ...idx.packages.map((p) => `| [\`${p.dir}/\`](${p.dir}/) | ${p.rows.length} |`),
+    ...idx.packages.map((p) => `| ${p.optIn === undefined ? `[\`${p.dir}/\`](${p.dir}/)` : `\`${p.dir}/\`${optInNote(p)}`} | ${p.rows.length} |`),
     "",
   ].join("\n");
 }

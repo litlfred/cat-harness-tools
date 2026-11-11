@@ -342,6 +342,23 @@ Feature: The ingest rung decision and the L1 completeness gate
     Then a lone not-derivable requirement may promote
     And a not-derivable with a met requirement may promote
 
+  @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::a_text_layer_of_mojibake_or_reversed_Arabic_ligatures_is_not_text
+  Scenario: A text layer that is mojibake, or that reverses Arabic ligatures, sends the document to OCR
+    Given a probe whose text layer is mostly letters
+    Then it is readable
+    And a probe whose non-space characters are under 55% letters is mojibake
+    And a probe where 967 of 12798 Arabic words carry a reversed lam-alef or lam-yeh ligature scrambles right-to-left ligatures
+    And 10 of 12798 is readable
+    And 20 Arabic words are too few to judge, and a probe with no counts decides nothing
+
+  @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::--qa-later_lets_ONLY_the_QA-only_requirements_stay_unmet
+  Scenario: --qa-later promotes past unmet image descriptions and nothing else
+    Given an entry whose only unmet requirement is image-descriptions
+    Then it does not promote by default
+    And it promotes with --qa-later
+    And an entry with image-descriptions and structure unmet does not promote even with --qa-later
+    And --qa-later is read from the arguments only when given
+
   @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::an_EMPTY_requirement_list_does_not_promote_by_vacuous_truth
   Scenario: An empty requirement list may promote, but an empty entry never yields one
     # Gap: the title says an empty list does NOT promote; the body asserts that mayPromote([]) is true, and relies on checkEntry never returning an empty list.

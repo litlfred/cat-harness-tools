@@ -33,6 +33,8 @@
  *   bun run cat ingest uploads/FILE.pdf --refresh-title  # re-resolve the title
  *   bun run cat ingest uploads/FILE.pdf --library <instance>
  *   bun run cat ingest uploads/FILE.pdf --title "WHO Editorial Style Manual"
+ *   bun run cat ingest uploads/FILE.pdf --lang-hint fr,en   # OCR languages (default: dc.language.iso)
+ *   bun run cat ingest uploads/FILE.pdf --promote --qa-later  # image narratives written afterwards
  *   bun run cat ingest uploads/FILE.md --text   # Markdown/MDX/XML: text has no magic bytes, so the caller says so
  *   bun run cat ingest ../qou/uploads/FILE.pdf --instance ../qou   # a content folio's library
  *
@@ -53,7 +55,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { ARCHIVE_MIMETYPES } from "../schemas/library/archive-contents.ts";
-import { checkEntry, type Requirement } from "./check-l1-complete.ts";
+import { QA_ONLY, checkEntry, type Requirement } from "./check-l1-complete.ts";
 import { catalogueRecordFor, dcValue } from "../pipeline/library-title.ts";
 import { TABULAR_MIMETYPES } from "../schemas/library/tabular-records.ts";
 import { SLIDE_MIMETYPES } from "../schemas/ui/pdf-structure.ts";
@@ -542,7 +544,74 @@ export interface Probe {
    */
   outlineUsable?: number | null;
   chars: number | null;
+  /** Alphabetic characters and non-space characters over the same pages, for {@link textLayerUnreadable}. */
+  letters?: number;
+  nonspace?: number;
+  /** Arabic-script words, and how many carry a reversed lam-alef or lam-yeh ligature. */
+  arabicWords?: number;
+  arabicLigatureReversed?: number;
+  /** Letters by script (latin, arabic, cyrillic, han), for the wrong-script check in {@link textLayerUnreadable}. */
+  scriptLetters?: Partial<Record<Script, number>>;
   error?: string;
+}
+
+/** Below this share of letters among non-space characters, a text layer is mojibake (pdf-ocr.py's MIN_ALPHA_RATIO). */
+export const MIN_LETTER_RATIO = 0.55;
+/** Above this share of Arabic words with a reversed ligature, the text layer is not trusted. */
+export const MAX_ARABIC_LIGATURE_REVERSED = 0.02;
+/** Below this share of letters in the script the document's languages are written in, the text layer is in the wrong script. */
+export const MIN_EXPECTED_SCRIPT_RATIO = 0.2;
+
+export type Script = "latin" | "arabic" | "cyrillic" | "han";
+/** The script each non-Latin language is written in. A language absent here is not checked. */
+const LANGUAGE_SCRIPT: Record<string, Script> = {
+  ar: "arabic", fa: "arabic", ur: "arabic", ps: "arabic",
+  ru: "cyrillic", uk: "cyrillic", bg: "cyrillic", sr: "cyrillic", kk: "cyrillic", mn: "cyrillic",
+  zh: "han", ja: "han",
+};
+
+/**
+ * Why a text layer with plenty of characters is still not text, or `undefined`. Pure.
+ *
+ * Owner, 2026-11-10: "rules may assume LTR languages". Two failures, both
+ * measured on the IRIS pilot, routed a document to `pdf-structure` because
+ * the character count alone looked healthy:
+ *
+ * - **Mojibake.** The Arabic edition of resolution WHA71.7 (10665/279510)
+ *   uses a font with no Unicode mapping: thousands of characters, almost none
+ *   of them letters. Its sections came out as control characters.
+ * - **Reversed Arabic ligatures.** The Arabic Global strategy on digital
+ *   health (10665/344249) maps its lam-alef ligature to alef-lam, so
+ *   "الاستراتيجيات" reads "االستراتيجيات" and "على" reads "عىل": about 7.5% of
+ *   its Arabic words. A word cannot begin with two alefs before a lam, nor end
+ *   alef-maksura then lam, so these two shapes are counted. The ordinary
+ *   definite article "ال" is not, since it is indistinguishable from a
+ *   reversed ligature in the middle of a word; the count is a lower bound.
+ *
+ * Either sends the document to the OCR rung, which reads the page image in
+ * the hinted language.
+ */
+export function textLayerUnreadable(p: Probe, langs: readonly string[] = []): string | undefined {
+  if (p.nonspace && p.letters !== undefined && p.nonspace >= OCR_THRESHOLD_CHARS && p.letters / p.nonspace < MIN_LETTER_RATIO) {
+    return `${p.letters} letters in ${p.nonspace} non-space characters (< ${MIN_LETTER_RATIO}): the text layer is mojibake, a font with no Unicode mapping`;
+  }
+  if (p.arabicWords && p.arabicWords >= 50 && (p.arabicLigatureReversed ?? 0) / p.arabicWords > MAX_ARABIC_LIGATURE_REVERSED) {
+    return `${p.arabicLigatureReversed} of ${p.arabicWords} Arabic words carry a reversed lam-alef or lam-yeh ligature (> ${MAX_ARABIC_LIGATURE_REVERSED * 100}%): the text layer scrambles right-to-left ligatures`;
+  }
+  // Wrong script. The Arabic edition of "Preparing for the introduction of HPV
+  // vaccines" (10665/69384) maps its Arabic glyphs onto Latin-1 code points:
+  // plenty of letters, so neither check above fires, but they read
+  // "¤EG 14 øe IóàªŸG". Checked only when every language the document is
+  // known to be in is written in one non-Latin script.
+  const scripts = [...new Set(langs.map((l) => LANGUAGE_SCRIPT[l.toLowerCase().split(/[-_]/)[0] ?? ""]))];
+  const want = scripts.length === 1 ? scripts[0] : undefined;
+  if (want && p.scriptLetters && p.letters && p.letters >= OCR_THRESHOLD_CHARS) {
+    const got = p.scriptLetters[want] ?? 0;
+    if (got / p.letters < MIN_EXPECTED_SCRIPT_RATIO) {
+      return `${got} of ${p.letters} letters are ${want} (< ${MIN_EXPECTED_SCRIPT_RATIO * 100}%), but the document is in ${langs.join(", ")}: the text layer maps its glyphs to the wrong script`;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -628,7 +697,28 @@ except Exception as e:
     print(json.dumps({"error": f"no PDF backend: {e}"})); sys.exit(0)
 try:
     d = pymupdf.open(sys.argv[1])
-    chars = sum(len(d[i].get_text()) for i in range(min(len(d), 20)))
+    text = "".join(d[i].get_text() for i in range(min(len(d), 20)))
+    chars = len(text)
+    nonspace = sum(1 for c in text if not c.isspace())
+    letters = sum(1 for c in text if c.isalpha())
+    # Arabic-script words, and those whose lam-alef or lam-yeh ligature came
+    # out of the text layer in reversed order (see arabicLigatureReversed).
+    ALEFS = (chr(0x627), chr(0x623), chr(0x625), chr(0x622))
+    LAM, YEH = chr(0x644), chr(0x649)
+    arabic = [w for w in text.split() if any(0x600 <= ord(c) <= 0x6FF for c in w)]
+    reversed_lig = sum(1 for w in arabic if (len(w) > 2 and w[0] == ALEFS[0] and w[1] in ALEFS and w[2] == LAM) or w.endswith(YEH + LAM))
+    def script_of(c):
+        o = ord(c)
+        if o < 0x250: return "latin"
+        if 0x600 <= o <= 0x6FF or 0x750 <= o <= 0x77F or 0xFB50 <= o <= 0xFEFF: return "arabic"
+        if 0x400 <= o <= 0x52F: return "cyrillic"
+        if 0x3400 <= o <= 0x9FFF or 0x3040 <= o <= 0x30FF: return "han"
+        return None
+    scripts = {}
+    for c in text:
+        if c.isalpha():
+            k = script_of(c)
+            if k: scripts[k] = scripts.get(k, 0) + 1
     toc = d.get_toc()
     # Facts only. Whether an entry can carry a chapter is decided ONCE, by
     # usableOutlineEntries() above, rather than restated here: a rule spelled
@@ -644,6 +734,11 @@ try:
         "outline": len(toc),
         "toc": [[t[1], t[2]] for t in toc],
         "chars": chars,
+        "letters": letters,
+        "nonspace": nonspace,
+        "arabicWords": len(arabic),
+        "arabicLigatureReversed": reversed_lig,
+        "scriptLetters": scripts,
     }))
 except Exception as e:
     print(json.dumps({"error": str(e)}))
@@ -770,6 +865,8 @@ export function planFor(
   mimetype: string | null | undefined = undefined,
   /** `--text`: the caller says the source is text (Markdown, MDX, XML). */
   text = false,
+  /** The languages the document is known to be in (`--lang-hint`, else `dc.language.iso`). */
+  langs: readonly string[] = [],
 ): Plan {
   // CONTENT decides the rung, before anything opens the file as a PDF.
   //
@@ -880,10 +977,10 @@ export function planFor(
       steps: [["python3", pyHelper("archive-contents.py"), "-o", lib, pdf]],
     };
   }
-  return planForPdf(pdf, p ?? probe(pdf), lib);
+  return planForPdf(pdf, p ?? probe(pdf), lib, langs);
 }
 
-function planForPdf(pdf: string, p: Probe, lib: string): Plan {
+function planForPdf(pdf: string, p: Probe, lib: string, langs: readonly string[] = []): Plan {
   if (p.error || p.outline === null || p.chars === null) {
     return {
       rung: "undetermined",
@@ -928,6 +1025,17 @@ function planForPdf(pdf: string, p: Probe, lib: string): Plan {
       ? `an outline of ${p.outline} entries, none of which can carry a chapter ` +
         `(page labels and entries with no destination) — present, but not a structure. `
       : "";
+  const unreadable = textLayerUnreadable(p, langs);
+  if (unreadable) {
+    return {
+      rung: "pdf-ocr+pdf-pages",
+      why: `${junkOutline}${unreadable} — OCR reads the page images instead`,
+      steps: [
+        ["python3", pyHelper("pdf-ocr.py"), "-o", lib, pdf],
+        ["python3", pyHelper("pdf-pages.py"), "-o", lib, "--from-ocr", pdf],
+      ],
+    };
+  }
   if (p.chars < OCR_THRESHOLD_CHARS) {
     return {
       rung: "pdf-ocr+pdf-pages",
@@ -1002,6 +1110,50 @@ export function withKnownTitle(plan: Plan, title: string | undefined): Plan {
     steps: plan.steps.map((s) =>
       // A Python rung is `python3 <script>`; a TypeScript one is `bun run <script>`.
       (TITLE_RUNGS.has(basename(s[1] ?? "")) || TITLE_RUNGS.has(basename(s[2] ?? ""))) && !s.includes("--title") ? [...s, "--title", title] : s,
+    ),
+  };
+}
+
+/**
+ * The document's languages, as ISO 639 codes, for the OCR rung.
+ *
+ * Owner, 2026-11-10: "make sure OCR is language aware". Tesseract's script
+ * detection cannot tell French from English or Persian from Arabic, so the
+ * catalogue's `dc.language.iso` is handed to `pdf-ocr.py --lang-hint`, which
+ * narrows each page to the hinted languages in the script it shows. An
+ * explicit `--lang-hint fr,en` wins. Absent both, nothing is passed and the
+ * rung detects by script alone, as before.
+ */
+export function knownLanguages(
+  argv: readonly string[],
+  instanceRoot: string,
+  slug: string,
+): { langs: string[]; from: string } | undefined {
+  const i = argv.indexOf("--lang-hint");
+  const given = i >= 0 ? (argv[i + 1] ?? "").split(",").map((x) => x.trim()).filter(Boolean) : [];
+  if (given.length) return { langs: given, from: "--lang-hint" };
+  const cat = catalogueRecordFor(instanceRoot, slug);
+  if (!cat) return undefined;
+  const fields = Array.isArray(cat.rec.fields) ? (cat.rec.fields as { element?: unknown; qualifier?: unknown; values?: { value?: unknown }[] }[]) : [];
+  const langs = [
+    ...new Set(
+      fields
+        .filter((f) => f.element === "language" && f.qualifier === "iso")
+        .flatMap((f) => (Array.isArray(f.values) ? f.values : []))
+        .map((v) => (typeof v.value === "string" ? v.value.trim() : ""))
+        .filter(Boolean),
+    ),
+  ];
+  return langs.length ? { langs, from: `${cat.file} dc.language.iso` } : undefined;
+}
+
+/** `plan` with `--lang-hint` handed to the OCR rung. Pure. */
+export function withLanguageHint(plan: Plan, langs: readonly string[] | undefined): Plan {
+  if (!langs || langs.length === 0) return plan;
+  return {
+    ...plan,
+    steps: plan.steps.map((s) =>
+      basename(s[1] ?? "") === "pdf-ocr.py" && !s.includes("--lang-hint") && !s.includes("--lang") ? [...s, "--lang-hint", langs.join(",")] : s,
     ),
   };
 }
@@ -1108,8 +1260,25 @@ export function ingestMode(argv: readonly string[]): "stage" | "promote" {
  * make the gate unusable, which is how a gate gets switched off. Only `unmet`
  * — a defect in THIS entry, fixable by re-running a rung — refuses.
  */
-export function mayPromote(requirements: readonly Requirement[]): boolean {
-  return requirements.every((r) => r.state !== "unmet");
+export function mayPromote(requirements: readonly Requirement[], qaLater = false): boolean {
+  return requirements.every((r) => r.state !== "unmet" || (qaLater && QA_ONLY.has(r.name)));
+}
+
+/**
+ * `--qa-later`: promote with the QA-only requirements ({@link QA_ONLY}, today
+ * `image-descriptions`) still unmet, and say so. Off by default, so a person
+ * ingesting one document by hand still meets the full gate.
+ *
+ * Owner, 2026-11-10 (who-iris#207): items catalogued by reference have their
+ * library KG derived in bulk ("retrieve PDF/source document locally, run KG
+ * ingestion routines/derivative KGs ... do all 144"). One of them, the Global
+ * strategy on digital health, places 125 images; the narratives are written
+ * later, by a person or an agent, which is the reason `QA_ONLY` exists
+ * (owner, 2026-10-15: "make QA check"). The unmet requirement stays recorded
+ * in the entry's QA verdicts and on the library page.
+ */
+export function qaLater(argv: readonly string[]): boolean {
+  return argv.includes("--qa-later");
 }
 
 /**
@@ -1217,6 +1386,7 @@ if (import.meta.main) {
   // permits posting a copy is a reading of the licence, not of the bytes.
   const reference = argv.includes("--reference") ? argv[argv.indexOf("--reference") + 1] : undefined;
   const known = knownTitle(argv, resolve(INSTANCE_ROOT), slug);
+  const languages = knownLanguages(argv, resolve(INSTANCE_ROOT), slug);
   const plan = withDerivedArms(
     reference
       ? {
@@ -1224,7 +1394,10 @@ if (import.meta.main) {
           why: "--reference given — recorded with its outline and sha256, text withheld",
           steps: [["python3", pyHelper("referenced-source.py"), "-o", stagingRoot, pdf, "--identity", reference]],
         }
-      : withKnownTitle(planFor(pdf, undefined, stagingRoot, undefined, argv.includes("--text")), known?.title),
+      : withLanguageHint(
+          withKnownTitle(planFor(pdf, undefined, stagingRoot, undefined, argv.includes("--text"), languages?.langs), known?.title),
+          languages?.langs,
+        ),
     pdf,
     stagingRoot,
     staging,
@@ -1238,6 +1411,7 @@ if (import.meta.main) {
   console.log(`  rung: ${plan.rung}`);
   console.log(`  why:  ${plan.why}`);
   if (known) console.log(`  title: ${known.title} (from ${known.from})`);
+  if (languages) console.log(`  languages: ${languages.langs.join(", ")} (from ${languages.from})`);
   // Before any arm runs — the licence step is EARLY by ruling (bean 7bg9).
   const lic = earlyLicence(pdf);
   console.log(`  licence: ${lic.verdict} — ${lic.detail}`);
@@ -1323,7 +1497,7 @@ if (import.meta.main) {
   // THE GATE, and the only place anything enters `library/`.
   const verdict = checkEntry(staging);
   const unmet = verdict.requirements.filter((r) => r.state === "unmet");
-  if (!mayPromote(verdict.requirements)) {
+  if (!mayPromote(verdict.requirements, qaLater(argv))) {
     console.error(`\n✗ NOT promoted — ${unmet.length} requirement(s) unmet:`);
     for (const r of unmet) console.error(`    ${r.name.padEnd(22)} ${r.detail}`);
     console.error(`\nStaged output is at ${relative(resolve(INSTANCE_ROOT), staging)}/ and was`);
@@ -1335,6 +1509,12 @@ if (import.meta.main) {
     // that store is a bad trade — and a person seeing this line has the
     // context a bean would only approximate.
     process.exit(1);
+  }
+
+  const deferred = unmet.filter((r) => QA_ONLY.has(r.name));
+  if (deferred.length) {
+    console.log(`\n! promoted with ${deferred.length} QA requirement(s) left for later (--qa-later):`);
+    for (const r of deferred) console.log(`    ${r.name.padEnd(22)} ${r.detail}`);
   }
 
   // Against INSTANCE_ROOT, never the CWD.

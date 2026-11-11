@@ -45,6 +45,8 @@ import { readLibraryGraph, referencedCatalogueEntries, type LibraryGraph, type L
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
 import { DOCUMENT_VIEW_JS, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
+import { LANGUAGE_TOGGLE_JS, entryLanguages, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
+import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
 import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
@@ -239,6 +241,15 @@ html[data-fa-scheme="light"] .lib-page {
 .lib-page .lib-view-absent p { margin:0; }
 .lib-page .lib-record { padding:6px 0; border-bottom:1px solid var(--line); }
 .lib-page .lib-record p { margin:0; }
+.lib-page .lib-summary { padding:6px 0 10px; border-bottom:1px solid var(--line); }
+.lib-page .lib-summary h2 { margin:.4rem 0; }
+.lib-page .lib-summary p { margin:.3rem 0; max-width:60rem; }
+.lib-page .lib-versions { padding:6px 0; border-bottom:1px solid var(--line); }
+.lib-page .lib-versions p { margin:0; }
+.lib-page .lib-lang-toggle { margin:.5rem 0 0; }
+.lib-page .lib-lang-toggle a.seg-link { display:inline-block; min-height:24px; line-height:24px; padding:2px 10px; border:1px solid var(--line); text-decoration:none; }
+.lib-page details.lib-all { padding:10px 0; border-top:1px solid var(--line); }
+.lib-page details.lib-all > summary { cursor:pointer; font-size:1rem; min-height:24px; }
 .lib-page .toolbar { padding:10px 0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
 .lib-page input, .lib-page select, .lib-page button { font:inherit; color:var(--fg); background:var(--box);
   border:1px solid var(--line); border-radius:6px; padding:6px 9px; }
@@ -926,7 +937,7 @@ fetch(DATA_HREF).then(function(r){
   $("listing").innerHTML = '<p class="empty">The projection at <code>' + esc(DATA_HREF) + '</code> could not be read. ' +
     "That is not an empty corpus \\u2014 it is a corpus that could not be loaded, and the page says so rather than showing nothing.</p>";
 });
-`;
+${LANGUAGE_TOGGLE_JS}`;
 
 /** The entry a shell is about, when it is one — its identity only, never its content. */
 export interface ShellEntry {
@@ -941,6 +952,11 @@ export interface ShellEntry {
   notHeld?: { file: string; elsewhere: { label: string; href: string }[] };
   /** The entry's catalogue record (its Dublin Core) and upstream Handle — {@link recordHtml}. */
   record?: readonly SourceLink[];
+  /** The entry's title, for the page heading. */
+  title?: string;
+  /** Its language versions and toggle, and its summary, as HTML (`scripts/lib/library-languages.ts`). */
+  versions?: string;
+  summary?: string;
 }
 
 // ── WHAT A PAGE IS RENDERED FROM, LINKED ON THE PAGE (owner, 2026-10-15) ──
@@ -1291,6 +1307,22 @@ const VIEWER_BODY = `<div class="toolbar">
   <section id="queue" class="wrap"></section>
 </div>`;
 
+/**
+ * An ENTRY page's body — owner, 2026-11-10 (who-iris#217): the entry's
+ * summary, sections and keywords were drawn BELOW the whole library's
+ * listing, so a reader arriving at one document saw a table of every other
+ * one first. Here the document comes first and the library listing folds
+ * away under it. Same ids as {@link VIEWER_BODY}, so the script is unchanged.
+ */
+const ENTRY_BODY = `<div class="lib-main">
+  <section id="document" class="wrap" hidden aria-live="polite"></section>
+  <section id="blocks" class="wrap" hidden aria-live="polite"></section>
+</div>
+<details class="lib-all">
+<summary>The whole library</summary>
+${VIEWER_BODY.replace(/\n\s*<section id="(?:document|blocks)"[^\n]*<\/section>/g, "")}
+</details>`;
+
 /** The shared stylesheet and script sit beside the projection. */
 const assetsOf = (dataHref: string): string => dataHref.slice(0, dataHref.lastIndexOf("/") + 1);
 
@@ -1316,6 +1348,12 @@ interface LibraryPage {
   view?: string;
   /** The entry's catalogue record line, as HTML — {@link recordHtml}. Drawn right under the head. */
   record?: string;
+  /** Set on an entry page: its title for the heading, and {@link ENTRY_BODY} in place of {@link VIEWER_BODY}. */
+  entryTitle?: string;
+  /** The entry's language versions and toggle, as HTML — `versionsHtml`. */
+  versions?: string;
+  /** The entry's summary, as HTML — `summaryHtml`. */
+  summary?: string;
 }
 
 /**
@@ -1358,8 +1396,8 @@ function libraryPageHtml(p: LibraryPage): string {
     },
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
 <div class="${LIBRARY_MOUNT}" data-fa-no-filter${decl?.attrs ?? ""}${attrs}>
-${decl ? `${decl.stub}\n` : ""}${VIEWER_HEAD}
-${p.record ? `${p.record}\n` : ""}${p.view ? `${p.view}\n` : ""}${VIEWER_BODY}
+${decl ? `${decl.stub}\n` : ""}${p.entryTitle === undefined ? VIEWER_HEAD : VIEWER_HEAD.replace("Library — the L1 corpus", escHtml(p.entryTitle))}
+${p.record ? `${p.record}\n` : ""}${p.versions ? `${p.versions}\n` : ""}${p.summary ? `${p.summary}\n` : ""}${p.view ? `${p.view}\n` : ""}${p.entryTitle === undefined ? VIEWER_BODY : ENTRY_BODY}
 ${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>
@@ -1427,6 +1465,9 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     sources: sourcesHtml(entry.sources ?? []),
     view: viewPanelHtml(entry.sources ?? []) || (entry.notHeld ? notHeldHtml(entry.notHeld) : ""),
     record: recordHtml(entry.record ?? []),
+    entryTitle: entry.title ?? entry.id,
+    ...(entry.versions ? { versions: entry.versions } : {}),
+    ...(entry.summary ? { summary: entry.summary } : {}),
     searchExclude: true,
   });
 }
@@ -2003,6 +2044,10 @@ if (import.meta.main) {
     // the entry, so it is copied as-is rather than re-expressed, and each
     // shell names it as its `alternate`.
     const mine = g.entries.filter((e) => e.instance === subject);
+    const languages = entryLanguages(
+      mine.map((e) => ({ id: e.id, ...(e.catalogue?.node ? { node: join(repoRoot, e.catalogue.node) } : {}) })),
+      new Set(mine.map((e) => e.id)),
+    );
     for (const e of mine) {
       const shellDir = join(sub.pageDir, e.id);
       const src = join(repoRoot, e.dir, "manifest.jsonld");
@@ -2043,13 +2088,25 @@ if (import.meta.main) {
         join(shellDir, "index.html"),
         entryPageHtml(`../${sub.dataHref}`, subject, "../../", {
           id: e.id,
+          title: e.title || e.id,
+          ...(() => {
+            const l = languages.get(e.id);
+            if (!l) return {};
+            const versions = versionsHtml(e.id, l, (id) => `../${encodeURIComponent(id)}/`);
+            const summary = summaryHtml(l.abstract);
+            return { ...(versions ? { versions } : {}), ...(summary ? { summary } : {}) };
+          })(),
           ...(jsonld ? { jsonld } : {}),
           ...(graphs.length ? { graphs } : {}),
           ...(() => {
             // No viewable source held, and the entry names one: say so where the panel would be.
             const held = sourceFileOf(repoRoot, e, g.uploads);
             return !held && e.sourceFile && e.provenance !== "referenced"
-              ? { notHeld: { file: e.sourceFile, elsewhere: [...elsewhereLinks(e), ...(e.upstream ?? [])] } }
+              ? { notHeld: { file: e.sourceFile, elsewhere: [...elsewhereLinks(e), ...(e.upstream ?? []), ...(() => {
+                  // The file this entry was derived from, at its source (script./lib/library-upstream-pdf.ts).
+                  const u = upstreamPdfOf(e.catalogue?.node ? join(repoRoot, e.catalogue.node) : undefined, e.id);
+                  return u ? [{ label: `${u.file} at its source`, href: u.href }] : [];
+                })()] } }
               : {};
           })(),
           ...(() => {

@@ -32,6 +32,7 @@
  * No ingestion is triggered and nothing is written; upload, process and
  * materialise-into-a-folio are writes, and live elsewhere.
  */
+import { ENDONYM, languageOfFile, slugOfLocal } from "./lib/library-languages.ts";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 import type { LibraryRef } from "./library-refs.ts";
@@ -766,15 +767,35 @@ function catalogueInfo(instanceRoot: string): Map<string, CatalogueEntryInfo> {
     const nodes = join(cat, "nodes");
     if (!existsSync(nodes)) continue;
     for (const f of readdirSync(nodes).filter((n) => n.endsWith(".json")).sort()) {
-      const node = readJson<{ libraryId?: unknown; title?: unknown; metadataRef?: unknown; handle?: unknown }>(join(nodes, f));
-      if (typeof node?.libraryId !== "string" || out.has(node.libraryId)) continue;
+      const node = readJson<{
+        libraryId?: unknown; title?: unknown; metadataRef?: unknown; handle?: unknown;
+        bitstreams?: { name?: unknown; bundle?: unknown; materialization?: { provenance?: { local?: unknown } } }[];
+      }>(join(nodes, f));
+      if (typeof node?.libraryId !== "string") continue;
+      const langOf = new Map<string, string>();
+      for (const b of node.bitstreams ?? []) {
+        const sl = slugOfLocal(b.materialization?.provenance?.local);
+        const lg = typeof b.name === "string" ? languageOfFile(b.name) : undefined;
+        if (sl && lg) langOf.set(sl, lg);
+      }
+      // The entry it names, and every entry one of its ORIGINAL bitstreams was
+      // derived into (`provenance.local` = `library/<slug>/structure.json#source`):
+      // the other language editions IRIS keeps on the same item (who-iris#217).
+      const slugs = [node.libraryId, ...(node.bitstreams ?? [])
+        .filter((b) => b.bundle === "ORIGINAL")
+        .map((b) => slugOfLocal(b.materialization?.provenance?.local))
+        .filter((x): x is string => !!x)].filter((x) => !out.has(x));
+      if (slugs.length === 0) continue;
       // `metadataRef` is relative to the layer root (`catalogue/records/<x>.dc.json`).
       const record = typeof node.metadataRef === "string" && node.metadataRef && !node.metadataRef.includes("..")
         ? join(instanceRoot, node.metadataRef)
         : undefined;
       const xml = record && existsSync(record) ? dcXmlSitePath(instanceRoot, record) : undefined;
-      out.set(node.libraryId, {
-        ...(typeof node.title === "string" && node.title.trim() ? { title: node.title.trim() } : {}),
+      for (const slug of new Set(slugs)) out.set(slug, {
+        // Another edition of the item is titled as the item, with its language.
+        ...(typeof node.title === "string" && node.title.trim()
+          ? { title: slug !== node.libraryId && langOf.has(slug) ? `${node.title.trim()} (${ENDONYM[langOf.get(slug)!] ?? langOf.get(slug)})` : node.title.trim() }
+          : {}),
         ...(record && existsSync(record) ? { record } : {}),
         ...(xml ? { xml } : {}),
         node: join(nodes, f),
