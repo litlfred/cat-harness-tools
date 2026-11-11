@@ -138,7 +138,9 @@ runs:
     - name: Playwright Chromium and its system libraries
       if: inputs.chromium == 'with-deps'
       shell: bash
-      run: npx --yes playwright install --with-deps chromium
+      # Browser always; apt only when a system library is missing. The shared
+      # installer sits in this same checkout of cat-harness-tools.
+      run: bash "$GITHUB_ACTION_PATH/../../scripts/playwright-chromium/install.sh" npx --yes playwright
 
     - name: Result
       id: result

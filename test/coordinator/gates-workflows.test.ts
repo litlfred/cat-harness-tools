@@ -181,6 +181,13 @@ describe("the gates come from the workflow, not from a list", () => {
       expect({ job, fast: fast.has(job) }).toEqual({ job, fast: !browser.has(job) });
     }
   });
+
+  test("the shared Chromium installer counts as installing a browser", () => {
+    const step = (run: string) => ({ steps: [{ run }] });
+    expect(installsBrowser(step("npx playwright install --with-deps chromium"))).toBe(true);
+    expect(installsBrowser(step("bash ../ci/.github/scripts/playwright-chromium/install.sh node_modules/.bin/playwright"))).toBe(true);
+    expect(installsBrowser(step("bun run cat gates"))).toBe(false);
+  });
 });
 
 describe("the workflow this reads is the one CI runs", () => {

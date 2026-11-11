@@ -1125,10 +1125,12 @@ export function exemptionFor(command: string): StepExemption | undefined {
  * (157 → 158).
  *
  * `playwright install` is the discriminator rather than a job's name: it is
- * what actually costs the 36 seconds and actually requires Chromium.
+ * what actually costs the 36 seconds and actually requires Chromium. The
+ * shared installer `.github/scripts/playwright-chromium/install.sh` (which
+ * skips apt when the libraries are present) counts the same.
  */
 export function installsBrowser(def: { steps?: { run?: string }[] }): boolean {
-  return (def.steps ?? []).some((s) => /playwright\s+install/.test(s.run ?? ""));
+  return (def.steps ?? []).some((s) => /playwright\s+install|playwright-chromium\/install\.sh/.test(s.run ?? ""));
 }
 
 /**
