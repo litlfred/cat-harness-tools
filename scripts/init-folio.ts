@@ -59,8 +59,15 @@ import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-
 /** The version a new layer declares beside its `iriBase` (bean folio-assistant-63q4). */
 export const INITIAL_VERSION = "0.1.0";
 
+/**
+ * The GitHub owner of the harness layers (folio-assistant, cat-harness-tools,
+ * …): `HARNESS_OWNER`, else litlfred. A new folio may live under any owner;
+ * only the harness it calls is assumed to live here.
+ */
+export const HARNESS_OWNER = process.env.HARNESS_OWNER || "litlfred";
+
 /** The upstream this folio pins its platform to. */
-export const FOLIO_ASSISTANT_REPO = "https://github.com/litlfred/folio-assistant.git";
+export const FOLIO_ASSISTANT_REPO = `https://github.com/${HARNESS_OWNER}/folio-assistant.git`;
 
 /**
  * How the folio reaches its folio-assistant checkout.
@@ -578,7 +585,7 @@ function headSha(dir: string): string | undefined {
 /**
  * Resolve the pinned `source.remote` for `layer` from the enclosing platform
  * checkout's `index.config.json` when available, falling back to `git rev-parse
- * HEAD` (or a deterministic 40-char SHA outside git) with `litlfred/<layer>`.
+ * HEAD` (or a deterministic 40-char SHA outside git) with `<HARNESS_OWNER>/<layer>`.
  */
 function resolveRemoteLayerSource(layer: string): RemoteSource {
   const platformRoot = REPO_ROOT ?? resolve(TOOLS_ROOT, "..");
@@ -597,7 +604,7 @@ function resolveRemoteLayerSource(layer: string): RemoteSource {
   const layerDir = resolve(platformRoot, layer);
   const ref = headSha(layerDir) ?? headSha(TOOLS_ROOT) ?? "0".repeat(40);
   return {
-    repository: `litlfred/${layer}`,
+    repository: `${HARNESS_OWNER}/${layer}`,
     ref,
     overrides: { [layer]: { whole: true } },
   };
@@ -1050,7 +1057,7 @@ permissions:
 
 jobs:
   staging:
-    uses: litlfred/folio-assistant/.github/workflows/folio-staging.yml@main
+    uses: ${HARNESS_OWNER}/folio-assistant/.github/workflows/folio-staging.yml@main
     with:
       build_command: '${build}'
       site_dir: _site
@@ -1737,7 +1744,7 @@ permissions:
   contents: write
 jobs:
   publish:
-    uses: litlfred/cat-harness-tools/.github/workflows/layer-publish-context.yml@main
+    uses: ${HARNESS_OWNER}/cat-harness-tools/.github/workflows/layer-publish-context.yml@main
     with:
       instance: ${slug}
 `;
@@ -1768,7 +1775,7 @@ permissions:
   contents: write
 jobs:
   publish:
-    uses: litlfred/cat-harness-tools/.github/workflows/layer-qa-publish.yml@main
+    uses: ${HARNESS_OWNER}/cat-harness-tools/.github/workflows/layer-qa-publish.yml@main
     with:
       instance: ${slug}
 `;
