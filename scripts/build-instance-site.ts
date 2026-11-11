@@ -496,7 +496,7 @@ export function overrideConfig(o: { title: string; description?: string; baseurl
 }
 
 /** Every `.html` file under `dir`, skipping vendored assets. */
-function htmlFiles(dir: string): string[] {
+function htmlFiles(dir: string, ext = ".html"): string[] {
   const out: string[] = [];
   const walk = (d: string): void => {
     for (const n of readdirSync(d)) {
@@ -504,7 +504,7 @@ function htmlFiles(dir: string): string[] {
       if (statSync(p).isDirectory()) {
         if (relative(dir, p).split(sep).join("/") === "assets/vendor") continue;
         walk(p);
-      } else if (n.endsWith(".html")) out.push(p);
+      } else if (n.endsWith(ext)) out.push(p);
     }
   };
   walk(dir);
@@ -517,7 +517,7 @@ export async function pageUrls(html: string): Promise<string[]> {
   await new HTMLRewriter()
     .on("*", {
       element(el) {
-        for (const a of ["href", "src", "action"]) {
+        for (const a of ["href", "src", "action", "xlink:href"]) {
           const v = el.getAttribute(a);
           if (v) urls.push(v);
         }
@@ -608,16 +608,40 @@ export async function relinkOutOfScope(site: string, base: string, linkRoot: str
  * are the content's to fix and are reported, while a dead link on any other
  * page is the build's and refuses the publish.
  */
-export async function checkLinks(site: string, base: string, upstream: ReadonlySet<string> = new Set()): Promise<{ pages: number; files: number; misses: string[]; upstreamMisses: string[] }> {
+export async function checkLinks(
+  site: string,
+  base: string,
+  upstream: ReadonlySet<string> = new Set(),
+  selfAddress?: string,
+): Promise<{ pages: number; diagrams: number; files: number; misses: string[]; upstreamMisses: string[]; selfMisses: string[]; diagramMisses: string[] }> {
   const misses: string[] = [];
   const upstreamMisses: string[] = [];
+  const selfMisses: string[] = [];
   const pages = htmlFiles(site);
   for (const page of pages) {
     const rel = relative(site, page).split(sep).join("/");
     for (const url of await pageUrls(readFileSync(page, "utf-8"))) {
+      const own = selfAddress === undefined ? undefined : selfTargetOf(url, selfAddress);
+      if (own !== undefined) {
+        if (!served(site, own)) selfMisses.push(`${rel}: ${url}`);
+        continue;
+      }
       const t = targetOf(url, rel, base);
       if (t === undefined) continue;
       if (t === "outside-base" || !served(site, t)) (upstream.has(rel) ? upstreamMisses : misses).push(`${rel}: ${url}`);
+    }
+  }
+  // Links inside diagrams: a standalone .svg's hrefs resolve against the
+  // .svg file. They are the drawing writer's, reported apart and not gated.
+  const diagramMisses: string[] = [];
+  const diagrams = htmlFiles(site, ".svg");
+  for (const svg of diagrams) {
+    const rel = relative(site, svg).split(sep).join("/");
+    for (const url of await pageUrls(readFileSync(svg, "utf-8"))) {
+      const own = selfAddress === undefined ? undefined : selfTargetOf(url, selfAddress);
+      const t = own ?? targetOf(url, rel, base);
+      if (t === undefined || (t !== "outside-base" && served(site, t))) continue;
+      diagramMisses.push(`${rel}: ${url}`);
     }
   }
   let files = 0;
@@ -629,7 +653,59 @@ export async function checkLinks(site: string, base: string, upstream: ReadonlyS
     }
   };
   count(site);
-  return { pages: pages.length, files, misses, upstreamMisses };
+  return { pages: pages.length, diagrams: diagrams.length, files, misses, upstreamMisses, selfMisses, diagramMisses };
+}
+
+/** Where the built site carries its link check's result, from the site root. */
+export const LINK_REPORT = "assets/site-qa/links.json";
+
+/** Write {@link LINK_REPORT}: the counts and every unresolved link, by kind. Deterministic. */
+export function writeLinkReport(
+  site: string,
+  r: { pages: number; diagrams?: number; misses: readonly string[]; upstreamMisses: readonly string[]; selfMisses: readonly string[]; diagramMisses?: readonly string[] },
+): void {
+  const file = join(site, LINK_REPORT);
+  mkdirSync(dirname(file), { recursive: true });
+  const rows = (xs: readonly string[]) => [...xs].sort().map((x) => ({ page: x.slice(0, x.indexOf(": ")), href: x.slice(x.indexOf(": ") + 2) }));
+  writeFileSync(
+    file,
+    JSON.stringify(
+      {
+        $schema: "site-link-report/v1",
+        pages: r.pages,
+        unresolved: rows(r.misses),
+        selfAddress: rows(r.selfMisses),
+        content: rows(r.upstreamMisses),
+        diagrams: r.diagrams ?? 0,
+        inDiagrams: rows(r.diagramMisses ?? []),
+      },
+      null,
+      1,
+    ) + "\n",
+  );
+}
+
+/** The site's own published address, `https://<owner>.github.io/<repo>/`: an absolute link to it is a link into this site. */
+export const selfAddressOf = (owner: string, repo: string): string => `https://${owner.toLowerCase()}.github.io/${repo}/`;
+
+/**
+ * Where an ABSOLUTE link to the site's own address (`selfAddress`, {@link
+ * selfAddressOf}) lands in the built tree, or undefined when the link is not
+ * one. {@link targetOf} leaves every absolute URL alone, so a writer that
+ * composed the site's own URL wrongly was never checked: every journey actor
+ * on smart-trust-demo linked `https://litlfred.github.io/smart-trust-demo/ActorDefinition-….html`,
+ * a page no build writes (fhir-harness#380). The path is read from the
+ * site's root, also in a preview, whose tree is the same site's.
+ */
+export function selfTargetOf(url: string, selfAddress: string): string | undefined {
+  const u = url.split("#")[0]!.split("?")[0]!;
+  const at = u.toLowerCase().startsWith(selfAddress.toLowerCase()) ? u.slice(selfAddress.length) : u.toLowerCase() === selfAddress.toLowerCase().replace(/\/$/, "") ? "" : undefined;
+  if (at === undefined) return undefined;
+  try {
+    return decodeURIComponent(at);
+  } catch {
+    return at;
+  }
 }
 
 /**
@@ -1060,8 +1136,20 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     console.log(`scope ${o.scope.join(", ")}: ${r.links} link(s) on ${r.pages} page(s) point at another layer's pages on ${o.linkRoot}`);
   }
   const upstream = readUpstreamPages(upstreamFile);
-  const links = await checkLinks(site, `${baseurl}/`, upstream);
+  const links = await checkLinks(site, `${baseurl}/`, upstream, selfAddressOf(gh.owner, gh.repo));
   console.log(`links: ${links.pages} html pages, ${links.misses.length} unresolved; ${links.files} files`);
+  // Absolute links to the site's own address (fhir-harness#380). Reported, not gated yet: the
+  // layers that wrote them publish again once they re-pin the fix, and then this gates too.
+  if (links.selfMisses.length > 0) {
+    console.log(`links: ${links.selfMisses.length} absolute link(s) to ${selfAddressOf(gh.owner, gh.repo)} reach no page of this build (reported, not gated):`);
+    for (const m of links.selfMisses.slice(0, 20)) console.log(`  · ${m}`);
+  }
+  if (links.diagramMisses.length > 0) {
+    console.log(`links: ${links.diagramMisses.length} link(s) inside ${links.diagrams} diagram(s) reach no page of this build (reported, not gated):`);
+    for (const m of links.diagramMisses.slice(0, 20)) console.log(`  · ${m}`);
+  }
+  // The same result on the site, for its QA report to read (an IG layer's `qa.html`).
+  writeLinkReport(site, links);
   if (links.upstreamMisses.length > 0) {
     console.log(`links: ${links.upstreamMisses.length} unresolved on ${upstream.size} page(s) the content supplies (reported, not gated: the content's own to fix):`);
     for (const m of links.upstreamMisses.slice(0, 20)) console.log(`  · ${m}`);

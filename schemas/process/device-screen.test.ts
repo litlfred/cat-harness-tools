@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { JOURNEY_GLYPHS } from "./user-scenario";
-import { BLOCK_TYPES, isWide, parseDeviceScreen, SCREEN_GLYPHS, screenActors, screenExamples, ScreenBlockSchema } from "./device-screen";
+import { BLOCK_TYPES, blocksIn, isWide, parseDeviceScreen, SCREEN_GLYPHS, screenActors, screenExamples, ScreenBlockSchema, screenStates } from "./device-screen";
 
 const base = {
   $schema: "device-screen/0.1.0",
@@ -60,6 +60,42 @@ describe("device-screen: a screen is typed data", () => {
     const s = parseDeviceScreen(base);
     expect(screenActors(s)).toEqual(["nurse", "baby"]);
     expect(screenExamples(s)).toEqual(["Bundle/ips", "Bundle/ips"]);
+  });
+  test("states: replace blocks by id, hide them, or show a block only in one state", () => {
+    const blocks = [
+      { type: "statusBadge", id: "verdict", status: "verified", text: "Valid signature" },
+      { type: "alert", id: "locked", severity: "danger", text: "Link revoked", only: ["tampered"] },
+      { type: "actions", id: "go", buttons: [{ label: "Proceed" }] },
+      { type: "personCard", actor: "baby" },
+    ];
+    const s = parseDeviceScreen({
+      ...base,
+      blocks,
+      stateLabel: "Valid card",
+      states: [{ id: "tampered", label: "Tampered card", blocks: [{ type: "statusBadge", id: "verdict", status: "failed", text: "Signature mismatch" }, { type: "qr", id: "go", payload: "x", example: "Bundle/bad" }], hide: [], try: "Ask why" }],
+    });
+    expect(screenStates(s)).toEqual([{ id: "default", label: "Valid card", try: base.try }, { id: "tampered", label: "Tampered card", try: "Ask why" }]);
+    expect(blocksIn(s).map((b) => b.type)).toEqual(["statusBadge", "actions", "personCard"]);
+    const t = blocksIn(s, "tampered");
+    expect(t.map((b) => b.type)).toEqual(["statusBadge", "alert", "qr", "personCard"]);
+    expect((t[0] as { text: string }).text).toBe("Signature mismatch");
+    expect(screenExamples(s)).toEqual(["Bundle/bad"]);
+    const hid = parseDeviceScreen({ ...base, blocks, states: [{ id: "tampered", label: "T", hide: ["go"] }] });
+    expect(blocksIn(hid, "tampered").map((b) => b.type)).toEqual(["statusBadge", "alert", "personCard"]);
+    expect(screenStates(parseDeviceScreen(base))).toEqual([]);
+  });
+  test("a state is checked: unique, changes something, replaces and hides only blocks that exist", () => {
+    const blocks = [{ type: "note", id: "a", text: "x" }];
+    const st = (states: unknown, more: object = {}) => () => parseDeviceScreen({ ...base, blocks, states, ...more });
+    expect(st([{ id: "default", label: "x", hide: ["a"] }])).toThrow(/screen's own name/);
+    expect(st([{ id: "b", label: "x", hide: ["a"] }, { id: "b", label: "y", hide: ["a"] }])).toThrow(/appears twice/);
+    expect(st([{ id: "b", label: "x" }])).toThrow(/changes nothing/);
+    expect(st([{ id: "b", label: "x", hide: ["z"] }])).toThrow(/no block "z" to hide/);
+    expect(st([{ id: "b", label: "x", blocks: [{ type: "note", id: "z", text: "y" }] }])).toThrow(/no block "z" to replace/);
+    expect(st([{ id: "b", label: "x", blocks: [{ type: "note", text: "y" }] }])).toThrow(/needs the id/);
+    expect(() => parseDeviceScreen({ ...base, blocks: [{ type: "note", text: "x", only: ["nope"] }] })).toThrow(/no state "nope"/);
+    expect(() => parseDeviceScreen({ ...base, stateLabel: "x" })).toThrow(/has none/);
+    expect(st([{ id: "b", label: "x", blocks: [{ type: "note", id: "a", text: "y" }] }])).not.toThrow();
   });
   test("the glyph list extends the journeys' and repeats none; the wide devices", () => {
     for (const g of JOURNEY_GLYPHS) expect(SCREEN_GLYPHS).toContain(g);

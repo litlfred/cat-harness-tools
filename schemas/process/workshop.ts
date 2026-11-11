@@ -23,6 +23,7 @@
  * | `sheets` | the printable canvases (A3 or A4), each filled in one or more modules |
  * | `resources` | job aids, handouts, readings, slides and links, each tied to modules or steps |
  * | `presentation` | how the journeys viewer presents the workshop in a room: the app frame's words, the story in one sentence, whose record the trust ladder follows, the presenter's note, the outward links |
+ * | `lab` | the Discussion view as a table's working steps (team, use case, readiness, who decides, components, mapping, pathway, summary), each with a timer and a DISCUSS prompt, after DPI-H Lab; what a table writes is kept in its browser and assembled into one summary |
  *
  * A question is a question: a module asks a room to NAME, not to decide.
  *
@@ -92,6 +93,8 @@ const TableRowSchema = z
     what: Text.optional(),
     /** A worked example from somewhere real. */
     example: Text.optional(),
+    /** A heading the row is listed under, when a table groups its rows ("Governance"). */
+    group: Text.optional(),
   })
   .strict();
 
@@ -146,6 +149,77 @@ export const WorkshopSheetSchema = z
   })
   .strict();
 export type WorkshopSheet = z.infer<typeof WorkshopSheetSchema>;
+
+/** A write-in field of a lab step: kept in the browser, in the summary. */
+const LabFieldSchema = z
+  .object({ id: Id, label: Text, hint: Text.optional(), lines: z.number().int().min(1).max(12).default(2) })
+  .strict();
+
+/**
+ * One step of the Discussion view's lab: a heading, a timer, a DISCUSS
+ * prompt, and the parts the table works through, drawn in this order:
+ * `fields`, `useCases`, `rate`, `holders`, `pick`, `capabilities` (the gap
+ * strip of every moment, the same answers the walkthrough keeps),
+ * `modules` (the journey's questions of those modules, answerable here and
+ * on the walkthrough alike), `discussion` (the closing questions), and
+ * `summary` (everything above, on one page).
+ */
+export const WorkshopLabStepSchema = z
+  .object({
+    id: Id,
+    /** On the step's tab ("Who decides"). */
+    label: Text,
+    /** The step's question ("Who is part of the working team?"). */
+    title: Text,
+    lede: Text.optional(),
+    /** The timer's length; no timer when absent. */
+    minutes: z.number().int().positive().max(240).optional(),
+    /** The DISCUSS prompt read to the table. */
+    discuss: Text.optional(),
+    /** A caution under the step ("Don't enter personal health information."). */
+    note: Text.optional(),
+    fields: z.array(LabFieldSchema).optional(),
+    /** The use-case cards (`lab.useCases`), any number ticked, and the table's own statement under them. */
+    useCases: z.boolean().optional(),
+    /** Tables whose rows the table rates on `lab.scale` (a readiness check). */
+    rate: z.array(Id).optional(),
+    /** Tables whose rows each get "who holds it today" (decision rights, legal bases). */
+    holders: z.array(Id).optional(),
+    /** Tables whose rows the table ticks (the patterns it would start with, the cost drivers that dominate). */
+    pick: z.array(Id).optional(),
+    capabilities: z.boolean().optional(),
+    modules: z.array(ModuleId).optional(),
+    discussion: z.boolean().optional(),
+    summary: z.boolean().optional(),
+    /** Resources (`resources[].id`) linked from the step. */
+    resources: z.array(Id).optional(),
+  })
+  .strict();
+export type WorkshopLabStep = z.infer<typeof WorkshopLabStepSchema>;
+
+/**
+ * The Discussion view as a lab (after DPI-H Lab, dpih.fhirlab.net): a tab per
+ * step, each timed, and a summary assembled from them. Nothing leaves the
+ * browser. `credit` is printed at the foot of the view, with `creditHref`.
+ */
+export const WorkshopLabSchema = z
+  .object({
+    name: Text.optional(),
+    intro: Text.optional(),
+    credit: Text.optional(),
+    creditHref: Text.optional(),
+    /** The credit link's words ("DPI-H Lab"); `name` when absent. */
+    creditLabel: Text.optional(),
+    /** The use cases a table may tick; `journey` ones come ticked, as the journeys teach them. */
+    useCases: z.array(z.object({ id: Id, label: Text, description: Text.optional(), journey: z.boolean().optional() }).strict()).optional(),
+    /** The table's use-case statement as the journeys fill it in; each taught journey's line is added under it. Editable. */
+    useCaseText: Text.optional(),
+    /** The scale `rate` tables are rated on (Done / In progress / Not yet), its first option "nothing missing". */
+    scale: z.object({ id: Id, label: Text, options: z.array(z.object({ id: Id, label: Text }).strict()).min(2) }).strict().optional(),
+    steps: z.array(WorkshopLabStepSchema).min(1),
+  })
+  .strict();
+export type WorkshopLab = z.infer<typeof WorkshopLabSchema>;
 
 /**
  * How the journeys viewer presents a workshop in a room (its overview and
@@ -334,6 +408,7 @@ export const WorkshopKind = nodeKind(
     sheets: z.array(WorkshopSheetSchema).optional(),
     resources: z.array(WorkshopResourceSchema).optional(),
     presentation: WorkshopPresentationSchema.optional(),
+    lab: WorkshopLabSchema.optional(),
   },
   { strict: true, refine: (w, ctx) => {
     const issue = (message: string) => ctx.addIssue({ code: "custom", message });
@@ -374,6 +449,19 @@ export const WorkshopKind = nodeKind(
     for (const d of w.discussion ?? []) mod(`discussion ${d.id}`, d.module);
     for (const s of w.sheets ?? []) for (const m of s.modules) mod(`sheet ${s.id}`, m);
     for (const r of w.resources ?? []) for (const m of r.modules ?? []) mod(`resource ${r.id}`, m);
+    if (w.lab) {
+      const resources = new Set((w.resources ?? []).map((r) => r.id));
+      dup("lab step", w.lab.steps.map((s) => s.id));
+      dup("lab use case", (w.lab.useCases ?? []).map((u) => u.id));
+      for (const s of w.lab.steps) {
+        for (const m of s.modules ?? []) mod(`lab step ${s.id}`, m);
+        for (const t of [...(s.rate ?? []), ...(s.holders ?? []), ...(s.pick ?? [])]) if (!tables.has(t)) issue(`lab step ${s.id} names table "${t}", which the workshop does not list`);
+        for (const r of s.resources ?? []) if (!resources.has(r)) issue(`lab step ${s.id} names resource "${r}", which the workshop does not list`);
+        if (s.rate?.length && !w.lab.scale) issue(`lab step ${s.id} rates tables, but the lab has no scale`);
+        if (s.useCases && !w.lab.useCases?.length) issue(`lab step ${s.id} shows the use cases, but the lab lists none`);
+        dup(`lab step ${s.id} field`, (s.fields ?? []).map((f) => f.id));
+      }
+    }
   } },
 );
 export const WorkshopSchema = WorkshopKind.schema;

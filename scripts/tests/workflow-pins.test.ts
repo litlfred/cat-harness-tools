@@ -57,3 +57,35 @@ describe("workflow-pins: a commit pin behind the lock", () => {
     expect(judge("jobs:\n  c:\n    uses: litlfred/cat-harness-tools/.github/workflows/x.yml@main\n").findings[0].trailing).toBeUndefined();
   });
 });
+
+describe("workflow-pins: layers under more than one owner", () => {
+  const repos = new Map([
+    ["cat-harness-tools", "litlfred/cat-harness-tools"],
+    ["smart-base", "WorldHealthOrganization/smart-base"],
+  ]);
+  const BASE = "d".repeat(40);
+  const refs2 = new Map([["cat-harness-tools", TOOLS], ["smart-base", BASE]]);
+  const judgeAt = (text: string, ownOwner = "WorldHealthOrganization", own = "smart-x") =>
+    judgeFile("/r", "/r/.github/workflows/ci.yml", text, own, refs2, repos, ownOwner);
+
+  test("a call under the old owner moves to the owner the lock names, even at the right commit", () => {
+    const { findings, text } = judgeAt(`jobs:\n  b:\n    uses: litlfred/smart-base/.github/workflows/ghbuild.yml@${BASE} # index.lock.json\n`);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].trailing).toBeUndefined();
+    expect(text).toContain(`uses: WorldHealthOrganization/smart-base/.github/workflows/ghbuild.yml@${BASE} # index.lock.json`);
+  });
+
+  test("a harness layer that stays under litlfred is judged from a WHO repository", () => {
+    const { text } = judgeAt("jobs:\n  c:\n    uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main\n");
+    expect(text).toContain(`uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@${TOOLS} # index.lock.json`);
+  });
+
+  test("this repository's own workflow under a non-litlfred owner becomes a local call", () => {
+    const { text } = judgeAt("jobs:\n  b:\n    uses: WorldHealthOrganization/smart-x/.github/workflows/build.yml@main\n");
+    expect(text).toContain("uses: ./.github/workflows/build.yml\n");
+  });
+
+  test("third-party actions are not judged", () => {
+    expect(judgeAt("jobs:\n  c:\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node/sub@v4\n").findings).toHaveLength(0);
+  });
+});

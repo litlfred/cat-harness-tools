@@ -200,8 +200,12 @@ describe("real repository measurement", () => {
     const findingsWhere = res.findings.map((f) => f.where);
     expect(findingsWhere.filter((w) => !KNOWN.has(w))).toEqual([]);
     // Unconsumed in either setting: no process mounted anywhere consumes these yet.
+    // `release-authorization` left this list when fhir-harness's
+    // processes/content/ig-release.bpmn (fhir-harness#359) gave its owner lane
+    // that permission. It stays in KNOWN: a checkout pinning fhir-harness
+    // before #359 still reports it, and either answer is right for its pin.
     for (const w of [
-      "release-authorization", "content-authoring", "qa-reporting", "clinical-validation",
+      "content-authoring", "qa-reporting", "clinical-validation",
       "perform-task", "approval-authority", "project-governance", "first-pass-review", "sme-coordination"]) {
       expect(findingsWhere).toContain(w);
     }

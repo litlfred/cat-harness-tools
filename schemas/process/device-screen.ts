@@ -22,6 +22,7 @@
  * | `steps` | the journey steps it shows, `{scenario, step}` |
  * | `blocks` | what is on it, top to bottom: typed blocks, data only |
  * | `try` | what to try on it in the room |
+ * | `states` | other versions of the screen a facilitator can switch to live (a tampered card, a wrong passcode) |
  *
  * ## Blocks are data, never markup
  *
@@ -49,6 +50,26 @@
  * `desktop`, `kiosk` in landscape) the side blocks are drawn in a second
  * column, as a clinical screen splits; on a phone or a scanner every block is
  * in one column, in order.
+ *
+ * ## States: the same screen, switched live
+ *
+ * A room learns most from a contrast: the same verification screen with a
+ * valid card and with a tampered one. A screen's `states` are those other
+ * versions. The screen as its `blocks` say is the first state (labelled
+ * `stateLabel`, "As shown" by default); each entry of `states` is another,
+ * with an `id` (its URL value, `?state=tampered`), a `label` for the
+ * switch, and what it changes:
+ *
+ * | field | what |
+ * |---|---|
+ * | `blocks` | blocks that replace the screen's blocks with the same `id` |
+ * | `hide` | ids of the screen's blocks this state does not show |
+ * | `try` | what to try in this state, shown under the switch |
+ *
+ * A block may also say `only: ["locked"]`: it is drawn in those states and
+ * no other (an alert that appears after the third wrong passcode). So a
+ * state never repeats the whole screen, only what differs, and the checks
+ * below see every block of every state.
  *
  * ## What resolves, and where it is checked
  *
@@ -105,6 +126,8 @@ const common = {
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
   /** `side`: the second column, on a device wide enough. */
   column: z.enum(["main", "side"]).optional(),
+  /** Drawn only in these states (their `id`s; `default` is the screen as its blocks say). */
+  only: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]*$/)).min(1).optional(),
 };
 
 export const HeaderBlockSchema = z
@@ -308,6 +331,26 @@ export type BlockOf<T extends ScreenBlock["type"]> = Extract<ScreenBlock, { type
 /** The block types, in the order the module's table lists them. */
 export const BLOCK_TYPES = ["header", "personCard", "qr", "passcode", "statusBadge", "recordList", "fields", "consent", "alert", "actions", "note"] as const;
 
+/** The id of the state the screen's own blocks draw. */
+export const DEFAULT_STATE = "default";
+
+/** Another version of a screen: what it replaces, what it hides, what to try in it. */
+export const ScreenStateSchema = z
+  .object({
+    /** Its URL value (`?state=tampered`) and what a block's `only` names. */
+    id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "a state id is lower-case kebab"),
+    /** The switch's label ("Tampered card"). */
+    label: Text,
+    /** Blocks that replace the screen's blocks with the same `id`. */
+    blocks: z.array(ScreenBlockSchema).optional(),
+    /** Ids of the screen's blocks this state does not show. */
+    hide: z.array(z.string()).optional(),
+    /** What to try in this state. */
+    try: Text.optional(),
+  })
+  .strict();
+export type ScreenState = z.infer<typeof ScreenStateSchema>;
+
 /** `device-screen/0.1.0`, as a node kind. */
 export const DeviceScreenKind = nodeKind(
   DEVICE_SCREEN_V01,
@@ -330,6 +373,10 @@ export const DeviceScreenKind = nodeKind(
      * configuration the frame's label names ("OHS Player Facility Config").
      */
     client: z.object({ name: Text, version: Text.optional(), time: Text.optional(), config: Text.optional() }).strict().optional(),
+    /** Other versions of the screen, switched live in the room. */
+    states: z.array(ScreenStateSchema).min(1).optional(),
+    /** The switch's label for the screen as its blocks say ("Valid card"). */
+    stateLabel: Text.optional(),
   },
   {
     strict: true,
@@ -340,6 +387,24 @@ export const DeviceScreenKind = nodeKind(
         if (seen.has(b.id)) ctx.addIssue({ code: "custom", message: `block id "${b.id}" appears twice` });
         seen.add(b.id);
       }
+      const stateIds = new Set<string>([DEFAULT_STATE]);
+      for (const st of s.states ?? []) {
+        if (stateIds.has(st.id)) ctx.addIssue({ code: "custom", message: `state "${st.id}" ${st.id === DEFAULT_STATE ? "is the screen's own name" : "appears twice"}` });
+        stateIds.add(st.id);
+        if (!st.blocks?.length && !st.hide?.length && !s.blocks.some((b) => b.only?.includes(st.id)))
+          ctx.addIssue({ code: "custom", message: `state "${st.id}" changes nothing: give it blocks, hide, or a block that is only in it` });
+        const own = new Set<string>();
+        for (const b of st.blocks ?? []) {
+          if (b.id === undefined) ctx.addIssue({ code: "custom", message: `state "${st.id}": a block that replaces another needs the id of the one it replaces` });
+          else if (!seen.has(b.id)) ctx.addIssue({ code: "custom", message: `state "${st.id}": no block "${b.id}" to replace` });
+          else if (own.has(b.id)) ctx.addIssue({ code: "custom", message: `state "${st.id}": block "${b.id}" replaced twice` });
+          if (b.id !== undefined) own.add(b.id);
+          if (b.only !== undefined) ctx.addIssue({ code: "custom", message: `state "${st.id}": a replacing block cannot say \`only\`` });
+        }
+        for (const h of st.hide ?? []) if (!seen.has(h)) ctx.addIssue({ code: "custom", message: `state "${st.id}": no block "${h}" to hide` });
+      }
+      for (const b of s.blocks) for (const o of b.only ?? []) if (!stateIds.has(o)) ctx.addIssue({ code: "custom", message: `block ${b.id ?? b.type}: no state "${o}"` });
+      if (s.stateLabel !== undefined && s.states === undefined) ctx.addIssue({ code: "custom", message: "stateLabel names the first of the states, but the screen has none" });
       const steps = new Set<string>();
       for (const st of s.steps) {
         const k = `${st.scenario}#${st.step}`;
@@ -359,14 +424,38 @@ export function parseDeviceScreen(raw: unknown, where = "device screen"): Device
   return r.data;
 }
 
-/** Every actor a screen names: its owner and its person cards'. */
-export function screenActors(s: DeviceScreen): string[] {
-  return [s.owner, ...s.blocks.flatMap((b) => (b.type === "personCard" ? [b.actor] : []))];
+/** Every block a screen can draw: its own, then each state's replacements. */
+export const allBlocks = (s: DeviceScreen): ScreenBlock[] => [...s.blocks, ...(s.states ?? []).flatMap((st) => st.blocks ?? [])];
+
+/** The states of a screen, the screen's own first: `[{id: "default", label}, ...states]`. Empty when it has none. */
+export function screenStates(s: DeviceScreen): { id: string; label: string; try?: string }[] {
+  if (!s.states?.length) return [];
+  return [
+    { id: DEFAULT_STATE, label: s.stateLabel ?? "As shown", ...(s.try ? { try: s.try } : {}) },
+    ...s.states.map((st) => ({ id: st.id, label: st.label, ...(st.try ? { try: st.try } : {}) })),
+  ];
 }
 
-/** Every FHIR example a screen names: its QR codes' and its record lists'. */
+/** The blocks a screen draws in one state, in the screen's order. */
+export function blocksIn(s: DeviceScreen, state: string = DEFAULT_STATE): ScreenBlock[] {
+  const st = s.states?.find((x) => x.id === state);
+  const swap = new Map((st?.blocks ?? []).flatMap((b) => (b.id !== undefined ? [[b.id, b] as const] : [])));
+  const hide = new Set(st?.hide ?? []);
+  return s.blocks.flatMap((b) => {
+    if (b.only !== undefined && !b.only.includes(state)) return [];
+    if (b.id !== undefined && hide.has(b.id)) return [];
+    return [(b.id !== undefined && swap.get(b.id)) || b];
+  });
+}
+
+/** Every actor a screen names: its owner and its person cards', in every state. */
+export function screenActors(s: DeviceScreen): string[] {
+  return [s.owner, ...allBlocks(s).flatMap((b) => (b.type === "personCard" ? [b.actor] : []))];
+}
+
+/** Every FHIR example a screen names: its QR codes' and its record lists', in every state. */
 export function screenExamples(s: DeviceScreen): string[] {
-  return s.blocks.flatMap((b) => ((b.type === "qr" || b.type === "recordList") && b.example !== undefined ? [b.example] : []));
+  return allBlocks(s).flatMap((b) => ((b.type === "qr" || b.type === "recordList") && b.example !== undefined ? [b.example] : []));
 }
 
 /** Is a device wide enough to draw the side column beside the main one? */

@@ -43,7 +43,8 @@ export const CALLER_PATH = ".github/workflows/site-publish.yml";
 export const TEMPLATE = resolve(import.meta.dir, "..", "templates", "document", "github", "workflows", "site-publish.yml");
 
 const SHA = /^[0-9a-f]{40}$/;
-const CALL = /^litlfred\/cat-harness-tools\/\.github\/workflows\/folio-site-publish\.yml@(\S+)$/;
+/** A call of the shared workflow, under whichever owner holds cat-harness-tools (the lock says which). */
+const CALL = /^[A-Za-z0-9_-][A-Za-z0-9_.-]*\/cat-harness-tools\/\.github\/workflows\/folio-site-publish\.yml@(\S+)$/;
 
 export interface Finding {
   file: string;
