@@ -46,6 +46,7 @@ import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
 import { DOCUMENT_VIEW_JS, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
 import { LANGUAGE_TOGGLE_JS, entryLanguages, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
+import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
 import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
@@ -2065,7 +2066,11 @@ if (import.meta.main) {
             // No viewable source held, and the entry names one: say so where the panel would be.
             const held = sourceFileOf(repoRoot, e, g.uploads);
             return !held && e.sourceFile && e.provenance !== "referenced"
-              ? { notHeld: { file: e.sourceFile, elsewhere: [...elsewhereLinks(e), ...(e.upstream ?? [])] } }
+              ? { notHeld: { file: e.sourceFile, elsewhere: [...elsewhereLinks(e), ...(e.upstream ?? []), ...(() => {
+                  // The file this entry was derived from, at its source (script./lib/library-upstream-pdf.ts).
+                  const u = upstreamPdfOf(e.catalogue?.node ? join(repoRoot, e.catalogue.node) : undefined, e.id);
+                  return u ? [{ label: `${u.file} at its source`, href: u.href }] : [];
+                })()] } }
               : {};
           })(),
           ...(() => {

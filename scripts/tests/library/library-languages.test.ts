@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { entryLanguages, languageOfFile, slugOfLocal, summaryHtml, versionsHtml } from "../../lib/library-languages.ts";
+import { upstreamPdfOf } from "../../lib/library-upstream-pdf.ts";
 
 function layer() {
   const root = mkdtempSync(join(tmpdir(), "lib-lang-"));
@@ -71,5 +72,17 @@ describe("library entry language versions", () => {
     expect(html).toContain('aria-current="page"');
     expect(summaryHtml(undefined)).toBe("");
     expect(summaryHtml("<b>x</b>")).toContain("&lt;b&gt;");
+  });
+
+  test("a not-held entry links the file it was derived from, at its source", () => {
+    const root = mkdtempSync(join(tmpdir(), "lib-up-"));
+    const p = join(root, "item.json");
+    writeFileSync(p, JSON.stringify({ bitstreams: [
+      { name: "x-ara.pdf", bundle: "ORIGINAL", materialization: { provenance: { local: "library/x-ara/structure.json#source", upstream: "https://iris.example/bitstreams/1/download" }, fixity: { algorithm: "sha256", digest: "a".repeat(64) } } },
+      { name: "x-eng.pdf", bundle: "ORIGINAL", materialization: { provenance: { local: "library/x/structure.json#source", upstream: "javascript:alert(1)" } } },
+    ] }));
+    expect(upstreamPdfOf(p, "x-ara")).toEqual({ file: "x-ara.pdf", href: "https://iris.example/bitstreams/1/download", sha256: "a".repeat(64) });
+    expect(upstreamPdfOf(p, "x")).toBeUndefined();
+    expect(upstreamPdfOf(undefined, "x")).toBeUndefined();
   });
 });
