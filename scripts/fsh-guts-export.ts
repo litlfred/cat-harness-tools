@@ -58,7 +58,7 @@ export interface FshGutsDocument {
   "@graph": Record<string, unknown>[];
   /** Files looked at and not included, each with why. Never omitted. */
   skipped: SkippedFile[];
-  /** Directories walked. Empty means the instance declares no trashcan. */
+  /** Directories walked. Empty means the layer declares no trashcan. */
   scans: string[];
   [key: string]: unknown;
 }
@@ -107,7 +107,7 @@ export interface FshGutsDir {
    * Both are carried because they answer different questions and the answers
    * diverged at the move (bean `wggr`). `fsh-guts/` is declared
    * `scope: "repository"`, so its absolute path is no longer under the
-   * instance root and `relative(root, absPath)` came back `../fsh-guts`. That
+   * layer root and `relative(root, absPath)` came back `../fsh-guts`. That
    * went into `scans`, into every node's `sourcePath`, and into every `@id` —
    * whose sanitiser permits `.` and would have published
    * `…/fsh-guts.jsonld#../docs/proposals/x.md`. A link-shaped value that
@@ -166,7 +166,7 @@ export function buildFshGutsExport(root: string = ROOT, baseUrl?: string): FshGu
       const rel = join(dir.path, relative(dir.absPath, path));
       // A node is carried by markdown front matter or a top-level JSON
       // `$schema` (`readFshGutsNode`), so nothing else is READ: since the
-      // separation the trashcan holds each separated instance's in-tree copy
+      // separation the trashcan holds each separated layer's in-tree copy
       // as a `.tar.gz` (272 MB with the uploaded PDFs), and decoding all of
       // it as UTF-8 to learn that it declares nothing took ~6 s a build.
       // Still listed as skipped, with the reason, so nothing vanishes.
@@ -316,7 +316,7 @@ if (import.meta.main) {
   // `_kg/` is a REPOSITORY build output — gitignored at the repository root,
   // beside `node_modules/`, `_site/` and `test-results/`, and read from there
   // by the e2e specs and `test-server.mjs`, both of which run at that root.
-  // `ROOT` became the INSTANCE root with the move (bean `wggr`), so this
+  // `ROOT` became the LAYER root with the move (bean `wggr`), so this
   // default started writing `cat-harness/_kg/` while every reader still looked
   // one level up — and the stale pre-move copy at the old path made it look
   // fine locally.

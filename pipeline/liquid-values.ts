@@ -6,7 +6,7 @@
  *
  * One syntax for every target: Liquid. Each harness instance declares the
  * prefix its values are addressed by (`liquid.prefix`, default its `name`).
- * An instance that declares a prefix `passThrough: true` (the FHIR IG layer
+ * A layer that declares a prefix `passThrough: true` (the FHIR IG layer
  * does, for `site.data`) leaves it to the renderer, so Jekyll and the IG
  * Publisher keep resolving `{{ site.data.fhir.… }}` exactly as they do today.
  * Every other declared prefix is resolved HERE, before the text reaches
@@ -19,12 +19,12 @@
  *      │   │            │             └ exact JSON path inside the entry
  *      │   │            └ the entry: <dir>/<entry>.witness.json | <entry>.json
  *      │   └ a DECLARED directory id — an undeclared directory is not addressable
- *      └ the instance's prefix
+ *      └ the layer's prefix
  *
  *   {{ bootstrap.version }}  — a scalar from the declaration itself
  *
  * Only DECLARED directories resolve: `resolveDirectories` would add the
- * conventional set too, and a value read from a directory the instance never
+ * conventional set too, and a value read from a directory the layer never
  * declared is the `dh4f` defect in another form.
  *
  * ## Formatting
@@ -55,7 +55,7 @@ import {
 import { asScalar, formatScalar, resolvePath } from "./render-value";
 import { findContentRepoRoot } from "./repo-root";
 
-/** One instance as the resolver sees it. */
+/** One layer as the resolver sees it. */
 export interface ScopeInstance {
   name: string;
   prefix: string;
@@ -99,7 +99,7 @@ export type Resolution =
 
 const SEG = /^[A-Za-z0-9_][A-Za-z0-9_-]*$/;
 
-/** Build the scope from every instance declared in this checkout. */
+/** Build the scope from every layer declared in this checkout. */
 export function buildValueScope(repoRoot: string): ValueScope {
   const problems: string[] = [];
   const instances: ScopeInstance[] = [];
@@ -122,7 +122,7 @@ export function buildValueScope(repoRoot: string): ValueScope {
     seen.set(prefix, decl.name);
     const directories = new Map<string, string>();
     for (const d of decl.directories ?? []) {
-      const base = rootForScope(root, d.scope); // the checkout for the root instance too (g43f)
+      const base = rootForScope(root, d.scope); // the checkout for the root layer too (g43f)
       directories.set(d.id, join(base, d.path));
     }
     const scalars = new Map<string, string | number | boolean>();

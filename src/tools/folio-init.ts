@@ -43,7 +43,7 @@ import { readEffectiveConfig } from "../../schemas/kg/harness-config.ts";
  * a list of seventeen "already present" lines to interpret.
  */
 function existingFolio(root: string): string | undefined {
-  // Index first (bean `ymvt`): an instance configured by its
+  // Index first (bean `ymvt`): a layer configured by its
   // `index.config.json` entry is a folio as much as one with a legacy file.
   const cfg = readEffectiveConfig(root);
   if (cfg.from !== undefined && (cfg.state !== "absent" || cfg.via === "index")) return cfg.from;

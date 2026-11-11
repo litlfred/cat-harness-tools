@@ -107,7 +107,7 @@ export const BUILDING_BLOCKS_V01 = "building-blocks/0.1.0";
 export const JOURNEY_GLYPHS = [
   "baby", "person", "family", "clinician", "health-worker", "hospital", "clinic", "home", "phone", "tablet",
   "qr", "paper", "wifi-off", "wifi", "shield-check", "calendar-check", "stethoscope", "link", "transfer",
-  "globe", "key", "lock", "database", "tent", "bus", "plane",
+  "globe", "key", "lock", "database", "tent", "bus", "plane", "scale", "coins", "shuffle",
 ] as const;
 export const JourneyGlyphSchema = z.enum(JOURNEY_GLYPHS);
 export type JourneyGlyph = z.infer<typeof JourneyGlyphSchema>;
@@ -184,7 +184,7 @@ const WhatIfSchema = z.object({ scenario: Text, outcome: Text }).strict();
 /** The BPMN that carries a step out: a process file and, optionally, which of its flow nodes. */
 export const RealisedBySchema = z
   .object({
-    /** The BPMN file, relative to the instance root. */
+    /** The BPMN file, relative to the layer root. */
     process: Text,
     /** Flow-node ids in that process. Omitted: the whole process. */
     tasks: z.array(Text).min(1).optional(),
@@ -241,7 +241,7 @@ const StepV01 = {
 
 /**
  * A step's picture: the image when there is one, and the brief for drawing it
- * when there is not. `src` is relative to the instance root, as
+ * when there is not. `src` is relative to the layer root, as
  * `realisedBy[].process` is, and `check:journey-refs` fails when it names no
  * file. `prompt` is the step's own image-generation prompt; the scenario's
  * {@link IllustrationStyleSchema} is the style and cast every step shares.
@@ -284,7 +284,7 @@ const ExampleKey = z.string().regex(/^[A-Z][A-Za-z]+\/[A-Za-z0-9.-]+$/);
  * One FHIR resource a step creates or changes, told for a room: what changes,
  * why it is there at this moment, the profile it conforms to, and the
  * examples that show it. `examples` are `Type/id` keys, resolved like the
- * step's own `examples` (an instance's `fhir-artifact-index`); `profile` is a
+ * step's own `examples` (a layer's `fhir-artifact-index`); `profile` is a
  * StructureDefinition id; `spec` the base standard's page.
  */
 export const FhirChangeSchema = z
@@ -315,7 +315,7 @@ export const DakRelSchema = z.enum(DAK_RELS);
 export type DakRel = z.infer<typeof DakRelSchema>;
 
 /**
- * One DAK asset a step uses, by its key in the instance's
+ * One DAK asset a step uses, by its key in the layer's
  * `fhir-artifact-index` (`StructureDefinition/<logical model>`,
  * `PlanDefinition/<decision table>`, `Measure/<indicator>`), resolved like the
  * step's `examples`. `rel` says what it is to the step; absent, a reader goes
@@ -372,7 +372,7 @@ export const PartSchema = z
   .strict();
 export type Part = z.infer<typeof PartSchema>;
 
-/** An ArchiMate view of a journey: a model id of the instance's `cat-archimate.config.json` and a view id in it. */
+/** An ArchiMate view of a journey: a model id of the layer's `cat-archimate.config.json` and a view id in it. */
 export const ViewRefSchema = z.object({ model: Text, view: Text, label: Text.optional() }).strict();
 
 const ScenarioV01 = {
@@ -534,7 +534,7 @@ export type BuildingBlock = z.infer<typeof BuildingBlockSchema>;
  * `building-blocks/0.1.0`: the catalogue a step's `uses` edges point into.
  *
  * Its own kind, `building-blocks`, not a family of `user-scenario`: the
- * catalogue describes the architecture, and an instance keeps it beside its
+ * catalogue describes the architecture, and a layer keeps it beside its
  * ArchiMate model, where the overlay that draws those blocks reads it. So a
  * reader finds a catalogue in ANY directory that declares the kind, never by
  * folder name. The usual place is a directory declared inside the
@@ -586,7 +586,7 @@ export type BuildingBlocks = z.infer<typeof BuildingBlocksSchema>;
  * `initials`, `color` and `icon` are optional presentation fields (owner,
  * 2026-11-05): kept on the actor when a demonstrator wants a fixed avatar,
  * derived by the viewer when absent. `avatar` (owner, 2026-11-06) is a square
- * picture of the person, a path from the instance root
+ * picture of the person, a path from the layer root
  * (`scenarios/avatars/<actor>.webp`): the viewer draws it wherever the
  * persona appears, and the initials (or the `icon`) on the colour stay the
  * fallback when there is none. `check:journey-refs` checks the path. Nothing
@@ -606,7 +606,7 @@ export const JourneyPersonaSchema = z
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
     /** A glyph drawn in the avatar instead of the initials (a baby, who has none). */
     icon: JourneyGlyphSchema.optional(),
-    /** A square picture of the person, a path from the instance root; the initials are the fallback. */
+    /** A square picture of the person, a path from the layer root; the initials are the fallback. */
     avatar: z.string().regex(/^[^/][^\\]*\.(?:webp|png|jpe?g|svg)$/i, "an avatar is an image path from the instance root").optional(),
   })
   .passthrough();

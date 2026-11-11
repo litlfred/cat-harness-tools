@@ -12,7 +12,7 @@
  * ({@link demoScreensOf}). When the checkout declares `device-screen` nodes
  * for any of those steps, the screens are those nodes, drawn here; only when
  * it declares none does the workshop's `presentation.deviceDemo` (an app of
- * the instance's own, framed) stand in. One list either way, so the step
+ * the layer's own, framed) stand in. One list either way, so the step
  * pages' "See what X sees", the map's "Open screen" and the demo pages read
  * the same screens.
  *
@@ -44,7 +44,7 @@ const e = escHtml;
 
 // ── the model ─────────────────────────────────────────────────────────────
 
-/** A screen of a workshop's Device Demo, drawn from a node or framed from the instance's app. */
+/** A screen of a workshop's Device Demo, drawn from a node or framed from the layer's app. */
 export interface DemoScreen {
   id: string;
   title: string;
@@ -209,7 +209,13 @@ export interface ScreenContext {
   exampleHref(key: string): string | undefined;
   /** An example's JSON, when the checkout has it. */
   exampleJson(key: string): string | undefined;
+  /** True when the page's payload drawer has a tab for the example: the block then offers "Inspect JSON". */
+  inspectable?(key: string): boolean;
 }
+
+/** "Inspect JSON" for a block's example, opening the page's drawer on its tab; empty when the drawer has none. */
+const inspectBtn = (key: string | undefined, ctx: ScreenContext): string =>
+  key !== undefined && ctx.inspectable?.(key) ? `<button type="button" class="jp-inspect ds-inspect" data-jp-inspect="${e(key)}">Inspect JSON</button>` : "";
 
 type Chip = { text: string; tone?: string; icon?: string };
 const chip = (c: Chip | undefined, cls = ""): string =>
@@ -248,9 +254,9 @@ export function blockHtml(b: ScreenBlock, ctx: ScreenContext): string {
       const href = b.example ? ctx.exampleHref(b.example) : undefined;
       const link = b.example ? (href ? `<a class="ds-ex" href="${e(href)}" target="_blank" rel="noopener noreferrer">${glyph("file")}${e(b.example)}</a>` : `<span class="ds-ex">${glyph("file")}${e(b.example)}</span>`) : "";
       if (b.mode === "scan") {
-        return `<section class="ds-scan"><div class="ds-reticle">${qrSvg(qrMatrix(b.payload), 1)}<i></i><i></i><i></i><i></i></div><div class="ds-scan-bar">${glyph("camera")}<span>${e(b.label ?? "Camera")}</span>${chip(b.badge)}</div>${b.caption ? `<p class="ds-caption">${e(b.caption)}</p>` : ""}${link}</section>`;
+        return `<section class="ds-scan"><div class="ds-reticle">${qrSvg(qrMatrix(b.payload), 1)}<i></i><i></i><i></i><i></i></div><div class="ds-scan-bar">${glyph("camera")}<span>${e(b.label ?? "Camera")}</span>${chip(b.badge)}</div>${b.caption ? `<p class="ds-caption">${e(b.caption)}</p>` : ""}${link}${inspectBtn(b.example, ctx)}</section>`;
       }
-      return `<section class="ds-card ds-qr">${b.title ? `<div class="ds-qr-h">${e(b.title)}</div>` : ""}${b.holder ? `<div class="ds-qr-who"><b>${e(b.holder)}</b>${b.holderNote ? `<small>${e(b.holderNote)}</small>` : ""}</div>` : ""}${b.label ? `<div class="ds-qr-l">${e(b.label)}</div>` : ""}<div class="ds-qr-code">${qrSvg(qrMatrix(b.payload))}</div>${chip(b.badge, "ds-qr-badge")}${b.caption ? `<p class="ds-caption">${e(b.caption)}</p>` : ""}${link}</section>`;
+      return `<section class="ds-card ds-qr">${b.title ? `<div class="ds-qr-h">${e(b.title)}</div>` : ""}${b.holder ? `<div class="ds-qr-who"><b>${e(b.holder)}</b>${b.holderNote ? `<small>${e(b.holderNote)}</small>` : ""}</div>` : ""}${b.label ? `<div class="ds-qr-l">${e(b.label)}</div>` : ""}<div class="ds-qr-code">${qrSvg(qrMatrix(b.payload))}</div>${chip(b.badge, "ds-qr-badge")}${b.caption ? `<p class="ds-caption">${e(b.caption)}</p>` : ""}${link}${inspectBtn(b.example, ctx)}</section>`;
     }
     case "passcode": {
       const digits = [...b.digits].map((d) => `<span class="ds-digit${b.shown ? "" : " is-hidden"}">${b.shown ? e(d) : "•"}</span>`).join("");
@@ -267,7 +273,7 @@ export function blockHtml(b: ScreenBlock, ctx: ScreenContext): string {
         ? `<ul class="ds-rows">${rows.map((r) => `<li${r.struck ? ' class="is-struck"' : ""}>${r.icon ? `<span class="ds-row-i">${glyph(r.icon)}</span>` : ""}<div class="ds-row-t"><div class="ds-row-top"><b>${e(r.label)}</b>${chip(r.status)}</div>${r.code ? `<code>${e(r.code)}</code>` : ""}${r.detail ? `<small>${e(r.detail)}</small>` : ""}</div></li>`).join("")}</ul>`
         : `<p class="ds-caption ds-unresolved">${b.example ? `No rows: ${e(b.example)} is not on disk here` : "No rows"}</p>`;
       const link = b.example ? (href ? `<a class="ds-ex" href="${e(href)}" target="_blank" rel="noopener noreferrer">${glyph("file")}${e(b.example)}</a>` : `<span class="ds-ex">${glyph("file")}${e(b.example)}</span>`) : "";
-      return `<section class="ds-card ds-list">${titleRow(b.title, b.icon, chip(b.summary))}${body}${b.footnote ? `<p class="ds-caption">${e(b.footnote)}</p>` : ""}${link}</section>`;
+      return `<section class="ds-card ds-list">${titleRow(b.title, b.icon, chip(b.summary))}${body}${b.footnote ? `<p class="ds-caption">${e(b.footnote)}</p>` : ""}${link}${inspectBtn(b.example, ctx)}</section>`;
     }
     case "fields":
       return `<section class="ds-card">${titleRow(b.title, b.icon)}${fieldsHtml(b.rows, b.columns ?? 1)}</section>`;
@@ -292,7 +298,21 @@ const fullWidth = (b: ScreenBlock): boolean => b.type === "header" || b.type ===
  * the blocks marked `column: "side"` go in a second column; full-width
  * blocks (header, banner, actions) stay where they are in the order.
  */
-export function renderDevice(screen: DeviceScreen, ctx: ScreenContext): string {
+export const DEVICE_FORM: Record<Device, string> = { phone: "Phone 390px", tablet: "Tablet / Web 1024px", scanner: "Handheld scanner", desktop: "Desktop / Web 1280px", kiosk: "Kiosk 600px" };
+
+/**
+ * The device's status bar (JV-17): on a phone the clock, the notch and the
+ * signal; on anything wider a dark bar with the app's name and version from
+ * the screen's `client`, the clock, signal and battery.
+ */
+export function statusBar(screen: DeviceScreen): string {
+  const c = screen.client;
+  const sys = `${glyph("wifi")}${glyph("battery")}`;
+  if (screen.device === "phone") return `<div class="ds-statusbar" aria-hidden="true"><span>${e(c?.time ?? "9:41")}</span><span class="ds-notch"></span><span>${sys}</span></div>`;
+  return `<div class="ds-statusbar ds-statusbar-wide" aria-hidden="true"><span class="ds-client">${c ? `<b>${e(c.name)}</b>${c.version ? `<small>v${e(c.version.replace(/^v/, ""))}</small>` : ""}` : ""}</span><span class="ds-sys"><span>${e(c?.time ?? "9:41 AM")}</span>${sys}</span></div>`;
+}
+
+export function renderDevice(screen: DeviceScreen, ctx: ScreenContext, opts: { caption?: boolean } = {}): string {
   const wide = isWide(screen.device) && screen.blocks.some((b) => b.column === "side");
   const parts: string[] = [];
   let main: string[] = [];
@@ -312,9 +332,9 @@ export function renderDevice(screen: DeviceScreen, ctx: ScreenContext): string {
   }
   flush();
   const owner = ctx.person(screen.owner);
-  const chrome = screen.device === "phone" ? `<div class="ds-statusbar" aria-hidden="true"><span>9:41</span><span class="ds-notch"></span><span>${glyph("wifi")}</span></div>` : "";
+  const chrome = statusBar(screen);
   const ownerHtml = owner
     ? `<figcaption class="ds-owner" style="--c:${e(owner.color)}">${avatar(owner, "lg")}<span><b>${e(owner.name)}</b><small>${e(DEVICE_LABEL[screen.device])}${owner.role ? ` · ${e(owner.role)}` : ""}</small></span></figcaption>`
     : `<figcaption class="ds-owner ds-unresolved">${e(screen.owner)}</figcaption>`;
-  return `<figure class="ds-device ds-${screen.device}" data-screen="${e(screen.id)}">${ownerHtml}<div class="ds-frame"><div class="ds-screen">${chrome}${parts.join("")}</div></div></figure>`;
+  return `<figure class="ds-device ds-${screen.device}" data-screen="${e(screen.id)}">${opts.caption === false ? "" : ownerHtml}<div class="ds-frame"><div class="ds-screen">${chrome}${parts.join("")}</div></div></figure>`;
 }

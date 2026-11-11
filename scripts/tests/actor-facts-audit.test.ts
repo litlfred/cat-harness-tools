@@ -175,7 +175,7 @@ describe("real repository measurement", () => {
 
     expect(res.result).toBe("fail");
     // A RATCHET that fits both settings the test runs in. In the index, the
-    // processes of the instances mounted beside cat-harness consume three more
+    // processes of the layers mounted beside cat-harness consume three more
     // facts than cat-harness's own do: lean-toolchain (folio-assistant-sci's
     // lean-docs-publish and authoring-a-paper), release-management
     // (fhir-harness's ig-incremental-build) and review-comments

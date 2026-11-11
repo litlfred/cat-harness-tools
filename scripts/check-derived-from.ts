@@ -7,12 +7,12 @@
  * derived graph is computed FROM. An edge nothing checks is prose, so this
  * gate checks:
  *
- * - **Resolution.** An id resolves to the NEAREST instance that declares it:
- *   the edge's own instance first, then the instances it `needs`, closest
- *   first. Ids are not unique across instances, so the instance picked is
+ * - **Resolution.** An id resolves to the NEAREST layer that declares it:
+ *   the edge's own layer first, then the layers it `needs`, closest
+ *   first. Ids are not unique across layers, so the layer picked is
  *   part of the answer and is printed.
  * - **An id declared nowhere** is refused.
- * - **An id declared only by an instance the edge's instance does not need**
+ * - **An id declared only by a layer the edge's layer does not need**
  *   is a LAYERING GAP (e.g. an IG's pages styled by the DAK base layer's
  *   chrome across no `needs` path). It is a RATCHET, held in
  *   `derived-from.baseline.ts` with a reason; a new gap fails, and a cleared
@@ -20,7 +20,7 @@
  * - **A cycle** is refused.
  * - **The interim order**: declaration order is rendering order until a
  *   topological order is computed, so a directory whose source is declared
- *   AFTER it in the same instance is refused.
+ *   AFTER it in the same layer is refused.
  * - **A dangling `writer`** is refused: the staging cone reads a directory's
  *   generator from it, and a missing path would silently shrink the cone.
  * - **The storage clock.** A derived artefact can be current in a commit only
@@ -59,7 +59,7 @@ const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 
 export interface Dir {
   id: string;
-  /** Position in the instance's declaration — the interim rendering order. */
+  /** Position in the layer's declaration — the interim rendering order. */
   index: number;
   derived: boolean;
   derivedFrom?: readonly string[];
@@ -75,7 +75,7 @@ export interface Dir {
 
 export interface Inst {
   name: string;
-  /** This instance's dependencies, NEAREST first. */
+  /** This layer's dependencies, NEAREST first. */
   ancestors: readonly string[];
   dirs: readonly Dir[];
 }
@@ -253,7 +253,7 @@ export function ratchet(findings: readonly Finding[], baseline: readonly Derived
   };
 }
 
-/** Read the real checkout into `judge`'s shape, instances DEPENDENCY-FIRST (the interim order across instances). */
+/** Read the real checkout into `judge`'s shape, layers DEPENDENCY-FIRST (the interim order across layers). */
 export function readTree(repoRoot = REPO_ROOT): Inst[] {
   const all = readInstances(repoRoot);
   const byName = new Map(all.map((i) => [i.name, i]));
@@ -264,7 +264,7 @@ export function readTree(repoRoot = REPO_ROOT): Inst[] {
     throw new Error(`check:derived-from: the instance needs graph is broken — ${flat.problems.map((p) => p.detail).join("; ")}`);
   }
   // The SAME reach as check:document-kind-sources, so the two gates cannot
-  // disagree about what an instance may name: itself plus what it needs,
+  // disagree about what a layer may name: itself plus what it needs,
   // transitively, and only itself when it declares no `needs`.
   const allowed = allowedFromNeeds(new Map(all.map((i) => [i.name, i.needs ?? []])), ancestorsOf(flat.order));
   // `flat.order` is dependency-first, so a LATER position is NEARER to a consumer.
@@ -319,7 +319,7 @@ export function analyse(repoRoot = REPO_ROOT): Judgement {
  * The rendering order DERIVED from the edges (bean `nama`, Done-when 4): a
  * topological order over every declared directory, a source before everything
  * computed from it. Stable under the interim rule: of the directories ready at
- * once, the one declared first (instances dependency-first, then declaration
+ * once, the one declared first (layers dependency-first, then declaration
  * order) goes first. So while the gate passes, this order and the interim one
  * agree — the gate's `order` refusal and the `needs` direction of a resolved
  * edge are exactly what make them agree — and it stays right once they may not.

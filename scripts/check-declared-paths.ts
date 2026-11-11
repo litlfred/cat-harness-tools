@@ -2,7 +2,7 @@
 /**
  * A path a declaration could have answered is not written down in code.
  *
- * The instance's declaration says where its graphs live; a literal such as
+ * The layer's declaration says where its graphs live; a literal such as
  * `processes` hardcoded at a call site turns a topical split into a many-file
  * edit, and a list of such sites always misses some. So this is a gate.
  *
@@ -202,7 +202,7 @@ const HELPERS: Record<string, string> = {
   schemas: "resolveDirectories() in schemas/kg/cat-harness.ts",
 };
 
-/** Source trees this instance authors. Generated output is not code. */
+/** Source trees this layer authors. Generated output is not code. */
 const SOURCE_DIRS = ["src", "scripts", "schemas", "content", "tools", "adapters", "simulators", "computations"];
 
 const MARKER = /declared-path-literal:\s*\S/;
@@ -407,7 +407,7 @@ export interface Scan {
 export const LITERAL = /(["'`])((?:[^\\\n]|\\.)*?)\1/g;
 
 /**
- * Every declared-path literal in the instance's own source, classified.
+ * Every declared-path literal in the layer's own source, classified.
  *
  * Exported so `scripts/tests/kg/declared-paths.test.ts` asserts the property
  * rather than shelling out to the CLI and reading its exit code — the pattern
@@ -418,7 +418,7 @@ export const LITERAL = /(["'`])((?:[^\\\n]|\\.)*?)\1/g;
 /**
  * `codeRoots`: the trees whose code is scanned (bean 70lx — the code moved to
  * cat-harness-tools, the content it names stayed). Literals still resolve in the
- * instance root, where the content is; a site is keyed relative to its own tree.
+ * layer root, where the content is; a site is keyed relative to its own tree.
  */
 export function scanDeclaredPaths(root: string, codeRoots: string[] = [...new Set([resolve(root), TOOLS_ROOT])]): Scan {
   let base = root;

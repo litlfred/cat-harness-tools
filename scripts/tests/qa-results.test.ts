@@ -63,7 +63,7 @@ describe("the results directory is DECLARED, not merely created", () => {
 });
 
 /**
- * `buildExport()` walks the whole instance: 2.3 s alone (2026-09-24). Bean
+ * `buildExport()` walks the whole layer: 2.3 s alone (2026-09-24). Bean
  * `61n5` recorded this test failing in 2 of 4 `bun run cat gates` runs and never
  * alone. Its sibling whole-repo scan in `check-declaration-filename.test.ts`
  * was caught failing the same way at 5.56 s against bun's 5 s default, with
@@ -187,7 +187,7 @@ describe("a generated page carries structure, never a verdict", () => {
         }
       }
     };
-    // Every docs source one run renders, not only this instance's: a page
+    // Every docs source one run renders, not only this layer's: a page
     // about a higher layer's process is authored in that layer.
     for (const s of docsSources(ROOT)) if (existsSync(s.outDir)) walk(s.outDir, 0);
     return out;

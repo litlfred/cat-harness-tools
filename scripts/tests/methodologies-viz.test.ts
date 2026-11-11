@@ -14,9 +14,9 @@
  *
  * **The join, over a fixture.** Which node lands in which of the three
  * evidence states is the one piece of logic in the generator, and it is keyed
- * by node PATH rather than by name — two instances may adopt methods with
+ * by node PATH rather than by name — two layers may adopt methods with
  * names one letter apart (`raci`, `rasci` already do), and a name-keyed join
- * would attribute one instance's evidence to another's node without saying so.
+ * would attribute one layer's evidence to another's node without saying so.
  *
  * **The consumer property, over the real corpus.** `check:artefact-verification`
  * asks what verifies a generated artefact FOR ITS CONSUMER, as against merely
@@ -29,7 +29,7 @@
  * @module scripts/tests/methodologies-viz.test
  *
  * The tests of this file that read the whole checkout (reads the methodology
- * graphs of the content instances, smart-base's among them) live in
+ * graphs of the content layers, smart-base's among them) live in
  * `test/methodologies-viz-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
@@ -39,6 +39,7 @@ import { resolve } from "node:path";
 import {
   evidenceLine,
   instanceOf,
+  linkProse,
   methodologyRows,
   page,
   nodePage,
@@ -124,7 +125,7 @@ describe("the three evidence states are three, and stay apart", () => {
 
 describe("the join is keyed by node path, not by name", () => {
   it("two instances adopting the same name do not share a verdict", () => {
-    // The failure this pins: a name-keyed join makes one instance's missing
+    // The failure this pins: a name-keyed join makes one layer's missing
     // source into the other's, silently, and the page then says a method rests
     // on a document that was never ingested for it.
     const nodes = [
@@ -236,5 +237,39 @@ describe("ingested sources link what resolves (qgjh)", () => {
   it("leaves an unknown item, or no resolver, as code", () => {
     expect(evidenceLine("library/unknown", links, "methodologies/index.md")).toBe("- `library/unknown`");
     expect(evidenceLine("library/known-item")).toBe("- `library/known-item`");
+  });
+});
+
+describe("code spans in prose that name a methodology or library item are links (owner, 2026-11-10)", () => {
+  const names = new Set(["grade", "madr"]);
+  const links = {
+    links: (id: string, instance?: string) =>
+      id === "9789240010567-eng" && (instance === undefined || instance === "who-iris")
+        ? { viewer: "en/cat-harness/library/who-iris/#who-iris%2F9789240010567-eng" }
+        : undefined,
+  };
+
+  it("links a methodology on this site to its section, and leaves others as code", () => {
+    expect(linkProse("that is `grade`, not `kepner-tregoe`", names)).toBe("that is [`grade`](#grade), not `kepner-tregoe`");
+    expect(linkProse("(`madr`)", names, "../../")).toBe("([`madr`](../../#madr))");
+  });
+
+  it("links a <layer>/library/<slug>/ reference to the library viewer, relative to the page", () => {
+    expect(linkProse("Ingested at `who-iris/library/9789240010567-eng/`;", names, "", links, "en/cat-harness/methodologies/index.md")).toBe(
+      "Ingested at [`who-iris/library/9789240010567-eng/`](../library/who-iris/#who-iris%2F9789240010567-eng);",
+    );
+    expect(linkProse("`library/unknown`", names, "", links)).toBe("`library/unknown`");
+  });
+
+  it("does not re-link a span that is already link text", () => {
+    expect(linkProse("[`grade`](x)", names)).toBe("[`grade`](x)");
+  });
+
+  it("is applied on the list page and on a node page", () => {
+    const r = { name: "diig", title: "DIIG", origin: "o", appliesWhen: "not `grade`", instance: "smart-base", evidence: [], state: "cited-only" as const };
+    const g = { ...r, name: "grade", title: "GRADE", appliesWhen: "a" };
+    const report = { undetermined: false, nodes: 2, invalid: [], unresolved: [], noEvidence: [], untagged: [], resolved: [] };
+    expect(page([r, g], report)).toContain("**Applies when.** not [`grade`](#grade)");
+    expect(nodePage(r, "# D\n", undefined, "", undefined, [], names)).toContain("**Applies when.** not [`grade`](../../#grade)");
   });
 });

@@ -1,5 +1,5 @@
 /**
- * `scripts/gen-instance-contexts.ts` over a small fixture tree: two instances,
+ * `scripts/gen-instance-contexts.ts` over a small fixture tree: two layers,
  * one needing the other, each with a few documents (bean folio-assistant-63q4).
  */
 import { afterAll, describe, expect, test } from "bun:test";
@@ -173,7 +173,7 @@ describe("gen-instance-contexts — remote-context terms", () => {
     expect(by("leaf").expected).toBe(
       render({ "@version": 1.1, "@protected": true, cito: "http://purl.org/spar/cito/", dcterms: "http://purl.org/dc/terms/", cites: { "@id": "cito:cites", "@type": "@id" }, title: "dcterms:title" }),
     );
-    // the harness has no documents of its own, so nothing a later instance uses lands in it
+    // the harness has no documents of its own, so nothing a later layer uses lands in it
     expect(by("harness").expected).toBeUndefined();
   });
 
@@ -185,7 +185,7 @@ describe("gen-instance-contexts — remote-context terms", () => {
 });
 
 describe("gen-instance-contexts — a fixed point once the emitters switch", () => {
-  // A document naming its instance's OWN context (what the switched emitters
+  // A document naming its layer's OWN context (what the switched emitters
   // write) must still yield that context's terms, or the next run drops them.
   const froot = mkdtempSync(join(tmpdir(), "gen-instance-contexts-fixed-"));
   afterAll(() => rmSync(froot, { recursive: true, force: true }));

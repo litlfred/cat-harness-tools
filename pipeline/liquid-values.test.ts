@@ -39,7 +39,7 @@ beforeAll(() => {
     version: "1.2.3",
     directories: [{ id: "computations", path: "computations/", graphTypologies: ["skills"] }],
   });
-  // An IG-style instance whose prefix is handed to Jekyll / the IG Publisher.
+  // An IG-style layer whose prefix is handed to Jekyll / the IG Publisher.
   const ig = join(repo, "ig");
   mkdirSync(ig, { recursive: true });
   writeDeclaration(ig, { name: "ig", liquid: { prefix: "site.data", passThrough: true }, directories: [] });

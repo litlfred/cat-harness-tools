@@ -1,14 +1,14 @@
 /**
  * `node-kinds` and `node-kinds:check` on THIS checkout, since the owner's
- * ruling of 2026-10-15: each instance's unkinded families are held to that
- * instance's own baseline, and the cross-layer table is built at publish.
+ * ruling of 2026-10-15: each layer's unkinded families are held to that
+ * layer's own baseline, and the cross-layer table is built at publish.
  *
  * The rules themselves (ownership, the ratchet, the baseline file) are pinned
  * on fixtures in cat-harness's `schemas/node-kind-index.test.ts`; this file
  * asks the real corpus what a migration has to keep true.
  *
  * Real-corpus tests: building the index imports every validator module every
- * instance names, which can pass 5 s on a cold CI runner, so each carries an explicit
+ * layer names, which can pass 5 s on a cold CI runner, so each carries an explicit
  * 60 s timeout.
  */
 import { describe, expect, test } from "bun:test";
@@ -60,7 +60,7 @@ describe("the table is built at publish", () => {
     const own = [...baselines()].filter(([i]) => !mounted().has(i)).flatMap(([, b]) => b ?? []).map(unkindedKey);
     const all = new Set([...baselines().values()].flatMap((b) => b ?? []).map(unkindedKey));
     // Every unkinded family is held by some baseline, and every family the
-    // checkout's own instances hold is still unkinded.
+    // checkout's own layers hold is still unkinded.
     expect(built.filter((k) => !all.has(k))).toEqual([]);
     expect(own.filter((k) => !built.includes(k)).sort()).toEqual([]);
   }, SLOW);

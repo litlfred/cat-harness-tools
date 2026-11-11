@@ -9,7 +9,7 @@
  * ## The contract
  *
  * A `folio-content-adapter/v1` node that says `typed: true` may name a
- * `vocabulary` module, relative to the instance that declares it. The module
+ * `vocabulary` module, relative to the layer that declares it. The module
  * exports:
  *
  * - `blockSchemas` — one Zod object per kind, each with a literal `kind`. Every

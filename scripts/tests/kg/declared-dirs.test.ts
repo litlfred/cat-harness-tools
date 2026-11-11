@@ -13,8 +13,8 @@
  * ## The resolution rule is what this module got wrong first
  *
  * `scope: "repository"` resolves against the repository root, anything else
- * against the declaring instance's. A first measurement for `8mbk` joined
- * repo-scoped paths belonging to OTHER instances onto the instance root and
+ * against the declaring layer's. A first measurement for `8mbk` joined
+ * repo-scoped paths belonging to OTHER layers onto the layer root and
  * reported ten phantom absences out of 35 — every one the checker's own error.
  * So the rule gets a test of its own rather than living only inside the sweep.
  *
@@ -25,7 +25,7 @@
  * | phantom directory, no reason | **1 finding**, exit 1 |
  * | same, with `absent.reason` | 0 findings, exit 0 |
  * | `absent.reason` on a directory that EXISTS | **1 finding**, exit 1 |
- * | restored | 0 findings across 66 directories, 14 instances |
+ * | restored | 0 findings across 66 directories, 14 layers |
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -42,14 +42,14 @@ import { dirname } from "node:path";
 const REPO = resolve(dirname(HARNESS_ROOT));
 const made: string[] = [];
 
-/** An instance declaring exactly the directories given. */
+/** A layer declaring exactly the directories given. */
 function instance(dirs: Array<Record<string, unknown>>): string {
   const root = mkdtempSync(join(tmpdir(), "declared-dirs-"));
   made.push(root);
   mkdirSync(root, { recursive: true });
   // The stem MUST equal `name`: `findDeclarationFile` matches on
   // `raw.name === stem`, so a `harness.json` declaring `name: "fixture"` is
-  // not found at all — the fixture reads as an instance with no declaration,
+  // not found at all — the fixture reads as a layer with no declaration,
   // and every assertion below passes over nothing.
   writeFileSync(
     join(root, "fixture.json"),
@@ -102,7 +102,7 @@ describe("absent and unexplained is a finding", () => {
 
 describe("an entry declared FROM WITHIN is checked too", () => {
   /**
-   * An instance whose `processes/` exists and carries a `processes.json`
+   * A layer whose `processes/` exists and carries a `processes.json`
    * declaring `nested` — the same from-within shape as `docs/docs.json` and
    * `beans/beans.json`.
    *
@@ -178,7 +178,7 @@ describe("an entry declared FROM WITHIN is checked too", () => {
     //
     // **The two sides agree once the nested entry can actually BE mounted**,
     // and that is the amendment bean `najo` measured. A mount is keyed on a
-    // directory id, and only a `"subgraph": true` entry has one at instance
+    // directory id, and only a `"subgraph": true` entry has one at layer
     // level (bean `cmsl`): `resolveDirectories` lists it, so `tipLocations`
     // sees it and `state:mount` reaches it. Without the marker, `unmounted`
     // would print `bun run cat state:mount` for an entry that command cannot
@@ -195,7 +195,7 @@ describe("an entry declared FROM WITHIN is checked too", () => {
   });
 
   test("a nested branch entry that no mount can reach says SO, rather than naming the mount", () => {
-    // The same entry without `"subgraph": true`. It is not listed at instance
+    // The same entry without `"subgraph": true`. It is not listed at layer
     // level, so `state:mount` has no id to mount it under and `unmounted`'s
     // remedy would be false. Bean `najo`.
     const stored = { id: "nested", path: "proposals", graphTypologies: ["proposals"], storage: { branch: "cat/x", keyedBy: "tip" } };
@@ -248,7 +248,7 @@ describe("a repository-scoped entry inside another instance is a mirror", () => 
 
   test("...but not inside an instance that CONTAINS the declaring one", () => {
     const root = instance([dir({ path: "x/", scope: "repository", absent: { reason: "fixture" } })]);
-    // The repo root is "/" here, and it contains every instance.
+    // The repo root is "/" here, and it contains every layer.
     expect(auditInstance(root, "/", [root, "/"]).filter((x) => x.kind === "mirror")).toEqual([]);
   });
 });

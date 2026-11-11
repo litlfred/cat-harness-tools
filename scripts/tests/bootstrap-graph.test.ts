@@ -39,8 +39,8 @@ import {
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-// `bootstrap/` is at the REPOSITORY root, not inside this instance — it is
-// the graph read before anything knows which instance it is looking at.
+// `bootstrap/` is at the REPOSITORY root, not inside this layer — it is
+// the graph read before anything knows which layer it is looking at.
 const CAT_BOOTSTRAP = join(repoRootFor(ROOT), "bootstrap");
 const STUB = artefactStub(readDeclaration(CAT_BOOTSTRAP)!);
 /** The document as the site build makes it: `@id` = base + the `--out` file name. */
@@ -61,7 +61,7 @@ describe("what it contains, read against the disk", () => {
   });
 
   test("bootstrap publishes only the graph typologies it DECLARES", () => {
-    // Bean `3jj9`: the universal registry once leaked into every instance, so
+    // Bean `3jj9`: the universal registry once leaked into every layer, so
     // bootstrap advertised `folio`, `voices` and `beans`, none of which it can
     // reach. Derived from the declaration, read here independently of the
     // exporter: published is a subset of declared.
@@ -86,9 +86,9 @@ describe("what it contains, read against the disk", () => {
     //
     // The behaviour it meant to pin — an absent directory is REPORTED, not
     // passed over — is real and still guarded, on a FIXTURE that declares the
-    // absence, in `kg-export-instance.test.ts`. A property of a real instance
+    // absence, in `kg-export-instance.test.ts`. A property of a real layer
     // that is still being built cannot carry it: the test breaks when the
-    // instance grows the feature, which is a fact about the subject rather
+    // layer grows the feature, which is a fact about the subject rather
     // than about the code.
     //
     // What belongs here is the fact that is now true and worth defending.

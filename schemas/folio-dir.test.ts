@@ -19,7 +19,7 @@ import { writeDeclaration } from "../test/support/instance-fixture.js";
  * Every root a test makes, removed after it. These sit directly in
  * `tmpdir()`, and one of them is malformed ON PURPOSE — left behind, it is
  * found by any checkout whose parent is `tmpdir()`, because the resolver
- * walks a checkout's parent to find sibling instances (bean `8zsb`: 163 of
+ * walks a checkout's parent to find sibling layers (bean `8zsb`: 163 of
  * them had accumulated, and two unrelated tests failed on them).
  */
 const made: string[] = [];
@@ -89,7 +89,7 @@ describe("folioDir", () => {
   test("a MALFORMED declaration throws rather than guessing", () => {
     const root = tempRoot("folio-dir-bad-");
     // Named after the DIRECTORY, not "broken". An unparseable file has no
-    // `name` to agree with, so since 2026-09-21 it counts as this instance's
+    // `name` to agree with, so since 2026-09-21 it counts as this layer's
     // broken declaration only when its stem matches the directory or a paired
     // `<stem>.config.json` sits beside it — otherwise every malformed JSON
     // file in the tree would be reported as a broken declaration.

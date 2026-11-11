@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import {
+  publishesNoInstanceGraph,
   COMMITTED_SIDECAR,
   committedSidecarSubjects,
   sidecarSubjectsFrom,
@@ -86,6 +87,23 @@ describe("publishedInstances", () => {
   });
 });
 
+// cat-harness-tools#1701: an IG repository that is its own index deploys no
+// folio site, so "examined nothing" there is determined, not a pattern drift.
+describe("publishesNoInstanceGraph", () => {
+  test("no deploy workflow and no publisher named anywhere: determined, with a reason", () => {
+    const wf = new Map([["ghbuild.yml", "run: ./_genonce.sh"], ["release.yml", "run: echo"]]);
+    expect(publishesNoInstanceGraph(wf)).toContain("publishes no instance graph");
+  });
+
+  test("the deploy workflow present: not determined, judged as before", () => {
+    expect(publishesNoInstanceGraph(new Map([["docs-site.yml", "run: echo"]]))).toBeUndefined();
+  });
+
+  test("a publisher named in a line the patterns miss: not determined (the pattern may have drifted)", () => {
+    expect(publishesNoInstanceGraph(new Map([["x.yml", "run: bun kg-export.ts\\\n  --instance ./a"]]))).toBeUndefined();
+  });
+});
+
 describe("formatReport", () => {
   const inv = (workflow: string, instance: string, standInBase = false) => ({ workflow, instance, standInBase });
 
@@ -144,7 +162,7 @@ describe("formatReport", () => {
 
   test("the node count rides with the tick, so a drop to nothing is visible", () => {
     // `exit 0` alone was not enough and the falsification proved it: an
-    // invocation pointed at a nonexistent instance exited 0 and this gate
+    // invocation pointed at a nonexistent layer exited 0 and this gate
     // printed a tick over an empty graph.
     const out = formatReport({
       invocations: [inv("docs-site.yml", "./bootstrap")],

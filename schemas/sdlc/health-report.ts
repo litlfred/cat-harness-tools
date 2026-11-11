@@ -37,7 +37,7 @@ import { RunContextRefSchema } from "./run-context";
 export const HEALTH_REPORT_SCHEMA = "health-report/v1";
 
 /**
- * Where reports live, relative to the instance root.
+ * Where reports live, relative to the layer root.
  *
  * `test/health/results/`. It was `tests/health/results/` when this family
  * landed, at the owner's instruction (2026-09-19: "health checks under
@@ -87,7 +87,7 @@ export type HealthState = (typeof HEALTH_STATES)[number];
  * - `critical` — something is being lost, or is about to be. Gates.
  * - `major` — a real problem somebody must act on, but nothing is being lost
  *   this minute. Gates under `--strict`.
- * - `minor` — worth knowing, with legitimate instances. Never gates.
+ * - `minor` — worth knowing, with legitimate layers. Never gates.
  */
 export const HEALTH_SEVERITIES = ["critical", "major", "minor"] as const;
 export type HealthSeverity = (typeof HEALTH_SEVERITIES)[number];
@@ -220,7 +220,7 @@ export const HealthReportSchema = z
     }),
     subject: z.object({
       kind: z.literal("repository"),
-      /** `owner/repo` where it could be determined, else the instance name. */
+      /** `owner/repo` where it could be determined, else the layer name. */
       id: z.string().min(1),
     }),
     updated_at: z.string().min(1),

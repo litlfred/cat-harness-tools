@@ -8,7 +8,7 @@
  * output: schemas/skills/content-validate/output.schema.json
  * ```
  *
- * The value is either a path relative to the declaring instance's root — a
+ * The value is either a path relative to the declaring layer's root — a
  * node of this knowledge graph — or an external `https://` IRI. No contract
  * is found by directory name. The JSON Schema files themselves are the
  * contract; how they are authored is not.
@@ -29,7 +29,7 @@ export interface SkillContract {
   /** The skill file, relative to the root the contracts were asked of. */
   from: string;
   /**
-   * The root of the instance that HOLDS the skill, which its local contract
+   * The root of the layer that HOLDS the skill, which its local contract
    * paths are relative to. Not always the root asked: from the checkout a
    * sci skill's `schemas/skills/<skill>/` is sci's (placement PR1, bean
    * `ybwt`), and resolving it against the harness would read a file that is
@@ -40,7 +40,7 @@ export interface SkillContract {
   output?: string;
 }
 
-/** True for an external IRI; false for a path into this instance. */
+/** True for an external IRI; false for a path into this layer. */
 export function isExternalContract(ref: string): boolean {
   return /^https:\/\//.test(ref);
 }

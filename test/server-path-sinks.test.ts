@@ -32,7 +32,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import { safeSegment } from "../src/core/safe-path.ts";
 
-// `import.meta.dir` is `cat-harness-tools/test`, so the instance root is one up.
+// `import.meta.dir` is `cat-harness-tools/test`, so the layer root is one up.
 // Moved here with the server (bean `w2gr`, step 3a).
 const SERVER = join(import.meta.dir, "../adapters/mcp-server/server.ts");
 const src = readFileSync(SERVER, "utf-8");

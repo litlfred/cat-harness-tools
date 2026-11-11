@@ -12,12 +12,12 @@
  * 1. **The declaration file parses and every group it names exists** — a
  *    declared-but-absent group would be scanned as an empty, clean group.
  * 2. **Every group is a code of `code-lists/concern-group.json`.** The eight
- *    groups are one vocabulary across every instance and every kind; a code
+ *    groups are one vocabulary across every layer and every kind; a code
  *    invented in one declaration is a ninth group nobody ruled on.
  *    Pre-existing exceptions (the harness's skills topic `authoring`) are
  *    BASELINED in `KNOWN_NON_CODES`. The baseline only shrinks — an entry
  *    that no longer occurs is a finding.
- * 3. **A group is declared once.** A higher instance whose same-named
+ * 3. **A group is declared once.** A higher layer whose same-named
  *    directory REDECLARES a group the harness declared is adding a group of
  *    its own; its directory is already a member.
  *
@@ -64,9 +64,9 @@ export function concernGroupCodes(instance: string = INSTANCE): string[] | undef
 }
 
 /**
- * `own`, when given, judges only what those instances commit (owner ruling
+ * `own`, when given, judges only what those layers commit (owner ruling
  * 2026-11-05, "Move the checks"; `lib/gate-own.ts`): their directories, the
- * groups they declare, and their redeclarations of a lower instance's group.
+ * groups they declare, and their redeclarations of a lower layer's group.
  * The baseline lives in this layer's own source, so its staleness is judged
  * only unscoped.
  */

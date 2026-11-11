@@ -88,7 +88,7 @@ describe("GUARD: two facts standing near each other are not a claim", () => {
 
 /**
  * Bean `vzur`. A GENERIC skill has to write `<name>.json` — it describes any
- * instance, so this repository's concrete filename would be the wrong thing to
+ * layer, so this repository's concrete filename would be the wrong thing to
  * say. Until 2026-09-21 the filename pattern excluded `<` and `>`, so every
  * such sentence fell OUT of the corpus: clearing the backlog took the check
  * from 5 claims to 3, and each disappearance read as a fix.

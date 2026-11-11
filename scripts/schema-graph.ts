@@ -54,13 +54,13 @@ import { withConcernGroupDirs } from "./concern-groups.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
- * Which instances' `schemas` directories a reading covers.
+ * Which layers' `schemas` directories a reading covers.
  *
- * - `corpus` (the default): this instance and every instance stacked ON it,
- *   never its own dependencies — the rule for a tool shipped BY an instance
+ * - `corpus` (the default): this layer and every layer stacked ON it,
+ *   never its own dependencies — the rule for a tool shipped BY a layer
  *   (`directory-conventions` §corpus scope). `kg-audit` and the glossary read
  *   this, and their verdicts are about the corpus they serve.
- * - `checkout`: every instance in the checkout, dependencies included. The
+ * - `checkout`: every layer in the checkout, dependencies included. The
  *   schemas VIEWER reads this (issue #2278): it is a handler publishing one
  *   page per subject, and a dependency such as `bootstrap` is a subject the
  *   owner expects to browse. Leaving it out made
@@ -81,18 +81,18 @@ export interface SchemaGraphScope {
  * silently once resolved `cat-harness` to `schemas/` and wrote 37 sidecars
  * against the wrong subjects on a run that exited 0.
  *
- * It threw the moment this branch met main. Four instances declare a
+ * It threw the moment this branch met main. Four layers declare a
  * `schemas` graph now — `schemas/`, the content core's `schemas/`,
  * `large-datasets/schemas/` and `detangle/schemas/` — so the singular question
  * has no answer, and the guard said so rather than picking one. **The right
- * fix is not to pick one.** The schema graph genuinely spans instances, a
+ * fix is not to pick one.** The schema graph genuinely spans layers, a
  * viewer that showed one of four would report a corpus that does not exist,
  * and every id here is already repo-relative so four directories cannot
  * collide.
  *
  * declared-path-literal: the fallback is at the call site so the choice is
  * visible. It applies only when NOTHING declares the graph — an unmigrated
- * instance — and an absent conventional directory yields `[]` rather than a
+ * layer — and an absent conventional directory yields `[]` rather than a
  * path nothing is at.
  */
 export function schemaRoots(root: string, opts: SchemaGraphScope = {}): string[] {
@@ -246,9 +246,9 @@ export interface SchemaGraphModule {
   /** Repo-relative path. */
   module: string;
   /**
-   * The instance whose `schemas/` directory this is.
+   * The layer whose `schemas/` directory this is.
    *
-   * Four instances declare one now, and a viewer that merged them would
+   * Four layers declare one now, and a viewer that merged them would
    * report a corpus that does not exist — the same per-instance rule the
    * uploads queues follow.
    */
@@ -1014,7 +1014,7 @@ function resolveJsonSchemaRefs(
 export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): SchemaGraph | null {
   const dirs = schemaRoots(root, opts);
   if (dirs.length === 0) return null;
-  // `kg-audit` passes the ROOT instance here; `dirname` of it is outside the checkout (g43f).
+  // `kg-audit` passes the ROOT layer here; `dirname` of it is outside the checkout (g43f).
   const repoRoot = checkoutRootFor(root);
   const rel = (p: string): string => relative(repoRoot, p).split("\\").join("/");
 
@@ -1024,10 +1024,10 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
    * Module key (its repo-relative path, `.ts` dropped) → its exports, for
    * cross-module resolution.
    *
-   * Keyed by PATH because a relative import names a FILE, not an instance —
+   * Keyed by PATH because a relative import names a FILE, not a layer —
    * `import { X } from "./foo.js"` inside `detangle/schemas/` means
-   * `detangle/schemas/foo.ts`, and two instances may both have a `foo.ts`.
-   * A global stem would resolve one instance's import to another's export,
+   * `detangle/schemas/foo.ts`, and two layers may both have a `foo.ts`.
+   * A global stem would resolve one layer's import to another's export,
    * which is the `wggr` failure in miniature. It was keyed by directory and
    * stem until the concern-group regroup (bean `f8wp`) put modules in
    * `schemas/<group>/`, where `../kg/foo.js` names a file in ANOTHER

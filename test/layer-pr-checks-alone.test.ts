@@ -19,7 +19,7 @@ import { join, resolve } from "node:path";
 
 const RUN_GATES = resolve(import.meta.dir, "..", ".github", "scripts", "layer-pr-checks", "run-gates.py");
 
-/** A root declaring instance `a`, whose scripts reach the tree tools in each way there is. */
+/** A root declaring layer `a`, whose scripts reach the tree tools in each way there is. */
 function fixtureRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "gate-alone-"));
   writeFileSync(join(root, "a.json"), JSON.stringify({ name: "a", needs: [] }));

@@ -50,7 +50,7 @@ const BASE_CASE = "cat-harness-tools/schemas/kg/cat-harness.ts"; // moved up a l
 /**
  * The harness and the layer that implements its tools. The MCP server moved to
  * `cat-harness-tools` (bean `w2gr`, step 3a) and took many of the `folioDir`
- * call sites with it. Scanning only this instance would let that code escape
+ * call sites with it. Scanning only this layer would let that code escape
  * the rule, and would make the floor below fail for a reason unrelated to it.
  */
 const SCANNED = [INSTANCE, resolve(ROOT, "cat-harness-tools")];

@@ -8,14 +8,14 @@
  * name, `type: cat-harness:DynamicState` and `$schema:
  * cat-harness-dynamic-state/v1`, holding only instances, positions and stuck
  * states. Built by the same readers the workflow pages use
- * (`dynamicStateInputs`), so the two never disagree about which instances
+ * (`dynamicStateInputs`), so the two never disagree about which layers
  * exist.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/dynamic-state-export.ts [--site <dir>] [--out <file>]
  *
  * A store that could not be read (a checkout without its bean branch) is
- * named in `unreadStores`, so its instances read as unknown, never as none.
+ * named in `unreadStores`, so its layers read as unknown, never as none.
  */
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";

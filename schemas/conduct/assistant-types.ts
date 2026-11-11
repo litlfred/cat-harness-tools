@@ -58,7 +58,7 @@
  *   asked for a judgement.
  * - `system` — **mechanical**. A fixed program — an MCP server, a CI runner. It
  *   executes a procedure and decides nothing.
- * - `external` — a participant outside this instance entirely.
+ * - `external` — a participant outside this layer entirely.
  *
  * Re-exported from `schemas/kg/skill-package.ts`, which holds the one vocabulary,
  * so this file does not become a second place the values can be edited.
@@ -349,7 +349,7 @@ export interface SkillDependency {
  *
  * So 11 of 22 skill modules carried a declaration that reached no reader and
  * no page. The declarations are removed (`folio-assistant-t2yg`); the type
- * stays because a downstream instance may hold one and a removed export is a
+ * stays because a downstream layer may hold one and a removed export is a
  * breaking change for a field that costs nothing to leave declarable.
  *
  * **Reinstating it means writing the consumer first.** A field whose only

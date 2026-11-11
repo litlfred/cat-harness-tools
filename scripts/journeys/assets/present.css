@@ -128,6 +128,7 @@ html[data-presenter="on"] .jp-off-only, html[data-presenter="off"] .jp-on-only, 
 .jp-av { border-radius: 50%; background: var(--c); color: #fff; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--shadow-sm); }
 .jp-av-sm { width: 24px; height: 24px; font-size: 9px; }
 .jp-av-md { width: 32px; height: 32px; font-size: 11px; }
+.jp-av-icon .jp-i { width: 62%; height: 62%; }
 .jp-named { white-space: nowrap; }
 .jp-named { font-weight: 600; }
 .jp-ext { display: inline-flex; align-items: center; gap: 2px; color: var(--sky700) !important; }
@@ -298,7 +299,8 @@ html[data-presenter="on"] .jp-off-only, html[data-presenter="off"] .jp-on-only, 
 .jp-mod { font: 700 10px/15px var(--mono); padding: 2px 6px; border-radius: 4px; background: #e0e7ff; color: #3730a3 !important; flex-shrink: 0; }
 .jp-forces { display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
 .jp-forces > div { display: flex; align-items: flex-start; gap: 8px; }
-.jp-forces dt { font-weight: 700; color: var(--s600); width: 112px; flex-shrink: 0; }
+.jp-forces dt { font-weight: 700; color: var(--s600); width: 112px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+.jp-forces dt .jp-i { width: 14px; height: 14px; color: var(--s500); }
 .jp-forces dd { color: var(--s800); line-height: 1.6; }
 .jp-forces dd > * { margin-right: 4px; }
 .jp-pill { display: inline-block; line-height: 16px; padding: 2px 8px; border-radius: 9999px; background: #f5f3ff; border: 1px solid #ddd6fe; color: #5b21b6; font-weight: 600; }
@@ -419,6 +421,7 @@ a.jp-dak-a:hover { text-decoration: underline; }
 a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-dak-text { background: var(--s50); border-color: var(--s200); color: var(--s600) !important; }
 .jp-inspect { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--sky700); background: none; border: 0; padding: 0; text-decoration: underline; }
+.ds-inspect { display: block; margin: 6px 0 0 auto; }
 
 /* ── the scene: a journey's small picture ───────────────────────────── */
 .jp-scene { margin: 8px 0 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; border-radius: 12px; border: 1px solid var(--lb); background: linear-gradient(to bottom right, var(--ls), #fff); color: var(--lt); }
@@ -439,10 +442,11 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-scene-violet { --ls: #f5f3ff; --lb: #ddd6fe; --lt: #6d28d9; }
 .jp-av .jp-i { width: 60%; height: 60%; }
 .jp-av-lg { width: 48px; height: 48px; font-size: 15px; }
-.jp-sees { display: flex; flex-wrap: wrap; gap: 8px; }
-.jp-see { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--sky200); background: var(--sky50); color: var(--sky800) !important; font-size: 13px; font-weight: 600; }
-.jp-see:hover { background: var(--sky100); }
-.jp-see small { font-weight: 500; color: var(--sky700); }
+/* "See what … sees": full width at the right column's foot, as VaxLink (ref/02). */
+.jp-sees { display: flex; flex-direction: column; gap: 8px; }
+.jp-see { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--s200); background: #fff; color: var(--s800) !important; font-size: 13px; font-weight: 500; box-shadow: var(--shadow-sm); }
+.jp-see:hover { background: var(--s50); border-color: var(--s300); }
+.jp-see small { font-weight: 500; color: inherit; font-size: inherit; }
 
 /* ── a view's heading, buttons ──────────────────────────────────────── */
 .jp-vhead h2 { font-size: 16px; line-height: 24px; font-weight: 700; color: var(--ink); }
@@ -469,6 +473,8 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-mfilter label { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
 .jp-map-scroll { overflow-x: auto; }
 .jp-mapgrid { display: grid; grid-template-columns: 160px repeat(var(--n), minmax(170px, 1fr)); min-width: calc(160px + var(--n) * 170px); font-size: 12px; }
+/* Desktop: narrow fixed-minimum moment columns so eight moments fit at 1400px (JV-11); scroll only below. */
+@media (min-width: 1280px) { .jp-mapgrid { grid-template-columns: 132px repeat(var(--n), minmax(136px, 1fr)); min-width: calc(132px + var(--n) * 136px); } }
 .jp-mr { display: contents; }
 .jp-ml { position: sticky; left: 0; z-index: 2; background: #fff; border-right: 1px solid var(--s200); border-bottom: 1px solid var(--s100); padding: 10px; display: flex; align-items: flex-start; gap: 8px; }
 .jp-ml b { display: block; font-size: 12px; color: var(--s900); }
@@ -487,11 +493,17 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-mc p { line-height: 1.4; color: var(--s700); }
 .jp-mc small { display: block; font-size: 10px; color: var(--s500); margin-top: 4px; }
 .jp-mc.is-sel { background: rgb(240 249 255 / .7); }
-.jp-mchap { background: var(--s900); color: #fff; padding: 8px 10px; display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--s700); min-width: 0; }
-.jp-mchap b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.jp-mchap { background: var(--s900); color: #fff; padding: 8px 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; border-left: 1px solid var(--s700); min-width: 0; }
+/* The chapter's name wraps under its scene rather than being cut, however few moments it spans. */
+.jp-mchap b { font-size: 14px; line-height: 1.25; min-width: 0; }
 .jp-mchap small { font-size: 10px; color: var(--s400); white-space: nowrap; }
 .jp-mchap-n { font: 700 12px var(--sans); color: var(--s300); }
 .jp-mchap .jp-scene { margin: 0; padding: 4px 8px; background: #fff; flex-shrink: 0; }
+/* Compact enough that a one-moment chapter's scene fits its column. */
+.jp-mchap .jp-scene { gap: 3px; padding: 4px 6px; }
+.jp-mchap .jp-scene-i { padding: 3px; }
+.jp-mchap .jp-scene-i .jp-i { width: 16px; height: 16px; }
+.jp-mchap .jp-scene .jp-scene-arrow { width: 10px; height: 10px; }
 .jp-mmoment { display: flex; flex-direction: column; gap: 2px; }
 .jp-mmoment b { font-size: 12px; line-height: 1.3; color: var(--s900); }
 .jp-mmoment small { margin: 0; }
@@ -556,7 +568,7 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-cv-band { fill: var(--s50); }
 .jp-cv-grid { stroke: var(--s100); }
 .jp-cv-zero { stroke: var(--s200); stroke-dasharray: 4 4; }
-.jp-cv-face { font-size: 13px; fill: var(--s400); }
+.jp-cv-face { fill: #fde68a; stroke: #b45309; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
 .jp-cv-code { font: 10px var(--mono); fill: var(--s400); }
 .jp-cv-ch { font: 600 12px var(--sans); fill: var(--s600); }
 .jp-cv-line { stroke: var(--c); stroke-width: 2.5; }
@@ -719,10 +731,17 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 
 /* ── the FHIR payload drawer ────────────────────────────────────────── */
 .jp-drawer { position: sticky; bottom: 0; z-index: 40; background: var(--s900); color: var(--s300); border-top: 1px solid var(--s700); }
-.jp-drawer-bar { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 24px; background: transparent; border: 0; color: inherit; font: 11px var(--mono); text-align: left; }
-.jp-drawer-bar b { color: var(--sky300); text-transform: uppercase; letter-spacing: .05em; }
-.jp-drawer-n { background: var(--s800); padding: 2px 8px; border-radius: 4px; }
-.jp-drawer-hint { margin-left: auto; font-family: var(--sans); color: var(--s400); }
+/* The bar: dark and monospace, as VaxLink's (ref/01, ref/13). */
+.jp .jp-drawer-bar { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 24px; background: transparent; border: 0; color: inherit; font: 12px/16px var(--mono); text-align: left; cursor: pointer; }
+.jp-drawer-bar > .jp-i { color: var(--sky300); }
+.jp-drawer-bar b { color: var(--sky300); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.jp-drawer-chip { background: var(--s800); color: var(--s200); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--s700); }
+.jp-drawer-key { display: inline-flex; align-items: center; gap: 4px; color: #6ee7b7; }
+.jp-drawer-key .jp-i { width: 13px; height: 13px; }
+.jp-drawer-n { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.jp-drawer-hint { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-family: var(--sans); color: var(--s400); }
+.jp-drawer-bar[aria-expanded="true"] .jp-drawer-hint .jp-i { transform: rotate(180deg); }
+.jp .jp-reset { background: #fff; font-size: 12px; cursor: pointer; }
 .jp-drawer-body { padding: 0 24px 16px; display: flex; flex-direction: column; gap: 8px; max-height: 60vh; }
 .jp-drawer-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .jp-drawer-tabs button { background: var(--s800); border-color: var(--s700); color: var(--s300); font-family: var(--mono); font-size: 11px; }
@@ -907,3 +926,67 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .ds-row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .ds-row-top .ds-chip { white-space: normal; text-align: right; flex: 0 1 auto; max-width: 60%; }
 .ds-row-t code { overflow-wrap: anywhere; }
+
+/* ArchiMate elements, linked: under each view drawing, and in a block's detail. */
+.jp-amel { margin-top: 8px; font-size: 13px; }
+.jp-amel summary { cursor: pointer; color: var(--s700); font-weight: 600; }
+.jp-amels { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.jp-amels small { color: var(--s500); }
+.jp-json-open { color: var(--sky300); text-decoration: underline; }
+
+/* ── How it works: the architecture panel (JV-13) ───────────────────── */
+.jp-arch-scroll { overflow-x: auto; margin-top: 12px; }
+.jp-arch-grid { display: grid; grid-template-columns: 150px repeat(var(--n), minmax(260px, 1fr)); gap: 8px; min-width: calc(150px + var(--n) * 260px); font-size: 12px; }
+.jp-arch-c { display: flex; align-items: center; gap: 8px; padding: 4px 8px; }
+.jp-arch-c b { font-size: 14px; color: var(--s900); }
+.jp-arch-c b a { color: inherit; }
+.jp-arch-code { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #fef3c7; color: #92400e; font: 700 10px var(--sans); }
+.jp-arch-l { border: 1px solid #a5f3fc; background: #ecfeff; border-radius: 6px; padding: 8px 10px; font-weight: 600; color: var(--s800, #1e293b); }
+.jp-arch-l a { color: inherit; }
+.jp-arch-cell { border: 1px dashed #67e8f9; background: rgb(236 254 255 / .6); border-radius: 6px; padding: 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.jp-arch-cell > i, .jp-arch-std > i { grid-column: 1 / -1; color: var(--s400); font-size: 11px; }
+.jp-arch-box { background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jp-arch-box small a { font: 10px var(--mono); text-transform: uppercase; letter-spacing: .03em; color: var(--s500); }
+.jp-arch-box b { font-size: 13px; line-height: 1.3; }
+.jp-arch-ig { font-size: 10px; }
+.jp-arch-ms { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.jp-arch-std { border: 1px solid var(--s200); border-radius: 6px; padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+.jp-arch-found { margin-top: 12px; border: 2px solid #fcd34d; background: #fffbeb; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--s700); }
+.jp-arch-found-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; color: var(--s900); }
+.jp-arch-found-h > .jp-i { width: 20px; height: 20px; color: #d97706; }
+.jp-arch-found ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; }
+@media (min-width: 1024px) { .jp-arch-found ul { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-left: 0; list-style: none; } }
+
+/* ── the device demo: journey stages, compact header, status bar (JV-15..17) ── */
+.jp-stagebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 6px; padding: 10px 32px; background: #fff; border-bottom: 1px solid var(--s200); }
+.jp-stagebar-l { font: 600 12px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--s600); margin-right: 8px; }
+.jp .jp-stage-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--s200); background: #fff; color: var(--s700); font-size: 13px; white-space: nowrap; }
+.jp-stage-pill code { font: 11px var(--mono); color: var(--s400); }
+.jp .jp-stage-pill:hover { border-color: var(--s300); }
+.jp .jp-stage-pill.is-on { background: #0284c7; border-color: #0284c7; color: #fff; font-weight: 600; }
+.jp-stage-pill.is-on code { color: #e0f2fe; }
+.jp-stage-sep { color: var(--s300); font-size: 14px; }
+.jp-demo .jp-screen-h { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px; margin: 0 auto; width: 100%; max-width: 1024px; }
+.jp-demo .jp-screen-row { justify-content: flex-start; }
+.jp-screen-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; color: var(--s600); }
+.jp .jp-back { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; border: 1px solid #fecaca; background: #fff1f2; color: #be123c; font-size: 13px; }
+.jp-back .jp-i { width: 14px; height: 14px; }
+.jp-devline { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--s700); }
+.jp-devline > span { display: inline-flex; align-items: center; gap: 6px; }
+.jp-devline code { font: 11px var(--mono); color: var(--s400); }
+.jp-devline .jp-i { width: 15px; height: 15px; color: #0284c7; }
+.jp-devline-r { gap: 14px !important; }
+.jp-devline-src { font-size: 12px; }
+.jp .jp-expand { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: #0284c7; font-size: 12px; cursor: pointer; padding: 0; }
+.jp-expand .jp-i { width: 13px; height: 13px; }
+.ds-stage:fullscreen { background: var(--s100, #f1f5f9); display: grid; place-items: center; overflow: auto; }
+.ds-statusbar-wide { background: #0b1220; color: #e2e8f0; padding: 8px 22px; font-weight: 500; }
+.ds-statusbar-wide .ds-client { display: inline-flex; align-items: baseline; gap: 8px; }
+.ds-statusbar-wide .ds-client b { font: 600 13px var(--sans); color: #fff; }
+.ds-statusbar-wide .ds-client small { font: 11px var(--mono); color: #94a3b8; }
+.ds-statusbar-wide .ds-sys { display: inline-flex; align-items: center; gap: 12px; font: 12px var(--mono); }
+.ds-statusbar-wide .jp-i { width: 15px; height: 15px; }
+.ds-statusbar-wide .ds-sys .jp-i:first-of-type { color: #34d399; }
+.ds-moments-h { border-bottom: 1px solid var(--s100); padding-bottom: 10px; margin-bottom: 10px; }
+.ds-moments-h h3 { font-size: 20px; font-weight: 700; color: var(--ink); margin: 2px 0 4px; }
+.ds-moments-h p { font-size: 14px; color: var(--s600); }

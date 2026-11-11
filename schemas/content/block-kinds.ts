@@ -32,7 +32,7 @@ import type { Block } from "../types";
  * managed"* (bean riit, step 2; sod4 finding #1). Each kind is a
  * `folio-block-kind/v1` node in a `block-kinds/` graph its OWNING harness
  * declares — document kinds in the content core, the math kinds in
- * the science layer — and this module scans every instance's declaration
+ * the science layer — and this module scans every layer's declaration
  * for them. Adding a kind is adding a node; nothing here changes.
  *
  * Why a runtime list matters at all: `Block` is a type and is erased, so
@@ -44,7 +44,7 @@ import type { Block } from "../types";
  * the same defect in a wider form, which is what one node per kind removes.
  *
  * Sorted by kind, so the order is a property of the set and not of which
- * instance was scanned first.
+ * layer was scanned first.
  */
 export function discoverBlockKinds(repoRoot: string = PLATFORM_ROOT): BlockKindNode[] {
   const byKind = new Map<string, { file: string; node: BlockKindNode }>();
@@ -59,7 +59,7 @@ export function discoverBlockKinds(repoRoot: string = PLATFORM_ROOT): BlockKindN
   return [...byKind.values()].map((v) => v.node).sort((a, b) => a.kind.localeCompare(b.kind));
 }
 
-/** The platform checkout this module sits in — where its instances are scanned from. */
+/** The platform checkout this module sits in — where its layers are scanned from. */
 const PLATFORM_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
@@ -124,7 +124,7 @@ export const DISCOVERED_BLOCK_KIND_NODES: readonly BlockKindNode[] = discoverBlo
  * The BUILT-IN kinds' nodes: those of an adapter the platform's code types
  * ({@link CONTENT_ADAPTERS}). A contributed adapter's kinds (the DAK layer's
  * `dak`) are discovered too, but reach a folio only through its dependency
- * tree — owner, 2026-10-04: a folio sees the nodes of the instances it depends
+ * tree — owner, 2026-10-04: a folio sees the nodes of the layers it depends
  * on (option 1 of 3) — so `loadContributions` registers them per folio, and
  * nothing read off THIS list names them.
  */
@@ -151,7 +151,7 @@ for (const n of BLOCK_KIND_NODES) {
 
 const NODE_OF: ReadonlyMap<string, BlockKindNode> = new Map(BLOCK_KIND_NODES.map((n) => [n.kind, n]));
 
-/** The discovered node for `kind`, or `undefined` for a kind no instance declares. */
+/** The discovered node for `kind`, or `undefined` for a kind no layer declares. */
 export function blockKindNode(kind: string): BlockKindNode | undefined {
   return NODE_OF.get(kind);
 }

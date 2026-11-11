@@ -61,7 +61,7 @@ describe("nodesOfKind", () => {
 });
 
 /**
- * Bean `ujiv` (issue #88): an instance declaration is found by its NAME RULE,
+ * Bean `ujiv` (issue #88): a layer declaration is found by its NAME RULE,
  * a repository-scoped directory is addressed from the repository rather than
  * with `../`, and a directory whose content is off the checkout is not read.
  */

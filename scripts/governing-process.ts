@@ -12,7 +12,7 @@
  *
  * `coverage.visualiser` and `coverage.serialisations` hold repository-relative
  * PATHS. This holds a diagram's basename: `workflowDirs` finds every
- * instance's `processes/` from its declaration, and `render-bpmn` names its
+ * layer's `processes/` from its declaration, and `render-bpmn` names its
  * output after the basename.
  *
  * ## Three states
@@ -93,7 +93,7 @@ export interface ProcessIndex {
   /** The site `workflows/` directories a render could have written into. */
   svgDirs: string[];
   /**
-   * Every global task id any instance declares. A call to one is a step the
+   * Every global task id any layer declares. A call to one is a step the
    * layer shares, not a sub-process, so it is left out of `subprocesses`.
    */
   globalTaskIds?: Set<string>;
@@ -102,9 +102,9 @@ export interface ProcessIndex {
 /**
  * Build the index once per run.
  *
- * Every instance in the repository, not this one — `render-bpmn` renders every
- * instance's diagrams into one output directory (bean `oqdr`), so a resolver
- * that looked at one instance would report a diagram as missing that is drawn
+ * Every layer in the repository, not this one — `render-bpmn` renders every
+ * layer's diagrams into one output directory (bean `oqdr`), so a resolver
+ * that looked at one layer would report a diagram as missing that is drawn
  * on the site.
  */
 export function processIndex(repoRoot: string): ProcessIndex {
@@ -142,10 +142,10 @@ export function processIndex(repoRoot: string): ProcessIndex {
  * Where a diagram's rendered SVG is, or `undefined`.
  *
  * Two places a render can land, in the order `render-bpmn` writes them: beside
- * the source (only for an instance exempt from `workflow-visualiser`, which
+ * the source (only for a layer exempt from `workflow-visualiser`, which
  * has no site of its own), and in a site's `assets/img/workflows/`. The
- * owning instance's site is tried first so a diagram is attributed to its own
- * instance where both hold one.
+ * owning layer's site is tried first so a diagram is attributed to its own
+ * layer where both hold one.
  */
 export function renderedSvg(idx: ProcessIndex, file: string): string | undefined {
   const name = basename(file, ".bpmn");

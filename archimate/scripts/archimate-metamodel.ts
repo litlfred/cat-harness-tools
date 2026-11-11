@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Derive the metamodel each ArchiMate model of an instance uses, and check it
+ * Derive the metamodel each ArchiMate model of a layer uses, and check it
  * against ArchiMate's relationship table. The Tool `archimate-metamodel`.
  *
  * @module cat-harness/archimate/scripts/archimate-metamodel
@@ -36,7 +36,7 @@ export const TOOL_ID = "archimate-metamodel";
 const FORMATS = ["text", "json", "dot", "mmd"] as const;
 type Format = (typeof FORMATS)[number];
 
-/** The metamodel of every model the instance's config names, or of one. */
+/** The metamodel of every model the layer's config names, or of one. */
 export function metamodelsOf(instanceRoot: string, only?: string): Metamodel[] {
   const config = readConfig(instanceRoot);
   const dir = archimateDir(instanceRoot, config);

@@ -1,16 +1,16 @@
 /**
  * Where a library entry's own files live upstream, and the links to them.
  *
- * Owner, 2026-10-15: the "source" link of a content instance's entry
+ * Owner, 2026-10-15: the "source" link of a content layer's entry
  * (`9789241511766-eng`) opened
  * `github.com/litlfred/cat-harness/blob/main/<instance>/library/…`, a 404 —
- * the entry is that instance's, and it keeps its instance directory in its own
+ * the entry is that layer's, and it keeps its layer directory in its own
  * repository. The viewer built every link from the HANDLER's repository
  * (cat-harness's `livesAt`) plus the path in the composed checkout, which is
  * right only for an entry of the handler itself.
  * The owner also asked, the same day, for links to the source PDF and the
  * entry's KG JSON-LD on a library assets page, a PDF opening in the PDF
- * viewer the way the IRIS instance's pages already do.
+ * viewer the way the IRIS layer's pages already do.
  *
  * So an entry's repository and in-repository path are asked of
  * `forgeLocation` — the one answer to "which repository holds this checkout
@@ -18,7 +18,7 @@
  * `upstreamRoot`) — and never composed here.
  *
  * The source PDF is linked through the site's pdf.js viewer pointed at the
- * RAW URL of the file in that repository, as the IRIS instance's page
+ * RAW URL of the file in that repository, as the IRIS layer's page
  * generator does (its `readHere`: the raw host serves the bytes with
  * `access-control-allow-origin: *`; the build's `pdf-viewer.ts --allow`
  * admits `https://raw.githubusercontent.com/<owner>/`). Nothing large is

@@ -46,7 +46,7 @@ describe("stakeholder map", () => {
     // report gave no way to tell those from a real role. Bean `qif9`.
     const map = TODO_MAP;
     expect(map.roles.length).toBeGreaterThan(0);
-    // The registry the map itself resolves against: this instance's roles,
+    // The registry the map itself resolves against: this layer's roles,
     // with its dependents' overlaid when it runs inside an index checkout
     // (placement PR0b). The lanes reached include theirs, so must the roles.
     const declared = new Set((roleGraphFor(ROOT)?.roles ?? []).map((r) => r.id));

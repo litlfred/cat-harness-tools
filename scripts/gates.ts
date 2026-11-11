@@ -109,10 +109,10 @@ export function contentCompileGates(paths: readonly string[]): ContentCompileGat
 }
 
 // The REPOSITORY root. `GATES_WORKFLOW` is `.github/workflows/…`, which
-// belongs to the repository rather than to this instance, and the gates
+// belongs to the repository rather than to this layer, and the gates
 // themselves are npm scripts run from the repository root. This arrived from
 // `main` as `resolve(HARNESS_ROOT)` — correct there, because the
-// instance and the repository were one directory; after the move (bean
+// layer and the repository were one directory; after the move (bean
 // `wggr`) it named `cat-harness/.github/`, which does not exist, and
 // `loadGates` would have thrown `NoGatesFound` on a workflow that is fine.
 const ROOT = repoRootFor(resolve(HARNESS_ROOT));
@@ -198,7 +198,7 @@ export const WORKFLOW_DIR = join(".github", "workflows");
  * one somebody added to get to green.
  */
 /**
- * Every present instance's declared `gateExemptions`. Read from the CHECKOUT
+ * Every present layer's declared `gateExemptions`. Read from the CHECKOUT
  * (`checkoutRootFor`), not `ROOT`: `repoRootFor` climbs out of a standalone
  * checkout whose root IS cat-harness (bean `g43f`).
  */
@@ -335,7 +335,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
   // `bun` line, which is all this reader extracts, so no exemption is needed
   // and the old one exempted nothing — the stale-exemption test's finding.
   {
-    // Bean `hupw`: the IG instances are remote mounts of their forks, which
+    // Bean `hupw`: the IG layers are remote mounts of their forks, which
     // do not commit the pages this checkout generates for them, so the
     // publish builds write them. (In the monorepo since before the
     // separation; this repository was seeded without it.)
@@ -387,7 +387,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     // Bean `4ak5` item 3. The root index is BUILT at publish time over the
     // exports the deploy has just written into `./_site`, and never committed
     // (owner, 2026-10-04), so there is no committed artefact for a `--check`
-    // to compare. It refuses to write when any declared instance has no
+    // to compare. It refuses to write when any declared layer has no
     // export, which is its verdict, and root-index.test.ts pins that over a
     // real site layout.
     match: "scripts/root-index.ts --site ./_site",
@@ -484,11 +484,11 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "nav include's one-checkbox rule are pinned by duplicate-ids.test.ts in `bun test`",
   },
   {
-    // Mounts each instance's rendered content into the built site. It COPIES
+    // Mounts each layer's rendered content into the built site. It COPIES
     // rather than checks, so there is no verdict for a contributor to run —
     // and it is meaningless outside a job that has just built `_site/`.
     //
-    // Its refusals are not exempt: the collision rule (two instances claiming
+    // Its refusals are not exempt: the collision rule (two layers claiming
     // one path) is asserted by `mount-instance-docs.test.ts` in `bun test`,
     // which IS in the gate set, and the staleness of what it mounts is gated
     // by `iris:pages:check`.
@@ -659,9 +659,9 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     match: "run cat library:keywords",
     kind: "covered-by",
     reason:
-      "the site build runs the writer at deploy, so nothing PUBLISHED goes stale; " +
-      "`library:keywords:check` is intentionally not gated, for `library:viz:check`'s reason — " +
-      "keywords derive from a WHOLE library's term weights (issue #2302)",
+      "the site build runs the writer at deploy (`derive:publish`, route `docs/assets/keywords/`, builtAtPublish), " +
+      "so nothing PUBLISHED goes stale and nothing is committed; keywords derive from a WHOLE library's " +
+      "term weights (issue #2302, cat-harness#1144)",
   },
   {
     match: "run cat uploads:viz",
@@ -724,16 +724,10 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
   // `qa-sweep.yml`, `qa-sweep-nightly.yml`, `section-title-audit.yml` and the
   // four Lean workflows are now templates `folio_init` writes, so the
   // `qa-staleness` and `qa-section-title-audit.ts` entries went with them.
+  // `pipeline/build.ts`, `check-witnesses`, `render-atlas` and
+  // `latex-overfull-report.ts` went with `publish.yml` and `witness-refresh.yml`
+  // when folio-assistant#3066 (2026-11-10) moved those to qou or dropped them.
   // What remains below still matches a workflow in `.github/workflows/`.
-  {
-    match: "pipeline/build.ts",
-    kind: "no-folio",
-    reason:
-      "runs after `cd content`, so it names a FOLIO's build. `cat-harness/" +
-      "pipeline/build.ts` does exist — a different file sharing the " +
-      "basename — so resolving to it would be a wrong fix that looks right " +
-      "(bean `52dz`, 2026-09-20)",
-  },
   {
     // Since `52dz` the only match is the reusable `folio-staging.yml`, which
     // runs inside a FOLIO's staging job and sweeps that folio's `folio_dir`.
@@ -743,21 +737,6 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "runs inside a FOLIO's staging job (`folio-staging.yml`, a reusable " +
       "workflow) over that folio's blocks; the platform carries no folio. " +
       "The standalone qa-sweep workflows are folio_init templates (bean `52dz`)",
-  },
-  {
-    match: "check-witnesses",
-    kind: "no-folio",
-    reason: "witness files are produced from a folio's computations; the platform has none",
-  },
-  {
-    match: "render-atlas",
-    kind: "no-folio",
-    reason: "renders a folio's Lean atlas",
-  },
-  {
-    match: "latex-overfull-report.ts",
-    kind: "no-folio",
-    reason: "reads `main.log` from a folio's LaTeX run",
   },
   // ── Needs something a checkout does not have ────────────────────────
   {
@@ -1021,7 +1000,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     // substring, and a deploy step whose destination carries a shell variable
     // must quote it. `--out "./_site` and `--out-dir ./_site` were the two
     // forms that had occurred; `--out-dir "./_site` had not until a per-locale
-    // export wrote into a foreign instance's subdirectory. Same reason, not a
+    // export wrote into a foreign layer's subdirectory. Same reason, not a
     // new exemption — a step that got to green by being spelled differently
     // would be the thing this ratchet exists to stop.
     // input-site: inert #4229d23b — prose naming the directory, in a message or a description
@@ -1108,8 +1087,8 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
 ];
 
 /**
- * {@link OWN_STEP_EXEMPTIONS} plus each present instance's declared
- * `gateExemptions.steps`. An instance above this layer declares the steps of
+ * {@link OWN_STEP_EXEMPTIONS} plus each present layer's declared
+ * `gateExemptions.steps`. A layer above this layer declares the steps of
  * its own that CI runs and the gate set does not (bean `0r7u`): naming them
  * here broke this layer standalone, where those steps do not exist and the
  * stale-exemption test would refuse them.
@@ -1509,6 +1488,33 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "check:optin-links",
+    kind: "covered-by",
+    reason:
+      "COMPOSED into `check:declaration-resolution`, which CI runs: its findings are that gate's `optInLinks` field, so a " +
+      "step of its own would report every link twice. Kept as a script to list the links alone (owner, 2026-11-11: a gate " +
+      "fails on links into a switched-off opt-in sub-graph, each fixed by hand)",
+  },
+  {
+    script: "layers:check",
+    kind: "covered-by",
+    reason:
+      "runs in the CALLER'S CI, not this layer's: job `layers-ref` of `layer-pr-checks.yml` runs the replayer at the " +
+      "commit the caller's lock pins with `--check-layers`, on an index-mode pull request that changes `index.lock.json` " +
+      "(owner, 2026-11-08: the re-pinner publishes the layers ref, and a gate checks it). This layer has no lock of its " +
+      "own to judge, so `bun run cat layers:check` here would only report `skipped`",
+  },
+  {
+    script: "lock:coherence:check",
+    kind: "covered-by",
+    reason:
+      "runs in the CALLER'S CI, not this layer's: job `lock-coherence` of `layer-pr-checks.yml` runs it at the commit the " +
+      "caller's lock pins, on every pull request that changes `index.lock.json` (owner, 2026-11-11: a lock whose harness " +
+      "pins disagree with the pinned harnesses' own locks, or lag their repositories' main, may not reach main, after " +
+      "a content layer's main went red on skewed pins). " +
+      "This layer has no lock of its own to judge, so `bun run cat lock:coherence:check` here only reports nothing to check",
+  },
+  {
     script: "translate-user-scenarios:check",
     kind: "no-folio",
     reason:
@@ -1533,6 +1539,16 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "`.github/workflows/*`, and every layer still calls `litlfred/*@main` until its index.lock.json is re-pinned past the " +
       "commit that adds this script and `bun run cat workflow-pins` is run there. Wiring it now would red every PR in every " +
       "layer on refs this commit does not change; it becomes a gate in each repository's own CI once that repository is pinned",
+  },
+  {
+    script: "check:site-publish-caller",
+    kind: "report",
+    reason:
+      "RED UNTIL THE ROLLOUT (owner, 2026-11-11: \"i want that it publishes once merge to main, update QA reports etc.\"; " +
+      "cat-harness-tools#1879): it judges the calling repository's own `.github/workflows/*` for the canonical caller of " +
+      "`folio-site-publish.yml`, and most layers still carry a dispatch-only copy or none. Here it judges nothing (this " +
+      "layer holds the template). Wiring it now would red every layer's PRs on files their change does not touch; it " +
+      "becomes a gate in each repository's own CI once that repository carries the caller",
   },
   {
     script: "check:lock-consistency",
@@ -1688,7 +1704,7 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     script: "library:keywords:check",
     kind: "covered-by",
     reason:
-      "same as `library:viz:check`: the writer runs at deploy (`docs-site.yml`, before the projection that reads it), and log-entropy weights derive from the WHOLE library, so one sibling ingesting an entry reweights every keywords.json in it — a red here means a sibling merged rather than that this diff forgot (issue #2302). Run it by hand, or from `/prepare-merge`",
+      "the keywords graph (`docs/assets/keywords/`) is builtAtPublish, so in the harness `--check` has nothing committed to compare and exits 0; `derive:publish` writes it at deploy. Its term weights derive from the WHOLE library, so one sibling ingesting an entry reweights every node (issue #2302, cat-harness#1144). Missing keywords and legacy keywords.json files are reported by the `library-keywords` health check",
   },
   {
     script: "uploads:viz:check",
@@ -1907,7 +1923,7 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   },
 ];
 
-/** {@link OWN_SCRIPT_EXEMPTIONS} plus each present instance's declared `gateExemptions.scripts` (bean `0r7u`). */
+/** {@link OWN_SCRIPT_EXEMPTIONS} plus each present layer's declared `gateExemptions.scripts` (bean `0r7u`). */
 export const SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   ...OWN_SCRIPT_EXEMPTIONS,
   ...declaredExemptions().scripts,

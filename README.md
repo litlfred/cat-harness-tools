@@ -60,7 +60,7 @@ across the layers, and bump it in all of them together.
 `main` of `cat-harness` is the right sibling, since this repository's `main`
 tracks it (see `.github/workflows/pr-tests.yml`). Inside a folio-assistant
 index, or a folio with its layers mounted, the same globs match the mounted
-directories and nothing needs cloning. Tests that read other instances (the
+directories and nothing needs cloning. Tests that read other layers (the
 index's workflows, `bootstrap/`, content folios) still need that full mount.
 
 ### Running the checkout scripts beside it
@@ -69,7 +69,7 @@ The `checkoutScripts` (every `check:` and `:check` among them) are spelled
 `bun run cat-harness-tools/scripts/…` and run from the directory that holds
 the layers, as in a composed index. For a plain directory of clones, add
 `bootstrap` beside the three above and write a minimal root into that
-directory — an `index.config.json` naming the four as local instances, and a
+directory — an `index.config.json` naming the four as local layers, and a
 `package.json` with the `cat` alias:
 
 ```sh
@@ -79,4 +79,4 @@ bun run cat check:import-direction
 ```
 
 It is not a folio-assistant index: checks that read the index's own files,
-other instances or a built site still need one.
+other layers or a built site still need one.

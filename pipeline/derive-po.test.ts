@@ -28,12 +28,12 @@ import { extractMarkdown, MD_CODE_FENCE_RE } from "./pot-extract.ts";
 import { SITE_DIR } from "./translation-index.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
-/** The five pages and five locales this instance publishes, for corpus-wide tests. */
+/** The five pages and five locales this layer publishes, for corpus-wide tests. */
 const PAGES_ALL = ["start/accessibility", "concepts/content-types", "start/contributing", "start/getting-started", "start/installation"];
 const LOCALES_ALL = ["ar", "es", "fr", "ru", "zh"];
 import { injectMarkdown } from "./po-inject.ts";
 
-/** A throwaway instance with a source page and whichever translations are given. */
+/** A throwaway layer with a source page and whichever translations are given. */
 function fixture(source: string, translations: Record<string, string>): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), "derive-po-"));
   mkdirSync(join(root, SITE_DIR), { recursive: true });
@@ -792,7 +792,7 @@ describe("the pages to catalogue are DISCOVERED, not listed in the script", () =
     // THE DEFECT THIS PINS. My first version matched a two-or-three-letter
     // directory name and picked up `wireframes/fsh-guts` as a locale — `fsh` plus
     // a suffix fits that shape exactly. A locale is a declared vocabulary, so
-    // guessing it from the filesystem invents an answer the instance already gives.
+    // guessing it from the filesystem invents an answer the layer already gives.
     const root = mkdtempSync(join(tmpdir(), "derive-po-lookalike-"));
     mkdirSync(join(root, SITE_DIR, "fsh-guts"), { recursive: true });
     mkdirSync(join(root, SITE_DIR, "fr"), { recursive: true });
@@ -866,7 +866,7 @@ describe("the pages to catalogue are DISCOVERED, not listed in the script", () =
     }
     // Anti-vacuity: the count must not quietly be 0, and each page that is
     // translated is translated into all five. Not an exact page count: which
-    // pages this instance authors changes when one moves to the instance whose
+    // pages this layer authors changes when one moves to the layer whose
     // process it shows (folio-assistant#2598), and that is not this function's
     // concern.
     expect(checked).toBeGreaterThan(0);

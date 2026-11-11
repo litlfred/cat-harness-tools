@@ -5,7 +5,7 @@
  * ## Why this exists
  *
  * `kg:audit` ran only from `cat-harness/` until 2026-09-26 (bean `bjzs`). Pointing
- * it at another declared instance is one assignment — everything derives from a
+ * it at another declared layer is one assignment — everything derives from a
  * single `root` — and the first run of it reported **76 criticals of which 73 were
  * false**: 36 repository-level actors judged against bootstrap's 4 roles, because
  * `ACTOR_DIR` resolves through `repoRootFor` and so does not follow `--instance`.
@@ -137,7 +137,7 @@ describe("the auditor acts on scope, measured by running it", () => {
     // **The floor was 50 and that number was the defect it was blind to.** It
     // was calibrated when a bootstrap run reported 134 subjects, of which 119
     // were cat-harness's Tool nodes audited as bootstrap's, because
-    // `checkTools()` took no instance root. Threading one in dropped the count
+    // `checkTools()` took no layer root. Threading one in dropped the count
     // to 15 and this assertion failed — an anti-vacuity floor CALIBRATED ON A
     // LEAKY MEASUREMENT encodes the leak, so fixing the leak breaks the floor
     // that was supposed to guard the fix.

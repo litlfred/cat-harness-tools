@@ -219,7 +219,7 @@ describe("subject — the processes/roles/tasks half", () => {
   });
 
   /**
-   * A whole instance on disk: a declaration naming a `pages` docs directory, a
+   * A whole layer on disk: a declaration naming a `pages` docs directory, a
    * `flows` processes directory with one BPMN, and a `lanes` scenarios
    * directory with one role graph.
    *

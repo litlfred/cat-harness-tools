@@ -75,7 +75,7 @@ export interface StepInputs {
    * moment a directory moves — while the render would go on hashing a path
    * that is not there and reporting everything unchanged.
    *
-   * Resolved at selection time, so a newly declared instance is picked up
+   * Resolved at selection time, so a newly declared layer is picked up
    * with no edit here.
    */
   inputGraphs?: readonly string[];

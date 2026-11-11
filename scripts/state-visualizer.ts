@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * A dashboard per declared STATE graph, at the path this instance uses for it.
+ * A dashboard per declared STATE graph, at the path this layer uses for it.
  *
  * @module scripts/state-visualizer
  * @covers none — it RENDERS every declared state graph rather than judging one; a stale
@@ -18,14 +18,14 @@
  * provide its visualiser at `<base-url>/beans` etc. (`harness-requirements`).
  * Three rules on the published URL space bind here:
  *
- * 1. **The segment is the instance's `name`, never its `stub`.** The stub
+ * 1. **The segment is the layer's `name`, never its `stub`.** The stub
  *    (`artefactStub(decl)`, e.g. `folio-assistant`) names the published GRAPH
- *    DOCUMENT, not the instance.
- * 2. **The declared graph IS a path segment**, not elided, because an instance
+ *    DOCUMENT, not the layer.
+ * 2. **The declared graph IS a path segment**, not elided, because a layer
  *    may declare more than one renderable graph and they would otherwise
  *    collide on one URL.
- * 3. **The root instance elides its own name**, because its `docs/` is
- *    installed by cat-harness rather than its own. This instance's site dir
+ * 3. **The root layer elides its own name**, because its `docs/` is
+ *    installed by cat-harness rather than its own. This layer's site dir
  *    IS the published root, so `<site>/<graph>/` already is `<base>/<graph>/`.
  *
  * ## The segment is the declared entry's `id`
@@ -48,7 +48,7 @@
  *
  * ## Committed, not written into `_site`
  *
- * The page is COMMITTED under the instance's site dir and gated on exact
+ * The page is COMMITTED under the layer's site dir and gated on exact
  * content (`state:visualizer:check`), so a reviewer sees it in the diff and
  * the gate fires when somebody changes the generator and does not regenerate.
  *
@@ -77,6 +77,7 @@
  *
  * Exit: 0 written or up to date, 1 stale under `--check`.
  */
+import { inScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import {
   existsSync,
   mkdirSync,
@@ -103,6 +104,7 @@ import { parseFrontMatter } from "../schemas/kg/front-matter.js";
 import { ROUTE_SEGMENT, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { jsonFilesIn, projectQaGraph, QA_GRAPH_INDEX_SCHEMA, type QaGraphProjection } from "../pipeline/qa-graph-index.ts";
 import { qaCorpusAvailability } from "../pipeline/qa-witness.ts";
+import { qaLivePanel, qaLiveSourceOf, type QaLiveSource } from "./qa-live.ts";
 import { isOpen, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";
 import { allInstances, beanInputs, beanStores, declaredDiagramIds, unlinkedReport, unlinkedSectionHtml } from "./unlinked-beans.ts";
 import { MergeQueueEntrySchema } from "../schemas/sdlc/merge-queue.ts";
@@ -164,6 +166,7 @@ import {
   withRenderedBy,
   withRenderedByFrontMatter,
   visualiserSitePath,
+  declaredVisualisers,
   withViewers,
 } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -181,7 +184,7 @@ const SITE = siteTarget(join(ROOT, siteDirFor(ROOT)));
  * to the INSTANCE. Measured across both declarations 2026-09-20: of 27
  * coverage paths, 25 resolve only from the repo root, 2 from both (the root
  * declaration's own, where the two roots coincide) and **none** from the
- * instance root alone. Resolving these against `ROOT` would therefore mark
+ * layer root alone. Resolving these against `ROOT` would therefore mark
  * every one of them missing — which is the failure this whole change exists
  * to prevent, one level down.
  */
@@ -193,14 +196,14 @@ let harnessName: string | undefined;
 /**
  * Where a dashboard is drawn: `<site>/<locale>/<harness>/<vis>/`, the declared
  * route (`visualiserRoute`, owner 2026-10-09) under the page locale
- * (`pageParts`, folio-assistant#2527). The harness segment is this instance's
+ * (`pageParts`, folio-assistant#2527). The harness segment is this layer's
  * declared `name`, read once.
  */
 function pageDirOf(vis: string): string {
   return visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: vis }));
 }
 
-/** This instance's declared `name`, read once: the harness segment of every route. */
+/** This layer's declared `name`, read once: the harness segment of every route. */
 function harnessOf(): string {
   return (harnessName ??= readDeclaration(ROOT)?.name ?? basename(ROOT));
 }
@@ -308,7 +311,7 @@ interface StateGraph {
    * `uploads-queue` for `uploads`, whose id is the uploads viewer's route.
    */
   vis: string;
-  /** Its path, relative to the instance root, as declared. */
+  /** Its path, relative to the layer root, as declared. */
   path: string;
   /** The graph typologies in it that are `state`. */
   kinds: string[];
@@ -390,7 +393,7 @@ function projectionFor(id: string): string | null {
  * @param id     the declared entry's id, which is also its page's URL segment
  * @param cov    `coverage.visualiser` as declared, or undefined
  * @param roots  the published site and the repo root; defaults to this
- *               instance's, which is what the generator itself passes
+ *               layer's, which is what the generator itself passes
  * @returns the state this graph is in once `projectionFor` has said `null`,
  *          with the declared path and an href where one is publishable
  */
@@ -424,10 +427,10 @@ export function declaredVisualiserFor(
 }
 
 /**
- * The state graphs this instance declares.
+ * The state graphs this layer declares.
  *
  * Its OWN declaration, not a dependency's: a dependency's directory must not
- * name the URL this instance publishes at, which is the same trap
+ * name the URL this layer publishes at, which is the same trap
  * `gen-schema-viz.ts` documents on `schemaRoots`.
  */
 function stateGraphsOf(decl: CatHarnessDeclaration, visOf: ReadonlyMap<string, string>, ownRefs: ReadonlySet<string>): StateGraph[] {
@@ -539,11 +542,11 @@ export function prunableDashboards(site: string, wantedIds: readonly string[]): 
  * gate green over pages that gain a rail only when somebody runs the generator.
  *
  * Its dashboard pages are keyed by GRAPH ID (`beans`, `todos`, `qa`), not by
- * instance, so the rail lists this instance's graphs and no instance is
+ * layer, so the rail lists this layer's graphs and no layer is
  * inferred from the id.
  */
 /**
- * Whether `path` is an artefact this instance builds at publish and never
+ * Whether `path` is an artefact this layer builds at publish and never
  * commits (`builtAtPublish`, owner 2026-10-14 B1): `--check` has no committed
  * bytes to compare it with, so a missing copy there is the normal case.
  */
@@ -1026,7 +1029,7 @@ export function qaPanelsOf(
  * The harness's one-node-per-file graphs that are neither state nor a
  * registry of `folio-…/v1` nodes, and had no viewer (bean `folio-assistant-6gme`,
  * owner 2026-10-20: "every kind gets a viewer"). Each is drawn as a registry
- * is — a page per instance holding the kind, listing every node by id and
+ * is — a page per layer holding the kind, listing every node by id and
  * title — because that is what their files are: `scenarios` (actors and
  * capabilities, which carry no `$schema`), `policies` (ODRL, `.jsonld`),
  * `test-plan`, `tool-release`, `vocab-mapping` and `substrate-snapshot`
@@ -1042,7 +1045,7 @@ export const NODE_EXTENSIONS: readonly string[] = [".json", ".jsonld"];
 
 /**
  * The kinds a `subgraphs: "instance"` visualiser can draw one page per
- * instance for: those whose documents are self-describing JSON (a `$schema`
+ * layer for: those whose documents are self-describing JSON (a `$schema`
  * tag), which the family reader (`readQaGraph`) counts without knowing the
  * kind. `qa` (`test/results/`), `health` (`health-report/v1`) and
  * `attestations` (`qa-attestations/v1`) are that shape; a kind outside this
@@ -1090,7 +1093,7 @@ export const REGISTRY_KINDS: ReadonlySet<string> = new Set([
   ...LISTED_KINDS,
 ]);
 
-/** One registry node, as an instance page lists it. */
+/** One registry node, as a layer page lists it. */
 export interface RegistryRow {
   /** Path under the declared directory. */
   file: string;
@@ -1149,7 +1152,7 @@ export function registryTable(rows: readonly RegistryRow[]): string {
 /**
  * `<base>/<harness>/<vis>/` for a per-instance visualiser that no state graph
  * draws (the registry kinds are not state): the list of instances, so the
- * "every instance's …" link from each instance page has somewhere to go.
+ * "every instance's …" link from each layer page has somewhere to go.
  */
 export function instanceHubPage(vis: { id: string; title?: string }, subjects: readonly InstanceSubject[]): string {
   const title = vis.title ?? vis.id;
@@ -1166,9 +1169,9 @@ export function instanceHubPage(vis: { id: string; title?: string }, subjects: r
 
 /**
  * Whether a per-instance visualiser's OWN route gets {@link instanceHubPage}:
- * when no state dashboard draws it, it has instance pages, and its kinds are
+ * when no state dashboard draws it, it has layer pages, and its kinds are
  * not state — a registry, or `code`. Without it `en/cat-harness/code/` had a
- * page per instance and none at its own route, which `site-coverage.ts`
+ * page per layer and none at its own route, which `site-coverage.ts`
  * refuses (dth-hrh and a DAK IG, 2026-10-15).
  */
 export function drawsInstanceHub(kinds: readonly string[], drawnByDashboard: boolean, subjects: number): boolean {
@@ -1180,13 +1183,13 @@ export function drawsInstanceHub(kinds: readonly string[], drawnByDashboard: boo
  * The kinds a declared `memory/` directory holds (`cat-harness.json`): agent
  * lessons (`folio-memory/v1`, front matter on a `.md`), the `interaction`
  * node and any `folio-waiver/v1` waivers (JSON), told apart by `$schema`.
- * `context`, not state, so no dashboard draws them: each instance holding one
+ * `context`, not state, so no dashboard draws them: each layer holding one
  * gets a page listing its nodes, and the visualiser's route gets the hub.
  * Until this, memory was the library page's last "no viewer yet" row.
  */
 export const MEMORY_KINDS: ReadonlySet<string> = new Set(["memory", "waiver", "interaction"]);
 
-/** One node of a memory directory, as its instance page lists it. */
+/** One node of a memory directory, as its layer page lists it. */
 export interface MemoryRow {
   /** Path under the declared directory. */
   file: string;
@@ -1248,9 +1251,9 @@ export function memoryRowsOf(absPath: string): MemoryRow[] | null {
 }
 
 /**
- * `<base>/<harness>/<vis>/<instance>/` — one instance's memory: every lesson,
+ * `<base>/<harness>/<vis>/<instance>/` — one layer's memory: every lesson,
  * the interaction node and any waivers, each linked to its file on GitHub at
- * the pinned commit when the instance is a pinned mount. Not run through
+ * the pinned commit when the layer is a pinned mount. Not run through
  * Liquid, since a lesson's summary is authored text.
  */
 export function memorySubjectPage(
@@ -1504,7 +1507,7 @@ export type ModelRead =
 /** One instance's view, and everything it is drawn from. */
 export interface WorkflowInstanceView {
   instance: InstanceState;
-  /** The bean store's instance name — the page's subgraph segment. */
+  /** The bean store's layer name — the page's subgraph segment. */
   store: string;
   model: ModelRead;
   /** The store's beans, or null when the store could not be read. */
@@ -1706,7 +1709,7 @@ export function dynamicStateTarget(): string {
  *
  * Why the generator writes it too: a workflow page links
  * `<site>/<harness>/state.jsonld`, and only `render-pipeline.ts` ran stage 3,
- * so a site built any other way — an instance site (`build-instance-site.ts`,
+ * so a site built any other way — a layer site (`build-instance-site.ts`,
  * which runs this generator as a declared visualiser writer) — published pages
  * linking a file it never wrote, and its link gate refused the publish
  * (smart-ra, cat-harness-tools 9326f5d onward). The page's writer now
@@ -2295,38 +2298,47 @@ export function todoStorePartsSection(storeAbs: string): string {
 }
 
 /**
- * One instance's graph of a kind: the sub-graph a `subgraphs: "instance"`
+ * One layer's graph of a kind: the sub-graph a `subgraphs: "instance"`
  * visualiser draws a page for (bean `folio-assistant-1nu0`, owner 2026-10-15:
  * "per-instance pages"; "each viewer draws one page per instance").
  *
- * `name` is the instance the directory BELONGS to — `member` for an inherited
+ * `name` is the layer the directory BELONGS to — `member` for an inherited
  * subgraph, else the declarer — which is the sub-graph segment `viewersOf`
- * looks for. `instanceRoot` is that instance's root, recovered from the
+ * looks for. `instanceRoot` is that layer's root, recovered from the
  * declared path rather than composed, so the corpus-availability probe asks
- * the instance that holds the directory.
+ * the layer that holds the directory.
  */
 export interface InstanceSubject {
   name: string;
   path: string;
   absPath: string;
   instanceRoot: string;
+  /** The branch the directory's records are kept on (`storage`/`source` `branch`), when it declares one. */
+  storage?: string;
+}
+
+/** A declared `storage`/`source` that names one branch, as `qaStorageOf` reads it; anything else is no branch. */
+function branchOf(x: unknown): string | undefined {
+  if (x === null || typeof x !== "object" || !("branch" in x)) return undefined;
+  const b = (x as { branch: unknown }).branch;
+  return typeof b === "string" && b.length > 0 ? b : undefined;
 }
 
 /**
- * The instances in the checkout holding a directory of one of `kinds`, one
+ * The layers in the checkout holding a directory of one of `kinds`, one
  * subject each, sorted by name.
  *
  * Read from the RESOLVED checkout (`checkoutDirectories`), never from a list:
- * an instance is a subject because it declares the kind, so a new instance
+ * a layer is a subject because it declares the kind, so a new layer
  * holding such a directory gets its page with no edit here. A declared
  * directory that is NOT on disk still gets one, and that page says the corpus
  * is unknown in this build: derived QA lives on the `qa-reports` branch and
  * health reports are written by a sweep and never committed, so an absent tree
- * is the normal case, not an empty graph — and with no page the instance's
+ * is the normal case, not an empty graph — and with no page the layer's
  * tile would have nowhere to go.
  */
 export function instanceSubjectsOf(
-  dirs: ReadonlyArray<{ id: string; path: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[] }>,
+  dirs: ReadonlyArray<{ id: string; path: string; absPath: string; declaredBy: string; member?: string; graphTypologies: readonly string[]; storage?: unknown; source?: unknown }>,
   kinds: readonly string[],
 ): InstanceSubject[] {
   const out = new Map<string, InstanceSubject>();
@@ -2336,15 +2348,28 @@ export function instanceSubjectsOf(
     if (out.has(name)) continue;
     const up = d.path.split("/").filter((x) => x.length > 0 && x !== ".").length;
     const instanceRoot = resolve(d.absPath, ...Array.from({ length: up }, () => ".."));
-    out.set(name, { name, path: d.path, absPath: d.absPath, instanceRoot });
+    const storage = branchOf(d.source) ?? branchOf(d.storage);
+    out.set(name, { name, path: d.path, absPath: d.absPath, instanceRoot, ...(storage ? { storage } : {}) });
   }
   return [...out.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
+ * Every OTHER layer's visualiser this Tool draws on the host site: declared
+ * `renderedBy: state-viewer`, `subgraphs: "instance"` and `builtOnHostSite`, by
+ * a layer that is not `own`. Each keeps its declaring layer's name, which is
+ * the harness segment of its route.
+ */
+export function hostedVisualisers(repoRoot: string, own: string): ReturnType<typeof declaredVisualisers> {
+  return declaredVisualisers(repoRoot).filter(
+    (v) => v.harness !== own && v.renderedBy === VIEWER_TOOL && v.subgraphs === "instance" && (v as { builtOnHostSite?: unknown }).builtOnHostSite !== undefined,
+  );
+}
+
+/**
  * What a per-instance visualiser (`subgraphs: "instance"`) draws in the
  * checkout at `root`: its kinds, the kinds it has no reader for, and the
- * instances that get a page. One home for the selection, because the page
+ * layers that get a page. One home for the selection, because the page
  * writer and the orphan keep-set both depend on it — the keep-set test held a
  * hand-written list and missed the seven hubs #294 added.
  *
@@ -2355,7 +2380,7 @@ export function instanceSubjectsOf(
  * it: no subject page — except a bean store, whose board draws its beans
  * only, so its notes and workflow instances need a page of their own. A
  * directory the checkout ROOT declares (`(root)`, the index's own `test/`)
- * belongs to no instance and has no route segment: it is `unrouted`.
+ * belongs to no layer and has no route segment: it is `unrouted`.
  */
 export function perInstanceSubjects(
   v: { coversKinds?: readonly string[]; covers?: readonly string[] },
@@ -2385,7 +2410,7 @@ export function perInstanceSubjects(
 }
 
 /**
- * One instance's directory of `kinds`, projected with the same family reader
+ * One layer's directory of `kinds`, projected with the same family reader
  * the whole-graph QA projection uses (`projectQaGraph`, bean `tfqf` C9), and
  * the same availability rule: absent is UNKNOWN, never zero.
  *
@@ -2406,10 +2431,10 @@ export function projectInstanceSubject(s: InstanceSubject, kinds: readonly strin
 }
 
 /**
- * `<base>/<harness>/<vis>/<instance>/` — one instance's graph of the kinds
+ * `<base>/<harness>/<vis>/<instance>/` — one layer's graph of the kinds
  * the visualiser covers.
  *
- * An instance whose corpus is not in the build says so — unknown, not zero —
+ * A layer whose corpus is not in the build says so — unknown, not zero —
  * instead of counting the few files that happen to be committed.
  */
 export function instanceSubjectPage(
@@ -2417,6 +2442,7 @@ export function instanceSubjectPage(
   s: InstanceSubject,
   subjects: readonly InstanceSubject[],
   ix: QaGraphProjection = projectInstanceSubject(s, vis.coversKinds ?? []),
+  live?: QaLiveSource,
 ): string {
   const title = vis.title ?? vis.id;
   const others = subjects
@@ -2428,13 +2454,17 @@ export function instanceSubjectPage(
     .join("");
   const qaFamilies = (vis.coversKinds ?? []).includes("qa");
   const registry = (vis.coversKinds ?? []).length > 0 && (vis.coversKinds ?? []).every((k) => REGISTRY_KINDS.has(k));
+  // The build holds no corpus, but the layer publishes one: the browser reads
+  // it from the layer's qa-reports branch at view time (owner card, 2026-11-10:
+  // "Load in the browser"), so a publish never fetches or copies results.
+  const loadsLive = qaFamilies && live !== undefined && (ix as { availability?: string }).availability === "unknown";
   return page({
     title: `${s.name} — ${title}`,
-    ...(registry ? { noLiquid: true } : {}),
+    ...(registry || loadsLive ? { noLiquid: true } : {}),
     body:
       `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
       `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's ${esc(title)}</a></p>` +
-      qaPanelsOf(ix, undefined, { qaFamilies }) +
+      (loadsLive ? qaLivePanel(live!) : qaPanelsOf(ix, undefined, { qaFamilies })) +
       (registry ? registryTable(registryRowsOf(s.absPath)) : "") +
       `<h2 class="sv-h2">Instances holding ${esc(title)}</h2>` +
       `<ul class="sv-list">${others}</ul>`,
@@ -2448,7 +2478,7 @@ export function instanceSubjectPage(
  */
 export type BeanStoreRead = { beans: BeanNode[] | null } | { unreachable: string };
 
-/** Read one instance's bean store, keeping "could not read" apart from "empty". */
+/** Read one layer's bean store, keeping "could not read" apart from "empty". */
 export function readSubjectBeans(instanceRoot: string): BeanStoreRead {
   try {
     return { beans: readBeans(instanceRoot) };
@@ -2461,10 +2491,10 @@ export function readSubjectBeans(instanceRoot: string): BeanStoreRead {
 const PRIORITY_ORDER = ["critical", "high", "normal", "low", "deferred"];
 
 /**
- * `<base>/<harness>/<vis>/<instance>/` — one instance's work plan (bean
+ * `<base>/<harness>/<vis>/<instance>/` — one layer's work plan (bean
  * `folio-assistant-1nu0`, owner 2026-10-15: "per-instance pages").
  *
- * Each instance's `beans/` is its OWN store (`cat-tools-…`,
+ * Each layer's `beans/` is its OWN store (`cat-tools-…`,
  * `folio-assistant-…` ids), not the repository store the full board draws,
  * so the page reads that store and lists its open beans. Rendered
  * SERVER-SIDE: the board's client (`work-plan.js`) reads the one bean index
@@ -2538,7 +2568,7 @@ export function beansSubjectPage(
 }
 
 /**
- * One declared code directory of an instance, for its per-instance code page
+ * One declared code directory of a layer, for its per-instance code page
  * (bean `folio-assistant-svgx`).
  */
 export interface CodeDirectory {
@@ -2549,9 +2579,9 @@ export interface CodeDirectory {
 }
 
 /**
- * Every directory of `kinds` that instance `name` holds, in declaration
+ * Every directory of `kinds` that layer `name` holds, in declaration
  * order. Unlike {@link instanceSubjectsOf}, which keeps ONE directory per
- * instance, an instance declares code in many places (`scripts/`,
+ * layer, a layer declares code in many places (`scripts/`,
  * `schemas/`, `pipeline/`, …) and its code page lists them all.
  */
 export function codeDirectoriesOf(
@@ -2609,27 +2639,33 @@ export function listCodeFiles(absPath: string, limit: number = CODE_FILE_LIMIT):
 }
 
 /**
- * `https://github.com/<repo>/blob/<ref>/` for an instance mounted from a
+ * `https://github.com/<repo>/blob/<ref>/` for a layer mounted from a
  * pinned commit — read from the checkout's `index.lock.json` — so a file links
- * to the source the site was built from. `undefined` when the instance is not
+ * to the source the site was built from. `undefined` when the layer is not
  * a locked mount (a layer repository's own checkout): the page then lists
  * names without links rather than guess a ref.
  */
 export function pinnedBlobBase(repoRoot: string, instance: string): string | undefined {
+  const m = pinnedMount(repoRoot, instance);
+  return m === undefined ? undefined : `https://github.com/${m.repository}/blob/${m.ref}/`;
+}
+
+/** The repository and commit `index.lock.json` pins a layer at, or `undefined` when the lock does not name it plainly. */
+export function pinnedMount(repoRoot: string, instance: string): { repository: string; ref: string } | undefined {
   try {
     const lock = JSON.parse(readFileSync(join(repoRoot, "index.lock.json"), "utf-8")) as {
       mounts?: Array<{ harness?: string; repository?: string; ref?: string }>;
     };
     const m = (lock.mounts ?? []).find((x) => x.harness === instance);
     if (!m?.repository || !m.ref || !/^[\w.-]+\/[\w.-]+$/.test(m.repository) || !/^[0-9a-f]{7,40}$/.test(m.ref)) return undefined;
-    return `https://github.com/${m.repository}/blob/${m.ref}/`;
+    return { repository: m.repository, ref: m.ref };
   } catch {
     return undefined;
   }
 }
 
 /**
- * `<base>/<harness>/<vis>/<instance>/` — one instance's code: each declared
+ * `<base>/<harness>/<vis>/<instance>/` — one layer's code: each declared
  * code directory with its files, linked to GitHub at the pinned commit
  * (bean `folio-assistant-svgx`, child of `46ob`). A source LISTING, not a
  * rendered source browser: the file opens on GitHub, which already renders
@@ -2705,7 +2741,7 @@ function readViewTodos(): TodoLike[] {
 }
 
 let processFiles: Map<string, string> | undefined;
-/** Process id → the `.bpmn` declaring it, over every instance in the checkout; built once. */
+/** Process id → the `.bpmn` declaring it, over every layer in the checkout; built once. */
 function processFileOf(processId: string): string | undefined {
   if (processFiles === undefined) {
     processFiles = new Map();
@@ -2787,9 +2823,9 @@ async function main(): Promise<void> {
 const declRead = readDeclaration(ROOT);
 // The CHECKOUT's state graphs too (placement PR0, bean `ejye`): `beans`,
 // `todos`, `memory`, `interaction` and `issue-marks` are declared by the
-// checkout's ROOT instance since the platform stopped mirroring them, and
+// checkout's ROOT layer since the platform stopped mirroring them, and
 // this site still draws their dashboards. Read as `repository`-scoped, which
-// is what they are relative to this instance and how `drawnDir` resolves them.
+// is what they are relative to this layer and how `drawnDir` resolves them.
 const decl = declRead && {
   ...declRead,
   directories: withViewers(siteDirectories(declRead.directories ?? [], ROOT, REPO_ROOT), ROOT),
@@ -2805,10 +2841,10 @@ if (!decl) {
 
 // AND the checkout root's own state graphs (bean `cmsl` step 2, issue #1694):
 // `beans/`, `todos/`, `memory/`, `fsh-guts/`, `issue-marks/`, `interaction/`
-// are declared by the root instance since the owner's round-5 ruling, and this
+// are declared by the root layer since the owner's round-5 ruling, and this
 // site is where their dashboards were always published — every one of them
 // names `cat-harness/docs/<id>/index.html` as its visualiser. Reading only this
-// instance's declaration would orphan all six the moment the entries moved.
+// layer's declaration would orphan all six the moment the entries moved.
 const rootRead = resolve(REPO_ROOT) === resolve(ROOT) ? undefined : readDeclaration(REPO_ROOT);
 const rootDirs = rootRead ? withViewers(rootRead.directories ?? [], REPO_ROOT, REPO_ROOT) : [];
 const ownIds = new Set((decl.directories ?? []).map((d) => d.id));
@@ -2875,10 +2911,10 @@ for (const g of graphs) {
 
 // PER-INSTANCE PAGES (bean `folio-assistant-1nu0`, owner 2026-10-15:
 // "per-instance pages"). A visualiser declaring `subgraphs: "instance"` gets
-// one page per instance in the checkout holding a directory of a kind it
+// one page per layer in the checkout holding a directory of a kind it
 // covers, at `<locale>/<harness>/<vis>/<instance>/` — the sub-graph route
 // `viewersOf` resolves a tile to. The kinds in `PER_INSTANCE_KINDS`
-// (self-describing JSON the family reader counts) draw on the shared instance
+// (self-describing JSON the family reader counts) draw on the shared layer
 // page, and `beans` on its own store reader; any other kind has no
 // per-instance reader here, and is refused loudly rather than drawn as an
 // empty page.
@@ -3078,9 +3114,29 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
 let combinedParts: StoreRows[] = [];
 
 const ownName = readDeclaration(ROOT)?.name ?? basename(ROOT);
-for (const v of mine.filter((x) => x.subgraphs === "instance")) {
+const SITE_SCOPE = siteScope();
+if (SITE_SCOPE !== undefined) console.log(`  scope ${scopeArg(SITE_SCOPE)}: instance pages of these only`);
+/**
+ * The per-instance visualisers this run draws: this layer's own, and every
+ * OTHER layer's `renderedBy: state-viewer` visualiser that is `builtOnHostSite`
+ * (cat-harness#1150, item 3, owner card Q-CGI-1 A, 2026-11-09). A layer above
+ * this one declares the page for a kind only it registers, and this Tool draws
+ * it on the host site under THAT layer's name — so the harness never names a
+ * kind from a layer above it. A hosted page is built at publish (a derived
+ * host-site route), so `--check` never judges it.
+ */
+const perInstance: { v: (typeof mine)[number]; harness: string; hosted: boolean }[] = [
+  ...mine.filter((x) => x.subgraphs === "instance").map((v) => ({ v, harness: harnessOf(), hosted: false })),
+  ...hostedVisualisers(REPO_ROOT, ownName).map((v) => ({ v: v as (typeof mine)[number], harness: v.harness, hosted: true })),
+];
+for (const { v, harness: vh, hosted } of perInstance) {
   combinedParts = [];
-  const { kinds, beans, code, memory, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
+  const pageDirFor = (vis: string) => (hosted ? visualiserPageDir(SITE, pageParts({ harness: vh, visualiser: vis })) : pageDirOf(vis));
+  const found = perInstanceSubjects(v, ROOT, vh);
+  const { kinds, beans, code, memory, unread, candidates, unrouted } = found;
+  // A scoped site (`--scope`, owner 2026-11-08 Q-SZ-2 "B") draws its scope's
+  // instance pages only; the hub still stands at the visualiser's route.
+  const subjects = found.subjects.filter((s) => inScope(SITE_SCOPE, s.name));
   if (kinds.length === 0 || unread.length > 0) {
     console.error(
       `  ! visualiser \`${v.id}\` asks for per-instance pages of ${kinds.join(", ") || "no kind"}; ` +
@@ -3092,7 +3148,7 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
     console.error(`  ! visualiser \`${v.id}\`: \`${s.path}\` is declared by ${s.name}, which is not an instance with a route — no page`);
   }
   for (const s of subjects) {
-    const dir = visualiserPageDir(SITE, pageParts({ harness: harnessOf(), visualiser: v.id, subgraph: s.name }));
+    const dir = visualiserPageDir(SITE, pageParts({ harness: vh, visualiser: v.id, subgraph: s.name }));
     const models = beans ? await workflowModelsOf(s) : undefined;
     const html = beans
       ? beansSubjectPage(v, s, subjects, readSubjectBeans(s.instanceRoot), { now: NOW, ends: endsOf(models!), unlinked: unlinkedSection(s) })
@@ -3100,22 +3156,22 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
         ? codeSubjectPage(v, s, subjects, codeDirectoriesOf(candidates, s.name, kinds), pinnedBlobBase(REPO_ROOT, s.name))
         : memory
           ? memorySubjectPage(v, s, subjects, pinnedBlobBase(REPO_ROOT, s.name))
-          : instanceSubjectPage(v, s, subjects);
-    // ANOTHER instance's page depends on which instances the checkout mounts,
+          : instanceSubjectPage(v, s, subjects, undefined, qaLiveSourceOf(s, pinnedMount(REPO_ROOT, s.name)));
+    // ANOTHER layer's page depends on which layers the checkout mounts,
     // so it is built at publish wherever this layer is mounted, listed or not:
-    // a downstream index adds instances no list here can name (Uganda #15).
-    if (!(check && s.name !== ownName)) emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
+    // a downstream index adds layers no list here can name (Uganda #15).
+    if (!(check && (hosted || s.name !== ownName))) emit(join(dir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
     if (beans) subjectOrphans.push(...drawWorkflows(v.id, s, dir, models!));
   }
   // No state graph draws this visualiser's own page (a registry kind is not
   // state, and neither is `code`), so its hub is drawn here, listing the
-  // instance pages. Without it `code/` had a page per instance and none at
+  // layer pages. Without it `code/` had a page per layer and none at
   // its own route, which the site-coverage gate refuses (dth-hrh, 2026-10-15).
-  if (drawsInstanceHub(kinds, graphs.some((g) => g.vis === v.id), subjects.length)) {
-    hubs.push(v.id);
-    emit(join(pageDirOf(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
+  if (drawsInstanceHub(kinds, !hosted && graphs.some((g) => g.vis === v.id), found.subjects.length)) {
+    if (!hosted) hubs.push(v.id);
+    if (!(check && hosted)) emit(join(pageDirFor(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
   }
-  const parent = pageDirOf(v.id);
+  const parent = pageDirFor(v.id);
   // Every store's beans by process on one page, beside the store pages
   // (owner, 2026-11-03). A store named like that page would be overwritten by
   // it, so such a store is refused, by name, and the combined page not drawn.
@@ -3132,7 +3188,7 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   for (const name of foreign) console.error(`  ! ${relative(SITE, join(parent, name))} is not an instance page and does not identify itself — left in place`);
   // Under a built-at-publish route a stale local copy is not a committed
   // orphan, so `--check` does not report it; a write run still prunes it.
-  if (!(check && builtAtPublishHere(join(parent, "x", "index.html")))) {
+  if (!hosted && !(check && builtAtPublishHere(join(parent, "x", "index.html")))) {
     subjectOrphans.push(...owned.map((name) => relative(SITE, join(parent, name))));
   }
 }

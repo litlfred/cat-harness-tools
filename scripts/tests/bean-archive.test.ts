@@ -20,7 +20,7 @@ afterAll(() => {
   for (const d of scratches) rmSync(d, { recursive: true, force: true });
 });
 
-/** A scratch instance whose bean graph declares `defs` and `archive`. */
+/** A scratch layer whose bean graph declares `defs` and `archive`. */
 function scratch(opts: { archiveStatuses: string[]; declareArchive?: boolean }): string {
   const dir = mkdtempSync(join(tmpdir(), "bean-archive-"));
   scratches.push(dir);

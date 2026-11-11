@@ -3,7 +3,7 @@
  *
  * A graph typology says what a declared directory holds: whether it `renderable`,
  * and which layer it `holds`. The kinds themselves, the registry they live in,
- * and the shared instance every reader consults are all here.
+ * and the shared layer every reader consults are all here.
  *
  * ## Why this is its own module
  *
@@ -57,7 +57,7 @@ import { readFileSync } from "node:fs";
  * - `content` — the subject. A process may PRODUCE it, and that is usually the
  *   point of the process.
  * - `context` — **static state.** A record about content that a process reads
- *   and never writes. Fixed for the duration of an instance. It changes only
+ *   and never writes. Fixed for the duration of a layer. It changes only
  *   when a human directs an authoring act, outside any process.
  * - `state` — **live state.** A record the process itself writes as it runs. A
  *   bean's status changes because a step completed.
@@ -160,7 +160,7 @@ export interface GraphTypologyDef {
   /**
    * Whose namespace the kind is named in, when it is not the harness's:
    * `core` for a kind the content layer above the harness declares as a node
-   * in its own `typologies/` graph, named in THAT instance's namespace
+   * in its own `typologies/` graph, named in THAT layer's namespace
    * ({@link graphTypologyIri}, {@link DECLARED_BY}). The harness registers no
    * `core` kind in code since folio-assistant#2598 (owner, 2026-10-16, "1a"):
    * the ones it uses itself (`todos`, `library`, `uploads`, `voices`, `folio`,
@@ -173,7 +173,7 @@ export interface GraphTypologyDef {
    */
   layer?: "core";
   /**
-   * Does every instance have ITS OWN graph of this kind — so an instance that
+   * Does every layer have ITS OWN graph of this kind — so a layer that
    * inherits a directory of this kind gets its own copy created?
    *
    * The per-entry `dependents: "reproduce" | "skip"` answered this until
@@ -191,20 +191,20 @@ export interface GraphTypologyDef {
    */
   perInstance?: true;
   /**
-   * Where a NEW instance's own graph of this kind lives, when `folio_init`
+   * Where a NEW layer's own graph of this kind lives, when `folio_init`
    * scaffolds it — `perInstance`'s companion: that field says a dependent HAS
    * its own; this one says where the new one is kept. Bean `hp54`.
    *
    * Read by `folio_init` ONCE, never by the resolver: the scaffolder writes a
    * complete `source: { kind: "branch", branch: "cat/<instance>/<id>",
    * keyedBy }` into the new instance's own declaration, and from then on that
-   * declaration is the one answer. So an existing instance whose entry
+   * declaration is the one answer. So an existing layer whose entry
    * declares no source (this repository's own `beans/` and `todos/`, still
    * awaiting their cutover) is not moved by it. The rule and the branch-name
    * convention are in the `directory-conventions` skill, §"Where a NEW
    * instance's state lives".
    *
-   * Absent means a new instance's graph of this kind is written into its
+   * Absent means a new layer's graph of this kind is written into its
    * checkout, as before.
    */
   newInstanceSource?: NewInstanceSource;
@@ -266,7 +266,7 @@ export interface GraphTypologyDef {
    */
   recordsWork?: boolean;
   /**
-   * Does a graph of this kind say what the instance **IS**, or where something
+   * Does a graph of this kind say what the layer **IS**, or where something
    * **GOT TO**?
    *
    * The second axis in this table, and the one the vocabulary was missing.
@@ -275,11 +275,11 @@ export interface GraphTypologyDef {
    * is handed the other has no way to tell today.
    *
    * - **`content`** — authored nodes a reader or a tool consumes as the
-   *   subject matter. It is what the instance IS. It stands on its own: you
+   *   subject matter. It is what the layer IS. It stands on its own: you
    *   can read a skill, a schema or a library section without knowing what
    *   anybody did with it.
    * - **`context`** — STATIC state. A record about content that a running
-   *   process READS and never writes, fixed for the duration of an instance.
+   *   process READS and never writes, fixed for the duration of a layer.
    *   It changes only when a human directs an authoring act, outside any
    *   process. A step that writes to a `context` graph is a defect.
    * - **`state`** — LIVE state. A record the process itself WRITES as it
@@ -384,8 +384,8 @@ export interface GraphTypologyDef {
    * `<cat-harness.processes:decision ref="file.dmn#Decision_Id"/>` already uses in every BPMN
    * gateway here, so this reuses a spelling rather than minting one.
    *
-   * **Resolved relative to the INSTANCE root**, not the repository root. That
-   * distinction was invisible until `#437` moved the instance under
+   * **Resolved relative to the LAYER root**, not the repository root. That
+   * distinction was invisible until `#437` moved the layer under
    * `cat-harness/`: the three `schema` paths kept working as instance-relative
    * strings while their own doc called them repo-relative, and nothing
    * noticed because nothing read them. `bun run cat check:kind-validators` is
@@ -504,10 +504,10 @@ export interface GraphTypologyDef {
    * tests*. A fact about the KIND, so a kind that groups cannot disagree with
    * itself between two declarations, the reason `perInstance` lives here.
    *
-   * A group is declared ONCE, by the instance that declares the subgraph
-   * (the harness), and inherited: each higher instance's same-named
+   * A group is declared ONCE, by the layer that declares the subgraph
+   * (the harness), and inherited: each higher layer's same-named
    * `<dir>/<group>/` is a named MEMBER of it (option A, bean `1g4s`). So a
-   * higher instance adds no group of its own. `scripts/concern-groups.ts`
+   * higher layer adds no group of its own. `scripts/concern-groups.ts`
    * resolves groups and members; `check:concern-groups` holds the rules.
    * Requires {@link declarationFile}, since that is where groups are named.
    */
@@ -603,7 +603,7 @@ export interface GraphTypologyDef {
  * ## Why the work plan is the harness's and not core's
  *
  * `folio` is registered by `folio-assist-core` because only core can render.
- * The work plan has no such constraint in either direction: an instance has
+ * The work plan has no such constraint in either direction: a layer has
  * work whether or not it has content, and `agentic-harness` itself carries a
  * `beans/` store for its own. A Tool repo and a Test repo have work plans too.
  * So it is declared here — the test for "does this belong to the harness" is
@@ -702,7 +702,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // The third META-KIND (bean riit, step 2): a directory of graph typology
   // `block-kinds` holds the block kinds a harness's adapter owns, one
   // `folio-block-kind/v1` node each. `block-kinds.ts` DISCOVERS them across
-  // every instance; no module lists them.
+  // every layer; no module lists them.
   "block-kinds": {
     description:
       "the block kinds a harness's content adapter owns, one `folio-block-kind/v1` node each (`schemas/kg/block-kind-node.ts`): the kind string, its adapter and narrowest profile, label prefix, RDF types, builder and English heading. `schemas/content/block-kinds.ts` discovers them across every instance's declared graph, so no module lists the kinds. Owner, 2026-10-04: *\"kinds need to be discoverable … not centrally managed\"*; document kinds live in the content core and the math kinds in the science layer (option 2 of 3). Bean `riit`, step 2; sod4 finding #1.",
@@ -739,7 +739,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     title: "Tools",
     renderable: false,
     // A Tool node is an authored definition of a mechanism. It says what this
-    // instance CAN DO, not what anybody did.
+    // layer CAN DO, not what anybody did.
     holds: "content",
     // declared-path-literal: this table IS the declaration, as on `health` — a validator is a
     // module#Export resolved by resolveKindValidator. Read by gen-uml-overview.ts to draw the nodes.
@@ -749,7 +749,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   //
   // It was `kg`, which named what the graph HOLDS rather than who owns it —
   // the odd one out in a vocabulary where `harness.json`, `CatHarness`
-  // and the `cat-harness` instance are all named for the harness. The owner,
+  // and the `cat-harness` layer are all named for the harness. The owner,
   // 2026-09-19: "kg -> cat-harness for naming conventions, no? skills/
   // schemas beans all in cat-harness, voices, uploads library in
   // folio-asst-core."
@@ -818,7 +818,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "Skill packages — the authored instruction bodies an Actor performs a Task from. A Skill is a **Capability with defined inputs and outputs**, stated generically so it is portable across forges, binaries and machines. Split out of `cat-harness` on 2026-09-21.",
     title: "Skills",
     // THE FROM-WITHIN NODE for a skills directory (bean cmsl, owner
-    // 2026-09-30, round 4): `skills/skills.json` names the instance
+    // 2026-09-30, round 4): `skills/skills.json` names the layer
     // directories declared inside `skills/` — `voices/`, and `lean/` in
     // the science layer — so the nesting is declared where the #980 ruling
     // says it must be, never by a root declaration reaching down.
@@ -882,7 +882,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // engine's reading of `processes` does not reach it.
     within: "processes",
     tileIcon: "processes",
-    // NOT `kgContent`: that would make every instance declaring one a HARNESS
+    // NOT `kgContent`: that would make every layer declaring one a HARNESS
     // (`kg-subscribe`'s rule: a harness kind holds Skills, Roles or
     // Processes the engine runs), and the engine's corpus walk would reach it.
     // A DAK's diagrams are content about work, like `folio`.
@@ -925,7 +925,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // Owner, 2026-11-05 (option A): "a specialized viewer of a journey. should
   // be able to see all journeys in repo, each individual journey and journeys
   // in subgraphs", with smart-trust-demo and smart-ips-pilgrimage as content
-  // instances. Promoted from smart-trust-demo's draft (bean
+  // layers. Promoted from smart-trust-demo's draft (bean
   // smart-trust-demo-kg01, gaps 1 and 2). `content`: a journey is authored and
   // true whether or not anything reads it. Its own kind rather than a family
   // of bootstrap's `scenarios`, because it has its own viewer
@@ -959,7 +959,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "a DAK user scenario, composed of other journeys in order.",
   },
   // The building blocks a journey step `uses`. Owner, 2026-11-05: the
-  // catalogue lives in an instance's `archimate/` directory, read by its
+  // catalogue lives in a layer's `archimate/` directory, read by its
   // ArchiMate overlay. A family of `user-scenario` could only be read from a
   // journeys directory, so it is a kind of its own, and a directory DECLARES
   // it: `archimate/building-blocks/`, declared inside the `archimate`
@@ -1054,7 +1054,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // Three properties a skill does not have:
   //
   // 1. **Extractable.** A methodology is somebody else's work, adopted. If the
-  //    field moves on, or an instance needs a different one, the directory lifts
+  //    field moves on, or a layer needs a different one, the directory lifts
   //    out and its declaration goes with it. A skill that had inlined the method
   //    could not be lifted — it would have to be rewritten.
   // 2. **Referenced, never inlined.** A skill names the methodology it follows;
@@ -1348,7 +1348,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // write these files — `external-schemas.ts --write` refreshes each
     // record's `terms[]` from the corpus — which sounds like `state`. It is
     // not, because the axis asks what the graph IS, and the subject matter
-    // here is a DECISION: which specifications this instance depends on, at
+    // here is a DECISION: which specifications this layer depends on, at
     // which edition, and what each term operatively means. A person makes
     // that; the deriver only keeps one field of it honest.
     //
@@ -1443,7 +1443,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     summary: BOOTSTRAP_GRAPH_TYPOLOGIES["schemas"],
   },
   // UML renderings of the declared sub-graphs — one `.puml` and one `.mmd`
-  // per named sub-graph and per instance, both written from one model by
+  // per named sub-graph and per layer, both written from one model by
   // `scripts/gen-uml-overview.ts`. `derived`: regenerated, never authored, so
   // a finding against one is a finding against the generator or its inputs.
   uml: {
@@ -1479,7 +1479,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // flattened for the web and is what the docs panel fetches. One is edited by
   // fixing a checker; the other is never edited at all.
   //
-  // Undeclared until 2026-09-19 — 134 committed files that no instance
+  // Undeclared until 2026-09-19 — 134 committed files that no layer
   // declaration mentioned, so a consumer scanning the declared directories saw
   // none of them and reported a clean run over the lot.
   qa: {
@@ -1504,10 +1504,10 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     nodeSchemas: {
       "kg-qa/v1": {},
       // The auditor's identity for the `kg-qa/v1` files beside it — one per
-      // instance, not one per sidecar, for the reason `KG_QA_MANIFEST_SCHEMA`
+      // layer, not one per sidecar, for the reason `KG_QA_MANIFEST_SCHEMA`
       // gives. Registered under `skills` until 2026-09-27, because the file
       // lived in `skills/`; it moved to `test/results/` when auditing every
-      // instance made the old home CREATE a skills directory holding no skills,
+      // layer made the old home CREATE a skills directory holding no skills,
       // and this registration had to move with it. A kind claiming a `$schema`
       // whose files live in another kind's directory is a validator aimed at
       // nothing.
@@ -1528,7 +1528,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // the list `head_custom.html` once read from `_data/`, now an asset.
       "folio-qa-translation-pages/v1": { generated: true },
       // The detangle sidecars, in cat-harness
-      // qa directory. `detangle` was its own instance until 2026-09-23 and is
+      // qa directory. `detangle` was its own layer until 2026-09-23 and is
       // now a directory of this harness (bean `byql`), so the shape is an
       // ordinary instance-relative path under `schemas/` and needs no `detangle:` qualifier.
       "folio-detangle-sidecar/v1": { shape: "schemas/kg/detangle-sidecar.ts#DetangleSidecar" },
@@ -1546,7 +1546,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     },
     // No `validator`, and that is a finding rather than an omission: the
     // module above exports TypeScript interfaces only. The largest generated
-    // graph in this instance has no runtime schema, so `kg_validate` reports
+    // graph in this layer has no runtime schema, so `kg_validate` reports
     // "could not determine" for it — which is the point of saying so here.
   },
   // Repository health reports — what the daily sweep under `test/health/`
@@ -1561,7 +1561,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // leave a consumer asking for verdicts about its content holding a fact
   // about its clone.
   //
-  // No `skill`, deliberately: none of the skills in this instance says how to
+  // No `skill`, deliberately: none of the skills in this layer says how to
   // READ a health report, and naming one that does not exist is the
   // fake-reference failure `activity-names-skill` is written to prevent. The
   // field is optional and absent means absent.
@@ -1571,7 +1571,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     title: "Health",
     renderable: false,
     // The same shape one level out: where the REPOSITORY got to, measured
-    // against thresholds. A report is evidence about an instance, never part
+    // against thresholds. A report is evidence about a layer, never part
     // of it.
     holds: "state",
     recordsWork: false, // live state, but nothing anybody is partway through
@@ -1639,7 +1639,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // `scripts/` are entry points named BY PATH in package.json and the CI
   // workflows -- which `check:ci-invocations` and `check:command-paths` guard.
   // So: declare them where they are, and keep `<stub>/src` as the convention
-  // for NEW instances.
+  // for NEW layers.
   //
   // `content` by the one question: somebody authors it, with an intention, and
   // you would re-author rather than regenerate it. It stands on its own -- a
@@ -1866,7 +1866,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // RENAMED from `glossary` on 2026-09-23 (owner: "Rename harness one"). The
   // name `glossary` now belongs to the content core's kind: local SKOS
   // terms plus references to external SKOS schemes, rendered on every
-  // instance's glossary/ page. This is the harness's swimlane-role ledger, one
+  // layer's glossary/ page. This is the harness's swimlane-role ledger, one
   // source that page reads.
   "swimlane-glossary": {
     description:
@@ -1892,7 +1892,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // reader is looking at a queue or at a fact.
     recordsWork: false,
     // cat-harness's own kind since 2026-09-30 (owner, bean `xsqm`): the
-    // ledger is harness state, hosted here for every instance it exports,
+    // ledger is harness state, hosted here for every layer it exports,
     // so the kind moved up from bootstrap with it. Written by
     // scripts/glossary-export.ts; the glossary document itself is derived and
     // not stored here — only the ledger, the one fact that cannot be re-derived.
@@ -1922,7 +1922,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   },
   beans: {
     tileIcon: "beans",
-    // A NEW instance keeps its own on `cat/<instance>/beans`, branch-mounted
+    // A NEW layer keeps its own on `cat/<instance>/beans`, branch-mounted
     // (owner, 2026-10-06, bean `hp54`). folio_init only — see the field.
     newInstanceSource: { kind: "branch", keyedBy: "tip" },
     description:
@@ -2146,7 +2146,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "human actors' outstanding work as a whole (`todos/`); its inner nodes are declared by `todos/todos.json`",
     title: "Todos",
     perInstance: true,
-    // A NEW instance keeps its own on `cat/<instance>/todos`, branch-mounted
+    // A NEW layer keeps its own on `cat/<instance>/todos`, branch-mounted
     // (owner, 2026-10-06, bean `hp54`). folio_init only — see the field.
     newInstanceSource: { kind: "branch", keyedBy: "tip" },
     renderable: false,
@@ -2364,7 +2364,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // source (cat-harness-tools#1356, owner 2026-11-01).
       "ingest-candidates/v1": {},
       // What the site mount must not publish from this directory (bean `cw35`).
-      // Written by the instance's generator from its licence gates; the mount
+      // Written by the layer's generator from its licence gates; the mount
       // validates it with this schema and refuses to mount if it cannot.
       "folio-withheld/v1": {},
       // A slide deck's accessibility report, per check (bean `scfh`).
@@ -2384,8 +2384,8 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   },
   // `computation-witness` was registered here until folio-assistant#2598
   // (owner, 2026-10-16, "1a"): a `core` kind, so it is now a
-  // `folio-graph-typology/v1` node in the content instance's `typologies/`
-  // graph and is named in that instance's namespace. Its envelope schema
+  // `folio-graph-typology/v1` node in the content layer's `typologies/`
+  // graph and is named in that layer's namespace. Its envelope schema
   // (`schemas/computation-witness.ts`) and validator node stay here, where the
   // witness tools below the content layer read them.
   // Binary releases — WHAT WAS PUBLISHED, under what version, with what
@@ -2402,7 +2402,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // has since landed (owner's pick 2026-09-23, "Third purpose"; issue #1194,
   // still open) and it SHARPENS that mismatch rather than softening it.
   // `MATERIALIZATION_PURPOSES` is now `working | archival | both | compiled`,
-  // and every one of the four is a purpose of A COPY THIS INSTANCE HOLDS —
+  // and every one of the four is a purpose of A COPY THIS LAYER HOLDS —
   // may I re-fetch it, are these the stored bytes, both, or was it built from
   // the inputs we have now. A release's subject is a publication UPSTREAM: it
   // happened whether or not a byte was ever fetched here, and it stays true
@@ -2616,6 +2616,27 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       reads: "a package on a hook — a library pulled in by an import, at the version its lockfile pins",
     },
   },
+  // A web app a layer holds as source and publishes as its own chrome-less
+  // page (owner, 2026-11-11, cards Q-GAME-5 A and Q-GAME-7 A): so a content
+  // layer carrying an app (the GDHCN onboarding game) need not be a harness,
+  // and no layer keeps a one-off publish script for it. Authored, so
+  // `content`; drawn by the harness's `apps` visualiser (`web-app-build`).
+  "web-app": {
+    anyLayer: true,
+    description:
+      "a web app the layer holds as source (`package.json`, a lockfile, the app's code and media) and publishes as a page of its own: one `web-app/0.1.0` file, `web-app.json`, at the directory's root names its id, title, how it builds, the languages it ships and the layer directories it reads at build time. The harness's `apps` visualiser, rendered by the `web-app-build` Tool, builds it at publish and writes the build to `<locale>/<harness>/apps/<id>/`, with no site chrome; nothing else loads it, so a reader downloads it only by opening its route. Shape in `schemas/ui/web-app.ts`.",
+    title: "Web apps",
+    renderable: false,
+    holds: "content",
+    // declared-path-literal: this table IS the declaration, as on `device-screen`.
+    schema: "schemas/ui/web-app.ts",
+    nodeSchemas: {
+      "web-app/0.1.0": {},
+    },
+    summary:
+      "A web app held as source and published as its own chrome-less page, built at publish by " +
+      "the web-app-build Tool and loaded only when a reader opens its route.",
+  },
   // A published static site, as a graph (bean `lehh`, owner 2026-10-05). Two
   // capability tiers, both declared now so a real CDN has a kind to land in:
   // `basic-cdn-site` serves files by path and nothing more (GitHub Pages);
@@ -2657,7 +2678,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // separate kind from `kg` because a voice is OPT-IN per folio while a skill is
   // simply available: the activation list in `harness.config.json` is what makes
   // a voice apply, and a graph typology that conflated the two would have no place
-  // to record that this instance ships four voices and activates none.
+  // to record that this layer ships four voices and activates none.
   voices: {
     description:
       "editorial voice profiles — one JSON each, `\"$schema\": \"folio-voice/v1\"`. Every rule cites its source. **Opt-in**: shipping a voice does not apply it.",
@@ -2699,7 +2720,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "`folio-voice/v1` with `extends` naming the base. A sub-graph of `voices`, " +
       "declared from within by `voices.json`, each vendor declared by `vendors.json`.",
   },
-  // Themes an instance DERIVED from a source it holds — a served stylesheet or
+  // Themes a layer DERIVED from a source it holds — a served stylesheet or
   // a style guide's stated rules. A separate kind from `folio` because a theme
   // is not read: it dresses what is. Separate from `kg` for the reason `voices`
   // is, one step further along — a voice is opt-in per folio, and a theme is
@@ -2801,7 +2822,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // Every clause of that is the `context` definition. A running process READS
   // memory and no step writes it; a step that did would be a defect rather
   // than an update. It changes when a human directs an authoring agent to
-  // change it, which is an act OUTSIDE any instance.
+  // change it, which is an act OUTSIDE any layer.
   //
   // That is also what separates it from `todos`, its mirror in the 2x2
   // `todos/todos.json` states. Both were called "memory" there — human and
@@ -2815,14 +2836,14 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // a few hours, which is the `folio` situation rather than the `dh4f` one:
   // `dh4f` is a DIRECTORY declared and absent, where a consumer scans nothing
   // and reports clean, and nothing scans a kind.
-  // A SESSION's context — who is acting, which instances are open, what it
+  // A SESSION's context — who is acting, which layers are open, what it
   // waits on. `state`: the session writes it as it goes.
   //
   // Distinct from `workflow-state`, and the line is not a nicety.
   // `workflow-state` is where ONE INSTANCE got to; a session SPANS processes —
-  // it starts before any instance, may open several, and outlives each. A
+  // it starts before any layer, may open several, and outlives each. A
   // session with nothing open is the commonest state there is, and would be
-  // unrepresentable as a field on an instance.
+  // unrepresentable as a field on a layer.
   //
   // REGISTERED AHEAD OF A DIRECTORY, like `memory` and like `folio`: nothing
   // writes a session record yet (bean `3nfv` is the state machine that will),
@@ -2849,7 +2870,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   //
   // `context`, by the same test as `memory`: an agent READS it at session
   // start and no step writes it; it changes when a person states a
-  // preference, which is a human-directed act outside any instance. The two
+  // preference, which is a human-directed act outside any layer. The two
   // are the same shape at different subjects — what the agent knows, and what
   // the person needs.
   //
@@ -2950,7 +2971,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // `context` by exactly the test that settled `memory` above — a running
   // process READS a waiver before a gate fires and no step writes one; it
   // changes when a person grants or withdraws permission, which is an act
-  // OUTSIDE any instance. That is why it is declared over the SAME directory:
+  // OUTSIDE any layer. That is why it is declared over the SAME directory:
   // `memory/` holds both, and the two are told apart by the `$schema` tag
   // inside each file rather than by where it sits. A directory is a place to
   // look and may hold more than one part of a graph.
@@ -2975,7 +2996,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   },
 
   "fsh-guts": {
-    // A NEW instance keeps its trashcan on `cat/<instance>/fsh-guts`, the way
+    // A NEW layer keeps its trashcan on `cat/<instance>/fsh-guts`, the way
     // `beans` and `todos` are kept (owner, 2026-10-06: "cutover dirs should go
     // to fsh-guts"; `state:seed --cutover` refuses without one). A STORAGE
     // fact, and independent of `holds` below: the cutover's deposit is a
@@ -3129,9 +3150,9 @@ export class GraphTypologyConflictError extends Error {
 /**
  * The graph-typology vocabulary, extensible by the layers above the harness.
  *
- * An instance registry rather than a bare module constant, so that a test — or
- * a process resolving more than one instance — cannot leak registrations into
- * the next. `defaultGraphTypologies` is the convenience shared instance; every read
+ * A layer registry rather than a bare module constant, so that a test — or
+ * a process resolving more than one layer — cannot leak registrations into
+ * the next. `defaultGraphTypologies` is the convenience shared layer; every read
  * accepts an explicit one.
  *
  * Registration is **idempotent for an identical definition** and throws on a
@@ -3148,7 +3169,7 @@ export class GraphTypologyConflictError extends Error {
  * `path`** — "matching on path makes two knowledge graphs out of one
  * relocation, and every consumer then scans a directory that is not there".
  * The same property that makes ids worth having makes renaming one a
- * CROSS-INSTANCE BREAKING CHANGE: a downstream instance overriding `kg` is
+ * CROSS-INSTANCE BREAKING CHANGE: a downstream layer overriding `kg` is
  * overriding nothing the moment the kind is called something else, and the
  * failure is silent — it scans, finds nothing, and reports a clean run over
  * it. That is the `dh4f` shape, delivered to somebody else's repository.
@@ -3250,7 +3271,7 @@ export function graphTypologyLayer(name: string, def?: Pick<GraphTypologyDef, "l
 }
 
 /**
- * The instance that declared a kind loaded from a `typologies/` graph: its
+ * The layer that declared a kind loaded from a `typologies/` graph: its
  * name (the prefix its terms are written with), root and namespace. Carried on
  * the def under a symbol rather than as a `GraphTypologyDef` field, because it
  * is a fact about WHERE the node was read, which a node cannot declare about
@@ -3275,7 +3296,7 @@ export function declaringInstanceOf(def: object | undefined): DeclaringInstance 
   return (def as WithDeclarer | undefined)?.[DECLARED_BY];
 }
 
-/** The instance whose declaration holds the node file `file`: the nearest directory up with a declaration. */
+/** The layer whose declaration holds the node file `file`: the nearest directory up with a declaration. */
 function declaringInstanceFor(file: string): DeclaringInstance | undefined {
   for (let dir = dirname(file); dir !== dirname(dir); dir = dirname(dir)) {
     const decl = findDeclarationFile(dir);
@@ -3292,10 +3313,10 @@ function declaringInstanceFor(file: string): DeclaringInstance | undefined {
  * A kind's identity: its `GraphTypology` individual, `<ns>graphTypology/<name>`.
  *
  * `<ns>` is the layer's namespace for a bootstrap or harness kind. A `core`
- * kind is named in the namespace of the instance that DECLARED it, read from
- * that instance's declaration (folio-assistant#2598, owner 2026-10-16): this
+ * kind is named in the namespace of the layer that DECLARED it, read from
+ * that layer's declaration (folio-assistant#2598, owner 2026-10-16): this
  * layer does not know the content layer's address, so a `core` def with no
- * declaring instance throws rather than inventing one.
+ * declaring layer throws rather than inventing one.
  */
 export function graphTypologyIri(name: string, def?: Pick<GraphTypologyDef, "layer">): string {
   const layer = graphTypologyLayer(name, def);
@@ -3310,10 +3331,10 @@ export function graphTypologyIri(name: string, def?: Pick<GraphTypologyDef, "lay
 }
 
 /**
- * The instance that declares the `core` layer's kinds in this registry — the
+ * The layer that declares the `core` layer's kinds in this registry — the
  * content layer above the harness — or `undefined` when none is composed (the
  * harness standing alone). Read from where the kinds were declared, so no
- * layer below it has to spell its name. Throws when two instances both
+ * layer below it has to spell its name. Throws when two layers both
  * declare `core` kinds: which one "the content layer" means would then be a
  * guess.
  */
@@ -3327,7 +3348,7 @@ export function contentLayerInstance(registry: GraphTypologyRegistry = defaultGr
   }
   const all = [...found.values()];
   if (all.length > 1) {
-    // The same instance read twice (a checkout and the fixture copy of it) is one instance.
+    // The same layer read twice (a checkout and the fixture copy of it) is one layer.
     const names = new Set(all.map((i) => i.name));
     if (names.size > 1) throw new Error(`contentLayerInstance: core kinds are declared by ${[...names].join(", ")}`);
   }
@@ -3383,7 +3404,7 @@ export class GraphTypologyRegistry {
    * @param seed the kinds this layer lists in code
    * @param declaredUnder a checkout — or several, in PRECEDENCE order, or a
    *   lazythunk returning them so module import touches no filesystem — whose
-   *   instances' `typologies/` graphs are loaded on first use; omitted, the
+   *   layers' `typologies/` graphs are loaded on first use; omitted, the
    *   registry holds only `seed` and what is `register`ed (a test's private
    *   registry). Within one checkout a name two files declare is refused, as
    *   before; a later checkout declaring a kind an earlier one already answered
@@ -3393,7 +3414,7 @@ export class GraphTypologyRegistry {
    * @param options.include which instances of those checkouts are read — a
    *   registry whose answers must not depend on what else is mounted (the
    *   harness's own kinds, for `kind:json-schemas`, bean `8lcl`) names them.
-   *   Omitted, every instance is.
+   *   Omitted, every layer is.
    */
   constructor(
     seed: Readonly<Record<string, GraphTypologyDef>> = BASE_GRAPH_TYPOLOGIES,
@@ -3445,10 +3466,10 @@ export class GraphTypologyRegistry {
    * when this is an unfiltered checkout-backed registry (bean `cat-tools-g7ls`,
    * owner card 2026-10-31 "A. Fix the loader").
    *
-   * When `readDeclaration` reads an instance from a checkout outside
+   * When `readDeclaration` reads a layer from a checkout outside
    * {@link declaredUnder} — e.g. a host or sibling checkout reached from a
    * standalone run, or a multi-instance test fixture — every discovered
-   * instance's `typologies/` in that checkout (such as a document layer's
+   * layer's `typologies/` in that checkout (such as a document layer's
    * `glossary` for an IG harness's declaration) is registered before any declaration in
    * it is validated. No-op on a bare or filtered registry.
    */
@@ -3583,7 +3604,7 @@ export class GraphTypologyRegistry {
 }
 
 /**
- * Every `folio-graph-typology/v1` node in every `typologies/` graph the instances under
+ * Every `folio-graph-typology/v1` node in every `typologies/` graph the layers under
  * `repoRoot` declare, files sorted for a stable order. Read RAW from each
  * declaration (only `directories[].graphTypologies`, `path` and `scope`), because
  * the declaration's Zod schema lives in `cat-harness.ts`, which imports this
@@ -3618,7 +3639,7 @@ function describeValidator(n: ValidatorNode): string {
  * order. Exported so a test can ask it without mutating the process.
  *
  * 1. `$REPO_ROOT`, when set — the caller said which checkout; it is the only one.
- * 2. The checkout under inspection: `cwd`, when it holds any instance. Every
+ * 2. The checkout under inspection: `cwd`, when it holds any layer. Every
  *    `check:*` script reads declarations from `process.cwd()`, so its kinds must
  *    come from there too.
  * 3. The checkout this module sits in, two levels up (or one).
@@ -3650,7 +3671,7 @@ export function defaultTypologyRoots(
 
 /**
  * The shared registry: the base layer's kinds above, plus every kind the
- * instances of the checkout under inspection — and then of the checkout this
+ * layers of the checkout under inspection — and then of the checkout this
  * module sits in — declare in their `typologies/` graphs (bean dmx1), loaded on
  * first use. Core registers `folio` into it at load. See {@link defaultTypologyRoots}.
  */

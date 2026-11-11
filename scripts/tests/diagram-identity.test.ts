@@ -1,16 +1,16 @@
 /**
- * A diagram is identified by its instance and its path within it, never by
+ * A diagram is identified by its layer and its path within it, never by
  * its file name alone: two layers may each hold `processes/global-tasks.bpmn`.
  *
  * The owner asked (2026-10-23) whether a diagram's identity carries its
- * instance. It does where it matters — a call resolves by element id within
- * the caller's own instance (owner, 2026-10-20, "c1"), and the export's IRIs
- * sit under each instance's own document — and these tests pin that, with
- * two instances each holding a same-named shared file. They also pin the one
+ * layer. It does where it matters — a call resolves by element id within
+ * the caller's own layer (owner, 2026-10-20, "c1"), and the export's IRIs
+ * sit under each layer's own document — and these tests pin that, with
+ * two layers each holding a same-named shared file. They also pin the one
  * reader that did not: `audit:reachability` counted the two files as a
  * `process-ambiguous` stem clash, and keyed decision references by basename.
  *
- * Fixture instances only, so a change to a real diagram cannot make these pass.
+ * Fixture layers only, so a change to a real diagram cannot make these pass.
  *
  * @module scripts/tests/diagram-identity.test
  * @graphNode none — a test
@@ -85,9 +85,9 @@ afterAll(() => {
 });
 
 /**
- * Two instances, `low` and `up` (which needs `low`), each holding
+ * Two layers, `low` and `up` (which needs `low`), each holding
  * `processes/global-tasks.bpmn` and `processes/decisions/route.dmn` — the
- * same paths within each instance. Only `up`'s process routes on its table.
+ * same paths within each layer. Only `up`'s process routes on its table.
  */
 function twoLayers(): { low: string; up: string; files: Record<string, string> } {
   const base = mkdtempSync(join(tmpdir(), "diagram-identity-"));

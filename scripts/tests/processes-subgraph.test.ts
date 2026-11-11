@@ -2,7 +2,7 @@
  * The processes viewer draws one page per sub-graph, as the tools, library
  * and beans viewers do (owner, 2026-11-01: "i thought this worked to show
  * process in the subgraph smart-trust only"). These tests pin the pure
- * parts: which instance owns a file, how rows split into pages, and that a
+ * parts: which layer owns a file, how rows split into pages, and that a
  * sub-graph page links one level deeper than the index.
  *
  * @module cat-harness-tools/scripts/tests/processes-subgraph.test

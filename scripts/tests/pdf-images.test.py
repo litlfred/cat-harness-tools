@@ -287,6 +287,41 @@ def main() -> int:
     check("the TypeScript schema knows the role the cutoff writes",
           '"furniture"' in open(os.path.join(ROOT, "schemas", "content", "document-image.ts"), encoding="utf-8").read())
 
+    # An ink colourspace and an off-size soft mask are still written as PNG
+    # (10665-44118-rus: ten DeviceN(Black) photos and a logo whose mask is
+    # three times its size were written as empty files).
+    import tempfile
+    import pymupdf
+    with tempfile.TemporaryDirectory() as tmp:
+        doc = pymupdf.open()
+        page = doc.new_page(width=200, height=200)
+        w, h = 40, 20
+        gray = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.IRect(0, 0, w, h), False)
+        gray.set_rect(gray.irect, (120,))
+        page.insert_image(pymupdf.Rect(10, 10, 110, 60), pixmap=gray)
+        other = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.IRect(0, 0, w, h), False)
+        other.set_rect(other.irect, (60,))
+        page.insert_image(pymupdf.Rect(10, 100, 110, 150), pixmap=other)
+        xa, xb = (im[0] for im in page.get_images(full=True))
+        ink = ("[/DeviceN [/Black] /DeviceCMYK << /FunctionType 2 /Domain [0 1]"
+               " /C0 [0 0 0 0] /C1 [0 0 0 1] /N 1 >>]")
+        doc.xref_set_key(xa, "ColorSpace", ink)
+        mask = doc.get_new_xref()
+        doc.update_object(mask, f"<< /Type /XObject /Subtype /Image /Width {w * 3}"
+                          f" /Height {h * 3} /ColorSpace /DeviceGray /BitsPerComponent 8 >>")
+        doc.update_stream(mask, bytes([255]) * (w * 3 * h * 3))
+        doc.xref_set_key(xb, "SMask", f"{mask} 0 R")
+        pdf = os.path.join(tmp, "ink.pdf")
+        doc.save(pdf)
+        out = os.path.join(tmp, "out")
+        import subprocess
+        subprocess.run([sys.executable, os.path.join(SCRIPTS, "pdf-images.py"), "-o", out, pdf],
+                       capture_output=True, text=True)
+        written = sorted(glob.glob(os.path.join(out, "*", "images", "*.png")))
+        sizes = [os.path.getsize(f) for f in written]
+        check(f"a DeviceN image and an off-size soft mask are written, not empty ({sizes})",
+              len(sizes) == 2 and all(n > 0 for n in sizes))
+
     print()
     print("  all checks passed" if rc == 0 else "  FAILURES above")
     return rc

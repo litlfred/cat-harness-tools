@@ -17,7 +17,7 @@
  *
  * The test is {@link isExemptFrom}`(decl, "visualiser")`, the rule the navbar
  * tiles sort by: bootstrap's own `renderExemption` says it renders nothing a
- * human browses. No instance is named here.
+ * human browses. No layer is named here.
  *
  * ## INSTANTIATED, not merely present
  *
@@ -39,6 +39,8 @@ import { TODO_GRAPH_FILE, parseTodoGraph } from "../schemas/sdlc/todo-graph.js";
 import { checkoutTopLevelDirs } from "../schemas/sdlc/git-corpus.ts";
 import { TODO_ROOT } from "./todos.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { graphReadPath } from "./graph-read.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const REPO_ROOT = resolve(ROOT, "..");
@@ -74,7 +76,7 @@ export function boardsDir(_repoRoot: string, todoRoot: string = TODO_ROOT()): st
 export function harnessesOwedABoard(repoRoot: string, names: readonly string[]): string[] {
   const out: string[] = [];
   // INSTANTIATED is the checkout's answer, not a file test: an index lists its
-  // instances in `index.config.json` and none of them has a root
+  // layers in `index.config.json` and none of them has a root
   // `<name>.config.json`, so asking for the file owed no harness a board in
   // the index checkout (2026-10-09, `gen-default-boards-checkout`). Without an
   // index, `instantiatedHarnessNames` is the same root config set as before.
@@ -96,6 +98,14 @@ export function defaultBoard(name: string, title: string): string {
 }
 
 if (import.meta.main) {
+  // The boards live INSIDE the todo graph. Where `state:mount` determined that
+  // graph absent from this checkout (declared for every checkout by a mounted
+  // instance, not by this root, and not on this remote — an IG repository that
+  // is its own index), there is no board directory to judge: not applicable,
+  // never "missing" (cat-harness-tools#1701). A refusal for any other reason
+  // still throws below, exactly as before.
+  const todos = graphReadPath("todos", REPO_ROOT);
+  if (todos.state === "refused" && todos.absent) exitNotApplicable("boards:default", todos.reason);
   const dir = boardsDir(REPO_ROOT);
   // ASKED OF GIT (bean `qrlc`). The hand-written filter below admitted **26**
   // top-level names on this container and `_kg` was the first: a gitignored

@@ -82,7 +82,7 @@ describe("the sweep finds what this run did not write", () => {
   });
 
   test("a missing results tree is not a finding", () => {
-    // No sidecars yet is a fresh instance, not a defect.
+    // No sidecars yet is a fresh layer, not a defect.
     expect(sweepOrphans(fixture(), new Set())).toEqual([]);
   });
 

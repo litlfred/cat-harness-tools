@@ -31,7 +31,7 @@
  *         bun run cat theme:page [--check]
  *
  * @covers none — it reads `THEMES` (the platform's own, declared in code)
- * plus an instance's declared art via `readDeclaration` and `THEME_LAYOUTS`.
+ * plus a layer's declared art via `readDeclaration` and `THEME_LAYOUTS`.
  * Neither is the `themes` graph, and this resolves no directory of that kind;
  * `check:instance-themes` is the gate that covers the graph.
  * @module scripts/render-theme-sheet
@@ -73,9 +73,9 @@ export function contrast(a: string, b: string): number {
 /**
  * `ink` over `scrim` laid on PURE BLACK — the binding case.
  *
- * Not over the art in use, and that is the whole idea: an instance may declare
+ * Not over the art in use, and that is the whole idea: a layer may declare
  * its own art for a role, so the picture a value was tuned against is not the
- * picture it will meet. Pure black is the darkest any instance could declare,
+ * picture it will meet. Pure black is the darkest any layer could declare,
  * so a number measured against it is true of all of them.
  */
 export function inkOverScrimOnBlack(ink: string, scrim: string): number | undefined {
@@ -177,8 +177,8 @@ export function sheetBody(
   worn: ReadonlyMap<string, readonly string[]> = new Map(),
   themes: readonly ResolvedTheme[] = THEMES,
 ): { html: string; css: string; themes: number; missing: string[] } {
-  // A theme's art is declared by the instance that owns the theme, so `root`
-  // is that instance's root: the platform's for `THEMES`, an instance's for
+  // A theme's art is declared by the layer that owns the theme, so `root`
+  // is that layer's root: the platform's for `THEMES`, a layer's for
   // its own `INSTANCE_THEMES`.
   const images = readDeclaration(root)?.images ?? [];
   const missing: string[] = [];
@@ -312,7 +312,7 @@ const LEDE =
   "already proves a box is square and inside the frame — what it cannot tell is whether the box is on " +
   "the cat, which is how two crops shipped framing scenery and a third clipped a hard hat.";
 
-/** The site page's path, relative to the instance's site directory. */
+/** The site page's path, relative to the layer's site directory. */
 export const THEME_PAGE = "themes/index.md";
 
 /**
@@ -362,19 +362,19 @@ export const VIEWER_TOOL = "theme-viewer";
 
 /**
  * The `themes` VISUALISER: every theme in the checkout, the platform's and
- * every instance's, at the route the declaration gives it.
+ * every layer's, at the route the declaration gives it.
  *
  * Bean `folio-assistant-6gme`, owner 2026-10-20: *"every kind gets a viewer"*.
- * The `themes` kind is declared by instances (an IG template theme, a
+ * The `themes` kind is declared by layers (an IG template theme, a
  * publisher's publication themes) as a
  * `themes.ts` exporting `INSTANCE_THEMES`, and until this page nothing drew
  * them: `theme:page` draws the platform's `THEMES` only. They are read
  * through `instanceThemes`, the one resolution every generator uses, so this
- * page cannot show a theme the runtime does not resolve, and an instance whose
+ * page cannot show a theme the runtime does not resolve, and a layer whose
  * themes cannot be read gets a row saying why rather than no row.
  *
  * Built at publish, like every viewer over a kind the whole checkout holds:
- * which instances are mounted is a fact about the checkout, not this commit.
+ * which layers are mounted is a fact about the checkout, not this commit.
  */
 export function buildViz(root: string): { path: string; md: string; themes: number; instances: number; missing: string[] } | undefined {
   const route = declaredPageRoute(root, VIEWER_TOOL);

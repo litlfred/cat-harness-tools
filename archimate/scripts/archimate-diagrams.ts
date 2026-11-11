@@ -3,7 +3,7 @@
  * Derive UML data class diagrams (from `DataObject` / `BusinessObject` elements,
  * `logical-model` tags and FSH `Logical:` definitions) and sequence diagrams
  * (from `ApplicationInteraction`s, `Flow` / `Triggering` chains, and BPMN
- * collaboration / cross-lane handoffs) for each ArchiMate model of an instance.
+ * collaboration / cross-lane handoffs) for each ArchiMate model of a layer.
  * The Tool `archimate-diagrams` (smart-ra#166 D5).
  *
  * @module cat-harness/archimate/scripts/archimate-diagrams

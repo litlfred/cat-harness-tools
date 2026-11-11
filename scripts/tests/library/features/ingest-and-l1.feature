@@ -286,7 +286,7 @@ Feature: The ingest rung decision and the L1 completeness gate
   Scenario: The derived arms follow a PDF rung only
     Given a pdf-pages plan of one step
     When the derived arms are added
-    Then there are 9 steps: the rung, latex-math-overlay, pdf-images, pdf-vector-labels, pdf-vector-figures, l1-blocks, extract-candidates, apply-image-verdicts and pdf-cover
+    Then there are 10 steps: the rung, latex-math-overlay, pdf-images, pdf-vector-labels, pdf-vector-figures, l1-blocks, pdf-footnotes, extract-candidates, apply-image-verdicts and pdf-cover
     And each arm is given its stated source, staging root, entry, library or cover path
     And an archive, tabular or undetermined plan keeps its one step
 
@@ -341,6 +341,23 @@ Feature: The ingest rung decision and the L1 completeness gate
   Scenario: Not-derivable does not refuse promotion
     Then a lone not-derivable requirement may promote
     And a not-derivable with a met requirement may promote
+
+  @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::a_text_layer_of_mojibake_or_reversed_Arabic_ligatures_is_not_text
+  Scenario: A text layer that is mojibake, or that reverses Arabic ligatures, sends the document to OCR
+    Given a probe whose text layer is mostly letters
+    Then it is readable
+    And a probe whose non-space characters are under 55% letters is mojibake
+    And a probe where 967 of 12798 Arabic words carry a reversed lam-alef or lam-yeh ligature scrambles right-to-left ligatures
+    And 10 of 12798 is readable
+    And 20 Arabic words are too few to judge, and a probe with no counts decides nothing
+
+  @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::--qa-later_lets_ONLY_the_QA-only_requirements_stay_unmet
+  Scenario: --qa-later promotes past unmet image descriptions and nothing else
+    Given an entry whose only unmet requirement is image-descriptions
+    Then it does not promote by default
+    And it promotes with --qa-later
+    And an entry with image-descriptions and structure unmet does not promote even with --qa-later
+    And --qa-later is read from the arguments only when given
 
   @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::an_EMPTY_requirement_list_does_not_promote_by_vacuous_truth
   Scenario: An empty requirement list may promote, but an empty entry never yields one

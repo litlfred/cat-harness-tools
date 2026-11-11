@@ -15,7 +15,7 @@
  * `renderable` and `holds` are required on {@link GraphTypologyDef}, so a kind
  * cannot compile without deciding them. `recordsWork` is **optional in the
  * type on purpose**: it is meaningless for `content`, `context` and
- * `derived` — a record of what the instance IS records no position. So the
+ * `derived` — a record of what the layer IS records no position. So the
  * "cannot ship undecided" property lives here, narrowed to the `state` layer.
  *
  * @module scripts/check-graph-typology-work

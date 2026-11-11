@@ -9,9 +9,9 @@
  *
  * ## What is a subgraph here
  *
- * Every directory under each of this instance's declared knowledge-graph
+ * Every directory under each of this layer's declared knowledge-graph
  * directories (`kgDirectories(…, "instance")`) and under each framed
- * instance's declared `tools` graph ({@link subgraphDirectories}), nested ones
+ * layer's declared `tools` graph ({@link subgraphDirectories}), nested ones
  * included — so `skills/` and `skills/sdlc/` are both subgraphs, and the second
  * is a child of the first. Above them is the ROOT, the harness instance
  * itself, whose IRI is `<BASE_URL>/subgraph/<HARNESS>/`.
@@ -24,28 +24,28 @@
  * - A node with no path is a member of whatever subgraph its `partOf` parent
  *   is in — a ProcessNode is part of a diagram, not a file. The same rule
  *   `stampSubgraph` uses for `inSubgraph`, to a fixed point.
- * - A node of an instance stacked on this one lands in that instance's own
+ * - A node of a layer stacked on this one lands in that layer's own
  *   tree, `<BASE_URL>/subgraph/<ITS NAME>/…`, by the same containment rule
  *   over its declared directories — a path outside them falls to that
- *   instance's root.
+ *   layer's root.
  * - A Tool node has no source path: it is placed by the folder convention
  *   (`schemas/tools/tool-folders.ts`, `<tools dir>/<id>/<id>.ts`) in its OWN
- *   instance's `tools` subgraph — `tools/<id>/` when that folder is on disk,
+ *   layer's `tools` subgraph — `tools/<id>/` when that folder is on disk,
  *   else the `tools/` directory itself.
  * - Everything else — schemas, roles, graph typologies — is a direct member
  *   of its own harness's ROOT.
  *
- * ## Each instance is framed from its OWN export
+ * ## Each layer is framed from its OWN export
  *
- * A stacked instance's nodes are read from that instance's export, under the
- * `@id`s its published document gives them. Which instances are framed is
- * {@link framedInstances}: the corpus this instance's checkout scope reaches.
- * A node's paths are relative to the instance that exported it, so the plan is
+ * A stacked layer's nodes are read from that layer's export, under the
+ * `@id`s its published document gives them. Which layers are framed is
+ * {@link framedInstances}: the corpus this layer's checkout scope reaches.
+ * A node's paths are relative to the layer that exported it, so the plan is
  * told which one (`rootOf`).
  *
  * Above every root is the REPOSITORY's index, `<BASE_URL>/subgraph/`, whose
  * `hasSubgraph` are the roots framed here. `bootstrap` and `bootstrap-tools`
- * sit below this instance and publish through their own graph; their
+ * sit below this layer and publish through their own graph; their
  * repository indexes are linked with `rdfs:seeAlso` — a link a reader may
  * follow, never membership.
  *
@@ -143,7 +143,7 @@ const ROOT = resolve(HARNESS_ROOT);
 
 export { SUBGRAPH_CONTEXT_PATH };
 /**
- * Where the subgraph tree is written, relative to the instance root: the
+ * Where the subgraph tree is written, relative to the layer root: the
  * `subgraph/` directory of the declared `docs` graph, which is the docs site
  * root — so a file there is served at `<BASE_URL>/subgraph/…`. Read from the
  * declaration by id rather than spelled, because the path is the unstable half.
@@ -154,7 +154,7 @@ export function subgraphOutDir(root: string = ROOT): string {
   return join(docs.path, "subgraph");
 }
 
-/** Where payloads are written, relative to the instance root: `<docs>/payload/sha256`. */
+/** Where payloads are written, relative to the layer root: `<docs>/payload/sha256`. */
 export function payloadOutDir(root: string = ROOT): string {
   return join(dirname(subgraphOutDir(root)), PAYLOAD_PATH);
 }
@@ -218,7 +218,7 @@ export function planPayloads(graph: Node[], opts: { root: string; baseUrl: strin
 }
 
 /**
- * Several instances' payload plans as one: a body two instances share is ONE
+ * Several layers' payload plans as one: a body two layers share is ONE
  * payload, referenced from both — the same rule {@link planPayloads} applies
  * inside one graph, and the same refusal when the media types disagree.
  */
@@ -314,19 +314,19 @@ export const HEAVY_LITERAL_BYTES = 16 * 1024;
 type Node = { "@id": string; "@type": string | string[]; [k: string]: unknown };
 
 /**
- * The own-namespace prefixes (`ownPrefixTable()` keys — each an instance's stub) a
+ * The own-namespace prefixes (`ownPrefixTable()` keys — each a layer's stub) a
  * subgraph file written under `root` may use as CURIEs: the stubs of `root`'s
- * instance and of every instance it `needs`, transitively. `undefined` when
- * `root`'s declaration is not among the checkout's instances — nothing is
+ * layer and of every layer it `needs`, transitively. `undefined` when
+ * `root`'s declaration is not among the checkout's layers — nothing is
  * known about its reach, so nothing is narrowed.
  *
  * ## Why (bean `folio-assistant-63q4`)
  *
  * Every subgraph file is written under `root`'s `docs/`, so the file BELONGS
- * to `root`'s instance, and `check:jsonld-contexts` (`gen-instance-contexts`)
- * resolves the prefixes it uses through that instance's flattened table —
+ * to `root`'s layer, and `check:jsonld-contexts` (`gen-instance-contexts`)
+ * resolves the prefixes it uses through that layer's flattened table —
  * its own, plus those of what it `needs`. The framing context used to bind
- * every own prefix (`ownPrefixTable()`), so an IRI in the namespace of an instance ABOVE
+ * every own prefix (`ownPrefixTable()`), so an IRI in the namespace of a layer ABOVE
  * `root` compacted to a CURIE: cat-harness's root frames the content layer's graph kinds
  * (`<content prefix>:graphTypology/catalogue`, …), and the overlaid
  * content-core tree names its own. cat-harness does not need core
@@ -338,17 +338,17 @@ type Node = { "@id": string; "@type": string | string[]; [k: string]: unknown };
  * spelling does. The reach is computed the way the gate computes it
  * (`readInstanceDecls`, `needs`), so the two cannot disagree.
  *
- * ## A needed instance the checkout does not hold is still in reach (bean `cat-tools-d5j0`)
+ * ## A needed layer the checkout does not hold is still in reach (bean `cat-tools-d5j0`)
  *
  * The reach is a property of the declarations, not of what else happens to be
  * checked out beside `root`. In the sibling-clone layout `checkoutRootFor`
  * stops at cat-harness's own `.git`, so `bootstrap`, which cat-harness
- * `needs`, is not among the checkout's instances. It used to be skipped, so
+ * `needs`, is not among the checkout's layers. It used to be skipped, so
  * the `bootstrap` prefix fell out of cat-harness's `ns/subgraph/v1.jsonld`
  * and `publish-check` called the committed file, which is correct, stale.
  *
- * A `needs` name with no instance here is kept when it is an own prefix
- * ({@link ownPrefixTable}, keyed by stub). An absent instance has no
+ * A `needs` name with no layer here is kept when it is an own prefix
+ * ({@link ownPrefixTable}, keyed by stub). An absent layer has no
  * declaration to read, so its stub is taken to be its name, which is the
  * default `readInstanceDecls` applies. Its own `needs` cannot be followed. A
  * name that is neither in the checkout nor an own prefix binds nothing, as
@@ -462,7 +462,7 @@ function linkTerms(ctx: Record<string, unknown>): string[] {
 
 export interface SubgraphEntry {
   iri: string;
-  /** Name of the instance whose tree this subgraph is in — `<HARNESS>` in its IRI. */
+  /** Name of the layer whose tree this subgraph is in — `<HARNESS>` in its IRI. */
   harness: string;
   /** Instance-relative directory with a trailing `/`; `""` for the root. */
   rel: string;
@@ -481,7 +481,7 @@ export interface SubgraphPlan {
   repoIri: string;
   /** The repository's name, the label of {@link repoIri}. */
   repoName: string;
-  /** Every harness root this build frames: this instance's first, then each overlaid one by name. */
+  /** Every harness root this build frames: this layer's first, then each overlaid one by name. */
   harnessRoots: string[];
   /**
    * The repository indexes of instances in this checkout that declare
@@ -491,7 +491,7 @@ export interface SubgraphPlan {
   seeAlso: string[];
   contextUrl: string;
   /**
-   * The own-namespace prefixes the files may compact to — `root`'s instance
+   * The own-namespace prefixes the files may compact to — `root`'s layer
    * and what it needs ({@link prefixesInScope}). `undefined`: all of them.
    */
   prefixesInScope?: ReadonlySet<string>;
@@ -501,7 +501,7 @@ export interface SubgraphPlan {
 }
 
 /**
- * The instances this build frames, this one first: every instance whose
+ * The layers this build frames, this one first: every layer whose
  * knowledge-graph directories the checkout scope reaches from `root` — the
  * corpus `kg-export` read in one document before the split, and each now read
  * from its own. `check:process-index` asks the same function, so the gate and
@@ -522,20 +522,20 @@ const TOOLS_GRAPH = "tools";
 /**
  * The graph typology whose directories hold library entries (cat-harness#180;
  * owner, 2026-10-11 and 2026-10-29: each `library/<doc>/` is a subgraph, nested
- * under its instance's `library` subgraph by the containment rule).
+ * under its layer's `library` subgraph by the containment rule).
  */
 const LIBRARY_GRAPH = "library";
 
 /**
  * Every directory this build heads a subgraph tree at: the knowledge-graph
  * directories the corpus reaches (`kgDirectories`), then each framed
- * instance's declared `tools` directories (bean `mo75` G1). Same shape as
+ * layer's declared `tools` directories (bean `mo75` G1). Same shape as
  * `kgDirectories`, so {@link planSubgraphs} walks both one way.
  *
  * Not folded into `kgDirectories`: that list is also the SKILL corpus's, and a
  * `tools/` directory holds `.ts` definitions, not skill bodies. Only the
- * instances {@link framedInstances} names are asked, because only their
- * exports are framed — a `tools/` tree for an unframed instance would be a
+ * layers {@link framedInstances} names are asked, because only their
+ * exports are framed — a `tools/` tree for an unframed layer would be a
  * tree of empty subgraphs.
  */
 export function subgraphDirectories(root: string = ROOT): Array<{ id: string; path: string; absPath: string }> {
@@ -592,7 +592,7 @@ export function planSubgraphs(
     baseUrl: string;
     title?: string;
     /**
-     * The instance root a node was EXPORTED from, by `@id` — what its paths
+     * The layer root a node was EXPORTED from, by `@id` — what its paths
      * are relative to, and whose harness root a node with no path and no
      * parent falls to. Absent → `root`, which is every node of a one-instance
      * graph.
@@ -610,27 +610,27 @@ export function planSubgraphs(
   const ownRoot = resolve(opts.root);
   const root: SubgraphEntry = { iri: rootIri, harness: opts.harness, rel: "", kinds: [], title: opts.title, members: [], children: [] };
   subgraphs.set(rootIri, root);
-  /** Instance root (absolute) → that instance's root subgraph. */
+  /** Layer root (absolute) → that layer's root subgraph. */
   const harnessRoots = new Map<string, SubgraphEntry>([[ownRoot, root]]);
 
-  // WHICH DIRECTORIES — the same corpus kg-export read, not this instance's
-  // alone. kg-export overlays every instance the checkout stacks on this one
+  // WHICH DIRECTORIES — the same corpus kg-export read, not this layer's
+  // alone. kg-export overlays every layer the checkout stacks on this one
   // (`corpusScopeFor`), so its graph holds the content core's processes
   // and skills too, and until bean `ax6r` every one of them fell to the ROOT,
   // which has no hydrated file: "every process of this graph" was not one
-  // fetch, nor any number of them. An overlaid instance's directory now
+  // fetch, nor any number of them. An overlaid layer's directory now
   // heads its OWN tree, `<BASE_URL>/subgraph/<ITS NAME>/`, because a
-  // subgraph is a directory of the instance that declares it — and this
+  // subgraph is a directory of the layer that declares it — and this
   // build frames it because this is the graph that publishes those nodes.
   //
   // `bootstrap` and `bootstrap-tools` are NOT in that corpus: they sit BELOW
-  // this instance, and the owner's `pve3` ruling (2026-09-21) keeps their
+  // this layer, and the owner's `pve3` ruling (2026-09-21) keeps their
   // processes out of this graph (#432's isolation). So no tree is framed for
   // them here, and none is invented.
   //
-  // `kgDirectories` answers WHERE; each instance's own declaration answers
+  // `kgDirectories` answers WHERE; each layer's own declaration answers
   // what kind and what title, looked up by the entry's id — ids are stable,
-  // paths are not, and two instances may reuse an id.
+  // paths are not, and two layers may reuse an id.
   const declOf = new Map<string, ReturnType<typeof readDeclaration>>();
   const declarationOf = (inst: string): ReturnType<typeof readDeclaration> => {
     if (!declOf.has(inst)) {
@@ -699,15 +699,15 @@ export function planSubgraphs(
   const nodes = new Map<string, Node>();
   for (const n of graph) nodes.set(String(n["@id"]), n);
 
-  /** The harness root a path outside every kg directory falls to: its own instance's tree, else this one's. */
+  /** The harness root a path outside every kg directory falls to: its own layer's tree, else this one's. */
   const rootFor = (abs: string): SubgraphEntry => {
     const inst = findInstanceRoot(abs);
     return (inst !== undefined && harnessRoots.get(resolve(inst))) || root;
   };
-  /** Where a node's paths are relative to: the instance that exported it. */
+  /** Where a node's paths are relative to: the layer that exported it. */
   const exportedFrom = (id: string): string => resolve(opts.rootOf?.get(id) ?? opts.root);
   /**
-   * A Tool's home (bean `mo75` G1): its own instance's `tools/<id>/` folder,
+   * A Tool's home (bean `mo75` G1): its own layer's `tools/<id>/` folder,
    * else that `tools/` directory, else — no `tools` graph walked — its root.
    */
   const toolsTops = new Map<string, string[]>();
@@ -726,7 +726,7 @@ export function planSubgraphs(
     const first = toolsTops.get(exportedFrom(String(n["@id"])))?.[0];
     return first === undefined ? undefined : byDir.get(first);
   };
-  /** A node with no path and no parent: a Tool's folder, else its own instance's root. */
+  /** A node with no path and no parent: a Tool's folder, else its own layer's root. */
   const homeOf = (id: string): SubgraphEntry => {
     const n = nodes.get(id);
     return (n && toolHome(n)) ?? harnessRoots.get(exportedFrom(id)) ?? root;
@@ -743,7 +743,7 @@ export function planSubgraphs(
     if (top === undefined) { placed.set(id, rootFor(abs)); continue; }
     // Bean `8lcl`: a Schema node's `module` is the implementing layer's file
     // (cat-harness-tools holds cat-harness's code), so it is missing under the
-    // instance that declares it. The node still belongs to the subgraph the
+    // layer that declares it. The node still belongs to the subgraph the
     // declaration names, so only a path NO layer holds is a problem.
     const onDisk = existsSync(abs);
     if (!onDisk && resolveImplementingPath(exportedFrom(id), p).state !== "found") {
@@ -794,7 +794,7 @@ export function planSubgraphs(
   // a harness, given the one file a reader needs to find every harness root
   // this build frames. Index only — a hydrated file here would be the whole
   // graph in one document, the monolith `f233` forbids.
-  const repoRoot = checkoutRootFor(opts.root); // not `dirname`: the root instance's is outside the checkout (g43f)
+  const repoRoot = checkoutRootFor(opts.root); // not `dirname`: the root layer's is outside the checkout (g43f)
   let repoName = basename(repoRoot);
   try {
     repoName = readDeclaration(repoRoot)?.repository?.split("/").pop() ?? repoName;
@@ -817,10 +817,10 @@ export function planSubgraphs(
 }
 
 /**
- * Where an instance this build does not frame publishes its own subgraphs:
+ * Where a layer this build does not frame publishes its own subgraphs:
  * `<its publication base>subgraph/`, by the same rule bootstrap-tools
  * publishes with (`publicationBase`), so the address is derived from its
- * declaration and never written here. Only an instance that declares a
+ * declaration and never written here. Only a layer that declares a
  * diagram is linked — the reader follows the link for processes, and a link
  * to a site with none would be a fetch for nothing.
  */
@@ -878,7 +878,7 @@ const NULL_LOADER = async (url: string): Promise<never> => {
 /** Render every file: instance-relative output path → bytes. */
 export async function renderSubgraphFiles(
   plan: SubgraphPlan,
-  /** Kept for callers; each subgraph now carries its own harness (an overlaid instance's tree is not this one's). */
+  /** Kept for callers; each subgraph now carries its own harness (an overlaid layer's tree is not this one's). */
   _harness: string,
   outDir: string,
 ): Promise<Map<string, string>> {
@@ -986,7 +986,7 @@ export async function renderSubgraphFiles(
   return out;
 }
 
-/** Build the plan and the files for an instance from kg-export's in-memory graph. */
+/** Build the plan and the files for a layer from kg-export's in-memory graph. */
 export async function generateSubgraphs(
   opts: { root?: string; baseUrl?: string } = {},
 ): Promise<{
@@ -1005,7 +1005,7 @@ export async function generateSubgraphs(
   if (!decl) throw new Error(`gen-subgraph-jsonld: no declaration under ${root}`);
   const baseUrl = opts.baseUrl ?? decl.canonicalUrl;
   if (!baseUrl) throw new Error(`gen-subgraph-jsonld: ${decl.name} declares no canonicalUrl and no --base-url was given`);
-  // ONE EXPORT PER FRAMED INSTANCE, each in its own scope (bean `4ak5` item
+  // ONE EXPORT PER FRAMED LAYER, each in its own scope (bean `4ak5` item
   // 2): the host's is the published document, the others are the documents
   // `instance-exports.ts` publishes. No `baseUrl`, as before: the IRIs are
   // canonical whatever site this tree is built for. A tombstone is the host
@@ -1039,7 +1039,7 @@ export async function generateSubgraphs(
       exported.push(n);
     }
     // Payloads first, so every node carries its link into both frames — each
-    // against the instance its paths are relative to.
+    // against the layer its paths are relative to.
     payloadPlans.push(planPayloads(own, { root: inst, baseUrl }));
   }
   const payloadPlan = mergePayloadPlans(payloadPlans);
@@ -1086,7 +1086,7 @@ async function main(): Promise<number> {
   }
 
   // The WHOLE subgraph directory, not this harness's tree alone: an overlaid
-  // instance's tree is written here too, and one that stops being overlaid
+  // layer's tree is written here too, and one that stops being overlaid
   // must not leave its files behind looking current. Payloads (f233) live in
   // their own directory and are checked the same way.
   const all = new Map<string, Buffer | string>([...files, ...payloadFiles]);

@@ -41,7 +41,7 @@ import {
   TabularRecordsSchema,
   isTabularMimetype,
 } from "../schemas/library/tabular-records.ts";
-import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "../schemas/library/tabular-csvw.ts";
+import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TABULAR_TABLES_DIR, TabularCsvwSchema } from "../schemas/library/tabular-csvw.ts";
 import {
   RECORDING_FILENAME,
   RECORDING_SCHEMA_ID,
@@ -78,8 +78,10 @@ function slotStates(slot: NarrativeSlot): string {
     .join(", ");
 }
 import { SUMMARIES_FILE } from "../schemas/content/block-summary.ts";
+import { DocumentErrataSchema, ERRATA_FILE } from "../schemas/content/document-errata.ts";
+import { DocumentFootnotesSchema, FOOTNOTES_FILE } from "../schemas/content/document-footnotes.ts";
 import { KEYWORDS_FILE } from "../schemas/library/library-keywords.ts";
-import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
+import { entryDirs, entryItems, sidecarDefects, summaryLangs, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
 import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "../schemas/library/referenced-source.ts";
@@ -101,12 +103,12 @@ export interface EntryReport {
   slug: string;
   /**
    * The library this entry is in, repo-relative — present only when there is
-   * more than one, so a single-library instance's output is unchanged.
+   * more than one, so a single-library layer's output is unchanged.
    *
    * A slug alone stopped locating an entry when `library` gained a second home
    * (bean `frs5`): the report printed `library/milnorlink/` and
    * `library/who-pub-tps-931/` identically while they sat in different
-   * instances. Same reasoning as the per-directory root names in
+   * layers. Same reasoning as the per-directory root names in
    * `graph-index.ts` and the MCP server's GRAPH_ROOTS — a line that says where
    * something came from is useless the moment two sources share a name.
    */
@@ -200,7 +202,8 @@ export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "record
 // gen-library-jsonld under its `GROUPING_DIRS`).
 // `transcript/` is a recording's transcripts, one file per language (bean `1r0p`).
 // `figure-data/` is a figure transcribed as data for a redrawing (owner, 2026-10-31).
-export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR, FIGURE_DATA_DIR, TRANSCRIPT_DIR];
+// `tables/` is the CSV files of tables transcribed from a PDF's pages, named by `tabular.csvw.json` (who-iris#224).
+export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR, FIGURE_DATA_DIR, TRANSCRIPT_DIR, TABULAR_TABLES_DIR];
 
 /** Sidecars an entry may carry beyond {@link KIND_SIDECAR}'s kind markers. */
 export const ENTRY_SIDECARS: readonly string[] = [
@@ -211,7 +214,16 @@ export const ENTRY_SIDECARS: readonly string[] = [
   VECTOR_FIGURES_FILE,
   "manifest.jsonld",
   SUMMARIES_FILE,
-  // The entry's LSI keywords, written by `library-keywords.ts` (issue #2302).
+  // Authored: errors in the source's own text, recorded beside it and never
+  // substituted for it (owner, 2026-11-11, "add to L1 doc schema errata").
+  ERRATA_FILE,
+  // The PDF's footnotes and the marks that call them, written by the
+  // `pdf-footnotes.py` arm (owner, 2026-11-11, "also foot notes/marks").
+  FOOTNOTES_FILE,
+  // LEGACY: the entry's LSI keywords, once written here by `library-keywords.ts`
+  // (issue #2302). Keywords are now built at publish into docs/assets/keywords/
+  // (cat-harness#1144); still allowed until the committed files are removed,
+  // and the `library-keywords` health check counts any that remain.
   KEYWORDS_FILE,
   // Authored, not produced by an arm: the licence record gen-library-jsonld
   // carries into manifest.jsonld as dcterms:license + licenceRecord (#1492, D4).
@@ -561,7 +573,7 @@ export function declaredFigureCaptions(sectionsDir: string): Map<string, string 
 
 /**
  * The locales an entry's narratives are owed in: the `translation.supportedLocales`
- * its instance declares, else the schema's default (the six UN languages).
+ * its layer declares, else the schema's default (the six UN languages).
  *
  * Bean `d5f1`'s Done-when is *"a description per configured language"*. The
  * gate used to ask only whether an image had ANY narrative, so an entry whose
@@ -569,7 +581,7 @@ export function declaredFigureCaptions(sectionsDir: string): Map<string, string 
  * reported "0 remaining English-only figures" while smart-ra's copy of the
  * DPI-H reference architecture held 31, which nothing could see.
  *
- * The entry is `<instance>/library/<slug>`, so its instance is two levels up.
+ * The entry is `<instance>/library/<slug>`, so its layer is two levels up.
  */
 export function entryLocales(dir: string): string[] {
   let raw: unknown = {};
@@ -739,7 +751,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     };
     // A DECLARED library sub-graph inside the entry (bean `8pzh` item 1, owner
     // 2026-10-12: L1 extraction output lives beside its entry and is published
-    // with it). The instance declares the directory with a kind that is
+    // with it). The layer declares the directory with a kind that is
     // `within: "library"`, so it is the entry's own KG content, not an arm's
     // misfiled output — the same lookup the library publisher follows. An
     // UNDECLARED directory there is still a stray.
@@ -890,6 +902,18 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     });
   }
 
+  // Errata — errors in the SOURCE's own text (owner, 2026-11-11, who-iris
+  // card Q-ODD-1 = A, "add to L1 doc schema errata"). Optional and authored:
+  // an entry with none is not incomplete. Unmet only when the file does not
+  // mean what it says: it will not parse, names another entry, or points at a
+  // block the entry does not have.
+  {
+    const r = errataRequirement(dir);
+    if (r) out.push(r);
+    const f = footnotesRequirement(dir);
+    if (f) out.push(f);
+  }
+
   // Block summaries — the agent-summary QA sidecar (owner, 2026-09-24).
   //
   // ADVISORY, like `narrative-review`: the backlog is reported and never
@@ -906,7 +930,18 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     if (defects.length) {
       out.push({ name: "block-summaries", state: "unmet", detail: defects.slice(0, 2).join("; ") });
     } else {
-      const t = tally(entryItems(dir));
+      const items = entryItems(dir);
+      const t = tally(items);
+      // Summaries are owed in each configured locale, like image descriptions
+      // (owner, 2026-11-11). Advisory too: the gap is reported, not failed on.
+      const locales = entryLocales(dir);
+      const gaps = new Map<string, number>();
+      for (const it of items) {
+        const langs = summaryLangs(it);
+        if (!langs.length) continue;
+        for (const l of locales) if (!langs.includes(l)) gaps.set(l, (gaps.get(l) ?? 0) + 1);
+      }
+      const owed = gaps.size ? `; missing a configured language: ${[...gaps].map(([l, n]) => `${l} (${n})`).join(", ")}` : "";
       out.push({
         name: "block-summaries",
         state: "met",
@@ -916,7 +951,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
             ? "no prose block with text to summarise"
             : `${t.summarised} of ${t.prose} prose block(s) summarised ` +
               `(${t.draft} draft, ${t.confirmed} confirmed); backlog ${t.backlog} ` +
-              `(${t.stale} stale, ${t.rejected} rejected) — advisory`,
+              `(${t.stale} stale, ${t.rejected} rejected)${owed} — advisory`,
       });
     }
   }
@@ -1604,9 +1639,9 @@ export function checkEntry(dir: string, registry: GraphTypologyRegistry = defaul
 }
 
 /**
- * The instance root, which is NOT the current working directory.
+ * The layer root, which is NOT the current working directory.
  *
- * This resolved the library from `resolve(".")` alone. The instance moved
+ * This resolved the library from `resolve(".")` alone. The layer moved
  * under `cat-harness/` (bean `wggr`), npm scripts run from the REPOSITORY
  * root, and so `bun run cat check:l1-complete` — a CI gate — found no declaration,
  * reported "no library/ entries — nothing to check" and **exited 0**. Measured
@@ -1735,15 +1770,15 @@ export function sidecarDocument(report: EntryReport) {
   return result;
 }
 
-/** {@link sidecarDocument}, written under the declared `qa` tree of the instance that owns the entry. */
+/** {@link sidecarDocument}, written under the declared `qa` tree of the layer that owns the entry. */
 export function sidecarFor(root: string, report: EntryReport): string {
   return writeQaResult(sidecarRootFor(root, report.slug), join("library-qa", report.slug), sidecarDocument(report));
 }
 
 /**
- * The instance whose `qa` tree holds an entry's verdict: the one that owns the
- * library the entry sits in. In a standalone instance that is `root` itself.
- * In the index checkout `root` declares no instance (owner, 2026-10-08), and
+ * The layer whose `qa` tree holds an entry's verdict: the one that owns the
+ * library the entry sits in. In a standalone layer that is `root` itself.
+ * In the index checkout `root` declares no layer (owner, 2026-10-08), and
  * writing under it put 79 sidecars in an undeclared `<index>/test/results/`
  * while the libraries sat in the IRIS replica and the others (measured 2026-10-09).
  * An entry no declared library holds stays at `root`, as before.
@@ -1830,7 +1865,7 @@ function format(reports: EntryReport[]): string {
   for (const r of reports) {
     const unmet = blockingUnmet(r.requirements);
     // `<library>/<slug>/` when several libraries are in play, `library/<slug>/`
-    // when there is only one — an instance with a single library reads exactly
+    // when there is only one — a layer with a single library reads exactly
     // as it always did.
     out.push(`${unmet.length ? "✗" : "✓"} ${r.library ?? "library"}/${r.slug}/`);
     for (const q of r.requirements) {
@@ -1938,7 +1973,7 @@ if (import.meta.main) {
     // The SAME root the reports came from. `resolve(".")` wrote the sidecars
     // beside the working directory, so running the documented command from
     // the repository root put them in a `test/` tree of their own while the
-    // committed ones sat under the instance — two sets, neither checking the
+    // committed ones sat under the layer — two sets, neither checking the
     // other. Measured 2026-09-20.
     const writeRoot = libraryRootFor(resolve(".")) ?? resolve(".");
     for (const r of reports) console.log(`wrote ${sidecarFor(writeRoot, r)}`);
@@ -1968,4 +2003,72 @@ if (import.meta.main) {
     );
   }
   process.exit(reports.some((r) => blockingUnmet(r.requirements).length > 0) ? 1 : 0);
+}
+
+/**
+ * The `errata` requirement for one entry, or `undefined` when it has no
+ * `errata.json` (no errata recorded is not a defect). Exported for tests.
+ */
+export function errataRequirement(dir: string): Requirement | undefined {
+  const f = join(dir, ERRATA_FILE);
+  if (!existsSync(f)) return undefined;
+  let doc: unknown;
+  try {
+    doc = JSON.parse(readFileSync(f, "utf-8"));
+  } catch (e) {
+    return { name: "errata", state: "unmet", detail: `${ERRATA_FILE} unparseable: ${String(e)}` };
+  }
+  const parsed = DocumentErrataSchema.safeParse(doc);
+  if (!parsed.success) {
+    const i = parsed.error.issues[0];
+    return { name: "errata", state: "unmet", detail: `${ERRATA_FILE}: ${i?.path.join(".")} ${i?.message}` };
+  }
+  const slug = dir.replace(/\/+$/, "").split("/").pop() ?? "";
+  if (parsed.data.entry !== slug) {
+    return { name: "errata", state: "unmet", detail: `${ERRATA_FILE} names entry ${parsed.data.entry}, not ${slug}` };
+  }
+  const missing = parsed.data.errata.filter((e) => {
+    if (!e.block) return false;
+    const name = e.block.split("/").pop() ?? "";
+    return !existsSync(join(dir, "blocks", `${name}.jsonld`));
+  });
+  if (missing.length) {
+    return {
+      name: "errata",
+      state: "unmet",
+      detail: `${missing.length} erratum/errata name a block this entry does not have (${missing[0]!.id}: ${missing[0]!.block})`,
+    };
+  }
+  return { name: "errata", state: "met", detail: `${parsed.data.errata.length} erratum/errata recorded against the source's own text` };
+}
+
+/**
+ * The `footnotes` requirement for one entry, or `undefined` when it has no
+ * `footnotes.json` (an entry ingested before the arm existed, or not a PDF).
+ * Unmet only when the file will not parse or names another entry.
+ */
+export function footnotesRequirement(dir: string): Requirement | undefined {
+  const f = join(dir, FOOTNOTES_FILE);
+  if (!existsSync(f)) return undefined;
+  let doc: unknown;
+  try {
+    doc = JSON.parse(readFileSync(f, "utf-8"));
+  } catch (e) {
+    return { name: "footnotes", state: "unmet", detail: `${FOOTNOTES_FILE} unparseable: ${String(e)}` };
+  }
+  const parsed = DocumentFootnotesSchema.safeParse(doc);
+  if (!parsed.success) {
+    const i = parsed.error.issues[0];
+    return { name: "footnotes", state: "unmet", detail: `${FOOTNOTES_FILE}: ${i?.path.join(".")} ${i?.message}` };
+  }
+  const slug = dir.replace(/\/+$/, "").split("/").pop() ?? "";
+  if (parsed.data.entry !== slug) {
+    return { name: "footnotes", state: "unmet", detail: `${FOOTNOTES_FILE} names entry ${parsed.data.entry}, not ${slug}` };
+  }
+  const d = parsed.data;
+  return {
+    name: "footnotes",
+    state: "met",
+    detail: `${d.footnotes.length} footnote(s) called from the text, ${d.uncalled_notes.length} uncalled, ${d.unlinked_marks.length} mark(s) unlinked (${d.status})`,
+  };
 }

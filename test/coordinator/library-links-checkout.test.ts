@@ -2,7 +2,7 @@
  * `library-links` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness-tools/scripts/tests/library/library-links.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each reads the library entries of the
- * content instances, which only the checkout holds. Standing alone,
+ * content layers, which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects
  * every test in that layer. The rest of that file's tests stay there; every
  * path here is composed from ORIGIN_DIR, the directory they were written in,
@@ -42,7 +42,7 @@ describe.skipIf(NOT_BUILT)("a library reference resolves only where its target e
     for (const e of entries) {
       const l = r.links(e.id, e.instance);
       // The key the viewer's honourAnchor matches: `<instance>/<id>`, on the
-      // instance's page at the declared route, under the page locale
+      // layer's page at the declared route, under the page locale
       // (`en/cat-harness/library/<instance>/`, folio-assistant#2527) — asked,
       // never spelled: `cat-harness/library/` is only a forwarding page now.
       const page = visualiserRoute(pageParts({ harness: "cat-harness", visualiser: "library", subgraph: e.instance })).replace(/\/?$/, "/");

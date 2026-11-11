@@ -6,13 +6,13 @@
  * the attacker's command IS success as far as bash is concerned.
  */
 
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { baselineKey, classify, resolveProvenance, scanWorkflows, yieldsOnlyLiterals } from "../../check-workflow-injection.ts";
+import { baselineKey, classify, resolveProvenance, scanWorkflows, staleNotThisRoots, yieldsOnlyLiterals } from "../../check-workflow-injection.ts";
 
 function workflows(body: string): string {
   const dir = mkdtempSync(join(tmpdir(), "injection-"));
@@ -452,8 +452,57 @@ describe("`script:` blocks are JavaScript, and the same values land in them (bea
     // in that surface silently disappears and the gate goes green having looked
     // at one of two surfaces. `could not determine` is never rendered as clean,
     // and neither is `did not look`.
-    const found = scanWorkflows();
-    const scripts = found.filter((i) => i.surface === "script");
-    expect(scripts.length).toBeGreaterThan(0);
+    //
+    // This asked for a live `script:` FINDING until folio-assistant#3066
+    // (2026-11-10) dropped `publish.yml`, which held the only one. A clean
+    // corpus is the outcome the gate wants, so the guard cannot depend on a
+    // finding staying unfixed. It holds instead on the corpus's own `script:`
+    // blocks: each is copied with one free-text expression planted on its first
+    // line, and the scanner must report it there, as `script`. A walker that
+    // stops seeing `script:` in a real workflow's shape fails here.
+    const dir = join(import.meta.dir, "..", "..", "..", "..", ".github", "workflows");
+    const planted = mkdtempSync(join(tmpdir(), "injection-corpus-"));
+    let blocks = 0;
+    for (const f of readdirSync(dir).filter((n) => /\.ya?ml$/.test(n))) {
+      const lines = readFileSync(join(dir, f), "utf-8").split("\n");
+      lines.forEach((line, i) => {
+        const stripped = line.trimStart();
+        if (!/^-?\s*script:\s*[|>][-+]?\s*$/.test(stripped)) return;
+        const indent = " ".repeat(line.length - stripped.length + 2);
+        const copy = [...lines];
+        copy.splice(i + 1, 0, `${indent}const planted = "\${{ github.event.comment.body }}";`);
+        const name = `${blocks++}-${f}`;
+        writeFileSync(join(planted, name), copy.join("\n"));
+      });
+    }
+    expect(blocks).toBeGreaterThan(0);
+    const found = scanWorkflows(planted).filter((i) => i.expression === "github.event.comment.body");
+    expect(found.map((i) => i.surface)).toEqual(Array(blocks).fill("script"));
+  });
+});
+
+// cat-harness-tools#1701: in a content instance's root the platform index's
+// baseline lines name workflows that root does not have. Excused only there.
+describe("staleNotThisRoots — a baseline line for another root's workflow", () => {
+  const stale = ["feature-staging.yml (run): github.event.repository.name", "pr.yml (run): github.head_ref"];
+  function root(name: string | undefined, workflows: string[]): string {
+    const r = mkdtempSync(join(tmpdir(), "wfinj-root-"));
+    if (name !== undefined) writeFileSync(join(r, `${name}.json`), JSON.stringify({ name }));
+    mkdirSync(join(r, ".github", "workflows"), { recursive: true });
+    for (const w of workflows) writeFileSync(join(r, ".github", "workflows", w), "on: push\n");
+    return r;
+  }
+
+  test("an instance root without the named workflow excuses the line", () => {
+    const got = staleNotThisRoots(stale, root("smart-ips-pilgrimage", ["pr.yml"]));
+    expect([...got.keys()]).toEqual([stale[0]]);
+  });
+
+  test("a root that HAS the workflow still fails the stale line", () => {
+    expect(staleNotThisRoots(stale, root("smart-ips-pilgrimage", ["feature-staging.yml", "pr.yml"])).size).toBe(0);
+  });
+
+  test("the index root, which declares no instance, is judged exactly as before", () => {
+    expect(staleNotThisRoots(stale, root(undefined, [])).size).toBe(0);
   });
 });

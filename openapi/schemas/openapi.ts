@@ -1,5 +1,5 @@
 /**
- * The OpenAPI harness's shapes: what an instance declares, what an ingest
+ * The OpenAPI harness's shapes: what a layer declares, what an ingest
  * records, and how an OpenAPI document's OPERATIONS become nodes with IRIs.
  *
  * @module cat-harness/openapi/schemas/openapi
@@ -46,8 +46,8 @@ const SEGMENT = /^[A-Za-z0-9._-]+$/;
  * is the instantiation). Owner, 2026-10-03: *"the consumer instance would have an
  * cat-openapi.config.json in the repo root or so"*.
  *
- * It names each OpenAPI document the instance holds and where it comes from.
- * The bytes themselves are ingested into the instance's `openapi` directory;
+ * It names each OpenAPI document the layer holds and where it comes from.
+ * The bytes themselves are ingested into the layer's `openapi` directory;
  * this file is the CONFIG, never a copy.
  */
 export const OPENAPI_CONFIG_SCHEMA_TAG = "cat-openapi-config/v1";
@@ -67,7 +67,7 @@ export const OpenApiConfigDocumentSchema = z
     id: z.string().regex(SEGMENT),
     /** What a reader calls it. Absent, the document's own `info.title` is used. */
     title: z.string().min(1).optional(),
-    /** One sentence on what this API is and why this instance holds it. */
+    /** One sentence on what this API is and why this layer holds it. */
     description: z.string().min(1).optional(),
     source: OpenApiSourceSchema,
   })

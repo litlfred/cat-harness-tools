@@ -128,7 +128,7 @@ describe("classifyReference follows the dependency arrow", () => {
 
   test("an instance that declares no `needs` is undetermined, never clean and never a finding", () => {
     // `[]` is the floor; absent is nobody-has-said. Collapsing the two would
-    // make every undeclared instance look either tangled or spotless.
+    // make every undeclared layer look either tangled or spotless.
     expect(classifyReference(occ("floating", "high"), RULE, never).verdict).toBe("undetermined");
   });
 });
@@ -143,7 +143,7 @@ describe("a name colliding with the repository's is decided per OCCURRENCE, not 
 
   test('"unknown" is still `undetermined` — the honest residue survives', () => {
     // A bare prose mention: no path, no URL, nothing to tell the repository
-    // from the instance. This test exists so the third state cannot be
+    // from the layer. This test exists so the third state cannot be
     // optimised away as unreachable.
     const v = classifyReference(occ("low", "high"), RULE, collides("unknown"));
     expect(v.verdict).toBe("undetermined");
@@ -172,7 +172,7 @@ describe("a name colliding with the repository's is decided per OCCURRENCE, not 
   });
 
   test('"instance" falls THROUGH to the arrow, so it can be wrong-direction', () => {
-    // The case the blanket could not reach: a real reference to the instance
+    // The case the blanket could not reach: a real reference to the layer
     // whose name happens to be the repository's.
     const v = classifyReference(occ("low", "high"), RULE, collides("instance"));
     expect(v.verdict).toBe("wrong-direction");
@@ -255,7 +255,7 @@ describe("analyse over a synthetic tree", () => {
   });
 
   test("a file belongs to the INNERMOST declaring root that contains it", () => {
-    // `high/` sits inside the repository root but is its own instance, so its
+    // `high/` sits inside the repository root but is its own layer, so its
     // files are high's — not the root's, and not counted for both.
     const r = tree({ "high/deep/nested/notes.md": "about low\n" });
     expect(analyse(r).classified).toEqual([]);
@@ -391,15 +391,15 @@ describe("a file that DECLARES itself generated is not read", () => {
 // and a sibling test's budget is 5s.
 
 describe("the repository-name collision, resolved from the occurrence and the declaration", () => {
-  // The root instance's name IS the repository's name, so a name match alone
+  // The root layer's name IS the repository's name, so a name match alone
   // cannot tell the two apart. What the occurrence CARRIES can: a URL around
   // it, an owner in front of it, a declared directory after it. On main
   // 2026-09-29 the blanket version of this test returned `undetermined` for
   // 11,090 of 14,299 occurrences — 78 % — of which 14 pointed into a directory
-  // the root instance actually declares.
+  // the root layer actually declares.
   //
   // `repo` here is declared AT the temp root, which is what makes it collide:
-  // an instance rooted at the repository root shares the repository's name.
+  // a layer rooted at the repository root shares the repository's name.
 
   /** `low` <- `repo` (rooted at the repo root, declaring `uploads/` and `tools/`) and `low` <- `high`. */
   function collidingTree(files: Record<string, string>): string {
@@ -445,7 +445,7 @@ describe("the repository-name collision, resolved from the occurrence and the de
 
   test("a path into a DECLARED directory is judged by the arrow, NOT `names-repository`", () => {
     // `uploads/` is one of the two directories `repo.json` declares, so this
-    // names the INSTANCE. `low` is depended on by `repo`, so it may not.
+    // names the LAYER. `low` is depended on by `repo`, so it may not.
     expect(only(collidingTree({ "low/a.md": "dropped in repo/uploads/x.pdf\n" }))).toEqual(["wrong-direction"]);
   });
 
@@ -526,7 +526,7 @@ describe("a declared path resolves against the scope it declares, not against th
 // that does not exist, so the producer hash is a stable `"unknown"` rather
 // than a hash of whichever version of the script is on disk.
 
-/** `low` <- `mid` <- `high`: `low` has TWO instances above it, which is what `names > 1` needs. */
+/** `low` <- `mid` <- `high`: `low` has TWO layers above it, which is what `names > 1` needs. */
 function threeTier(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "refdir-"));
   made.push(root);
@@ -633,7 +633,7 @@ describe("the census records VERDICT counts and no FILE count", () => {
 });
 
 describe("the sidecar is idempotent, and `--check` grades the states rather than the counts", () => {
-  /** An instance root with a `test/results/` the writer can fill. */
+  /** A layer root with a `test/results/` the writer can fill. */
   const instanceRoot = (): string => {
     const d = mkdtempSync(join(tmpdir(), "refdir-side-"));
     made.push(d);
@@ -1137,7 +1137,7 @@ describe("X5 — a dated proposal record may name the layers it was written abou
     expect(verdict("cat-harness/docs/proposals/checkout-layout-2026-10-12.md", "cat-harness-tools")).toBe("exempt");
     // The measurement a record carries, beside it.
     expect(verdict("cat-harness/docs/proposals/placement-audit-2026-10-01.json")).toBe("exempt");
-    // Any instance's proposals, not only the harness's.
+    // Any layer's proposals, not only the harness's.
     expect(verdict("cat-harness-tools/docs/proposals/tools-split-2026-10-01.md")).toBe("exempt");
   });
 
@@ -1251,7 +1251,7 @@ describe("3a — a workflow `uses:` names the repository a reusable workflow liv
     expect(verdict(REUSABLE)).toBe("exempt");
     expect(verdict(REUSABLE, "bootstrap/.github/workflows/harness-pr-checks.yml", "bootstrap")).toBe("exempt");
     expect(verdict(REUSABLE, "bootstrap-tools/.github/workflows/harness-pr-checks.yaml", "bootstrap")).toBe("exempt");
-    // The repository root's own workflows, with no instance prefix.
+    // The repository root's own workflows, with no layer prefix.
     expect(verdict(REUSABLE, ".github/workflows/ci.yml")).toBe("exempt");
   });
 
@@ -1435,7 +1435,7 @@ describe("bean tdir — a baseline pair on tools/index.ts is compared at the Too
 describe("an instance's uploads/ is its data store, not a reference (owner, 2026-11-03)", () => {
   // who-iris#176 stopped declaring uploads/ as a graph; its intakes record
   // provenance ("cited in DAK Component 1 … smart-base/scripts/…", "moved here
-  // from … smart-immunizations"), which names instances above it.
+  // from … smart-immunizations"), which names layers above it.
   test("an intake under <instance>/uploads/ naming a higher instance is exempt, with the ruling as its reason", () => {
     const v = classifyReference(occ("low", "high", "basis: cited by high/scripts/x.ts", "low/uploads/item/intake.json"), RULE, never, [INSTANCE_UPLOADS_DATA]);
     expect(v.verdict).toBe("exempt");

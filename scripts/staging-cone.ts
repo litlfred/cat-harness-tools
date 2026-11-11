@@ -193,7 +193,7 @@ export function coneForCheckout(changed: readonly string[] | undefined, repoRoot
 
 /**
  * Changes that alter every site a preview BUILDS (as opposed to composes),
- * whatever the instance: the build environment. The Gemfile pins the Jekyll and
+ * whatever the layer: the build environment. The Gemfile pins the Jekyll and
  * just-the-docs a per-IG site is built with, and the workflow is the build.
  */
 export const SITE_ENVIRONMENT: readonly RegExp[] = [
@@ -205,16 +205,16 @@ export const SITE_ENVIRONMENT: readonly RegExp[] = [
 /**
  * Whether a per-instance BUILT site (an IG's own Jekyll site, its AST site) is
  * in the cone (bean `4j86`, last Done-when). Such a site is built from an
- * upstream repository pinned in the instance's own files, the instance's
+ * upstream repository pinned in the layer's own files, the layer's
  * declared theme, the build environment, and the stager's code, so it is
  * carried when the file list is unknown, when the environment changed, when
- * the branch touches the instance's root (the floor, as `carriedInstances`
- * keeps it), when the cone reaches any of the instance's directories (a theme
+ * the branch touches the layer's root (the floor, as `carriedInstances`
+ * keeps it), when the cone reaches any of the layer's directories (a theme
  * change arrives that way, down `derivedFrom`), or when a changed file is in a
  * writer's closure. Doubt carries, exactly as `cone` does.
  */
 export function siteInCone(o: {
-  /** The instance's directory, repo-relative, no trailing slash. */
+  /** The layer's directory, repo-relative, no trailing slash. */
   root: string;
   changed: readonly string[] | undefined;
   cone: readonly ConeDecision[];
@@ -249,7 +249,7 @@ export function readChangedFiles(path: string | undefined): string[] | undefined
   return lines;
 }
 
-/** The per-site filter both stagers call: one cone, one closure memo, a decision per instance. */
+/** The per-site filter both stagers call: one cone, one closure memo, a decision per layer. */
 export function siteFilter(repoRoot: string, changed: readonly string[] | undefined, writers: readonly string[]) {
   const coneDecisions = changed === undefined ? [] : coneForCheckout(changed, repoRoot);
   const memo = new Map<string, Closure>();

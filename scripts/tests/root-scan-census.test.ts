@@ -32,7 +32,7 @@ describe("the census covers the repository, and says which instances it scanned 
   const decl = (name: string) => JSON.stringify({ name, version: "0.1.0", directories: [] });
 
   test("a script in a SECOND instance is counted — moving a script up never drops it from the census", () => {
-    // The defect: the census scanned only its own instance, so every script
+    // The defect: the census scanned only its own layer, so every script
     // moved into another read as one fewer scanner, and the headline family
     // read 0 of 0 while its only member sat one directory over.
     const { dir, cleanup } = repo({

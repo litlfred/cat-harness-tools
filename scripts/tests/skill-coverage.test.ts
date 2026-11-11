@@ -1,5 +1,5 @@
 /**
- * Every skill this instance can resolve is a graph node AND a published page.
+ * Every skill this layer can resolve is a graph node AND a published page.
  *
  * ## The defect these assert against
  *
@@ -127,9 +127,9 @@ describe("skill coverage", () => {
     // resolvable skills that must NOT be nodes, so this invariant excludes
     // them rather than being weakened. Bean `folio-assistant-uv09`.
     //
-    // THIS INSTANCE's skills, not the corpus's: since bean `4ak5` item 2 the
-    // graph is built in instance scope, and a skill held by an instance
-    // stacked on this one is a node in THAT instance's document.
+    // THIS LAYER's skills, not the corpus's: since bean `4ak5` item 2 the
+    // graph is built in layer scope, and a skill held by a layer
+    // stacked on this one is a node in THAT layer's document.
     const known = new Set([...knownSkills(ROOT, "instance")].filter(isPublishedSkill));
 
     // The exclusion must be doing something, or a later change that stops

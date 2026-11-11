@@ -31,6 +31,9 @@ import {
   injectInto,
   previewRootOf,
   FRAGMENT,
+  CLIENT,
+  LOADER,
+  BANNER_SCRIPT,
   type StagingFacts,
 } from "../../staging-banner.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
@@ -107,14 +110,14 @@ describe("the injected HTML does not depend on the build — bean `g196`", () =>
     expect(JSON.parse(c.json).checksUrl).toBe("https://github.com/o/r/pull/1/checks");
     expect(c.html.get("index.html")).not.toContain("/pull/1/checks");
     expect(c.html.get("index.html")).toBe(a.html.get("index.html"));
-    expect(FRAGMENT).toContain("f.checksUrl");
+    expect(CLIENT).toContain("f.checksUrl");
     rmSync(c.dir, { recursive: true, force: true });
   });
 
   test("every page in one build carries the SAME fragment, at any depth", () => {
     // `reference/skills/deep/nested/page.html` is four levels down. A
-    // `<script src>` would have needed a document-relative href and so would
-    // differ here — which is why the client half is inlined.
+    // document-relative `<script src>` would differ here, which is why the
+    // loader derives the preview root from the path instead.
     for (const p of PAGES) expect(a.html.get(p)).toContain(FRAGMENT);
   });
 
@@ -126,6 +129,28 @@ describe("the injected HTML does not depend on the build — bean `g196`", () =>
   });
 
   for (const d of [a, b]) rmSync(d.dir, { recursive: true, force: true });
+});
+
+describe("the client is served once per preview, not inlined in every page (fhir-harness#325)", () => {
+  test("run() writes it at the preview root, beside staging.json", () => {
+    const a = build({});
+    expect(readFileSync(join(a.dir, BANNER_SCRIPT), "utf-8")).toBe(CLIENT + "\n");
+    rmSync(a.dir, { recursive: true, force: true });
+  });
+
+  test("the page carries only the loader: the fragment is a small fraction of the client", () => {
+    expect(FRAGMENT).toContain(`<script>${LOADER}</script>`);
+    expect(FRAGMENT).not.toContain("function fill(");
+    expect(FRAGMENT.length).toBeLessThan(1500);
+    expect(CLIENT.length).toBeGreaterThan(FRAGMENT.length * 4);
+  });
+
+  test("the loader names the client from the preview root, and states a failure to load it", () => {
+    expect(LOADER).toContain(`m[1]+'${BANNER_SCRIPT}'`);
+    expect(LOADER).toMatch(/s\.onerror=function\(\)\{[^}]*build details unavailable/);
+    // Off a preview path it says so without loading anything.
+    expect(LOADER).toContain("not served from a preview path");
+  });
 });
 
 describe("a failed fetch still says PREVIEW — the third-state rule", () => {
@@ -150,7 +175,7 @@ describe("a failed fetch still says PREVIEW — the third-state rule", () => {
     // The catch of the `staging.json` fetch, not the first catch in the
     // fragment: the live staleness check (#1076) has its own, which is
     // silent on purpose, since a failed GitHub request must not guess.
-    const m = FRAGMENT.match(/fetch\(r\+'staging\.json'[\s\S]*?\.catch\(function\(\)\{([^}]*)\}\)/);
+    const m = CLIENT.match(/fetch\(r\+'staging\.json'[\s\S]*?\.catch\(function\(\)\{([^}]*)\}\)/);
     expect(m).not.toBe(null);
     expect(m![1]).toContain("build details unavailable");
   });
@@ -163,7 +188,7 @@ describe("values from the JSON are never concatenated into markup", () => {
     // and the control characters. A branch name concatenated into HTML is
     // therefore attacker-influenced markup. The old bash banner interpolated
     // `$BRANCH` into a string; this one must not.
-    const client = FRAGMENT.slice(FRAGMENT.indexOf("<script"));
+    const client = CLIENT;
     expect(client).toContain("textContent");
     expect(client).not.toMatch(/innerHTML\s*=/);
   });
@@ -194,11 +219,15 @@ describe("the preview root is derived from the path, not baked in", () => {
     // instead.
     // Greedy to the LAST `/` before the closing paren: the pattern itself
     // contains escaped separators, so a non-greedy match stops inside it.
-    const shipped = FRAGMENT.match(/location\.pathname\.match\((\/.*\/)\)/);
-    expect(shipped).not.toBe(null);
-    const client = new RegExp(shipped![1]!.slice(1, -1));
-    for (const p of ["/a/STAGING/b/c.html", "/STAGING/x/", "/a/branches/b/c.html", "/branches/x/", "/nope/index.html"]) {
-      expect(client.exec(p)?.[1] ?? null).toBe(previewRootOf(p));
+    // Both copies: the loader's, which finds the client, and the client's,
+    // which finds `staging.json`.
+    for (const src of [LOADER, CLIENT]) {
+      const shipped = src.match(/location\.pathname\.match\((\/.*\/)\)/);
+      expect(shipped).not.toBe(null);
+      const client = new RegExp(shipped![1]!.slice(1, -1));
+      for (const p of ["/a/STAGING/b/c.html", "/STAGING/x/", "/a/branches/b/c.html", "/branches/x/", "/nope/index.html"]) {
+        expect(client.exec(p)?.[1] ?? null).toBe(previewRootOf(p));
+      }
     }
   });
 });
@@ -260,6 +289,14 @@ describe("the banner goes in the BODY, not in a comment that mentions one", () =
     expect(outcome).toBe("injected");
     // Inside the comment is where it used to land.
     expect(out.indexOf(FRAGMENT)).toBeGreaterThan(out.indexOf("-->"));
+    expect(out).toContain(`<body>${FRAGMENT}`);
+  });
+
+  test("a Liquid-commented `<body>` in an unrendered include does not absorb the banner", () => {
+    const page = "<html><head>{%- comment -%} hoists a stray div into <body> {%- endcomment -%}</head><body>x</body></html>";
+    const { html: out, outcome } = injectInto(page);
+    expect(outcome).toBe("injected");
+    expect(out.indexOf(FRAGMENT)).toBeGreaterThan(out.indexOf("endcomment -%}"));
     expect(out).toContain(`<body>${FRAGMENT}`);
   });
 
@@ -358,7 +395,7 @@ describe("newPages is the SHORT list, and absent is not empty", () => {
     // "Could not tell" must never render as "this page is new" — that would
     // label every page new on any run where the publish-ref fetch failed. The
     // client branches on the flag before it ever consults the list.
-    const client = FRAGMENT.slice(FRAGMENT.indexOf("<script"));
+    const client = CLIENT;
     expect(client).toMatch(/if\(!f\.mainPagesKnown\)/);
     const flagAt = client.indexOf("mainPagesKnown");
     const listAt = client.indexOf("newPages.indexOf");
@@ -413,7 +450,7 @@ describe("the STAGING build does not bake a per-run stamp into the footer", () =
   });
 
   test("the client fills the stamp from the facts it already fetched", () => {
-    const client = FRAGMENT.slice(FRAGMENT.indexOf("<script"));
+    const client = CLIENT;
     expect(client).toContain("fa-build-stamp");
     // The definition existing is not the same as it being CALLED. Checking
     // only for `fa-build-stamp` passed with the `stamp(f)` call deleted —

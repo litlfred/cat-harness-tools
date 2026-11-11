@@ -41,10 +41,11 @@ import { checkoutDirectories, instanceConfigFor } from "../schemas/kg/harness-co
 import type { ToolDefinition } from "../schemas/tools/tool.js";
 
 import { discoverTools } from "../tools/discover.ts";
-import { runWriter, type WriterOutcome } from "./derive-at-publish.ts";
+import { declaredPlan, runWriter, writersOf, type WriterOutcome } from "./derive-at-publish.ts";
 import { writerCommand } from "./lib/script-command.ts";
 import { expectedPages, missingPages, type ExpectedPage } from "./site-coverage.ts";
 import { declaredVisualisers, type DeclaredVisualiser } from "./viewer-declarations.ts";
+import { SCOPE_INPUT, scopeArg } from "./lib/site-scope.ts";
 
 /** The Tool input names this runner fills with the site being built. */
 export const SITE_INPUTS = ["site", "out"] as const;
@@ -68,6 +69,8 @@ export interface VisualiserWriter {
   invoke?: string[];
   /** The flag of the Tool's site input ({@link SITE_INPUTS}). */
   siteFlag?: string;
+  /** The flag of the Tool's `scope` input, when it declares one ({@link SCOPE_INPUT}). */
+  scopeFlag?: string;
   /** For a Tool with an `instance` input: its flag and the harness root it is run for. */
   instance?: { flag: string; root: string };
   /** Why it cannot be run into a site, when it cannot. */
@@ -81,7 +84,7 @@ type ToolLike = Pick<ToolDefinition, "id" | "invoke" | "io">;
 
 /**
  * The writers of the given visualisers, one per Tool (and per harness, for a
- * Tool run for one instance at a time), each with what the Tool declares about
+ * Tool run for one layer at a time), each with what the Tool declares about
  * pointing it at a site.
  */
 export function visualiserWriters(
@@ -123,12 +126,13 @@ export function visualiserWriters(
     }
     w.invoke = shell.trim().split(/\s+/);
     w.siteFlag = SITE_INPUTS.map(flagOf).find((f) => f !== undefined);
+    w.scopeFlag = flagOf(SCOPE_INPUT);
     if (instanceInput) {
       const flag = flagOf(INSTANCE_INPUT);
       if (flag === undefined) w.unrunnable = `Tool ${t.id}'s \`instance\` input declares no flag`;
       else w.instance = { flag, root: ref.harnessRoot };
     }
-    const owed = inputs.filter((i) => i.required && i.name !== INSTANCE_INPUT && !(SITE_INPUTS as readonly string[]).includes(i.name));
+    const owed = inputs.filter((i) => i.required && i.name !== INSTANCE_INPUT && i.name !== SCOPE_INPUT && !(SITE_INPUTS as readonly string[]).includes(i.name));
     if (owed.length > 0 && w.unrunnable === undefined) {
       w.unrunnable = `Tool ${t.id} requires input(s) ${owed.map((i) => `\`${i.name}\``).join(", ")}, which a site build has no value for`;
     }
@@ -141,7 +145,7 @@ export function visualiserWriters(
  * goes through `writerCommand`, so a checkout with no `cat` script still
  * runs it. Throws when the writer cannot be run that way.
  */
-export function writerArgv(root: string, w: VisualiserWriter, site?: string): string[] {
+export function writerArgv(root: string, w: VisualiserWriter, site?: string, scope?: readonly string[]): string[] {
   if (w.unrunnable !== undefined) throw new Error(w.unrunnable);
   if (w.invoke === undefined) throw new Error(`Tool ${w.tool} has no shell invocation`);
   if (site !== undefined && w.siteFlag === undefined) throw new Error(`Tool ${w.tool} declares no \`site\` input, so it cannot be pointed at a site being built`);
@@ -153,6 +157,8 @@ export function writerArgv(root: string, w: VisualiserWriter, site?: string): st
     ...base,
     ...(w.instance ? [w.instance.flag, w.instance.root] : []),
     ...(site !== undefined ? [w.siteFlag!, resolve(site)] : []),
+    // A scope reaches only a writer that declares one: the others still write every instance.
+    ...(scope !== undefined && w.scopeFlag !== undefined ? [w.scopeFlag, scopeArg(scope)] : []),
   ];
 }
 
@@ -160,14 +166,14 @@ export function writerArgv(root: string, w: VisualiserWriter, site?: string): st
  * The writers of the expected pages in `pages`: each writer once, with only the
  * visualisers it owes.
  *
- * A writer run for one instance at a time (an `instance` input) is keyed on the
+ * A writer run for one layer at a time (an `instance` input) is keyed on the
  * harness that DECLARES the visualiser, so by itself it draws that harness's
  * pages only. A visualiser with `subgraphs: "instance"` also owes a page to
- * every OTHER instance with entries of the kinds it covers: the DAK base
+ * every OTHER layer with entries of the kinds it covers: the DAK base
  * layer's `artifact-index` owes `en/<dak-base>/artifact-index/<dak-ig>/` on
  * that DAK IG's site (2026-10-15), and `ig-pages --instance <dak-base>`
- * never drew it. So for each such owed page whose instance `rootOf` can place,
- * the writer runs once more, pointed at that instance.
+ * never drew it. So for each such owed page whose layer `rootOf` can place,
+ * the writer runs once more, pointed at that layer.
  */
 export function writersFor(
   writers: readonly VisualiserWriter[],
@@ -193,7 +199,7 @@ export function writersFor(
   return out;
 }
 
-/** The root of each instance in the checkout at `root`, by name: where a writer run for that instance is pointed. */
+/** The root of each layer in the checkout at `root`, by name: where a writer run for that layer is pointed. */
 export function instanceRoots(root: string): Map<string, string> {
   const out = new Map<string, string>();
   for (const d of checkoutDirectories(root)) {
@@ -221,12 +227,13 @@ export function runVisualiserWriters(
   writers: readonly VisualiserWriter[],
   site?: string,
   runOne: (argv: readonly string[], cwd: string) => WriterOutcome = runWriter,
+  scope?: readonly string[],
 ): WriterRun[] {
   const runs: WriterRun[] = [];
   for (const w of writers) {
     let argv: string[];
     try {
-      argv = writerArgv(root, w, site);
+      argv = writerArgv(root, w, site, scope);
     } catch (e) {
       console.error(`  ✗ visualiser writer ${label(w)} not run: ${(e as Error).message}`);
       runs.push({ writer: w, outcome: { kind: "unrunnable", why: (e as Error).message } });
@@ -243,15 +250,48 @@ export function runVisualiserWriters(
 
 /**
  * The site build's step: run the writer of every expected page `site` does
- * not hold yet — the checkout's own visualisers and every instance it needs.
+ * not hold yet — the checkout's own visualisers and every layer it needs.
  * A page a recipe step already wrote (smart-ra's `site:archimate`) is not
- * written twice.
+ * written twice. With `opts.scope`, only the scope's instances' pages are
+ * owed, and each writer that declares a `scope` input is told it.
  */
-export function writeMissingVisualisers(root: string, site: string, opts: { staging?: boolean } = {}, runOne?: (argv: readonly string[], cwd: string) => WriterOutcome): WriterRun[] {
+export function writeMissingVisualisers(root: string, site: string, opts: { staging?: boolean; scope?: readonly string[] } = {}, runOne?: (argv: readonly string[], cwd: string) => WriterOutcome): WriterRun[] {
   const missing = missingPages(expectedPages(root, opts), (p) => existsSync(join(site, p)));
   if (missing.length === 0) return [];
   const roots = instanceRoots(root);
-  return runVisualiserWriters(root, writersFor(visualiserWriters(root), missing, (name) => roots.get(name)), site, runOne);
+  const writers = writersFor(visualiserWriters(root), missing, (name) => roots.get(name));
+  return runVisualiserWriters(root, inPublishOrder(writers, publishOrder(root)), site, runOne, opts.scope);
+}
+
+/** The publish-time writers in the order `derive:publish` runs them; empty when the plan cannot be read. */
+function publishOrder(root: string): string[] {
+  try {
+    return writersOf(declaredPlan(root));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The writers, with those `derive:publish` also runs put in its order.
+ *
+ * A viewer can read what another viewer writes: the methodologies page links
+ * an ingested source only when the library's projection and pages are already
+ * in the site (owner, 2026-11-10). The declarations order them (`cat-harness`
+ * lists `library:viz` before `methodologies:viz`), but this step ran writers in
+ * VISUALISER order, where `methodologies` comes first, so on every IG site the
+ * page was written before the pages it links and linked none of them. Writers
+ * the plan does not name keep their place; the named ones are reordered among
+ * the slots they hold.
+ */
+export function inPublishOrder(writers: readonly VisualiserWriter[], order: readonly string[]): VisualiserWriter[] {
+  const rank = new Map(order.map((w, k) => [w, k] as const));
+  const rankOf = (w: VisualiserWriter): number | undefined => rank.get(w.invoke?.at(-1) ?? "");
+  const slots = writers.flatMap((w, k) => (rankOf(w) === undefined ? [] : [k]));
+  const sorted = slots.map((k) => writers[k]!).sort((a, b) => rankOf(a)! - rankOf(b)!);
+  const out = [...writers];
+  slots.forEach((k, i) => (out[k] = sorted[i]!));
+  return out;
 }
 
 if (import.meta.main) {

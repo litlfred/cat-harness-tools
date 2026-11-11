@@ -24,7 +24,8 @@
  * on them.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { parse } from "yaml";
@@ -32,6 +33,7 @@ import { parse } from "yaml";
 import {
   DELIBERATELY_RED,
   invocations,
+  notApplicableHere,
   redGateIsLast,
   type RedGate,
 } from "../../check-red-gate-is-last.ts";
@@ -46,10 +48,15 @@ const wf = (steps: Array<{ name?: string; run?: string }>): unknown => ({
   jobs: { gates: { steps } },
 });
 
-describe("the real workflow", () => {
-  const report = redGateIsLast(parse(readFileSync(WORKFLOW, "utf-8")));
+// A content root (an instance run by layer-pr-checks) carries no gates
+// workflow, so the corpus half has nothing to read there; the gate exits 78
+// in such a root, and the fixtures below still run (cat-harness-tools#1701).
+describe.skipIf(notApplicableHere(REPO) !== null)("the real workflow", () => {
+  // Read lazily: a skipped describe still runs its body.
+  const real = (): ReturnType<typeof redGateIsLast> => redGateIsLast(parse(readFileSync(WORKFLOW, "utf-8")));
 
   test("it PARSED — jobs and steps were found, so a clean verdict means something", () => {
+    const report = real();
     // The failure shape this repository keeps paying for: a scan that matched
     // nothing reporting a clean run over it. `main` exits 2 on this state
     // rather than 0, and the assertion is here as well because a test that
@@ -59,6 +66,7 @@ describe("the real workflow", () => {
   });
 
   test("every declared red gate was LOCATED, not merely not-found", () => {
+    const report = real();
     // `absent` is a finding rather than a pass, so this is really asserting
     // that the declaration still matches the workflow's spelling.
     expect(report.located.map((l) => l.script).sort()).toEqual(
@@ -67,6 +75,7 @@ describe("the real workflow", () => {
   });
 
   test("each is the last step of its job", () => {
+    const report = real();
     expect(report.findings.map((f) => `${f.kind}: ${f.script}`)).toEqual([]);
     for (const l of report.located) expect(l.index).toBe(l.of - 1);
   });
@@ -252,5 +261,27 @@ describe("a bare runner is a gate too — `bun test` takes no target", () => {
     // Without this the widening could be reverted and every test in this block
     // would still pass, since they all supply their own fixture list.
     expect(DELIBERATELY_RED.map((g) => g.script)).toContain("bun test");
+  });
+});
+
+describe("not applicable in a content root (cat-harness-tools#1701)", () => {
+  test("a root with no gates workflow is a content root: not applicable, with a reason", () => {
+    const root = mkdtempSync(join(tmpdir(), "red-gate-content-"));
+    try {
+      expect(notApplicableHere(root)).toContain("content root");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a root that carries it is a harness root and is judged as before", () => {
+    const root = mkdtempSync(join(tmpdir(), "red-gate-harness-"));
+    try {
+      mkdirSync(join(root, ".github", "workflows"), { recursive: true });
+      writeFileSync(join(root, ".github", "workflows", "code-quality-gates.yml"), "jobs: {}\n");
+      expect(notApplicableHere(root)).toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

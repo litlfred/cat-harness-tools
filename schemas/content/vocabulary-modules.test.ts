@@ -42,7 +42,7 @@ describe("readVocabulary holds a module to the contract", () => {
 });
 
 describe("composition, in whatever checkout this runs", () => {
-  // Which modules are discovered depends on the instances beside cat-harness
+  // Which modules are discovered depends on the layers beside cat-harness
   // (the science layer's is, in the index), so these hold for any answer.
   test("every built-in kind stays typed, and a module's kinds are added", () => {
     const all = new Set(allTypedBlockKinds());

@@ -1,5 +1,5 @@
 /**
- * The skill overlay reads declarations and keeps every instance's contribution.
+ * The skill overlay reads declarations and keeps every layer's contribution.
  *
  * @module schemas/skill-overlay.test
  *
@@ -22,9 +22,9 @@ const roots: string[] = [];
 afterAll(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
 
 /**
- * A fresh directory for ONE fixture instance, alone in a private parent.
+ * A fresh directory for ONE fixture layer, alone in a private parent.
  *
- * Not `mkdtempSync(tmpdir())` itself: a leaf instance's checkout is its
+ * Not `mkdtempSync(tmpdir())` itself: a leaf layer's checkout is its
  * PARENT (`checkoutRootFor`), so a fixture made directly in the system temp
  * directory is resolved as a sibling of everything else there. Measured
  * 2026-10-09 with ~22,000 entries in `/tmp` left by other runs: one
@@ -41,7 +41,7 @@ function fixtureRoot(prefix: string): string {
   return root;
 }
 
-/** An instance whose knowledge graph sits at `kgPath` — deliberately NOT always "skills". */
+/** A layer whose knowledge graph sits at `kgPath` — deliberately NOT always "skills". */
 function instance(name: string, kgPath: string): string {
   const root = fixtureRoot(`overlay-${name}-`);
   mkdirSync(join(root, kgPath), { recursive: true });
@@ -53,7 +53,7 @@ function instance(name: string, kgPath: string): string {
 }
 
 function dependsOn(root: string, dep: string, provides?: string[]): void {
-  // `root` is a FIXTURE instance root; its config belongs IN it, under the
+  // `root` is a FIXTURE layer root; its config belongs IN it, under the
   // name `root`'s own `harness.json` declares — `instance()` above wrote one,
   // and `writeInstanceConfig` reads that name rather than imposing a new one.
   writeInstanceConfig(
@@ -66,7 +66,7 @@ function dependsOn(root: string, dep: string, provides?: string[]): void {
 
 describe("the overlay is read from declarations, not from a literal", () => {
   test("a knowledge graph NOT at skills/ is still found", () => {
-    // The whole reason the old `join(root, "skills")` was wrong. An instance
+    // The whole reason the old `join(root, "skills")` was wrong. A layer
     // may declare its kg anywhere; here the id is `cat-harness` and the path
     // is `kg/`, which is exactly the id/path split the declaration absorbs.
     const root = instance("solo", "kg");
@@ -86,7 +86,7 @@ describe("the overlay is read from declarations, not from a literal", () => {
 
   test("resolveDirectories keeps both as MEMBERS, but not in overlay order — why it is not used", () => {
     // Before option A (2026-09-30) resolveDirectories overrode by id and the
-    // dependency's graph vanished. It now keeps every instance's directory as
+    // dependency's graph vanished. It now keeps every layer's directory as
     // a member of the one subgraph — but the declaring (root) member comes
     // first, while the overlay is deepest-first, and it knows nothing of
     // `provides`. Pinned so a later "simplification" sees what it would break.
@@ -102,7 +102,7 @@ describe("the overlay is read from declarations, not from a literal", () => {
   });
 
   test("`provides` without 'skills' opts a dependency out", () => {
-    // The only way to depend on another instance for content or translations
+    // The only way to depend on another layer for content or translations
     // without inheriting its skills.
     const dep = instance("dep3", "skills");
     const root = instance("root3", "skills");
@@ -124,7 +124,7 @@ describe("the overlay is read from declarations, not from a literal", () => {
 
   test("an UNDECLARED instance still falls back to the conventions", () => {
     // A regression I introduced and the existing suite caught: the first
-    // version returned [] for an instance with no `harness.json`, which
+    // version returned [] for a layer with no `harness.json`, which
     // silently dropped every unmigrated dependency's skills.
     //
     // `AGENTS.md`: "Absent declaration is fine — an unmigrated instance falls
@@ -159,7 +159,7 @@ describe("the overlay is read from declarations, not from a literal", () => {
 
 describe("a REPOSITORY-scoped directory resolves against the repository", () => {
   /**
-   * An instance nested one level inside a checkout, declaring a kg directory
+   * A layer nested one level inside a checkout, declaring a kg directory
    * that lives BESIDE it rather than inside it — the `bootstrap/skills/` shape,
    * as a fixture, because the real tree has exactly one instance of it and an
    * assertion against the real tree would pin today's layout rather than the
@@ -181,7 +181,7 @@ describe("a REPOSITORY-scoped directory resolves against the repository", () => 
   test("ownDirectories resolves `scope: repository` one level out", () => {
     // The defect this suite exists for. `ownDirectories` composed
     // `resolve(link.root, dir.path)` and never called `rootForScope`, so a
-    // repository-scoped entry pointed INSIDE the instance — at a directory
+    // repository-scoped entry pointed INSIDE the layer — at a directory
     // that is not there. Nothing threw: `resolveSkillDirs` existence-filters,
     // so the graph was dropped and the run reported clean over it. That is
     // `dh4f`, and in the real tree it is why `skill_fetch` answered "package
@@ -258,8 +258,8 @@ describe("the two resolvers agree about what a declaration means", () => {
   });
 
   test("a default that is NOT on disk is not resolved — dh4f, not generosity", () => {
-    // The existence filter is what makes "seed the defaults always" safe: an
-    // instance that genuinely owns none of them gets none, and a
+    // The existence filter is what makes "seed the defaults always" safe: a
+    // layer that genuinely owns none of them gets none, and a
     // declared-but-absent directory is the defect where a consumer scans
     // nothing and reports a clean run over it.
     const root = instance("no-conventions", "kg");

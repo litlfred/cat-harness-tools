@@ -503,7 +503,7 @@ function citedBeans(): Record<string, CitedBean> {
   return Object.fromEntries(
     PAGES_CITES.map((id) => {
       // The id is a SUFFIX of the bean's own id (`folio-assistant-yzsj`), and
-      // matching on the full id would tie this to one instance's prefix.
+      // matching on the full id would tie this to one layer's prefix.
       const bean = store.beans.find((b) => b.id === id || b.id.endsWith(`-${id}`));
       return [id, bean ? { state: "read", status: bean.status } : { state: "absent" }];
     }),

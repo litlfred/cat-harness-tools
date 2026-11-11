@@ -142,7 +142,7 @@ function skillSidecarDir(node: { id: string; kind: AdversarialContentKind; path:
       if (hit !== undefined) return hit;
     }
   } catch {
-    // instance discovery failed: fall through to path resolution
+    // layer discovery failed: fall through to path resolution
   }
   const rawDir = dirname(node.path);
   if (rawDir === ".") {
@@ -174,7 +174,7 @@ export function resolveSidecarPath(node: { id: string; kind: AdversarialContentK
 
 /**
  * The committed attestation file for a sidecar path, or `undefined` when the
- * path is under no instance's `kg-qa/` tree (a scratch tree, as in the tests).
+ * path is under no layer's `kg-qa/` tree (a scratch tree, as in the tests).
  */
 export function reviewAttestationPath(sidecarPath: string, repoRoot: string = ROOT): { file: string; storeRoot: string } | undefined {
   try {

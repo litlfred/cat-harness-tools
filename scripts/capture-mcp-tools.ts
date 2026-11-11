@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * What this instance's MCP server actually serves, read from the registrars.
+ * What this layer's MCP server actually serves, read from the registrars.
  *
  * Mounting each registrar against a capture object gives the **real** Zod
  * shapes, including which keys are optional, because it asks the same objects

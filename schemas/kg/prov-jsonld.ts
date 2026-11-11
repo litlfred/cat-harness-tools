@@ -10,7 +10,7 @@
  * ## What it emits
  *
  * PROV-JSONLD's shape (W3C Member Submission 2024-08-25, held at
- * `cat-harness/library/kg/w3c-2024-prov-jsonld/`): an `Activity` node, and
+ * `cat-harness/library/corpus/kg/w3c-2024-prov-jsonld/`): an `Activity` node, and
  * each qualified association as its own `Association` node whose `activity`,
  * `agent`, `role` and `plan` are the context's TERMS — so its coercions and
  * its `@reverse` mapping to `prov:qualifiedAssociation` apply (rule
@@ -20,7 +20,7 @@
  *
  * At the node's release address, the rule `check:node-iris` enforces:
  * `<iriBase>v<major>/<path in its knowledge graph>[/<node>]`, read through
- * the OWNING instance's declaration (`releaseIris`). An actor is
+ * the OWNING layer's declaration (`releaseIris`). An actor is
  * `scenarios/actors/<id>`, a role `scenarios/roles/<id>`, a plan step
  * `<dir>/<process file stem>/<task>`. A node inside a document is a path
  * segment under it, never a `#` fragment, so each has its own page.
@@ -109,7 +109,7 @@ export interface AddressBook {
   subject?(kind: AddressKind, value: string): string | undefined;
 }
 
-/** Mints a subject IRI in the published document of the instance at `root`. */
+/** Mints a subject IRI in the published document of the layer at `root`. */
 export type SubjectMinter = (root: string, kind: "actor" | "role" | "process", id: string) => string | undefined;
 
 /**
@@ -131,9 +131,9 @@ export function processHolding(xml: string, taskId: string): string | undefined 
 }
 
 interface Owned {
-  /** Instance root, absolute. */
+  /** Layer root, absolute. */
   root: string;
-  /** Path inside the instance, without extension, `/`-separated. */
+  /** Path inside the layer, without extension, `/`-separated. */
   path: string;
   fragment?: string;
   /** The file itself, absolute (plans only). */
@@ -155,8 +155,8 @@ const rel = (root: string, file: string): string => relative(root, file).split("
 
 /**
  * The address book for a checkout: who owns each actor, role and process, and
- * at what release address. Built once; nested instances are their own owners
- * (`instanceRootsIn`), so a process file is attributed to the DEEPEST instance
+ * at what release address. Built once; nested layers are their own owners
+ * (`instanceRootsIn`), so a process file is attributed to the DEEPEST layer
  * holding it.
  */
 export function addressBook(repo: string, mint?: SubjectMinter): AddressBook {
@@ -167,8 +167,8 @@ export function addressBook(repo: string, mint?: SubjectMinter): AddressBook {
   const plans = new Map<string, Owned>();
 
   for (const root of roots) {
-    // The instance's own declared `scenarios` graph, never a composed path:
-    // an instance that declares none holds no actors or roles to address.
+    // The layer's own declared `scenarios` graph, never a composed path:
+    // a layer that declares none holds no actors or roles to address.
     const scenarios = instanceDirectoryForGraph(root, "scenarios");
     if (!scenarios) continue;
     const actorDir = join(scenarios, "actors");
@@ -183,7 +183,7 @@ export function addressBook(repo: string, mint?: SubjectMinter): AddressBook {
     }
   }
   // `prov:used` names catalogue items (`item/<uuid>`, a DSpace id). Each
-  // instance's declared `catalogue` graph holds `folio-catalogue-node/v1`
+  // layer's declared `catalogue` graph holds `folio-catalogue-node/v1`
   // records; one with a Handle is addressed at the global Handle resolver,
   // the identifier that outlives the publishing host (owner 2026-10-01,
   // option A). The same rule as `handleIri` in the content core's
@@ -226,7 +226,7 @@ export function addressBook(repo: string, mint?: SubjectMinter): AddressBook {
   };
 
   // `prov:used` also names tool releases (`<name>@<version>` or
-  // `tool-releases/<stem>`) from an instance's declared `tool-release` graph
+  // `tool-releases/<stem>`) from a layer's declared `tool-release` graph
   // (issue #2481, bean `3sbm`, step 3 of `docs/proposals/tool-releases-2026-10-07.md`).
   for (const root of roots) {
     const dir = instanceDirectoryForGraph(root, "tool-release");

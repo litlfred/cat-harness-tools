@@ -239,7 +239,7 @@ if (import.meta.main) {
   const repoRoot = repoRootFor(ROOT);
   const g = readVoicesGraph([repoRoot], repoRoot);
   if (g === null) {
-    // NOT a pass. An instance declaring no voices has none to check, and
+    // NOT a pass. A layer declaring no voices has none to check, and
     // saying so is different from saying they are all fine.
     console.log("Voice skills — no voices directory is declared, so nothing was checked");
     process.exit(0);

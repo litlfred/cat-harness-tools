@@ -9,11 +9,15 @@
  * @module scripts/tests/check-workflow-paths.test
  */
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   FOLIO_PATHS,
   Verdict,
   allWorkDirs,
+  allowlistsNotOursReason,
   cdTarget,
   cwdFlag,
   invocationsFrom,
@@ -229,7 +233,10 @@ describe("verdicts", () => {
   });
 
   test("a declared folio path is NEEDS-FOLIO and carries its reason", () => {
-    const [inv] = invocationsFrom("f.yml", wf("cd content\nbun run pipeline/build.ts"));
+    // The shipped table is empty since folio-assistant#3066, so the entry is
+    // the test's own: what is pinned is the verdict a declaration produces.
+    const table = [{ match: "pipeline/build.ts", reason: "a folio's own build, which this checkout has no copy of" }];
+    const [inv] = invocationsFrom("f.yml", wf("cd content\nbun run pipeline/build.ts"), table);
     expect(inv.verdict).toBe(Verdict.NeedsFolio);
     expect(inv.note).toMatch(/folio/i);
   });
@@ -429,17 +436,15 @@ describe("FOLIO_PATHS", () => {
     }
   });
 
-  test("build.ts is exempt for the FOLIO's copy, not resolved to the platform's", () => {
-    // `cat-harness/content/pipeline/build.ts` exists and is a DIFFERENT file
-    // with the same basename. Pointing the workflow at it would be a wrong
-    // fix that looks like a right one, so the exemption records why.
-    const entry = FOLIO_PATHS.find((f) => f.match === "pipeline/build.ts");
-    // The invariant, not a phrasing: the reason must name the basename trap
-    // and must say `folio/` is retired rather than merely absent. Pinning
-    // the exact sentence broke on the first correction, which is the wrong
-    // thing for a test to be sensitive to.
-    expect(entry?.reason).toContain("basename");
-    expect(entry?.reason).toContain("retired");
+  test("build.ts is not exempt any more, and is not resolved to the platform's copy either", () => {
+    // Its entry left with `publish.yml` (folio-assistant#3066). The trap it
+    // recorded still holds: `pipeline/build.ts` exists in cat-harness-tools,
+    // a DIFFERENT file with the same basename, and a folio's `cd content`
+    // copy must not be read as that one. With no exemption it is MISSING —
+    // a finding, not a pass and not a quiet NEEDS-FOLIO.
+    expect(FOLIO_PATHS.find((f) => f.match === "pipeline/build.ts")).toBeUndefined();
+    const [inv] = invocationsFrom("f.yml", wf("cd content\nbun run pipeline/build.ts"));
+    expect(inv.verdict).toBe(Verdict.Missing);
   });
 });
 
@@ -491,17 +496,18 @@ describe("working-directory — does the cwd exist at all", () => {
     expect(verdictOf(wfCwd("${{ matrix.lake-root }}"))).toBe(Verdict.Undetermined);
   });
 
-  // `folio-assistant/snappea-wasm` rather than `content`: the `content` entry
-  // left FOLIO_WORKDIRS under bean `52dz`, when the workflows that `cd content`
-  // became `folio_init` templates.
+  // `tools/hecke-engine` rather than `content`: the `content` entry left
+  // FOLIO_WORKDIRS under bean `52dz`, when the workflows that `cd content`
+  // became `folio_init` templates, and `folio-assistant/snappea-wasm` left it
+  // with `snappea_wasm.yml` (folio-assistant#3066).
   test("a folio directory is exempt WITH A REASON, not silently skipped", () => {
-    const [wd] = workDirsFrom("w.yml", wfCwd("folio-assistant/snappea-wasm"));
+    const [wd] = workDirsFrom("w.yml", wfCwd("tools/hecke-engine"));
     expect(wd?.verdict).toBe(Verdict.NeedsFolio);
     expect(wd?.note ?? "").not.toBe("");
   });
 
   test("the exemption matches a subdirectory of a folio path too", () => {
-    expect(verdictOf(wfCwd("folio-assistant/snappea-wasm/src"))).toBe(Verdict.NeedsFolio);
+    expect(verdictOf(wfCwd("tools/hecke-engine/src"))).toBe(Verdict.NeedsFolio);
   });
 });
 
@@ -673,5 +679,27 @@ describe("the baseline is a RATCHET", () => {
     // being vacuous, so this one does not also have to.
     const live = allWorkDirs().filter((w) => w.verdict === Verdict.Missing);
     expect(live.every((w) => workDirBaseline().has(workDirKey(w)))).toBe(true);
+  });
+});
+
+describe("the allowlist ratchets are the harness root's (cat-harness-tools#1701)", () => {
+  test("a content root (no gates workflow) excuses them, with a reason", () => {
+    const root = mkdtempSync(join(tmpdir(), "wp-content-"));
+    try {
+      expect(allowlistsNotOursReason(root)).toContain("content root");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a harness root judges them as before", () => {
+    const root = mkdtempSync(join(tmpdir(), "wp-harness-"));
+    try {
+      mkdirSync(join(root, ".github", "workflows"), { recursive: true });
+      writeFileSync(join(root, ".github", "workflows", "code-quality-gates.yml"), "jobs: {}\n");
+      expect(allowlistsNotOursReason(root)).toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -31,7 +31,7 @@ import { materializedNodesIn, run } from "../check-read-only-graphs.js";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 
-/** An instance with one declared directory holding `nodes` materialized records. */
+/** A layer with one declared directory holding `nodes` materialized records. */
 function fixture(dir: Record<string, unknown>, nodes: number, top: Record<string, unknown> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "ro-"));
   const inst = join(root, "inst");

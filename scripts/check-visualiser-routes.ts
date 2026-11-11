@@ -4,7 +4,7 @@
  * inside the route its Tool is declared to render.
  *
  * @module scripts/check-visualiser-routes
- * @covers cat-harness — the `visualisers` of every instance declaration in the
+ * @covers cat-harness — the `visualisers` of every layer declaration in the
  *   checkout, and the pages under the site directory that name a `rendered-by`
  *
  * A harness declares its visualisers and each one's `renderedBy` Tool. The

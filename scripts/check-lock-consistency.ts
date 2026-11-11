@@ -18,7 +18,7 @@
  *
  * ## The rule
  *
- * For each instance A the index's lock pins at commit `a`, and each mounted
+ * For each layer A the index's lock pins at commit `a`, and each mounted
  * layer L whose OWN lock (at the commit the index pins L) pins A at `b`:
  * `a === b`, or it is a finding. A layer L pins that the index does not
  * mount is not compared.
@@ -26,7 +26,7 @@
  * ## Which pairs it judges, and when it can be green
  *
  * Every pair: the index against EVERY mounted layer that has a lock, the
- * harness and the content layers alike, not only the instances below the
+ * harness and the content layers alike, not only the layers below the
  * harness. Aligning the harness's own pins (cat-harness#1570, #1097) clears
  * the pairs against cat-harness; the content layers' locks hold older pins
  * that also disagree with each other today, so this check stays red until

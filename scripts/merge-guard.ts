@@ -48,7 +48,17 @@
  *    that file's dispatch line cannot be parsed. One exemption from WAITING,
  *    never from judging: a workflow in {@link NOT_WAITED_FOR_WORKFLOW_FILES}
  *    (Feature Staging) that is still in flight or has not started is not a
- *    refusal; once finished, red refuses.
+ *    refusal; once finished, red refuses. The same holds for the
+ *    {@link AGENT_BUILD_CONTEXT} commit status (folio-assistant#2881): when
+ *    Feature Staging defers to an agent-built preview its own run judges
+ *    nothing, and the verify rebuild reports the built-site checks only
+ *    there. `failure` or `error` refuses as a defect; `pending` is not
+ *    waited for.
+ *    **Check 5 gates a RELEASE only** (owner, card Q-CIB-4 A, 2026-11-08:
+ *    "CI not gate on non-release merge to main"). A merge is a release when
+ *    run with `--release` or when the PR carries the `release` label. On any
+ *    other merge the same judgement is made and reported, and the check
+ *    passes as advisory ({@link advisoryCi}).
  * 6. `checklist` — no unticked `- [ ]` item in the body.
  * 7. `open-question` — no comment newer than the ready marker asks the owner
  *    or the Merge Manager an open question. A heuristic; its limits are on
@@ -118,6 +128,14 @@ export const BASE = "main";
 export const READY_LABEL = "ready-to-merge";
 export const HUMAN_LABEL = "needs-merge-human";
 export const BOT_LOGIN = "github-actions[bot]";
+/**
+ * The commit status an agent-built preview's verify rebuild posts on the head
+ * (folio-assistant#2881, `feature-staging.yml`). A deferred Feature Staging run
+ * builds and checks nothing, so it is green over a site it never examined;
+ * this status is where its checks reach the PR. Check 5 judges it the way it
+ * judges Feature Staging: once it has an answer, never waiting for one.
+ */
+export const AGENT_BUILD_CONTEXT = "preview/agent-build";
 /** The first line of every comment `merge-main.yml` writes. */
 export const MERGE_MAIN_MARKER = "<!-- merge-main-bot -->";
 /** This guard's own workflow. Its runs are never evidence about the head: they are the guard. */
@@ -251,6 +269,21 @@ export interface GuardSnapshot {
    * means not fetched, which refuses as before.
    */
   failedSteps?: Record<number, string[] | { unknown: string }>;
+  /**
+   * The newest {@link AGENT_BUILD_CONTEXT} status on the head: `null` when the
+   * head has none (no agent build), `unknown` when the statuses could not be
+   * read. Absent means not fetched, and nothing is judged.
+   */
+  agentBuild?: GhStatus | null | { unknown: string };
+}
+
+/** A commit status as `GET /repos/{repo}/commits/{ref}/statuses` returns it (newest first). */
+export interface GhStatus {
+  context: string;
+  state: string;
+  description?: string | null;
+  target_url?: string | null;
+  created_at?: string;
 }
 
 export interface GuardOptions {
@@ -266,6 +299,12 @@ export interface GuardOptions {
    * still applies. CLI: `--no-merge-manager`.
    */
   noMergeManager?: boolean;
+  /**
+   * This merge is a RELEASE (owner, card Q-CIB-4 A, 2026-11-08): check 5
+   * gates it. Without it, and without the {@link RELEASE_LABEL} label on the
+   * PR, check 5 is advisory. CLI: `--release`.
+   */
+  release?: boolean;
   /** For a fixture's clock; defaults to {@link READY_WINDOW_MS}. */
   readyWindowMs?: number;
 }
@@ -662,12 +701,23 @@ function runOrder(r: GuardRun): number {
   return r.id ?? Number(r.html_url?.match(/\/runs\/(\d+)/)?.[1] ?? 0);
 }
 
-/** The latest run per workflow name, by {@link runOrder}. */
+/** A finished run whose every job was skipped: it judged nothing. */
+const allSkipped = (r: GuardRun) => r.status === "completed" && r.conclusion === "skipped";
+
+/**
+ * The latest run per workflow name, by {@link runOrder}. A run whose every job
+ * skipped judged nothing, so it never displaces another run of the same
+ * workflow on the head: a `labeled` run for a label other than `release`
+ * (`ready-to-merge`, added after the full tier) skips every job, and taken as
+ * the latest it would read a red full tier as passed (owner, 2026-11-11,
+ * card B). It stands only when no run of that workflow judged anything.
+ */
 function latestByName(runs: readonly GuardRun[]): Map<string, GuardRun> {
   const latest = new Map<string, GuardRun>();
   for (const r of runs) {
     const prev = latest.get(r.name);
-    if (!prev || runOrder(r) > runOrder(prev)) latest.set(r.name, r);
+    const newer = !prev || runOrder(r) > runOrder(prev);
+    if (!prev || (allSkipped(prev) && !allSkipped(r)) || (newer && (!allSkipped(r) || allSkipped(prev)))) latest.set(r.name, r);
   }
   return latest;
 }
@@ -767,6 +817,21 @@ function checkCi(s: GuardSnapshot): CheckResult {
       if (Array.isArray(steps) && steps.length > 0 && steps.every((x) => x === DEPLOY_ONLY_STEP)) {
         notWaited.push(`${name} (${r.conclusion} in the deploy step only)`);
       } else problem(name, `${name}: ${r.conclusion}`, "defect");
+    }
+  }
+
+  // The agent-built preview's verify (folio-assistant#2881): judged once it
+  // has an answer, never waited for, as Feature Staging is.
+  const ab = s.agentBuild;
+  if (ab !== undefined && ab !== null) {
+    if ("unknown" in ab) {
+      return R(5, "ci", "unknown", `could not read the head's \`${AGENT_BUILD_CONTEXT}\` status: ${ab.unknown}`);
+    }
+    const why = ab.description ? ` (${ab.description})` : "";
+    if (ab.state === "failure" || ab.state === "error") {
+      problem(AGENT_BUILD_CONTEXT, `${AGENT_BUILD_CONTEXT}: ${ab.state}${why}`, "defect");
+    } else if (ab.state === "pending") {
+      notWaited.push(`${AGENT_BUILD_CONTEXT} (pending: the verify rebuild has not reported)`);
     }
   }
 
@@ -873,13 +938,36 @@ function checkMergeable(s: GuardSnapshot): CheckResult {
 }
 
 /** Run the eight checks. Pure: everything it reads is in `s`. */
+/** The label that makes a merge a release, so CI gates it (check 5). */
+export const RELEASE_LABEL = "release";
+
+const ADVISORY_RULING = 'owner, card Q-CIB-4 A, 2026-11-08: "CI not gate on non-release merge to main"';
+
+/** A release merge: `--release`, or the PR carries {@link RELEASE_LABEL}. */
+export function isRelease(s: GuardSnapshot, o: GuardOptions = {}): boolean {
+  return o.release === true || s.pr.labels.some((l) => l.name === RELEASE_LABEL);
+}
+
+/**
+ * Check 5 on a NON-release merge: reported, never a refusal. The full suite
+ * gates the release instead (release-gated CI, cat-harness
+ * `release-lifecycle`). What CI said is kept in the detail, so the verdict
+ * still shows a red or unread head.
+ */
+export function advisoryCi(c: CheckResult): CheckResult {
+  if (c.status === "pass") return { ...c, detail: `${c.detail} (advisory: not a gate on a non-release merge)` };
+  const what = c.status === "unknown" ? "could not be judged" : "is not green";
+  return R(5, "ci", "pass", `advisory, not a gate: CI ${what} (${c.detail}). A non-release merge does not wait for CI (${ADVISORY_RULING}); \`--release\` or the \`${RELEASE_LABEL}\` label makes it a gate`);
+}
+
 export function evaluate(s: GuardSnapshot, o: GuardOptions = {}): GuardVerdict {
+  const ci = checkCi(s);
   const checks = [
     checkBase(s),
     checkReadyForReview(s, o),
     checkReadyMarker(s),
     checkLabels(s),
-    checkCi(s),
+    isRelease(s, o) ? ci : advisoryCi(ci),
     checkChecklist(s),
     checkOpenQuestion(s),
     checkMergeable(s),
@@ -1013,6 +1101,18 @@ export async function fetchPull(
 }
 
 /** Read everything {@link evaluate} needs. Throws {@link CannotAsk} when a required fact is unreadable. */
+/**
+ * The newest {@link AGENT_BUILD_CONTEXT} status, or `null` for none. GitHub
+ * lists a ref's statuses newest first, and every update is a new entry, so
+ * the first match is the current one; `created_at` orders them when present.
+ */
+export function agentBuildStatus(statuses: readonly GhStatus[]): GhStatus | null {
+  const mine = statuses.filter((x) => x.context === AGENT_BUILD_CONTEXT);
+  if (mine.length === 0) return null;
+  if (mine.every((x) => x.created_at)) return [...mine].sort((a, b) => b.created_at!.localeCompare(a.created_at!))[0]!;
+  return mine[0]!;
+}
+
 export async function fetchSnapshot(repo: string, n: number, root: string): Promise<GuardSnapshot> {
   const pr = await fetchPull(repo, n);
   const [comments, timeline, commits] = await Promise.all([
@@ -1059,7 +1159,13 @@ export async function fetchSnapshot(repo: string, n: number, root: string): Prom
       }
     }
   }
-  return { pr, comments, timeline, commits, baseMergedAsHeadOf, runs, scan, mergeMainDispatches, failedSteps };
+  let agentBuild: GuardSnapshot["agentBuild"];
+  try {
+    agentBuild = agentBuildStatus(await getJson<GhStatus[]>(`repos/${repo}/commits/${pr.head.sha}/statuses?per_page=100`));
+  } catch (e) {
+    agentBuild = { unknown: e instanceof Error ? e.message : String(e) };
+  }
+  return { pr, comments, timeline, commits, baseMergedAsHeadOf, runs, scan, mergeMainDispatches, failedSteps, agentBuild };
 }
 
 export type MergeOutcome = { merged: true; sha: string } | { merged: false; refused: boolean; reason: string };
@@ -1106,7 +1212,7 @@ export function render(v: GuardVerdict): string {
   return lines.join("\n");
 }
 
-const USAGE = "usage: bun run cat merge:guard <pr> [--merge --session <id> [--no-merge-manager]] [--actor <login>] [--repo owner/repo] [--status] [--json]";
+const USAGE = "usage: bun run cat merge:guard <pr> [--merge --session <id> [--no-merge-manager]] [--release] [--actor <login>] [--repo owner/repo] [--status] [--json]";
 
 async function main(argv: string[]): Promise<number> {
   const args = [...argv];
@@ -1127,6 +1233,7 @@ async function main(argv: string[]): Promise<number> {
   const asJson = flag("--json");
   const doStatus = flag("--status");
   const noMergeManager = flag("--no-merge-manager");
+  const release = flag("--release");
   const sessionArg = opt("--session");
   const actor = opt("--actor");
   const root = repoRootFor(resolve(HARNESS_ROOT));
@@ -1149,7 +1256,7 @@ async function main(argv: string[]): Promise<number> {
     console.error(`merge-guard #${n}: COULD NOT DETERMINE — ${e instanceof Error ? e.message : String(e)}`);
     return 2;
   }
-  const v = evaluate(snapshot, { mergingSession, mergingActor: actor, noMergeManager });
+  const v = evaluate(snapshot, { mergingSession, mergingActor: actor, noMergeManager, release });
   console.log(asJson ? JSON.stringify(v, null, 2) : render(v));
   if (doStatus) {
     try {

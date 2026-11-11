@@ -1,6 +1,6 @@
 /**
- * Bean `g8jp`, GAP 1: the site build mounts an instance's directories from a
- * SUBSCRIPTION's materialised tree, not only from an in-tree instance. Every
+ * Bean `g8jp`, GAP 1: the site build mounts a layer's directories from a
+ * SUBSCRIPTION's materialised tree, not only from an in-tree layer. Every
  * test builds a fixture repository with one subscriber and a substrate served
  * through `subscribe`'s injectable fetcher — no network.
  */
@@ -49,7 +49,7 @@ const fetchRoot: RootFetcher = () => {
   return d;
 };
 
-/** A repository with one subscriber instance, `host/`, subscribed to the substrate at {@link SHA}. */
+/** A repository with one subscriber layer, `host/`, subscribed to the substrate at {@link SHA}. */
 async function repoWith(subgraphs: string[]): Promise<{ repo: string; host: string; snapshotDir: string }> {
   const repo = tmp("subscribed-trees-repo-");
   const host = join(repo, "host");

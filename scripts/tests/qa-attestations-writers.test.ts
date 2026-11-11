@@ -72,9 +72,9 @@ interface Fixture {
 /** A content repo with one block, a store holding two attestations on it, and NO derived report. */
 function fixture(): Fixture {
   // NESTED one level, inside a REAL repository: the criteria registry asks git
-  // for the top level and then scans the instances beside it (`repoRootFor` is
+  // for the top level and then scans the layers beside it (`repoRootFor` is
   // the parent directory), so a fixture directly under the temp directory would
-  // read every other test's fixture as a sibling instance.
+  // read every other test's fixture as a sibling layer.
   const parent = realpathSync(mkdtempSync(join(tmpdir(), "qa-attest-writers-")));
   const root = join(parent, "repo");
   mkdirSync(root);

@@ -22,13 +22,13 @@
  *
  * The entry files are FOUND, not listed (a list would go stale like the
  * links): the three agent-generic names, at the repository root and at any
- * instance root (e.g. `bootstrap/AGENTS.md`), skipping vendored and published
+ * layer root (e.g. `bootstrap/AGENTS.md`), skipping vendored and published
  * trees.
  *
  * ## A moved path
  *
- * A link into a path some instance has moved resolves at the new place while
- * that instance's `moves` entry is in its window (sdlc skill
+ * A link into a path some layer has moved resolves at the new place while
+ * that layer's `moves` entry is in its window (sdlc skill
  * `two-phase-move`), and is reported as moved, not dead; past `until` it is
  * dead again.
  */
@@ -45,8 +45,8 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
  * The `resolveMoved` a link auditor takes: through the moves declared by the
- * instances at and under {@link start} (an instance root or a checkout root)
- * and every instance of its checkout, when it has one.
+ * layers at and under {@link start} (a layer root or a checkout root)
+ * and every layer of its checkout, when it has one.
  */
 export function movesResolver(
   start: string,
@@ -56,7 +56,7 @@ export function movesResolver(
   try {
     roots.push(...instanceRootsIn(checkoutRootFor(start)));
   } catch {
-    // Not in a checkout: the instance's own moves are still honoured.
+    // Not in a checkout: the layer's own moves are still honoured.
   }
   const moves = declaredMoves(roots, today);
   return (abs) => {
@@ -82,7 +82,7 @@ const SKIP = new Set(["node_modules", ".git", "_site", "dist", "build", ".lake",
 /**
  * Entry files at the repository root and one level down.
  *
- * One level, because an instance root is a direct child (`bootstrap/`,
+ * One level, because a layer root is a direct child (`bootstrap/`,
  * `cat-harness/`). Deeper is a folio's own content, which is not this
  * repository's to gate.
  */

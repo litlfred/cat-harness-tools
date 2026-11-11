@@ -74,6 +74,7 @@ import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declar
 import { generatedBanner } from "@litlfred/bootstrap-tools/scripts/generated-by.ts";
 import { frontMatter, nodeSummary } from "../scripts/front-matter.ts";
 import { isSkillMd, skillMdDirs } from "../scripts/known-skills.ts";
+import { groupOf, optInRootsOf } from "../schemas/kg/opt-in-roots.ts";
 import { filesSection, processesSection, rolesSection } from "@litlfred/bootstrap-tools/scripts/readme-graph-sections.ts";
 
 // ── Section contract ────────────────────────────────────────────────────────
@@ -354,7 +355,7 @@ const simulatorsSection: ReadmeSection = {
     // the first place.
     let dir = "simulators";
     const eff = readEffectiveConfig(root);
-    // The index entry when one lists the instance, else `<name>.config.json`.
+    // The index entry when one lists the layer, else `<name>.config.json`.
     if (eff.state === "ok") {
       try {
         const parsed = eff.config as {
@@ -402,9 +403,9 @@ const workflowsSection: ReadmeSection = {
   summary: "GitHub Actions workflows, described by their own `name:` field.",
   render({ root }) {
     // `root` is the FOLIO's root, supplied by the caller — this module
-    // generates a folio's README, not this instance's. `.github/` sits at that
+    // generates a folio's README, not this layer's. `.github/` sits at that
     // root. The `repoRootFor` sweep of 2026-09-19 treated this like the ~57
-    // sites where `root` meant this instance, and sent it to the folio's
+    // sites where `root` meant this layer, and sent it to the folio's
     // PARENT. The platform assuming it is the folio is the boundary this
     // repository exists to keep.
     const dir = join(root, ".github", "workflows");
@@ -444,7 +445,7 @@ const workflowsSection: ReadmeSection = {
 // ── Harness instances ───────────────────────────────────────────────────────
 
 /**
- * Two entries per instance, because two different readers arrive.
+ * Two entries per layer, because two different readers arrive.
  *
  * The owner, 2026-09-20:
  *
@@ -459,10 +460,10 @@ const workflowsSection: ReadmeSection = {
  * and this repository has paid for the other shape repeatedly: a hardcoded
  * list of instances in two gates (bean `6tkl`), a hardcoded skills catalogue,
  * a comment asserting a committed artefact that was gitignored. **A table of
- * instances written by hand is wrong the day an instance is added**, and
+ * instances written by hand is wrong the day a layer is added**, and
  * nobody finds out, because a README is the one file no check reads.
  *
- * So every cell here is resolved from the instance's own `harness.json`: its
+ * So every cell here is resolved from the layer's own `harness.json`: its
  * declared assets for the two file links, its declared `graphs` for the two
  * directory links. Nothing is composed from a convention — `join(root,
  * "AGENTS.md")` would render a link to a file that may not be declared, and
@@ -471,9 +472,9 @@ const workflowsSection: ReadmeSection = {
  *
  * ## A gap is rendered AS a gap
  *
- * An instance with no `agent-instructions` asset gets an em dash and a
+ * A layer with no `agent-instructions` asset gets an em dash and a
  * footnote count, never a blank cell and never a guessed path. Eight of eleven
- * instances were in that state when this was written, and a table that quietly
+ * layers were in that state when this was written, and a table that quietly
  * omitted them would have read as though the work were done. Same rule as
  * every other section here: not-looked-at is never reported as nothing-found,
  * and a KNOWN gap is not reported as an absence either.
@@ -483,17 +484,17 @@ const instancesSection: ReadmeSection = {
   summary: "Every harness instance in this repository, with its agent entry and its human entry",
   render(ctx) {
     // `ctx.root` and NOT `repoRootFor(ctx.root)`: this section indexes the
-    // instances held by the instance whose README is being written, and
-    // `repoRootFor` is `instanceRoot/..` — correct for a nested instance
+    // layers held by the layer whose README is being written, and
+    // `repoRootFor` is `instanceRoot/..` — correct for a nested layer
     // asking "which repository am I in", and one level too far for the
-    // repository root itself, which is exactly the instance that carries this
+    // repository root itself, which is exactly the layer that carries this
     // section. Called that way it enumerated the CONTAINING directory and
     // rendered a one-row table listing this repository as its own child.
     const repo = ctx.root;
     const roots = instanceRootsIn(repo);
-    // Zero instances is UNDETERMINED, not "this repository has none": the
+    // Zero layers is UNDETERMINED, not "this repository has none": the
     // reader is holding a README that sits in a repository which, by
-    // construction, contains at least the instance that declared it.
+    // construction, contains at least the layer that declared it.
     if (roots.length === 0) {
       return { markdown: "", notes: ["no instance declares a <name>.json — nothing was read"], skip: true };
     }
@@ -518,7 +519,7 @@ const instancesSection: ReadmeSection = {
       if (decl === undefined) continue;
 
       // A declared `src` or `path` is relative to the root its SCOPE names —
-      // this instance's by default, the repository's when `scope` says so —
+      // this layer's by default, the repository's when `scope` says so —
       // which is the one rule `rootForScope` exists to hold. Composing
       // `./<instance>/<path>` instead rendered cat-harness's `memory/` as
       // `./cat-harness/memory/`, and it is declared `scope: "repository"`, so
@@ -535,14 +536,14 @@ const instancesSection: ReadmeSection = {
         const a = (decl.assets ?? []).find((x) => x.role === role);
         return a === undefined ? undefined : { src: a.src, scope: a.scope };
       };
-      // A directory link is any directory this instance declares as holding
+      // A directory link is any directory this layer declares as holding
       // that graph typology. Several is possible and all of them are rendered:
-      // picking one would be this file choosing on the instance's behalf.
+      // picking one would be this file choosing on the layer's behalf.
       //
       // A declared directory that is NOT ON DISK is not linked, and is
-      // counted instead. An index checkout lays an instance down as a remote
+      // counted instead. An index checkout lays a layer down as a remote
       // mount, and a mount may take only some of its directories
-      // (`overrides.<name>.directories`) — an instance's declared `docs/` may
+      // (`overrides.<name>.directories`) — a layer's declared `docs/` may
       // not be mounted. Linking it rendered a dead link in a generated row, which
       // asserts the entry exists; dropping it silently would hide the gap.
       const dirs = (kind: string): Array<{ path: string; scope?: string }> =>
@@ -597,7 +598,7 @@ const instancesSection: ReadmeSection = {
 
     // The gaps are stated under the table rather than left as em dashes a
     // reader has to count. `check:subgraph-coverage` is named because it is
-    // the thing that will tell them WHICH instance, and a README that reports
+    // the thing that will tell them WHICH layer, and a README that reports
     // a number without saying where to get the list is the "count in prose"
     // failure this repository already has a rule about.
     const gaps: string[] = [];
@@ -671,7 +672,7 @@ const instancesSection: ReadmeSection = {
  * for an agent with no MCP server. A README that lists skills is wrong the
  * day a skill is added and nothing says so, because a README is the one file
  * no check reads. This repository has paid for that shape repeatedly: a
- * hardcoded instance list in two gates (`6tkl`), a hardcoded skills
+ * hardcoded layer list in two gates (`6tkl`), a hardcoded skills
  * catalogue, a comment asserting a committed artefact that was gitignored.
  *
  * The one thing it DOES compute is the active-vs-static verdict, because
@@ -936,7 +937,7 @@ const readmeTocSection: ReadmeSection = {
   },
 };
 
-// ── Skills this instance publishes ──────────────────────────────────────────
+// ── Skills this layer publishes ──────────────────────────────────────────
 
 /** The marker for the per-repository skill index (bean `e0uk`). */
 export const SKILLS_INDEX_MARKER = "skills:index";
@@ -995,13 +996,14 @@ export function skillPurpose(text: string, name: string): { summary?: string; fr
  */
 export const AGENTS_MD_BYTE_BUDGET = 32_768;
 
-/** Where the full list goes when it does not fit in AGENTS.md: beside it, at the instance root. */
+/** Where the full list goes when it does not fit in AGENTS.md: beside it, at the layer root. */
 export const SKILLS_INDEX_FILE = "SKILLS.md";
 
-/** The instance's own skills, grouped by declared directory. */
-export function ownSkillIndex(root: string): { packages: { dir: string; rows: string[] }[]; total: number; notes: string[] } {
+/** The layer's own skills, grouped by declared directory. */
+export function ownSkillIndex(root: string): { packages: { dir: string; rows: string[]; optIn?: string }[]; total: number; notes: string[] } {
   const notes: string[] = [];
-  const packages: { dir: string; rows: string[] }[] = [];
+  const packages: { dir: string; rows: string[]; optIn?: string }[] = [];
+  const groups = optInRootsOf(root);
   let total = 0;
   for (const parts of skillMdDirs(root, "instance")) {
     const abs = join(root, ...parts);
@@ -1011,15 +1013,19 @@ export function ownSkillIndex(root: string): { packages: { dir: string; rows: st
       .sort();
     if (files.length === 0) continue;
     const dir = parts.join("/");
+    // A skill inside an opt-in sub-graph is absent wherever the group is
+    // switched off, so the list names it without linking it.
+    const optIn = groupOf(abs.replace(/[\\/]+$/, ""), groups)?.id;
     const rows = files.map((f) => {
       const text = readFileSync(join(abs, f), "utf-8");
       const name = frontMatter(text).name ?? f.slice(0, -3);
       const { summary, from } = skillPurpose(text, name);
       if (from !== "description") notes.push(`${dir}/${f}: no \`description:\` in front matter (summary from ${from})`);
-      return `| [\`${cell(name)}\`](${dir}/${f}) | ${summary === undefined ? "_(no description)_" : cell(summary)} |`;
+      const label = `\`${cell(name)}\``;
+      return `| ${optIn === undefined ? `[${label}](${dir}/${f})` : label} | ${summary === undefined ? "_(no description)_" : cell(summary)} |`;
     });
     total += rows.length;
-    packages.push({ dir, rows });
+    packages.push(optIn === undefined ? { dir, rows } : { dir, rows, optIn });
   }
   return { packages, total, notes };
 }
@@ -1027,6 +1033,11 @@ export function ownSkillIndex(root: string): { packages: { dir: string; rows: st
 const INDEX_FOOTER =
   "`bun run cat readme:sync` rewrites this list and `readme:sync:check` fails when it is stale. " +
   "Skills this repository inherits are listed by the repositories that publish them.";
+
+/** The marker after a directory in an opt-in sub-graph: its skills are unlinked, since the group may be switched off. */
+function optInNote(p: { optIn?: string }): string {
+  return p.optIn === undefined ? "" : ` (opt-in \`${p.optIn}\`)`;
+}
 
 /** The full list: every skill with its one-line purpose. */
 export function renderFullSkillIndex(idx: ReturnType<typeof ownSkillIndex>): string {
@@ -1036,7 +1047,7 @@ export function renderFullSkillIndex(idx: ReturnType<typeof ownSkillIndex>): str
     "",
   ];
   for (const p of idx.packages) {
-    lines.push(`**\`${p.dir}/\`** (${p.rows.length})`, "", "| Skill | What it is for |", "|---|---|", ...p.rows, "");
+    lines.push(`**\`${p.dir}/\`** (${p.rows.length})${optInNote(p)}`, "", "| Skill | What it is for |", "|---|---|", ...p.rows, "");
   }
   return lines.join("\n");
 }
@@ -1051,7 +1062,7 @@ export function renderCompactSkillIndex(idx: ReturnType<typeof ownSkillIndex>, b
     "",
     "| Directory | Skills |",
     "|---|---|",
-    ...idx.packages.map((p) => `| [\`${p.dir}/\`](${p.dir}/) | ${p.rows.length} |`),
+    ...idx.packages.map((p) => `| ${p.optIn === undefined ? `[\`${p.dir}/\`](${p.dir}/)` : `\`${p.dir}/\`${optInNote(p)}`} | ${p.rows.length} |`),
     "",
   ].join("\n");
 }
@@ -1069,7 +1080,7 @@ export function skillIndexIsCompact(root: string, agentsText: string, budget = A
 }
 
 /**
- * The skills THIS instance publishes, so an agent opened in this repository
+ * The skills THIS layer publishes, so an agent opened in this repository
  * alone sees them without an MCP server or a query.
  *
  * The owner, 2026-10-24 09:49Z: *"all repos should have agentic advice (e.g.
@@ -1079,7 +1090,7 @@ export function skillIndexIsCompact(root: string, agentsText: string, budget = A
  * one file no check reads". This section is the answer to that reason rather
  * than an exception to it: it is generated from each skill's own front
  * matter, and `readme:sync:check` fails CI the day it goes stale. It lists
- * the instance's OWN skills (`scope: "instance"`), never what it inherits, so
+ * the layer's OWN skills (`scope: "instance"`), never what it inherits, so
  * a skill added upstream changes no downstream file.
  *
  * With {@link SectionContext.byteBudget} set (the AGENTS.md target), a full
@@ -1202,7 +1213,7 @@ export function syncSections(
  *
  * Through the `lean-coverage` pipeline slot, which a higher layer fills
  * (bean `squu`). This used to import `scripts/lean-coverage.ts` by a variable
- * path under THIS instance's root, which named no file to the partition but
+ * path under THIS layer's root, which named no file to the partition but
  * would have found nothing once that script moves to the science layer, and
  * reported "could not determine" for a reason nobody could see. `undefined` on
  * any failure, which the coverage section renders as "could not determine"
@@ -1241,11 +1252,11 @@ export async function runReadmeSync(opts: {
     }
   }
 
-  // ASKED, not composed. This instance's README is declared
+  // ASKED, not composed. This layer's README is declared
   // `scope: "repository"` — it sits at the top of the checkout, one directory
-  // above the instance — so `join(root, "README.md")` named nothing and the
+  // above the layer — so `join(root, "README.md")` named nothing and the
   // gate failed with "No README" on a file that exists. The composed path is
-  // still the fallback, for an instance that declares no README asset.
+  // still the fallback, for a layer that declares no README asset.
   const readmePath =
     opts.readmePath ?? declaredAssetPath(root, INSTANCE_README_ROLE) ?? join(root, "README.md");
   if (!existsSync(readmePath) || !statSync(readmePath).isFile()) {
@@ -1256,7 +1267,7 @@ export async function runReadmeSync(opts: {
   const check = opts.check ?? false;
   const readme = syncOneFile(readmePath, ctx, opts.only, check);
 
-  // The instance's AGENTS.md is a second target for the skill index ONLY
+  // The layer's AGENTS.md is a second target for the skill index ONLY
   // (bean `e0uk`: the index belongs where every vendor's agent reads). Only
   // that marker, because other regions of an AGENTS.md (the root's
   // `cat-harness:cold-start`) have their own writer, `index-render.ts`, and two
@@ -1363,7 +1374,7 @@ if (import.meta.main) {
   }
   const only = flag("only")?.split(",").map((s) => s.trim()).filter(Boolean);
 
-  // `--all`: every instance under `--dir` (default: this checkout), each
+  // `--all`: every layer under `--dir` (default: this checkout), each
   // against its OWN declared README. Added with `readme:toc`, which the owner
   // asked for on every harness's README: a generated region only the root,
   // cat-harness and bootstrap were checked for is a hand-kept list in every
@@ -1378,7 +1389,7 @@ if (import.meta.main) {
     let worst = 0;
     for (const root of roots) {
       // A SUBMODULE is another repository, and it owns its own README (owner
-      // D3, 2026-10-01: each instance hosts the generated outputs about
+      // D3, 2026-10-01: each layer hosts the generated outputs about
       // itself). Writing into it leaves a change this checkout cannot commit,
       // and checking it compares the other repository's generator against
       // this one's — they disagree on bootstrap-tools/README.md (bean `kye5`).
@@ -1407,7 +1418,7 @@ if (import.meta.main) {
 
   try {
     const result = await runReadmeSync({
-      // `--dir` names the INSTANCE whose README is being synced, and it is not
+      // `--dir` names the LAYER whose README is being synced, and it is not
       // a convenience. The Tool node has declared a `dir` input since it was
       // written; the CLI never accepted one, so the two disagreed and the flag
       // was silently ignored. It became load-bearing when the repository's
@@ -1415,7 +1426,7 @@ if (import.meta.main) {
       // cat-harness declared the root's file with `scope: "repository"`, so
       // "this instance's README" and "the repository's README" were one file
       // and the difference could not show. They are now two, and
-      // `findContentRepoRoot()` resolves to whichever instance carries a
+      // `findContentRepoRoot()` resolves to whichever layer carries a
       // `folio/` — which is cat-harness, not the root.
       root: flag("dir") === undefined ? undefined : resolve(flag("dir")!),
       check: argv.includes("--check"),

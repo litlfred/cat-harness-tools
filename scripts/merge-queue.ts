@@ -71,7 +71,7 @@ export const SMALL_CHANGED_LINES = 5000;
 
 /**
  * Shared declarations (T3): files whose change can alter what OTHER changes
- * mean — a schema, a generator, an instance declaration, a BPMN or DMN, the
+ * mean — a schema, a generator, a layer declaration, a BPMN or DMN, the
  * package manifest, a CI workflow. Two PRs touching the same one are
  * predicted to conflict even when no line overlaps.
  */

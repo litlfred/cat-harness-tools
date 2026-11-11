@@ -35,7 +35,7 @@ const sha256 = (b: Buffer | string) => createHash("sha256").update(b).digest("he
 
 let base: string;
 let bare: string;
-/** The two pins of the fixture instance, oldest first. */
+/** The two pins of the fixture layer, oldest first. */
 const pins: Array<{ sha: string; treeDigest: string; files: number; declSha: string }> = [];
 
 beforeAll(() => {

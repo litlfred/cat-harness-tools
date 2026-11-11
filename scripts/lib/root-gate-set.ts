@@ -34,7 +34,7 @@ import { join, resolve } from "node:path";
 
 import { GATES_WORKFLOW } from "./gates-workflow.ts";
 
-/** `run-gates.py`, beside this module's instance: the derivation every caller reads. */
+/** `run-gates.py`, beside this module's layer: the derivation every caller reads. */
 export const RUN_GATES = resolve(import.meta.dir, "..", "..", ".github", "scripts", "layer-pr-checks", "run-gates.py");
 
 /** `harness`: measured against {@link GATES_WORKFLOW}. `content`: against the gates its own CI runs. */
@@ -45,12 +45,12 @@ export function rootProfile(root: string): RootProfile {
 }
 
 /** Why `run-gates.py` does not run a declared gate (its `skip_reason` kinds, and `input-absent`). */
-export type SkipKind = "live-state" | "needs-input" | "runner-state" | "sweep-only" | "layer-mode" | "other-layer" | "prerequisite" | "input-absent";
+export type SkipKind = "live-state" | "needs-input" | "runner-state" | "sweep-only" | "layer-mode" | "untracked-corpus" | "other-layer" | "prerequisite" | "input-absent";
 
 export interface RootGateSet {
-  /** The root's own instances. */
+  /** The root's own layers. */
   own: string[];
-  /** Their transitive `needs`, own instances included. */
+  /** Their transitive `needs`, own layers included. */
   harness: string[];
   /** How a script name is run here (`bun run cat`, or the harness runner). */
   runner: string | null;
@@ -71,7 +71,7 @@ export class GateSetUndetermined extends Error {
 /**
  * The gates `layer-pr-checks.yml` runs for `root`, from `run-gates.py --list`.
  * Throws {@link GateSetUndetermined} when python3 or the script is missing, or
- * the root has no own instance.
+ * the root has no own layer.
  */
 export function rootGateSet(root: string, opts: { instances?: readonly string[]; script?: string } = {}): RootGateSet {
   const script = opts.script ?? RUN_GATES;

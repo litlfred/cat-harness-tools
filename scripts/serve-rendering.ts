@@ -1,9 +1,9 @@
 /**
- * Serve an instance's renderings over local HTTP, with their DECLARED media
+ * Serve a layer's renderings over local HTTP, with their DECLARED media
  * types.
  *
  * `skills/ui/ui-core/serving-renderings.md` settles the contract — four
- * endpoints under the instance's stub, the media type each declares, and the
+ * endpoints under the layer's stub, the media type each declares, and the
  * three enforcement states per host — and names no server; this is one. It
  * is the publication host for every topology in
  * `docs/proposals/deployment-topologies.md` whose `publication host` axis is
@@ -144,7 +144,7 @@ export function iriBasesFor(mounts: readonly Mount[], origin: string | undefined
 
 /**
  * The origin IRIs are published under, read from a declaration's
- * `canonicalUrl` (the working instance first, then the harness). Undefined
+ * `canonicalUrl` (the working layer first, then the harness). Undefined
  * when neither declares one, and then nothing is rewritten unless asked.
  */
 export function declaredIriOrigin(dirs: readonly string[] = [process.cwd(), HARNESS_ROOT]): string | undefined {

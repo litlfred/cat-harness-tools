@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * check-invocation-parity.ts — a preview must run the generators the deploy
- * runs, with the same instance arguments.
+ * runs, with the same layer arguments.
  *
  * A preview that skips an export the deploy runs (e.g. `kg-export.ts
  * --instance ./bootstrap`) publishes links to documents its build never
@@ -21,6 +21,8 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
+
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const WORKFLOW_DIR = join(REPO_ROOT, ".github", "workflows");
@@ -102,6 +104,13 @@ export interface ParityReport {
   /** Exemptions naming a generator the deploy no longer runs. */
   staleExemptions: string[];
   unreadable?: string;
+  /**
+   * Set when the root's workflows were read and NONE builds a site and
+   * exports the graph: there is no deploy and no preview to compare, which is
+   * a determined fact about this root, not a reference this check failed to
+   * find (cat-harness-tools#1701).
+   */
+  notApplicable?: string;
 }
 
 /** A workflow's text with comment lines removed — prose is not an invocation. */
@@ -125,7 +134,7 @@ export function invocations(workflowText: string): Invocation[] {
     const instance = inst ? (inst[1] ?? inst[2] ?? inst[3]) : undefined;
     // Keyed on the PAIR: `kg-export` and `kg-export --instance ./bootstrap`
     // are different obligations, and collapsing them is exactly how `3jhq`
-    // hid — staging ran the exporter, just not for the foreign instance.
+    // hid — staging ran the exporter, just not for the foreign layer.
     const key = `${script}\u0000${instance ?? ""}`;
     if (!out.has(key)) out.set(key, instance === undefined ? { script } : { script, instance });
   }
@@ -146,22 +155,22 @@ export function isDeploy(workflowText: string): boolean {
   return m !== null && !/--base-url/.test(m[1] ?? "");
 }
 
-export function checkInvocationParity(): ParityReport {
+export function checkInvocationParity(dir: string = WORKFLOW_DIR): ParityReport {
   let files: string[];
   try {
-    files = readdirSync(WORKFLOW_DIR)
+    files = readdirSync(dir)
       .map(String)
       .filter((f) => f.endsWith(".yml") || f.endsWith(".yaml"))
       .sort();
   } catch (e) {
-    return { peers: [], staleExemptions: [], unreadable: `${WORKFLOW_DIR} could not be listed: ${e instanceof Error ? e.message : String(e)}` };
+    return { peers: [], staleExemptions: [], unreadable: `${dir} could not be listed: ${e instanceof Error ? e.message : String(e)}` };
   }
 
   const graphWorkflows: Array<{ name: string; text: string }> = [];
   for (const f of files) {
     let text: string;
     try {
-      text = readFileSync(join(WORKFLOW_DIR, f), "utf-8");
+      text = readFileSync(join(dir, f), "utf-8");
     } catch {
       continue;
     }
@@ -172,6 +181,23 @@ export function checkInvocationParity(): ParityReport {
     if (!/\.\/_site/.test(text)) continue;
     if (!/cat-harness(?:-tools)?\/scripts\/kg-export\.ts/.test(withoutComments(text))) continue;
     graphWorkflows.push({ name: f, text });
+  }
+
+  // cat-harness-tools#1701: a root whose workflows build no site that exports
+  // the graph (a content instance such as smart-ips-pilgrimage, whose site is
+  // built by the IG publisher and whose harness checks run through the
+  // reusable layer-pr-checks workflow) has no deploy/preview pair to hold to
+  // parity. That is determined from its own workflows, so it is NOT
+  // APPLICABLE here rather than "could not determine". A root with at least
+  // one such workflow and no identifiable deploy is still undetermined below.
+  if (graphWorkflows.length === 0) {
+    return {
+      peers: [],
+      staleExemptions: [],
+      notApplicable:
+        `none of the ${String(files.length)} workflow(s) in ${dir} builds a site (\`./_site\`) and exports the graph ` +
+        "(`kg-export.ts`), so this root has no deploy and no preview to compare",
+    };
   }
 
   const deploy = graphWorkflows.find((w) => isDeploy(w.text));
@@ -254,6 +280,7 @@ export function formatReport(r: ParityReport): string {
 
 if (import.meta.main) {
   const report = checkInvocationParity();
+  if (report.notApplicable !== undefined) exitNotApplicable("check:invocation-parity", report.notApplicable);
   const clean =
     report.unreadable === undefined &&
     report.peers.length > 0 &&

@@ -250,7 +250,7 @@ async function run(): Promise<number> {
 
     for (const loaded of [...blocks.values()].sort((a, b) => a.file.localeCompare(b.file))) {
       const out = loaded.file.replace(/\.ts$/, ".jsonld");
-      // The block names the context of the instance its file sits in (bean
+      // The block names the context of the layer its file sits in (bean
       // folio-assistant-63q4), applied here because this is where `out` is known.
       const next = serialise(atInstanceContext(blockToJsonLd(loaded, paper, dangling, unconventional, contributions), out));
       const prev = existsSync(out) ? readFileSync(out, "utf-8") : undefined;

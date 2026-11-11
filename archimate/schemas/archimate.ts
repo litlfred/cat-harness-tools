@@ -1,5 +1,5 @@
 /**
- * The ArchiMate harness's shapes: what an instance declares, and how an Archi
+ * The ArchiMate harness's shapes: what a layer declares, and how an Archi
  * model becomes nodes — the model, each of its views, elements and
  * relationships — with an IRI each.
  *
@@ -43,9 +43,9 @@ import { z } from "zod";
 const SEGMENT = /^[A-Za-z0-9._-]+$/;
 
 /**
- * `cat-archimate.config.json` — at the instance's root, or inside the
+ * `cat-archimate.config.json` — at the layer's root, or inside the
  * directory it declares with graph typology `archimate`; the root wins. It
- * names each model the instance holds, by its file inside that directory.
+ * names each model the layer holds, by its file inside that directory.
  *
  * Unlike an OpenAPI document, an ArchiMate model is usually AUTHORED where it
  * is held (smart-ra's are drawn in Archi and committed), so a model is named
@@ -64,12 +64,12 @@ export const ArchimateConfigModelSchema = z
       .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the declared directory, without `..`"),
     /** What a reader calls it. Absent, the model's own name is used. */
     title: z.string().min(1).optional(),
-    /** One sentence on what this model is and why the instance holds it. */
+    /** One sentence on what this model is and why the layer holds it. */
     description: z.string().min(1).optional(),
   })
   .strict();
 /**
- * A figure in the instance's document that IS a view of a model: the link
+ * A figure in the layer's document that IS a view of a model: the link
  * between the picture a reader sees in the prose and the view it was taken
  * from. `archimate-check` fails when the block or the view is gone, so a
  * figure cannot silently drift from the model; `archimate-pages` names the
@@ -78,7 +78,7 @@ export const ArchimateConfigModelSchema = z
  */
 export const ArchimateConfigFigureSchema = z
   .object({
-    /** The document block holding the figure, relative to the instance root. */
+    /** The document block holding the figure, relative to the layer root. */
     block: z
       .string()
       .regex(/\.md$/, "a document block, a .md file")
@@ -96,7 +96,7 @@ export const ArchimateConfigFigureSchema = z
     basis: z.enum(["same-elements", "by-eye"]),
     /**
      * Where `archimate-blocks` writes the view as SVG, relative to the
-     * instance root, so the block can show the model's own drawing instead of
+     * layer root, so the block can show the model's own drawing instead of
      * a picture of it. Absent, the figure is only linked to the view.
      */
     svg: z
@@ -112,7 +112,7 @@ export type ArchimateConfigFigure = z.infer<typeof ArchimateConfigFigureSchema>;
 export const ARCHIMATE_TABLE_KINDS = ["relationship-types", "relationship-rules"] as const;
 
 /**
- * A table in the instance's document that is drawn from data, never typed:
+ * A table in the layer's document that is drawn from data, never typed:
  * `archimate-blocks` rewrites the table in `block` and leaves the caption and
  * anything after the table alone. `--check` fails when the block and the data
  * disagree, so the table cannot drift.
@@ -124,7 +124,7 @@ export const ARCHIMATE_TABLE_KINDS = ["relationship-types", "relationship-rules"
  */
 export const ArchimateConfigTableSchema = z
   .object({
-    /** The document block holding the table, relative to the instance root. */
+    /** The document block holding the table, relative to the layer root. */
     block: z
       .string()
       .regex(/\.md$/, "a document block, a .md file")

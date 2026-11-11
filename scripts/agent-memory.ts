@@ -56,8 +56,8 @@ export const ROOT = resolve(HARNESS_ROOT);
 export const DEFAULT_ROOT = checkoutRootFor(ROOT);
 
 /**
- * True when `targetRoot` is a mounted instance placed by a mount lock (bean `bx4c`).
- * A mounted instance is a read-only copy of a pinned commit; index surface
+ * True when `targetRoot` is a mounted layer placed by a mount lock (bean `bx4c`).
+ * A mounted layer is a read-only copy of a pinned commit; index surface
  * regeneration must never write inside it.
  */
 export function isMountedInstance(targetRoot: string, baseRoot?: string): boolean {
@@ -71,7 +71,7 @@ export function isMountedInstance(targetRoot: string, baseRoot?: string): boolea
 }
 
 /**
- * Memory directories for `root`: an instance root reads only the `memory`
+ * Memory directories for `root`: a layer root reads only the `memory`
  * directories it declares itself (`ownDeclaredDirectories`, bean `t5zb`), while
  * an index root reads every declared `memory` directory across the checkout.
  */
@@ -98,7 +98,7 @@ export function memoryDirsFor(root: string = DEFAULT_ROOT): string[] {
  * without an edit, which composing a path does not.
  */
 //
-// EVERY instance's, since the owner's ruling of 2026-10-06 (bean `ar1s`):
+// EVERY layer's, since the owner's ruling of 2026-10-06 (bean `ar1s`):
 // memory moved out of the repository root and SPLIT by the harness each lesson
 // belongs to — platform discipline in `cat-harness/memory/`, content authoring
 // in the content harness's `memory/`. One agent may be owed lessons from both,
@@ -276,7 +276,7 @@ export function readArchivedFlag(raw: unknown, where: string): boolean | undefin
 
 /**
  * Every memory node under `dirs` — one directory or several (every declared
- * `memory` directory by default). An id held twice is refused: two instances
+ * `memory` directory by default). An id held twice is refused: two layers
  * owning one lesson is the duplicate the split must not create.
  */
 export function readMemoryNodes(dirs: string | readonly string[] = MEMORY_DIRS()): MemoryNode[] {
@@ -816,7 +816,7 @@ export const AGENT_MEMORY_TARGETS: readonly AgentMemoryTargetDef[] = [
  * one folder per skill holding a required `SKILL.md` (the Agent Skills open
  * standard; Antigravity also reads the older `.agent/skills`). Measured from
  * the library's own copy of the vendor docs,
- * `cat-harness/library/conduct/agent-skills---google-antigravity-docs/`, page 1 and 4.
+ * `cat-harness/library/corpus/conduct/agent-skills---google-antigravity-docs/`, page 1 and 4.
  *
  * Antigravity has no per-agent memory like Claude's `memory: project`, so each
  * agent's memory is published as one skill the agent model sees by name and

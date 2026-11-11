@@ -359,7 +359,7 @@ test("both controls are ABSENT, not broken, when the pipeline has no forge", asy
 });
 
 test("neither link carries a `..` — the old one resolved to a dead path", () => {
-  // The path `readTodoFiles` reports is relative to the cat-harness INSTANCE
+  // The path `readTodoFiles` reports is relative to the cat-harness LAYER
   // while todos/ sits at the repository root, so it read `../todos/items/x.md`
   // and the old link shipped that verbatim. A browser normalises the `..`
   // before the request is sent, so GitHub received `/edit/todos/items/x.md` —
@@ -662,7 +662,7 @@ test("pressing the pressed pin takes it off the glass — the pin is its own inv
 
 test("pin and unpin are reachable and operable from the keyboard alone", async ({ page }) => {
   // The reason "pick up and move" is a BUTTON rather than a drag. This
-  // instance's declared interaction profile is low-dexterity, and a pointer
+  // layer's declared interaction profile is low-dexterity, and a pointer
   // drag cannot be operated without reimplementing the whole gesture.
   await page.goto(PAGE_URL);
   await openBoard(page);
@@ -1073,7 +1073,7 @@ test("a pinned sticky can be moved, and by the keyboard alone", async ({ page })
   expect(Number.isFinite(before.left)).toBe(true);
   expect(Number.isFinite(before.top)).toBe(true);
 
-  // NO POINTER FROM HERE ON. This instance's declared interaction profile is
+  // NO POINTER FROM HERE ON. This layer's declared interaction profile is
   // low-dexterity, and a move that needs a drag excludes its owner.
   const move = card.locator('[data-fa-control="move"]');
   await expect(move).toHaveAttribute("aria-pressed", "false");

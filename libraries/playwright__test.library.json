@@ -17,6 +17,7 @@
   "usedBy": [
     "playwright.config.ts",
     "scripts/block-screenshots.ts",
+    "test/bar-controls.e2e.ts",
     "test/beans-count-agrees.e2e.ts",
     "test/beans-page-search.e2e.ts",
     "test/conduct/glass-interactions.e2e.ts",
@@ -62,6 +63,7 @@
     "test/glass-zoom-steady.e2e.ts",
     "test/harness-row-alignment.e2e.ts",
     "test/ig-diagram-viewer.e2e.ts",
+    "test/ig-section-rail.e2e.ts",
     "test/kg-graph.e2e.ts",
     "test/kg/harness-config-panel.e2e.ts",
     "test/kg/schema-overview-filter.e2e.ts",

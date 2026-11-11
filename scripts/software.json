@@ -9,14 +9,23 @@
       },
       "apt": [
         "tesseract-ocr",
-        "tesseract-ocr-eng"
+        "tesseract-ocr-eng",
+        "tesseract-ocr-osd",
+        "tesseract-ocr-ara",
+        "tesseract-ocr-chi-sim",
+        "tesseract-ocr-chi-tra",
+        "tesseract-ocr-fra",
+        "tesseract-ocr-rus",
+        "tesseract-ocr-spa",
+        "tesseract-ocr-por",
+        "tesseract-ocr-fas"
       ],
       "licence": "Apache-2.0",
       "usedBy": [
         "scripts/pdf-ocr.py",
         "scripts/pdf-extract.py"
       ],
-      "why": "OCR for scanned PDFs (the pdf-ocr+pdf-pages rung)."
+      "why": "OCR for scanned PDFs (the pdf-ocr+pdf-pages rung). The language packs are the six UN languages plus Portuguese and Persian, which WHO IRIS publishes in; pdf-ocr.py refuses a hinted language whose pack is missing rather than reading it as English (owner, 2026-11-10)."
     },
     {
       "name": "pdftoppm",
@@ -75,7 +84,8 @@
         "scripts/pdf-cover.py",
         "scripts/pdf-images.py",
         "scripts/pdf-vector-figures.py",
-        "scripts/pdf-vector-labels.py"
+        "scripts/pdf-vector-labels.py",
+        "scripts/pdf-footnotes.py"
       ],
       "why": "The PDF backend ingest-document probes with; without it every PDF's rung is `undetermined`."
     },

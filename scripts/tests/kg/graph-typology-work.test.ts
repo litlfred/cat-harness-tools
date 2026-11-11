@@ -84,7 +84,7 @@ describe("the verdict is asked of the REPOSITORY, not one instance", () => {
     const { plan } = workPlanGraphsIn(repo);
     // WHO declares the checkout's work plan has moved twice. cat-harness did,
     // at `scope: "repository"`; from placement PR0 (bean `ejye`) the ROOT
-    // instance did, and this asserted that pair. The owner then removed the
+    // layer did, and this asserted that pair. The owner then removed the
     // root declaration (3d4caf6, 2026-10-08), and cat-harness hosts the
     // checkout-root `beans/` and `todos/` again (coordinator decision (b)).
     // What has not moved is the verdict above: the REPOSITORY is active, on

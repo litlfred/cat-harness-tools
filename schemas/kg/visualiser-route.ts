@@ -17,7 +17,7 @@
  * | `<base>/<harness>/<visualiser>/<sub-graph>/<path>` | an asset of that sub-graph's view |
  * | `<base>/<harness>/<visualiser>/<path>` | an asset of the full view (a per-node page, its data) |
  *
- * `<harness>` is the declaring instance's `name`, `<visualiser>` the entry's
+ * `<harness>` is the declaring layer's `name`, `<visualiser>` the entry's
  * `id`. Both are URL segments, checked by {@link ROUTE_SEGMENT}, never encoded:
  * an id that is not a portable segment is a defect in the declaration.
  *

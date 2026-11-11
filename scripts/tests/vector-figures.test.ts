@@ -235,6 +235,7 @@ describe("the entry may carry the arm's outputs", () => {
     expect(ENTRY_DIRECTORIES).toContain("figures");
     expect(ENTRY_DIRECTORIES).toContain("sheets");
     expect(ENTRY_DIRECTORIES).toContain("figure-data");
+    expect(ENTRY_DIRECTORIES).toContain("tables");
   });
 });
 

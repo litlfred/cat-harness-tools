@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Print where an instance's published files go, for a workflow to capture.
+ * Print where a layer's published files go, for a workflow to capture.
  *
  * @module scripts/print-published-path
  *
- * An instance presented as itself publishes at `<base>/<instance>/`, the
+ * A layer presented as itself publishes at `<base>/<instance>/`, the
  * segment being its NAME, and cat-harness's `publishedPath` is the one
  * resolver that composes it; a workflow cannot call it directly, so this is a
  * script.
@@ -16,7 +16,7 @@
  * `bootstrap/` followed by the path given) and nothing else, so `$(…)` captures it
  * cleanly; a directory keeps its trailing slash, as `publishedPath` returns it.
  *
- * Exit 0 printed; 1 no declaration; 3 the instance declares `"enabled": false`
+ * Exit 0 printed; 1 no declaration; 3 the layer declares `"enabled": false`
  * and is not published, which a workflow reads as "skip", never as an error.
  */
 import { readDeclaration } from "../schemas/kg/cat-harness.js";

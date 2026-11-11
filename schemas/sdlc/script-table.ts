@@ -16,9 +16,9 @@
  *
  * ## How a script is found
  *
- * By asking the declared instances, never by naming one: this module is the
+ * By asking the declared layers, never by naming one: this module is the
  * LOWEST layer's, so a literal list here would point up the layer order.
- * {@link instanceRootsIn} answers which directories are instances; each one's
+ * {@link instanceRootsIn} answers which directories are layers; each one's
  * `package.json` is read for `checkoutScripts`. A name defined twice is an
  * error, not a precedence rule, except within the root's own manifest, where
  * `scripts` wins over the same name in its `checkoutScripts`.

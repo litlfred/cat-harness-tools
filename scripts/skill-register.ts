@@ -62,7 +62,7 @@
  *   its manifest entry, its front matter, and whether the manifest points at
  *   anything absent. The derived `folio` reference pages and `qa` sidecars are
  *   judged by their own gates (`skills:docs:check`, `kg:audit:check`). The
- *   subject set is resolved from the instance's declarations via
+ *   subject set is resolved from the layer's declarations via
  *   `kgDirectories`, never from a list written here
  * @covers cat-harness — retained, though in `cat-harness.json` the
  *   `cat-harness` kind is declared on the `schemas/` directories and this gate
@@ -79,19 +79,20 @@ import { buildQaResult, writeQaResult } from "./qa-results.js";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, REPO_ROOT, resolveWorkingInstanceRoot, runnerRootFor } from "./lib/roots.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 import { BUILD_TYPE_ENV, buildTypeOf } from "./lib/build-type.ts";
 
 /**
- * The instance being worked on — `resolveWorkingInstanceRoot` in
+ * The layer being worked on — `resolveWorkingInstanceRoot` in
  * `lib/roots.ts`: the harness in its own repository and in an index checkout,
- * the separated instance that MOUNTS it otherwise (bean `j3ls`: from a separated content instance
+ * the separated layer that MOUNTS it otherwise (bean `j3ls`: from a separated content layer
  * this audited the mount and wrote its sidecar into a gitignored tree).
  *
  * NOT `process.cwd()`, and that is a correction rather than a preference.
  * `writeQaResult` composes `<root>/test/results/`, so a cwd-relative root puts
  * the sidecar wherever the command happened to be invoked from — measured:
  * run from the repository root it landed in a fresh top-level `test/results/`,
- * a directory no instance declares and no sweep reads. Every sibling here
+ * a directory no layer declares and no sweep reads. Every sibling here
  * derives the root from its own module path for that reason
  * (`check-layout-norms.ts`, `check-harness-state.ts`), so the sidecar goes to
  * the same place whoever runs the command and from wherever.
@@ -100,7 +101,7 @@ const INSTANCE_ROOT = resolveWorkingInstanceRoot().root;
 
 /**
  * Where `bun run cat` resolves the steps' scripts: the checkout holding the
- * harness, not the instance's parent. Since bean `j3ls` the instance may be a
+ * harness, not the layer's parent. Since bean `j3ls` the layer may be a
  * separated repository that MOUNTS the harness, whose parent is outside it.
  */
 const RUNNER_ROOT = runnerRootFor(HARNESS_ROOT, REPO_ROOT);
@@ -140,7 +141,7 @@ const STRIPPABLE = ["roles", "package", "capability"] as const;
  * the wrong tree the day somebody moves it.
  *
  * Asking the declaration also widens the subject correctly rather than by
- * accident: `kgDirectories` resolves a dependent instance's packages too
+ * accident: `kgDirectories` resolves a dependent layer's packages too
  * (the content core's and the IRIS replica's `skills/`
  * here), so a skill added in one of those is judged by the same gate instead of
  * being a case nobody thought of.
@@ -161,7 +162,7 @@ export function skillPackages(instance: string = INSTANCE_ROOT): SkillPackage[] 
       if (!existsSync(manifest)) continue;
       const parsed = JSON.parse(readFileSync(manifest, "utf-8")) as { skills?: string[] };
       out.push({
-        // Qualified by its graph, so two instances' packages of the same name
+        // Qualified by its graph, so two layers' packages of the same name
         // are two rows rather than one ambiguous finding.
         name: graph.id === "skills" ? d.name : `${graph.id}/${d.name}`,
         dir,
@@ -310,18 +311,18 @@ export interface Findings {
  * Why there is nothing for this command to judge in `instance`, or `undefined`
  * when there is.
  *
- * An instance that declares no `skills` directory holds no skill, so no
+ * A layer that declares no `skills` directory holds no skill, so no
  * skill of it can be unregistered and nothing the chain regenerates is staled
- * by one. Since bean `j3ls` the instance judged is the one MOUNTING the harness
- * (a content instance's own index, such as a FHIR IG's), and most of those
+ * by one. Since bean `j3ls` the layer judged is the one MOUNTING the harness
+ * (a content layer's own index, such as a FHIR IG's), and most of those
  * declare no skills graph: before this they read as exit 2, "cannot tell",
  * which is a question with no answer rather than one nobody could reach.
  *
  * Deliberately narrow, so `dh4f` stays shut: it is the DECLARATION that is
- * asked, not the disk. An instance that declares a `skills` directory and has
+ * asked, not the disk. A layer that declares a `skills` directory and has
  * no package manifests in it is still the third state. Any OTHER
  * knowledge-graph directory (`scenarios`, which an IG declares for the actors
- * its journeys name) holds no skill package, so it does not make the instance
+ * its journeys name) holds no skill package, so it does not make the layer
  * applicable.
  */
 export function notApplicable(instance: string = INSTANCE_ROOT): string | undefined {
@@ -822,11 +823,14 @@ async function main(): Promise<number> {
   const na = notApplicable();
   if (na !== undefined) {
     // Not a pass and not a finding: nothing here is of the kind judged. Says
-    // so, writes nothing (no sidecar: there is no subject to record a verdict
-    // about), and exits 0 so a content index's gates are not red over it.
+    // so and writes nothing (no sidecar: there is no subject to record a
+    // verdict about). Exits 78, not 0 (cat-harness-tools#1701): `qa:refresh`
+    // read the silent 0 as a writer that "produced nothing" and failed the QA
+    // working copy in an IG repository that is its own index; 78 is the
+    // convention every runner reads as not applicable, and no gate turns red
+    // over it (`lib/not-applicable.ts`).
     if (flags.json) console.log(JSON.stringify({ notApplicable: na }, null, 2));
-    else console.log(`skill-register: not applicable — ${na}. Nothing judged, nothing written.`);
-    return 0;
+    exitNotApplicable("skill-register", na);
   }
 
   const f = audit();

@@ -203,7 +203,7 @@ describe("buildInstanceContext — terms", () => {
     expect(Object.keys(r.context)).toEqual(["@version", "@protected", "cito", "cites"]);
     expect(r.terms).toEqual([{ term: "cites", context: CONTENT_URL, documents: 1 }]);
     expect(r.bound).toEqual([{ prefix: "cito", iri: cito, documents: 1 }]);
-    // `title` is defined in the source and unused: absent — nothing a later instance uses is carried.
+    // `title` is defined in the source and unused: absent — nothing a later layer uses is carried.
     expect("title" in r.context).toBe(false);
   });
 

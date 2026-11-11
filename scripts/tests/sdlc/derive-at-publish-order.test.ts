@@ -1,8 +1,8 @@
 /**
  * The order `derive:publish` runs the declared publish-time writers in (owner,
- * 2026-10-15, "A1"): lowest layer first, each instance's entries in their
+ * 2026-10-15, "A1"): lowest layer first, each layer's entries in their
  * declared order, a shared writer once, and a writer that DECLARES it reads a
- * kind of directory (`reads`) after the writers of other instances' entries
+ * kind of directory (`reads`) after the writers of other layers' entries
  * that fill one. A cycle is refused.
  *
  * The case that failed (2026-10-15): cat-harness's `docs/_data/harness.json`
@@ -19,11 +19,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { declaredPlan, writerEdges, writersOf, writingOrder, type DeclaredArtefact } from "../../derive-at-publish.ts";
+import { declaredPlan, enclosingKinds, writerEdges, writersOf, writingOrder, type DeclaredArtefact } from "../../derive-at-publish.ts";
 
 let tmp: string;
 
-// declared-path-literal: a fixture instance's own builtAtPublish entry, written into a temp tree, not a path of this checkout
+// declared-path-literal: a fixture layer's own builtAtPublish entry, written into a temp tree, not a path of this checkout
 const PLATFORM_DATA = "docs/_data/harness.json";
 
 type Entry = { path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string };
@@ -52,6 +52,7 @@ beforeAll(() => {
     ],
     [{ id: "b-ig-docs", path: "docs/", graphTypologies: ["docs", "ig-pages"] }],
   );
+  // declared-path-literal: the same published context path, declared by the fixture base layer.
   instance("c-base", ["a-platform"], [{ path: "ns/context/v1.jsonld", writer: ["shared:contexts"], because: "checkout" }]);
 });
 
@@ -119,5 +120,61 @@ describe("a cycle is refused", () => {
       { instance: "low", abs: "/low/x", path: "x", writer: ["shared:gen"], because: "checkout", reads: ["docs"] },
     ];
     expect(() => writersOf(plan)).toThrow(/high lists shared:gen before high:pages/);
+  });
+});
+
+/**
+ * folio-assistant#2953 (2026-11-08): an IG layer declares its artefact index as
+ * a directory of kind `fhir-artifact-index`, but the `builtAtPublish` entries
+ * that `ig-index:build` writes into it (`fhir-artifact-index/index.json`, ...)
+ * name no `directory`. So they filled no kind, nothing could be ordered after
+ * them, and `uml:overview` (which draws every declared directory) ran beside
+ * `ig-index:build` and read a sidecar while it was being rewritten (ENOENT).
+ * An entry that names no `directory` now fills the kinds of the declared
+ * directory that holds it.
+ */
+describe("an entry fills the kinds of the declared directory that holds it", () => {
+  let root: string;
+  beforeAll(() => {
+    root = mkdtempSync(join(tmpdir(), "derive-enclosing-"));
+    const write = (name: string, needs: string[], builtAtPublish: Entry[], directories: unknown[] = []): void => {
+      const p = join(root, name, `${name}.json`);
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, JSON.stringify({ name, needs, directories, builtAtPublish: builtAtPublish.map((e) => ({ ...e, reason: "fixture" })) }));
+    };
+    write("platform", [], [
+      { path: "uml/overview/", writer: ["platform:handler", "platform:uml"], because: "checkout", reads: ["fhir-artifact-index"] },
+    ]);
+    write(
+      "ig",
+      ["platform"],
+      [{ path: "fhir-artifact-index/index.json", writer: ["ig:index"], because: "checkout" }],
+      [{ id: "ig-artifact-index", path: "fhir-artifact-index/", graphTypologies: ["fhir-artifact-index"] }],
+    );
+  });
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  test("an index file inside the declared index directory fills its kind", () => {
+    expect(declaredPlan(root).find((a) => a.instance === "ig")?.fills).toEqual(["fhir-artifact-index"]);
+  });
+
+  test("the reader of that kind runs after the index's writer, though it stands in a lower layer", () => {
+    const writers = writersOf(declaredPlan(root));
+    expect(writers.indexOf("ig:index")).toBeLessThan(writers.indexOf("platform:uml"));
+    expect(writers.indexOf("platform:handler")).toBeLessThan(writers.indexOf("platform:uml"));
+  });
+
+  test("the deepest declared directory wins; a path outside every one fills nothing; an explicit `directory` is unchanged", () => {
+    const dirs = [
+      { path: "docs/", graphTypologies: ["docs"] },
+      { path: "docs/api/", kinds: ["api"] },
+      { path: "fhir-artifact-index", graphTypologies: ["fhir-artifact-index"] },
+    ];
+    expect(enclosingKinds(dirs, "docs/api/x.json")).toEqual(["api"]);
+    expect(enclosingKinds(dirs, "docs/")).toEqual(["docs"]);
+    expect(enclosingKinds(dirs, "./fhir-artifact-index/menu.json")).toEqual(["fhir-artifact-index"]);
+    expect(enclosingKinds(dirs, "fhir-artifact-indexes/x.json")).toEqual([]);
+    expect(enclosingKinds(dirs, "elsewhere/outside.json")).toEqual([]);
+    expect(declaredPlan(tmp).find((a) => a.instance === "b-ig" && a.path === "docs/")?.fills).toEqual(["docs", "ig-pages"]);
   });
 });

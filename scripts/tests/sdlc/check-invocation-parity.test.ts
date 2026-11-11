@@ -11,7 +11,10 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { EXEMPT, formatReport, invocations, isDeploy, withoutComments } from "../../check-invocation-parity.js";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+
+import { checkInvocationParity, EXEMPT, formatReport, invocations, isDeploy, withoutComments } from "../../check-invocation-parity.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..", "..", "..");
 const wf = (n: string) => readFileSync(join(REPO_ROOT, ".github", "workflows", n), "utf-8");
@@ -30,7 +33,7 @@ describe("invocations", () => {
 
   test("`kg-export` and `kg-export --instance X` are DIFFERENT obligations", () => {
     // The whole of `3jhq`: staging ran the exporter, just not for the foreign
-    // instance. Collapsing the two is what let that pass unnoticed.
+    // layer. Collapsing the two is what let that pass unnoticed.
     const yml = [
       "          bun run cat-harness/scripts/kg-export.ts --out a.jsonld",
       "          bun run cat-harness/scripts/kg-export.ts --instance ./no-such-instance --out b.jsonld",
@@ -179,5 +182,49 @@ describe("formatReport", () => {
     });
     expect(out).toContain("exempt, each with its reason");
     expect(out).toContain("fsh-guts-export");
+  });
+});
+
+// cat-harness-tools#1701: a content instance's root (smart-ips-pilgrimage) has
+// workflows, none of which builds a site and exports the graph. That is a
+// determined "nothing to compare here", reported as not applicable; a root
+// that HAS a graph-exporting site workflow but no identifiable deploy is still
+// could-not-determine.
+describe("checkInvocationParity over a workflows directory", () => {
+  const withWorkflows = (files: Record<string, string>, fn: (dir: string) => void) => {
+    const dir = mkdtempSync(join(tmpdir(), "invocation-parity-"));
+    try {
+      mkdirSync(dir, { recursive: true });
+      for (const [n, t] of Object.entries(files)) writeFileSync(join(dir, n), t);
+      fn(dir);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  test("no workflow builds a site and exports the graph: not applicable, not a pass", () => {
+    withWorkflows(
+      {
+        "harness-pr-checks.yml": "jobs:\n  checks:\n    uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@abc\n",
+        "translations.yml": "    steps:\n      - run: bun input/scripts/translation-pot.ts --check\n",
+      },
+      (dir) => {
+        const r = checkInvocationParity(dir);
+        expect(r.notApplicable).toContain("2 workflow(s)");
+        expect(r.unreadable).toBeUndefined();
+        expect(r.peers).toEqual([]);
+      },
+    );
+  });
+
+  test("a graph-exporting site workflow with no deploy is still could-not-determine", () => {
+    withWorkflows(
+      { "staging.yml": "      - run: bun run cat-harness-tools/scripts/kg-export.ts --base-url https://x.invalid/ --out ./_site/kg.jsonld\n" },
+      (dir) => {
+        const r = checkInvocationParity(dir);
+        expect(r.notApplicable).toBeUndefined();
+        expect(r.unreadable).toContain("deploy cannot be identified");
+      },
+    );
   });
 });

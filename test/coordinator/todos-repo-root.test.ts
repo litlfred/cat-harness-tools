@@ -1,6 +1,6 @@
 /**
  * `todos` tests that read the aggregate repository's own root — the
- * root-declared `todos/` and `beans/` graphs, and the processes every instance
+ * root-declared `todos/` and `beans/` graphs, and the processes every layer
  * stacks — moved here from `cat-harness/scripts/tests/todos.test.ts` (bean
  * `ho66`), as `merge-guard-workflows.test.ts` was: a standalone cat-harness
  * layer has no such root, and `check:cat-harness-standalone` collects every
@@ -11,7 +11,7 @@
  * Moved again, from `cat-harness-tools/scripts/tests/` to the checkout's own
  * test home `test/` (bean `7zz1`, owner ruling 2026-10-06 "Top-level
  * instance"): what it reads belongs to the whole checkout, which the root
- * instance declares, not to any one layer — so cat-harness-tools stays green
+ * layer declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
@@ -51,7 +51,7 @@ const CORPUS: ReadonlyArray<{ id: string; calls: string[] }> = await (async () =
 
 describe("the declaration and the directory agree", () => {
   test("cat-harness declares the checkout's `todos` graph, repository-scoped", () => {
-    // It was the ROOT instance's from placement PR0 (bean `ejye`): `todos/`
+    // It was the ROOT layer's from placement PR0 (bean `ejye`): `todos/`
     // sits at the checkout's root and belongs to the checkout, not to one
     // layer. RESTATED 2026-10-09: the owner removed the root declaration on
     // 2026-10-08 (3d4caf6), and the checkout-root state graphs are now
@@ -103,7 +103,7 @@ describe("the declaration and the directory agree", () => {
     // PRE-EXISTING: `beans/beans.json` has declared a `workflows` node since
     // the graph was written and the directory had never been committed.
     // Nothing checked it, because the bean graph had no equivalent of this
-    // test. Found 2026-09-19 while fixing the todo instance.
+    // test. Found 2026-09-19 while fixing the todo layer.
     //
     // Asserted here rather than in a bean-graph test file so the two cannot
     // drift: the rule is about DECLARATIONS, not about todos.
@@ -148,7 +148,7 @@ describe("the published process hierarchy", () => {
   // publish) is not a failure of its own: the tests below then fail on the
   // missing index under their own names, as they always did.
   // The generator also re-derives the committed witnesses under every
-  // instance's `test/results/`; they are put back as they were, so the run
+  // layer's `test/results/`; they are put back as they were, so the run
   // leaves no tracked file changed (bean w1gy F24).
   beforeAll(() => {
     if (!existsSync(INDEX)) {

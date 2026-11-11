@@ -62,6 +62,28 @@ done <<< "$candidates"
 [ -n "$found" ] || { echo "mount-from-lock: no pinned commit carries scripts/mount-from-lock.ts" >&2; exit 2; }
 
 export CAT_MOUNT_CACHE_DIR="${CAT_MOUNT_CACHE_DIR:-$HOME/.cache/cat-mount}"
+# The layers cache: the replayer reads it from `CAT_LAYERS_URL`, else from the
+# root's own origin. An IG's origin usually carries no `refs/cat/layers/*`, so
+# when it has none and the root names a shared cache in `.github/layers-url`
+# (one URL on one line), that remote is used instead. The replayer still
+# verifies each layer's digest and fetches any layer the cache lacks.
+if [ -z "${CAT_LAYERS_URL:-}" ] && [ "${CAT_LAYERS_CACHE:-1}" != "0" ] && [ -f "$root/.github/layers-url" ]; then
+  if [ -z "$(git -C "$root" ls-remote origin 'refs/cat/layers/*' 2>/dev/null | head -1)" ]; then
+    shared="$(head -1 "$root/.github/layers-url" | tr -d '[:space:]')"
+    [ -n "$shared" ] && export CAT_LAYERS_URL="$shared"
+  fi
+fi
 status=0
 bun "$found" --root "$root" "$@" || status=$?
+# A full replay that succeeded stamps the lock it laid down, so `.github/cat.ts`
+# can tell, with one file hash, when the lock has moved past the mounts on disk
+# (a re-pin pulled in by `git pull`) and replay again. `--check` and the other
+# modes change nothing on disk, so they never stamp.
+if [ "$status" -eq 0 ] && [ "$#" -eq 0 ] && [ -f "$lock" ]; then
+  stamp="$(git -C "$root" rev-parse --git-path cat-mounted-lock 2>/dev/null || true)"
+  if [ -n "$stamp" ]; then
+    case "$stamp" in /*) ;; *) stamp="$root/$stamp" ;; esac
+    bun -e 'const c=require("node:crypto"),fs=require("node:fs");fs.writeFileSync(process.argv[2],c.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex")+"\n")' "$lock" "$stamp" || true
+  fi
+fi
 exit "$status"

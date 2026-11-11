@@ -23,7 +23,7 @@ import { declarationChain } from "../../schemas/kg/harness-config.ts";
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { RemoteSourceSchema, resolveSubgraphSource } from "../../schemas/kg/subgraph-source.ts";
 import { MountLockSchema, mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
-import { AGENT_SURFACE_GENERATORS, checkRemote, editedOnlyPerLock, exitCode, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise } from "../remote-mount.ts";
+import { AGENT_SURFACE_GENERATORS, checkRemote, editedOnlyPerLock, exitCode, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise, switchedOffOptInPaths } from "../remote-mount.ts";
 import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "../../schemas/kg/index-config.ts";
 import { run as replayLocks } from "../mount-from-lock.ts";
 import { gitCorpus } from "../../schemas/sdlc/git-corpus.ts";
@@ -190,7 +190,7 @@ describe("mount:remote over fixture repositories", () => {
     mountRemote({ instanceRoot: root, urlFor });
     const file = join(root, "index.lock.json");
     const lock = JSON.parse(readFileSync(file, "utf-8")) as { mounts: Array<{ harness: string; repository: string }>; instances: Array<{ instance: string; via: string; repository: string; sha: string }> };
-    // What `--seed` left behind: the pin moved, its own instance entry did not.
+    // What `--seed` left behind: the pin moved, its own layer entry did not.
     const own = lock.instances.find((i) => lock.mounts.some((m) => m.harness === i.via && m.repository === i.repository))!;
     own.sha = "f".repeat(40);
     writeFileSync(file, `${JSON.stringify(lock, null, 2)}\n`);
@@ -524,8 +524,8 @@ describe("whole-instance mounts and replaying the lock (bean `nn8e`, #2462)", ()
   });
 
   test("19b. a re-mount keeps a STATE mount inside the instance — never re-lays over it", () => {
-    // folio-assistant#2529: each instance's `health` is state-mounted inside
-    // the instance, and a re-mount that removed the instance's directories
+    // folio-assistant#2529: each layer's `health` is state-mounted inside
+    // the layer, and a re-mount that removed the layer's directories
     // removed it too — unpushed edits and all — leaving its marker describing
     // files that were gone. The marker is the state store's record of what it
     // put down; that directory is set aside and put back.
@@ -550,7 +550,7 @@ describe("whole-instance mounts and replaying the lock (bean `nn8e`, #2462)", ()
 
   test("19c. a re-mount keeps the instance's node_modules — an install artefact is never the mount's to delete", () => {
     // folio-assistant#2529: `state:mount` re-lays the mounts, and the re-lay
-    // removed each instance's directory whole — its `node_modules/` with it.
+    // removed each layer's directory whole — its `node_modules/` with it.
     // A workspace member's dependencies come from the root's `bun install`,
     // which the mount does not repeat, so folio-assistant-sci lost its pinned
     // katex 0.18 and resolved the root's 0.16.
@@ -628,6 +628,73 @@ describe("whole-instance mounts and replaying the lock (bean `nn8e`, #2462)", ()
     const r = replayLocks(fresh, false);
     expect(r.outcomes[0]!.state).toBe("could-not-determine");
     expect(existsSync(join(fresh, "boot"))).toBe(false);
+  });
+});
+
+describe("a whole mount leaves out the opt-in sub-graphs the downstream has not switched on (Q-SG-1)", () => {
+  test("W1. the paths: top-level and from-within, outermost only, enabled ones kept", () => {
+    const top = [
+      { id: "skills", path: "skills/" },
+      { id: "sdlc", path: "sdlc/", optIn: true },
+      { id: "library-graph", path: "library/" },
+    ];
+    const nested = [
+      { id: "library-corpus", path: "library/corpus/", optIn: true },
+      { id: "sdlc-skills", path: "sdlc/skills/", optIn: true },
+      { id: "climbs", path: "../x/", optIn: true },
+    ];
+    expect(switchedOffOptInPaths("ch", top, nested, new Set())).toEqual(["library/corpus", "sdlc"]);
+    expect(switchedOffOptInPaths("ch", top, nested, new Set(["ch.sdlc"]))).toEqual(["library/corpus", "sdlc/skills"]);
+    expect(switchedOffOptInPaths("ch", top, nested, new Set(["ch.sdlc", "ch.sdlc-skills", "ch.library-corpus"]))).toEqual([]);
+    expect(switchedOffOptInPaths("ch", top, nested, "all")).toEqual([]);
+  });
+
+  test("W2. mounted, locked with `except`, checked clean, and replayed without them; enabling brings them back", () => {
+    const opt = bareRepo(base, "opt", {
+      "opt.json": decl("opt", {
+        directories: [
+          { id: "opt-schemas", path: "schemas/", graphTypologies: ["code"] },
+          { id: "extra", path: "extra/", optIn: true, graphTypologies: ["code"] },
+        ],
+      }),
+      "package.json": '{"name":"opt"}\n',
+      "schemas/a.ts": "export const a = 1;\n",
+      "extra/big.txt": "big\n",
+    });
+    const local = (r: string): string => (r === "o/opt" ? `file://${opt.bare}` : urlFor(r));
+    const root = join(base, `down-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, { "down.json": decl("down", { mountApprovers: ["test"], remoteMounts: [{ harness: "opt", repository: "o/opt", ref: opt.sha, ...consentFor(opt.sha), overrides: { opt: { whole: true } } }] }) });
+    const r = mountRemote({ instanceRoot: root, urlFor: local });
+    expect(summarise(r.plan.outcomes).state).toBe("mounted");
+    expect(existsSync(join(root, "opt/package.json"))).toBe(true);
+    expect(existsSync(join(root, "opt/schemas/a.ts"))).toBe(true);
+    expect(existsSync(join(root, "opt/extra"))).toBe(false);
+    const lock = MountLockSchema.parse(JSON.parse(readFileSync(join(root, "index.lock.json"), "utf-8")));
+    expect(lock.instances.find((i) => i.instance === "opt")!.directories).toMatchObject([{ id: "*", path: "opt", upstreamPath: ".", except: ["extra"] }]);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+
+    // A fresh clone replays the lock and leaves the same paths out.
+    const fresh = join(base, `fresh-${++n}`);
+    mkdirSync(fresh, { recursive: true });
+    git(fresh, "init", "-q", "-b", "main");
+    const replayLock = JSON.parse(readFileSync(join(root, "index.lock.json"), "utf-8"));
+    for (const i of replayLock.instances) i.repository = `file://${opt.bare}`;
+    writeFileSync(join(fresh, "index.lock.json"), JSON.stringify(replayLock));
+    const first = replayLocks(fresh, false);
+    expect(first.outcomes.map((o) => o.state)).toEqual(["mounted"]);
+    expect(existsSync(join(fresh, "opt/schemas/a.ts"))).toBe(true);
+    expect(existsSync(join(fresh, "opt/extra"))).toBe(false);
+    expect(replayLocks(fresh, true).outcomes.every((o) => o.state === "current")).toBe(true);
+
+    // The downstream switches it on: the next mount brings it.
+    write(root, { "down.json": decl("down", { enableSubgraphs: ["opt.extra"], mountApprovers: ["test"], remoteMounts: [{ harness: "opt", repository: "o/opt", ref: opt.sha, ...consentFor(opt.sha), overrides: { opt: { whole: true } } }] }) });
+    const again = mountRemote({ instanceRoot: root, urlFor: local });
+    expect(summarise(again.plan.outcomes).state).toBe("mounted");
+    expect(readFileSync(join(root, "opt/extra/big.txt"), "utf-8")).toBe("big\n");
+    const lock2 = MountLockSchema.parse(JSON.parse(readFileSync(join(root, "index.lock.json"), "utf-8")));
+    expect(lock2.instances.find((i) => i.instance === "opt")!.directories[0]!.except).toBeUndefined();
   });
 });
 
@@ -913,7 +980,7 @@ describe("a changed lock re-renders the agent surface", () => {
     expect(existsSync(join(root, ".claude/commands/hello.md"))).toBe(true);
     expect(existsSync(join(root, ".agents/rules/agent-memory.md"))).toBe(true);
     expect(readFileSync(join(root, ".agents/rules/agent-memory.md"), "utf-8")).toContain("fresh mounted lesson");
-    // 2. Nothing under the mounted instance's directory was written: lock digests still match.
+    // 2. Nothing under the mounted layer's directory was written: lock digests still match.
     expect(readFileSync(join(root, "surf/.claude/commands/hello.md"), "utf-8")).toBe(staleCmd);
     expect(readFileSync(join(root, "surf/.claude/agent-memory/watcher/MEMORY.md"), "utf-8")).toBe(staleMem);
     expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
@@ -926,13 +993,19 @@ describe("a changed lock re-renders the agent surface", () => {
 
 describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () => {
   // Each test here builds bare repositories and replays mounts through `git`
-  // subprocesses (local file:// fixtures: no network). Measured 2026-11-05:
-  // ~3 s each on an idle machine, 10-15 s on a loaded 4-CPU container, and
-  // bun's 5000 ms default failed H1-H6 at random on CI shards
-  // (folio-assistant#2949, #2950; cat-harness-tools#1487). 30 s is twice the
-  // worst measured cost.
+  // subprocesses over local file:// fixtures. The 30 s budget dates from
+  // 2026-11-05 (folio-assistant#2949, #2950; cat-harness-tools#1487), when the
+  // timeouts were read as load. They were not: a directory whose
+  // index.hydrated.jsonld the tree does not hold falls back to the pin's
+  // subgraph index PACKAGE (G2b), and with no `packageUrlFor` that fetch
+  // curled the real https://github.com/o/<repo>/releases/... — a 404 in
+  // ~1 s on a quiet runner, a hang until bun killed curl on a busy one, so a
+  // different subset failed each run as `could-not-determine`
+  // (cat-harness-tools#1487, #1488). `beforeAll` below points every package
+  // fetch at a file:// path that holds nothing, so the answer is "absent"
+  // and no test here reaches the network.
   const HYDRATED_TIMEOUT_MS = 30_000;
-  // o/hy holds two instances. `hh` publishes ONE hydrated file, for `tools`
+  // o/hy holds two layers. `hh` publishes ONE hydrated file, for `tools`
   // (and a child's, which must not travel); its `skills` and `docs` publish
   // none, and its code must not arrive. `hb` publishes a file under the
   // wrong IRI. o/np builds its subgraph files at publish, so no pin of it
@@ -957,7 +1030,14 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
   let np: { bare: string; sha: string };
   let hUrl: (r: string) => string;
 
+  let prevPrefix: string | undefined;
   beforeAll(() => {
+    // No package is published for these fixtures: every release-asset URL is
+    // fetched from an empty file:// mirror (curl exit 37, read as absent),
+    // never from github.com. H6 and H10 set their own mirror and restore this one.
+    // input-site: inert #04b6f973 — saves the environment to restore it after the suite; no assertion reads the value
+    prevPrefix = process.env.CAT_MOUNT_URL_PREFIX;
+    process.env.CAT_MOUNT_URL_PREFIX = `file://${join(base, "no-packages-published")}`;
     hy = bareRepo(base, "hy", {
       "hh/hh.json": decl("hh", { livesAt: { repository: "o/hy", path: "hh" }, directories: dirs }),
       "hh/tools/a/a.ts": "export const a = 1;\n",
@@ -1005,7 +1085,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     expect(existsSync(join(root, "hh/tools/index.jsonld"))).toBe(false);
     expect(existsSync(join(root, "hh/skills"))).toBe(false);
     expect(existsSync(join(root, "hh/hh.json"))).toBe(false);
-    // nothing discovers a code-less instance there, and the overlay offers none
+    // nothing discovers a code-less layer there, and the overlay offers none
     expect(instanceRootsIn(root)).toEqual([root]);
     expect(mountedInstanceRoots(root).has("hh")).toBe(false);
 
@@ -1187,6 +1267,11 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
       else process.env.CAT_MOUNT_URL_PREFIX = prev;
     }
   }, HYDRATED_TIMEOUT_MS);
+
+  afterAll(() => {
+    if (prevPrefix === undefined) delete process.env.CAT_MOUNT_URL_PREFIX;
+    else process.env.CAT_MOUNT_URL_PREFIX = prevPrefix;
+  });
 });
 
 describe("named ids declared FROM WITHIN (bean `mo75` G3)", () => {

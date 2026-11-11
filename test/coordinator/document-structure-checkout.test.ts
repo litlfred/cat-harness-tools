@@ -2,7 +2,7 @@
  * `document-structure` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/schemas/document-structure.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each reads the document structures
- * committed in the content instances' libraries, which only the checkout
+ * committed in the content layers' libraries, which only the checkout
  * holds. Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. The rest
  * of that file's tests stay there; every path here is composed from
@@ -25,7 +25,7 @@ describe("structureOf reads every committed structure, each as its own variant",
   // The whole premise of A+B: pdf-structure/v1 stays as it is. If any
   // committed file stops reading through the accessor, the premise is false.
   // `gitCorpus`, not a bare `git ls-files`: in the composed checkout every
-  // instance is a REMOTE MOUNT, ignored by the index repository's git, so
+  // layer is a REMOTE MOUNT, ignored by the index repository's git, so
   // `ls-files` from the root lists none of their files. `gitCorpus` counts a
   // mount's files as a submodule's were counted.
   const files = (gitCorpus(REPO, ["*structure.json"]) ?? [])

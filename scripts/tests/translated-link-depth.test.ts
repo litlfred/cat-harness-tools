@@ -101,7 +101,7 @@ describe("repair — the two ways the rewrite was wrong before it was right", ()
       // `siteDir` rather than "docs": the output site root is ONE ANSWER and
       // a literal is a second one. `site-dir-single-answer` flagged both
       // lines below, and it was right to — a test that hardcodes the site
-      // root keeps passing the day the instance moves it, which is the only
+      // root keeps passing the day the layer moves it, which is the only
       // moment it mattered.
       const site = siteDir({ name: "scratch" });
       mkdirSync(join(dir, site, "fr"), { recursive: true });

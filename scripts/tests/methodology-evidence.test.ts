@@ -7,7 +7,7 @@
  * zero ingested sources) was only visible because the real corpus was read.
  *
  * The tests of this file that read the whole checkout (reads the methodology
- * graphs of the content instances, smart-base's among them) live in
+ * graphs of the content layers, smart-base's among them) live in
  * `test/methodology-evidence-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
@@ -100,7 +100,7 @@ describe("the helpers", () => {
   });
 
   it("resolves a bib-slug across EVERY declared library, not just one", () => {
-    // Bean `a02m`. Several instances declare a library; resolving against one
+    // Bean `a02m`. Several layers declare a library; resolving against one
     // would report a present document as missing.
     expect(resolveEvidence(INSTANCE_ROOT, "library/gurel-tat-2017-swot-analysis")).toBeDefined();
     expect(resolveEvidence(INSTANCE_ROOT, "library/not-a-real-slug")).toBeUndefined();

@@ -1,11 +1,11 @@
 /**
- * The repository-partition ENGINE — the algorithm, with no instance's data in
+ * The repository-partition ENGINE — the algorithm, with no layer's data in
  * it.
  *
  * ## What moved, and why the host had to carry prose
  *
  * `scripts/repo-partition.ts` was 1,194 lines. Measured before the split:
- * the algorithm is roughly 390 of them, this instance's exception data 272,
+ * the algorithm is roughly 390 of them, this layer's exception data 272,
  * and its RATIONALE 532 — 65% of the rules block is comment, and the comments
  * are where the measurements live ("measured by putting these in the harness
  * list at the bottom first and watching the two edges survive", and a hundred
@@ -21,10 +21,10 @@
  *
  * ## What makes it generic
  *
- * Repo ids are `string`, not this instance's six-member union. Everything
+ * Repo ids are `string`, not this layer's six-member union. Everything
  * else arrives in a {@link PartitionSpec}: the repos, the allowed-import DAG,
  * the ordered rules, the scan roots, the skipped directories and the root to
- * resolve against. Another instance writes its own spec module and reuses
+ * resolve against. Another layer writes its own spec module and reuses
  * every line of this one.
  *
  * ## The three-valued discipline is IN here, not in the caller
@@ -60,7 +60,7 @@ export interface Rule {
 }
 
 /**
- * Everything an instance supplies. No default: a spec that forgot a field
+ * Everything a layer supplies. No default: a spec that forgot a field
  * would scan a directory it does not have, or permit an edge nobody allowed,
  * and both fail quietly.
  */

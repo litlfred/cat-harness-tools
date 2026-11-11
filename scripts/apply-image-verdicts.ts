@@ -78,10 +78,10 @@ import { libraryEntryDir } from "./lib/library-entry-graphs.ts";
 const ROOT = resolve(HARNESS_ROOT);
 
 /**
- * The library directory as the instance DECLARES it, not as convention
+ * The library directory as the layer DECLARES it, not as convention
  * assumes it. `harness.json` is the list; hardcoding the path is how a
  * consumer comes to scan a directory that is not there after a relocation —
- * which this repository has already done once, moving the whole instance
+ * which this repository has already done once, moving the whole layer
  * under `cat-harness/`.
  */
 // EVERY declared library, not the first — a verdict names a document, and
@@ -104,6 +104,13 @@ interface Verdict {
    * {@link DEFAULT_NARRATIVE_LANG} (bean `cat-tools-e1lo`).
    */
   lang?: string;
+  /**
+   * The same description in other languages, keyed by BCP 47 tag, e.g. the
+   * six UN languages (owner, 2026-11-11). Each becomes its own `draft`
+   * narrative beside `draft`, since a slot holds one narrative per language
+   * (bean `cat-tools-e1lo`). A key equal to `lang` is refused, never merged.
+   */
+  translations?: Record<string, string>;
   /** Vector figures only: the declared figure numbers this render shows. */
   shows?: string[];
   /**
@@ -130,6 +137,22 @@ interface VerdictFile {
    */
   attribution?: Record<string, { inspected_by: unknown; inspected_at: string }>;
   verdicts: Record<string, Record<string, Verdict>>;
+}
+
+/**
+ * The draft narratives one verdict yields: `draft` in `lang`, then one per
+ * `translations` entry. A translation in the verdict's own language would put
+ * two narratives of one language in a slot, which the schema refuses; it is
+ * refused here first, with the verdict's language named.
+ */
+export function draftsOf(v: Verdict, who: unknown, when: string) {
+  const lang = v.lang ?? DEFAULT_NARRATIVE_LANG;
+  const out = [{ text: v.draft, lang, state: "draft" as const, drafted_by: who, drafted_at: when }];
+  for (const [tag, text] of Object.entries(v.translations ?? {})) {
+    if (tag === lang) throw new Error(`a translation keyed "${tag}" repeats the verdict's own language`);
+    out.push({ text, lang: tag, state: "draft" as const, drafted_by: who, drafted_at: when });
+  }
+  return out;
 }
 
 /** The attribution for one document: its own, else the file's. */
@@ -187,17 +210,7 @@ export function applyTo(
     }
     const who = AttributionSchema.parse(v.inspected_by ?? by);
     const when = v.inspected_at ?? at;
-    const narrative = DESCRIBABLE_ROLES.includes(v.role)
-      ? [
-          {
-            text: v.draft,
-            lang: v.lang ?? DEFAULT_NARRATIVE_LANG,
-            state: "draft" as const,
-            drafted_by: who,
-            drafted_at: when,
-          },
-        ]
-      : undefined;
+    const narrative = DESCRIBABLE_ROLES.includes(v.role) ? draftsOf(v, who, when) : undefined;
     return {
       ...img,
       role: v.role,
@@ -254,15 +267,7 @@ export function applyToVector(
       ...(v.shows && v.shows.length > 0 ? { shows: v.shows } : {}),
       ...(DESCRIBABLE_ROLES.includes(v.role)
         ? {
-            narrative: [
-              {
-                text: v.draft,
-                lang: v.lang ?? DEFAULT_NARRATIVE_LANG,
-                state: "draft" as const,
-                drafted_by: who,
-                drafted_at: when,
-              },
-            ],
+            narrative: draftsOf(v, who, when),
           }
         : {}),
     };

@@ -99,7 +99,7 @@ export const ROLE_GRAPH_FILENAME = "roles.json";
 
 /**
  * What kind of thing an actor is — **human, agentic or mechanical**, plus
- * `external` for a participant outside this instance entirely.
+ * `external` for a participant outside this layer entirely.
  *
  * Those three words are the author's; `person`, `agent` and `system` are the
  * ids they are spelled with here, and the mapping is one-to-one:
@@ -109,7 +109,7 @@ export const ROLE_GRAPH_FILENAME = "roles.json";
  * | `person` | **human** | a skill to read, and a judgement to make |
  * | `agent` | **agentic** | a skill to read, and a judgement to make |
  * | `system` | **mechanical** | a program to run, and nothing to decide |
- * | `external` | outside this instance | nothing — it is not ours to task |
+ * | `external` | outside this layer | nothing — it is not ours to task |
  *
  * There is deliberately no second vocabulary carrying the author's words. Two
  * spellings of one concept is the drift this repository keeps paying for, and
@@ -231,7 +231,7 @@ export interface RoleDef {
   description: string;
   /**
    * Which kinds of actor may take this role on. `external` marks a participant
-   * outside the instance's control (a registry, a third-party service).
+   * outside the layer's control (a registry, a third-party service).
    *
    * A SET, not one kind, and the corpus is what settled it. `reviewer` carried
    * `person` alone while `review-agent`'s own description says it performs
@@ -415,19 +415,19 @@ export interface RoleGraph {
   /** Actors, when declared alongside. Usually read from the actor directory. */
   actors?: ActorDef[];
   /**
-   * Roles of a LOWER instance this graph adds skills to, BY ID (placement
+   * Roles of a LOWER layer this graph adds skills to, BY ID (placement
    * PR0b, bean `ejye`). See {@link RoleExtension}.
    */
   extensions?: RoleExtension[];
 }
 
 /**
- * A higher instance adding skills to a role a lower instance declares.
+ * A higher layer adding skills to a role a lower layer declares.
  *
  * The extension POINTS AT the role, the way a voice points at the role it
  * addresses (`activeIn.roles`) and a user story at the role it is told as
  * (#1168): the dependent holds the pointer, so the role is added to without
- * being edited, and the lower instance never names anything above it. That
+ * being edited, and the lower layer never names anything above it. That
  * is what lets a role→skill edge naming a core or sci skill move UP with its
  * skill (placement PR1–PR4) instead of staying in the harness as an upward
  * reference.
@@ -438,9 +438,9 @@ export interface RoleGraph {
  * (beans `tuvg`, `v625`) — the edge lives on the role graph, as before.
  */
 export interface RoleExtension {
-  /** The id of a role declared by an instance this one depends on. */
+  /** The id of a role declared by a layer this one depends on. */
   role: string;
-  /** Skills the role gains in this instance's checkout. */
+  /** Skills the role gains in this layer's checkout. */
   skills: string[];
 }
 
@@ -659,7 +659,7 @@ export const RoleDefSchema = z.object({
   // was corrected in #452; this is what stops the next one.
   //
   // `_`-prefixed documentation keys stay legal — see `withoutComments`. A
-  // downstream instance carrying some OTHER extra key will now fail at read
+  // downstream layer carrying some OTHER extra key will now fail at read
   // where it used to load, and that is the trade taken deliberately: a
   // declaration that silently means less than it says is worse than one that
   // refuses to load and names the key.
@@ -692,8 +692,8 @@ function withoutRetiredKeys(raw: unknown, p: string): unknown {
  * that reader, a user story told as them.
  *
  * The dependent holds this; the role holds nothing back (data-modelling step
- * 8). `instance` is the `owner/repo` of the instance whose role graph
- * declares the role (bean `6rmv`), absent for the pointer's own instance —
+ * 8). `instance` is the `owner/repo` of the layer whose role graph
+ * declares the role (bean `6rmv`), absent for the pointer's own layer —
  * never a path, as `VoiceRuleSourceSchema.instance` spells it.
  *
  * @ref RoleDefSchema
@@ -727,7 +727,7 @@ export const RoleGraphSchema = z.object({
 /**
  * Strip `_`-prefixed documentation keys, at the graph level and on each role.
  *
- * This instance writes rationale into the JSON it declares — `_comment` here,
+ * This layer writes rationale into the JSON it declares — `_comment` here,
  * `_comment`/`_title` in `harness.json`, `_lanes_comment` in bootstrap's
  * graph — so the convention is established rather than invented here. It is
  * what makes {@link RoleDefSchema}'s `.strict()` affordable: an unknown key
@@ -764,7 +764,7 @@ export const ACTORS_DIRNAME = "actors";
  * UNDECLARED directory: the one graph every swimlane binds to was outside
  * every declaration, so no audit could claim it.
  *
- * Resolved from the platform instance's declaration, never spelled as a path,
+ * Resolved from the platform layer's declaration, never spelled as a path,
  * so that relocating `scenarios/` moves the actors with it. Takes the
  * REPOSITORY root. `undefined` when the platform declares no
  * `scenarios` graph: a caller must say it could not determine, never read
@@ -792,7 +792,7 @@ export function capabilitiesDir(repoRoot: string): string | undefined {
 
 /** A registry directory inside the platform's declared `scenarios` graph. */
 function scenariosSubdir(repoRoot: string, name: string): string | undefined {
-  // The platform instance by its declaration, not `<repoRoot>/cat-harness`:
+  // The platform layer by its declaration, not `<repoRoot>/cat-harness`:
   // standalone, cat-harness IS the repository root (bean `uxn1`).
   const platform = instanceRootNamed(repoRoot, "cat-harness");
   if (platform === undefined) return undefined;
@@ -801,14 +801,14 @@ function scenariosSubdir(repoRoot: string, name: string): string | undefined {
 }
 
 /**
- * The role ids declared by every instance the instance holding `kgRoot`
- * `needs`, transitively: the LOWER instances whose roles a role here may
+ * The role ids declared by every layer the layer holding `kgRoot`
+ * `needs`, transitively: the LOWER layers whose roles a role here may
  * inherit (placement PR0b).
  *
  * {@link readRoleGraph} uses this when a caller passes no `lower`. Before it
  * did, a caller that passed nothing (`kg-export`, `glossary-export`,
  * `gen-auto-docs` and others) refused any role inheriting a role from a lower
- * instance: a DAK layer's `l1-extraction-reviewer`, which inherits cat-harness's
+ * layer: a DAK layer's `l1-extraction-reviewer`, which inherits cat-harness's
  * `reviewer`, stopped every KG export that mounted that layer. Only `needs` is
  * followed, never a sibling or a dependent, so a role still cannot inherit
  * upward and a cross-instance cycle still cannot form.
@@ -840,7 +840,10 @@ export function lowerRoleIds(kgRoot: string): ReadonlySet<string> {
     for (const need of needsOf(root)) {
       if (visited.has(need)) continue;
       visited.add(need);
-      const lowerRoot = instanceRootNamed(repo, need);
+      // A self-mounting checkout (`bun .github/cat.ts`) holds its `needs`
+      // INSIDE its own root (`who-iris/cat-harness/`), not beside it, so the
+      // layer's own root is searched first and its parent second.
+      const lowerRoot = instanceRootNamed(own, need) ?? instanceRootNamed(repo, need);
       if (lowerRoot === undefined) continue;
       visit(lowerRoot);
       let scenarios: string | undefined;
@@ -870,9 +873,9 @@ export function readRoleGraph(kgRoot: string, lower: ReadonlySet<string> = lower
   // joining `roles/` onto it looks one level too deep.
   //
   // Both are tried rather than the old one being dropped: a DOWNSTREAM
-  // instance has not moved its file, and every caller here passes all roots
-  // and takes the first that answers, so an instance on either layout
-  // resolves. Convention first, since that is where an unmigrated instance
+  // layer has not moved its file, and every caller here passes all roots
+  // and takes the first that answers, so a layer on either layout
+  // resolves. Convention first, since that is where an unmigrated layer
   // keeps it.
   const p = [join(kgRoot, ROLE_GRAPH_DIR, ROLE_GRAPH_FILENAME), join(kgRoot, ROLE_GRAPH_FILENAME)]
     .find((c) => existsSync(c));
@@ -911,8 +914,8 @@ export function readRoleGraph(kgRoot: string, lower: ReadonlySet<string> = lower
     const storeError = storeRoleError(r);
     if (storeError) throw new Error(`${p}: ${storeError}`);
     for (const parent of r.inherits ?? []) {
-      // `lower`: role ids a LOWER instance declares (placement PR0b). A
-      // higher instance's role may inherit one; the lower graph is read first
+      // `lower`: role ids a LOWER layer declares (placement PR0b). A
+      // higher layer's role may inherit one; the lower graph is read first
       // and can never inherit upward, so a cross-instance cycle cannot form.
       if (!ids.has(parent) && !lower.has(parent)) {
         throw new Error(`${p}: role "${r.id}" inherits "${parent}", which is not declared.`);
@@ -1079,7 +1082,7 @@ export function readActors(actorsDir: string, grants?: ReadonlyMap<string, reado
     } catch (e) {
       throw new Error(`${p} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
     }
-    // An EXTENSION of another instance's actor (placement PR0b) is not an
+    // An EXTENSION of another layer's actor (placement PR0b) is not an
     // actor; `overlayActors` in `scenario-overlay.ts` applies it.
     if (typeof raw.extends === "string") continue;
     const kind = actorKindOf(raw, p);
@@ -1364,8 +1367,8 @@ export function laneBinding(
  * `scenarios/roles.json` is an internal authoring registry for BPMN swimlanes,
  * defining the roles that processes and lane bindings reference. It is not
  * published as an independent JSON-LD document or Subgraph collection; instead,
- * its roles are projected directly into the declaring instance's Knowledge Graph
- * export (`scripts/kg-export.ts`) under the instance's own IRI (`#role/<id>`),
+ * its roles are projected directly into the declaring layer's Knowledge Graph
+ * export (`scripts/kg-export.ts`) under the layer's own IRI (`#role/<id>`),
  * while swimlane terminology is published separately in the SKOS swimlane glossary
  * (`scripts/glossary-export.ts`).
  */
@@ -1412,7 +1415,7 @@ export function isMechanicalRole(role: RoleDef): boolean {
  *
  * Two rejections, and the second is the one that is easy to miss:
  *
- * - **unknown** — not a role in this instance's KG. A mistyped audience
+ * - **unknown** — not a role in this layer's KG. A mistyped audience
  *   scopes QA to nobody, which reads as "no findings" rather than as an error.
  * - **mechanical** — `Work plan (beans)`, `Corpus` and `Build pipeline` are
  *   roles a machine plays ({@link isMechanicalRole}). Their skills are a
@@ -1497,7 +1500,7 @@ export const PermissionVocabularySchema = z.object({
 });
 
 /**
- * Read the permission vocabulary. Absent → `undefined` (an unmigrated instance
+ * Read the permission vocabulary. Absent → `undefined` (an unmigrated layer
  * simply declares none); present but unparseable → throws, on the same rule as
  * every other declaration here.
  */

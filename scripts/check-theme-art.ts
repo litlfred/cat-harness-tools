@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 /**
- * Report on this instance's theme art — the intake check, run over what shipped.
+ * Report on this layer's theme art — the intake check, run over what shipped.
  *
  * @module scripts/check-theme-art
- * @covers none — its subject is an instance's declared theme ART, read from
+ * @covers none — its subject is a layer's declared theme ART, read from
  * the declaration's `images` via `readDeclaration` and grouped by
  * `THEME_LAYOUTS`. It resolves NO `themes` directory; `check:instance-themes`
  * covers the graph.
  *
  * `schemas/library/theme-art-intake.ts` is the check itself and is pure. This
- * is its CLI face: it reads the instance's declaration, groups the declared
+ * is its CLI face: it reads the layer's declaration, groups the declared
  * images by role, and runs intake over each group. A report is not an
  * action: it never repairs art.
  *
@@ -93,7 +93,7 @@ if (import.meta.main) {
   // is a correction the first run of this script forced. `docs/` is not a
   // declared directory and should not be: a declared entry names a GRAPH, and
   // the site is the render TARGET, resolved by `siteDirFor` rather than
-  // declared. Without it every one of this instance's five backdrop roles was
+  // declared. Without it every one of this layer's five backdrop roles was
   // refused for `undeclared-destination` — a check firing on all of its
   // subjects is a check that is wrong, not a repository that is.
   //

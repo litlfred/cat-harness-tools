@@ -7,7 +7,7 @@
  * typology**: `harness.json` already says which directory holds which kind,
  * and {@link GraphTypologyDef.validator} supplies the schema.
  *
- * A downstream instance inherits the platform's `tools/` graph but not its CI
+ * A downstream layer inherits the platform's `tools/` graph but not its CI
  * workflows, so this is how a folio built on the platform validates its own
  * graph.
  *
@@ -49,11 +49,11 @@ import { implementingRootFor } from "./harness-config.js";
 /** A validator reference, split from its `module#Export` form. */
 export interface ValidatorRef {
   /**
-   * The instance the module belongs to, by its DECLARED NAME, when that is not
-   * the instance resolving the reference: `folio-assistant-core:schemas/x.ts#X`.
+   * The layer the module belongs to, by its DECLARED NAME, when that is not
+   * the layer resolving the reference: `folio-assistant-core:schemas/x.ts#X`.
    *
    * By name rather than by a `../` path, because a relative path resolves into
-   * whatever checkout sits next door, and a name resolves only to the instance
+   * whatever checkout sits next door, and a name resolves only to the layer
    * that declares it. Bean `quda`: a harness kind whose node shapes live in
    * core (`catalogue`, `uploads`) had no honest way to say so.
    */
@@ -117,10 +117,12 @@ export function isZodSchema(v: unknown): v is z.ZodTypeAny {
 /**
  * The validator for a graph typology, or a stated reason there is none.
  *
- * `instanceRoot` is the INSTANCE root, not the repository root — the two
- * parted company when `#437` moved this instance under `cat-harness/`, and
+ * `instanceRoot` is the LAYER root, not the repository root — the two
+ * parted company when `#437` moved this layer under `cat-harness/`, and
  * nothing noticed because nothing read these paths.
  */
+const kindValidatorCache = new WeakMap< object, Map<string, Promise<KindValidator>> >();
+
 export async function resolveKindValidator(
   kind: string,
   instanceRoot: string,
@@ -140,8 +142,17 @@ export async function resolveKindValidator(
         `cannot be checked. Not a failure and not a pass.`,
     };
   }
-
-  return loadValidator(def.validator, canonical, instanceRoot);
+  let byRoot = kindValidatorCache.get(def);
+  if (!byRoot) {
+    byRoot = new Map();
+    kindValidatorCache.set(def, byRoot);
+  }
+  const key = resolve(instanceRoot);
+  const cached = byRoot.get(key);
+  if (cached) return cached;
+  const pending = loadValidator(def.validator, canonical, instanceRoot);
+  byRoot.set(key, pending);
+  return pending;
 }
 
 /**
@@ -262,17 +273,17 @@ export function familyBody(node: unknown): unknown {
 const rootsByName = new Map<string, Map<string, string>>();
 
 /**
- * The root a reference resolves against: the named instance's, or the
- * resolving instance's own when the reference names none. `undefined` when
- * no instance in the checkout declares that name.
+ * The root a reference resolves against: the named layer's, or the
+ * resolving layer's own when the reference names none. `undefined` when
+ * no layer in the checkout declares that name.
  */
 /**
- * Where an unqualified validator module is read from: the declaring instance,
- * then the one instance that implements it — the rule `check:tools` applies to
+ * Where an unqualified validator module is read from: the declaring layer,
+ * then the one layer that implements it — the rule `check:tools` applies to
  * a Tool's `invoke.*.module`. The harness declares kinds whose schema code
  * lives in the tools layer (bean `8lcl`), so `schemas/kg/x.ts#X` in a harness
  * declaration names a file there. A qualified ref (`name:path#X`) starts from
- * the instance it names, then falls back the same way.
+ * the layer it names, then falls back the same way.
  */
 export function moduleRootOf(ref: ValidatorRef, instanceRoot: string): string | undefined {
   const base = rootOf(ref.instance, instanceRoot);
@@ -282,9 +293,9 @@ export function moduleRootOf(ref: ValidatorRef, instanceRoot: string): string | 
 
 export function rootOf(instance: string | undefined, instanceRoot: string): string | undefined {
   if (instance === undefined) return instanceRoot;
-  // `siblingScopeFor`, not `repoRootFor` (`dirname`): for the instance declared
+  // `siblingScopeFor`, not `repoRootFor` (`dirname`): for the layer declared
   // AT the checkout root the latter climbs out of the checkout and finds no
-  // instance by name — the class of beans `pgzn` and `676g`.
+  // layer by name — the class of beans `pgzn` and `676g`.
   const repo = siblingScopeFor(instanceRoot);
   let byName = rootsByName.get(repo);
   if (!byName) {
@@ -305,7 +316,7 @@ export function rootOf(instance: string | undefined, instanceRoot: string): stri
   const found = byName.get(instance);
   if (found !== undefined) return found;
   // The layer running this code is always present, whatever the checkout
-  // around the resolving instance holds. cat-harness declares kinds whose
+  // around the resolving layer holds. cat-harness declares kinds whose
   // validators live here (`cat-harness-tools:scripts/gen-slice-sqlite.ts#…`),
   // and when the harness is its own checkout `siblingScopeFor` searches no
   // siblings (ruling `68k7`), so the name was unresolvable standalone though
@@ -315,7 +326,7 @@ export function rootOf(instance: string | undefined, instanceRoot: string): stri
   return undefined;
 }
 
-/** The root of the layer this module belongs to: `schemas/kg/` → its instance root. */
+/** The root of the layer this module belongs to: `schemas/kg/` → its layer root. */
 const OWN_ROOT = resolve(import.meta.dir, "..", "..");
 
 function readOwnDeclaration(root: string): { name?: string; repository?: string } | undefined {
@@ -391,6 +402,8 @@ export function readShape(instanceRoot: string, shape: string): { ref: Validator
   return { ref, fields };
 }
 
+const nodeSchemasCache = new WeakMap< object, Map<string, Promise<NodeSchemaResolution[]>> >();
+
 /**
  * Every `$schema` family a kind declares, resolved. Empty when the kind
  * declares none — the caller then falls back to the kind-level validator.
@@ -401,24 +414,38 @@ export async function resolveNodeSchemas(
   registry: GraphTypologyRegistry = defaultGraphTypologies,
 ): Promise<NodeSchemaResolution[]> {
   const canonical = resolveGraphTypology(kind).kind;
-  const map = (registry.get(canonical)?.nodeSchemas ?? {}) as Record<string, NodeSchemaRef>;
-  const out: NodeSchemaResolution[] = [];
-  for (const [tag, ref] of Object.entries(map)) {
-    const at = out.length;
-    if (ref.validator) {
-      const v = await loadValidator(ref.validator, canonical, instanceRoot);
-      out.push(
-        v.state === "resolved"
-          ? { tag, state: "resolved", ref: v.ref, schema: v.schema }
-          : { tag, state: "unresolvable", reason: v.reason },
-      );
-    } else if (ref.shape) {
-      const r = readShape(instanceRoot, ref.shape);
-      out.push(typeof r === "string" ? { tag, state: "unresolvable", reason: r } : { tag, state: "shape", ...r });
-    } else if (ref.external) {
-      out.push({ tag, state: "external", spec: ref.external });
-    }
-    if (ref.derived && out.length > at) out[at] = { ...out[at], derived: true };
+  const def = registry.get(canonical);
+  if (!def?.nodeSchemas) return [];
+  let byRoot = nodeSchemasCache.get(def);
+  if (!byRoot) {
+    byRoot = new Map();
+    nodeSchemasCache.set(def, byRoot);
   }
-  return out;
+  const key = resolve(instanceRoot);
+  const cached = byRoot.get(key);
+  if (cached) return cached;
+  const pending = (async (): Promise<NodeSchemaResolution[]> => {
+    const map = (def.nodeSchemas ?? {}) as Record<string, NodeSchemaRef>;
+    const out: NodeSchemaResolution[] = [];
+    for (const [tag, ref] of Object.entries(map)) {
+      const at = out.length;
+      if (ref.validator) {
+        const v = await loadValidator(ref.validator, canonical, instanceRoot);
+        out.push(
+          v.state === "resolved"
+            ? { tag, state: "resolved", ref: v.ref, schema: v.schema }
+            : { tag, state: "unresolvable", reason: v.reason },
+        );
+      } else if (ref.shape) {
+        const r = readShape(instanceRoot, ref.shape);
+        out.push(typeof r === "string" ? { tag, state: "unresolvable", reason: r } : { tag, state: "shape", ...r });
+      } else if (ref.external) {
+        out.push({ tag, state: "external", spec: ref.external });
+      }
+      if (ref.derived && out.length > at) out[at] = { ...out[at], derived: true };
+    }
+    return out;
+  })();
+  byRoot.set(key, pending);
+  return pending;
 }

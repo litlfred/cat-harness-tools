@@ -165,8 +165,8 @@ export interface RouteMountResult {
 export async function mountDeclaredRoutes(
   declarations: readonly RouteDeclaration[],
   /**
-   * The DECLARING instance's root. A module is looked up there first and
-   * then in the one instance that implements it, so a content route that
+   * The DECLARING layer's root. A module is looked up there first and
+   * then in the one layer that implements it, so a content route that
    * lives with its content package (owner, 2026-10-04: feedback, glossary
    * and relevance moved up with their content) is found without its path
    * being written here. Same rule as `registerDeclaredToolGroups`.

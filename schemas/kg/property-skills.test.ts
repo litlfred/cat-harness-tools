@@ -4,7 +4,7 @@
  * and so does a row naming a skill that does not exist.
  *
  * The tests of this file that read the whole checkout (resolves skills that
- * the content instances above cat-harness hold) live in
+ * the content layers above cat-harness hold) live in
  * `test/property-skills-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

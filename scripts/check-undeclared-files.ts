@@ -11,8 +11,8 @@
  *
  * A root entry is accounted for when it is one of:
  *
- * 1. **an instance** — a directory holding its own declaration;
- * 2. **a declared directory** of any instance, resolved at repository scope
+ * 1. **a layer** — a directory holding its own declaration;
+ * 2. **a declared directory** of any layer, resolved at repository scope
  *    (`beans/`, `todos/` and friends live at the root by declaration);
  * 3. **repository infrastructure** — {@link ROOT_INFRASTRUCTURE}, a list with
  *    a reason per entry;
@@ -25,7 +25,7 @@
  * with findings.
  */
 import { spawnSync } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { findDeclarationFile, instanceRootFor, readDeclaration, repoRootFor, rootForScope } from "../schemas/kg/cat-harness.js";
@@ -47,24 +47,24 @@ import { instanceConfigFilename } from "../schemas/kg/harness-config.js";
  * inside a DECLARED directory whose description names it, which is a better
  * account of a file than a line here.
  *
- * ## The instance configs are COMPUTED, and that is not a pattern either
+ * ## The layer configs are COMPUTED, and that is not a pattern either
  *
  * `harness.config.json` was an entry here until 2026-09-20. The config is
- * `<instance>.config.json` now, one per instance at the instantiation root,
+ * `<instance>.config.json` now, one per layer at the instantiation root,
  * so a fixed entry could only ever account for one of them — and `*.config.json`
  * would be exactly the wildcard this list exists to refuse.
  *
  * {@link instanceConfigNames} therefore asks the DECLARATIONS which names are
  * legitimate. That is still a list with reasons: the reason each name is
- * allowed is that an instance in this checkout declares it, which is a better
- * reason than a line in a constant, and a config for an instance that is not
+ * allowed is that a layer in this checkout declares it, which is a better
+ * reason than a line in a constant, and a config for a layer that is not
  * here stays a finding.
  */
 export const ROOT_INFRASTRUCTURE: Readonly<Record<string, string>> = {
   "package.json": "bun/npm reads it from the repository root",
   "bun.lock": "the lockfile beside package.json",
   "bunfig.toml": "bun's own config, root-only",
-  // The root instance's remote-mount lock (bean `nn8e`, #2462): CI's replay
+  // The root layer's remote-mount lock (bean `nn8e`, #2462): CI's replay
   // (`mount-from-lock.ts`, node:* only) reads it from the root before anything
   // else is present, so it cannot live inside a layer.
   // Renamed `index.lock.json` 2026-10-07 (skill `index-config`), beside the
@@ -83,19 +83,23 @@ export const ROOT_INFRASTRUCTURE: Readonly<Record<string, string>> = {
   "GEMINI.md": "the same, for another tool",
   "README.md": "what a person landing on the repository reads",
   LICENSE: "the repository's licence",
+  // The same file in its Markdown spelling, which GitHub's licence detection
+  // reads from the root exactly as it reads LICENSE (the WHO IG repositories,
+  // smart-ips-pilgrimage among them, ship it so; cat-harness-tools#1701).
+  "LICENSE.md": "the repository's licence, in the Markdown spelling GitHub also detects at the root",
   "LICENSE-CONTENT.md": "the separate licence for content",
   NOTICE: "attribution required by the licence",
   "THIRD-PARTY-NOTICES.md": "the dependency attributions",
   // The one root-level entry that is neither config nor prose. Tool definitions
-  // live at `<stub>/tools/*.ts` so a composed instance can contribute its own
+  // live at `<stub>/tools/*.ts` so a composed layer can contribute its own
   // without colliding on a filename — but FIVE modules import `../tools/index.js`,
   // and had the move stopped at relocating the files, each would now name this
-  // instance's stub. That is the defect the stub pattern exists to remove,
+  // layer's stub. That is the defect the stub pattern exists to remove,
   // reintroduced one directory along. The barrel stays at the top on purpose.
   tools: "the merged Tool barrel five modules import as `../tools/index.js`",
   // The index repository's own workflow tests (#2521, ruling 1c): they test
   // `.github/workflows/`, which is the root's and no layer's, so they live
-  // beside it rather than in an instance that does not own what they test.
+  // beside it rather than in a layer that does not own what they test.
   test: "the index repository's tests of its own .github/workflows (#2521 ruling 1c)",
   // Playwright's `outputDir`, created by a run rather than authored. Accounted
   // for here rather than left to `gitIgnored`, and the difference is worth
@@ -180,10 +184,10 @@ export interface UndeclaredEntry {
 }
 
 /**
- * The config filename each declared instance is entitled to at this root.
+ * The config filename each declared layer is entitled to at this root.
  *
  * Asked of the declarations rather than listed, because the names are the
- * instances' own (`<name>.config.json`, 2026-09-20). An unreadable
+ * layers' own (`<name>.config.json`, 2026-09-20). An unreadable
  * declaration contributes NOTHING rather than a guess: the config stays
  * unaccounted for and the sweep reports it, which is the right way round —
  * "could not tell" must not buy a file its place on the list.
@@ -221,7 +225,7 @@ export function accountedRootPaths(repoRoot: string): Map<string, string> {
   // TWO PASSES, and the order is the whole correctness argument.
   //
   // A single pass got this wrong in a way that only CI could see. It marked a
-  // directory "an instance", then walked that instance's declared directories
+  // directory "an instance", then walked that layer's declared directories
   // and OVERWROTE entries — and `cat-harness` declares `bootstrap/skills/` at
   // repository scope, whose first segment is `bootstrap`. So whether
   // `bootstrap` ended up reading "an instance: it declares itself" or "declared
@@ -229,15 +233,15 @@ export function accountedRootPaths(repoRoot: string): Map<string, string> {
   // that is bootstrap; on the CI runner it is not, and the test failed there and
   // nowhere else.
   //
-  // Being an instance is the stronger fact and must win: an instance is
-  // accounted for BY ITSELF, and another instance happening to declare a
-  // directory inside it does not change that. So instances are marked first and
+  // Being a layer is the stronger fact and must win: a layer is
+  // accounted for BY ITSELF, and another layer happening to declare a
+  // directory inside it does not change that. So layers are marked first and
   // the declared-directory pass never replaces one.
   const instances: string[] = [];
   for (const entry of readdirSync(repoRoot, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    // An instance declares itself. That is the contract everywhere else here,
-    // and it means a new instance is accounted for the moment it exists rather
+    // A layer declares itself. That is the contract everywhere else here,
+    // and it means a new layer is accounted for the moment it exists rather
     // than when somebody remembers to add it to a list.
     if (findDeclarationFile(join(repoRoot, entry.name)) !== undefined) {
       out.set(entry.name, "an instance: it declares itself");
@@ -245,27 +249,27 @@ export function accountedRootPaths(repoRoot: string): Map<string, string> {
     }
   }
 
-  // THE ROOT MAY ITSELF BE AN INSTANCE, and since 2026-09-20 it is.
+  // THE ROOT MAY ITSELF BE A LAYER, and since 2026-09-20 it is.
   //
   // Owner: *"only uploads/ on this repo's root b/c acting as if it was
   // intialized"*. A `harness.json` at the repository root declares the checkout
-  // as an initialized instance, so the directories IT names sit at the root
+  // as an initialized layer, so the directories IT names sit at the root
   // legitimately — `uploads/` is the worked example, and it is a DIFFERENT
-  // queue from `cat-harness/uploads/`: same id, different instance, not one
+  // queue from `cat-harness/uploads/`: same id, different layer, not one
   // directory declared twice.
   //
-  // This sweep was written when the root was deliberately not an instance, and
+  // This sweep was written when the root was deliberately not a layer, and
   // said so; that premise changed and the sweep reported 19.4 MB of correctly
   // declared content as unaccounted. A sweep whose model of the repository has
   // gone stale reports exactly like one finding a real defect, which is why
   // this reads the declaration rather than gaining two `ROOT_INFRASTRUCTURE`
-  // entries — the entries would still be there after the next instance is
+  // entries — the entries would still be there after the next layer is
   // declared, and would account for anything sharing those names.
   //
-  // `rootForScope` is deliberately NOT used here. For the root instance both
+  // `rootForScope` is deliberately NOT used here. For the root layer both
   // scopes land at the root, and `repoRootFor` would resolve a
   // repository-scoped entry to the checkout's PARENT — outside the repository
-  // entirely. A root instance declaring repository scope is a contradiction in
+  // entirely. A root layer declaring repository scope is a contradiction in
   // terms; it is not special-cased because nothing should write one.
   if (findDeclarationFile(repoRoot) !== undefined) {
     out.set(findDeclarationFile(repoRoot) ?? "", "the repository's own declaration: it acts as an initialized instance");
@@ -279,13 +283,24 @@ export function accountedRootPaths(repoRoot: string): Map<string, string> {
     }
     for (const dir of rootDecl?.directories ?? []) {
       const top = dir.path.replace(/^\.\//, "").split("/")[0];
-      // Same `!out.has` guard and the same reason: being an instance is the
+      // Same `!out.has` guard and the same reason: being a layer is the
       // stronger fact, and the root claiming a name does not unmake one.
       if (top && !out.has(top)) {
         out.set(top, `declared by ${rootDecl?.name ?? "the repository"} as "${dir.id}"`);
       }
     }
   }
+
+  // THE ROOT INDEX'S CONTENT-TYPE SECTIONS name root paths too
+  // (cat-harness-tools#1701). An IG repository that is its own index declares
+  // `contentTypes.ig.include` in `index.config.json` (the IG layer's `ig`
+  // type, owner 2026-10-30: "harness declares what it pays attention to in
+  // the repo"), listing `sushi-config.yaml` and `ig.ini` among the paths it
+  // reads. A path a declaration lists is accounted for by that declaration,
+  // exactly as a declared directory is. Read as data, without naming the type:
+  // this layer may not import the FHIR layer, and only a section that LISTS
+  // paths accounts for any.
+  for (const [top, why] of contentTypeIncludes(repoRoot)) if (!out.has(top)) out.set(top, why);
 
   for (const name of instances) {
     const abs = join(repoRoot, name);
@@ -297,9 +312,39 @@ export function accountedRootPaths(repoRoot: string): Map<string, string> {
       if (base !== abs) {
         const top = dir.path.replace(/^\.\//, "").split("/")[0];
         // `!out.has(top)` is what makes this order-independent: an entry
-        // already marked an instance keeps that, and so does one already
-        // claimed by an earlier instance's declaration.
+        // already marked a layer keeps that, and so does one already
+        // claimed by an earlier layer's declaration.
         if (top && !out.has(top)) out.set(top, `declared by ${decl?.name ?? name} as "${dir.id}"`);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Root-level names listed by a `contentTypes.<id>.include` array of the root
+ * `index.config.json`, each with the section that lists it. An absent or
+ * unreadable file, or a section without a string `include`, contributes
+ * nothing — "could not tell" buys no file its place (cat-harness-tools#1701).
+ */
+export function contentTypeIncludes(repoRoot: string): Map<string, string> {
+  const out = new Map<string, string>();
+  let doc: unknown;
+  try {
+    doc = JSON.parse(readFileSync(join(repoRoot, "index.config.json"), "utf8"));
+  } catch {
+    return out;
+  }
+  const sections = (doc as { contentTypes?: unknown } | null)?.contentTypes;
+  if (!sections || typeof sections !== "object") return out;
+  for (const [id, section] of Object.entries(sections as Record<string, unknown>)) {
+    const include = (section as { include?: unknown } | null)?.include;
+    if (!Array.isArray(include)) continue;
+    for (const e of include) {
+      if (typeof e !== "string") continue;
+      const top = e.replace(/^\.\//, "").split("/")[0];
+      if (top && !top.startsWith(".") && !out.has(top)) {
+        out.set(top, `declared by index.config.json contentTypes.${id}.include`);
       }
     }
   }

@@ -1,15 +1,15 @@
 /**
- * Instance discovery with git worktrees present (bean `g43f`).
+ * Layer discovery with git worktrees present (bean `g43f`).
  *
  * A Claude Code session dispatches agents into `<checkout>/.claude/worktrees/<id>/`,
- * each a full checkout that declares the root instance. Two ways a sweep could
- * read one of them as an instance of THIS repository:
+ * each a full checkout that declares the root layer. Two ways a sweep could
+ * read one of them as a layer of THIS repository:
  *
  * 1. **Nested** — scanning the checkout and descending into `.claude/`. The
  *    dot-prefix guard already stops this; pinned here so it stays stopped.
  * 2. **Escaped** — `repoRootFor` was `dirname`, so for the ROOT instance of a
  *    worktree it landed on `.claude/worktrees/`, whose every child is a sibling
- *    worktree. Measured 2026-10-03: ten siblings returned as instances. Since
+ *    worktree. Measured 2026-10-03: ten siblings returned as layers. Since
  *    cat-harness 91aee02 (folio-assistant-lvlv) it steps over
  *    `.claude/worktrees/` to the enclosing checkout instead.
  *
@@ -125,7 +125,7 @@ describe("sibling clones in a plain directory — the separated layout (ho66)", 
     // every one of them, so `needs` resolved to nothing (2026-10-05).
     //
     // A clone's OWN sibling scope is itself: the owner ruled on 2026-10-11
-    // (bean `68k7`, cat-harness 7d4a633) that an instance which is its own
+    // (bean `68k7`, cat-harness 7d4a633) that a layer which is its own
     // checkout never looks outside it, so the directory holding the clones
     // is scanned by naming it, as the first assertion does.
     const plain = mkdtempSync(join(tmpdir(), "ho66-siblings-"));
@@ -154,7 +154,7 @@ describe("checkoutRootFor — repository-level reads stay inside the checkout (g
     // The oracle is git's own toplevel, not a path climbed from this file:
     // the aggregate when cat-harness is nested in it, cat-harness itself when
     // it is its own clone (the standalone rehearsal, bean `ho66`). Either way
-    // the checkout answers itself, and so does the instance it holds.
+    // the checkout answers itself, and so does the layer it holds.
     const instance = resolve(import.meta.dir, "..");
     const here = checkoutHolding(instance);
     expect(checkoutRootFor(here)).toBe(here);
@@ -199,7 +199,7 @@ describe("checkoutRootFor — repository-level reads stay inside the checkout (g
   });
 
   test("known-skills never reads `.claude/skills` from outside the checkout", () => {
-    // The ROOT instance reads its OWN checkout's `.claude/skills` (owner,
+    // The ROOT layer reads its OWN checkout's `.claude/skills` (owner,
     // 2026-10-04, bean g43f); a sibling's `.claude/skills` must never appear.
     const seed = join(checkout, ".claude", "worktrees", ".claude", "skills", "leak");
     mkdirSync(seed, { recursive: true });
@@ -236,7 +236,7 @@ describe("checkoutRootFor — repository-level reads stay inside the checkout (g
 
   test("check-subgraph-coverage recognises the worktree's root instance AS the root", () => {
     // Its default `repoRoot` is what decides `isRoot`; `dirname` made it false
-    // for the one instance the guard exists for. Observable as no readme
+    // for the one layer the guard exists for. Observable as no readme
     // finding being raised against the repository root's own README rule.
     expect(() => auditInstance(wtA)).not.toThrow();
     expect(auditInstance(wtA)).toEqual(auditInstance(wtA, wtA));

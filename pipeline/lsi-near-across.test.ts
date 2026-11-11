@@ -95,7 +95,7 @@ describe("parseNearAcrossArgs", () => {
   });
 });
 
-/** A checkout of plain directories, each an instance with its own declaration. */
+/** A checkout of plain directories, each a layer with its own declaration. */
 function checkout(instances: Record<string, { providers?: unknown; files?: Record<string, string> }>): string {
   const root = mkdtempSync(join(tmpdir(), "near-across-"));
   for (const [name, spec] of Object.entries(instances)) {

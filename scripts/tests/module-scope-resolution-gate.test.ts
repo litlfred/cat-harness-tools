@@ -19,7 +19,7 @@ import { join } from "path";
 import { checkModuleScopeResolution } from "../check-module-scope-resolution.ts";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
-/** A repo with one instance holding one module, and nothing else. */
+/** A repo with one layer holding one module, and nothing else. */
 function repoWith(source: string): string {
   const root = mkdtempSync(join(tmpdir(), "modscope-"));
   const inst = join(root, "thing");

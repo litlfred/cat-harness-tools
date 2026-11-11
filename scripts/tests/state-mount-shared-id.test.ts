@@ -1,5 +1,5 @@
 /**
- * Several instances of one index each declaring a state graph with the SAME id.
+ * Several layers of one index each declaring a state graph with the SAME id.
  *
  * Found on folio-assistant#2529 (2026-10-11): cat-harness, cat-harness-tools,
  * folio-assistant-core and who-iris each declare `health` on a branch of their
@@ -8,8 +8,8 @@
  * without a word, and `audit:coverage` reported `health` undetermined and
  * refused to write its sidecar.
  *
- * And the second half: a graph declared INSIDE a remote-mounted instance is
- * that instance's state, so it is read from — and pushed to — the instance's
+ * And the second half: a graph declared INSIDE a remote-mounted layer is
+ * that layer's state, so it is read from — and pushed to — the layer's
  * own repository (named by the index lock), at its instance-relative path.
  *
  * Real repositories throughout, as in `state-mount-per-branch.test.ts`: the
@@ -68,9 +68,9 @@ const INSTANCES = ["alpha", "beta"] as const;
 const HEALTH = "test/health/results";
 
 /**
- * An index checkout with two remote-mounted instances, `alpha/` and `beta/`,
+ * An index checkout with two remote-mounted layers, `alpha/` and `beta/`,
  * each declaring `health` at `test/health/results/` on `cat/<instance>/health`.
- * Each instance's branch is seeded in ITS OWN repository at the
+ * Each layer's branch is seeded in ITS OWN repository at the
  * instance-relative path; the checkout's `origin` holds an index-layout copy
  * of alpha's only (what folio-assistant carried on 2026-10-11).
  */

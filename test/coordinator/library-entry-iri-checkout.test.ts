@@ -49,7 +49,7 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
     expect(entryView({ links: [{ href: "/somewhere-else/" }] }, roots, "x/y/z")).toBe("/x/y/z/");
     expect(entryView({}, roots, "x/y/z")).toBe("/x/y/z/");
   });
-  // smart-trust is an instance above the harness, held only by the composed checkout.
+  // smart-trust is a layer above the harness, held only by the composed checkout.
   const noSmartTrust =
     !existsSync(join(REPO, "smart-trust")) && notApplicableAlone("smart-trust's checkout, whose declared root this reads (a higher instance)");
   test.skipIf(noSmartTrust)("and smart-trust's declared root is the route its entries take", () => {

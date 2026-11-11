@@ -275,7 +275,7 @@ function ghJson(path: string): unknown {
   return r.status === 0 ? JSON.parse(r.stdout) : undefined;
 }
 
-/** The GitHub repositories the checkout's index config mounts instances from. */
+/** The GitHub repositories the checkout's index config mounts layers from. */
 export function instanceRepos(repo: string): string[] {
   const r = readIndexConfig(repo);
   if (!("config" in r)) return [];
@@ -320,12 +320,12 @@ export async function replay(o: ReplayOptions): Promise<{ steps: number; ran: nu
   }
   if (o.plan) return { steps: steps.length, ran: 0, failed: [] };
 
-  // The build reads every mounted instance's repository through the GitHub
+  // The build reads every mounted layer's repository through the GitHub
   // API (its releases, for the IG indexes). A runner's token reads any public
   // repository; an agent session's often reads only the repositories attached
   // to it. Found on the first trial replay (2026-11-01): derive:publish failed
   // after 14 min on a 403 for the IG repositories' releases. Said up front,
-  // not refused: not every instance's API is read, and which are is the
+  // not refused: not every layer's API is read, and which are is the
   // build's business, not this file's.
   const unreachable = instanceRepos(repo).filter((r) => spawnSync("gh", ["api", `repos/${r}`, "--silent"], { encoding: "utf-8" }).status !== 0);
   if (unreachable.length) o.log(`⚠ the GitHub API does not answer for ${unreachable.join(", ")} from this session. If a step fails on a 403, attach those repositories and run again (the IG repositories' releases are read by derive:publish).`);

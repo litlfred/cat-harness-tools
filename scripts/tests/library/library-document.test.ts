@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
+import { entryFigureFiles, extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
 
 function entry(structure: object, extra: Record<string, string> = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "libdoc-"));
@@ -191,5 +191,51 @@ describe("a Markdown table in an extract (litlfred/dth-hrh, 'Handbook at a glanc
     const md = "## At a glance\n\n| Part | Chapter | Sections |\n| :---- | :---- | :---- |\n| Part 0 | 1. Why **registries** | A; B |\n| | 2. Scope | `a\\|b` |\n";
     // As sectionText reads it: whitespace collapsed and trimmed.
     expect(plainMarkdown(md).replace(/\s+/g, " ").trim()).toBe("Part; Chapter; Sections Part 0; 1. Why registries; A; B 2. Scope; a|b");
+  });
+});
+
+describe("kept figures and transcribed tables (who-iris#224)", () => {
+  const images = {
+    images: [
+      { id: "img-p002-1", file: "images/img-p002-1.webp", role: "figure", basis: { page: 2 },
+        narrative: [{ text: "A bar chart.", lang: "en", state: "draft" }, { text: "Un graphique.", lang: "fr", state: "draft" }] },
+      { id: "img-p001-1", file: "images/img-p001-1.png", role: "decorative", basis: { page: 1 } },
+      { id: "img-p003-1", file: "images/img-p003-1.webp", role: "figure", basis: { page: 3 } },
+    ],
+  };
+  const csvw = {
+    tables: [{ url: "tables/table-1.csv", tableSchema: { columns: [{ titles: "A", "fac:group": "G" }, { titles: "B", "fac:group": "G" }] },
+      "fac:label": "Table 1", "fac:caption": "Table 1. Things", "fac:pages": [4], "fac:headerRow": 1,
+      "fac:narrative": [{ text: "Lists things.", lang: "en", state: "draft" }] }],
+  };
+  function withFiles(): string {
+    const dir = entry(base, { "images.json": JSON.stringify(images), "tabular.csvw.json": JSON.stringify(csvw) });
+    mkdirSync(join(dir, "images"));
+    mkdirSync(join(dir, "tables"));
+    writeFileSync(join(dir, "images", "img-p002-1.webp"), "x");
+    writeFileSync(join(dir, "tables", "table-1.csv"), 'A,B\n"a, ""quoted""",2\nx,"two\nlines"\n');
+    return dir;
+  }
+
+  test("a figure with its WebP on disk is shown with every language; others are not", () => {
+    const v = readEntryDocument(withFiles(), "r")!;
+    expect(v.images?.map((i) => i.id)).toEqual(["img-p002-1"]);
+    expect(v.images?.[0]?.narratives).toEqual({ en: "A bar chart.", fr: "Un graphique." });
+  });
+
+  test("a table's cells come from its CSV, header row dropped, quotes and newlines kept", () => {
+    const t = readEntryDocument(withFiles(), "r")!.tables![0]!;
+    expect(t.rows).toEqual([['a, "quoted"', "2"], ["x", "two\nlines"]]);
+    expect(t.columns[0]).toEqual({ titles: "A", group: "G" });
+  });
+
+  test("a withheld entry shows neither", () => {
+    const v = readEntryDocument(withFiles(), "r", { withheld: true })!;
+    expect(v.images).toBeUndefined();
+    expect(v.tables).toBeUndefined();
+  });
+
+  test("the site copies exactly the files the page shows", () => {
+    expect(entryFigureFiles(withFiles())).toEqual(["images/img-p002-1.webp", "tables/table-1.csv"]);
   });
 });

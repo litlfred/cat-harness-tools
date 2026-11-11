@@ -120,7 +120,7 @@ export const MAX_WRITER_PATHS = 200000;
 /**
  * A trace file larger than this is not parsed: the check is recorded as
  * undetermined. Measured 2026-10-07: `kg:audit:all:check` spawns a process
- * per instance, and parsing its whole trace in memory aborted the recorder
+ * per layer, and parsing its whole trace in memory aborted the recorder
  * (exit 134) after the check itself had passed.
  */
 export const MAX_TRACE_BYTES = 512 * 1024 * 1024;
@@ -433,6 +433,13 @@ export function parseTrace(
     rewriteAsInput?: (rel: string) => boolean;
     /** Paths whose successful opens for reading are counted into `opened` (`read-projections.ts`). */
     countOpens?: ReadonlySet<string>;
+    /**
+     * `count`: a git command the cone cannot replay (`--git-dir=`, a write
+     * subcommand) is counted in `git` as it was run, not refused. For what a
+     * run TOUCHED only: its syscalls still name every path it wrote, and
+     * `git` makes any neighbour's write a clash. A record never uses it.
+     */
+    gitUnreplayable?: "refuse" | "count";
   } = {},
 ): ReadSet {
   const parsed = calls(text);
@@ -545,8 +552,11 @@ export function parseTrace(
         gitPids.add(c.pid);
         if (where === undefined) return { undetermined: `git ${argv.slice(1).join(" ")} ran outside the checkout, or where the trace does not say` };
         const call = gitReplayable(where, argv.slice(1), (abs) => repoRelative(roots, abs));
-        if ("undetermined" in call) return call;
-        git.set(JSON.stringify(call), call);
+        if ("undetermined" in call) {
+          if (opts.gitUnreplayable !== "count") return call;
+          const asRun: GitCall = { cwd: where, args: argv.slice(1) };
+          git.set(JSON.stringify(asRun), asRun);
+        } else git.set(JSON.stringify(call), call);
       }
       if (c.name === "chdir") {
         if (/^0\b/.test(c.ret)) me.dir = abs;
@@ -1256,13 +1266,79 @@ export const RUNNER = ["bun", "run", "cat"] as const;
  * A check that is not a candidate, or whose fingerprint is undetermined, runs
  * untraced and is not recorded.
  */
+/**
+ * Set by a runner that traces several checks at once (`run-gates.py`, owner
+ * pick Q-ACT-1 A, 2026-11-10). `CI_CONE_TOUCHED_OUT` names a file this run
+ * writes what it touched inside the checkout: `{reads, listed, writes, git}`,
+ * or `{undetermined}` when that is not known (an untraced run, a trace that
+ * could not be read). The runner drops the record of any check whose reads a
+ * neighbour's writes met, and runs that check again alone.
+ * `CI_CONE_RECORD_OUT` names a file this run writes its record to, instead of
+ * the shared record file, which concurrent runs would overwrite; the runner
+ * merges the records it keeps.
+ */
+export const TOUCHED_OUT_ENV = "CI_CONE_TOUCHED_OUT";
+export const RECORD_OUT_ENV = "CI_CONE_RECORD_OUT";
+
+/**
+ * Keep the records concurrent runs wrote to {@link RECORD_OUT_ENV} files: each
+ * goes into the record file and the result store, exactly as a lone run's
+ * would. A file whose record is null removes the script's old record, as a
+ * lone run that recorded nothing does. Returns one note per file.
+ */
+export function keepRecords(root: string, files: readonly string[]): string[] {
+  const notes: string[] = [];
+  let records: ConeRecords | undefined;
+  for (const f of files) {
+    const got = JSON.parse(readFileSync(f, "utf-8")) as { script: string; sha: string; run: string; recordedAt: string; record: ConeCheck | null };
+    records ??= loadRecords(root) ?? { version: TRACER_VERSION, recipe: RECIPE_VERSION, sha: got.sha, checks: {} };
+    if (got.record === null) {
+      delete records.checks[got.script];
+      notes.push(`${got.script}: not recorded`);
+      continue;
+    }
+    records.checks[got.script] = got.record;
+    const digest = putResult<ConeCheck>(root, { gate: got.script, recipe: STORE_RECIPE, recordedAt: got.recordedAt, run: got.run, entry: got.record });
+    notes.push(`${got.script}: recorded (${Object.keys(got.record.reads).length} paths; result store ${digest.slice(0, 12)})`);
+  }
+  if (records !== undefined) saveRecords(root, records);
+  return notes;
+}
+
+/** What a run touched, for {@link TOUCHED_OUT_ENV}: from its trace, or undetermined. */
+export function touchedOf(text: string | undefined, root: string, why = "not traced"): Record<string, unknown> {
+  if (text === undefined) return { undetermined: why };
+  const t = parseTrace(text, root, { writes: "collect", rewriteAsInput: () => true, gitUnreplayable: "count" });
+  if ("undetermined" in t) return { undetermined: t.undetermined };
+  return {
+    reads: t.paths,
+    listed: t.listed ?? [],
+    writes: [...new Set([...(t.writes ?? []), ...(t.rewritten ?? [])])].sort(),
+    git: t.git.length,
+  };
+}
+
+function writeTouched(root: string, text: string | undefined, why?: string): void {
+  // input-site: traced #b81eb7f4 — where a concurrent runner wants the touched paths written, on the record path only
+  inputSiteReached("ci-cone: touched out");
+  const out = process.env[TOUCHED_OUT_ENV];
+  if (!out) return;
+  let body: Record<string, unknown>;
+  try {
+    body = touchedOf(text, root, why);
+  } catch (e) {
+    body = { undetermined: (e as Error).message };
+  }
+  writeFileSync(out, `${JSON.stringify(body)}\n`);
+}
+
 export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   const stdio = o.stdio ?? "inherit";
   // When `runner` is omitted, run the resolved command directly via `sh -c`
   // (as `run-script.ts` does) instead of spawning `bun run cat <script>` under
   // `strace`: `run-script.ts` calls `scriptTable(REPO)` -> `instanceRootsIn(REPO)`
   // to look up the script name `main()` already resolved in `o.scripts`, which
-  // polluted every traced check's read set with every instance directory and
+  // polluted every traced check's read set with every layer directory and
   // declaration in the checkout (cat-harness-tools#634).
   const scriptCmd = o.scripts[o.script];
   // A test file runs as `bun test ./<path>` itself, not under `sh`, so the
@@ -1299,6 +1375,7 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
     // input-site: traced #3f7614a5 — runs the check itself, untraced, on the record path
     inputSiteReached("ci-cone: run plain");
     const r = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
+    writeTouched(o.root, undefined, `not traced — ${why}`);
     return { code: r.exitCode ?? 1, note: `not traced — ${why}` };
   };
   let before: Fingerprint;
@@ -1322,6 +1399,18 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
     env: cmdEnv(trace.env),
   });
   let code = r.exitCode ?? 1;
+  // input-site: traced #022c9b80 — whether a concurrent runner will ask a failed check again alone, on the record path only
+  inputSiteReached("ci-cone: failed beside others");
+  if (code !== 0 && process.env[TOUCHED_OUT_ENV]) {
+    // Beside neighbours, a failed traced run is not asked again here: an
+    // untraced run would write what nobody sees while they run. It reports
+    // what its trace saw it touch, and the runner asks it again alone, where
+    // the step below makes the verdict the check's own.
+    const text = existsSync(log) && statSync(log).size <= MAX_TRACE_BYTES ? readFileSync(log, "utf-8") : undefined;
+    rmSync(log, { force: true });
+    writeTouched(o.root, text, "the trace is absent or too large");
+    return { code, note: `not recorded — the traced run exited ${r.exitCode ?? r.signalCode} beside other gates; it runs again alone` };
+  }
   if (code !== 0) {
     // The verdict must be the check's, never the tracer's. A traced run that
     // failed is asked again, untraced, and THAT exit status is the answer.
@@ -1330,9 +1419,12 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
     const again = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
     code = again.exitCode ?? 1;
     rmSync(log, { force: true });
+    writeTouched(o.root, undefined, "the check ran again untraced");
     return { code, note: `not recorded — the traced run exited ${r.exitCode ?? r.signalCode}; re-run untraced, which exited ${code}` };
   }
   let note: string;
+  const text = existsSync(log) && statSync(log).size <= MAX_TRACE_BYTES ? readFileSync(log, "utf-8") : undefined;
+  writeTouched(o.root, text, "the trace is absent or too large");
   try {
     const digests = new FileDigests(o.root);
     const rec = coneRecordOf({
@@ -1344,13 +1436,26 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
         ? { undetermined: "no trace was written" }
         : statSync(log).size > MAX_TRACE_BYTES
           ? { undetermined: `the trace is ${statSync(log).size} bytes, more than ${MAX_TRACE_BYTES}` }
-          : parseTrace(readFileSync(log, "utf-8"), o.root),
+          : parseTrace(text ?? readFileSync(log, "utf-8"), o.root),
       reached: trace.reached(againstRefsOf(o.scripts, o.script)),
       root: o.root,
       digests,
       scripts: o.scripts,
       testGate: isTestGate(o.script),
     });
+    // input-site: traced #1d9837ba — where a concurrent runner wants the record written, on the record path only
+    inputSiteReached("ci-cone: record out");
+    const recordOut = process.env[RECORD_OUT_ENV];
+    if (recordOut) {
+      // A concurrent run: its record goes to its own file. Nothing is stored
+      // yet: the runner keeps it (`ci-cone.ts keep`) only when no neighbour's
+      // writes met its reads.
+      writeFileSync(
+        recordOut,
+        `${JSON.stringify({ script: o.script, sha: o.sha, run: o.run ?? o.sha, recordedAt: o.recordedAt ?? "", record: "none" in rec ? null : rec })}\n`,
+      );
+      return { code, note: "none" in rec ? `not recorded — ${rec.none}` : `traced (${Object.keys(rec.reads).length} paths; kept by the runner unless a neighbour's writes met its reads)` };
+    }
     const records = loadRecords(o.root) ?? { version: TRACER_VERSION, recipe: RECIPE_VERSION, sha: o.sha, checks: {} };
     if ("none" in rec) {
       delete records.checks[o.script];
@@ -1472,8 +1577,12 @@ function main(argv: readonly string[]): number {
     console.log(`ci-cone: mode ${mode || "off"}`);
     return 0;
   }
+  if (cmd === "keep") {
+    for (const n of keepRecords(root, argv.slice(1))) console.log(`ci-cone: ${n}`);
+    return 0;
+  }
   if (script === undefined || (cmd !== "decide" && cmd !== "run")) {
-    console.error("usage: ci-cone.ts prepare | decide <script> | run <script> | decide-all <out.json> <script>...");
+    console.error("usage: ci-cone.ts prepare | decide <script> | run <script> | decide-all <out.json> <script>... | keep <record-out.json>...");
     return 2;
   }
   let io: PairIO | undefined;

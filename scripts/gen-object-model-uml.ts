@@ -64,7 +64,7 @@ const HARNESS = resolve(HARNESS_ROOT);
 /** Colours from `uml.css`, the one place they are declared. */
 const PALETTE = readUmlPalette(HARNESS);
 /**
- * In THIS instance's declared `uml` directory, beside the per-sub-graph
+ * In THIS layer's declared `uml` directory, beside the per-sub-graph
  * diagrams `gen-uml-overview.ts` writes under `uml/overview/`.
  */
 const OUT = join(
@@ -79,7 +79,7 @@ const BPMN_RECORD = join(
 /**
  * The rendered glossary page, whose `<dt id>` entries are the anchors a class
  * links to. Read from the PAGE rather than from the glossary documents: the
- * page is this instance's own output, while the documents sit in
+ * page is this layer's own output, while the documents sit in
  * the content core, which cat-harness does not depend on.
  */
 const OWN = readDeclaration(HARNESS);
@@ -92,7 +92,7 @@ if (!OWN) throw new Error(`${HARNESS} declares no instance — no site to find t
 // Under the page locale since 2026-10-16 (owner, "c"), `en/<harness>/<visualiser>`,
 // like every other visualiser's page; the page is read at its old address too
 // until the site holding it is regenerated, and the link always goes to the new one.
-// The instance that owns the glossary is the one declaring the `core` layer's
+// The layer that owns the glossary is the one declaring the `core` layer's
 // kinds — `glossary` among them — read from where they were declared, not
 // spelt here (folio-assistant#2598). With no content layer composed there is
 // no glossary page to link, and the bare alias stands in.
@@ -106,10 +106,10 @@ const GLOSSARY_PAGE = [GLOSSARY_ROUTE, GLOSSARY_LEGACY_ROUTE].map(glossaryPageAt
 /** The glossary page whose `<dt id>` anchors every class must reach — written at publish, so a test can ask whether it is there. */
 export const glossaryPage = (): string => GLOSSARY_PAGE;
 /**
- * Where a term's entry is: on the page of the instance that owns its scheme,
+ * Where a term's entry is: on the page of the layer that owns its scheme,
  * `<route>/instance/<instance>/` (the content core, owner 2026-10-15: the
- * authored terms left the glossary index for one page per owning instance).
- * The instance is the anchor's first segment, `<instance>--<scheme>--<id>`.
+ * authored terms left the glossary index for one page per owning layer).
+ * The layer is the anchor's first segment, `<instance>--<scheme>--<id>`.
  */
 export function termPageRoute(term: string): string {
   return `${GLOSSARY_ROUTE}/instance/${term.split("--", 1)[0]}/`;
@@ -346,7 +346,7 @@ function assertEdges(classes: ClassDef[], edges: Edge[]): string[] {
 
 /**
  * The `<dt id>` anchors each at the page it is on — the index and every
- * instance's authored page — or null if there is no glossary page. An anchor
+ * layer's authored page — or null if there is no glossary page. An anchor
  * counts only on the page {@link termPageRoute} links to, so a class cannot
  * pass on an entry its link does not reach.
  */

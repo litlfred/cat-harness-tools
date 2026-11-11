@@ -30,7 +30,7 @@
  *
  * ## Why the thresholds are above the floor
  *
- * This instance's declared interaction profile is low-dexterity
+ * This layer's declared interaction profile is low-dexterity
  * (`cat-harness/memory/interaction.json`). WCAG 2.2 SC 2.5.8 asks for 24x24 CSS pixels;
  * a target that is barely legal is a target that is hard to hit. The page aims
  * at 32px for list and facet rows and 28px for inline edge controls, and the
@@ -146,7 +146,7 @@ test.describe("accessibility — a translated, right-to-left interface", () => {
 
   test("the language switcher is reachable and operable from the keyboard", async ({ page }) => {
     // A switcher only a mouse can reach hands the choice to exactly the people
-    // this instance's declared interaction profile says to build for first.
+    // this layer's declared interaction profile says to build for first.
     await page.goto(I18N_PAGE);
     const other = page.locator('.lang[lang="qaa"]');
     await other.focus();

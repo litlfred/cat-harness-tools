@@ -1,7 +1,7 @@
 /**
  * `instance-repositories` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/schemas/instance-repositories.test.ts` (bean `7zz1`, owner
- * ruling 2026-10-06 "Top-level instance"): each reads every instance this
+ * ruling 2026-10-06 "Top-level instance"): each reads every layer this
  * checkout stages and the repository each declares, which only the checkout
  * holds. Standing alone, cat-harness has none of it, and
  * `check:cat-harness-standalone` collects every test in that layer. The rest
@@ -33,15 +33,15 @@ describe("instance repositories — this checkout (bean 6rmv)", () => {
   });
 
   test("every livesAt names the instance's OWN repository as its home", () => {
-    // This compared each `livesAt` with the repository of the instance AT the
-    // checkout root -- the host every staged instance lived in. Both premises
+    // This compared each `livesAt` with the repository of the layer AT the
+    // checkout root -- the host every staged layer lived in. Both premises
     // are gone: the owner removed the root declaration (3d4caf6, 2026-10-08),
-    // and since cat-harness#15 a mounted instance's `livesAt` names its HOME,
+    // and since cat-harness#15 a mounted layer's `livesAt` names its HOME,
     // where it lives in its own repository, not the checkout that mounts it.
-    // RESTATED to that rule: no instance at the root, and every `livesAt`
-    // names the declaring instance's own repository. A `livesAt` pointing at
-    // another repository is a staged instance claiming a home it does not
-    // have, and fails here as a mismatch against the root instance did.
+    // RESTATED to that rule: no layer at the root, and every `livesAt`
+    // names the declaring layer's own repository. A `livesAt` pointing at
+    // another repository is a staged layer claiming a home it does not
+    // have, and fails here as a mismatch against the root layer did.
     expect(map.entries.some((e) => resolve(e.root) === CHECKOUT)).toBe(false);
     const withHome = map.entries.filter((e) => e.livesAt !== undefined);
     expect(withHome.length).toBeGreaterThan(0);

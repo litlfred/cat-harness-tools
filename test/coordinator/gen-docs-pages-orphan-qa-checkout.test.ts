@@ -33,7 +33,7 @@ const QA_ASSET_DIR = join(INSTANCE_ROOT, "test", "results", "witnesses");
 const QA_INDEX_PATH = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "assets", "qa", "index.json");
 
 describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () => {
-  // The generator re-derives the committed witnesses under every instance's
+  // The generator re-derives the committed witnesses under every layer's
   // `test/results/`; they are put back as they were afterwards, so the test
   // leaves no tracked file changed (bean w1gy F24).
   test("published QA count matches the post-sweep tree, not the tree it started from, and consecutive runs are idempotent", () => restoringTracked(qaResultDirsIn(REPO_ROOT), () => {

@@ -1,5 +1,5 @@
 /**
- * A call activity whose target is hosted by another instance in the repository
+ * A call activity whose target is hosted by another layer in the repository
  * resolves as a pass, not unknown.
  *
  * A test about the WHOLE CHECKOUT, so it lives in the root `test/` rather than

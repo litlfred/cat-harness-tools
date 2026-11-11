@@ -27,9 +27,9 @@ export const SkillTopicSchema = z
   .strict();
 
 /**
- * An INSTANCE directory declared from inside `skills/` (bean `cmsl`, owner
+ * A LAYER directory declared from inside `skills/` (bean `cmsl`, owner
  * 2026-09-30): `voices/`, or the science layer's `lean/`. The resolver in
- * `cat-harness.ts` promotes each to a directory of the instance, exactly as if
+ * `cat-harness.ts` promotes each to a directory of the layer, exactly as if
  * `<instance>.json` declared it. Only the fields that resolver needs are
  * required here — this module depends on zod alone (see above), so the full
  * `ContentDirectorySchema` stays in `cat-harness.ts` and the rest passes through.
@@ -39,7 +39,7 @@ export const SkillsDirectoryEntrySchema = z
     id: z.string().min(1),
     path: z.string().min(1),
     /**
-     * Marks the entry as a subgraph of the INSTANCE rather than a part of the
+     * Marks the entry as a subgraph of the LAYER rather than a part of the
      * skills graph. Replaced `dependents` on 2026-09-30 (option A), when
      * inheritance became automatic and the per-entry field was retired.
      */
@@ -53,7 +53,7 @@ export const SkillTopicsSchema = z
     $schema: z.literal(SKILL_TOPICS_TAG),
     _comment: z.string().optional(),
     topics: z.array(SkillTopicSchema),
-    /** One node, two lists: the instance directories declared from within. */
+    /** One node, two lists: the layer directories declared from within. */
     directories: z.array(SkillsDirectoryEntrySchema).optional(),
   })
   .strict();

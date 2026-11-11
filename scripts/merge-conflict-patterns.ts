@@ -65,7 +65,7 @@ export interface ConflictPattern {
 
 /**
  * The checkout git is asked about: the directory holding this layer and the
- * harness beside it (the index checkout, where every instance is mounted).
+ * harness beside it (the index checkout, where every layer is mounted).
  */
 const CHECKOUT_ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -76,7 +76,7 @@ const SITE = "cat-harness/docs";
 /** The Tool that draws a glossary page; the routes of the visualisers it renders are the glossary pages. */
 export const GLOSSARY_RENDERER = "glossary-page";
 
-/** The visualiser id an instance declares for its catalogue viewer. */
+/** The visualiser id a layer declares for its catalogue viewer. */
 export const CATALOGUE_VISUALISER = "catalogue";
 
 /** The locales a generated glossary page is written in beside the English one. */
@@ -90,8 +90,8 @@ export interface RouteOf {
 }
 
 /**
- * The visualiser routes in the checkout at `repoRoot`: those the instances
- * DECLARE, and — for a checkout where a declaring instance is not mounted, as
+ * The visualiser routes in the checkout at `repoRoot`: those the layers
+ * DECLARE, and — for a checkout where a declaring layer is not mounted, as
  * when this layer stands alone beside the harness — those the harness site
  * RECORDS through its generated pages' own front matter
  * ({@link routesRecordedInSite}). A glob derived from nothing matches nothing,
@@ -114,10 +114,10 @@ function routesIn(repoRoot: string): RouteOf[] {
  * The unlocalised route `<harness>/<visualiser>/` of each declared visualiser
  * `pick` selects, under the harness site.
  *
- * Derived from the declarations — each instance's `visualisers[]`, through
+ * Derived from the declarations — each layer's `visualisers[]`, through
  * {@link visualiserRoute}, or the site's record of them when the declaring
- * instance is not mounted ({@link routesIn}) — rather than written down, so this lower layer
- * names no instance above it (check:reference-direction) and a renamed or
+ * layer is not mounted ({@link routesIn}) — rather than written down, so this lower layer
+ * names no layer above it (check:reference-direction) and a renamed or
  * newly declared visualiser is matched without an edit here.
  */
 export function declaredRouteGlobs(
@@ -248,9 +248,9 @@ export const PATTERNS: readonly ConflictPattern[] = [
       // `uploads` refusal below catches it. Found 2026-10-01 on #1764.
       "cat-harness/docs/cat-harness/{beans,todos,health,issue-marks,swimlane-glossary,uploads-queue,attestations}/index.html",
       // document-kinds:viz writes these pages whole from the declared document
-      // kinds: the index and one page per instance. The index and attestations/
+      // kinds: the index and one page per layer. The index and attestations/
       // above refused a merge of #2082 on 2026-10-04 with "no declared
-      // pattern"; a content instance's per-instance page refused the next one.
+      // pattern"; a content layer's per-instance page refused the next one.
       "cat-harness/docs/cat-harness/document-kinds/**/index.html",
       // node-kind:pages writes these whole from the node-kind index and the
       // nodes the typologies' directories hold (#2195): /<locale>/<declaring>/<kind>/.
@@ -333,7 +333,7 @@ export const PATTERNS: readonly ConflictPattern[] = [
   },
   {
     id: "health-report",
-    // An instance that declares a code `test/` keeps `health` at its root instead (cat-harness-tools, layout-norms).
+    // A layer that declares a code `test/` keeps `health` at its root instead (cat-harness-tools, layout-norms).
     globs: ["**/test/health/results/*.health-report.json", "**/health/*.health-report.json"],
     strategy: "take-base",
     why: "the committed repository health report: a MEASUREMENT of external state (the publish branch, clone size, the work plan) written by `bun run cat health` and refreshed daily on the base by the health-check workflow, so the base's copy is the newer measurement. check:harness-state judges its producer hash; if the merge changes the producer, `bun run cat health` rewrites it. Found 2026-10-01 on #1754.",
@@ -359,7 +359,7 @@ export const PATTERNS: readonly ConflictPattern[] = [
   {
     id: "subgraph-index",
     // Instance-agnostic, like `prov-qaqc`: `subgraphOutDir` is `<docs>/subgraph`
-    // under whichever instance runs the writer.
+    // under whichever layer runs the writer.
     globs: ["**/docs/subgraph/**"],
     strategy: "owned-tree",
     prunedBy: "subgraph:jsonld",
@@ -428,7 +428,7 @@ export const PATTERNS: readonly ConflictPattern[] = [
   {
     id: "uploads",
     // declared-path-literal: a GLOB matched against conflicted paths, not a
-    // directory read; it refuses any uploads/ wherever an instance declares one.
+    // directory read; it refuses any uploads/ wherever a layer declares one.
     globs: ["uploads/**", "**/uploads/**"],
     strategy: "refuse",
     why: "uploaded source material (30). Provenance-bearing input, never regenerated.",

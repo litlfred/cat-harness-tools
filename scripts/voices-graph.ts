@@ -14,12 +14,12 @@
  *
  * A `voices` directory that is declared but absent is reported as a declared
  * directory with no voices rather than omitted: that is a gap somebody should
- * close, unlike an instance that never claimed any.
+ * close, unlike a layer that never claimed any.
  *
  * ## A voice that will not load THROWS
  *
  * `loadVoices` throws on a malformed voice and this reader does not catch it.
- * A malformed voice must not present as an instance with fewer voices: the
+ * A malformed voice must not present as a layer with fewer voices: the
  * second is a legitimate state and the first is a defect. Same rule as
  * `shippedVoices` in `pipeline/voice-criteria.ts`, which is the other
  * cross-instance reader over this graph.
@@ -72,7 +72,7 @@ export interface VoiceRuleView {
   citation: CitationKind;
   /** The cited document or node, as written. */
   cites?: string;
-  /** The instance holding the cited corpus, when the rule names one. */
+  /** The layer holding the cited corpus, when the rule names one. */
   citesInstance?: string;
   /** Page range in the SOURCE document, as a reader holding the paper would cite it. */
   pages?: string;
@@ -88,7 +88,7 @@ export interface VoiceView {
   id: string;
   title: string;
   description: string;
-  /** The declared name of the instance that DERIVED it. */
+  /** The declared name of the layer that DERIVED it. */
   instance: string;
   /** Repo-relative directory or file the voice was read from. */
   path: string;
@@ -118,7 +118,7 @@ export interface VoiceView {
   rules: VoiceRuleView[];
 }
 
-/** One instance's declared voices directory. */
+/** One layer's declared voices directory. */
 export interface VoicesDirectory {
   instance: string;
   /** Repo-relative. */
@@ -143,7 +143,7 @@ export interface VoicesGraph {
     rules: number;
     /** Rules citing an ingested library document. */
     citingLibrary: number;
-    /** Rules citing a node of their own instance's knowledge graph. */
+    /** Rules citing a node of their own layer's knowledge graph. */
     citingKgNode: number;
     /** Rules with a mechanical half — at least one pattern or terminology pair. */
     mechanical: number;
@@ -234,18 +234,18 @@ function voiceIdsIn(dir: string): string[] {
 /**
  * Read every declared `voices` directory reachable from these roots.
  *
- * Each entry of `roots` is an INSTANCE root. Pass `repoRootIn` when you are
+ * Each entry of `roots` is a LAYER root. Pass `repoRootIn` when you are
  * starting from the repository root instead — see the note inside.
  *
- * Returns `null` when no root declares one — not an empty graph. An instance
+ * Returns `null` when no root declares one — not an empty graph. A layer
  * with no voices simply has none, and a consumer rendering the two alike
  * reports a clean run over something it never opened. The same three-state
  * discipline `readLibraryGraph` follows.
  */
 export function readVoicesGraph(roots: string[], repoRootIn?: string): VoicesGraph | null {
-  // `repoRootFor` is `dirname` and is documented as taking an INSTANCE root, so
+  // `repoRootFor` is `dirname` and is documented as taking a LAYER root, so
   // deriving it from `roots[0]` is right only when that root IS one. A caller
-  // passing the repository root gets its PARENT, finds no instance beneath it,
+  // passing the repository root gets its PARENT, finds no layer beneath it,
   // and this reader returns `null` — "no voices are declared" for a repository
   // that declares three. Measured while writing `check-voice-skills.ts`, which
   // did exactly that: `repoRootFor("/…/folio-assistant")` is `/home/user`.
@@ -255,9 +255,9 @@ export function readVoicesGraph(roots: string[], repoRootIn?: string): VoicesGra
   // the rule `resolveCoveragePath` states one level up: resolving against
   // whichever root happens to work is worse than picking wrong, because the
   // wrong pick is visible and the lucky one is not.
-  // `siblingScopeFor`: given the ROOT instance, `dirname` lists no instance (g43f).
+  // `siblingScopeFor`: given the ROOT layer, `dirname` lists no layer (g43f).
   const repoRoot = repoRootIn ?? siblingScopeFor(roots[0] ?? ".");
-  // Every instance in the repository, not only the roots passed in: a voice is
+  // Every layer in the repository, not only the roots passed in: a voice is
   // owned by whoever DERIVED it, and the platform derives none — so a reader
   // that asked only its own root would find nothing and report it as an
   // absence rather than as somebody else's.
@@ -281,7 +281,7 @@ export function readVoicesGraph(roots: string[], repoRootIn?: string): VoicesGra
       present: existsSync(dir),
       voices: ids,
     });
-    // `loadVoices` reads the instance's DECLARED directory, which is the one
+    // `loadVoices` reads the layer's DECLARED directory, which is the one
     // resolved above — asking it by root rather than by path keeps one answer
     // to "where do this instance's voices live".
     for (const v of loadVoices(root)) {

@@ -132,7 +132,7 @@ export function gitCorpus(dir: string, pathspec: readonly string[] = []): string
 
 /**
  * The paths the remote-mount locks beside `dir` laid down, relative to it —
- * each locked directory and each instance's declaration file. Read
+ * each locked directory and each layer's declaration file. Read
  * structurally: this module sits below the lock's schema.
  */
 function mountedUnder(dir: string): string[] {
@@ -393,7 +393,7 @@ export function corpusPredicate(repoRoot: string): (abs: string) => boolean {
  * Top-level directory names under `root` that GIT accounts for.
  *
  * The instance-discovery shape, and it is NOT the recursive one `gitFiles`
- * serves. Three scanners list the repository's top level to find instances —
+ * serves. Three scanners list the repository's top level to find layers —
  * `check-artifact-index`, `gen-default-boards`, `sync-docs-harness` — each
  * behind the same hand-written filter: skip dot-names and `node_modules`.
  *
@@ -441,7 +441,7 @@ export function gitTopLevelDirs(root: string): { names: string[]; source: "git" 
     const first = relative(root, abs).split(sep)[0];
     // A top-level FILE has no directory segment, and a dot-name is excluded
     // here for the same reason each caller excluded it before: `.github/` and
-    // `.claude/` are tracked content but they are not instances.
+    // `.claude/` are tracked content but they are not layers.
     if (first !== undefined && first !== "" && !first.startsWith(".") && relative(root, abs) !== first) {
       names.add(first);
     }
@@ -453,9 +453,9 @@ export function gitTopLevelDirs(root: string): { names: string[]; source: "git" 
  * {@link gitTopLevelDirs} plus every top-level directory a REMOTE MOUNT laid
  * down (bean `0mpw`), read from the checkout's mount lock.
  *
- * Bean `hupw`, the first real consumer: once the IG instances became remote
+ * Bean `hupw`, the first real consumer: once the IG layers became remote
  * mounts, git no longer tracked them — on purpose, the mounted bytes are never
- * committed — and every caller that asked git which instances the checkout
+ * committed — and every caller that asked git which layers the checkout
  * holds dropped them. The site lost their navbar entries, rail scopes and
  * artefact-index checks with no error, because "not tracked" read as "not
  * here". A mounted directory is DECLARED (`remoteMounts`, and the lock that

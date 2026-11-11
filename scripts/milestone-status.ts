@@ -293,7 +293,7 @@ function gateEvidence(prs: readonly Pr[]): Gate {
   };
 }
 
-/** GATE: the seeding gate itself — does any open PR still touch the tools instance? */
+/** GATE: the seeding gate itself — does any open PR still touch the tools layer? */
 function gateSeeding(base: string, prs: readonly Pr[]): Gate {
   const basis =
     "seeding `cat-harness-tools` copies a tree, so a PR still editing that tree would be seeded from a base it does not match; measured on AUTHORED paths only, because a generated README region is regenerated after the move anyway";

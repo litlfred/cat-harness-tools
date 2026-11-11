@@ -362,7 +362,7 @@ describe("a folio's own repository (hp54)", () => {
 
   /**
    * Owner, 2026-10-06: "cutover dirs should go to fsh-guts". The removal
-   * DEPOSITS a snapshot into the instance's own trashcan first, verifies it,
+   * DEPOSITS a snapshot into the layer's own trashcan first, verifies it,
    * and only then makes the removal commit.
    */
   describe("the deposit into fsh-guts", () => {
@@ -465,14 +465,14 @@ describe("a folio's own repository (hp54)", () => {
 });
 
 /**
- * `--retire <path> --into <instance>`: separating a whole instance root into
+ * `--retire <path> --into <instance>`: separating a whole layer root into
  * the HOST's trashcan (stage 13 of `sub-kg-lifecycle`), asked for by the
  * session separating smart-trust, smart-base and smart-immunizations (#2320).
  * The refusals are the point, as for `--cutover`: what leaves main must be
  * on the host's fsh-guts tip, byte for byte, before the `git rm`.
  */
 describe("separating an instance (--retire)", () => {
-  /** Host `h` (fsh-guts on `cat/h/fsh-guts`), an instance `leaf/` inside it, and a fork for the live copy. */
+  /** Host `h` (fsh-guts on `cat/h/fsh-guts`), a layer `leaf/` inside it, and a fork for the live copy. */
   function hostWithLeaf(opts: { guts?: boolean; eol?: boolean } = {}) {
     const r = remote();
     run(r.work, "config", "user.name", "t");

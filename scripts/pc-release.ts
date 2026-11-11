@@ -186,6 +186,7 @@ export function freeze(o: FreezeOptions): PcRelease {
   cpSync(site, dest, { recursive: true });
   // The preview's own record would describe the branch, not the release.
   rmSync(join(dest, "staging.json"), { force: true });
+  rmSync(join(dest, "staging-banner.js"), { force: true });
 
   let pdf: PcRelease["pdf"];
   if (o.pdf) {

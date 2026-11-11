@@ -24,11 +24,11 @@
 import { BOOTSTRAP_TERMS } from "@litlfred/bootstrap-tools/schemas/graph.ts";
 
 /**
- * Which layer owns a term — and therefore which instances must carry it.
+ * Which layer owns a term — and therefore which layers must carry it.
  *
  * The owner, 2026-09-19: "we shouldnt need voicegraph or librarygrph or
  * previewgrapjh in bootstrap!!" Exactly right, and the flat vocabulary I first
- * wrote had no way to say so. A bootstrap instance reads a declaration, walks
+ * wrote had no way to say so. A bootstrap layer reads a declaration, walks
  * a dependency tree and hands over; it has no opinion about editorial voices,
  * an L1 library or a preview target, and a vocabulary that makes it define
  * them has made bootstrap carry the thing bootstrap exists to defer.
@@ -41,12 +41,12 @@ import { BOOTSTRAP_TERMS } from "@litlfred/bootstrap-tools/schemas/graph.ts";
  *   needs. Nothing here may require the harness.
  * - `harness` — the agentic machinery: tools, capabilities, requirements,
  *   work plan, process detail.
- * - `core` — authored content, declared by an instance above the harness and
- *   minted in THAT instance's namespace (`<iriBase>v<major>/ns/` from its
+ * - `core` — authored content, declared by a layer above the harness and
+ *   minted in THAT layer's namespace (`<iriBase>v<major>/ns/` from its
  *   declaration). The harness glosses no `core` term: since
  *   folio-assistant#2598 (owner, 2026-10-16, "1a") the kinds it uses itself —
  *   todos, library, uploads, voices, the folio — are harness terms, and the
- *   rest are declared as nodes in the content instance's `typologies/` graph.
+ *   rest are declared as nodes in the content layer's `typologies/` graph.
  *
  * The direction rule holds here as everywhere: core may name a harness term,
  * harness may name a bootstrap term, and never the reverse.
@@ -243,7 +243,7 @@ export const CLASS_GLOSSES: Readonly<Record<string, TermGloss>> = {
   // `ns-export` to read and are glossed here instead. Harness terms since
   // folio-assistant#2598 (owner, 2026-10-16, "1a"): the harness mints them for
   // its own declaration and graphs, so they are in its namespace. The glossary
-  // kind's class went up with the kind, to the instance that declares it.
+  // kind's class went up with the kind, to the layer that declares it.
   FolioGraph: {
     gloss: "Authored content — the folio itself, rendered to a website.",
     seeAlso: "/concepts/content-types.html",
@@ -265,7 +265,7 @@ export const CLASS_GLOSSES: Readonly<Record<string, TermGloss>> = {
   },
   // ── The content model (bean `0r7u`, owner 2026-10-06) ──────────────────
   // The node classes every content type shares. Minted here, not in core: the
-  // content-object model is the harness's, and an instance above it types its
+  // content-object model is the harness's, and a layer above it types its
   // own kinds (`Prose`, `Theorem`, `Persona`, …) in its OWN namespace, read off
   // its `folio-block-kind/v1` nodes rather than listed here.
   Block: {
@@ -521,6 +521,7 @@ export const PROPERTY_GLOSSES: Readonly<Record<string, TermGloss>> = {
   maintains: { gloss: "An artefact this tool generates and keeps current." },
   maintainsFrom: { gloss: "The source a maintained artefact is generated from." },
   maintainedBy: { gloss: "The tool that generates and keeps this artefact current." },
+  jsonSchema: { gloss: "The published JSON Schema rendering of one of a schema module's public exports." },
 
   // ── Schemas and the standards a graph conforms to ────────────────────
   conformsTo: { gloss: "A published specification this node's files are written in, e.g. BPMN 2.0 for a process.", replacedBy: "dcterms:conformsTo" },
@@ -694,7 +695,7 @@ export const PROPERTY_GLOSSES: Readonly<Record<string, TermGloss>> = {
  *
  * A name this file does not gloss is `harness`, the middle. Same default and
  * same reasoning as {@link TermGloss.layer}: over-assigning to harness costs
- * an instance a term it did not need, while under-assigning to bootstrap makes
+ * a layer a term it did not need, while under-assigning to bootstrap makes
  * the base depend on something above it.
  */
 export function termLayer(name: string): TermLayer {

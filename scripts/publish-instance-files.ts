@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 /**
- * Publish an instance's own files at `<base>/<stub>/`, as they sit, with every
+ * Publish a layer's own files at `<base>/<stub>/`, as they sit, with every
  * `.md` also rendered as `.html` and `README.md` also as `index.html`.
  *
  * @module scripts/publish-instance-files
  *
- * For an instance that renders nothing of its own: bootstrap. Its
+ * For a layer that renders nothing of its own: bootstrap. Its
  * `renderExemption.reachableAt` names one of its own files (`README.md`), and
  * the navbar tab links to where this script puts it.
  *

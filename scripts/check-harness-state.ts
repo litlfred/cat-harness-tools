@@ -38,7 +38,8 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { directoriesForGraph, instanceRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { directoriesForGraph, directoryEntriesForGraph, instanceRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { absenceAt } from "./branch-store.ts";
 // The producer's OWN hash, not a re-derivation. See `healthProducerCurrent`.
 import { checkerHash } from "../test/health/run.js";
 import {
@@ -79,6 +80,14 @@ export interface Family {
   /** Set when the graph could not be read at all. */
   unreadable?: string;
   /**
+   * Set instead of `unreadable` when the graph that would hold this family's
+   * nodes was DETERMINED absent from this checkout by `state:mount` (its
+   * `.absent` record): platform state a mounted layer declares for every
+   * checkout, which this root neither declares nor carries
+   * (cat-harness-tools#1701). Neither a pass nor a blind spot, and not gated.
+   */
+  notApplicable?: string;
+  /**
    * Set when the subject is a STORED record that is not here — the health
    * report once it leaves `main` for the `qa-reports` branch (bean `0dav`) —
    * and no `--against <ref>` was given, or the branch had no answer. Reported
@@ -90,11 +99,11 @@ export interface Family {
 }
 
 /**
- * Every file of a kind, across every instance that declares a directory for it.
+ * Every file of a kind, across every layer that declares a directory for it.
  *
  * ## DEDUPED, and the duplicate is not hypothetical
  *
- * Two instance roots can resolve one kind to the SAME directory: measured
+ * Two layer roots can resolve one kind to the SAME directory: measured
  * 2026-09-24, the repository root and `cat-harness` both resolve `todos` to
  * `./todos`, so a naive walk listed three todo items as six and reported one
  * planted defect twice. That is worse than a cosmetic double-count — it inflates
@@ -106,12 +115,12 @@ export interface Family {
  * still overlap by nesting.
  */
 /**
- * Every root whose declaration may name a directory: each instance, AND the
- * checkout root itself. Until the separation the checkout root WAS an instance
+ * Every root whose declaration may name a directory: each layer, AND the
+ * checkout root itself. Until the separation the checkout root WAS a layer
  * (folio-assistant.json), and it declared `beans/`; now the index checkout
  * declares nothing and `beans/` is declared `scope: "repository"` by
  * cat-harness, which only a lookup FROM the checkout resolves. Asking the
- * instances alone found no `merge-queue` or `session-survey` directory and
+ * layers alone found no `merge-queue` or `session-survey` directory and
  * reported both families could-not-determine over a mounted store holding them.
  */
 function declaringRoots(): string[] {
@@ -196,7 +205,7 @@ export const HEALTH_PRODUCER_GRACE_HOURS = 26;
 
 /**
  * Is a report under `root` this repository's OWN, rather than one a mounted
- * instance carries? Only the own report is judged here: each other report is
+ * layer carries? Only the own report is judged here: each other report is
  * written at its repository's own tools pin and judged by that repository's
  * own CI, which is the only place its producer is known (Q-FAD-6 A).
  */
@@ -248,7 +257,7 @@ export function healthProducerCurrent(opts: { against?: string; now?: Date } = {
   };
   const roots = instanceRootsIn(REPO);
   const allLocal = nodesOf("health", ".json");
-  // Mounted instances' reports are left to their own repositories (Q-FAD-6 A).
+  // Mounted layers' reports are left to their own repositories (Q-FAD-6 A).
   const local = allLocal.filter((p) => isOwnHealthReport(p, REPO, roots));
   // ── Where the report is: here, or on the `qa-reports` branch (bean `0dav`) ──
   //
@@ -508,7 +517,7 @@ export function interactionProfilesRead(): Family {
   // very family is about, committed one function away from it: a hardcoded
   // directory is a declaration read from memory, and it goes stale the moment
   // anybody relocates one. It also under-searched: a literal list covers THIS
-  // instance, while a profile may be honoured by a dependency's skill.
+  // layer, while a profile may be honoured by a dependency's skill.
   for (const inst of declaringRoots()) {
     for (const kind of ["cat-harness", "skills", "code", "schemas"]) {
       for (const dir of directoriesForGraph(inst, kind)) walk(dir);
@@ -548,7 +557,7 @@ export function interactionProfilesRead(): Family {
 
 /**
  * The declared directories of one kind that exist, or `undefined` when no
- * instance declares one that does. A declared-but-absent directory is
+ * layer declares one that does. A declared-but-absent directory is
  * `check:declared-dirs`'s finding; here it means there is nothing to walk, and
  * a family that walked nothing must say so rather than pass.
  */
@@ -976,7 +985,9 @@ export function harnessStateDocument(families: readonly Family[]): QaResult {
         {
           summary: f.unreadable
             ? `${f.summary} COULD NOT DETERMINE: ${f.unreadable}`
-            : f.stored
+            : f.notApplicable
+              ? `${f.summary} NOT APPLICABLE here: ${f.notApplicable}`
+              : f.stored
               ? `${f.summary} UNKNOWN (stored record not here): ${f.stored}`
               : `${f.summary} Examined ${f.examined}${f.walked ? ` across ${walkedLabel(f.walked)}` : ""}.`,
           entries: f.findings,
@@ -999,6 +1010,56 @@ export function judgeHarnessState(families: readonly Family[]): Judgement {
   });
 }
 
+/**
+ * The graph each family's nodes live in, when that is not the family's own
+ * kind: `merge-queue` and `session-survey` are declared from within `beans`,
+ * and the three todo kinds from within `todos`. When that graph is absent from
+ * this checkout, its nested declarations are too, so the kind resolves to no
+ * directory for a reason that is known.
+ */
+export const FAMILY_CONTAINERS: Readonly<Record<string, readonly string[]>> = {
+  "issue-mark-accounts-for-edits": ["issue-marks"],
+  "merge-queue-entry-is-named-for-its-pr": ["beans"],
+  "survey-is-filed-under-its-upper-edge": ["beans"],
+  "todo-item-bean-references-resolve": ["todos"],
+  "feedback-file-reads-back-as-a-list": ["todos"],
+  "board-positions-point-at-declared-boards": ["todos"],
+  "todo-process-references-resolve": ["todos"],
+};
+
+/**
+ * Why `graphs` are not this checkout's, when `state:mount` recorded one of
+ * them absent here; `undefined` when none was (so the family stays blind).
+ * Matched by declared PATH only: an id several mounts share (`health`) must
+ * not borrow another graph's record.
+ */
+export function absentContainer(graphs: readonly string[], repo: string = REPO, roots: readonly string[] = declaringRoots()): string | undefined {
+  for (const root of roots) {
+    for (const g of graphs) {
+      for (const d of directoryEntriesForGraph(root, g)) {
+        const rel = relative(repo, d.absPath).split(sep).join("/").replace(/\/+$/, "");
+        if (rel.startsWith("..")) continue;
+        const a = absenceAt(repo, rel);
+        if (a) return `\`${g}\` (${rel}/) is absent from this checkout: ${a.reason}`;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** A blind family whose container graph is determined absent becomes not applicable. */
+export function excuseAbsent(families: Family[], why: (graphs: readonly string[]) => string | undefined = absentContainer): Family[] {
+  for (const f of families) {
+    const graphs = FAMILY_CONTAINERS[f.id];
+    if (!f.unreadable || !graphs) continue;
+    const reason = why(graphs);
+    if (reason === undefined) continue;
+    f.notApplicable = reason;
+    delete f.unreadable;
+  }
+  return families;
+}
+
 function main(): number {
   const check = judging();
   if (check) {
@@ -1007,7 +1068,7 @@ function main(): number {
   }
   const { against, exit: badRef } = againstOrUsage("check:harness-state", process.argv.slice(2));
   if (badRef !== undefined) return badRef;
-  const families = [
+  const families = excuseAbsent([
     healthProducerCurrent({ against }),
     todoProcessRefs(),
     issueMarkEdits(),
@@ -1017,7 +1078,7 @@ function main(): number {
     todoBeanRefs(),
     feedbackFilesReadable(),
     boardPositionsPointAtBoards(),
-  ];
+  ]);
 
   const unreadable = families.filter((f) => f.unreadable);
   const total = families.reduce((a, f) => a + f.findings.length, 0);
@@ -1033,6 +1094,10 @@ function main(): number {
     }
     if (f.stored) {
       console.log(`  ? ${f.id}: UNKNOWN — ${f.stored}`);
+      continue;
+    }
+    if (f.notApplicable) {
+      console.log(`  · ${f.id}: not applicable here — ${f.notApplicable}`);
       continue;
     }
     // The denominator, always — a family that examined nothing has not passed.

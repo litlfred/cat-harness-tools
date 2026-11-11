@@ -1,5 +1,5 @@
 /**
- * The themes this instance ships, and the default: grumpy-cat, white and
+ * The themes this layer ships, and the default: grumpy-cat, white and
  * black (with high-contrast variants), pale sages and dusty carolina blues in
  * several gradations.
  *
@@ -92,7 +92,7 @@ const RAW = [
       surface: "#edeae4", ink: "#221f1b", edge: "#cbc5bb", accent: "#7d8a6e",
     },
     // The one shipped theme with art, and it names a ROLE rather than three
-    // paths — so an instance declaring its own `landing` images gets its own
+    // paths — so a layer declaring its own `landing` images gets its own
     // backdrop, and one declaring none renders palette-only instead of pointing
     // at three `.webp`s that live only in this repository. See
     // `theme.ts`'s ThemeBackdropSchema docs for why that inversion is the whole
@@ -101,7 +101,7 @@ const RAW = [
       imageRole: "landing",
       // 0.86 is measured, not chosen by eye: `themes.test.ts` computes the
       // WORST-CASE contrast of `ink` over this scrim laid on pure black — the
-      // darkest art any instance could declare — and requires it to clear WCAG
+      // darkest art any layer could declare — and requires it to clear WCAG
       // AAA. At 0.90 it is 10.94:1, against 13.93:1 on pure white — the dark end
       // is the binding one. A thinner scrim is where that guarantee
       // goes, which is why the number has a test and not a comment saying it
@@ -114,7 +114,7 @@ const RAW = [
       // scrim was doing less work than it appeared to.
       //
       // Re-measured rather than nudged. Ink over this scrim on PURE BLACK — the
-      // darkest art any instance could declare, which is the binding case:
+      // darkest art any layer could declare, which is the binding case:
       //   grumpy-cat 9.02:1 | engineer 10.33:1 | library 8.81:1 | analyst 9.70:1
       // Every one still clears AAA (7:1), which is the floor this must not cross.
       scrim: "rgba(237, 234, 228, 0.82)",
@@ -189,7 +189,7 @@ const RAW = [
     backdrop: {
       imageRole: "landing-bootstrap",
       // Measured the same way as its siblings: `ink` over this scrim laid on
-      // PURE BLACK, the darkest art any instance could declare, is 9.25:1 \u2014
+      // PURE BLACK, the darkest art any layer could declare, is 9.25:1 \u2014
       // clear of the AAA 7:1 floor. 14.37:1 on pure white.
       scrim: "rgba(244, 240, 230, 0.82)",
     },
@@ -239,7 +239,7 @@ const RAW = [
     backdrop: {
       imageRole: "landing-operations",
       // Measured the way every sibling's is: `ink` over this scrim laid on PURE
-      // BLACK — the darkest art any instance could declare, and therefore the
+      // BLACK — the darkest art any layer could declare, and therefore the
       // binding case — is 9.36:1, clear of the AAA 7:1 floor. 14.57:1 on pure
       // white.
       scrim: "rgba(237, 240, 243, 0.82)",
@@ -422,7 +422,7 @@ const RAW = [
  *
  * None of these eleven inherits from anything, so resolving them is a parse
  * with `kind` defaulted to `sticky`. They go through the same function a
- * content instance's theme will, rather than a shortcut that would stop exercising the
+ * content layer's theme will, rather than a shortcut that would stop exercising the
  * path the moment it mattered.
  */
 export const THEMES: readonly ResolvedTheme[] = RAW.map((t) => {

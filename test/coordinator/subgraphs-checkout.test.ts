@@ -2,7 +2,7 @@
  * `subgraphs` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness-tools/scripts/tests/subgraphs.test.ts` (bean `7zz1`, owner ruling
  * 2026-10-06 "Top-level instance"): each attributes the directories smart-base
- * and the root instance declare, which only the checkout holds. Standing
+ * and the root layer declare, which only the checkout holds. Standing
  * alone, cat-harness has none of it, and `check:cat-harness-standalone`
  * collects every test in that layer. The rest of that file's tests stay there;
  * every path here is composed from ORIGIN_DIR, the directory they were written
@@ -65,7 +65,7 @@ describe("the entanglement report", () => {
     const probe = REAL.dangling;
     expect(Array.isArray(probe), "the category is absent, not merely empty").toBe(true);
     // The synthetic file: a link to nothing, in a declared directory of a
-    // throwaway instance, swept by the same `scanSubgraphs`. It must come back
+    // throwaway layer, swept by the same `scanSubgraphs`. It must come back
     // in the dangling category, by file and target.
     const fixture = mkdtempSync(join(tmpdir(), "subgraphs-dangling-"));
     try {
@@ -93,7 +93,7 @@ describe("repository-scoped directories are attributed", () => {
   test("fsh-guts is exempt because it DECLARES an unpublished kind", () => {
     // It was already skipped before this bean — by accident, via the path
     // bug. Right answer, wrong reason, and therefore not one to rely on.
-    // Declared by the checkout's ROOT instance since placement PR0, so it is
+    // Declared by the checkout's ROOT layer since placement PR0, so it is
     // labelled `folio-assistant/fsh-guts`.
     expect(report.exempt.some((d) => /(^|\/)fsh-guts \(/.test(d))).toBe(true);
     // And the exemption is narrow: it must not swallow ordinary directories.

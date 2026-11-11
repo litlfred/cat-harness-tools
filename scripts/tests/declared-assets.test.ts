@@ -54,7 +54,7 @@ describe("this repository's own declarations", () => {
     // declaring the REPOSITORY's AGENTS.md as its own and the bootstrap
     // provenance went to the root declaration's `agent-instructions` asset,
     // because the root's is the file bootstrap copies at initialisation. Then
-    // the root stopped declaring any instance at all (owner, 2026-10-08), and
+    // the root stopped declaring any layer at all (owner, 2026-10-08), and
     // the owner ruled on 2026-10-09 that the root AGENTS.md and README are
     // RENDERED files (option a). So the provenance is no longer a `source`
     // field anybody could forget to move: the renderer QUOTES bootstrap's
@@ -109,7 +109,7 @@ describe("the gate catches what v8gh measured", () => {
   });
 
   test("a declared asset that is not on disk is a finding, never a skip", () => {
-    // Unlike a conventional DIRECTORY, which may simply be one this instance
+    // Unlike a conventional DIRECTORY, which may simply be one this layer
     // did not take up, a declared asset is an assertion.
     const root = instance([{ id: "gone", src: "NOPE.md" }]);
     const { findings } = auditInstance(root);
@@ -192,7 +192,7 @@ describe("leadParagraph reads headings the way a reader does", () => {
   });
 });
 
-// folio-assistant-tsh9: an asset's link into a path the instance moved is
+// folio-assistant-tsh9: an asset's link into a path the layer moved is
 // `moved`, not `dead-link`, until the move's `until` (sdlc skill `two-phase-move`).
 describe("a declared move", () => {
   const moved = (until: string): string => {

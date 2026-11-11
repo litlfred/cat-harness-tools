@@ -99,7 +99,7 @@ export const RenderedImpactSchema = z.object({
   /** The renderer, by its Tool id or script, e.g. `fhir-ig-ast-pages`. */
   renderer: z.string().min(1),
   method: z.enum(["cone", "build-diff"]),
-  /** The site the paths are relative to, as a reader finds it (an instance, a URL path). */
+  /** The site the paths are relative to, as a reader finds it (a layer, a URL path). */
   site: z.string().optional(),
   base: z.string().optional(),
   head: z.string().optional(),

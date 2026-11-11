@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * check:instance-graph — every instance's dependency graph resolves: no
+ * check:instance-graph — every layer's dependency graph resolves: no
  * missing dependency, no cycle.
  *
  * At runtime a missing dependency WARNS and the overlay continues without
@@ -9,15 +9,15 @@
  * whole, so a dependency missing here is misspelled or gone.
  *
  * A cycle already throws at runtime (`orderedDependencies`); it is reported
- * here as well, so one run names every broken instance rather than the first.
+ * here as well, so one run names every broken layer rather than the first.
  *
  * ## Declared, and identified
  *
- * - **Every instance DECLARES `needs`.** Absent is undetermined, and at
+ * - **Every layer DECLARES `needs`.** Absent is undetermined, and at
  *   runtime it stays a legal third state (`resolution-across-needs.test.ts`
  *   proves what it reports), but in this repository it is a finding. `[]`
  *   declares the floor and is fine.
- * - **Every instance has an absolute harness IRI, and no two share one.** The
+ * - **Every layer has an absolute harness IRI, and no two share one.** The
  *   IRI is `kg-export`'s own `exportIdentity(...).canonicalIri`, called rather
  *   than re-derived, so this gate and the published `@id` cannot disagree.
  *
@@ -39,17 +39,17 @@ export type DeclarationProblem =
   | { kind: "no-iri"; detail: string }
   | { kind: "duplicate-iri"; detail: string }
   /**
-   * The checkout's root instance does not reach an instance the checkout
+   * The checkout's root layer does not reach a layer the checkout
    * stages (placement PR0a, cmsl option A: "the checkout aggregates"). A
    * corpus-wide tool resolves over the root's overlay, so an unreached
-   * instance is invisible to every one of them — the `dh4f` shape at the
+   * layer is invisible to every one of them — the `dh4f` shape at the
    * scale of a whole layer.
    */
   | { kind: "unstaged"; detail: string }
   /**
-   * A NON-root instance declaring a `scope: "repository"` entry — a mirror of
-   * another instance's directory or of checkout-level state. Retired by the
-   * same ruling: only the instance whose root IS the checkout declares at the
+   * A NON-root layer declaring a `scope: "repository"` entry — a mirror of
+   * another layer's directory or of checkout-level state. Retired by the
+   * same ruling: only the layer whose root IS the checkout declares at the
    * checkout's scope, so the platform never names a dependent again.
    */
   | { kind: "repository-mirror"; detail: string };
@@ -57,11 +57,11 @@ export type DeclarationProblem =
 export interface InstanceGraphReport {
   instances: number;
   problems: Array<{ instance: string; problem: InstanceGraphProblem | DeclarationProblem }>;
-  /** Each instance's harness IRI, when one could be derived. */
+  /** Each layer's harness IRI, when one could be derived. */
   iris: Record<string, string>;
 }
 
-/** Resolves an instance root to its canonical harness IRI, or `undefined`. */
+/** Resolves a layer root to its canonical harness IRI, or `undefined`. */
 export type IriOf = (root: string) => string | undefined;
 
 /** The exporter's own answer, loaded lazily: `kg-export` is a large module. */
@@ -105,8 +105,8 @@ export function collect(repoRoot: string, iriOf?: IriOf): InstanceGraphReport {
       problems.push({ instance: name, problem: { kind: "duplicate-iri", detail: `${name} and ${other} share the IRI ${iri}` } });
     } else byIri.set(iri, name);
   }
-  // THE CHECKOUT AGGREGATES. Only where the repository root is itself an
-  // instance: a checkout of a lone instance has no aggregator to hold to it.
+  // THE CHECKOUT AGGREGATES. Only where the repository root is itself a
+  // layer: a checkout of a lone layer has no aggregator to hold to it.
   const checkout = resolve(repoRoot);
   if (roots.some((r) => resolve(r) === checkout)) {
     let reached = new Set<string>();
@@ -139,7 +139,7 @@ export function collect(repoRoot: string, iriOf?: IriOf): InstanceGraphReport {
   }
   for (const root of roots) {
     for (const problem of resolveInstanceGraph(root).problems) {
-      // An instance's broken edge is reached again from every dependent; say it once.
+      // A layer's broken edge is reached again from every dependent; say it once.
       const key = `${problem.kind}:${problem.detail}`;
       if (seen.has(key)) continue;
       seen.add(key);

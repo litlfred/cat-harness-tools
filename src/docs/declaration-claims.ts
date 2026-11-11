@@ -138,7 +138,7 @@ const NEAR = 120;
 //
 // `<` and `>` are here for the same reason, and the near-miss became a real
 // one. A GENERIC skill correctly writes `<name>.json`: it describes any
-// instance, so substituting this repository's concrete file would be wrong.
+// layer, so substituting this repository's concrete file would be wrong.
 // Without the brackets in this class, every such sentence dropped out of the
 // corpus — clearing bean `vzur`'s backlog took it 5 claims → 3, and each
 // disappearance READ AS A FIX. That is the `dh4f` shape once more: examining
@@ -213,7 +213,7 @@ export function claimsIn(markdown: string, file: string, graphs: GraphSources): 
  * declared at `agent-skills/library/` and in two content layers' directories
  * (the IRIS replica's and the formal-math layer's) as well as at the root.
  * Pruning a walk by first segment would have skipped the whole of the IRIS
- * replica's directory — three instances
+ * replica's directory — three layers
  * silently unexamined, reported as a clean run. The `dh4f` shape arriving
  * through a convenience.
  */
@@ -229,7 +229,7 @@ export function historicalPrefixes(repoRoot: string): string[] {
     for (const entry of readDeclaration(instance)?.directories ?? []) {
       if (!(entry.graphTypologies ?? []).some((g) => historical.has(g))) continue;
       // RESOLVED BY THE ENTRY'S OWN SCOPE, then made repo-relative. A draft
-      // that prefixed every path with its declaring instance produced
+      // that prefixed every path with its declaring layer produced
       // `cat-harness/beans/` and `cat-harness/fsh-guts/`, neither of which
       // exists — those are `scope: "repository"`. The fix that followed joined
       // EVERY path onto the repository root instead, which is the same mistake
@@ -249,7 +249,7 @@ export function historicalPrefixes(repoRoot: string): string[] {
   // `check:declared-paths` owns that question and reports it. Filtering here
   // only keeps this function from pruning a walk by a path that is not there.
   //
-  // `beans/beans.json` is a bean-graph declaration rather than an instance
+  // `beans/beans.json` is a bean-graph declaration rather than a layer
   // declaration, so `instanceRootsIn` does not reach it. The root declaration
   // already carries `beans/` as the `beans` graph, which is the entry above —
   // stated because a draft looked for `bean-defs` here, found nothing, and let

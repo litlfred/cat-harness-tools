@@ -2,16 +2,16 @@
  * Per-instance JSON-LD contexts, GENERATED from what documents use — the pure half.
  *
  * Bean `folio-assistant-63q4`, owner 2026-10-14: no "forward-declared" prefix
- * anywhere. Each instance declares the external namespaces it speaks
+ * anywhere. Each layer declares the external namespaces it speaks
  * (`jsonldPrefixes`, cat-harness `schemas/kg/jsonld-prefixes.ts`), and its
  * published context binds ONLY the prefixes its documents actually use,
- * resolved through its table flattened with the tables of the instances it
+ * resolved through its table flattened with the tables of the layers it
  * `needs`. A bound-but-unused prefix cannot exist, so nothing needs excusing.
  *
  * Since the follow-up on the same bean it also DEFINES every content- and
  * subgraph-context TERM those documents use ({@link documentUses},
  * {@link buildInstanceContext} §Terms): prefixes alone cannot stand in for the
- * content context — a 60-document sample per instance lost 352–593 triples
+ * content context — a 60-document sample per layer lost 352–593 triples
  * when the prefix-only context was swapped in, and loses none with the terms.
  *
  * This module reads no files. `scripts/gen-instance-contexts.ts` walks the
@@ -135,7 +135,7 @@ export interface UsedPrefixesOptions {
    * FULL IRIs (`alternateOf` → `http://www.w3.org/ns/prov#alternateOf`). Such
    * a term speaks the prefix whose namespace its IRI starts with. Inline
    * full-IRI terms never count (see `addContext`). The writer passes
-   * the instance's flattened table, inverted; without it only CURIE-valued
+   * the layer's flattened table, inverted; without it only CURIE-valued
    * terms count as aliases.
    */
   namespacePrefixes?: ReadonlyMap<string, string>;
@@ -328,28 +328,28 @@ export interface UnresolvedPrefix {
 }
 
 /**
- * A remote context an instance context may stand in for, and the instance
- * that owns it. Its terms are available to an instance only when the owner is
- * in that instance's flattened `needs` — the same rule its prefixes follow.
+ * A remote context an instance context may stand in for, and the layer
+ * that owns it. Its terms are available to a layer only when the owner is
+ * in that layer's flattened `needs` — the same rule its prefixes follow.
  */
 export interface TermSource {
-  /** The instance that publishes the context (`cat-harness` for the content and subgraph contexts). */
+  /** The layer that publishes the context (`cat-harness` for the content and subgraph contexts). */
   instance: string;
   /** The context object itself (the value of its `@context`): read for its own prefix bindings. */
   context: Record<string, unknown>;
 }
 
 export interface InstanceContextInput {
-  /** The instance this context is for. */
+  /** The layer this context is for. */
   instance: string;
   /**
    * Its declared table, then its dependencies', in DEPENDENCY ORDER — `needs`
-   * first, the instance itself LAST, which is the order `mergePrefixTables`
+   * first, the layer itself LAST, which is the order `mergePrefixTables`
    * takes.
    */
   tables: readonly DeclaredPrefixes[];
   /**
-   * Every prefix the instance's documents use, per document: the prefix map
+   * Every prefix the layer's documents use, per document: the prefix map
    * from {@link usedPrefixes} and the bindings from {@link ownBindings}, and
    * the remote-context terms from {@link documentUses}.
    */
@@ -358,7 +358,7 @@ export interface InstanceContextInput {
    * The remote contexts whose TERMS this instance context carries — the ones
    * it stands in for — by URL. A term from a context not listed here (a
    * third-party context the document goes on naming) is neither copied nor
-   * reported; one from a listed context owned by an instance outside the
+   * reported; one from a listed context owned by a layer outside the
    * flattened `needs` is reported in {@link InstanceContext.unresolvedTerms}.
    */
   termSources?: ReadonlyMap<string, TermSource>;
@@ -395,7 +395,7 @@ export interface InstanceContext {
   unresolved: UnresolvedPrefix[];
   /** Met only as a literal string and not bound — reported, never failed on. */
   literalOnly: UnresolvedPrefix[];
-  /** Prefixes two instances in the flattened table bind differently — a FINDING; never resolved by order. */
+  /** Prefixes two layers in the flattened table bind differently — a FINDING; never resolved by order. */
   conflicts: PrefixConflict[];
   /** Terms defined two ways, or colliding with a prefix — a FINDING; never resolved by order. */
   termConflicts: TermConflict[];
@@ -481,7 +481,7 @@ function contextBinding(context: Record<string, unknown>, prefix: string): strin
 }
 
 /**
- * Build one instance's context from its flattened table and its documents' uses.
+ * Build one layer's context from its flattened table and its documents' uses.
  *
  * Nothing is silently dropped or overridden: a used prefix is either bound
  * (resolved through the table, unconflicted), or the document binds it itself,
@@ -501,9 +501,9 @@ function contextBinding(context: Record<string, unknown>, prefix: string): strin
  *
  * - only from a context it stands in for (`termSources`) — a third-party
  *   context the document keeps naming carries its own terms — and only when
- *   that context's owning instance is in the flattened `needs`; otherwise the
+ *   that context's owning layer is in the flattened `needs`; otherwise the
  *   term is {@link InstanceContext.unresolvedTerms};
- * - only terms the instance's OWN documents use — nothing a later instance uses;
+ * - only terms the layer's OWN documents use — nothing a later layer uses;
  * - every prefix the definition is written with is bound too, resolved
  *   through the flattened table, and must resolve to the SAME IRI the source
  *   context binds it to — otherwise the copied term would expand differently,

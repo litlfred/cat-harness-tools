@@ -21,12 +21,12 @@ import { scriptsOf } from "../../../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { notApplicableAlone, siteNotBuilt } from "../../../test/support/checkout.ts";
 
-/** This instance and the repository it sits in, for the filesystem-driven sweeps. */
+/** This layer and the repository it sits in, for the filesystem-driven sweeps. */
 const INSTANCE = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(INSTANCE);
 
 /**
- * Whether the checkout knows the route of a visualiser a HIGHER instance
+ * Whether the checkout knows the route of a visualiser a HIGHER layer
  * declares — its declaration, or the generated page a built site records it
  * by. Standing alone neither is here: the content core declares the glossary,
  * a folio declares its catalogue, and their pages are built at publish and
@@ -65,7 +65,7 @@ function frontMatter(text: string): string {
 }
 
 /**
- * Every `.md` under this instance's site directory whose own front matter names
+ * Every `.md` under this layer's site directory whose own front matter names
  * `gen-docs-pages.ts` as its writer, repo-relative. Read from the TREE rather
  * than listed, so a page added to `docs/source/` makes the `docs-pages` test
  * fail until its slug is declared — the enumeration cannot go quietly stale.
@@ -92,8 +92,8 @@ function generatedDocsPages(): string[] {
 }
 
 describe("generated-page globs come from the declared visualisers, not instance names", () => {
-  // The glossary and catalogue globs used to spell out the instance that
-  // declares each page, which made this lower layer name instances above it
+  // The glossary and catalogue globs used to spell out the layer that
+  // declares each page, which made this lower layer name layers above it
   // (check:reference-direction). They are now read off `visualisers[]`.
   function fixture(visualisers: object[]): string {
     const repo = mkdtempSync(join(tmpdir(), "conflict-routes-"));
@@ -127,7 +127,7 @@ describe("generated-page globs come from the declared visualisers, not instance 
   });
 
   test("standing alone, the routes come from the generated pages the harness site holds", () => {
-    // check-standalone lays out this layer and its `needs` only: the instance
+    // check-standalone lays out this layer and its `needs` only: the layer
     // that DECLARES the glossary or catalogue visualiser is absent, but the
     // harness site still holds the pages its generator wrote.
     const repo = mkdtempSync(join(tmpdir(), "conflict-routes-site-"));
@@ -388,7 +388,7 @@ describe("classify", () => {
     }
     expect(classify("cat-harness/docs/_includes/generated/navbar-footer.html").pattern?.id).toBe("navbar-include");
     expect(classify("cat-harness/test/results/viewer-nav/viewer-nav.qa.json").pattern?.id).toBe("viewer-nav-qa");
-    // The real uploads stay refused, at the root and in any instance.
+    // The real uploads stay refused, at the root and in any layer.
     expect(classify("uploads/9789240093362-eng.pdf").pattern?.id).toBe("uploads");
     expect(classify("who-iris/uploads/x.pdf").pattern?.id).toBe("uploads");
     // Authored neighbours of the new globs stay refused.

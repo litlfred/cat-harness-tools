@@ -2,7 +2,7 @@
 /**
  * Where the docs site's action tiles point — RESOLVED, never composed.
  *
- * `renderingPath` in `schemas/kg/cat-harness.ts` says where an instance's
+ * `renderingPath` in `schemas/kg/cat-harness.ts` says where a layer's
  * renderings land:
  *
  * ```
@@ -126,7 +126,7 @@ export function siteLinks(
     // `@id` in the document names — so that is what is linked, even though the
     // build also publishes a `.json` alias for hosts with no `.jsonld` media
     // type. Linking the alias would advertise a URL no `@id` claims.
-    // Under the instance's own directory, the host's included, since #603
+    // Under the layer's own directory, the host's included, since #603
     // decision 1b (owner, 2026-10-23): `exportIdentity`'s `docPath`, through
     // the same resolver. The old root `<stub>.jsonld` is a tombstone now.
     { id: "jsonld", path: sitePath(instanceDocPath({ name: decl.name, stub })), target: instanceDocPath({ name: decl.name, stub }) },

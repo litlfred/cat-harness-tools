@@ -101,7 +101,7 @@ describe("what gets written", () => {
     // cannot tell the right path from the broken one is not covering the
     // thing it looks like it covers, so each full path is written out.
     //
-    // The two differ in their INSTANCE, which is the fact worth pinning, and
+    // The two differ in their LAYER, which is the fact worth pinning, and
     // since 2026-09-30 NEITHER is under `cat-harness/`: `document` under
     // `folio-assistant-core/` (bean `ybp4`, step 2 of the adapters closure)
     // and `paper` under `folio-assistant-sci/` (bean `y5si`, step 1). That is
@@ -109,7 +109,7 @@ describe("what gets written", () => {
     // longer holds an adapter that imports upward.
     //
     // This assertion is why `toBe` replaced `toContain`, and it earned that on
-    // the very next move: the document path changed instance, and a substring
+    // the very next move: the document path changed layer, and a substring
     // pin on `adapters/document/index.ts` would have passed over it silently.
     // A change that re-composes both from one template breaks this line.
     const doc = tmp();

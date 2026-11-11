@@ -1,7 +1,7 @@
 /**
  * The conformance check has to FAIL on each thing it claims to catch.
  *
- * Bean `z4mq` item 3. Written against temp instances rather than only this
+ * Bean `z4mq` item 3. Written against temp layers rather than only this
  * repository, because the repository currently passes — and a test that only
  * asserts "the repo renders" would go on passing if the check were gutted to
  * `return { verdict: "rendered" }`. Each case below perturbs one thing.
@@ -22,7 +22,7 @@ afterEach(() => {
   for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-/** A throwaway instance. `decl === null` writes no declaration at all. */
+/** A throwaway layer. `decl === null` writes no declaration at all. */
 function instance(decl: unknown | null, files: Record<string, string> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "render-"));
   made.push(root);
@@ -36,7 +36,7 @@ function instance(decl: unknown | null, files: Record<string, string> = {}): str
 
 describe("could not determine is a THIRD state, never a pass", () => {
   test("no declaration is undetermined, not failed and not rendered", () => {
-    // The distinction that matters: an instance nobody declared has not been
+    // The distinction that matters: a layer nobody declared has not been
     // shown to render badly, it has not been shown at all. Calling it `failed`
     // would be as wrong as calling it `rendered` — one invents a defect, the
     // other invents a clean run.
@@ -56,7 +56,7 @@ describe("could not determine is a THIRD state, never a pass", () => {
   });
 
   test("undetermined carries NO published kinds — it never looked", async () => {
-    // Guard against the shape where an unreadable instance still reports an
+    // Guard against the shape where an unreadable layer still reports an
     // empty `published` that a consumer reads as "publishes nothing".
     const r = await renderInstance(instance(null));
     expect(r.published).toEqual([]);
@@ -74,7 +74,7 @@ describe("an empty render is a failure, not an empty success", () => {
     // The fixture DECLARES a directory and renders nothing from it (its kind,
     // `fsh-guts`, is unpublished, so not even the directory's node is
     // emitted): the defect's shape. It declared `directories: []` until the
-    // owner ruled an instance declaring no directories acceptable (C1,
+    // owner ruled a layer declaring no directories acceptable (C1,
     // 2026-10-15), which is the case below.
     const r = await renderInstance(instance({ name: "empty", directories: [{ id: "guts", path: "fsh-guts/", graphTypologies: ["fsh-guts"] }] }, { "fsh-guts/.keep": "" }));
     expect(r.verdict).toBe("failed");
@@ -114,7 +114,7 @@ describe("an instance that declares no directories is accepted, and reported (C1
 describe("declared means TRANSITIVELY declared", () => {
   test("a nested graph file's kinds count as the instance's", () => {
     // `beans/beans.json` declares `bean-defs` and `workflow-state`; reading
-    // only `harness.json` reports them as kinds the instance smuggled in.
+    // only `harness.json` reports them as kinds the layer smuggled in.
     // Measured before this was written: that mistake gives cat-harness five
     // undeclared kinds where the true figure is one.
     const root = instance(
@@ -160,15 +160,15 @@ describe("declared means TRANSITIVELY declared", () => {
 });
 
 /**
- * Every instance in this repository, rendered ONCE at module scope.
+ * Every layer in this repository, rendered ONCE at module scope.
  *
  * The same remedy bean `sff8` settled on for `tools.test.ts`: module scope
  * belongs to no test's timeout, while a raised budget decays as the corpus
  * grows. "every instance renders" rendered all of them inside one test and
  * timed out at 5073 ms of 5000 on CI (#2139) — the cost grows with every
- * instance added, which is a rate, not a flake. `renderInstance` only READS
+ * layer added, which is a rate, not a flake. `renderInstance` only READS
  * (it collects nodes into memory and writes nothing), and nothing below
- * mutates the repository, so one render per instance gives every test the
+ * mutates the repository, so one render per layer gives every test the
  * answer it would have computed itself.
  */
 const OWN_REPO = repoRootFor(resolve(import.meta.dir, "../../.."));
@@ -184,12 +184,12 @@ describe("this repository's own instances", () => {
     // the whole period that list was wrong: `instancesIn` returned a literal
     // and this test pinned the same literal, so the two agreed with each other
     // and neither looked at the repository. `folio-assist-core` and the root
-    // were instances the gate never rendered (bean `6tkl`).
+    // were layers the gate never rendered (bean `6tkl`).
     //
     // The order is root-first then sorted, which is what `instanceRootsIn`
     // promises so that a report is stable.
     //
-    // Updated 2026-09-20 when it fired as designed: seven instances arrived on
+    // Updated 2026-09-20 when it fired as designed: seven layers arrived on
     // one branch and `folio-assist-core` became `folio-assistant-core`. This
     // list is the new truth, and it is the SECOND place that truth is written
     // — `schemas/cat-harness.test.ts` holds the other. Two copies is a real
@@ -200,17 +200,17 @@ describe("this repository's own instances", () => {
     // literal passed for the whole period it was wrong.
     // The root by its DECLARED name (bean `t5dm`): its last path segment is
     // the clone's folder, which a worktree names anything. Every other
-    // instance is a path inside the repository and the same in every clone.
+    // layer is a path inside the repository and the same in every clone.
     const found = instancesIn(REPO).map((p) => (resolve(p) === resolve(REPO) ? readDeclaration(p)?.name : p.split("/").pop()));
     expect(found).toEqual([
       // `folio-assistant`, the ROOT, led this list until the owner removed its
       // declaration (3d4caf6, 2026-10-08: "should not need folio-assistant
       // declared at all"). The checkout root is an index now and declares no
-      // instance, so discovery finds none there. It fired as designed.
+      // layer, so discovery finds none there. It fired as designed.
       "bootstrap",
       // Added 2026-09-30 when it fired as designed: bootstrap's tools were
-      // re-created as the sibling instance `bootstrap-tools/` (bean `xsqm`),
-      // which declares `bootstrap-tools.json` and is therefore an instance.
+      // re-created as the sibling layer `bootstrap-tools/` (bean `xsqm`),
+      // which declares `bootstrap-tools.json` and is therefore a layer.
       "bootstrap-tools",
       "cat-harness",
       // Added 2026-10-01 with bean `w2gr` (step 3a): the tool IMPLEMENTATION
@@ -238,16 +238,16 @@ describe("this repository's own instances", () => {
       "folio-assistant-sci",
       // Added 2026-09-21 with the FHIR IG artefact-index ingest (issue #689).
       // It fired as designed, which is what this list is for: `smart-trust/`
-      // declares a `harness.json` and is therefore an instance, sorting
+      // declares a `harness.json` and is therefore a layer, sorting
       // between `large-datasets` and `who-iris`. A directory with no
-      // `harness.json` is not an instance and is correctly absent — `smart-kg/`
+      // `harness.json` is not a layer and is correctly absent — `smart-kg/`
       // was the example until it was removed (bean `wg7r`).
       // Added 2026-09-21 with the second ingested IG (bean qrnz). PROVISIONAL:
       // the owner has since ruled that a per-IG harness should not exist at all
       // (bean nsbb), so this entry and `smart-trust` below are both expected to
-      // collapse into a `smart-base` instance. It is listed because it EXISTS
+      // collapse into a `smart-base` layer. It is listed because it EXISTS
       // today, which is the only thing this assertion is about.
-      // Added 2026-09-22 (issue #877) -- `smart-base`, the instance `nsbb`
+      // Added 2026-09-22 (issue #877) -- `smart-base`, the layer `nsbb`
       // called for. Listed here as well as in `schemas/cat-harness.test.ts`
       // because the two assert different things: that discovery FINDS it,
       // and that it RENDERS. The duplication is the deliberate cost noted
@@ -260,7 +260,7 @@ describe("this repository's own instances", () => {
       "smart-immunizations",
       "smart-trust",
       // Added 2026-10-31 when it fired as designed: folio-assistant#2761 mounted
-      // `smart-trust-phw` (bean `nr5p`, PCF1) as an instance of the index.
+      // `smart-trust-phw` (bean `nr5p`, PCF1) as a layer of the index.
       "smart-trust-phw",
       "who-iris",
       // `who-style-guide` was listed here until 2026-10-01, when the owner
@@ -268,19 +268,19 @@ describe("this repository's own instances", () => {
     ]);
     // Named individually rather than only as a list: these two are the ones
     // the old literal omitted, so if a future edit narrows the set again, the
-    // failure should say which instance stopped being checked.
+    // failure should say which layer stopped being checked.
     expect(found).toContain("folio-assistant-core");
     // The other was the ROOT, `folio-assistant`, whose declaration the owner
     // removed (3d4caf6, 2026-10-08). Pinned the other way now: discovery must
-    // not find an instance at the checkout root, which holds an index.
+    // not find a layer at the checkout root, which holds an index.
     expect(found).not.toContain("folio-assistant");
     expect(instancesIn(REPO).map((p) => resolve(p))).not.toContain(resolve(REPO));
   });
 
   test("every instance renders, and none renders nothing unless it declares nothing", async () => {
-    // An instance declaring `directories: []` (smart-immunizations here, owner
+    // A layer declaring `directories: []` (smart-immunizations here, owner
     // B1 and C1, 2026-10-15) renders zero nodes of its own BY DECLARATION and
-    // is accepted, flagged; every other instance must render something.
+    // is accepted, flagged; every other layer must render something.
     for (const root of instancesIn(REPO)) {
       const r = ownRender(root);
       expect({ [r.name]: r.verdict }).toEqual({ [r.name]: "rendered" });
@@ -299,7 +299,7 @@ describe("this repository's own instances", () => {
 
   test("bootstrap's OWN skills are in its render — the silent drop, pinned", async () => {
     // `confirm-harness` lives only in `bootstrap/skills/`. When `skillMdDirs`
-    // resolved that repository-scoped directory against the instance root, the
+    // resolved that repository-scoped directory against the layer root, the
     // skill vanished from the graph and `hasSkill` dangled. Nothing failed.
     const boot = instancesIn(REPO).find((p) => p.endsWith("bootstrap"))!;
     const r = ownRender(boot);

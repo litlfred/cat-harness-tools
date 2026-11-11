@@ -52,6 +52,9 @@ import {
 import { instanceRootsIn, nestedDirectories, readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
 import { checkRemote } from "../../scripts/remote-mount.ts";
+import { lsiHealthEvidence, readIndexes, type LsiHealthEvidence } from "../../scripts/lsi-health.ts";
+import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { keywordsStates, type KeywordsState } from "../../scripts/library-keywords.ts";
 import {
   stagingSlug,
   type BranchEvidence,
@@ -573,7 +576,7 @@ export function probeRepoSize(repoRoot: string): Probe<RepoSizeEvidence> {
 /** Resolve a declared store directory, falling back to the documented default. */
 /**
  * Does the repository at `repoRoot` declare a graph of `kind` anywhere — its
- * store's own graph file, or a directory of that kind in its instance
+ * store's own graph file, or a directory of that kind in its layer
  * declaration? `false` is the determined answer "this repository has none".
  */
 function declaresStore(repoRoot: string, graphFile: string, kind: string): boolean {
@@ -991,7 +994,7 @@ export interface SpecialBranchDecl {
 
 /**
  * The branch prefix a directory of graph typology `typology` declares as its
- * `storage`, read from every instance in `repoRoot` (the folio itself first);
+ * `storage`, read from every layer in `repoRoot` (the folio itself first);
  * `undefined` when none declares one. The same reading as `state:drift`'s
  * `declaredBranches`, keyed by the kind instead of the directory's id.
  */
@@ -1162,6 +1165,8 @@ export async function gatherContext(o: GatherOptions): Promise<HealthContext> {
     }),
     pagesServing: probePagesServing({ repoRoot: o.repoRoot }),
     remoteMounts: probeRemoteMounts(o.repoRoot),
+    lsiIndexes: probeLsiIndexes(o.repoRoot),
+    libraryKeywords: probeLibraryKeywords(o.repoRoot),
   };
 }
 
@@ -1177,5 +1182,35 @@ export function probeRemoteMounts(repoRoot: string): StoreProbe<RemoteMountEvide
     };
   } catch (e) {
     return { state: "unknown", reason: `mount:remote:check threw: ${(e as Error).message}` };
+  }
+}
+
+/**
+ * The LSI indexes as evidence (cat-harness#1144). They live under the HARNESS's
+ * `qa` graph, so another repository's report has nothing to check: absent.
+ * A read that is not a hit is `unknown`, never "no index is missing".
+ */
+export function probeLsiIndexes(repoRoot: string, harnessRoot: string = HARNESS_ROOT): StoreProbe<LsiHealthEvidence> {
+  if (resolve(repoRoot) !== resolve(harnessRoot)) return { state: "absent", reason: "the LSI indexes are cat-harness's; this repository holds none" };
+  try {
+    const read = readIndexes();
+    if (read.state !== "hit") return { state: "unknown", reason: `the stored LSI indexes could not be read (${read.state}): ${read.reason}` };
+    return { state: "ok", value: lsiHealthEvidence(read) };
+  } catch (e) {
+    return { state: "unknown", reason: `the LSI read threw: ${(e as Error).message}` };
+  }
+}
+
+/**
+ * Every library entry under `repoRoot` with its keywords.json state
+ * (cat-harness#1144). No library under it is `absent`. Writes nothing.
+ */
+export function probeLibraryKeywords(repoRoot: string, states: typeof keywordsStates = keywordsStates): StoreProbe<KeywordsState[]> {
+  try {
+    const { libraries, entries } = states(repoRoot);
+    if (libraries === 0) return { state: "absent", reason: "this repository declares no library with entries" };
+    return { state: "ok", value: entries };
+  } catch (e) {
+    return { state: "unknown", reason: `library:keywords could not be computed: ${(e as Error).message}` };
   }
 }

@@ -50,6 +50,8 @@ import type {
   PagesServingObservation,
 } from "../../schemas/sdlc/health-report.ts";
 import { isPreviewName, MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
+import type { LsiHealthEvidence } from "../../scripts/lsi-health.ts";
+import type { KeywordsState } from "../../scripts/library-keywords.ts";
 import { PREVIEW_PREFIX } from "../../schemas/sdlc/preview-prefix.ts";
 import {
   EXPIRY_BASIS,
@@ -222,7 +224,7 @@ export interface TodoEvidence {
  */
 export interface HealthContext {
   now: Date;
-  /** `owner/repo`, or the instance name when there is no GitHub remote. */
+  /** `owner/repo`, or the layer name when there is no GitHub remote. */
   subject: string;
   staging: Probe<StagingEvidence>;
   /** Head refs of the currently open pull requests — `claude/foo`, unsanitised. */
@@ -251,9 +253,20 @@ export interface HealthContext {
    * before this probe existed reads as `absent`.
    */
   remoteMounts?: StoreProbe<RemoteMountEvidence>;
+  /**
+   * The LSI indexes over the declared prose graphs, read from the checkout or
+   * the `qa-reports` branch (`scripts/lsi-health.ts`, cat-harness#1144).
+   * Optional: a context built before this probe existed reads as `absent`.
+   */
+  lsiIndexes?: StoreProbe<LsiHealthEvidence>;
+  /**
+   * Each library entry's `keywords.json` against what `library:keywords` would
+   * write now (cat-harness#1144). Optional: absent without a probe.
+   */
+  libraryKeywords?: StoreProbe<KeywordsState[]>;
 }
 
-/** One declared remote instance as the mount check left it. */
+/** One declared remote layer as the mount check left it. */
 export interface RemoteMountEvidence {
   outcomes: { instance: string; state: string; detail?: string }[];
   command: string;
@@ -1996,6 +2009,104 @@ export function remoteMountHealthCheck(ctx: HealthContext): HealthCheckResult {
   return settle(id, summary, REMOTE_MOUNT_THRESHOLDS, measurements, findings);
 }
 
+export const LSI_INDEX_THRESHOLDS: HealthThreshold[] = [
+  {
+    metric: "lsi-graphs-lacking-fresh-index",
+    value: 0,
+    unit: "count",
+    severity: "minor",
+    basis:
+      "a prose graph at or over the need-an-index threshold (100 units and 20,000 words, a house number with " +
+      "its basis in `scripts/lsi.ts`) with no fresh index answers `lsi query`, `lsi:near` and keyword extraction " +
+      "from a stale or missing index. `minor`: an index is a retrieval aid whose every output is a proposal " +
+      "(method `lsi`), so a missing one loses nothing; it moved here from the LSI viewer page (cat-harness#1144).",
+  },
+];
+
+export function lsiIndexHealthCheck(ctx: HealthContext): HealthCheckResult {
+  const id = "lsi-indexes";
+  const summary =
+    "Each declared prose graph that needs a latent semantic index: whether its stored index is fresh, and what each stored index found.";
+  const probe = ctx.lsiIndexes ?? { state: "absent" as const, reason: "no LSI probe ran" };
+  if (probe.state === "absent") return absentResult(id, summary, LSI_INDEX_THRESHOLDS, probe.reason);
+  if (probe.state === "unknown") return unknownResult(id, summary, LSI_INDEX_THRESHOLDS, probe.reason);
+  const { graphs, indexes, from } = probe.value;
+  const command = "bun run cat lsi audit";
+  const failing = graphs.filter((g) => g.result === "fail");
+  const measurements: HealthMeasurement[] = [
+    { metric: "lsi-graphs-needing-index", value: graphs.filter((g) => g.result !== "n/a").length, unit: "count", command },
+    { metric: "lsi-graphs-lacking-fresh-index", value: failing.length, unit: "count", command },
+    ...indexes.flatMap((i) => [
+      { metric: `lsi-narrow-dimensions:${i.graph}`, value: i.narrowDimensions, unit: "count", command: `read ${i.sidecar} (from ${from})` },
+      { metric: `lsi-near-duplicate-pairs:${i.graph}`, value: i.nearDuplicates, unit: "count", command: `read ${i.sidecar} (from ${from})` },
+    ]),
+  ];
+  const findings: HealthFinding[] = failing.map((g) => ({
+    metric: "lsi-graphs-lacking-fresh-index",
+    severity: "minor",
+    summary: `${g.graph}: ${g.detail}`,
+    action: `Run \`${g.command}\`; the index is a proposal aid, so nothing waits on it.`,
+  }));
+  return settle(id, summary, LSI_INDEX_THRESHOLDS, measurements, findings);
+}
+
+export const LIBRARY_KEYWORD_THRESHOLDS: HealthThreshold[] = [
+  {
+    metric: "library-keywords-entries-without",
+    value: 0,
+    unit: "count",
+    severity: "minor",
+    basis:
+      "a library entry the keyword extraction gives nothing has no keywords on the library viewer, the keyword " +
+      "viewer or in the derived keywords graph — usually a scanned page with no text layer, or sections under the " +
+      "LSI tool's minimum length. `minor`: keywords are derived proposals; nothing waits on them (cat-harness#1144).",
+  },
+  {
+    metric: "library-keywords-legacy-files",
+    value: 0,
+    unit: "count",
+    severity: "minor",
+    basis:
+      "keywords are EXTRACTED content, so they are built at publish into the derived keywords graph and do not live " +
+      "in the ingest record (owner, 2026-11-08, cat-harness#1144). A `keywords.json` still committed inside an entry " +
+      "is the old location: nothing reads it once the move lands, and it goes stale on every ingest.",
+  },
+];
+
+export function libraryKeywordsHealthCheck(ctx: HealthContext): HealthCheckResult {
+  const id = "library-keywords";
+  const summary = "Each library entry's LSI keywords: whether the extraction gives any, and any keywords.json still committed inside an entry.";
+  const probe = ctx.libraryKeywords ?? { state: "absent" as const, reason: "no library-keywords probe ran" };
+  if (probe.state === "absent") return absentResult(id, summary, LIBRARY_KEYWORD_THRESHOLDS, probe.reason);
+  if (probe.state === "unknown") return unknownResult(id, summary, LIBRARY_KEYWORD_THRESHOLDS, probe.reason);
+  const entries = probe.value;
+  const command = "bun run cat library:keywords";
+  const without = entries.filter((e) => e.keywords === 0);
+  const legacy = entries.filter((e) => e.legacy);
+  const list = (es: KeywordsState[]): string => es.slice(0, 5).map((e) => e.entry).join(", ") + (es.length > 5 ? ", …" : "");
+  const measurements: HealthMeasurement[] = [
+    { metric: "library-keywords-entries", value: entries.length, unit: "count", command },
+    { metric: "library-keywords-entries-without", value: without.length, unit: "count", command },
+    { metric: "library-keywords-legacy-files", value: legacy.length, unit: "count", command: "ls library/*/keywords.json" },
+  ];
+  const findings: HealthFinding[] = [];
+  if (without.length)
+    findings.push({
+      metric: "library-keywords-entries-without",
+      severity: "minor",
+      summary: `${without.length} entr(ies) the keyword extraction gives nothing: ${list(without)}`,
+      action: "Open the entry's sections: a page with no text layer needs OCR at ingest (`l1-document-ingestion`); a very short entry has nothing to extract.",
+    });
+  if (legacy.length)
+    findings.push({
+      metric: "library-keywords-legacy-files",
+      severity: "minor",
+      summary: `${legacy.length} keywords.json still committed inside an entry: ${list(legacy)}`,
+      action: "Remove them in one PR per repository: keywords are built at publish now (`assets/keywords/`), and the ingest record keeps only what was ingested.",
+    });
+  return settle(id, summary, LIBRARY_KEYWORD_THRESHOLDS, measurements, findings);
+}
+
 export function todoStoreCheck(ctx: HealthContext): HealthCheckResult {
   const id = "todo-store";
   const summary = "The human todo store: how many items are open, and whether any have gone stale.";
@@ -2153,6 +2264,20 @@ export const HEALTH_CHECKS: readonly {
       "Each declared remote mount: its pinned bytes on disk, or why not, with what a person does " +
       "(folio-assistant#2467). Reads the lock and the disk; fetches nothing, changes nothing.",
     run: remoteMountHealthCheck,
+  },
+  {
+    id: "lsi-indexes",
+    summary:
+      "Each declared prose graph that needs a latent semantic index, whether its stored index is fresh, " +
+      "and each index's narrow-dimension and near-duplicate counts (cat-harness#1144). Builds nothing.",
+    run: lsiIndexHealthCheck,
+  },
+  {
+    id: "library-keywords",
+    summary:
+      "Each library entry's LSI keywords: entries the extraction gives nothing, and keywords.json files still " +
+      "committed inside an entry now that keywords are built at publish (cat-harness#1144).",
+    run: libraryKeywordsHealthCheck,
   },
   {
     id: "staging-preview-orphans",

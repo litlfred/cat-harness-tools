@@ -269,7 +269,7 @@ describe("the CLI: one finding per line, exit 0 / 1 / 2", () => {
     const root = acme("cli");
     const r = run(["--check", "--instance", root, "--locale", "fr"], base);
     expect(r.code).toBe(1);
-    // No layer below fixes "Actor" here, so only the instance's own term binds.
+    // No layer below fixes "Actor" here, so only the layer's own term binds.
     expect(r.out.split("\n").filter((l) => l.startsWith("✗ fr "))).toEqual([
       '✗ fr not-fixed-rendering «Health worker» → «Agent de santé» (acme) not used in translations/fr/page.po: "Every health worker signs in."',
     ]);
@@ -331,7 +331,7 @@ const schemeTerm = (id: string, str: string, def: string, defStr: string) =>
   `\n#. Glossary term definition: https://example.org/t/${id.toLowerCase()}\nmsgid "${def}"\nmsgstr "${defStr}"\n`;
 
 /**
- * `sense`: an instance whose own glossary fixes "Health worker", below a
+ * `sense`: a layer whose own glossary fixes "Health worker", below a
  * platform layer (`core`, another subject area) that fixes "Actor", and one
  * content catalogue per locale.
  */
@@ -480,7 +480,7 @@ describe("the verdict store and the adjudicator's entry points", () => {
     const { root } = senseInstance("sense-cli-record", {
       fr: { hw: "Agent de santé", actor: "Acteur", page: plain("Clinic hours", "Heures") + plain("A health worker arrives.", "Un agent de santé arrive.") },
     });
-    // The instance's own terminology pins a term of its own area.
+    // The layer's own terminology pins a term of its own area.
     writeFileSync(join(root, "translations", "fr", "glossary.po"), HEADER + "\n#. A place of care.\nmsgid \"Clinic\"\nmsgstr \"Clinique\"\n");
     const fails = run(["--check", "--instance", root, "--locale", "fr"], base);
     expect(fails.code).toBe(1);

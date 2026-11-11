@@ -6,9 +6,9 @@
  * @module scripts/publish-check
  * @covers none — it runs one declared writer and judges what it wrote; it reads no graph of its own
  *
- * An artefact an instance declares in `builtAtPublish`
+ * An artefact a layer declares in `builtAtPublish`
  * (`@litlfred/cat-harness/schemas/kg/built-at-publish.ts`) has no committed
- * bytes: it is computed over the checkout's other instances, or from a
+ * bytes: it is computed over the checkout's other layers, or from a
  * branch-kept graph, so comparing with a commit would go red on every re-pin.
  *
  * ## What it asks instead, in order
@@ -22,10 +22,10 @@
  * 3. **Every declared artefact of this writer was built**: present, and a
  *    directory not empty.
  * 4. **No COMMITTED file moved.** A generator that writes both kinds — the
- *    BPMN renderer draws this instance's own diagrams (committed, so its README
- *    renders on github.com) and other instances' (built at publish) — is still
+ *    BPMN renderer draws this layer's own diagrams (committed, so its README
+ *    renders on github.com) and other layers' (built at publish) — is still
  *    held to the committed half: any file that changed, appeared or vanished,
- *    is not under a declared path and is not ignored by ITS INSTANCE's own
+ *    is not under a declared path and is not ignored by ITS LAYER's own
  *    `.gitignore`, is stale (see
  *    {@link ignoredBy} for why the enclosing checkout's rules are not asked).
  *    A file in a mount but outside every path the lock mounts is not
@@ -76,8 +76,8 @@ export function snapshot(roots: readonly string[], repoRoot = REPO_ROOT): Map<st
       if (SKIP_DIRS.has(e.name)) continue;
       // Top-level build-output directories (`_kg/`, `dist/`, …) are written by
       // `kg:export` during `qa:refresh` with a fresh timestamp; in a content
-      // root that declares an instance at `.` (`repoRoot` is in `roots`), they
-      // sit at `rootAbs` without belonging to the root instance's commit.
+      // root that declares a layer at `.` (`repoRoot` is in `roots`), they
+      // sit at `rootAbs` without belonging to the root layer's commit.
       if (d === rootAbs && (BUILD_OUTPUT_DIRS as readonly string[]).includes(e.name)) continue;
       const abs = join(d, e.name);
       if (e.isDirectory()) walk(abs);
@@ -95,15 +95,15 @@ export function moved(before: ReadonlyMap<string, string>, after: ReadonlyMap<st
 }
 
 /**
- * The subset each path's OWN INSTANCE ignores — asked of git with that
- * instance's `.gitignore` as the only exclude file, in a scratch repository.
+ * The subset each path's OWN LAYER ignores — asked of git with that
+ * layer's `.gitignore` as the only exclude file, in a scratch repository.
  *
  * Not the enclosing checkout's ignore rules: an index ignores every mount
  * wholesale (`/cat-harness/` in folio-assistant's `.gitignore`), so asking the
  * checkout would call every file in a mount ignored, and the committed half of
  * this gate would pass vacuously (measured 2026-10-14). The question is "could
- * the instance's commit contain this file", and only the instance's own rules
- * answer it. Paths are repo-relative in, and grouped by the instance root that
+ * the instance's commit contain this file", and only the layer's own rules
+ * answer it. Paths are repo-relative in, and grouped by the layer root that
  * contains them (`roots`, deepest first wins).
  */
 export function ignoredBy(paths: readonly string[], roots: readonly string[], repoRoot = REPO_ROOT): Set<string> {
@@ -114,13 +114,13 @@ export function ignoredBy(paths: readonly string[], roots: readonly string[], re
   for (const p of paths) {
     const abs = resolve(repoRoot, p);
     const root = sorted.find((r) => abs.startsWith(r + sep));
-    if (root === undefined) continue; // outside every instance: not an instance's commit, so never "committed" here
+    if (root === undefined) continue; // outside every layer: not a layer's commit, so never "committed" here
     byRoot.set(root, [...(byRoot.get(root) ?? []), p]);
   }
   for (const [root, ps] of byRoot) {
-    // A scratch repository holding ONLY this instance's `.gitignore` files, at
+    // A scratch repository holding ONLY this layer's `.gitignore` files, at
     // their own relative paths, so nested ones apply exactly as they do in the
-    // instance's own repository, and nothing above the instance does.
+    // layer's own repository, and nothing above the layer does.
     // input-site: inert #0c7d0248 — a scratch directory, removed before this returns; its path never reaches the answer
     const scratch = mkdtempSync(join(tmpdir(), "publish-check-"));
     try {
@@ -131,7 +131,7 @@ export function ignoredBy(paths: readonly string[], roots: readonly string[], re
         copyFileSync(join(root, g), join(scratch, g));
       }
       const rel = ps.map((p) => relative(root, resolve(repoRoot, p)).split(sep).join("/"));
-      // input-site: tree #b7962d6a — `git check-ignore --no-index` against copies of the instance's own `.gitignore` files: a function of the working tree
+      // input-site: tree #b7962d6a — `git check-ignore --no-index` against copies of the layer's own `.gitignore` files: a function of the working tree
       const r = spawnSync("git", ["check-ignore", "--no-index", "--stdin"], { cwd: scratch, input: rel.join("\n"), encoding: "utf-8" });
       // 0: some ignored, 1: none; anything else is "could not ask", which must not read as "none".
       if (r.status !== 0 && r.status !== 1) throw new Error(`git check-ignore failed: ${r.stderr.trim()}`);
@@ -158,24 +158,24 @@ function gitignoresUnder(root: string): string[] {
   return out;
 }
 
-/** Paths outside every instance root: never an instance's committed file. */
+/** Paths outside every layer root: never a layer's committed file. */
 export function outsideInstances(paths: readonly string[], roots: readonly string[], repoRoot = REPO_ROOT): Set<string> {
   const rs = roots.map((r) => resolve(r) + sep);
   return new Set(paths.filter((p) => !rs.some((r) => resolve(repoRoot, p).startsWith(r))));
 }
 
 /**
- * The subset that lies in a MOUNTED instance but outside everything its mount
+ * The subset that lies in a MOUNTED layer but outside everything its mount
  * carries: no locked directory, asset or declaration file covers it.
  *
- * A mount holds only what the lock names (`index.lock.json`, each instance's
+ * A mount holds only what the lock names (`index.lock.json`, each layer's
  * `directories`, `assets` and `declaration`), so a file a writer leaves
  * anywhere else in it is not in the index and no re-pin can bring a committed
  * copy of it here. Calling it a COMMITTED artefact that moved is false, and
  * the old remedy ("run the writer and commit it") cannot work: committing it
  * upstream does not mount it (folio-assistant#2781, where `check-l1-complete`
  * wrote a trust IG's `test/results/library-qa/`, a path that IG does not
- * declare). An instance the lock does not list (this checkout's own) is not a
+ * declare). A layer the lock does not list (this checkout's own) is not a
  * mount and is left to {@link ignoredBy}.
  */
 export function outsideMounts(paths: readonly string[], repoRoot = REPO_ROOT): Set<string> {
@@ -294,7 +294,7 @@ if (import.meta.main) {
   }
   const instances = readInstances(work);
   const roots = instances.map((i) => i.root);
-  // Under ANY instance's declared publish-time path or branch-stored directory
+  // Under ANY layer's declared publish-time path or branch-stored directory
   // (e.g. `test/results/` on `qa-reports`), not only this writer's: a writer may
   // also refresh another publish-time or branch-stored artefact, and that is not
   // a commit moving.

@@ -22,6 +22,7 @@
 
 import { markdownEditLink, repoOf } from "../src/core/edit-links.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
+import { orphanPages } from "./doc-orphans.ts";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "fs";
 import { join, resolve, basename, dirname, relative, isAbsolute, sep } from "path";
 
@@ -48,7 +49,7 @@ const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
  * cannot be named as one.
  *
  * Bean `oe98`. The source and edit links were composed from a prefix relative
- * to the INSTANCE root, so 240 of 244 pages linked `skills/...` (the pre-split
+ * to the LAYER root, so 240 of 244 pages linked `skills/...` (the pre-split
  * path — there is no `skills/` at the repository root) and nine linked
  * `../bootstrap/skills/...`, a parent segment no GitHub URL can carry. Both are
  * the same mistake: a link into the repository has to be relative to the
@@ -176,21 +177,7 @@ export function indexSummary(line: string, max = 100): string {
   return close === -1 ? cut : line.slice(0, close + 1);
 }
 
-/**
- * Pages sitting in the output directory that THIS RUN did not produce.
- *
- * `index.md` is the generator's own, so it is never an orphan.
- *
- * Pure and exported so the guard can be falsified without a corpus: on the real
- * tree the answer is now the empty set, and an empty set is exactly what a
- * guard that computes nothing also returns.
- */
-export function orphanPages(onDisk: readonly string[], produced: Iterable<string>): string[] {
-  const made = new Set(produced);
-  return onDisk
-    .filter((f) => f.endsWith(".md") && f !== "index.md" && !made.has(f.slice(0, -".md".length)))
-    .sort();
-}
+export { orphanPages };
 
 /**
  * A committed page no source produces is a STALE DOCUMENT, and it is the one
@@ -252,7 +239,7 @@ export function unpublishedTwins(
  * A twin entry is only true while BOTH its pages are produced.
  *
  * Bean `bsay`. `kg-navigation` named a second document that stopped publishing
- * when `pve3` ruled bootstrap's skills out of this instance, and the generator
+ * when `pve3` ruled bootstrap's skills out of this layer, and the generator
  * kept emitting a banner for it — naming a page and linking to it — because
  * the table is consulted for a name being PUBLISHED and never asked whether
  * the partner is. So the check ran on the wrong side of the relation.
@@ -420,7 +407,7 @@ const SAME_BASENAME_DIFFERENT_DOCUMENT: Record<
   //
   // It was added with `tdmg` for a real collision: bootstrap's copy and the
   // tooled one are different documents, and neither page said the other
-  // existed. Then `pve3` ruled bootstrap's skills out of this instance
+  // existed. Then `pve3` ruled bootstrap's skills out of this layer
   // entirely, and the SECOND DOCUMENT STOPPED PUBLISHING HERE while this entry
   // stayed. Nothing downstream checks that a twin's page is produced, so the
   // generator went on emitting the banner:
@@ -477,6 +464,14 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   "sdlc-core": "Software delivery practice — review, merge, CI, coordination (sdlc-core)",
   // Split out of `sdlc-core` into the opt-in `work-plan` sub-graph of cat-harness (cat-harness#991 step 23.2).
   "work-plan": "The work plan — beans, claiming, blocking, draining, the store (work-plan)",
+  // The opt-in sub-graphs of card Q-SG-1 C (2026-11-10): packages moved out of
+  // always-on ones so a layer that does not enable them mounts less.
+  "editorial-audits": "Editorial audits — voice, readability, watchers (editorial-audits)",
+  "kg-ops": "Knowledge graph operations — N-Quads, named queries, fencing (kg-ops)",
+  "platform-ui": "Platform UI — theming checks, viewers, render QC (platform-ui)",
+  dsa: "Data Sharing Agreements — DCAT records, checksums, ODRL (dsa)",
+  board: "The board — diagram interchange and windows (board)",
+  "library-extras": "Library extras — transcription, photo ingestion, catalogue search (library-extras)",
   theming: "Theming (theming)",
   // Keyed by basename: a package subdirectory of the declared `skills/`,
   // like `theming` above. Bean `6bhf`, owner 2026-09-25 — "bean as
@@ -490,13 +485,13 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   "authoring-who-smart-guidelines": "WHO SMART Guidelines (authoring-who-smart-guidelines)",
   // Packages of a health-credential library layer mounted above this one
   // (owner, 2026-11-07). Headings say what the skills are about, never which
-  // instance holds them: this layer may not name a higher one.
+  // layer holds them: this layer may not name a higher one.
   hcert: "Health certificates — encoding, signing and verifying an HCERT (hcert)",
   "hcert-library": "Health-certificate libraries — architecture, contract and conformance (hcert-library)",
   vhl: "Verifiable Health Links — sharing and receiving (vhl)",
   wallet: "Health-credential wallets — holding, handing over and scanning (wallet)",
   // Placement PR1 (bean `ybwt`): packages split out of the harness's content
-  // packages when they moved up to their owning instance, by #1702's theme.
+  // packages when they moved up to their owning layer, by #1702's theme.
   "fhir-ig-authoring": "FHIR IG authoring (fhir-ig-authoring)",
   "content-lifecycle-ext": "Content lifecycle refinements (content-lifecycle-ext)",
   "requirements-planning": "Requirements planning (requirements-planning)",
@@ -518,7 +513,7 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   "folio-assistant-core-skills": "Core layer — high-level processes (folio-assistant-core-skills)",
   "folio-assistant-sci-lean-skills": "Science layer — Lean tooling (folio-assistant-sci-lean-skills)",
   "folio-assistant-sci-data-skills": "Science layer — reference data (folio-assistant-sci-data-skills)",
-  // Stubs for skills a remote package DECLARES and this instance does not
+  // Stubs for skills a remote package DECLARES and this layer does not
   // vendor. The heading says "not implemented" in the reader's own words,
   // because the published page is where somebody meets one of these first and
   // the worst outcome is following it as guidance. `kg:audit` carries the same
@@ -580,7 +575,7 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // it out. `pve3`, 2026-09-21: the root declares BOTH halves of bootstrap or
   // NEITHER, and the answer was neither. Carrying its skills without its
   // process minted three dangling `bindsLane` links and the `v3se` collision;
-  // carrying both would undo #432's isolation and put a process this instance
+  // carrying both would undo #432's isolation and put a process this layer
   // does not own into its published graph. So bootstrap's skills publish
   // through `bootstrap.jsonld` alone, and their absence from this site is the
   // DECISION, not a gap.
@@ -592,7 +587,7 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // `expect(s.has("confirm-harness")).toBe(false)`, and `kg-export.test.ts`'s
   // `a Tool satisfying a sibling's skill links into the SIBLING's document` —
   // the `discuss` Tool's `satisfies` stopped pointing into bootstrap's document the moment this
-  // instance claimed the skill. Removing the key rather than rekeying it is
+  // layer claimed the skill. Removing the key rather than rekeying it is
   // the fix, because the key WAS the lure: `discoverGroups` throws on an id
   // with no heading and never on a heading with no id, so a stale one is
   // unfalsifiable from this file and reads as an unfinished job.
@@ -631,7 +626,7 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   "data-skills": "Science layer: reference data ({instance})",
   // `large-datasets` is a package of the harness's `library` group since bean
   // `j7ql` (2026-10-01), keyed by basename like the packages above; it was
-  // the `large-datasets-skills` root of its own instance before.
+  // the `large-datasets-skills` root of its own layer before.
   "large-datasets": "Large data sets (subsetting, materializing, publishing)",
   "who-iris-skills": "WHO IRIS (catalogue instance)",
   // The FHIR IG harness instance's two packages, keyed by BASENAME because they
@@ -645,14 +640,14 @@ const SKILLS_CATEGORIES: Record<string, string> = {
 };
 
 /**
- * A heading with the declaring instance filled in.
+ * A heading with the declaring layer filled in.
  *
- * A heading for a package another instance owns names that instance, and the
+ * A heading for a package another layer owns names that layer, and the
  * name is READ from the declaration found above the directory rather than
- * written into this table: this layer sits below the instances whose skills
+ * written into this table: this layer sits below the layers whose skills
  * it publishes, and must not spell their names. `{instance}` is the declared
  * `name`; `{instance-path}` is that name followed by the directory's path
- * inside the instance (`<name>/skills/<package>`). A heading with neither
+ * inside the layer (`<name>/skills/<package>`). A heading with neither
  * placeholder is returned as written.
  */
 export function headingFor(template: string, dir: string): string {
@@ -710,7 +705,7 @@ function holdsSkill(dir: string): boolean {
 function discoverGroups(): Group[] {
   const out: Group[] = [];
   const undeclared: string[] = [];
-  // Every DECLARED knowledge-graph directory, not `skills/` alone: an instance
+  // Every DECLARED knowledge-graph directory, not `skills/` alone: a layer
   // may put its graph anywhere, and this repository declares three —
   // `skills/`, `bootstrap/skills/` and `src/skills/` (beans `x3bd`, `osbo`).
   //
@@ -896,7 +891,7 @@ function flatPublishedNames(): Map<string, string> {
   return flat;
 }
 
-/** The instance's site root — what `../../` means from a published skill page. */
+/** The layer's site root — what `../../` means from a published skill page. */
 const SITE_ROOT = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
 
 /**
@@ -904,7 +899,7 @@ const SITE_ROOT = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
  *
  * Keyed on the ABSOLUTE PATH rather than the basename, because
  * {@link ProcessRow.file} is documented as the identity for precisely this
- * reason: basenames collide across instances, and two diagrams sharing one
+ * reason: basenames collide across layers, and two diagrams sharing one
  * would otherwise make a link land on whichever page was built last.
  */
 function processPageStems(rows: readonly ProcessRow[]): Map<string, string> {

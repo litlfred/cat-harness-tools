@@ -16,7 +16,7 @@
  *
  * The kinds are the harness's own: every kind of {@link BASE_GRAPH_TYPOLOGIES}
  * and every kind cat-harness declares in its `typologies/` graph. A kind a
- * higher instance declares is that instance's to publish. What a kind's nodes
+ * higher layer declares is that layer's to publish. What a kind's nodes
  * are checked against is what `check:kind-validators` resolves, read through the
  * same functions, so the two cannot disagree about which Zod is the kind's:
  *
@@ -33,18 +33,18 @@
  *
  * ## The same output whatever is mounted beside the harness
  *
- * - **Validator nodes.** A higher instance may answer a harness kind's family
+ * - **Validator nodes.** A higher layer may answer a harness kind's family
  *   from its own `validators/` graph. The kinds are read from a PRIVATE
  *   registry ({@link harnessRegistry}) that loads the `typologies/` and
  *   `validators/` graphs of the harness and of what it `needs`, transitively,
- *   and of no other instance ({@link harnessInstances}).
+ *   and of no other layer ({@link harnessInstances}).
  * - **Discovered enums.** `BLOCK_KINDS` is read at import from every mounted
  *   `block-kinds/` graph, an open vocabulary extended by the layers above, so
  *   a schema in a {@link DISCOVERED_VOCABULARIES} entry is written as the open
  *   type `{ "type": "string" }` ({@link body}).
  *
  * `scripts/tests/gen-kind-json-schemas.test.ts` mounts a synthetic higher
- * instance contributing both and asserts the output does not move.
+ * layer contributing both and asserts the output does not move.
  *
  * ## The `$id` is the file's path
  *
@@ -123,8 +123,8 @@ function canonicalPath(p: string): string {
 }
 
 /**
- * The instance roots this generator may read: the harness and every instance
- * it `needs`, transitively — never a layer above it. A needed instance that is
+ * The layer roots this generator may read: the harness and every layer
+ * it `needs`, transitively — never a layer above it. A needed layer that is
  * not mounted THROWS: generating without it would write a different document,
  * which is the defect this list exists to end.
  */
@@ -151,7 +151,7 @@ export function harnessInstances(harnessRoot: string = HARNESS_ROOT): string[] {
  * A registry of the harness's kinds as the harness and what it needs declare
  * them — the base layer's code list plus the `typologies/` and `validators/`
  * graphs of {@link harnessInstances} — whatever else is mounted beside it.
- * `scopes` are the checkouts scanned for them; an instance in a scope that is
+ * `scopes` are the checkouts scanned for them; a layer in a scope that is
  * not in `instances` is not read.
  */
 export function harnessRegistry(
@@ -200,7 +200,7 @@ export function body(schema: z.ZodType): Record<string, unknown> {
   return out;
 }
 
-/** Is this validator code this layer holds — not a sibling repository's, not a higher instance's? */
+/** Is this validator code this layer holds — not a sibling repository's, not a higher layer's? */
 function heldHere(ref: ValidatorRef): boolean {
   return moduleRootOf(ref, HARNESS_ROOT) === TOOLS_ROOT;
 }

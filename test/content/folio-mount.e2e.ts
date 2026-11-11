@@ -169,7 +169,7 @@ test.describe("the glass comes down on a library page", () => {
 test.describe("a path the pattern does not match", () => {
   test("requests no platform assets rather than guessing a root", async ({ page }) => {
     // Returning `null` is a real state. A client that guessed would issue two
-    // requests that 404 on every page of an instance that mis-declared its
+    // requests that 404 on every page of a layer that mis-declared its
     // route — noise that looks like a broken site rather than a wrong config.
     const asked = await serve(page, "/somewhere/else/page.html");
     expect(asked.filter((p) => p.includes("docs-ui"))).toHaveLength(0);

@@ -22,6 +22,12 @@
  * - **undeclared** — a HAND-WRITTEN command with no `user_invocable` skill of
  *   its name. Reported and never touched; its author decides.
  *
+ * A command in a MOUNTED layer whose skill lies in a directory that mount
+ * left out (a switched-off opt-in sub-graph in a whole mount's `except`, or a
+ * directory a partial mount did not choose) is neither: the skill exists
+ * upstream and is simply not on disk here. It is listed under `notMounted`,
+ * never reported as a finding and never removed.
+ *
  * A hand-written command (no `generated:` key) for a declared skill is left
  * alone — `watch`, `goal-review` and `staging-review` carry argument handling
  * a pointer cannot.
@@ -37,7 +43,7 @@ import { basename, join, relative, resolve } from "node:path";
 
 import { checkoutRootFor, findDeclarationFile, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { lockedMountPaths } from "../schemas/kg/index-config.js";
-import { mountScopeFor } from "../schemas/kg/remote-mount.js";
+import { mountChoiceOf, mountScopeFor } from "../schemas/kg/remote-mount.js";
 import { userInvocableSkills, type InvocableSkill } from "./invocable-skills.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { discoverLocalPackages } from "./skill-packages.ts";
@@ -102,11 +108,34 @@ export interface CommandReport {
   declared: number;
   findings: Finding[];
   duplicates: { name: string; paths: string[] }[];
+  /** Commands whose skill lies in a directory the layer's mount left out: not findings (see the module comment). */
+  notMounted: { name: string; file: string; skill: string }[];
+}
+
+/** The layer-relative skill path a command points at (`[…](../../<path>)`), or `undefined`. */
+export function pointerTarget(text: string): string | undefined {
+  const m = /\]\(\.\.\/\.\.\/([^)\s]+)\)/.exec(text);
+  return m?.[1];
 }
 
 /**
- * True when `targetRoot` is a mounted instance placed by a mount lock (bean `bx4c`).
- * A mounted instance is a read-only copy of a pinned commit; index surface
+ * The skill path a command points at, when `repo` is a mounted layer and
+ * that path lies in a directory its mount did not bring (an opt-in sub-graph
+ * in `except`, or an unchosen directory); else `undefined`. The lock decides:
+ * no lock, or a skill that is on disk, is no answer, and the command is
+ * judged as usual.
+ */
+export function skillLeftOutByMount(repo: string, text: string): string | undefined {
+  const target = pointerTarget(text);
+  if (target === undefined) return undefined;
+  const abs = resolve(repo, target);
+  if (existsSync(abs) || !abs.startsWith(`${resolve(repo)}/`)) return undefined;
+  return mountChoiceOf(repo, abs)?.chosen === false ? target : undefined;
+}
+
+/**
+ * True when `targetRoot` is a mounted layer placed by a mount lock (bean `bx4c`).
+ * A mounted layer is a read-only copy of a pinned commit; index surface
  * regeneration must never write inside it.
  */
 export function isMountedInstance(targetRoot: string, baseRoot?: string): boolean {
@@ -120,7 +149,7 @@ export function isMountedInstance(targetRoot: string, baseRoot?: string): boolea
 }
 
 /**
- * Skill packages for `repo`: an instance root gets only the skills it owns
+ * Skill packages for `repo`: a layer root gets only the skills it owns
  * (`"instance"`, bean `t5zb`), while an index root gets the checkout overlay.
  */
 export function packagesFor(repo: string = REPO_ROOT): Record<string, string> {
@@ -139,6 +168,7 @@ export function reconcile(repo: string = REPO_ROOT, packages: Record<string, str
   const present = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".md")) : [];
   const declared = new Map(skills.map((s) => [s.name, s]));
   const findings: Finding[] = [];
+  const notMounted: CommandReport["notMounted"] = [];
   for (const s of skills) {
     const file = join(COMMANDS_DIR, `${s.name}.md`);
     const abs = join(repo, file);
@@ -153,12 +183,17 @@ export function reconcile(repo: string = REPO_ROOT, packages: Record<string, str
     if (declared.has(name)) continue;
     const file = join(COMMANDS_DIR, f);
     const text = readFileSync(join(repo, file), "utf8");
+    const leftOut = skillLeftOutByMount(repo, text);
+    if (leftOut !== undefined) {
+      notMounted.push({ name, file, skill: leftOut });
+      continue;
+    }
     findings.push({ kind: isGenerated(text) ? "orphaned" : "undeclared", name, file });
   }
-  return { declared: skills.length, findings, duplicates };
+  return { declared: skills.length, findings, duplicates, notMounted };
 }
 
-/** Write what is missing or stale and remove this generator's orphans. Returns the files changed. Never writes inside a mounted instance (bean `bx4c`). */
+/** Write what is missing or stale and remove this generator's orphans. Returns the files changed. Never writes inside a mounted layer (bean `bx4c`). */
 export function write(repo: string = REPO_ROOT, packages: Record<string, string> = packagesFor(repo)): string[] {
   if (isMountedInstance(repo)) return [];
   const { skills } = userInvocableSkills(packages);
@@ -250,6 +285,11 @@ export function runSkillCommands(
       const msg = `✗ ${prefix}${f.file}: ${why}`;
       lines.push(msg);
       if (mounted) mountedFindings.push(msg);
+    }
+    if (r.notMounted.length > 0) {
+      lines.push(
+        `· ${prefix}${r.notMounted.length} command(s) point at skills in directories this mount leaves out (${[...new Set(r.notMounted.map((n) => n.skill.split("/")[0]))].join(", ")}) — not checked, not removed`,
+      );
     }
     const bad = r.findings.length + r.duplicates.length;
     totalBad += bad;

@@ -3,21 +3,21 @@
  * implementations, each a node in a graph of its own.
  *
  * One graph per contribution type, and a folio sees the nodes of the
- * instances it depends on. `loadContributions` registers them through the
+ * layers it depends on. `loadContributions` registers them through the
  * same `orderedDependencies` walk it finds `contributes` modules by.
  *
  * ## What a node names, and what it does not
  *
  * The DATA is the node: which criterion a checker answers, which slot a plugin
  * fills. The CODE is referenced as `path#Export`, relative to the CONTRIBUTING
- * instance's root, and the export is a TABLE keyed by the node's `criterion`
+ * layer's root, and the export is a TABLE keyed by the node's `criterion`
  * or `slot`, so `tsc` checks every entry against the contract it fills
  * (`PipelinePlugins`, the checker signature). The node says the entry exists,
  * discoverable without loading code.
  *
  * A contribution's code is its OWN: an `instance:` prefix is refused. A slot
  * whose implementation lives in a lower layer is wrapped by a module in the
- * contributing instance, as the science layer's `plugin-slots.ts` does.
+ * contributing layer, as the science layer's `plugin-slots.ts` does.
  *
  * A LEAF: Zod only.
  *

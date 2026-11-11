@@ -1,5 +1,5 @@
 /**
- * The site root is composed from the instance stub, in ONE place.
+ * The site root is composed from the layer stub, in ONE place.
  *
  * Bean `x4a6`. Before the move, `docs/` was spelled out separately in
  * `translation-index.ts`, `gen-docs-pages.ts`, `gen-skill-docs.ts`,
@@ -132,8 +132,8 @@ function stripComments(text: string): string {
 describe("the site root is one answer, not a literal", () => {
   test("siteDir composes docs/<stub> and siteDirFor reads this instance's", () => {
     expect(siteDir({ name: "x", stub: "y" })).toBe("docs");
-    // No longer varies with the stub: the instance root IS the stub directory,
-    // so the site dir within it is the same string for every instance.
+    // No longer varies with the stub: the layer root IS the stub directory,
+    // so the site dir within it is the same string for every layer.
     expect(siteDir({ name: "x" })).toBe("docs");
     expect(siteDirFor(ROOT)).toBe("docs");
   });

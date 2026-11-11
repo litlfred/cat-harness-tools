@@ -3,7 +3,7 @@
  *
  * @module scripts/tests/state-visualizer
  *
- * The generator writes COMMITTED pages under this instance's site dir, so
+ * The generator writes COMMITTED pages under this layer's site dir, so
  * `state:visualizer:check` is the staleness gate and this file is the
  * behaviour gate. It reads what the generator produced rather than re-deriving
  * it the same way, and it must never assert a COUNT of beans or epics — those
@@ -44,6 +44,7 @@ import {
   memorySubjectPage,
   drawsInstanceHub,
   perInstanceSubjects,
+  hostedVisualisers,
   MERGE_REVIEWS_KIND,
   mergeReviewsPage,
   mergeReviewsSection,
@@ -113,10 +114,10 @@ describe("the route is the policy, not this generator's choice", () => {
   });
 
   test("no stub segment, and no invented one", () => {
-    // Bean `o7eq` ruling 1: the segment is the instance's NAME, never its
+    // Bean `o7eq` ruling 1: the segment is the layer's NAME, never its
     // stub. Two earlier drafts published under `folio-assistant`, which names
-    // the published graph DOCUMENT and not the instance. Ruling 3 then elides
-    // this instance's own name, because its docs are the published root.
+    // the published graph DOCUMENT and not the layer. Ruling 3 then elides
+    // this layer's own name, because its docs are the published root.
     expect(existsSync(join(SITE, "folio-assistant"))).toBe(false);
     expect(existsSync(join(SITE, "state"))).toBe(false);
     expect(existsSync(join(SITE, "state-visualizer"))).toBe(false);
@@ -420,7 +421,7 @@ describe("declaredVisualiserFor — the four outcomes, against fixtures", () => 
   test("resolution is against the REPO root, not the instance root", () => {
     // The trap that would have marked all 27 missing. Measured 2026-09-20: 25
     // of 27 coverage paths resolve ONLY from the repo root, 0 only from the
-    // instance. The same page, spelled both ways: the repo-root spelling must
+    // layer. The same page, spelled both ways: the repo-root spelling must
     // resolve and the instance-relative one must not, or the assertion above
     // is not discriminating.
     const rel = page("lib", "x", "index.html");
@@ -1198,6 +1199,19 @@ describe("per-instance registry pages (bean folio-assistant-k7ro)", () => {
     expect(html).not.toContain("Nodes —");
   });
 
+  test("a QA page whose layer keeps its results on a branch loads them in the browser", () => {
+    const [s] = instanceSubjectsOf(
+      [{ id: "qa", path: "test/results/", absPath: "/x/a/test/results", declaredBy: "a", graphTypologies: ["qa"], storage: { branch: "cat/cat-harness/qa-reports", keyedBy: "commit" } }],
+      ["qa"],
+    );
+    expect(s!.storage).toBe("cat/cat-harness/qa-reports");
+    const live = { repository: "o/a", ref: "a".repeat(40), branch: "cat/cat-harness/qa-reports", root: "a/test/results" };
+    const html = instanceSubjectPage({ id: "qa", coversKinds: ["qa"] }, s!, [s!], { $schema: "folio-qa-graph/v1", availability: "unknown", reason: "x" } as never, live);
+    expect(html).toContain('class="sv-qa-live"');
+    expect(html).toContain("render_with_liquid: false");
+    expect(html).not.toContain("Not available in this build");
+  });
+
   test("the hub lists every instance page", () => {
     const html = instanceHubPage({ id: "validators", title: "Validators" }, [
       { name: "a", path: "validators/", absPath: "/x/a/validators", instanceRoot: "/x/a" },
@@ -1616,3 +1630,51 @@ describe("the workflow view: per-instance pages and the store's stuck column (be
     }
   });
 });
+
+/**
+ * cat-harness#1150, item 3 (owner card Q-CGI-1 A, 2026-11-09): a layer above
+ * the harness declares the page for a kind only it registers, and this Tool
+ * draws it on the host site under that layer's name. Before, cat-harness
+ * declared the Editor checkers page itself, naming a kind only
+ * folio-assistant-sci registers.
+ */
+describe("hostedVisualisers: another layer's state-viewer page, built on the host site", () => {
+  test("picks only another layer's builtOnHostSite, per-instance, state-viewer visualisers", async () => {
+    const { clearDeclaredVisualisers } = await import("../viewer-declarations.ts");
+    const repo = mkdtempSync(join(tmpdir(), "hosted-vis-"));
+    const files: Record<string, unknown> = {
+      "base/cat-harness.json": {
+        name: "cat-harness",
+        directories: [],
+        visualisers: [{ id: "validators", renderedBy: "state-viewer", coversKinds: ["validators"], subgraphs: "instance" }],
+      },
+      "top/top.json": {
+        name: "top",
+        needs: ["cat-harness"],
+        directories: [{ id: "top-editor-checkers", path: "editor-checkers/", graphTypologies: ["editor-checkers"] }],
+        visualisers: [
+          { id: "editor-checkers", renderedBy: "state-viewer", coversKinds: ["editor-checkers"], subgraphs: "instance", builtOnHostSite: {} },
+          { id: "not-hosted", renderedBy: "state-viewer", coversKinds: ["editor-checkers"], subgraphs: "instance" },
+          { id: "other-tool", renderedBy: "glossary-page", coversKinds: ["glossary"], subgraphs: "instance", builtOnHostSite: {} },
+          { id: "a-dashboard", renderedBy: "state-viewer", covers: ["top-editor-checkers"], builtOnHostSite: {} },
+        ],
+      },
+    };
+    for (const [f, body] of Object.entries(files)) {
+      mkdirSync(join(repo, dirname(f)), { recursive: true });
+      writeFileSync(join(repo, f), JSON.stringify(body));
+    }
+    mkdirSync(join(repo, "top/editor-checkers"), { recursive: true });
+    clearDeclaredVisualisers();
+    try {
+      const got = hostedVisualisers(repo, "cat-harness").map((v) => `${v.harness}/${v.id}`);
+      expect(got).toEqual(["top/editor-checkers"]);
+      // The harness's own visualisers are never "hosted": it draws them as before.
+      expect(hostedVisualisers(repo, "top").map((v) => `${v.harness}/${v.id}`)).toEqual([]);
+    } finally {
+      clearDeclaredVisualisers();
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+

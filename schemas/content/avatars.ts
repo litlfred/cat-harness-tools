@@ -36,7 +36,7 @@ import { findDeclarationFile, instanceRootsIn } from "../kg/instance-roots";
 
 export { BLANK_AVATAR };
 
-/** The platform checkout this module sits in — where instances are scanned from. */
+/** The platform checkout this module sits in — where layers are scanned from. */
 const PLATFORM_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
@@ -64,15 +64,15 @@ export const AVATARS: Readonly<Record<string, Avatar>> = {
   //
   // THIS TABLE SERVES TWO KEY SPACES, and the entries below are the second
   // one. `kind-fan` and `gen-avatars-css` key by GRAPH TYPOLOGY; `harness-tiles`
-  // calls `avatarFor(decl.name)` — an INSTANCE's declared name. Most entries
-  // are kinds; these three are instances, which is why `check-avatar-coverage`
+  // calls `avatarFor(decl.name)` — a LAYER's declared name. Most entries
+  // are kinds; these three are layers, which is why `check-avatar-coverage`
   // reports them as "an avatar for a kind this instance does not declare" and
   // will go on doing so. That finding is correct about the kind axis and says
   // nothing about the instance axis, which nothing currently checks. Bean
-  // `4kj4` is where instance coverage belongs; it is not this table's to
+  // `4kj4` is where layer coverage belongs; it is not this table's to
   // assert.
   //
-  // THE COMMENT HERE WAS STALE AND COST THE INSTANCE ITS FACE. It read: *"the
+  // THE COMMENT HERE WAS STALE AND COST THE LAYER ITS FACE. It read: *"the
   // split (#223) has not happened, so `bootstrap` and `folio-assist-core`
   // exist as layers in the namespace and as nothing in `harness.json`"*. Both
   // halves were false by 2026-09-21 — `bootstrap/harness.json` and
@@ -218,6 +218,14 @@ export const AVATARS: Readonly<Record<string, Avatar>> = {
     glyph: "M11 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16M3 12h16M11 4q-4 8 0 16M11 4q4 8 0 16M19 4l2 2-2 2M21 6h-4",
     tone: 184,
     reads: "a globe with an arrow at its rim: served by path, and redirected and re-headed on the way",
+  },
+  // An app a layer carries (web-app kind, owner 2026-11-11, Q-GAME-5): a
+  // window of its own with a play mark, since it draws its own frame and
+  // runs rather than reads.
+  "web-app": {
+    glyph: "M3 5h18v14H3zM3 9h18M10 12v5l4.5-2.5z",
+    tone: 262,
+    reads: "a window of its own with a play mark: an app that draws its own frame and runs when opened",
   },
   "merge-queue": {
     glyph: "M5 7h5M5 12h5M5 17h5M10 7q4 0 4 5M10 17q4 0 4-5M10 12h9",
@@ -692,7 +700,7 @@ export function blankAvatar(tone: number = 0): Avatar {
 }
 
 /**
- * The avatar for a kind or an instance, falling back to a themed blank when
+ * The avatar for a kind or a layer, falling back to a themed blank when
  * none is declared.
  */
 export function avatarOrBlank(kind: string, themeTone: number = 0): Avatar {
@@ -708,8 +716,8 @@ function declaredAvatar(kind: string): Avatar | undefined {
 }
 
 /**
- * An INSTANCE that declares its own mark (bean sod4 #4): the `avatar` field of
- * its `<instance>.json`. Eleven instances' marks sat in AVATARS until
+ * A LAYER that declares its own mark (bean sod4 #4): the `avatar` field of
+ * its `<instance>.json`. Eleven layers' marks sat in AVATARS until
  * 2026-10-05; only the two submodules, `bootstrap` and `bootstrap-tools`,
  * remain there, because their declarations live in other repositories and a
  * mark for a layer BELOW this one is a reference in the allowed direction.
@@ -735,19 +743,19 @@ function instanceAvatars(): Map<string, Avatar> {
   return out;
 }
 
-/** Has this kind, or this instance, got an avatar of its own? */
+/** Has this kind, or this layer, got an avatar of its own? */
 export function hasAvatar(kind: string): boolean {
   return Object.prototype.hasOwnProperty.call(AVATARS, kind) || declaredAvatar(kind) !== undefined || instanceAvatars().has(kind);
 }
 
-/** The avatar for a kind or an instance, falling back to {@link GENERIC}. */
+/** The avatar for a kind or a layer, falling back to {@link GENERIC}. */
 export function avatarFor(kind: string): Avatar {
   return AVATARS[kind] ?? declaredAvatar(kind) ?? instanceAvatars().get(kind) ?? GENERIC;
 }
 
 /**
  * Every key that has one: this table's, in declaration order, then the
- * declared kinds', then the declared instances'.
+ * declared kinds', then the declared layers'.
  */
 export function avatarKinds(): string[] {
   const listed = Object.keys(AVATARS);
@@ -756,7 +764,7 @@ export function avatarKinds(): string[] {
   return [...listed, ...kinds, ...insts];
 }
 
-/** Every avatar, keyed as {@link avatarKinds} orders them — the table, then declared kinds and instances. */
+/** Every avatar, keyed as {@link avatarKinds} orders them — the table, then declared kinds and layers. */
 export function allAvatars(): [string, Avatar][] {
   return avatarKinds().map((k) => [k, avatarFor(k)]);
 }

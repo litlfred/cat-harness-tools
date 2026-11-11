@@ -96,7 +96,7 @@ describe("an empty population — falsified by breaking", () => {
   });
 
   test("it says an empty population may be legitimate, and how to record that", () => {
-    // Otherwise the only way past a legitimate empty instance is to delete the
+    // Otherwise the only way past a legitimate empty layer is to delete the
     // guard, which is how a check becomes decoration.
     expect(msg).toContain("record");
     expect(msg).toContain("check-bean-front-matter");

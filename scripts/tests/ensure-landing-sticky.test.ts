@@ -264,7 +264,7 @@ describe("a malformed sticky is repaired, not fatal", () => {
   });
 
   test("an instance with no description falls back to its name", () => {
-    // A landing page with no words is worse than one naming the instance, and
+    // A landing page with no words is worse than one naming the layer, and
     // `summary` is `min(1)` so an empty description would refuse the node.
     const root = instance(DECL.replace(/  "description": "[^"]*",\n/, ""));
     const path = declarationPathIn(root)!;
@@ -282,7 +282,7 @@ describe("a malformed sticky is repaired, not fatal", () => {
   }
 
   test("a declaration that already declares a folio elsewhere is respected", () => {
-    // Matched on the GRAPH TYPOLOGY, not on id or path: an instance may keep its
+    // Matched on the GRAPH TYPOLOGY, not on id or path: a layer may keep its
     // folio anywhere and call the entry what it likes.
     const root = instance(withFolioAt("authored/", "graphTypologies"));
     mkdirSync(join(root, "authored"), { recursive: true });
@@ -307,7 +307,7 @@ describe("a malformed sticky is repaired, not fatal", () => {
 });
 
 describe("a nested instance contributes its own stickies", () => {
-  /** An instance declaring a directory that is itself an instance — bootstrap's shape. */
+  /** A layer declaring a directory that is itself a layer — bootstrap's shape. */
   function nested(): string {
     const root = mkdtempSync(join(tmpdir(), "landing-nested-"));
     writeDeclaration(root, JSON.stringify(
@@ -318,7 +318,7 @@ describe("a nested instance contributes its own stickies", () => {
             { id: "landing", order: 10, theme: { themeId: "engineer" }, bodyFrom: "description" },
           ],
           // Mirrors the live shape rather than a convenient one: the declared
-          // entry is the nested instance's GRAPH directory, one level inside it,
+          // entry is the nested layer's GRAPH directory, one level inside it,
           // so `harness.json` is not in the directory named here. That is what
           // `bootstrap/skills/` looks like, and a composer that looked for a
           // declaration inside the declared directory would find nothing.
@@ -347,7 +347,7 @@ describe("a nested instance contributes its own stickies", () => {
   test("the nested instance is DISCOVERED, not named by the outer one", () => {
     // Hardcoding `bootstrap/` in the composer would put the layer list back in
     // the layer above — the ownership inversion this change undoes — and would go
-    // stale the moment the split happens. What marks an instance is that it
+    // stale the moment the split happens. What marks a layer is that it
     // declares itself.
     const root = nested();
     expect(contributingRoots(root)).toEqual([join(root, "inner"), root]);
@@ -355,7 +355,7 @@ describe("a nested instance contributes its own stickies", () => {
 
   test("a declared directory of the instance ITSELF is not a second contributor", () => {
     // `findInstanceRoot` walks up, so a plain subdirectory resolves to the
-    // instance that declared it — which must not be read twice, or its own
+    // layer that declared it — which must not be read twice, or its own
     // stickies would collide with themselves.
     const root = mkdtempSync(join(tmpdir(), "landing-plain-"));
     writeDeclaration(root, JSON.stringify(
@@ -408,7 +408,7 @@ describe("a nested instance contributes its own stickies", () => {
     );
     expect(inner.contributedBy).toBe("inner");
 
-    // readLandingStickies reads from each instance's folio
+    // readLandingStickies reads from each layer's folio
     expect(readLandingStickies(root).map((s) => s.id)).toEqual(["landing", "inner-card"]);
   });
 

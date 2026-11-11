@@ -34,7 +34,7 @@ function write(root: string, files: Record<string, string | object>): void {
   }
 }
 
-/** An instance `h` that has BUILT its subgraph files, as `subgraph:jsonld` leaves them. */
+/** A layer `h` that has BUILT its subgraph files, as `subgraph:jsonld` leaves them. */
 function builtInstance(extra: Record<string, string | object> = {}): string {
   const root = join(base, `inst-${++n}`);
   write(root, {

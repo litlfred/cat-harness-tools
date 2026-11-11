@@ -5,7 +5,7 @@
  * @module scripts/check-declared-assets
  * @covers cat-harness
  *
- * This checks **whatever an instance declares** as an asset (such as its
+ * This checks **whatever a layer declares** as an asset (such as its
  * `AGENTS.md`), not one special-cased file: a file nobody declares is a file
  * no checker looks at. A newly declared markdown asset is covered with no
  * change here. (`readme:audit` verifies `README.md` alone, and
@@ -14,10 +14,10 @@
  * ## Three states
  *
  * - **missing** — declared and not on disk. A finding: somebody asserted this
- *   file is ours (unlike a conventional directory an instance may not use).
+ *   file is ours (unlike a conventional directory a layer may not use).
  * - **dead link** — a relative target that does not resolve.
  * - **not checked** — a non-markdown asset, a link this cannot resolve
- *   offline (`http(s)`, `mailto`), or a link into one of the instance's own
+ *   offline (`http(s)`, `mailto`), or a link into one of the layer's own
  *   declared directories that is not on disk in this checkout. Reported as
  *   such and never counted clean.
  *
@@ -36,12 +36,12 @@ import { declaredAssets, instanceDirectories, instanceRootsIn } from "../schemas
 import { movesResolver } from "./check-agent-entry-links.ts";
 
 /**
- * Instances whose declarations this repository owns — **discovered, not
+ * Layers whose declarations this repository owns — **discovered, not
  * listed**, via {@link instanceRootsIn}.
  *
  * This was a literal `["cat-harness", "bootstrap"]`, and the docstring on it
  * recorded the list being wrong ONCE already: the first entry was `"."`, which
- * named the instance while the instance was the repository, and after the move
+ * named the layer while the layer was the repository, and after the move
  * (bean `wggr`) it named a root carrying no `harness.json`, so `declaredAssets`
  * returned `[]` and this gate reported *"1 declared asset across 2 instances,
  * 0 findings"* over a file it had never opened.
@@ -52,9 +52,9 @@ import { movesResolver } from "./check-agent-entry-links.ts";
  * (bean `6tkl`).
  *
  * **How far it had drifted, measured 2026-09-20 while adding the sixth
- * instance** (the formal-math layer, bean `frs5`): the list still said two while
+ * layer** (the formal-math layer, bean `frs5`): the list still said two while
  * `folio-assist-core`, the IRIS replica, `detangle`, `kg-navigation` and
- * `large-datasets` had all arrived. Five instances the gate had never opened,
+ * `large-datasets` had all arrived. Five layers the gate had never opened,
  * reported in the same words as a clean run — and the README declared by
  * the formal-math layer's brand-new `harness.json` would have been the sixth.
  * Widening it immediately found a dead link the list had been hiding.
@@ -158,7 +158,7 @@ if (import.meta.main) {
   }
   console.log(
     // NAMED, not just counted. This gate twice reported a clean run over
-    // instances it had never opened, and a bare count is exactly what made
+    // layers it had never opened, and a bare count is exactly what made
     // that readable as success — "2 instances" looks fine until you know there
     // were seven. The names are what a reader checks against the repository.
     `${declared} declared asset(s) across ${instances.length} instance(s) ` +

@@ -194,7 +194,7 @@ describe("resolveInstanceGraph", () => {
 });
 
 /**
- * Bean a1lq. No instance in this repository needs two others, so the corpus
+ * Bean a1lq. No layer in this repository needs two others, so the corpus
  * has no diamond to test against; each case here builds its own.
  */
 describe("multiple inheritance of instances (bean a1lq)", () => {
@@ -265,7 +265,7 @@ describe("resolveTranslationDirs", () => {
 });
 
 /**
- * A downstream instance INHERITS the ingestion directories, and gets them made.
+ * A downstream layer INHERITS the ingestion directories, and gets them made.
  *
  * The owner, 2026-09-20: *"please add back uploads/ folder … library/ should
  * also be added in at initation."*
@@ -273,11 +273,11 @@ describe("resolveTranslationDirs", () => {
  * **"Add back" turned out not to mean restore.** Both directories are present,
  * declared and populated in this checkout — `uploads/` with the raw queue,
  * `library/` with 1455 tracked files — so the ask is about what a *newly
- * initiated* instance gets, not about this one. Measured before anything was
+ * initiated* layer gets, not about this one. Measured before anything was
  * written, so that nobody goes looking for a deletion to revert or "restores" a
  * directory over one that already has contents.
  *
- * And a newly initiated instance **already gets both**: they are declared
+ * And a newly initiated layer **already gets both**: they are declared
  * instance-scoped in `cat-harness/harness.json`, so `resolveDirectories` hands
  * them to every dependent and `materialiseDeclaredDirectories` — which
  * `init-folio` calls — creates them in the dependent's own root.
@@ -312,7 +312,7 @@ describe("a dependent instance inherits the ingestion directories", () => {
 
   beforeAll(() => {
     mkdirSync(DOWN, { recursive: true });
-    // The downstream folio is an INSTANCE — it declares itself, and its config
+    // The downstream folio is a LAYER — it declares itself, and its config
     // is named after that declaration. A bare `harness.config.json` here would
     // be a file `resolveHarnessConfigPath` no longer looks for.
     writeInstanceConfig(
@@ -327,7 +327,7 @@ describe("a dependent instance inherits the ingestion directories", () => {
   });
 
   it("materialises the ingestion directories it passes down in the DEPENDENT's own root", () => {
-    // An instance inherits the CONVENTION — an id and a relative path — not a
+    // A layer inherits the CONVENTION — an id and a relative path — not a
     // licence to write into the dependency's checkout. `absPath` pointing back
     // into cat-harness/ would be the equivalent of creating folders inside
     // node_modules.
@@ -344,7 +344,7 @@ describe("a dependent instance inherits the ingestion directories", () => {
 
   it("they are inherited, not defaults — the declaring instance is named", () => {
     // `DEFAULT_DIRECTORIES` entries report `(default)`. If these ever came
-    // through that path instead, an instance declaring nothing would still get
+    // through that path instead, a layer declaring nothing would still get
     // them and the declaration would have stopped being what decides.
     const made = materialiseDeclaredDirectories(DOWN, { dryRun: true });
     for (const id of FROM_HARNESS) {
@@ -378,7 +378,7 @@ describe("a dependent instance inherits the ingestion directories", () => {
 });
 
 /**
- * A dependent instance materialises its own `docs/` — bean `n0nf`, issue #638.
+ * A dependent layer materialises its own `docs/` — bean `n0nf`, issue #638.
  *
  * ## Why this is a test and not a line in the declaration
  *
@@ -423,7 +423,7 @@ describe("a dependent instance materialises its own docs/", () => {
     const made = materialiseDeclaredDirectories(DOWN, { dryRun: true });
     const docs = made.find((d) => d.id === "docs");
     expect(docs, `no "docs" among ${made.map((d) => d.id).join(", ")}`).toBeDefined();
-    // Its OWN root — an instance inherits the CONVENTION, not a licence to
+    // Its OWN root — a layer inherits the CONVENTION, not a licence to
     // write into the dependency's checkout.
     expect(docs!.absPath.startsWith(DOWN)).toBe(true);
     expect(docs!.declaredBy).toBe("cat-harness");

@@ -15,7 +15,7 @@
  *
  * | entry | scope | resolves to | role |
  * |---|---|---|---|
- * | `docs` | instance (absent) | `cat-harness/docs/` | the BASE |
+ * | `docs` | layer (absent) | `cat-harness/docs/` | the BASE |
  * | `root-docs` | `repository` | `<repo>/docs/` | the OVERLAY |
  *
  * Base first, overlay last, so an overlay file SHADOWS the base file at the
@@ -70,7 +70,7 @@ export interface DocsLayer {
   readonly id: string;
   /** Absolute path to the directory. */
   readonly dir: string;
-  /** Whether it resolved against the repository root rather than the instance. */
+  /** Whether it resolved against the repository root rather than the layer. */
   readonly repositoryScoped: boolean;
 }
 
@@ -111,12 +111,12 @@ interface DeclEntry {
  * path is the `dh4f` defect — a consumer that scans nothing and reports clean.
  */
 export function baseDocsDir(repo = REPO): string {
-  // The layer a generator writes PAGES into is the instance's own site
+  // The layer a generator writes PAGES into is the layer's own site
   // directory (`siteDirFor`), not merely the first instance-scoped layer: since
   // slice 1 of the semantic subgraphs (owner, 2026-10-09) cat-harness declares
   // its just-the-docs CHROME, `site-chrome/`, as a `docs` layer BEFORE `docs/`,
   // so "the first" is the chrome, and a page written there would be a page in
-  // the theme. Falls back to the first instance-scoped layer for an instance
+  // the theme. Falls back to the first instance-scoped layer for a layer
   // whose site directory is not one of its declared layers.
   const harness = join(repo, "cat-harness");
   const instanceLayers = docsLayers(repo).layers.filter((l) => !l.repositoryScoped);
@@ -147,7 +147,7 @@ export function chromeLayers(repo = REPO): DocsLayer[] {
 }
 
 /**
- * The directories an instance declares it BUILDS AT PUBLISH (`builtAtPublish`,
+ * The directories a layer declares it BUILDS AT PUBLISH (`builtAtPublish`,
  * cat-harness `schemas/kg/built-at-publish.ts`; owner, 2026-10-14, "B1"), as
  * absolute paths ending in the separator. Read as `check-declared-dirs.ts`
  * `builtAtPublishDirs` reads them.
@@ -162,7 +162,7 @@ function builtAtPublishIn(instanceRoot: string): Set<string> {
 /**
  * The declared docs layers, split three ways: on disk (`layers`); absent
  * (`missing`, a finding: the `dh4f` shape); and absent but declared BUILT AT
- * PUBLISH by the instance that declares them (`pending`). A `pending` layer is
+ * PUBLISH by the layer that declares them (`pending`). A `pending` layer is
  * correctly absent from a checkout whose build has not run the step that
  * writes it. That is `derive:publish`'s question, which refuses an entry that
  * came out empty. It is said and left out, never refused: an IG's own site
@@ -193,7 +193,7 @@ export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLay
     const root = repositoryScoped ? repo : join(repo, "cat-harness");
     found.push({ id: e.id, dir: join(root, e.path), repositoryScoped });
   }
-  // The REPOSITORY overlay is the checkout root instance's `docs` entry since
+  // The REPOSITORY overlay is the checkout root layer's `docs` entry since
   // placement PR0 (bean `ejye`): the root declares the directories at its own
   // root, so the platform no longer reaches up for `root-docs` with
   // `scope: "repository"`. Same layer, same order — the overlay goes last.
@@ -218,15 +218,15 @@ export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLay
   };
 }
 
-/** One instance directory composed into the Jekyll source under its own name. */
+/** One layer directory composed into the Jekyll source under its own name. */
 export interface ComposedInstance {
   instance: string;
   /** Absolute source directory. */
   dir: string;
-  /** Where it lands, relative to the composed tree — the instance's name. */
+  /** Where it lands, relative to the composed tree — the layer's name. */
   under: string;
   /**
-   * The instance's own directory, repo-relative and without a trailing slash.
+   * The layer's own directory, repo-relative and without a trailing slash.
    *
    * NOT the same string as `under`, and the difference is the whole reason
    * this field exists: `under` is the declaration's `name`, which is what a
@@ -238,7 +238,7 @@ export interface ComposedInstance {
    */
   root: string;
   /**
-   * True when the instance also declares an `igSite` directory: its own IG
+   * True when the layer also declares an `igSite` directory: its own IG
    * site is built at `/<instance>/` (`stage-ig-sites.ts`, bean `mftp`) and
    * answers `/<instance>/index.html`, so no stub may be written there.
    */
@@ -246,7 +246,7 @@ export interface ComposedInstance {
 }
 
 /**
- * Every OTHER instance's directory that asks to be composed rather than mounted.
+ * Every OTHER layer's directory that asks to be composed rather than mounted.
  *
  * This is the owner's *"harness can have docs/ which then get listed under
  * `cat-harness/docs/<harness>`"* — the clause neither consumer implemented.
@@ -254,7 +254,7 @@ export interface ComposedInstance {
  * is a different thing and is what leaves those pages with no layout at all.
  *
  * **Opt-in, read off `composed` on the directory.** A composed default would
- * silently restyle the IRIS replica instance, which is a replica of somebody else's site and
+ * silently restyle the IRIS replica layer, which is a replica of somebody else's site and
  * must not wear just-the-docs' chrome — the same reason `mount-instance-docs`
  * gives where it declines to run Jekyll over these.
  *
@@ -293,10 +293,10 @@ export function composedInstances(repo = REPO): ComposedInstance[] {
       out.push({ instance: d.name ?? e.name, dir: abs, under: d.name ?? e.name, root: e.name, ...(igSite ? { igSite } : {}) });
     }
   }
-  // A SUBSCRIBED instance's composed directories, from the tree this checkout
+  // A SUBSCRIBED layer's composed directories, from the tree this checkout
   // holds (bean `g8jp`). Only `held` ones: a chosen directory that is not held
   // is `mount-instance-docs`' finding, which fails the build, and reporting it
-  // here too would be a second voice on it. A subscribed instance also staged
+  // here too would be a second voice on it. A subscribed layer also staged
   // in the tree is composed from the staged copy alone.
   for (const t of subscribedTrees(subscribers)) {
     if (t.state !== "held" || !t.instance || !t.tree || t.entry?.["composed"] !== true || staged.has(t.instance)) continue;
@@ -305,7 +305,7 @@ export function composedInstances(repo = REPO): ComposedInstance[] {
   return out.sort((a, b) => a.under.localeCompare(b.under));
 }
 
-/** What `carriedInstances` decided about one composed instance. */
+/** What `carriedInstances` decided about one composed layer. */
 export interface CarryDecision {
   readonly instance: ComposedInstance;
   /** True to compose its files; false to leave a stub in their place. */
@@ -315,7 +315,7 @@ export interface CarryDecision {
 }
 
 /**
- * Which composed instances a preview must carry, given the branch's own diff.
+ * Which composed layers a preview must carry, given the branch's own diff.
  *
  * Bean `ga8a`, following `tebu` one directory over. A DAK IG's `docs/` is
  * **3.2 MB of markdown** in the checkout and **111.6 MB of HTML** in a
@@ -323,19 +323,19 @@ export interface CarryDecision {
  * whole navigation into every page. Measured across `origin/gh-pages` on
  * 2026-09-23: **776.6 MB over 13 previews, 37 % of a 2.10 GB `branches/`
  * tree**, against a 1 GB Pages limit the main site shares. Every preview
- * carried it, whether or not its branch mentioned the instance.
+ * carried it, whether or not its branch mentioned the layer.
  *
  * It does not deduplicate either. That IG's tree hash is DISTINCT in
  * all 13 previews, because the staging banner injects the slug into every
  * page — so unlike the dedup argument `tebu` rightly rejected for a
  * published-size threshold, this weighs on both budgets.
  *
- * ## The predicate is the INSTANCE, not its composed directory
+ * ## The predicate is the LAYER, not its composed directory
  *
  * That IG's `docs/` is generated from its `fhir-artifact-index/` by its own
  * `scripts/`, so a branch that changes the generator and
  * regenerates in the same commit must still get the rebuilt pages. Matching
- * the instance root is the superset that covers all three, and a superset is
+ * the layer root is the superset that covers all three, and a superset is
  * the right direction here for the reason below.
  *
  * ## ANY DOUBT CARRIES EVERYTHING
@@ -348,7 +348,7 @@ export interface CarryDecision {
  * evidence is this family's whole history of bugs (`dh4f`).
  *
  * An EMPTY list is not the same as no list and is not treated as one: a pull
- * request that genuinely changes nothing touches no instance, and saying so is
+ * request that genuinely changes nothing touches no layer, and saying so is
  * a determined answer rather than a doubt.
  *
  * ## And the CONE on top (bean `4j86`)
@@ -360,7 +360,7 @@ export interface CarryDecision {
  * closure, and down `derivedFrom`. The prefix match is kept as a floor, so the
  * union can only carry more than before, never less.
  *
- * @param composed every composed instance, from `composedInstances`
+ * @param composed every composed layer, from `composedInstances`
  * @param files the pull request's changed paths, repo-relative; `undefined` when unknown
  * @param cone the staging cone's decisions over the same files, when computed
  */
@@ -393,7 +393,7 @@ export function carriedInstances(
 }
 
 /**
- * The page left where a composed instance's tree would have been.
+ * The page left where a composed layer's tree would have been.
  *
  * A stub rather than nothing, and that is `pb04`: the navbar's harness tiles
  * and every cross-reference address `/<instance>/`, so removing the directory
@@ -519,7 +519,7 @@ function pagesToForward(out: string, route: string, at: string): [string, string
  * its alias. The redirect targets the page where it IS — under the locale
  * once drawn there — never the forwarding page at the old address.
  *
- * Written AFTER every layer and composed instance, and REFUSED over anything
+ * Written AFTER every layer and composed layer, and REFUSED over anything
  * already in the tree: an alias that would replace a page is a collision, and
  * the declaration is what has to change — never the page, silently. The gate
  * `check:visualiser-routes` refuses the same collision before a build;
@@ -684,7 +684,7 @@ export const EMPTY_TODO_LISTING: { pages: Record<string, string> } = { pages: {}
 
 export interface ComposeReport {
   /**
-   * A shell's scoping to the folio whose site it is (#2263): which instance,
+   * A shell's scoping to the folio whose site it is (#2263): which layer,
    * which platform root its borrowed links point at, and the host's count
    * projections left out. Absent on a whole-site compose.
    */
@@ -719,22 +719,22 @@ export interface ComposeReport {
    */
   readonly withheld: string[];
   /**
-   * Instances composed under their own name, rather than mounted after Jekyll.
+   * Layers composed under their own name, rather than mounted after Jekyll.
    *
    * Reported separately from `layers`, and that is not tidiness: a layer
-   * OVERLAYS the site's own tree and a composed instance sits beside it under
+   * OVERLAYS the site's own tree and a composed layer sits beside it under
    * its own prefix. Folding them together would make "did the root change this
    * page" and "did an instance add one" the same answer.
    */
   readonly composed: ComposedInstance[];
   /**
-   * The carry decision taken for each composed instance, and why.
+   * The carry decision taken for each composed layer, and why.
    *
    * Reported rather than inferred from `composed`, for the same reason
-   * `withheld` is reported: a tree quietly missing an instance's pages is
-   * indistinguishable from an instance that failed to read. Every entry in
+   * `withheld` is reported: a tree quietly missing a layer's pages is
+   * indistinguishable from a layer that failed to read. Every entry in
    * `composed` appears here exactly once, so a reader can tell a stubbed
-   * instance from an absent one.
+   * layer from an absent one.
    */
   readonly carried: CarryDecision[];
   /** The `<alias>/` redirect stubs written (bean `t4xb`), and every one refused over an existing page. */
@@ -748,7 +748,7 @@ export interface ComposeReport {
   /**
    * The visualiser pages a harness commits in its OWN site directory, laid at
    * their declared route (`heldVisualiserPages`), and each file refused because
-   * a layer or composed instance already put one there.
+   * a layer or composed layer already put one there.
    */
   readonly held: { written: string[]; collisions: string[] };
   /** The repository-scoped layers a platform-only shell left out (`platformOnly`), never silently. */
@@ -830,14 +830,14 @@ export interface ComposeOptions {
    * The branch's changed paths, repo-relative, when they are known.
    *
    * Passed only by a preview build. Absent — the canonical publisher, a local
-   * build, an unreadable API response — carries every composed instance, per
+   * build, an unreadable API response — carries every composed layer, per
    * `carriedInstances`.
    */
   readonly changedFiles?: readonly string[];
   /**
    * Compose the CHROME only: the layers' Jekyll machinery (`_config.yml`,
    * `_includes/`, `_layouts/`, `_sass/`, `_data/`, …) and `assets/`, and no
-   * page and no composed instance. An IG repository's own site composes its
+   * page and no composed layer. An IG repository's own site composes its
    * IG INTO this shell, so it is built with the same search box, locale
    * selector and navbar as the main site rather than with a plain stand-in
    * layout (#2235 F1). A page is any other path, so it is left out.
@@ -848,7 +848,7 @@ export interface ComposeOptions {
    * re-scoped to that folio (`lib/foreign-site-scope.ts`), and the platform's
    * count projections under `assets/`, and its translation sweep and index
    * under `_data/`, are left out. Omitted on a shell, the
-   * folio is unknown and the scoping still runs, with no instance: nothing is
+   * folio is unknown and the scoping still runs, with no layer: nothing is
    * then the folio's own, so every state tile is unlinked and every platform
    * tile re-based — never the platform's numbers on someone else's page.
    */
@@ -962,8 +962,8 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
     }
   }
 
-  // Composed instances land UNDER THEIR OWN NAME, after the layers, so an
-  // instance cannot shadow a base page by accident: `<instance>/index.md` in a
+  // Composed layers land UNDER THEIR OWN NAME, after the layers, so a
+  // layer cannot shadow a base page by accident: `<instance>/index.md` in a
   // composed tree is `<out>/<instance>/index.md`, never `<out>/index.md`.
   const composedInst = opts.shell ? [] : composedInstances(repo);
   const carry = carriedInstances(
@@ -975,7 +975,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   for (const d of carry) {
     const c = d.instance;
     if (!d.carry) {
-      // An instance with its own IG site has its landing page there: the IG
+      // A layer with its own IG site has its landing page there: the IG
       // build composes `/<instance>/index.html` after this tree, and refuses
       // a path the host source already holds. A stub here would be a second
       // answer for one URL, so the IG site's own landing stands instead.
@@ -996,16 +996,16 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
       suppliedBy[under] = c.instance;
       continue;
     }
-    // A docs SOURCE the instance declares inside this directory is authored
+    // A docs SOURCE the layer declares inside this directory is authored
     // blocks and manifests that `gen-docs-pages.ts` renders into the pages
     // beside them — never pages of their own. The base layer keeps its own out
     // with Jekyll's `exclude`, which names a path from the site root and so
-    // cannot reach one composed under an instance's name; it is left out here.
+    // cannot reach one composed under a layer's name; it is left out here.
     const sources = declaredDocsSources(join(repo, c.root)).map((s) => s.srcDir + sep);
     for (const rel of filesUnder(c.dir)) {
       if (sources.some((src) => (resolve(c.dir, rel) + sep).startsWith(src))) continue;
-      // A composed instance lands under its own name, so its withholding is
-      // asked about the path the TREE will carry rather than the instance's
+      // A composed layer lands under its own name, so its withholding is
+      // asked about the path the TREE will carry rather than the layer's
       // own. Skipping this loop would leave a staging-only graph publishable
       // simply by declaring it `composed`.
       const under = `${c.under}/${rel}`;
@@ -1021,7 +1021,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   }
 
   // THE VISUALISER PAGES A HARNESS HOLDS ITSELF, at their declared route,
-  // after the layers and composed instances so a collision with either is
+  // after the layers and composed layers so a collision with either is
   // seen. Not on a shell: a folio's own site publishes its own page at its own
   // root, and the platform's routes are not its business.
   const held = opts.shell ? { written: [], collisions: [] } : writeHeldVisualiserPages(out, repo, withheld, suppliedBy);
@@ -1072,7 +1072,7 @@ export function compose(out: string, repo = REPO, opts: ComposeOptions = {}): Co
   }
 
   // THE ALIASES, last, over the finished tree — so a collision with any page,
-  // from any layer or instance, is seen. Not on a shell: it carries no page.
+  // from any layer or layer, is seen. Not on a shell: it carries no page.
   const aliases = opts.shell ? { written: [], collisions: [] } : writeAliasRedirects(out, repo, withheld);
   // THE FORWARDING PAGES at the old addresses, after the aliases, so neither
   // ever writes over the other or over a page.
@@ -1148,7 +1148,7 @@ if (import.meta.main) {
   // `--changed-files` names a file holding the branch's changed paths, one per
   // line — what a preview build reads out of the pull request. ABSENT IS THE
   // SAFE DIRECTION and the default everywhere else: `carriedInstances` then
-  // carries every composed instance. An unreadable or empty FILE is treated
+  // carries every composed layer. An unreadable or empty FILE is treated
   // the same as no flag, because "the list could not be read" and "the list
   // said nothing changed" would otherwise be one answer, and only one of them
   // is a determined zero (`dh4f`).
@@ -1239,8 +1239,8 @@ if (import.meta.main) {
   for (const m of r.merged) {
     console.log(`  MERGED   ${m.path} — ${m.baseLayer} <- ${m.by} (${m.keys.join(", ")})`);
   }
-  // Every composed instance, carried or stubbed, with its reason. Printing
-  // only the stubbed ones would leave a reader unable to tell an instance that
+  // Every composed layer, carried or stubbed, with its reason. Printing
+  // only the stubbed ones would leave a reader unable to tell a layer that
   // was carried from one this build never saw (bean `ga8a`).
   for (const d of r.carried) {
     console.log(`  ${d.carry ? "CARRIED " : "STUBBED "} ${d.instance.under} — ${d.why}`);

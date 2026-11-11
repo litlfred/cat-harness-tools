@@ -169,7 +169,7 @@ export interface BranchStoreOptions {
   /**
    * How a location's `repository` (`owner/repo`, from the index lock) becomes a
    * fetch URL — the same injection `remote-mount.ts` takes, so a test serves a
-   * local bare repository per instance. Only consulted for a location kept in
+   * local bare repository per layer. Only consulted for a location kept in
    * ANOTHER repository (see {@link TipLocation.repository}); default GitHub.
    */
   urlFor?: UrlFor;
@@ -214,24 +214,24 @@ export interface TipLocation {
   /**
    * The key its mount marker is filed under, when that is not `id`.
    *
-   * An index composes instances that each declare their own state graph, and
+   * An index composes layers that each declare their own state graph, and
    * nothing stops two of them choosing the same id: on 2026-10-11 four
-   * instances declared `health`. Keyed by id alone, `tipLocations` kept the
+   * layers declared `health`. Keyed by id alone, `tipLocations` kept the
    * first and the other three were never mounted — silently, so
    * `audit:coverage` read them as undetermined. An id that more than one
    * location declares is therefore keyed `<instance>.<id>`, every one of them
    * (not "all but the first", which would make a marker's name depend on the
-   * order instances are scanned). Absent for an id only one location declares,
+   * order layers are scanned). Absent for an id only one location declares,
    * so a checkout without a collision keeps the `<id>.json` markers it has.
    */
   key?: string;
-  /** The instance the declaration belongs to, when the location is keyed by it. */
+  /** The layer the declaration belongs to, when the location is keyed by it. */
   instance?: string;
   /**
    * The repository whose branch keeps this graph (`owner/repo`), when it is not
    * this checkout's `origin`: a directory declared INSIDE a remote-mounted
-   * instance of an index is that instance's state, and its branch lives in the
-   * instance's own repository with instance-relative paths. Read from the
+   * layer of an index is that layer's state, and its branch lives in the
+   * layer's own repository with instance-relative paths. Read from the
    * index lock. Absent for the checkout's own graphs.
    */
   repository?: string;
@@ -239,7 +239,7 @@ export interface TipLocation {
   branchPath?: string;
   /**
    * Set when the location is a `scope: "repository"` graph that a mounted
-   * instance declares and the checkout's root does not: the instance that
+   * layer declares and the checkout's root does not: the layer that
    * declared it. Such a graph is the checkout's own (its work plan, its issue
    * marks), so it is read from the checkout's `origin`, but no declaration at
    * the root asked for it. If that origin does not carry its branch, the
@@ -304,7 +304,7 @@ function keptAt(
     // tree at a pinned version — retrieved by its Tool, kept on no branch here.
     case "npm":
       return undefined;
-    // HYDRATED metadata (bean `mo75` G2) is another instance's published
+    // HYDRATED metadata (bean `mo75` G2) is another layer's published
     // `index.hydrated.jsonld` at a pin: `remote-mount` lays it down and locks
     // it, and no branch here keeps it.
     case "hydrated":
@@ -321,7 +321,7 @@ function repoRelative(repoRoot: string, abs: string): string {
 }
 
 /**
- * Every declared directory that is kept at a branch tip, across the instances
+ * Every declared directory that is kept at a branch tip, across the layers
  * in this checkout.
  *
  * The companion to {@link resolveTipLocation}: that answers "which branch for
@@ -344,21 +344,21 @@ export function tipLocations(repoRoot: string = gitTopLevel(), keyedBy: BranchKe
  *
  * Until 2026-10-11 this kept the first location per id, which in an index
  * mounted cat-harness's `health` and silently dropped cat-harness-tools',
- * and two content instances'. One per path is the real identity: two
+ * and two content layers'. One per path is the real identity: two
  * declarations of one path are one directory, two paths are two graphs.
  */
 function allBranchLocations(repoRoot: string, wantId: (id: string) => boolean = () => true): TipLocation[] {
   const found: Array<TipLocation & { instRoot: string }> = [];
   const remotes = new Map<string, RemoteInstance | undefined>();
   for (const inst of instanceRootsIn(repoRoot)) {
-    // The instance's overrides, read ONCE for all its directories and only
+    // The layer's overrides, read ONCE for all its directories and only
     // when one needs them. Read per directory, they were ~4.5 s of a ~9 s
     // `gen-docs-pages` run (2026-10-30, #871): `subgraphSourceOverrides` re-reads
-    // the instance's and the checkout's config each time.
+    // the layer's and the checkout's config each time.
     let overrides: SubgraphSourceOverrides | undefined;
     const overridesOf = (): SubgraphSourceOverrides => (overrides ??= subgraphSourceOverrides(inst, repoRoot));
     for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
-      // Filtered BEFORE `keptAt`, which reads the instance's config: resolving
+      // Filtered BEFORE `keptAt`, which reads the layer's config: resolving
       // every directory of an index costs ~27 s, one id ~0.2 s (measured
       // 2026-10-11), and `resolveTipLocation` asks about one id.
       if (!wantId(d.id)) continue;
@@ -368,12 +368,12 @@ function allBranchLocations(repoRoot: string, wantId: (id: string) => boolean = 
       const path = repoRelative(repoRoot, d.absPath);
       if (found.some((o) => o.path === path)) continue;
       const loc: TipLocation & { instRoot: string } = { id: d.id, path, branch: at!.branch, keyedBy: k, instRoot: inst };
-      // A checkout-level graph some mounted instance declares for whatever
+      // A checkout-level graph some mounted layer declares for whatever
       // checkout it sits in, with no declaration of the root's own claiming
       // the path (that one would have been found first and won above).
       if (k === "tip" && d.scope === "repository" && resolve(inst) !== resolve(repoRoot)) loc.unownedBy = d.declaredBy ?? relative(repoRoot, inst);
-      // A TIP graph declared inside a remote-mounted instance is read from that
-      // instance's repository. Route stores are published by the checkout's own
+      // A TIP graph declared inside a remote-mounted layer is read from that
+      // layer's repository. Route stores are published by the checkout's own
       // generators and stay on its origin.
       if (k === "tip") {
         if (!remotes.has(inst)) remotes.set(inst, remoteInstanceOf(inst, repoRoot));
@@ -399,17 +399,17 @@ function allBranchLocations(repoRoot: string, wantId: (id: string) => boolean = 
   return out.sort((a, b) => a.id.localeCompare(b.id) || a.path.localeCompare(b.path));
 }
 
-/** A remote-mounted instance as the index lock records it. */
+/** A remote-mounted layer as the index lock records it. */
 export interface RemoteInstance {
   instance: string;
   /** `owner/repo`. */
   repository: string;
-  /** The instance's root inside that repository; `""` is its root. */
+  /** The layer's root inside that repository; `""` is its root. */
   upstreamRoot: string;
 }
 
 /**
- * The lock entry that put `instRoot` where it is, or undefined for an instance
+ * The lock entry that put `instRoot` where it is, or undefined for a layer
  * no remote mount placed (the checkout's own, or a plain directory). Reads only
  * lock files: `mountScopeFor` finds the scope, and the lock there names the
  * repository. A lock that does not parse contributes nothing — `mount:remote:check`
@@ -432,7 +432,7 @@ export function remoteInstanceOf(instRoot: string, repoRoot: string): RemoteInst
 
 /**
  * The declared directory `id`, kept at a branch tip, across the checkout's
- * instances. Refuses a directory that is undeclared, kept in the checkout, or
+ * layers. Refuses a directory that is undeclared, kept in the checkout, or
  * commit-keyed, rather than guessing a branch: the default for "no
  * declaration" is `main`, which is not this store.
  */
@@ -443,7 +443,7 @@ export function resolveTipLocation(
 ): TipLocation {
   // A location KEY (`<instance>.health`) names one graph exactly; an id more
   // than one location declares names several, and guessing among them is how
-  // the wrong instance's state gets read or pushed.
+  // the wrong layer's state gets read or pushed.
   // Only directories that could answer: the id itself, or the `<id>` a key
   // `<instance>.<id>` ends in. Keys are assigned per id, so a narrowed scan
   // keys them exactly as the full one does.
@@ -1245,7 +1245,7 @@ function sharedGitDirOwner(repoRoot: string): string | undefined {
 
 /**
  * Where the marker filed under `key` lives: `<this worktree's git-dir>/branch-mounts/<key>.json`.
- * The key is a directory id, or `<instance>.<id>` for an id several instances
+ * The key is a directory id, or `<instance>.<id>` for an id several layers
  * declare ({@link TipLocation.key}).
  */
 export function markerPath(repoRoot: string, key: string): string {
@@ -1309,7 +1309,7 @@ function allMarkers(repoRoot: string, use?: MarkerUse): Array<{ file: string; ma
  * existed from stranding its edits: in an index, cat-harness's `health` was
  * mounted as `health.json`, and the location is now keyed
  * `cat-harness.health`. Matching on the PATH, never on the id, is what keeps
- * another instance's `health` from adopting cat-harness's marker.
+ * another layer's `health` from adopting cat-harness's marker.
  */
 export function markerFor(repoRoot: string, loc: Pick<TipLocation, "id" | "key" | "path">): MountMarker | undefined {
   const key = locationKey(loc);
@@ -1342,7 +1342,7 @@ export interface AbsenceRecord {
   key: string;
   /** The declared, repository-relative path. */
   path: string;
-  /** The mounted instance that declared the graph. */
+  /** The mounted layer that declared the graph. */
   declaredBy: string;
   /** The remote it was judged absent against; a different origin is a different question. */
   origin: string;
@@ -1485,8 +1485,8 @@ export function storeOptionsFor(
  *
  * The signal behind an unowned graph's `absent` ({@link TipLocation.unownedBy};
  * owner, 2026-10-14, cat-harness-tools#249: "Tighten it"). A checkout whose
- * remote keeps a declaring instance's state branches has adopted that
- * instance's namespace for its own state (folio-assistant carries
+ * remote keeps a declaring layer's state branches has adopted that
+ * layer's namespace for its own state (folio-assistant carries
  * `cat/cat-harness/{beans,todos,issue-marks,fsh-guts,...}`), so one of them
  * going missing there is a failure. A checkout whose remote has no branch in
  * the namespace (smart-ra) never carried it, and the graph is absent. Whether
@@ -1797,7 +1797,7 @@ export function contentAt(id: string, repoRoot: string = gitTopLevel()): Content
       const dir = d.absPath.replace(/[/\\]+$/, "");
       const at = keptAt(inst, repoRoot, d);
       if (!at) return { state: "present", dir, via: "checkout" };
-      // By PATH first: an id several instances declare is filed under
+      // By PATH first: an id several layers declare is filed under
       // `<instance>.<id>`, and only the path says which of them this is.
       // Only where the mount lives is used: `resolveMarkerInto` reads `id`, `key` and `into`.
       const m = markerAtPath(repoRoot, repoRelative(repoRoot, d.absPath), "location") ?? readMarker(repoRoot, id, "location");

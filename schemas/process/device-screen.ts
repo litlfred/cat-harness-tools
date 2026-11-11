@@ -324,6 +324,12 @@ export const DeviceScreenKind = nodeKind(
     blocks: z.array(ScreenBlockSchema).min(1),
     /** What to try on it in the room. */
     try: Text.optional(),
+    /**
+     * The app as the device's status bar names it (JV-17): "OHS Facility
+     * Client", its version "2.4.1", the clock "10:14 AM", and the
+     * configuration the frame's label names ("OHS Player Facility Config").
+     */
+    client: z.object({ name: Text, version: Text.optional(), time: Text.optional(), config: Text.optional() }).strict().optional(),
   },
   {
     strict: true,

@@ -132,7 +132,7 @@ describe("every subject loads: its own .jsonld and page", () => {
     node("process/P/node/T", "ProcessNode", { partOf: makeIri(DOC, "process", "P") }),
     node("process/P/lane/L", "Lane"),
     node("process/P/flow/F", "SequenceFlow", { from: makeIri(DOC, "process", "P/node/T") }),
-    // Not this document's: another instance's subject, and a Tool beside it.
+    // Not this document's: another layer's subject, and a Tool beside it.
     { "@id": makeIri(HOST, "skill", "z"), "@type": "https://x.test/ns#Skill" },
     { "@id": "https://x.test/site/folio-assistant-core/tools/t.jsonld", "@type": "https://x.test/ns#Tool" },
   ];

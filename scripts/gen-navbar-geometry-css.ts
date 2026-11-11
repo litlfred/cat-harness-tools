@@ -29,7 +29,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * gate that enforces it. My first draft spelled the path out and that gate
  * caught it: a literal site root is a second answer to a question the
  * declaration already answers, and it writes the file where nothing serves it
- * the moment an instance is laid out differently.
+ * the moment a layer is laid out differently.
  */
 export function navbarGeometryCssPath(root: string): string {
   // The site CHROME holds it (semantic subgraphs, slice 1).
@@ -91,7 +91,7 @@ export const NAVBAR_GEOMETRY_MARKER_ERROR = "navbar-geometry: unterminated regio
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
-  // THE INSTANCE this script belongs to — the one it lives in — not whatever
+  // THE LAYER this script belongs to — the one it lives in — not whatever
   // directory the gate was invoked from, for the reason `gen-avatars-css.ts`
   // states: `siteDirFor(cwd)` throws on a `harness.json` one directory down.
   const root = HARNESS_ROOT;

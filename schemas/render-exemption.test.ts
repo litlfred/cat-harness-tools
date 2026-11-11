@@ -27,7 +27,7 @@ const REPO = repoRootFor(ROOT);
 describe("isExemptFrom is what the QA axis calls", () => {
   test("the axis reads the DECLARATION, not an instance name", () => {
     // Guarded because the obvious shortcut is `if (name === "bootstrap")`,
-    // which states a rule true only for the instance somebody remembered —
+    // which states a rule true only for the layer somebody remembered —
     // and a vendored or renamed bootstrap would silently reacquire the
     // obligation it was excused from.
     const checker = readFileSync(join(REPO, "cat-harness-tools", "scripts", "check-instance-render.ts"), "utf-8");

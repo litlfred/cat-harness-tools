@@ -1,7 +1,7 @@
 /**
  * `glossary-export` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/scripts/tests/glossary-export.test.ts` (bean `7zz1`, owner
- * ruling 2026-10-06 "Top-level instance"): each reads roles another instance
+ * ruling 2026-10-06 "Top-level instance"): each reads roles another layer
  * (folio-assistant-core) draws, which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects
  * every test in that layer. The rest of that file's tests stay there; every
@@ -16,7 +16,7 @@ describe("the corpus it is actually run against", () => {
   const { report } = buildGlossary({ today: () => "2026-09-21" });
 
   test("an undrawn role another instance draws is told apart from one drawn nowhere (bean nafz)", () => {
-    // The walk is per instance, so "no swimlane draws" is a fact about the
+    // The walk is per layer, so "no swimlane draws" is a fact about the
     // walk. deep-researcher's lane is in folio-assistant-core, bound by
     // <folio:role ref>; the report must say where rather than list it beside
     // roles no diagram in the repository draws.

@@ -13,12 +13,31 @@
  *
  * | question | answered by |
  * |---|---|
- * | which harnesses are instantiated | `instances[].name` |
- * | where each one comes from | `instances[].source` — `local.at`, or `remote` (a `remoteMounts` entry without its `harness`) |
+ * | which harnesses are instantiated | `harnesses[].name` — or, in an index with no `harnesses`, every `instances[].name` (the old reading) |
+ * | which layers are mounted, and where each comes from | `layers[].source` (spelled `instances` in the old form) — `local.at`, or `remote` (a `remoteMounts` entry without its `harness`) |
  * | each one's configuration | the imported `<name>.config.json` (when it exists), overlaid by the entry's inline fields |
  * | which one is `/` | `site.landing` — an instance name, or `"hub"` |
  * | whether an agent publishes it | `site.agentRun` — `true` when the repository is agent-run |
  * | what the checkout is called | `title` and `description`, which `index:render` writes into the root `README.md` and `AGENTS.md` |
+ *
+ * ## Two forms (cat-harness#1138)
+ *
+ * An INSTANCE is an instance of a node kind; a repository in the stack is a
+ * LAYER; Harness is one node kind (owner, 2026-11-08). The old form has one
+ * list, `instances`, that says both which layers are mounted and — because
+ * every name in it was read as instantiated — which harnesses are
+ * instantiated. The new form says the two apart:
+ *
+ * ```json
+ * { "layers":    [{ "name": "guide-base", "source": { "remote": { … } } }, …],
+ *   "harnesses": [{ "name": "guide-base" }] }
+ * ```
+ *
+ * Parsed, both forms give `instances` (the layers, under the old name until
+ * the P4 code rename) and, for the new form, `harnesses`. `formatIndexConfig`
+ * writes `layers` exactly when `harnesses` is present, so a file keeps the
+ * form it was written in. `layers` without `harnesses` is refused: it would
+ * read as "every layer instantiated" under a name that says otherwise.
  *
  * Without it, readers infer the instances from the root `*.config.json`
  * files, `site.landing` flags and the root declaration's `remoteMounts`.
@@ -143,6 +162,23 @@ export const IndexInstanceSchema = z
   .passthrough();
 export type IndexInstance = z.infer<typeof IndexInstanceSchema>;
 
+/**
+ * One harness INSTANTIATED here (cat-harness#1138): an instance of the Harness
+ * node kind, named in the index rather than inferred from which layers are
+ * mounted. `name` must be a layer this index lists, because its config is
+ * the one that layer's entry imports and overlays (`effectiveInstanceConfig`).
+ * `definedBy`, when given, names the layer whose Harness this instantiates —
+ * a content layer instantiates the document harness a lower layer defines.
+ */
+export const IndexHarnessSchema = z
+  .object({
+    name: IndexInstanceNameSchema,
+    definedBy: IndexInstanceNameSchema.optional(),
+    _comment: z.string().optional(),
+  })
+  .strict();
+export type IndexHarness = z.infer<typeof IndexHarnessSchema>;
+
 export const IndexSiteSchema = z
   .object({
     /** An instance name, or {@link HUB_LANDING}. Must name an instance this file lists. */
@@ -169,6 +205,29 @@ export const IndexSiteSchema = z
      */
     agentRun: z.boolean().optional(),
     /**
+     * Which site publisher `stage-local.ts` uses for this checkout when no
+     * `--publisher` is given: `folio`, or the kind of a publisher a mounted
+     * layer declares (`ig`, an IG layer's `site-publisher-ig`). Absent: the
+     * declared `site.build` recipe, else the publisher the repository's own
+     * workflows call, as before. It exists for a repository that has both, such as a
+     * DAK whose instance declares a folio recipe while its site is the IG
+     * (smart-trust-demo). Agents had to remember `--publisher ig` for that
+     * repository, and the shared `folio-site-publish.yml` that runs on every
+     * push to main had no way of knowing it (owner, 2026-11-11: "i want that
+     * it publishes once merge to main, update QA reports etc.";
+     * cat-harness-tools#1879).
+     */
+    publisher: z.string().regex(/^[a-z][a-z0-9-]*$/, "folio, or a declared publisher's kind such as ig").optional(),
+    /**
+     * Workflow files under `.github/workflows/` whose run on the SAME commit
+     * the push-to-main publish waits for, before it builds (cat-harness-tools#1879).
+     * An IG's site is built from its AST cache, which its `ig-ast-refresh.yml`
+     * seeds on the same push. A publish that starts first finds the cache
+     * stale and is refused. A workflow that did not run on that commit is not
+     * waited for.
+     */
+    publishAfter: z.array(z.string().regex(/^[\w.-]+\.ya?ml$/, "a workflow file name under .github/workflows/")).optional(),
+    /**
      * Whether the ⓘ task panel on this site's BPMN drawings shows skills: the
      * skills a task requires and the skills its lane's role has. Absent or
      * `true` shows them, as every knowledge-graph site does; `false` hides
@@ -182,6 +241,19 @@ export const IndexSiteSchema = z
      * Read by `task-panel.ts` `taskSkillsDeclared`.
      */
     taskSkills: z.boolean().optional(),
+    /**
+     * Where this site loads the assets every IG site shares, instead of
+     * carrying its own copy (owner, 2026-11-09, Q-SZ-7 "A"): a site on the same
+     * github.io origin that publishes them, such as
+     * `https://litlfred.github.io/smart-html-jtd/`. Each shared directory is
+     * served at `<sharedAssets>shared/<dir>/<digest>/`, so a site keeps
+     * loading the exact bytes it was built with. A build whose copy the host
+     * does not serve keeps it local (`scripts/lib/shared-assets.ts`).
+     */
+    sharedAssets: z
+      .string()
+      .regex(/^https:\/\/[^/]+\/(?:[^\s]*\/)?$/, "an https URL ending in /")
+      .optional(),
     /**
      * The workflow files that publish this repository's site and stage a
      * preview of it, by file name under `.github/workflows/`. The
@@ -201,7 +273,20 @@ export const IndexSiteSchema = z
   })
   .strict();
 
-export const IndexConfigSchema = z
+/**
+ * The new form's `layers` read as `instances` (see "Two forms" above). Both
+ * spelled is refused, and so is `layers` without `harnesses`. Anything that
+ * is not an object passes through for the object schema to refuse.
+ */
+function readLayersSpelling(raw: unknown): unknown {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw) || !("layers" in raw)) return raw;
+  const { layers, ...rest } = raw as Record<string, unknown>;
+  if ("instances" in rest) return { ...rest, __layersAndInstances: true };
+  if (!("harnesses" in rest)) return { ...rest, instances: layers, __layersWithoutHarnesses: true };
+  return { ...rest, instances: layers };
+}
+
+const IndexConfigObject = z
   .object({
     $schema: z.literal(INDEX_CONFIG_SCHEMA),
     _comment: z.string().optional(),
@@ -218,6 +303,18 @@ export const IndexConfigSchema = z
       .array(IndexInstanceSchema)
       .refine((xs) => new Set(xs.map((x) => x.name)).size === xs.length, { message: "instances: a name appears twice" })
       .refine((xs) => !xs.some((x) => x.name === HUB_LANDING), { message: `instances: \`${HUB_LANDING}\` is the landing keyword, not an instance name` }),
+    /**
+     * Which harnesses are INSTANTIATED here (cat-harness#1138), each an
+     * instance of the Harness node kind. Absent is the old form: every layer
+     * is read as instantiated, as before. Present, only these are, and the
+     * file is written with `layers` rather than `instances`.
+     */
+    harnesses: z
+      .array(IndexHarnessSchema)
+      .refine((xs) => new Set(xs.map((x) => x.name)).size === xs.length, { message: "harnesses: a name appears twice" })
+      .optional(),
+    __layersAndInstances: z.literal(true).optional(),
+    __layersWithoutHarnesses: z.literal(true).optional(),
     site: IndexSiteSchema.optional(),
     /**
      * The opt-in named sub-graphs switched on for THIS checkout, each
@@ -267,16 +364,40 @@ export const IndexConfigSchema = z
   })
   .strict()
   .superRefine((c, ctx) => {
+    if (c.__layersAndInstances) {
+      ctx.addIssue({ code: "custom", path: ["layers"], message: "`layers` and `instances` are the same list in two forms: write one (`layers` with `harnesses`, cat-harness#1138)" });
+    }
+    if (c.__layersWithoutHarnesses) {
+      ctx.addIssue({ code: "custom", path: ["layers"], message: "`layers` needs `harnesses` beside it, saying which are instantiated here; the old form spells the list `instances` (cat-harness#1138)" });
+    }
+    const layerNames = new Set(c.instances.map((i) => i.name));
+    for (const [n, h] of (c.harnesses ?? []).entries()) {
+      if (!layerNames.has(h.name)) {
+        ctx.addIssue({ code: "custom", path: ["harnesses", n, "name"], message: `harnesses names \`${h.name}\`, which is not a layer this file lists` });
+      }
+      if (h.definedBy !== undefined && !layerNames.has(h.definedBy)) {
+        ctx.addIssue({ code: "custom", path: ["harnesses", n, "definedBy"], message: `\`${h.definedBy}\` is not a layer this file lists` });
+      }
+    }
     const l = c.site?.landing;
-    if (l !== undefined && l !== HUB_LANDING && !c.instances.some((i) => i.name === l)) {
+    const landable = c.harnesses?.map((h) => h.name) ?? c.instances.map((i) => i.name);
+    if (l !== undefined && l !== HUB_LANDING && !landable.includes(l)) {
       ctx.addIssue({
         code: "custom",
         path: ["site", "landing"],
-        message: `site.landing names \`${l}\`, which is not an instance this file lists (${c.instances.map((i) => i.name).join(", ") || "none"})`,
+        message: `site.landing names \`${l}\`, which is not ${c.harnesses ? "a harness" : "an instance"} this file lists (${landable.join(", ") || "none"})`,
       });
     }
-  });
-export type IndexConfig = z.infer<typeof IndexConfigSchema>;
+  })
+  .transform(({ __layersAndInstances: _a, __layersWithoutHarnesses: _b, ...c }) => c);
+
+export const IndexConfigSchema = z.preprocess(readLayersSpelling, IndexConfigObject);
+export type IndexConfig = z.output<typeof IndexConfigObject>;
+
+/** The names instantiated per the index: `harnesses` when given, else every listed layer (the old form). */
+export function indexHarnessNames(config: IndexConfig): string[] {
+  return (config.harnesses?.map((h) => h.name) ?? config.instances.map((e) => e.name)).sort();
+}
 
 /** The inline `HarnessConfig` overrides an entry carries — every key but the index's own. */
 export function inlineOverrides(entry: IndexInstance): Record<string, unknown> {
@@ -481,23 +602,26 @@ export function addIndexInstance(root: string, entry: IndexInstance): boolean {
   const idx = readIndexConfig(root);
   if (idx.state === "unreadable") throw new Error(`${idx.file} is ${idx.why}`);
   if (idx.state === "absent" || idx.config.instances.some((e) => e.name === entry.name)) return false;
-  const next = IndexConfigSchema.parse({ ...idx.config, instances: [...idx.config.instances, entry] });
+  const harnesses = idx.config.harnesses === undefined ? undefined : [...idx.config.harnesses, { name: entry.name }];
+  const next = IndexConfigSchema.parse({ ...idx.config, instances: [...idx.config.instances, entry], ...(harnesses ? { harnesses } : {}) });
   writeFileSync(idx.file, formatIndexConfig(next));
   return true;
 }
 
 /** The canonical text of an index: two-space JSON, `$schema` first, a trailing newline. */
 export function formatIndexConfig(config: IndexConfig): string {
-  const { $schema, _comment, title, description, instances, site, gateExemptions, contentTypes, mountApprovers, enableSubgraphs } = config;
+  const { $schema, _comment, title, description, instances, harnesses, site, gateExemptions, contentTypes, mountApprovers, enableSubgraphs } = config;
+  const layers = instances.map((e) => {
+    const { name, _comment: c, import: imp, source, ...rest } = e as IndexInstance & Record<string, unknown>;
+    return { name, ...(c !== undefined ? { _comment: c } : {}), ...(imp !== undefined ? { import: imp } : {}), ...(source !== undefined ? { source } : {}), ...rest };
+  });
   const ordered = {
     $schema,
     ...(_comment !== undefined ? { _comment } : {}),
     ...(title !== undefined ? { title } : {}),
     ...(description !== undefined ? { description } : {}),
-    instances: instances.map((e) => {
-      const { name, _comment: c, import: imp, source, ...rest } = e as IndexInstance & Record<string, unknown>;
-      return { name, ...(c !== undefined ? { _comment: c } : {}), ...(imp !== undefined ? { import: imp } : {}), ...(source !== undefined ? { source } : {}), ...rest };
-    }),
+    // The new form writes `layers` + `harnesses`; the old one `instances` (cat-harness#1138).
+    ...(harnesses !== undefined ? { layers, harnesses } : { instances: layers }),
     ...(site !== undefined ? { site } : {}),
     // Kept, like the exemptions below: a re-pin rewrites the index, and
     // dropping these would delete who may consent and what the content
@@ -513,6 +637,29 @@ export function formatIndexConfig(config: IndexConfig): string {
     ...(gateExemptions !== undefined ? { gateExemptions } : {}),
   };
   return `${JSON.stringify(ordered, null, 2)}\n`;
+}
+
+/**
+ * The harnesses an old-form index really instantiates (cat-harness#1138, owner
+ * card "A. Only what is instantiated", 2026-11-08): the landing, every entry
+ * with a config of its own (inline fields, or a root `<name>.config.json` it
+ * imports), and the sole layer of a one-layer index. A layer that is only
+ * mounted for its content is not one. Returns `config` unchanged when it
+ * already declares `harnesses`. Pure apart from checking which files exist.
+ */
+export function withDeclaredHarnesses(root: string, config: IndexConfig): IndexConfig {
+  if (config.harnesses !== undefined) return config;
+  const landing = config.site?.landing;
+  const named = new Set<string>();
+  if (config.instances.length === 1) named.add(config.instances[0]!.name);
+  for (const e of config.instances) {
+    if (e.name === landing) named.add(e.name);
+    else if (Object.keys(inlineOverrides(e)).length > 0) named.add(e.name);
+    else if (existsSync(join(root, importedConfigFilename(e)))) named.add(e.name);
+  }
+  // Layer order, so the list reads like the stack it is drawn from.
+  const harnesses = config.instances.filter((e) => named.has(e.name)).map((e) => ({ name: e.name }));
+  return IndexConfigSchema.parse({ ...config, harnesses }) as IndexConfig;
 }
 
 // ── Building an index from what a checkout holds today (the migration) ──────

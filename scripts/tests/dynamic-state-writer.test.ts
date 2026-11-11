@@ -25,7 +25,7 @@ describe("writeDynamicState: the one writer of state.jsonld", () => {
   test("writes a DynamicState document, creating the harness directory of a site that has none", async () => {
     const dir = mkdtempSync(join(tmpdir(), "dynamic-state-"));
     try {
-      // A root with no declaration has no instances: the document is still
+      // A root with no declaration has no layers: the document is still
       // written, and says so, rather than leaving the pages' link dangling.
       const root = join(dir, "empty-harness");
       const out = dynamicStatePath(join(dir, "site"), "cat-harness");

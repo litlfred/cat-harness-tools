@@ -26,7 +26,9 @@
  * Exit 0 every condition passed · 1 at least one failed · 2 at least one could
  * not be determined (and none failed). A site build takes minutes, so it runs
  * only with `--site`; WITHOUT it the `site` condition is `not-run`, and a run
- * with a condition not run is not "complete" — exit 2.
+ * with a condition not run is not "complete" — exit 2. In an INSTANCE root
+ * (the root declares its own instance) `site` is `not-applicable` without
+ * `--site` instead, which does not block exit 0 (Q-NA-1 B).
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/separation-cutover-check.ts [--root <checkout>] [--site]
@@ -44,7 +46,7 @@ import { analyse as referenceDirection } from "./check-reference-direction.ts";
 
 export const CONDITIONS = ["mounts", "declarations", "monorepo-paths", "import-direction", "reference-direction", "site"] as const;
 export type ConditionId = (typeof CONDITIONS)[number];
-export type ConditionState = "pass" | "fail" | "could-not-determine" | "not-run";
+export type ConditionState = "pass" | "fail" | "could-not-determine" | "not-run" | "not-applicable";
 
 export interface ConditionResult {
   id: ConditionId;
@@ -54,7 +56,7 @@ export interface ConditionResult {
   summary: string;
   findings: string[];
   /**
-   * Findings inside a MOUNTED layer — an instance this repository does not
+   * Findings inside a MOUNTED layer — a layer this repository does not
    * track. Reported, never counted: a cutover is this repository's, and a
    * defect in a layer it mounts at a pin is fixed upstream and re-pinned.
    */
@@ -64,14 +66,14 @@ export interface ConditionResult {
 export interface CutoverReport {
   root: string;
   instance: string | undefined;
-  /** Instances this repository tracks — its own, as opposed to its mounts. */
+  /** Layers this repository tracks — its own, as opposed to its mounts. */
   own: string[];
   conditions: ConditionResult[];
 }
 
 /**
- * The instances a checkout TRACKS, by declared name. A remote mount is
- * gitignored, so an instance with no tracked file is a layer this repository
+ * The layers a checkout TRACKS, by declared name. A remote mount is
+ * gitignored, so a layer with no tracked file is a layer this repository
  * consumes rather than one it owns.
  */
 export function ownInstances(root: string): string[] {
@@ -275,7 +277,22 @@ export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?:
   }
 
   // site
-  if (!opts.site) {
+  if (!opts.site && instance !== undefined) {
+    // An instance root (smart-ips-pilgrimage, the root declaring its own
+    // instance) is not the platform index this condition was written for:
+    // its own CI builds and publishes its site. Without `--site` the
+    // condition is NOT APPLICABLE there rather than not-run, so the gate can
+    // show complete on an instance's main (owner, Q-NA-1 B, 2026-11-08;
+    // cat-harness-tools#1701). `--site` still builds and judges it, and the
+    // index (whose root declares no instance) is still not-run without it.
+    conditions.push({
+      id: "site",
+      state: "not-applicable",
+      by: "build-instance-site --no-mount",
+      summary: "not applicable here: an instance root builds its own site in its own CI; pass --site to build it anyway",
+      findings: [],
+    });
+  } else if (!opts.site) {
     conditions.push({ id: "site", state: "not-run", by: "build-instance-site --no-mount", summary: "not run: pass --site (a full build, minutes)", findings: [] });
   } else if (instance === undefined) {
     conditions.push({ id: "site", state: "could-not-determine", by: "build-instance-site --no-mount", summary: "the checkout root declares no instance to build", findings: [] });
@@ -289,12 +306,12 @@ export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?:
 
 export function cutoverExitCode(r: CutoverReport): 0 | 1 | 2 {
   if (r.conditions.some((c) => c.state === "fail")) return 1;
-  if (r.conditions.some((c) => c.state !== "pass")) return 2;
+  if (r.conditions.some((c) => c.state !== "pass" && c.state !== "not-applicable")) return 2;
   return 0;
 }
 
 export function formatCutover(r: CutoverReport): string {
-  const mark: Record<ConditionState, string> = { pass: "✓", fail: "✗", "could-not-determine": "?", "not-run": "·" };
+  const mark: Record<ConditionState, string> = { pass: "✓", fail: "✗", "could-not-determine": "?", "not-run": "·", "not-applicable": "·" };
   const lines = [`separation:cutover:check — ${r.instance ?? "(no root instance)"} at ${r.root}; own instance(s): ${r.own.join(", ") || "none"}`];
   for (const c of r.conditions) {
     lines.push(`  ${mark[c.state]} ${c.id.padEnd(20)} ${c.state.padEnd(20)} ${c.summary}  [${c.by}]`);
@@ -303,7 +320,7 @@ export function formatCutover(r: CutoverReport): string {
     if (c.upstream?.length) lines.push(`      (+ ${c.upstream.length} in mounted layers — upstream's to fix, not counted; --json lists them)`);
   }
   const code = cutoverExitCode(r);
-  lines.push(code === 0 ? "CUTOVER COMPLETE — every condition measured and passed" : code === 1 ? "CUTOVER INCOMPLETE — a condition failed" : "CUTOVER NOT SHOWN COMPLETE — a condition was not run or could not be determined. Not a pass.");
+  lines.push(code === 0 ? "CUTOVER COMPLETE — every applicable condition measured and passed" : code === 1 ? "CUTOVER INCOMPLETE — a condition failed" : "CUTOVER NOT SHOWN COMPLETE — a condition was not run or could not be determined. Not a pass.");
   return lines.join("\n");
 }
 

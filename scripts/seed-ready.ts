@@ -26,7 +26,7 @@
  * | `layerPrs`         | open PRs touching L                                          |
  * | `layerMovingPrs`   | open PRs that delete a file in L, or rename one into or out of it — not counting `owned-tree` generated names (isRegeneratedName) |
  * | `standaloneRed`    | failing tests when L and what it needs run as sibling clones |
- * | `upwardPaths`      | paths DECLARED in L that resolve only in an instance above L |
+ * | `upwardPaths`      | paths DECLARED in L that resolve only in a layer above L |
  * | `undetermined`     | criteria this run could not decide                           |
  *
  * The first four ask whether the SOURCE is still moving; the last two re-ask,
@@ -44,11 +44,11 @@
  *
  * ## The layer map is derived, never written here
  *
- * A layer is an instance declaration whose `livesAt` says it is staged in a
+ * A layer is a layer declaration whose `livesAt` says it is staged in a
  * repository. Its directory is `livesAt.path`; its position is the longest
  * `needs` chain beneath it, so `bootstrap → bootstrap-tools → cat-harness →
  * cat-harness-tools → <content core> → {the layers above it}`
- * falls out of the declarations. "The next layer" is every instance one level
+ * falls out of the declarations. "The next layer" is every layer one level
  * up that needs L, directly or transitively. PRs are read from
  * `livesAt.repository`.
  *
@@ -93,7 +93,7 @@ import { workflowFile } from "./known-skills.js";
 import { classify as classifyConflict } from "./merge-conflict-patterns.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** This instance's root — where the declared `processes` graph is found from. */
+/** This layer's root — where the declared `processes` graph is found from. */
 // The HARNESS, not this layer: the script moved up in 70lx B2 and still reads cat-harness's declarations.
 const INSTANCE_ROOT = HARNESS_ROOT;
 
@@ -123,7 +123,7 @@ export const GITHUB_FILES_CAP = 3000;
 
 // ─── the layer map ──────────────────────────────────────────────────────────
 
-/** One instance declaration, reduced to what the layer map needs. */
+/** One layer declaration, reduced to what the layer map needs. */
 export interface LayerDecl {
   name: string;
   /** Repository-relative directory: `livesAt.path`, or where the declaration sits. */
@@ -133,12 +133,12 @@ export interface LayerDecl {
   stagedIn?: string;
   /** Absolute path of the directory the declaration was read from. */
   root?: string;
-  /** Instances this one is seeded together with (`seedsWith`); absent is "alone". */
+  /** Layers this one is seeded together with (`seedsWith`); absent is "alone". */
   seedsWith?: string[];
 }
 
 /**
- * Read every instance declaration in the checkout.
+ * Read every layer declaration in the checkout.
  *
  * The aggregate at the repository root is left out: its directory is the
  * whole checkout, so it would "touch" every PR, and it is not a layer anybody
@@ -167,7 +167,7 @@ export interface LayerPlan {
   layer: LayerDecl;
   /** Longest `needs` chain beneath the layer; the foundation is 0. */
   depth: number;
-  /** Instances one level up that need this layer, directly or transitively. */
+  /** Layers one level up that need this layer, directly or transitively. */
   next: LayerDecl[];
 }
 
@@ -347,7 +347,7 @@ export interface CriterionReport {
   offenders: Offender[];
   /** PRs whose unseen files could change the answer. */
   undetermined: number[];
-  /** For the two non-PR criteria: what was found (failing tests, missed instances). */
+  /** For the two non-PR criteria: what was found (failing tests, missed layers). */
   findings?: string[];
   note?: string;
 }
@@ -607,7 +607,7 @@ export interface DeclaredPath {
  * `resolveImplementingPath` — the three registries whose callers do so today
  * (`check-tools`, `script-sweep`/`criterion-source`, `render-discovery`).
  *
- * Tool modules are read per declaring instance (`toolsOf`); the QA criteria
+ * Tool modules are read per declaring layer (`toolsOf`); the QA criteria
  * and render targets are the harness's own registries, so they are declared
  * by `cat-harness` and by no other layer.
  */
@@ -635,11 +635,11 @@ export function declaredPathsOf(layerRoot: string): DeclaredPath[] {
 }
 
 /**
- * Paths declared in this layer that resolve ONLY in an instance above it.
+ * Paths declared in this layer that resolve ONLY in a layer above it.
  *
  * ## Why this replaced "sibling discovery" (owner, 2026-10-04)
  *
- * The criterion it replaces counted the instances that `needs` L which
+ * The criterion it replaces counted the layers that `needs` L which
  * discovery could not find in a workspace of sibling clones. Two things were
  * wrong with that count. Discovery is checkout-local ON PURPOSE — `cmsl`:
  * *"the tool sees what the checkout contains, not what the platform
@@ -647,12 +647,12 @@ export function declaredPathsOf(layerRoot: string): DeclaredPath[] {
  * dependents, and the criterion could never pass. And the count was of
  * INSTANCES, while the risk it named was PATHS: *"each one it cannot find …
  * is a path resolved through it that fails the day the layer is seeded."*
- * Measured that day on cat-harness: 3 instances missed, and **0** declared
+ * Measured that day on cat-harness: 3 layers missed, and **0** declared
  * paths resolving through any of them (25 of 25 in-process Tool modules, and
  * all 8 distinct QA criterion source files, resolve inside cat-harness).
  *
  * So this counts the paths themselves. A path resolving `via: "needs"` is one
- * that breaks when L stands alone — UNLESS the instance holding it declares
+ * that breaks when L stands alone — UNLESS the layer holding it declares
  * `seedsWith: [L]`, in which case the same seeding step creates both and the
  * path is stated in the note rather than counted (owner, 2026-10-04: the
  * harness's Tool nodes resolving into cat-harness-tools are a seeding pair); `ambiguous` counts too, since two
@@ -671,7 +671,7 @@ export function probeUpwardPaths(repoRoot: string, layerName: string, decls: Lay
     return { state: "error", note: `the declared paths could not be read: ${message(e)}` };
   }
   const upward: string[] = [];
-  // Declared by the instance ABOVE (`seedsWith`): one seeding step creates
+  // Declared by the layer ABOVE (`seedsWith`): one seeding step creates
   // both, so a path into it cannot break on the day L is seeded (owner,
   // 2026-10-04). Counted and stated, never silently dropped.
   const partners = new Set(decls.filter((d) => d.seedsWith?.includes(layerName)).map((d) => d.name));
@@ -1011,7 +1011,7 @@ export function probeStandalone(
       count: parsed.failed,
       // The report names only tests that ran; a file that failed to load is in
       // `parsed.failed` and nowhere in the report (see LOAD_ERROR_MARK).
-      // A message may name the workspace itself (an instance named after its
+      // A message may name the workspace itself (a layer named after its
       // directory), whose suffix is random: replaced, so names compare across runs.
       findings: [...names, ...parsed.loadErrors].map((n) => n.replaceAll(basename(ws!), "<rehearsal>")),
       note: `${members.map((m) => m.name).join(", ")} laid out as siblings${opts.shard ? `, test files part ${opts.shard}` : ""}`,

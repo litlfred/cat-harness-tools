@@ -26,10 +26,10 @@ afterEach(() => {
 });
 
 /**
- * A repo holding one instance, which declares `dirs` as `cat-harness` graphs.
+ * A repo holding one layer, which declares `dirs` as `cat-harness` graphs.
  *
- * Two levels deep on purpose: the instance sits UNDER the repo root, which is
- * the arrangement that lets a declared path point at a sibling instance and
+ * Two levels deep on purpose: the layer sits UNDER the repo root, which is
+ * the arrangement that lets a declared path point at a sibling layer and
  * escape — the case the filter exists for.
  */
 function repo(dirs: string[], opts: { sibling?: string[] } = {}): { repoRoot: string; inst: string } {
@@ -82,7 +82,7 @@ describe("the walk follows the DECLARATION, not the literal `skills/`", () => {
   test("`skills/` is a DEFAULT, so it survives being undeclared", () => {
     // Asserted because it surprised me, not because it is desirable:
     // `resolveDirectories` supplies the conventional directories alongside the
-    // declaration, so an instance that declares only a topical directory still
+    // declaration, so a layer that declares only a topical directory still
     // gets `skills/` when the directory exists. A test written to the
     // intuition — "declare none, get none" — fails against correct behaviour,
     // which is how this one came to be written the wrong way round first.
@@ -102,7 +102,7 @@ describe("the walk follows the DECLARATION, not the literal `skills/`", () => {
 describe("another instance's roots are excluded — not this audit's to write", () => {
   test("a repository-scoped sibling directory is dropped", () => {
     // `kgRoots` resolves a DEPENDENCY's directories too. Walking them is what
-    // `instance-graph-isolation.test.ts` guards against — one instance's graph
+    // `instance-graph-isolation.test.ts` guards against — one layer's graph
     // must not carry another's nodes.
     const { inst } = repo(["skills"], { sibling: ["other/skills"] });
     expect(seen(inst)).toEqual(["skills"]);
@@ -125,8 +125,8 @@ describe("another instance's roots are excluded — not this audit's to write", 
   });
 
   test("the instance root itself is not a root of its own graph", () => {
-    // `relative(here, here)` is "", which does not start with ".." — so an
-    // instance declaring `./` would otherwise walk everything, its own results
+    // `relative(here, here)` is "", which does not start with ".." — so a
+    // layer declaring `./` would otherwise walk everything, its own results
     // tree included.
     const { inst } = repo(["skills"]);
     expect(seen(inst)).not.toContain("");

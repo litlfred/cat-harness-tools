@@ -175,7 +175,7 @@ export function observedBranches(opts: { repoRoot?: string; remote?: string } = 
 
 /**
  * Which declared directory each branch backs: a single-branch \`storage\` or
- * \`source\`, read from every instance's declaration. A FAMILY declares a
+ * \`source\`, read from every layer's declaration. A FAMILY declares a
  * prefix, so its members match by prefix. The declarations are the only source
  * of a branch's NAME; this map is how an observed branch is told apart from an
  * undeclared one.
@@ -191,7 +191,7 @@ export function declaredBranches(repoRoot: string = defaultRepoRoot()): { exact:
       continue; // an unreadable declaration is check:declared-dirs' finding
     }
     // Nested entries too (`beans/beans.json`'s `queue`): a store declared on
-    // the node that labels it is as declared as one in the instance file.
+    // the node that labels it is as declared as one in the layer file.
     const entries = decl ? [...(decl.directories ?? []), ...nestedDirectories(root, decl)] : [];
     for (const d of entries) {
       const st = d.storage as { branch?: string; branchPrefix?: string } | undefined;

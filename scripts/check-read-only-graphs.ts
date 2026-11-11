@@ -18,7 +18,7 @@
  * - **undeclared** — the directory holds materialized nodes and says nothing.
  *   Reported, not failed; absent is not `false`.
  * - **not-applicable** — nothing to compare: silence over nothing materialized,
- *   or a read-only directory whose materialized content the instance BUILDS AT
+ *   or a read-only directory whose materialized content the layer BUILDS AT
  *   PUBLISH (a `builtAtPublish` entry lies inside it), so zero committed nodes
  *   is the declared state.
  *
@@ -92,7 +92,7 @@ export function materializedNodesIn(dir: string): number {
   return n;
 }
 
-/** Every instance declaration in the repository, by the stem-equals-name rule. */
+/** Every layer declaration in the repository, by the stem-equals-name rule. */
 function instances(repo: string): { name: string; dir: string; file: string }[] {
   const out: { name: string; dir: string; file: string }[] = [];
   for (const e of readdirSync(repo, { withFileTypes: true })) {

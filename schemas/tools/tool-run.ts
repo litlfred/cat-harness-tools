@@ -44,7 +44,7 @@ import { RunContextRefSchema, RunReleaseSchema } from "../sdlc/run-context";
 /** The `$schema` tag every run record carries. */
 export const TOOL_RUN_SCHEMA_ID = "folio-tool-run/v1";
 
-/** Where run records live, under an instance's `qa` directory. */
+/** Where run records live, under a layer's `qa` directory. */
 export const TOOL_RUNS_DIR = join("test", "results", "tool-runs");
 
 export const ToolRunRecordSchema = z.object({
@@ -135,7 +135,7 @@ export interface ListedToolRun {
 }
 
 /**
- * Every record under an instance, or `unknown` when there is no record
+ * Every record under a layer, or `unknown` when there is no record
  * directory to list.
  *
  * ## Why an absent directory is `unknown`, not an empty list

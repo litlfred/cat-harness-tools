@@ -3,7 +3,7 @@
  * and `needs` — in the checkout being checked, whatever its layout.
  *
  * @module cat-harness-tools/scripts/check-declaration-resolution
- * @covers cat-harness — every instance declaration in the checkout
+ * @covers cat-harness — every layer declaration in the checkout
  *
  * ## Mostly composition
  *
@@ -16,14 +16,15 @@
  * | `assets` | `check:declared-assets` → `auditInstance` | the file exists |
  * | `visualisers[].renderedBy` | `check:visualiser-routes` → `checkVisualiserRoutes` | names a discovered Tool node |
  * | `needs` | `check:instance-graph` → `resolveInstanceGraph` | every dependency resolves, no cycle |
- * | `enableSubgraphs` | here → `enableSubgraphsProblems` | each id names an opt-in sub-graph of this instance or its `needs` closure |
+ * | `enableSubgraphs` | here → `enableSubgraphsProblems` | each id names an opt-in sub-graph of this layer or its `needs` closure |
+ * | `optInLinks` (the opt-in `directories`, as link targets) | `check:optin-links` → `checkOptInLinks` | no always-on page links into an opt-in sub-graph, which is absent wherever it is switched off |
  *
  * It also resolves `visualisers[].coversKinds`, a graph typology, which
  * `checkVisualiserRoutes` drops unjudged (it filters to PUBLISHED kinds).
  * `covers`, a directory id, is refused by the declaration schema itself; a
  * declaration that does not parse is a finding.
  *
- * The result is one run, one verdict, per instance and per field, over the
+ * The result is one run, one verdict, per layer and per field, over the
  * checkout as it is actually laid out.
  *
  * ## The checkout is `cwd`
@@ -40,7 +41,7 @@
  *
  * Exit 0 every reference resolves · 1 at least one does not (reported even
  * when something else was undetermined: a certain finding is never hidden) ·
- * 2 could not determine (no instance in the checkout, or a composed gate that
+ * 2 could not determine (no layer in the checkout, or a composed gate that
  * could not run). 2 is never a pass.
  *
  * Usage:
@@ -59,13 +60,14 @@ import "../schemas/kg/folio-graph-typology.js";
 import { auditInstance as auditDirs } from "./check-declared-dirs.ts";
 import { auditInstance as auditAssets } from "./check-declared-assets.ts";
 import { checkVisualiserRoutes } from "./check-visualiser-routes.ts";
+import { checkOptInLinks } from "./check-optin-links.ts";
 
-/** The fields a declaration names paths or instances in, and the declaration itself (it must parse for any to be read). */
-export const RESOLVED_FIELDS = ["declaration", "directories", "assets", "visualisers", "needs", "enableSubgraphs"] as const;
+/** The fields a declaration names paths or layers in, and the declaration itself (it must parse for any to be read). */
+export const RESOLVED_FIELDS = ["declaration", "directories", "assets", "visualisers", "needs", "enableSubgraphs", "optInLinks"] as const;
 export type ResolvedField = (typeof RESOLVED_FIELDS)[number];
 
 export interface ResolutionFinding {
-  /** The instance's declared name, or its path when it has none. */
+  /** The layer's declared name, or its path when it has none. */
   instance: string;
   field: ResolvedField;
   /** The entry, as the declaration spells it (a directory id, an asset id, `visualisers[<id>]`, a needs name). */
@@ -78,7 +80,7 @@ export interface ResolutionFinding {
 export interface ResolutionReport {
   root: string;
   instances: string[];
-  /** Entries examined per field, summed over instances — a zero is printed, never hidden. */
+  /** Entries examined per field, summed over layers — a zero is printed, never hidden. */
   examined: Record<ResolvedField, number>;
   findings: ResolutionFinding[];
   /** Reasons this run could not decide something. Non-empty means exit 2. */
@@ -116,7 +118,7 @@ export function coverageFindings(
 export function checkDeclarationResolution(rootArg: string): ResolutionReport {
   const root = resolve(rootArg);
   const roots = instanceRootsIn(root);
-  const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0, enableSubgraphs: 0 };
+  const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0, enableSubgraphs: 0, optInLinks: 0 };
   const findings: ResolutionFinding[] = [];
   const undetermined: string[] = [];
   const names = new Map<string, string>();
@@ -197,7 +199,7 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     }
 
     // enableSubgraphs — each id names an opt-in sub-graph (`optIn: true`) of
-    // this instance or one in its `needs` closure, top level or from within.
+    // this layer or one in its `needs` closure, top level or from within.
     const enable = decl.enableSubgraphs ?? [];
     examined.enableSubgraphs += enable.length;
     if (enable.length > 0) {
@@ -216,9 +218,9 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     }
   }
 
-  // An index root declares no instance, so its `enableSubgraphs` is in its
-  // index.config.json (step 23.4). Each id names an opt-in sub-graph of an
-  // instance in this checkout, held to the same rule as a declaration's list.
+  // An index root declares no layer, so its `enableSubgraphs` is in its
+  // index.config.json (step 23.4). Each id names an opt-in sub-graph of a
+  // layer in this checkout, held to the same rule as a declaration's list.
   if (findDeclarationFile(root) === undefined) {
     const enable = declaredEnableSubgraphs(root);
     examined.enableSubgraphs += enable.length;
@@ -250,6 +252,29 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     } catch (e) {
       undetermined.push(`check:visualiser-routes could not run — ${(e as Error).message.split("\n")[0]}`);
     }
+  }
+
+  // A link from an always-on page into an opt-in sub-graph resolves only where
+  // the group is switched on — check:optin-links (owner, 2026-11-11: a gate
+  // fails on them, each fixed by hand; turned on once every link was fixed).
+  // `optInLinks` counts the pages read.
+  try {
+    const links = checkOptInLinks(root);
+    examined.optInLinks = links.files;
+    const own = [...names.entries()].sort((a, b) => b[0].length - a[0].length);
+    for (const f of links.findings) {
+      const abs = resolve(root, f.file);
+      const layer = own.find(([dir]) => abs === dir || abs.startsWith(dir + "/"));
+      findings.push({
+        instance: layer?.[1] ?? f.file.split("/")[0]!,
+        field: "optInLinks",
+        subject: f.file,
+        by: "check:optin-links",
+        detail: `links ${f.target}, inside opt-in \`${f.group}\` — dead wherever that group is switched off; fix the link by hand`,
+      });
+    }
+  } catch (e) {
+    undetermined.push(`check:optin-links could not run — ${(e as Error).message.split("\n")[0]}`);
   }
 
   // A kind problem is reported once per needs edge by every dependent; say each once.

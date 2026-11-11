@@ -117,7 +117,7 @@ const DATA_TYPES = new Set<string>(["bpmn:DataStoreReference", "bpmn:DataObjectR
  * `store` is the id of the `bpmn:dataStore` the reference points at, which is
  * the store's Role id (`work-plan`, `corpus`, `log`, `session-record`, …), the
  * same id a lane's `partitionElementRef` uses. It may be declared in the same
- * file or in an instance's shared stores file; when it is declared nowhere in
+ * file or in a layer's shared stores file; when it is declared nowhere in
  * this file, moddle leaves the reference unset and the id comes from the
  * tolerated warning, exactly as for a lane (`partitionTolerated`).
  */
@@ -547,7 +547,7 @@ export function isGlobalTasksFile(xml: string): boolean {
 }
 
 /**
- * A global `bpmn:dataStore`: a store declared once for an instance, which
+ * A global `bpmn:dataStore`: a store declared once for a layer, which
  * processes point at with a `dataStoreReference` (owner, 2026-11-01, Q-DS-3 A).
  * A file of them and no process is shared like a global-tasks file, and may be
  * the same file.
@@ -687,8 +687,8 @@ export type PreconditionKind =
 /** The checks the engine implements. Adding one is adding a case below. */
 export type PreconditionCheck =
   /**
-   * `ref` names a path, relative to the INSTANCE that owns the diagram, that
-   * must exist. Not the repository root: an instance can be a subdirectory
+   * `ref` names a path, relative to the LAYER that owns the diagram, that
+   * must exist. Not the repository root: a layer can be a subdirectory
    * today and a repository of its own tomorrow, and a ref written against the
    * repository root means a different file in each (bean `r3gy`, group C).
    */
@@ -704,7 +704,7 @@ export interface Precondition {
   /**
    * Present exactly when `kind` is `checkable` — the parser enforces both ways.
    *
-   * `base` is the absolute root of the instance that owns the diagram, found
+   * `base` is the absolute root of the layer that owns the diagram, found
    * when it is parsed. It is carried on the check rather than passed to the
    * evaluator, so no caller can resolve `ref` against a different directory.
    */
@@ -1126,7 +1126,7 @@ function narrativeOf(ext: ReadonlyArray<{ $type: string }>): { narrative?: strin
   return typeof el?.href === "string" && el.href.trim() !== "" ? { narrative: el.href.trim() } : {};
 }
 
-/** Code lists by instance root — loaded once, since every diagram of an instance shares them. */
+/** Code lists by layer root — loaded once, since every diagram of a layer shares them. */
 const codeListCache = new Map<string, Promise<Map<string, CodeList>>>();
 
 async function checkCodeLists(nodes: Map<string, ProcessNode>, bpmnPath: string): Promise<void> {
@@ -1482,7 +1482,7 @@ function globalTaskIndex(dir: string): Map<string, string> {
 }
 
 /**
- * Where a called global task lives in the calling diagram's OWN instance:
+ * Where a called global task lives in the calling diagram's OWN layer:
  * its declared `processes` directories. Never a dependency's — a layer's
  * global tasks are shared within that layer only (owner, 2026-10-20, "c1").
  */
@@ -1496,7 +1496,7 @@ function ownInstanceGlobalTaskIndex(dir: string): Map<string, string> {
 }
 
 /**
- * Where an instance's diagrams live: its own declared `processes`
+ * Where a layer's diagrams live: its own declared `processes`
  * directories, and each dependency's, nearest dependency first. LAYOUT only
  * — paths, never a parsed model (`normaliseOwnExtensions` mutates a model in
  * place, which is why `fallbackRolesBySkill` is a pass and not a cache).
@@ -1512,7 +1512,7 @@ interface InstanceLayout {
 }
 
 /**
- * {@link InstanceLayout}s by instance root, each held with the signature it
+ * {@link InstanceLayout}s by layer root, each held with the signature it
  * was computed under.
  *
  * Bean `sff8`. Resolving the layout re-reads every declaration in the
@@ -1520,15 +1520,15 @@ interface InstanceLayout {
  * and `ownInstanceProcessIndex`, `dependencyProcessIndex` and
  * `ownInstanceGlobalTaskIndex` each did it once per DIAGRAM. Measured
  * 2026-10-24 over 101 diagrams: one `loadProcessModel` pass ~7 s, 49 % of it
- * in that discovery and 28 % in XML parsing. Every diagram of an instance
- * shares one answer, so it is computed once per instance root.
+ * in that discovery and 28 % in XML parsing. Every diagram of a layer
+ * shares one answer, so it is computed once per layer root.
  *
  * Keyed, like {@link readBpmnCached}, on what would change the answer: the
- * instance root's listing and each `*.json` in it (path, mtime, size — the
+ * layer root's listing and each `*.json` in it (path, mtime, size — the
  * declaration among them), the listing of the directory above it (the
- * checkout a nested instance's siblings are discovered in), and the same
- * `*.json` signature of every dependency root. A fixture that adds an
- * instance root, or rewrites a declaration, is resolved again.
+ * checkout a nested layer's siblings are discovered in), and the same
+ * `*.json` signature of every dependency root. A fixture that adds a
+ * layer root, or rewrites a declaration, is resolved again.
  */
 const layouts = new Map<string, { sig: string; depSig: string; depRoots: string[]; layout: InstanceLayout }>();
 
@@ -1596,7 +1596,7 @@ function instanceLayout(dir: string): InstanceLayout {
 /**
  * A diagram's text, read once per (path, mtime, size).
  *
- * The id indexes above walk every `.bpmn` of an instance, and a corpus pass
+ * The id indexes above walk every `.bpmn` of a layer, and a corpus pass
  * loads each diagram once, so the same files were read once per diagram per
  * index. With the global-task index (owner, 2026-10-20, "a1 b1 c1") that was
  * twice per diagram, and the corpus convention test went over its 5 s budget.
@@ -1618,7 +1618,7 @@ function idIndex(dir: string, pattern: RegExp): Map<string, string> {
   const out = new Map<string, string>();
   // RECURSIVE since placement PR3 (bean `63wl`): a declared `processes/`
   // directory groups its diagrams by concern (`processes/sdlc/`,
-  // `processes/process/`, …), so a caller and its callee in one instance can
+  // `processes/process/`, …), so a caller and its callee in one layer can
   // sit in sibling subdirectories. A flat read here turned every cross-group
   // call opaque — no descent, and no `checkAcceptedCodes` — exactly the
   // silent failure `dependencyProcessIndex` was written to stop one level out.
@@ -1640,10 +1640,10 @@ function idIndex(dir: string, pattern: RegExp): Map<string, string> {
 }
 
 /**
- * Where a called process lives in the calling diagram's OWN instance when no
- * file beside it defines it: that instance's declared `processes` directories,
+ * Where a called process lives in the calling diagram's OWN layer when no
+ * file beside it defines it: that layer's declared `processes` directories,
  * walked recursively. Bean `63wl` — once diagrams are grouped by concern, the
- * sibling directory is one group, not the instance.
+ * sibling directory is one group, not the layer.
  *
  * Every process id at once, keyed by id, the directories merged in
  * declaration order with the first definition winning — the answer a per-id
@@ -1660,14 +1660,14 @@ function ownInstanceProcessIndex(dir: string): Map<string, string> {
 
 /**
  * Where a called process lives when no SIBLING file defines it: the declared
- * `processes` directories of the calling diagram's instance's DEPENDENCIES,
+ * `processes` directories of the calling diagram's layer's DEPENDENCIES,
  * nearest dependency first, first definition wins.
  *
  * Bean `cjvs` (2026-09-30). The sibling index was the whole lookup while
  * every calling diagram and its callee shared one directory. Moving
  * `refresh-materialized.bpmn` into `large-datasets/processes/` made it the
  * first diagram whose callee (`Process_Adjudication`) is in ANOTHER
- * instance — one it is allowed to reach, since large-datasets needs
+ * layer — one it is allowed to reach, since large-datasets needs
  * the content core, which needs cat-harness. Without this the call went
  * silently opaque: no descent, and `checkAcceptedCodes` never ran. (Bean
  * `j7ql`, 2026-10-01, dissolved large-datasets into cat-harness, so the
@@ -1676,7 +1676,7 @@ function ownInstanceProcessIndex(dir: string): Map<string, string> {
  *
  * Only DEPENDENCIES are searched, never dependents, so a lower layer's
  * diagram cannot descend into a process defined above it — the same arrow
- * `kg:detangle:direction` grades. Any failure to resolve the instance or its
+ * `kg:detangle:direction` grades. Any failure to resolve the layer or its
  * dependencies yields no entry, which keeps the pre-existing behaviour (the
  * call stays an opaque single step) rather than inventing an answer. Built
  * once per load for every id, like {@link ownInstanceProcessIndex}.
@@ -1701,7 +1701,7 @@ function dependencyProcessIndex(dir: string): Map<string, string> {
  * `satisfied`, so the guarantee is structural rather than a rule somebody has
  * to keep remembering.
  *
- * A `file-exists` ref resolves against `check.base`, the owning instance's
+ * A `file-exists` ref resolves against `check.base`, the owning layer's
  * root, and nothing else — which is why this takes no root argument.
  */
 export function evaluatePrecondition(p: Precondition): PreconditionVerdict {
@@ -1980,7 +1980,7 @@ export function partitionTolerated(raw: readonly unknown[]): {
       if (ww.element.id) unresolvedPartitions.set(ww.element.id, ww.value);
       continue;
     }
-    // A store declared once for the instance, not in this file: the same
+    // A store declared once for the layer, not in this file: the same
     // tolerance a lane's role gets, for the same reason (owner, 2026-11-01).
     if (unresolved && ww.property === "bpmn:dataStoreRef" && ww.element?.$type === "bpmn:DataStoreReference" && typeof ww.value === "string") {
       if (ww.element.id) unresolvedDataStores.set(ww.element.id, ww.value);
@@ -2006,7 +2006,7 @@ export async function loadProcessModel(
   seen: readonly string[] = [],
   /**
    * The fallback process indexes already built during THIS load, by the
-   * calling diagram's directory, so a descent into the same instance does not
+   * calling diagram's directory, so a descent into the same layer does not
    * rebuild them. Created fresh by every top-level call: nothing outlives a
    * load, so a test that rewrites a fixture still sees its own disk.
    */
@@ -2219,9 +2219,9 @@ export async function loadProcessModel(
   const flows = new Map<string, ProcessFlow>();
 
   // The indexes a call resolves against, built once for this load: a
-  // process first (sibling files, then the instance, then its dependencies,
-  // below), and failing a process in this instance, a global task of the
-  // same instance (owner, 2026-10-20, "a1 b1 c1").
+  // process first (sibling files, then the layer, then its dependencies,
+  // below), and failing a process in this layer, a global task of the
+  // same layer (owner, 2026-10-20, "a1 b1 c1").
   const index = processIndex(dirname(bpmnPath));
   const here = homes.get(dirname(bpmnPath)) ?? {};
   homes.set(dirname(bpmnPath), here);
@@ -2443,8 +2443,8 @@ export async function loadProcessModel(
             `ref. The check needs to know WHAT must exist.`,
         );
       }
-      // Relative to the instance, and INSIDE it. An absolute path or a `..`
-      // segment would name a file the instance does not own, which is the
+      // Relative to the layer, and INSIDE it. An absolute path or a `..`
+      // segment would name a file the layer does not own, which is the
       // repository-root dependence this resolution exists to remove.
       if (isAbsolute(ref) || ref.split(/[\\/]/).includes("..")) {
         throw new UnsupportedBpmn(
@@ -2559,10 +2559,10 @@ export async function loadProcessModel(
       );
     }
     // The two fallback indexes are built at most ONCE per directory per
-    // top-level load (`homes`), and only when a call misses the sibling index. Resolving the instance and its
+    // top-level load (`homes`), and only when a call misses the sibling index. Resolving the layer and its
     // dependencies per call activity re-read every declaration in the
     // checkout each time; in the index checkout, which composes eleven
-    // instances, that put the corpus load past the 5 s test budget
+    // layers, that put the corpus load past the 5 s test budget
     // (measured 2026-10-09: content-lifecycle.bpmn 700 ms a load).
     const home =
       index.get(node.calledElement) ??

@@ -38,6 +38,7 @@ import { renderViewPages, VIEW_SEGMENTS } from "./present-views.ts";
 import { demoScreensOf, DEVICE_GLYPH, type DemoScreen, type DemoSource } from "./screens.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
+import { screenExamples } from "../../schemas/process/device-screen.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
 import { blockFor, fromSite, journeyById, lookup, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
@@ -242,14 +243,17 @@ export function mentionedChips(text: string, people: readonly PersonaView[], exc
 
 /** A person's avatar: their picture when the persona names one (from the route root, `ROOT_MARK`), else their glyph or initials on their colour. */
 export function avatar(p: PersonaView, size: "sm" | "md" | "lg" = "md"): string {
-  // A persona's picture where it names one; otherwise initials for everyone, the baby too: one chip
-  // style wherever people are stacked or listed (owner, 2026-11-06), never a glyph among initials.
-  const inner = p.avatar ? `<img src="${e(ROOT_MARK + p.avatar)}" alt="" loading="lazy">` : e(p.initials);
-  return `<span class="jp-av jp-av-${size}${p.avatar ? " jp-av-img" : ""}" style="--c:${e(p.color)}" title="${e(p.name)}" aria-hidden="true">${inner}</span>`;
+  // A persona's picture where it names one; else its `icon` (the baby's face, as VaxLink draws
+  // Somsack: owner's side-by-side review, 2026-11-11, row D05, superseding the 2026-11-06
+  // initials-for-everyone rule); else its initials.
+  const inner = p.avatar ? `<img src="${e(ROOT_MARK + p.avatar)}" alt="" loading="lazy">` : p.icon && GLYPH[p.icon] ? glyph(p.icon) : e(p.initials);
+  return `<span class="jp-av jp-av-${size}${p.avatar ? " jp-av-img" : p.icon && GLYPH[p.icon] ? " jp-av-icon" : ""}" style="--c:${e(p.color)}" title="${e(p.name)}" aria-hidden="true">${inner}</span>`;
 }
 
 // Small line icons (24×24, stroked), drawn for these pages.
 const ICON: Record<string, string> = {
+  up: '<path d="M18 15l-6-6-6 6"/>',
+  reset: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
   eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   route: '<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H17a3.5 3.5 0 0 0 0-7H7a3.5 3.5 0 0 1 0-7h8.5"/>',
@@ -267,6 +271,7 @@ const ICON: Record<string, string> = {
   play: '<path d="M6 3l14 9-14 9z"/>',
   arrow: '<path d="M5 12h14M13 5l7 7-7 7"/>',
   left: '<path d="M15 18l-6-6 6-6"/>',
+  expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
   right: '<path d="M9 18l6-6-6-6"/>',
   package: '<path d="M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/>',
   ext: '<path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
@@ -312,6 +317,7 @@ export const GLYPH: Record<string, string> = {
   paper: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"/>',
   "wifi-off": ICON.wifioff!,
   wifi: ICON.wifi!,
+  battery: '<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2M5 10h9v4H5z"/>',
   "shield-check": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   "calendar-check": '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/>',
   stethoscope: '<path d="M5 3v6a4 4 0 0 0 8 0V3M9 13v2a5 5 0 0 0 10 0v-2"/><circle cx="19" cy="11" r="2"/>',
@@ -324,6 +330,9 @@ export const GLYPH: Record<string, string> = {
   tent: '<path d="M3 21L12 4l9 17zM12 4v17M9 21l3-6 3 6"/>',
   bus: '<rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3M7 15h.01M17 15h.01"/>',
   plane: '<path d="M2 16l20-8-6 13-3-6z"/><path d="M13 15l-5 5"/>',
+  scale: '<path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/>',
+  coins: '<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v4c0 1.7 2.7 3 6 3s6-1.3 6-3V7M9 14v3c0 1.7 2.7 3 6 3s6-1.3 6-3v-4c0-1.6-2.4-2.9-5.5-3"/>',
+  shuffle: '<path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>',
   // The glyphs a device screen adds (`SCREEN_GLYPHS` of the device-screen kind).
   syringe: '<path d="M18 2l4 4M15 5l4 4M17 7l-9.5 9.5a2 2 0 0 1-2.8 0l-.2-.2a2 2 0 0 1 0-2.8L14 4M9 11l2 2M6 14l2 2M5 19l-3 3"/>',
   pill: '<path d="M10.5 20.5a5 5 0 0 1-7-7l10-10a5 5 0 0 1 7 7z"/><path d="M8.5 8.5l7 7"/>',
@@ -355,6 +364,9 @@ export const GLYPH: Record<string, string> = {
   file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"/>',
   "baby-new": '<circle cx="12" cy="8" r="4.5"/><path d="M10.2 7.5h.01M13.8 7.5h.01M10.5 9.8a2 2 0 0 0 3 0M6 21v-1.5a6 6 0 0 1 12 0V21M19 3v4M17 5h4"/>',
 };
+/** An icon's bare paths, for drawing it inside another SVG. */
+export const iconPaths = (name: string): string => ICON[name] ?? "";
+
 export const glyph = (name: string, cls = ""): string =>
   `<svg class="jp-i${cls ? ` ${cls}` : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPH[name] ?? ""}</svg>`;
 
@@ -475,7 +487,7 @@ export const deviceGlyph = (x: DemoScreen, cls = ""): string => glyph(DEVICE_GLY
 /** The Device Demo's name on the frame: the workshop's word for it, else "Device Demo". */
 export const demoLabel = (p: Presentation): string => p.w.workshop.presentation?.deviceDemo?.label ?? "Device Demo";
 
-/** A framed screen's address in the instance's app. */
+/** A framed screen's address in the layer's app. */
 export function screenHref(pr: WorkshopPresentation, id: string, siteRoot: string): string | undefined {
   const d = pr.deviceDemo;
   if (!d) return undefined;
@@ -485,7 +497,9 @@ export function screenHref(pr: WorkshopPresentation, id: string, siteRoot: strin
 /**
  * JSON as HTML with each token in a span (`jp-j-key`, `-str`, `-num`,
  * `-lit`, `-pun`), escaped: the payload drawer's syntax colouring, done once
- * at build so the page needs no highlighter.
+ * at build so the page needs no highlighter. A view page's drawer loads the
+ * JSON instead, and `assets/present.js` colours it with the same rule; the
+ * two must agree (`journeys-viz.test.ts` checks they do).
  */
 export function highlightJson(json: string): string {
   const re = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b|([{}[\],])/g;
@@ -526,6 +540,8 @@ export interface FrameOpts {
   bodyClass?: string;
   /** What sits under the page, fixed at the foot (the payload drawer). */
   foot?: string;
+  /** A band under the app bar, above the presenter's note (the device demo's journey stages). */
+  band?: string;
 }
 
 /** The step range and the scope: "J1 → J4.1 (Thailand ⇄ Lao PDR)". */
@@ -591,9 +607,10 @@ ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="n
       ? `<a${o.view === "demo" ? ' class="is-on" aria-current="page"' : ""} href="${e(`${o.toWorkshop}demo/`)}">${icon("phone", "jp-sky")}<span>${e(demoLabel(o.p))}</span></a>`
       : `<span class="jp-mode-off" aria-disabled="true" title="No device screen shows a step of this workshop">${icon("phone", "jp-sky")}<span>Device Demo</span></span>`
   }</div>
-<div class="jp-links">${links}</div>
+<div class="jp-links">${links}<button type="button" class="jp-btn-link jp-reset" data-jp-reset="${e(ws.id)}" data-jp-reset-to="${e(`${o.toWorkshop}overview/`)}" title="Forget this workshop's answers and the presenter's choices in this browser, and go back to the overview">${icon("reset")}<span>Reset Simulation</span></button></div>
 </div>
 </header>
+${o.band ?? ""}
 ${o.note ? `<div class="jp-note jp-presenter-only"><div><span class="jp-note-tag">PRESENTER NOTE</span><span>${e(o.note)}</span></div><button type="button" data-jp-dismiss>Dismiss</button></div>` : ""}
 <main class="jp-main"><div class="jp-wrap">
 ${o.view === "demo" ? "" : `<nav class="jp-tabs" aria-label="Views">${nav}</nav>`}
@@ -716,6 +733,7 @@ ${ladderHtml}
     ...(pr.presenterNote ? { note: pr.presenterNote } : {}),
     ...(first ? { next: walk(first) } : {}),
     body,
+    foot: viewDrawer(corpus, p, stepsExampleKeys(p.steps), toWorkshop, links ? siteRootFrom(root, links) : root, undefined, "Overview"),
   });
 }
 
@@ -748,19 +766,22 @@ function policyPanel(p: Presentation, s: PresentedStep, toWorkshop: string): str
   const qs = (ws.questions ?? [])
     .map((q) => `<li><a class="jp-mod" href="${e(`${toWorkshop}${moduleSegment(q.module)}/`)}" title="${e(mod(q.module)?.title ?? q.module)}">${e(q.module)}</a><span>${e(q.text)}</span></li>`)
     .join("");
-  // One row per table the step touches, in the workshop's table order.
-  const tables = (w.tables ?? []).filter((t) => (ws.tags ?? []).some((g) => g.table === t.id));
-  const rows = tables
-    .map((t) => {
-      const tags = (ws.tags ?? []).filter((g) => g.table === t.id);
+  // The rows of the card's foot: the workshop's `tagRows` (VaxLink's Forces / Cost driver /
+  // If it is missing), else one row per table the step touches, in the workshop's table order.
+  const groups: { label: string; icon?: string; tables: string[] }[] =
+    w.presentation?.tagRows ?? (w.tables ?? []).map((t) => ({ label: t.title, tables: [t.id] }));
+  const rows = groups
+    .map((gr) => {
+      const tags = gr.tables.flatMap((id) => (ws.tags ?? []).filter((g) => g.table === id));
+      if (tags.length === 0) return "";
       const why = tags.find((g) => g.why);
       const chips = tags
         .map((g) => {
-          const r = t.rows.find((x) => x.id === g.row);
+          const r = w.tables?.find((t) => t.id === g.table)?.rows.find((x) => x.id === g.row);
           return `<span class="jp-pill" title="${e(r?.question ?? r?.what ?? "")}">${e(r?.label ?? g.row)}${g.why ? " ★" : ""}</span>`;
         })
         .join("");
-      return `<div><dt>${e(t.title)}</dt><dd>${chips}${why ? `<span class="jp-why">— ${e(why.why!)}</span>` : ""}</dd></div>`;
+      return `<div><dt>${gr.icon ? glyph(gr.icon) : ""}${e(gr.label)}</dt><dd>${chips}${why ? `<span class="jp-why">— ${e(why.why!)}</span>` : ""}</dd></div>`;
     })
     .join("");
   const scales = w.assessment?.scales ?? [];
@@ -805,18 +826,68 @@ export function processLinks(corpus: JourneyCorpus, pr: WorkshopPresentation, j:
   return out.join("");
 }
 
-/** The FHIR payload drawer of a step: every example it names whose JSON this build has, highlighted, with a copy button. */
-export function payloadDrawer(corpus: JourneyCorpus, st: ScenarioStep, pageOf?: (key: string) => string | undefined): string {
-  const keys = [...new Set([...(st.examples ?? []), ...(st.fhirChanges ?? []).flatMap((c) => c.examples ?? [])])].filter((k) => corpus.examples.get(k)?.json);
-  if (keys.length === 0) return "";
-  const tabs = keys.map((k, i) => `<button type="button" role="tab" data-jp-tab="${e(k)}" aria-selected="${i === 0}"${i === 0 ? ' class="is-on"' : ""}>${e(k)}</button>`).join("");
-  const panes = keys
-    .map((k, i) => `<div class="jp-pane" role="tabpanel" data-jp-pane="${e(k)}"${i === 0 ? "" : " hidden"}>${pageOf?.(k) ? `<p class="jp-pane-link">${ext(pageOf(k)!, `${k} in the IG`, "", DAK_ATTR)}</p>` : ""}<pre class="jp-json"><code>${highlightJson(corpus.examples.get(k)!.json!)}</code></pre></div>`)
+/** The FHIR examples a step names, its own and its FHIR changes', once each, in order. */
+export function stepExampleKeys(st: ScenarioStep): string[] {
+  return [...new Set([...(st.examples ?? []), ...(st.fhirChanges ?? []).flatMap((c) => c.examples ?? [])])];
+}
+
+/** Where a view page loads a FHIR example's JSON from: one file per example, under the workshop's `payload/`, coloured by `present.js` as {@link highlightJson} colours it. */
+export function payloadFile(key: string): string {
+  return `payload/${key.replace("/", "-")}.json`;
+}
+
+export interface DrawerOpts {
+  /** The example's page in the IG, when there is one. */
+  pageOf?: (key: string) => string | undefined;
+  /** What the count says the resources belong to: "at this moment", "on this screen", "in this view". */
+  scope: string;
+  /**
+   * From the page to the workshop's directory. Given, each pane loads its
+   * JSON from the shared {@link payloadFile} on first show instead of
+   * carrying it, so a view page stays small however many moments it spans.
+   */
+  toWorkshop?: string;
+  /** The bar's "Active Stage" chip: the step, the screen or the view the page shows. */
+  stage?: string;
+  /** The workshop's own words for the bar (`presentation.inspector`). */
+  inspector?: WorkshopPresentation["inspector"];
+}
+
+/** A FHIR payload drawer: each example of `keys` whose JSON this build has, highlighted, with a copy button. Empty when none has JSON. */
+export function drawerFor(corpus: JourneyCorpus, keys: readonly string[], o: DrawerOpts): string {
+  const shown = [...new Set(keys)].filter((k) => corpus.examples.get(k)?.json);
+  if (shown.length === 0) return "";
+  const tabs = shown.map((k, i) => `<button type="button" role="tab" data-jp-tab="${e(k)}" aria-selected="${i === 0}"${i === 0 ? ' class="is-on"' : ""}>${e(k)}</button>`).join("");
+  const code = (k: string) =>
+    o.toWorkshop === undefined
+      ? `<pre class="jp-json"><code>${highlightJson(corpus.examples.get(k)!.json!)}</code></pre>`
+      : `<pre class="jp-json" data-jp-src="${e(o.toWorkshop + payloadFile(k))}"><code>Loading ${e(k)}…</code></pre>`;
+  const panes = shown
+    .map((k, i) => {
+      const page = o.pageOf?.(k);
+      return `<div class="jp-pane" role="tabpanel" data-jp-pane="${e(k)}"${i === 0 ? "" : " hidden"}>${page ? `<p class="jp-pane-link">${ext(page, `${k} in the IG`, "", DAK_ATTR)}</p>` : ""}${code(k)}</div>`;
+    })
     .join("");
   return `<aside class="jp-drawer" data-jp-drawer aria-label="FHIR payload inspector">
-<button type="button" class="jp-drawer-bar" data-jp-drawer-toggle aria-expanded="false">${icon("code", "jp-sky3")}<b>FHIR payload inspector</b><span class="jp-drawer-n">${keys.length} resource${keys.length === 1 ? "" : "s"} at this moment</span><span class="jp-drawer-hint">Click to inspect the raw FHIR JSON</span></button>
+<button type="button" class="jp-drawer-bar" data-jp-drawer-toggle aria-expanded="false" title="${e(`${shown.length} resource${shown.length === 1 ? "" : "s"} ${o.scope}`)}">${icon("code", "jp-sky3")}<b>${e(o.inspector?.title ?? "FHIR payload inspector")}</b>${o.stage ? `<span class="jp-drawer-chip">Active Stage: ${e(o.stage)}</span>` : ""}${o.inspector?.key ? `<span class="jp-drawer-key">${glyph("shield-check")}${e(o.inspector.key)}</span>` : ""}<span class="jp-drawer-n">${shown.length} resource${shown.length === 1 ? "" : "s"} ${e(o.scope)}</span><span class="jp-drawer-hint">${e(o.inspector?.hint ?? "Click to inspect the raw FHIR payload")}${icon("up")}</span></button>
 <div class="jp-drawer-body" hidden><div class="jp-drawer-tabs" role="tablist">${tabs}<button type="button" class="jp-copy" data-jp-copy>Copy</button></div>${panes}</div>
 </aside>`;
+}
+
+/** The FHIR payload drawer of a step: every example it names whose JSON this build has, highlighted, with a copy button. */
+export function payloadDrawer(corpus: JourneyCorpus, st: ScenarioStep, pageOf?: (key: string) => string | undefined, inspector?: WorkshopPresentation["inspector"]): string {
+  return drawerFor(corpus, stepExampleKeys(st), { scope: "at this moment", stage: st.id, ...(pageOf ? { pageOf } : {}), ...(inspector ? { inspector } : {}) });
+}
+
+/** A view's drawer: the examples of the steps it spans, loaded from the shared payload files. */
+export function viewDrawer(corpus: JourneyCorpus, p: Presentation, keys: readonly string[], toWorkshop: string, siteRoot: string, scope = "in this view", stage?: string): string {
+  const pr = p.w.workshop.presentation ?? {};
+  return drawerFor(corpus, keys, { scope, toWorkshop, pageOf: (k) => artifactPage(corpus, pr, k, siteRoot), ...(stage ? { stage } : {}), ...(pr.inspector ? { inspector: pr.inspector } : {}) });
+}
+
+/** The examples of a run of steps, once each, in step order. */
+export function stepsExampleKeys(steps: readonly PresentedStep[]): string[] {
+  return [...new Set(steps.flatMap((s) => stepExampleKeys(s.step)))];
 }
 
 function hood(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, links: SiteLinks, root: string): string {
@@ -865,8 +936,10 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
   const inspect = (k: string | undefined) => (k && corpus.examples.get(k)?.json ? `<button type="button" class="jp-inspect" data-jp-inspect="${e(k)}">Inspect JSON</button>` : "");
   const exLink = (k: string, label: string) => {
     const href = examplePage(corpus, pr, k, siteRoot);
-    return href ? ext(href, label, "", DAK_ATTR) : `<span class="jp-small">${e(label)}</span>`;
+    return href ? ext(href, label, "jp-exlabel", `${DAK_ATTR} title="${e(k)}"`) : `<span class="jp-small jp-exlabel" title="${e(k)}">${e(label)}</span>`;
   };
+  // An example reads as words, as VaxLink's do: its title in the artifact index, else its id.
+  const exLabel = (k: string) => corpus.examples.get(k)?.title ?? k.split("/")[1] ?? k;
   const profileChip = (profile: string | undefined, of?: string) => {
     if (!profile) return "";
     const href = profilePage(pr, profile, siteRoot, corpus);
@@ -878,7 +951,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
         const first = c.examples?.[0];
         const head = first && examplePage(corpus, pr, first, siteRoot) ? `<a class="jp-mono" href="${e(examplePage(corpus, pr, first, siteRoot)!)}" ${DAK_ATTR} target="_blank" rel="noopener noreferrer">${e(c.resource)}</a>` : `<span class="jp-mono">${e(c.resource)}</span>`;
         const json = (c.examples ?? []).find((k) => corpus.examples.get(k)?.json);
-        const more = [...(c.examples ?? []).map((k) => exLink(k, k.split("/")[1] ?? k)), c.spec ? ext(c.spec, "base standard", "jp-ext-soft") : ""].filter(Boolean).join("");
+        const more = [...(c.examples ?? []).map((k) => exLink(k, exLabel(k))), c.spec ? ext(c.spec, "base standard", "jp-ext-soft") : ""].filter(Boolean).join("");
         return `<li>${icon("file", "jp-sky")}<div><div class="jp-fhir-row">${head}${profileChip(c.profile, c.profileOf)}<span class="jp-fhir-change">${e(c.change)}</span>${inspect(json)}</div>${c.why ? `<p class="jp-fhir-why">${e(c.why)}</p>` : ""}${more ? `<div class="jp-fhir-links">${more}</div>` : ""}</div></li>`;
       })
     : examples.map((k) => {
@@ -971,7 +1044,8 @@ ${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> $
       // Whose device it is: a drawn screen's owner, else the step's lead.
       const ownerId = sc.node?.screen.owner;
       const who = (ownerId ? p.cast.find((x) => x.id === ownerId) ?? personaOf(corpus, sc.node!.instance, ownerId, p.cast.length) : undefined) ?? lead;
-      return `<a class="jp-see" href="${e(`${toWorkshop}demo/${sc.id}/`)}">${who ? avatar(who, "sm") : deviceGlyph(sc)}<span>See what ${e(who?.name ?? "they")} ${who?.name ? "sees" : "see"} <small>(screen ${e(sc.id)})</small></span>${icon("right")}</a>`;
+      // VaxLink's full-width button at the right column's foot: the device, then whose screen it is.
+      return `<a class="jp-see" href="${e(`${toWorkshop}demo/${sc.id}/`)}">${deviceGlyph(sc)}<span>See what ${e(who?.name ?? "they")} ${who?.name ? "sees" : "see"} <small>(screen ${e(sc.id)})</small></span></a>`;
     })
     .join("");
   void siteRoot;
@@ -984,13 +1058,13 @@ ${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> $
 <div class="jp-story-head"><h2><a href="./" title="Link to this moment">${e(st.title)}</a></h2>${pic || chapterScene(chapter) ? `<div class="jp-story-pic">${pic}${sceneStrip(chapterScene(chapter), tones.get(country ?? "") ?? "sky", "sm")}</div>` : ""}</div>
 ${st.headline ? `<p class="jp-headline">${personaText(st.headline, p.cast, pl)}</p>` : ""}
 ${meta ? `<div class="jp-meta">${meta}</div>` : ""}
-${screens ? `<div class="jp-sees">${screens}</div>` : ""}
 </section>
 <section><h3 class="jp-h jp-h-pad">Who’s in this moment</h3><div class="jp-whos">${personCards}</div></section>
 ${st.painPoint || st.enabler ? `<section class="jp-pe">${st.painPoint ? `<div class="jp-pain"><div class="jp-h">${icon("alert")} Without this</div><p>${personaText(st.painPoint, p.cast, pl)}</p></div>` : ""}${st.enabler ? `<div class="jp-enable"><div class="jp-h">${icon("sparkles")} What makes it work</div><p>${personaText(st.enabler, p.cast, pl)}</p></div>` : ""}</section>` : ""}
 </div>
 <div class="jp-walk-r">
 ${record}${ask}${whatIf}${policy}${policyPanel(p, s, toWorkshop)}${cue}
+${screens ? `<div class="jp-sees">${screens}</div>` : ""}
 </div>
 </div>
 <div class="jp-hood-toggle"><i></i><button type="button" class="is-on" data-jp-hood-toggle aria-controls="hood" aria-expanded="true">${icon("cpu")}<span class="jp-hood-hide">Hide what’s under the hood</span><span class="jp-hood-show">Show what’s under the hood</span></button><i></i></div>
@@ -1005,7 +1079,7 @@ ${hood(corpus, p, s, links, root)}`;
     ...(prev ? { prev } : { prev: "../../overview/" }),
     next,
     body,
-    foot: payloadDrawer(corpus, st, (k) => artifactPage(corpus, pr, k, siteRoot)),
+    foot: payloadDrawer(corpus, st, (k) => artifactPage(corpus, pr, k, siteRoot), pr.inspector),
   });
 }
 
@@ -1021,6 +1095,12 @@ export function renderPresentationPages(corpus: JourneyCorpus, links: SiteLinks)
     out.push({ path: `${base}/overview/index.html`, content: overviewPage(corpus, p, links) });
     for (const s of p.steps) out.push({ path: `${base}/walkthrough/${s.key}/index.html`, content: stepPage(corpus, p, s, links) });
     for (const f of renderViewPages(corpus, p, links)) out.push({ ...f, path: `${base}/${f.path}` });
+    // The JSON the views' drawers load: once per example, not once per page.
+    const keys = new Set([...stepsExampleKeys(p.steps), ...p.screens.flatMap((x) => (x.node ? screenExamples(x.node.screen) : []))]);
+    for (const k of keys) {
+      const json = corpus.examples.get(k)?.json;
+      if (json) out.push({ path: `${base}/${payloadFile(k)}`, content: json });
+    }
   }
   return out;
 }

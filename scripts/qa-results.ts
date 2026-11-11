@@ -171,7 +171,7 @@ export function qaResultPath(root: string, stem: string): string {
 }
 
 /**
- * Any file under an instance's QA results directory, by its path inside it —
+ * Any file under a layer's QA results directory, by its path inside it —
  * for the QA records that are not `qa-results/v1` (`viewer-nav/viewer-nav.qa.json`).
  * The same one composition as {@link qaResultPath}.
  */
@@ -292,7 +292,7 @@ export type BaselineRead =
 function storedOn(absPath: string, repoRoot?: string, location?: QaLocation): string | undefined {
   try {
     // A caller judging many paths resolves the location ONCE and passes it:
-    // resolving it per path walks every instance each time, and over the 84
+    // resolving it per path walks every layer each time, and over the 84
     // library entries that ran the real-corpus test past bun's 5 s limit,
     // whose SIGTERM to `git rev-parse` this catch then read as "not stored".
     const loc = location ?? resolveQaLocation(repoRoot);

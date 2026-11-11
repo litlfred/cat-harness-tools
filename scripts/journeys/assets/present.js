@@ -154,13 +154,82 @@
     return show;
   }
 
+  // highlightJson of present.ts, the same rule: keep the two alike.
+  function esc(t) {
+    return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function highlightJson(json) {
+    var re = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b|([{}[\],])/g;
+    var out = "";
+    var last = 0;
+    var m;
+    while ((m = re.exec(json)) !== null) {
+      out += esc(json.slice(last, m.index));
+      if (m[1] !== undefined) out += m[2] !== undefined ? '<span class="jp-j-key">' + esc(m[1]) + "</span>" + esc(m[2]) : '<span class="jp-j-str">' + esc(m[1]) + "</span>";
+      else if (m[3] !== undefined) out += '<span class="jp-j-num">' + m[3] + "</span>";
+      else if (m[4] !== undefined) out += '<span class="jp-j-lit">' + m[4] + "</span>";
+      else out += '<span class="jp-j-pun">' + esc(m[5]) + "</span>";
+      last = m.index + m[0].length;
+    }
+    return out + esc(json.slice(last));
+  }
+
   function drawer(d) {
-    var show = tabs(d);
+    var pick = tabs(d);
     var bar = d.querySelector("[data-jp-drawer-toggle]");
     var body = d.querySelector(".jp-drawer-body");
+    // A view page's panes name their JSON (data-jp-src) instead of carrying
+    // it: one shared file per example, fetched and coloured when shown.
+    // Opened from disk (file://) a browser refuses the fetch, so the pane
+    // links the file instead: the browser opens a local JSON file itself.
+    function offline(pre, why) {
+      var src = pre.getAttribute("data-jp-src");
+      var code = pre.querySelector("code");
+      code.textContent = why + " ";
+      var a = doc.createElement("a");
+      a.href = src;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.className = "jp-json-open";
+      a.textContent = "Open " + src.replace(/^.*\//, "");
+      code.appendChild(a);
+    }
+    function load() {
+      if (body.hidden) return;
+      var pre = d.querySelector("[data-jp-pane]:not([hidden]) pre[data-jp-src]");
+      if (!pre || pre.hasAttribute("data-jp-loading")) return;
+      if (location.protocol === "file:") {
+        offline(pre, "This page is open from disk, so the JSON is in its own file:");
+        return;
+      }
+      pre.setAttribute("data-jp-loading", "");
+      fetch(pre.getAttribute("data-jp-src"))
+        .then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.text();
+        })
+        .then(function (json) {
+          pre.querySelector("code").innerHTML = highlightJson(json);
+          pre.removeAttribute("data-jp-src");
+        })
+        .catch(function () {
+          offline(pre, "Could not load this payload here.");
+        })
+        .then(function () {
+          pre.removeAttribute("data-jp-loading");
+        });
+    }
+    function show(id) {
+      pick(id);
+      load();
+    }
+    Array.prototype.forEach.call(d.querySelectorAll("[data-jp-tab]"), function (b) {
+      b.addEventListener("click", load);
+    });
     function open(on) {
       body.hidden = !on;
       bar.setAttribute("aria-expanded", String(on));
+      load();
     }
     bar.addEventListener("click", function () {
       open(body.hidden);
@@ -176,7 +245,7 @@
     if (copy) {
       copy.addEventListener("click", function () {
         var pane = d.querySelector("[data-jp-pane]:not([hidden]) pre");
-        if (!pane || !navigator.clipboard) return;
+        if (!pane || pane.hasAttribute("data-jp-src") || !navigator.clipboard) return;
         navigator.clipboard.writeText(pane.textContent).then(function () {
           copy.textContent = "Copied";
           setTimeout(function () {
@@ -354,8 +423,43 @@
     draw();
   }
 
+  // Reset Simulation (VaxLink's second bar): forget what this browser keeps for the
+  // workshop (the gap strip's answers, jv:<workshop>:…) and for the viewer (the
+  // presenter's and the hood's choices, jp:…), then start again at the overview.
+  function reset(b) {
+    b.addEventListener("click", function () {
+      if (!window.confirm("Reset the simulation? This forgets the room's answers and choices kept in this browser.")) return;
+      var ws = "jv:" + b.getAttribute("data-jp-reset") + ":";
+      try {
+        var drop = [];
+        for (var i = 0; i < window.localStorage.length; i++) {
+          var k = window.localStorage.key(i);
+          if (k && (k.indexOf(ws) === 0 || k.indexOf("jp:") === 0)) drop.push(k);
+        }
+        drop.forEach(function (k) {
+          window.localStorage.removeItem(k);
+        });
+      } catch (_e) {
+        /* storage unavailable: nothing kept */
+      }
+      window.location.href = b.getAttribute("data-jp-reset-to");
+    });
+  }
+
   function init() {
     oldAddress();
+    each("[data-jp-reset]", reset);
+    // The device demo's Expand: the device, full screen.
+    each("[data-jp-expand]", function (b) {
+      var stage = doc.querySelector("[data-jp-stage]");
+      if (!stage || !stage.requestFullscreen) {
+        b.hidden = true;
+        return;
+      }
+      b.addEventListener("click", function () {
+        stage.requestFullscreen();
+      });
+    });
     each("[data-jp-presenter]", function (b) {
       b.addEventListener("click", function () {
         setPresenter(root.getAttribute("data-presenter") !== "on");

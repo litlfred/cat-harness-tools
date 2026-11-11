@@ -15,10 +15,10 @@
  * every `beans` directory. `governs:` is for the case the kind cannot say — a
  * domain skill over one `docs` or `tools` directory — where listing the
  * generic kind would claim every directory of it. Instance-qualified because a
- * directory id is unique only within its instance: the DAK base layer and
+ * directory id is unique only within its layer: the DAK base layer and
  * `cat-harness` each declare one called `tools`.
  *
- * A kind claim reaches only the skill's own instance and the instances that
+ * A kind claim reaches only the skill's own layer and the layers that
  * DEPEND on it: the FHIR IG harness's `ig-build-pipeline` governs that harness's
  * tools and never `cat-harness`'s, which does not depend on it.
  *
@@ -32,7 +32,7 @@ export interface SkillGovernance {
   skill: string;
   /** Repository-relative path of the skill file. */
   file: string;
-  /** The instance directory the skill lives in (its first path segment). */
+  /** The layer directory the skill lives in (its first path segment). */
   instance: string;
   kinds: string[];
   directories: string[];
@@ -77,8 +77,8 @@ export function skillGovernance(repoRoot: string, files: readonly string[]): Ski
 /**
  * The skills governing one directory.
  *
- * @param dir the directory's instance, id and graph typologies
- * @param reach absolute roots of the directory's instance and every instance
+ * @param dir the directory's layer, id and graph typologies
+ * @param reach absolute roots of the directory's layer and every layer
  *   it depends on — a kind claim counts only from a skill in one of them
  */
 export function governingSkills(

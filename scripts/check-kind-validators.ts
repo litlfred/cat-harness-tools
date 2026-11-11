@@ -48,7 +48,7 @@ import { mountChoiceOf } from "../schemas/kg/remote-mount.js";
 import { graphReadPath } from "./graph-read.ts";
 import { ownedOutside, typologyOwner } from "../schemas/kg/node-kind-index.js";
 
-/** The INSTANCE root — this file lives at `<instance>/scripts/`. */
+/** The LAYER root — this file lives at `<instance>/scripts/`. */
 const instanceRoot = HARNESS_ROOT;
 
 export interface ValidatorSweep {
@@ -74,7 +74,7 @@ export interface ValidatorSweep {
    */
   contradictory: string[];
   /**
-   * A kind owned by an instance this checkout does not hold (`ownedOutside`),
+   * A kind owned by a layer this checkout does not hold (`ownedOutside`),
    * with that owner: its validator is that layer's to declare and its gate's to
    * judge, so it is in none of the states above. Standalone these are the
    * fixture's kinds (bean `w1gy`); in a composed checkout it is empty.
@@ -143,7 +143,7 @@ export interface FamilySweep {
   unmapped: { tag: string; example: string }[];
   /**
    * A tag the map does not name, met ONLY inside a checkout-built
-   * `builtAtPublish` path: a projection of another instance's graph (the byte
+   * `builtAtPublish` path: a projection of another layer's graph (the byte
    * copies under `docs/assets/library/jsonld/`, bean `8pzh`), whose nodes are
    * judged where their source is declared. Reported, never a failure.
    */
@@ -152,7 +152,7 @@ export interface FamilySweep {
   unresolvable: { tag: string; reason: string }[];
   /** A node that fails its family's Zod schema. */
   invalid: { file: string; issue: string }[];
-  /** No instance declares a directory of this kind — nested, or not yet present. */
+  /** No layer declares a directory of this kind — nested, or not yet present. */
   noDirectory?: boolean;
   /**
    * Every declared directory of this kind keeps its content on a branch TIP
@@ -198,7 +198,7 @@ export interface FamilySweep {
   derivedNotComputed?: { id: string; at: string; branch: string }[];
   /**
    * Declared directories of this kind that the mount which placed their
-   * instance did NOT choose: the upstream declares them, the lock
+   * layer did NOT choose: the upstream declares them, the lock
    * (`instances[].directories`) does not record them, and they are not on
    * disk. **Not examined — never `EXAMINED NOTHING`.** A downstream that
    * mounts only an upstream's `glossary/` has no `references/` to read, and
@@ -283,9 +283,9 @@ export async function sweepFamilies(
   // and the library map must not call that kind's run contexts and work lists
   // "unmapped" (folio-assistant#2529).
   const declaredDirs: { abs: string; kinds: readonly string[] }[] = [];
-  // The checkout-built `builtAtPublish` paths of every instance: what they
-  // hold is computed over OTHER instances, so a family met only there is the
-  // projected instance's (see `FamilySweep.projected`).
+  // The checkout-built `builtAtPublish` paths of every layer: what they
+  // hold is computed over OTHER layers, so a family met only there is the
+  // projected layer's (see `FamilySweep.projected`).
   const checkoutBuilt: string[] = [];
   for (const inst of instanceRootsIn(join(root, ".."))) {
     for (const b of readDeclaration(inst)?.builtAtPublish ?? []) {
@@ -302,7 +302,7 @@ export async function sweepFamilies(
     }
     return best;
   };
-  // A NESTED kind: it names its `$schema` families and no instance declares a
+  // A NESTED kind: it names its `$schema` families and no layer declares a
   // directory of it, so its nodes sit inside a parent kind's directory (the
   // IG artefact JSON-LD that gen-ig-pages writes under an `ig-pages` docs
   // root). Its families route from the parent's sweep and count as its own.
@@ -352,7 +352,7 @@ export async function sweepFamilies(
         if (onFamily.has(d.absPath.replace(/\/$/, ""))) continue;
         declared++;
         // Declared upstream, not chosen by the mount that placed this
-        // instance, and not on disk: there is nothing here to read, and that
+        // layer, and not on disk: there is nothing here to read, and that
         // is not the same answer as an empty directory (see `notMounted`).
         if (!existsSync(d.absPath)) {
           const choice = mountChoiceOf(inst, d.absPath);
@@ -371,9 +371,9 @@ export async function sweepFamilies(
           }
         })();
         const atTip = src?.kind === "branch" && src.keyedBy === "tip";
-        // A directory in the checkout is read where its own instance declares
+        // A directory in the checkout is read where its own layer declares
         // it. `graphReadPath` resolves an id across the whole repository, so
-        // two instances' `glossary` would both resolve to one of them — only a
+        // two layers' `glossary` would both resolve to one of them — only a
         // branch-stored graph needs it, to find its mount.
         if (src?.kind !== "branch") {
           // Built at publish and not built here: nothing committed to read.
@@ -621,7 +621,7 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  // A VALIDATOR NODE naming a kind no instance declares (bean riit): the
+  // A VALIDATOR NODE naming a kind no layer declares (bean riit): the
   // registry cannot join it to anything, so its code checks nothing. A node
   // naming an unlisted family already throws at load, with its path.
   const orphans = defaultGraphTypologies.validatorNodeList().filter((v) => !defaultGraphTypologies.has(v.node.validates.kind));
@@ -666,7 +666,7 @@ async function main(): Promise<number> {
 
   // CONTENT ADAPTERS (bean riit, step 5): every block kind's `adapter` names
   // a vocabulary some `folio-content-adapter/v1` node declares, and an untyped
-  // vocabulary's `vocabulary` module exists in the instance that declares it.
+  // vocabulary's `vocabulary` module exists in the layer that declares it.
   // A kind naming no vocabulary would split into neither the typed list nor
   // a contribution, and be read by nothing.
   {
@@ -690,11 +690,11 @@ async function main(): Promise<number> {
 
   // CONTRIBUTION NODES (bean riit, step 3b): every QA checker and pipeline
   // plugin a harness declares as a node must resolve to the table entry its
-  // ref names. The platform root's dependency tree holds every instance, so
+  // ref names. The platform root's dependency tree holds every layer, so
   // loading its contributions loads every node; a node naming code that is
   // not there throws, with the node's path.
   if (REPO_ROOT === undefined) {
-    // Standalone: no checkout holds the contributing instances, so nothing is
+    // Standalone: no checkout holds the contributing layers, so nothing is
     // examined — said, never read as a pass.
     console.log("\n· contribution nodes not examined: standalone, no checkout holds the instances that declare them");
   } else {

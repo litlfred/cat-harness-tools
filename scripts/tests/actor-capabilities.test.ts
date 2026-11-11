@@ -2,10 +2,10 @@
  * `actor-capabilities-resolve` reads capabilities over the layers the actors
  * came from.
  *
- * The defect: the platform's run overlays every instance above it for ACTORS
+ * The defect: the platform's run overlays every layer above it for ACTORS
  * (`checkoutActors`) but read CAPABILITIES from the platform's
  * `scenarios/capabilities/` alone, so `folio-assistant-sci`'s `lean-mcp`,
- * claiming the `lean-toolchain` capability that same instance declares, was
+ * claiming the `lean-toolchain` capability that same layer declares, was
  * reported unresolved — CRITICAL. Built as a throwaway tree, never the live
  * repository.
  */
@@ -51,7 +51,7 @@ describe("actor-capabilities-resolve — capabilities over the actors' layers", 
     try {
       const platform = join(root, "cat-harness");
       const actors = checkoutActors(platform, PLATFORM_ACTORS(root));
-      // Anti-vacuity: the overlay did bring the higher instance's actor in.
+      // Anti-vacuity: the overlay did bring the higher layer's actor in.
       expect(actors.map((a) => a.id).sort()).toEqual(["admin", "lean-mcp"]);
       const caps = declaredCapabilityIds(platform, PLATFORM_CAPS(root), "checkout");
       expect(caps.has("lean-toolchain")).toBe(true);

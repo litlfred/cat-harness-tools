@@ -63,7 +63,7 @@ describe("the real corpus", () => {
   test("pages actually declare the field — otherwise this file asserts nothing", () => {
     // `6tkl`. The first two versions of my own scanner reported a clean sweep
     // over ZERO pages: once because `translation-index` is rooted at the
-    // instance rather than the repo, once because `SITE_DIR` is the site
+    // layer rather than the repo, once because `SITE_DIR` is the site
     // directory's NAME and my pathspec matched nothing.
     expect(report.declaring).toBeGreaterThan(0);
   });
@@ -129,7 +129,7 @@ describe("sourceKeyByTranslation — the inversion", () => {
     // `pageKey` strips the extension and leading slash, because Jekyll serves
     // one page at several spellings under a `baseurl` this code does not know.
     // Matching on `/fr/architecture.html` would work here and break on any
-    // instance with a baseurl.
+    // layer with a baseurl.
     expect(bySource.has("/fr/architecture.html")).toBe(false);
   });
 });

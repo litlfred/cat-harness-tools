@@ -1,23 +1,23 @@
 #!/usr/bin/env bun
 /**
- * Can this instance render its own JSON-LD, and does it publish what it owns?
+ * Can this layer render its own JSON-LD, and does it publish what it owns?
  *
- * Rendering JSON-LD is a conformance requirement of every instance, including
+ * Rendering JSON-LD is a conformance requirement of every layer, including
  * one whose declaration names directories this repository does not have.
  *
  * ## Why "did it throw" is not the check
  *
  * **An export of nothing succeeds**: a reader resolving a directory against
  * the wrong root finds nothing and renders cleanly, and an export can publish
- * kinds the instance never declared. So this compares what the instance
+ * kinds the layer never declared. So this compares what the layer
  * DECLARES with what it PUBLISHES.
  *
  * ## Declared means transitively declared
  *
- * The instance declaration names a directory and the graph typologies in it;
+ * The layer declaration names a directory and the graph typologies in it;
  * a graph file inside that directory may name more. `beans/beans.json`
  * declares `bean-defs` and `workflow-state`, `todos/todos.json` declares
- * `todo-items` and `todo-feedback`. Those are the instance's, declared one
+ * `todo-items` and `todo-feedback`. Those are the layer's, declared one
  * level down.
  *
  * ## Three states
@@ -25,18 +25,18 @@
  * - **rendered** — it declared, it published, and everything it published is
  *   its own.
  * - **undetermined** — no declaration, or one that will not parse. NEVER a
- *   pass: an instance whose declaration cannot be read has not been shown to
+ *   pass: a layer whose declaration cannot be read has not been shown to
  *   render, it has been shown to be unreadable. Exit 2.
  * - **failed** — the render threw, or it published nothing, or it published a
  *   kind it does not own. Exit 1.
  *
- * ## An instance that declares no directories renders nothing, and passes
+ * ## A layer that declares no directories renders nothing, and passes
  *
- * An instance may declare `directories: []` (e.g. an index that mounts none
+ * A layer may declare `directories: []` (e.g. an index that mounts none
  * of a repository's directories). Its render is then empty BY DECLARATION,
  * so it is **rendered**, flagged `noDirectories`, and reported as "declares
  * no directories" in the summary. The exemption is exactly the explicit
- * empty list: an instance that declares a directory and renders nothing
+ * empty list: a layer that declares a directory and renders nothing
  * still fails, and so does one whose declaration leaves `directories` out.
  *
  * Usage:
@@ -62,15 +62,15 @@ import {
 } from "../schemas/kg/cat-harness.js";
 import { collectInstanceNodes } from "./kg-export.js";
 
-/** How an instance's render came out. Never two states. */
+/** How a layer's render came out. Never two states. */
 export type RenderVerdict = "rendered" | "undetermined" | "failed";
 
 export interface InstanceRender {
-  /** The instance's directory name, for reporting. */
+  /** The layer's directory name, for reporting. */
   name: string;
   root: string;
   verdict: RenderVerdict;
-  /** Graph typologies the instance declares, transitively. */
+  /** Graph typologies the layer declares, transitively. */
   declared: string[];
   /** Graph typologies it actually published nodes for. */
   published: string[];
@@ -78,7 +78,7 @@ export interface InstanceRender {
    * Published and not declared — REPORTED, not yet fatal.
    *
    * Measured on `35b868a45d`: cat-harness 1 (`folio`, contributed by core),
-   * bootstrap 15. Both instances publish all 16 registered kinds because
+   * bootstrap 15. Both layers publish all 16 registered kinds because
    * `collectGraphTypologies()` takes no root — `COLLECTOR_SCOPE` files `graphTypologies`
    * as `universal`, "reads nothing instance-specific at all". A graph typology is
    * contributed by a LAYER, so the registry is global in STORAGE and not in
@@ -93,10 +93,10 @@ export interface InstanceRender {
    */
   undeclared: string[];
   /**
-   * Nodes the instance itself contributed — skills, processes, roles, its
+   * Nodes the layer itself contributed — skills, processes, roles, its
    * declaration. Zero is a FAILURE, not an empty success.
    *
-   * Excludes the graph-typology registry, which every instance gets for free
+   * Excludes the graph-typology registry, which every layer gets for free
    * because `collectGraphTypologies()` takes no root. Counting those made the
    * emptiness guard unreachable; see `renderInstance`.
    */
@@ -106,13 +106,13 @@ export interface InstanceRender {
   /** Collectors deliberately not run, so "has none" is distinct from "never looked". */
   omitted: readonly string[];
   /**
-   * Determined empties — things this instance was looked for and has none of.
+   * Determined empties — things this layer was looked for and has none of.
    *
    * Reported, never fatal, and that is the distinction it exists to carry.
    * "No workflow diagrams under a declared knowledge-graph directory" is a
-   * fact worth printing and not a reason to fail an instance: a skills
+   * fact worth printing and not a reason to fail a layer: a skills
    * package with no process is ordinary. Before this, it was a `problem`, and
-   * three instances holding one skill each failed on it alone.
+   * three layers holding one skill each failed on it alone.
    *
    * Different from `omitted`, which is "never looked for". This one IS the
    * result of looking.
@@ -128,16 +128,16 @@ export interface InstanceRender {
 }
 
 /**
- * Every graph typology an instance declares, following nested graph files.
+ * Every graph typology a layer declares, following nested graph files.
  *
  * A directory entry names kinds; a graph file INSIDE that directory may name
- * more, and those are equally the instance's. Reading only `harness.json`
+ * more, and those are equally the layer's. Reading only `harness.json`
  * makes `bean-defs` look like something bootstrap smuggled in.
  */
 
 /**
  * Whether the declaration as WRITTEN says `directories: []` (C1). Read raw:
- * the parsed declaration gives an instance that leaves `directories` out the
+ * the parsed declaration gives a layer that leaves `directories` out the
  * same empty list, and that one has not declared that it holds nothing.
  */
 export function declaresNoDirectories(root: string): boolean {
@@ -152,10 +152,10 @@ export function declaresNoDirectories(root: string): boolean {
 }
 
 /**
- * Render one instance and judge it.
+ * Render one layer and judge it.
  *
- * `base` is a placeholder rather than the instance's `canonicalUrl`: this asks
- * whether the instance CAN render, not where it publishes, and an instance
+ * `base` is a placeholder rather than the layer's `canonicalUrl`: this asks
+ * whether the layer CAN render, not where it publishes, and a layer
  * with no canonical URL must still be checkable.
  */
 export async function renderInstance(root: string): Promise<InstanceRender> {
@@ -193,13 +193,13 @@ export async function renderInstance(root: string): Promise<InstanceRender> {
     };
   }
 
-  // THE INSTANCE'S OWN NODES, which is not the node count.
+  // THE LAYER'S OWN NODES, which is not the node count.
   //
   // `collectGraphTypologies()` is classified `universal` — it takes no root and
-  // emits the whole registry — so EVERY instance gets those nodes for free,
+  // emits the whole registry — so EVERY layer gets those nodes for free,
   // including one that declares nothing. The first version of this check
-  // failed an instance on `nodes.length === 0`, and its own test proved that
-  // condition unreachable: an empty instance renders 16 nodes, all of them
+  // failed a layer on `nodes.length === 0`, and its own test proved that
+  // condition unreachable: an empty layer renders 16 nodes, all of them
   // the registry's.
   //
   // A guard that cannot fire is a guard that reports a clean run, which is
@@ -220,7 +220,7 @@ export async function renderInstance(root: string): Promise<InstanceRender> {
   // this repository's own precedent, stated in `code-quality-gates.yml` for
   // ruff: "a check is an error only once its count is zero". These three are
   // at zero and so are errors; `undeclared` is at 16 and so is a finding.
-  // An explicit `directories: []` is an instance that declares nothing to
+  // An explicit `directories: []` is a layer that declares nothing to
   // render (C1): its empty graph is the declaration's, not a lost directory's.
   const noDirectories = declaresNoDirectories(root);
   if (ownNodes === 0 && !noDirectories) {
@@ -247,11 +247,11 @@ export async function renderInstance(root: string): Promise<InstanceRender> {
 }
 
 /**
- * Every instance this repository owns — the root, and any beside it.
+ * Every layer this repository owns — the root, and any beside it.
  *
  * The docstring above is unchanged and was FALSE in both halves until
  * 2026-09-20: this listed `["cat-harness", "bootstrap"]`, so the root was not
- * in it and two instances beside it were missing. There are four —
+ * in it and two layers beside it were missing. There are four —
  * `folio-assist-core` and the repository root are the two that were going
  * unchecked, and `check-declared-assets` carried the same literal and the same
  * blind spot (bean `6tkl`).
@@ -281,7 +281,7 @@ export function formatReport(rs: InstanceRender[]): string {
       );
     }
     if (r.omitted.length) out.push(`      not looked for: ${r.omitted.join(", ")}`);
-    // Printed for a RENDERED instance too — a determined empty that only
+    // Printed for a RENDERED layer too — a determined empty that only
     // shows up on failures is a determined empty nobody reads.
     for (const n of r.notes ?? []) out.push(`      looked, found none: ${n}`);
   }
@@ -298,12 +298,12 @@ export function formatReport(rs: InstanceRender[]): string {
     // fatal … they become fatal when collectGraphTypologies() is instance-scoped
     // and the count reaches zero — bean z4mq". Both halves have happened:
     // `collectGraphTypologies` takes a root and filters by `declaredKinds`, and
-    // the count is zero across every instance in this repository.
+    // the count is zero across every layer in this repository.
     //
     // The repository's standing rule is that a check is an error only once
     // its count is zero, and the corollary is that it should become one THEN
     // rather than later — a finding left advisory after it is clearable is
-    // how the next instance quietly reacquires it.
+    // how the next layer quietly reacquires it.
     out.push(
       `${findings} instance(s) publish a graph typology they do not declare. An instance that ` +
         `advertises a vocabulary it cannot reach is a type that does not dereference.`,
@@ -327,7 +327,7 @@ if (import.meta.main) {
   // FROM. Bean `hfkl`: bootstrap is excused the visualiser and the
   // workflow visualiser, and owes its own `.jsonld`/`.json` instead.
   //
-  // Checked across every instance in ONE call rather than per instance,
+  // Checked across every layer in ONE call rather than per layer,
   // because the property that matters is not "is this claim well-formed" but
   // "how many layers claim it". The exemption is the bottom of the stack and
   // there is one bottom; a second claimant is the requirement spreading

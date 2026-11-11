@@ -11,7 +11,7 @@ import { dependenciesFromNeeds, resolveInstanceGraph, resolveSkillDirs } from ".
  *
  * `yag0` this week was an assertion derived from the very data it was meant to
  * check — it passed on broken data. These build the shape under test so the
- * assertion survives the repository's own instances changing.
+ * assertion survives the repository's own layers changing.
  */
 function tree(instances: Record<string, object>): string {
   const root = mkdtempSync(join(tmpdir(), "overlay-"));
@@ -22,7 +22,7 @@ function tree(instances: Record<string, object>): string {
   return root;
 }
 
-/** An instance declared AT a directory, rather than one level under it. */
+/** A layer declared AT a directory, rather than one level under it. */
 function rootInstance(at: string, name: string, body: object): void {
   writeFileSync(join(at, `${name}.json`), JSON.stringify({ name, ...body }));
 }
@@ -52,8 +52,8 @@ describe("siblingScopeFor — which directory a sibling is looked up in", () => 
   });
 
   test("the ROOT instance of a checkout never looks outside it (owner, 2026-10-11, bean 68k7)", () => {
-    // A checkout holding one instance at its root, cloned into a directory that
-    // ALSO holds an instance — the `/tmp` case. Its siblings are not out there.
+    // A checkout holding one layer at its root, cloned into a directory that
+    // ALSO holds a layer — the `/tmp` case. Its siblings are not out there.
     withTree({ stray: { name: "stray", directories: [] }, repo: { name: "repo", directories: [] } }, (root) => {
       const repo = join(root, "repo");
       mkdirSync(join(repo, ".git"));

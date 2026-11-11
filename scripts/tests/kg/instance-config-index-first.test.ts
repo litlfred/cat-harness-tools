@@ -1,6 +1,6 @@
 /**
  * Bean `ymvt` (owner, 2026-10-07; restated 2026-10-14: "i thought ONLY
- * index.config.json"): an instance's config is its `index.config.json` entry;
+ * index.config.json"): a layer's config is its `index.config.json` entry;
  * a root `<name>.config.json` is a legacy import, read only as a REPORTED
  * fallback and retired by `index-config:migrate --inline`.
  *

@@ -70,6 +70,8 @@ import { isAbsolute, join, resolve } from "node:path";
 import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { parse } from "yaml";
 
+import { rootProfile } from "./lib/root-gate-set.ts";
+
 const ROOT = repoRootFor(resolve(import.meta.dir, ".."));
 
 /** Where the workflows live, relative to the repository root. */
@@ -99,94 +101,13 @@ export interface FolioPath {
   reason: string;
 }
 
+// Empty since folio-assistant#3066 (2026-11-10). Every entry named a step in a
+// workflow that came across in the qou split and could not run here —
+// `publish.yml` (its `cd content` scripts) and `snappea_wasm.yml` (the
+// `folio-assistant/snappea-wasm` shell scripts). Those workflows were moved to
+// qou or dropped, the entries matched nothing, and an entry matching nothing
+// fails the run. A future folio-relative path comes back here with its reason.
 export const FOLIO_PATHS: FolioPath[] = [
-  // ── They name `content/`, and `content/` is NOT the convention ──────
-  //
-  // Owner, 2026-09-20: *"content/ shouldnt be expected anymore. folio/ was
-  // renamed as default/convention."*
-  //
-  // So these are not "waiting for a folio tree we happen not to carry".
-  // They `cd content` — a directory the convention has moved off. The
-  // instance's own declaration already says so: `cat-harness/harness.json`
-  // declares `folio/` holding the `folio` graph, and there is no `content`
-  // entry anywhere in it.
-  //
-  // Bean `52dz` (owner, 2026-09-24) moved the QA and Lean workflows that
-  // `cd content` into the `folio_init` templates, pointed at `folio/`, and
-  // their entries (`pipeline/qa-sweep.ts`, `scripts/lean-build-all.sh`) left
-  // this table with them. What remains is `publish.yml`, the workflow folios
-  // CALL, whose `cd content` is the caller's layout.
-  //
-  // They stay exempt rather than becoming failures for one reason: the
-  // verdict here is about whether a PATH RESOLVES, and a retired path in a
-  // workflow nobody dispatches is a filing question, not a broken build.
-  // Recording WHY is the contribution — the previous reasons asserted
-  // `content/` was "where a folio's sources live", which was the old
-  // convention stated as a present fact, and that is the exact failure this
-  // whole module exists to stop.
-  {
-    match: "pipeline/build.ts",
-    reason:
-      "runs after `cd content`, a directory the convention has retired in " +
-      "favour of `folio/`. Note `cat-harness/content/pipeline/build.ts` DOES " +
-      "exist — a different file sharing the basename — so resolving to it " +
-      "would be a wrong fix that looks right",
-  },
-  {
-    match: "pipeline/export-bibtex.ts",
-    reason: "same retired `cd content` root as build.ts",
-  },
-  {
-    match: "pipeline/latex-preflight.ts",
-    reason: "same retired `cd content` root",
-  },
-  {
-    match: "pipeline/validate.ts",
-    reason: "same retired `cd content` root",
-  },
-  {
-    match: "pipeline/latex-overfull-report.ts",
-    reason:
-      "reads a FOLIO's `main.log`, inside `publish.yml` — the ONE workflow " +
-      "exposing `workflow_call`, which `litlfred/qou` invokes at `@main` " +
-      "(`qou/.github/workflows/build.yml:10`). Its four sibling invocations " +
-      "are folio-relative (each does `cd content`, then runs a `pipeline/` script) and its " +
-      "`actions/checkout` steps carry no `repository:`, so they check out the " +
-      "CALLING repo: a `cat-harness/` prefix resolves to nothing there. " +
-      "I prefixed this line under `52dz` because THIS check demanded it, " +
-      "which made the file internally inconsistent in the one workflow folios " +
-      "consume. The check was right that the path does not resolve here and " +
-      "wrong about the remedy; that is what this table is for",
-  },
-
-  // ── Found by widening the extractor to `bash` (bean `7iog`) ────────
-  //
-  // Five shell scripts that were invisible to this check until the verb was
-  // added. None is platform rot; all five are FOLIO-facing, and each would
-  // be made worse by the obvious fix. (Four since `52dz`: `lean-build-all.sh`
-  // went with `lean-build-sidecar.yml` into the `folio_init` templates.)
-  {
-    match: "scripts/build-gmp.sh",
-    reason:
-      "`snappea_wasm.yml` runs entirely under workflow-level " +
-      "`working-directory: folio-assistant/snappea-wasm`, a directory that " +
-      "exists in NO checkout of this repository — the layout from before the " +
-      "#223 split, when a folio carried the platform as `folio-assistant/`. " +
-      "The workflow is `workflow_dispatch`-only and has never been able to " +
-      "run; that is `52dz`'s documented class, not a path to repoint",
-  },
-  {
-    match: "scripts/build-pari.sh",
-    reason: "same dead `folio-assistant/snappea-wasm` root as build-gmp.sh",
-  },
-  {
-    match: "scripts/build-snappea.sh",
-    reason: "same dead `folio-assistant/snappea-wasm` root as build-gmp.sh",
-  },
-  {
-    match: "scripts/link.sh",
-    reason: "same dead `folio-assistant/snappea-wasm` root as build-gmp.sh",
-  },
 ];
 
 /** One script invocation found in a workflow. */
@@ -410,8 +331,18 @@ function stripCheckout(path: string, checkouts: string[]): string {
   return path;
 }
 
-/** Every script invocation in one workflow, with the cwd each runs in. */
-export function invocationsFrom(file: string, text: string): Invocation[] {
+/**
+ * Every script invocation in one workflow, with the cwd each runs in.
+ *
+ * `folioPaths` is {@link FOLIO_PATHS} unless a caller supplies its own — which
+ * only a test does, to exercise the NEEDS-FOLIO verdict when the shipped table
+ * holds nothing (it has been empty since folio-assistant#3066).
+ */
+export function invocationsFrom(
+  file: string,
+  text: string,
+  folioPaths: readonly FolioPath[] = FOLIO_PATHS,
+): Invocation[] {
   const doc = parse(text) as WorkflowDoc;
   const out: Invocation[] = [];
   for (const [job, def] of Object.entries(doc.jobs ?? {})) {
@@ -451,6 +382,7 @@ export function invocationsFrom(file: string, text: string): Invocation[] {
             classify(
               { file, job, step: step.name ?? "(unnamed step)", path, cwd: effective },
               layout,
+              folioPaths,
             ),
           );
         }
@@ -463,6 +395,7 @@ export function invocationsFrom(file: string, text: string): Invocation[] {
 function classify(
   inv: { file: string; job: string; step: string; path: string; cwd: string | null },
   layout: CheckoutLayout,
+  folioPaths: readonly FolioPath[],
 ): Invocation {
   const base = { file: inv.file, job: inv.job, step: inv.step, path: inv.path };
   if (inv.cwd === null) {
@@ -517,7 +450,7 @@ function classify(
   if (existsSync(resolve(ROOT, inTree))) {
     return { ...base, cwd: inv.cwd, verdict: Verdict.Resolves };
   }
-  const folio = FOLIO_PATHS.find((f) => inv.path.includes(f.match));
+  const folio = folioPaths.find((f) => inv.path.includes(f.match));
   if (folio) {
     return { ...base, cwd: inv.cwd, verdict: Verdict.NeedsFolio, note: folio.reason };
   }
@@ -538,25 +471,10 @@ export interface FolioWorkDir {
 
 // `content` left this table under bean `52dz` (2026-09-24): its only matches
 // were `qa-sweep` and `lean-build`, which moved to the `folio_init` templates.
+// `folio-assistant/computations` and `folio-assistant/snappea-wasm` left it
+// under folio-assistant#3066 (2026-11-10), with `witness-refresh.yml` and
+// `snappea_wasm.yml`, the only workflows that declared them.
 export const FOLIO_WORKDIRS: FolioWorkDir[] = [
-  {
-    // declared-path-literal: a value this repo MATCHES against workflow text, not a path it reads. No declaration answers it — the workflows own the spelling.
-    match: "folio-assistant/computations",
-    reason:
-      "bean `u9r9`. NOT simply absent, and the distinction is the finding: " +
-      "`cat-harness/computations` EXISTS one directory over, so the prefix is " +
-      "stale from the split — but it holds one `.json` and ZERO `.py` while " +
-      "the step runs Python. Correcting the path would move the failure " +
-      "rather than fix it, so this stays an exemption until the computations " +
-      "themselves arrive",
-  },
-  {
-    // declared-path-literal: a value this repo MATCHES against workflow text, not a path it reads. No declaration answers it — the workflows own the spelling.
-    match: "folio-assistant/snappea-wasm",
-    reason:
-      "bean `u9r9`. Exists under NO prefix — unlike its neighbour above, " +
-      "there is nothing to point a corrected path at",
-  },
   {
     // declared-path-literal: a value this repo MATCHES against workflow text, not a path it reads. No declaration answers it — the workflows own the spelling.
     match: "tools/hecke-engine",
@@ -797,6 +715,23 @@ export function allInvocations(root = ROOT): Invocation[] {
   return out;
 }
 
+/**
+ * Why the allowlist ratchets ({@link FOLIO_PATHS}, {@link FOLIO_WORKDIRS},
+ * {@link workDirBaseline}) cannot be judged STALE in `root`, or null when they can.
+ *
+ * Every entry describes a step of the HARNESS index's own workflows — the root
+ * that carries the gates workflow (`rootProfile` "harness"). In a CONTENT root
+ * (an instance run by layer-pr-checks, e.g. smart-ips-pilgrimage#13) those
+ * steps were never here, so "matches nothing" says nothing about whether the
+ * exemption outlived its step (cat-harness-tools#1701). Both criteria still
+ * judge this root's own workflows in full, and a harness root ratchets as before.
+ */
+export function allowlistsNotOursReason(root: string): string | null {
+  return rootProfile(root) === "content"
+    ? "this is a content root (no .github/workflows/code-quality-gates.yml); the entry exempts a step of the harness index's workflows, not of this root's"
+    : null;
+}
+
 function main(): number {
   const list = process.argv.includes("--list");
   const invocations = allInvocations();
@@ -818,9 +753,16 @@ function main(): number {
 
   // An exemption matching nothing is a claim about the present that stopped
   // being true. Ratchet in the other direction, same as `gates.ts`.
-  const unused = FOLIO_PATHS.filter(
+  const notOurs = allowlistsNotOursReason(ROOT);
+  const unusedAll = FOLIO_PATHS.filter(
     (f) => !invocations.some((i) => i.path.includes(f.match)),
   );
+  // cat-harness-tools#1701: in a content root an unused entry is excused, and
+  // said so, rather than red — see allowlistsNotOursReason.
+  const unused = notOurs === null ? unusedAll : [];
+  for (const f of notOurs === null ? [] : unusedAll) {
+    console.log(`· FOLIO_PATHS entry \`${f.match}\` matches no invocation — not applicable here — ${notOurs}.`);
+  }
 
   console.log(
     `${invocations.length} invocation(s): ${invocations.length - missing.length - undetermined.length - folio.length} resolve, ` +
@@ -861,13 +803,24 @@ function main(): number {
   );
   // Same direction as every other ratchet here: an allowance that no longer
   // matches anything is a claim about the present that stopped being true.
-  const staleBaseline = [...baseline].filter(
+  const staleBaselineAll = [...baseline].filter(
     (k) => !workDirs.some((w) => workDirKey(w) === k && w.verdict !== Verdict.Resolves),
   );
   const folioDirs = workDirs.filter((w) => w.verdict === Verdict.NeedsFolio);
-  const unusedDirs = FOLIO_WORKDIRS.filter(
+  const unusedDirsAll = FOLIO_WORKDIRS.filter(
     (f) => !workDirs.some((w) => w.dir.startsWith(f.match)),
   );
+  // cat-harness-tools#1701: same excuse as FOLIO_PATHS above, for both ratchets.
+  const staleBaseline = notOurs === null ? staleBaselineAll : [];
+  const unusedDirs = notOurs === null ? unusedDirsAll : [];
+  if (notOurs !== null) {
+    for (const k of staleBaselineAll) {
+      console.log(`· workdir-baseline.json entry \`${k}\` matches nothing open — not applicable here — ${notOurs}.`);
+    }
+    for (const f of unusedDirsAll) {
+      console.log(`· FOLIO_WORKDIRS entry \`${f.match}\` matches no declaration — not applicable here — ${notOurs}.`);
+    }
+  }
 
   console.log(
     `${workDirs.length} working-directory declaration(s): ` +

@@ -38,11 +38,11 @@ export const LOG_ENTRY_SCHEMA_ID = "folio-log/v1";
 export const LOG_NODE = "logs";
 
 /**
- * Where logs live, for every `fsh-guts` directory the instance declares.
+ * Where logs live, for every `fsh-guts` directory the layer declares.
  *
  * **Composed, never spelled.** This schema owns the NODE name (`logs`); the
  * declaration owns where the trashcan is. Writing `fsh-guts/logs` as a literal
- * would be the `dh4f` defect one level down: an instance that puts its
+ * would be the `dh4f` defect one level down: a layer that puts its
  * trashcan elsewhere gets a writer that creates a second one beside it and a
  * reader that reports a clean run over the real one.
  *
@@ -182,7 +182,7 @@ export const LogExecutionSchema = z.object({
   /** Exit status. `undefined` means it did not finish, which is not `0`. */
   exitCode: z.number().int().optional(),
   durationMs: z.number().nonnegative().optional(),
-  /** Working directory, relative to the instance root. */
+  /** Working directory, relative to the layer root. */
   cwd: z.string().min(1).optional(),
   /** WHERE the output went. There is deliberately no field for the output. */
   outputRef: z.string().min(1).optional(),
@@ -255,7 +255,7 @@ export type LogEntry = z.infer<typeof LogEntrySchema>;
  *
  * **Absent is `unknown`, never `off`.** They are different claims: `off`
  * says somebody decided not to keep this, `unknown` says nobody could tell.
- * Collapsing them would make a misconfigured instance indistinguishable from
+ * Collapsing them would make a misconfigured layer indistinguishable from
  * a deliberately quiet one, and the first is a bug while the second is a
  * choice.
  */

@@ -184,7 +184,7 @@ export function autoTriggered(yaml: string): boolean | { reason: string } {
  * Every workflow file, with its coverage.
  *
  * Diagram paths are REPOSITORY-relative, the one spelling `.github/workflows/`
- * can use for a diagram inside an instance (`cat-harness/processes/…`). When
+ * can use for a diagram inside a layer (`cat-harness/processes/…`). When
  * the diagram carried the pointer this took two roots, and a first version
  * that passed the repository root for both found no diagrams at all.
  *

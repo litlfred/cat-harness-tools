@@ -40,7 +40,7 @@
  * declares what it attends to rather than taking all of it. For each content
  * marker found — `sushi-config.yaml`, a legacy `dak.json`, `.bpmn` processes,
  * a beans store, `library/`, Lean, folio manifests — it reports the paths,
- * whether `index.config.json` (or a local instance's declaration) ALREADY
+ * whether `index.config.json` (or a local layer's declaration) ALREADY
  * declares it, and the snippet that would. It suggests; it never declares.
  * The pick is the person's, made on `Task_ChooseHarnessed` in
  * `getting-started.bpmn`. See `lib/content-markers.ts`.
@@ -54,9 +54,9 @@
  *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir]             # report
  *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --json      # facts
  *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --markers   # markers only:
- *     "what else could this harness declare?" on an instance that already exists
+ *     "what else could this harness declare?" on a layer that already exists
  *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --markers --json   # markers only, as facts
- *   bun run cat scan:repo [dir] [--markers] [--json]                          # the same, from an instance root
+ *   bun run cat scan:repo [dir] [--markers] [--json]                          # the same, from a layer root
  *
  * `--json` with `--markers` prints the {@link MarkerScan} of
  * `lib/content-markers.ts`; without it, the whole scan, `markers` included.
@@ -248,7 +248,7 @@ export function listFiles(root: string): { files: string[]; source: "git" | "fil
   const r = spawnSync("git", ["-C", root, "ls-files", "-z"], { encoding: "buffer" });
   if (r.status === 0 && r.stdout) {
     const files = r.stdout.toString("utf-8").split(NUL).filter(Boolean);
-    // A tree its enclosing git IGNORES — an instance remote-mounted into an
+    // A tree its enclosing git IGNORES — a layer remote-mounted into an
     // index checkout — lists nothing here although it holds a whole
     // repository's files. `gitCorpus` counts a mount's files as git's own.
     if (files.length === 0) {

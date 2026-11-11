@@ -10,7 +10,7 @@
  * see {@link RETIRED}.
  *
  * @module scripts/check-retired-front-matter
- * @covers computed — its scan set is `kgRoots(instance)` — whichever kg graphs each instance
+ * @covers computed — its scan set is `kgRoots(instance)` — whichever kg graphs each layer
  *   declares — plus the `.claude/skills/` convention, which is not a declared graph at all. A
  *   literal list is what `known-skills.ts` was extracted to remove
  */
@@ -52,7 +52,7 @@ interface Retired {
   exceptSchemas?: string[];
   /**
    * The fsh-guts record holding the full inventory, relative to the
-   * `fsh-guts` directory the instance DECLARES.
+   * `fsh-guts` directory the layer DECLARES.
    *
    * Relative rather than repo-relative because `fsh-guts/` is declared, not
    * conventional: `directoryForGraph(…, "fsh-guts")` is what resolves it,
@@ -105,7 +105,7 @@ export const RETIRED: Retired[] = [
 ];
 
 /**
- * Where to sweep — EVERY directory the instance declares, plus two
+ * Where to sweep — EVERY directory the layer declares, plus two
  * conventions. Never a list written here.
  *
  * A hand-kept list is the failure `known-skills.ts` was extracted to remove:
@@ -135,7 +135,7 @@ export const RETIRED: Retired[] = [
  * silent for an unrelated reason.
  *
  * `scope: "repository"` is honoured through `rootForScope`, or `fsh-guts/`,
- * `beans/` and `memory/` resolve inside the instance and find nothing.
+ * `beans/` and `memory/` resolve inside the layer and find nothing.
  */
 function sweepRoots(instance: string, repo: string): string[] {
   const dirs: string[] = [];
@@ -147,7 +147,7 @@ function sweepRoots(instance: string, repo: string): string[] {
     for (const d of decl.directories ?? []) {
       if (typeof d.path !== "string") continue;
       // `repo` AS GIVEN, not recomputed. `rootForScope` derives the
-      // repository root from the instance, which is right in production and
+      // repository root from the layer, which is right in production and
       // wrong for any caller that passes one — `scan(root, root)` in the
       // tests means "this fixture IS its own repository", and recomputing
       // resolved a `scope: "repository"` entry to the tmpdir's PARENT.
@@ -165,21 +165,21 @@ function sweepRoots(instance: string, repo: string): string[] {
     }
   } else {
     // No declaration is not a reason to sweep nothing: an unmigrated
-    // instance falls back to the conventions, exactly as every other
+    // layer falls back to the conventions, exactly as every other
     // consumer does.
     dirs.push(...kgRoots(instance));
   }
-  // The CHECKOUT's root instance too (placement PR0, bean `ejye`): `memory/`,
+  // The CHECKOUT's root layer too (placement PR0, bean `ejye`): `memory/`,
   // `beans/` and `fsh-guts/` are declared there now that the platform no
   // longer mirrors them with `scope: "repository"`, and a sweep of this
-  // instance alone would lose them — the exemption test is what notices.
+  // layer alone would lose them — the exemption test is what notices.
   const checkoutDecl = resolve(repo) === resolve(instance) ? undefined : declarationPathIn(repo);
   if (checkoutDecl !== undefined && existsSync(checkoutDecl)) {
     const decl = JSON.parse(readFileSync(checkoutDecl, "utf-8")) as { directories?: { path?: string }[] };
     for (const d of decl.directories ?? []) if (typeof d.path === "string") dirs.push(resolve(repo, d.path));
   }
   // `.claude/skills/` is a local convention rather than a declared graph,
-  // and since #437 it sits beside the instance rather than inside it.
+  // and since #437 it sits beside the layer rather than inside it.
   // Checking one place would silently skip it.
   for (const base of new Set([instance, repo])) dirs.push(join(base, ".claude", "skills"));
   return [...new Set(dirs)].filter((d) => existsSync(d));

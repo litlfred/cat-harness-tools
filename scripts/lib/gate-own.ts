@@ -1,6 +1,6 @@
 /**
- * Which instances' files a gate run is the judge of: the caller's OWN
- * instances, as the layer PR-check runner names them.
+ * Which layers' files a gate run is the judge of: the caller's OWN
+ * layers, as the layer PR-check runner names them.
  *
  * @module scripts/lib/gate-own
  * @graphNode none — an environment contract and its reader
@@ -14,26 +14,26 @@
  * smart-ra#228's re-pin listed it as a newly failing gate.
  *
  * `run-gates.py` (`.github/scripts/layer-pr-checks/`) sets
- * {@link GATE_OWN_ENV} to the caller's own instances, comma-separated. A
- * check that honours it judges only the directories those instances
+ * {@link GATE_OWN_ENV} to the caller's own layers, comma-separated. A
+ * check that honours it judges only the directories those layers
  * declare; the mounted layers' files are judged by their own CI. Unset (a
  * local run, the index's own gates workflow), the check judges the whole
  * checkout, as before.
  */
 import { checkoutDirectories, corpusDirectoriesForGraph } from "../../schemas/kg/harness-config.js";
 
-/** Comma-separated names of the instances whose files this run judges. */
+/** Comma-separated names of the layers whose files this run judges. */
 export const GATE_OWN_ENV = "CAT_GATE_OWN_INSTANCES";
 
-/** The caller's own instances, or `undefined` when the run names none (judge everything). */
-// input-site: env CAT_GATE_OWN_INSTANCES #e41b5e4a — the instances whose files are judged; the value is the whole of what it contributes
+/** The caller's own layers, or `undefined` when the run names none (judge everything). */
+// input-site: env CAT_GATE_OWN_INSTANCES #e41b5e4a — the layers whose files are judged; the value is the whole of what it contributes
 export function gateOwnInstances(env: Readonly<Record<string, string | undefined>> = process.env): Set<string> | undefined {
   const raw = env[GATE_OWN_ENV];
   const names = (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   return names.length > 0 ? new Set(names) : undefined;
 }
 
-/** The corpus directories holding `kind` that `own`'s instances commit (an inherited member counts as its member's). */
+/** The corpus directories holding `kind` that `own`'s layers commit (an inherited member counts as its member's). */
 export function ownDirectoriesForGraph(root: string, kind: string, own: ReadonlySet<string>): string[] {
   return checkoutDirectories(root, { stackedOn: root })
     .filter((d) => d.graphTypologies.includes(kind as never) && own.has(d.member ?? d.declaredBy))
@@ -42,7 +42,7 @@ export function ownDirectoriesForGraph(root: string, kind: string, own: Readonly
 
 /**
  * The directories holding `kind` whose files a gate JUDGES: the corpus
- * (`corpusDirectoriesForGraph`), or, when this run names its own instances,
+ * (`corpusDirectoriesForGraph`), or, when this run names its own layers,
  * only the ones they commit. `scoped` says which, so a check can tell "this
  * caller commits none" (nothing of its own to judge, a pass) from "the corpus
  * has none" (its own refusal, unchanged).
@@ -67,20 +67,20 @@ export function nothingOwnLine(check: string, what: string, own: ReadonlySet<str
   return `✓ ${check}: ${[...own].join(", ")} commits no ${what}; the mounted layers' are judged by their own CI.`;
 }
 
-/** The caller's own instances' directories, relative to the root (`.` for an instance at the root), comma-separated. */
+/** The caller's own layers' directories, relative to the root (`.` for a layer at the root), comma-separated. */
 export const GATE_OWN_PATHS_ENV = "CAT_GATE_OWN_PATHS";
-/** Every other instance's directory in the root, the same way. */
+/** Every other layer's directory in the root, the same way. */
 export const GATE_FOREIGN_PATHS_ENV = "CAT_GATE_FOREIGN_PATHS";
 
 /**
  * Whether the file at `rel` (relative to the root) is the caller's own, or
  * `undefined` when this run names no own paths (judge everything). For a
  * check whose subjects are FILES rather than declared directories: a file
- * belongs to the deepest instance directory that contains it, and a file
- * outside every instance directory (the index's own README) is the caller's
- * only when one of its instances sits at the root.
+ * belongs to the deepest layer directory that contains it, and a file
+ * outside every layer directory (the index's own README) is the caller's
+ * only when one of its layers sits at the root.
  */
-// input-site: env CAT_GATE_OWN_PATHS,CAT_GATE_FOREIGN_PATHS #6166bceb — the instance directories ownership is decided by; the values are the whole of what they contribute
+// input-site: env CAT_GATE_OWN_PATHS,CAT_GATE_FOREIGN_PATHS #6166bceb — the layer directories ownership is decided by; the values are the whole of what they contribute
 export function gateOwnsFile(rel: string, env: Readonly<Record<string, string | undefined>> = process.env): boolean | undefined {
   const list = (name: string) => (env[name] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const own = list(GATE_OWN_PATHS_ENV);

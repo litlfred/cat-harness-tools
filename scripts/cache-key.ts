@@ -76,7 +76,7 @@ export type KeySource = { script: string; base?: boolean } | { hashFiles: readon
  * The class-(a) steps a committer may publish, as the workflows call them.
  * Empty today: the mounts, the first class-(a) cache, have their own
  * committer path, the layers ref (`refs/cat/layers/<key>`, `layers:publish`),
- * whose replayer verifies per instance and serves every layer that did not
+ * whose replayer verifies per layer and serves every layer that did not
  * move. One committer path per cache, so the mounts are not published here.
  */
 export const STEPS: Readonly<Record<string, { key: KeySource; paths: readonly string[] }>> = {};

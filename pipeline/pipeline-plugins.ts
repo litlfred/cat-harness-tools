@@ -22,7 +22,7 @@
  *
  * ## Why the registry is held here, and filled lazily
  *
- * `ContributionRegistry` is deliberately an instance, not module state. The
+ * `ContributionRegistry` is deliberately a layer, not module state. The
  * callers here are synchronous and deep — a checker in the sweep's hot loop, a
  * module-load side effect, a build step — and threading a registry through
  * each would change the signatures the QA dispatch tables are keyed on. So
@@ -174,7 +174,7 @@ export class UnregisteredPipelinePluginError extends Error {
     readonly kind: string,
     readonly root: string | undefined,
     readonly filled: string[],
-    /** Instances in the checkout that DECLARE a node for this slot — read from their declarations. */
+    /** Layers in the checkout that DECLARE a node for this slot — read from their declarations. */
     readonly declaredBy: string[] = [],
   ) {
     super(
@@ -243,7 +243,7 @@ export function pipelinePlugin<K extends PipelinePluginKind>(kind: K): PipelineP
 }
 
 /**
- * The instances in the checkout at `repoRoot` whose declared
+ * The layers in the checkout at `repoRoot` whose declared
  * `pipeline-plugins` graph holds a node for `slot` — what the error offers as
  * the dependency to declare, read from the declarations rather than written
  * down, so this generic module names no layer above it

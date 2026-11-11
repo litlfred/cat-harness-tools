@@ -7,10 +7,10 @@
  * ## Why the obvious composition is wrong
  *
  * `harness.json` declares `{ id: "uploads", path: "uploads/" }` with no
- * `scope`, and absent scope means **instance**. So the declared path resolves
- * against the INSTANCE root (e.g. `cat-harness/`), while a GitHub upload URL
+ * `scope`, and absent scope means **layer**. So the declared path resolves
+ * against the LAYER root (e.g. `cat-harness/`), while a GitHub upload URL
  * needs the path relative to the **repository** root. Pasting the declared
- * `path` straight into `/upload/<branch>/` drops the instance segment and
+ * `path` straight into `/upload/<branch>/` drops the layer segment and
  * mints a 404. `rootForScope` resolves it, and this module is one more caller.
  *
  * **So the path is never written down**: a literal would be wrong at the next
@@ -43,7 +43,7 @@ export type UploadTarget =
   | { ok: false; reason: string; remedy: string };
 
 /**
- * Where an instance's acquisition queue is, relative to the REPOSITORY root.
+ * Where a layer's acquisition queue is, relative to the REPOSITORY root.
  *
  * The one piece of arithmetic this module exists for. Exported so a test can
  * assert it against the real declaration rather than against a literal.
@@ -61,7 +61,7 @@ export function queueRepoRelative(root: string): string | undefined {
 }
 
 /**
- * The upload URL for this instance's queue, or a named failure.
+ * The upload URL for this layer's queue, or a named failure.
  *
  * `branch` defaults to `main` because that is what a forge's web upload form
  * targets when nobody says otherwise; pass the working branch to send somebody

@@ -23,7 +23,7 @@
  *
  * Upstream uses the Agent Skills layout, `<path>/<skill>/SKILL.md`, with
  * `references/`, `scripts/` and `assets/` beside it, and SKILL.md links to
- * them relatively. This instance serves FLAT packages, `<package>/<skill>.md`.
+ * them relatively. This layer serves FLAT packages, `<package>/<skill>.md`.
  * Flattening several upstream skills into one package would collide their
  * `references/` directories, so each skill becomes its own package:
  * `skills/<skill>/<skill>.md` is the upstream SKILL.md renamed, and everything
@@ -35,7 +35,7 @@
  * - every upstream file under `<path>/<skill>/`, byte for byte;
  * - `materialization.json` — one `materialization` record per file, in the
  *   shape `check:materialized-fixity` already walks;
- * - `package-manifest.json` — THIS instance's wrapper for the package, which
+ * - `package-manifest.json` — THIS layer's wrapper for the package, which
  *   is ours rather than upstream's and so carries no fixity.
  *
  * Usage:
@@ -242,7 +242,7 @@ export function syncedPackageDir(skillsDir: string, skill: string): string {
 
 /**
  * Every skills directory in the checkout that holds a `remote-packages/`
- * directory. A wrapper belongs to the instance whose skills use it — sci holds
+ * directory. A wrapper belongs to the layer whose skills use it — sci holds
  * `claude-scientific-skills`, the FHIR IG harness `smarter-fhir` (placement PR1) — so
  * a check rooted at the harness alone would read none of them.
  */

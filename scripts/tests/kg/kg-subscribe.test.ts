@@ -67,7 +67,7 @@ const failing: RootFetcher = () => {
   throw new Error("fatal: unable to access 'https://github.com/litlfred/ihris-kb.git/': 403");
 };
 
-/** A subscriber instance with a `substrate-snapshot` directory, formatted the way this repo's are. */
+/** A subscriber layer with a `substrate-snapshot` directory, formatted the way this repo's are. */
 function subscriber(opts: { snapshotDir?: boolean; extra?: string } = {}): { dir: string; file: string } {
   const dir = tmp("kg-sub-inst-");
   const file = join(dir, "example.json");
@@ -337,7 +337,7 @@ describe("checkSubscriptions: the offline gate", () => {
 
 // ── A declaration one level down (bean 437w) ──────────────────────────────────
 //
-// The shape of litlfred/trust-kg: nothing at the root, the instance one
+// The shape of litlfred/trust-kg: nothing at the root, the layer one
 // directory down in a directory NOT named for it.
 const NESTED = {
   name: "trust-kg",

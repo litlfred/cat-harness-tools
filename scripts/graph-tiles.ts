@@ -8,7 +8,7 @@
  * which opens the existing visualisation. A harness may declare one or more.
  *
  * The tile set is the visualiser obligation made reachable:
- * `SubgraphCoverageSchema.visualiser` is where an instance says what renders a
+ * `SubgraphCoverageSchema.visualiser` is where a layer says what renders a
  * directory, and `check:subgraph-coverage` reports the ones that owe one. No
  * second list exists to disagree with it. Nothing here builds a viewer; a tile
  * carries the declared ref and opens it.
@@ -77,8 +77,8 @@ export interface GraphTile {
    * copies the site directory's CONTENTS to the mount and the declared prefix
    * is exactly what a published URL does not carry.
    *
-   * ABSENT when the declared page is not under the published site — an
-   * instance may declare a viewer that lives somewhere this site does not
+   * ABSENT when the declared page is not under the published site — a
+   * layer may declare a viewer that lives somewhere this site does not
    * serve. `pb04` one layer down: a tile with no href is not a link, which is
    * better than a link to nowhere.
    */
@@ -116,7 +116,7 @@ export interface GraphTile {
    * view-time control on this surface.
    */
   hidden: boolean;
-  /** The tile's theme: its own, then the directory's, then absent (the instance's). */
+  /** The tile's theme: its own, then the directory's, then absent (the layer's). */
   theme?: string;
   /**
    * `"staging-only"` when the page this tile opens is withheld from the
@@ -166,7 +166,7 @@ export interface GraphTile {
 /** The directory fields a tile is derived from — named rather than imported. */
 export type TiledDirectory = {
   id: string;
-  /** `repository` when the path is resolved from the repository root rather than the instance's. */
+  /** `repository` when the path is resolved from the repository root rather than the layer's. */
   scope?: string;
   coverage?: Parameters<typeof visualisationsOf>[0];
   /** A theme reference (#1168 B8); the tile carries its `themeId`. */
@@ -206,7 +206,7 @@ export function kindTileIcon(kinds: readonly string[] | undefined): string | und
 }
 
 /**
- * Every tile an instance's declarations yield.
+ * Every tile a layer's declarations yield.
  *
  * Ordered by directory then by declaration order, which is the declaration's
  * own order and therefore stable across regenerations — the property that lets
@@ -248,12 +248,22 @@ export function graphTiles(
   qualifierFor?: (d: TiledDirectory) => string | undefined,
   /** Harness names a declared title may end with, as "Docs — cat-harness". Stripped from the label. */
   harnessNames: readonly string[] = [],
+  /**
+   * The name the harness rows already give a destination (`href`), when they
+   * give one. Consulted ONLY for a tile with no declared title, in place of
+   * the directory's first kind (cat-harness-tools#1701): a base layer's
+   * `schemas/` declares `["code", "schemas"]` and opens the schema viewer, so
+   * the rows, FOLDERS and the sidebar call that page "Schemas" while the
+   * first-kind fallback made its tile "Code" — two names for one destination,
+   * which `check:nav-names` fails. A declared title still wins, unchanged.
+   */
+  labelFor?: (href: string) => string | undefined,
 ): GraphTile[] {
   const tiles: GraphTile[] = [];
   // ONE TILE PER PAGE (#1168 B7a-2b, owner 2026-09-29: "tiles for all, one
   // per page"). Viewers are read from the pages now, and one page may draw
-  // several directories — the processes index draws every instance's. The
-  // tile goes to the instance's OWN directory before a repository-scoped one,
+  // several directories — the processes index draws every layer's. The
+  // tile goes to the layer's OWN directory before a repository-scoped one,
   // then by id, so the page keeps the tile it had when it was declared.
   const opened = new Set<string>();
   const order = [...dirs].sort(
@@ -271,22 +281,19 @@ export function graphTiles(
       // as "not declared" and the kind's display name is used instead.
       const declared = v.title === d.id ? undefined : v.title;
       const qualifier = qualifierFor?.(d);
+      const href = siteDirFromRepoRoot === undefined ? undefined : publishedHref(siteDirFromRepoRoot, v.ref);
+      const rowName = declared === undefined && href !== undefined ? labelFor?.(href) : undefined;
       tiles.push({
         // The index is part of the id only where it has to be. A directory
         // with one visualisation gets its own name, which is what a reader
         // sees in a URL fragment and what a test addresses it by.
         id: vis.length === 1 ? d.id : `${d.id}/${i + 1}`,
         directory: d.id,
-        title: tileLabel(d, declared, harnessNames),
+        title: rowName ?? tileLabel(d, declared, harnessNames),
         ...(qualifier ? { qualifier } : {}),
         ref: v.ref,
         surfaces: TILE_SURFACES.filter((s) => showsOn(v, s)),
-        ...(siteDirFromRepoRoot === undefined
-          ? {}
-          : (() => {
-              const href = publishedHref(siteDirFromRepoRoot, v.ref);
-              return href === undefined ? {} : { href };
-            })()),
+        ...(href === undefined ? {} : { href }),
         hidden: v.hidden === true,
         // FROM THE DIRECTORY, NOT THE VISUALISATION. Read-only is a property of
         // the CONTENT — several visualisations of one directory are several
@@ -391,7 +398,7 @@ export function publishedProjection(siteDir: string, id: string): boolean {
 }
 
 /**
- * Findings for a whole instance, in the shape `harness-tiles.ts` already uses.
+ * Findings for a whole layer, in the shape `harness-tiles.ts` already uses.
  *
  * Phrased as the repair rather than as the symptom: *"declare it"* is the
  * action, and `coverage.visualiser` is where.
@@ -455,8 +462,8 @@ export function withTileCounts(
  * ## Why a generator needs this, and why it is a LOOKUP rather than a rule
  *
  * Issue #863. A tile's count is keyed by directory id ({@link withTileCounts}),
- * but a scoped viewer's generator knows the SUBJECT it is rendering — an
- * instance name like the content core's — not the id of the directory whose
+ * but a scoped viewer's generator knows the SUBJECT it is rendering — a
+ * layer name like the content core's — not the id of the directory whose
  * declaration produced the tile. The obvious bridge is to compose one from the
  * other, and it is wrong on this repository's own corpus:
  *

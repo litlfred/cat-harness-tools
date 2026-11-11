@@ -29,12 +29,14 @@
     "scripts/check-workflows.ts",
     "scripts/compose-docs.ts",
     "scripts/gates.ts",
+    "scripts/gen-lsi-viz.ts",
     "scripts/kg-audit.ts",
     "scripts/lib/default-scope-globs.ts",
     "scripts/lib/jekyll-pages-nav.ts",
     "scripts/lib/jekyll-permalink.ts",
     "scripts/lib/skill-edges.ts",
     "scripts/lib/skill-pages.ts",
+    "scripts/site-publish-caller.ts",
     "scripts/site-publisher.ts",
     "scripts/stage-workflow-local.ts",
     "scripts/tests/compose-docs.test.ts",
@@ -50,6 +52,7 @@
     "src/workflow/ci-health.ts",
     "test/coordinator/gate-shell-workflow.test.ts",
     "test/coordinator/gates-workflows.test.ts",
-    "test/layer-ready-reuse.test.ts"
+    "test/layer-ready-reuse.test.ts",
+    "test/release-gated-ci.test.ts"
   ]
 }

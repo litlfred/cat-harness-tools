@@ -27,12 +27,12 @@ import { join } from "node:path";
 
 import { readSchemaGraph } from "../scripts/schema-graph.ts";
 
-/** A throwaway instance whose `schemas/` holds exactly the given files. */
+/** A throwaway layer whose `schemas/` holds exactly the given files. */
 function fixture(files: Record<string, string>): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), "schema-graph-"));
   mkdirSync(join(root, "schemas"), { recursive: true });
   // No `harness.json`: `schemasRoot` falls back to the convention, which is
-  // the path an unmigrated instance takes and therefore worth exercising.
+  // the path an unmigrated layer takes and therefore worth exercising.
   for (const [name, body] of Object.entries(files)) {
     writeFileSync(join(root, "schemas", name), body);
   }

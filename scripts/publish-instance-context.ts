@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 /**
- * Build ONE instance's JSON-LD `@context` and publish it to that instance's
- * own GitHub Pages, at `<iriBase>ns/context/v1.jsonld` — or, for an instance
+ * Build ONE layer's JSON-LD `@context` and publish it to that layer's
+ * own GitHub Pages, at `<iriBase>ns/context/v1.jsonld` — or, for a layer
  * whose `ns` is a document (bootstrap's `ns.jsonld`), BESIDE it at
  * `<iriBase>ns.context.v1.jsonld` (`contextPathFor` in
  * `gen-instance-contexts.ts`). The path is the build's `path`, and
  * `publish --path` takes it, so the workflow never spells it.
  *
- * Each instance's context is published by its own repository, through one
+ * Each layer's context is published by its own repository, through one
  * reusable workflow (`.github/workflows/layer-publish-context.yml`), and
  * placeholder `gh-pages` branches are created so Pages can be switched on.
  *
@@ -15,13 +15,13 @@
  *
  * `build` runs `gen-instance-contexts`'s generator over the whole index (the
  * flattened `needs` tables need every ancestor present) and judges ONLY the
- * named instance: another instance's unresolved prefix is that instance's
+ * named layer: another layer's unresolved prefix is that layer's
  * repository's finding, and must not stop this one publishing. It writes the
  * context to `--out` and the outcome to `--report` (JSON) and exits:
  *
  *   0  built, or SKIPPED with a reason, printed as a warning (no `iriBase`, or no `.jsonld`
  *      documents — nothing to publish under, or nothing to publish);
- *   1  the instance's own findings (an unresolved or conflicting prefix, a
+ *   1  the layer's own findings (an unresolved or conflicting prefix, a
  *      malformed `jsonldPrefixes`), each named.
  *
  * `publish` puts that one file on the repository's `gh-pages` through the
@@ -82,7 +82,7 @@ export function contextUrl(iriBase: string, path: string = INSTANCE_CONTEXT_PATH
 
 /**
  * Build `instance`'s context over the index at `repoRoot`, judging only that
- * instance. Never throws for a finding; a broken `needs` graph (the
+ * layer. Never throws for a finding; a broken `needs` graph (the
  * generator's throw) is reported as `failed`.
  */
 export function buildOne(repoRoot: string, instance: string, options: GenerateOptions = {}): BuildOutcome {
@@ -101,7 +101,7 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
   }
   const report = result.reports.find((r) => r.instance === instance);
   if (report === undefined) return { kind: "failed", instance, problems: [`the generator reported no \`${instance}\``] };
-  // Only this instance's findings. Drift is not one: what is on disk is
+  // Only this layer's findings. Drift is not one: what is on disk is
   // irrelevant to a context being built for publishing.
   const { problems } = findings({ reports: [report], unowned: [] });
   if (problems.length > 0) return { kind: "failed", instance, problems };
@@ -123,23 +123,23 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
 // ── vocabulary ───────────────────────────────────────────────────
 
 /**
- * The instance's own VOCABULARY, served where its term IRIs point.
+ * The layer's own VOCABULARY, served where its term IRIs point.
  *
  * Owner, 2026-10-15 ("2 Serve vocab at own iriBase"): a term IRI is
  * `<iriBase>v<major>/ns/Term` (`cat-harness/schemas/kg/namespaces.ts`; slash
  * form since cat-harness-tools#1378, Q-SLASH-1 A), so the document
- * `<iriBase>v<major>/ns/` has to exist on the instance's own Pages or
- * every term it mints answers 404 — which was the state of two instances,
+ * `<iriBase>v<major>/ns/` has to exist on the layer's own Pages or
+ * every term it mints answers 404 — which was the state of two layers,
  * cat-harness one of them, when this was written (no `0.1.0/` on either
  * gh-pages).
  *
  * The path is read off the vocabulary's own `@id`, never composed here: the
  * document says where it lives, and a second spelling of that address is the
- * drift this repository keeps paying for. It must sit under the instance's
+ * drift this repository keeps paying for. It must sit under the layer's
  * `iriBase`, and must not be a directory the context sits in, nor the
  * context itself: with the default context path `ns` is the DIRECTORY holding
  * `ns/context/v1.jsonld`, and a static host cannot serve both
- * (folio-assistant#2560 is the same clash on the aggregate site). An instance
+ * (folio-assistant#2560 is the same clash on the aggregate site). A layer
  * whose `ns` is a document has its context beside it (D1), so `ns` is free.
  *
  * A slash namespace (`…/ns/`) is a DIRECTORY, because every term below it is
@@ -148,7 +148,7 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
  * `index.jsonld` and `index.json`. Clean break (owner, 2026-11-02): no copy
  * is kept at the old extensionless `ns` path.
  *
- * A hash-form `@id` (an instance not yet on the slash rule) is still
+ * A hash-form `@id` (a layer not yet on the slash rule) is still
  * published three times: extensionless because the IRI is, `.jsonld` for the
  * canonical extension, `.json` because Pages sends no correct Content-Type
  * for `.jsonld`.
@@ -236,7 +236,7 @@ ${rows}
 
 /**
  * Where a vocabulary whose `@id` is `id` is served on the Pages at `iriBase`:
- * the three paths, or why it cannot be. `contextPath` is where the instance's
+ * the three paths, or why it cannot be. `contextPath` is where the layer's
  * context is published (instance-relative): a vocabulary path in the
  * directory it sits in, or at its own path, collides with it.
  */
@@ -451,7 +451,7 @@ async function main(argv: readonly string[]): Promise<number> {
     }
     if (outcome.kind === "skipped") {
       // A warning, not a notice: the caller's run is green either way, and a
-      // notice let an instance with nothing to publish look published
+      // notice let a layer with nothing to publish look published
       // (aai-programme, 2026-10-20). The reason says what to add.
       console.log(`::warning::${outcome.reason}; nothing was published`);
       return 0;

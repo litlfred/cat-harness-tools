@@ -1,7 +1,7 @@
 /**
  * The layer output resolver (bean `cat-tools-sm8r`, item 4, plan step 1):
  * a mounted layer's computed files go to `build/layers/<instance>/`, a local
- * instance's stay inside it, and a reader sees the computed file over the
+ * layer's stay inside it, and a reader sees the computed file over the
  * pinned bytes.
  */
 import { afterAll, describe, expect, test } from "bun:test";

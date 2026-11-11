@@ -93,7 +93,7 @@ export function buildL1(dir: string, write = true): BuildResult {
   if (missing.length > 0) return { docId: st.doc_id, blocks: 0, missing };
 
   const base = stem(st.doc_id);
-  // The asset's own IRI once the entry sits in an instance's library (#1881);
+  // The asset's own IRI once the entry sits in a layer's library (#1881);
   // a STAGED entry keeps the relative form until promotion regenerates it.
   const instance = libraryInstanceOf(dir);
   const manifestIri = instance !== undefined ? libraryAssetIri(instance, st.doc_id) : `${base}/manifest`;

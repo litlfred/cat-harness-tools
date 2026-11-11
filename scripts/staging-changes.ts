@@ -14,7 +14,7 @@
  *
  * ## Why a re-pin has to be expanded
  *
- * A change to a mounted instance reaches this site as a one-line edit to
+ * A change to a mounted layer reaches this site as a one-line edit to
  * `index.lock.json`, which predicts nothing on its own. So each mount whose
  * commit moved is diffed in its OWN repository between the two pins, and each
  * changed file is mapped through the lock's `directories` to the path it is
@@ -97,7 +97,7 @@ export interface SourceChange {
   ref?: string;
   /** The mount it came through, or absent for the checkout's own file. */
   instance?: string;
-  /** False for a file the instance's repository changed outside every directory the lock mounts. */
+  /** False for a file the layer's repository changed outside every directory the lock mounts. */
   mounted: boolean;
 }
 
@@ -311,7 +311,7 @@ export function coneInputs(s: Sources): string[] {
 // `<path>`" note at the top of its body, and `data-src="<path>"` on its edit
 // link, both repo-relative. That is the generators' own record, so reading it
 // back off the PUBLISHED root maps a changed source to the pages built from it
-// last time, with no guess from a file name. A mounted instance's skill,
+// last time, with no guess from a file name. A mounted layer's skill,
 // process or schema reaches the site only through such generators, which is
 // why the docs renderer can name no page for it.
 //
@@ -568,7 +568,7 @@ export interface QaCheck {
   confirmed: string[];
   /** In the cone, not measured. */
   unconfirmed: PredictionCheck["unconfirmed"];
-  /** On the root, not in the preview (an instance the preview does not carry, or a page the build dropped), by top directory. */
+  /** On the root, not in the preview (a layer the preview does not carry, or a page the build dropped), by top directory. */
   absent: { dir: string; count: number; sample: string[] }[];
 }
 

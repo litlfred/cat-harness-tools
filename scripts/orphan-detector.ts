@@ -43,7 +43,7 @@ export interface AttestationCandidate {
 }
 
 export interface OrphanDetectorOptions {
-  /** The root directory of the instance being audited */
+  /** The root directory of the layer being audited */
   root?: string;
   /** Repository root (defaults to checkoutRootFor(root) or climbing out of worktree) */
   repoRoot?: string;

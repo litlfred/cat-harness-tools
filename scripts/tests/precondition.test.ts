@@ -30,8 +30,8 @@ const REAL = join(ROOT, "bootstrap/processes/initialize-harness.bpmn");
 /**
  * A minimal loadable process, with whatever extension XML the case needs.
  *
- * `declared` writes an instance declaration beside it. A `file-exists` ref
- * resolves against the instance that owns the diagram, so a checkable fixture
+ * `declared` writes a layer declaration beside it. A `file-exists` ref
+ * resolves against the layer that owns the diagram, so a checkable fixture
  * needs one; a stated-only fixture does not, and leaving it out keeps the
  * refusal tests down to the one reason each is about.
  */
@@ -90,7 +90,7 @@ describe("the real diagram — `initialize-harness`", () => {
     const m = await loadProcessModel(REAL);
     const readme = evaluatePreconditions(m).find((x) => x.precondition.id === "readme-present")!;
     expect(readme.verdict).toBe("satisfied");
-    // `README.md`, not `bootstrap/README.md`: relative to the instance, so the
+    // `README.md`, not `bootstrap/README.md`: relative to the layer, so the
     // same ref names the same file once bootstrap is a repository of its own.
     expect(readme.precondition.check).toEqual({
       kind: "file-exists",

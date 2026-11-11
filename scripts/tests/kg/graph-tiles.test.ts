@@ -139,7 +139,7 @@ describe("visibility and theme default, and may be overridden", () => {
 
   test("a tile's theme falls back to the directory's, then to nothing", () => {
     // The same inherit-and-override rule `semantic-zoom.ts` encodes: a tile
-    // that states nothing is complete, and absent means the instance's.
+    // that states nothing is complete, and absent means the layer's.
     expect(graphTiles([dir("x", { visualiser: "a.html" }, "library")])[0]?.theme).toBe("library");
     expect(
       graphTiles([dir("x", { visualiser: [{ ref: "a.html", theme: { themeId: "own" } }] }, "library")])[0]?.theme,
@@ -378,9 +378,9 @@ describe("a page's declared ref names the directory that declared it", () => {
   test("two directories over ONE page keep the first, rather than racing", () => {
     // A page is NOT uniquely owned, and assuming it was is the defect this
     // test exists for. `.../library/agent-skills/` is `agent-skills-library`
-    // to this instance and plain `library` to the agent-skills instance, which
+    // to this layer and plain `library` to the agent-skills layer, which
     // declares its own view of the same page. Building the lookup across every
-    // instance therefore returned an id that is not a tile HERE -- which is
+    // layer therefore returned an id that is not a tile HERE -- which is
     // why callers pass the ONE declaration their tiles came from.
     const got = directoryByVisualisationRef([
       dir("agent-skills-library", { visualiser: "docs/library/agent-skills/index.html" }),
@@ -397,7 +397,7 @@ describe("a page's declared ref names the directory that declared it", () => {
 
 describe("one tile per page (#1168 B7a-2b)", () => {
   // Viewers are read from the pages, and one page may draw several
-  // directories. The tile goes to the instance's own directory first.
+  // directories. The tile goes to the layer's own directory first.
   const shared = "docs/cat-harness/processes/index.md";
   const tiles = graphTiles([
     { id: "smart-base-processes", scope: "repository", coverage: { visualiser: shared } },
@@ -523,5 +523,33 @@ describe("resolveGlassStrip — pinned tiles first, plus '+N more'", () => {
     expect(GlassStripSchema.safeParse([{ kind: "tools" }, { kind: "tools" }]).success).toBe(false);
     expect(GlassStripSchema.safeParse([{ chrome: "more" }]).success).toBe(false);
     expect(GlassStripSchema.safeParse([{ chrome: "todos" }, { kind: "tools" }]).success).toBe(true);
+  });
+});
+
+// cat-harness-tools#1701: an undeclared tile takes the name the harness rows
+// give its page, so the glass and FOLDERS/the sidebar say one name.
+describe("labelFor — an undeclared tile is named as its page's rows name it", () => {
+  const SITE = "cat-harness/docs";
+  const schemas = (): TiledDirectory => ({
+    ...dir("smart-base-schemas", { visualiser: "cat-harness/docs/en/cat-harness/schemas/smart-base/index.html" }),
+    graphTypologies: ["code", "schemas"],
+  });
+  const rows = (href: string) => (href === "/en/cat-harness/schemas/smart-base/" ? "Schemas" : undefined);
+
+  test("the row's name replaces the first-kind fallback", () => {
+    expect(graphTiles([schemas()], SITE)[0]?.title).toBe("Code");
+    expect(graphTiles([schemas()], SITE, undefined, [], rows)[0]?.title).toBe("Schemas");
+  });
+
+  test("a declared title still wins over the row's name", () => {
+    const d: TiledDirectory = {
+      ...dir("x", { visualiser: [{ ref: "cat-harness/docs/en/cat-harness/schemas/smart-base/index.html", title: "Declared" }] }),
+      graphTypologies: ["code"],
+    };
+    expect(graphTiles([d], SITE, undefined, [], rows)[0]?.title).toBe("Declared");
+  });
+
+  test("no row for the page keeps the fallback", () => {
+    expect(graphTiles([schemas()], SITE, undefined, [], () => undefined)[0]?.title).toBe("Code");
   });
 });

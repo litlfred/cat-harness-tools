@@ -15,7 +15,7 @@
  *    reading as a clean disconnection.
  *
  * The tests of this file that read the whole checkout (attributes the
- * directories smart-base and the root instance declare) live in
+ * directories smart-base and the root layer declare) live in
  * `test/subgraphs-checkout.test.ts` (bean `7zz1`): standing alone, cat-harness
  * has none of it.
  */
@@ -64,7 +64,7 @@ describe("subgraph containment is derived from declared paths", () => {
     // narrow one: the methodology subgraphs this branch un-buried stay
     // un-buried. Corpus-wide nesting is `check:layout-norms`'s question, where
     // it is a ratchet with a baseline rather than an absolute.
-    // Scoped to the id `methodologies` EXACTLY — this instance's own graph.
+    // Scoped to the id `methodologies` EXACTLY — this layer's own graph.
     // A /methodolog/ substring also matches `smart-base-methodologies`, which
     // `main` landed in #881 with a nested `smart-base-processes` inside it.
     // That is a real finding, it is baselined in `check:layout-norms`, and it
@@ -78,8 +78,8 @@ describe("subgraph containment is derived from declared paths", () => {
   // The real declaration no longer nests anything, so the two properties
   // below have no witness in this corpus. They are pinned against a SYNTHETIC
   // pair instead of dropped: `subgraphTree` and `owningDirectory` are shared
-  // machinery that any instance may exercise, and deleting their only tests
-  // because this instance stopped nesting would retire a guard for a defect
+  // machinery that any layer may exercise, and deleting their only tests
+  // because this layer stopped nesting would retire a guard for a defect
   // that is still reachable.
   const NESTED = [
     { id: "outer", path: "outer/", absPath: `${ROOT}/outer`, graphTypologies: ["cat-harness"] },
@@ -132,7 +132,7 @@ describe("the entanglement report", () => {
     // would be the same trap the test above documents: it would fail the day
     // somebody drains it, punishing the fix. This holds whether the corpus
     // carries twelve or none.
-    // Same call shape as `scanSubgraphs` itself — it takes an instance CHAIN,
+    // Same call shape as `scanSubgraphs` itself — it takes a layer CHAIN,
     // not a path, and passing the root produced a `chain.find is not a
     // function` rather than a wrong answer.
     // Over the CORPUS the sweep reads since placement PR0 (bean `ejye`), with
@@ -170,7 +170,7 @@ describe("the entanglement report", () => {
 });
 
 /**
- * Attribution spans the whole repository, not just this instance.
+ * Attribution spans the whole repository, not just this layer.
  *
  * Bean `3ye4`. `owningDirectory` compares in the space of the path it is
  * given, and `scanSubgraphs` handed it INSTANCE-RELATIVE paths — so a

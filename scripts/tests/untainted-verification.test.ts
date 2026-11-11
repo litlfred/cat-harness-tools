@@ -229,7 +229,7 @@ describe("mergeUntainted", () => {
 
 /**
  * Bean `8iqt`: the recorder writes the attestation store, not the derived
- * report. Every case runs in a throwaway instance with no declaration, so its
+ * report. Every case runs in a throwaway layer with no declaration, so its
  * store is the convention path `test/attestations/`.
  */
 describe("recordUntainted — the attestation store is the home", () => {

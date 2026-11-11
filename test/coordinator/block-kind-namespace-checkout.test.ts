@@ -1,9 +1,9 @@
 /**
- * Every block kind's RDF class is minted in the namespace of the instance that
+ * Every block kind's RDF class is minted in the namespace of the layer that
  * declares the kind (owner ruling 2026-10-06, bean `0r7u`): `Prose` is
  * folio-assistant-core's, `Theorem` folio-assistant-sci's, `Persona`
- * smart-base's. A class written under another instance's prefix would assert
- * that instance defines it. Whole-checkout, so it lives in the top-level test
+ * smart-base's. A class written under another layer's prefix would assert
+ * that layer defines it. Whole-checkout, so it lives in the top-level test
  * home (bean `7zz1`).
  */
 import { describe, expect, test } from "bun:test";

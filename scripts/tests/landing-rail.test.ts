@@ -1,5 +1,5 @@
 /**
- * The rail of a site whose checkout declares NO instance and only names the
+ * The rail of a site whose checkout declares NO layer and only names the
  * harness it lands on (`index.config.json` `site.landing`; an IG repository
  * built by `build-instance-site.ts` with an identity). Owner, 2026-10-14, on
  * litlfred/smart-hiv: *"active graphs have broken links, they go back to

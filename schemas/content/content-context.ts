@@ -3,10 +3,10 @@
  *
  * `CONTENT_CONTEXT` (`jsonld.ts`) is the context cat-harness PUBLISHES, so it
  * binds only cat-harness's own prefix and the external vocabularies. A block's
- * kind class is minted in the namespace of the instance that declares the
- * kind, and cat-harness may not name the instances above it. So each document
+ * kind class is minted in the namespace of the layer that declares the
+ * kind, and cat-harness may not name the layers above it. So each document
  * binds the prefixes its own `@type`s use, in the local half of its context,
- * read from the declaring instance's declaration (`instanceNamespace`) rather
+ * read from the declaring layer's declaration (`instanceNamespace`) rather
  * than from a list here.
  *
  * Node-only: it reads declarations from disk, which is why it is not in
@@ -24,9 +24,9 @@ import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL, FOLIO_BASE, instanceContextUrl } 
 
 import { harnessRoot } from "../harness-root.ts";
 /**
- * Every instance's prefix — its stub, else its name — mapped to its namespace,
+ * Every layer's prefix — its stub, else its name — mapped to its namespace,
  * over a checkout and, when given, a folio's dependency overlay. Throws when
- * two instances claim one prefix, since a binding would then depend on which
+ * two layers claim one prefix, since a binding would then depend on which
  * was read first.
  */
 export function instancePrefixes(checkoutRoot: string, folioRoot?: string): Map<string, string> {
@@ -74,10 +74,10 @@ export function defaultInstancePrefixes(): Map<string, string> {
  * The context for a document whose `@type`s are `types`: the published
  * context, then a local object carrying `@base` (the content base unless
  * `opts.base` names another, as the docs site's does) and a binding for every
- * instance prefix those types use that the published context does not bind.
+ * layer prefix those types use that the published context does not bind.
  *
- * Throws on a prefix that is neither bound by the published context nor an
- * instance's: a document must never carry a compact IRI no processor can
+ * Throws on a prefix that is neither bound by the published context nor a
+ * layer's: a document must never carry a compact IRI no processor can
  * expand.
  */
 export function documentContext(
@@ -88,7 +88,7 @@ export function documentContext(
   // {@link instanceContext}); without it, the shared content context.
   const url = opts.instance === undefined ? CONTENT_CONTEXT_URL : instanceContext(opts.instance, opts.instances).url;
   const local: Record<string, string> = { "@base": opts.base ?? FOLIO_BASE };
-  // CONTENT_CONTEXT still decides what needs no LOCAL binding: an instance
+  // CONTENT_CONTEXT still decides what needs no LOCAL binding: a layer
   // context binds every prefix its documents' types use (it is generated from
   // them), and the ones CONTENT_CONTEXT binds are what those types draw on.
   for (const t of types) {
@@ -103,7 +103,7 @@ export function documentContext(
   return [url, local];
 }
 
-/** One instance's declaration, as {@link instanceContext} reads it. */
+/** One layer's declaration, as {@link instanceContext} reads it. */
 export interface InstanceContextDecl {
   root: string;
   name: string;
@@ -112,7 +112,7 @@ export interface InstanceContextDecl {
 
 let checkoutInstances: InstanceContextDecl[] | undefined;
 
-/** Every instance in the checkout this module sits in, read once. */
+/** Every layer in the checkout this module sits in, read once. */
 function defaultCheckoutInstances(): InstanceContextDecl[] {
   if (checkoutInstances === undefined) {
     const checkout = checkoutRootFor(harnessRoot() ?? dirname(dirname(dirname(fileURLToPath(import.meta.url)))));
@@ -129,18 +129,18 @@ function defaultCheckoutInstances(): InstanceContextDecl[] {
 }
 
 /**
- * An instance's published `@context` URL, `<iriBase>ns/context/v1.jsonld`
- * (bean `folio-assistant-63q4`, owner 2026-10-15), and the instance it
+ * A layer's published `@context` URL, `<iriBase>ns/context/v1.jsonld`
+ * (bean `folio-assistant-63q4`, owner 2026-10-15), and the layer it
  * belongs to.
  *
- * `instance` is an instance NAME, or a PATH — an output file or directory —
- * in which case the innermost instance containing it is meant. A path is the
+ * `instance` is a layer NAME, or a PATH — an output file or directory —
+ * in which case the innermost layer containing it is meant. A path is the
  * form an emitter has: the context a document names must be the context of
- * the instance its file sits in, since that is the instance whose generated
+ * the layer its file sits in, since that is the layer whose generated
  * context (`jsonld:contexts`) is computed from it. A context of any other
- * instance would not define the document's terms.
+ * layer would not define the document's terms.
  *
- * Throws when the instance is unknown or declares no `iriBase`: a document
+ * Throws when the layer is unknown or declares no `iriBase`: a document
  * must never name a context URL nobody publishes.
  */
 export function instanceContext(
@@ -162,10 +162,10 @@ export function instanceContext(
 }
 
 /**
- * The `@context` a document emitted into `instance` carries: that instance's
+ * The `@context` a document emitted into `instance` carries: that layer's
  * published context by URL, then `@base` in the document's own context —
  * the same two-part shape as {@link CONTENT_DOCUMENT_CONTEXT}, with the
- * shared content context replaced by the instance's own. See
+ * shared content context replaced by the layer's own. See
  * {@link instanceContext} for what `instance` may be, and why it throws.
  */
 export function instanceDocumentContext(
@@ -177,8 +177,8 @@ export function instanceDocumentContext(
 
 /**
  * `doc` as it should be WRITTEN at `outputPath`: a document naming the shared
- * content context by URL names its own instance's context instead — the
- * instance whose directory holds `outputPath` (bean `folio-assistant-63q4`).
+ * content context by URL names its own layer's context instead — the
+ * layer whose directory holds `outputPath` (bean `folio-assistant-63q4`).
  * Everything else about the context, its local `@base` and bindings, is kept.
  *
  * This is the one place an emitter switches, applied at the write boundary
@@ -186,9 +186,9 @@ export function instanceDocumentContext(
  * path-free and testable on their own.
  *
  * - A document naming any other context is returned unchanged.
- * - A path inside NO instance (a staged entry before promotion) is returned
- *   unchanged: no instance publishes it yet, and promotion regenerates it.
- * - A path inside an instance that declares no `iriBase` THROWS (see
+ * - A path inside NO layer (a staged entry before promotion) is returned
+ *   unchanged: no layer publishes it yet, and promotion regenerates it.
+ * - A path inside a layer that declares no `iriBase` THROWS (see
  *   {@link instanceContext}): its document would otherwise name a context
  *   nobody publishes, or silently keep the shared one.
  */

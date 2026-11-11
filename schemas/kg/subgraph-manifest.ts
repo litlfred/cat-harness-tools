@@ -129,7 +129,7 @@ export type PayloadSidecar = z.infer<typeof PayloadSidecarSchema>;
  * WHAT IS HEAVY — the node fields whose TARGET is published as a payload,
  * keyed by node class.
  *
- * Decided from measurement (2026-10-03, kg-export over this instance: 3,120
+ * Decided from measurement (2026-10-03, kg-export over this layer: 3,120
  * nodes, 2.5 MB of metadata, no literal field over 4.6 KB). The graph already
  * holds no body inline, so "heavy" is what its pointers name:
  *
@@ -239,7 +239,7 @@ export const SubgraphHydratedSchema = SubgraphNodeBase.extend({
 export type SubgraphHydrated = z.infer<typeof SubgraphHydratedSchema>;
 
 /**
- * Where the shared subgraph `@context` is written, relative to the instance
+ * Where the shared subgraph `@context` is written, relative to the layer
  * root, and published, relative to the base URL — the same path for both,
  * beside `ns/content/v1.jsonld`.
  */
@@ -251,11 +251,11 @@ export const SUBGRAPH_INDEX_FILE = "index.jsonld";
 export const SUBGRAPH_HYDRATED_FILE = "index.hydrated.jsonld";
 
 /**
- * Where an instance PUBLISHES one subgraph's two files, relative to its own
+ * Where a layer PUBLISHES one subgraph's two files, relative to its own
  * root: `<docs>/subgraph/<HARNESS>/<PATH>/` — `gen-subgraph-jsonld`'s output
  * layout, and the directory `kg:materialize --nodes` and a hydrated mount
  * (bean `mo75` G2) read `index.hydrated.jsonld` from. `docsPath` is the
- * instance's declared `docs` directory, read from ITS declaration by the
+ * layer's declared `docs` directory, read from ITS declaration by the
  * caller, never spelled.
  *
  * Throws on the root (`""`, `.`): a harness root publishes `index.jsonld`
@@ -279,24 +279,24 @@ export function publishedSubgraphDir(docsPath: string, harness: string, subgraph
  * published per pin in a package*, and a hydrated mount fetches them through
  * the Tool its source names (`HydratedSource.tool`, bean `j9cs`). Rejected:
  * committing them in each repository (B) — they are `builtAtPublish`, computed
- * over the checkout's other instances, so no commit could hold them current
+ * over the checkout's other layers, so no commit could hold them current
  * and every re-pin would turn a committed-bytes check red (owner, 2026-10-14,
  * "B1"); and generating them at mount time (C) — a mount would then need the
  * whole index, kg-export and the framing toolchain to read one file of
  * metadata, which is the cost a hydrated mount exists to avoid.
  *
- * What a pin publishes, for each instance that builds `<docs>/subgraph/`:
+ * What a pin publishes, for each layer that builds `<docs>/subgraph/`:
  *
  * - ONE npm package (`bun pm pack`), `<harness>-subgraph-index` at version
  *   `0.0.0-pin.<sha>`, holding every `index.jsonld` and
  *   `index.hydrated.jsonld` under `<docs>/subgraph/<harness>/` at the paths
- *   the instance publishes them (instance-relative), plus the manifest
+ *   the layer publishes them (instance-relative), plus the manifest
  *   {@link SUBGRAPH_INDEX_MANIFEST_FILE} at the package root;
  * - the package's `folio-binary-release/v1` record beside it
  *   (`<tarball>.release.json`, `schemas/sdlc/binary-release.ts`), with the
  *   tarball's size and sha256;
  * - both as assets of the GitHub release tagged
- *   {@link subgraphIndexPackage}`.tag` in the instance's repository — the host
+ *   {@link subgraphIndexPackage}`.tag` in the layer's repository — the host
  *   `npm-kg-distribution` §3 already names, downloadable without a token.
  *
  * Every name is a function of (repository, pin, harness) alone, so a consumer
@@ -326,7 +326,7 @@ export const SubgraphIndexFileSchema = z
 export type SubgraphIndexFile = z.infer<typeof SubgraphIndexFileSchema>;
 
 /**
- * `subgraph-index.json`: which pin of which instance the files are, and a
+ * `subgraph-index.json`: which pin of which layer the files are, and a
  * sha256 per file. A consumer refuses a package whose manifest names another
  * repository, pin or harness than the one it fetched for, and a file whose
  * bytes do not hash to its entry.
@@ -337,9 +337,9 @@ export const SubgraphIndexManifestSchema = z
     repository: z.string().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, "owner/name"),
     ref: Sha40,
     harness: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "an instance name"),
-    /** The instance's declared `docs` directory, no trailing slash. */
+    /** The layer's declared `docs` directory, no trailing slash. */
     docs: z.string().min(1),
-    /** What the files were built in — they are computed over a checkout's instances, so the checkout is provenance. */
+    /** What the files were built in — they are computed over a checkout's layers, so the checkout is provenance. */
     builtIn: z.object({ repository: z.string().min(1), ref: z.string().min(1) }).strict().optional(),
     files: z.array(SubgraphIndexFileSchema).min(1),
   })

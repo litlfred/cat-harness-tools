@@ -24,7 +24,7 @@ import { corpusDirectoriesForGraph as directoriesForGraph } from "../../schemas/
 import { libraryEntryDirs } from "../lib/library-entry-graphs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
-/** The instance root these helpers resolve against: `cat-harness`. */
+/** The layer root these helpers resolve against: `cat-harness`. */
 export const INSTANCE = resolve(HARNESS_ROOT);
 
 /** Every declared library directory, absolute. Empty when none is declared. */

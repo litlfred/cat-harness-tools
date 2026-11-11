@@ -4,9 +4,9 @@
  * unkinded families.
  *
  * @module scripts/check-node-kinds
- * @covers cat-harness, typologies — it resolves every declared family's validator, records which are node kinds, and holds each instance's unkinded families to that instance's own baseline
+ * @covers cat-harness, typologies — it resolves every declared family's validator, records which are node kinds, and holds each layer's unkinded families to that layer's own baseline
  *
- *   bun run cat node-kinds                       write every instance's baseline, and cat-harness/docs/_data/node-kinds.json
+ *   bun run cat node-kinds                       write every layer's baseline, and cat-harness/docs/_data/node-kinds.json
  *   bun run cat node-kinds:check                 fail on a NEW unkinded family, a stale or foreign baseline entry, or an id collision
  *   bun run cat node-kinds --accept-unkinded     write, admitting new unkinded families to their owners' baselines
  *
@@ -16,8 +16,8 @@
  * is the deliberate override. A family that becomes a node kind leaves the
  * baseline at the next write, and `--check` fails until it is written.
  *
- * A family belongs to the instance that declares its typology
- * (`typologyOwner`). Each instance keeps its baseline in a declared asset of
+ * A family belongs to the layer that declares its typology
+ * (`typologyOwner`). Each layer keeps its baseline in a declared asset of
  * role `unkinded-baseline` (none declared: empty) and is judged against it
  * (`ratchet`). The table `docs/_data/node-kinds.json` is still written for
  * the node-kind pages but is `builtAtPublish`, so `--check` does not compare
@@ -78,7 +78,7 @@ function committed(): NodeKindIndexFile | undefined {
   }
 }
 
-/** One instance's declared baseline: where, and what it admits; `error` when declared and unreadable. */
+/** One layer's declared baseline: where, and what it admits; `error` when declared and unreadable. */
 interface DeclaredBaseline {
   instance: string;
   path?: string;
@@ -89,7 +89,7 @@ interface DeclaredBaseline {
   mounted?: boolean;
 }
 
-/** Every instance in the checkout, with its declared baseline read. */
+/** Every layer in the checkout, with its declared baseline read. */
 export function readBaselines(root = repoRoot): DeclaredBaseline[] {
   const out: DeclaredBaseline[] = [];
   const mounts = new Set(lockedMountPaths(root).map((p) => resolve(root, p)));

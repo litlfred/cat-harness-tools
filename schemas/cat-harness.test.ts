@@ -1,8 +1,8 @@
 /**
  * Tests for the CatHarness root declaration — issue #223, Phase 0.3.
  *
- * The shape under test: an instance declares the directories it scans and the
- * graph typology each holds, and a downstream instance INHERITS its dependencies'
+ * The shape under test: a layer declares the directories it scans and the
+ * graph typology each holds, and a downstream layer INHERITS its dependencies'
  * directories without restating them.
  */
 import { describe, it, test, expect, beforeAll, afterAll } from "bun:test";
@@ -22,7 +22,7 @@ import { checkoutDirectories, corpusDirectoriesForGraph } from "./kg/harness-con
 const TMP = join(import.meta.dir, "__test_agent_harness__");
 const INSTANCE_ROOT = HARNESS_ROOT;
 const HARNESS = join(TMP, "agentic-harness");
-/** This repository itself — the instance that declares all seven. */
+/** This repository itself — the layer that declares all seven. */
 const ROOT = HARNESS_ROOT;
 const CORE = join(TMP, "folio-assist-core");
 const RELOCATED = join(TMP, "relocated");
@@ -43,7 +43,7 @@ beforeAll(() => {
   mkdirSync(CORE, { recursive: true });
   writeDeclaration(CORE, JSON.stringify({ name: "folio-assist-core", directories: [{ id: "folio", path: "folio/", graphTypologies: ["folio"] }] }));
 
-  // An instance that moves its knowledge graph somewhere else.
+  // A layer that moves its knowledge graph somewhere else.
   mkdirSync(RELOCATED, { recursive: true });
   writeDeclaration(RELOCATED, JSON.stringify({ name: "relocated", directories: [{ id: "kg", path: "graph/knowledge/", graphTypologies: ["kg"] }] }));
 
@@ -61,7 +61,7 @@ describe("reading a declaration", () => {
   });
 
   it("an absent declaration is undefined, not an error", () => {
-    // An instance not yet migrated is ordinary; callers fall back to today's
+    // A layer not yet migrated is ordinary; callers fall back to today's
     // conventions rather than failing.
     expect(readDeclaration(join(TMP, "no-such-instance"))).toBeUndefined();
   });
@@ -113,7 +113,7 @@ describe("reading a declaration", () => {
     // spelling.
     //
     // **The id survives and the kind CANONICALISES**, and the asymmetry is
-    // right. An id is the instance's own handle — `AGENTS.md` requires it to
+    // right. An id is the layer's own handle — `AGENTS.md` requires it to
     // be stable across a relocation — so a projection must hand it back
     // unchanged. A graph TYPOLOGY is projected as its type IRI, and the IRI is
     // the identity: `kg` and `cat-harness` are two spellings of
@@ -143,7 +143,7 @@ describe("inheritance — the Phase 0.3 gate", () => {
     const tools = dirs.find((d) => d.id === "tools")!;
     expect(tools.own).toBe(false);
     expect(tools.declaredBy).toBe("agentic-harness");
-    // Inherited paths resolve against the instance that DECLARED them.
+    // Inherited paths resolve against the layer that DECLARED them.
     expect(tools.absPath).toBe(join(HARNESS, "tools"));
   });
 
@@ -551,7 +551,7 @@ describe("materialiseDirectories", () => {
     //
     // So this asserts on the GRAPH rather than on an id. An id is a name
     // somebody chose; the graph is what the pipeline needs to find, and it
-    // keeps being found however many instances declare one or whatever they
+    // keeps being found however many layers declare one or whatever they
     // call their entries.
     const dirs = resolveDirectories([{ name: "folio-assistant", root: INSTANCE_ROOT, own: true }]);
     expect(dirs.map((d) => d.id)).toContain("uploads");
@@ -567,7 +567,7 @@ describe("materialiseDirectories", () => {
     //
     // This asserted `not.toContain("library")` for a few hours — the platform
     // owning no content, stated as a rule. The rule is not wrong; the entry
-    // is no longer a claim about what this instance HOLDS. What replaces it is
+    // is no longer a claim about what this layer HOLDS. What replaces it is
     // the check that the corpus is reachable and is NOT here: at least two
     // libraries resolve, and the platform's own is not one of the two that
     // carry documents.
@@ -578,7 +578,7 @@ describe("materialiseDirectories", () => {
     // `libraries.length > 1` on the line above, which was true only because
     // cat-harness declared five of its dependents' libraries as
     // `scope: "repository"` mirrors. The platform resolved alone now holds
-    // one; the checkout holds every instance's.
+    // one; the checkout holds every layer's.
     expect(libraries.length).toBe(1);
     expect(corpusDirectoriesForGraph(INSTANCE_ROOT, "library").length).toBeGreaterThan(1);
     // The platform's own library EXISTS. It was absent for a few hours between
@@ -613,7 +613,7 @@ describe("the `kg` → `cat-harness` rename keeps old declarations working", () 
    * "matching on path makes two knowledge graphs out of one relocation, and
    * every consumer then scans a directory that is not there". The same
    * property makes renaming an id dangerous in the other direction — a
-   * downstream instance overriding `kg` overrides nothing once the kind is
+   * downstream layer overriding `kg` overrides nothing once the kind is
    * called something else, and the failure is SILENT: it scans, finds
    * nothing, reports a clean run. That is the `dh4f` shape, delivered to
    * somebody else's repository.
@@ -637,7 +637,7 @@ describe("the `kg` → `cat-harness` rename keeps old declarations working", () 
 
   it("a declaration written against the OLD vocabulary still loads", () => {
     // The migration guarantee, end to end: this is verbatim what a downstream
-    // instance's `harness.json` looked like before the rename.
+    // layer's `harness.json` looked like before the rename.
     const old = join(TMP, "old-vocabulary");
     mkdirSync(join(old, "skills"), { recursive: true });
     writeDeclaration(old, JSON.stringify({ name: "downstream", directories: [{ id: "kg", path: "skills/", graphTypologies: ["kg"] }] }));
@@ -650,8 +650,8 @@ describe("the `kg` → `cat-harness` rename keeps old declarations working", () 
 describe("default directories — inherit the convention, declare only the deviation", () => {
   /**
    * The owner, 2026-09-19: "inherit, set default dirs/graphs in container
-   * schema definitions." An instance that follows the convention should
-   * declare NOTHING; before this, every instance restated the same seven
+   * schema definitions." A layer that follows the convention should
+   * declare NOTHING; before this, every layer restated the same seven
    * entries, which is seven chances to disagree with the platform about what
    * `beans/` is.
    */
@@ -665,8 +665,8 @@ describe("default directories — inherit the convention, declare only the devia
 
     const d = resolveDirectories([{ name: "minimal", root: inst, own: true }]);
     expect(d.map((x) => x.id).sort()).toEqual(["beans", "skills", "tools"]);
-    // `(default)` rather than the instance's name: a consumer can tell an
-    // inherited convention from something this instance chose.
+    // `(default)` rather than the layer's name: a consumer can tell an
+    // inherited convention from something this layer chose.
     expect(d.every((x) => x.declaredBy === "(default)")).toBe(true);
     expect(d.find((x) => x.id === "skills")!.path).toBe("skills/");
   });
@@ -674,8 +674,8 @@ describe("default directories — inherit the convention, declare only the devia
   it("a default whose directory is ABSENT is not seeded", () => {
     // The `dh4f` defect, and the reason defaults are existence-filtered:
     // "a declared-but-absent directory is where a consumer scans nothing and
-    // reports a clean run over it". Seeding `voices/` into an instance with no
-    // voices would manufacture that in every instance at once.
+    // reports a clean run over it". Seeding `voices/` into a layer with no
+    // voices would manufacture that in every layer at once.
     const d = resolveDirectories([{ name: "minimal", root: inst, own: true }]);
     for (const absent of ["voices", "library", "uploads", "todos", "schemas"]) {
       expect(d.find((x) => x.id === absent)).toBeUndefined();
@@ -686,7 +686,7 @@ describe("default directories — inherit the convention, declare only the devia
   it("an explicit entry overrides the default of the same id", () => {
     // Defaults are the OUTERMOST link of the chain, not a special case: the
     // same override-by-id rule that lets a dependent relocate an inherited
-    // directory lets an instance relocate a defaulted one.
+    // directory lets a layer relocate a defaulted one.
     const moved = join(TMP, "defaults-override");
     mkdirSync(join(moved, "graph", "knowledge"), { recursive: true });
     mkdirSync(join(moved, "tools"), { recursive: true });
@@ -724,7 +724,7 @@ describe("default directories — inherit the convention, declare only the devia
 describe("the scope trap", () => {
   it("refuses to materialise an empty twin beside a directory that has content", () => {
     // REGRESSION, 2026-09-20, and the defect was mine. `scope` is optional and
-    // its ABSENCE is meaningful — the path resolves against the instance
+    // its ABSENCE is meaningful — the path resolves against the layer
     // rather than the repository. Omitting it on an entry that meant
     // `repository` made the declaration name a different directory, and
     // `materialiseDirectories` then CREATED that directory with a keep
@@ -928,7 +928,7 @@ describe("a nested declaration is named by its KIND, not by its directory", () =
 
   test("the directory-name convention still works for a kind declaring no filename", () => {
     // Unmigrated is not broken. A graph whose kind names no declaration file
-    // falls back to `${dirName}.json`, so an instance that never relocates
+    // falls back to `${dirName}.json`, so a layer that never relocates
     // behaves exactly as it did.
     const root = mkdtempSync(join(tmpdir(), "nested-conv-"));
     try {
@@ -971,7 +971,7 @@ describe("instanceRootsIn — discovered, never listed", () => {
       mkdirSync(join(base, d), { recursive: true });
       writeDeclaration(join(base, d), decl);
     }
-    // declares nothing — present, but not an instance
+    // declares nothing — present, but not a layer
     mkdirSync(join(base, "plain"), { recursive: true });
 
     expect(instanceRootsIn(base)).toEqual([
@@ -1009,15 +1009,15 @@ describe("instanceRootsIn — discovered, never listed", () => {
   it("finds EVERY instance of THIS repository, which is the defect it fixes", () => {
     // The gates carried `["cat-harness", "bootstrap"]`. Asserting against the
     // real repository is the point: a fixture would have passed for the whole
-    // period the literal was wrong. If an instance is added or removed this
+    // period the literal was wrong. If a layer is added or removed this
     // test SHOULD fail — that is the signal the literal never gave.
     //
     // It fired as designed on 2026-09-20 and the list below is the updated
-    // truth, not a widened assertion: seven instances arrived on one branch
+    // truth, not a widened assertion: seven layers arrived on one branch
     // (`who-iris`, `who-style-guide`, `folio-assistant-sci`, `kg-navigation`,
     // `detangle`, `large-datasets`, `agent-skills`) and `folio-assist-core`
     // became `folio-assistant-core` under the owner's ruling that cat-harness,
-    // folio-assistant-core and folio-assistant are three distinct instances.
+    // folio-assistant-core and folio-assistant are three distinct layers.
     // Four of eleven is what the old literal would have gone on reporting.
     const repo = resolve(import.meta.dir, "..", "..");
     const found = instanceRootsIn(repo).map((r) => r.slice(repo.length + 1) || ".");
@@ -1027,8 +1027,8 @@ describe("instanceRootsIn — discovered, never listed", () => {
       // all"); the checkout root holds an index now. It fired as designed.
       "bootstrap",
       // Added 2026-09-30 when it fired as designed: bootstrap's tools were
-      // re-created as the sibling instance `bootstrap-tools/` (bean `xsqm`),
-      // which declares `bootstrap-tools.json` and is therefore an instance.
+      // re-created as the sibling layer `bootstrap-tools/` (bean `xsqm`),
+      // which declares `bootstrap-tools.json` and is therefore a layer.
       "bootstrap-tools",
       "cat-harness",
       // Added 2026-10-01 with bean `w2gr` (step 3a): the tool IMPLEMENTATION
@@ -1056,16 +1056,16 @@ describe("instanceRootsIn — discovered, never listed", () => {
       "folio-assistant-sci",
       // Added 2026-09-21 with the FHIR IG artefact-index ingest (issue #689).
       // It fired as designed, which is what this list is for: `smart-trust/`
-      // declares a `harness.json` and is therefore an instance, sorting
+      // declares a `harness.json` and is therefore a layer, sorting
       // between `large-datasets` and `who-iris`. A directory with no
-      // `harness.json` is not an instance and is correctly absent — `smart-kg/`
+      // `harness.json` is not a layer and is correctly absent — `smart-kg/`
       // was the example until it was removed (bean `wg7r`).
       // Added 2026-09-21 with the second ingested IG (bean qrnz). PROVISIONAL:
       // the owner has since ruled that a per-IG harness should not exist at all
       // (bean nsbb), so this entry and `smart-trust` below are both expected to
-      // collapse into a `smart-base` instance. It is listed because it EXISTS
+      // collapse into a `smart-base` layer. It is listed because it EXISTS
       // today, which is the only thing this assertion is about.
-      // Added 2026-09-22 (issue #877). This is the `smart-base` instance that
+      // Added 2026-09-22 (issue #877). This is the `smart-base` layer that
       // `nsbb` called for, and its arrival is the FIRST half of what the note
       // above predicted: the per-IG harnesses are expected to collapse into it.
       // They have NOT collapsed yet and both are still listed, because this
@@ -1083,7 +1083,7 @@ describe("instanceRootsIn — discovered, never listed", () => {
       "smart-immunizations",
       "smart-trust",
       // Added 2026-10-31 when it fired as designed: folio-assistant#2761 mounted
-      // `smart-trust-phw` (bean `nr5p`, PCF1) as an instance of the index.
+      // `smart-trust-phw` (bean `nr5p`, PCF1) as a layer of the index.
       "smart-trust-phw",
       "who-iris",
       // `who-style-guide` was listed here until 2026-10-01, when the owner
@@ -1094,7 +1094,7 @@ describe("instanceRootsIn — discovered, never listed", () => {
     // `folio-assistant-core` is the rename that would otherwise read as a
     // deletion plus an addition.
     expect(found).toContain("folio-assistant-core");
-    // The root is pinned the other way now: an index, never an instance. If a
+    // The root is pinned the other way now: an index, never a layer. If a
     // root declaration comes back, this fails and the list above must say so.
     expect(found).not.toContain(".");
   });
@@ -1213,7 +1213,7 @@ describe("ownDirectoryById — two entries, one path, different scopes", () => {
    * The case this exists for is real and in this repository: `cat-harness.json`
    * declares `docs` (instance-scoped) and `root-docs` (`scope: "repository"`),
    * both with `path: "docs/"`. They resolve against different roots, so a
-   * caller asking for the instance's own `docs` must not be handed the
+   * caller asking for the layer's own `docs` must not be handed the
    * repository's. `pipeline/translation-index.ts` is that caller —
    * everything it computes is instance-relative.
    */
@@ -1255,7 +1255,7 @@ describe("ownDirectoryById — two entries, one path, different scopes", () => {
 });
 
 // Bean `cmsl`: an entry declared FROM WITHIN a resolved directory's
-// declaration file, marked `"subgraph": true`, is an instance directory.
+// declaration file, marked `"subgraph": true`, is a layer directory.
 describe("resolveDirectories — from-within declarations", () => {
   function fixture(declareSkills: boolean): string {
     const root = mkdtempSync(join(tmpdir(), "from-within-"));
@@ -1290,8 +1290,8 @@ describe("resolveDirectories — from-within declarations", () => {
   });
 
   // The parent being a built-in DEFAULT does not make the nested declaration
-  // nobody's: it is a file in the root instance's own tree. Inheriting
-  // `(default)` / `own: false` dropped two instances' voices diagrams.
+  // nobody's: it is a file in the root layer's own tree. Inheriting
+  // `(default)` / `own: false` dropped two layers' voices diagrams.
   test("a nested entry under a DEFAULT parent belongs to the root instance", () => {
     const root = fixture(false);
     const dirs = resolveDirectories([{ name: "fw", root, own: true }]);

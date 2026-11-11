@@ -158,7 +158,7 @@ export function reusableCalls(doc: unknown): string[] {
  * `./.github/workflows/x.yml` is one of this repository's own files, which the
  * scan reads anyway (`"local"`). `owner/repo/.github/workflows/x.yml@ref` is
  * found at `<repo>/.github/workflows/x.yml` when that repository is mounted
- * here as an instance; otherwise `undefined`, which the caller reports as
+ * here as a layer; otherwise `undefined`, which the caller reports as
  * delegated. The mounted copy is the pinned one, which is the one CI calls
  * when the site's caller names the same pin.
  */

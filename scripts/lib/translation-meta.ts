@@ -10,7 +10,7 @@
 import { readHarnessConfig, TranslationConfigSchema } from "../../schemas/kg/harness-config.ts";
 
 /**
- * The instance's declared translation config, with the SCHEMA's defaults (the
+ * The layer's declared translation config, with the SCHEMA's defaults (the
  * six UN languages, source `en`). Read through `schemas/` rather than
  * `pipeline/translation-index.ts`: this is harness chrome, and the
  * harness may not import the content pipeline (`adapter-layering.test.ts`).
@@ -32,7 +32,7 @@ export const TRANSLATION_META_ID = "fa-translation-meta";
  * globe. Issue #2219: the owner asked why the IRIS replica's root had no translations,
  * and chose *"USE THE SAME CHROME AS FOLIO-ASSISTANT. THIS IS ALREADY
  * DEFINED"*. So this is the include's block with the include's defaults, not
- * a new format: `lang` and `supportedLocales` come from the instance's own
+ * a new format: `lang` and `supportedLocales` come from the layer's own
  * declaration, and `availableLocales` is `[]`. That empty list is exactly what
  * the include writes for a docs page with no translations, and `docs-ui.js`
  * then shows every declared locale and greys out each one but the source.

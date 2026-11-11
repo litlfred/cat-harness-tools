@@ -30,8 +30,8 @@
  *
  * ## Three states per kind, kept distinguishable
  *
- * 1. **no directory** — no instance declares a directory of this kind (a
- *    nested kind such as `bean-defs` inside `beans/`, or one this instance
+ * 1. **no directory** — no layer declares a directory of this kind (a
+ *    nested kind such as `bean-defs` inside `beans/`, or one this layer
  *    does not have). NOT a gap.
  * 2. **a directory with no files** — a determined empty.
  * 3. **files, and no criterion and no gate reaching them** — the finding.
@@ -73,7 +73,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import {
   type ResolvedDirectory,
@@ -107,14 +107,15 @@ import { readQaTree } from "./qa-store.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";
+import { absenceAt } from "./branch-store.ts";
 
-/** The INSTANCE root — this file lives at `<instance>/scripts/`. */
+/** The LAYER root — this file lives at `<instance>/scripts/`. */
 const ROOT = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
 
 /** Where a kind's files stand relative to the audits that reach them. */
 export type KindState =
-  /** No instance declares a directory of this kind. Not a gap. */
+  /** No layer declares a directory of this kind. Not a gap. */
   | "no-directory"
   /** A directory exists and holds no files. A determined empty. */
   | "empty"
@@ -179,7 +180,17 @@ export type KindState =
    * which of the two cases it is and how to fix it; this report's job is only
    * to refuse to put a number on what it could not read.
    */
-  | "undetermined";
+  | "undetermined"
+  /**
+   * Every directory of this kind that is not `stored` was DETERMINED absent
+   * from this checkout by `state:mount` (an `.absent` record, `absenceAt`):
+   * declared for every checkout by a mounted instance, not by this root, and
+   * not on this checkout's remote — an IG repository that is its own index
+   * (cat-harness-tools#1701). Not a lower bound like `undetermined`: the
+   * graph is not this checkout's, so there is nothing here to count. Not a
+   * finding, and not covered either.
+   */
+  | "absent";
 
 export type AdversarialCoverageState = "reviewed" | "stale" | "never";
 
@@ -356,12 +367,13 @@ export function censusDirectories(
   dirs: ReadonlyArray<{ id?: string; absPath: string; storage?: unknown; source?: SubgraphSource }>,
   skip?: ReadonlySet<string>,
   repoRoot: string = process.cwd(),
-): { files: number; sidecars: number; stored: number; undetermined: number; uncounted: number } {
+): { files: number; sidecars: number; stored: number; undetermined: number; uncounted: number; absent: number } {
   let files = 0;
   let sidecars = 0;
   let stored = 0;
   let undetermined = 0;
   let uncounted = 0;
+  let absent = 0;
   for (const d of dirs) {
     let at = d.absPath;
     if (contentIsOffCheckout(d)) {
@@ -389,6 +401,13 @@ export function censusDirectories(
       }
       const t = tipPresence(src, d.absPath, repoRoot);
       if (t.state !== "mounted") {
+        // Determined NOT this checkout's at mount time (cat-harness-tools#1701):
+        // nothing to count, and no lower bound either. Only an unmounted tip
+        // with that record; a not-cut-over one stays undetermined.
+        if (t.state === "unmounted" && absenceAt(repoRoot, relative(repoRoot, d.absPath).split(sep).join("/"), d.id)) {
+          absent++;
+          continue;
+        }
         undetermined++;
         continue;
       }
@@ -402,7 +421,7 @@ export function censusDirectories(
     files += c.files;
     sidecars += c.sidecars;
   }
-  return { files, sidecars, stored, undetermined, uncounted };
+  return { files, sidecars, stored, undetermined, uncounted, absent };
 }
 
 /**
@@ -583,7 +602,7 @@ export function gateCoverage(root: string, repo: string, given?: readonly Gate[]
   return out;
 }
 
-/** The universe of kinds: the registry, plus anything an instance declares that it does not know. */
+/** The universe of kinds: the registry, plus anything a layer declares that it does not know. */
 export function kindUniverse(repo: string): { registered: string[]; declaredOnly: string[] } {
   const registered = defaultGraphTypologies.names().sort();
   const extra = new Set<string>();
@@ -678,13 +697,13 @@ export function adversarialCoverageByGraph(repo: string, root: string = ROOT): M
   }
 
   // The committed half. The harness root's own store first, then every
-  // instance's that `kg-audit` would resolve from it; a layout whose
-  // instances cannot be listed still reads the harness root's.
+  // layer's that `kg-audit` would resolve from it; a layout whose
+  // layers cannot be listed still reads the harness root's.
   const homes = new Set<string>([resolve(attestationsHomeFor(root).root)]);
   try {
     for (const t of kgAttestationTrees(repo, root)) homes.add(resolve(t.attHome));
   } catch {
-    // instance discovery failed: the harness root's store is still read
+    // layer discovery failed: the harness root's store is still read
   }
   for (const home of homes) {
     for (const s of storedAdversarialReviews(home)) record(s.file.subject, s.file.source_hash ?? undefined);
@@ -757,11 +776,11 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
     }
   }
 
-  // Each instance's directories, resolved ONCE rather than once per kind. The
+  // Each layer's directories, resolved ONCE rather than once per kind. The
   // resolution does not depend on the kind, and it was the run's cost: about
-  // 50 ms per pass over the checkout's instances, repeated for each of ~90
+  // 50 ms per pass over the checkout's layers, repeated for each of ~90
   // kinds, so most of a `coverage()` call (measured 2026-10-26: 6.5 s, of
-  // which under 1 s was the gates, the universe and the census). An instance
+  // which under 1 s was the gates, the universe and the census). A layer
   // whose declaration will not resolve is skipped here as it was in the loop.
   const dirsByInstance: ResolvedDirectory[][] = [];
   for (const inst of instanceRootsIn(repo)) {
@@ -782,7 +801,7 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
       }
     }
     const dirs = new Set(resolved.keys());
-    const { files, sidecars, stored, undetermined, uncounted } = censusDirectories([...resolved.values()], undefined, repo);
+    const { files, sidecars, stored, undetermined, uncounted, absent } = censusDirectories([...resolved.values()], undefined, repo);
     const crit = criteriaByGraph.get(kind);
     const gs = gatesByKind.get(kind) ?? [];
     const def = defaultGraphTypologies.get(kind);
@@ -798,6 +817,8 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
         // for the same reason it always had it.
         : undetermined > 0
           ? "undetermined"
+          : absent > 0 && absent + stored === dirs.size
+            ? "absent"
           : stored === dirs.size
             ? "stored"
             : files === 0 && uncounted > 0
@@ -1029,7 +1050,7 @@ function main(): number {
   // - a missing baseline, and a kind with no census, are UNKNOWN: printed,
   //   never a pass, never a failure (proposal §2.3).
   //
-  // The INSTANCE root, not the repository root: `check:undeclared-files`
+  // The LAYER root, not the repository root: `check:undeclared-files`
   // caught the first version writing to `<repo>/test/results/`, a directory no
   // declaration names — the `dh4f` defect, committed by the script whose whole
   // subject is coverage.

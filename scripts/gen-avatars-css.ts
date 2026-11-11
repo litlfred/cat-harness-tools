@@ -219,7 +219,7 @@ export function renderAvatarsCss(): string {
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
-  // THE INSTANCE this script belongs to — the one it lives in — not whatever
+  // THE LAYER this script belongs to — the one it lives in — not whatever
   // directory the gate was invoked from. Those were the same until the move
   // (bean `wggr`), after which `siteDirFor(cwd)` threw on a `harness.json`
   // that is one directory down.

@@ -98,7 +98,7 @@ export function diff(base: Pick<SplitBaseline, "mcpTools" | "knownSkills">, now:
 /**
  * Whether the baseline judges the root named `here`. It records the skills and
  * tools of the root it was written in; a site that mounts this layer resolves a
- * different skill set (none of an instance it does not mount), so there every
+ * different skill set (none of a layer it does not mount), so there every
  * such skill read as "no longer resolves" (owner, 2026-11-05: "scope to fa").
  */
 export function judges(base: Pick<SplitBaseline, "root">, here: string): boolean {

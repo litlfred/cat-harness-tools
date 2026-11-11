@@ -62,11 +62,11 @@
  * Usage:
  *   bun run cat translation:index          # write cat-harness/docs/_data/translations.json
  *   bun run cat translation:index:check    # fail if stale, invalid, or unreadable
- *   bun run cat translation:index:check --instance <dir>   # another instance's own site
+ *   bun run cat translation:index:check --instance <dir>   # another layer's own site
  *
- * `--instance <dir>` reads the instance at `<dir>` instead of this one, and its
+ * `--instance <dir>` reads the layer at `<dir>` instead of this one, and its
  * site is the one IT declares ({@link instanceSiteRoot}); the index is written
- * into that site's `_data/`. An instance that declares no Jekyll site is
+ * into that site's `_data/`. A layer that declares no Jekyll site is
  * reported `unreadable` (exit 2) — it has published no translated page to
  * index, which is not the same answer as "none of its pages is translated".
  *
@@ -92,20 +92,20 @@ import { ownDirectoryById, siteDirFor } from "../schemas/kg/cat-harness.ts";
 const REPO_ROOT = resolve(HARNESS_ROOT);
 
 /**
- * The Jekyll site directory, relative to the instance root.
+ * The Jekyll site directory, relative to the layer root.
  *
- * **Read from the instance's own declaration** (`cat-harness.json`, entry id
+ * **Read from the layer's own declaration** (`cat-harness.json`, entry id
  * `docs`), with the composed `siteDirFor()` as the fallback when nothing is
  * declared. That is bean `x4a6`'s last box: *"`translation-index.ts` takes its
  * root from the declaration instead of `SITE_DIR`."*
  *
  * ## Why the id lookup, and not the path
  *
- * This instance declares **two** entries whose `path` is `docs/` — `docs`
+ * This layer declares **two** entries whose `path` is `docs/` — `docs`
  * (instance-scoped, resolving under `cat-harness/`) and `root-docs`
  * (`scope: "repository"`, resolving under the REPOSITORY root). They are
  * different directories wearing one path. {@link ownDirectoryById} excludes
- * the repository-scoped one, so this resolves to the instance's own.
+ * the repository-scoped one, so this resolves to the layer's own.
  *
  * Everything here is instance-relative — `join(instanceRoot, SITE_DIR)` below,
  * and `INDEX_PATH` — so the absolute path the lookup returns is made relative
@@ -130,7 +130,7 @@ const DECLARED_SITE_DIR = ownDirectoryById(REPO_ROOT, "docs", siteDirFor(REPO_RO
 
 export const SITE_DIR = relative(REPO_ROOT, DECLARED_SITE_DIR);
 
-/** Where the generated index lands, relative to the instance root. */
+/** Where the generated index lands, relative to the layer root. */
 export const INDEX_PATH = join(SITE_DIR, "_data", "translations.json");
 
 /** The `$schema` tag the generated document carries, per the repo convention. */
@@ -213,7 +213,7 @@ export interface BuildResult {
  * the SAME normalisation to an `href` at read time (`navKey` in docs-ui.js).
  *
  * Matching on the raw URL instead would work on this site and break on any
- * instance with a `baseurl` or a trailing-slash permalink style — which is the
+ * layer with a `baseurl` or a trailing-slash permalink style — which is the
  * platform-specific-literal failure `AGENTS.md` catalogues at length.
  */
 export function pageKey(url: string): string {
@@ -269,22 +269,22 @@ export function frontMatter(text: string): Record<string, unknown> | undefined {
   return parsed as Record<string, unknown>;
 }
 
-// ── The instance ────────────────────────────────────────────────
+// ── The layer ────────────────────────────────────────────────
 
-/** The instance's config (its index entry, else `<name>.config.json`), or `{}` when there is none. */
+/** The layer's config (its index entry, else `<name>.config.json`), or `{}` when there is none. */
 function harnessConfig(instanceRoot: string): Record<string, unknown> {
   const eff = readEffectiveConfig(instanceRoot);
   return eff.state === "ok" ? eff.config : {};
 }
 
-/** The instance's source language. `harness.config.json`, defaulting to `en`. */
+/** The layer's source language. `harness.config.json`, defaulting to `en`. */
 export function sourceLocale(instanceRoot: string): string {
   const t = harnessConfig(instanceRoot).translation as { defaultLocale?: string } | undefined;
   return t?.defaultLocale ?? "en";
 }
 
 /**
- * Every locale this instance claims to support, INCLUDING the source language.
+ * Every locale this layer claims to support, INCLUDING the source language.
  *
  * `harness.config.json`'s `translation.supportedLocales`, defaulting to the six
  * UN languages — the same default `TranslationConfigSchema` declares, read from
@@ -389,7 +389,7 @@ export function localesReadableFor(
   return supportedLocales(instanceRoot).filter((l) => have.has(l));
 }
 
-/** The instance's content type, which decides which formats are translatable. */
+/** The layer's content type, which decides which formats are translatable. */
 export function contentType(instanceRoot: string): string {
   const c = harnessConfig(instanceRoot).contentType;
   // No declared content type means a plain docs site: the `docs` profile this
@@ -414,13 +414,13 @@ export function siteRoot(instanceRoot: string): string | undefined {
 }
 
 /**
- * The Jekyll site an instance DECLARES for itself — its own `docs` entry, else
+ * The Jekyll site a layer DECLARES for itself — its own `docs` entry, else
  * its composed `siteDirFor` — confirmed by `_config.yml` as {@link siteRoot} is.
  *
- * {@link siteRoot} composes THIS instance's site path under whatever root it is
- * handed, which is right for this instance and its fixtures and wrong for
- * another instance whose site sits elsewhere. `--instance` asks this instead.
- * `undefined` when the instance has no declaration or no site there.
+ * {@link siteRoot} composes THIS layer's site path under whatever root it is
+ * handed, which is right for this layer and its fixtures and wrong for
+ * another layer whose site sits elsewhere. `--instance` asks this instead.
+ * `undefined` when the layer has no declaration or no site there.
  */
 export function instanceSiteRoot(instanceRoot: string): string | undefined {
   let abs: string;
@@ -474,8 +474,8 @@ export function buildTranslationIndex(instanceRoot: string, siteDir?: string): B
   const empty: TranslationIndex = { $schema: INDEX_SCHEMA, sourceLocale: src, locales: [], pages: {} };
 
   // `siteDir` names a docs directory that is not a Jekyll site of its own —
-  // one an instance above the base renders into and the site build composes
-  // under the instance's name (`gen-docs-pages.ts`). Named by the caller, so
+  // one a layer above the base renders into and the site build composes
+  // under the layer's name (`gen-docs-pages.ts`). Named by the caller, so
   // it is checked to EXIST rather than for a `_config.yml` it never has.
   const site = siteDir !== undefined ? (existsSync(siteDir) ? siteDir : undefined) : siteRoot(instanceRoot);
   if (!site) {
@@ -493,7 +493,7 @@ export function buildTranslationIndex(instanceRoot: string, siteDir?: string): B
 
   // One pass over every translatable page, sorting them into sources and
   // translations by what each one DECLARES. A page with no `lang` is source
-  // language by default — `AGENTS.md`'s rule that absent means the instance's
+  // language by default — `AGENTS.md`'s rule that absent means the layer's
   // default rather than unknown.
   interface Page {
     rel: string;
@@ -734,8 +734,8 @@ function report(findings: IndexFinding[]): void {
 }
 
 if (import.meta.main) {
-  // `--instance <dir>`: another instance, read through ITS declaration. Absent,
-  // this instance as before.
+  // `--instance <dir>`: another layer, read through ITS declaration. Absent,
+  // this layer as before.
   const explicit = explicitInstanceRoot();
   const root = explicit ?? REPO_ROOT;
   const site = explicit === undefined ? undefined : instanceSiteRoot(explicit);

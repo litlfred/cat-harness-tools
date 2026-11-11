@@ -199,7 +199,7 @@ function lastVerdict(state: InstanceState, node: string): TaskAuthVerdict | unde
  * The role graph for `repoRoot`, so every step can say what the agent is acting AS.
  *
  * Read lazily and a read failure is swallowed to `undefined` rather than
- * taking the tools down: an instance that declares no role graph is
+ * taking the tools down: a layer that declares no role graph is
  * unmigrated, not broken, and the workflow interpreter predates roles.
  * A graph that is present but malformed is `kg:audit`'s finding — it fails
  * loudly there, which is where somebody can act on it.
@@ -220,7 +220,7 @@ export function resolveWorkflowRoles(repoRoot: string): RoleGraph | undefined {
       // A graph that declares no role of its own is a layer of
       // EXTENSIONS by id (placement PR0b/PR1, e.g. core's
       // `scenarios/roles.json`), not the graph a lane binds into: keep
-      // going down to the instance that declares the roles, whose
+      // going down to the layer that declares the roles, whose
       // checkout answer already carries every extension.
       if (graph && graph.roles.length > 0) break;
     }

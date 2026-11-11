@@ -1,6 +1,6 @@
 /**
  * `--instance <dir>` on the translation scripts, and the catalogue pass of
- * `translation-block-qa.ts`, run against a downstream instance that is not this
+ * `translation-block-qa.ts`, run against a downstream layer that is not this
  * one: it declares `translation-sources`, has no Jekyll site, and its pages live
  * outside any site (as an IG's `input/pagecontent/` do).
  *
@@ -22,7 +22,7 @@ import { cataloguePairs } from "./translation-block-qa.ts";
 const HEADER = 'msgid ""\nmsgstr ""\n"Content-Type: text/plain; charset=UTF-8\\n"\n';
 const entry = (ref: string, id: string, str: string) => `\n#: ${ref}\nmsgid "${id}"\nmsgstr "${str}"\n`;
 
-/** A downstream instance: one page, its template, and a French catalogue one source change behind. */
+/** A downstream layer: one page, its template, and a French catalogue one source change behind. */
 function makeInstance(root: string, opts: { declare?: boolean } = {}): void {
   mkdirSync(join(root, "input"), { recursive: true });
   mkdirSync(join(root, "translations", "fr", "glossary"), { recursive: true });

@@ -91,7 +91,7 @@ describe("loading", () => {
 });
 
 describe("the engine checks an adjudication's codes against the list it names", () => {
-  // Under the instance, so the diagram resolves the instance's real lists; a
+  // Under the layer, so the diagram resolves the layer's real lists; a
   // dot-prefixed directory, which every corpus walker skips.
   const dir = mkdtempSync(join(INSTANCE, "test", ".code-list-fixture-"));
   afterAll(() => rmSync(dir, { recursive: true, force: true }));

@@ -1,6 +1,6 @@
 /**
  * The beans-by-process projection and its pages (cat-harness-tools#1413,
- * bean `folio-assistant-pbv1`), against hand-built instances and beans.
+ * bean `folio-assistant-pbv1`), against hand-built layers and beans.
  */
 import { describe, expect, test } from "bun:test";
 

@@ -1,125 +1,69 @@
 /**
- * The LSI viewer page works for its reader: every unit it names is a file in
- * this checkout, every index it reads has its section, every declared prose
- * graph has a verdict row, and every table row has the columns its header
- * promises.
+ * The Indexing evidence page works for its reader (cat-harness#1144): every
+ * indexing method has its section with its held evidence and the skills that
+ * apply it, each skill row carries its Tools and processes, an indexing skill
+ * with no method is listed as having no evidence yet, and every table row has
+ * the columns its header promises.
  *
- * Drawn over a FIXTURE index, never over the committed `test/results/lsi/`
- * (bean `cxcn`, reader audit F7 R69): that corpus is leaving `main` for the
- * `qa-reports` branch, and a test that reads it fails for a reason that is not
- * a defect once it has gone. Whether the committed PAGE matches the committed
- * indexes is `lsi:viz:check`'s question — a gate, which reads the checkout or
- * the branch and says UNKNOWN on a miss — and it is not re-asked here.
- *
- * The tests of this file that read the whole checkout (reads the LSI indexes
- * every instance in the checkout publishes) live in
- * `test/gen-lsi-viz-checkout.test.ts` (bean `7zz1`): standing alone,
- * cat-harness has none of it.
+ * Drawn over a FIXTURE model, so nothing here depends on what the checkout
+ * holds. The test over the whole checkout is in
+ * `test/coordinator/gen-lsi-viz-checkout.test.ts` (bean `7zz1`).
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { renderCommitted, renderFrom, type IndexesRead } from "../gen-lsi-viz.ts";
-import { INDEX_DIR, proseGraphs, sourceFromFiles, type LsiSidecar } from "../lsi.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
-import { dirname } from "node:path";
-import { harnessRel } from "../lib/harness-layout.ts";
+import { evidencePage, type EvidenceModel } from "../gen-lsi-viz.ts";
 
-const REPO = resolve(dirname(HARNESS_ROOT));
-
-/** Two real skill files, so "every unit it names is a file" has something true to check. */
-// declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
-const UNIT_A = `cat-harness/${harnessRel("sdlc/skills/sdlc-core/qa-reports.md")}`;
-const UNIT_B = `cat-harness/${harnessRel("sdlc/skills/sdlc-core/qa-witness.md")}`;
-
-const FIXTURE: LsiSidecar = {
-  $schema: "folio-lsi-index/v1",
-  method: "cat-harness/methodologies/lsi.md",
-  instance: "fixture-instance",
-  graph: "fixture-graph",
-  path: "cat-harness/skills",
-  docs: null,
-  fingerprint: "0".repeat(64),
-  options: { k: 2, weighting: "log-entropy", minDf: 2, maxDfShare: 0.5, powerIterations: 4, seed: 1990 },
-  units: 2,
-  terms: 3,
-  k: 2,
-  retained: 0.5,
-  dimensions: [
-    { dim: 1, sigma: 2.5, positive: ["qa", "branch"], negative: [] },
-    { dim: 2, sigma: 1.25, positive: ["witness"], negative: ["store|pipe"] },
+const MODEL: EvidenceModel = {
+  methods: [
+    {
+      name: "lsi",
+      title: "Latent Semantic Indexing",
+      appliesWhen: "Finding units that discuss the same thing in different words.",
+      instance: "cat-harness",
+      evidence: ["library/deerwester-1990-indexing-by-lsa", "library/landauer-foltz-laham-1998-intro-lsa"],
+      state: "ingested",
+      skills: [
+        { name: "lsi-indexing", instance: "cat-harness", description: "Build and query an index | with a pipe.", methods: ["lsi"], tools: ["lsi-index", "lsi-query"], processes: ["document-ingestion"] },
+      ],
+    },
+    { name: "correspondence-analysis", title: "Correspondence analysis", appliesWhen: "Margins dominate.", instance: "cat-harness", evidence: [], state: "cited-only", skills: [] },
   ],
-  findings: {
-    nearDuplicates: [{ a: UNIT_A, b: UNIT_B, cosine: 0.97 }],
-    narrowDimensions: [{ dim: 2, units: [UNIT_B] }],
-  },
-  neighbours: {},
+  unbacked: [{ name: "glossary-terms", instance: "fixture-core", description: "Add glossary terms.", methods: [], tools: ["glossary-from-source"], processes: [] }],
 };
 
-const FIXTURE_PATH = `${INDEX_DIR}/fixture-instance/fixture-graph.lsi.json`;
-const read: IndexesRead = {
-  state: "hit",
-  from: "a fixture",
-  files: [join(REPO, FIXTURE_PATH)],
-  src: sourceFromFiles(new Map([[FIXTURE_PATH, JSON.stringify(FIXTURE)]])),
-};
-const drawn = renderFrom(read);
-const page = drawn.state === "hit" ? drawn.page : "";
+const page = evidencePage(MODEL);
 
-describe("the LSI viewer page", () => {
-  // `renderCommitted` walks every declared prose graph (~2-4 s on a CI
-  // runner), so it is rendered ONCE here and reused; only the determinism
-  // test below renders it a second time, and carries a timeout for that.
-  let committedOnce: string | undefined;
-  const committedPage = (): string => (committedOnce ??= renderCommitted());
-  test("a miss is returned with its reason, never drawn as an empty page", () => {
-    const miss = renderFrom({ state: "miss", reason: "no lsi/ in this entry" });
-    expect(miss).toEqual({ state: "miss", reason: "no lsi/ in this entry" });
+describe("the Indexing evidence page", () => {
+  test("is titled for what it is, not for the method", () => {
+    expect(page).toContain('title: "Indexing evidence"');
+    expect(page).toContain("rendered-by: lsi-viewer");
   });
 
-  test("a hit is drawn", () => {
-    expect(drawn.state).toBe("hit");
-    expect(page.length).toBeGreaterThan(0);
+  test("has a section per method, with its evidence and the skills that apply it", () => {
+    expect(page).toContain("### Latent Semantic Indexing {#lsi}");
+    expect(page).toContain("`library/deerwester-1990-indexing-by-lsa`");
+    expect(page).toContain("| `lsi-indexing`<br><small>cat-harness</small> |");
+    expect(page).toContain("`lsi-index`<br>`lsi-query`");
+    expect(page).toContain("`document-ingestion`");
   });
 
-  test("has a section for every index it read", () => {
-    expect(page).toContain("## " + FIXTURE.instance + " / " + FIXTURE.graph);
+  test("a method with no held source and no skill says both, rather than drawing nothing", () => {
+    expect(page).toContain("**No held evidence.**");
+    expect(page).toContain("nothing declares `uses-methodology: correspondence-analysis`");
   });
 
-  test("the committed page is the same whether or not an index is to hand", () => {
-    // `renderCommitted` takes no source, which is the point: there is no
-    // argument by which a container holding a working copy could get a
-    // different page from a fresh CI checkout (module docblock, bean `in5a`).
-    // Two independent renders, compared: one cached, one fresh.
-    const fresh = renderCommitted();
-    expect(fresh).toBe(committedPage());
-    expect(fresh.length).toBeLessThan(page.length);
-  }, 30_000);
-
-  test("the freshness column exists only with --detail", () => {
-    expect(page).toContain("| graph | needs one | verdict | detail |");
-    expect(committedPage()).toContain("| graph | needs one |");
-    expect(committedPage()).not.toContain("| verdict |");
+  test("an indexing skill with no method is listed as having no evidence yet", () => {
+    const gap = page.slice(page.indexOf("## Indexing work with no evidence yet"));
+    expect(gap).toContain("`glossary-terms`");
+    expect(gap).toContain("`glossary-from-source`");
   });
 
-  test("has a verdict row for every declared prose graph", () => {
-    const graphs = proseGraphs();
-    expect(graphs.length).toBeGreaterThan(0);
-    for (const t of graphs) expect(page).toContain("| `" + t.instance + "/" + t.id + "` |");
+  test("points index health at the repository health report", () => {
+    expect(page).toContain("check `lsi-indexes`");
+    expect(page).not.toContain("| graph | needs one |");
   });
 
-  test("every unit it names is a file in this checkout", () => {
-    const named = [...page.matchAll(/`([^`\s]+\/sections\/[^`\s]+\.md|[^`\s]+\.md)`/g)].map((m) => m[1]).filter((p) => p.includes("/"));
-    expect(named).toContain(UNIT_A);
-    for (const p of named) if (!p.startsWith("scripts/")) expect(existsSync(join(REPO, p!))).toBe(true);
-  });
-
-  test("a dimension with no negative pole is flagged as a margin, not a theme", () => {
-    expect(page).toContain("Dimension 1 has **no negative pole**");
-  });
-
-  test("every table row has as many cells as its header — a `|` in a term is escaped", () => {
-    expect(page).toContain("store\\|pipe");
+  test("every table row has as many cells as its header — a `|` in a description is escaped", () => {
+    expect(page).toContain("index \\| with a pipe");
     let cols = 0;
     for (const line of page.split("\n")) {
       if (!line.startsWith("|")) { cols = 0; continue; }
@@ -127,5 +71,13 @@ describe("the LSI viewer page", () => {
       if (cols === 0) cols = cells;
       else expect(cells).toBe(cols);
     }
+  });
+});
+
+describe("the evidence page links the keyword viewer", () => {
+  test("a reader on the LSI page can reach the Keywords page beneath it", () => {
+    const model: EvidenceModel = { methods: [], unbacked: [] };
+    const page = evidencePage(model);
+    expect(page).toContain("[Keywords](keywords/)");
   });
 });

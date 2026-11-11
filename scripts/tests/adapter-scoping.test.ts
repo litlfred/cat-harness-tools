@@ -24,7 +24,7 @@
  * this checkout's declared dependencies.
  *
  * The tests of this file that read the whole checkout (reads the adapters and
- * block kinds the content instances contribute (smart-base's `dak`)) live in
+ * block kinds the content layers contribute (smart-base's `dak`)) live in
  * `test/adapter-scoping-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

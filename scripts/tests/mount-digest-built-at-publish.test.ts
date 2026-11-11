@@ -1,9 +1,9 @@
 /**
- * A remote mount's integrity digest leaves out what the instance declares it
+ * A remote mount's integrity digest leaves out what the layer declares it
  * builds at publish (`builtAtPublish`), in EVERY directory the lock pins of
- * it, not only when the lock pins the instance root.
+ * it, not only when the lock pins the layer root.
  *
- * Found 2026-11-06 (bean `cat-tools-sm8r`): an IG instance is pinned as seven
+ * Found 2026-11-06 (bean `cat-tools-sm8r`): an IG layer is pinned as seven
  * directories (`<ig>/fhir-artifact-index`, `<ig>/document-kinds`,
  * …) and declares `fhir-artifact-index/index.json` built by `ig-index:build`.
  * The declaration was looked for inside each pinned directory and its
@@ -32,7 +32,7 @@ const decl = (builtAtPublish: unknown[]) =>
   JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "ig", builtAtPublish });
 
 spawnSync("git", ["init", "-q"], { cwd: ROOT });
-// An index checkout: the instance `ig` is mounted under it, pinned as several directories.
+// An index checkout: the layer `ig` is mounted under it, pinned as several directories.
 put("index.lock.json", "{}\n");
 put(
   "ig/ig.json",
@@ -47,7 +47,7 @@ put(
 put("ig/fhir-artifact-index/pinned.json", "{}\n");
 put("ig/document-kinds/k.json", "{}\n");
 put("ig/built-whole/a.txt", "a\n");
-// An instance that declares nothing, next to it: it must borrow no entries.
+// A layer that declares nothing, next to it: it must borrow no entries.
 put("plain/notes/index.json", "{}\n");
 
 describe("builtAtPublishOf", () => {
@@ -83,5 +83,31 @@ describe("the digest of a pinned sub-directory", () => {
     rmSync(join(ROOT, "ig/fhir-artifact-index/menu.json"));
     put("ig/fhir-artifact-index/pinned.json", '{"edited":true}\n');
     expect(digestOf(dir).treeDigest).not.toBe(before);
+  });
+});
+
+// cat-harness-tools#1701: bootstrap declares itself the way bootstrap's own
+// layers do, `name` and `needs` with no `$schema`, and declares
+// `ns.context.v1.jsonld` built at publish. Only the harness's `$schema` was
+// read, so that entry never applied and derive:publish writing the file made
+// every later mount check read `bootstrap/ modified`.
+describe("a bare `<name>.json` declaration (bootstrap's form)", () => {
+  put("boot/boot.json", JSON.stringify({ name: "boot", needs: [], builtAtPublish: [{ path: "ns.context.v1.jsonld", writer: ["jsonld:contexts"] }] }));
+  put("boot/pinned.json", "{}\n");
+  // A JSON file whose `name` is not its own is not a declaration.
+  put("other/data.json", JSON.stringify({ name: "something-else", builtAtPublish: [{ path: "pinned.json" }] }));
+  put("other/pinned.json", "{}\n");
+
+  test("its builtAtPublish entries are read", () => {
+    expect(builtAtPublishOf(join(ROOT, "boot"))).toEqual(["ns.context.v1.jsonld"]);
+  });
+  test("so the digest is the same before and after the declared file is built", () => {
+    const dir = join(ROOT, "boot");
+    const before = digestOf(dir);
+    put("boot/ns.context.v1.jsonld", '{"@context":{}}\n');
+    expect(digestOf(dir)).toEqual(before);
+  });
+  test("a JSON file that does not name itself declares nothing", () => {
+    expect(builtAtPublishOf(join(ROOT, "other"))).toEqual([]);
   });
 });

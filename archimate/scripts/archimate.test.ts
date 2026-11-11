@@ -6,8 +6,8 @@ import { deflateRawSync } from "node:zlib";
 import { ARCHIMATE_MODEL_TAG, ArchimateConfigSchema, ArchimateModelSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "../schemas/archimate.ts";
 import { renderViewSvg, wrap } from "./render-view.ts";
 import { checkCommitted } from "./check-archimate.ts";
-import { PAGE_CONFIG_ID, figureTargets, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
-import { thinPageConfigOf } from "../../scripts/thin-page.ts";
+import { pageNodeOf, pageNodeProblems } from "../../scripts/thin-page.ts";
+import { pageDataOf, figureTargets, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
 import { renderedByOf } from "../../scripts/viewer-declarations.ts";
 
 /** A small Archi model: two elements in a group, a serving and an access relationship, a note. */
@@ -136,7 +136,7 @@ describe("reading a model", () => {
 
 describe("drawing a view", () => {
   const m = parseArchimate(XML);
-  const svg = renderViewSvg(m, m.views[0]!, { elementHref: (id) => `../elements/${id}/` });
+  const svg = renderViewSvg(m, m.views[0]!, { elementHref: (id) => `../element/${id}/` });
 
   it("escapes every string from the model", () => {
     expect(svg).toContain("Registry &lt;script&gt;");
@@ -157,7 +157,7 @@ describe("drawing a view", () => {
   });
 
   it("links each box to its element, and draws each relationship with its own ends", () => {
-    expect(svg).toContain('href="../elements/id-a/" target="_top"');
+    expect(svg).toContain('href="../element/id-a/" target="_top"');
     expect(svg).toContain('marker-end="url(#arrow-open)"');
     // A read access draws its arrow at the source end.
     expect(svg).toContain('marker-start="url(#arrow-small)"');
@@ -287,9 +287,9 @@ describe("an instance", () => {
         "Figure 2: block folio/f-2.md is not in the instance",
       ]);
       const files = pagesFor(root).files;
-      const page = files.find((f) => f.path === "1.0.0/views/overview/index.html")!;
+      const page = files.find((f) => f.path === "1.0.0/view/overview/index.html")!;
       expect(page.content).toContain("drawn in the document as Figure 1 (<code>folio/f-1.md</code>)");
-      const node = JSON.parse(files.find((f) => f.path === "1.0.0/views/id-v1.jsonld")!.content);
+      const node = JSON.parse(files.find((f) => f.path === "1.0.0/view/id-v1.jsonld")!.content);
       expect(node["schema:subjectOf"][0]).toEqual({ "schema:name": "Figure 1", "schema:url": "https://example.org/tiny/folio/f-1.md" });
       // What a document site needs to draw the figure live: the SVG and the page, site-relative.
       const site = pagesFor(root, { site: true });
@@ -320,26 +320,62 @@ describe("an instance", () => {
       const pages = files.filter((f) => f.path.endsWith("/index.html"));
       // model, metamodel, one view, three elements, two relationships
       expect(pages.length).toBe(1 + 1 + 1 + 3 + 2);
-      expect(files.some((f) => f.path === "1.0.0/views/id-v1.svg")).toBe(true);
+      expect(files.some((f) => f.path === "1.0.0/view/id-v1.svg")).toBe(true);
       for (const f of files.filter((x) => x.path.endsWith(".jsonld"))) {
-        expect(JSON.parse(f.content)["@id"]).toBe(`https://example.org/tiny/archimate/${f.path}`);
+        expect(JSON.parse(f.content)["@id"]).toBe(`https://example.org/tiny/archimate/${f.path.replace(/\.jsonld$/, "")}`);
       }
-      const el = JSON.parse(files.find((f) => f.path === "1.0.0/elements/id-a.jsonld")!.content);
+      const el = JSON.parse(files.find((f) => f.path === "1.0.0/element/id-a.jsonld")!.content);
       expect(el["@type"]).toBe("archimate:ApplicationComponent");
-      const rel = JSON.parse(files.find((f) => f.path === "1.0.0/relationships/id-r1.jsonld")!.content);
-      expect(rel["archimate:source"]["@id"]).toBe("https://example.org/tiny/archimate/1.0.0/elements/id-b.jsonld");
+      const rel = JSON.parse(files.find((f) => f.path === "1.0.0/relationship/id-r1.jsonld")!.content);
+      expect(rel["archimate:source"]["@id"]).toBe("https://example.org/tiny/archimate/1.0.0/element/id-b");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it("a page copies none of the model's documentation, properties or notes: its config points at the normalised model relative to itself", () => {
+  it("serves a small page AT each node's IRI that declares the node and links its page, in the graph and in a site", () => {
+    const root = make(config);
+    try {
+      const graph = pagesFor(root).files;
+      const stub = graph.find((f) => f.path === "1.0.0/element/id-a.html")!;
+      expect(pageNodeOf(stub.content)!.rdfa[0]).toEqual({ iri: "https://example.org/tiny/archimate/1.0.0/element/id-a", types: ["http://www.opengroup.org/xsd/archimate/3.0/ApplicationComponent"] });
+      expect(pageNodeProblems(stub.content)).toEqual([]);
+      expect(stub.content).toContain('<link rel="alternate" type="application/ld+json" href="id-a.jsonld">');
+      expect(stub.content).not.toContain("<script src=");
+      // One stub per node: the model, its view, three elements, two relationships.
+      expect(graph.filter((f) => f.path.endsWith(".html") && !f.path.endsWith("index.html")).map((f) => f.path).sort()).toEqual([
+        "1.0.0.html",
+        "1.0.0/element/id-a.html",
+        "1.0.0/element/id-b.html",
+        "1.0.0/element/id-c.html",
+        "1.0.0/relationship/id-r1.html",
+        "1.0.0/relationship/id-r2.html",
+        "1.0.0/view/id-v1.html",
+      ]);
+      // In a site the stub is at the IRI (the graph's path) and its link crosses to the page at the declared route.
+      const site = pagesFor(root, { site: true });
+      const at = (f: Written) => sitePathOf(site, f);
+      const written = new Set(site.files.map(at));
+      for (const f of site.files.filter((x) => x.path.endsWith(".html") && !x.path.endsWith("index.html"))) {
+        expect(at(f).startsWith("archimate/")).toBe(true);
+        const href = /<link rel="canonical" href="([^"]*)">/.exec(f.content)![1]!;
+        const target = posix.join(posix.normalize(posix.join(posix.dirname(at(f)), href)), "index.html");
+        expect({ stub: at(f), target, ok: written.has(target) }).toEqual({ stub: at(f), target, ok: true });
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("a page copies none of the model's documentation, properties or notes: it declares its node and points at the normalised model relative to itself", () => {
     const root = make(config);
     try {
       for (const p of pagesFor(root).files.filter((f) => f.path.endsWith("/index.html"))) {
-        const cfg = thinPageConfigOf(p.content, PAGE_CONFIG_ID)!;
+        const cfg = pageDataOf(p.content) as Record<string, unknown>;
         const depth = p.path.split("/").length;
-        expect(cfg.model).toBe(depth === 2 ? "./model.json" : depth === 3 ? "../model.json" : "../../model.json");
+        // The metamodel page is drawn at build time: it points its renderer at nothing.
+        expect(cfg.model).toBe(depth === 2 ? "./model.json" : depth === 3 ? undefined : "../../model.json");
+        expect(pageNodeProblems(p.content)).toEqual([]);
         for (const text of ["Holds the records.", "owner", "WHO", "A note", "its text"]) expect({ page: p.path, text, copied: p.content.includes(text) }).toEqual({ page: p.path, text, copied: false });
       }
     } finally {
@@ -357,9 +393,9 @@ describe("an instance", () => {
       };
       expect(navOf("1.0.0/index.html")[0].items).toEqual([
         { label: "Metamodel in use", href: "./metamodel/" },
-        { label: "Overview", href: "./views/overview/" },
+        { label: "Overview", href: "./view/overview/" },
       ]);
-      expect(navOf("1.0.0/views/overview/index.html")[0]).toMatchObject({ href: "../../", items: [{ href: "../../metamodel/" }, { href: "../../views/overview/" }] });
+      expect(navOf("1.0.0/view/overview/index.html")[0]).toMatchObject({ href: "../../", items: [{ href: "../../metamodel/" }, { href: "../../view/overview/" }] });
       expect(navOf("index.html")[0].items).toEqual([{ label: "Tiny <RA>", href: "1.0.0/" }]);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -370,7 +406,7 @@ describe("an instance", () => {
     const root = make(config);
     try {
       const { graphPath, pageRoot, files } = pagesFor(root, { site: true });
-      // `<locale>/<harness>/<visualiser>`: the route the instance declares for this Tool.
+      // `<locale>/<harness>/<visualiser>`: the route the layer declares for this Tool.
       expect(pageRoot).toBe("en/tiny/archimate");
       const at = (f: Written) => sitePathOf({ graphPath, pageRoot }, f);
       // Pages at the route, every other file at the graph's own path.
@@ -388,17 +424,17 @@ describe("an instance", () => {
       };
       for (const f of files.filter((x) => x.page || x.path.endsWith(".svg"))) {
         const refs = [...f.content.matchAll(/(?:href|src|data)="([^"#:]+)"/g)].map((m) => m[1]!);
-        const cfg = f.page && f.path !== "index.html" ? thinPageConfigOf(f.content, PAGE_CONFIG_ID)! : {};
+        const cfg = f.page && f.path !== "index.html" ? pageDataOf(f.content) as Record<string, unknown> : {};
         for (const k of ["node", "model", "svg"]) if (typeof cfg[k] === "string") refs.push(cfg[k] as string);
         for (const r of refs) expect({ from: at(f), ref: r, ok: resolves(at(f), r) }).toEqual({ from: at(f), ref: r, ok: true });
       }
       // The page reaches the model in the data tree, not beside itself.
-      const view = files.find((f) => f.path === "1.0.0/views/overview/index.html")!;
-      expect(thinPageConfigOf(view.content, PAGE_CONFIG_ID)!.model).toBe("../../../../../../archimate/1.0.0/model.json");
+      const view = files.find((f) => f.path === "1.0.0/view/overview/index.html")!;
+      expect(pageDataOf(view.content).model).toBe("../../../../../../archimate/1.0.0/model.json");
       // In the graph (no site), nothing changes: pages beside their data, and no route to name.
       const inGraph = pagesFor(root);
       expect(inGraph.pageRoot).toBe("archimate");
-      expect(inGraph.files.find((f) => f.path === "1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/registry-script/"');
+      expect(inGraph.files.find((f) => f.path === "1.0.0/view/id-v1.svg")!.content).toContain('href="../element/registry-script/"');
       expect(inGraph.files.filter((f) => f.page).map((f) => renderedByOf(f.content)).filter(Boolean)).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });

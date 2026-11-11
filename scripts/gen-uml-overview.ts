@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 /**
- * UML for every NAMED SUB-GRAPH an instance declares — PlantUML and Mermaid
+ * UML for every NAMED SUB-GRAPH a layer declares — PlantUML and Mermaid
  * from one model.
  *
  * Nothing here invents a grouping. The groups are read:
  *
- * - **Section** — one entry of an instance's declaration (`<instance>.json`
+ * - **Section** — one entry of a layer's declaration (`<instance>.json`
  *   `directories[]`), named `<instance>/<entry id>`.
  * - **Node schema kind** — each of the entry's `graphTypologies`, resolved through
  *   {@link resolveKindValidator}: the Zod schema the registry names, turned
@@ -17,7 +17,7 @@
  *
  * ## Renderings, cross-referenced
  *
- * Per section and per instance:
+ * Per section and per layer:
  *
  * ```
  * uml/overview/<instance>.puml|.mmd              every section of the instance
@@ -81,7 +81,7 @@ const REPO = repoRootFor(HARNESS);
 const UML_ROOT = join(instanceDirectoryForGraph(HARNESS, "uml") ?? join(HARNESS, "uml"), "overview");
 const OWN = readDeclaration(HARNESS);
 if (!OWN) throw new Error(`${HARNESS} declares no instance — nothing to draw`);
-/** This instance's own site, where the pages are rendered. */
+/** This layer's own site, where the pages are rendered. */
 const DOCS_ROOT = join(HARNESS, siteDir(OWN), "uml", "overview");
 /** The PlantUML renderings the pages show, beside the BPMN ones under assets/img/. */
 const SVG_ROOT = join(HARNESS, siteDir(OWN), "assets", "img", "uml", "overview");
@@ -118,7 +118,7 @@ interface Attr {
 const remark = (text: string): Attr => ({ name: text, type: "", mult: "", remark: true });
 
 interface UmlClass {
-  /** Unique within an instance diagram. */
+  /** Unique within a layer diagram. */
   id: string;
   title: string;
   /** The stereotype: which schema this class was read from. */
@@ -136,7 +136,7 @@ interface Composition {
 
 export interface Section {
   instance: string;
-  /** The declaration entry's id — the sub-graph's name within its instance. */
+  /** The declaration entry's id — the sub-graph's name within its layer. */
   id: string;
   /** Repo-relative directory. */
   path: string;
@@ -492,7 +492,7 @@ export async function sectionsOf(instanceRoot: string): Promise<Section[]> {
       // as a second, undetermined box would invent a kind nobody declared.
       if (kind === "cat-harness" && section.kinds.length > 1) continue;
       // A base kind's validator is a path in the harness that DEFINES the
-      // kind. Resolving it only against the declaring instance made every
+      // kind. Resolving it only against the declaring layer made every
       // downstream sub-graph — bootstrap/scenarios — unresolvable.
       // Bean `rdkm`: a kind that names its `$schema` families is drawn one
       // class per family — seven for `qa` — rather than as one kind-level box.
@@ -847,7 +847,7 @@ function page(opts: {
     // inferring one from `docs/uml/`. The two copies this script writes --
     // `uml/overview/` and `docs/uml/overview/` -- are the same pages, and
     // 195 of them were reporting to `check:reference-direction` as authored
-    // prose naming instances above this one (2026-09-24).
+    // prose naming layers above this one (2026-09-24).
     "generated: scripts/gen-uml-overview.ts — do not hand-edit",
     `title: "UML — ${opts.title}"`,
     // Menu: the index and one entry per harness. The ~85 sub-graph pages stay
@@ -931,13 +931,13 @@ export async function overviewFilesFor(
       page({
         title: inst.name,
         // `instance`, not `harness`. This one template emitted "the `X`
-        // harness declares" on every page, and 10 of the 22 instances it runs
+        // harness declares" on every page, and 10 of the 22 layers it runs
         // over are NOT harnesses — declared, with no `<name>.config.json` at
         // the repository root, which is what instantiates one (`harness-tiles`,
         // bean `6n23`). Measured 2026-09-23: a single generator was the largest
         // producer of that mislabelling in the whole corpus, ten pages to one
         // word. `instance` is correct for all 22, since an instantiated one is
-        // an instance too.
+        // a layer too.
         lead: `Every named sub-graph the \`${inst.name}\` instance declares, one box each, with the node schema kinds found in it.`,
         sourceBase: `${umlRel}/${inst.name}`,
         svg: svgSite(inst.name),
@@ -1119,7 +1119,7 @@ async function main(): Promise<void> {
 
 /**
  * Files under the generator's roots that this run does not write: the pages
- * and diagrams of an instance or section that no longer exists (bean `ghgn`).
+ * and diagrams of a layer or section that no longer exists (bean `ghgn`).
  * Only this generator's own kinds of output count, so a file a person put
  * there is never an orphan.
  *

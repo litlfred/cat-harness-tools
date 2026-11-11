@@ -3,8 +3,8 @@
  *
  * @module scripts/lib/withheld
  *
- * Bean `cw35`. The format is `folio-withheld/v1` (`schemas/content/withheld.ts`); an
- * instance's generator writes it from its own licence data, and EVERY surface
+ * Bean `cw35`. The format is `folio-withheld/v1` (`schemas/content/withheld.ts`); a
+ * layer's generator writes it from its own licence data, and EVERY surface
  * that publishes from that directory reads it here — the site mount
  * (`mount-instance-docs.ts`) and the library viewer (`library-graph.ts`,
  * `gen-library-viz.ts`). One reader, so the two cannot disagree about what is

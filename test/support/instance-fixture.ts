@@ -1,17 +1,17 @@
 /**
- * Make a temp directory a real INSTANCE, so its config is resolvable.
+ * Make a temp directory a real LAYER, so its config is resolvable.
  *
  * ## Why fixtures had to change at all
  *
  * The config filename is `<instance>.config.json` as of 2026-09-20, derived
- * from the `name` in the instance's own `harness.json`. A bare temp directory
+ * from the `name` in the layer's own `harness.json`. A bare temp directory
  * has no declaration, so it has no name, so it has no config filename — and
  * `resolveHarnessConfigPath` correctly answers `undefined` rather than
  * guessing a global one back into existence.
  *
  * Twenty fixtures wrote a config into a directory that declared nothing.
  * Adding the declaration is the honest fix rather than the expedient one: a
- * directory pretending to be a configured instance ought to say that it is
+ * directory pretending to be a configured layer ought to say that it is
  * one, which is this repository's own declaration-over-location rule applied
  * to its test material.
  *
@@ -32,7 +32,7 @@ import {
  *
  * Every helper below defaults to `basename(dir)` instead, and that is not a
  * convenience — it is the fix for the defect that made this file necessary
- * twice. A shared constant gives every instance in a dependency-tree fixture
+ * twice. A shared constant gives every layer in a dependency-tree fixture
  * the SAME name, so `<name>.json` collides and the outward walk finds
  * a sibling's config rather than its own. Naming each after its directory
  * makes them distinct for free, and makes the fixture read the way the real
@@ -47,8 +47,8 @@ export const FIXTURE_INSTANCE = "fixture";
  * 2026-09-21, which was accurate only while the declaration and the config
  * shared one filename. Once the owner split them, these helpers went on
  * writing `<name>.config.json` while `findDeclarationFile` looked for
- * `<name>.json` — 250 tests failed at once, all of them fixtures declaring an
- * instance that discovery could then not see. The name says which of the two
+ * `<name>.json` — 250 tests failed at once, all of them fixtures declaring a
+ * layer that discovery could then not see. The name says which of the two
  * it is, so the next split cannot make it quietly wrong again.
  */
 export const FIXTURE_DECLARATION = instanceDeclarationFilename(FIXTURE_INSTANCE);
@@ -67,11 +67,11 @@ export function configNameFor(dir: string): string {
 }
 
 /**
- * Declare `dir` as an instance, and return the name it ends up with.
+ * Declare `dir` as a layer, and return the name it ends up with.
  *
  * NON-DESTRUCTIVE. A fixture that already wrote its own `harness.json` —
  * several do, to pin a specific name the assertions then check — keeps it.
- * Overwriting would have silently renamed the instance under the test that
+ * Overwriting would have silently renamed the layer under the test that
  * was about its name, which is the kind of helper that makes a suite lie.
  */
 export function declareInstance(dir: string, name?: string): string {
@@ -112,7 +112,7 @@ export function declareInstance(dir: string, name?: string): string {
  * commits whose measurements are about something else.
  *
  * This is a fixture convenience, and it is NOT what `folio_init` does — a
- * real instance declares what it owns, deliberately, once.
+ * real layer declares what it owns, deliberately, once.
  */
 function conventionalDirectories(dir: string): unknown[] {
   return DEFAULT_DIRECTORIES.filter((d) => existsSync(join(dir, d.path))).map((d) => ({ ...d }));
@@ -206,13 +206,13 @@ export function writeDeclaration(dir: string, body: unknown, name?: string): str
 
 
 /**
- * Write one fixture file, MERGING when it is the instance's declaration.
+ * Write one fixture file, MERGING when it is the layer's declaration.
  *
  * A fixture that hands a helper `{ "<name>.config.json": "{…}" }` used to be
  * writing a file the declaration did not occupy — `harness.json` was a
  * separate path. It is the same path now, so a plain write clobbers the
  * declaration and the fixture silently loses its `directories`. Merging is
- * what one file per instance means; the body wins on every key it sets.
+ * what one file per layer means; the body wins on every key it sets.
  *
  * Any other path is written verbatim, which is what a fixture map is for.
  */

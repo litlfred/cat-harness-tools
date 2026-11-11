@@ -1,12 +1,13 @@
 /**
- * The journeys viewer over a fixture checkout of two instances: `lower`, a
+ * The journeys viewer over a fixture checkout of two layers: `lower`, a
  * layer holding journeys of its own, and `top`, which needs it, holds a
  * journey group, a workshop, and declares the visualiser.
  *
  * What is asserted is what the owner asked the viewer to show (2026-11-05):
  * every journey in the checkout, each journey alone, journeys in sub-graphs
- * (per instance, and by `partOf` within one), and the didactic layer on top.
+ * (per layer, and by `partOf` within one), and the didactic layer on top.
  */
+import { WorkshopSchema } from "../../schemas/process/workshop.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,7 +17,8 @@ import { readJourneyCorpus, unescapeXml } from "../journeys/read.ts";
 import { bpmnFigure, orderByFollows, panelHead, renderJourneyPages, stepAnchor, type PageFile, type SiteLinks } from "../journeys/render.ts";
 import { PANEL_CSS, PANEL_SCRIPT } from "../lib/task-panel.ts";
 import { BARE_VHL, checkDakLinks, DAK_ATTR, pascal, personaArtifact } from "../journeys/dak-links.ts";
-import { journeyFiles, journeysRoute } from "../gen-journeys-viz.ts";
+import { architecturePanel, journeyFiles, journeysRoute } from "../gen-journeys-viz.ts";
+import type { ArchimateModel } from "../../archimate/schemas/archimate.ts";
 import {
   chapterRoots,
   countryTones,
@@ -267,7 +269,13 @@ const LINKS: SiteLinks = {
   route: "en/top/journeys",
   title: "Top demonstrator",
   stepPage: (instance, bpmn, process, task) => `kg/${instance}/${bpmn.replace(/\.bpmn$/, "")}/${process}/node/${task}/`,
-  archimateView: (instance, model, view) => ({ svg: `archimate/${model}/views/${view}.svg`, page: `en/${instance}/archimate/${model}/views/${view}/`, name: "P2 view" }),
+  archimateView: (instance, model, view) => ({
+    svg: `archimate/${model}/views/${view}.svg`,
+    page: `en/${instance}/archimate/${model}/views/${view}/`,
+    name: "P2 view",
+    elements: [{ name: "Wallet app", type: "Application Component", page: `en/${instance}/archimate/${model}/element/wallet-app/` }],
+  }),
+  archimateBlock: (instance, block) => (block === "wallet" ? [{ name: "Wallet app", type: "Application Component", page: `en/${instance}/archimate/ra/element/wallet-app/` }] : []),
   processPanel: (_instance, bpmn) => `en/kg/processes/${posix.basename(bpmn, ".bpmn")}.tasks.json`,
 };
 const files = renderJourneyPages(corpus, LINKS, "top");
@@ -421,9 +429,10 @@ describe("the workshop layer", () => {
   test("a module's tables are drawn on its page", () => {
     expect(at("top/workshops/policy/m2/index.html")).toContain("Trust anchor");
   });
-  test("the sheets page carries one sheet per declared sheet, with its assessment strip", () => {
+  test("the sheets page carries the cover and one sheet per declared sheet, with its assessment strip", () => {
     const sheets = at("top/workshops/policy/sheets/index.html");
-    expect((sheets.match(/class="jv-sheet /g) ?? []).length).toBe(1);
+    expect((sheets.match(/class="jv-sheet /g) ?? []).length).toBe(2);
+    expect((sheets.match(/class="jv-sheet [^"]*jv-cover"/g) ?? []).length).toBe(1);
     expect(sheets).toContain('class="jv-strip"');
     expect(sheets).toContain("A viewer");
   });
@@ -528,13 +537,18 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(ana).toContain('<a href="../../walkthrough/P2/"><title>P2 Step P2: Worried</title>');
     expect(ana).toContain("Ana’s touchpoints (2)");
     expect(at(`${base}/personas/index.html`)).toContain('href="ana/"');
-    // One chip style for everyone, the baby too: initials, never a glyph among them (owner, 2026-11-06).
-    expect(at(`${base}/personas/cleo/index.html`)).toMatch(/class="jp-av jp-av-lg"[^>]*title="Cleo"[^>]*>C<\/span>/);
-    expect(map).not.toMatch(/class="jp-av[^"]*"[^>]*><svg/);
+    // JV-06: a persona with an icon wears it in every avatar, as VaxLink's baby does (owner's
+    // review, 2026-11-11, superseding initials for everyone of 2026-11-06); the rest keep initials.
+    expect(at(`${base}/personas/cleo/index.html`)).toMatch(/class="jp-av jp-av-lg jp-av-icon"[^>]*title="Cleo"[^>]*><svg/);
+    expect(map).toMatch(/class="jp-av[^"]* jp-av-icon"[^>]*title="Cleo"/);
+    expect(map).toMatch(/class="jp-av jp-av-sm"[^>]*title="Ana"[^>]*>A<\/span>/);
+    // JV-12: the curve's axis is three faces, not characters.
+    const curve = at(`${base}/personas/ana/index.html`);
+    for (const f of ["happy", "neutral", "sad"]) expect(curve).toContain(`class="jp-cv-face" aria-label="${f}"`);
   });
   test("how it works: the big ideas, the grid, a block's detail with the moments that use it", () => {
     expect(how).toContain("Carry it yourself");
-    expect(how).toContain('<a class="jp-bchip jp-layer-teal" href="wallet/">Health wallet</a>');
+    expect(how).toContain('<a class="jp-bchip jp-layer-teal" href="wallet/#jp-blocks">Health wallet</a>');
     expect(how).toContain("Select a building block");
     expect(wallet).toContain("So what for the journey");
     expect(wallet).toContain('href="https://example.org/wallet"');
@@ -559,6 +573,8 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(p2).toContain('href="../../demo/S2/"');
     expect(p2).toContain("<small>(screen S2)</small>");
     expect(p2).toContain('data-jp-inspect="Bundle/ana-ips"');
+    // JV-18: an example's link reads as its title, the id its tooltip.
+    expect(p2).toMatch(/<a class="jp-ext jp-exlabel" href="[^"]*Bundle-ana-ips\.html" data-jv-dak title="Bundle\/ana-ips"[^>]*>Ana&#39;s IPS</);
     expect(p2).toContain('<span class="jp-j-key">&quot;resourceType&quot;</span>');
     expect(p2).toContain("Read, not stored");
     expect(p2).toContain("Intl profile");
@@ -570,7 +586,122 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     const s2 = at(`${base}/demo/S2/index.html`);
     expect(s2).toContain('<iframe class="jp-device jp-device-tablet" src="../../../../../../../../app/#/demo/S2"');
     expect(s2).toContain('href="../../walkthrough/P2/"');
-    expect(s2).toContain("Screen S2 — Flip the toggle");
+    // The note names the stage and its title; what to try sits in the Moments card.
+    expect(s2).toContain("Stage P2 (");
+    expect(s2).toContain("Flip the toggle");
+  });
+  test("JV-01: each view lists its ArchiMate elements, and a block's page the elements that deploy it, each linked", () => {
+    const pagesOf = (html: string, page: string) => hrefsOf(html, DAK_ATTR).map((h) => landsAt(sitePath(page), h));
+    for (const page of [`${base}/how/index.html`, `${base}/how/wallet/index.html`]) {
+      const html = at(page);
+      expect(html).toContain("The 1 element in this view");
+    }
+    expect(pagesOf(at(`${base}/how/wallet/index.html`), `${base}/how/wallet/index.html`)).toContain("en/top/archimate/ra/element/wallet-app/");
+    expect(wallet).toContain("In the architecture (ArchiMate)");
+    expect(wallet).toContain("<small>Application Component</small>");
+    // A block that no element deploys lists none.
+    const other = files.find((f) => f.path.startsWith(`${base}/how/`) && f.path !== `${base}/how/wallet/index.html` && f.path !== `${base}/how/index.html`);
+    if (other) expect(String(other.content)).not.toContain("In the architecture (ArchiMate)");
+  });
+  test("JV-02: every view has the payload drawer; a view page loads each payload from one shared file, a step page carries it", () => {
+    for (const path of ["overview", "map", "personas", "personas/ana", "how", "how/wallet", "discuss", "sheets", "demo", "demo/S2"]) {
+      const page = at(`${base}/${path}/index.html`);
+      expect(page).toContain("data-jp-drawer");
+      expect(page).toContain('data-jp-tab="Bundle/ana-ips"');
+      expect(page).toContain("data-jp-copy");
+      const src = /<pre class="jp-json" data-jp-src="([^"]+)">/.exec(page)?.[1];
+      expect(src).toBeDefined();
+      expect(landsAt(sitePath(`${base}/${path}/index.html`), src!)).toBe(sitePath(`${base}/payload/Bundle-ana-ips.json`));
+    }
+    expect(JSON.parse(at(`${base}/payload/Bundle-ana-ips.json`))).toMatchObject({ resourceType: "Bundle", id: "ana-ips" });
+    expect(files.filter((f) => f.path.endsWith("/payload/Bundle-ana-ips.json"))).toHaveLength(1);
+    expect(at(`${base}/demo/S2/index.html`)).toContain("resource on this screen");
+    // The step page keeps its JSON inline, so it needs no fetch.
+    expect(p2).not.toContain("data-jp-src");
+  });
+  test("JV-08: the drawer's bar names the active stage, and the workshop's inspector title, key and hint", () => {
+    expect(p2).toContain('<span class="jp-drawer-chip">Active Stage: P2</span>');
+    expect(at(`${base}/map/index.html`)).toContain("Active Stage: Journey map");
+    expect(at(`${base}/demo/S2/index.html`)).toContain("Active Stage: S2 · P2");
+    expect(p2).toContain("<b>FHIR payload inspector</b>");
+    expect(p2).not.toContain("jp-drawer-key");
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, inspector: { title: "FHIR R4 & WHO GDHCN payload inspector", key: "DEV Key: 916ffa (XXR)", hint: "Click to inspect raw FHIR / CBOR payload" } } } };
+    const out = renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top");
+    for (const path of ["walkthrough/P2", "map", "demo/S2"]) {
+      const page = String(out.find((f) => f.path === `${base}/${path}/index.html`)!.content);
+      expect(page).toContain("<b>FHIR R4 &amp; WHO GDHCN payload inspector</b>");
+      expect(page).toMatch(/<span class="jp-drawer-key"><svg[^>]*>[\s\S]*?<\/svg>DEV Key: 916ffa \(XXR\)<\/span>/);
+      expect(page).toContain("Click to inspect raw FHIR / CBOR payload");
+    }
+  });
+  test("JV-07: every page's header has Reset Simulation, scoped to the workshop, returning to the overview", () => {
+    for (const path of ["overview", "walkthrough/P2", "map", "how", "demo/S2"]) {
+      const page = at(`${base}/${path}/index.html`);
+      const depth = path.split("/").length;
+      expect(page).toContain(`data-jp-reset="policy" data-jp-reset-to="${"../".repeat(depth)}overview/"`);
+      expect(page).toContain("<span>Reset Simulation</span>");
+    }
+    const js = at("assets/present.js");
+    expect(js).toContain('each("[data-jp-reset]", reset)');
+  });
+  test("JV-11: the map's moment columns are narrow enough on a desktop for eight, and a chapter's name wraps, never cut", () => {
+    const css = at("assets/present.css");
+    expect(css).toMatch(/@media \(min-width: 1280px\) \{ \.jp-mapgrid \{ grid-template-columns: 132px repeat\(var\(--n\), minmax\(136px, 1fr\)\)/);
+    // 132 + 8 × 136 = 1220px: inside a 1400px window less its gutters.
+    expect(132 + 8 * 136).toBeLessThan(1400 - 2 * 32 - 2);
+    expect(css).not.toMatch(/\.jp-mchap b \{[^}]*text-overflow: ellipsis/);
+  });
+  test("JV-13: How it works opens with the architecture panel from the ArchiMate graph, then the views, then the big ideas", () => {
+    const w0 = corpus.workshops[0]!;
+    const spec = { model: "ra", root: "root", countries: [{ group: "c-a", label: "Country A (north)", code: "AA" }, { group: "c-b" }], shared: "shared", notes: ["Keys cross, data does not."] };
+    const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, architecture: spec } } };
+    const box = (name: string, block: string, bpmn: string[], ig?: string) => ({ name, type: "Application Component", page: `en/top/archimate/ra/element/${name.toLowerCase().replace(/ /g, "-")}/`, block: { name: block, type: "Application Component", page: `en/top/archimate/ra/element/${block}/` }, bpmn, ...(ig ? { ig } : {}) });
+    const el = (name: string) => ({ name, type: "Grouping", page: `en/top/archimate/ra/element/${name}/` });
+    const links: SiteLinks = {
+      ...LINKS,
+      archimateArchitecture: (_i, sp) =>
+        sp.model === "ra"
+          ? {
+              countries: [el("Country A"), el("Country B")],
+              rows: [
+                { layer: el("Point of service"), cells: [[box("Wallet app", "provider-systems", ["processes/care.bpmn"], "https://ig.example/Wallet.html")], []], blocks: [] },
+                { layer: el("Interop"), cells: [[], []], blocks: [el("Open standards")] },
+              ],
+              shared: { group: el("Shared"), members: [el("Trust network")] },
+            }
+          : undefined,
+    };
+    const out = renderJourneyPages({ ...corpus, workshops: [w] }, links, "top");
+    const how = String(out.find((f) => f.path === `${base}/how/index.html`)!.content);
+    expect(how).toContain('<span class="jp-arch-code">AA</span>');
+    expect(how).toContain("Country A (north)");
+    expect(how).toContain("Country B");
+    expect(how).toContain("Wallet app");
+    expect(how).toContain('href="https://ig.example/Wallet.html"');
+    // Its moments: the steps whose BPMN the system serves, linked to the walkthrough.
+    expect(how).toMatch(/jp-arch-ms">[^]*?P2/);
+    expect(how).toContain("<i>Not needed in this journey</i>");
+    expect(how).toContain("Open standards");
+    expect(how).toContain("Trust network");
+    expect(how).toContain("<li>Keys cross, data does not.</li>");
+    const order = ["jp-arch-grid", "jp-am\"", "jp-ideas", 'id="jp-blocks"'].map((m) => how.indexOf(m.replace("\\", "")));
+    expect(order.every((x) => x > 0)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
+    // A ref the model does not hold says so rather than drawing an empty panel.
+    const bad = renderJourneyPages({ ...corpus, workshops: [{ ...w, workshop: { ...w.workshop, presentation: { ...w.workshop.presentation, architecture: { ...spec, model: "nowhere" } } } }] }, links, "top");
+    expect(String(bad.find((f) => f.path === `${base}/how/index.html`)!.content)).toContain("is not in this layer's ArchiMate graph");
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0" }).success).toBe(true);
+  });
+  test("the drawer's script colours JSON exactly as the build does", () => {
+    const js = at("assets/present.js");
+    const src = /\n {2}function esc\(t\) \{[\s\S]*?\n {2}\}\n {2}function highlightJson\(json\) \{[\s\S]*?\n {2}\}\n/.exec(js)?.[0];
+    expect(src).toBeDefined();
+    const run = new Function(`${src}; return highlightJson;`)() as (j: string) => string;
+    const json = JSON.stringify({ resourceType: "Bundle", total: -1.5e3, ok: true, none: null, note: 'a "<b>" & \'x\'', entry: [{}] }, null, 2);
+    expect(run(json)).toBe(highlightJson(json));    // Opened from disk, the fetch is refused: the pane links the file instead.
+    expect(js).toContain('location.protocol === "file:"');
+    expect(js).toContain("jp-json-open");
   });
   test("the font is vendored and copied as bytes, with its licence", () => {
     const woff = files.find((f) => f.path === "assets/fonts/PlusJakartaSans-Bold.woff2");
@@ -592,6 +723,61 @@ describe("a workshop with none of the optional data still presents", () => {
     expect(page("walkthrough/P2/index.html")).toContain('aria-disabled="true" title="No device screen shows a step of this workshop"');
     expect(page("how/index.html")).toContain("No building-block catalogue is declared");
     expect(bare.some((f) => f.path.includes("/demo/"))).toBe(false);
+  });
+});
+
+describe("architecturePanel: the How it works panel read from an ArchiMate model (JV-13)", () => {
+  const E = (id: string, type: string, name: string, props: Record<string, string> = {}) => ({ id, type, name, layer: "", folder: "", properties: Object.entries(props).map(([key, value]) => ({ key, value })) });
+  let n = 0;
+  const R = (type: string, source: string, target: string) => ({ id: `r${n++}`, type, source, target, properties: [] });
+  const model = {
+    elements: [
+      E("root", "Grouping", "RA"), E("l-pos", "Grouping", "Point of service"), E("l-dpif", "Grouping", "Foundational"), E("l-int", "Grouping", "Interop"), E("sub", "Grouping", "Clinical"),
+      E("b-prov", "ApplicationComponent", "Provider Systems"), E("b-trust", "ApplicationComponent", "National Trust Services"), E("b-med", "ApplicationComponent", "Mediator"), E("b-apps", "ApplicationComponent", "Citizen Apps"), E("b-std", "ApplicationComponent", "Open standards"),
+      E("c-a", "Grouping", "Country A"), E("c-b", "Grouping", "Country B"), E("shared", "Grouping", "Shared"), E("gdhcn", "ApplicationComponent", "Trust network"),
+      E("a-hosp", "ApplicationComponent", "Hospital system"), E("a-ehr", "ApplicationComponent", "Birth EHR", { ig: "https://ig.example/Ehr.html" }), E("a-sign", "ApplicationComponent", "DVC signer"),
+      E("a-prov", "ApplicationComponent", "Provider Systems (A)"), E("a-trust", "ApplicationComponent", "National Trust Services (A)"),
+      E("b-phone", "Device", "Family phone"), E("b-wallet", "ApplicationComponent", "Family wallet"), E("b-appsi", "ApplicationComponent", "Citizen Apps (B)"), E("b-medi", "ApplicationComponent", "Mediator (B)"), E("b-gw", "ApplicationComponent", "Gateway"), E("b-portal", "ApplicationComponent", "Portal"),
+      E("j1", "BusinessProcess", "J1 Issue", { bpmn: "processes/j1.bpmn" }), E("j4", "BusinessProcess", "J4 Share", { bpmn: "processes/j4.bpmn" }),
+    ],
+    relationships: [
+      R("Aggregation", "root", "l-pos"), R("Aggregation", "root", "l-dpif"), R("Aggregation", "root", "l-int"),
+      R("Aggregation", "l-pos", "b-prov"), R("Aggregation", "l-pos", "sub"), R("Aggregation", "sub", "b-apps"), R("Aggregation", "l-dpif", "b-trust"), R("Aggregation", "l-dpif", "b-med"), R("Aggregation", "l-int", "b-med"), R("Aggregation", "l-int", "b-std"),
+      R("Aggregation", "c-a", "a-hosp"), R("Aggregation", "c-a", "a-prov"), R("Aggregation", "c-a", "a-trust"),
+      R("Specialization", "a-prov", "b-prov"), R("Specialization", "a-trust", "b-trust"),
+      R("Composition", "a-hosp", "a-ehr"), R("Composition", "a-hosp", "a-sign"), R("Realization", "a-ehr", "a-prov"), R("Realization", "a-sign", "a-trust"), R("Serving", "a-hosp", "j1"),
+      R("Aggregation", "c-b", "b-phone"), R("Aggregation", "c-b", "b-portal"), R("Aggregation", "c-b", "b-appsi"), R("Aggregation", "c-b", "b-medi"),
+      R("Specialization", "b-appsi", "b-apps"), R("Specialization", "b-medi", "b-med"),
+      R("Realization", "b-phone", "b-wallet"), R("Realization", "b-wallet", "b-appsi"), R("Serving", "b-phone", "j4"),
+      R("Composition", "b-portal", "b-gw"), R("Realization", "b-gw", "b-medi"), R("Serving", "b-portal", "j4"),
+      R("Aggregation", "shared", "gdhcn"),
+    ],
+    views: [],
+  } as unknown as ArchimateModel;
+  const element = (id: string) => {
+    const x = model.elements.find((y) => y.id === id);
+    return x ? { name: x.name, type: x.type, page: `p/${id}/` } : undefined;
+  };
+  const panel = architecturePanel(model, element, { root: "root", countries: [{ group: "c-a" }, { group: "c-b" }], shared: "shared" })!;
+  const row = (name: string) => panel.rows.find((r) => r.layer.name === name)!;
+  test("rows are the root's groupings, columns the countries", () => {
+    expect(panel.rows.map((r) => r.layer.name)).toEqual(["Point of service", "Foundational", "Interop"]);
+    expect(panel.countries.map((c) => c.name)).toEqual(["Country A", "Country B"]);
+  });
+  test("a system's parts go in the row of the block their country's instance specializes, with the BPMN it serves", () => {
+    expect(row("Point of service").cells[0]!.map((b) => [b.name, b.block.name, b.ig, b.bpmn])).toEqual([["Birth EHR", "Provider Systems", "https://ig.example/Ehr.html", ["processes/j1.bpmn"]]]);
+    expect(row("Foundational").cells[0]!.map((b) => b.name)).toEqual(["DVC signer"]);
+    // A device's app is its part; a block under a sub-grouping finds its layer.
+    expect(row("Point of service").cells[1]!.map((b) => [b.name, b.block.name, b.bpmn])).toEqual([["Family wallet", "Citizen Apps", ["processes/j4.bpmn"]]]);
+  });
+  test("a block two layers hold sits in the first; a row no country uses lists its own blocks", () => {
+    expect(row("Foundational").cells[1]!.map((b) => b.name)).toEqual(["Gateway"]);
+    expect(row("Interop").cells.every((c) => c.length === 0)).toBe(true);
+    expect(row("Interop").blocks.map((b) => b.name)).toEqual(["Mediator", "Open standards"]);
+  });
+  test("the shared grouping is the foundation; a ref the model lacks gives no panel", () => {
+    expect(panel.shared?.members.map((m) => m.name)).toEqual(["Trust network"]);
+    expect(architecturePanel(model, element, { root: "nowhere", countries: [{ group: "c-a" }] })).toBeUndefined();
   });
 });
 
@@ -625,6 +811,40 @@ describe("presentation helpers", () => {
     expect(card2.indexOf('class="jp-moment-sum"')).toBeLessThan(card2.indexOf('class="jp-moment-foot"'));
     expect(card2).toContain('jp-scene jp-scene-md');
     expect(card2).toContain('<span class="jp-scene-l">A clinic</span>');
+  });
+  test("JV-09: presentation.tagRows groups a step's tags into the policy card's rows, with their glyphs, in its order", () => {
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, tagRows: [{ label: "Cost driver", icon: "coins" as const, tables: ["nowhere"] }, { label: "Forces", icon: "scale" as const, tables: ["rights"] }] } } };
+    const page = String(renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top").find((f) => f.path === "top/workshops/policy/walkthrough/P2/index.html")!.content);
+    const forces = /<dl class="jp-forces">([\s\S]*?)<\/dl>/.exec(page)![1]!;
+    expect(forces).toMatch(/<dt><svg[^>]*>[\s\S]*?<\/svg>Forces<\/dt><dd><span class="jp-pill"[^>]*>Trust anchor ★<\/span>/);
+    expect(forces).not.toContain("Decision rights");
+    // A row none of the step's tags fall in is left out.
+    expect(forces).not.toContain("Cost driver");
+    // A row naming a table the workshop does not list is refused.
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0" }).success).toBe(false);
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", presentation: { ...w.workshop.presentation, tagRows: [{ label: "Forces", icon: "scale", tables: ["rights"] }] } }).success).toBe(true);
+  });
+  test("JV-14: the sheets open with a cover, its own page: the blanks, the scope promise, the ways to start", () => {
+    const sheets = at("top/workshops/policy/sheets/index.html");
+    // The default cover: the four blanks, before Sheet 1, the size of the first sheet.
+    expect(sheets).toContain('<article class="jv-sheet jv-sheet-a3 jv-cover" id="sheet-cover">');
+    expect(sheets.indexOf('id="sheet-cover"')).toBeLessThan(sheets.indexOf('id="sheet-s1"'));
+    for (const f of ["Country", "Delegation", "Table", "Facilitator"]) expect(sheets).toContain(`<span>${f}</span>`);
+    expect(sheets).not.toContain("jv-ways");
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, promise: "You will leave knowing where you stand.", presentation: { ...w0.workshop.presentation, cover: { fields: ["Country", "Table"], table: "rights" } } } };
+    const out = renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top");
+    const page = String(out.find((f) => f.path === "top/workshops/policy/sheets/index.html")!.content);
+    expect(page).toContain('<p class="jv-promise"><b>The scope promise.</b> You will leave knowing where you stand.</p>');
+    expect(page).toContain('<section class="jv-ways" aria-label="Decision rights"><div class="jv-way"><b>Trust anchor</b>');
+    expect(page).not.toContain("<span>Delegation</span>");
+    expect(page).toContain("A cover and 1 sheet,");
+    // Printed, every sheet (the cover too) breaks to its own page.
+    expect(at("assets/journeys.css")).toContain(".jv-print-sheets .jv-sheet { break-after: page;");
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0" }).success).toBe(true);
+    const bad = WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", presentation: { ...w.workshop.presentation, cover: { table: "nowhere" } } });
+    expect(bad.success).toBe(false);
   });
   test("presentation.cast orders the cast everywhere; presentation.chapterTitles names a chapter", () => {
     const w0 = corpus.workshops[0]!;
@@ -876,8 +1096,8 @@ describe("the check over a staged site: every DAK link resolves to a file", () =
 });
 
 describe("composition (user-scenario 0.4.0): a parent's parts, in its order, and a step that is a journey", () => {
-  // A checkout of its own: one instance, every journey of it 0.4.0. The
-  // instance sits one level down, as `lower` and `top` do: an instance at
+  // A checkout of its own: one layer, every journey of it 0.4.0. The
+  // layer sits one level down, as `lower` and `top` do: a layer at
   // the temporary directory's top would make the system temporary directory
   // its checkout, read with every other test's fixtures in it.
   const ROOT = mkdtempSync(join(tmpdir(), "journeys-compose-"));

@@ -85,7 +85,7 @@ export class GitUnanswerable extends Error {
 }
 
 /**
- * The manifests of each REMOTE-MOUNTED instance, for one filename.
+ * The manifests of each REMOTE-MOUNTED layer, for one filename.
  *
  * In the index checkout every layer is a mount: another repository's bytes,
  * laid down from the lock and never tracked here, so `git ls-files` sees none
@@ -141,7 +141,32 @@ function manifests(root: string, glob: string): string[] {
  * and every `.venv/` in the tree and report several thousand third-party
  * packages as this repository's own.
  */
-export function publishablePackages(root: string = ROOT): PublishablePackage[] {
+/**
+ * Why a `package.json` is not an npm manifest at all, or `undefined` when it
+ * is one (cat-harness-tools#1701).
+ *
+ * A FHIR package shares the filename: an IG repository's
+ * `local-template/package/package.json` declares `"type": "fhir.template"`,
+ * the FHIR NPM package spec's type, and is read by the IG Publisher, never by
+ * npm. npm's own `type` takes only `module` or `commonjs`, so any other
+ * value says the manifest belongs to another ecosystem, and `bun install`
+ * on it judges nothing this gate is about. An absent `type` is npm's.
+ */
+export function notAnNpmManifest(raw: Record<string, unknown>): string | undefined {
+  const type = raw.type;
+  if (type === undefined || type === "module" || type === "commonjs") return undefined;
+  const what = typeof type === "string" && /^(fhir\.|IG|Conformance|Core|Examples|Group|Tool)/.test(type) ? "a FHIR package" : "not an npm package";
+  return `its \`type\` is ${JSON.stringify(type)}, which npm does not define: ${what}, never installed or published by npm`;
+}
+
+/** A manifest {@link publishablePackages} found and did not take, with why. */
+export interface ForeignManifest {
+  dir: string;
+  name: string;
+  why: string;
+}
+
+export function publishablePackages(root: string = ROOT, foreign: ForeignManifest[] = []): PublishablePackage[] {
   const out: PublishablePackage[] = [];
 
   for (const rel of [...manifests(root, "*package.json"), ...mountedManifests(root, "package.json")]) {
@@ -153,6 +178,11 @@ export function publishablePackages(root: string = ROOT): PublishablePackage[] {
       continue;
     }
     if (raw.private === true || typeof raw.name !== "string") continue;
+    const why = notAnNpmManifest(raw);
+    if (why !== undefined) {
+      foreign.push({ dir: dirname(rel), name: raw.name, why });
+      continue;
+    }
     const scripts = (raw.scripts ?? {}) as Record<string, string>;
     out.push({
       dir: dirname(rel),
@@ -243,8 +273,9 @@ if (import.meta.main) {
   // cannot see that, because `pkgs.length` is not 0. A partial corpus wearing
   // a total's clothes is the failure this whole file was written about.
   let pkgs: PublishablePackage[];
+  const foreign: ForeignManifest[] = [];
   try {
-    pkgs = publishablePackages();
+    pkgs = publishablePackages(ROOT, foreign);
   } catch (e) {
     if (!(e instanceof GitUnanswerable)) throw e;
     console.error(`\n✗ ${e.message}`);
@@ -268,6 +299,7 @@ if (import.meta.main) {
     `Publishable packages — ${pkgs.length} across ${dirs} director${dirs === 1 ? "y" : "ies"},` +
       ` derived from the git index\n`,
   );
+  for (const f of foreign) console.log(`  · ${f.name} (${f.dir}): not applicable here — ${f.why}`);
 
   const failed: string[] = [];
   const skipped: string[] = [];

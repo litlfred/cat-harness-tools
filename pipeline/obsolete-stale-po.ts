@@ -32,9 +32,9 @@
  *
  * ## `--instance <dir>`
  *
- * Surveys the catalogues of the instance at `<dir>` instead of this one: its
+ * Surveys the catalogues of the layer at `<dir>` instead of this one: its
  * `translation-sources` directory, from its declaration, and its pages,
- * resolved against its own root. An instance that declares no such directory
+ * resolved against its own root. A layer that declares no such directory
  * is reported and exits 2 — "no catalogue" is not "no stale catalogue".
  *
  * @covers translation-sources
@@ -64,7 +64,7 @@ export type Unresolved =
   | "ambiguous";
 
 export interface Catalogue {
-  /** Path relative to the instance root. */
+  /** Path relative to the layer root. */
   po: string;
   /** The resolved source, or the reason there is none. */
   source: string | Unresolved;
@@ -144,17 +144,17 @@ export function resolveSource(
   ref: string,
 ): { path: string } | { unresolved: "source-absent" | "ambiguous" } {
   // `siteRoot` rather than a `docs` literal, for the reason `derive-po.ts` gives
-  // at its own call site: two directories in this instance declare that path, and
+  // at its own call site: two directories in this layer declare that path, and
   // `siteRoot` CONFIRMS a site by finding `_config.yml` rather than trusting the
   // name. The `site-dir-single-answer` gate exists because a hardcoded "docs"
   // silently stops being the site root the moment the declaration moves — and it
   // caught this file on its first push.
   // An instance-relative path is resolved before any site is asked for: it
-  // names its file exactly, and an instance with no Jekyll site (an IG whose
+  // names its file exactly, and a layer with no Jekyll site (an IG whose
   // pages are under `input/`) still has one.
   const exact = join(root, ref);
   if (existsSync(exact) && statSync(exact).isFile()) return { path: exact };
-  // This instance's site, else the site the instance at `root` declares for
+  // This layer's site, else the site the layer at `root` declares for
   // itself (`--instance`).
   const docs = siteRoot(root) ?? instanceSiteRoot(root);
   if (docs === undefined) return { unresolved: "source-absent" };
@@ -176,7 +176,7 @@ export function survey(root: string, opts: { translationsDir?: string } = {}): C
   // against the wrong subjects on a run that exited 0.
   //
   // `opts.translationsDir` is what the tests pass, following `derive-po.ts`'s
-  // `opts.docsDir` for the same reason: a temp-dir fixture carries no instance
+  // `opts.docsDir` for the same reason: a temp-dir fixture carries no layer
   // declaration, so resolving through it there would test the declaration
   // machinery rather than this module's classification.
   const dir = opts.translationsDir ?? directoryForGraph(root, "translation-sources");
@@ -263,7 +263,7 @@ function main(): void {
   const dir = directoryForGraph(root, "translation-sources");
   if (explicit !== undefined) {
     // Named by the caller, so judged whoever commits it: the layer-PR scoping
-    // below is for the default run over this instance.
+    // below is for the default run over this layer.
     if (dir === undefined || !existsSync(dir)) {
       console.error(
         `${root} declares no \`translation-sources\` directory, or it is absent. ` +

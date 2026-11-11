@@ -163,22 +163,22 @@ export function census(dir: string, repo: string = REPO): ScanRow[] {
  * the content core then left the measurement and was counted nowhere:
  * 68 → 67 → 65 enumerating scripts, each drop reading as an improvement. And
  * the headline family read **0 of 0** while the one script with its shape,
- * `check-artifact-index.ts`, sat in the instance it did not scan — the `dh4f`
+ * `check-artifact-index.ts`, sat in the layer it did not scan — the `dh4f`
  * failure through a different door: the scan worked, its SUBJECT narrowed.
  *
- * Decided: ONE census over every declared instance's `scripts/`, rather than a
- * census per instance. The question is about the repository's scanners, and a
- * per-instance census would need every instance to remember to run one — the
+ * Decided: ONE census over every declared layer's `scripts/`, rather than a
+ * census per layer. The question is about the repository's scanners, and a
+ * per-instance census would need every layer to remember to run one — the
  * same "counted nowhere" gap, one step later.
  *
- * And the denominator cannot shrink silently: every declared instance is
+ * And the denominator cannot shrink silently: every declared layer is
  * listed in the `scope` family as `scanned` (with its count) or
  * `no-scripts-dir` — which is neither a finding nor a pass, only a statement
- * that there was nothing there to census. A script moving between instances
+ * that there was nothing there to census. A script moving between layers
  * now changes WHICH row it is counted under, never whether it is counted.
  */
 export interface InstanceScope {
-  /** The instance's declared `name`, or its directory name if it declares none. */
+  /** The layer's declared `name`, or its directory name if it declares none. */
   instance: string;
   /** Its `scripts/` directory, repository-relative. */
   path: string;
@@ -187,7 +187,7 @@ export interface InstanceScope {
   enumerating: number;
 }
 
-/** Census every declared instance under `repo`, and say which were scanned. */
+/** Census every declared layer under `repo`, and say which were scanned. */
 export function censusRepository(repo: string): { rows: ScanRow[]; scope: InstanceScope[] } {
   const rows: ScanRow[] = [];
   const scope: InstanceScope[] = [];

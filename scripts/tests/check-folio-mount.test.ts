@@ -15,7 +15,7 @@ import { reportFor } from "../check-folio-mount.ts";
 
 const PAGE = "<!doctype html><html><body>no mount</body></html>";
 
-/** Instance `x`: root `docs/`, exempt `docs/wireframes/`, one page in each. */
+/** Layer `x`: root `docs/`, exempt `docs/wireframes/`, one page in each. */
 function fixture(): string {
   const repo = mkdtempSync(join(tmpdir(), "folio-mount-"));
   mkdirSync(join(repo, "x", "docs", "wireframes", "catalogue"), { recursive: true });

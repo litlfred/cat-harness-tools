@@ -20,7 +20,7 @@
  *
  * ## Where a graph's units come from
  *
- * An instance DECLARES its providers under `lsiUnitProviders` in its
+ * A layer DECLARES its providers under `lsiUnitProviders` in its
  * `<instance>.json` (cat-harness `LsiUnitProviderDeclaration`). This module
  * reads those declarations and imports each provider by variable path, as
  * `src/builtin-adapters.ts` does for content adapters. It names no layer above
@@ -75,7 +75,7 @@ export type LsiUnitProvider = (ctx: LsiProviderContext) => LsiProviderResult | P
 /** One declared provider, located. */
 export interface DiscoveredLsiProvider {
   graphKind: string;
-  /** The declaring instance's `name`. */
+  /** The declaring layer's `name`. */
   instance: string;
   /** Absolute path of the provider module. */
   modulePath: string;
@@ -89,9 +89,9 @@ export const NEAR_ACROSS_DEFAULTS: LsiOptions = { k: 100, seed: 1990 };
 const MIN_UNITS = 3;
 
 /**
- * Every `lsiUnitProviders` entry declared by an instance in `checkoutRoot`.
+ * Every `lsiUnitProviders` entry declared by a layer in `checkoutRoot`.
  *
- * A declaration that cannot be read, or two instances declaring one
+ * A declaration that cannot be read, or two layers declaring one
  * `graphKind`, is RECORDED in `problems`. Two declarations of one kind are
  * both left out: which one wins is not decided by scan order.
  */
@@ -151,7 +151,7 @@ export function explicitRefs(text: string, refKeys: ReadonlyArray<readonly [stri
 /** One graph's answer. */
 export interface GraphNear {
   graphKind: string;
-  /** The instance that declared the provider, when one did. */
+  /** The layer that declared the provider, when one did. */
   instance?: string;
   /** Set when the graph was not searched, with why. Nothing else is meaningful then. */
   notSearched?: string;
@@ -186,7 +186,7 @@ export function nearInGraph(graphKind: string, result: LsiProviderResult, text: 
 
 /** Load a discovered provider's function. Throws with the reason when the module or export is wrong. */
 export async function loadLsiUnitProvider(p: DiscoveredLsiProvider): Promise<LsiUnitProvider> {
-  // input-site: imports **/*.ts #2c2bcc37 — the LSI unit provider module an instance declaration names, which may sit anywhere in its tree
+  // input-site: imports **/*.ts #2c2bcc37 — the LSI unit provider module a layer declaration names, which may sit anywhere in its tree
   const mod = (await import(p.modulePath)) as Record<string, unknown>;
   const fn = mod[p.export];
   if (typeof fn !== "function") throw new Error(`${relative(process.cwd(), p.modulePath)} has no exported function \`${p.export}\``);
@@ -197,7 +197,7 @@ export async function loadLsiUnitProvider(p: DiscoveredLsiProvider): Promise<Lsi
  * The query in every requested graph, one result per graph.
  *
  * `graphs` limits the search to those kinds; a requested kind that no
- * instance declares comes back as not searched. Left out, every declared
+ * layer declares comes back as not searched. Left out, every declared
  * provider is searched.
  */
 export async function nearAcross(

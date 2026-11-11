@@ -1,5 +1,5 @@
 /**
- * An edit link names the repository its file's instance DECLARES, not the
+ * An edit link names the repository its file's layer DECLARES, not the
  * `origin` of whichever checkout generated the page — bean `5o5c`, owner
  * ruling C (2026-10-22). The rendered link is a msgid in the translation
  * catalogues, so a link that varied with the checkout root made every
@@ -10,7 +10,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { readDeclaration } from "../../../schemas/kg/cat-harness.ts";
 
-import { declaredEditLocation } from "../../gen-docs-pages.ts";
+import { baseLayerWeb, declaredEditLocation } from "../../gen-docs-pages.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 describe("declaredEditLocation (bean 5o5c)", () => {
@@ -30,5 +30,18 @@ describe("declaredEditLocation (bean 5o5c)", () => {
     const block = readdirSync(join(sourceDir, page!)).find((f) => f.endsWith(".md"))!;
     const target = `docs/source/${page}/${block}`;
     expect(declaredEditLocation(target)).toEqual({ source: target, repo: declared });
+  });
+});
+
+// The page header's "generated from" link (cat-harness#1150, item 4): for the
+// base layer it named the CHECKOUT's origin, so a page rendered in the index
+// linked folio-assistant, in an instance root linked that instance, and in a
+// bare clone linked cat-harness. derive:publish then rewrote 8 committed pages
+// in every root but the one that last committed them.
+describe("baseLayerWeb (cat-harness#1150)", () => {
+  test("names the base layer's declared repository, whatever the checkout", () => {
+    const declared = readDeclaration(HARNESS_ROOT)?.repository;
+    expect(declared).toBeDefined();
+    expect(baseLayerWeb()).toBe(`https://github.com/${declared}`);
   });
 });

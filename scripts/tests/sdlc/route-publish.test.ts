@@ -98,7 +98,7 @@ function fixture(
   git(root, "remote", "add", "origin", url);
   if (opts.gitignore !== undefined) writeFileSync(join(root, ".gitignore"), opts.gitignore);
   // The declaration. The stem MUST equal `name` or `findDeclarationFile` does not
-  // find it, and the fixture would read as an instance with no declaration at all.
+  // find it, and the fixture would read as a layer with no declaration at all.
   writeFileSync(
     join(root, "fixture.json"),
     JSON.stringify({

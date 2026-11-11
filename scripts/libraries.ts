@@ -395,7 +395,7 @@ export function installedManifest(from: string, name: string): { path: string; m
 const NESTED_LOCKFILES = ["bun.lock", "bun.lockb", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
 
 /**
- * Is `file` an instance declaration, rather than another JSON named like one?
+ * Is `file` a layer declaration, rather than another JSON named like one?
  * A file that names a `$schema` other than `cat-harness-declaration/…` is not
  * (a concern-groups file); one naming none still is (bootstrap's declarations
  * carry no `$schema`).
@@ -417,8 +417,8 @@ function walkDirs(root: string, visit: (rel: string, abs: string) => boolean | v
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       if (!e.isDirectory() || e.name.startsWith(".") || SKIP_DIRS.has(e.name)) continue;
       const p = join(dir, e.name);
-      // Another instance nested inside this one is its own layer. Its
-      // `<name>.json` must BE an instance declaration: a grouped graph's
+      // Another layer nested inside this one is its own layer. Its
+      // `<name>.json` must BE a layer declaration: a grouped graph's
       // from-within file has the same shape of name (`schemas/schemas.json`,
       // `concern-groups/v1`, bean `f8wp`) and its directory is still ours.
       if (isInstanceDeclarationFile(join(p, `${e.name}.json`)) && existsSync(join(p, "package.json"))) continue;
@@ -586,9 +586,9 @@ function isOwnOrBuiltin(spec: string): boolean {
  * holds its nodes instead, under `libraries/held/<layer>/`, each stamped
  * `software-library/1.2.0` with `layer: "<layer>"`. It is the glossary's rule
  * (bean `q3n9`: core holds the schemes of the layers below its typology, keyed
- * by their owning instance), applied to libraries.
+ * by their owning layer), applied to libraries.
  *
- * The held set is DERIVED, never listed: every instance in the checkout that
+ * The held set is DERIVED, never listed: every layer in the checkout that
  * has a `package.json`, declares no `software-library` directory, is not
  * {@link KIND_OWNER}, and does not reach it through `needs`. A layer that does
  * reach it declares its own `libraries/` instead, and is never held. The nodes
@@ -602,7 +602,7 @@ export const KIND_OWNER = "cat-harness";
 /** The layer that holds the nodes of the layers below the kind: this script's own. */
 export const HOLDER = basename(resolve(import.meta.dir, ".."));
 
-/** `needs` as each instance in the checkout declares it, by instance name. */
+/** `needs` as each layer in the checkout declares it, by layer name. */
 function needsByInstance(repoRoot: string): Map<string, { root: string; needs: string[] }> {
   const out = new Map<string, { root: string; needs: string[] }>();
   for (const root of instanceRootsIn(repoRoot)) {
@@ -613,7 +613,7 @@ function needsByInstance(repoRoot: string): Map<string, { root: string; needs: s
       const d = JSON.parse(readFileSync(decl, "utf-8")) as { needs?: unknown };
       if (Array.isArray(d.needs)) needs = d.needs.filter((n): n is string => typeof n === "string");
     } catch {
-      // No readable declaration: no `needs` to follow. The instance is still listed.
+      // No readable declaration: no `needs` to follow. The layer is still listed.
     }
     out.set(name, { root, needs });
   }

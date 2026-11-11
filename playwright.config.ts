@@ -42,7 +42,7 @@ export default defineConfig({
   // `test/results/`, `tests/` because this one line pointed here. An id in a
   // declaration is the expensive thing to move, a `testDir` is one line, so
   // the specs came to the declaration rather than the other way round.
-  // `test` beside this file: the specs moved with the instance (bean `wggr`),
+  // `test` beside this file: the specs moved with the layer (bean `wggr`),
   // then into cat-harness-tools with the code (bean `70lx`), and this config
   // moved with them; relative paths here resolve against this file. A stale
   // `testDir` does not error — it collects ZERO specs and reports a clean run, which is the `dh4f` shape and

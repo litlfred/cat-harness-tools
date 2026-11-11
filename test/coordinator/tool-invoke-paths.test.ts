@@ -6,7 +6,7 @@
  *
  * **Nine of the forty-four checkable `invoke.shell` values named a path that does
  * not exist.** Every one was missing the `cat-harness/` prefix, stale since the
- * instance moved under that directory, so `bun run scripts/ingest-document.ts`
+ * layer moved under that directory, so `bun run scripts/ingest-document.ts`
  * failed with `Module not found`. `ingest-stdlib` and `ingest-extended` had been
  * unreachable through their own declared invocation for as long as the inversion
  * has been in, and `check:tools` was green throughout.
@@ -21,8 +21,8 @@
  *
  * `invoke.shell` resolves against the REPOSITORY — it is a command a caller
  * types, and `package.json` and `.github/` live at the repo root.
- * `invoke.*.module` resolves against the INSTANCE — it is loaded by this
- * instance's own server, same convention as `maintains.source`.
+ * `invoke.*.module` resolves against the LAYER — it is loaded by this
+ * layer's own server, same convention as `maintains.source`.
  *
  * All twenty `inProcess.module` values are instance-relative and correct. The
  * field's docstring said *"Repo-relative"* while giving `src/tools/workflow.ts`
@@ -36,7 +36,7 @@
  * Moved here from `cat-harness/scripts/tests/tool-invoke-paths.test.ts` to the
  * checkout's own test home `test/` (bean `7zz1`, owner ruling 2026-10-06
  * "Top-level instance"): every test in it resolves every Tool node's paths
- * against the repository and the instance implementing it, cat-harness-tools
+ * against the repository and the layer implementing it, cat-harness-tools
  * among them, which only the whole checkout holds. Standing alone, cat-harness
  * has none of it, and `check:cat-harness-standalone` collects every test in
  * that layer. Paths are composed from ORIGIN_DIR, the directory it was written
@@ -92,11 +92,11 @@ describe("the two roots, asserted separately because conflating them breaks 20 n
     // change that "helpfully" rewrites these to repo-relative fails here rather
     // than silently making twenty modules unloadable.
     //
-    // "The instance" is the declaring one OR the one instance whose own `needs`
+    // "The instance" is the declaring one OR the one layer whose own `needs`
     // names it (owner ruling T1, bean `70lx`): the definitions stay here while
     // the code moves up a layer, and the path is not rewritten to say so.
     //
-    // Each node is resolved from the instance that DECLARES it — the harness's
+    // Each node is resolved from the layer that DECLARES it — the harness's
     // from cat-harness, sci's `lean-formal-edges` from folio-assistant-sci —
     // which is how both MCP servers resolve them (bean riit, 3c).
     const mods = instanceRootsIn(REPO).flatMap((inst) =>

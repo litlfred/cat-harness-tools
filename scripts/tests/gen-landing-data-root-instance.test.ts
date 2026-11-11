@@ -1,5 +1,5 @@
 /**
- * Landing data for the CHECKOUT-ROOT instance never reads outside the checkout.
+ * Landing data for the CHECKOUT-ROOT layer never reads outside the checkout.
  *
  * Measured 2026-10-15, publishing litlfred/smart-ra from `~/space_cats/smart-ra`:
  * `gen-landing-data` resolved sticky themes against `repoRootFor(ROOT)`, which
@@ -10,7 +10,7 @@
  *
  * The fixture is that machine in miniature: a parent directory holding an
  * unrelated, INVALID declaration (sorted first, so the old scan reaches it
- * before anything else) beside a git checkout whose root instance is the
+ * before anything else) beside a git checkout whose root layer is the
  * landing. The build must succeed and must carry the root's own card — the
  * second assertion is what keeps the first from passing on an empty board.
  *
@@ -43,7 +43,7 @@ function fixture(): { parent: string; checkout: string } {
   mkdirSync(join(parent, "aaa-stranger"));
   writeFileSync(join(parent, "aaa-stranger", "aaa-stranger.json"), '{ "name": "aaa-stranger", not json\n');
 
-  // The checkout: a root instance that is the site's sole landing, with the
+  // The checkout: a root layer that is the site's sole landing, with the
   // platform nested beneath it as a lock mount would lay it down.
   const checkout = join(parent, "folio");
   mkdirSync(checkout);
@@ -102,7 +102,7 @@ describe("gen-landing-data for a checkout-root landing", () => {
 describe("contributingRoots for a checkout-root instance", () => {
   // The `.git` guard in `contributingRoots` stops a scan of a plain parent,
   // but not of a parent that is a checkout too — a Claude Code worktree, whose
-  // `repoRootFor` is the MAIN checkout. Its instances are another tree's.
+  // `repoRootFor` is the MAIN checkout. Its layers are another tree's.
   test("never takes an instance from a parent checkout as a layer", () => {
     const parent = mkdtempSync(join(tmpdir(), "landing-root-git-"));
     try {

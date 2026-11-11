@@ -201,11 +201,11 @@ if (import.meta.main) {
     console.error(`${USAGE}\n  no commit given — nothing to watch`);
     process.exit(2);
   }
-  // `repoRootFor` takes an INSTANCE root and is `join(x, "..")` — it is not a
+  // `repoRootFor` takes a LAYER root and is `join(x, "..")` — it is not a
   // cwd finder. Passing `process.cwd()` gave the repository's PARENT and the
   // git call failed with "not a git repository", which this reported as
   // `undetermined` rather than as a pass. Correct by construction instead:
-  // this file lives in <instance>/scripts/, so the instance root is one up.
+  // this file lives in <instance>/scripts/, so the layer root is one up.
   const root = repoRootFor(resolve(HARNESS_ROOT));
   const slug = slugOf(root);
   if (slug === undefined) {

@@ -4,7 +4,7 @@
  * @module schemas/subgraph-source.test
  *
  * The tests of this file that read the whole checkout (resolves every subgraph
- * every instance in the checkout declares) live in
+ * every layer in the checkout declares) live in
  * `test/subgraph-source-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */

@@ -87,8 +87,8 @@ const NAV_ITEMS = Array.from(
 
 /**
  * THE SCOPE UNDER TEST (#1902), taken from the generated data rather than
- * named: the first instance `railScopes` lists. The fixture page sits at that
- * instance's root, and its page list holds the instance's root row with a
+ * named: the first layer `railScopes` lists. The fixture page sits at that
+ * layer's root, and its page list holds the layer's root row with a
  * table of contents under it, among the site's 60 other pages.
  */
 const SCOPE = (HARNESS.railScopes ?? [])[0];

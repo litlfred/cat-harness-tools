@@ -6,7 +6,7 @@
  *
  * `folio` is registered by CORE as a load-time side effect
  * (`folio-graph-typology.ts`: *"a layer that cannot render must not own the
- * renderable kind"*), so whether `readDeclaration` accepts an instance's
+ * renderable kind"*), so whether `readDeclaration` accepts a layer's
  * declaration could depend on whether anything had imported core yet — an
  * IMPORT-ORDER dependency, and a test runner chooses its own order.
  *
@@ -28,7 +28,7 @@ import "./kg/folio-graph-typology.js";
  * THE SUITE'S DEFAULT TIMEOUT — bean `61n5`.
  *
  * bun's default is 5 s, and this repository has a whole class of tests that
- * walk the entire instance: `buildExport()`, the declaration-filename scan, the
+ * walk the entire layer: `buildExport()`, the declaration-filename scan, the
  * sweep's profile gate. Timed from one full run on 2026-09-24 (junit reporter),
  * about twenty of them take 1.9–3.2 s ALONE. Under a full `bun test` the
  * slowest measured 4.44 s, and in 1 of 4 full runs it took 5.56 s and failed.

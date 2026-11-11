@@ -1,11 +1,11 @@
 /**
  * `workflow-skill-refs` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness-tools/scripts/tests/process/workflow-skill-refs.test.ts` (bean `7zz1`, owner
- * ruling 2026-10-06 "Top-level instance"): each resolves every instance's
+ * ruling 2026-10-06 "Top-level instance"): each resolves every layer's
  * declared diagrams, which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects
  * every test in that layer. The rest of that file's tests stay there. Each path
- * resolves from the instance that declares it, down its `needs` chain
+ * resolves from the layer that declares it, down its `needs` chain
  * (`resolveTranslationPath`), so no root is composed here.
  */
 import { describe, expect, test } from "bun:test";

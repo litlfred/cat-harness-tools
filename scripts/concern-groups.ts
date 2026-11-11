@@ -11,12 +11,12 @@
  * `schemas/schemas.json`, `library/library.json`, `uml/uml.json`, a test
  * directory's `code.json` (`groups`) — by a code from
  * `code-lists/concern-group.json`. A group is declared ONCE, by the lowest
- * instance whose same-named directory declares it, and every higher
- * instance's same-named `<dir>/<group>/` is a MEMBER of it, so a higher
- * instance adds no group of its own. Nesting is declared FROM WITHIN, never
+ * layer whose same-named directory declares it, and every higher
+ * layer's same-named `<dir>/<group>/` is a MEMBER of it, so a higher
+ * layer adds no group of its own. Nesting is declared FROM WITHIN, never
  * by `<instance>.json` reaching down a path.
  *
- * A member sits at the SAME path relative to its own instance as the
+ * A member sits at the SAME path relative to its own layer as the
  * declaring directory (core's `skills/library/` is a member of the harness's
  * `skills/library/` group), which is why a group's directory is its code.
  *
@@ -159,9 +159,9 @@ function siblingNeedsDeps(inst: string): string[] {
 }
 
 /**
- * The groups declared in the SAME-NAMED directory of every instance `dir`'s
- * instance depends on — what `dir` inherits, whether or not it holds them.
- * A lower instance's malformed file is that instance's finding, not this
+ * The groups declared in the SAME-NAMED directory of every layer `dir`'s
+ * layer depends on — what `dir` inherits, whether or not it holds them.
+ * A lower layer's malformed file is that layer's finding, not this
  * walk's, so it contributes nothing here rather than throwing.
  */
 export function inheritedGroupsFor(dir: string, kind: string, registry: GraphTypologyRegistry = defaultGraphTypologies): DeclaredGroup[] {
@@ -189,7 +189,7 @@ export function inheritedGroupsFor(dir: string, kind: string, registry: GraphTyp
           if (!out.some((o) => o.code === g.code)) out.push(g);
         }
       } catch {
-        // reported by `check:concern-groups` against the instance that owns it
+        // reported by `check:concern-groups` against the layer that owns it
       }
     }
   }
@@ -259,19 +259,19 @@ export function groupedChildrenIn(dir: string, kind: string, registry: GraphTypo
 export interface ResolvedGroup {
   kind: string;
   code: string;
-  /** The grouping directory's path, relative to each instance. */
+  /** The grouping directory's path, relative to each layer. */
   within: string;
-  /** The instance that declared it — the lowest one, in overlay order. */
+  /** The layer that declared it — the lowest one, in overlay order. */
   declaredBy: string;
-  /** Every instance holding `<within>/<code>/`, the declarer first. */
+  /** Every layer holding `<within>/<code>/`, the declarer first. */
   members: Array<{ member: string; absPath: string }>;
-  /** Other instances that ALSO declared it — a finding: a higher instance adds no group. */
+  /** Other layers that ALSO declared it — a finding: a higher layer adds no group. */
   redeclaredBy: string[];
 }
 
 /**
  * Every concern group of `kind` in the checkout `start` is staged in.
- * Resolved over {@link checkoutDirectories}, deepest instance first, so the
+ * Resolved over {@link checkoutDirectories}, deepest layer first, so the
  * first declarer is the lowest.
  */
 export function resolveGroups(kind: string, start: string, registry: GraphTypologyRegistry = defaultGraphTypologies): ResolvedGroup[] {

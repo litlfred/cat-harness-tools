@@ -38,10 +38,11 @@ import {
 import { isZodSchema } from "../schemas/kg/kind-validator.js";
 import { isExternalContract, skillContracts } from "./skill-contracts.js";
 import { termIri } from "../schemas/kg/namespaces.js";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 const WORKFLOW_DIR = join(REPO_ROOT, ".github", "workflows");
-/** The instance whose `kg-export.*.qa-results.json` sidecars this gate compares. */
+/** The layer whose `kg-export.*.qa-results.json` sidecars this gate compares. */
 const QA_ROOT = join(REPO_ROOT, "cat-harness");
 /** Where those sidecars live — the one composition, `qaResultPath`'s. */
 const QA_DIR = dirname(qaResultPath(QA_ROOT, "x"));
@@ -62,7 +63,7 @@ const PLACEHOLDER_BASE = "https://example.invalid/gate-stand-in";
  * A `kg-export.ts --instance <path>` invocation inside the deploy workflow.
  *
  * Deliberately anchored on `kg-export.ts` rather than on `--instance` alone:
- * other scripts take an instance argument and are not this export, and a gate
+ * other scripts take a layer argument and are not this export, and a gate
  * that ran them would report failures that say nothing about the published
  * graph.
  */
@@ -79,8 +80,8 @@ const TOOLS_INVOCATION = /bootstrap-tools\/scripts\/export-graph\.ts\s+--root\s+
 
 /**
  * `instance-exports.ts --out-dir` — the DERIVED publisher (bean `4ak5`): one
- * line that runs `kg-export --instance` for every declared instance not
- * published elsewhere. Expanded into one invocation per planned instance, so
+ * line that runs `kg-export --instance` for every declared layer not
+ * published elsewhere. Expanded into one invocation per planned layer, so
  * each is run and its committed sidecar compared exactly as a literal line's.
  */
 const PLAN_INVOCATION = /instance-exports\.ts\s+--out-dir\s+\S+([^\n]*)/g;
@@ -91,7 +92,7 @@ export const DEPLOY_WORKFLOW = "docs-site.yml";
 export interface Invocation {
   /** The workflow file that runs it, basename only. */
   workflow: string;
-  /** The instance path exactly as the workflow spells it. */
+  /** The layer path exactly as the workflow spells it. */
   instance: string;
   /** True when the workflow passes a `--base-url` this gate had to stand in for. */
   standInBase: boolean;
@@ -99,7 +100,7 @@ export interface Invocation {
   tool?: "kg-export" | "export-graph";
   /**
    * Expanded from an `instance-exports.ts` line, so the deploy also writes this
-   * instance a `<stub>/schema/` directory and links it (bean `4ak5` item 1).
+   * layer a `<stub>/schema/` directory and links it (bean `4ak5` item 1).
    */
   planned?: boolean;
 }
@@ -114,7 +115,7 @@ export const COMMITTED_SIDECAR = "(committed sidecar)";
 export interface ExportResult {
   /** The workflow file that runs it, basename only. */
   workflow: string;
-  /** The instance path exactly as the workflow spells it. */
+  /** The layer path exactly as the workflow spells it. */
   instance: string;
   /** True when the workflow passes a `--base-url` this gate had to stand in for. */
   standInBase: boolean;
@@ -157,12 +158,12 @@ export interface PublishedExportReport {
    */
   sidecarSubjects?: Invocation[];
   /**
-   * Bean `4ak5` item 5: declared instances a publishing workflow leaves with
+   * Bean `4ak5` item 5: declared layers a publishing workflow leaves with
    * no export. Each entry names the workflow and why. Non-empty is a failure.
    */
   incomplete?: string[];
   /**
-   * Bean `4ak5` item 1: contracts a planned instance's skills name that the
+   * Bean `4ak5` item 1: contracts a planned layer's skills name that the
    * publisher would not write into its `<stub>/schema/`. Non-empty is a failure.
    */
   unpublishedSchemas?: string[];
@@ -176,6 +177,11 @@ export interface PublishedExportReport {
   sidecarSubjectsUnknown?: string;
   /** The `--against` ref the committed sidecars were read from, when one was given. */
   against?: string;
+  /**
+   * Why this root publishes no instance graph at all, when that is DETERMINED
+   * ({@link publishesNoInstanceGraph}); the gate then exits not applicable.
+   */
+  notApplicable?: string;
 }
 
 /**
@@ -260,7 +266,7 @@ function subjectsFrom(names: readonly string[], covered: readonly Invocation[]):
 }
 
 /**
- * The stub `kg-export` names an instance's sidecar with — the declaration's
+ * The stub `kg-export` names a layer's sidecar with — the declaration's
  * `stub ?? name` (`artefactStub`), read RAW so this gate needs no graph typology
  * registered. It was `basename(path)`, which is the same answer for
  * `./bootstrap` and the wrong one for `.`: the checkout root's directory is
@@ -282,7 +288,7 @@ export function instanceStub(instance: string): string {
   return basename(abs);
 }
 
-/** The repository-relative instance path whose stub is `stub` — `.` for the checkout root, else `./<stub>`. */
+/** The repository-relative layer path whose stub is `stub` — `.` for the checkout root, else `./<stub>`. */
 function instancePathForStub(stub: string): string {
   return instanceStub(".") === stub ? "." : `./${stub}`;
 }
@@ -303,7 +309,7 @@ export function publishedInstances(
     plan().map((p) => ({
       workflow,
       instance: p.path,
-      // The publisher passes no base to an instance with its own canonical URL.
+      // The publisher passes no base to a layer with its own canonical URL.
       standInBase: /--base-url/.test(m[1] ?? "") && !p.ownCanonical,
       tool: "kg-export" as const,
       planned: true,
@@ -360,13 +366,13 @@ function runExport(inv: Invocation, outDir: string, against?: string): ExportRes
   if (!existsSync(abs)) {
     return { ...inv, ok: false, detail: `instance path does not exist: ${inv.instance}` };
   }
-  // AND IT MUST BE A DECLARED INSTANCE. "0 nodes" is too weak to discriminate
+  // AND IT MUST BE A DECLARED LAYER. "0 nodes" is too weak to discriminate
   // a wrong path: pointing this at `./.github` produced 28 nodes, because the
   // generic collectors read the repository regardless of what the argument
   // names. So the question asked is the one the repository already answers
   // everywhere else — declaration over location. Without it the export mints
   // a stub from `package.json` and publishes somebody else's content under
-  // the wrong instance's name.
+  // the wrong layer's name.
   if (declarationPathIn(abs) === undefined) {
     return {
       ...inv,
@@ -409,7 +415,7 @@ function runExport(inv: Invocation, outDir: string, against?: string): ExportRes
   const nodes = nodesEmitted(r.stdout ?? "");
   // The sidecar the export just computed, read back out of the temp root and
   // compared with the committed one. `qaStem` mirrors `kg-export.ts`'s own
-  // rule: the HOST keeps the bare stem, a foreign instance is qualified by its
+  // rule: the HOST keeps the bare stem, a foreign layer is qualified by its
   // stub. Composed here rather than parsed out of the export's output, because
   // a gate that reads a path off stdout breaks when a log line is reworded.
   const qaStem = `kg-export.${instanceStub(inv.instance)}`;
@@ -418,7 +424,7 @@ function runExport(inv: Invocation, outDir: string, against?: string): ExportRes
   // agree with it: measured 2026-10-04, the content core and the DAK base
   // layer came out STALE under the stand-in and CURRENT without one.
   // So a stand-in run builds and counts the document and does not compare;
-  // the base-less invocation of the same instance is the one that does
+  // the base-less invocation of the same layer is the one that does
   // (bean `4ak5`).
   const compares = !inv.standInBase;
   // ONLY for a kg-export row (bean `0utt`). Every invocation shares `outDir`,
@@ -440,14 +446,13 @@ function runExport(inv: Invocation, outDir: string, against?: string): ExportRes
     }
     // ── THE SCHEMA HALF (bean `4ak5` item 1) ────────────────────────────
     //
-    // A planned instance's document must link the index the deploy writes for
-    // it, and must list no public `Schema` node the publisher would leave
-    // out. The second is a standing tripwire, not a present failure: the
-    // schema-node collector is instance-bound (`COLLECTOR_SCOPE`), so no
-    // foreign export lists one today. The index renders Zod schemas per
-    // EXPORT under `zod/` (owner ruling 2026-10-05), but a Schema node names a
-    // MODULE, and nothing maps one to the other yet — so the day an export
-    // lists nodes, they would point at nothing. This fails then.
+    // A planned layer's document must link the index the deploy writes for
+    // it, and each `Schema` node it lists must link only renderings that sit
+    // in that index's `zod/<module>/` directory. The schema-node collector is
+    // generic now (`COLLECTOR_SCOPE`), so foreign exports list their layer's
+    // modules; `kg-export` maps each MODULE to its EXPORTS' renderings with
+    // the publisher's own `scannedInstanceSchemas`, and this checks the link
+    // lands where the publisher writes.
     if (inv.planned === true) {
       const gap = schemaLinkGap(inv, join(outDir, `${stub}.jsonld`));
       if (gap !== undefined) return { ...inv, nodes, ok: false, qaSidecar, detail: gap };
@@ -506,7 +511,7 @@ function runExport(inv: Invocation, outDir: string, against?: string): ExportRes
 }
 
 /**
- * Why a planned instance's exported document disagrees with the schema
+ * Why a planned layer's exported document disagrees with the schema
  * directory the deploy writes for it, or `undefined` when it agrees.
  *
  * Built with the base the deploy would pass, so the comparison is between the
@@ -530,22 +535,29 @@ function schemaLinkGap(inv: Invocation, docPath: string): string | undefined {
   }
   const schemaType = termIri("Schema");
   const listed = (doc["@graph"] ?? []).filter((n) => n["@type"] === schemaType || (Array.isArray(n["@type"]) && n["@type"].includes(schemaType)));
-  if (listed.length > 0) {
+  const zodDir = built.indexIri === undefined ? undefined : built.indexIri.replace(/[^/]*$/, "zod/");
+  const stray: string[] = [];
+  for (const n of listed) {
+    const links = Array.isArray(n.jsonSchema) ? n.jsonSchema.map(String) : typeof n.jsonSchema === "string" ? [n.jsonSchema] : [];
+    for (const l of links) {
+      if (zodDir === undefined || !l.startsWith(`${zodDir}${String(n.name)}/`) || !l.endsWith(".schema.json")) stray.push(`${String(n.name ?? n["@id"])} → ${l}`);
+    }
+  }
+  if (stray.length > 0) {
     return (
-      `its graph lists ${listed.length} public Schema node(s) (${listed.map((n) => String(n.name ?? n["@id"])).join(", ")}), ` +
-      "and the index maps no Schema NODE (a module) to its renderings — `zod/` is keyed by export, not by node. " +
-      "Link the nodes to their renderings before publishing them"
+      `its graph links ${stray.length} Schema rendering(s) outside the index's \`zod/<module>/\` (${stray.join(", ")}) — ` +
+      "the link and the file must come from one identity"
     );
   }
   return undefined;
 }
 
 /**
- * Bean `4ak5` item 1 — does every contract a planned instance's skills NAME
+ * Bean `4ak5` item 1 — does every contract a planned layer's skills NAME
  * reach its published `<stub>/schema/`?
  *
- * The two sides are read independently on purpose. What the instance HAS is
- * its own skills' `input:` / `output:` refs (`skillContracts`, instance
+ * The two sides are read independently on purpose. What the layer HAS is
+ * its own skills' `input:` / `output:` refs (`skillContracts`, layer
  * scope, external IRIs aside); what the publisher WRITES is
  * `publishedInstanceSchemas`, the function `instance-exports.ts` calls. A
  * check that read the contract directory for both would agree with itself
@@ -569,7 +581,7 @@ export function unpublishedInstanceSchemas(
     }
     const written = new Set(built.contracts.map((c) => norm(c.source)));
     for (const c of skillContracts(root, "instance").values()) {
-      if (resolve(c.instanceRoot) !== root) continue; // a skill held higher up publishes with its own instance
+      if (resolve(c.instanceRoot) !== root) continue; // a skill held higher up publishes with its own layer
       for (const ref of [c.input, c.output]) {
         if (ref === undefined || isExternalContract(ref)) continue;
         if (!written.has(norm(ref))) {
@@ -641,12 +653,12 @@ export function declaredExportNames(text: string): { names: string[]; star: bool
 
 /**
  * Bean `4ak5` item 1, part 2 — does every public Zod schema a planned
- * instance HAS reach its published `<stub>/schema/zod/`?
+ * layer HAS reach its published `<stub>/schema/zod/`?
  *
  * The rule is the owner's (2026-10-05, option C, "every exported *Schema"):
  * every exported const named `*Schema` whose value is a Zod schema, in the
- * top-level `.ts` modules (not `*.test.ts`) of the instance's schemas
- * directory. What the instance HAS is read here from the modules' text — each
+ * top-level `.ts` modules (not `*.test.ts`) of the layer's schemas
+ * directory. What the layer HAS is read here from the modules' text — each
  * exported name ending `Schema` ({@link declaredExportNames}) — and then
  * confirmed a Zod value by importing the module (`isZodSchema`, the
  * repository's one answer to "is this Zod"). What
@@ -737,17 +749,17 @@ function commands(text: string): string {
 }
 
 /**
- * Bean `4ak5` item 5 — does every declared instance get a graph?
+ * Bean `4ak5` item 5 — does every declared layer get a graph?
  *
  * The planned set is complete by construction, so what can go wrong is at its
  * edges, and each edge is asked here:
  *
  * - the DEPLOY must run the derived publisher at all, or the site carries
- *   only the instances somebody wrote a line for — the state this bean found;
- * - every workflow that runs it must also run each exempt instance's own
+ *   only the layers somebody wrote a line for — the state this bean found;
+ * - every workflow that runs it must also run each exempt layer's own
  *   publisher ({@link PUBLISHED_ELSEWHERE}), or the exemption outlives its
- *   reason and the instance is published by nobody;
- * - an exemption must name a DECLARED instance, or it exempts nothing and
+ *   reason and the layer is published by nobody;
+ * - an exemption must name a DECLARED layer, or it exempts nothing and
  *   hides a rename.
  */
 export function incompleteExports(
@@ -772,6 +784,25 @@ export function incompleteExports(
     if (!declaredStubs.has(stub)) out.push(`PUBLISHED_ELSEWHERE names \`${stub}\`, which no instance in this checkout declares`);
   }
   return out;
+}
+
+/**
+ * Why this root's workflows publish no instance graph, or `undefined` when
+ * that cannot be determined (cat-harness-tools#1701).
+ *
+ * "Examined nothing" means either nothing publishes or the pattern stopped
+ * matching. In a root that has NO {@link DEPLOY_WORKFLOW} and whose workflows
+ * name none of the publishers anywhere (not even in a line the patterns miss)
+ * the first is determined: an IG repository that is its own index
+ * (smart-ips-pilgrimage) builds its IG with the IG Publisher and deploys no
+ * folio site. A root with the deploy, or with any line naming a publisher,
+ * is judged exactly as before.
+ */
+export function publishesNoInstanceGraph(workflows: ReadonlyMap<string, string>): string | undefined {
+  if (workflows.has(DEPLOY_WORKFLOW)) return undefined;
+  const named = /kg-export|instance-exports|export-graph/;
+  if ([...workflows.values()].some((t) => named.test(t))) return undefined;
+  return `this root has no ${DEPLOY_WORKFLOW}, and none of its ${workflows.size} workflow file(s) names kg-export, instance-exports or export-graph: it publishes no instance graph`;
 }
 
 export async function checkPublishedInstanceExports(opts: { against?: string } = {}): Promise<PublishedExportReport> {
@@ -826,7 +857,10 @@ export async function checkPublishedInstanceExports(opts: { against?: string } =
     ...(incomplete.length > 0 ? { incomplete } : {}),
     ...(unpublishedSchemas.length > 0 ? { unpublishedSchemas } : {}),
   };
-  if (invocations.length === 0) return base;
+  if (invocations.length === 0) {
+    const why = unreadable.length === 0 ? publishesNoInstanceGraph(texts) : undefined;
+    return why === undefined ? base : { ...base, notApplicable: why };
+  }
 
   const { subjects: sidecarSubjects, unknown } = sidecarSubjectsFrom(invocations, { against: opts.against });
   const outDir = mkdtempSync(join(tmpdir(), "published-instance-export-"));
@@ -945,6 +979,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   const report = await checkPublishedInstanceExports({ against });
+  if (report.notApplicable !== undefined) exitNotApplicable("check:published-instance-exports", report.notApplicable);
   const clean =
     report.unreadable === undefined &&
     report.invocations.length > 0 &&

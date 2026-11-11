@@ -40,7 +40,7 @@ const INSTANCE = HARNESS_ROOT; // the harness's stores; this test moved up in 70
 const script = (tag: string) => ({ result: "pass", reviewer: { kind: "script", id: `s-${tag}` }, field_hash: { md: tag } });
 const agent = (tag: string) => ({ result: "fail", reviewer: { kind: "agent", id: `a-${tag}` }, notes: tag });
 
-/** A throwaway instance with no declaration: its store is the convention path. */
+/** A throwaway layer with no declaration: its store is the convention path. */
 function instance(withStore: boolean): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), "qa-attest-"));
   if (withStore) writeCriteriaAttestations(root, blockAttestationKey(root, join(root, "seed")), { c: [agent("seed")] });
@@ -258,7 +258,7 @@ const FIXTURE_REPORTS: Record<string, CriteriaMap> = {
 };
 const FIXTURE_JUDGEMENTS = 4;
 
-/** A fixture instance holding the derived reports, and (with `migrated`) the store the migration writes. */
+/** A fixture layer holding the derived reports, and (with `migrated`) the store the migration writes. */
 function corpusInstance(migrated: boolean): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), "qa-attest-corpus-"));
   for (const [rel, criteria] of Object.entries(FIXTURE_REPORTS)) {

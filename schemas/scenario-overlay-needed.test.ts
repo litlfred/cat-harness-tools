@@ -15,7 +15,7 @@ import {
 } from "./process/scenario-overlay";
 
 /**
- * An instance audit resolves actors from the platform, every instance the
+ * A layer audit resolves actors from the platform, every layer the
  * audited one `needs`, and its own `scenarios/actors/` — never from a sibling
  * or a dependent. Built as throwaway trees, never the live repository.
  */

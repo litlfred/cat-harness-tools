@@ -1,6 +1,6 @@
 /**
  * `check:instance-graph` gates the DECLARATION as well as the graph: every
- * instance declares `needs`, and every instance has its own absolute harness
+ * layer declares `needs`, and every layer has its own absolute harness
  * IRI. Issue #1548, owner 2026-09-30: *"QA gates on harness declaration of
  * dependences. harness instancess need IRI for harness."*
  *

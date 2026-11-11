@@ -13,12 +13,12 @@
  *
  * The drawing itself (bpmn-js in headless Chromium, byte-stable and
  * responsive) is bootstrap-tools'
- * `scripts/render-bpmn.ts`. This is the SITE half: every instance's
+ * `scripts/render-bpmn.ts`. This is the SITE half: every layer's
  * diagrams, into this site's `workflows/`, with each step's title linking to
  * its page and each call activity's [+] to the process it calls
  * (`src/workflow/diagram-links.ts`).
  *
- * @covers processes
+ * @covers processes, business-processes — it draws both kinds' diagrams (a folio block brings its own SVG)
  *
  * @conformsTo omg-bpmn-2.0
  * @conformsTo omg-dd-1.0
@@ -49,26 +49,26 @@ import { subjectHref } from "./lib/subject-pages.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 /**
- * The `.bpmn` sources, from EVERY instance in the repository — each one's
+ * The `.bpmn` sources, from EVERY layer in the repository — each one's
  * declared knowledge-graph directories, via `workflowFiles` — not from the
- * literal `processes/`, and not from this instance alone.
+ * literal `processes/`, and not from this layer alone.
  *
  * `workflowFiles` returns absolute paths, so `file` below is already complete
  * and nothing joins it to a base. That is the point: a topical layout
  * (`bootstrap/processes/`, `crdm/workflows/`) is found without this script
  * knowing the layout exists.
  *
- * Every instance, not just this one, since bean `oqdr` (2026-09-26): bootstrap
- * is a separate instance, so `workflowFiles(ROOT)` never reached its three
+ * Every layer, not just this one, since bean `oqdr` (2026-09-26): bootstrap
+ * is a separate layer, so `workflowFiles(ROOT)` never reached its three
  * diagrams. Their SVGs sat in this site's `workflows/` rendered by nothing —
  * `initialize-harness.svg` went ten source commits stale, still drawing the
  * pre-rename role — and `render:bpmn:check`, which checks only what this
  * function returns, could not see it. The same walk `audit-coverage` and
  * `check-asset-roles` already do.
  *
- * Output names are the BASENAME, so two instances holding a diagram of the
+ * Output names are the BASENAME, so two layers holding a diagram of the
  * same name would silently overwrite one SVG with the other. That was
- * "latent" while one directory fed this; with every instance feeding it, it
+ * "latent" while one directory fed this; with every layer feeding it, it
  * is refused rather than trusted.
  */
 function bpmnSources(): string[] {
@@ -94,7 +94,7 @@ function bpmnSources(): string[] {
 const OUT_DIR = join(ROOT, siteDirFor(ROOT), "assets/img/workflows");
 // `node_modules/` is a REPOSITORY artefact — it sits beside `package.json` and
 // `bun.lock`, which is where `bun install` writes it, and there is one per
-// repository however many instances it holds. `ROOT` is this instance's root
+// repository however many layers it holds. `ROOT` is this layer's root
 // since the move (bean `wggr`), so joining here looked for
 // `cat-harness/node_modules/` and reported bpmn-js as not installed.
 //
@@ -164,9 +164,9 @@ for (const file of sources) {
 }
 
 /**
- * Page sections presenting each diagram, keyed relative to this instance —
- * from every docs source in the checkout, so a diagram presented on a page an
- * instance above this one authors is still linked to that section.
+ * Page sections presenting each diagram, keyed relative to this layer —
+ * from every docs source in the checkout, so a diagram presented on a page a
+ * layer above this one authors is still linked to that section.
  */
 const presentations = await checkoutProcessPresentations(ROOT);
 
@@ -200,7 +200,7 @@ function subprocessLinks(xml: string): Map<string, string> {
     if (!home) continue;
     // The called process's own page, its subject IRI (owner, 2026-10-23: "the
     // info button/icons in the bpmn rendering should point to those new
-    // IRIs", #603) — where its instance's graph publishes one; else its page
+    // IRIs", #603) — where its layer's graph publishes one; else its page
     // section or diagram page, as before.
     out.set(
       id,

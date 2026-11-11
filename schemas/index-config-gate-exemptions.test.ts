@@ -1,6 +1,6 @@
 /**
  * An index declares the gate exemptions of its OWN workflows
- * (`gateExemptions` in `index.config.json`), in the shape an instance
+ * (`gateExemptions` in `index.config.json`), in the shape a layer
  * declaration uses, and every rewrite of the index keeps them.
  */
 import { describe, expect, test } from "bun:test";

@@ -24,7 +24,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { compare, keyOf, stateDirectories } from "../check-state-on-main.ts";
+import { compare, instancesNotInCheckout, keyOf, stateDirectories } from "../check-state-on-main.ts";
 import type { StateDirectory } from "../check-state-on-main.ts";
 
 const made: string[] = [];
@@ -32,7 +32,7 @@ afterAll(() => {
   for (const d of made) rmSync(d, { recursive: true, force: true });
 });
 
-/** A fixture instance whose declaration is written from `dirs`. */
+/** A fixture layer whose declaration is written from `dirs`. */
 function instance(dirs: unknown[], nested?: Record<string, unknown[]>): string {
   const root = mkdtempSync(join(tmpdir(), "state-on-main-"));
   made.push(root);
@@ -216,5 +216,49 @@ describe("stateDirectories reads the declaration, not the disk", () => {
       { id: "beans", path: "beans/", graphTypologies: ["beans"], source: { kind: "branch", branch: "cat/cat-harness/beans", keyedBy: "tip" } },
     ]);
     expect(compare(stateDirectories(root), { onMain: [] })).toHaveLength(0);
+  });
+});
+
+// cat-harness-tools#1701: a content instance's joined checkout (smart-ips-
+// pilgrimage) does not mount `folio-assistant-sci`, so its baseline line is
+// not this checkout's to judge. Excused only when DETERMINED — lock parses,
+// does not list it, and it is not on disk — and judged as before otherwise.
+describe("instancesNotInCheckout — a baseline line for an instance this checkout does not hold", () => {
+  function checkout(lockInstances: unknown[] | undefined, dirs: string[] = []): string {
+    const root = mkdtempSync(join(tmpdir(), "state-on-main-lock-"));
+    made.push(root);
+    if (lockInstances !== undefined) {
+      writeFileSync(join(root, "index.lock.json"), JSON.stringify({ instances: lockInstances }));
+    }
+    for (const d of dirs) mkdirSync(join(root, d), { recursive: true });
+    return root;
+  }
+  const baseline = { onMain: [".::checkout-uploads", "cat-harness::uploads", "folio-assistant-sci::attestations"] };
+
+  test("an instance absent from the lock and the disk is not applicable, and is not a failure", () => {
+    const root = checkout([{ instance: "cat-harness", path: "cat-harness" }], ["cat-harness"]);
+    const notHere = instancesNotInCheckout(root, baseline);
+    expect([...notHere.keys()]).toEqual(["folio-assistant-sci"]);
+    const f = compare([], { onMain: ["folio-assistant-sci::attestations"] }, notHere);
+    expect(f.map((x) => x.kind)).toEqual(["not-applicable"]);
+  });
+
+  test("an instance the lock mounts is still judged, so a really stale line still fails", () => {
+    const root = checkout([{ instance: "folio-assistant-sci", path: "folio-assistant-sci" }]);
+    const notHere = instancesNotInCheckout(root, baseline);
+    expect(notHere.has("folio-assistant-sci")).toBe(false);
+    expect(compare([], { onMain: ["folio-assistant-sci::attestations"] }, notHere).map((x) => x.kind)).toEqual(["baseline-stale"]);
+  });
+
+  test("an instance on disk is still judged, lock or no lock entry", () => {
+    const root = checkout([], ["folio-assistant-sci"]);
+    expect(instancesNotInCheckout(root, baseline).has("folio-assistant-sci")).toBe(false);
+  });
+
+  test("no lock, or an unreadable lock, determines nothing", () => {
+    expect(instancesNotInCheckout(checkout(undefined), baseline).size).toBe(0);
+    const bad = checkout(undefined);
+    writeFileSync(join(bad, "index.lock.json"), "{ not json");
+    expect(instancesNotInCheckout(bad, baseline).size).toBe(0);
   });
 });

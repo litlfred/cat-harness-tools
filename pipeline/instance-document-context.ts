@@ -1,7 +1,7 @@
 /**
  * The emitters' write boundary for per-instance JSON-LD contexts — bean
  * `folio-assistant-63q4`, owner 2026-10-15: an emitted document names
- * `<iriBase>ns/context/v1.jsonld`, the context of the instance its file sits
+ * `<iriBase>ns/context/v1.jsonld`, the context of the layer its file sits
  * in, in place of the shared `ns/content/v1.jsonld`.
  *
  * ## Why this is here and not only in cat-harness
@@ -25,22 +25,22 @@ import { CONTENT_CONTEXT_URL } from "../schemas/kg/jsonld.js";
 
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
-/** Where an instance's own context lives, relative to its `iriBase`. */
+/** Where a layer's own context lives, relative to its `iriBase`. */
 export const INSTANCE_CONTEXT_PATH = "ns/context/v1.jsonld";
 
-/** An instance's context URL from its declared `iriBase` (with or without the trailing `/`). */
+/** A layer's context URL from its declared `iriBase` (with or without the trailing `/`). */
 export function instanceContextUrl(iriBase: string): string {
   return `${iriBase.endsWith("/") ? iriBase : `${iriBase}/`}${INSTANCE_CONTEXT_PATH}`;
 }
 
-/** One instance, as the write boundary reads it. */
+/** One layer, as the write boundary reads it. */
 export interface InstanceContextDecl {
   root: string;
   name: string;
   iriBase?: string;
 }
 
-/** Every instance under `checkoutRoot`, with its declared `iriBase`. */
+/** Every layer under `checkoutRoot`, with its declared `iriBase`. */
 export function instancesIn(checkoutRoot: string): InstanceContextDecl[] {
   return instanceRootsIn(checkoutRoot).flatMap((root) => {
     const decl = readDeclaration(root);
@@ -55,7 +55,7 @@ export function instancesIn(checkoutRoot: string): InstanceContextDecl[] {
 let checkoutInstances: InstanceContextDecl[] | undefined;
 
 /**
- * The instances of the checkout this layer sits in, read once — the same
+ * The layers of the checkout this layer sits in, read once — the same
  * checkout cat-harness's `content-context` reads from its own location.
  */
 function defaultInstances(): InstanceContextDecl[] {
@@ -65,14 +65,14 @@ function defaultInstances(): InstanceContextDecl[] {
 
 /**
  * `doc` as it should be WRITTEN at `outputPath`: a document naming the shared
- * content context by URL names its own instance's context instead. Everything
+ * content context by URL names its own layer's context instead. Everything
  * else about the context — its local `@base` and bindings — and the key order
  * are kept, since `--check` compares bytes.
  *
  * - A document naming any other context is returned unchanged.
- * - A path inside NO instance (a staged entry) is returned unchanged: no
- *   instance publishes it yet, and promotion regenerates it.
- * - A path inside an instance that declares no `iriBase` THROWS: its document
+ * - A path inside NO layer (a staged entry) is returned unchanged: no
+ *   layer publishes it yet, and promotion regenerates it.
+ * - A path inside a layer that declares no `iriBase` THROWS: its document
  *   would otherwise name a context nobody publishes, or silently keep the
  *   shared one.
  */

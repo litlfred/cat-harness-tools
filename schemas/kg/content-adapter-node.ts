@@ -42,9 +42,9 @@ export const ContentAdapterNodeSchema = z
     /**
      * The vocabulary's name — the same field, and the same value, as a
      * block-kind node's `adapter`. Deliberately NOT `name`: a `<stem>.json`
-     * whose `name` equals its stem is an instance DECLARATION to
+     * whose `name` equals its stem is a layer DECLARATION to
      * `findDeclarationFile`, so `paper.json` with `name: "paper"` made
-     * `content-adapters/` an instance and collapsed sci's sibling scope.
+     * `content-adapters/` a layer and collapsed sci's sibling scope.
      */
     adapter: z.string().regex(/^[a-z][a-z0-9-]*$/),
     /**
@@ -59,7 +59,7 @@ export const ContentAdapterNodeSchema = z
     companionRoles: z.array(z.enum(COMPANION_ROLES)).min(1),
     /**
      * The vocabulary's own module, `path.ts`, relative to the declaring
-     * instance: the code that defines its blocks. For a TYPED vocabulary it
+     * layer: the code that defines its blocks. For a TYPED vocabulary it
      * exports the kinds' schemas (`blockSchemas`), and may export
      * `constraintRules` and `builders` — the contract and its loader are
      * `vocabulary-modules.ts`. So a layer above cat-harness types its own kinds,

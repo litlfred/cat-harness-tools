@@ -400,14 +400,14 @@ describe("post-merge-regen pipeline (bean folio-assistant-ey1c)", () => {
 });
 
 /**
- * Bean `folio-assistant-p7mb`: an output an instance declares `builtAtPublish`
+ * Bean `folio-assistant-p7mb`: an output a layer declares `builtAtPublish`
  * is gitignored and never committed, so post-merge regen must not report it
  * stale. Measured on cat-harness run 39786173033 (2026-10-22): `library:viz`,
  * `uploads:viz`, `voices:viz`, `document-kinds:viz` and `slice:sqlite` were
  * listed stale and "repaired" only because their publish-time pages were absent.
  */
 describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", () => {
-  // A scratch composed tree: one instance `inst` declaring one directory and one file built at publish.
+  // A scratch composed tree: one layer `inst` declaring one directory and one file built at publish.
   const PUBLISH_DIR = "out/pages/";
   const PUBLISH_FILE = "out/index.json";
   const COMMITTED = "notes.txt";
@@ -442,7 +442,7 @@ describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", (
     expect(builtAtPublishIn("inst/out/pages/a/index.html", decls, "/r")).toBe(true);
     expect(builtAtPublishIn("inst/out/index.json", decls, "/r")).toBe(true);
     expect(builtAtPublishIn("inst/notes.txt", decls, "/r")).toBe(false);
-    // Another instance's tree, and the deepest instance declaring nothing, are not this one's declaration.
+    // Another layer's tree, and the deepest layer declaring nothing, are not this one's declaration.
     expect(builtAtPublishIn("other/out/pages/a.html", decls, "/r")).toBe(false);
     expect(builtAtPublishIn("inst/nested/out/pages/a.html", decls, "/r")).toBe(false);
   });

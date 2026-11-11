@@ -162,10 +162,10 @@ const OWNED_CITATION =
  *
  * Two roots because the move (bean `wggr`) split the question in half:
  * `AGENTS.md` stayed at the top of the checkout and `skills/` went into the
- * instance. With one parameter the live run scanned `<repo>/skills`, found no
+ * layer. With one parameter the live run scanned `<repo>/skills`, found no
  * files, and printed a census of **0** — where it had been 8 — as a clean run.
  * The fixtures in `check-agents-xref.test.ts` still pass one root, because a
- * fixture repository has no instance in it.
+ * fixture repository has no layer in it.
  */
 export function auditXrefs(
   repoRoot: string,
@@ -185,7 +185,7 @@ export function auditXrefs(
   const agentsMd = readFileSync(agentsPath, "utf8");
   const headings = headingsOf(agentsMd);
   const folio = folioAttributedSections(agentsMd);
-  // `owner/name` of this instance, so a citation naming THIS repo is still
+  // `owner/name` of this layer, so a citation naming THIS repo is still
   // audited against its own headings rather than waved through as somebody
   // else's.
   const instanceName = agentsMd.match(/^#\s+AGENTS\.md\s+[—-]\s+(\S+)/m)?.[1] ?? "";
@@ -226,10 +226,10 @@ export function auditXrefs(
 // declared-path-literal: these are relative roots applied to an ARBITRARY
 // repository root — `auditXrefs(root, SKILL_ROOTS)` is called against fixture
 // repositories throughout `check-agents-xref.test.ts`, which have no
-// `harness.json` at all. Reading THIS instance's declaration would answer a
+// `harness.json` at all. Reading THIS layer's declaration would answer a
 // question about a different tree, which is worse than a literal: it would be
 // confidently wrong rather than obviously fixed. `.claude/skills` is not a
-// declared `cat-harness` directory in any instance, so no declaration reaches
+// declared `cat-harness` directory in any layer, so no declaration reaches
 // it either.
 export const SKILL_ROOTS = ["skills", "src/skills", ".claude/skills"];
 
@@ -237,10 +237,10 @@ if (import.meta.main) {
   const strict = process.argv.includes("--strict");
   let cites: Citation[];
   try {
-    // The skills AND the `AGENTS.md` they cite are the instance's. Until
+    // The skills AND the `AGENTS.md` they cite are the layer's. Until
     // 2026-10-09 the cited file was the checkout root's; the root of an index
-    // checkout declares no instance, and its `AGENTS.md` is now a RENDERED
-    // index of the instances (`index-render.ts`, owner's option a). The
+    // checkout declares no layer, and its `AGENTS.md` is now a RENDERED
+    // index of the layers (`index-render.ts`, owner's option a). The
     // sections a skill cites moved, with the rest of that file's pointers, to
     // the harness's own `AGENTS.md` — which is also the file a skill means
     // when this layer is checked out on its own, with no root above it.

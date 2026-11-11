@@ -20,7 +20,7 @@
  *
  * Rendered assets live at `<base>/<instantiated harness>/<path to rendered
  * content>`, relative to the instance's own URL, so no `schema/` segment or
- * instance name is written here: `siteDirFor` resolves this instance's
+ * layer name is written here: `siteDirFor` resolves this layer's
  * rendered-content root from its declaration.
  *
  * ## A faceted index with a ONE-TYPE diagram
@@ -82,11 +82,11 @@ const DOC_MAX = 400;
  * - `node-kind` — a `nodeKind()` the node-kind index found through the
  *   typologies. It has a page at `/<locale>/<declaring>/<kind>/`.
  * - `family` — a `$schema` family a typology holds whose validator is not (yet)
- *   a `nodeKind()`, or one an instance declares in its own `nodeSchemas`
+ *   a `nodeKind()`, or one a layer declares in its own `nodeSchemas`
  *   (bootstrap's `model-registry/1.0.0`, a JSON Schema file).
  * - `typology` — a typology validated as a whole, with no families.
  *
- * `instance` is the instance whose schemas DEFINE it — the one the validator
+ * `instance` is the layer whose schemas DEFINE it — the one the validator
  * path names, the node-kind index's `declaredBy` rule — so a subject page
  * lists the kinds its own schemas define. Absent when nothing names a
  * validator: such a row appears on the unscoped page only, and says why.
@@ -113,7 +113,7 @@ export async function nodeKindRows(g: SchemaGraph, root: string, repoRoot: strin
   const declIds = new Set(g.decls.map((d) => d.id));
   const rel = (abs: string): string => relative(repoRoot, abs).split(sep).join("/");
   const instanceOf = (module: string): string | undefined => g.modules.find((m) => m.module === module)?.instance ?? module.split("/")[0];
-  /** A validator ref → the declaration id it names, and the instance holding it. */
+  /** A validator ref → the declaration id it names, and the layer holding it. */
   const at = (ref: string | undefined): { decl?: string; instance?: string } => {
     if (!ref) return {};
     try {
@@ -173,7 +173,7 @@ export async function nodeKindRows(g: SchemaGraph, root: string, repoRoot: strin
     });
   }
 
-  // Families an instance declares in its OWN declaration (bootstrap's
+  // Families a layer declares in its OWN declaration (bootstrap's
   // `nodeSchemas`). A path is relative to the declaration; an IRI is an
   // outside standard and is not a family of this graph.
   for (const dir of g.roots) {
@@ -202,14 +202,14 @@ export async function nodeKindRows(g: SchemaGraph, root: string, repoRoot: strin
  *
  * The `schemas` graph typology admits `folio-source-descriptor/v1` as a node
  * schema (`graph-typology-registry.ts`, `nodeSchemas`), so a directory of
- * descriptors — an instance's `sources/`, as two content instances hold — is a
+ * descriptors — a layer's `sources/`, as two content layers hold — is a
  * `schemas` directory by declaration. That classification is deliberate and
  * this generator does not second-guess it.
  *
  * What it got wrong was the READ: `readSchemaGraph` collects `.ts` modules and
  * `*.schema.json` files, and a descriptor is neither, so a directory holding
- * only descriptors produced no module, its instance was no subject, no page
- * was written, and the site's tile read "no viewer yet". An instance whose
+ * only descriptors produced no module, its layer was no subject, no page
+ * was written, and the site's tile read "no viewer yet". A layer whose
  * only `schemas` directory holds descriptors was invisible here for a reason
  * no page said.
  *
@@ -227,7 +227,7 @@ export interface SourceDescriptorRow {
   id: string;
   /** Repo-relative path of the descriptor file. */
   file: string;
-  /** The instance holding it, by the same rule `readSchemaGraph` uses for a module. */
+  /** The layer holding it, by the same rule `readSchemaGraph` uses for a module. */
   instance: string;
   title?: string;
   system?: string;
@@ -248,7 +248,7 @@ export function sourceDescriptorRows(
   /** Repo-relative schema directories, as `SchemaGraph.roots` carries them. */
   roots: readonly string[],
   repoRoot: string,
-  /** The instance a directory at the checkout's root belongs to. */
+  /** The layer a directory at the checkout's root belongs to. */
   rootName?: string,
 ): SourceDescriptorRow[] {
   const rows: SourceDescriptorRow[] = [];
@@ -444,10 +444,10 @@ function projection(
  *
  * **This is a resolution, not a composition, and the difference is not
  * cosmetic.** The first draft of this function composed `<owner>/<kind>` from
- * the rendering instance's name and the graph typology. That gives the right
+ * the rendering layer's name and the graph typology. That gives the right
  * answer for `cat-harness/schemas/` by coincidence — the directory happens to
  * sit at owner/kind — and the WRONG one for every directory that does not:
- * a content instance's `<instance>/library/` would have been addressed as
+ * a content layer's `<instance>/library/` would have been addressed as
  * `cat-harness/library`, naming the machinery where the rule names the data. Taking the path means
  * the two can never disagree, because there is only one of them.
  *
@@ -1537,13 +1537,13 @@ let stale = 0;
 const emitOrCheck = makeEmit({ check, onStale: () => { stale++; } });
 /**
  * BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The projection and
- * the pages are drawn over the WHOLE checkout (issue #2278): every instance
+ * the pages are drawn over the WHOLE checkout (issue #2278): every layer
  * the index mounts, at its pin. So the committed copies moved with the
- * index's pins, not with this instance's commit. The instance declares them
+ * index's pins, not with this layer's commit. The layer declares them
  * `builtAtPublish` with this script as the writer, and `derive:publish` runs
  * it; under `--check` a declared file has no committed bytes to compare, so it
  * is skipped there (the `folio:viz` rule) and written otherwise. Asked by the
- * file's path in the instance's own site, so `--site` asks the same question.
+ * file's path in the layer's own site, so `--site` asks the same question.
  */
 let builtSite: string | undefined;
 function builtHere(path: string): boolean {
@@ -1556,7 +1556,7 @@ const emit = (path: string, content: string): void => {
 };
 
 /**
- * The instances this writer draws a subject page for: those with a schema
+ * The layers this writer draws a subject page for: those with a schema
  * module or a source descriptor in a declared `schemas` directory of the
  * checkout. ONE rule, read by the writer below and by the site's coverage guard
  * (`site-coverage.ts` SUBJECT_READERS), so the guard never owes a page this
@@ -1602,16 +1602,16 @@ if (import.meta.main) {
    * subgraphs get viewers.
    */
   /**
-   * This instance's OWN schemas directory decides the segment.
+   * This layer's OWN schemas directory decides the segment.
    *
-   * Four instances declare one, and `schemaRoots` returns all four — a
-   * dependency's directory must not name the URL this instance publishes at.
+   * Four layers declare one, and `schemaRoots` returns all four — a
+   * dependency's directory must not name the URL this layer publishes at.
    * So the one inside ROOT wins, and the first declared one is the fallback
-   * for an instance that declares none of its own.
+   * for a layer that declares none of its own.
    *
    * On the wider URL shape: the owner ruled on `o7eq` that a rendered asset's
-   * address is the instance's NAME plus the declared graph as a segment, with
-   * whether the ROOT instance elides its own name still open and recommended
+   * address is the layer's NAME plus the declared graph as a segment, with
+   * whether the ROOT layer elides its own name still open and recommended
    * to elide. This publishes at `<site>/<graph>/`, which is that ruling with
    * the root eliding — so it needs no change if the recommendation stands,
    * and one segment if it does not. `8325` tracks it either way.
@@ -1633,13 +1633,13 @@ if (import.meta.main) {
   // ── Rule 1: a HANDLER rendering a kind's assets ────────────────────────
   //
   // `<base>/<handler>/<kind>/<optional subject>` — the owner's own example is
-  // `<base>/cat-harness/docs/<subject>/`, with the IRIS instance as the
-  // subject. The handler is THIS instance, the kind names what it renders,
-  // the subject scopes it to one instance.
+  // `<base>/cat-harness/docs/<subject>/`, with the IRIS layer as the
+  // subject. The handler is THIS layer, the kind names what it renders,
+  // the subject scopes it to one layer.
   //
-  // Rule 2, `<base>/<instance>/`, is the instance presenting ITSELF, and a
+  // Rule 2, `<base>/<instance>/`, is the layer presenting ITSELF, and a
   // subject page must never be published there: it would squat on that
-  // instance's own site.
+  // layer's own site.
   //
   // Read BEFORE the projection because the projection now carries the subject
   // pages' tile counts, and their keys are derived from the page paths this
@@ -1661,7 +1661,7 @@ if (import.meta.main) {
 
   // One page per SUBJECT — read from what was actually found, so a
   // declared-but-empty directory gets no page claiming to show it. "Found"
-  // includes source descriptors: an instance whose only `schemas` directory
+  // includes source descriptors: a layer whose only `schemas` directory
   // holds them (bean `folio-assistant-1nu0`) has something to show and gets
   // its page, rather than a tile reading "no viewer yet".
   const sources = sourceDescriptorRows(g.roots, REPO_ROOT, rootInstanceName(REPO_ROOT));
@@ -1683,12 +1683,12 @@ if (import.meta.main) {
   // THE LANDING HARNESS'S directories only, because those are the ones that
   // produce tiles (`tileDirectories`, the list `sync-docs-harness.ts` hands
   // `graphTiles`; #931: reading `ROOT`'s own declaration keyed every count by
-  // a cat-harness id once the landing moved to the core content layer). Scanning every instance was the first draft and it was
+  // a cat-harness id once the landing moved to the core content layer). Scanning every layer was the first draft and it was
   // wrong in a way worth recording, because it looked more thorough:
   //
   // a page is NOT uniquely owned by one directory id. The page at
-  // `.../library/agent-skills/` is `agent-skills-library` to this instance and
-  // plain `library` to the agent-skills instance, which declares its own view
+  // `.../library/agent-skills/` is `agent-skills-library` to this layer and
+  // plain `library` to the agent-skills layer, which declares its own view
   // of it. Scanning both meant the first-wins rule picked an id that is not a
   // tile here, so `agent-skills-library` silently lost its badge while
   // `uploads` gained a count over the wrong page entirely.
@@ -1741,13 +1741,13 @@ if (import.meta.main) {
   // ── Rule 1: a HANDLER rendering a kind's assets ────────────────────────
   //
   // `<base>/<handler>/<kind>/<optional subject>` — the owner's own example is
-  // `<base>/cat-harness/docs/<subject>/`, with the IRIS instance as the
-  // subject. The handler is THIS instance, the kind names what it renders,
-  // the subject scopes it to one instance.
+  // `<base>/cat-harness/docs/<subject>/`, with the IRIS layer as the
+  // subject. The handler is THIS layer, the kind names what it renders,
+  // the subject scopes it to one layer.
   //
-  // Rule 2, `<base>/<instance>/`, is the instance presenting ITSELF, and a
+  // Rule 2, `<base>/<instance>/`, is the layer presenting ITSELF, and a
   // subject page must never be published there: it would squat on that
-  // instance's own site.
+  // layer's own site.
   const { pageDir, dataDir, dataHref } = viewerPlacement(site, route, seg);
   emit(join(dataDir, "index.json"), data);
   /** The site root relative to a page, with a trailing slash: where node-kind pages hang. */

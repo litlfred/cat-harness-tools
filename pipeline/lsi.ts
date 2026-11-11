@@ -531,6 +531,65 @@ export interface Keyword {
 }
 
 /**
+ * How {@link keywordsOf} scores terms. Absent `scores`, a term's score is its
+ * weighted count in the units' columns of the surface matrix — the default,
+ * and the keywords this platform has always written. With `scores` (term row
+ * → score), the caller supplies them, e.g. {@link latentTermScores}.
+ */
+export interface KeywordScoring {
+  scores?: Map<number, number>;
+  /** Admit a term the text does not use. Only meaningful with latent `scores`. */
+  anyTerm?: boolean;
+}
+
+/**
+ * Term scores for a set of units from an index's rank-k reconstruction: for
+ * term `i`, `Σ_{j ∈ cols} Â_ij` where `Â = U · unitCoordsᵀ`.
+ *
+ * For LSI (`buildLsi`) `unitCoords` is `V_k Σ_k`, so this is the rank-k
+ * approximation of the weighted matrix (Deerwester et al. 1990, §4): a term
+ * scores in a unit it never occurs in when it occurs with that unit's words
+ * elsewhere. For CA (`buildCa`, α = 1) `unitCoords` is the principal row
+ * coordinates and `U` the standard column coordinates, so the product is the
+ * reconstitution `p_ij / (r_j c_i) − 1` of CA (Qi et al. 2023, §2.2): how far
+ * the term is OVER-represented in the unit relative to independence, length
+ * and frequency margins removed. Keys are rows of `index.terms`; a caller
+ * scoring against another matrix maps them by term.
+ */
+export function latentTermScores(index: LsiIndex, cols: number[], opts: { rows?: Iterable<number>; top?: number } = {}): Map<number, number> {
+  const k = index.k;
+  const sum = new Float64Array(k);
+  for (const j of cols) for (let c = 0; c < k; c++) sum[c] += index.unitCoords[j * k + c];
+  const at = (i: number): number => {
+    let s = 0;
+    const o = i * k;
+    for (let c = 0; c < k; c++) s += index.U[o + c] * sum[c];
+    return s;
+  };
+  const out = new Map<number, number>();
+  if (opts.rows) {
+    // Only the rows asked for: a re-rank over the words a text uses.
+    for (const i of opts.rows) {
+      const s = at(i);
+      if (s > 0) out.set(i, s);
+    }
+    return out;
+  }
+  const all = new Float64Array(index.terms.length);
+  for (let i = 0; i < all.length; i++) all[i] = at(i);
+  // The `top` highest only: a caller keeps a dozen keywords, and handing it
+  // every positive score of a 10⁴-term vocabulary costs a sort per unit.
+  const top = opts.top ?? all.length;
+  let floor = -Infinity;
+  if (top < all.length) {
+    const sorted = Float64Array.from(all).sort();
+    floor = sorted[sorted.length - top]!;
+  }
+  for (let i = 0; i < all.length; i++) if (all[i]! > 0 && all[i]! >= floor) out.set(i, all[i]!);
+  return out;
+}
+
+/**
  * The terms that characterise one unit (or several, pooled), read from the
  * SAME weighted matrix the index is built from — so a keyword is "frequent
  * here, rare across this corpus" exactly as the index means it, with no second
@@ -544,7 +603,7 @@ export interface Keyword {
  */
 // Words the index keeps (they do discriminate between texts) but that say
 // nothing about what a text is ABOUT. Measured 2026-10-06 on a catalogue
-// instance's handbook: "anyone", "aims", "take", "produce", "resulting" and "positive"
+// layer's handbook: "anyone", "aims", "take", "produce", "resulting" and "positive"
 // led section keyword lists. A keyword list only, never the index's tokens.
 const KEYWORD_STOP = new Set(
   ("anyone anything everyone someone something aim aims aimed take takes taken taking make makes made " +
@@ -574,20 +633,76 @@ function fold(term: string): string {
     .join(" ");
 }
 
+/** term → row, once per matrix: building it per call cost a 10⁴-entry map per unit. */
+const TERM_INDEX = new WeakMap<TermMatrix, Map<string, number>>();
+function termIndexOf(m: TermMatrix): Map<string, number> {
+  let idx = TERM_INDEX.get(m);
+  if (!idx) TERM_INDEX.set(m, (idx = new Map(m.terms.map((t, i) => [t, i]))));
+  return idx;
+}
+
+/**
+ * A text's runs of truly adjacent content tokens, once per text: the same
+ * section is read by every keyword variant. Bounded so a long-lived process
+ * does not keep every text it ever saw.
+ */
+const RUNS = new Map<string, string[][]>();
+const RUNS_MAX = 20_000;
+function tokenRuns(t: string): string[][] {
+  const hit = RUNS.get(t);
+  if (hit) return hit;
+  const runs: string[][] = [];
+  // A line break ends a run when the next line opens with a capital or a
+  // heading mark: that is a table cell, a heading or a new item, not a
+  // wrapped sentence ("Development" over "Systematic review team" is two
+  // cells of a WHO table, not the phrase "development systematic"). A
+  // wrapped sentence continues in lower case and keeps its run.
+  const pieces = plainText(t)
+    .split(/\n(?=\s*[\p{Lu}#])/u)
+    .flatMap((line) => line.toLowerCase().split(/[.,;:!?()\[\]"“”]+/));
+  for (const piece of pieces) {
+    let run: string[] = [];
+    for (const mm of piece.matchAll(/\p{L}[\p{L}\p{N}'-]*\p{L}|\p{L}{2,}/gu)) {
+      const w = mm[0].replace(/'s$/, "");
+      if (w.length < 3 || STOP.has(w)) {
+        if (run.length) runs.push(run);
+        run = [];
+        continue;
+      }
+      run.push(w);
+    }
+    if (run.length) runs.push(run);
+  }
+  if (RUNS.size >= RUNS_MAX) RUNS.clear();
+  RUNS.set(t, runs);
+  return runs;
+}
+
 /**
  * `headings` are the text's own statements of its subject — a section's
  * title. A term every word of which a heading names scores double: the author
  * saying what the text is about outranks a rare word the text merely uses.
  */
-export function keywordsOf(m: TermMatrix, cols: number[], texts: string[], top = 8, headings: string[] = []): Keyword[] {
+export function keywordsOf(
+  m: TermMatrix,
+  cols: number[],
+  texts: string[],
+  top = 8,
+  headings: string[] = [],
+  opts: KeywordScoring = {},
+): Keyword[] {
   const named = new Set(headings.flatMap((h) => tokenize(h)));
-  const score = new Map<number, number>();
-  for (const j of cols) {
-    for (let p = m.A.colPtr[j]; p < m.A.colPtr[j + 1]; p++) {
-      score.set(m.A.rowIdx[p], (score.get(m.A.rowIdx[p]) ?? 0) + m.A.vals[p]);
+  let score = new Map<number, number>();
+  if (opts.scores) {
+    score = opts.scores;
+  } else {
+    for (const j of cols) {
+      for (let p = m.A.colPtr[j]; p < m.A.colPtr[j + 1]; p++) {
+        score.set(m.A.rowIdx[p], (score.get(m.A.rowIdx[p]) ?? 0) + m.A.vals[p]);
+      }
     }
   }
-  const termIdx = new Map(m.terms.map((t, i) => [t, i]));
+  const termIdx = termIndexOf(m);
   // Token runs that are truly adjacent in the text: a stop word, a short
   // word or punctuation BREAKS the run, so "evidence and systematic" never
   // yields the phrase "evidence systematic" (measured: that and "new contain"
@@ -596,20 +711,9 @@ export function keywordsOf(m: TermMatrix, cols: number[], texts: string[], top =
   const pairs = new Map<string, number>();
   let tokens = 0;
   for (const t of texts) {
-    let prev: string | null = null;
-    // A line break ends a run when the next line opens with a capital or a
-    // heading mark: that is a table cell, a heading or a new item, not a
-    // wrapped sentence ("Development" over "Systematic review team" is two
-    // cells of a WHO table, not the phrase "development systematic"). A
-    // wrapped sentence continues in lower case and keeps its run.
-    const pieces = plainText(t)
-      .split(/\n(?=\s*[\p{Lu}#])/u)
-      .flatMap((line) => line.toLowerCase().split(/[.,;:!?()\[\]"“”]+/));
-    for (const piece of pieces) {
-      prev = null;
-      for (const mm of piece.matchAll(/\p{L}[\p{L}\p{N}'-]*\p{L}|\p{L}{2,}/gu)) {
-        const w = mm[0].replace(/'s$/, "");
-        if (w.length < 3 || STOP.has(w)) { prev = null; continue; }
+    for (const run of tokenRuns(t)) {
+      let prev: string | null = null;
+      for (const w of run) {
         tokens++;
         tf.set(w, (tf.get(w) ?? 0) + 1);
         if (prev && prev !== w && termIdx.has(prev) && termIdx.has(w)) {
@@ -626,8 +730,11 @@ export function keywordsOf(m: TermMatrix, cols: number[], texts: string[], top =
   const minTf = tokens >= 100 ? 2 : 1;
   const single: Keyword[] = [...score]
     .map(([i, w]) => ({ term: m.terms[i], score: w }))
-    .filter((k) => !KEYWORD_STOP.has(k.term) && !/ly$/.test(k.term))
-    .filter((k) => (tf.get(k.term) ?? 0) >= minTf || named.has(k.term));
+    .filter((k) => (opts.scores === undefined || k.score > 0) && !KEYWORD_STOP.has(k.term) && !/ly$/.test(k.term))
+    // A LATENT score may propose a term the text never uses (synonymy,
+    // Deerwester et al. 1990 §1): `anyTerm` lets it through. Otherwise a word
+    // must occur in the text, as before.
+    .filter((k) => opts.anyTerm || (tf.get(k.term) ?? 0) >= minTf || named.has(k.term));
   const byTerm = new Map([...score].map(([i, w]) => [m.terms[i], w]));
   const phrases: Keyword[] = [...pairs]
     .filter(([k, c]) => c >= 2 && !k.split(" ").some((w) => KEYWORD_STOP.has(w) || /ly$/.test(w)))
@@ -657,7 +764,7 @@ export function keywordsOf(m: TermMatrix, cols: number[], texts: string[], top =
 // ─── Cross-group link proposals (bean `9udd`) ─────────────────────────────────
 
 /** Below this cosine a cross-group pair is not proposed. House number,
- *  measured 2026-09-29 on a catalogue instance's 15 strongest cross-document pairs a
+ *  measured 2026-09-29 on a catalogue layer's 15 strongest cross-document pairs a
  *  reader labelled: 0.5 keeps all 4 real pairs and drops 5 of 7 spurious
  *  ones. Fitted to 15 examples — move it when a larger ground truth exists. */
 export const LINK_FLOOR = 0.5;

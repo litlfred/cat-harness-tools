@@ -8,7 +8,7 @@
  *
  * The Jekyll source is COMPOSED (`compose-docs.ts`): the declared `docs`
  * layers (`docsLayers`, base first, overlay last) at its root, and every
- * instance directory declared `composed` under its instance's name
+ * layer directory declared `composed` under its layer's name
  * (`composedInstances`). Jekyll renders that tree. So:
  *
  * | changed file | rendered |
@@ -33,7 +33,7 @@
  *
  * A script, a skill, a schema reaches the site only through a writer, whose
  * output is either committed (and mapped above) or built (`derive:publish`,
- * the KG viewer, the instance mounts) and so cannot be mapped file by file
+ * the KG viewer, the layer mounts) and so cannot be mapped file by file
  * before the build. A file the cone carries somewhere is `undetermined`
  * (`scope: unknown`) with the directories named, never a guess at pages; a
  * file it reaches nowhere renders no page. The staging build's measurement
@@ -68,7 +68,7 @@ export const DOCS_RENDERER = "docs-site";
 export interface Mount {
   /** Repo-relative, ending in `/`. */
   from: string;
-  /** Composed-tree prefix: `""` for a docs layer, `<instance>/` for a composed instance. */
+  /** Composed-tree prefix: `""` for a docs layer, `<instance>/` for a composed layer. */
   to: string;
 }
 
@@ -83,7 +83,7 @@ export function docsMounts(repo: string): Mount[] {
 
 /** A changed file's path in the composed tree, or undefined when it is not in it. */
 export function composedPath(file: string, mounts: readonly Mount[]): string | undefined {
-  // Longest mount first: a composed instance can sit inside nothing else, but a layer could be nested.
+  // Longest mount first: a composed layer can sit inside nothing else, but a layer could be nested.
   const m = [...mounts].sort((a, b) => b.from.length - a.from.length).find((x) => file.startsWith(x.from));
   return m ? m.to + file.slice(m.from.length) : undefined;
 }

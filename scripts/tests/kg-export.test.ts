@@ -21,7 +21,7 @@
  * of "where skills live" narrows again, this fails.
  *
  * The tests of this file that read the whole checkout (exports the graph of
- * every instance in the checkout, who-iris's packages among them) live in
+ * every layer in the checkout, who-iris's packages among them) live in
  * `test/kg-export-checkout.test.ts` (bean `7zz1`): standing alone, cat-harness
  * has none of it.
  */
@@ -45,7 +45,7 @@ import { declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } fro
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { hostSchemaBase } from "../lib/host-schema.ts";
-import { artefactStub, findDeclarationFile, findInstanceRoot, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { artefactStub, findDeclarationFile, findInstanceRoot, instanceDirectoryForGraph, instanceRootsIn, optInDirectoriesForGraph, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
 import { termIri } from "../../schemas/kg/namespaces.js";
 import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import { inAggregate } from "../../test/support/checkout.js";
@@ -107,7 +107,7 @@ const ALT_BASE = "https://example.invalid/fa";
 const BOOT_ROOT = join(dirname(HARNESS_ROOT), "bootstrap");
 /** Canonical base, explicit — distinct from `EXPORT`, which passes no `baseUrl`. */
 const EXPORT_CANONICAL = await buildExport({ baseUrl: BASE });
-/** The preview base, this instance's content. */
+/** The preview base, this layer's content. */
 const EXPORT_ALT = await buildExport({ baseUrl: ALT_BASE });
 /** The preview base, BOOTSTRAP's content — the pair the size comparison needs. */
 const EXPORT_ALT_BOOT = await buildExport({ baseUrl: ALT_BASE, instanceRoot: BOOT_ROOT });
@@ -126,7 +126,7 @@ const EXPORT_ALT_BOOT = await buildExport({ baseUrl: ALT_BASE, instanceRoot: BOO
  */
 const EXPORT_PREVIEW = await buildExport({ baseUrl: "https://example.invalid/fa/STAGING/demo" });
 /**
- * The CHECKOUT-scope graph — every instance stacked on this one, under this
+ * The CHECKOUT-scope graph — every layer stacked on this one, under this
  * document's name. Not published since bean `4ak5` item 2 (owner ruling
  * 2026-10-05, option B): it is what the published graph is measured against, and
  * the only graph still holding a package whose manifest name differs from its
@@ -182,7 +182,7 @@ describe("kg export", () => {
     // rename — correctly, but for the wrong reason: the property here is that
     // the document names ITSELF, which holds whatever the stub is. The value
     // is pinned once, in the naming test below, where it IS the subject.
-    // Under the instance's own directory, the host's included, since #603
+    // Under the layer's own directory, the host's included, since #603
     // decision 1b (owner, 2026-10-23): `<base>/<name>/<stub>.jsonld`.
     const decl = readDeclaration(join(HARNESS_ROOT))!;
     expect(EXPORT["@id"]).toBe(`${BASE}/${decl.name}/${artefactStub(decl)}.jsonld`);
@@ -292,7 +292,7 @@ describe("kg export", () => {
     // absent only in the sense that it is harder to notice.
     //
     // So: every value of every `@id`-coerced term must already BE an IRI.
-    // `hasCapability` is the live instance — actor registry files carry bare
+    // `hasCapability` is the live layer — actor registry files carry bare
     // capability names, and the collector mints them.
     const ctx = EXPORT["@context"] as Record<string, { "@type"?: string } | string>;
     const coerced = Object.entries(ctx)
@@ -383,8 +383,8 @@ describe("kg export", () => {
     const stub = artefactStub(decl);
     // `cat-harness` since 2026-09-21, on the owner's ruling (issue #649).
     // While this read `folio-assistant` it was the same string the REPOSITORY
-    // ROOT instance carries as its `name`, and `artefactStub` falls through to
-    // `name` when no stub is declared — so both instances resolved to
+    // ROOT layer carries as its `name`, and `artefactStub` falls through to
+    // `name` when no stub is declared — so both layers resolved to
     // `<base>/folio-assistant.jsonld`. Two vocabularies, one path. The literal
     // is pinned HERE and derived everywhere else, because this test is the one
     // whose subject is the name itself.
@@ -419,22 +419,22 @@ describe("kg export", () => {
     const declFile = findDeclarationFile(join(HARNESS_ROOT));
     expect(declFile).toBe(`${readDeclaration(join(HARNESS_ROOT))!.name}.json`);
     // ...and the stub does NOT name it. The stub names published ARTEFACTS;
-    // the declaration is named for the instance. They are equal here only
+    // the declaration is named for the layer. They are equal here only
     // because cat-harness's stub is its own name, so asserting on the stub
-    // would pass for the wrong reason in any instance that sets one.
+    // would pass for the wrong reason in any layer that sets one.
     expect(declFile).not.toBe(`${stub}.config.json`);
   });
 
   test("EVERY declared instance exports at an absolute IRI — the base is the SITE's, not the instance's", () => {
-    // Bean `40fl`. `exportIdentity` read `canonicalUrl` off the instance being
+    // Bean `40fl`. `exportIdentity` read `canonicalUrl` off the layer being
     // EXPORTED. `bootstrap` declares none deliberately — it has no site of
     // its own — so the moment `docs-site.yml` started publishing its graph
     // (2026-09-21, 11:31) the export minted a document-relative `@id`, pushed
     // that onto `problems`, and exited 1. Every push to `main` for the next
     // two hours failed to publish the site.
     //
-    // DERIVED over the declared instances rather than listing bootstrap:
-    // the defect is not about that instance, it is about any instance whose
+    // DERIVED over the declared layers rather than listing bootstrap:
+    // the defect is not about that layer, it is about any layer whose
     // graph this site publishes, and the next one to be added would have
     // reproduced it against a literal list that still read green.
     //
@@ -444,7 +444,7 @@ describe("kg export", () => {
     const repoRoot = repoRootFor(join(HARNESS_ROOT));
     const instances = instanceRootsIn(repoRoot);
     // An empty list is a broken probe, not a clean run — the `dh4f` shape.
-    // Without this, a resolver that stopped finding instances would make every
+    // Without this, a resolver that stopped finding layers would make every
     // assertion below vacuous and this test would pass by checking nothing.
     expect(instances.length).toBeGreaterThan(1);
 
@@ -457,7 +457,7 @@ describe("kg export", () => {
 
   test("an instance OUTSIDE this repository gets no base — the boundary, not a prefix", () => {
     // The defect the first version of this fallback shipped (#718, mine). It
-    // inherited the host's `canonicalUrl` for ANY instance declaring none,
+    // inherited the host's `canonicalUrl` for ANY layer declaring none,
     // with no condition, so exporting a directory in /tmp minted
     // `<this site>/outside.jsonld` — a URL that will never resolve, claiming a
     // document this repository does not publish, and reported as no problem.
@@ -499,7 +499,7 @@ describe("kg export", () => {
     const id = exportIdentity({ instanceRoot: boot });
     expect(id.publishedHere).toBe(true);
     // `<stub>/<stub>.jsonld` since `dyd3`: the owner's URL-space rule puts a
-    // foreign instance under its own segment, and the site-root path this
+    // foreign layer under its own segment, and the site-root path this
     // used to assert is the one that had two `@id`s for one graph.
     expect(id.docIri).toBe(`${BASE}/bootstrap/bootstrap.jsonld`);
   });
@@ -513,10 +513,10 @@ describe("kg export", () => {
     const boot = join(repoRootFor(join(HARNESS_ROOT)), "bootstrap");
     const ex = await buildExport({ instanceRoot: boot });
     expect(ex.problems).toEqual([]);
-    // `BASE` is THIS instance's declared canonicalUrl, which is the whole
+    // `BASE` is THIS layer's declared canonicalUrl, which is the whole
     // point: the foreign document is published at the publishing site's base,
     // under its own stub. Spelling the URL as a literal here would pass even
-    // if the fallback started reading some other instance's declaration.
+    // if the fallback started reading some other layer's declaration.
     expect(ex["@id"]).toBe(`${BASE}/bootstrap/bootstrap.jsonld`);
   });
 
@@ -737,8 +737,8 @@ describe("every self-URL the export publishes resolves to something published", 
     ]);
     // One document per NAMESPACE, as downloads. The extensionless `<dir>/ns`
     // is NOT published here any more (owner, 2026-10-15, folio-assistant#2560):
-    // the term IRIs moved to each instance's own iriBase
-    // (`<iriBase>v<major>/ns#`), served by that instance's own Pages
+    // the term IRIs moved to each layer's own iriBase
+    // (`<iriBase>v<major>/ns#`), served by that layer's own Pages
     // (`publish-instance-context.ts vocab`), and `<dir>/ns/` is a directory on
     // this site. Measured before removing it: this file's dead-link walk passed
     // with the three extensionless entries gone, so nothing named them.
@@ -746,13 +746,13 @@ describe("every self-URL the export publishes resolves to something published", 
       out.add(`${dir}/ns.jsonld`);
       out.add(`${dir}/ns.json`);
     }
-    // Each instance's OWN document (bean `4ak5` items 1 and 2): the root
-    // instance's line, then every instance in `instance-exports.ts`'s plan —
+    // Each layer's OWN document (bean `4ak5` items 1 and 2): the root
+    // layer's line, then every layer in `instance-exports.ts`'s plan —
     // the deploy's own list, read rather than restated, since a second list
     // here would be the "what is declared" answer that went stale before.
     // A re-homed skill link lands in these.
     //
-    // An index checkout's root declares no instance (owner, 2026-10-08), so
+    // An index checkout's root declares no layer (owner, 2026-10-08), so
     // there is no root line to publish and none to admit here.
     const rootDecl = readDeclaration(repoRootFor(join(HARNESS_ROOT)));
     const rootStubs = rootDecl === undefined ? [] : [artefactStub(rootDecl)];
@@ -785,11 +785,15 @@ describe("every self-URL the export publishes resolves to something published", 
       out.add(`tool-types/${n}.schema.json`);
       out.add(`${hostDir}tool-types/${n}.schema.json`);
     }
-    // The Tool folders: `tools/`, and the `work-plan` sub-graph's since
-    // cat-harness#1014 moved eleven of them there (cat-harness#991 step 23.2).
+    // The Tool folders: the layer's own `tools` graph, and the one inside each
+    // opt-in sub-graph that holds one — `work-plan` since cat-harness#1014,
+    // `integrations` and `kg-ops` since the opt-in waves moved Tools there.
+    // Read from the DECLARATION, the way `discoverTools` finds them: a list of
+    // literals here went stale when a sub-graph gained a `tools` graph, and
+    // its Tools' documents read as dead though the deploy writes them.
     // The document beside each is `tools/<id>.jsonld` whichever folder holds it.
-    // declared-path-literal: the two Tool folders the harness has, one per layout (transitional, cat-harness#991 step 23).
-    const toolDirs = [join(HARNESS_ROOT, "tools"), join(HARNESS_ROOT, "work-plan", "tools")].filter((d) => existsSync(d));
+    const ownTools = instanceDirectoryForGraph(HARNESS_ROOT, "tools");
+    const toolDirs = [...(ownTools === undefined ? [] : [ownTools]), ...optInDirectoriesForGraph(HARNESS_ROOT, "tools")].filter((d) => existsSync(d));
     // Beside the document, so under `<name>/` since #603 decision 1b.
     const docDir = docPath.includes("/") ? docPath.slice(0, docPath.lastIndexOf("/") + 1) : "";
     for (const toolDir of toolDirs) {
@@ -802,7 +806,7 @@ describe("every self-URL the export publishes resolves to something published", 
     for (const f of readdirSync(svgDir)) if (f.endsWith(".svg")) out.add(`assets/img/workflows/${f}`);
     // Each subject's page and document (#603), which the deploy's kg-export
     // writes beside the host's document and `instance-exports.ts` beside each
-    // planned instance's. Read from what `writeSubjectDocuments` WRITES, not
+    // planned layer's. Read from what `writeSubjectDocuments` WRITES, not
     // from the nodes, for the depiction's reason: an `@id` naming a file the
     // writer does not produce must fail here. Pages serves `<x>.html` at `<x>`.
     const site = mkdtempSync(join(tmpdir(), "kg-subjects-"));
@@ -846,7 +850,7 @@ describe("every self-URL the export publishes resolves to something published", 
     return out;
   }
 
-  // Reads other instances' exports, so it runs only where those instances
+  // Reads other layers' exports, so it runs only where those layers
   // exist; skipped visibly when cat-harness stands alone (bean `ho66`).
   test.skipIf(!inAggregate())("no absolute self-URL names a path the deploy does not write", async () => {
     const doc = EXPORT_CANONICAL;
@@ -1102,7 +1106,7 @@ describe("a package's id is declared, not derived from its path", () => {
   //
   // It is now `who-iris`: directory `who-iris/skills/`, basename `skills`,
   // manifest `who-iris`. (It was `large-datasets` until bean `j7ql` dissolved
-  // that instance into cat-harness on 2026-10-01, where its package sits at
+  // that layer into cat-harness on 2026-10-01, where its package sits at
   // `cat-harness/skills/library/large-datasets/` and the basename IS the name;
   // before that `kg-navigation`, until bean `byql` folded it into
   // `cat-harness/skills/kg/kg-navigation/` for the same reason.) Same shape,
@@ -1111,13 +1115,13 @@ describe("a package's id is declared, not derived from its path", () => {
   // rather than listed, so adding a skill there is not a test edit.
   //
   // Read from the CHECKOUT-scope graph since bean `4ak5` item 2: who-iris is
-  // its own instance, so the published graph does not hold its package
+  // its own layer, so the published graph does not hold its package
   // (asserted below), and no package of cat-harness's own has a
   // manifest name that differs from its directory. The rule is
   // `packageIdFor`'s, which runs the same in either scope.
   const WITNESS = "who-iris";
 
-  // Reads other instances' exports, so it runs only where those instances
+  // Reads other layers' exports, so it runs only where those layers
   // exist; skipped visibly when cat-harness stands alone (bean `ho66`).
   test.skipIf(!inAggregate())("in the PUBLISHED graph the witness is gone: nothing forwards it (clean break, #1378)", () => {
     const ids = (EXPORT["@graph"] as Array<Record<string, unknown>>).map((n) => String(n["@id"]));
@@ -1167,7 +1171,7 @@ describe("a package's id is declared, not derived from its path", () => {
 describe("exporting ANOTHER instance's graph", () => {
   // `gn4l` separated the generic collectors from the instance-bound ones in
   // 2026-09-19 and proved `collectInstanceNodes` against bootstrap. What
-  // it did not do is let a DOCUMENT be built for another instance, and the
+  // it did not do is let a DOCUMENT be built for another layer, and the
   // owner's `pve3` ruling ("neither") made that necessary: this graph now
   // links into bootstrap's, so bootstrap's has to exist.
 
@@ -1183,7 +1187,7 @@ describe("exporting ANOTHER instance's graph", () => {
     // wrong about whose it is, under a name a consumer trusts.
     //
     // Measured by removing the branch: bootstrap's document came back
-    // with 2079 nodes — this instance's 222 skills and 55 processes — instead
+    // with 2079 nodes — this layer's 222 skills and 55 processes — instead
     // of 85. A size comparison is the check, because every other signal
     // (`@id`, stub, published path) was correct in that run.
     const mine = EXPORT_ALT;
@@ -1192,7 +1196,7 @@ describe("exporting ANOTHER instance's graph", () => {
     expect(n(theirs)).toBeGreaterThan(0);
     expect(n(theirs)).toBeLessThan(n(mine) / 4);
     // And named, not merely smaller: a skill bootstrap has and this
-    // instance does not.
+    // layer does not.
     const ids = new Set((theirs["@graph"] as Array<{ "@id": string }>).map((x) => x["@id"]));
     // `skillHome` follows `exportIdentity`, so repointing the document moved
     // every link into it — which is the half of `dyd3`'s option B that needed
@@ -1216,11 +1220,11 @@ describe("exporting ANOTHER instance's graph", () => {
     // because a Tool is cat-harness's vocabulary (`gn4l`).
     const e = EXPORT_ALT;
     // The document's OWN `@id`, never a spelled-out stub. Main renamed this
-    // instance's stub from `folio-assistant` to `cat-harness` while this
+    // layer's stub from `folio-assistant` to `cat-harness` while this
     // branch was open and the hardcoded literal took two tests down with it —
     // the same failure this file's package-witness comment warns about, made
     // in the act of fixing it.
-    // A Tool is its own document beside the instance's (bean `tdir`).
+    // A Tool is its own document beside the layer's (bean `tdir`).
     const tool = (e["@graph"] as Array<Record<string, unknown>>).find(
       (n) => n["@id"] === toolIri(String(e["@id"]), "discuss"),
     )!;
@@ -1229,14 +1233,14 @@ describe("exporting ANOTHER instance's graph", () => {
 
   test("a skill THIS instance also declares stays here", async () => {
     // Own-first, and it is not academic: `agent-skills` and `kg-navigation`
-    // declare ids this instance also declares, and without the own-first
+    // declare ids this layer also declares, and without the own-first
     // check their documents appeared as link targets the deploy never writes.
     const e = EXPORT_ALT;
     const own = String(e["@id"]);
-    // Every legitimate foreign home is a document some instance PUBLISHES,
-    // minted as that instance's export mints it. bootstrap was the only one
-    // until the split (bean `4ak5` item 2); since then a skill held by an
-    // instance stacked on this one links into that instance's document.
+    // Every legitimate foreign home is a document some layer PUBLISHES,
+    // minted as that layer's export mints it. bootstrap was the only one
+    // until the split (bean `4ak5` item 2); since then a skill held by a
+    // layer stacked on this one links into that layer's document.
     const homes = instanceRootsIn(REPO)
       .map((r) => publishedIdentity(r, ALT_BASE).docIri)
       .filter((d) => d !== own);
@@ -1250,7 +1254,7 @@ describe("exporting ANOTHER instance's graph", () => {
 });
 
 /**
- * Bean `tdir`. An instance's OWN Tools are in its own document.
+ * Bean `tdir`. A layer's OWN Tools are in its own document.
  *
  * Measured 2026-10-15 before the fix: `kg-export --instance ./smart-base`
  * emitted 0 Tool nodes against 11 declared, `--instance ./fhir-harness` 0
@@ -1272,7 +1276,7 @@ describe("an instance export carries that instance's Tools", () => {
       expect(declared).toBeGreaterThan(0);
       expect({ root: basename(root), tools: nodes.length }).toEqual({ root: basename(root), tools: declared });
       // The port types are the HARNESS's vocabulary, minted against the
-      // deploy's base, never against the instance's own canonical.
+      // deploy's base, never against the layer's own canonical.
       for (const t of nodes) {
         const io = t.io as { inputs?: Array<{ schema: string }>; outputs?: Array<{ schema: string }> };
         for (const p of [...(io.inputs ?? []), ...(io.outputs ?? [])]) {
@@ -1445,8 +1449,8 @@ describe("DMN decisions are nodes, linked to their gateways and to DMN 1.3", () 
   test("every decision in every .dmn file is a Decision node conforming to DMN 1.3", () => {
     // Every `.dmn` the harness's corpus declares, wherever it is grouped
     // (`processes/<group>/decisions/`, placement PR3, bean `63wl`).
-    // THIS instance's — the published graph holds no other's since bean
-    // `4ak5` item 2; each stacked instance's decisions are in its own.
+    // THIS layer's — the published graph holds no other's since bean
+    // `4ak5` item 2; each stacked layer's decisions are in its own.
     const declared = workflowFiles(resolve(HARNESS_ROOT), "instance")
       .filter((f) => f.endsWith(".dmn"))
       .flatMap((f) =>
@@ -1487,7 +1491,7 @@ describe("DMN decisions are nodes, linked to their gateways and to DMN 1.3", () 
       expect(String(p.description).startsWith(String(p.summary).replace(/…$/, ""))).toBe(true);
     }
     // The witness is one of cat-harness's OWN diagrams, so the case holds where
-    // cat-harness is its own clone with no higher instance beside it (bean
+    // cat-harness is its own clone with no higher layer beside it (bean
     // `ho66`); `content-lifecycle` was folio-assistant-core's.
     const review = processes.find((p) => String(p.sourcePath).endsWith("content/review-task.bpmn"))!;
     expect(review.description).toBeDefined();
@@ -1531,15 +1535,15 @@ describe("an actor's roles are links to Role nodes (#1168 B8)", () => {
 /*
  * THE SPLIT — bean `4ak5` item 2, owner ruling 2026-10-05 (option B).
  *
- * `cat-harness.jsonld` is built in instance scope: cat-harness's own declared
+ * `cat-harness.jsonld` is built in layer scope: cat-harness's own declared
  * directories only. Measured the day it landed, the checkout-scope document
- * it replaced carried 825 nodes of five other instances under
+ * it replaced carried 825 nodes of five other layers under
  * `cat-harness.jsonld#…` fragments. Each such node is in its owner's
  * published document; nothing here forwards it (clean break, owner
  * 2026-11-02, cat-harness-tools#1378).
  */
 const OWNER_EXPORTS = new Map<string, Set<string>>();
-/** The same builds, whole, by instance root — for the schema-link tests below. */
+/** The same builds, whole, by layer root — for the schema-link tests below. */
 const OWNER_DOCS = new Map<string, Awaited<ReturnType<typeof buildExport>>>();
 for (const r of instanceRootsIn(REPO)) {
   if (resolve(r) === resolve(join(HARNESS_ROOT))) continue;
@@ -1565,13 +1569,13 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
     expect(outside).toEqual([]);
   });
 
-  // Reads other instances' exports, so it runs only where those instances
+  // Reads other layers' exports, so it runs only where those layers
   // exist; skipped visibly when cat-harness stands alone (bean `ho66`).
   test.skipIf(!inAggregate())("every @id the checkout-scope graph mints and this one lacks is held by its owner's PUBLISHED document", () => {
     // Nothing forwards it (clean break, #1378), so the owner must hold it:
     // the same subject path under the owner's own document, or, for a node no
     // other document names by path (a package), a source inside another
-    // instance, whose document is then its home.
+    // layer, whose document is then its home.
     const DOC = String(EXPORT_CANONICAL["@id"]);
     const here = new Set(graph.map((n) => String(n["@id"])));
     const moved = (EXPORT_CHECKOUT["@graph"] as Array<Record<string, unknown>>).filter((n) => !here.has(String(n["@id"])));
@@ -1591,30 +1595,30 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
     expect(homeless.map((n) => n["@id"])).toEqual([]);
   });
 
-  // Reads other instances' exports, so it runs only where those instances
+  // Reads other layers' exports, so it runs only where those layers
   // exist; skipped visibly when cat-harness stands alone (bean `ho66`).
   test.skipIf(!inAggregate())("nothing left behind links to a node that moved", () => {
     // A link to a node that LEFT is reported, not resolved: a role's skill
-    // held by a stacked instance is re-homed by `skillHome`, as a Tool's
+    // held by a stacked layer is re-homed by `skillHome`, as a Tool's
     // `satisfies` is.
     expect(EXPORT_CANONICAL.danglingLinks).toEqual([]);
   });
 });
 
 /*
- * A DOCUMENT LINKS THE SCHEMAS ITS INSTANCE PUBLISHES — bean `4ak5` follow-up,
+ * A DOCUMENT LINKS THE SCHEMAS ITS LAYER PUBLISHES — bean `4ak5` follow-up,
  * owner-approved 2026-10-05. Three links, each minted by the function that
  * mints the file it names, so the link and the file cannot disagree:
  *
- * - a planned instance's `omitted` drops `schemas` once its document links
+ * - a planned layer's document links
  *   the `<stub>/schema/` index, which says where they ARE;
- * - a skill held by a planned instance links its contract's published `$id`
+ * - a skill held by a planned layer links its contract's published `$id`
  *   (`publishedInstanceSchemas`), where it used to be left unset;
  * - the host's own document `conformsTo` its `<stub>.schema.json`.
  */
 describe("a document links the schemas its instance publishes (bean 4ak5 follow-up)", () => {
   const HOST = resolve(join(HARNESS_ROOT));
-  /** The base the deploy passes this instance — none for one with its own `canonicalUrl`. */
+  /** The base the deploy passes this layer — none for one with its own `canonicalUrl`. */
   const deployBase = (root: string): string | undefined => (declaresOwnCanonical(readDeclaration(root)) ? undefined : BASE);
   type Skill = { name: string; inputSchema?: string; outputSchema?: string };
   const skills = (e: { "@graph": unknown[] }): Map<string, Skill> =>
@@ -1623,7 +1627,7 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
         .filter((n) => n["@type"] === termIri("Skill"))
         .map((n) => [String(n.name), n as unknown as Skill]),
     );
-  /** `skill/io` → the `$id` the deploy writes that contract under, for one instance. */
+  /** `skill/io` → the `$id` the deploy writes that contract under, for one layer. */
   const contractIds = (root: string, baseUrl: string | undefined): Map<string, string> =>
     new Map(publishedInstanceSchemas(root, baseUrl).contracts.map((c) => [c.source.split("\\").join("/"), String(c.schema.$id)]));
 
@@ -1639,9 +1643,14 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
     }
   });
 
-  test("an exempt instance publishes no schema/ here, so it still says `schemas` was not looked for", () => {
+  test("an exempt instance publishes no schema/ here: no index link, and no Schema node links a rendering", () => {
+    // `schemas` is generic now (`COLLECTOR_SCOPE`): the layer's own schema
+    // modules were looked for, so it is not `omitted`. With no `schema/`
+    // published here, a node it lists must not link a `zod/` file nobody writes.
     expect(EXPORT_ALT_BOOT.conformsTo).toBeUndefined();
-    expect([...(EXPORT_ALT_BOOT.omitted ?? [])].sort()).toEqual(["packages", "registry", "schemas"]);
+    expect([...(EXPORT_ALT_BOOT.omitted ?? [])].sort()).toEqual(["packages", "registry"]);
+    const linked = (EXPORT_ALT_BOOT["@graph"] as Array<Record<string, unknown>>).filter((n) => n.jsonSchema !== undefined);
+    expect(linked).toEqual([]);
   });
 
   test.skipIf(!inAggregate())("a planned instance's skills link the contract $id its publisher writes", () => {
@@ -1662,7 +1671,7 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
         }
       }
     }
-    // Measured 2026-10-05: 14 skills across four planned instances hold contracts.
+    // Measured 2026-10-05: 14 skills across four planned layers hold contracts.
     expect(linked).toBeGreaterThan(0);
     const qc = skills(OWNER_DOCS.get(resolve(REPO, "folio-assistant-core"))!).get("quality-control")!;
     expect(qc.inputSchema).toBe(`${BASE}/folio-assistant-core/schema/skills/quality-control/input.schema.json`);
@@ -1670,7 +1679,7 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
 
   test.skipIf(!inAggregate())("in checkout scope a skill held by a stacked instance links that instance's published contract", () => {
     // The host's own skills are minted under the host's base, as before; a
-    // stacked instance's under its OWN publication identity — smart-base's
+    // stacked layer's under its OWN publication identity — smart-base's
     // `canonicalUrl`, not this site.
     const nodes = skills(EXPORT_CHECKOUT);
     let foreign = 0;

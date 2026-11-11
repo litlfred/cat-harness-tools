@@ -250,7 +250,7 @@ const sha256 = (b: Uint8Array | string): string => createHash("sha256").update(b
 const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
 const posix = (p: string) => p.split("\\").join("/");
 
-/** The instance's declared `canonicalUrl` — the base a payload IRI is minted on. */
+/** The layer's declared `canonicalUrl` — the base a payload IRI is minted on. */
 export function canonicalBase(root: string = INSTANCE_ROOT): string {
   const url = readDeclaration(root)?.canonicalUrl;
   if (!url) throw new Error(`gen-slice-sqlite: ${root} declares no canonicalUrl to mint payload IRIs on`);
@@ -726,7 +726,7 @@ export const TODOS_SLICE: SliceDef = {
     // The todo reader is imported lazily: it resolves its graph at import.
     const { readTodoFiles } = await import("./todos.ts");
     const sources = new Map<string, string>();
-    // `readTodoFiles` reports paths relative to THIS instance (`../todos/…`),
+    // `readTodoFiles` reports paths relative to THIS layer (`../todos/…`),
     // so they are resolved here before being made repo-relative (bean `pb04`).
     for (const f of readTodoFiles()) sources.set(f.todo.id, posix(relative(root, resolve(INSTANCE_ROOT, f.path))));
     return todosData(JSON.parse(readFileSync(p, "utf-8")), sources, root);
@@ -894,7 +894,7 @@ type KgNode = Record<string, unknown> & { "@id": string; "@type"?: string | stri
  * when it was `<doc>#`: the short form is what keeps 14,000 edges from
  * carrying a 60-byte prefix twice each, plus once more in the reverse index.
  * Only this document's subjects are shortened (`subjectPathOf`): the host's
- * directory is the site root, under which every instance's subjects sit.
+ * directory is the site root, under which every layer's subjects sit.
  */
 export function kgData(doc: { "@id": string; "@context": unknown; "@graph": unknown[] }, plan: PayloadPlan): SliceData {
   const docIri = doc["@id"];
@@ -997,8 +997,8 @@ export const KG_SLICE: SliceDef = {
   async load() {
     const { buildExport } = await import("./kg-export.ts");
     // `checkout`, deliberately: this slice is the CORPUS's search, every
-    // instance stacked on this one included, as it was before the published
-    // document split (bean `4ak5` item 2). A stacked instance's node keeps
+    // layer stacked on this one included, as it was before the published
+    // document split (bean `4ak5` item 2). A stacked layer's node keeps
     // this document's `@id`, which the published document answers with a
     // tombstone forwarding to its owner's — so a result still resolves.
     const data = await buildExport({ instanceRoot: INSTANCE_ROOT, scope: "checkout", provenance: false });

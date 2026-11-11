@@ -148,7 +148,7 @@ describe("the structural half — what Zod cannot check", () => {
   });
 
   test("the reader is told the repository root rather than deriving it wrongly", () => {
-    // `repoRootFor` is `dirname` and takes an INSTANCE root, so a caller
+    // `repoRootFor` is `dirname` and takes a LAYER root, so a caller
     // starting from the repository root gets its PARENT and the reader finds
     // nothing — "no voices are declared" for a repository declaring three.
     // Found live while writing the checker. The explicit parameter is the fix,

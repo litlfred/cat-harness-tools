@@ -9,7 +9,7 @@
  *   KEY `<harness>/<visualiser>` (the route `visualiserRoute` computes, without
  *   the base), never by a page path.
  * - **`cat-harness/docs/wireframes/index.json`**, and the same file in the
- *   `wireframes/` of every other instance's declared `docs` directories
+ *   `wireframes/` of every other layer's declared `docs` directories
  *   ({@link wireframeSources}): which wireframe covers which visualiser. A
  *   `covers` entry is a route key, or a route key and a sub-graph
  *   (`cat-harness/auto-docs/index/skills`); one wireframe may cover several.
@@ -79,7 +79,7 @@ export interface WireframeReport {
   failing: { wireframe: string; candidate: string; viewport: string; criterion: string; notes?: string }[];
 }
 
-/** Every declared visualiser, by route key `<harness>/<visualiser>`, across every instance in the checkout. */
+/** Every declared visualiser, by route key `<harness>/<visualiser>`, across every layer in the checkout. */
 export function declaredVisualisers(repoRoot: string = REPO_ROOT): string[] {
   return [...new Set(harnessVisualisers(repoRoot).map((v) => `${v.harness}/${v.id}`))].sort();
 }
@@ -92,22 +92,22 @@ export function coveredKey(entry: string, declared: readonly string[]): string |
 /**
  * Where the wireframes are: this harness's own `<site>/wireframes/`, and the
  * `wireframes/` directory of every declared `docs` directory of every OTHER
- * instance of the checkout that has one.
+ * layer of the checkout that has one.
  *
  * A wireframe belongs with the page it draws. While every wireframe sat here,
  * the harness's index named pages of layers ABOVE it — a catalogue page of a
- * content instance — and in any checkout that did not mount that layer the
+ * content layer — and in any checkout that did not mount that layer the
  * ref read as undeclared (measured in a content repository that mounts only
  * the platform, cat-harness-tools#281). A content layer's own visualiser had
- * nowhere to put its wireframe at all. So each instance's index is read where it sits, and
+ * nowhere to put its wireframe at all. So each layer's index is read where it sits, and
  * names only refs it can see. This harness's wireframes keep their bare
- * names; another instance's are named `<instance>/<topic>`, since two layers
+ * names; another layer's are named `<instance>/<topic>`, since two layers
  * may each have a `catalogue`.
  *
- * WHICH directories is the declaration's: every directory the instance
+ * WHICH directories is the declaration's: every directory the layer
  * declares of the `docs` kind, its site directory among them. The site
  * directory alone was not enough (wrong-direction move M3, 2026-10-20): an IG
- * instance builds its site directory at publish and commits nothing there, so
+ * layer builds its site directory at publish and commits nothing there, so
  * its authored pages sit in a second `docs` directory it declares for exactly
  * that reason, and so do its wireframes.
  */

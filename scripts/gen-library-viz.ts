@@ -35,21 +35,26 @@
  *   bun run cat library:viz          # write
  *   bun run cat library:viz:check    # fail if either artefact is stale
  */
+import { inScope as siteInScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { readLibraryGraph, type LibraryGraph, type LibraryBlock, type LibraryEntry,
+import { readLibraryGraph, referencedCatalogueEntries, type LibraryGraph, type LibraryBlock, type LibraryEntry,
   readEntryBlocks, instanceOf,
 } from "./library-graph.ts";
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
-import { DOCUMENT_VIEW_JS, readEntryDocument } from "./lib/library-document.ts";
+import { DOCUMENT_VIEW_JS, entryFigureFiles, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
+import { LANGUAGE_TOGGLE_JS, entryLanguages, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
+import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
+import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
-import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
+import { blobUrl, elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
-import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "../schemas/library/library-iri.ts";
+import { LIBRARY_JSONLD_SITE_DIR, libraryAssetIri, libraryAssetSitePath, libraryStubSitePath } from "../schemas/library/library-iri.ts";
+import { termCurie, termIri } from "../schemas/kg/namespaces.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
 import { subgraphOutDir } from "./gen-subgraph-jsonld.ts";
 import { SUBGRAPH_INDEX_FILE } from "../schemas/kg/subgraph-manifest.ts";
@@ -63,7 +68,7 @@ import { tileCounts } from "../schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
-import { escHtml, thinPageConfigOf } from "./thin-page.ts";
+import { escHtml, nodeStubPageHtml, themedNodeDeclaration, type PageNode } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "../schemas/kg/harness-config.js";
 import { gateOwnsFile } from "./lib/gate-own.ts";
@@ -85,7 +90,7 @@ const mineToCheck = (abs: string): boolean => gateOwnsFile(relative(REPO_ROOT, a
 const check = process.argv.includes("--check");
 /**
  * This harness's own repository. NOT where an entry's links point: an entry
- * is held by its own instance, in that instance's repository, which
+ * is held by its own layer, in that layer's repository, which
  * `forgeAt` reads from the mount lock (`lib/library-source.ts`). This is the
  * fallback for a path no mount covers when the checkout's origin is unknown.
  */
@@ -154,6 +159,14 @@ export const VIEWER_CSS = `/* The block content panel — bean lrmo. Tokens only
 .lib-page #document .seg button[aria-selected="true"] { font-weight: 600; }
 .lib-page #document .docbody { padding: 0 16px 8px; }
 .lib-page #document .dockw { padding: 4px 16px; }
+/* Kept figures and transcribed tables (who-iris#224). */
+.lib-page #document .doc-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: .5rem 0 1rem; }
+.lib-page #document .doc-figure { margin: 0; border: 1px solid var(--border, #8884); border-radius: 6px; padding: 6px; background: var(--card, transparent); }
+.lib-page #document .doc-figure img { display: block; width: 100%; height: auto; max-height: 320px; object-fit: contain; background: #fff; border-radius: 4px; }
+.lib-page #document .doc-figure figcaption { font-size: .85em; margin-top: 6px; }
+.lib-page #document .doc-table { margin: .4rem 0; }
+.lib-page #document .doc-table-scroll { overflow-x: auto; max-width: 100%; }
+.lib-page #document .doc-table table { font-size: .85em; }
 .lib-page #document p.kw, .lib-page #document .dockw p.kw { display: inline; margin: 0; }
 .lib-page #document .docsec p.kw { display: block; margin: 2px 0 6px; }
 .lib-page #document p.kw .pill { margin: 0 2px 2px 0; }
@@ -234,6 +247,17 @@ html[data-fa-scheme="light"] .lib-page {
 .lib-page .lib-view .pdf-viewer { margin:.6rem 0 0 !important; }
 .lib-page .lib-view img { display:block; max-width:100%; height:auto; border:1px solid var(--line); border-radius:6px; }
 .lib-page .lib-view-absent p { margin:0; }
+.lib-page .lib-record { padding:6px 0; border-bottom:1px solid var(--line); }
+.lib-page .lib-record p { margin:0; }
+.lib-page .lib-summary { padding:6px 0 10px; border-bottom:1px solid var(--line); }
+.lib-page .lib-summary h2 { margin:.4rem 0; }
+.lib-page .lib-summary p { margin:.3rem 0; max-width:60rem; }
+.lib-page .lib-versions { padding:6px 0; border-bottom:1px solid var(--line); }
+.lib-page .lib-versions p { margin:0; }
+.lib-page .lib-lang-toggle { margin:.5rem 0 0; }
+.lib-page .lib-lang-toggle a.seg-link { display:inline-block; min-height:24px; line-height:24px; padding:2px 10px; border:1px solid var(--line); text-decoration:none; }
+.lib-page details.lib-all { padding:10px 0; border-top:1px solid var(--line); }
+.lib-page details.lib-all > summary { cursor:pointer; font-size:1rem; min-height:24px; }
 .lib-page .toolbar { padding:10px 0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
 .lib-page input, .lib-page select, .lib-page button { font:inherit; color:var(--fg); background:var(--box);
   border:1px solid var(--line); border-radius:6px; padding:6px 9px; }
@@ -378,12 +402,16 @@ export const VIEWER_JS = `"use strict";
 var G = null, SORT = { key: "id", dir: 1 }, VIEW = "list";
 /* THE PAGE'S IDENTITY, and the only thing a page carries -- owner,
    2026-10-02 (#1881): every page is a thin shell that loads its content from
-   the published assets. A JSON data block rather than script, so a shell
+   the published assets. Attributes on the page's own element rather than script, so a shell
    holds no code of its own. DATA_HREF is made ABSOLUTE here, once, before
    anything can rewrite the address bar (see honourAddress). */
 var CONFIG = (function(){
-  var el = document.getElementById("fa-library-config");
-  try { return JSON.parse(el ? el.textContent : "{}") || {}; } catch (_e) { return {}; }
+  /* data-kg-* on the page's .lib-page element (issue #1830) -- no private block. */
+  var el = document.querySelector(".lib-page");
+  var d = el ? el.dataset : {};
+  var c = { data: d.kgData || "", scope: d.kgScope || "", libRoot: d.kgLibRoot };
+  if (d.kgEntry !== undefined) c.entry = d.kgEntry;
+  return c;
 })();
 var DATA_HREF = new URL(String(CONFIG.data || ""), location.href).href;
 /* ARRIVING AT #lib-view OPENS THE VIEW PANEL -- the folio glass's eye links
@@ -890,7 +918,7 @@ fetch(DATA_HREF).then(function(r){
       " prose block(s) not yet summarised" + (sd ? ", <b>" + sd + "</b> agent draft(s) awaiting a person" : "") + "</span>";
   }
   if (G.refScan) {
-    var none = scoped.filter(function(e){ return e.refCount === 0; }).length;
+    var none = scoped.filter(function(e){ return e.refCount === 0 && e.provenance !== "catalogued"; }).length;
     $("badges").innerHTML += '<span class="badge">' +
       (none ? '<b>'+none+"</b> entr(ies) referenced by nothing" : "references scanned") +
       (G.refScan.unreadable.length
@@ -917,7 +945,7 @@ fetch(DATA_HREF).then(function(r){
   $("listing").innerHTML = '<p class="empty">The projection at <code>' + esc(DATA_HREF) + '</code> could not be read. ' +
     "That is not an empty corpus \\u2014 it is a corpus that could not be loaded, and the page says so rather than showing nothing.</p>";
 });
-`;
+${LANGUAGE_TOGGLE_JS}`;
 
 /** The entry a shell is about, when it is one — its identity only, never its content. */
 export interface ShellEntry {
@@ -930,6 +958,13 @@ export interface ShellEntry {
   sources?: SourceLink[];
   /** Set when the entry names a source file this site does not hold — {@link notHeldHtml}. */
   notHeld?: { file: string; elsewhere: { label: string; href: string }[] };
+  /** The entry's catalogue record (its Dublin Core) and upstream Handle — {@link recordHtml}. */
+  record?: readonly SourceLink[];
+  /** The entry's title, for the page heading. */
+  title?: string;
+  /** Its language versions and toggle, and its summary, as HTML (`scripts/lib/library-languages.ts`). */
+  versions?: string;
+  summary?: string;
 }
 
 // ── WHAT A PAGE IS RENDERED FROM, LINKED ON THE PAGE (owner, 2026-10-15) ──
@@ -954,13 +989,13 @@ export interface SourceLink {
   view?: ViewSource;
 }
 
-/** One instance's library, as the whole-library page lists it. */
+/** One layer's library, as the whole-library page lists it. */
 export interface LibrarySubgraphLink {
   instance: string;
   entries: number;
-  /** The instance's library page, when this handler renders one. */
+  /** The layer's library page, when this handler renders one. */
   page?: string;
-  /** The instance's published subgraph JSON-LD, which holds its `library` directory as a member. */
+  /** The layer's published subgraph JSON-LD, which holds its `library` directory as a member. */
   jsonld?: string;
 }
 
@@ -973,10 +1008,10 @@ export function entryDataFiles(dataDir: string, id: string): { blocks: string; d
 }
 
 /**
- * An instance's subgraph JSON-LD on disk under this harness's site, or
+ * A layer's subgraph JSON-LD on disk under this harness's site, or
  * `undefined` when none is published. There is no document for the library
  * alone: `gen-subgraph-jsonld.ts` frames subgraphs under the KG directories
- * only, and the library is a member (`#directory/library`) of the instance's
+ * only, and the library is a member (`#directory/library`) of the layer's
  * root, so the root is the graph the library page links.
  */
 export function instanceSubgraphFile(harnessRoot: string, site: string, instance?: string): string | undefined {
@@ -993,8 +1028,8 @@ export function instanceSubgraphFile(harnessRoot: string, site: string, instance
 
 /**
  * One entry's own subgraph JSON-LD (cat-harness#180): since library entries
- * are framed, `library/<doc>/` is a subgraph of its instance's tree, at the
- * entry's path relative to its instance. `undefined` when it is not on disk
+ * are framed, `library/<doc>/` is a subgraph of its layer's tree, at the
+ * entry's path relative to its layer. `undefined` when it is not on disk
  * (subgraphs are built before this writer, and not on every run).
  */
 export function entrySubgraphFile(harnessRoot: string, site: string, instance: string, entryAbs: string): string | undefined {
@@ -1007,11 +1042,11 @@ export function entrySubgraphFile(harnessRoot: string, site: string, instance: s
 }
 
 /**
- * The instance roots a site COMPOSES — owner, 2026-10-15: *"a harness should
+ * The layer roots a site COMPOSES — owner, 2026-10-15: *"a harness should
  * combine it libray/ (or whatever) sites of it and all its depndencies"*.
- * When the checkout's root declares an instance (a per-repository site such
- * as a folio), that instance and its transitive `needs` (`declarationChain`);
- * when it declares none (a hub index), `undefined`: every instance listed.
+ * When the checkout's root declares a layer (a per-repository site such
+ * as a folio), that layer and its transitive `needs` (`declarationChain`);
+ * when it declares none (a hub index), `undefined`: every layer listed.
  */
 export function composedInstanceRoots(repoRoot: string): Set<string> | undefined {
   let name: string | undefined;
@@ -1024,7 +1059,7 @@ export function composedInstanceRoots(repoRoot: string): Set<string> | undefined
   return new Set(declarationChain(repoRoot).map((c) => resolve(c.root)));
 }
 
-/** Whether `repoRel` (a path in the checkout) belongs to an instance the site composes. */
+/** Whether `repoRel` (a path in the checkout) belongs to a layer the site composes. */
 export function inComposition(scope: ReadonlySet<string> | undefined, repoRoot: string, repoRel: string): boolean {
   if (scope === undefined) return true;
   const inst = findInstanceRoot(join(repoRoot, repoRel));
@@ -1073,26 +1108,26 @@ export function entrySources(
   ];
 }
 
-/** The files an instance's page renders: the projection, its subgraph JSON-LD, and each entry's manifest. */
+/** The files a layer's page renders: the projection, its subgraph JSON-LD, and each entry's manifest. */
 export function instanceSources(
   o: { pageDir: string; dataFile: string; subgraph?: string; manifests: readonly { id: string; abs: string }[] },
 ): SourceLink[] {
   return [
     { label: basename(o.dataFile), href: hrefFrom(o.pageDir, o.dataFile), what: "library projection (JSON)" },
     ...(o.subgraph ? [{ label: SUBGRAPH_INDEX_FILE, href: hrefFrom(o.pageDir, o.subgraph), what: "the instance's subgraph (JSON-LD)" }] : []),
-    ...o.manifests.map((m) => ({ label: `${m.id}/manifest.jsonld`, href: hrefFrom(o.pageDir, m.abs), what: "entry JSON-LD" })),
+    ...o.manifests.map((m) => ({ label: `source/${m.id}.jsonld`, href: hrefFrom(o.pageDir, m.abs), what: "entry JSON-LD" })),
   ];
 }
 
 /**
- * Every instance in the CHECKOUT that declares a library, with its page and
+ * Every layer in the CHECKOUT that declares a library, with its page and
  * its subgraph JSON-LD. Owner, 2026-10-15: the whole-library page *"should
  * also link to the library sub-graphs from the other harnesses"*, and *"a
  * harness should combine it libray/ (or whatever) sites of it and all its
  * depndencies"*. So the set is read from the checkout's declarations
  * (`checkoutDirectoriesForGraph`), never listed: on folio-assistant it is every
- * instance, on one repository's site its own and its mounted `needs`. An
- * instance with no page here (no entries, no queue) is still listed.
+ * layer, on one repository's site its own and its mounted `needs`. A
+ * layer with no page here (no entries, no queue) is still listed.
  */
 export function librarySubgraphs(
   o: {
@@ -1102,7 +1137,7 @@ export function librarySubgraphs(
     pageDir: string;
     pages: ReadonlySet<string>;
     entries: readonly { instance: string }[];
-    /** {@link composedInstanceRoots}; `undefined` lists every instance. */
+    /** {@link composedInstanceRoots}; `undefined` lists every layer. */
     scope?: ReadonlySet<string>;
   },
 ): LibrarySubgraphLink[] {
@@ -1121,7 +1156,7 @@ export function librarySubgraphs(
   });
 }
 
-/** The visible list of {@link SourceLink}s, and on the whole-library page the table of every instance's library. */
+/** The visible list of {@link SourceLink}s, and on the whole-library page the table of every layer's library. */
 export function sourcesHtml(links: readonly SourceLink[], libraries: readonly LibrarySubgraphLink[] = []): string {
   if (links.length === 0 && libraries.length === 0) return "";
   const a = (href: string, text: string): string => `<a href="${escHtml(href)}">${escHtml(text)}</a>`;
@@ -1193,13 +1228,66 @@ export function notHeldHtml(n: { file: string; elsewhere: readonly { label: stri
 </section>`;
 }
 
-/** The config block's id — how a library page names itself, and how this generator recognises its own output. */
-export const LIBRARY_CONFIG_ID = "fa-library-config";
+/**
+ * The entry's CATALOGUE RECORD, at the top of its page — owner, 2026-11-10:
+ * library entry pages *"should have dublin core linked at top"*. The links
+ * come from {@link catalogueRecordLinks}; an entry no catalogue node names
+ * gets nothing here.
+ */
+export function recordHtml(links: readonly SourceLink[]): string {
+  if (links.length === 0) return "";
+  return `<section class="lib-record" id="lib-record">
+<p><strong>Catalogue record:</strong> ${links
+    .map((l) => `<a href="${escHtml(l.href)}"${/^https?:/.test(l.href) ? ' rel="noopener"' : ""}>${escHtml(l.label)}</a> <span class="note">${escHtml(l.what)}</span>`)
+    .join(" &middot; ")}</p>
+</section>`;
+}
+
+/**
+ * The links {@link recordHtml} draws for one entry: its Dublin Core record on
+ * the repository host, and its Handle at the global resolver. Only what the
+ * catalogue node records, and only a record file that exists.
+ */
+export function catalogueRecordLinks(o: {
+  repoRoot: string;
+  checkoutRepo: string | undefined;
+  catalogue?: { record?: string; handle?: string; node?: string };
+  /**
+   * The record's Dublin Core XML rendering on this site, page-relative. When
+   * given it IS the Dublin Core link (owner, 2026-11-10: *"dublic core sould
+   * be the XML"*); the GitHub JSON is the fallback for a record with none.
+   */
+  xmlHref?: string;
+}): SourceLink[] {
+  const out: SourceLink[] = [];
+  const at = o.catalogue?.record ? forgeAt(o.repoRoot, o.catalogue.record, o.checkoutRepo) : undefined;
+  if (o.xmlHref && o.catalogue?.record) {
+    const stem = basename(o.catalogue.record).replace(/\.dc\.json$/, "");
+    out.push({ label: `Dublin Core XML — ${stem}.dc.xml`, href: o.xmlHref, what: "the item's metadata record" });
+  } else if (at && o.catalogue?.record) out.push({ label: `Dublin Core — ${basename(o.catalogue.record)}`, href: blobUrl(at), what: "the item's metadata record, on GitHub" });
+  const node = o.catalogue?.node ? forgeAt(o.repoRoot, o.catalogue.node, o.checkoutRepo) : undefined;
+  if (node && o.catalogue?.node) out.push({ label: `KG node — ${basename(o.catalogue.node)}`, href: blobUrl(node), what: "the item's catalogue node, on GitHub" });
+  const h = o.catalogue?.handle;
+  if (h && /^\d+(\.\d+)*\/\S+$/.test(h)) out.push({ label: `hdl:${h}`, href: `https://hdl.handle.net/${h.split("/").map(encodeURIComponent).join("/")}`, what: "the item upstream" });
+  return out;
+}
+
+/**
+ * The element every library page's viewer reads its identity from — the
+ * `data-kg-*` attributes on `<div class="lib-page">` (issue #1830: no private
+ * config block). An entry's page also declares its node there, in RDFa, with
+ * a JSON-LD stub beside it.
+ */
+const LIBRARY_MOUNT = "lib-page";
+
+/** An entry's class: the library's `SourceDocument`, as its manifest types it (`gen-library-jsonld.ts`). */
+const ENTRY_TYPE = termCurie("SourceDocument");
+const ENTRY_PREFIXES = { [ENTRY_TYPE.split(":")[0]!]: termIri("SourceDocument").slice(0, -"SourceDocument".length) };
 
 /**
  * The skeleton {@link VIEWER_JS} fills — this head, then the view panel when
- * there is one, then {@link VIEWER_BODY}: the same on the handler's page, an
- * instance's page and every entry page, since the script decides from the
+ * there is one, then {@link VIEWER_BODY}: the same on the handler's page, a
+ * layer's page and every entry page, since the script decides from the
  * config and the page's own path what to draw into it.
  */
 const VIEWER_HEAD = `<div class="lib-head">
@@ -1227,6 +1315,22 @@ const VIEWER_BODY = `<div class="toolbar">
   <section id="queue" class="wrap"></section>
 </div>`;
 
+/**
+ * An ENTRY page's body — owner, 2026-11-10: the entry's
+ * summary, sections and keywords were drawn BELOW the whole library's
+ * listing, so a reader arriving at one document saw a table of every other
+ * one first. Here the document comes first and the library listing folds
+ * away under it. Same ids as {@link VIEWER_BODY}, so the script is unchanged.
+ */
+const ENTRY_BODY = `<div class="lib-main">
+  <section id="document" class="wrap" hidden aria-live="polite"></section>
+  <section id="blocks" class="wrap" hidden aria-live="polite"></section>
+</div>
+<details class="lib-all">
+<summary>The whole library</summary>
+${VIEWER_BODY.replace(/\n\s*<section id="(?:document|blocks)"[^\n]*<\/section>/g, "")}
+</details>`;
+
 /** The shared stylesheet and script sit beside the projection. */
 const assetsOf = (dataHref: string): string => dataHref.slice(0, dataHref.lastIndexOf("/") + 1);
 
@@ -1236,8 +1340,10 @@ interface LibraryPage {
   title: string;
   /** The projection's href, relative to the page. The shared assets sit beside it. */
   dataHref: string;
-  /** The page's identity, read by {@link VIEWER_JS}. Never an entry's content. */
-  config: Record<string, unknown>;
+  /** The page's identity, read by {@link VIEWER_JS} from `data-kg-*`. Never an entry's content. */
+  config: { data: string; scope: string; libRoot: string; entry?: string };
+  /** The entry this page renders, declared in RDFa and a JSON-LD stub. Absent on a library's own page. */
+  node?: PageNode;
   /** The `<noscript>` content, as HTML; the caller escapes what it interpolates. */
   noscript: string;
   /** The entry's published JSON-LD, relative to the page — its `alternate`. */
@@ -1248,6 +1354,14 @@ interface LibraryPage {
   sources?: string;
   /** The primary asset's view panel, as HTML — {@link viewPanelHtml}. Drawn under the head. */
   view?: string;
+  /** The entry's catalogue record line, as HTML — {@link recordHtml}. Drawn right under the head. */
+  record?: string;
+  /** Set on an entry page: its title for the heading, and {@link ENTRY_BODY} in place of {@link VIEWER_BODY}. */
+  entryTitle?: string;
+  /** The entry's language versions and toggle, as HTML — `versionsHtml`. */
+  versions?: string;
+  /** The entry's summary, as HTML — `summaryHtml`. */
+  summary?: string;
 }
 
 /**
@@ -1275,7 +1389,11 @@ interface LibraryPage {
  */
 function libraryPageHtml(p: LibraryPage): string {
   const assets = assetsOf(p.dataHref);
-  const config = JSON.stringify(p.config).replace(/</g, "\\u003c");
+  const attrs = Object.entries({ data: p.config.data, scope: p.config.scope, "lib-root": p.config.libRoot, entry: p.config.entry })
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => ` data-kg-${k}="${escHtml(v!)}"`)
+    .join("");
+  const decl = p.node ? themedNodeDeclaration(p.node, ENTRY_PREFIXES) : undefined;
   return themedPage({
     title: p.title,
     generator: "cat-harness-tools/scripts/gen-library-viz.ts",
@@ -1285,20 +1403,19 @@ function libraryPageHtml(p: LibraryPage): string {
       alternate_jsonld: p.alternate,
     },
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
-<div class="lib-page" data-fa-no-filter>
-${VIEWER_HEAD}
-${p.view ? `${p.view}\n` : ""}${VIEWER_BODY}
+<div class="${LIBRARY_MOUNT}" data-fa-no-filter${decl?.attrs ?? ""}${attrs}>
+${decl ? `${decl.stub}\n` : ""}${p.entryTitle === undefined ? VIEWER_HEAD : VIEWER_HEAD.replace("Library — the L1 corpus", escHtml(p.entryTitle))}
+${p.record ? `${p.record}\n` : ""}${p.versions ? `${p.versions}\n` : ""}${p.summary ? `${p.summary}\n` : ""}${p.view ? `${p.view}\n` : ""}${p.entryTitle === undefined ? VIEWER_BODY : ENTRY_BODY}
 ${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>
-<script type="application/json" id="${LIBRARY_CONFIG_ID}">${config}</script>
 <script src="${escHtml(assets)}viewer.js"></script>`,
   });
 }
 
 /**
- * A library page that is NOT about one entry — the handler's whole view or an
- * instance's library: a THIN SHELL — owner, 2026-10-02, #1881: *"each
+ * A library page that is NOT about one entry — the handler's whole view or a
+ * layer's library: a THIN SHELL — owner, 2026-10-02, #1881: *"each
  * link/page needs to be materialized on the CDN (gh-pagees), just load the
  * content from the KG json(ld) assets already published"*.
  *
@@ -1328,7 +1445,7 @@ export function viewerHtml(
 /**
  * One ENTRY's page, at `<library>/<instance>/<id>/` (#1881, #1899).
  *
- * The same skeleton ({@link VIEWER_BODY}) the instance page draws into, with
+ * The same skeleton ({@link VIEWER_BODY}) the layer page draws into, with
  * the entry's identity in the config; the `<noscript>` names both sources the
  * page loads — the library projection and the entry's JSON-LD — and the
  * JSON-LD is the page's `alternate`. Kept out of the site search: seventy
@@ -1341,6 +1458,8 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     title: `${entry.id} — ${scope} library`,
     dataHref,
     config: { data: dataHref, scope, libRoot, entry: entry.id },
+    // The entry's IRI is its manifest's (`library-iri.ts`), declared only when the manifest is published.
+    ...(entry.jsonld ? { node: { iri: libraryAssetIri(scope, entry.id), types: [ENTRY_TYPE] } } : {}),
     noscript: `<p class="note">This page loads its entries from <a href="${escHtml(dataHref)}">the library projection</a>${
       entry.jsonld ? ` and this entry from <a href="${escHtml(entry.jsonld)}">its JSON-LD</a>` : ""
     }; it needs JavaScript to draw them.</p>${
@@ -1353,6 +1472,10 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     ...(entry.jsonld ? { alternate: entry.jsonld } : {}),
     sources: sourcesHtml(entry.sources ?? []),
     view: viewPanelHtml(entry.sources ?? []) || (entry.notHeld ? notHeldHtml(entry.notHeld) : ""),
+    record: recordHtml(entry.record ?? []),
+    entryTitle: entry.title ?? entry.id,
+    ...(entry.versions ? { versions: entry.versions } : {}),
+    ...(entry.summary ? { summary: entry.summary } : {}),
     searchExclude: true,
   });
 }
@@ -1363,7 +1486,22 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
  * later run prune its own stale output and nothing else.
  */
 export function libraryConfigOf(content: string): { data?: unknown; scope?: unknown; libRoot?: unknown; entry?: unknown } | undefined {
-  return thinPageConfigOf(content, LIBRARY_CONFIG_ID);
+  const tag = new RegExp(`<div class="${LIBRARY_MOUNT}"[^>]*>`).exec(content)?.[0];
+  if (tag === undefined) return undefined;
+  const get = (k: string): string | undefined => {
+    const v = new RegExp(`\\sdata-kg-${k}="([^"]*)"`).exec(tag)?.[1];
+    return v === undefined ? undefined : v.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  };
+  const data = get("data");
+  if (data === undefined) return undefined;
+  const out: { data?: unknown; scope?: unknown; libRoot?: unknown; entry?: unknown } = { data };
+  const scope = get("scope");
+  const libRoot = get("lib-root");
+  const entry = get("entry");
+  if (scope !== undefined) out.scope = scope;
+  if (libRoot !== undefined) out.libRoot = libRoot;
+  if (entry !== undefined) out.entry = entry;
+  return out;
 }
 
 /**
@@ -1400,7 +1538,7 @@ export function orphanFiles(root: string, wanted: ReadonlySet<string>): string[]
 }
 
 /**
- * Every instance whose declaration publishes a renderable directory at its
+ * Every layer whose declaration publishes a renderable directory at its
  * ROOT route (`instanceRoot: true`), by name → its site-root path `/<name>/`.
  * The route rule is `mount-instance-docs.ts` `withRoutes`: a declared root
  * answers at `/<instance>/`.
@@ -1425,11 +1563,11 @@ export function instanceRootRoutes(repoRoot: string): Map<string, string> {
 /**
  * An entry's `view` — the site-root path of the page that RENDERS it.
  *
- * Owner, 2026-10-02 (paraphrased): clicking a referenced instance's slug
- * should open that instance's visualiser. Two cases:
+ * Owner, 2026-10-02 (paraphrased): clicking a referenced layer's slug
+ * should open that layer's visualiser. Two cases:
  *
  * - a REFERENCED entry whose record links a `site_path` that is another
- *   instance's DECLARED root route (`instanceRootRoutes`) is rendered there —
+ *   layer's DECLARED root route (`instanceRootRoutes`) is rendered there —
  *   a DAK IG's viewer at its `/<instance>/` root. The link chooses the
  *   candidate; the declaration is what makes it a visualiser rather than a
  *   page that merely exists, so a link to anything else is not taken;
@@ -1536,22 +1674,44 @@ if (import.meta.main) {
     console.log("  · no library or uploads directory is declared — nothing to publish");
     process.exit(0);
   }
-  // A per-repository site composes its own instance and its `needs`, not
-  // every instance its checkout happens to mount (`composedInstanceRoots`).
+  // A per-repository site composes its own layer and its `needs`, not
+  // every layer its checkout happens to mount (`composedInstanceRoots`).
   const scope = composedInstanceRoots(repoRoot);
   g.entries = g.entries.filter((e) => inComposition(scope, repoRoot, e.dir));
   g.queues = g.queues.filter((q) => inComposition(scope, repoRoot, q.dir));
   g.uploads = g.uploads.filter((u) => inComposition(scope, repoRoot, u.path));
+  // A scoped site (`--scope`, owner 2026-11-08 Q-SZ-2 "B") publishes its scope's
+  // entries only; every other layer's library stays on that layer's own site.
+  const siteOnly = siteScope();
+  if (siteOnly !== undefined) {
+    const before = g.entries.length;
+    g.entries = g.entries.filter((e) => siteInScope(siteOnly, e.instance));
+    g.queues = g.queues.filter((q) => siteInScope(siteOnly, q.instance));
+    g.uploads = g.uploads.filter((u) => siteInScope(siteOnly, u.instance));
+    console.log(`  · scope ${scopeArg(siteOnly)}: ${g.entries.length} of ${before} entr(ies)`);
+  }
+  // Items the catalogue holds BY REFERENCE get an entry and a page too
+  // (owner, 2026-11-10: a referenced item's link goes to "our ingested record
+  // in linbrary and associated KG", not IRIS). Pages only — see
+  // `referencedCatalogueEntries` for why the graph itself leaves them out.
+  {
+    const taken = new Set(g.entries.map((e) => `${e.instance}/${e.id}`));
+    const extra = referencedCatalogueEntries([ROOT, repoRoot], repoRoot, taken).filter(
+      (e) => inComposition(scope, repoRoot, e.dir) && (siteOnly === undefined || siteInScope(siteOnly, e.instance)),
+    );
+    if (extra.length) console.log(`  · ${extra.length} entr(ies) catalogued by reference`);
+    g.entries.push(...extra);
+  }
   const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
   // ── Who references a slug — bean `jbx2`'s third ask ───────────────────
   //
-  // The sources are DERIVED: every instance's own declaration, every
+  // The sources are DERIVED: every layer's own declaration, every
   // directory it names, labelled by that directory's declared graph typology. So
   // `catalogue` and `voices` appear because they are declared and carry the
   // field, not because this file lists them — and a new kind that starts
   // referencing slugs shows up the day it is declared.
   //
-  // Each instance's SITE directory is skipped: it holds published copies of
+  // Each layer's SITE directory is skipped: it holds published copies of
   // the catalogue and of this projection, so scanning it would count the page
   // that displays a reference as a reference.
   {
@@ -1576,7 +1736,9 @@ if (import.meta.main) {
     // reported on the line below instead, where a statistic about a run
     // belongs.
     g.refScan = { unreadable: scan.unreadable };
-    const orphans = g.entries.filter((e) => (e.referencedBy?.length ?? 0) === 0).map((e) => e.id);
+    // An entry catalogued by reference is not an L1 source, so nothing is
+    // expected to cite it: it is not counted as an orphan.
+    const orphans = g.entries.filter((e) => e.provenance !== "catalogued" && (e.referencedBy?.length ?? 0) === 0).map((e) => e.id);
     console.log(
       `  · references: ${scan.filesRead} json file(s) read, ` +
         `${Object.keys(scan.bySlug).length} slug(s) referenced, ` +
@@ -1601,7 +1763,7 @@ if (import.meta.main) {
   };
   const seg = libDirs.length > 0 ? topOf(libDirs[0]!) : null;
   if (seg === null) {
-    // No library directory declared by this instance — the uploads half alone
+    // No library directory declared by this layer — the uploads half alone
     // has nowhere to hang, and composing a name would be exactly the literal
     // the rule forbids.
     console.log("  · no library directory declared by this instance — nothing to publish");
@@ -1612,18 +1774,18 @@ if (import.meta.main) {
   // Owner, 2026-09-20, reducing three cases to two:
   //
   //   (paraphrased) two rules, not three: one is cat-harness handling the
-  //   library/ dir, which holds a content instance's assets; the other is that
-  //   instance's own handler, which replicates the source website.
+  //   library/ dir, which holds a content layer's assets; the other is that
+  //   layer's own handler, which replicates the source website.
   //
   // So the form is `<base>/<handler>/<kind>/<optional subject>` — which is the
   // owner's own first example, `<base>/cat-harness/docs/<instance>/`. The
-  // handler is THIS instance (the machinery), the kind names what it renders,
-  // and the subject scopes it to one instance's assets.
+  // handler is THIS layer (the machinery), the kind names what it renders,
+  // and the subject scopes it to one layer's assets.
   //
   // **A subject page must NOT be published at `<base>/<subject>/<kind>/`.**
   // That is rule 2's namespace — `<base>/<instance>/` is the IRIS replica presenting
   // ITSELF, mocking the IRIS website — and a viewer parked there would squat
-  // on the instance's own site. An earlier draft of this file was about to do
+  // on the layer's own site. An earlier draft of this file was about to do
   // exactly that.
   const handler = readDeclaration(ROOT)?.name;
   if (!handler) {
@@ -1644,7 +1806,7 @@ if (import.meta.main) {
   // NO FOLIO MOUNT since 2026-10-07: the pages are on the theme's layout,
   // which loads docs-ui.js and docs-ui.css itself (`libraryPageHtml`).
 
-  // One page per SUBJECT — the instances whose assets this handler renders.
+  // One page per SUBJECT — the layers whose assets this handler renders.
   // Read from the entries and the queues rather than from the directory list,
   // so a declared-but-empty directory gets no page claiming to show it.
   const subjects = [...new Set([
@@ -1664,17 +1826,17 @@ if (import.meta.main) {
    * Counted FOR THE PAGE, which is the whole correction: the `library`
    * directory's page is the cat-harness-scoped one, so its count is
    * cat-harness's entries — zero — and not the eight entries the graph holds
-   * across every instance.
+   * across every layer.
    */
   // THE LANDING HARNESS'S directories only, because those are the ones that
   // produce tiles (`tileDirectories`, the list `sync-docs-harness.ts` hands
   // `graphTiles`; #931: reading `ROOT`'s own declaration keyed every count by
-  // a cat-harness id once the landing moved to the core content layer). Scanning every instance was the first draft and it was
+  // a cat-harness id once the landing moved to the core content layer). Scanning every layer was the first draft and it was
   // wrong in a way worth recording, because it looked more thorough:
   //
   // a page is NOT uniquely owned by one directory id. The page at
-  // `.../library/agent-skills/` is `agent-skills-library` to this instance and
-  // plain `library` to the agent-skills instance, which declares its own view
+  // `.../library/agent-skills/` is `agent-skills-library` to this layer and
+  // plain `library` to the agent-skills layer, which declares its own view
   // of it. Scanning both meant the first-wins rule picked an id that is not a
   // tile here, so `agent-skills-library` silently lost its badge while
   // `uploads` gained a count over the wrong page entirely.
@@ -1752,17 +1914,29 @@ if (import.meta.main) {
   // The browsable document — TOC, pages with their printed labels, figures
   // and tables, sections with a summary or an extract, the document checks —
   // read from the INGESTION SCHEMA (`pdf-structure/v1`), so every library
-  // entry of every instance gets it. Written for every entry: one with no
+  // entry of every layer gets it. Written for every entry: one with no
   // structure.json gets `{absent: true}`, a determined answer rather than a
   // 404 the viewer would have to tell apart from a failure.
+  // The default variant of the derived keywords graph (cat-harness#1144),
+  // computed here rather than read from the site, so the panel does not
+  // depend on `library:keywords` having run first.
+  const kwVariant = KEYWORD_VARIANTS[0]!.id;
+  const keywordsOf = new Map<string, EntryKeywordLists>(
+    keywordsGraphs(undefined, repoRoot, KEYWORD_VARIANTS.slice(0, 1)).map((k) => [
+      `${k.instance}/${k.entry}`,
+      { document: k.document[kwVariant] ?? [], sections: Object.fromEntries(Object.entries(k.sections).map(([sid, v]) => [sid, v[kwVariant] ?? []])) },
+    ]),
+  );
   for (const e of g.entries) {
     // [source] and [feedback] on the document and each section (bean zcak).
-    // No [edit]: an entry is frozen, and this instance materialises none.
+    // No [edit]: an entry is frozen, and this layer materialises none.
     // In the repository that HOLDS the entry, at its path there — never this
     // harness's repository plus the checkout path (owner, 2026-10-15: a 404).
     const at = forgeAt(repoRoot, e.dir, checkoutRepo);
+    const kws = keywordsOf.get(`${e.instance}/${e.id}`);
     const doc = readEntryDocument(join(repoRoot, e.dir), e.id, {
       withheld: !!e.withheld,
+      ...(kws ? { keywords: kws } : {}),
       ...(at ? { links: { repo: at.repo, dir: at.path } } : {}),
     });
     // The entry's resolved title, not the page-1 guess in structure.json
@@ -1772,6 +1946,12 @@ if (import.meta.main) {
       entryDataFiles(dataDir, e.id).doc,
       JSON.stringify(doc ?? { $schema: "folio-library-document/v1", id: e.id, absent: true }, null, 2) + "\n",
     );
+    // The figures and table CSVs the document view shows (who-iris#224),
+    // COPIED like the avatars: the entry's directory is not on the site.
+    // A withheld entry shows none, so none is copied.
+    if (doc && !e.withheld)
+      for (const rel of entryFigureFiles(join(repoRoot, e.dir)))
+        emitBytes(join(dataDir, "files", e.id, rel), readFileSync(join(repoRoot, e.dir, rel)));
   }
 
   for (const e of g.entries) {
@@ -1788,7 +1968,7 @@ if (import.meta.main) {
   // ── AVATARS (bean `zrvt`) ─────────────────────────────────────────────
   //
   // Each entry's picture, COPIED under the site so it resolves wherever the
-  // committed tree is served — the instance mount exists only on the built
+  // committed tree is served — the layer mount exists only on the built
   // site. `--check` compares BYTES, so a cover regenerated upstream and not
   // re-copied here is stale, never silently old.
   const copies = avatarCopies(g, site, repoRoot);
@@ -1821,7 +2001,7 @@ if (import.meta.main) {
   emit(join(dataDir, "viewer.js"), VIEWER_JS);
 
   // The whole-library page links the projection, the repository's subgraph
-  // index, and every instance's library in the checkout (`librarySubgraphs`).
+  // index, and every layer's library in the checkout (`librarySubgraphs`).
   const dataFile = join(dataDir, "index.json");
   const repoIndex = instanceSubgraphFile(ROOT, site);
   emit(
@@ -1867,7 +2047,7 @@ if (import.meta.main) {
     //   > … no query strings... each asset gets its own IRI
     //
     // So `<library>/<instance>/<id>/` is a REAL file — no 404 routing, which
-    // the owner ruled "a hack" — and it is the SAME template as the instance
+    // the owner ruled "a hack" — and it is the SAME template as the layer
     // page with the entry's identity in its config: nothing of the entry's
     // content is written into it. The script reads the projection and the
     // entry's block file, both already published, and selects the entry from
@@ -1878,6 +2058,10 @@ if (import.meta.main) {
     // the entry, so it is copied as-is rather than re-expressed, and each
     // shell names it as its `alternate`.
     const mine = g.entries.filter((e) => e.instance === subject);
+    const languages = entryLanguages(
+      mine.map((e) => ({ id: e.id, ...(e.catalogue?.node ? { node: join(repoRoot, e.catalogue.node) } : {}) })),
+      new Set(mine.map((e) => e.id)),
+    );
     for (const e of mine) {
       const shellDir = join(sub.pageDir, e.id);
       const src = join(repoRoot, e.dir, "manifest.jsonld");
@@ -1889,6 +2073,21 @@ if (import.meta.main) {
         wantedJsonld.add(dest);
         emitBytes(dest, readFileSync(src));
         jsonld = relative(shellDir, dest).split(sep).join("/");
+        // The stub AT the IRI (Q-THIN-3 A): it declares the node and points
+        // to the entry's page, so the extensionless IRI resolves to a page.
+        const stub = join(site, libraryStubSitePath(subject, e.id));
+        wantedJsonld.add(stub);
+        const from = (abs: string): string => relative(dirname(stub), abs).split(sep).join("/");
+        emit(
+          stub,
+          nodeStubPageHtml({
+            title: e.title || e.id,
+            node: { iri: libraryAssetIri(subject, e.id), types: [ENTRY_TYPE] },
+            prefixes: ENTRY_PREFIXES,
+            jsonld: from(dest),
+            page: `${from(shellDir)}/`,
+          }),
+        );
       }
       // ── THE ENTRY'S DECLARED SUB-GRAPHS, BESIDE ITS MANIFEST (bean 8pzh) ──
       //
@@ -1901,7 +2100,7 @@ if (import.meta.main) {
       // are linked from the page (here, and through the projection's `links`).
       //
       // The copies are NOT committed (owner, 2026-10-15, "H1"): their bytes
-      // come from the entry's instance at whatever pin the checkout mounts, so
+      // come from the entry's layer at whatever pin the checkout mounts, so
       // this harness declares them `builtAtPublish` and `derive:publish` runs
       // this writer to lay them down. A declared copy has no committed bytes
       // for `--check` to compare, so it is skipped there (the `folio:viz`
@@ -1918,14 +2117,33 @@ if (import.meta.main) {
         join(shellDir, "index.html"),
         entryPageHtml(`../${sub.dataHref}`, subject, "../../", {
           id: e.id,
+          title: e.title || e.id,
+          ...(() => {
+            const l = languages.get(e.id);
+            if (!l) return {};
+            const versions = versionsHtml(e.id, l, (id) => `../${encodeURIComponent(id)}/`);
+            const summary = summaryHtml(l.abstract);
+            return { ...(versions ? { versions } : {}), ...(summary ? { summary } : {}) };
+          })(),
           ...(jsonld ? { jsonld } : {}),
           ...(graphs.length ? { graphs } : {}),
           ...(() => {
             // No viewable source held, and the entry names one: say so where the panel would be.
             const held = sourceFileOf(repoRoot, e, g.uploads);
             return !held && e.sourceFile && e.provenance !== "referenced"
-              ? { notHeld: { file: e.sourceFile, elsewhere: elsewhereLinks(e) } }
+              ? { notHeld: { file: e.sourceFile, elsewhere: [...elsewhereLinks(e), ...(e.upstream ?? []), ...(() => {
+                  // The file this entry was derived from, at its source (script./lib/library-upstream-pdf.ts).
+                  const u = upstreamPdfOf(e.catalogue?.node ? join(repoRoot, e.catalogue.node) : undefined, e.id);
+                  return u ? [{ label: `${u.file} at its source`, href: u.href }] : [];
+                })()] } }
               : {};
+          })(),
+          ...(() => {
+            const record = catalogueRecordLinks({
+              repoRoot, checkoutRepo, ...(e.catalogue ? { catalogue: e.catalogue } : {}),
+              ...(e.catalogue?.xml ? { xmlHref: hrefFrom(shellDir, join(site, e.catalogue.xml)) } : {}),
+            });
+            return record.length ? { record } : {};
           })(),
           sources: entrySources({
             site, dataDir, shellDir, instance: subject, entry: e, manifest: jsonld !== undefined, files,

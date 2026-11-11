@@ -49,9 +49,9 @@ export function repoFiles(root: string, trees: readonly string[]): string[] {
   const seen = new Set<string>();
   for (const t of trees) {
     // `gitCorpus` asks the same question (tracked ∪ untracked-not-ignored) and
-    // also answers it for a tree git does not hold: an instance REMOTE-MOUNTED
+    // also answers it for a tree git does not hold: a layer REMOTE-MOUNTED
     // into the index checkout is ignored there wholesale, so a bare
-    // `ls-files` listed nothing and every gate over a mounted instance passed
+    // `ls-files` listed nothing and every gate over a mounted layer passed
     // over an empty set. Asked from inside the tree, the corpus is the
     // mount's files.
     const corpus = gitCorpus(join(root, t));

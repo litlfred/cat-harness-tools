@@ -2,7 +2,7 @@
 # cat-tools-pp9g
 $schema: bean/1.0.0
 title: 'Pre-push: the fast gates run on the committer''s machine, and a tree-keyed record CI can honour with deferred verification'
-status: in-progress
+status: completed
 type: feature
 priority: normal
 tags:
@@ -10,7 +10,7 @@ tags:
     - f017
     - 4rbc
 created_at: 2026-11-05T08:20:00Z
-updated_at: 2026-11-05T08:20:00Z
+updated_at: 2026-11-08T14:35:00Z
 parent: folio-assistant-fn8q
 ---
 
@@ -217,4 +217,19 @@ identical tree, same bun and platform, first attempt only, pending
 `gates/verified` set first) and #2958 (the sweep re-runs the run and resolves
 the status; a red re-run revokes and opens an issue). Both are off until the
 repository variable `CQG_HONOUR_LOCAL_RECORDS` is set.
+
+## Completed (2026-11-08)
+
+Parent `folio-assistant-fn8q` is completed and all PRs for this work item are merged on `main`:
+
+- `litlfred/cat-harness-tools#1488` (`35e9fe06`): `remote-mount.test.ts` hydrated-mount test timeout raised to 30 s under load.
+- `litlfred/cat-harness-tools#1489` (`42778580`): `state:mount` skips remote fan-out when every lock mount is current (48–59 s down to 1.1–1.2 s).
+- `litlfred/cat-harness-tools#1490` (`23147a7f`): `input-trace.ts` avoids `push(...lines)` stack overflow on large gate runs.
+- `litlfred/folio-assistant#2957` (`0d486d9b7e04`): `cqg` deferred verification hook for local gate records.
+- `litlfred/folio-assistant#2958` (`3f2aeaa881de`): `cqg` sweep re-verifies gates skipped on a local record off the critical path.
+- `litlfred/cat-harness-tools#1572` (`e7dc68c5`): `pre-push: stop attaching local gate records for CI (owner's ruling)` — local pre-push hook remains opt-in (`CAT_PREPUSH_GATES=1` / `cat.gates.prePush`) without attaching git-note records for CI.
+- `litlfred/folio-assistant#2989` (`acadc5dccb29`): `cqg: CI never honours a local gate record (owner's ruling)`.
+
+The remaining follow-up discovered while re-timing `pp9g` (mounted layers dirtied during a local `gates` run) is tracked in `cat-tools-sm8r` under epic `folio-assistant-1xhc`.
+
 

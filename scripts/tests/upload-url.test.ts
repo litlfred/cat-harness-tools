@@ -10,7 +10,7 @@
  * The URL's SHAPE is asserted over a throwaway repository whose `origin` is
  * known (`test/support/git-fixture.ts`), not over this checkout's: standing
  * alone, cat-harness has no `origin`, and the shape is logic over whatever
- * remote it is given. Whether THIS instance resolves — its declaration, its
+ * remote it is given. Whether THIS layer resolves — its declaration, its
  * queue on disk, its remote — is a check of this repository's configuration,
  * and lives in `test/upload-url-repo-root.test.ts` at the checkout's root.
  */
@@ -26,7 +26,7 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 const ROOT = resolve(HARNESS_ROOT);
 
 /**
- * An INSTANCE inside a throwaway repository: `inst/` declares an `uploads`
+ * A LAYER inside a throwaway repository: `inst/` declares an `uploads`
  * graph at `uploads/`, which exists, and the repository's `origin` is
  * `https://github.com/example/demo.git` — `.git` suffix and all.
  */
@@ -45,7 +45,7 @@ afterAll(() => FIXTURE.cleanup());
 describe("the queue path is REPOSITORY-relative, not instance-relative", () => {
   test("it carries the instance segment", () => {
     // The whole bug. `harness.json` declares `path: "uploads/"` with no scope,
-    // and absent scope means instance — so the declared path is missing the
+    // and absent scope means layer — so the declared path is missing the
     // `cat-harness/` a forge URL needs.
     const rel = queueRepoRelative(ROOT);
     expect(rel).toBeDefined();
@@ -55,7 +55,7 @@ describe("the queue path is REPOSITORY-relative, not instance-relative", () => {
 
   test("it is NOT the bare declared path", () => {
     // The assertion that would have caught the 404. If this ever equals
-    // `uploads`, the instance segment has been dropped again.
+    // `uploads`, the layer segment has been dropped again.
     expect(queueRepoRelative(ROOT)).not.toBe("uploads");
   });
 

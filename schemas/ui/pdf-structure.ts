@@ -146,6 +146,25 @@ export const PdfSourceSchema = z
      * layer.
      */
     runContext: RunContextRefSchema.optional(),
+    /**
+     * Pages whose embedded text layer failed `scripts/_text_quality.py` and
+     * were read from the OCR cache instead, each with the reason (owner,
+     * 2026-11-11, who-iris card Q-ODD-1 = A: "force OCR when a page's text
+     * layer fails a quality check"). The rest of the document keeps its
+     * embedded text, so `text_source` stays `embedded`. Absent when no page
+     * was replaced.
+     */
+    ocr_pages: z
+      .array(z.object({ page: z.number().int().min(1), reason: z.string().min(1) }).strict())
+      .optional(),
+    /**
+     * The document's languages as the ingest was told them (`--lang-hint`,
+     * ISO 639-1). A reader asks this, not the entry's slug: 10665/202203 is
+     * Russian and its slug has no language suffix, because an item's first
+     * edition keeps the bare slug (owner, 2026-11-11, card Q-ODD-1 = A).
+     * Absent when the ingest was given none.
+     */
+    languages: z.array(z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$/)).min(1).optional(),
   })
   .strict()
   // The two fields are one fact: `_tech_meta.sniff_effective_mimetype` returns
@@ -304,6 +323,59 @@ export const PdfDiagnosticsSchema = z
     furniture_lines_stripped: z.number().int().min(0).optional(),
     /** The flat outline ran against its own pages and `repair_outline` put it in page order. Absent when not. */
     outline_reordered: z.literal(true).optional(),
+    /**
+     * The PDF carried an outline and it was not used, with why: its entries
+     * are machine bookmark names (`_GoBack`, `_Hlk62546849`, `_TOC_250000`,
+     * "Blank Page", a merged file's name), or too few of them name a heading
+     * the pages print (a Russian edition carrying its English outline). The
+     * contents were then inferred, as for a PDF with no outline. Absent when
+     * the outline was used or there was none.
+     */
+    outline_rejected: z.string().min(1).optional(),
+    /**
+     * Sections too long to be one block (more than half of a document of 20
+     * pages or more, or over 20,000 words) and how each was cut: at the
+     * headings inferred inside it, else where the chapter in its running heads
+     * changes, else one section per page. Absent when no section was cut.
+     */
+    oversized_split: z
+      .array(
+        z
+          .object({
+            title: z.string(),
+            page_start: z.number().int().min(1),
+            page_end: z.number().int().min(1),
+            words: z.number().int().min(0),
+            by: z.enum(["headings", "running heads", "pages"]),
+            into: z.number().int().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
+    /**
+     * Inferred headings that did not read as headings: a title cut to its last
+     * line, rejoined with the lines above it up to its number (`as`), or a body
+     * word, a reference's first author or a diagram's labels, dropped. Absent
+     * when none was.
+     */
+    headings_tidied: z
+      .array(
+        z
+          .object({
+            title: z.string(),
+            page: z.number().int().min(1).nullable(),
+            action: z.enum(["rejoined", "dropped"]),
+            as: z.string().optional(),
+            why: z.string().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
+    /**
+     * Pages whose text stream drew the outline's first heading after the
+     * page's body, re-read in print order (1-based). Absent when none was.
+     */
+    pages_read_in_print_order: z.array(z.number().int().min(1)).optional(),
   })
   .strict();
 

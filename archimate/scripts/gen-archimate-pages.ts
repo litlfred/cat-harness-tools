@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Write a JSON-LD node and a thin page for every ArchiMate model an instance
+ * Write a JSON-LD node and a thin page for every ArchiMate model a layer
  * holds, and for every VIEW, ELEMENT and RELATIONSHIP in each — and draw every
  * view as SVG from the model's own diagram.
  *
@@ -15,12 +15,12 @@
  * With `--out`, they are written into a site being built — the way a folio's
  * staging build uses it, since a large model is thousands of nodes and nobody
  * should commit them. The DATA (every `.jsonld`, `.json`, `model.json`, drawn
- * view and the loader) is at the path the graph has in the instance,
+ * view and the loader) is at the path the graph has in the layer,
  * `<site>/<graph path>/…`, so no IRI moves. The PAGES are at the route of the
- * visualiser the instance DECLARES for this Tool, `<site>/en/<harness>/<id>/…`
+ * visualiser the layer DECLARES for this Tool, `<site>/en/<harness>/<id>/…`
  * (`visualiserRoute`; owner 2026-10-09, every visualiser page at
  * `<base>/<harness>/<visualiser>`, and folio-assistant#2527, under the
- * locale). An instance that declares none gets no site pages: the run stops
+ * locale). A layer that declares none gets no site pages: the run stops
  * and says so, because a generator writing to a route nobody declared is what
  * the routes gate exists to end. Each page carries `rendered-by`, so
  * `check:visualiser-routes` can see it. Each page reaches its data, and each
@@ -36,21 +36,30 @@
  * | path | what |
  * |---|---|
  * | `<m>.jsonld`, `.json` | the model as a node: its views, each by IRI |
+ * | `<m>.html`, `<m>/<kind>/<id>.html` | the small page AT each node's IRI: its declaration, and a link to its page (Q-THIN-3 A) |
  * | `<m>/` | the model's page: views, and elements by layer |
  * | `<m>/model.json` | the model, normalised — what the loader draws from |
- * | `<m>/views/<v>.svg` | the view, drawn (`render-view.ts`) |
- * | `<m>/views/<v>.jsonld`, `.json`, `<m>/views/<slug>/` | a view's node and page |
- * | `<m>/elements/<e>.jsonld`, `.json`, `<m>/elements/<slug>/` | an element's node and page |
- * | `<m>/relationships/<r>.jsonld`, `.json`, `<m>/relationships/<r>/` | a relationship's node and page |
+ * | `<m>/view/<v>.svg` | the view, drawn (`render-view.ts`) |
+ * | `<m>/view/<v>.jsonld`, `.json`, `<m>/view/<slug>/` | a view's node and page |
+ * | `<m>/element/<e>.jsonld`, `.json`, `<m>/element/<slug>/` | an element's node and page |
+ * | `<m>/relationship/<r>.jsonld`, `.json`, `<m>/relationship/<r>/` | a relationship's node and page |
  * | `<m>/metamodel.json`, `.dot`, `.mmd`, `.svg`, `<m>/metamodel/` | the metamodel the model uses, derived (Tool `archimate-metamodel`, `schemas/metamodel.ts`); the SVG only when a run can lay out DOT |
  * | `index.html` | every model the graph holds |
- * | `assets/archimate.js`, `assets/archimate.css` | the one shared loader and its style |
+ * | `assets/kg-render.js` | the generic renderer every page loads first (`scripts/templates/kg-render.js`, issue #1830) |
+ * | `assets/archimate.js`, `assets/archimate.css` | the ArchiMate renderer it dispatches to, and its style |
  *
  * Ids are Archi's own (`schemas/archimate.ts` §"Ids are the model's own"), so
  * an element keeps its IRI across a model's versions wherever Archi kept its id.
  *
+ * A node's IRI is extensionless, `<base><graph>/<m>/<kind>/<id>`, and its data
+ * is that IRI plus `.jsonld` (owner, Q-THIN-2 = A, issue #1830; a clean break
+ * from the `.jsonld` IRIs, nothing forwards). Every page DECLARES the node it
+ * renders — RDFa `resource`/`typeof` on its `<main>` and a JSON-LD stub in its
+ * head (`thin-page.ts`) — and loads the generic renderer, which hands it to
+ * `archimate.js`. No private config block.
+ *
  * A view's or an element's PAGE is at a readable slug worked out from its
- * name each build (`schemas/slugs.ts`), `<m>/views/<slug>/`, while its node
+ * name each build (`schemas/slugs.ts`), `<m>/view/<slug>/`, while its node
  * keeps the id IRI. Nothing redirects from the old id paths: a clean break
  * (owner, cat-harness-tools#1054).
  *
@@ -66,7 +75,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, relative, resolve } from "node:path";
 import { DOCS_SITE_BASE } from "../../schemas/kg/jsonld.ts";
-import { escHtml, thinPageConfigOf, thinPageHtml } from "../../scripts/thin-page.ts";
+import { KG_RENDER_ASSET, escHtml, kgRenderScript, nodeAttrs, nodeStubPageHtml, pageNodeOf, thinPageHtml, type PageNode } from "../../scripts/thin-page.ts";
 import { visualiserNavDeclaration, type VisualiserNavEntry } from "../../scripts/lib/navbar.ts";
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
@@ -81,17 +90,23 @@ import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "../../schemas/kg/visualiser-route.ts";
 
-/** The config-block id every page written here carries — how a run recognises its own output. */
-export const PAGE_CONFIG_ID = "archimate-page";
-/** The Tool node these pages are drawn by (`cat-harness/tools/index.ts`), which an instance names in its `visualisers`. */
+/**
+ * The namespace every page written here declares its node's class in
+ * (`typeof="archimate:…"`, issue #1830) — how a run recognises its own output,
+ * and what the loader registers with the generic renderer for.
+ */
+export const ARCHIMATE_NS = "http://www.opengroup.org/xsd/archimate/3.0/";
+/** The prefixes a page's `typeof` is written over. */
+const PREFIXES = { archimate: ARCHIMATE_NS };
+/** The Tool node these pages are drawn by (`cat-harness/tools/index.ts`), which a layer names in its `visualisers`. */
 export const TOOL_ID = "archimate-pages";
 const LOADER = "assets/archimate.js";
 const STYLE = "assets/archimate.css";
-// declared-path-literal: this module's own templates under cat-harness-tools/archimate/, not an instance's archimate/ directory.
+// declared-path-literal: this module's own templates under cat-harness-tools/archimate/, not a layer's archimate/ directory.
 const TEMPLATES = join(TOOLS_ROOT, "archimate", "scripts", "templates");
 
 export const CONTEXT = {
-  archimate: "http://www.opengroup.org/xsd/archimate/3.0/",
+  archimate: ARCHIMATE_NS,
   schema: "https://schema.org/",
   dcterms: "http://purl.org/dc/terms/",
 };
@@ -106,7 +121,7 @@ export interface Written {
 
 /** Where a run's files go: the data at the graph's path, and the pages — in a site — at the declared route. */
 export interface Layout {
-  /** The graph's path in the instance, with no trailing slash: where the data is, in the graph and in a site. */
+  /** The graph's path in the layer, with no trailing slash: where the data is, in the graph and in a site. */
   graphPath: string;
   /**
    * Site-relative, with no trailing slash: where the PAGES are in a site,
@@ -133,7 +148,7 @@ interface Declaration {
 }
 
 /**
- * The route an instance declares for these pages: its one visualiser
+ * The route a layer declares for these pages: its one visualiser
  * `renderedBy` {@link TOOL_ID}, or — when it declares several — the one that
  * covers the archimate directory. Throws when there is none to choose, and
  * says what to declare.
@@ -152,14 +167,14 @@ export function declaredPageRoot(decl: Declaration, directory: string): string {
   return visualiserRoute(pageParts({ harness: decl.name, visualiser: chosen.id })).replace(/\/$/, "");
 }
 
-/** Where the instance's IRIs start: its own `iriBase`, else the platform's site under its name. */
+/** Where the layer's IRIs start: its own `iriBase`, else the platform's site under its name. */
 export function iriBaseOf(decl: Declaration): string {
   const b = decl.iriBase ?? `${DOCS_SITE_BASE}${decl.name}/`;
   return b.endsWith("/") ? b : `${b}/`;
 }
 
 /**
- * Every file a run writes for one instance, keyed by its path under the graph.
+ * Every file a run writes for one layer, keyed by its path under the graph.
  * `site`: the files are for a site being built (`--out`), so each page links
  * its data and loader, and each drawn view its pages, across the locale (see
  * {@link sitePathOf}); otherwise everything sits together in the graph.
@@ -193,14 +208,28 @@ export function pagesFor(
   // data, while the page itself is at the declared route.
   const toData = (from: string, rel: string): string =>
     site ? posix.relative(posix.join(pageRoot, from), posix.join(graphPath, from, rel)) : rel;
-  // A link from a drawn view (data, in `<m>/views/`) to a page, the reverse way.
+  // A link from a drawn view (data, in `<m>/view/`) to a page, the reverse way.
   const toPage = (from: string, rel: string): string =>
     site ? `${posix.relative(posix.join(graphPath, from), posix.join(pageRoot, from, rel))}/` : rel;
   // In a site, every page names the Tool that drew it, which is what lets
   // `check:visualiser-routes` hold it to the declared route.
   const stamp = (w: Written): Written => (site ? { ...w, content: withRenderedBy(w.content, TOOL_ID) } : w);
-  const page = (path: string, depth: number, title: string, jsonld: string, config: Record<string, unknown>, body: string, tail?: string): Written =>
-    stamp(thinPage(path, depth, title, jsonld, config, body, tail, toData));
+  const page = (path: string, depth: number, title: string, jsonld: string, node: PageNode, body: string, tail?: string): Written =>
+    stamp(thinPage(path, depth, title, jsonld, node, body, tail, toData));
+  // The element the generic renderer fills: the node in RDFa, and where the
+  // loader finds what it draws from (`data-kg-*`, relative to the page).
+  // The small page AT a node's IRI (`<dir>/<id>.html`, which the host serves
+  // at the extensionless IRI): the same declaration, and a link and redirect
+  // to the page that draws it (owner, Q-THIN-3 = A). Data, not a page: it is
+  // at the graph's path, where the IRI is, in a site as in the graph.
+  const stubAt = (dir: string, id: string, title: string, node: PageNode, pageRel: string): void => {
+    files.push({
+      path: dir === "" ? `${id}.html` : `${dir}/${id}.html`,
+      content: nodeStubPageHtml({ title, node, prefixes: PREFIXES, jsonld: `${encodeURIComponent(id)}.jsonld`, page: `${toPage(dir, pageRel)}${site ? "" : "/"}` }),
+    });
+  };
+  const mount = (node: PageNode, cls: string, data: Record<string, string>): string =>
+    `<main class="${cls}"${nodeAttrs(node)}${Object.entries(data).map(([k, v]) => ` data-kg-${k}="${escHtml(v)}"`).join("")}>`;
   const json = (path: string, node: object) => {
     const text = `${JSON.stringify(node, null, 2)}\n`;
     files.push({ path: `${path}.jsonld`, content: text }, { path: `${path}.json`, content: text });
@@ -212,10 +241,11 @@ export function pagesFor(
     const m = cm.id;
     const title = cm.title ?? model.name;
     listed.push({ id: m, title, views: model.views.length, elements: model.elements.length });
-    const modelIri = `${base}${m}.jsonld`;
-    const viewIri = (id: string) => `${base}${m}/views/${id}.jsonld`;
-    const elIri = (id: string) => `${base}${m}/elements/${id}.jsonld`;
-    const relIri = (id: string) => `${base}${m}/relationships/${id}.jsonld`;
+    // Extensionless slash IRIs, `…/<kind>/<id>`; each node's data is `<IRI>.jsonld` (Q-THIN-2 A, issue #1830).
+    const modelIri = `${base}${m}`;
+    const viewIri = (id: string) => `${base}${m}/view/${id}`;
+    const elIri = (id: string) => `${base}${m}/element/${id}`;
+    const relIri = (id: string) => `${base}${m}/relationship/${id}`;
     const elements = new Map(model.elements.map((e) => [e.id, e]));
     const slugOf = planSlugs(model);
     // The path segment of a view's or an element's page: its slug, else its id.
@@ -243,13 +273,15 @@ export function pagesFor(
           href: toModel,
           items: [
             { label: "Metamodel in use", href: `${toModel}metamodel/` },
-            ...model.views.map((v) => ({ label: v.name || "(unnamed view)", href: `${toModel}views/${seg(v.id)}/` })),
+            ...model.views.map((v) => ({ label: v.name || "(unnamed view)", href: `${toModel}view/${seg(v.id)}/` })),
           ],
         },
         { label: "ArchiMate models", href: `${toModel}../` },
       ]);
-    files.push(page(`${m}/index.html`, 1, title, toData(m, `../${m}.jsonld`), { kind: "model", node: toData(m, `../${m}.jsonld`), model: toData(m, "./model.json") },
-      `<main class="am"><p class="am-up"><a href="../">← ArchiMate models</a></p><h1>${escHtml(title)}</h1>` +
+    const modelNode: PageNode = { iri: modelIri, types: ["archimate:Model"] };
+    stubAt("", m, title, modelNode, m);
+    files.push(page(`${m}/index.html`, 1, title, toData(m, `../${m}.jsonld`), modelNode,
+      `${mount(modelNode, "am", { model: toData(m, "./model.json") })}<p class="am-up"><a href="../">← ArchiMate models</a></p><h1>${escHtml(title)}</h1>` +
         `<p class="am-kind"><a href="metamodel/">Metamodel in use</a>: the element types and relationships this model uses, derived from it</p>` +
         `<div class="am-body" aria-live="polite"><p>Loading the model…</p></div></main>`, nav("./")));
 
@@ -280,8 +312,8 @@ export function pagesFor(
     if (dm.classes.length > 0) {
       const dmDot = dataModelDot(dm, {
         href: {
-          element: (id) => `${toPage(m, `elements/${seg(id)}`)}${site ? "" : "/"}`,
-          relationship: (id) => `${toPage(m, `relationships/${id}`)}${site ? "" : "/"}`,
+          element: (id) => `${toPage(m, `element/${seg(id)}`)}${site ? "" : "/"}`,
+          relationship: (id) => `${toPage(m, `relationship/${id}`)}${site ? "" : "/"}`,
         },
       });
       files.push(
@@ -301,23 +333,22 @@ export function pagesFor(
       );
     }
     const mp = `${m}/metamodel`;
-    files.push(page(`${mp}/index.html`, 2, `Metamodel in use — ${title}`, toData(mp, `../../${m}.jsonld`),
-      { kind: "metamodel", node: toData(mp, `../../${m}.jsonld`), model: toData(mp, "../model.json"), metamodel: toData(mp, "../metamodel.json") },
+    files.push(page(`${mp}/index.html`, 2, `Metamodel in use — ${title}`, toData(mp, `../../${m}.jsonld`), modelNode,
       metamodelBody(mm, title, {
         data: (rel) => toData(mp, `../${rel}`),
-        element: (id) => `../elements/${seg(id)}/`,
-        relationship: (id) => `../relationships/${id}/`,
-        view: (id) => `../views/${seg(id)}/`,
+        element: (id) => `../element/${seg(id)}/`,
+        relationship: (id) => `../relationship/${id}/`,
+        view: (id) => `../view/${seg(id)}/`,
         nameOf: (id) => elements.get(id)?.name ?? id,
         drawn,
         dataModel: dm,
         sequences: seqs,
-      }), nav("../")));
+      }, modelNode), nav("../")));
 
     const figuresOf = (viewId: string) => (config.figures ?? []).filter((f) => f.model === m && f.view === viewId);
     for (const v of model.views) {
       const shown = [...new Set(v.nodes.filter((n) => n.kind === "element" && n.ref && elements.has(n.ref)).map((n) => n.ref!))];
-      json(`${m}/views/${v.id}`, {
+      json(`${m}/view/${v.id}`, {
         "@context": CONTEXT,
         "@id": viewIri(v.id),
         "@type": "archimate:Diagram",
@@ -325,37 +356,38 @@ export function pagesFor(
         "schema:name": v.name,
         ...(v.documentation ? { "schema:description": v.documentation } : {}),
         ...(v.viewpoint ? { "archimate:viewpoint": v.viewpoint } : {}),
-        "schema:image": `${base}${m}/views/${v.id}.svg`,
+        "schema:image": `${base}${m}/view/${v.id}.svg`,
         "schema:about": shown.map((id) => ({ "@id": elIri(id) })),
         ...(figuresOf(v.id).length ? { "schema:subjectOf": figuresOf(v.id).map((f) => ({ "schema:name": f.label, "schema:url": `${iriBaseOf(decl)}${f.block}` })) } : {}),
         "dcterms:isPartOf": modelIri,
       });
-      // Relative to the SVG's own address (`<m>/views/`), so it links correctly
+      // Relative to the SVG's own address (`<m>/view/`), so it links correctly
       // standalone, embedded as a figure, or in its page's <object>.
       // In a site the pages are under the locale and the drawing is not, so
       // there each link crosses to the page (`toPage`).
-      const vd = `${m}/views`;
+      const vd = `${m}/view`;
       files.push({
-        path: `${m}/views/${v.id}.svg`,
+        path: `${m}/view/${v.id}.svg`,
         // Banded views without lines are drawn as posters; the rest keep their layout, in the same theme.
         content: posterFits(model, v)
-          ? renderPosterSvg(model, v, { ...config.poster, elementHref: (id) => toPage(vd, `../elements/${seg(id)}/`) })
+          ? renderPosterSvg(model, v, { ...config.poster, elementHref: (id) => toPage(vd, `../element/${seg(id)}/`) })
           : renderViewSvg(model, v, {
-              elementHref: (id) => toPage(vd, `../elements/${seg(id)}/`),
-              relationshipHref: (id) => toPage(vd, `../relationships/${id}/`),
+              elementHref: (id) => toPage(vd, `../element/${seg(id)}/`),
+              relationshipHref: (id) => toPage(vd, `../relationship/${id}/`),
               viewHref: (id) => toPage(vd, `./${seg(id)}/`),
             }),
       });
-      const vp = `${m}/views/${seg(v.id)}`;
-      files.push(page(`${vp}/index.html`, 3, `${v.name} — ${title}`, toData(vp, `../${v.id}.jsonld`),
-        { kind: "view", node: toData(vp, `../${v.id}.jsonld`), model: toData(vp, "../../model.json"), id: v.id, svg: toData(vp, `../${v.id}.svg`) },
-        `<main class="am am-wide"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(v.name)}</h1>` +
+      const vp = `${m}/view/${seg(v.id)}`;
+      const viewNode: PageNode = { iri: viewIri(v.id), types: ["archimate:Diagram"] };
+      stubAt(`${m}/view`, v.id, `${v.name} — ${title}`, viewNode, seg(v.id));
+      files.push(page(`${vp}/index.html`, 3, `${v.name} — ${title}`, toData(vp, `../${v.id}.jsonld`), viewNode,
+        `${mount(viewNode, "am am-wide", { model: toData(vp, "../../model.json"), svg: toData(vp, `../${v.id}.svg`) })}<p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(v.name)}</h1>` +
           `<p class="am-kind">View${figuresOf(v.id).map((f) => ` · drawn in the document as ${escHtml(f.label)} (<code>${escHtml(f.block)}</code>)`).join("")}</p>` +
           `<div class="am-body" aria-live="polite"><p>Loading the view…</p></div></main>`, nav("../../")));
     }
 
     for (const e of model.elements) {
-      json(`${m}/elements/${e.id}`, {
+      json(`${m}/element/${e.id}`, {
         "@context": CONTEXT,
         "@id": elIri(e.id),
         "@type": `archimate:${e.type}`,
@@ -365,15 +397,16 @@ export function pagesFor(
         "schema:category": e.layer,
         "dcterms:isPartOf": modelIri,
       });
-      const ep = `${m}/elements/${seg(e.id)}`;
-      files.push(page(`${ep}/index.html`, 3, `${e.name || typeLabel(e.type)} — ${title}`, toData(ep, `../${e.id}.jsonld`),
-        { kind: "element", node: toData(ep, `../${e.id}.jsonld`), model: toData(ep, "../../model.json"), id: e.id },
-        `<main class="am"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(e.name || "(unnamed)")}</h1>` +
+      const ep = `${m}/element/${seg(e.id)}`;
+      const elNode: PageNode = { iri: elIri(e.id), types: [`archimate:${e.type}`] };
+      stubAt(`${m}/element`, e.id, `${e.name || typeLabel(e.type)} — ${title}`, elNode, seg(e.id));
+      files.push(page(`${ep}/index.html`, 3, `${e.name || typeLabel(e.type)} — ${title}`, toData(ep, `../${e.id}.jsonld`), elNode,
+        `${mount(elNode, "am", { model: toData(ep, "../../model.json") })}<p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(e.name || "(unnamed)")}</h1>` +
           `<p class="am-kind">${escHtml(typeLabel(e.type))} · ${escHtml(e.layer)}</p><div class="am-body" aria-live="polite"><p>Loading the element…</p></div></main>`));
     }
 
     for (const r of model.relationships) {
-      json(`${m}/relationships/${r.id}`, {
+      json(`${m}/relationship/${r.id}`, {
         "@context": CONTEXT,
         "@id": relIri(r.id),
         "@type": `archimate:${r.type}`,
@@ -385,10 +418,11 @@ export function pagesFor(
         "dcterms:isPartOf": modelIri,
       });
       const label = `${typeLabel(r.type)}: ${elements.get(r.source)?.name ?? r.source} → ${elements.get(r.target)?.name ?? r.target}`;
-      const rp = `${m}/relationships/${r.id}`;
-      files.push(page(`${rp}/index.html`, 3, `${label} — ${title}`, toData(rp, `../${r.id}.jsonld`),
-        { kind: "relationship", node: toData(rp, `../${r.id}.jsonld`), model: toData(rp, "../../model.json"), id: r.id },
-        `<main class="am"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(r.name || typeLabel(r.type))}</h1>` +
+      const rp = `${m}/relationship/${r.id}`;
+      const relNode: PageNode = { iri: relIri(r.id), types: [`archimate:${r.type}`] };
+      stubAt(`${m}/relationship`, r.id, `${label} — ${title}`, relNode, r.id);
+      files.push(page(`${rp}/index.html`, 3, `${label} — ${title}`, toData(rp, `../${r.id}.jsonld`), relNode,
+        `${mount(relNode, "am", { model: toData(rp, "../../model.json") })}<p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(r.name || typeLabel(r.type))}</h1>` +
           `<p class="am-kind">${escHtml(typeLabel(r.type))} relationship</p><div class="am-body" aria-live="polite"><p>Loading the relationship…</p></div></main>`));
     }
 
@@ -408,6 +442,7 @@ export function pagesFor(
   }));
   files.push(
     { path: LOADER, content: readFileSync(join(TEMPLATES, "archimate.js"), "utf8") },
+    { path: KG_RENDER_ASSET, content: kgRenderScript() },
     // `color-scheme: light dark` alone follows the OS, not the navbar switch
     // (`data-fa-scheme`, issue #2208): pin the scheme the reader picked.
     { path: STYLE, content: readFileSync(join(TEMPLATES, "archimate.css"), "utf8") + darkRules(":root { color-scheme: dark; }") + "\n" },
@@ -462,9 +497,10 @@ function filterBar(mm: Metamodel, svg: (name: string) => string): string {
 
 /**
  * The body of the "Metamodel in use" page. Everything on it is computed at
- * build time, so the loader has nothing to draw (`kind: "metamodel"` is not
- * one of its kinds). Links: `data` to the model's data directory, `element`
- * and `relationship` to their pages.
+ * build time, so the loader has nothing to draw: the page declares the
+ * model as its node (`node`, RDFa on its `<main>`) but holds no `.am-body`
+ * for the loader to fill. Links: `data` to the model's data directory,
+ * `element` and `relationship` to their pages.
  */
 export function metamodelBody(
   mm: Metamodel,
@@ -479,13 +515,14 @@ export function metamodelBody(
     dataModel?: DataModel;
     sequences?: SequenceSet;
   },
+  node?: PageNode,
 ): string {
   const verdict = (a: boolean | undefined): string => (a === true ? "✓ allowed" : a === false ? "✗ not allowed" : "? not in the table");
   const bad = mm.patterns.filter((p) => p.allowed === false);
   const rels = (ids: string[]): string =>
     ids.slice(0, 8).map((id, i) => `<a href="${escHtml(link.relationship(id))}">${i + 1}</a>`).join(" ") + (ids.length > 8 ? ` +${ids.length - 8} more` : "");
   return (
-    `<main class="am am-wide"><p class="am-up"><a href="../">← ${escHtml(title)}</a></p><h1>Metamodel in use</h1>` +
+    `<main class="am am-wide"${node ? nodeAttrs(node) : ""}><p class="am-up"><a href="../">← ${escHtml(title)}</a></p><h1>Metamodel in use</h1>` +
     `<p class="am-kind">Derived from the model on every build (Tool <code>archimate-metamodel</code>), never drawn: ` +
     `${mm.types.length} element type(s) and ${mm.patterns.length} relationship pattern(s), each checked against ArchiMate ${escHtml(mm.archimateVersion)}'s relationship table.</p>` +
     `<p>${bad.length ? `✗ ${mm.notAllowed} relationship(s) follow ${bad.length} pattern(s) ArchiMate does not allow (red below).` : "✓ Every relationship follows a pattern ArchiMate allows."}` +
@@ -584,7 +621,7 @@ function thinPage(
   depth: number,
   title: string,
   jsonld: string,
-  config: Record<string, unknown>,
+  node: PageNode,
   body: string,
   tail: string | undefined,
   toData: (from: string, rel: string) => string,
@@ -598,9 +635,10 @@ function thinPage(
       title,
       jsonld,
       script: toData(dir, `${up}${LOADER}`),
+      renderer: toData(dir, `${up}${KG_RENDER_ASSET}`),
       stylesheet: toData(dir, `${up}${STYLE}`),
-      configId: PAGE_CONFIG_ID,
-      config,
+      node,
+      prefixes: PREFIXES,
       body,
       noscriptLead: `The page for ${escHtml(title)}`,
       ...(tail !== undefined ? { tail } : {}),
@@ -610,7 +648,7 @@ function thinPage(
 
 /** A document figure the config maps to a view, with where the site holds its drawing and its page. */
 export interface FigureTarget {
-  /** The block holding the figure, relative to the instance root (`figures[].block`). */
+  /** The block holding the figure, relative to the layer root (`figures[].block`). */
   block: string;
   label: string;
   model: string;
@@ -624,10 +662,10 @@ export interface FigureTarget {
 }
 
 /**
- * Every figure the instance's config maps to a view (`figures`), with the site
+ * Every figure the layer's config maps to a view (`figures`), with the site
  * paths `archimate-pages --out` writes for it, so a document site can show the
  * live drawing in the figure's place and link its page. Empty when the
- * instance holds no ArchiMate config or maps no figure. Reads only the models
+ * layer holds no ArchiMate config or maps no figure. Reads only the models
  * a figure names.
  */
 export function figureTargets(instanceRoot: string): FigureTarget[] {
@@ -652,8 +690,8 @@ export function figureTargets(instanceRoot: string): FigureTarget[] {
       out.push({
         ...f,
         viewName: v.name,
-        svg: posix.join(graphPath, cm.id, "views", `${v.id}.svg`),
-        page: `${posix.join(pageRoot, cm.id, "views", slugOf.get(v.id) ?? v.id)}/`,
+        svg: posix.join(graphPath, cm.id, "view", `${v.id}.svg`),
+        page: `${posix.join(pageRoot, cm.id, "view", slugOf.get(v.id) ?? v.id)}/`,
       });
     }
   }
@@ -697,10 +735,32 @@ export function normalisedFor(model: ArchimateModel, file: string, slugOf?: Map<
 
 /**
  * Files in the graph this generator wrote earlier and no longer would — found
- * by what they are: a thin page declaring {@link PAGE_CONFIG_ID}, a node file,
+ * by what they are: a page declaring an ArchiMate node ({@link isArchimatePage}), a node file,
  * a drawn view, the normalised model, or the loader. The models, the config
  * and any README are never candidates.
  */
+/**
+ * What a page points its renderer at, read from its markup: the node's data
+ * (`rel="alternate"`), and the model and drawing (`data-kg-model`,
+ * `data-kg-svg` on the node's element). Each relative to the page.
+ */
+export function pageDataOf(html: string): { node?: string; model?: string; svg?: string } {
+  const get = (re: RegExp) => re.exec(html)?.[1];
+  const out: { node?: string; model?: string; svg?: string } = {};
+  const node = get(/<link rel="alternate" type="application\/ld\+json" href="([^"]*)">/);
+  const model = get(/\sdata-kg-model="([^"]*)"/);
+  const svg = get(/\sdata-kg-svg="([^"]*)"/);
+  if (node !== undefined) out.node = node;
+  if (model !== undefined) out.model = model;
+  if (svg !== undefined) out.svg = svg;
+  return out;
+}
+
+/** Is this page one of ours — by the node it declares (an ArchiMate class), not by its name or its directory? */
+export function isArchimatePage(html: string): boolean {
+  return pageNodeOf(html)?.rdfa.some((n) => n.types.some((t) => t.startsWith(ARCHIMATE_NS))) ?? false;
+}
+
 function orphans(root: string, wanted: Set<string>): string[] {
   const out: string[] = [];
   const walk = (d: string) => {
@@ -720,8 +780,9 @@ function orphans(root: string, wanted: Set<string>): string[] {
         // A node's `.json` twin — never a `.json` that has no `.jsonld` beside it.
         (e.name.endsWith(".json") && existsSync(p.replace(/\.json$/, ".jsonld"))) ||
         p === join(root, LOADER) ||
+        p === join(root, KG_RENDER_ASSET) ||
         p === join(root, STYLE) ||
-        (e.name === "index.html" && thinPageConfigOf(readFileSync(p, "utf8"), PAGE_CONFIG_ID) !== undefined);
+        (e.name.endsWith(".html") && isArchimatePage(readFileSync(p, "utf8")));
       if (ours) out.push(p);
     }
   };

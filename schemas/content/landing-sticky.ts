@@ -91,7 +91,7 @@ export const LandingStickySchema = CarriedNoteSchema.extend({
    * The theme id, by reference.
    *
    * Validated for **shape and not existence**, exactly as `ThemedTodoFields`
-   * does: whether a theme is installed is a question about the instance's theme
+   * does: whether a theme is installed is a question about the layer's theme
    * set, which a note cannot see. Resolution happens at render time, where a
    * missing theme degrades rather than failing the page.
    */
@@ -124,7 +124,7 @@ export const LandingStickySchema = CarriedNoteSchema.extend({
    * `contributedBy` says which layer, which is what attribution needs.
    * This says which FILE, which is what a link to the source needs — and
    * they are different questions: a name is not resolvable, and two
-   * instances sharing one is a collision this repository has already had.
+   * layers sharing one is a collision this repository has already had.
    */
   declaredIn: z.string().min(1),
   /**
@@ -233,7 +233,7 @@ export function stickyFromContribution(
   // `bodyFrom: "summary"` is the landing's reader text (`ob3m` finding 3);
   // `bodyFrom: "description"` is the author's text, kept for a pinned layer.
   const fromDeclaration = c.bodyFrom === "summary" ? readerText(declared) : description;
-  // `body`, then the declaring instance's `description`, then its `name` — and
+  // `body`, then the declaring layer's `description`, then its `name` — and
   // the last step is a DELIBERATE non-failure, carried over from the fixed-set
   // version rather than re-decided here: *"an instance with no description still
   // gets a sticky: its `name` is what `displayTitle` already falls back to, and a
@@ -244,7 +244,7 @@ export function stickyFromContribution(
   const declaredBody = c.body ?? fromDeclaration;
   const base =
     declaredBody !== undefined && declaredBody.trim().length > 0 ? declaredBody : declaredBy;
-  // Appended AFTER the fallback chain, so a card that reads its instance's
+  // Appended AFTER the fallback chain, so a card that reads its layer's
   // description verbatim can still add to it without copying the words.
   const body = c.bodyAppend === undefined ? base : `${base}\n\n${c.bodyAppend}`;
   const firstLine = body.split("\n").find((l) => l.trim().length > 0)?.trim();

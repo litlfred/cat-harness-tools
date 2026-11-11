@@ -46,7 +46,7 @@ export interface IdEntry {
 
 /**
  * The three materialisation states, as a catalogue node records them. Restated
- * here, deliberately, rather than imported: this instance sits BELOW the
+ * here, deliberately, rather than imported: this layer sits BELOW the
  * content layer that owns the full catalogue-node schema, and nothing may point
  * up the dependency arrow (owner ruling 2026-10-01, bean `rfuq`). The content
  * layer validates whole nodes in its own gates; this module reads three fields.
@@ -109,7 +109,7 @@ export const NamespaceIndexSchema = z
 export const IdLookupManifestSchema = z
   .object({
     $schema: z.literal(ID_LOOKUP_MANIFEST_SCHEMA_TAG),
-    /** The corpus this indexes, by its instance name. */
+    /** The corpus this indexes, by its layer name. */
     source: z.string().min(1),
     /** Which nodes, and from where. A count with no statement of what was counted cannot be checked. */
     selection: z.string().min(1),

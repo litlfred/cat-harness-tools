@@ -141,7 +141,7 @@ describe("the equivalences still hold in this tree", () => {
   test("kg:audit:all:check runs kg:audit:check's audit for the cat-harness instance, flags and all", () => {
     expect(SCRIPTS["kg:audit:check"]).toBe("bun run cat-harness-tools/scripts/kg-audit.ts --check --against main");
     expect(SCRIPTS["kg:audit:all:check"]).toBe("bun run cat-harness-tools/scripts/kg-audit-all.ts --check --against main");
-    // The default root of kg-audit.ts is its own instance; the sweep must reach it.
+    // The default root of kg-audit.ts is its own layer; the sweep must reach it.
     expect(instanceRootsIn(REPO).map((r) => resolve(r))).toContain(resolve(INSTANCE));
     const all = readFileSync(join(TOOLS_ROOT, "scripts", "kg-audit-all.ts"), "utf-8");
     // Passes --check and --against through, and fails on any non-0/1 exit.

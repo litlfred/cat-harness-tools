@@ -1,5 +1,5 @@
 /**
- * Instance DISCOVERY: which directories are instances, and which file in a
+ * Layer DISCOVERY: which directories are layers, and which file in a
  * directory is its declaration. Filesystem only, and deliberately a LEAF:
  * it imports nothing from the schema layer, so `graph-typology-registry.ts` can
  * find each harness's declared `typologies/` graph without importing
@@ -7,7 +7,7 @@
  * all four.
  *
  * @module cat-harness/schemas/instance-roots
- * @graphNode none — constants and functions that locate an instance's declaration; no schema
+ * @graphNode none — constants and functions that locate a layer's declaration; no schema
  */
 import { existsSync, readdirSync, readFileSync, type Dirent } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -16,7 +16,7 @@ import { projectedRead } from "../sdlc/read-projections.ts";
 /**
  * The REPOSITORY root that contains `instanceRoot` — the aggregate checkout.
  *
- * Handles both monorepo layout (instance is a subdirectory of the repo root)
+ * Handles both monorepo layout (layer is a subdirectory of the repo root)
  * and worktree layout (e.g. `.claude/worktrees/<name>/`).
  */
 export function repoRootFor(instanceRoot: string): string {
@@ -29,7 +29,7 @@ export function repoRootFor(instanceRoot: string): string {
 }
 
 /**
- * The suffix every instance declaration carries — `<name>.config.json`.
+ * The suffix every layer declaration carries — `<name>.config.json`.
  *
  * ## `harness.json` is gone, and this replaced it
  *
@@ -39,7 +39,7 @@ export function repoRootFor(instanceRoot: string): string {
  * There used to be TWO files with no overlap in content: `harness.json` held
  * the DECLARATION (`name`, `directories`, `assets`, `needs`, `stickies`) and
  * `<name>.config.json` held the CONFIG (`contentType`, `adapter`,
- * `dependencies`, `translation`). One instance, two files, and a reader had to
+ * `dependencies`, `translation`). One layer, two files, and a reader had to
  * know which question each answered. They are one file now.
  *
  * ## A fixed filename cannot be discovered, and that was the point
@@ -66,7 +66,7 @@ export function repoRootFor(instanceRoot: string): string {
  *
  * | file | schema | reader |
  * |---|---|---|
- * | `<name>.json` in the instance | {@link CatHarnessDeclarationSchema} | `readDeclaration` |
+ * | `<name>.json` in the layer | {@link CatHarnessDeclarationSchema} | `readDeclaration` |
  * | `<name>.config.json` at the instantiation root | `HarnessConfigSchema` | `readHarnessConfig` |
  *
  * The `name` check STAYS rather than being replaced by the suffix.
@@ -102,7 +102,7 @@ export const CONFIG_SUFFIX = ".config.json";
  *
  * **Several declarations in one directory THROWS.** Picking one silently is
  * the `dh4f` shape — a consumer reads a declaration, gets an answer, and
- * reports a clean run over the instance it did not see. There is no correct
+ * reports a clean run over the layer it did not see. There is no correct
  * choice to make here, so the caller is told rather than guessed at.
  */
 export function findDeclarationFile(dir: string): string | undefined {
@@ -138,7 +138,7 @@ export function findDeclarationFile(dir: string): string | undefined {
       // parse), so it is collected separately and `readDeclaration` throws on
       // it rather than returning `undefined`.
       //
-      // BUT ONLY WHEN IT COULD PLAUSIBLY BE THIS INSTANCE'S. The suffix was
+      // BUT ONLY WHEN IT COULD PLAUSIBLY BE THIS LAYER'S. The suffix was
       // `.config.json` until 2026-09-21, which made "unparseable file with
       // this suffix" a near-certain broken declaration. A bare `.json` makes
       // it near-certainly NOT one: a malformed `folio/landing.json` — a
@@ -152,7 +152,7 @@ export function findDeclarationFile(dir: string): string | undefined {
       // about — that is about deriving a declaration's location from a
       // directory name, and resolution still goes only through a file
       // agreeing with its own `name`. This is error REPORTING: the cost of
-      // being wrong is a worse message, not a missed instance.
+      // being wrong is a worse message, not a missed layer.
       const plausible = stem === basename(dir) || entries.includes(`${stem}${CONFIG_SUFFIX}`);
       if (plausible) broken.push(entry);
       continue;
@@ -161,15 +161,15 @@ export function findDeclarationFile(dir: string): string | undefined {
   }
   // A VALID declaration wins over a broken sibling: a directory may hold an
   // unrelated `*.config.json` that is merely malformed, and that must not stop
-  // the instance being read.
+  // the layer being read.
   //
   // With NOTHING valid, the broken one is returned rather than thrown on, and
   // that is the whole third-state design. DISCOVERY MUST BE TOTAL —
   // `instanceRootsIn` asks "which directories are instances" and a throw there
   // takes out every caller, including the ones written to REPORT an unreadable
   // declaration (`workPlanGraphsIn`, `isActiveKg`). Returning it reproduces
-  // the old semantics exactly: `harness.json` present made the directory an
-  // instance, and `readDeclaration` threw when it came to parse it. Present
+  // the old semantics exactly: `harness.json` present made the directory a
+  // layer, and `readDeclaration` threw when it came to parse it. Present
   // and unreadable stays distinguishable from absent, which is the property;
   // where the error is raised is not.
   if (found.length === 0 && broken.length > 0) return broken.sort()[0];
@@ -183,10 +183,10 @@ export function findDeclarationFile(dir: string): string | undefined {
 }
 
 /**
- * Every instance in `repoRoot` — the repository root itself when it declares,
+ * Every layer in `repoRoot` — the repository root itself when it declares,
  * plus each immediate subdirectory that does.
  *
- * {@link findInstanceRoot} walks UP from a path to the instance owning it;
+ * {@link findInstanceRoot} walks UP from a path to the layer owning it;
  * this is the same fact in the other direction, and until now it was the
  * direction nobody had implemented — the note on {@link initializationDoc}
  * said so explicitly ("*NOT implemented and is not assumed here*", bean
@@ -194,14 +194,14 @@ export function findDeclarationFile(dir: string): string | undefined {
  *
  * **Two gates were each carrying their own literal `["cat-harness",
  * "bootstrap"]` instead** (`check-declared-assets`, `check-instance-render`),
- * and by 2026-09-20 there were FOUR instances: those two, `folio-assist-core`,
+ * and by 2026-09-20 there were FOUR layers: those two, `folio-assist-core`,
  * and the repository root. So both gates reported clean runs over sets that
  * excluded half the subject — `dh4f` again, in the two checks whose whole job
- * is to look at instances.
+ * is to look at layers.
  *
  * `check-instance-render`'s literal even sat under the docstring "*Every
  * instance this repository owns — the root, and any beside it*", which was
- * false in both halves: the root was not in the list and two instances beside
+ * false in both halves: the root was not in the list and two layers beside
  * it were missing. **A list that has to be edited when a directory is added is
  * a list that will be wrong**, and the fix is to ask the filesystem rather
  * than to lengthen it (bean `6tkl`).
@@ -212,16 +212,16 @@ export function findDeclarationFile(dir: string): string | undefined {
  * repository root first when it declares.
  */
 /**
- * Top-level BUILD OUTPUT directories, which are never instances, so their
+ * Top-level BUILD OUTPUT directories, which are never layers, so their
  * `*.json` are never read as candidate declarations. Bean `4rbc`, measured
- * 2026-10-07: every check that discovers instances read
+ * 2026-10-07: every check that discovers layers read
  * `build/qa-refresh.json`, a report stamped with the commit it was built on.
  * That made a build product an input of 17 traced gates, and those gates
  * could never be skipped. The same list as `BUILD_OUTPUT_DIRS` in
  * `scripts/input-hash.ts` (ci-cone.test.ts asserts they agree). This layer
  * may not import that module.
  */
-// input-site: inert #0f548420 — the build-output directories instance discovery leaves out; it reads none of them
+// input-site: inert #0f548420 — the build-output directories layer discovery leaves out; it reads none of them
 export const NOT_INSTANCE_DIRS: readonly string[] = ["build", "_kg", "_site", "dist"];
 
 export function instanceRootsIn(repoRoot: string): string[] {
@@ -243,7 +243,7 @@ export function instanceRootsIn(repoRoot: string): string[] {
   // Only a directory INSIDE a checkout has foreign checkouts to exclude. A
   // plain directory of sibling clones — the separated layout, and the
   // standalone rehearsal (bean `ho66`) that lays it out — has no repository
-  // for a clone to be foreign to, so every clone in it is an instance. Without
+  // for a clone to be foreign to, so every clone in it is a layer. Without
   // this, g43f's filter dropped all of them: `needs` resolved to nothing and
   // 86 tests failed standalone on `main` at 24b5c12 (2026-10-05).
   const inCheckout = insideGitCheckout(root);
@@ -258,9 +258,9 @@ export function instanceRootsIn(repoRoot: string): string[] {
 }
 
 /**
- * The root of the instance named `name` within `repoRoot`: the repository root
+ * The root of the layer named `name` within `repoRoot`: the repository root
  * itself when it declares `<name>.json` (the standalone layout, where a layer
- * IS its repository), else the one-level-deep instance that does (the
+ * IS its repository), else the one-level-deep layer that does (the
  * monorepo, where it is `<repoRoot>/<dir>`). `undefined` when neither does.
  *
  * Bean `uxn1`: three callers wrote `join(repoRoot, "cat-harness")`, which is
@@ -294,7 +294,7 @@ function submodulePathsOf(root: string): ReadonlySet<string> {
  *
  * ## The escape this closes
  *
- * {@link repoRootFor} is `dirname`, so for the ROOT instance it climbs out of
+ * {@link repoRootFor} is `dirname`, so for the ROOT layer it climbs out of
  * the checkout. In a Claude Code worktree that lands on `.claude/worktrees/`,
  * whose every child is a sibling worktree declaring `folio-assistant` at its
  * root. Measured 2026-10-03 from `agent-aefc4dcac619f2e1f`:
@@ -304,8 +304,8 @@ function submodulePathsOf(root: string): ReadonlySet<string> {
  *
  * The rule is the same one git applies: a nested checkout is not part of the
  * enclosing tree unless it is a declared submodule. `bootstrap/` and
- * `bootstrap-tools/` have a `.git` file and ARE instances, which is why the
- * `.gitmodules` half exists; an instance directory with no `.git` is
+ * `bootstrap-tools/` have a `.git` file and ARE layers, which is why the
+ * `.gitmodules` half exists; a layer directory with no `.git` is
  * untouched, so non-git fixtures read exactly as before.
  */
 export function isForeignCheckout(dir: string, submodules: ReadonlySet<string> = submodulePathsOf(resolve(dir, ".."))): boolean {
@@ -328,7 +328,7 @@ function insideGitCheckout(dir: string): boolean {
 // ── The instantiation root's CONFIG files, scanned once ──────────────────────
 
 /**
- * The retired global config name. Not an instance called `harness`; kept so
+ * The retired global config name. Not a layer called `harness`; kept so
  * `check:instance-config` can FIND it, never so a reader can fall back to it.
  * Defined here (a leaf) and re-exported by `schemas/kg/harness-config.ts`, which
  * is where every existing importer looks for it.
@@ -348,7 +348,7 @@ export const LEGACY_HARNESS_CONFIG = "harness.config.json";
 export const INDEX_CONFIG_FILENAME = "index.config.json";
 
 /**
- * Instance names no harness may take, because a file the platform owns
+ * Layer names no harness may take, because a file the platform owns
  * already spells `<name>.config.json` with them. `index` is the root index.
  */
 export const RESERVED_INSTANCE_NAMES: readonly string[] = ["index"];

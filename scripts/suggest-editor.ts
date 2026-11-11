@@ -28,6 +28,8 @@ import { fileURLToPath } from "url";
 
 /** Where the editor lands, relative to the SITE ROOT. The runtime derives the same path. */
 export const SUGGEST_EDITOR_DIR = "assets/vendor/crepe";
+/** The bundle's build record, beside it: the versions it was built from. */
+export const BUILD_FILE = ".build.json";
 
 // From the module URL, not `import.meta.dir`: the e2e spec imports this file under Node.
 const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "suggest-editor");
@@ -87,6 +89,12 @@ export async function installSuggestEditor(siteDir: string): Promise<{ dir: stri
     writeFileSync(join(dir, "crepe.css"), bundled + "\n" + katexFaces.join("") + "\n");
     cpSync(join(katexDir(), "dist", "fonts"), join(dir, "fonts"), { recursive: true });
     if (!existsSync(join(dir, "crepe.css"))) throw new Error("the editor's stylesheet was not written");
+    // What the bundle was built from. Bun names chunks by a hash that depends on
+    // the temporary build path, so two builds of the same versions differ in
+    // bytes; a host that shares the bundle between sites keys it by this file
+    // instead (scripts/lib/shared-assets.ts).
+    const version = (d: string): string => String((JSON.parse(readFileSync(join(d, "package.json"), "utf-8")) as { version?: unknown }).version ?? "");
+    writeFileSync(join(dir, BUILD_FILE), `${JSON.stringify({ "@milkdown/crepe": version(packageDir("@milkdown/crepe")), katex: version(katexDir()), bun: Bun.version }, null, 2)}\n`);
     const files = readdirSync(dir, { recursive: true }).map(String).sort();
     return { dir, files };
   } finally {

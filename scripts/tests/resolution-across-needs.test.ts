@@ -1,5 +1,5 @@
 /**
- * A reference resolves against this instance AND everything it `needs`.
+ * A reference resolves against this layer AND everything it `needs`.
  *
  * Both graphs: a `<skill ref>` against the reachable SKILLS, a `<role ref>` and
  * every RACI value against the reachable ROLE IDS. One file because it is one
@@ -9,7 +9,7 @@
  * ## The defect this pins
  *
  * `kg-audit.ts` resolved every `<bootstrap.processes:skill ref>` against
- * `knownSkills(root)` — the audited instance's OWN skills and nothing else. A
+ * `knownSkills(root)` — the audited layer's OWN skills and nothing else. A
  * skill that legitimately lives in a DEPENDENCY therefore dangled.
  *
  * Measured 2026-09-27, before the fix: `kg:audit --instance ./smart-base`
@@ -30,10 +30,10 @@
  *
  * ## Why this is the FIFTH cross-instance defect and none of the first four
  *
- * The other four leaked things an instance should NOT see — a repository's
- * actors read as one instance's roles (73 false criticals), its capabilities,
+ * The other four leaked things a layer should NOT see — a repository's
+ * actors read as one layer's roles (73 false criticals), its capabilities,
  * 119 phantom tool sidecars, 23 skills from `.claude/skills/`. Every one was
- * fixed by NARROWING. This one is the opposite polarity: an instance could not
+ * fixed by NARROWING. This one is the opposite polarity: a layer could not
  * see what is legitimately BELOW it. No narrowing fix could find it, which is
  * exactly why it survived all four.
  *
@@ -41,8 +41,8 @@
  *
  * Asserting "smart-base reports zero" pins today's corpus: the diagram may be
  * edited, the skill may move, and the test then passes for the wrong reason.
- * The rule is that **no ref is reported dangling when the instance's own
- * `needs` closure holds it**, stated over every instance that declares one —
+ * The rule is that **no ref is reported dangling when the layer's own
+ * `needs` closure holds it**, stated over every layer that declares one —
  * with an anti-vacuity floor, because on a corpus where every ref happens to
  * be local the invariant holds trivially and would keep passing through a
  * regression. That floor is the shape whose absence let the original defect
@@ -68,8 +68,8 @@ const REPO = resolve(dirname(HARNESS_ROOT));
  * Every spawn below passes `--check`, and that is not a detail.
  *
  * Without it the audit WRITES: `kg-audit.ts` writes `skills/kg-qa.manifest.json`
- * into the audited instance unless `--check` is set, so a test that spawned it
- * across sixteen instances left sixteen untracked manifests behind — including
+ * into the audited layer unless `--check` is set, so a test that spawned it
+ * across sixteen layers left sixteen untracked manifests behind — including
  * one in a `skills/` directory it created at the REPOSITORY ROOT, which
  * `check:undeclared-files` then fails on. A test that dirties the tree it is
  * judging is the defect `bun run cat gates` warns about in its own failure
@@ -86,14 +86,14 @@ const WRITE_FREE = ["--check", "--json"] as const;
  *
  * The skill half and the role half judge the SAME report — `kg-audit
  * --instance X --check --json` — for overlapping sets of instances, and each
- * spawned it again, one instance after another. Measured 2026-10-03: one pass
- * over the 14 instances is 54 s locally (`./cat-harness` alone 16 s), the file
+ * spawned it again, one layer after another. Measured 2026-10-03: one pass
+ * over the 14 layers is 54 s locally (`./cat-harness` alone 16 s), the file
  * made two of them plus a default run, 123 s in all, and in CI it was 92 s of
  * the 223 s `bun test` shard 2/4 — the longest job in the workflow, and one no
  * shard split can shorten because a file is the unit a shard moves (bean `fmdl`).
  *
  * Memoised by argument list, so each test still reads exactly the output it
- * read before; and every instance's audit is STARTED on first use, under a
+ * read before; and every layer's audit is STARTED on first use, under a
  * limit of one per core, rather than when its turn in a loop comes. Each spawn
  * is a separate process, `--check` writes nothing, and `bun test` runs this
  * file's tests one at a time, so the only contention is for cores — which is
@@ -143,7 +143,7 @@ const auditInstance = (rel: string) =>
   resolve(REPO, rel) === resolve(HARNESS_ROOT) ? audit(WRITE_FREE) : audit(["--instance", rel, ...WRITE_FREE]);
 
 /**
- * Start every audit this file reads — each instance's and the default run's —
+ * Start every audit this file reads — each layer's and the default run's —
  * so they overlap; the tests then await the ones they judge.
  */
 function startAudits(): void {
@@ -169,7 +169,7 @@ function closureSkills(root: string): Set<string> {
   return out;
 }
 
-/** Does this instance declare where it sits? Absent `needs` is UNDETERMINED, never `[]`. */
+/** Does this layer declare where it sits? Absent `needs` is UNDETERMINED, never `[]`. */
 function declaresLayering(root: string): boolean {
   try {
     return readDeclaration(root)?.needs !== undefined;
@@ -181,15 +181,15 @@ function declaresLayering(root: string): boolean {
 const INSTANCES = instanceRootsIn(REPO);
 
 // No root-instance exclusion: `kg:audit --instance .` used to throw before
-// auditing anything (bean `pgzn`), and this file excluded that instance by
+// auditing anything (bean `pgzn`), and this file excluded that layer by
 // name. The audit now resolves its repository root through `checkoutRootFor`,
-// so every declared instance — the one AT the checkout root included — is a
+// so every declared layer — the one AT the checkout root included — is a
 // subject here. `kg-audit-root-instance.test.ts` pins the crash itself.
 
-/** A name no instance holds, used by the constructed third-state case below. */
+/** A name no layer holds, used by the constructed third-state case below. */
 const MISSING_SKILL = "a-skill-that-exists-nowhere";
 
-/** Instances whose closure is strictly wider than their own skills. */
+/** Layers whose closure is strictly wider than their own skills. */
 const REACHES_DOWN = INSTANCES.filter(
   (i) => declaresLayering(i) && closureSkills(i).size > knownSkills(i).size,
 );
@@ -198,7 +198,7 @@ describe("skill refs resolve across the `needs` chain", () => {
   test("some instance's closure is strictly wider than its own skills", () => {
     // Anti-vacuity, and the floor the whole file rests on. Measured 2026-09-27:
     // smart-base 0 own → 287 in closure; folio-assistant-core 1 → 287;
-    // cat-harness 280 → 287 (bootstrap's seven). With no such instance the
+    // cat-harness 280 → 287 (bootstrap's seven). With no such layer the
     // invariant below is about nothing.
     expect(
       REACHES_DOWN.length,
@@ -216,7 +216,7 @@ describe("skill refs resolve across the `needs` chain", () => {
 
       const { out, err } = await auditInstance(rel);
 
-      // A run that did not report cannot clear the instance — "could not
+      // A run that did not report cannot clear the layer — "could not
       // determine" is never a pass, so it is recorded as an offence of its own
       // rather than skipped.
       // `--json` emits `{ reports, stale }`; the subjects are under `reports`.
@@ -250,18 +250,18 @@ describe("skill refs resolve across the `needs` chain", () => {
    * repository's own corpus is no longer allowed to exhibit.
    *
    * `needs` is OPTIONAL in the schema and an absent value is UNDETERMINED —
-   * `[]` asserts this instance is the floor, absent is nobody having said
+   * `[]` asserts this layer is the floor, absent is nobody having said
    * (`schemas/kg/cat-harness.ts`; `schemas/kg/layer-direction.ts` refuses the same
-   * collapse for edges). Such an instance cannot have a ref judged dangling:
+   * collapse for edges). Such a layer cannot have a ref judged dangling:
    * what it reaches was never declared, so the honest answer is `unknown`.
-   * The constructed test below proves that mechanism on an instance it builds.
+   * The constructed test below proves that mechanism on a layer it builds.
    *
    * **In THIS repository the state is now gated out.** Measured 2026-09-27,
-   * 5 of 16 instances declared no `needs`; #1508 declared all five by hand,
+   * 5 of 16 layers declared no `needs`; #1508 declared all five by hand,
    * which left this test's corpus half with no subjects and its anti-vacuity
    * floor red on `main`. The owner's ruling, 2026-09-30 (issue #1548): *"QA
    * gates on harness declaration of dependences"* — so `check:instance-graph`
-   * now FAILS on an undeclared instance, and what this test asserts about the
+   * now FAILS on an undeclared layer, and what this test asserts about the
    * corpus is that gated invariant, not the coincidence it used to depend on.
    * Should the gate ever be relaxed, the loop below judges whatever it lets in.
    */
@@ -281,7 +281,7 @@ describe("skill refs resolve across the `needs` chain", () => {
       try {
         reports = (JSON.parse(out) as { reports?: typeof reports }).reports ?? [];
       } catch {
-        continue; // an instance with nothing to audit is not a counter-example
+        continue; // a layer with nothing to audit is not a counter-example
       }
       for (const r of reports) {
         const e = r.criteria?.["skill-ref-resolves"];
@@ -297,8 +297,8 @@ describe("skill refs resolve across the `needs` chain", () => {
    * Resolution widened; OWNERSHIP did not.
    *
    * `manifest-skill-exists` and `remote-skill-is-servable` both ask whether
-   * THIS instance holds a BODY for a name it publishes, and a dependency's
-   * skill is not this instance's to serve — widening them would excuse exactly
+   * THIS layer holds a BODY for a name it publishes, and a dependency's
+   * skill is not this layer's to serve — widening them would excuse exactly
    * the defect they exist to catch. Same split, same ruling (`pve3`, *"not in
    * my overlay is not does not exist"*), as `satisfiableSkills` in
    * `check-tools.ts`.
@@ -328,14 +328,14 @@ describe("skill refs resolve across the `needs` chain", () => {
   });
 
   /**
-   * The third state, PROVED — by building the instance the corpus lacks.
+   * The third state, PROVED — by building the layer the corpus lacks.
    *
-   * Two runs over one synthetic instance whose diagram names a skill nothing
+   * Two runs over one synthetic layer whose diagram names a skill nothing
    * holds. The only difference between them is its declaration:
    *
    * | `needs`   | result    | because                                    |
    * |-----------|-----------|--------------------------------------------|
-   * | absent    | `unknown` | nobody said what this instance reaches     |
+   * | absent    | `unknown` | nobody said what this layer reaches     |
    * | `[]`      | `fail`    | it asserts it IS the floor, so nothing else holds the skill |
    *
    * That pair is the whole rule. A implementation that collapsed absent into
@@ -345,9 +345,9 @@ describe("skill refs resolve across the `needs` chain", () => {
    *
    * Built under `tmpdir()` with its own `package.json`, following
    * `schemas/harness-config.test.ts`. The `package.json` is not decoration:
-   * `kg-audit.ts` reads one from `resolve(root, "..")`, so a synthetic instance
+   * `kg-audit.ts` reads one from `resolve(root, "..")`, so a synthetic layer
    * needs a parent that has it — the same resolution that makes bean `pgzn`
-   * crash on the repository-root instance.
+   * crash on the repository-root layer.
    */
   describe("absent `needs` and `needs: []` are different answers", () => {
     let dir: string;
@@ -359,7 +359,7 @@ describe("skill refs resolve across the `needs` chain", () => {
      * **Not named `declare`.** It was, and every call VANISHED: `declare` is a
      * TypeScript keyword, so `declare([]);` at statement position parses as an
      * ambient declaration and the transpiler erases it. Both tests below then
-     * ran against an instance with NO declaration file at all — which reads
+     * ran against a layer with NO declaration file at all — which reads
      * `needs` as `undefined` and so reported `unknown`, making the absent-needs
      * case pass for entirely the wrong reason. That is why each case reads its
      * declaration back before asserting.
@@ -499,13 +499,13 @@ describe("role refs resolve across the `needs` chain", () => {
   /**
    * The measured case, and why the role half is not a footnote.
    *
-   * After the skill half landed, 11 of 13 nested instances reported ZERO
+   * After the skill half landed, 11 of 13 nested layers reported ZERO
    * criticals and two did not: `smart-base` and `folio-assistant-core`, on
    * `role-ref-resolves` and `raci-role-resolves`. Their diagrams name
    * `business-analyst`, `programme-manager` and `deep-researcher` — all three
    * defined in `cat-harness/scenarios/roles.json`, a transitive dependency of
    * both. Only bootstrap (4 roles) and cat-harness (48) declare a role graph at
-   * all, so every other instance's references necessarily resolve downward or
+   * all, so every other layer's references necessarily resolve downward or
    * not at all.
    */
   test("a role held anywhere in the `needs` closure is not reported dangling", async () => {

@@ -54,7 +54,7 @@ import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
  * blocked on anything but the question"*, *"blocked on there being a
  * dataset"*, *"blocked on effort"* and four more, none of them a bean. So the
  * id must be **in a code span** and must be **id-shaped**: the store's
- * `id_length` is 4, with the instance prefix optional.
+ * `id_length` is 4, with the layer prefix optional.
  *
  * ## The `not` escape is LINE-SCOPED, and a wrap defeats it
  *

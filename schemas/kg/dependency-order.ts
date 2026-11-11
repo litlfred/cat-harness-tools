@@ -3,7 +3,7 @@
  * with the failure policy attached to each step rather than to the runner.
  *
  * One implementation for every "run these in dependency order" caller (the
- * render pipeline, the instances table, the work-plan roadmap, the skill
+ * render pipeline, the layers table, the work-plan roadmap, the skill
  * graph): they differ only in what the nodes are, never in what ordering
  * MEANS.
  *

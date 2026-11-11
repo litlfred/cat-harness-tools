@@ -174,7 +174,7 @@ describe("viewerPlacement — the URL is the directory's path, not a composition
 describe("the readers agree with what the generators publish", () => {
   test("the schema graph spans every DECLARED schemas directory, not one", () => {
     // `directoryForGraph` throws when several directories declare a graph —
-    // the `wggr` guard — and four instances declare `schemas` here. Asking for
+    // the `wggr` guard — and four layers declare `schemas` here. Asking for
     // one was the bug; this locks in the plural answer.
     const g = SCHEMA_GRAPH;
     expect(g).not.toBeNull();

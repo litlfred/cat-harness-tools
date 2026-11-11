@@ -69,13 +69,13 @@ describe("this instance's declaration", () => {
   test("nothing declared is tracked (asked of git only where this instance IS the repository)", () => {
     const top = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: ROOT, encoding: "utf-8" });
     // A mount inside an index, or an extract with no git: nothing here is this
-    // instance's commit, so there is nothing to ask. Not a pass dressed as one —
+    // layer's commit, so there is nothing to ask. Not a pass dressed as one —
     // the `.gitignore` test above is what binds there.
     if (top.status !== 0 || resolve(top.stdout.trim()) !== ROOT) return;
     // `git ls-files --` with NO paths lists every tracked file, so an empty
     // declaration must not reach it: there is nothing declared, hence nothing
     // declared that could be tracked. (It reached it in the standalone
-    // rehearsal, where this instance IS the repository, and failed there.)
+    // rehearsal, where this layer IS the repository, and failed there.)
     if (declared.length === 0) return;
     const r = spawnSync("git", ["ls-files", "-z", "--", ...declared.map((e) => e.path)], { cwd: ROOT, encoding: "utf-8" });
     expect(r.status).toBe(0);

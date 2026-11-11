@@ -48,8 +48,8 @@ const ACTOR_DIR = actorsDir(REPO)!;
  *
  * Two agent actors left this map with move M4 (2026-10-23): the evidence and
  * onboarding agents, which listed `content-authoring` here, moved up to the
- * dependent instance whose lanes they play, and their grants moved with them
- * into that instance's own `policies/`. The grant is unchanged; it is read
+ * dependent layer whose lanes they play, and their grants moved with them
+ * into that layer's own `policies/`. The grant is unchanged; it is read
  * there, by the scenario overlay, not here.
  */
 const BEFORE: Record<string, string[]> = {
@@ -125,7 +125,7 @@ describe("the policies in this repository", () => {
 
   test("in the checkout, every assignee of every instance's policy is an actor the checkout declares", () => {
     // A dependent that adds an actor writes its grants in its own policies/;
-    // read alone, this instance sees neither, and the check above is the same.
+    // read alone, this layer sees neither, and the check above is the same.
     const all = checkoutPolicies(INSTANCE, POLICY_DIR);
     const ids = new Set(checkoutActors(INSTANCE, ACTOR_DIR).map((a) => a.id));
     const bad = [...all.values()].flatMap((p) =>

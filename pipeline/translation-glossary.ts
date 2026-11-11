@@ -1,12 +1,12 @@
 /**
- * Glossary consistency of an instance's translations, against a term base
+ * Glossary consistency of a layer's translations, against a term base
  * merged from the glossaries of the layers it mounts.
  *
  * Owner, 2026-11-06, for the translation watcher: the layered glossaries
  * provide precedence for fixed translation terms. The rules are ported from
  * the instance-side `tools/translation/glossary_qa.py` (smart-trust-demo #54,
  * by the EN translation team) and made generic: every path comes from a
- * declaration, and no instance is named here.
+ * declaration, and no layer is named here.
  *
  * ## The term base, and which layer wins
  *
@@ -15,9 +15,9 @@
  *
  * 1. reference glossaries named with `--layer <name>=<pattern>` (normative
  *    content, such as a WHO glossary, outranks the platform);
- * 2. the layers of the instance's `needs` chain, deepest (most authoritative)
+ * 2. the layers of the layer's `needs` chain, deepest (most authoritative)
  *    first — `declarationChain`, the order every layered reader here uses;
- * 3. the instance's own glossaries, last: they may ADD terms, never change one.
+ * 3. the layer's own glossaries, last: they may ADD terms, never change one.
  *
  * In each layer the glossaries are its declared `translation-sources`
  * directory's `<locale>/glossary/<owner>--<scheme>.po` (the per-scheme
@@ -46,8 +46,8 @@
  * The glossary is read as data from the file each scheme catalogue's `#:`
  * names, since its schema belongs to a layer above this one.
  *
- * Precedence applies within one subject area. A term binds the instance's
- * catalogues when its area is one of the instance's own (its glossaries'
+ * Precedence applies within one subject area. A term binds the layer's
+ * catalogues when its area is one of the layer's own (its glossaries'
  * subjects and schemes, its terminology file), or it came from a `--layer`
  * reference glossary, whose area is every area.
  *
@@ -67,7 +67,7 @@
  *   `exception` ("in sense, but the fixed term is wrong here because …")
  *   passes and is listed. An `exception` also passes a use in sense by rule.
  *
- * Verdicts are stored in the instance, `<translation-sources>/glossary-sense.json`
+ * Verdicts are stored in the layer, `<translation-sources>/glossary-sense.json`
  * (`schemas/kg/glossary-sense.ts`), keyed by the term's id and the msgid's
  * SHA-256: sense is a property of the English, so one verdict serves every
  * locale, and a changed msgid is asked again. This script never asks a model;
@@ -87,16 +87,16 @@
  *   short all-caps acronym) and its msgstr does not use the term's fixed
  *   translation. Matching is by word stem (ru, ar, fr, es) or substring (zh,
  *   ar), as the prior art did.
- * - `inconsistent`: a term that two or more of the instance's entries — whose
+ * - `inconsistent`: a term that two or more of the layer's entries — whose
  *   whole msgid is the term — render differently in one locale.
  * - `override`: a second, different translation of a fixed term in the SAME
- *   subject area (or of a reference glossary's term). The instance translating
+ *   subject area (or of a reference glossary's term). The layer translating
  *   another area's label otherwise is a sense check.
  *
  * Exit: 0 clean, 1 on findings, 2 when it cannot determine (no declared
  * `translation-sources`, an unknown locale). Without `--check` the result is
  * also written as `glossary-consistency.qa-results.json` (`qa-results/v1`, one
- * family per locale) in the instance's QA directory, where `kg-qa-report`
+ * family per locale) in the layer's QA directory, where `kg-qa-report`
  * reads it into its "Glossary consistency" section.
  *
  * A use pending adjudication, or ruled `other-sense` or `exception`, never
@@ -148,7 +148,7 @@ export interface GlossarySource {
   /** The layer the entry is ranked by: the scheme's owner, or the hosting layer. */
   layer: string;
   file: string;
-  /** From `--layer`: normative, binds every catalogue of the instance. */
+  /** From `--layer`: normative, binds every catalogue of the layer. */
   reference: boolean;
   /** The scheme's subject area (`dcterms:subject`), when its glossary declares one. */
   scope?: string;
@@ -184,7 +184,7 @@ export interface FixedTerm {
   file: string;
   /** The subject area it is fixed in. */
   scope: string;
-  /** Whether it binds the checked instance's catalogues: a reference, or one of the instance's own areas. */
+  /** Whether it binds the checked layer's catalogues: a reference, or one of the layer's own areas. */
   inScope: boolean;
 }
 
@@ -202,7 +202,7 @@ export interface TermBase {
   terms: Map<string, FixedTerm>;
   /** A different translation of a fixed term IN ITS SUBJECT AREA: a violation. */
   overrides: Override[];
-  /** The same label translated otherwise in ANOTHER area, by the instance: a sense check. */
+  /** The same label translated otherwise in ANOTHER area, by the layer: a sense check. */
   senseOverrides: Override[];
 }
 
@@ -259,7 +259,7 @@ function schemeFileOf(po: string, roots: readonly string[]): string | undefined 
 }
 
 /**
- * Every subject area the instance's OWN content belongs to: its glossaries'
+ * Every subject area the layer's OWN content belongs to: its glossaries'
  * scheme and term subjects (the scheme itself where none is declared), and its
  * terminology file's.
  */
@@ -315,7 +315,7 @@ function translationsOf(root: string): string | undefined {
 
 /**
  * Every glossary for `locale`, in precedence order: references, then the
- * `needs` chain deepest first, then the instance itself.
+ * `needs` chain deepest first, then the layer itself.
  */
 export function glossarySources(
   instanceRoot: string,
@@ -336,7 +336,7 @@ export function glossarySources(
   chain.forEach((c, at) => {
     const dir = translationsOf(c.root);
     if (dir === undefined) return;
-    // declared-path-literal: `<translations>/<locale>/glossary/` is where glossary:pot writes the scheme catalogues inside the declared translation-sources directory, not an instance's `glossary` directory.
+    // declared-path-literal: `<translations>/<locale>/glossary/` is where glossary:pot writes the scheme catalogues inside the declared translation-sources directory, not a layer's `glossary` directory.
     const schemes = join(dir, locale, "glossary");
     if (existsSync(schemes)) {
       for (const f of readdirSync(schemes).filter((x) => x.endsWith(".po")).sort()) {
@@ -377,7 +377,7 @@ function expand(pattern: string): string[] {
  * Merge the glossaries into one term base, ONE SUBJECT AREA AT A TIME: in an
  * area the first translation of a label wins and a later, different one is an
  * override (a violation). The same label in another area is a different term;
- * where the instance translates it otherwise, that is a sense-check note.
+ * where the layer translates it otherwise, that is a sense-check note.
  */
 export function termBase(
   instance: string,
@@ -569,7 +569,7 @@ export interface GlossaryFinding {
   inSense?: "rule" | "adjudicated";
 }
 
-/** The instance translating another subject area's glossary label otherwise: a note on the term base, never a violation. */
+/** The layer translating another subject area's glossary label otherwise: a note on the term base, never a violation. */
 export interface SenseNote {
   term: string;
   fixed: string;
@@ -619,7 +619,7 @@ export const msgidSha256 = (msgid: string): string => createHash("sha256").updat
 /** The verdicts, by {@link senseKey}. */
 export type Verdicts = ReadonlyMap<string, GlossarySenseVerdict>;
 
-/** Where an instance keeps its verdicts: `<translation-sources>/glossary-sense.json`. */
+/** Where a layer keeps its verdicts: `<translation-sources>/glossary-sense.json`. */
 export const senseStorePath = (translations: string): string => join(translations, GLOSSARY_SENSE_FILE);
 
 /** Read the store; an absent file is an empty one. Throws on a file that does not parse against the schema. */
@@ -665,7 +665,7 @@ export function recordVerdicts(file: string, incoming: unknown): { added: number
   return { added, replaced };
 }
 
-/** Every `.po` under the instance's `<translations>/<locale>/`, the glossaries included. */
+/** Every `.po` under the layer's `<translations>/<locale>/`, the glossaries included. */
 function catalogues(dir: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true })
@@ -673,7 +673,7 @@ function catalogues(dir: string): string[] {
     .flatMap((e) => (e.isDirectory() ? catalogues(join(dir, e.name)) : e.name.endsWith(".po") ? [join(dir, e.name)] : []));
 }
 
-/** Check one locale of the instance at `root`, whose catalogues are in `translations`. */
+/** Check one locale of the layer at `root`, whose catalogues are in `translations`. */
 export function checkLocale(
   root: string,
   translations: string,
@@ -681,7 +681,7 @@ export function checkLocale(
   references: ReadonlyArray<{ name: string; pattern: string }> = [],
   /** The glossaries in precedence order; {@link glossarySources} when not given. */
   sources?: readonly GlossarySource[],
-  /** The adjudicator's verdicts; the instance's store when not given. */
+  /** The adjudicator's verdicts; the layer's store when not given. */
   verdicts?: Verdicts,
 ): LocaleResult {
   const ruled = verdicts ?? readVerdicts(senseStorePath(translations));
@@ -877,7 +877,7 @@ function args(argv: readonly string[], name: string): string[] {
 
 /**
  * The roots a run with no `--instance` judges. The layer PR-check runner names
- * the caller's own instance directories in {@link GATE_OWN_PATHS_ENV}: a gate
+ * the caller's own layer directories in {@link GATE_OWN_PATHS_ENV}: a gate
  * run in an IG's index judges that IG's catalogues, not the platform's, which
  * their own CI judges (owner ruling 2026-11-05, "Move the checks"). Only those
  * that declare a `translation-sources` directory are returned; `undefined`
@@ -908,10 +908,10 @@ function main(argv: readonly string[]): number {
 }
 
 /**
- * The `needs` of the instance at `root` that resolve to nothing on disk, as the
+ * The `needs` of the layer at `root` that resolve to nothing on disk, as the
  * instance graph reports them. Without such a layer its scheme catalogues still
- * sit in the instance's `translations/` (glossary:pot writes them there), so they
- * would be read as the instance's own and judged in sense by rule — a wrong
+ * sit in the layer's `translations/` (glossary:pot writes them there), so they
+ * would be read as the layer's own and judged in sense by rule — a wrong
  * verdict, not a missing one. Measured: a bare clone of the platform without its
  * foundation beside it reported 95 violations where the mounted layer had 12.
  */
@@ -1005,7 +1005,7 @@ function mainFor(root: string, argv: readonly string[]): number {
   if (stale > 0) console.log(`  ${stale} recorded verdict(s) match no use that needs one (a changed msgid, or a use now rendered)`);
   if (!check) {
     // `qaResultPath`'s one composition: `<instance>/test/results/`, the `qa`
-    // directory every instance in an index declares, where `kg-qa-report` reads it.
+    // directory every layer in an index declares, where `kg-qa-report` reads it.
     const out = writeQaResult(root, GLOSSARY_RESULT_STEM, glossaryResult(instance, results));
     console.log(`  wrote ${relative(root, out)}`);
   }

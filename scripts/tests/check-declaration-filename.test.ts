@@ -46,7 +46,7 @@ import {
 /**
  * A tree holding one source file at `<root>/<rel>`.
  *
- * Defaults to placing it **inside the owning instance**, because that is where
+ * Defaults to placing it **inside the owning layer**, because that is where
  * a failing bypass has to live: a site outside it is classified as
  * cross-instance and counted rather than failed. An earlier draft of this
  * helper wrote to a bare `src/`, and all four detection tests went red for
@@ -184,7 +184,7 @@ describe("a path to the declaration is built from the constant", () => {
 
   test("GUARD: `docs/_data/harness.json` is a DIFFERENT FILE and must not be reported", () => {
     // Found by that same false positive, and worth more than the rule it
-    // corrected: the Jekyll data file shares the basename, is not an instance
+    // corrected: the Jekyll data file shares the basename, is not a layer
     // declaration, and must NOT be renamed under the REPLACE ruling.
     const src = "const msg = `docs/_data/harness.json is stale.`;\n";
     const r = checkDeclarationFilename(fixture("src/a.ts", src));
@@ -376,7 +376,7 @@ describe("markdown lines are classified, not matched", () => {
   });
 
   test("a generated reference follows its source rather than failing", () => {
-    // The prefixes are DERIVED from each instance's `siteDirFor()`, so the
+    // The prefixes are DERIVED from each layer's `siteDirFor()`, so the
     // test supplies one rather than assuming this repo's layout.
     const gen = ["cat-harness/docs/reference/skill-instructions/"];
     expect(

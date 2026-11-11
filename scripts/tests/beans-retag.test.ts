@@ -170,7 +170,7 @@ describe("retagDeclarationText", () => {
     expect(r.below.sort()).toEqual(["bootstrap-tools/bootstrap-tools.json", "bootstrap/bootstrap.json"]);
     expect(r.added.sort()).toEqual(["cat-harness-tools/cat-harness-tools.json", "cat-harness/cat-harness.json"]);
 
-    // One instance at a time (`--instance`), judged by the checkout's graph.
+    // One layer at a time (`--instance`), judged by the checkout's graph.
     const one = retagDeclarations([roots[1]!], root, { write: false, needs: needsOfRoots(roots) });
     expect(one.below).toEqual(["bootstrap-tools/bootstrap-tools.json"]);
     expect(one.files).toBe(0);

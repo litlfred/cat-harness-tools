@@ -5,8 +5,8 @@
  * @graphNode schema
  *
  * The pipeline step is **"publish a large artifact"**, and *how* is a property
- * of the instance, not of the step; a GitHub Release is one implementation, a
- * CDN such as Cloudflare another. As with `publication.host`, an instance that
+ * of the layer, not of the step; a GitHub Release is one implementation, a
+ * CDN such as Cloudflare another. As with `publication.host`, a layer that
  * has not said is `undefined`, and must never be read as `github-pages`.
  *
  * A store holds what is too large for the site tree (e.g. a search index for a
@@ -24,9 +24,9 @@ import { z } from "zod";
 export const ARTIFACT_STORE_SCHEMA_TAG = "folio-artifact-store/v1";
 
 /**
- * Where large artifacts go for this instance.
+ * Where large artifacts go for this layer.
  *
- * `undefined` — no declaration — means the instance has **no** store, so the
+ * `undefined` — no declaration — means the layer has **no** store, so the
  * publish step must REFUSE rather than fall back to a default. Falling back to
  * GitHub would silently publish somebody's data to a host they did not choose.
  */
@@ -88,7 +88,7 @@ export type SearchIndexPlan =
  * Decide, for one stage.
  *
  * Deliberately takes the store as a possibly-`undefined` argument rather than
- * reading a default: an instance that has declared no store must reach
+ * reading a default: a layer that has declared no store must reach
  * `refuse`, and a default would have published to somebody else's host.
  */
 export function planSearchIndex(

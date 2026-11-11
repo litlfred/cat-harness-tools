@@ -122,7 +122,7 @@ function resolveCriteria(args: Args): string[] {
     return qaCriteriaFor(instanceRoot).map((c) => c.id);
   }
   // By id through the instance-aware index: the voice-overlay criteria are
-  // derived from the voices an instance ships (bean `btuv`), so the static
+  // derived from the voices a layer ships (bean `btuv`), so the static
   // index does not carry them and naming one on the command line would be
   // rejected as unknown.
   const criteriaById = qaCriteriaByIdFor(instanceRoot);

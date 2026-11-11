@@ -82,7 +82,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { guardUntrusted, oneLineLabel } from "../../src/core/handover-screen.js";
 
 // ── Access control ───────────────────────────────────────────
-// Decided by the instance's ODRL policies through the core module (issue
+// Decided by the layer's ODRL policies through the core module (issue
 // #1207). This file kept a private copy of the old viewer < collaborator <
 // owner ladder until then — a second copy of a permission rule is a second
 // rule, free to drift from the first.
@@ -3605,7 +3605,7 @@ server.tool = function (...args: Parameters<typeof origTool>) {
 // 2026-10-05, bean riit 3c), so this server no longer keeps a list of its own:
 //
 //   1. every Tool node in the folio's dependency tree, the harness's always,
-//      each resolved from the instance that declares it;
+//      each resolved from the layer that declares it;
 //   2. the content adapter's own tools (`content_validate`, `paper_render_pdf`,
 //      `lean_build`, …), from the adapter the folio's config names.
 //
@@ -3632,7 +3632,7 @@ server.tool = function (...args: Parameters<typeof origTool>) {
 }
 
 // Tools CONTRIBUTED by the folio's declared dependencies — the direction that
-// needs no name: the server walks what the instance declares and registers
+// needs no name: the server walks what the layer declares and registers
 // what each dependency's `contributes` module supplies, as qa-sweep already
 // does for contributed QA checkers. `ContributionRegistry.registerTools` had
 // no production caller until this block, so a contributed tool never reached

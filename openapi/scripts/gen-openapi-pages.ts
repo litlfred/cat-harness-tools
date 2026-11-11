@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Write a JSON-LD node and a thin page for every OpenAPI document an instance
+ * Write a JSON-LD node and a thin page for every OpenAPI document a layer
  * holds, and for every OPERATION in each — the "page + IRI for each operation"
  * the owner asked for (2026-10-03, bean `s4ta`).
  *
@@ -11,22 +11,29 @@
  * Usage:
  *   bun run cat-harness-tools/openapi/scripts/gen-openapi-pages.ts --instance <instance-dir> [--check]
  *
- * ## What is written, INSIDE the instance's `openapi` graph
+ * ## What is written, INSIDE the layer's `openapi` graph
  *
  * | path (under the graph's directory) | what |
  * |---|---|
  * | `<doc>.openapi.json`, `<doc>.source.json` | the document and its provenance — the INGEST's, never written here |
  * | `<doc>.jsonld`, `.json` | the document as a node: its operations, each by IRI |
- * | `<doc>/<op>.jsonld`, `.json` | one operation — its `@id` IS this address |
- * | `<doc>/` | the document's RENDERING: a thin page listing the operations |
- * | `<doc>/<op>/` | the operation's RENDERING: a thin page, drawn Swagger-style |
- * | `assets/openapi.js`, `assets/openapi.css` | the one shared loader and its style |
+ * | `<doc>/operation/<op>.jsonld`, `.json` | one operation; its `@id` is this address less `.jsonld` |
+ * | `<doc>/` | the document's RENDERING: a thin page listing the operations, at the document's IRI |
+ * | `<doc>/operation/<op>/` | the operation's RENDERING: a thin page, drawn Swagger-style, at the operation's IRI |
+ * | `assets/kg-render.js` | the generic renderer every page loads first (`scripts/templates/kg-render.js`) |
+ * | `assets/openapi.js`, `assets/openapi.css` | the OpenAPI renderer it dispatches to, and its style |
+ *
+ * IRIs are extensionless, `…/openapi/<doc>` and `…/openapi/<doc>/operation/<op>`
+ * (owner, Q-THIN-2 = A and Q-THIN-4 = A, issue #1830: a clean break from the
+ * `.jsonld` IRIs and from `<doc>/<op>`). The page is in the directory the IRI
+ * names, so the host serves it at the IRI and no stub is needed. Every page
+ * DECLARES its node in RDFa and a JSON-LD stub (`thin-page.ts`).
  *
  * **In the graph, not in `docs/`.** Owner: *"kind is an OpenAPI node"* — an
  * operation is a node OF the openapi graph, so its IRI sits under that
- * graph's path (`<base>/<instance>/openapi/<doc>/<op>.jsonld`). It also keeps
+ * graph's path (`<base>/<instance>/openapi/<doc>/operation/<op>`). It also keeps
  * this generator out of a directory another one owns: `gen-ig-pages.ts`
- * treats every file under an IG instance's `docs/` as its own output and
+ * treats every file under an IG layer's `docs/` as its own output and
  * reports anything else there as an orphan — measured on the first version of
  * this harness, which wrote `docs/api/` and had the two generators deleting
  * each other's files. The graph is `served`, so its bytes publish verbatim at
@@ -61,14 +68,23 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { DOCS_SITE_BASE } from "../../schemas/kg/jsonld.ts";
-import { escHtml, thinPageConfigOf, thinPageHtml } from "../../scripts/thin-page.ts";
+import { KG_RENDER_ASSET, escHtml, kgRenderScript, nodeAttrs, pageNodeOf, thinPageHtml, type PageNode } from "../../scripts/thin-page.ts";
 import { OpenApiDocumentSchema, OpenApiProvenanceSchema, operationsOf, type OpenApiOperation } from "../schemas/openapi.ts";
 import { CONFIG_FILE, localDirOf, openapiDir, readConfig } from "./ingest-openapi.ts";
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
-/** The config-block id every page written here carries — how a run recognises its own output. */
-export const PAGE_CONFIG_ID = "openapi-page";
+/**
+ * The classes a page written here declares its node as (`typeof`, issue
+ * #1830) — how a run recognises its own output, and what the loader
+ * registers with the generic renderer for.
+ */
+export const WEB_API = "https://schema.org/WebAPI";
+export const HYDRA_OPERATION = "http://www.w3.org/ns/hydra/core#Operation";
+/** The prefixes a page's `typeof` is written over. */
+const PREFIXES = { schema: "https://schema.org/", hydra: "http://www.w3.org/ns/hydra/core#" };
+/** The kind segment of an operation's IRI and paths: `<doc>/operation/<op>` (Q-THIN-2/4, singular). */
+const OPERATION = "operation";
 const LOADER = "assets/openapi.js";
 const STYLE = "assets/openapi.css";
 const TEMPLATES = join(TOOLS_ROOT, "openapi", "scripts", "templates");
@@ -79,7 +95,7 @@ export const CONTEXT = {
   dcterms: "http://purl.org/dc/terms/",
 };
 
-/** A site-relative path under the instance, as an absolute IRI. */
+/** A site-relative path under the layer, as an absolute IRI. */
 const iri = (instance: string, sitePath: string): string => `${DOCS_SITE_BASE}${instance}/${sitePath}`;
 
 export interface Written {
@@ -87,14 +103,14 @@ export interface Written {
   content: string;
 }
 
-/** Every file a run writes for one instance, keyed by its path under the instance's docs. */
+/** Every file a run writes for one layer, keyed by its path under the layer's docs. */
 export function pagesFor(instanceRoot: string): Written[] {
   const config = readConfig(instanceRoot);
   const dir = openapiDir(instanceRoot, config);
-  // The declaration is FOUND, and the instance is its DECLARED name, never the
+  // The declaration is FOUND, and the layer is its DECLARED name, never the
   // directory's: in an IG fork the directory is the base IG's checkout name and the
-  // instance the fork's own (n3ni stage E), and the name is what every IRI below
-  // extends, so the published IRIs stay the same wherever the instance lives.
+  // layer the fork's own (n3ni stage E), and the name is what every IRI below
+  // extends, so the published IRIs stay the same wherever the layer lives.
   const declFile = findDeclarationFile(instanceRoot);
   if (declFile === undefined) throw new Error(`no instance declaration in ${resolve(instanceRoot)}`);
   const decl = JSON.parse(readFileSync(join(instanceRoot, declFile), "utf8")) as {
@@ -117,7 +133,7 @@ export function pagesFor(instanceRoot: string): Written[] {
  * The same files for a graph named directly rather than through a
  * declaration: `instance` is the name every IRI extends, `dir` holds the
  * documents and their provenance, `graphPath` is where the graph is served
- * under the instance. An IG repository's own site uses it (`ig-site-openapi.ts`),
+ * under the layer. An IG repository's own site uses it (`ig-site-openapi.ts`),
  * since such a repository has no declaration (owner, 2026-10-14).
  */
 export function pagesForGraph(o: { instance: string; config: ReturnType<typeof readConfig>; dir: string; graphPath: string }): Written[] {
@@ -140,8 +156,8 @@ export function pagesForGraph(o: { instance: string; config: ReturnType<typeof r
     const docSite = d.id;
     listed.push({ id: d.id, title, version: doc.info.version, ops: ops.length });
     for (const o of ops) opDoc[o.id] ??= d.id;
-    const docIri = iri(instance, `${graphPath}/${docSite}.jsonld`);
-    const opIri = (o: OpenApiOperation) => iri(instance, `${graphPath}/${docSite}/${o.id}.jsonld`);
+    const docIri = iri(instance, `${graphPath}/${docSite}`);
+    const opIri = (o: OpenApiOperation) => iri(instance, `${graphPath}/${docSite}/${OPERATION}/${o.id}`);
     const opSummary = (o: OpenApiOperation) => ({
       "@id": opIri(o),
       "@type": "hydra:Operation",
@@ -166,22 +182,24 @@ export function pagesForGraph(o: { instance: string; config: ReturnType<typeof r
     });
 
     // The document's page, one level into the graph: the document is at ../<file>.
+    const docNode: PageNode = { iri: docIri, types: ["schema:WebAPI"] };
     out.push({
       path: `${docSite}/index.html`,
       content: thinPageHtml({
         title: `${title} ${doc.info.version}`,
         jsonld: `../${d.id}.jsonld`,
         script: `../${LOADER}`,
+        renderer: `../${KG_RENDER_ASSET}`,
         stylesheet: `../${STYLE}`,
-        configId: PAGE_CONFIG_ID,
-        config: { kind: "document", node: `../${d.id}.jsonld`, openapi: `../${prov.file}` },
-        body: `<main class="oa"><h1>${escHtml(title)}</h1><div class="oa-body" aria-live="polite"><p>Loading the API…</p></div></main>`,
+        node: docNode,
+        prefixes: PREFIXES,
+        body: `<main class="oa"${nodeAttrs(docNode)} data-kg-openapi="${escHtml(`../${prov.file}`)}"><h1>${escHtml(title)}</h1><div class="oa-body" aria-live="polite"><p>Loading the API…</p></div></main>`,
         noscriptLead: `The ${escHtml(title)} API page`,
       }),
     });
 
     for (const o of ops) {
-      json(`${docSite}/${o.id}`, {
+      json(`${docSite}/${OPERATION}/${o.id}`, {
         "@context": CONTEXT,
         ...opSummary(o),
         ...(o.description ? { "hydra:description": o.description } : {}),
@@ -190,18 +208,21 @@ export function pagesForGraph(o: { instance: string; config: ReturnType<typeof r
         "dcterms:isPartOf": docIri,
       });
       const heading = `${o.method.toUpperCase()} ${o.path}`;
+      const opNode: PageNode = { iri: opIri(o), types: ["hydra:Operation"] };
       out.push({
-        path: `${docSite}/${o.id}/index.html`,
+        path: `${docSite}/${OPERATION}/${o.id}/index.html`,
         content: thinPageHtml({
           title: `${heading} — ${title}`,
           jsonld: `../${o.id}.jsonld`,
-          script: `../../${LOADER}`,
-          stylesheet: `../../${STYLE}`,
-          configId: PAGE_CONFIG_ID,
-          config: { kind: "operation", node: `../${o.id}.jsonld`, openapi: `../../${prov.file}`, method: o.method, path: o.path },
+          script: `../../../${LOADER}`,
+          renderer: `../../../${KG_RENDER_ASSET}`,
+          stylesheet: `../../../${STYLE}`,
+          node: opNode,
+          prefixes: PREFIXES,
           // Identity only — what a link preview, search and a no-JS reader need.
           body:
-            `<main class="oa"><p class="oa-up"><a href="../">← ${escHtml(title)}</a></p>` +
+            `<main class="oa"${nodeAttrs(opNode)} data-kg-openapi="${escHtml(`../../../${prov.file}`)}" data-kg-method="${escHtml(o.method)}" data-kg-path="${escHtml(o.path)}">` +
+            `<p class="oa-up"><a href="../../">← ${escHtml(title)}</a></p>` +
             `<h1><span class="oa-m oa-m-${o.method}">${o.method.toUpperCase()}</span> <code>${escHtml(o.path)}</code></h1>` +
             `${o.summary ? `<p class="oa-sum">${escHtml(o.summary)}</p>` : ""}` +
             `<div class="oa-body" aria-live="polite"><p>Loading the operation…</p></div></main>`,
@@ -213,7 +234,7 @@ export function pagesForGraph(o: { instance: string; config: ReturnType<typeof r
   // THE GRAPH'S OWN INDEX — `openapi/index.html`. An IG's pages link it the
   // way the Publisher's vendored Swagger UI is linked, often deep:
   // `openapi/index.html#/<tag>/<operationId>`. Nothing wrote it, so 43 links
-  // on the first instance's pages led nowhere (#2235). It lists the documents held,
+  // on the first layer's pages led nowhere (#2235). It lists the documents held,
   // and sends a Swagger-style deep link to that operation's own page.
   out.push({
     path: "index.html",
@@ -223,10 +244,11 @@ export function pagesForGraph(o: { instance: string; config: ReturnType<typeof r
       `<h1>API documents</h1><ul>` +
       listed.map((l) => `<li><a href="${encodeURI(l.id)}/">${escHtml(l.title)}</a> ${escHtml(l.version)} — ${l.ops} operation(s)</li>`).join("") +
       `</ul></main>\n<script>(function(){var m=/^#\\/[^/]+\\/([^/?#]+)/.exec(location.hash);var d=${JSON.stringify(opDoc).replace(/</g, "\\u003c")};` +
-      `if(m&&Object.prototype.hasOwnProperty.call(d,m[1]))location.replace(encodeURIComponent(d[m[1]])+"/"+encodeURIComponent(m[1])+"/");})();</script>\n</body></html>\n`,
+      `if(m&&Object.prototype.hasOwnProperty.call(d,m[1]))location.replace(encodeURIComponent(d[m[1]])+"/${OPERATION}/"+encodeURIComponent(m[1])+"/");})();</script>\n</body></html>\n`,
   });
   out.push(
     { path: LOADER, content: readFileSync(join(TEMPLATES, "openapi.js"), "utf8") },
+    { path: KG_RENDER_ASSET, content: kgRenderScript() },
     { path: STYLE, content: readFileSync(join(TEMPLATES, "openapi.css"), "utf8") },
   );
   return out;
@@ -234,11 +256,16 @@ export function pagesForGraph(o: { instance: string; config: ReturnType<typeof r
 
 /**
  * Files in the graph this generator wrote earlier and no longer would — found
- * by what they are, never by where they sit: a thin page declaring
- * {@link PAGE_CONFIG_ID}, a node file (`.jsonld`, or `.json` that is neither a
+ * by what they are, never by where they sit: a page whose declared node is
+ * {@link isOpenApiPage}, a node file (`.jsonld`, or `.json` that is neither a
  * document nor its provenance), or the loader. The ingest's own files and the
  * directory's README and config are never candidates.
  */
+/** Is this page one of ours — by the node it declares, not by its name or its directory? */
+export function isOpenApiPage(html: string): boolean {
+  return pageNodeOf(html)?.rdfa.some((n) => n.types.some((t) => t === WEB_API || t === HYDRA_OPERATION)) ?? false;
+}
+
 function orphans(root: string, wanted: Set<string>): string[] {
   const out: string[] = [];
   const ingested = /\.(openapi|source)\.json$/;
@@ -255,8 +282,9 @@ function orphans(root: string, wanted: Set<string>): string[] {
         e.name.endsWith(".jsonld") ||
         e.name.endsWith(".json") ||
         p === join(root, LOADER) ||
+        p === join(root, KG_RENDER_ASSET) ||
         p === join(root, STYLE) ||
-        (e.name === "index.html" && thinPageConfigOf(readFileSync(p, "utf8"), PAGE_CONFIG_ID) !== undefined);
+        (e.name === "index.html" && isOpenApiPage(readFileSync(p, "utf8")));
       if (ours) out.push(p);
     }
   };

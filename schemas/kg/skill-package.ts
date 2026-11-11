@@ -34,7 +34,7 @@ import type { SutRef } from "../sdlc/test-run";
 
 /**
  * What kind of thing an actor is — **human, agentic or mechanical**, plus
- * `external` for a participant outside this instance entirely.
+ * `external` for a participant outside this layer entirely.
  *
  * `person` names the human, `agent` the agentic and `system` the mechanical.
  * The prose reading, the table and the argument for the split live on the
@@ -67,7 +67,7 @@ export const DegradationStrategySchema = z.enum(["fail", "warn", "skip", "fallba
  *
  * The general shape is worth naming, because this enum will grow again: an
  * event the host supports and this schema does not is a class of enforcement
- * the instance cannot express, and it fails at the REGISTRY rather than at the
+ * the layer cannot express, and it fails at the REGISTRY rather than at the
  * hook — `.claude/settings.json` accepted the entry and the generated skill
  * registry refused it. That is the right order (the gate caught it) and it is
  * still a gap: the hook was live and unrepresentable at the same time.
@@ -326,7 +326,7 @@ export const SkillDefinitionSchema = z.object({
   lifecycleStages: z.array(LifecycleStageSchema).optional(),
   // No `schemaRef` (#1168, B3b). It named a directory and was read only by a
   // retired generator. A skill names its contracts in its front matter —
-  // `input:` and `output:`, a path into the instance or an https IRI — and
+  // `input:` and `output:`, a path into the layer or an https IRI — and
   // `scripts/skill-contracts.ts` is the one reader.
 });
 
@@ -454,7 +454,7 @@ export const RemoteSyncStrategySchema = z.enum(["shallow-clone", "sparse-checkou
  * implement it, **committed, pinned and read-only**:
  *
  * - the sync copies each declared skill at the wrapper's `ref` into its own
- *   package under the instance's skills directory, with a sha256 fixity record
+ *   package under the layer's skills directory, with a sha256 fixity record
  *   per file, so `check:materialized-fixity` fails an edit in place;
  * - a wrapper that declares `sync` must pin a full commit SHA and may not
  *   `autoUpdate` — a skill body is a prompt an agent follows, so an unpinned

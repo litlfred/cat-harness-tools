@@ -1,39 +1,39 @@
 /**
- * The `CatHarness` declaration — what an instance IS, at its root.
+ * The `CatHarness` declaration — what a layer IS, at its root.
  *
  * Named for the **harness**: `agentic-harness` is the layer that defines
  * Roles, Skills, Tools and the conventional directories, and every other
- * instance inherits from it. An instance need not be a folio-assistant to
+ * layer inherits from it. A layer need not be a folio-assistant to
  * have one — a Tool repo or a Test repo carries the same declaration.
  *
- * Every instance carries one at its repository root (`harness.json`). It
- * declares the directories the instance scans for content, and what **kind
+ * Every layer carries one at its repository root (`harness.json`). It
+ * declares the directories the layer scans for content, and what **kind
  * of graph** each one holds.
  *
  * ## Directories, not a content-type field
  *
- * The general object is **an instance with directories, each holding a
+ * The general object is **a layer with directories, each holding a
  * graph**: Tool definitions under `tools/`, a knowledge graph under `kg/`,
  * the schema graph under `schemas/`. `folio` is one graph typology among
  * several — distinguished only by being renderable to a website (see
- * `BASE_GRAPH_TYPOLOGIES` in `./graph-typology-registry.ts`). An instance with no `folio/` directory is
+ * `BASE_GRAPH_TYPOLOGIES` in `./graph-typology-registry.ts`). A layer with no `folio/` directory is
  * ordinary.
  *
  * ## Inheritance
  *
- * An instance inherits its dependencies' directory conventions without
+ * A layer inherits its dependencies' directory conventions without
  * restating them, by the same depth-first walk as
  * `schemas/kg/harness-config.ts` and the same overlay order — deepest
  * dependency first, root last, so the root wins.
  *
- * Overriding is by graph **id**, not by path: an instance that wants its
+ * Overriding is by graph **id**, not by path: a layer that wants its
  * knowledge graph somewhere other than `kg/` redeclares the `kg` id with a
  * different path, and the inherited entry is replaced rather than duplicated.
  *
  * ## Self-declarative
  *
  * Each directory is a node with an `@id` and an `@type`, so the set of
- * directories an instance scans is queryable like anything else in the
+ * directories a layer scans is queryable like anything else in the
  * knowledge graph.
  *
  * @module schemas/cat-harness
@@ -104,7 +104,7 @@ import { BranchPrefixSchema, KeyedBySchema, SubgraphSourceSchema, contentIsOffCh
 
 
 /**
- * The CONFIG filename for an instance of this name — `<name>.config.json`.
+ * The CONFIG filename for a layer of this name — `<name>.config.json`.
  *
  * Defined HERE and re-exported by `schemas/kg/harness-config.ts`, which is where
  * it used to live — that module imports this one, so the dependency only runs
@@ -118,7 +118,7 @@ export function instanceConfigFilename(name: string): string {
 }
 
 /**
- * The DECLARATION filename for an instance of this name — `<name>.json`.
+ * The DECLARATION filename for a layer of this name — `<name>.json`.
  *
  * Its sibling above spells the config. Both exist so that neither is composed
  * at a call site: a literal `${name}.json` is the thing that survives a
@@ -135,7 +135,7 @@ export function instanceDeclarationFilename(name: string): string {
  *
  * The replacement for `join(dir, DECLARATION_FILENAME)`, which every reader
  * used to compose. It cannot be composed any more — the filename carries the
- * instance's name, so the only way to know it is to look.
+ * layer's name, so the only way to know it is to look.
  */
 export function declarationPathIn(dir: string): string | undefined {
   const f = findDeclarationFile(dir);
@@ -147,8 +147,8 @@ export function declarationPathIn(dir: string): string | undefined {
  *
  * Separate from {@link findDeclarationFile} because the two answer different
  * questions: that one says which file IS the declaration, this one says what
- * could not be read at all. A caller reporting instance health needs both, and
- * folding them would make a broken sibling look like a missing instance.
+ * could not be read at all. A caller reporting layer health needs both, and
+ * folding them would make a broken sibling look like a missing layer.
  */
 export function unparseableConfigsIn(dir: string): string[] {
   let entries: string[];
@@ -206,7 +206,7 @@ export type {
 } from "./graph-typology-registry.js";
 // ...and imported as well as re-exported, because the predicates below
 // (`isRenderable`, `graphLayer`, the layer tests) stayed in this module and
-// default their `registry` parameter to the shared instance. `export *`
+// default their `registry` parameter to the shared layer. `export *`
 // forwards a name; it does not bring it into local scope.
 import {
   BASE_GRAPH_TYPOLOGIES,
@@ -342,12 +342,12 @@ export function graphTypologiesOfLayer(layer: GraphLayer, registry: GraphTypolog
 /**
  * One declared place to look, with no statement about inheritance.
  *
- * The base both an instance directory and a GRAPH NODE share. See
+ * The base both a layer directory and a GRAPH NODE share. See
  * {@link GraphNodeDirectorySchema} for why the two are not one type.
  */
 export interface GraphNodeDirectory extends KgNodeLabels {
   /**
-   * Stable identifier, unique within an instance. Inheritance overrides match
+   * Stable identifier, unique within a layer. Inheritance overrides match
    * on THIS, never on `path` — see the module note on relocation.
    */
   id: string;
@@ -357,7 +357,7 @@ export interface GraphNodeDirectory extends KgNodeLabels {
    */
   path: string;
   /**
-   * Which root `path` is relative to. Absent means this instance's.
+   * Which root `path` is relative to. Absent means this layer's.
    *
    * See `DeclarationScopeSchema` in `kg-node.ts` for what `repository` means
    * and why it is a field rather than a `../` in the path.
@@ -384,11 +384,11 @@ export interface GraphNodeDirectory extends KgNodeLabels {
 }
 
 /**
- * One declared directory of an INSTANCE — a place to look, plus what a
+ * One declared directory of a LAYER — a place to look, plus what a
  * dependent does about it.
  *
  * The single field separating this from {@link GraphNodeDirectory} is the
- * one a graph node cannot answer: nothing resolves a node across instances,
+ * one a graph node cannot answer: nothing resolves a node across layers,
  * so "does a dependent get its own?" has no meaning there.
  */
 export interface ContentDirectory extends GraphNodeDirectory {
@@ -403,7 +403,7 @@ export interface ContentDirectory extends GraphNodeDirectory {
    * `dependents` did the day it landed. See {@link SubgraphCoverageSchema}.
    */
   coverage?: SubgraphCoverage;
-  /** Built into the instance's own IG site at `/<instance>/` (bean `mftp`); see `igSite` on the shape below. */
+  /** Built into the layer's own IG site at `/<instance>/` (bean `mftp`); see `igSite` on the shape below. */
   igSite?: boolean;
 
   /**
@@ -431,7 +431,7 @@ export interface ContentDirectory extends GraphNodeDirectory {
    * Which theme this subgraph renders on — one answer for every surface that
    * renders it (navbar section, board panel, sticky).
    *
-   * Absent means the instance's own theme. See {@link ContentDirectorySchema}
+   * Absent means the layer's own theme. See {@link ContentDirectorySchema}
    * for why it lives on the directory and why the methodologies take
    * `analyst`.
    */
@@ -440,7 +440,7 @@ export interface ContentDirectory extends GraphNodeDirectory {
   /**
    * Where this subgraph gets its content. Absent is `{ kind: "directory" }`.
    * Read it through `resolveSubgraphSource` (`schemas/kg/subgraph-source.ts`),
-   * which applies the instance config's override by id.
+   * which applies the layer config's override by id.
    */
   source?: SubgraphSource;
 
@@ -490,24 +490,24 @@ export interface ContentDirectory extends GraphNodeDirectory {
   writer?: string[];
 }
 
-/** An instance's root declaration. */
-/** How an instance's values are addressed in Liquid — {@link CatHarnessDeclaration.liquid}. */
+/** A layer's root declaration. */
+/** How a layer's values are addressed in Liquid — {@link CatHarnessDeclaration.liquid}. */
 export interface LiquidPrefix {
-  /** The first path segment(s); default the instance's `name`. */
+  /** The first path segment(s); default the layer's `name`. */
   prefix?: string;
   /** Leave `{{ <prefix>.… }}` for the downstream engine (Jekyll, IG Publisher). */
   passThrough?: boolean;
 }
 
 /**
- * Where an instance sits today inside a HOST repository — the pre-split case,
+ * Where a layer sits today inside a HOST repository — the pre-split case,
  * where `cat-harness` declares `litlfred/cat-harness` but is the
  * `cat-harness/` directory of `litlfred/folio-assistant` (bean `6rmv`).
  */
 export interface InstanceLocation {
-  /** The repository that holds the instance today, `owner/name`. */
+  /** The repository that holds the layer today, `owner/name`. */
   repository: RepoFullName;
-  /** The instance's directory within it, repository-relative, no leading `./`. */
+  /** The layer's directory within it, repository-relative, no leading `./`. */
   path: string;
 }
 
@@ -523,8 +523,8 @@ export const InstanceLocationSchema = z
   .strict();
 
 /**
- * Where this instance gets its upstream/source material (e.g. an IG source in Git).
- * Bean `bamf`, owner ruling 2026-10-07: declare IG source in instance declaration.
+ * Where this layer gets its upstream/source material (e.g. an IG source in Git).
+ * Bean `bamf`, owner ruling 2026-10-07: declare IG source in layer declaration.
  */
 export const InstanceGitSourceSchema = z
   .object({
@@ -542,9 +542,9 @@ export type InstanceSource = z.infer<typeof InstanceSourceSchema>;
 
 
 /**
- * One content adapter an instance ships, as its own declaration states it.
+ * One content adapter a layer ships, as its own declaration states it.
  *
- * `module` is relative to the DECLARING instance's root, and `className` is the
+ * `module` is relative to the DECLARING layer's root, and `className` is the
  * export to construct. `extends` names the `contentType` this one specialises —
  * `paper` extends `document` — and is what orders the fallback: a
  * specialisation is a superset, so falling back TO it loses nothing, while
@@ -581,12 +581,12 @@ export const ContentAdapterDeclarationSchema = z
   .strict();
 
 /**
- * One LSI unit provider an instance ships: the code that turns one of this
- * instance's graphs into text units for `lsi:near` (bean `ec2a` step 3,
+ * One LSI unit provider a layer ships: the code that turns one of this
+ * layer's graphs into text units for `lsi:near` (bean `ec2a` step 3,
  * proposal `lsi-cross-graph-near-2026-10-24`, owner decision A).
  *
  * `graphKind` names the graph in the output (`blocks`, `lean-decl`). `module`
- * is relative to the DECLARING instance's root, and `export` is the function
+ * is relative to the DECLARING layer's root, and `export` is the function
  * to call. The tools layer finds providers by reading these declarations, as
  * it finds content adapters, so it never imports a layer above it
  * (`check:import-direction`). The function's contract is the tools layer's
@@ -682,10 +682,10 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
   alsoWritten?: string[];
   /** The prefix this harness's skills get when installed into an agent host — see {@link CatHarnessDeclarationSchema}'s `skillPrefix` (bean `x4mt`). */
   skillPrefix?: string;
-  /** The instance's own avatar (sod4 #4); the table in avatars.ts covers only the instances below the harness. */
+  /** The layer's own avatar (sod4 #4); the table in avatars.ts covers only the layers below the harness. */
   avatar?: KindAvatar;
   /**
-   * Images this instance names — its marks, in the graph rather than beside it.
+   * Images this layer names — its marks, in the graph rather than beside it.
    *
    * See {@link KgImage}: the docs site, the README and the browser tab all want
    * the same picture, and a node is what stops each of them hardcoding its own
@@ -693,7 +693,7 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    */
   images?: KgImage[];
   /**
-   * Non-image artefacts this instance names — `AGENTS.md` first among them.
+   * Non-image artefacts this layer names — `AGENTS.md` first among them.
    *
    * See {@link KgAsset}. Declared for the same reason {@link images} is: a
    * file nobody declares is a file nobody checks, and `AGENTS.md` was the only
@@ -709,7 +709,7 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    */
   icon?: string;
   /**
-   * Which icons this instance's navbar row shows — see `NavbarIconsSchema`.
+   * Which icons this layer's navbar row shows — see `NavbarIconsSchema`.
    *
    * Three states: absent inherits, `[]` shows none, a list decides. The two
    * empty-looking answers are deliberately different and must not be read
@@ -718,11 +718,11 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
   navbarIcons?: NavbarIcon[];
   /** Which tiles the glass's bottom strip pins, in order — see `GlassStripSchema`. Absent inherits. */
   glassStrip?: GlassStripPin[];
-  /** The instance's name, e.g. `"agentic-harness"`. */
+  /** The layer's name, e.g. `"agentic-harness"`. */
   name: string;
   /**
    * The repository's short name, used as the **filename stem of every artefact
-   * this instance publishes** — `<stub>.jsonld` for the knowledge graph,
+   * this layer publishes** — `<stub>.jsonld` for the knowledge graph,
    * `<stub>.schema.json` for its schema. Defaults to `name`.
    *
    * WHO's SMART Base IG derives its stub by stripping the `smart-` prefix from
@@ -739,26 +739,26 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    * repository's name; the artefacts it *describes* are free to be named.
    */
   /**
-   * The repository this instance IS — `owner/name`, its PLANNED home once the
+   * The repository this layer IS — `owner/name`, its PLANNED home once the
    * pre-split repository is broken apart (owner, 2026-09-30, bean `6rmv`).
    *
    * The identity every cross-instance reference resolves through: a bare
    * `name` says nothing about which forge or owner, and two owners may both
-   * publish an instance of the same name. Planned rather than current so that an IRI keyed
-   * by it survives the split — where the instance sits TODAY is {@link livesAt}.
+   * publish a layer of the same name. Planned rather than current so that an IRI keyed
+   * by it survives the split — where the layer sits TODAY is {@link livesAt}.
    * `instanceRepositories` in `schemas/kg/instance-repositories.ts` derives the
    * `owner/repo ↔ name ↔ root` map from these; nothing keeps a list by hand.
    */
   repository?: RepoFullName;
   /**
-   * Where the instance lives TODAY when that is not the root of
+   * Where the layer lives TODAY when that is not the root of
    * {@link repository} — the host repository and the directory within it.
    * Absent means it already lives at the root of its own repository.
    */
   livesAt?: InstanceLocation;
   /**
-   * Where this whole instance gets its upstream/source material (e.g. an IG source in Git).
-   * Bean `bamf`, owner ruling 2026-10-07: declare IG source in instance declaration.
+   * Where this whole layer gets its upstream/source material (e.g. an IG source in Git).
+   * Bean `bamf`, owner ruling 2026-10-07: declare IG source in layer declaration.
    */
   source?: InstanceSource;
   /**
@@ -768,19 +768,19 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    */
   separation?: "content" | "tools";
   /**
-   * Instances this one is seeded together with — see `seedsWith` on
+   * Layers this one is seeded together with — see `seedsWith` on
    * {@link CatHarnessDeclarationSchema}. Absent is "seeds alone".
    */
   seedsWith?: string[];
   stub?: string;
   /**
-   * Whether this instance is published on the site. Defaults to enabled; only
+   * Whether this layer is published on the site. Defaults to enabled; only
    * `false` disables it. Read through `isPublished` (`schemas/kg/url-space.ts`,
    * bean `nbal`).
    */
   enabled?: boolean;
   /**
-   * Where this instance's artefacts are published — the base every `@id` in
+   * Where this layer's artefacts are published — the base every `@id` in
    * the exported graph is minted against.
    *
    * Absent means **no absolute IRIs can be minted**, which the exporter reports
@@ -792,7 +792,7 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
   /** Where CI previews are served, when that differs from `canonicalUrl`. */
   previewUrl?: string;
   /**
-   * WHAT KIND of host serves this instance's renderings.
+   * WHAT KIND of host serves this layer's renderings.
    *
    * The `publication host` axis of
    * `docs/proposals/deployment-topologies.md`, accepted 2026-09-19. Four
@@ -816,7 +816,7 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    *
    * **No `url` here, deliberately.** `canonicalUrl` already holds that fact,
    * and a second URL field is two places to disagree. A local server's
-   * address is a `--port` at run time, not a property of the instance.
+   * address is a `--port` at run time, not a property of the layer.
    */
   publication?: Publication;
   /**
@@ -824,19 +824,19 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    * {@link Topology} — every field optional, absent meaning "has not said".
    */
   topology?: Topology;
-  /** Directories this instance scans, before inheritance. */
+  /** Directories this layer scans, before inheritance. */
   directories: ContentDirectory[];
   /** The visualisers this harness declares, each at `<base>/<name>/<id>/` — {@link HarnessVisualiser}. Owner, 2026-10-09. */
   visualisers?: HarnessVisualiser[];
   /**
-   * Artefacts this instance serves and must never commit, each built at publish
+   * Artefacts this layer serves and must never commit, each built at publish
    * by the package scripts it names — {@link BuiltAtPublish}. Owner, 2026-10-14
-   * ("B1"): a page computed over the checkout's other instances, or from a
+   * ("B1"): a page computed over the checkout's other layers, or from a
    * branch-kept graph, cannot be current in a commit of this one.
    */
   builtAtPublish?: BuiltAtPublish[];
   /**
-   * The external vocabularies this instance's JSON-LD speaks, prefix →
+   * The external vocabularies this layer's JSON-LD speaks, prefix →
    * namespace IRI — {@link JsonldPrefixTable}. Owner, 2026-10-14 (bean 63q4):
    * the published context is generated from what documents use, flattened over
    * `needs`, so a vocabulary is declared by the layer that owns it.
@@ -850,9 +850,9 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
   subscriptions?: Subscription[];
   /** Substrates known to exist or planned that NO declaration here names — {@link KnownSubstrate}. Issue #1719. */
   knownSubstrates?: KnownSubstrate[];
-  /** What a downstream remote-mounts of this instance by default — `schemas/kg/remote-mount.ts`, bean `0mpw`. */
+  /** What a downstream remote-mounts of this layer by default — `schemas/kg/remote-mount.ts`, bean `0mpw`. */
   mountDefaults?: MountDefaults;
-  /** Harnesses this instance remote-mounts at a pin, transitively — `schemas/kg/remote-mount.ts`, bean `0mpw`. */
+  /** Harnesses this layer remote-mounts at a pin, transitively — `schemas/kg/remote-mount.ts`, bean `0mpw`. */
   remoteMounts?: RemoteMount[];
   /** Who may consent to a remote mount here — `schemas/kg/mount-trust.ts`, roast `1ygp` L4.2. */
   mountApprovers?: string[];
@@ -870,52 +870,52 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    *
    * Optional, and absent means **this layer contributes none** rather than
    * "unmigrated". That is the honest reading and the useful one: a bare
-   * bootstrap instance with no cat is the owner's ruling, and a default here
+   * bootstrap layer with no cat is the owner's ruling, and a default here
    * would hand one back.
    */
   stickies?: StickyContribution[];
   /**
-   * What this instance is excused from rendering, and what it carries instead.
+   * What this layer is excused from rendering, and what it carries instead.
    *
    * See {@link RenderExemption}. **Absent is the normal case** — every
-   * instance owes a visualiser per declared subgraph, which is the `2krx` QA
+   * layer owes a visualiser per declared subgraph, which is the `2krx` QA
    * axis. Present means a layer has traded that obligation for another one it
    * names, and it is refused without a `reason` and an `owes`.
    */
   renderExemption?: RenderExemption;
 
   /**
-   * The instances this one is BUILT ON — its layer stack, foundation first.
+   * The layers this one is BUILT ON — its layer stack, foundation first.
    *
    * The owner, 2026-09-20: *"So bootsteap, cat harness, fa-core, f-a, from
    * bottom to top."*
    *
    * **Absent is UNDETERMINED, `[]` is the floor**, and a consumer that
-   * treated them as the same would place every unlabelled instance beside
+   * treated them as the same would place every unlabelled layer beside
    * the bootstrap. See the schema field for why this is declared rather
    * than computed, and why it is optional.
    */
   needs?: string[];
   /**
-   * The opt-in sub-graphs this instance switches on FOR ITSELF, qualified
+   * The opt-in sub-graphs this layer switches on FOR ITSELF, qualified
    * `<instance>.<directory id>` — see the schema field and
    * `schemas/kg/opt-in-subgraphs.ts`. Not inherited by the layers above.
    */
   enableSubgraphs?: string[];
   /**
-   * Paths this instance moved and still answers for, during the window of the
+   * Paths this layer moved and still answers for, during the window of the
    * two-phase move rule (sdlc skill `two-phase-move`). See the schema field.
    */
   moves?: DeclaredMove[];
   /**
-   * What this instance's own package tasks read and write, keyed by task name
+   * What this layer's own package tasks read and write, keyed by task name
    * — the same {@link ScriptIO}-shaped facts `cat-harness-tools/scripts/task-io.ts`
    * holds for the harness's own tasks: `outputs: []` (measured to write
    * nothing, so it may run in the pool) and `inputs` (what can change the
    * answer, so `regen` may skip it on an unchanged tree; `"{tracked}"` is the
    * whole working tree). `because` keeps the measurement that justified it.
    *
-   * Declared by the instance that OWNS the task, so the harness collects it
+   * Declared by the layer that OWNS the task, so the harness collects it
    * instead of naming a layer above itself (owner ruling 2026-10-06: "each
    * instance declares its own tasks", bean `0r7u` step 0). Absent declares
    * nothing: those tasks run alone and are never skipped, the safe default.
@@ -933,7 +933,7 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
     }
   >;
   /**
-   * The CI steps and check scripts of THIS instance that the local gate set
+   * The CI steps and check scripts of THIS layer that the local gate set
    * deliberately does not run, each with its reason — the rows
    * `cat-harness-tools/scripts/gates.ts` holds as `STEP_EXEMPTIONS` and
    * `SCRIPT_EXEMPTIONS` for the harness's own. Same contract: a reason is
@@ -953,10 +953,10 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
       followUp?: string;
     }>;
     /**
-     * Files of THIS instance that one named gate's allowlist admits, each with
+     * Files of THIS layer that one named gate's allowlist admits, each with
      * its reason — `gate` is the check's script name (`check:structure-accessor`),
-     * `file` is relative to the declaring instance's root. Declared by the
-     * instance that owns the file, so the gate below it reads the entry
+     * `file` is relative to the declaring layer's root. Declared by the
+     * layer that owns the file, so the gate below it reads the entry
      * instead of naming a file of a layer above (owner, 2026-10-16, item 6b
      * of the folio-assistant#2598 wrong-direction triage). The gate decides
      * what an entry admits; a stale entry is the gate's finding, as for its
@@ -965,35 +965,35 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
     files?: Array<{ gate: string; file: string; reason: string }>;
   };
   /**
-   * The content adapters this instance SHIPS, which the harness's composition
+   * The content adapters this layer SHIPS, which the harness's composition
    * root discovers rather than names. See {@link ContentAdapterDeclaration}.
    */
   contentAdapters?: ContentAdapterDeclaration[];
   /**
-   * The LSI unit providers this instance SHIPS, which `lsi:near` discovers
+   * The LSI unit providers this layer SHIPS, which `lsi:near` discovers
    * rather than names. See {@link LsiUnitProviderDeclaration}.
    */
   lsiUnitProviders?: LsiUnitProviderDeclaration[];
   /**
-   * The translation profile of each content type THIS instance owns: which
+   * The translation profile of each content type THIS layer owns: which
    * formats it can extract and inject, and which diagrams need re-rendering.
-   * Collected by `schemas/library/translation-tools.ts` from every present instance
+   * Collected by `schemas/library/translation-tools.ts` from every present layer
    * (bean `0r7u`, step 0 part 3), so cat-harness names no content type above
-   * it. Module and diagram paths resolve from the declaring instance, then
+   * it. Module and diagram paths resolve from the declaring layer, then
    * down its `needs` chain.
    */
   contentTranslations?: ContentTypeTranslation[];
   /**
-   * The Liquid prefix this instance's VALUES are addressed by in authored
+   * The Liquid prefix this layer's VALUES are addressed by in authored
    * text — `{{ <prefix>.<directory-id>.<entry>.<path> }}` — and whether the
    * platform resolves it or passes it through.
    *
    * Owner, 2026-09-30 (bean `kott`, issue #1564), paraphrased: `{{ site.data... }}`
-   * is the prefix the IG-pipeline layer declares for itself, every instance
+   * is the prefix the IG-pipeline layer declares for itself, every layer
    * declares its own site prefix (bootstrap's is `{{ bootstrap.... }}`), so the
    * existing IG Publisher works as is.
    *
-   * **Absent means the default: the prefix is the instance's `name`, resolved
+   * **Absent means the default: the prefix is the layer's `name`, resolved
    * by the platform.** `passThrough: true` hands the prefix to the downstream
    * engine untouched — the FHIR IG layer declares `site.data`, which Jekyll and the
    * IG Publisher resolve themselves.
@@ -1038,7 +1038,7 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    *
    * No range syntax, ever (`instance-versioning.md` §2 rule 2). FHIR pins exact
    * versions and `dependsOn` has no field a range fits, and aligning downstream
-   * is the owner's hard constraint rather than a preference — some instances
+   * is the owner's hard constraint rather than a preference — some layers
    * here are consumed from outside this monorepo.
    *
    * `current` and `dev` are FHIR's pseudo-versions for "the latest CI build"
@@ -1051,12 +1051,12 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    *
    * **Universal, and enforced by the GATE rather than by this type.** Owner's
    * ruling, 2026-09-23: *"all assets get a version"*. All 17 carry one, and
-   * `check:publishable` fails an instance without one.
+   * `check:publishable` fails a layer without one.
    *
    * It is not `required` HERE because making it so breaks **376 tests across
    * 20+ files** — every fixture that builds a declaration without it. A sweep
    * that size hides a real regression among the noise, and the property asked
-   * for is delivered either way: the corpus is complete, and a new instance
+   * for is delivered either way: the corpus is complete, and a new layer
    * with no version does not pass.
    *
    * §3.1 originally REFUSED one unless `publishable: true`, on the premise
@@ -1073,7 +1073,7 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
  * "skip"` said whether an instance inheriting a directory got its own copy.
  * The owner: "make dependents: reproduce automatic behaviour so [we] don't
  * need it." Every declared subgraph is now inherited automatically — each
- * instance in the chain whose same-named directory exists is a MEMBER of it
+ * layer in the chain whose same-named directory exists is a MEMBER of it
  * ({@link ResolvedDirectory.member}) — and whether an inherited directory is
  * CREATED is a fact about its graph typology, `GraphTypologyDef.perInstance`, stated
  * once rather than per entry (the per-entry field disagreed with itself:
@@ -1087,11 +1087,11 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
  *
  * ## Why this is separate from {@link ContentDirectorySchema}
  *
- * One schema served two jobs that differ in exactly one respect. An INSTANCE
+ * One schema served two jobs that differ in exactly one respect. A LAYER
  * directory can be inherited by a dependent, so "does a dependent get its own?"
  * is a real question about it. A GRAPH NODE — `beans/defs`, `todos/feedback` —
  * lives inside a graph that is inherited or not as a whole; nothing ever
- * resolves a node across instances, so the question has no answer there.
+ * resolves a node across layers, so the question has no answer there.
  *
  * Making `dependents` required on the shared schema forced every graph node to
  * state something meaningless, and a required field that is sometimes noise is
@@ -1176,13 +1176,13 @@ export const GraphNodeDirectoryShape = z.object({
     .object({ reason: z.string().min(1, "an absent directory's reason cannot be empty") })
     .optional(),
   /**
-   * This entry is an instance SUBGRAPH, not a part of its parent's graph.
+   * This entry is a layer SUBGRAPH, not a part of its parent's graph.
    *
    * Bean `cmsl`: `resolveDirectories` lists a `"subgraph": true` entry exactly
    * as if `<instance>.json` had declared it (`skills.json`'s `voices`,
    * `beans.json`'s `queue`), while an entry without the marker — `beans.json`'s
    * `defs`, `docs.json`'s `proposals` — is one graph's interior and stays out
-   * of the instance list.
+   * of the layer list.
    *
    * Declared here because `promoteFromWithin` has read it off the raw JSON
    * since `cmsl` and this schema did not carry it, so every consumer going
@@ -1318,7 +1318,7 @@ export const VisualisationSchema = z.object({
    * nowhere — which is `reader-filter.ts`'s rule on another surface.
    */
   hidden: z.boolean().optional(),
-  /** The tile's theme, by reference (#1168 B8). Absent means the directory's, then the instance's. */
+  /** The tile's theme, by reference (#1168 B8). Absent means the directory's, then the layer's. */
   theme: ThemeRefSchema.optional(),
   /**
    * WHICH GLYPH the tile wears, by NAME. Absent falls back to the generic
@@ -1328,7 +1328,7 @@ export const VisualisationSchema = z.object({
    *
    * `tileLink` assigns its glyph with `innerHTML`. A field carrying SVG would
    * therefore make a DECLARATION an HTML injection site — and a declaration is
-   * inherited: a dependency's `<instance>.json` reaches this instance through
+   * inherited: a dependency's `<instance>.json` reaches this layer through
    * `resolveSkillDirs`, so the markup would not even have to be written by
    * somebody with commit access here.
    *
@@ -1488,17 +1488,17 @@ export function showsOn(v: Visualisation, surface: TileSurface): boolean {
 export const SubgraphCoverageSchema = z.object({
   /**
    * The page that renders this subgraph, **relative to the REPOSITORY root**
-   * — not to the instance, which is what the sibling `path` on
+   * — not to the layer, which is what the sibling `path` on
    * {@link ContentDirectorySchema} is relative to.
    *
    * The two bases differ and nothing said so until 2026-09-20. Measured then
    * across both declarations in this repository: of 27 coverage paths, **25
    * resolve only from the repo root**, 2 from both (the root declaration's
-   * own, where the two roots coincide) and **none** from the instance root
+   * own, where the two roots coincide) and **none** from the layer root
    * alone.
    *
    * It is worth stating here rather than leaving to be rediscovered, because
-   * a consumer whose instance root is a subdirectory gets a plausible wrong
+   * a consumer whose layer root is a subdirectory gets a plausible wrong
    * answer rather than an error: `state-visualizer.ts` runs with
    * `ROOT = cat-harness/`, so `join(ROOT, cov)` finds nothing and reports
    * every declared visualiser as absent. That very nearly shipped as a page
@@ -1541,7 +1541,7 @@ export const SubgraphCoverageSchema = z.object({
    * rather than a silence. This one does not, on the owner's ruling,
    * 2026-09-20: *"harnesses cannot override there being in the KG."*
    *
-   * An instance may decide nothing renders a directory, nothing documents it
+   * A layer may decide nothing renders a directory, nothing documents it
    * and nothing governs it — those are choices about EFFORT. Whether its nodes
    * are addressable is not a choice about effort, it is the claim that they
    * are in the graph at all. A harness that could waive it could declare a
@@ -1639,7 +1639,7 @@ export type SubgraphCoverage = z.infer<typeof SubgraphCoverageSchema>;
  * misclassification rather than an obstacle produced the better placement.
  *
  * WHERE IT ATTACHES is per graph — issue #764, O2, settled 2026-09-22 — on
- * {@link ContentDirectorySchema}, beside `graphTypologies`. Per instance
+ * {@link ContentDirectorySchema}, beside `graphTypologies`. Per layer
  * cannot distinguish the two graphs one folio shows (F2: the library and the
  * working documents, and which one a node came from must stay visible); per
  * node kind inverts F1, where a folio renders nodes of OTHER objects and a
@@ -1688,20 +1688,20 @@ export type Tile = z.infer<typeof TileSchema>;
  *
  * ## What it covers
  *
- * - `covers` — directory ids THIS instance declares. A harness names its own
- *   directories, never another instance's: that would be a lower layer naming
+ * - `covers` — directory ids THIS layer declares. A harness names its own
+ *   directories, never another layer's: that would be a lower layer naming
  *   a higher one.
  * - `coversKinds` — graph typologies, over every declared directory of those
  *   kinds in the checkout: the "full KG" a corpus-wide viewer draws. That is
  *   how cat-harness's library viewer covers the IRIS replica's library without
- *   naming it — a kind is vocabulary, not another instance's directory.
+ *   naming it — a kind is vocabulary, not another layer's directory.
  *
  * At least one is required: a visualiser covering nothing is a page nothing
  * can open.
  *
  * ## `subgraphs` — what `<visualiser>/<sub-graph>/` names
  *
- * `instance` — one page per covered instance (`cat-harness/library/<instance>/`);
+ * `instance` — one page per covered layer (`cat-harness/library/<instance>/`);
  * `directory` — one per covered directory id. Absent: the visualiser draws
  * the full view only. Readers use it to send a directory's tile to its
  * sub-graph page rather than the full one.
@@ -1728,7 +1728,7 @@ export const HarnessVisualiserSchema = TileSchema.extend({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "a URL segment: lower-case letters, digits, hyphens"),
   /** The Tool node that draws it. */
   renderedBy: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "a Tool node id"),
-  /** This instance's directory ids it covers. */
+  /** This layer's directory ids it covers. */
   covers: z.array(z.string().min(1)).nonempty().optional(),
   /** Graph typologies it covers, over every declared directory of them in the checkout. */
   coversKinds: z.array(z.string().min(1)).nonempty().optional(),
@@ -1925,7 +1925,7 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    * `held` keeps every entry out of `summaries:next` and out of the backlog,
    * and the listing names it as held rather than dropping it — "never
    * offered" must not read as "nothing to do". A property of the directory,
-   * declared by the instance that OWNS it: the owner held agent-skills'
+   * declared by the layer that OWNS it: the owner held agent-skills'
    * library back on 2026-09-24, and while that lived only as prose on the
    * bean, `summaries:next` handed its blocks out FIRST.
    */
@@ -1959,12 +1959,12 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    * owner 2026-09-22. The vocabulary is `VISUALISER_KINDS` and the argument
    * for its single member is there; this is where it attaches.
    *
-   * ## Why here rather than on the instance or on a node kind
+   * ## Why here rather than on the layer or on a node kind
    *
-   * Per instance cannot answer it. F2 of the spec: a folio shows the LIBRARY
+   * Per layer cannot answer it. F2 of the spec: a folio shows the LIBRARY
    * (static) and the WORKING documents, assets and artefacts (dynamic), and
    * which of the two a node came from must stay visible — so the graph is
-   * already the unit carrying that provenance, and one answer per instance
+   * already the unit carrying that provenance, and one answer per layer
    * would flatten exactly the distinction the folio has to draw.
    *
    * Per node kind inverts F1, where a folio renders nodes of OTHER objects.
@@ -2046,13 +2046,13 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    */
   readOnlyBasis: z.string().min(1).optional(),
   /**
-   * This directory is what answers at the instance's own route, `/<instance>/`.
+   * This directory is what answers at the layer's own route, `/<instance>/`.
    *
-   * `mount-instance-docs.ts` publishes an instance's content twice: at
+   * `mount-instance-docs.ts` publishes a layer's content twice: at
    * `/<kind>/<instance>/` for every renderable kind it declares, and once at
-   * `/<instance>/` — the instance's themed root, per the owner's 2026-09-20
+   * `/<instance>/` — the layer's themed root, per the owner's 2026-09-20
    * ruling (paraphrased) that `/docs/<instance>/` is the cat-harness handler's
-   * default for an instance's docs, and the instance's own themed site is at
+   * default for a layer's docs, and the layer's own themed site is at
    * `/<instance>/`.
    *
    * **Until this field existed, the second route went to whichever kind sorted
@@ -2062,7 +2062,7 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    * concrete, because `docs` sorts first and the themed root would have served
    * the documentation, contradicting the ruling it was implementing.
    *
-   * Optional, because an instance declaring ONE renderable kind has nothing to
+   * Optional, because a layer declaring ONE renderable kind has nothing to
    * choose. With several and none marked, the mount reports the root as
    * UNDETERMINED and keeps the deterministic order rather than silently
    * picking — a site must serve something there, and a quiet pick is how the
@@ -2075,15 +2075,15 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    *
    * The case it exists for is a directory that WAS mounted and stopped being:
    * its kind route was a live URL, somebody may have linked it, and a route
-   * that simply vanishes turns every such link into a 404. Bean `2b5s`: an
-   * instance's `library/` held both its rendered pages and its corpus, the
+   * that simply vanishes turns every such link into a 404. Bean `2b5s`: a
+   * layer's `library/` held both its rendered pages and its corpus, the
    * mount copied the corpus to two routes, and moving the pages out left
    * `/library/<instance>/` with nothing to serve.
    *
    * **Declared, not inferred.** "Was this route ever published" is a fact
    * about history, which a checkout does not hold; deriving the redirect from
    * "has a published viewer and no index" instead would emit one stub per
-   * such directory in every instance — 38 declared entries on 2026-09-30, several at routes
+   * such directory in every layer — 38 declared entries on 2026-09-30, several at routes
    * Jekyll already serves. `mount-instance-docs.ts` refuses the redirect,
    * naming it, when the directory IS mountable (a route cannot be both a
    * mount and a redirect) or declares no published viewer (a redirect to
@@ -2131,7 +2131,7 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    * This directory is AUTHORED FOR THE SITE'S PIPELINE, so compose it into the
    * Jekyll source instead of mounting its built output.
    *
-   * Two ways an instance's content can reach the site, and they are not
+   * Two ways a layer's content can reach the site, and they are not
    * interchangeable:
    *
    * | | when | what it gets |
@@ -2160,14 +2160,14 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    */
   composed: z.boolean().optional(),
   /**
-   * This directory is built INTO the instance's own IG site, which is served
+   * This directory is built INTO the layer's own IG site, which is served
    * at `/<instance>/` — never composed into the main site.
    *
-   * An instance that mirrors a FHIR IG and records its source
+   * A layer that mirrors a FHIR IG and records its source
    * (`fhir-artifact-index/menu.json`) gets one Jekyll site of its own, built
    * by the FHIR IG layer's `scripts/stage-ig-sites.ts` from the IG's narrative pages
    * (bean `bamf`). Without this field that site sits at `/<instance>/ig/`
-   * BESIDE the instance's composed pages: two sites, two menus, and the
+   * BESIDE the layer's composed pages: two sites, two menus, and the
    * reader at `/<instance>/` sees only the artefact index. With it, the IG
    * site IS `/<instance>/` and this directory's pages (the artefact pages and
    * their assets) build inside it, under the IG's own menu — one site, as the
@@ -2249,7 +2249,7 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
   /**
    * Where this subgraph gets its CONTENT — the checkout's own directory (the
    * default, so absent means `{ kind: "directory" }`) or a declared repository
-   * branch, with room for a later kind. The instance config may override it
+   * branch, with room for a later kind. The layer config may override it
    * by id. Resolve it with `resolveSubgraphSource`, never by reading this
    * field: the override and #1764's `storage` are folded in there, once.
    * See `schemas/kg/subgraph-source.ts` — bean `l4ay`, owner 2026-10-03.
@@ -2257,7 +2257,7 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
   source: SubgraphSourceSchema.optional(),
 });
 
-/** As {@link GraphNodeDirectorySchema}, for an instance's own directories. */
+/** As {@link GraphNodeDirectorySchema}, for a layer's own directories. */
 export const ContentDirectorySchema = z.preprocess(
   acceptLegacyGraphsKey,
   // A `qa` directory is commit-keyed by construction: its readers compare one
@@ -2304,15 +2304,15 @@ export const ContentDirectorySchema = z.preprocess(
 // one declaration for the content, and `lang` on the file.
 
 /**
- * The conventional directories every instance gets without declaring them.
+ * The conventional directories every layer gets without declaring them.
  *
  * ## Why defaults live in the CONTAINER SCHEMA
  *
  * The owner, 2026-09-19: *"inherit, set default dirs/graphs in container
- * schema definitions."* An instance that follows the convention should declare
+ * schema definitions."* A layer that follows the convention should declare
  * NOTHING — the friction of a new topical directory ought to be a line, and
  * the friction of a conventional one ought to be zero. Before this, every
- * instance restated the same seven entries, which is seven chances to disagree
+ * layer restated the same seven entries, which is seven chances to disagree
  * with the platform about what `beans/` is.
  *
  * `resolveDirectories` seeds from these and the declaration chain overrides
@@ -2325,12 +2325,12 @@ export const ContentDirectorySchema = z.preprocess(
  * They are filtered by existence at resolve time, and that is not an
  * optimisation. `AGENTS.md`: *"Declare only what exists — a declared-but-absent
  * directory is the bean `dh4f` defect, where a consumer scans nothing and
- * reports a clean run over it."* Seeding a default for `voices/` into an
- * instance with no voices would manufacture exactly that, at scale, in every
- * instance at once.
+ * reports a clean run over it."* Seeding a default for `voices/` into a
+ * layer with no voices would manufacture exactly that, at scale, in every
+ * layer at once.
  *
  * An EXPLICIT declaration is honoured whether or not the directory is there:
- * that is the instance asserting something, and `readDeclaration` already
+ * that is the layer asserting something, and `readDeclaration` already
  * refuses a declaration it cannot read. A default is the platform guessing,
  * and a guess has to be checked.
  *
@@ -2344,13 +2344,13 @@ export const ContentDirectorySchema = z.preprocess(
  */
 // declared-path-literal: THE BASE CASE. These ARE the defaults every other
 // site reads through `resolveDirectories`; reading a declaration to learn the
-// fallback for an instance that has none is not a thing that can be done.
+// fallback for a layer that has none is not a thing that can be done.
 export const DEFAULT_DIRECTORIES: readonly ContentDirectory[] = [
   // `dependents` on the CONVENTIONAL set, classified by the same question as
   // every declared entry: would a folio depending on this one want its own?
   //
   // The four `skip` entries are the platform's own machinery — a folio reads
-  // this instance's schemas, tools and skills through the overlay and has no
+  // this layer's schemas, tools and skills through the overlay and has no
   // use for four empty directories bearing those names. The four `reproduce`
   // entries are the shape a folio HAS: its own work plan, its own todos, its
   // own ingestion queue, its own L1 library.
@@ -2364,20 +2364,20 @@ export const DEFAULT_DIRECTORIES: readonly ContentDirectory[] = [
   { id: "tools", path: "tools/", graphTypologies: ["tools"] },
   { id: "schemas", path: "schemas/", graphTypologies: ["schemas", "cat-harness"] },
   { id: "skills", path: "skills/", graphTypologies: ["skills"] },
-  // THE CONVENTION, as of 2026-09-21: an instance's Knowledge Graph is five sibling
+  // THE CONVENTION, as of 2026-09-21: a layer's Knowledge Graph is five sibling
   // directories rather than one with subdirectories. `scenarios/` and
   // `processes/` were `skills/roles/` and `skills/workflows/`, found by
   // walking down from the skills root.
   //
   // They are listed here and not only in the declarations because
-  // `DEFAULT_DIRECTORIES` is what an instance with NO declaration resolves
+  // `DEFAULT_DIRECTORIES` is what a layer with NO declaration resolves
   // against — AGENTS.md: "an unmigrated instance falls back to today's
   // conventions". Leaving them out made that fallback describe yesterday's,
   // which is how the workflow-coverage fixtures went blind: they write a
   // temp root with no declaration, so every diagram they create resolved
   // through this list or not at all.
   //
-  // Existence-filtered like every other entry, so an instance that has no
+  // Existence-filtered like every other entry, so a layer that has no
   // `processes/` is not claimed to have an empty one — the `dh4f` defect.
   { id: "scenarios", path: "scenarios/", graphTypologies: ["scenarios"] },
   { id: "processes", path: "processes/", graphTypologies: ["processes"] },
@@ -2392,7 +2392,7 @@ export const DEFAULT_DIRECTORIES: readonly ContentDirectory[] = [
   // day: this said `voices/` while that said `skills/voices`.
   //
   // The disagreement was harmless only by accident — `resolveDirectories`
-  // drops an entry whose directory is absent, so an undeclared instance with
+  // drops an entry whose directory is absent, so an undeclared layer with
   // voices under `skills/` got `undefined` here and fell through to
   // `VOICES_DIR`. An accident is not a mechanism, and the next reader would
   // have had to rediscover it to know which of the two was right.
@@ -2404,7 +2404,7 @@ export const DEFAULT_DIRECTORIES: readonly ContentDirectory[] = [
 ];
 
 /**
- * The kinds of host that can serve an instance's renderings.
+ * The kinds of host that can serve a layer's renderings.
  *
  * The values are the `publication host` axis of
  * `docs/proposals/deployment-topologies.md` verbatim. Keep them in step: the
@@ -2431,7 +2431,7 @@ export interface Publication {
    */
   host?: PublicationHost;
   /**
-   * WHAT STATE this instance's publication is in. `draft`, always, today.
+   * WHAT STATE this layer's publication is in. `draft`, always, today.
    *
    * **The discipline is in the skill, not here** —
    * `skills/kg/kg-core/instance-publication.md`. Owner's ruling, 2026-09-23:
@@ -2451,7 +2451,7 @@ export interface Publication {
    * flag is a gate somebody switches off. Absent means `draft`.
    *
    * It replaced the top-level `publishable?: boolean`, whose three states
-   * could not express what was true: all 17 instances reported `undecided`
+   * could not express what was true: all 17 layers reported `undecided`
    * while the answer was known for every one of them. A third state that
    * cannot say what is the case is a missing value, not a third state.
    */
@@ -2531,11 +2531,11 @@ export const VISIBILITIES = ["public", "private", "internal"] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
 
 /**
- * The topology axes an instance declares about ITSELF.
+ * The topology axes a layer declares about ITSELF.
  *
  * ## The ten axes from deployment-topologies.md
  *
- * Ten axes model WHERE the instance and its artefacts live. Each field is
+ * Ten axes model WHERE the layer and its artefacts live. Each field is
  * optional, and absent means "has not said", never a default.
  *
  * **`publication.host` is axis 3 and lives on {@link Publication}** rather than
@@ -2737,7 +2737,7 @@ export class TopologyConflictError extends Error {
 }
 
 /**
- * A graph this instance KNOWS ABOUT but does not hold.
+ * A graph this layer KNOWS ABOUT but does not hold.
  *
  * The owner, 2026-09-20: *"any top level repos or KGs in the repo, or
  * navigable if external/remote pointed to in the core harness schema (need to
@@ -2766,13 +2766,13 @@ export class TopologyConflictError extends Error {
  * **referenced** (we know it exists and where, we hold none of it).
  *
  * A reader may FOLLOW a remote graph — the KG viewer does, to keep a hierarchy
- * of named subgraphs navigable across instances that are not in this checkout.
+ * of named subgraphs navigable across layers that are not in this checkout.
  * Anything that wants the CONTENTS goes through `materialize-remote`: the five
  * gates and a declared purpose, rather than fetching it merely because it has
  * an address.
  */
 export interface RemoteGraph extends KgNodeLabels {
-  /** Stable identifier, unique within an instance — as on a directory, and for the same reason. */
+  /** Stable identifier, unique within a layer — as on a directory, and for the same reason. */
   id: string;
   /** Where it is. A reader may follow this; a consumer wanting its bytes may not, without the gates. */
   url: string;
@@ -2781,7 +2781,7 @@ export interface RemoteGraph extends KgNodeLabels {
 }
 
 /**
- * A HARNESS this instance is associated with: another instance, with its own
+ * A HARNESS this layer is associated with: another layer, with its own
  * declaration, properties and graphs, that lives ELSEWHERE — its own repository
  * and its own site. Issue #1146. Owner, 2026-09-23: *"we need a good mechanism for
  * 'associated' harnessed KGs. it should be an optional list property of any
@@ -2791,7 +2791,7 @@ export interface RemoteGraph extends KgNodeLabels {
  * ## Not a remote graph, not a dependency
  *
  * - {@link RemoteGraph} is a GRAPH known but not held: graph typologies at a URL. An
- *   associated harness is an INSTANCE — a declaration of its own — so it is a
+ *   associated harness is a LAYER — a declaration of its own — so it is a
  *   separate list, not a `RemoteGraph` with more fields.
  * - It is **not** `needs`: it fixes no build order, adds nothing to the overlay,
  *   resolves no skills, and nothing here is materialized. It is the fourth
@@ -2803,7 +2803,7 @@ export interface RemoteGraph extends KgNodeLabels {
  * its ✎ points (never this checkout's `origin`).
  */
 export interface AssociatedHarness {
-  /** The associated harness's instance name, as ITS declaration gives it. Unique within this list. */
+  /** The associated harness's layer name, as ITS declaration gives it. Unique within this list. */
   name: string;
   /** Human title, as its declaration gives it. */
   title?: string;
@@ -2819,7 +2819,7 @@ export interface AssociatedHarness {
   note?: string;
 }
 
-/** The `name` grammar instance names already follow: lowercase, digits, hyphens. */
+/** The `name` grammar layer names already follow: lowercase, digits, hyphens. */
 const INSTANCE_NAME = /^[a-z0-9][a-z0-9-]*$/;
 
 export const AssociatedHarnessSchema = z
@@ -2939,23 +2939,23 @@ export const SubscriptionSchema = z
  * Issue #1719, owner: *"cat-harness should list known substrates now and as
  * part of separation plans."*
  *
- * **Hand-entered only where no fact already exists.** Every staged instance
+ * **Hand-entered only where no fact already exists.** Every staged layer
  * already declares its planned `repository` (#1652), and every associated
  * harness its `repository`, so the registry DERIVES those rows. Listing them
  * again here would be a second copy of a fact, free to drift. This list is for
- * the rest: a proposed substrate with no instance yet (the WHO World Health
+ * the rest: a proposed substrate with no layer yet (the WHO World Health
  * Data Hub), or a status only a person knows (a repository created today).
  * `scripts/subscriptions-viz.ts` merges the two, and a hand row overrides a
  * derived one by `name`.
  */
 export interface KnownSubstrate {
-  /** The substrate's instance name, as its declaration gives it or will. */
+  /** The substrate's layer name, as its declaration gives it or will. */
   name: string;
   /** Human title. */
   title?: string;
   /** `owner/repo`, when one exists or is planned. */
   repository?: RepoFullName;
-  /** Where it stands: proposed (an idea), planned (a staged instance), exists (a repository), published (a release). */
+  /** Where it stands: proposed (an idea), planned (a staged layer), exists (a repository), published (a release). */
   status: "proposed" | "planned" | "exists" | "published";
   /** Its paired tools repository, when the `kg-separation` pattern gives it one. */
   toolsRepository?: RepoFullName;
@@ -3002,7 +3002,7 @@ export const RemoteGraphSchema = z
  */
 
 /**
- * What a {@link RenderExemption} may excuse an instance from.
+ * What a {@link RenderExemption} may excuse a layer from.
  *
  * Two entries, because the owner named two and they fail differently: a
  * subgraph nobody can look at, and a process nobody can look at. Closed, so a
@@ -3012,7 +3012,7 @@ export const RENDER_OBLIGATIONS = [
   "visualiser",
   "workflow-visualiser",
   /**
-   * The instance's OWN `docs/` — its source documentation, at
+   * The layer's OWN `docs/` — its source documentation, at
    * `<instance>/docs/`, as against a handler's rendering of it.
    *
    * Added 2026-09-21 for bean `op30`, and it reuses this mechanism rather than
@@ -3025,14 +3025,14 @@ export const RENDER_OBLIGATIONS = [
 export type RenderObligation = (typeof RENDER_OBLIGATIONS)[number];
 
 /**
- * An instance's declared exemption from the rendering obligations, with a
+ * A layer's declared exemption from the rendering obligations, with a
  * reason and a substitute.
  *
  * ## The rule this encodes is a FLOOR THAT RISES, not a flat requirement
  *
  * [`cat-harness-minimum`](../docs/architecture/cat-harness-minimum.md) carries
  * *"if it produces something a human looks at, it is not the harness"*, and
- * the same architecture states that an instance renders by default. Read
+ * the same architecture states that a layer renders by default. Read
  * flatly the two cannot both hold. The owner settled it on 2026-09-20: the
  * requirement **starts** at `cat-harness` rather than applying uniformly.
  *
@@ -3060,7 +3060,7 @@ export type RenderObligation = (typeof RENDER_OBLIGATIONS)[number];
  *
  * ## Declared locally, validated globally
  *
- * The declaration is local because only the instance knows why. The guard
+ * The declaration is local because only the layer knows why. The guard
  * against the exemption SPREADING is not — {@link renderExemptionProblems}
  * takes the count of claimants across the repository, because "only the bottom
  * layer may claim this" is a fact about the stack and cannot be seen from one
@@ -3081,10 +3081,10 @@ export interface RenderExemption {
    */
   owes: string;
   /**
-   * Where the instance IS reachable, since it renders nothing of its own.
+   * Where the layer IS reachable, since it renders nothing of its own.
    *
-   * One of the instance's OWN files, relative to its own directory and
-   * inside it — e.g. `README.md`. The site build publishes the instance's
+   * One of the layer's OWN files, relative to its own directory and
+   * inside it — e.g. `README.md`. The site build publishes the layer's
    * files at `<base>/<stub>/` (`publish-instance-files.ts`), rendering `.md`
    * as `.html`, and the tab links there.
    *
@@ -3110,7 +3110,7 @@ export interface RenderExemption {
    *
    * ## Optional, and absent is a real state
    *
-   * An exempt instance with nothing published about it anywhere has no
+   * An exempt layer with nothing published about it anywhere has no
    * honest target, and a link invented for it would 404. Absent leaves the
    * tab unlinked, which is what it should be in that case.
    *
@@ -3129,12 +3129,12 @@ export const RenderExemptionSchema = z.object({
 });
 
 /**
- * Is this instance excused from `obligation`?
+ * Is this layer excused from `obligation`?
  *
  * The predicate the `2krx` axis calls before raising a no-visualiser finding,
  * so the exemption is read from the declaration rather than from a hardcoded
- * instance name in the checker. A name literal would make the rule true only
- * for the one instance somebody remembered.
+ * layer name in the checker. A name literal would make the rule true only
+ * for the one layer somebody remembered.
  */
 export function isExemptFrom(
   d: Pick<CatHarnessDeclaration, "renderExemption">,
@@ -3184,7 +3184,7 @@ export function renderExemptionProblems(
 }
 
 /**
- * The navbar icon row — WHICH icons, declared per instance.
+ * The navbar icon row — WHICH icons, declared per layer.
  *
  * Owner, 2026-09-22: *"[x] should be on the navbar w/ other icons, can make
  * two lines avatar+name of harness/catalogue/sub-grrraph as approrirate, the
@@ -3195,7 +3195,7 @@ export function renderExemptionProblems(
  * ## A CLOSED set, not free strings
  *
  * Each id is an affordance the navbar knows how to render and where to point.
- * A free string would let an instance name an icon nothing draws, and the
+ * A free string would let a layer name an icon nothing draws, and the
  * failure would be a silent gap in a row capped at six — `pb04` one layer up
  * from a dead link: a slot that renders nothing reads as a navbar that lost
  * something.
@@ -3210,8 +3210,8 @@ export function renderExemptionProblems(
  * row globe was tried and taken out the same day: the owner kept ONE globe,
  * the locale toggle in the glass band (#2211).
  *
- * Refused rather than truncated. Truncating drops whichever the instance
- * listed last, silently, and an instance that declared seven has made a
+ * Refused rather than truncated. Truncating drops whichever the layer
+ * listed last, silently, and a layer that declared seven has made a
  * decision the navbar would then be overruling without saying so.
  */
 export const NAVBAR_ICONS = ["close", "todos", "beans", "processes", "kg", "fsh-guts", "launcher", "qr"] as const;
@@ -3235,7 +3235,7 @@ export const NavbarIconsSchema = z
  *
  * ## Declared here, not hard-coded per surface
  *
- * The pinned set is a property of the instance, inherited like
+ * The pinned set is a property of the layer, inherited like
  * {@link NavbarIconsSchema} (absent inherits, `[]` pins nothing), so a folio
  * that wants a different strip says so in its own declaration rather than in
  * `docs-ui.js`.
@@ -3273,14 +3273,14 @@ export const GlassStripSchema = z
   });
 
 /**
- * Which icons an instance's navbar row shows, after inheritance.
+ * Which icons a layer's navbar row shows, after inheritance.
  *
  * Owner: *"should be in each harness config which are shown (so some could
  * show none, but make this default in cat-harness that is inherited)."*
  *
  * ## The walk is `needs`, because that is the inheritance this repo already has
  *
- * Nearest declaration wins: the instance itself, then its `needs` chain toward
+ * Nearest declaration wins: the layer itself, then its `needs` chain toward
  * the foundation, breadth-first so a nearer layer beats a deeper one. It is
  * the same direction `resolveSkillDirs` composes and the same spine `builtOn`
  * documents — a second traversal would be a second answer to "what is this
@@ -3288,24 +3288,24 @@ export const GlassStripSchema = z
  *
  * ## `[]` STOPS the walk; absent continues it
  *
- * An instance that declares `[]` has said "show none", and inheriting over
- * that would overrule a decision it made. An instance that declares nothing
+ * A layer that declares `[]` has said "show none", and inheriting over
+ * that would overrule a decision it made. A layer that declares nothing
  * has said nothing. The two are different answers and this function must not
  * turn one into the other — which is why the guard is `!== undefined` rather
  * than a truthiness test, the shape that collapses exactly this distinction.
  *
  * ## `undefined` is the THIRD state and callers must not render it as none
  *
- * Returned when neither the instance nor anything it needs has decided, and
+ * Returned when neither the layer nor anything it needs has decided, and
  * `floor` has not either. "Nobody has said" is not "nothing to show": a caller
- * that draws an empty row for it reports an un-migrated instance as a
+ * that draws an empty row for it reports an un-migrated layer as a
  * deliberate one. Report it.
  *
- * @param name the instance to resolve
- * @param declared every instance's own value, keyed by name — absent key and
+ * @param name the layer to resolve
+ * @param declared every layer's own value, keyed by name — absent key and
  *   `undefined` value both mean "did not declare"
- * @param needs each instance's dependency names
- * @param floor the instance whose list is the default when nothing else has
+ * @param needs each layer's dependency names
+ * @param floor the layer whose list is the default when nothing else has
  *   decided; `cat-harness` here, passed rather than named so this function
  *   does not know which repository it is in
  */
@@ -3358,7 +3358,7 @@ export function resolveInherited<T>(
  * matters most: **FHIR pins exact versions and has no way to express a range**,
  * so a downstream that must align to FHIR cannot be handed `^1.2.0`. The
  * constraint is alignment, and alignment is not a preference here — the owner
- * called it a hard constraint on 2026-09-20 because some instances are
+ * called it a hard constraint on 2026-09-20 because some layers are
  * consumed from outside this monorepo.
  *
  * `current` and `dev` are FHIR's pseudo-versions for "the latest CI build"
@@ -3391,7 +3391,7 @@ export const ExactVersionSchema = z
 
 
 /**
- * The `$schema` an instance declaration carries: `cat-harness-declaration/1.0.0`.
+ * The `$schema` a layer declaration carries: `cat-harness-declaration/1.0.0`.
  *
  * Bean `ujiv` (issue #88). A declaration is a node kind like any other file
  * that says what it is, but it sits in no typology directory — it is found by
@@ -3406,10 +3406,10 @@ export const CAT_HARNESS_DECLARATION_SCHEMA_TAG = "cat-harness-declaration/1.0.0
  * does not, each with its reason — read by the tools layer's `gates.ts`
  * (beans `0r7u`, `ot9a`).
  *
- * Declared by whoever OWNS what is exempted: an instance for its own scripts
+ * Declared by whoever OWNS what is exempted: a layer for its own scripts
  * and steps (`gateExemptions` on its declaration), and an index for the steps
  * of its own workflows (`gateExemptions` in `index.config.json`). An index
- * declares no instance, so before this its workflow steps were exempted from
+ * declares no layer, so before this its workflow steps were exempted from
  * a layer's declaration instead, AHEAD of the workflow change — and a layer
  * re-pinned before the workflow landed carried an exemption that matched
  * nothing CI ran (`qa:publish --add`, 2026-10-14).
@@ -3485,19 +3485,19 @@ const catHarnessDeclarationShape = {
    *
    * `ob3m` findings 4 and 5: the landing's harness sections printed the
    * declaration's `description`, which here is authoring text — a naming
-   * rationale in one instance, a run of alternative spellings in another.
+   * rationale in one layer, a run of alternative spellings in another.
    * The landing shows this instead when it is present, and the description
    * when it is not, so an undeclared summary is today's behaviour.
    */
   summary: z.string().min(1).optional(),
   /**
-   * Other ways the instance's name is written, shown on the landing as a small
+   * Other ways the layer's name is written, shown on the landing as a small
    * "also written" list rather than run into the description as one line.
    * Owner's choice, 2026-10-01: keep the spellings visible, as a list.
    */
   alsoWritten: z.array(z.string().min(1)).nonempty().optional(),
   /**
-   * The namespace this instance's skills take when they are INSTALLED into an
+   * The namespace this layer's skills take when they are INSTALLED into an
    * agent host (Claude Code, Antigravity, …): a skill `todo-manager` installs
    * as `<skillPrefix>-todo-manager`, so two harnesses' skills, or a harness's
    * and the host's own, cannot collide.
@@ -3506,8 +3506,8 @@ const catHarnessDeclarationShape = {
    * **at install** — nothing in the repository is renamed, so manifests, BPMN
    * `folio:skill` refs and cross-references keep the bare name — and it is
    * **per harness**, declared here (`cat` for cat-harness, `fa` for
-   * folio-assistant), not one global `fa-`. The install layer reads it; an
-   * instance that declares none takes the prefix of the harness it is
+   * folio-assistant), not one global `fa-`. The install layer reads it; a
+   * layer that declares none takes the prefix of the harness it is
    * installed from.
    *
    * Lowercase letters and digits, starting with a letter: it becomes part of
@@ -3515,9 +3515,9 @@ const catHarnessDeclarationShape = {
    */
   skillPrefix: z.string().regex(/^[a-z][a-z0-9]*$/).optional(),
   /**
-   * The instance's mark — the same shape a kind node carries (bean sod4 #4).
+   * The layer's mark — the same shape a kind node carries (bean sod4 #4).
    * It sat in `schemas/content/avatars.ts`'s AVATARS beside the kinds' until
-   * 2026-10-05, so a new instance needed an edit to cat-harness to get a face;
+   * 2026-10-05, so a new layer needed an edit to cat-harness to get a face;
    * declared here, it brings its own. `avatarFor(name)` reads it.
    */
   avatar: KindAvatarSchema.optional(),
@@ -3526,63 +3526,63 @@ const catHarnessDeclarationShape = {
    * Declared non-image artefacts — `AGENTS.md` first among them.
    *
    * Optional, and absent is the unmigrated case rather than "this instance
-   * has none": every instance has an `AGENTS.md`, and until one declares it
+   * has none": every layer has an `AGENTS.md`, and until one declares it
    * nothing can check it. See {@link KgAssetSchema}.
    */
   assets: z.array(KgAssetSchema).optional(),
   icon: z.string().min(1).optional(),
   /**
-   * Which icons this instance's navbar row shows.
+   * Which icons this layer's navbar row shows.
    *
    * THREE STATES, and the third is the point. **Absent** means *inherit* —
-   * this instance has not decided, and the answer comes from its dependency
+   * this layer has not decided, and the answer comes from its dependency
    * stack with `cat-harness`'s list as the floor. **`[]`** means *show none*,
    * which the owner asked for by name (*"some could show none"*). **A list**
-   * is this instance's own answer and overrides what it inherits.
+   * is this layer's own answer and overrides what it inherits.
    *
    * Absent and `[]` must not collapse into each other. They are the same
    * failure `renderExemption` and the graph-typology declarations already guard:
    * "nobody has said" rendered as "nothing to show" is a decision nobody made,
-   * and here it would make an un-migrated instance indistinguishable from one
+   * and here it would make an un-migrated layer indistinguishable from one
    * that deliberately wants a bare navbar.
    */
   navbarIcons: NavbarIconsSchema.optional(),
   /**
    * Which tiles the glass's bottom strip pins, in order — see
    * {@link GlassStripSchema}. Same three states as `navbarIcons`: absent
-   * inherits, `[]` pins nothing, a list is this instance's own answer.
+   * inherits, `[]` pins nothing, a list is this layer's own answer.
    */
   glassStrip: GlassStripSchema.optional(),
   repository: RepoFullNameSchema.optional(),
   livesAt: InstanceLocationSchema.optional(),
   /**
-   * Where this whole instance gets its upstream/source material (e.g. an IG source in Git).
-   * Bean `bamf`, owner ruling 2026-10-07: declare IG source in instance declaration.
+   * Where this whole layer gets its upstream/source material (e.g. an IG source in Git).
+   * Bean `bamf`, owner ruling 2026-10-07: declare IG source in layer declaration.
    */
   source: InstanceSourceSchema.optional(),
   /**
-   * Which half of a kg-separation pair this instance's planned `repository`
+   * Which half of a kg-separation pair this layer's planned `repository`
    * is: `content` (files to read — no code, bootstrap FR-7) or `tools` (the
    * code that writes and checks a content repository).
    *
    * Optional, and absent is "has not said", never "not content": most staged
-   * instances here have not been through the split, and a default would claim
+   * layers here have not been through the split, and a default would claim
    * a decision nobody made. Added 2026-09-30 (bean `eayu`) because the IRIS replica is
    * staged as a CONTENT repository with no tools repository authorised, so
    * nothing else in the tree says it must hold no code; kg:audit's
-   * `content-instance-holds-code` reads it. An instance a declared tools
-   * instance `supports` is content too, and is read as such without this.
+   * `content-instance-holds-code` reads it. A layer a declared tools
+   * layer `supports` is content too, and is read as such without this.
    */
   separation: z.enum(["content", "tools"]).optional(),
   /**
-   * Instances this one is SEEDED TOGETHER with: the same seeding step creates
+   * Layers this one is SEEDED TOGETHER with: the same seeding step creates
    * both repositories, so neither ever stands alone in a checkout (bean
    * `smbc` seeds `cat-harness` and its tools layer at once).
    *
-   * Declared by the HIGHER instance, naming the lower one, because a lower
-   * instance naming one above it is the wrong direction
+   * Declared by the HIGHER layer, naming the lower one, because a lower
+   * layer naming one above it is the wrong direction
    * (`check:reference-direction`). `seed:ready` reads it: a path declared in
-   * a lower instance that resolves only into an instance seeding with it is
+   * a lower layer that resolves only into a layer seeding with it is
    * not "upward" — it cannot break on a seeding day that creates both.
    * Owner, 2026-10-04: cat-harness's Tool nodes resolving into
    * the tools layer are a seeding pair, not a seeding risk.
@@ -3592,7 +3592,7 @@ const catHarnessDeclarationShape = {
   seedsWith: z.array(z.string().min(1)).optional(),
   stub: z.string().min(1).optional(),
   /**
-   * Whether this instance is PUBLISHED on the site — served at
+   * Whether this layer is PUBLISHED on the site — served at
    * `<base>/<name>/…` (`schemas/kg/url-space.ts`, bean `nbal`). Defaults to
    * enabled (owner, 2026-09-20: *"instantiated and enabled (by default
    * enabled)"*), so not publishing is a declaration, `false`, never an
@@ -3601,7 +3601,7 @@ const catHarnessDeclarationShape = {
   enabled: z.boolean().optional(),
   canonicalUrl: z.string().url().optional(),
   /**
-   * The address this instance's IRIs are minted under, BEFORE the version —
+   * The address this layer's IRIs are minted under, BEFORE the version —
    * bootstrap's `iriBase` (see `graph.ts`), and the one place a fork edits.
    *
    * Not `canonicalUrl`, and the difference is the version. `canonicalUrl`
@@ -3615,7 +3615,7 @@ const catHarnessDeclarationShape = {
    */
   iriBase: z.string().url().optional(),
   /**
-   * The instance's Node Kinds, declared: each `$schema` tag its files may
+   * The layer's Node Kinds, declared: each `$schema` tag its files may
    * carry → the JSON Schema that defines it (an IRI, or a path relative to
    * the declaration). Bootstrap's field (`graph.ts`, owner 2026-09-29: the
    * schema-reference table "should be in bootstrap"), inherited here because
@@ -3633,15 +3633,15 @@ const catHarnessDeclarationShape = {
    * The visualisers this harness declares — see {@link HarnessVisualiserSchema}.
    * Each is published at `<base>/<name>/<id>/` and nowhere else; ids are unique
    * and every `covers` entry names a directory declared above (refined below).
-   * `.optional()`: absent means this instance declares none.
+   * `.optional()`: absent means this layer declares none.
    */
   visualisers: z.array(HarnessVisualiserSchema).optional(),
-  /** See {@link CatHarnessDeclaration.builtAtPublish} and `schemas/kg/built-at-publish.ts`. Absent: this instance builds nothing at publish. */
+  /** See {@link CatHarnessDeclaration.builtAtPublish} and `schemas/kg/built-at-publish.ts`. Absent: this layer builds nothing at publish. */
   builtAtPublish: BuiltAtPublishListSchema.optional(),
-  /** See {@link CatHarnessDeclaration.jsonldPrefixes} and `schemas/kg/jsonld-prefixes.ts`. Absent: this instance speaks no external vocabulary of its own. */
+  /** See {@link CatHarnessDeclaration.jsonldPrefixes} and `schemas/kg/jsonld-prefixes.ts`. Absent: this layer speaks no external vocabulary of its own. */
   jsonldPrefixes: JsonldPrefixTableSchema.optional(),
   /**
-   * Graphs this instance knows about and does not hold — see {@link RemoteGraph}.
+   * Graphs this layer knows about and does not hold — see {@link RemoteGraph}.
    * A SEPARATE array from `directories`, not a variant of one, because a remote
    * graph has no directory.
    */
@@ -3667,7 +3667,7 @@ const catHarnessDeclarationShape = {
     .refine((xs) => new Set(xs.map((x) => x.id)).size === xs.length, { message: "subscriptions: an id appears twice" })
     .optional(),
   /**
-   * What a DOWNSTREAM mounts of this instance by default, and where — see
+   * What a DOWNSTREAM mounts of this layer by default, and where — see
    * `schemas/kg/remote-mount.ts` (bean `0mpw`). Owner, 2026-10-06: the defaults
    * live in the harness's own declaration, so a downstream names only the
    * harness and its pin and never restates the paths. Absent is the stated
@@ -3675,14 +3675,14 @@ const catHarnessDeclarationShape = {
    */
   mountDefaults: MountDefaultsSchema.optional(),
   /**
-   * Harnesses this instance REMOTE-MOUNTS — each a repository and a 40-char
+   * Harnesses this layer REMOTE-MOUNTS — each a repository and a 40-char
    * pin, resolved transitively through the harness's `needs` (bean `0mpw`).
    * Not a submodule and not `.deps/`: the mounted directories are declared,
    * locked by tree digest, and checked by `mount:remote:check`.
    */
   remoteMounts: RemoteMountsSchema.optional(),
   /**
-   * The people whose consent may authorise a remote mount of this instance's
+   * The people whose consent may authorise a remote mount of this layer's
    * `remoteMounts` (roast `1ygp` L4.2). Declared: a `trust.consent.by` not on
    * the list is refused. Absent: consent still mounts, but every such mount
    * is reported as `unverified-approver`, never as clean.
@@ -3700,7 +3700,7 @@ const catHarnessDeclarationShape = {
   stickies: z.array(StickyContributionSchema).optional(),
   renderExemption: RenderExemptionSchema.optional(),
   /**
-   * The instances this one is BUILT ON — its layer stack, foundation first.
+   * The layers this one is BUILT ON — its layer stack, foundation first.
    *
    * The owner, 2026-09-20, giving the spine in one sentence:
    *
@@ -3714,56 +3714,56 @@ const catHarnessDeclarationShape = {
    * `folio/`"*) — but it lived only in prose, so every consumer that needed the
    * order had to know it. The navbar needed it and would otherwise have
    * hardcoded four names, which is the failure `hfkl` put the exemption in the
-   * declaration to avoid: a rule true only for the instances somebody
+   * declaration to avoid: a rule true only for the layers somebody
    * remembered.
    *
    * ## OPTIONAL, and an absent value is UNDETERMINED rather than "needs nothing"
    *
    * Required would be a change every concurrent branch pays for — `dependents`
    * cost a sibling branch 166 failures on the merged tree four hours after it
-   * was made required. And the two states are genuinely different: `[]` is an
-   * instance asserting it sits on nothing, which is true of exactly one
-   * instance here, while absent is nobody having said. A consumer that treated
-   * absent as `[]` would place every unlabelled instance on the floor beside
+   * was made required. And the two states are genuinely different: `[]` is a
+   * layer asserting it sits on nothing, which is true of exactly one
+   * layer here, while absent is nobody having said. A consumer that treated
+   * absent as `[]` would place every unlabelled layer on the floor beside
    * the bootstrap.
    *
-   * Names, not paths: an instance is identified by its `name` everywhere else
+   * Names, not paths: a layer is identified by its `name` everywhere else
    * in this schema, and a path would break the moment a directory moved.
    */
   needs: z.array(z.string().min(1)).optional(),
   /**
-   * The opt-in sub-graphs (`optIn: true` directory entries) this instance
+   * The opt-in sub-graphs (`optIn: true` directory entries) this layer
    * switches on FOR ITSELF, each qualified `<instance>.<directory id>`
-   * (`cat-harness.sdlc`) and naming an entry declared by this instance or
+   * (`cat-harness.sdlc`) and naming an entry declared by this layer or
    * one in its `needs` closure. Not inherited: a layer above that wants one
    * lists it too (owner, 2026-11-03, cat-harness#991 step 23.1). The
    * development override `CAT_SUBGRAPHS` adjusts it per process.
    *
    * An id that names nothing opt-in is REFUSED, never ignored: the shape and
-   * this instance's own top-level entries here, the `needs` closure and the
+   * this layer's own top-level entries here, the `needs` closure and the
    * entries declared from within by `check:declaration-resolution`.
    */
   enableSubgraphs: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]*\.[^\s]+$/, "`<instance>.<directory id>`, e.g. `cat-harness.sdlc`")).optional(),
   /**
-   * Paths this instance moved, each still answered for at its old place until
+   * Paths this layer moved, each still answered for at its old place until
    * `until` (sdlc skill `two-phase-move`). A link from any layer into `from`
    * resolves as the same path under `to`, so the layers that link here can
-   * switch to the new path in any order, after this instance is re-pinned.
-   * Both are directory paths relative to this instance's root. Past `until`
+   * switch to the new path in any order, after this layer is re-pinned.
+   * Both are directory paths relative to this layer's root. Past `until`
    * the entry is no longer honoured and `check:subgraphs --check` fails on it:
    * remove it once nothing links to `from` (the report names the inbound
    * links still left).
    */
   moves: z.array(DeclaredMoveSchema).optional(),
   /**
-   * What this instance's own package tasks read and write, keyed by task name
+   * What this layer's own package tasks read and write, keyed by task name
    * — the same {@link ScriptIO}-shaped facts `cat-harness-tools/scripts/task-io.ts`
    * holds for the harness's own tasks: `outputs: []` (measured to write
    * nothing, so it may run in the pool) and `inputs` (what can change the
    * answer, so `regen` may skip it on an unchanged tree; `"{tracked}"` is the
    * whole working tree). `because` keeps the measurement that justified it.
    *
-   * Declared by the instance that OWNS the task, so the harness collects it
+   * Declared by the layer that OWNS the task, so the harness collects it
    * instead of naming a layer above itself (owner ruling 2026-10-06: "each
    * instance declares its own tasks", bean `0r7u` step 0). Absent declares
    * nothing: those tasks run alone and are never skipped, the safe default.
@@ -3779,8 +3779,8 @@ const catHarnessDeclarationShape = {
           afterMerge: z.boolean().optional(),
           /**
            * The COMMITTED files this task writes, as globs: bare, relative to
-           * the declaring instance, or `<instance>:<glob>` for a file in
-           * another instance (a writer in a tools layer writing into the
+           * the declaring layer, or `<instance>:<glob>` for a file in
+           * another layer (a writer in a tools layer writing into the
            * content layer below it). `check:generated-writers` warns on every
            * file a glob matches that carries no generated marker
            * (litlfred/cat-harness#693, owner 2026-10-29). Unrelated to
@@ -3797,13 +3797,13 @@ const catHarnessDeclarationShape = {
     .optional(),
   gateExemptions: GateExemptionsSchema.optional(),
   /**
-   * The content adapters this instance ships — see {@link ContentAdapterDeclaration}.
+   * The content adapters this layer ships — see {@link ContentAdapterDeclaration}.
    *
-   * Declared by the instance that OWNS the adapter, so the harness below it
+   * Declared by the layer that OWNS the adapter, so the harness below it
    * finds them by reading declarations instead of naming a directory above
    * itself. `src/builtin-adapters.ts` held a `../<instance>/adapters/…` path
    * for each until 2026-09-30 — a variable import no static gate could see,
-   * and the edge that kept this instance from lifting out on its own
+   * and the edge that kept this layer from lifting out on its own
    * (`check:import-direction`, bean `p11x`).
    */
   contentAdapters: z.array(ContentAdapterDeclarationSchema).optional(),
@@ -3838,7 +3838,7 @@ const catHarnessDeclarationShape = {
    * URL is stable ACROSS versions.
    *
    * **Universal, gate-enforced** — see the interface field for why this is not
-   * required here: 376 fixtures. `check:publishable` is what fails an instance
+   * required here: 376 fixtures. `check:publishable` is what fails a layer
    * without one.
    */
   version: ExactVersionSchema.optional(),
@@ -3862,7 +3862,7 @@ function refineCatHarnessDeclaration(
   // The owner, 2026-10-09: one route per `(harness, visualiser)`. Two
   // entries with one id would be two pages contending for one URL, which is
   // the defect the harness-level declaration exists to make impossible; and
-  // `covers` names THIS instance's directories, so an id it does not
+  // `covers` names THIS layer's directories, so an id it does not
   // declare points at nothing.
   const visIds = new Set<string>();
   const dirIds = new Set((d.directories ?? []).map((x) => x.id));
@@ -3886,7 +3886,7 @@ function refineCatHarnessDeclaration(
     });
   });
   // cat-harness#991 step 23.1: an enable id names an opt-in sub-graph. Of
-  // this instance's OWN top-level entries that is decidable here; the rest
+  // this layer's OWN top-level entries that is decidable here; the rest
   // (the `needs` closure, entries declared from within) is
   // `check:declaration-resolution`'s, which reads the other declarations.
   const enabled = new Set<string>();
@@ -3969,7 +3969,7 @@ export const CatHarnessDeclarationSchema = z
   .superRefine(refineCatHarnessDeclaration);
 
 /**
- * An instance declaration as a node kind (bean `ujiv`, issue #88): the same
+ * A layer declaration as a node kind (bean `ujiv`, issue #88): the same
  * fields and the same cross-field checks as {@link CatHarnessDeclarationSchema},
  * with `$schema` required, as every tagged kind's is.
  */
@@ -3982,7 +3982,7 @@ export const CatHarnessDeclarationKind = nodeKind(CAT_HARNESS_DECLARATION_SCHEMA
  * otherwise `name`.
  *
  * One function so the KG export, the schema export and any future artefact
- * cannot disagree about what this instance is called — the naming convention
+ * cannot disagree about what this layer is called — the naming convention
  * is only worth having if it is computed in one place.
  */
 export function artefactStub(d: Pick<CatHarnessDeclaration, "name" | "stub">): string {
@@ -3990,11 +3990,11 @@ export function artefactStub(d: Pick<CatHarnessDeclaration, "name" | "stub">): s
 }
 
 /**
- * Where this instance's renderable site lives in the working tree:
+ * Where this layer's renderable site lives in the working tree:
  * `docs/<stub>/`.
  *
  * **The stub segment is the packaging for the repo split (issue #223).** Every
- * layer's pages sit under their own instance's stub, so splitting a layer out
+ * layer's pages sit under their own layer's stub, so splitting a layer out
  * is a directory move rather than a sift through a shared tree — and two
  * layers' docs can be checked out side by side without colliding, which is the
  * same job the stub already does for `<base>/<stub>.jsonld` and
@@ -4006,7 +4006,7 @@ export function artefactStub(d: Pick<CatHarnessDeclaration, "name" | "stub">): s
  * `litlfred.github.io/folio-assistant/...` link resolves exactly as before.
  *
  * **This is NOT the `folio` graph-typology declaration**, and it deliberately
- * stops short of it. `docs/` cannot be declared a directory of this instance
+ * stops short of it. `docs/` cannot be declared a directory of this layer
  * yet: `folio` is registered by CORE, and re-measured 2026-09-19 with the
  * entry added, `harness:dirs`, `kg:schema:check` and `docs:harness:check` all
  * throw `unknown graph typology "folio"` and 5 tests fail. What this function does
@@ -4017,28 +4017,28 @@ export function artefactStub(d: Pick<CatHarnessDeclaration, "name" | "stub">): s
  * one line reading the declared directory instead of composing it.
  */
 export function siteDir(_d: Pick<CatHarnessDeclaration, "name" | "stub">): string {
-  // **Relative to the INSTANCE root, and that is the whole of it: `docs`.**
+  // **Relative to the LAYER root, and that is the whole of it: `docs`.**
   //
   // This returned `docs/<stub>`, then `<stub>/docs`, and both were composing a
-  // stub level into a path because the instance had no directory of its own —
-  // every instance artefact and every repository artefact shared one root, so
-  // the stub was the only thing keeping two instances apart.
+  // stub level into a path because the layer had no directory of its own —
+  // every layer artefact and every repository artefact shared one root, so
+  // the stub was the only thing keeping two layers apart.
   //
-  // The move (bean `wggr`) gave the instance its own directory, and the stub
-  // level stopped being something to compose: it IS the instance root. So this
+  // The move (bean `wggr`) gave the layer its own directory, and the stub
+  // level stopped being something to compose: it IS the layer root. So this
   // function got SHORTER, which is the honest outcome — the layout now
   // expresses directly what the string used to encode.
   //
   // ## It takes the declaration anyway, and the parameter is deliberate
   //
   // Every caller already holds one, the signature is what ~20 call sites are
-  // written against, and an instance is free to declare its site elsewhere
+  // written against, and a layer is free to declare its site elsewhere
   // later. Dropping the parameter would make that a breaking change for a
   // saving of nothing.
   //
   // ## Both ends are measured from the SAME root now, which they were not
   //
-  // `siteDirFor` reads `<root>/harness.json`, so its input is the instance
+  // `siteDirFor` reads `<root>/harness.json`, so its input is the layer
   // root; its output was `<stub>/docs`, measured from the REPOSITORY root.
   // While those were one directory nobody could see the difference. The move
   // separated them and every `join(ROOT, siteDirFor(ROOT), …)` — the shape of
@@ -4052,42 +4052,42 @@ export function siteDir(_d: Pick<CatHarnessDeclaration, "name" | "stub">): strin
 }
 
 /**
- * The REPOSITORY root, given an instance root.
+ * The REPOSITORY root, given a layer root.
  *
  * ## Two roots stopped being one directory
  *
- * Until the stub move (bean `wggr`) every instance artefact and every
+ * Until the stub move (bean `wggr`) every layer artefact and every
  * repository artefact sat side by side, so `resolve(import.meta.dir, "../../..")`
  * answered both questions and nobody had to ask which one they meant. Moving
- * the instance under `<stub>/` separated them, and **every consumer that had
+ * the layer under `<stub>/` separated them, and **every consumer that had
  * conflated the two now resolves the wrong one** — silently, because the join
  * still produces a plausible path.
  *
  * Measured on the move: 97 test failures and 11 load errors, one cause. Every
  * ENOENT named something correctly at the repository root and looked for it
- * under the instance: `.github/workflows/`, `.gitignore`, `package.json`,
+ * under the layer: `.github/workflows/`, `.gitignore`, `package.json`,
  * `AGENTS.md`, `beans/`, `todos/`, `fsh-guts/`.
  *
  * ## What lives at which root, and why the split is not arbitrary
  *
  * The repository root holds what belongs to the REPOSITORY rather than to any
- * instance in it: the CI configuration that builds it, the package manifest
+ * layer in it: the CI configuration that builds it, the package manifest
  * and lockfile that install it, `.gitignore`, and the stores that are never
  * overlaid — `beans/`, `todos/`, `fsh-guts/`, `bootstrap/`. That set is closed
- * by a test rather than by this comment; a repository holding two instances
+ * by a test rather than by this comment; a repository holding two layers
  * has one of each of those and two of everything else, which is the property
  * that decides membership.
  *
  * Everything else — `skills/`, `schemas/`, `src/`, `content/`, `docs/`,
- * `tools/` — is the instance's and travels with it when the repository splits.
+ * `tools/` — is the layer's and travels with it when the repository splits.
  *
  * ## It is `dirname`, and it is a function anyway
  *
  * One line, and worth a name for two reasons. It makes the QUESTION visible at
  * the call site: `repoRootFor(ROOT)` says "I mean the repository" where
  * `join(ROOT, "..")` says only "up one", and up-one is what the broken callers
- * were already doing by accident. And it is the single place to change if an
- * instance is ever nested deeper than one level, which `siteDir` already
+ * were already doing by accident. And it is the single place to change if a
+ * layer is ever nested deeper than one level, which `siteDir` already
  * anticipates by composing rather than hardcoding.
  *
  * It does NOT verify that the result is a repository. A caller that needs to
@@ -4105,18 +4105,18 @@ export function repoRootFor(instanceRoot: string): string {
 }
 
 /**
- * The CHECKOUT an instance's repository-level files live in — `.gitmodules`,
+ * The CHECKOUT a layer's repository-level files live in — `.gitmodules`,
  * `.github/`, `.claude/skills/`, the root declaration, a `scope: "repository"`
- * path — answered for the root instance too (bean `g43f`).
+ * path — answered for the root layer too (bean `g43f`).
  *
  * ## Why {@link repoRootFor} cannot be used for these reads
  *
- * `repoRootFor` is `dirname`, so for the instance declared AT the checkout root
+ * `repoRootFor` is `dirname`, so for the layer declared AT the checkout root
  * it climbs out. In the main checkout that is `/home/user`; in a Claude Code
  * worktree it is `.claude/worktrees/`, whose every child is ANOTHER session's
  * checkout. Measured 2026-10-03: twenty-odd readers composed
  * `join(repoRootFor(root), …)` and were safe only because their callers passed
- * a nested instance. Given the root instance they read a directory that is not
+ * a nested layer. Given the root layer they read a directory that is not
  * there — `.claude/skills` read as empty, a root declaration read as absent —
  * which is `dh4f`: a clean run over nothing.
  *
@@ -4146,7 +4146,7 @@ export function repoRootFor(instanceRoot: string): string {
 export function checkoutRootFor(instanceRoot: string): string {
   const abs = resolve(instanceRoot);
   if (isForeignCheckout(abs)) return abs;
-  // A git-less tree whose root AGGREGATES other instances (`init-folio` before
+  // A git-less tree whose root AGGREGATES other layers (`init-folio` before
   // `git init`, a cross-instance fixture) is its own checkout too — the
   // container rule {@link siblingScopeFor} states, and the whole of what
   // `harness-config`'s `checkoutRootFor` was before this (it now delegates
@@ -4163,13 +4163,13 @@ export function checkoutRootFor(instanceRoot: string): string {
 }
 
 /**
- * The scope to resolve an instance's SIBLINGS in — `repoRootFor`, except when
- * the instance root IS the repository root.
+ * The scope to resolve a layer's SIBLINGS in — `repoRootFor`, except when
+ * the layer root IS the repository root.
  *
  * ## Why {@link repoRootFor} is not enough, and is not wrong either
  *
- * `repoRootFor` is `dirname`, and says so. Its contract assumes an instance
- * nested one level under the repository, which every instance here satisfies
+ * `repoRootFor` is `dirname`, and says so. Its contract assumes a layer
+ * nested one level under the repository, which every layer here satisfies
  * but one: **`folio-assistant` is declared AT the repository root.** For that
  * one, `dirname` climbs out of the checkout, and a name lookup built on it
  * sees no siblings at all.
@@ -4181,7 +4181,7 @@ export function checkoutRootFor(instanceRoot: string): string {
  * instanceRootsIn("/home/user")              -> 1   (only folio-assistant)
  * ```
  *
- * so the root instance's `needs` on the content core derived **nothing**,
+ * so the root layer's `needs` on the content core derived **nothing**,
  * and its overlay held one directory — the authored config edge, which does not
  * go through the derivation. A broken resolver that returns one plausible entry
  * is worse than one that returns none: it reads as a working overlay.
@@ -4190,34 +4190,34 @@ export function checkoutRootFor(instanceRoot: string): string {
  *
  * Asked in this module's own vocabulary rather than by probing for `.git`, for
  * two reasons. A `.git` probe answers a question about version control when
- * the question is about instance scope — a repository is not the only thing
- * that can hold instances, and `init-folio` already builds trees that have no
+ * the question is about layer scope — a repository is not the only thing
+ * that can hold layers, and `init-folio` already builds trees that have no
  * `.git` yet. And it keeps this testable over the throwaway trees the
  * cross-instance tests use, which is where the sibling rules are falsified.
  *
- * So: if scanning `instanceRoot` finds an instance OTHER than itself, it is a
+ * So: if scanning `instanceRoot` finds a layer OTHER than itself, it is a
  * container and it is the scope. Otherwise it is a leaf and its siblings live
  * one level up, which is exactly {@link repoRootFor}'s assumption.
  *
  * **This does NOT replace `repoRootFor`.** That function answers "where does
  * the REPOSITORY's own furniture live" — `.github/`, `package.json`, `beans/`
- * — and for a nested instance the two agree. This one answers "where do I look
- * up a sibling by name", and they differ only for the instance that is also
+ * — and for a nested layer the two agree. This one answers "where do I look
+ * up a sibling by name", and they differ only for the layer that is also
  * the root. Collapsing them would make the repository-furniture question
- * wrong for that same instance, in the other direction.
+ * wrong for that same layer, in the other direction.
  */
 export function siblingScopeFor(instanceRoot: string): string {
   const abs = resolve(instanceRoot);
   for (const found of instanceRootsIn(abs)) {
     if (resolve(found) !== abs) return abs;
   }
-  // NEVER outside the checkout (owner ruling 2026-10-11, bean `68k7`): an
-  // instance that IS its own checkout — its own `.git`, not a declared
-  // submodule of its parent — is the root instance, and its parent is not a
+  // NEVER outside the checkout (owner ruling 2026-10-11, bean `68k7`): a
+  // layer that IS its own checkout — its own `.git`, not a declared
+  // submodule of its parent — is the root layer, and its parent is not a
   // place to look for siblings. A checkout cloned straight into `/tmp` would
-  // otherwise treat every directory in `/tmp` as a candidate instance, which is
+  // otherwise treat every directory in `/tmp` as a candidate layer, which is
   // how 163 malformed fixtures once failed two unrelated tests (`8zsb`).
-  // Nested instances, submodules and lock mounts (no `.git`) are unchanged.
+  // Nested layers, submodules and lock mounts (no `.git`) are unchanged.
   if (isForeignCheckout(abs)) return abs;
   return repoRootFor(abs);
 }
@@ -4247,7 +4247,7 @@ export function siblingScopeFor(instanceRoot: string): string {
  *
  * ## Resolving against "whichever root happens to work" is not a kindness
  *
- * `check-subgraph-coverage.ts` tried the instance root and then the repository
+ * `check-subgraph-coverage.ts` tried the layer root and then the repository
  * root, accepting either. That is worse than picking wrong: a path that is
  * incorrect in its declared base passes anyway via the other, so the check
  * cannot enforce the convention it documents, and the corpus is free to drift
@@ -4257,10 +4257,10 @@ export function siblingScopeFor(instanceRoot: string): string {
  *
  * ## Take the repository root; do not derive it here
  *
- * The parameter is the REPOSITORY root, not an instance root, because
- * {@link repoRootFor} overshoots for the one instance where it matters: the
- * root declaration's instance root IS the repository, so going up one lands
- * outside the checkout entirely. A caller that holds an instance root and
+ * The parameter is the REPOSITORY root, not a layer root, because
+ * {@link repoRootFor} overshoots for the one layer where it matters: the
+ * root declaration's layer root IS the repository, so going up one lands
+ * outside the checkout entirely. A caller that holds a layer root and
  * knows it is nested composes `repoRootFor` itself, at a call site where that
  * assumption is visible.
  *
@@ -4278,7 +4278,7 @@ export function resolveCoveragePath(repoRoot: string, coveragePath: string): str
  *
  * The ONE place a declared scope turns into a directory. Every consumer of a
  * declared path goes through `resolveDirectories` or `declaredAssets`, and
- * both go through here, so relocating an instance within its repository is a
+ * both go through here, so relocating a layer within its repository is a
  * change to this function rather than a sweep over six declarations.
  */
 export function rootForScope(instanceRoot: string, scope?: DeclarationScope): string {
@@ -4288,20 +4288,20 @@ export function rootForScope(instanceRoot: string, scope?: DeclarationScope): st
 }
 
 /**
- * The instance directory a module inside it belongs to — the nearest enclosing
+ * The layer directory a module inside it belongs to — the nearest enclosing
  * directory carrying a declaration — see {@link findDeclarationFile}.
  *
  * ## Why a walk rather than `process.cwd()`
  *
- * Nine scripts under `scripts/` and `pipeline/` read this instance's
+ * Nine scripts under `scripts/` and `pipeline/` read this layer's
  * declaration and got the root from the working directory. That was never a
- * claim about the instance; it was true only because a gate is run from the
+ * claim about the layer; it was true only because a gate is run from the
  * repository root and the two were one directory. After the move (bean
  * `wggr`) seven CI gates threw `ENOENT: …/harness.json` — which was at least
  * loud. `check-declared-assets` did not throw: it read a declaration that was
  * not there, got no assets, and reported a clean run.
  *
- * An instance's own tooling belongs to exactly one instance — **the one it
+ * A layer's own tooling belongs to exactly one layer — **the one it
  * lives in** — so the honest question is "where am I", and every such script
  * passes `import.meta.dir`.
  *
@@ -4326,7 +4326,7 @@ export function findInstanceRoot(start: string): string | undefined {
 }
 
 /**
- * Whether a declaration is the instance a reference names — by its planned
+ * Whether a declaration is the layer a reference names — by its planned
  * repository (`owner/name`, the form references take since bean `6rmv`) or
  * by its machine `name`, which internal callers and `needs` edges still use.
  * One predicate so every resolver answers "which instance is this" alike.
@@ -4352,7 +4352,7 @@ export function instanceRootFor(start: string): string {
 }
 
 /**
- * `siteDir` for the instance rooted at `root`, read from its declaration.
+ * `siteDir` for the layer rooted at `root`, read from its declaration.
  *
  * Deliberately a RAW read of `name`/`stub` rather than `readDeclaration`:
  * those two fields are all this needs, and going through the full reader
@@ -4367,19 +4367,19 @@ export function instanceRootFor(start: string): string {
  * nothing serves, and "could not determine" is never rendered as an answer.
  */
 /**
- * Where an instance publishes the instructions for BOOTSTRAPPING INTO IT,
- * relative to that instance's own docs root.
+ * Where a layer publishes the instructions for BOOTSTRAPPING INTO IT,
+ * relative to that layer's own docs root.
  *
  * ## Why a fixed convention rather than a lookup
  *
  * §5 of the bootstrap proposal has the agent obtain exactly ONE reference —
- * `litlfred/f-a-sci` — and read everything else from that instance's own
- * declaration. That answers *which* instance. It does not answer *where in it*
+ * `litlfred/f-a-sci` — and read everything else from that layer's own
+ * declaration. That answers *which* layer. It does not answer *where in it*
  * the initialization steps are, and without a fixed answer the agent needs
  * per-instance knowledge of every harness it might be pointed at, which is
  * precisely what one reference was meant to remove.
  *
- * So every cat-harness instance, and every instance that depends on one,
+ * So every cat-harness layer, and every layer that depends on one,
  * publishes them at the SAME place. CatBootstrap then needs no special case per
  * target: `f-a-sci`, a DAK layer and a specialised harness nobody has written
  * yet are all read the same way. That is what lets bootstrap initialise into a
@@ -4396,8 +4396,8 @@ export function instanceRootFor(start: string): string {
 export const CAT_BOOTSTRAP_INIT_DOC = "bootstrap/initialization.md";
 
 /**
- * The path to an instance's initialization instructions, relative to that
- * INSTANCE's root — `docs/bootstrap/initialization.md`.
+ * The path to a layer's initialization instructions, relative to that
+ * LAYER's root — `docs/bootstrap/initialization.md`.
  *
  * THE one answer, so the README that tells an agent where to look and the
  * check that verifies the file is there cannot disagree about the spelling.
@@ -4406,16 +4406,16 @@ export const CAT_BOOTSTRAP_INIT_DOC = "bootstrap/initialization.md";
  *
  * This arrived composing `<stub>/docs/...` and its docstring said "full
  * repo-relative path", which was true while {@link siteDir} returned
- * `<stub>/docs`. It returns plain `docs` now, because the instance has a
+ * `<stub>/docs`. It returns plain `docs` now, because the layer has a
  * directory of its own and the stub level inside it would repeat the name.
  *
- * So the suffix is IDENTICAL for every instance, which is a stronger version
+ * So the suffix is IDENTICAL for every layer, which is a stronger version
  * of the property bootstrap relies on than "differs only by site root".
  *
  * ## The open half, stated rather than papered over
  *
  * CatBootstrap is handed ONE reference and must reach this file, so it needs the
- * instance's DIRECTORY, and this function no longer supplies it. On this
+ * layer's DIRECTORY, and this function no longer supplies it. On this
  * repository the directory is `cat-harness/` while the stub is
  * `folio-assistant` — deliberately different, since the stub names published
  * artefacts and the directory is a filesystem fact — so `<stub>/` would name
@@ -4477,7 +4477,7 @@ export function docsSourceDirFor(root: string): string {
 }
 
 /**
- * The instance's SITE LAYERS: every directory it declares with graph typology
+ * The layer's SITE LAYERS: every directory it declares with graph typology
  * `docs`, relative to `root`, in DECLARATION order — base first, the layer
  * that overlays it last. This is the order `compose-docs` lays them down in.
  *
@@ -4488,7 +4488,7 @@ export function docsSourceDirFor(root: string): string {
  * On cat-harness it is `["site-chrome", "docs"]` (proposal
  * semantic-subgraphs-2026-10-09, slice 1; owner, 2026-10-09: *"go ahead with
  * the cat-harness chrome subgraph"*): the just-the-docs CHROME is the base and
- * the harness's own pages overlay it. An instance that declares one docs
+ * the harness's own pages overlay it. A layer that declares one docs
  * directory has one layer, and every answer below collapses to
  * {@link siteDirFor}'s.
  */
@@ -4511,7 +4511,7 @@ export function siteLayersFor(root: string): string[] {
     )
     .map((d) => (d.path as string).replace(/\/+$/, ""));
   const site = siteDirFor(root);
-  // The site directory is always a layer: it is where the instance's pages are
+  // The site directory is always a layer: it is where the layer's pages are
   // generated, whether or not the declaration happens to name it.
   return layers.includes(site) ? layers : [...layers, site];
 }
@@ -4541,7 +4541,7 @@ export function siteChromeDirFor(root: string): string {
 }
 
 /**
- * {@link artefactStub} for the instance rooted at `root`, read from its
+ * {@link artefactStub} for the layer rooted at `root`, read from its
  * declaration — the RAW read, for the same reason {@link siteDirFor} takes one.
  *
  * `readDeclaration` validates the whole declaration, which means it throws
@@ -4583,14 +4583,14 @@ export function artefactStubFor(root: string): string {
 /**
  * A declared asset's path, as the PUBLISHED site serves it.
  *
- * `docs/assets/img/x.webp` → `/assets/img/x.webp`. An instance declares an
+ * `docs/assets/img/x.webp` → `/assets/img/x.webp`. A layer declares an
  * image by its repo-relative path, and the site build copies the site
  * directory's CONTENTS to the site root — so the declared prefix is exactly
  * what a published URL does not carry.
  *
  * **Derived from {@link siteDirFor}, never from the literal `docs/`.** Two
  * consumers needed this and the first wrote the literal; the second would have
- * copied it, and an instance that moves its site directory would then serve
+ * copied it, and a layer that moves its site directory would then serve
  * two different answers — one correct, one a 404 that looks like a missing
  * image. `site-dir-single-answer.test.ts` exists for exactly this class of
  * duplicate.
@@ -4702,7 +4702,7 @@ export function forgeLocation(path: string, repoUrl: string, repoRoot?: string):
 }
 
 /**
- * Each remote-mounted instance's checkout path, forge URL and path in its own
+ * Each remote-mounted layer's checkout path, forge URL and path in its own
  * repository, from the root's lock: `index.lock.json`, else the legacy
  * `*.mount-lock.json` (`lockFilesIn`; both present contributes nothing, and
  * `mount:lock:check` reports it).
@@ -4719,13 +4719,13 @@ export function mountedLocations(repoRoot: string = join(import.meta.dir, "..", 
 }
 
 /**
- * Where an instance's renderings are published, given the site they are
+ * Where a layer's renderings are published, given the site they are
  * published to.
  *
- * **They sit at the base, not in a subdirectory.** A cat-harness instance's
+ * **They sit at the base, not in a subdirectory.** A cat-harness layer's
  * repository IS its declaration that it is a graph — `harness.json` at the
  * root says which graphs are here — so there is nothing for a `kg/` segment to
- * distinguish it from. The stub is what separates one instance's renderings
+ * distinguish it from. The stub is what separates one layer's renderings
  * from another's in a tree that overlays several, which is the job a directory
  * would otherwise have been doing.
  *
@@ -4777,7 +4777,7 @@ function kindsWith(test: (d: GraphTypologyDef) => boolean): string[] {
  *
  * **Keeping the CONTENT out of the render pipeline is not the same as keeping
  * the REFERENCE out of the graph, and the first was shipped believing it
- * covered the second.** An instance's declared directories become nodes in
+ * covered the second.** A layer's declared directories become nodes in
  * `<stub>.jsonld`, so declaring `fsh-guts/` locally — which is required, or
  * no tool can find it and the never-delete rule has no destination — put its
  * id, path and description into the published graph.
@@ -4798,7 +4798,7 @@ export function isPublishedGraphTypology(name: string): boolean {
 }
 
 /**
- * Does an instance declaring a directory of this kind owe a **visualiser**?
+ * Does a layer declaring a directory of this kind owe a **visualiser**?
  *
  * The owner, 2026-09-20: *"if there is active state directory in repo root/
  * (**not part of the static KG**) like `beans/`, `todos/`, `fsh-guts/` those
@@ -4838,12 +4838,12 @@ export function isPublishedGraphTypology(name: string): boolean {
  * kind that is not content would otherwise acquire an obligation it meets by
  * construction.
  *
- * ## Bootstrap is exempt by INSTANCE, not by kind
+ * ## Bootstrap is exempt by LAYER, not by kind
  *
  * `hfkl` carries the owner's ruling that `bootstrap` has no visualiser
  * *"but it must have its json/jsonld... that is its existence"*. That
  * exemption lives in the checker as `VISUALISER_EXEMPT_INSTANCES`, keyed on
- * the instance name, so every other instance declaring the same kind keeps
+ * the layer name, so every other layer declaring the same kind keeps
  * the obligation. An axis that dropped bootstrap by KIND would stop checking
  * the one thing bootstrap must have.
  */
@@ -4924,7 +4924,7 @@ export function isPublishedDirectory(d: { graphTypologies?: readonly string[] })
 }
 
 /**
- * The declared publication host for the instance rooted at `root`, or
+ * The declared publication host for the layer rooted at `root`, or
  * `undefined` when it has not said.
  *
  * **`undefined` is never to be read as `github-pages`.** A caller that wants
@@ -5037,9 +5037,9 @@ export function renderingMediaType(path: string): string | undefined {
 // ── Reading ─────────────────────────────────────────────────────
 
 /**
- * Read one instance's declaration.
+ * Read one layer's declaration.
  *
- * Returns `undefined` when the file is absent — an instance that has not been
+ * Returns `undefined` when the file is absent — a layer that has not been
  * migrated yet is not an error, and callers fall back to today's conventions.
  * A file that is present but malformed **throws**: a declaration nobody can
  * read leaves every consumer scanning the wrong directories, which is worse
@@ -5059,7 +5059,7 @@ export function readDeclaration(
     throw new Error(`${p} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
   // MEMOISED ON THE FILE'S TEXT, not its path or mtime: the checkout overlay
-  // (placement PR0) resolves every staged instance through its own chain and
+  // (placement PR0) resolves every staged layer through its own chain and
   // reads each declaration a dozen times per process, and the Zod parse is
   // the cost (measured: a CLI run went from 0.2 s to 2 s). Keyed on the bytes,
   // so a test that rewrites a fixture is re-parsed, and on the registry's
@@ -5110,7 +5110,7 @@ function parseDeclarationText(p: string, text: string, registry: GraphTypologyRe
   for (const dir of parsed.data.directories) {
     for (const g of dir.graphTypologies) {
       if (!registry.has(g)) {
-        // Register kinds from every discovered instance's `typologies/` in the
+        // Register kinds from every discovered layer's `typologies/` in the
         // declaration's checkout before refusing an unknown kind (bean
         // `cat-tools-g7ls`, owner card 2026-10-31 "A. Fix the loader"). Done
         // lazily on `!registry.has(g)` so reading a fixture declaration whose
@@ -5344,20 +5344,20 @@ export function owningDirectory<T extends { id: string; path: string; absPath?: 
 
 // ── Inheritance ─────────────────────────────────────────────────
 
-/** A directory after inheritance, with the instance that declared it. */
+/** A directory after inheritance, with the layer that declared it. */
 export interface ResolvedDirectory extends ContentDirectory {
-  /** Name of the instance whose declaration contributed this entry. */
+  /** Name of the layer whose declaration contributed this entry. */
   declaredBy: string;
-  /** Absolute path, resolved against the instance that declared it. */
+  /** Absolute path, resolved against the layer that declared it. */
   absPath: string;
   /**
-   * True when this entry is the ROOT instance's — its own declaration, or its
+   * True when this entry is the ROOT layer's — its own declaration, or its
    * own member of an inherited subgraph.
    */
   own: boolean;
   /**
-   * The instance whose directory this is. A declared subgraph is inherited as
-   * one MEMBER per instance in the chain whose same-named directory exists
+   * The layer whose directory this is. A declared subgraph is inherited as
+   * one MEMBER per layer in the chain whose same-named directory exists
    * (owner, 2026-09-30, bean `3r47`/`xsqm` follow-up, option A: "if f-a-core
    * … has a docs/ … and depends on cat-harness where docs/ is declared …
    * the viewer should detect f-a-core/docs", "a named (sub-)subgraph of
@@ -5392,7 +5392,7 @@ export interface ResolveOptions {
 }
 
 /**
- * Resolve the directories an instance scans, including inherited ones.
+ * Resolve the directories a layer scans, including inherited ones.
  *
  * `chain` runs deepest dependency first and the root last, so a root
  * redeclaring an inherited id wins. Callers usually get this from
@@ -5412,10 +5412,10 @@ export interface ResolveOptions {
 export const RENAMED_DIRECTORY_IDS: Readonly<Record<string, string>> = { "cat-harness": "skills" };
 
 /**
- * The absolute path of a directory this instance declares by `id`, or the
+ * The absolute path of a directory this layer declares by `id`, or the
  * convention fallback joined to `root`.
  *
- * **`scope: "repository"` entries are excluded on purpose.** An instance may
+ * **`scope: "repository"` entries are excluded on purpose.** A layer may
  * declare two entries with the same `path` and different scopes — this
  * repository declares `docs` (instance-scoped, resolving under
  * `cat-harness/`) and `root-docs` (`scope: "repository"`, resolving under the
@@ -5430,7 +5430,7 @@ export const RENAMED_DIRECTORY_IDS: Readonly<Record<string, string>> = { "cat-ha
  * declared, and it would be asking the wrong question even while it worked."*
  * The `docs`/`root-docs` pair is that second directory, and it exists now.
  *
- * @param root the instance root to resolve against
+ * @param root the layer root to resolve against
  * @param id the declared entry's `id`
  * @param fallback a path relative to `root`, used when nothing is declared
  */
@@ -5453,7 +5453,7 @@ export function resolveDirectories(
   // Existence-filtered — see DEFAULT_DIRECTORIES on why a default that is not
   // there is the `dh4f` defect rather than a harmless extra. `declaredBy` says
   // `(default)` so a consumer can tell an inherited convention from something
-  // an instance chose, and `own` is false: a default is not the instance's own
+  // a layer chose, and `own` is false: a default is not the layer's own
   // declaration, it is what it did not have to write.
   const rootLink = chain.find((l) => l.own === true) ?? chain[chain.length - 1];
   // OPT-IN SUB-GRAPHS (cat-harness#991 step 23.1): the ROOT decides, from its
@@ -5508,17 +5508,17 @@ export function resolveDirectories(
 
   // Directories declared FROM WITHIN (bean `cmsl`, owner 2026-09-30, round 4):
   // an entry in a resolved directory's declaration file (`skills/skills.json`)
-  // that answers the `dependents` question is an INSTANCE directory, declared
+  // that answers the `dependents` question is a LAYER directory, declared
   // where the owner's #980 ruling says nesting must be. Entries that do not
   // answer it (`beans/beans.json`'s `defs`, `docs/docs.json`'s `proposals`,
   // `voices/voices.json`'s `vendors`) are parts of one graph rather than
-  // instance directories, and stay out of this list exactly as before.
+  // layer directories, and stay out of this list exactly as before.
   // An instance-level entry with the same id wins, so a declaration can move
   // inward without two answers existing at once.
   for (const d of [...byId.values()]) promoteFromWithin(d, byId, registry, new Set(), rootLink, optInOf);
 
   // MEMBERS (option A, owner 2026-09-30). A subgraph declared once is
-  // inherited by every instance in the chain: each whose `<root>/<path>`
+  // inherited by every layer in the chain: each whose `<root>/<path>`
   // exists contributes its own member, a named sub-subgraph of the declared
   // one — "if f-a-core … has a docs/ … and depends on cat-harness where docs/
   // is declared …, the viewer should detect f-a-core/docs". The declarer's
@@ -5529,7 +5529,7 @@ export function resolveDirectories(
   //
   // NESTED MEMBERS (placement PR0c, bean `ejye`). The same rule one level
   // down, for a sub-subgraph declared FROM WITHIN: the harness declares a
-  // group once (`skills/skills.json` naming `library/`), and each instance's
+  // group once (`skills/skills.json` naming `library/`), and each layer's
   // same-named `skills/library/` is a member of it. And a MEMBER's own
   // declaration file is read as well as the declarer's — before this, sci's
   // `skills/skills.json` (naming `lean/`, `data/`, `voices/`) was read only
@@ -5577,7 +5577,7 @@ export function resolveDirectories(
 }
 
 /**
- * The instance directories a directory's kind-declaration file names FROM
+ * The layer directories a directory's kind-declaration file names FROM
  * WITHIN (`"subgraph": true` entries), unresolved: each with its single path
  * segment `sub`. Unparseable or absent files yield nothing —
  * `check:harness-dirs` owns that finding.
@@ -5631,9 +5631,9 @@ function declaredFromWithin(
 }
 
 /**
- * An instance's OWN sub-graphs: its declaration's entries as authored, then
+ * A layer's OWN sub-graphs: its declaration's entries as authored, then
  * the ones it declares FROM WITHIN them (bean `cmsl`: `skills/skills.json`
- * declaring `voices/`), with paths relative to the instance root.
+ * declaring `voices/`), with paths relative to the layer root.
  *
  * For a consumer that enumerates "the sub-graphs this instance has" — one
  * diagram, one page, one visualiser per entry. Reading `decl.directories`
@@ -5643,7 +5643,7 @@ function declaredFromWithin(
  *
  * Unlike {@link nestedDirectories} this also reaches a nested declaration
  * under a DEFAULT parent (agent-skills never declares `skills/`), and it
- * returns only entries that answer `dependents` — the instance directories,
+ * returns only entries that answer `dependents` — the layer directories,
  * not the parts of one graph (`voices.json`'s `vendors`).
  */
 export function instanceDirectories(
@@ -5654,7 +5654,7 @@ export function instanceDirectories(
   if (!decl) return [];
   const authored = decl.directories ?? [];
   const ids = new Set(authored.map((d) => d.id));
-  // `"all"`: what the instance DECLARES, opt-in sub-graphs included — this
+  // `"all"`: what the layer DECLARES, opt-in sub-graphs included — this
   // enumerates sub-graphs, it does not decide what a folio is given.
   const inward = resolveDirectories([{ name: decl.name, root, own: true }], registry, { enabledSubgraphs: "all" })
     .filter((d) => d.own && d.within !== undefined && !ids.has(d.id))
@@ -5663,8 +5663,8 @@ export function instanceDirectories(
 }
 
 /**
- * Whether a repository-scoped entry's store belongs to the instance that
- * declared it: the repository root is that instance, or declares none.
+ * Whether a repository-scoped entry's store belongs to the layer that
+ * declared it: the repository root is that layer, or declares none.
  */
 function repositoryIsUnowned(
   d: ResolvedDirectory,
@@ -5681,7 +5681,7 @@ function repositoryIsUnowned(
   }
 }
 
-/** Add `d`'s from-within instance directories to `byId`, recursively. */
+/** Add `d`'s from-within layer directories to `byId`, recursively. */
 function promoteFromWithin(
   d: ResolvedDirectory,
   byId: Map<string, ResolvedDirectory>,
@@ -5692,18 +5692,18 @@ function promoteFromWithin(
 ): void {
   if (seen.has(d.absPath)) return;
   seen.add(d.absPath);
-  // Never through a MIRROR. A `scope: "repository"` entry is this instance
-  // pointing at another instance's directory (cmsl's group 2, the wrong-way
+  // Never through a MIRROR. A `scope: "repository"` entry is this layer
+  // pointing at another layer's directory (cmsl's group 2, the wrong-way
   // arrow), and what that directory declares from within belongs to ITS owner.
   // Following it made cat-harness resolve core's `voices/` as its own the
   // moment core declared it from within (measured 2026-09-30).
   //
-  // Unless nobody else owns it. When the repository's root IS this instance,
-  // or declares no instance at all (the index checkout, owner 2026-10-08:
+  // Unless nobody else owns it. When the repository's root IS this layer,
+  // or declares no layer at all (the index checkout, owner 2026-10-08:
   // "folio-asst should not need folio-assistant declared at all"), the store
   // this entry names has no other owner to defer to. Returning here then left
   // `todos/todos.json`'s `items` and `beans/beans.json`'s `defs` attributed to
-  // `(root)` — an instance that does not exist (measured 2026-10-09).
+  // `(root)` — a layer that does not exist (measured 2026-10-09).
   if (d.scope === "repository" && !(d.own === true && repositoryIsUnowned(d, rootLink, registry))) return;
   const files = d.graphTypologies
     .map((g) => registry.get(g)?.declarationFile)
@@ -5719,7 +5719,7 @@ function promoteFromWithin(
       continue; // `check:harness-dirs` owns an unparseable declaration and says so
     }
     for (const nd of nested.directories ?? []) {
-      // `"subgraph": true` marks an entry that is a subgraph of the INSTANCE
+      // `"subgraph": true` marks an entry that is a subgraph of the LAYER
       // (skills.json's `voices`), not a part of its parent's graph
       // (beans.json's `defs`, docs.json's `proposals`). It answered the retired
       // `dependents` question until 2026-09-30 (option A); the fact it carried
@@ -5731,10 +5731,10 @@ function promoteFromWithin(
       const existing = byId.get(nd.id);
       if (existing !== undefined && existing.declaredBy !== "(default)") continue;
       const sub = nd.path.replace(/^\.\//, "").replace(/\/+$/, "");
-      // A DEFAULT parent (`skills/` that the instance never declared) is still
+      // A DEFAULT parent (`skills/` that the layer never declared) is still
       // a directory in the root link's own tree — the defaults are seeded
       // against it — so the file that declares from within it was written by
-      // that instance. Inheriting `(default)`/`own: false` from the parent made
+      // that layer. Inheriting `(default)`/`own: false` from the parent made
       // agent-skills' and sci's `voices/` look like nobody's, and the UML
       // overview dropped both (measured 2026-09-30).
       const fromDefault = d.declaredBy === "(default)" && rootLink !== undefined;
@@ -5743,7 +5743,7 @@ function promoteFromWithin(
         // A from-within entry's `path` is spelled from its PARENT's path, so it
         // resolves against the parent's root: it inherits the parent's `scope`
         // unless it states its own. Without this, `beans/beans.json`'s `defs`
-        // under the repository-scoped `beans/` resolved against the INSTANCE,
+        // under the repository-scoped `beans/` resolved against the LAYER,
         // and `materialiseDirectories` refused (`harness:dirs:check`).
         ...(d.scope !== undefined && (nd as { scope?: unknown }).scope === undefined ? { scope: d.scope } : {}),
         path: `${d.path.replace(/\/+$/, "")}/${sub}/`,
@@ -5770,18 +5770,18 @@ function promoteFromWithin(
  * is how one of them goes missing when the layout moves.
  */
 /**
- * The role an instance's agent-instruction file declares.
+ * The role a layer's agent-instruction file declares.
  *
  * One constant because the declaration writes it and every checker reads it,
  * and a role spelled twice is a role one side stops finding.
  */
 export const AGENT_INSTRUCTIONS_ROLE = "agent-instructions";
 
-/** The role an instance's reader-facing README declares. */
+/** The role a layer's reader-facing README declares. */
 export const INSTANCE_README_ROLE = "instance-readme";
 
 /**
- * The role of an instance's node-kind ratchet baseline: the families IT owns
+ * The role of a layer's node-kind ratchet baseline: the families IT owns
  * that may stay unkinded (`schemas/kg/node-kind-index.ts`, {@link UnkindedBaselineKind}
  * there). Owner, 2026-10-15: one baseline per layer, so a layer's own families
  * are judged by its own commit, and the cross-layer table is built at publish.
@@ -5803,7 +5803,7 @@ export const UNKINDED_BASELINE_ROLE = "unkinded-baseline";
  */
 export type AssetDelivery = "file" | "injected";
 
-/** What a declared asset ROLE means — asked once, for every instance. */
+/** What a declared asset ROLE means — asked once, for every layer. */
 export interface AssetRoleDef {
   /** What this artefact is FOR — one line. */
   purpose: string;
@@ -5831,10 +5831,10 @@ export interface AssetRoleDef {
  * > mantiaing agent memroies)
  *
  * A `purpose` field beside `role` on every asset would be a second answer to
- * one question, free to disagree with the first: eleven instances would each
+ * one question, free to disagree with the first: eleven layers would each
  * spell out what `instance-readme` is for, and the eleventh would say
  * something slightly different. The role already IS the purpose — this is
- * where the role says so, once, for every instance that declares it.
+ * where the role says so, once, for every layer that declares it.
  *
  * It was tried the other way first. A `purpose` key was written into
  * `cat-harness/harness.json` and {@link KgAssetSchema} silently stripped it,
@@ -5862,7 +5862,7 @@ export interface AssetRoleDef {
  *
  * ## The two that matter, and the line between them
  *
- * `instance-readme` says what the instance IS; `agent-instructions` says what
+ * `instance-readme` says what the layer IS; `agent-instructions` says what
  * to DO. The second **augments and never restates** the first — the owner
  * again, on the same day:
  *
@@ -5870,7 +5870,7 @@ export interface AssetRoleDef {
  * > readme.md) but augment.
  *
  * That is checkable rather than a matter of taste, and it is why both are
- * required of every instance: a reader arriving with either question is
+ * required of every layer: a reader arriving with either question is
  * entitled to a file that answers only theirs.
  *
  * Absent from this map means the role is one this layer does not govern —
@@ -5950,14 +5950,14 @@ export function processMayWriteAsset(role: string): boolean | undefined {
  *
  * {@link KgAssetSchema} is a non-strict `z.object`, so an unknown key is
  * dropped without a word — and that is not a defect to fix here, because the
- * schema is also how a downstream instance carries a key this layer has not
+ * schema is also how a downstream layer carries a key this layer has not
  * learned about yet. What it costs is recorded above: a `purpose` written into
  * `cat-harness/harness.json` read as if it carried one, and no consumer ever
  * saw it.
  *
  * So the finding is raised against the RAW declaration rather than the parsed
  * one — after parsing, the evidence is gone. Returns one entry per offending
- * key, with the instance root and the asset id, because "some instance has a
+ * key, with the layer root and the asset id, because "some instance has a
  * stray key" is not something anybody can act on.
  */
 export function strayAssetRoleKeys(
@@ -6018,13 +6018,13 @@ export const REQUIRED_ASSET_ROLES = [INSTANCE_README_ROLE, AGENT_INSTRUCTIONS_RO
  * could pick up: beans, todos, or a BPMN instance mid-flight. **STATIC**
  * means the graph is there to be read.
  *
- * ## Asked of the REPOSITORY, not of one instance
+ * ## Asked of the REPOSITORY, not of one layer
  *
- * Measured 2026-09-21: the root instance declares no work-plan graph and
+ * Measured 2026-09-21: the root layer declares no work-plan graph and
  * `cat-harness` declares `beans` and `todos` at `scope: "repository"`. So a
  * person standing at the repository root plainly has a work plan while the
- * root instance alone scores static. The question is about the checkout —
- * "is there work recorded anywhere I can see" — and answering it per instance
+ * root layer alone scores static. The question is about the checkout —
+ * "is there work recorded anywhere I can see" — and answering it per layer
  * gets it wrong for the one place a reader actually stands.
  *
  * ## Derived, never listed
@@ -6105,13 +6105,13 @@ export function undecidedWorkKinds(
 
 /**
  * Where a declared asset of this role actually is, or `undefined` if the
- * instance declares none.
+ * layer declares none.
  *
  * The point of asking rather than composing `join(root, "README.md")`: an
- * asset carries a {@link DeclarationScope}, and this instance's README and
+ * asset carries a {@link DeclarationScope}, and this layer's README and
  * `AGENTS.md` are the REPOSITORY's — one of each per checkout, however many
- * instances it holds. `readme:sync` and `readme:audit` composed the path and
- * so looked inside the instance, where `readme:sync:check` reported "No
+ * layers it holds. `readme:sync` and `readme:audit` composed the path and
+ * so looked inside the layer, where `readme:sync:check` reported "No
  * README" and failed the gate on a file that was one directory up.
  *
  * Existence is NOT filtered here, for the same reason {@link declaredAssets}
@@ -6131,12 +6131,12 @@ export function declaredAssetPath(
 }
 
 /**
- * This instance's declared assets, resolved to absolute paths.
+ * This layer's declared assets, resolved to absolute paths.
  *
  * Existence is reported rather than filtered, unlike the directory defaults:
  * a declared asset that is missing is a FINDING — somebody said this file is
  * ours and it is not there — whereas a conventional directory that is absent
- * is simply a convention this instance did not take up. Silently dropping the
+ * is simply a convention this layer did not take up. Silently dropping the
  * first would reproduce `dh4f` in the one place the declaration is an
  * assertion rather than a guess.
  */
@@ -6158,7 +6158,7 @@ export const KG_GRAPH_TYPOLOGY = "cat-harness";
  *
  * `cat-harness` is here because a downstream declaration that has not migrated
  * still spells a skill directory that way, and dropping it would make every
- * unmigrated instance's skills unreachable rather than merely unclassified.
+ * unmigrated layer's skills unreachable rather than merely unclassified.
  *
  * `processes` and `scenarios` are NOT here, and that is the split doing its
  * job: `processes/` holds only `.bpmn` and `scenarios/` only `roles.json`, so
@@ -6228,7 +6228,7 @@ export function isKgContentDirectory(d: ContentDirectory): boolean {
 }
 
 /**
- * One instance's OWN declared directories — no inheritance, no override.
+ * One layer's OWN declared directories — no inheritance, no override.
  *
  * ## Why this is not {@link resolveDirectories}
  *
@@ -6238,7 +6238,7 @@ export function isKgContentDirectory(d: ContentDirectory): boolean {
  * dependency's entry and one path comes back. That is correct for its question
  * and is the documented rule — overrides match on `id`, never on `path`.
  *
- * **Overlay is the opposite question.** Loading skills needs EVERY instance's
+ * **Overlay is the opposite question.** Loading skills needs EVERY layer's
  * contribution, in order, because a dependency's skills and the root's are both
  * real and the root's merely win *per skill name*. Collapsing them by id
  * discards the dependency entirely.
@@ -6247,9 +6247,9 @@ export function isKgContentDirectory(d: ContentDirectory): boolean {
  * here, and why the overlay resolver that predates this hardcoded
  * `join(root, "skills")` instead — it needed per-instance paths and reached for
  * a literal to get them. A literal is how a skill goes missing the moment the
- * layout moves; this reads the instance's own declaration instead.
+ * layout moves; this reads the layer's own declaration instead.
  *
- * ## An undeclared instance still gets the conventions
+ * ## An undeclared layer still gets the conventions
  *
  * `AGENTS.md`: *"Absent declaration is fine — an unmigrated instance falls
  * back to today's conventions."* So a dependency with a `skills/` directory
@@ -6257,7 +6257,7 @@ export function isKgContentDirectory(d: ContentDirectory): boolean {
  * where that convention is written down once.
  *
  * **This was a regression before it was a feature.** The first version of this
- * function returned `[]` for an undeclared instance, which silently dropped
+ * function returned `[]` for an undeclared layer, which silently dropped
  * every unmigrated dependency's skills — caught by
  * `harness-config.test.ts`'s existing overlay test, whose fixture declares
  * nothing. Reading a declaration is the improvement; requiring one would have
@@ -6272,7 +6272,7 @@ export function ownDirectories(
   link: { name: string; root: string; own?: boolean },
   registry: GraphTypologyRegistry = defaultGraphTypologies,
   /**
-   * The opt-in sub-graphs switched on. Absent: this instance's own list (and
+   * The opt-in sub-graphs switched on. Absent: this layer's own list (and
    * `CAT_SUBGRAPHS`). A caller resolving a DEPENDENCY for a folio passes the
    * folio's, since the folio decides (`opt-in-subgraphs.ts`).
    */
@@ -6304,7 +6304,7 @@ export function ownDirectories(
   // (the other was teaching the schema to tell an ABSENT `directories` from an
   // empty one, which is a migration). It is also the one that makes the rule
   // sayable in a sentence: **a declaration adds and overrides; it does not
-  // withdraw.** An instance that genuinely owns none of the conventional
+  // withdraw.** A layer that genuinely owns none of the conventional
   // directories says so by not having them on disk — the existence filter is
   // what makes that the same answer either way, and it is the same reason
   // `DEFAULT_DIRECTORIES` carries: a declared-but-absent directory is `dh4f`,
@@ -6323,7 +6323,7 @@ export function ownDirectories(
     // checkout, so inheriting its entry points every consumer at somebody
     // else's store. Stated in both resolvers because both are entry points.
     .filter((dir) => dir.scope !== "repository" || link.own === true)
-    // A switched-off opt-in sub-graph is not this instance's to offer.
+    // A switched-off opt-in sub-graph is not this layer's to offer.
     .filter((dir) => !switchedOff({ ...dir, declaredBy: decl.name }, enabled))
     .map((dir) => ({
       ...dir,
@@ -6339,7 +6339,7 @@ export function ownDirectories(
       //
       // The consequence was silent and it was `dh4f`. `cat-harness/harness.json`
       // declares `bootstrap/skills/` at `scope: "repository"`; resolving it
-      // against the INSTANCE gave `cat-harness/bootstrap/skills`, which is not
+      // against the LAYER gave `cat-harness/bootstrap/skills`, which is not
       // there, and `resolveSkillDirs` drops a directory that does not exist.
       // So `skill_fetch` answered "package not found" for every bootstrap
       // skill while the declaration naming them was correct and present, and
@@ -6412,7 +6412,7 @@ function wrapComment(text: string, width = 74): string[] {
 export interface MaterialisedDirectory {
   id: string;
   /**
-   * Path the directory was (or would be) created at — inside the instance, or
+   * Path the directory was (or would be) created at — inside the layer, or
    * at the repository root for a `repository`-scoped entry.
    */
   absPath: string;
@@ -6420,9 +6420,9 @@ export interface MaterialisedDirectory {
    * from `absPath` — `relative(instanceRoot, absPath)` gives `../beans` for a
    * repository-scoped entry, which is a traversal rather than a name. */
   path: string;
-  /** Which root `path` was resolved against; absent means the instance's. */
+  /** Which root `path` was resolved against; absent means the layer's. */
   scope?: DeclarationScope;
-  /** The instance whose declaration contributed the entry — may be a dependency. */
+  /** The layer whose declaration contributed the entry — may be a dependency. */
   declaredBy: string;
   /** True when this call created the directory; false when it already existed. */
   created: boolean;
@@ -6431,7 +6431,7 @@ export interface MaterialisedDirectory {
 }
 
 /**
- * Does each instance have its own directory of every kind this one holds
+ * Does each layer have its own directory of every kind this one holds
  * ({@link GraphTypologyDef.perInstance})? Such a directory is reproduced in each
  * dependent by {@link materialiseDirectories}; an unregistered kind has said
  * nothing, so it is not.
@@ -6445,7 +6445,7 @@ export function isPerInstance(
 }
 
 /**
- * Create every declared directory that does not exist yet, in the instance
+ * Create every declared directory that does not exist yet, in the layer
  * being set up.
  *
  * WHY THIS EXISTS, and why it must land in the same change as any new
@@ -6457,7 +6457,7 @@ export function isPerInstance(
  * empty rather than an unanswered question — the same third-state discipline
  * the README sections and the CI-health report follow.
  *
- * PATHS RESOLVE AGAINST THE INSTANCE, NOT THE DECLARER. An instance inherits
+ * PATHS RESOLVE AGAINST THE LAYER, NOT THE DECLARER. A layer inherits
  * its dependencies' directory conventions, so what it inherits is the
  * CONVENTION — an id and a relative path — and it needs that directory in
  * ITSELF. `ResolvedDirectory.absPath` points into the declaring checkout,
@@ -6468,8 +6468,8 @@ export function isPerInstance(
  * the same rule `schemas/sdlc/bean-graph.ts` applies to its node paths: a directory
  * outside that root is not a directory of it. A `repository`-scoped entry is
  * materialised at the repository root — `beans/` and `todos/` belong to the
- * checkout rather than to any instance in it, so creating them inside the
- * instance would give the work plan a second home and leave the real one
+ * checkout rather than to any layer in it, so creating them inside the
+ * layer would give the work plan a second home and leave the real one
  * reported MISSING, which is what `harness:dirs:check` said about four
  * directories that were all sitting there.
  *
@@ -6479,7 +6479,7 @@ export function isPerInstance(
  * marker: it is not at risk of vanishing, so a file explaining that it might
  * would be both redundant and wrong.
  */
-/** The instance's declared publish-time artefacts; none when it declares none or cannot be read. */
+/** The layer's declared publish-time artefacts; none when it declares none or cannot be read. */
 function publishTimeOf(instanceRoot: string): BuiltAtPublish[] {
   try {
     return readDeclaration(instanceRoot)?.builtAtPublish ?? [];
@@ -6498,13 +6498,13 @@ export function materialiseDirectories(
   for (const dir of dirs) {
     // ── What a DEPENDENT gets, and what it does not ───────────────────
     //
-    // An instance always materialises what it DECLARED ITSELF; `dependents`
+    // A layer always materialises what it DECLARED ITSELF; `dependents`
     // governs only what an INHERITED entry does here. `skip` means the entry
-    // names where the declaring instance's own content lives — `schemas/`,
+    // names where the declaring layer's own content lives — `schemas/`,
     // `tools/`, `src/skills/` — and a dependent has no use for an empty
     // directory of that name.
     //
-    // Measured before this existed: a fresh folio depending on this instance
+    // Measured before this existed: a fresh folio depending on this layer
     // inherits 12 directories, four of them the platform's own, and every one
     // was created with a committed keep marker. That is the `dh4f` shape —
     // a consumer scanning a directory that exists and is empty, reporting a
@@ -6530,9 +6530,9 @@ export function materialiseDirectories(
     // is not "missing", so `--check` does not list it either.
     // Any source off the checkout, not only `storage` (bean `l4ay`).
     if (contentIsOffCheckout(dir)) continue;
-    // BUILT AT PUBLISH (owner, 2026-10-14, "B1"): the instance declares it
+    // BUILT AT PUBLISH (owner, 2026-10-14, "B1"): the layer declares it
     // never commits this directory, and `derive:publish` writes it. Creating
-    // it here would commit a keep marker into a path the instance's own
+    // it here would commit a keep marker into a path the layer's own
     // `.gitignore` keeps out, and its absence before a publish build is its
     // correct state, so `--check` does not list it as missing either.
     if (dir.own === true && dir.scope !== "repository" && isBuiltAtPublish(publishTimeOf(rootAbs), dir.path.replace(/\/*$/, "/"))) continue;
@@ -6549,7 +6549,7 @@ export function materialiseDirectories(
     // ── The scope trap ────────────────────────────────────────────────
     //
     // `scope` is optional and its ABSENCE is meaningful: the path resolves
-    // against the instance rather than the repository. Omit it on an entry
+    // against the layer rather than the repository. Omit it on an entry
     // that meant `repository` and the declaration silently names a different
     // directory — and this function then CREATES that directory, with a keep
     // marker, turning declared-but-absent into declared-and-empty. The
@@ -6565,8 +6565,21 @@ export function materialiseDirectories(
     // missing or wrong `scope` rather than a coincidence — and creating an
     // empty twin beside it is the one outcome that helps nobody.
     const otherBase = rootForScope(rootAbs, dir.scope === "repository" ? undefined : "repository");
-    if (otherBase !== base) {
-      const twin = resolve(otherBase, dir.path);
+    const twinPath = resolve(otherBase, dir.path);
+    // A twin that is ITSELF a declared entry of this list is no scope mistake
+    // but a second directory on purpose: cat-harness declares `uploads`
+    // (its own queue) and `checkout-uploads` (the checkout's, `scope:
+    // "repository"`) at the same relative path. In a checkout whose root holds
+    // no `uploads/` yet (an IG repository that is its own index), the guard
+    // read the declared `cat-harness/uploads` as the misplaced content
+    // (cat-harness-tools#1701). An undeclared twin is still refused, and so
+    // is one only the existence-filtered `(default)` convention names: that
+    // entry exists BECAUSE the directory does, so it declares nothing.
+    const twinDeclared = dirs.some(
+      (o) => o !== dir && o.declaredBy !== "(default)" && resolve(rootForScope(rootAbs, o.scope), o.path) === twinPath,
+    );
+    if (otherBase !== base && !twinDeclared) {
+      const twin = twinPath;
       // The condition is "this one is EMPTY and the twin has content", not
       // "this one is absent" — so it DETECTS the mistake already standing as
       // well as preventing a new one. A first draft tested absence only, and
@@ -6590,7 +6603,7 @@ export function materialiseDirectories(
     const markerExisted = existed && existsSync(markerPath);
     // The marker earns its place ONLY in a directory that would otherwise be
     // empty — that is the whole failure it addresses. Writing one into a
-    // directory that already holds files (this instance's `skills/` holds
+    // directory that already holds files (this layer's `skills/` holds
     // hundreds) adds a file nobody asked for and says something untrue about
     // why it is there.
     const needsMarker =
@@ -6624,7 +6637,7 @@ export function renderableDirectories(
 
 /**
  * The absolute path of the directory holding a given graph, read from the
- * instance's declaration.
+ * layer's declaration.
  *
  * ## The literal this exists to replace
  *
@@ -6641,9 +6654,9 @@ export function renderableDirectories(
  *
  * ## Three states, and the third is why this returns `undefined`
  *
- * A graph the instance does not declare is NOT the same as one declared at
- * the conventional path. `DEFAULT_DIRECTORIES` is existence-filtered, so an
- * instance with no `uploads/` genuinely has no `uploads` graph — and
+ * A graph the layer does not declare is NOT the same as one declared at
+ * the conventional path. `DEFAULT_DIRECTORIES` is existence-filtered, so a
+ * layer with no `uploads/` genuinely has no `uploads` graph — and
  * defaulting here would hand a caller a path to a directory that is not
  * there, which is precisely the `dh4f` defect (a consumer scans nothing and
  * reports a clean run over it). Callers that legitimately want the
@@ -6684,7 +6697,7 @@ export function renderableDirectories(
  *
  * Every site that wanted one was migrated: scanners fan out through
  * {@link directoriesForGraph}, write targets refuse through this, and the four
- * that wanted THEIR OWN instance's directory ask
+ * that wanted THEIR OWN layer's directory ask
  * {@link instanceDirectoryForGraph}, which is a third question neither of the
  * other two answers. `scripts/tests/no-silent-first-directory.test.ts` fails
  * on a new `directoriesForGraph(…)[0]`, since the last fix of this shape was
@@ -6714,12 +6727,12 @@ export function directoryForGraph(
 }
 
 /**
- * Where an instance's `.pot` / `.po` sources actually live — its own declared
- * directory, or a HOST's, namespaced by the instance's stub.
+ * Where a layer's `.pot` / `.po` sources actually live — its own declared
+ * directory, or a HOST's, namespaced by the layer's stub.
  *
  * ## The third case, and why it had to exist
  *
- * Two answers were assumed for years and both are about the instance itself:
+ * Two answers were assumed for years and both are about the layer itself:
  * it declares `translation-sources`, or it does not and the convention
  * `<root>/translations` applies. Ten readers spell the second as
  * `directoryForGraph(root, "translation-sources") ?? join(root, "translations")`.
@@ -6728,8 +6741,8 @@ export function directoryForGraph(
  * READS — no TypeScript, `needs: []` — and a `.pot` is tooling OUTPUT that
  * nobody reads. So on the owner's instruction its 15 templates moved to
  * `cat-harness/translations/<locale>/bootstrap/processes/`: the files that
- * describe one instance's diagrams, kept in the translation corpus of the
- * instance that PUBLISHES them.
+ * describe one layer's diagrams, kept in the translation corpus of the
+ * layer that PUBLISHES them.
  *
  * Both assumed answers then compose a path that does not exist, and this is
  * not hypothetical — it took three CI jobs red on 2026-09-27, twice, in two
@@ -6740,11 +6753,11 @@ export function directoryForGraph(
  * Worth stating because the natural guess is wrong and costs an afternoon.
  * `bootstrap` declares `needs: []`; it depends on nothing, so no dependency of
  * bootstrap's could be hosting anything. `cat-harness` is what declares
- * `needs: ['bootstrap']`. The host is the instance that DEPENDS on this one,
+ * `needs: ['bootstrap']`. The host is the layer that DEPENDS on this one,
  * which is also the one whose build publishes it — so the host cannot be found
- * by walking this instance's own dependencies, and `hostRoot` is supplied by
+ * by walking this layer's own dependencies, and `hostRoot` is supplied by
  * the caller rather than derived. A tool shipping inside cat-harness passes
- * its own instance root, which is the only host it could sensibly mean.
+ * its own layer root, which is the only host it could sensibly mean.
  *
  * ## Three states, reported rather than collapsed
  *
@@ -6755,8 +6768,8 @@ export function directoryForGraph(
  * reader deciding whether an empty result is a determined empty or a defect
  * needs to know it was a guess.
  *
- * @param instanceRoot the instance whose translations are wanted
- * @param hostRoot an instance that may host them; omit when there is none
+ * @param instanceRoot the layer whose translations are wanted
+ * @param hostRoot a layer that may host them; omit when there is none
  */
 export function translationsHomeFor(
   instanceRoot: string,
@@ -6776,7 +6789,7 @@ export function translationsHomeFor(
     // undefined, so it reads the DIRECTORY and node refuses. Found by this
     // function's own tests, which pass exactly such a directory — and by two
     // OLDER tests in the same file that had been passing temp dirs to
-    // `catalogueFor` for months. An instance with no declaration has no stub,
+    // `catalogueFor` for months. A layer with no declaration has no stub,
     // so it cannot be hosted under one; that is the convention case below.
     const decl = readDeclaration(instanceRoot);
     if (host !== undefined && decl !== undefined && decl !== null) {
@@ -6794,7 +6807,7 @@ export function translationsHomeFor(
     }
   }
 
-  // declared-path-literal: the base case for an instance that declares nothing
+  // declared-path-literal: the base case for a layer that declares nothing
   // and is hosted by nobody. Reading a declaration to learn the fallback for
   // having no declaration cannot be done; `DEFAULT_DIRECTORIES` supplies this
   // same convention, and `by: "convention"` tells the caller it was a guess.
@@ -6802,7 +6815,7 @@ export function translationsHomeFor(
 }
 
 /**
- * The directory holding one locale's files for an instance, hosted or not:
+ * The directory holding one locale's files for a layer, hosted or not:
  * `<root>/<locale>` when it owns its corpus, `<root>/<locale>/<stub>` when a
  * host carries it.
  *
@@ -6817,17 +6830,17 @@ export function localeDirIn(
   return join(home.root, locale, ...home.scope);
 }
 
-/** Every directory this instance declares as holding `graph`, in declaration order. */
+/** Every directory this layer declares as holding `graph`, in declaration order. */
 /**
- * Where an instance's `kg-audit` results live: the directory holding its
+ * Where a layer's `kg-audit` results live: the directory holding its
  * `kg-qa/` tree and its `kg-qa.manifest.json`.
  *
  * Three answers, and the caller is told which, as {@link translationsHomeFor}
  * does for translations:
  *
- * - **own** — the instance declares a `qa` directory; its results live there.
- * - **hosted** — it declares none, and `hostRoot` (the auditor's instance)
- *   does; the results live in the host's `qa` directory under the instance's
+ * - **own** — the layer declares a `qa` directory; its results live there.
+ * - **hosted** — it declares none, and `hostRoot` (the auditor's layer)
+ *   does; the results live in the host's `qa` directory under the layer's
  *   stub, e.g. `cat-harness/test/results/bootstrap/`. This is how bootstrap
  *   keeps its QA sidecars out of its own tree (owner, 2026-09-29, decision 2 of
  *   bean `r3gy`): a verdict ABOUT bootstrap is harness output, and bootstrap is
@@ -6835,7 +6848,7 @@ export function localeDirIn(
  * - **convention** — neither declares one; `<instance>/test/results/`.
  *
  * A hosted home sits BESIDE the host's own `kg-qa/` tree, never inside it, so
- * the host's orphan sweep cannot claim another instance's sidecars as its own.
+ * the host's orphan sweep cannot claim another layer's sidecars as its own.
  */
 export function kgQaHomeFor(
   instanceRoot: string,
@@ -6851,19 +6864,19 @@ export function kgQaHomeFor(
       return { root: join(host.absPath, artefactStub(decl)), by: "hosted" };
     }
   }
-  // declared-path-literal: the base case for an instance that declares no `qa`
+  // declared-path-literal: the base case for a layer that declares no `qa`
   // directory and is hosted by nobody — the same convention KG_QA_RESULTS_DIR names.
   return { root: join(instanceRoot, "test", "results"), by: "convention" };
 }
 
 /**
- * Where an instance's swimlane-glossary retirement LEDGER lives — the same
+ * Where a layer's swimlane-glossary retirement LEDGER lives — the same
  * three answers as {@link kgQaHomeFor}, for the same reason.
  *
- * - **own** — the instance declares a `swimlane-glossary` directory.
- * - **hosted** — it declares none, and `hostRoot` (the instance running the
+ * - **own** — the layer declares a `swimlane-glossary` directory.
+ * - **hosted** — it declares none, and `hostRoot` (the layer running the
  *   export) does; the ledger lives in the host's directory under the
- *   instance's stub, e.g. `cat-harness/glossary/bootstrap/`. The ledger is
+ *   layer's stub, e.g. `cat-harness/glossary/bootstrap/`. The ledger is
  *   harness state ABOUT bootstrap — `glossary-export` writes it, nothing in
  *   bootstrap reads it — so it is hosted like the QA verdicts (owner,
  *   2026-09-30, Q2 of bean `xsqm`).
@@ -6887,7 +6900,7 @@ export function glossaryHomeFor(
       return { root: join(host.absPath, artefactStub(decl)), by: "hosted" };
     }
   }
-  // declared-path-literal: the base case for an instance that declares no
+  // declared-path-literal: the base case for a layer that declares no
   // `swimlane-glossary` directory and is hosted by nobody — `GLOSSARY_DIR`'s convention.
   return { root: join(instanceRoot, "glossary"), by: "convention" };
 }
@@ -6906,7 +6919,7 @@ function matchingDirectories(
  * Every directory holding `graph`, for the callers {@link directoryForGraph}
  * now refuses.
  *
- * Empty means the instance declares the graph nowhere — the same third state
+ * Empty means the layer declares the graph nowhere — the same third state
  * its sibling documents, and for the same reason: a caller that wants the
  * convention as a fallback says so at its own call site, where the choice is
  * visible, rather than being handed a path to a directory that is not there.
@@ -6942,8 +6955,8 @@ export function directoryEntriesForGraph(
 }
 
 /**
- * The CONVENTIONAL folio directory, `<root>/folio` — the answer when an
- * instance declares no `folio` graph, and the only place outside a test where
+ * The CONVENTIONAL folio directory, `<root>/folio` — the answer when a
+ * layer declares no `folio` graph, and the only place outside a test where
  * the string is spelled.
  *
  * Bean `hs08` concentrated 162 spellings of `join(root, "folio")` into
@@ -7005,7 +7018,7 @@ export function conventionalFolioDir(root: string): string {
  *
  * ## The fallback is the CONVENTION, not `content/`
  *
- * An instance that declares nothing gets `folio/`. It never gets `content/`:
+ * A layer that declares nothing gets `folio/`. It never gets `content/`:
  * that root is excised, and a folio keeping it must SAY so. Silence means the
  * convention, and the convention is `folio/`.
  *
@@ -7016,7 +7029,7 @@ export function folioDir(root: string): string {
   try {
     return directoryForGraph(root, "folio") ?? conventionalFolioDir(root);
   } catch (e) {
-    // An instance whose declaration does not KNOW the `folio` kind — core
+    // A layer whose declaration does not KNOW the `folio` kind — core
     // registers it by load-time side effect (`schemas/kg/folio-graph-typology.ts`)
     // and a harness-only process may not have reached it. That is `ot9a`'s
     // fragility, and the convention is the right answer for it.
@@ -7151,8 +7164,8 @@ export function deferResolution<T>(
 }
 
 /**
- * The directory a graph has AT THIS INSTANCE'S OWN ROOT — repository-scoped
- * entries pointing at sibling instances excluded.
+ * The directory a graph has AT THIS LAYER'S OWN ROOT — repository-scoped
+ * entries pointing at sibling layers excluded.
  *
  * ## A third question, found by reading the callers rather than by design
  *
@@ -7172,36 +7185,36 @@ export function deferResolution<T>(
  * from the `cat-harness` root all FOUR `schemas` directories are `own` —
  * `cat-harness/schemas` plus the content core's, `large-datasets/` and
  * `detangle/`, each declared by cat-harness's own `harness.json` with
- * `scope: "repository"` because this repository stages three future instances
+ * `scope: "repository"` because this repository stages three future layers
  * as sibling top-level directories. `own` distinguishes the root from a
  * DEPENDENCY, which is a different question and not the one being asked.
  *
  * The discriminator is `scope`, and `rootForScope` above is where it already
  * means exactly this: a repository-scoped entry resolves against the
- * REPOSITORY root, everything else against the instance root. So this asks for
+ * REPOSITORY root, everything else against the layer root. So this asks for
  * the entries that resolve against `root` itself — the directory that is
- * genuinely this instance's, not one it points at from across the repository.
+ * genuinely this layer's, not one it points at from across the repository.
  *
  * ## Why `[0]` was not already wrong here
  *
  * `resolveDirectories` happens to order the root's instance-scoped
  * declarations first, so `[0]` landed on the intended one. A reordering, or a
  * staged sibling declared earlier, would have moved it silently — and the
- * symptom would be a generator writing its output into another instance's
+ * symptom would be a generator writing its output into another layer's
  * tree, with a clean exit code.
  */
 /**
- * Every directory of `graph` that is genuinely THIS instance's — the plural of
+ * Every directory of `graph` that is genuinely THIS layer's — the plural of
  * {@link instanceDirectoryForGraph}, with the identical `scope` filter.
  *
- * It exists because the singular THROWS when an instance declares more than one,
+ * It exists because the singular THROWS when a layer declares more than one,
  * deliberately: taking `[0]` is the `dh4f` shape, where a second declared
  * directory is scanned by nobody and the run reports clean. That refusal is
  * right, and it makes the singular the wrong accessor for a caller whose
  * question is plural — which is how `kg:audit --instance ./large-datasets`
  * CRASHED rather than auditing (measured 2026-09-27):
  *
- *     instance at .../large-datasets declares 2 directories for graph "schemas"
+ *     layer at .../large-datasets declares 2 directories for graph "schemas"
  *     at its own root, and this call site expects one:
  *       large-datasets-schemas → .../large-datasets/schemas
  *       large-datasets-sources → .../large-datasets/sources
@@ -7211,7 +7224,7 @@ export function deferResolution<T>(
  * asking for one. `unclaimedSkillContracts` in `kg-audit.ts` is that caller.
  *
  * Filtered on `scope` and not on `own`, for the reason spelled out on the
- * singular: from a root that stages sibling instances, all of them are `own`,
+ * singular: from a root that stages sibling layers, all of them are `own`,
  * and `scope` is the discriminator that actually asks "resolves against THIS
  * root".
  */
@@ -7232,7 +7245,7 @@ export function instanceDirectoryForGraph(
 ): string | undefined {
   // Not one inside an opt-in sub-graph: that is an ADDITIONAL graph of its
   // kind, found by `optInDirectoriesForGraph`, and a switched-on `work-plan`
-  // holding a `tools` graph must not make the instance's one `tools` two.
+  // holding a `tools` graph must not make the layer's one `tools` two.
   const here = matchingDirectories(root, graph, registry).filter(
     (d) => d.own && d.scope !== "repository" && d.optInSubgraph === undefined,
   );
@@ -7246,11 +7259,11 @@ export function instanceDirectoryForGraph(
 }
 
 /**
- * The `graph` directories an instance holds INSIDE its switched-on opt-in
+ * The `graph` directories a layer holds INSIDE its switched-on opt-in
  * sub-graphs — the ones {@link instanceDirectoryForGraph} leaves out. Empty
  * while nothing is opt-in, or while every opt-in sub-graph is off.
  *
- * @param enabled what is switched on; absent, the instance's own list. A
+ * @param enabled what is switched on; absent, the layer's own list. A
  *   reader serving a FOLIO passes the folio's (`opt-in-subgraphs.ts`).
  */
 export function optInDirectoriesForGraph(
@@ -7375,7 +7388,7 @@ export function toJsonLd(
         path: d.path,
         // ...and `scope` was ALREADY being dropped, silently, because it is
         // optional: a declaration round-tripped through JSON-LD came back
-        // saying every path resolves against the instance. `beans/`, `todos/`
+        // saying every path resolves against the layer. `beans/`, `todos/`
         // and six others are repository-scoped, so the projection was lossy
         // about the one field that decides WHERE they are. Found while adding
         // the line above; nothing had caught it because an absent optional
@@ -7389,18 +7402,18 @@ export function toJsonLd(
 }
 
 /**
- * The graph typologies an instance DECLARES — its own, not the universal registry's.
+ * The graph typologies a layer DECLARES — its own, not the universal registry's.
  *
  * Moved here from `scripts/check-instance-render.ts` (bean `3jj9`) so the two
  * exporters can read one fact. `kg-export` needs it to stop emitting every
- * kind any layer defines into every instance's graph: `bootstrap` published
+ * kind any layer defines into every layer's graph: `bootstrap` published
  * 16 GraphTypology nodes while declaring exactly one. The render check already
  * imports `kg-export`, so importing back would have been a cycle — and a
  * declaration's own contents belong beside the declaration reader anyway.
  *
  * Follows NESTED declarations, which is the part a plain read of
  * `directories[].graphTypologies` misses: `beans/beans.json` is what says `bean-defs`
- * and `workflow-state` exist, and an instance that owns them would otherwise
+ * and `workflow-state` exist, and a layer that owns them would otherwise
  * be reported as not owning them.
  */
 export function declaredKinds(
@@ -7425,8 +7438,8 @@ export function declaredKinds(
     // now lives, once.
     //
     // The directory-name convention stays as a FALLBACK, after it: a graph
-    // whose kind declares no filename is unmigrated, not broken, and an
-    // instance that never relocates behaves exactly as before.
+    // whose kind declares no filename is unmigrated, not broken, and a
+    // layer that never relocates behaves exactly as before.
     const dirName = basename(d.path.replace(/\/+$/, ""));
     const declared = (d.graphTypologies ?? [])
       .map((g) => registry.get(g)?.declarationFile)
@@ -7476,12 +7489,12 @@ export function declaredKinds(
  * not determine" as the reason. A from-within graph could therefore never read
  * as mounted, which is the state the whole cutover produces.
  *
- * `subgraph` says whether the entry is an instance subgraph at all
+ * `subgraph` says whether the entry is a layer subgraph at all
  * (bean `cmsl`). Without it a consumer cannot tell "mounted under its own id"
  * from "no mount can reach this entry, because nothing lists it".
  */
 export interface NestedDirectory {
-  /** `<parent id>/<own id>` — unique across the instance, and says who declares it. */
+  /** `<parent id>/<own id>` — unique across the layer, and says who declares it. */
   id: string;
   /** The entry's OWN id, as `resolveDirectories` and a mount marker spell it. */
   ownId: string;
@@ -7491,7 +7504,7 @@ export interface NestedDirectory {
   absent?: { reason: string };
   storage?: unknown;
   source?: unknown;
-  /** `true` when the entry declares itself an instance subgraph (bean `cmsl`). */
+  /** `true` when the entry declares itself a layer subgraph (bean `cmsl`). */
   subgraph?: boolean;
   parentId: string;
 }
@@ -7503,7 +7516,7 @@ function declaredKindsEntryRoot(root: string, d: { path: string; scope?: string 
 
 /**
  * The sub-graphs a declared directory names FROM WITHIN — its nested
- * declaration's entries, with paths rebased onto the instance root.
+ * declaration's entries, with paths rebased onto the layer root.
  *
  * Issue #1164, under the owner's #980 ruling: nesting is sanctioned when a
  * node inside the outer directory labels what it holds (`docs/docs.json`,
@@ -7641,13 +7654,13 @@ function walkNested(
 // the problem: this import, and `schemas/test-preload.ts`.
 import "./folio-graph-typology.js";
 // The `glossary` kind was registered here too until folio-assistant#2598: it
-// is now a node in the content instance's own `typologies/` graph (owner
+// is now a node in the content layer's own `typologies/` graph (owner
 // 2026-09-23, "put glossary into" the content layer).
 import { ThemeRefSchema, type ThemeRef } from "../ui/theme";
 import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
 import { projectedRead } from "../sdlc/read-projections";
 import { declaredEnableSubgraphs, enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
-// Instance DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
+// Layer DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this
 // file, which imports the registry. Re-exported here so no caller moves.
 export { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout } from "./instance-roots";

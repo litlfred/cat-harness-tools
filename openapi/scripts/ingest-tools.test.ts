@@ -5,7 +5,7 @@
  * `ingest-openapi.ts --check` verifies either kind offline.
  *
  * Driven against a copy of smart-trust's real declaration, so the directory a
- * document lands in is resolved the way every instance resolves it.
+ * document lands in is resolved the way every layer resolves it.
  *
  * @module cat-harness-tools/openapi/scripts/ingest-tools.test
  */
@@ -28,7 +28,7 @@ afterEach(() => {
 const SPEC = (title: string) =>
   JSON.stringify({ openapi: "3.0.3", info: { title, version: "1.0.0" }, paths: { "/ping": { get: { operationId: "ping", responses: {} } } } }, null, 2);
 
-/** An instance carrying smart-trust's declaration, an empty openapi directory, and `config`. */
+/** A layer carrying smart-trust's declaration, an empty openapi directory, and `config`. */
 function instance(config: Record<string, unknown>): { inst: string; dir: string } {
   const base = mkdtempSync(join(tmpdir(), "openapi-ingest-"));
   dirs.push(base);

@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * No instance spells a path into ANOTHER instance's declared directories.
+ * No layer spells a path into ANOTHER layer's declared directories.
  *
  * @module cat-harness/scripts/check-foreign-paths
- * @covers code — every instance's own source, read for literals that name a directory some other instance declares
+ * @covers code — every layer's own source, read for literals that name a directory some other layer declares
  *
- * `check:declared-paths` reads one instance's code against that instance's
- * OWN declarations, so it cannot see platform code naming another instance's
+ * `check:declared-paths` reads one layer's code against that layer's
+ * OWN declarations, so it cannot see platform code naming another layer's
  * `fsh-guts/`, `beans/`, `uploads/`, … by literal. Such directories may move
  * to their own branches, and a spelled path then keeps "finding" an empty
  * directory.
@@ -18,10 +18,10 @@
  * literal of a path-building call, templates and sentences skipped, and the
  * `declared-path-literal: <reason>` marker honoured.
  *
- * A literal is foreign when it lands in a directory another instance
- * declares — and the scanning instance does NOT declare a directory of the
+ * A literal is foreign when it lands in a directory another layer
+ * declares — and the scanning layer does NOT declare a directory of the
  * same name itself. So `join(ROOT, "docs")` in cat-harness, which declares
- * its own `docs/`, is not counted; names only another instance declares —
+ * its own `docs/`, is not counted; names only another layer declares —
  * `beans`, `todos`, `fsh-guts`, `uploads`, `issue-marks` — are.
  *
  * Also excluded: a module specifier (`"../cat-harness/schemas/x.js"`), which
@@ -55,15 +55,16 @@ import {
   pathContextRanges,
   stripComments,
 } from "./check-declared-paths.js";
+import { mountedInstances } from "./lib/layer-output.ts";
 import { TOOLS_ROOT } from "./lib/roots.ts";
 import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 
 export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "foreign-path-baseline.json");
 
-/** One instance and the directories it declares, repo-relative and code-free. */
+/** One layer and the directories it declares, repo-relative and code-free. */
 export interface InstanceDirs {
   name: string;
-  /** Repo-relative instance root ("" for the checkout root). */
+  /** Repo-relative layer root ("" for the checkout root). */
   root: string;
   /** Repo-relative declared directories, without a trailing slash. */
   dirs: string[];
@@ -83,7 +84,7 @@ export interface ForeignScan {
   marked: Array<ForeignSite & { reason: string }>;
 }
 
-/** Every instance's declared, non-code directories, repo-relative. */
+/** Every layer's declared, non-code directories, repo-relative. */
 export function instanceDirsIn(repo: string): InstanceDirs[] {
   return instanceRootsIn(repo).map((at) => {
     const abs = resolve(at);
@@ -96,13 +97,13 @@ export function instanceDirsIn(repo: string): InstanceDirs[] {
   });
 }
 
-/** The last path segment of each directory an instance declares: the names it OWNS. */
+/** The last path segment of each directory a layer declares: the names it OWNS. */
 function ownNames(i: InstanceDirs): Set<string> {
   return new Set(i.dirs.map((d) => d.split("/").pop()!));
 }
 
 /**
- * The directories `scanner`'s code must not spell: every other instance's,
+ * The directories `scanner`'s code must not spell: every other layer's,
  * minus any whose name the scanner declares for itself (the `docs/` rule).
  */
 export function foreignTargets(scanner: InstanceDirs, all: InstanceDirs[]): Array<{ dir: string; owner: string }> {
@@ -121,11 +122,11 @@ export function foreignTargets(scanner: InstanceDirs, all: InstanceDirs[]): Arra
   return out.sort((a, b) => b.dir.length - a.dir.length);
 }
 
-/** Tracked, non-test `.ts` files of an instance, excluding nested instances. */
+/** Tracked, non-test `.ts` files of a layer, excluding nested layers. */
 function sourceFiles(repo: string, inst: InstanceDirs, all: InstanceDirs[]): string[] {
   const nested = all.map((i) => i.root).filter((r) => r !== inst.root && (inst.root === "" || r.startsWith(`${inst.root}/`)));
   // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
-  // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
+  // layer is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
   // by the index repository's git, so `ls-files` at the root lists none of
   // their files. `gitCorpus` counts a mount's files as it counted a
   // submodule's, and is tracked-plus-untracked exactly as before elsewhere.
@@ -175,7 +176,7 @@ export function scanText(
       // A module specifier is CODE, addressed by path on purpose — the same
       // exemption `check:declared-paths` gives code directories.
       if (/\.(?:[cm]?[jt]sx?)$/.test(value)) continue;
-      // As written (repo-relative), or `../`-relative to the instance's root.
+      // As written (repo-relative), or `../`-relative to the layer's root.
       const asRepo = value.startsWith("../") && instRoot !== "" ? normalize(join(instRoot, value)).split(sep).join("/") : value;
       const hit = targets.find((t) => asRepo === t.dir || asRepo.startsWith(`${t.dir}/`));
       if (!hit) continue;
@@ -188,8 +189,8 @@ export function scanText(
         // `resolve(opt("todos"))` the literal is an option NAME (gz47, measured).
         if (nestedInAnotherCall(code, range[0], at)) continue;
         // ...and not when the call builds from the INSTANCE's own root:
-        // `join(INSTANCE, "docs")` is that instance's directory (gz47, measured
-        // on the FHIR IG harness), whatever another instance also declares.
+        // `join(INSTANCE, "docs")` is that layer's directory (gz47, measured
+        // on the FHIR IG harness), whatever another layer also declares.
         if (INSTANCE_BASE.test(code.slice(range[0], at))) continue;
       }
       const site: ForeignSite = { file, line: n + 1, literal: value, target: hit.dir, owner: hit.owner };
@@ -218,7 +219,7 @@ function nestedInAnotherCall(code: string, start: number, at: number): boolean {
 /**
  * A base argument that names the INSTANCE rather than the checkout. A
  * heuristic over names, stated as one: `ROOT` is not in it, because in this
- * corpus `ROOT` is as often the checkout as the instance, and a missed foreign
+ * corpus `ROOT` is as often the checkout as the layer, and a missed foreign
  * path is the cheaper error for a ratchet that must not cry wolf.
  */
 const INSTANCE_BASE = /^\s*(?:INSTANCE\w*|instanceRoot|instance|HERE|import\.meta\.dir|__dirname)\b/;
@@ -238,6 +239,43 @@ export function scanForeignPaths(repo: string): ForeignScan {
     }
   }
   return out;
+}
+
+/**
+ * Sites that are not THIS checkout's to judge, split off the count
+ * (cat-harness-tools#1701).
+ *
+ * In a content instance's joined checkout (smart-ips-pilgrimage) the ROOT
+ * declares `docs/`, `translations/`, `fhir-artifact-index/`, and every literal
+ * in a MOUNTED layer's code that spells one of those names (three
+ * mounted layers, 39 sites) was counted against that layer's
+ * baseline, which is kept in the platform index where the root declares
+ * nothing. The root does not own that code and cannot change it.
+ *
+ * A site is excused only when all three hold: the checkout root declares an
+ * instance of its own, the site's target is that ROOT instance's directory,
+ * and the file sits inside a layer `index.lock.json` mounts. The root's own
+ * files, and a mounted layer spelling another mounted layer's directory, are
+ * judged exactly as before; in the index (root declares nothing) nothing is
+ * excused.
+ */
+export function notThisCheckouts(
+  scan: ForeignScan,
+  all: readonly InstanceDirs[],
+  mountedPaths: readonly string[],
+): { scan: ForeignScan; excused: Array<ForeignSite & { layer: string }> } {
+  const rootInst = all.find((i) => i.root === "" && i.name !== ".");
+  if (rootInst === undefined) return { scan, excused: [] };
+  const mounts = mountedPaths.map((p) => p.replace(/\\/g, "/").replace(/\/+$/, "")).filter((p) => p !== "" && p !== ".");
+  const layerOf = (file: string) => mounts.find((m) => file.startsWith(`${m}/`));
+  const counted: ForeignSite[] = [];
+  const excused: Array<ForeignSite & { layer: string }> = [];
+  for (const s of scan.counted) {
+    const layer = s.owner === rootInst.name ? layerOf(s.file) : undefined;
+    if (layer !== undefined) excused.push({ ...s, layer });
+    else counted.push(s);
+  }
+  return { scan: { counted, marked: scan.marked }, excused };
 }
 
 export function countsOf(scan: ForeignScan): Record<string, number> {
@@ -272,7 +310,11 @@ const COMMENT =
 
 if (import.meta.main) {
   const repo = repoRootFor(resolve(import.meta.dir, ".."));
-  const scan = scanForeignPaths(repo);
+  const { scan, excused } = notThisCheckouts(
+    scanForeignPaths(repo),
+    instanceDirsIn(repo),
+    [...mountedInstances(repo).values()],
+  );
   const current = countsOf(scan);
   if (process.argv.includes("--update")) {
     writeFileSync(BASELINE_PATH, JSON.stringify({ _comment: COMMENT, files: current }, null, 2) + "\n");
@@ -288,6 +330,13 @@ if (import.meta.main) {
   console.log(
     `Foreign paths — ${total} literal(s) in ${Object.keys(current).length} file(s) spell another instance's declared directory; ${scan.marked.length} marked.`,
   );
+  if (excused.length > 0) {
+    const layers = [...new Set(excused.map((e) => e.layer))].sort();
+    console.log(
+      `  · ${excused.length} literal(s) in mounted layer(s) ${layers.join(", ")} not applicable here — they spell ` +
+        `${excused[0]!.owner}'s own directories, and that code's ratchet is kept in the platform index (cat-harness-tools#1701)`,
+    );
+  }
   for (const o of j.over) {
     console.log(`  ✗ ${o.file}: ${o.was} → ${o.now}`);
     for (const s of scan.counted.filter((x) => x.file === o.file))

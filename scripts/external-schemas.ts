@@ -32,6 +32,7 @@ import { directoriesForGraph, instanceDirectoriesForGraph } from "../schemas/kg/
 import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import { workflowFiles } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { rootProfile } from "./lib/root-gate-set.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 // Read from the DECLARATION rather than hardcoded, and the reason this
@@ -42,7 +43,7 @@ const ROOT = resolve(HARNESS_ROOT);
 // job, and is why a held-but-undeclared directory is worse than it looks.
 //
 // declared-path-literal: the convention fallback, at the call site so the
-// choice is visible. An instance that declares no registry gets the
+// choice is visible. A layer that declares no registry gets the
 // conventional path and `loadSpecs` reports the empty result as the third
 // state rather than as a pass.
 const REGISTRY: string = (() => {
@@ -78,16 +79,11 @@ export function loadSpecs(dir = REGISTRY): ExternalSchema[] {
 /** XML namespaces the corpus declares, read from the files that declare them. */
 export function namespacesInUse(root = ROOT): string[] {
   const out: string[] = [];
-  const dir = join(root, "processes");
-  if (!existsSync(dir)) return out;
-  // RECURSIVE since 2026-09-27: the DMN tables live in `processes/decisions/`,
-  // and reading only the top level left their namespaces unseen, so DMN 1.3
-  // went unregistered while nine files conformed to it.
-  const files = (readdirSync(dir, { recursive: true }) as string[])
-    .filter((f) => f.endsWith(".bpmn") || f.endsWith(".dmn"))
-    .sort();
-  for (const f of files) {
-    const src = readFileSync(join(dir, f), "utf-8");
+  // The DECLARED workflow graph, recursively (the DMN tables sit in
+  // `processes/decisions/`), not a literal `processes/`: a sub-graph's diagrams
+  // (cat-harness#1032: `library/processes/`) are this instance's too.
+  for (const f of workflowFiles(root, "instance")) {
+    const src = readFileSync(f, "utf-8");
     for (const m of src.matchAll(/xmlns(?::[a-zA-Z0-9]+)?="([^"]+)"/g)) out.push(m[1]!);
   }
   return [...new Set(out)].sort();
@@ -119,20 +115,20 @@ export function targetNamespacesInUse(
 }
 
 /**
- * Namespaces this instance BINDS IN JSON-LD, with the files that bind them.
+ * Namespaces this layer BINDS IN JSON-LD, with the files that bind them.
  *
  * Bean `2j09`. {@link namespacesInUse} reads only diagram `xmlns`, so the
  * registry could pin every namespace a BPMN file binds and none that only an
  * `@context` binds — and report a clean pass over the gap. Owner, 2026-09-23,
- * approved the scope: what THIS instance emits, i.e.
+ * approved the scope: what THIS layer emits, i.e.
  *
  * - every `.ts` file under a directory declared as `code` or `schemas` that
  *   writes an `@context` — the emitters, found by what they do rather than by
  *   a list that goes stale — and the namespace literals they carry;
- * - every committed `.jsonld` under this instance, by its `@context` bindings.
+ * - every committed `.jsonld` under this layer, by its `@context` bindings.
  *
- * NOT third-party documents another instance ingested (the DAK base layer's
- * and a DAK IG's FHIR artefact indexes): those are that instance's data.
+ * NOT third-party documents another layer ingested (the DAK base layer's
+ * and a DAK IG's FHIR artefact indexes): those are that layer's data.
  * `@base` is not a namespace and is not read; an IRI of OURS (the
  * `own-namespaces` code list, or one under it) is excluded — ours need
  * spelling one way, not a registry record.
@@ -197,13 +193,12 @@ function isOwn(iri: string): boolean {
  * thirteenth, and goes stale silently.
  */
 export function bpmnTermsInUse(root = ROOT): string[] {
-  const dir = join(root, "processes");
-  if (!existsSync(dir)) return [];
   const out = new Set<string>();
-  // Recursive since placement PR3 (bean `63wl`): the diagrams sit in
-  // `processes/<group>/`, so a top-level read saw none of them.
-  for (const f of (readdirSync(dir, { recursive: true }) as string[]).filter((f) => f.endsWith(".bpmn"))) {
-    for (const m of readFileSync(join(dir, f), "utf-8").matchAll(/<(bpmn:[a-zA-Z]+)/g)) {
+  // The declared workflow graph, as {@link namespacesInUse} reads it: a literal
+  // `processes/` missed the diagrams a sub-graph declares (cat-harness#1032
+  // moved the library's to `library/processes/`).
+  for (const f of workflowFiles(root, "instance").filter((f) => f.endsWith(".bpmn"))) {
+    for (const m of readFileSync(f, "utf-8").matchAll(/<(bpmn:[a-zA-Z]+)/g)) {
       out.add(m[1]!);
     }
   }
@@ -322,12 +317,12 @@ export function namespaceMentions(iris: readonly string[], repoRoot = resolve(RO
  *
  * `use` on this record is `conforms`, not `reads`, and the distinction is the
  * one {@link SpecUse} draws: we do not parse somebody else's SKOS, we publish
- * documents that claim to BE `skos:ConceptScheme` instances. A version bump is
+ * documents that claim to BE `skos:ConceptScheme` layers. A version bump is
  * therefore a migration of our own output, not a compatibility question.
  */
 export function skosTermsInUse(root = resolve(ROOT, "..")): string[] {
   const out = new Set<string>();
-  // This script's own exporters, plus every instance's DECLARED `schemas`
+  // This script's own exporters, plus every layer's DECLARED `schemas`
   // graph. The third entry used to be a literal path to the content core's `schemas`:
   // a path into a layer above cat-harness that no import gate sees, and one
   // that would scan nothing, silently, once cat-harness stands alone
@@ -364,6 +359,34 @@ const DERIVERS: Record<string, () => string[]> = {
   "dcmi-terms": () => dcTermsInUse(),
   "w3c-skos": () => skosTermsInUse(),
 };
+
+/**
+ * The derivers that read the WHOLE CHECKOUT (every instance's catalogue
+ * records, every instance's declared `schemas`), not only the record's own
+ * instance. `omg-bpmn-2.0` reads the harness's own `processes/` and is judged
+ * everywhere; these two give a different answer per composition.
+ */
+export const COMPOSED_DERIVERS: ReadonlySet<string> = new Set(["dcmi-terms", "w3c-skos"]);
+
+/**
+ * Why a composed record's terms ({@link COMPOSED_DERIVERS}) are not
+ * `repoRoot`'s to judge stale, or null when they are (cat-harness-tools#1701).
+ *
+ * The records live in a mounted layer's registry (cat-harness) and are written
+ * by the harness index (the root carrying the gates workflow, `rootProfile`
+ * "harness"), from what IT mounts. In a CONTENT root (smart-ips-pilgrimage#13)
+ * a term only an unmounted layer uses reads as "no longer used", and one only a
+ * layer this root mounts at another pin reads as new; neither is a defect of the
+ * record. A registry at the root itself, and every harness root, are judged as before.
+ */
+export function composedTermsNotOursReason(registry: string, repoRoot: string): string | null {
+  if (rootProfile(repoRoot) !== "content") return null;
+  if (!relative(repoRoot, registry).includes("/")) return null;
+  return (
+    `a content root (no .github/workflows/code-quality-gates.yml) and the record is a mounted layer's ` +
+    `(${relative(repoRoot, registry)}); its terms are derived from every instance the harness index mounts, not this checkout's`
+  );
+}
 
 function run(argv: string[]): number {
   const write = argv.includes("--write");
@@ -426,6 +449,12 @@ function run(argv: string[]): number {
     const missing = found.filter((t) => !have.has(t));
     const gone = [...have].filter((t) => !found.includes(t));
     if (missing.length === 0 && gone.length === 0) continue;
+    // cat-harness-tools#1701: excused, and said so, where the record is not ours.
+    const notOurs = COMPOSED_DERIVERS.has(s.id) ? composedTermsNotOursReason(REGISTRY, resolve(ROOT, "..")) : null;
+    if (notOurs !== null) {
+      console.log(`· ${s.id}: ${missing.length} new term(s), ${gone.length} no longer used — not applicable here — ${notOurs}`);
+      continue;
+    }
     stale++;
     console.log(`${s.id}: ${missing.length} new term(s), ${gone.length} no longer used`);
     for (const t of missing.slice(0, 6)) console.log(`    + ${t}`);

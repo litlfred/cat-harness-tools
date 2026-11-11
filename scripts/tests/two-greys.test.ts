@@ -85,7 +85,7 @@ describe.skipIf(NOT_BUILT)("the two states arrive separately", () => {
    * corpus now holds a kind that has a viewer AND an explicit `readOnly`,
    * and the two fields are visibly independent rather than only structurally
    * so. `who-iris/catalogue` still does not resolve, because its viewer lives
-   * in the instance's own MOUNTED `docs/`, which is copied in after Jekyll
+   * in the layer's own MOUNTED `docs/`, which is copied in after Jekyll
    * and is not under the site directory the stripping works against. Every
    * `readOnly: true` kind therefore still lacks a path.
    *
@@ -130,7 +130,7 @@ describe.skipIf(NOT_BUILT)("read-only is SAID, not only recorded", () => {
    * The first attempt put the read-only mark on the graph-tile surface —
    * `docs-ui.js` reading `t.readOnly`, CSS dashing the tile. Both shipped.
    * Reading the branches/ DEPLOY found `readOnly` on **0 of 3** sampled pages,
-   * because that surface's tiles come from the ROOT instance's declaration and
+   * because that surface's tiles come from the ROOT layer's declaration and
    * no cat-harness directory is read-only. Live code, nothing to act on.
    *
    * A description of a rendered artefact is not the artefact
@@ -172,7 +172,7 @@ describe.skipIf(NOT_BUILT)("read-only is SAID, not only recorded", () => {
   });
 
   it("an instance with nothing frozen says nothing", () => {
-    // The mirror: a finding on every instance would be noise, and noise is how
+    // The mirror: a finding on every layer would be noise, and noise is how
     // a report stops being read.
     for (const h of harnesses) {
       if ((h.visualisations ?? []).some((v) => v.readOnly === true)) continue;
@@ -181,7 +181,7 @@ describe.skipIf(NOT_BUILT)("read-only is SAID, not only recorded", () => {
   });
 });
 
-/** who-iris is a content instance above the harness, which a standalone checkout does not hold. */
+/** who-iris is a content layer above the harness, which a standalone checkout does not hold. */
 const NO_IRIS =
   !existsSync(join(REPO, "who-iris")) && notApplicableAlone("who-iris's checkout, the instance whose report this reads (a higher instance)");
 describe.skipIf(NOT_BUILT || NO_IRIS)("who-iris — the instance that carries both answers", () => {
@@ -228,10 +228,10 @@ describe.skipIf(NOT_BUILT || NO_IRIS)("who-iris — the instance that carries bo
   });
 
   it("so readOnly is per kind, not a per-instance constant", () => {
-    // If readOnly were resolved per INSTANCE rather than per kind, no instance
+    // If readOnly were resolved per LAYER rather than per kind, no layer
     // could hold a frozen kind and an explicitly writable one. who-iris did,
     // through its uploads drop zone; once that is repository data, any
-    // instance that does carries the proof.
+    // layer that does carries the proof.
     const mixed = harnesses.filter((h) => {
       const ro = (h.visualisations ?? []).map((v) => v.readOnly);
       return ro.includes(true) && ro.includes(false);

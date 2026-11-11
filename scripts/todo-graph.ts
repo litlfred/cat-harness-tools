@@ -12,8 +12,8 @@
  * | path (site-relative) | what |
  * |---|---|
  * | `todos.jsonld`, `todos.json` | the whole graph — one named graph holding every todo |
- * | `todos/<id>.jsonld`, `todos/<id>.json` | one todo — and its `@id` IS this address |
- * | `todos/<id>/` | the todo's RENDERING, a thin page (`todo-page.ts`), not the asset |
+ * | `todo/<id>.jsonld`, `todo/<id>.json` | one todo — its `@id` is this address less `.jsonld` |
+ * | `todo/<id>/` | the todo's RENDERING, a thin page (`todo-page.ts`), served at the todo's IRI |
  *
  * `skills/kg/kg-core/harness-requirements.md` requires the directory level
  * and the per-node level both, and does not let a harness waive either.
@@ -21,11 +21,13 @@
  * Content-Type for `.jsonld`. No `.schema.json`: a todo carries no per-node
  * schema, and a missing form is not invented.
  *
- * ## The IRI is the address of the published JSON-LD
+ * ## The IRI is extensionless, `<site>/todo/<id>` (issue #1830)
  *
- * An asset's IRI dereferences to the asset. So a todo is
- * `<site>/todos/<id>.jsonld`, and the page at `<site>/todos/<id>/` is a second
- * resource that points TO it. The todo names no rendering.
+ * Owner, Q-THIN-2 = A and Q-THIN-4 = A: a node's IRI is `…/<kind>/<id>`, the
+ * kind singular, its data the IRI plus `.jsonld`. The host serves the todo's
+ * page directory at the IRI, and the page declares the todo (RDFa and a
+ * JSON-LD stub) and links the `.jsonld` as `alternate`. The todo itself names
+ * no rendering. A clean break from `<site>/todos/<id>.jsonld`.
  *
  * ## Vocabularies — borrowed, not minted
  *
@@ -74,17 +76,28 @@ export const TODO_GRAPH_SITE_PATH = "todos.jsonld";
 
 /** A todo's JSON-LD, site-relative. One function names both the file and the `@id`. */
 export function todoSitePath(id: string): string {
-  return `todos/${segment(id)}.jsonld`;
+  return `${TODO_SITE_DIR}/${segment(id)}.jsonld`;
 }
 
-/** A todo's IRI — absolute, and it dereferences to {@link todoSitePath}. */
+/**
+ * The directory one todo's files are published in, site-relative: the
+ * singular kind, `todo/<id>` (owner, Q-THIN-4 = A, issue #1830). The board
+ * page stays at `todos/`.
+ */
+export const TODO_SITE_DIR = "todo";
+
+/**
+ * A todo's IRI — absolute and extensionless, `<site>/todo/<id>` (owner,
+ * Q-THIN-2 = A): the host serves the todo's page directory there, and its
+ * data is the IRI plus `.jsonld` ({@link todoSitePath}).
+ */
 export function todoIri(id: string): string {
-  return `${DOCS_SITE_BASE}${todoSitePath(id)}`;
+  return `${DOCS_SITE_BASE}${TODO_SITE_DIR}/${segment(id)}`;
 }
 
-/** The todo's rendering, site-relative — a directory, served as `index.html`. */
+/** The todo's rendering, site-relative — a directory, served as `index.html`, at the todo's IRI. */
 export function todoPageSitePath(id: string): string {
-  return `todos/${segment(id)}/`;
+  return `${TODO_SITE_DIR}/${segment(id)}/`;
 }
 
 /**
@@ -152,10 +165,10 @@ function linked(href: string | undefined, identifier: string, type?: string, nam
 
 /**
  * A site node's IRI from a todo's `target` parts: the page's QUALIFIED key
- * and the node id. The default suits a page of the base instance; the
+ * and the node id. The default suits a page of the base layer; the
  * generator passes the checkout's answer (`siteNodeOf` in
  * `lib/docs-sources.ts`), which also places a page of a source above the base
- * under its instance, where `gen-site-jsonld.ts` publishes it.
+ * under its layer, where `gen-site-jsonld.ts` publishes it.
  */
 export type TargetIri = (page: string, node: string) => string;
 
@@ -222,7 +235,7 @@ export function todoDocument(item: TodoIndexItem, subgraph?: TodoSubgraph, targe
  * `fetchTodoGraph`, #1953) sees the same todos. Order is the input's, which
  * `readTodoFiles` makes deterministic.
  *
- * Without a subgraph — an instance that declares no `todos` — the document is
+ * Without a subgraph — a layer that declares no `todos` — the document is
  * the bare `@graph`: no container is invented to stand in for the missing
  * declaration.
  */
@@ -235,8 +248,8 @@ export function todoGraphDocument(items: readonly TodoIndexItem[], subgraph?: To
           // NO `name`. The node's name is the declaration's, published by
           // kg-export; restating it here as `"todos"` made `docs/todos.json`
           // a file whose `name` equals its stem — which `findDeclarationFile`
-          // reads as an INSTANCE declaration, turning the site directory into
-          // an instance root and hiding the checkout from every resolver.
+          // reads as a LAYER declaration, turning the site directory into
+          // a layer root and hiding the checkout from every resolver.
           members: items.map((i) => todoIri(i.id)),
           ...(subgraph.contentSource ? { contentSource: subgraph.contentSource } : {}),
         })

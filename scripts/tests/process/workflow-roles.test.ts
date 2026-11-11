@@ -6,7 +6,7 @@
  * That is not an answer to "who performs this" — sixty lane strings spell two
  * dozen positions — so an agent handed a step could not find out what skills
  * its performer carries. These pin the join, and the fallback that keeps an
- * unmigrated instance working.
+ * unmigrated layer working.
  */
 import { describe, expect, test } from "bun:test";
 import { join, basename } from "node:path";

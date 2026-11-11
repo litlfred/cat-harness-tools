@@ -22,7 +22,7 @@
  *
  * ## Each declared `uploads` queue is counted on its own
  *
- * Several instances may declare an `uploads/` (the repository root and
+ * Several layers may declare an `uploads/` (the repository root and
  * `cat-harness` each do). Attribution follows declaration, so every count is
  * per queue and the reader returns them separately; a merged count would
  * report a set that does not exist.
@@ -32,13 +32,14 @@
  * No ingestion is triggered and nothing is written; upload, process and
  * materialise-into-a-folio are writes, and live elsewhere.
  */
+import { ENDONYM, languageOfFile, slugOfLocal } from "./lib/library-languages.ts";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 import type { LibraryRef } from "./library-refs.ts";
-import { dirname, extname, join, relative } from "node:path";
+import { basename, dirname, extname, join, relative } from "node:path";
 import { createHash } from "node:crypto";
 
-import { checkoutRootFor, directoriesForGraph, repoRootFor, sourceLinks } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, directoriesForGraph, readDeclaration, repoRootFor, sourceLinks } from "../schemas/kg/cat-harness.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { arxivId } from "./library-readmes.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -75,14 +76,14 @@ export type UploadLink = "match" | "differs" | "absent" | "unknown";
 export interface LibraryEntry {
   /** The slug — the identifier every reference resolves through. */
   id: string;
-  /** The instance whose library this is, e.g. `cat-harness`. */
+  /** The layer whose library this is, e.g. `cat-harness`. */
   instance: string;
   /** Repo-relative directory. */
   dir: string;
   /**
    * The title a reader is shown. A catalogue record's title when a catalogue
    * node names this slug (`libraryId`), else the manifest's, else the slug —
-   * see `catalogueTitles` for why the order is that way round (bean `gnqa`).
+   * see `catalogueInfo` for why the order is that way round (bean `gnqa`).
    */
   title: string;
   /**
@@ -177,6 +178,23 @@ export interface LibraryEntry {
     record?: { id?: string; page?: string; uri?: string };
   };
   /**
+   * The CATALOGUE RECORD behind this entry, when a node of the layer's
+   * declared `catalogue` graph names the slug in `libraryId`. `record` is the
+   * node's `metadataRef` (its Dublin Core record) as a repo-relative path,
+   * present only when the file exists; `handle` is the node's Handle, when it
+   * records one. Owner, 2026-11-10: a library entry page *"should have dublin
+   * core linked at top"*. Absent when no catalogue node names the entry.
+   */
+  catalogue?: { record?: string; handle?: string; xml?: string; node?: string };
+  /**
+   * Set on an entry CATALOGUED BY REFERENCE ({@link referencedCatalogueEntries}):
+   * the catalogue holds its record but this site holds no bytes, and these are
+   * where its files are upstream (each `referenced` ORIGINAL bitstream's
+   * `provenance.upstream`). Owner, 2026-11-10: a referenced item's title links
+   * *"our ingested record in library and associated KG"*, not IRIS.
+   */
+  upstream?: { label: string; href: string }[];
+  /**
    * The block-summary drain's counts for this entry — owner, 2026-09-24.
    *
    * Attached by the CALLER (`gen-library-viz`), for the reason `referencedBy`
@@ -251,7 +269,7 @@ export const AVATAR_MAX_BYTES = 128 * 1024;
  * The entry's avatar, or `undefined`.
  *
  * PUBLISHED AS A COPY under the site's own `assets/library/avatars/`, not at
- * the instance's mount. The mount (`/library/<instance>/`) exists only on the
+ * the layer's mount. The mount (`/library/<instance>/`) exists only on the
  * BUILT site, so a cover linked there 404'd on every surface that serves the
  * committed tree — the e2e server, and any page read before the build. A
  * copy resolves on all of them, and `gen-library-viz --check` fails when a
@@ -325,7 +343,7 @@ export interface UploadItem {
    * `intake` — a directory whose `intake.json` declares a capture.
    */
   kind: "file" | "intake";
-  /** The instance whose queue this is. */
+  /** The layer whose queue this is. */
   instance: string;
   /** Repo-relative path. */
   path: string;
@@ -427,24 +445,24 @@ function sha256(path: string): string {
 }
 
 /**
- * The instance a declared directory belongs to.
+ * The layer a declared directory belongs to.
  *
  * Its parent's basename — `cat-harness/library` belongs to `cat-harness`, and
  * a directory at the repository root belongs to the repository. Derived from
  * the resolved path rather than passed in, so a caller cannot label a queue
- * with an instance it did not come from, which is the mislabelling `v1hw`
+ * with a layer it did not come from, which is the mislabelling `v1hw`
  * warns about from the other direction.
  *
- * The repository root's instance is its DECLARED name, never
+ * The repository root's layer is its DECLARED name, never
  * `basename(repoRoot)` (bean `t5dm`): the root's basename is wherever the
  * repository was cloned — a worktree named `pr1290` published
  * `"uploadInstance": "pr1290"` — while a sub-instance's first path segment is
  * a path INSIDE the repository and the same in every clone.
  *
  * A root that declares nothing is NOT named after its folder any more (issue
- * #1904): it belongs to the landing instance when exactly one harness is
+ * #1904): it belongs to the landing layer when exactly one harness is
  * decided (`rootInstanceName`), and otherwise this throws, because a queue
- * labelled with a guessed instance is the mislabelling above.
+ * labelled with a guessed layer is the mislabelling above.
  */
 export function instanceOf(absDir: string, repoRoot: string): string {
   const rel = relative(repoRoot, absDir).split("\\").join("/");
@@ -681,7 +699,7 @@ export function readEntryBlocks(dir: string, opts: { verbatim?: boolean } = {}):
 }
 
 /**
- * Catalogue titles by library slug, for one instance root (bean `gnqa`,
+ * Catalogue titles by library slug, for one layer root (bean `gnqa`,
  * finding 5).
  *
  * A manifest's `title` is whatever the extractor found on the first page, and
@@ -694,25 +712,98 @@ export function readEntryBlocks(dir: string, opts: { verbatim?: boolean } = {}):
  * extractor guessed, so the catalogue answers first and the manifest only
  * where no catalogue node names the entry.
  *
- * Read from the instance's DECLARED `catalogue` graph, the same lookup
+ * Read from the layer's DECLARED `catalogue` graph, the same lookup
  * `intakeTitle` uses — never a hardcoded `catalogue/nodes` path.
  */
-const catalogueTitleCache = new Map<string, Map<string, string>>();
-function catalogueTitles(instanceRoot: string): Map<string, string> {
-  const hit = catalogueTitleCache.get(instanceRoot);
+/** What a catalogue node says about the library entry it names. */
+interface CatalogueEntryInfo {
+  title?: string;
+  /** Absolute path of the node's Dublin Core record, when the file exists. */
+  record?: string;
+  handle?: string;
+  /**
+   * The record's Dublin Core XML rendering, SITE-relative
+   * (`<instance>/dublin-core/<stem>.dc.xml`), when the layer's published root
+   * holds it. Owner, 2026-11-10: *"dublic core sould be the XML"*.
+   */
+  xml?: string;
+  /** Absolute path of the catalogue node itself — the item's node in the KG. */
+  node?: string;
+}
+
+/**
+ * The directory a layer serves at `/<instance>/` — the one its declaration
+ * marks `instanceRoot` (what `mount-instance-docs` publishes there), or
+ * undefined when it marks none.
+ */
+function publishedRootOf(instanceRoot: string): string | undefined {
+  const decl = readDeclaration(instanceRoot) as { directories?: { path?: string; instanceRoot?: boolean }[] } | undefined;
+  const dir = decl?.directories?.find((d) => d.instanceRoot === true && typeof d.path === "string")?.path;
+  return dir === undefined || dir.includes("..") ? undefined : join(instanceRoot, dir);
+}
+
+/**
+ * The site path of a record's Dublin Core XML rendering, when the layer's
+ * published root holds one: `<published root>/dublin-core/<stem>.dc.xml`
+ * (the content core's `dc-render`) is served at `<instance>/dublin-core/…`.
+ */
+function dcXmlSitePath(instanceRoot: string, record: string): string | undefined {
+  const root = publishedRootOf(instanceRoot);
+  const stem = basename(record).replace(/\.dc\.json$/, "");
+  if (root === undefined || stem === basename(record)) return undefined;
+  const file = `${stem}.dc.xml`;
+  // The site serves the layer at its DECLARED name, not at whatever the
+  // checkout directory is called (a clone at `who-iris-217/` is still `/who-iris/`).
+  const name = (readDeclaration(instanceRoot) as { name?: unknown } | undefined)?.name;
+  const served = typeof name === "string" && name ? name : basename(instanceRoot);
+  return existsSync(join(root, "dublin-core", file)) ? `${served}/dublin-core/${file}` : undefined;
+}
+const catalogueInfoCache = new Map<string, Map<string, CatalogueEntryInfo>>();
+function catalogueInfo(instanceRoot: string): Map<string, CatalogueEntryInfo> {
+  const hit = catalogueInfoCache.get(instanceRoot);
   if (hit) return hit;
-  const out = new Map<string, string>();
+  const out = new Map<string, CatalogueEntryInfo>();
   for (const cat of directoriesForGraph(instanceRoot, "catalogue")) {
     const nodes = join(cat, "nodes");
     if (!existsSync(nodes)) continue;
     for (const f of readdirSync(nodes).filter((n) => n.endsWith(".json")).sort()) {
-      const node = readJson<{ libraryId?: unknown; title?: unknown }>(join(nodes, f));
-      if (typeof node?.libraryId === "string" && typeof node.title === "string" && node.title.trim()) {
-        if (!out.has(node.libraryId)) out.set(node.libraryId, node.title.trim());
+      const node = readJson<{
+        libraryId?: unknown; title?: unknown; metadataRef?: unknown; handle?: unknown;
+        bitstreams?: { name?: unknown; bundle?: unknown; materialization?: { provenance?: { local?: unknown } } }[];
+      }>(join(nodes, f));
+      if (typeof node?.libraryId !== "string") continue;
+      const langOf = new Map<string, string>();
+      for (const b of node.bitstreams ?? []) {
+        const sl = slugOfLocal(b.materialization?.provenance?.local);
+        const lg = typeof b.name === "string" ? languageOfFile(b.name) : undefined;
+        if (sl && lg) langOf.set(sl, lg);
       }
+      // The entry it names, and every entry one of its ORIGINAL bitstreams was
+      // derived into (`provenance.local` = `library/<slug>/structure.json#source`):
+      // the other language editions IRIS keeps on the same item (who-iris#217).
+      const slugs = [node.libraryId, ...(node.bitstreams ?? [])
+        .filter((b) => b.bundle === "ORIGINAL")
+        .map((b) => slugOfLocal(b.materialization?.provenance?.local))
+        .filter((x): x is string => !!x)].filter((x) => !out.has(x));
+      if (slugs.length === 0) continue;
+      // `metadataRef` is relative to the layer root (`catalogue/records/<x>.dc.json`).
+      const record = typeof node.metadataRef === "string" && node.metadataRef && !node.metadataRef.includes("..")
+        ? join(instanceRoot, node.metadataRef)
+        : undefined;
+      const xml = record && existsSync(record) ? dcXmlSitePath(instanceRoot, record) : undefined;
+      for (const slug of new Set(slugs)) out.set(slug, {
+        // Another edition of the item is titled as the item, with its language.
+        ...(typeof node.title === "string" && node.title.trim()
+          ? { title: slug !== node.libraryId && langOf.has(slug) ? `${node.title.trim()} (${ENDONYM[langOf.get(slug)!] ?? langOf.get(slug)})` : node.title.trim() }
+          : {}),
+        ...(record && existsSync(record) ? { record } : {}),
+        ...(xml ? { xml } : {}),
+        node: join(nodes, f),
+        ...(typeof node.handle === "string" && node.handle.trim() ? { handle: node.handle.trim() } : {}),
+      });
     }
   }
-  catalogueTitleCache.set(instanceRoot, out);
+  catalogueInfoCache.set(instanceRoot, out);
   return out;
 }
 
@@ -722,14 +813,14 @@ function catalogueTitles(instanceRoot: string): Map<string, string> {
  * `folio-intake/v1` no longer repeats what another record says: it names a
  * catalogue `item`, or a Dublin Core `record`, and carries its own `title`
  * only when neither exists. So the title is looked up in that order — the
- * intake's own, then the catalogue node (in the instance's declared
+ * intake's own, then the catalogue node (in the layer's declared
  * `catalogue` graph), then the record's `dc.title` — and is `""` when none
  * answers, which the uploads view already renders as untitled.
  */
 function intakeTitle(intake: { title?: string; item?: string; record?: string }, dir: string): string {
   if (intake.title) return intake.title;
   if (intake.item) {
-    // entry → its library (past a concern group, bean `6fez`) → the instance.
+    // entry → its library (past a concern group, bean `6fez`) → the layer.
     const instanceRoot = dirname(libraryOfEntry(dir));
     for (const cat of directoriesForGraph(instanceRoot, "catalogue")) {
       const nodes = join(cat, "nodes");
@@ -753,20 +844,20 @@ function intakeTitle(intake: { title?: string; item?: string; record?: string },
 export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRootFor(roots[0] ?? ".")): LibraryGraph | null {
   // `repoRoot` is passed by a caller whose first root IS the repository root:
   // `repoRootFor` of that is its parent, which put every upload queue under
-  // one wrong instance with a path one level too long (#1168 B7a-2).
+  // one wrong layer with a path one level too long (#1168 B7a-2).
   const libDirs = new Set<string>();
   const upDirs = new Set<string>();
   for (const r of roots) {
     for (const d of corpusDirectoriesForGraph(r, "library")) libDirs.add(d);
     for (const d of directoriesForGraph(r, "uploads")) upDirs.add(d);
   }
-  // An instance that declares a library declares its own queue, and that
+  // A layer that declares a library declares its own queue, and that
   // declaration does not always reach the roots passed in: measured
   // 2026-09-20, `directoriesForGraph(cat-harness, "library")` resolves
   // the IRIS replica's `library` while `…(cat-harness, "uploads")` does NOT
   // resolve its `uploads`. Reading the entries of a queue this reader then
-  // omitted would report an instance's corpus as though it arrived from
-  // nowhere. So each library's own instance root is asked for its queue.
+  // omitted would report a layer's corpus as though it arrived from
+  // nowhere. So each library's own layer root is asked for its queue.
   for (const lib of [...libDirs]) {
     for (const d of directoriesForGraph(dirname(lib), "uploads")) upDirs.add(d);
   }
@@ -850,10 +941,17 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
         dir: relative(repoRoot, dir).split("\\").join("/"),
         ...(() => {
           const extracted = manifest?.title ?? slug;
-          const catalogued = catalogueTitles(dirname(libDir)).get(slug);
+          const catalogued = catalogueInfo(dirname(libDir)).get(slug)?.title;
           return catalogued && catalogued !== extracted
             ? { title: catalogued, extractedTitle: extracted }
             : { title: extracted };
+        })(),
+        ...(() => {
+          const info = catalogueInfo(dirname(libDir)).get(slug);
+          const record = info?.record ? relative(repoRoot, info.record).split("\\").join("/") : undefined;
+          return info && (record || info.handle)
+            ? { catalogue: { ...(record ? { record } : {}), ...(info.handle ? { handle: info.handle } : {}), ...(info.xml ? { xml: info.xml } : {}), ...(info.node ? { node: relative(repoRoot, info.node).split("\\").join("/") } : {}) } }
+            : {};
         })(),
         provenance: manifest?.provenance ?? "",
         rung: ingestRungOf(has),
@@ -1049,4 +1147,90 @@ if (import.meta.main) {
   for (const q of g.queues) {
     console.log(`  ${q.dir.padEnd(22)} ${q.total} file(s), ${q.ingested} ingested, ${q.uningested} UNINGESTED`);
   }
+}
+
+/**
+ * Library entries for the items a layer's catalogue holds BY REFERENCE —
+ * owner, 2026-11-10: *"i dont wnat this this link to go to iris, but our
+ * ingested record in linbrary and associated KG"*.
+ *
+ * A `referenced` catalogue item has a Dublin Core record here and its files
+ * upstream; it has no `<library>/<slug>/` directory, and the catalogue schema
+ * forbids it a `libraryId` (that names materialized bytes). So it is listed
+ * from the catalogue instead: one entry per `referenced` item whose
+ * `metadataRef` resolves, id the record's stem (`10665-360869`, the name its
+ * Dublin Core renderings carry), counts zero, and `upstream` naming its files.
+ *
+ * NOT part of {@link readLibraryGraph}: the L1 checks, the narrative queue and
+ * the MCP roots read that graph as "what was ingested", and an entry with no
+ * structure would read to them as a failed ingest. Only the library's pages
+ * add these. An id a held entry already uses, in any layer, is skipped, and
+ * an id two layers' catalogues both hold is listed once (first layer by path).
+ */
+export function referencedCatalogueEntries(roots: string[], repoRoot: string, taken: ReadonlySet<string>): LibraryEntry[] {
+  const libDirs = new Set<string>();
+  for (const r of roots) for (const d of corpusDirectoriesForGraph(r, "library")) libDirs.add(d);
+  const out: LibraryEntry[] = [];
+  const seen = new Set<string>();
+  // `taken` is keyed `<instance>/<id>`; an id held in ANY layer is taken.
+  const takenIds = new Set([...taken].map((k) => k.slice(k.lastIndexOf("/") + 1)));
+  for (const libDir of [...libDirs].sort()) {
+    if (!existsSync(libDir)) continue;
+    const instanceRoot = dirname(libDir);
+    const instance = instanceOf(libDir, repoRoot);
+    for (const cat of directoriesForGraph(instanceRoot, "catalogue")) {
+      const nodes = join(cat, "nodes");
+      if (!existsSync(nodes)) continue;
+      for (const f of readdirSync(nodes).filter((n) => n.endsWith(".json")).sort()) {
+        const node = readJson<{
+          flavour?: unknown; title?: unknown; handle?: unknown; libraryId?: unknown; metadataRef?: unknown;
+          materialization?: { state?: unknown };
+          bitstreams?: { name?: unknown; bundle?: unknown; materialization?: { state?: unknown; provenance?: { upstream?: unknown } } }[];
+        }>(join(nodes, f));
+        if (!node || node.flavour !== "item" || node.libraryId !== undefined) continue;
+        if (node.materialization?.state !== "referenced") continue;
+        if (typeof node.metadataRef !== "string" || node.metadataRef.includes("..") || !node.metadataRef.endsWith(".dc.json")) continue;
+        const record = join(instanceRoot, node.metadataRef);
+        if (!existsSync(record)) continue;
+        const id = basename(record).replace(/\.dc\.json$/, "");
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) continue;
+        // By id alone: the site publishes one `entries/<id>.json` per id and
+        // the library slice keys on it, and several layers' catalogues hold the
+        // same record (each smart-* layer cites `who-smart-guidelines`).
+        if (takenIds.has(id) || seen.has(id)) continue;
+        seen.add(id);
+        const files = (node.bitstreams ?? []).filter(
+          (b) => b.bundle === "ORIGINAL" && b.materialization?.state === "referenced" &&
+            typeof b.materialization.provenance?.upstream === "string" && /^https:\/\//.test(b.materialization.provenance.upstream as string),
+        );
+        const upstream = files.map((b) => ({
+          label: typeof b.name === "string" && b.name ? b.name : "the file",
+          href: b.materialization!.provenance!.upstream as string,
+        }));
+        const handle = typeof node.handle === "string" && node.handle.trim() ? node.handle.trim() : undefined;
+        const xml = dcXmlSitePath(instanceRoot, record);
+        const title = typeof node.title === "string" && node.title.trim() ? node.title.trim() : id;
+        const sourceFile = typeof files[0]?.name === "string" ? (files[0].name as string) : "";
+        out.push({
+          id, instance,
+          dir: relative(repoRoot, join(libDir, id)).split("\\").join("/"),
+          title,
+          provenance: "catalogued",
+          rung: "none",
+          docId: id, sourceFile, sourceSha256: "", arxiv: "", doi: "", documentClass: "",
+          sections: 0, blocks: 0, images: 0, ocrPages: 0,
+          hasOcr: false, hasManifest: false, hasStructure: false, hasImagesJson: false,
+          pageStart: null, pageEnd: null, words: 0, chars: 0, bytes: 0,
+          upload: "unknown", uploadInstance: "",
+          catalogue: { record: relative(repoRoot, record).split("\\").join("/"), ...(handle ? { handle } : {}), ...(xml ? { xml } : {}), node: relative(repoRoot, join(nodes, f)).split("\\").join("/") },
+          ...(upstream.length ? { upstream } : {}),
+          ...(() => {
+            const avatar = avatarOf(libDir, instance, id, null, repoRoot, sourceFile);
+            return avatar ? { avatar } : {};
+          })(),
+        } as LibraryEntry);
+      }
+    }
+  }
+  return out;
 }

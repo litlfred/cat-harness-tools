@@ -3,7 +3,7 @@
  *
  * Issue #836, bean `v18c`. `uploads` and `library` declared the same
  * `coverage.visualiser`, so the uploads tile opened the corpus browser and
- * rendered the library's entry count — 0 on this instance, while 27 sources
+ * rendered the library's entry count — 0 on this layer, while 27 sources
  * waited in the queue beside it. The owner rejected all three ways of dividing
  * one page: *"funcionally different/behavior diffent so need distinct
  * harness"*.

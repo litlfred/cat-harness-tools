@@ -16,7 +16,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-/** An instance declaring `src/` and `test/` as code and `beans/` as beans, shipping `src/` only. */
+/** A layer declaring `src/` and `test/` as code and `beans/` as beans, shipping `src/` only. */
 function fixture(exports: Record<string, string>, files = ["src/"]): string {
   const root = mkdtempSync(join(tmpdir(), "pkg-exports-"));
   dirs.push(root);

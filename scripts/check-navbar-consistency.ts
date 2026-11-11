@@ -11,7 +11,7 @@
  * A navbar entry's picture comes from one of **two unrelated namespaces**,
  * reported as separate families because the repairs differ:
  *
- * 1. An instance's own `icon` is an **id into that instance's `images` list** —
+ * 1. A layer's own `icon` is an **id into that layer's `images` list** —
  *    `sync-docs-harness.ts` resolves it with
  *    `decl.images?.find((i) => i.id === decl.icon)`, so it ends at an SVG file.
  * 2. A directory tile's `tile.icon` is a **name in the client's glyph
@@ -57,11 +57,11 @@ import { KIND_TILE_ICONS } from "./graph-tiles.js";
  * It was written `join("cat-harness", "docs", "assets", "js", "docs-ui.js")`,
  * which `check:site-root` rejected: **the output site root is one answer, and a
  * literal is a second one free to disagree.** The declaration owns where a
- * site is written; a script that hardcodes it keeps working right up until an
- * instance moves its `siteDir`, and then reads an absent file — which this
+ * site is written; a script that hardcodes it keeps working right up until a
+ * layer moves its `siteDir`, and then reads an absent file — which this
  * check would report as a refusal over a client that had simply relocated.
  *
- * The client belongs to the instance that ships the harness UI, so the root is
+ * The client belongs to the layer that ships the harness UI, so the root is
  * asked for by name rather than guessed from the scan order.
  */
 const CLIENT_INSTANCE = "cat-harness";
@@ -90,7 +90,7 @@ function registry(src: string, name: string): Map<string, string> | undefined {
   return out.size > 0 ? out : undefined;
 }
 
-/** An instance's declared navbar art, as the two namespaces see it. */
+/** A layer's declared navbar art, as the two namespaces see it. */
 interface InstanceArt {
   readonly instance: string;
   /** Root-level `icon`, an id into `images`. */
@@ -108,7 +108,7 @@ interface InstanceArt {
   /** Tile ids with no `icon`, so sharing the fallback drawing. */
   readonly tilesOnFallback: readonly string[];
   /**
-   * Directories this instance declares with graph typology `themes`.
+   * Directories this layer declares with graph typology `themes`.
    *
    * The field is **`graphTypologies`** and not `graphs`, which cost three wrong
    * measurements in the session that wrote this: a plausible key name read
@@ -121,7 +121,7 @@ interface InstanceArt {
 /**
  * `undefined` when this directory declares nothing; **throws** when it declares
  * something unreadable, which the caller turns into a refusal rather than a
- * finding. An instance whose declaration will not load is one this check cannot
+ * finding. A layer whose declaration will not load is one this check cannot
  * judge, and judging the other sixteen and printing a clean verdict would be
  * the `dh4f` defect — a sweep blind on one subject has not cleared the rest.
  */
@@ -165,18 +165,18 @@ interface Finding {
 }
 
 /**
- * What one themed instance declares, by kind — or why it could not be read.
+ * What one themed layer declares, by kind — or why it could not be read.
  *
- * `unreadable` is the third state rather than an empty list: an instance whose
+ * `unreadable` is the third state rather than an empty list: a layer whose
  * `themes.ts` will not load has not been shown to declare nothing, and judging
- * it as themeless would clear exactly the instance that may be falling back.
+ * it as themeless would clear exactly the layer that may be falling back.
  */
 export type DeclaredThemes =
   | { readonly instance: string; readonly themes: readonly { readonly kind: ThemeKind; readonly id: string }[] }
   | { readonly instance: string; readonly unreadable: string };
 
 /**
- * What the platform's surfaces actually SELECT per instance, read off the
+ * What the platform's surfaces actually SELECT per layer, read off the
  * artefacts they render from.
  *
  * Only `webpage` has an instance-scoped consumer today: `head_custom.html`
@@ -189,7 +189,7 @@ export interface ThemeWiring {
   readonly headConsumesData: boolean;
 }
 
-/** One instance × kind the comparison could not judge. */
+/** One layer × kind the comparison could not judge. */
 export interface ThemeUnknown {
   readonly subject: string;
   readonly reason: string;
@@ -197,25 +197,25 @@ export interface ThemeUnknown {
 
 /**
  * Kind for kind — the owner's ruling on `pnn5` (option 1): *a surface of kind K
- * on an instance's pages uses that instance's K-kind theme when it declares
+ * on a layer's pages uses that layer's K-kind theme when it declares
  * one, and falls back to the default only for kinds it doesn't declare.*
  *
  * So the domain is (instance, declared kind), and for each pair the question
- * is whether the surface of that kind selects the instance's theme:
+ * is whether the surface of that kind selects the layer's theme:
  *
  * - **`webpage`** has a consumer, so a miss is a defect in wiring that exists —
  *   the data entry is absent, names another theme, or `head_custom.html` no
  *   longer reads it. BLOCKING (`theme-fallback`).
  * - **A kind with no instance-scoped consumer** (`sticky`, `publication` today)
- *   falls back on every instance's pages by construction: `themes.css` emits
- *   an instance's sticky theme by id, but an unselected board takes the
+ *   falls back on every layer's pages by construction: `themes.css` emits
+ *   a layer's sticky theme by id, but an unselected board takes the
  *   platform default under `.fa-sticky-board:not([data-fa-sticky-theme])`.
- *   That is the ruling's violation, and it is REPORTED for each instance
+ *   That is the ruling's violation, and it is REPORTED for each layer
  *   declaring the kind — advisory (`theme-kind-unconsumed`), because the
  *   repair is a platform surface to build, not a declaration to correct, and
- *   no instance can clear it by editing its own files.
+ *   no layer can clear it by editing its own files.
  *
- * Kinds an instance does not declare are not judged: falling back there is
+ * Kinds a layer does not declare are not judged: falling back there is
  * what the ruling permits.
  */
 export function judgeThemeKinds(
@@ -301,9 +301,9 @@ function main(): number {
 
   let client: string;
   try {
-    // `siteDirFor` answers RELATIVE to the instance ("docs"), not absolute —
+    // `siteDirFor` answers RELATIVE to the layer ("docs"), not absolute —
     // measured, after composing it as absolute first and getting the ROOT
-    // instance's `docs/` instead of `cat-harness/docs/`.
+    // layer's `docs/` instead of `cat-harness/docs/`.
     const instanceRoot = join(repoRoot, CLIENT_INSTANCE);
     client = join(instanceRoot, siteFileFor(instanceRoot, CLIENT_TAIL));
   } catch (e) {
@@ -390,8 +390,8 @@ function main(): number {
   // The test that found it planted the defect and got the schema's error rather
   // than the finding. Reading the code would not have shown it.
 
-  // Family 2 — art shipped and not pointed at. NOT blocking: whether an
-  // instance WANTS a navbar mark is the owner's call, and an image may exist
+  // Family 2 — art shipped and not pointed at. NOT blocking: whether a
+  // layer WANTS a navbar mark is the owner's call, and an image may exist
   // for a landing page rather than for the rail. Reported because the gap
   // between "has art" and "wears it" is invisible from either file alone.
   for (const a of art) {
@@ -485,7 +485,7 @@ function main(): number {
   // them would be the defect this whole change exists to end. That 20 was
   // counted on a RENDER, where the panel also holds tiles derived from pages
   // rather than from `directories[].tile`. This number is the declaration-side
-  // half: of the tiles an instance DECLARES, how many name a drawing. An e2e
+  // half: of the tiles a layer DECLARES, how many name a drawing. An e2e
   // assertion is what can count the rendered panel; a static check cannot see it.
 
   // EVERY count above carries its denominator, and the two registry sizes are
@@ -501,7 +501,7 @@ function main(): number {
   console.log(`  declaring a themes graph    ${themed.length} of ${art.length}` +
     (themed.length > 0 ? `  (${themed.map((a) => a.instance).join(", ")})` : ""));
   // KIND FOR KIND (`pnn5`, owner's option 1) — `v8n5`'s Done-when #2, now a
-  // comparison rather than a denominator. Each themed instance's themes are read
+  // comparison rather than a denominator. Each themed layer's themes are read
   // the way every generator reads them (`instanceThemes`), and each declared
   // kind is held to what its surface actually selects.
   const instanceRoot = join(repoRoot, CLIENT_INSTANCE);
@@ -551,7 +551,7 @@ function main(): number {
   // A DEFECT FOUND is 1 even when a theme comparison was blind: what was
   // established stays established, and the planted-defect tests above rely on
   // a finding reading as a finding. Blind with nothing failing is 2, never 0 —
-  // a comparison that could not read an instance has not cleared it.
+  // a comparison that could not read a layer has not cleared it.
   const fail = blocking.length > 0 || (strict && advisory.length > 0);
   if ((check || strict) && fail) return 1;
   if ((check || strict) && kinds.unknowns.length > 0) {

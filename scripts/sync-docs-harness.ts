@@ -1,8 +1,8 @@
 /**
- * Put the instance's own title, description and mark where Jekyll can read them.
+ * Put the layer's own title, description and mark where Jekyll can read them.
  *
  * just-the-docs draws `site.title` at the top of the left sidebar. The root
- * declaration is the one source for what the instance is called; this copies
+ * declaration is the one source for what the layer is called; this copies
  * the reader-facing part of it into `docs/_data/harness.json`, which
  * `docs/_includes/title.html` renders, rather than a second hand-written
  * title in `docs/_config.yml`.
@@ -40,16 +40,16 @@ import { harnessTiles, instanceDirs } from "./harness-tiles.js";
 import { harnessPanel, skillPageIn } from "./harness-panel.js";
 import { siteLinks } from "./site-links.js";
 import { siteDirectories, withViewers } from "./viewer-declarations.js";
-import { harnessTitle } from "./lib/nav-label.js";
+import { harnessTitle, normaliseDestination } from "./lib/nav-label.js";
 import { checkoutDirectories, resolveLandingInstance } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 
 const ROOT = resolve(HARNESS_ROOT);
 /**
- * The repository root — where sibling INSTANCES live.
+ * The repository root — where sibling LAYERS live.
  *
- * `ROOT` is this instance (`cat-harness/`), which owns the published site.
+ * `ROOT` is this layer (`cat-harness/`), which owns the published site.
  * Every other initiated harness is a directory beside it, so the tile scan
  * starts one level up. The two are different places and the previous version
  * of this file needed only the first.
@@ -124,13 +124,13 @@ const icon = decl.images?.find((i) => i.id === decl.icon);
 // The SMALL mark, resolved by ROLE rather than by the declared `icon` id,
 // because the two answer different questions and the site needs both.
 //
-// `icon` is what the instance calls its mark — one id, the instance's choice.
+// `icon` is what the layer calls its mark — one id, the layer's choice.
 // But a mark is rendered at two sizes that want different DRAWINGS: the
 // sidebar at 24 px and a browser tab at 16 px cannot carry the detail a mark
 // shown large can. `role: "browser-icon"` is the declaration already saying
 // which image is drawn for that, and until 2026-09-19 nothing read it.
 //
-// Absent is FINE and is not guessed around: an instance declaring no
+// Absent is FINE and is not guessed around: a layer declaring no
 // `browser-icon` gets `null` here, and the templates fall back to `icon`.
 // Substituting the large mark silently is how a 24 px blob ships.
 const smallIcon = imageForRole(decl.images, "browser-icon");
@@ -143,19 +143,19 @@ const smallIcon = imageForRole(decl.images, "browser-icon");
 // against the light ink's 2.60:1, which is under the 3:1 bar for meaningful
 // non-text content).
 //
-// ABSENT IS A REAL STATE and the templates handle it: an instance that
+// ABSENT IS A REAL STATE and the templates handle it: a layer that
 // declares no `mark-dark` shows its one mark in both schemes, which is what
-// every instance did before this existed. `imageForRole` returns undefined
+// every layer did before this existed. `imageForRole` returns undefined
 // and nothing downstream has to special-case a folio that never opted in.
 const iconDark = imageForRole(decl.images, "mark-dark");
-// THE MASK FORM, which replaces the light/dark PAIR when an instance declares
-// it. Resolved by role like `mark-dark`, so an instance that declares no mask
+// THE MASK FORM, which replaces the light/dark PAIR when a layer declares
+// it. Resolved by role like `mark-dark`, so a layer that declares no mask
 // keeps the two-image path and nothing changes for it — absent is a real
 // state, the same rule `mark-dark` itself follows.
 const iconMask = imageForRole(decl.images, "mark-mask");
 
 // The landing backdrop's variants, keyed by layout, so the template can pick
-// by viewport rather than parse a filename. An instance with none gets `{}`,
+// by viewport rather than parse a filename. A layer with none gets `{}`,
 // and the template renders its description plainly — see `landing.html`, which
 // treats a missing backdrop as a reason to draw no overlay rather than as a
 // reason to guess where the quiet part of an image it does not have might be.
@@ -331,13 +331,13 @@ const config = harnessPanel(
 
 /**
  * The row, resolved. Separate from the payload literal because it joins THREE
- * sources -- the resolved icon list on this instance's own tile, that tile's
+ * sources -- the resolved icon list on this layer's own tile, that tile's
  * declared visualisations, and `siteLinks` -- and a join inlined in an object
  * literal is a join nobody can test.
  */
 /**
- * The instance that holds this checkout's shared graphs (`beans`, `todos`):
- * the checkout root's own instance when it declares one, else the instance
+ * The layer that holds this checkout's shared graphs (`beans`, `todos`):
+ * the checkout root's own layer when it declares one, else the layer
  * that declares the repository-scoped directories. In the index checkout the
  * root declares nothing (owner, 2026-10-08) and cat-harness declares them
  * (decision (b)); asking only the root left the navbar's Todos and Beans
@@ -375,11 +375,11 @@ function navbarRow(
   const mine = harnesses.find((h) => h.name === self);
   // UNDETERMINED -> `null`, never `{icons: []}`. "Nobody decided" and "show
   // none" are different answers and the template must be able to tell them
-  // apart; `[]` here would report every un-migrated instance as deliberate.
+  // apart; `[]` here would report every un-migrated layer as deliberate.
   if (!mine || mine.navbarIcons === undefined) return null;
   // This harness's own graphs FIRST, then the CHECKOUT ROOT's for a kind it
   // does not hold. An icon names a kind, and since cmsl step 2 (issue #1694)
-  // the shared state — `beans`, `todos` — is declared by the root instance,
+  // the shared state — `beans`, `todos` — is declared by the root layer,
   // so cat-harness's own `navbarIcons: ["todos", "beans", …]` found no tile
   // and rendered both inert, "reason not recorded" (caught by
   // `navbar-row.e2e.ts`). Its own tile still wins for a kind it does hold.
@@ -413,7 +413,7 @@ function navbarRow(
   const notes: Record<string, string> = {};
   for (const icon of mine.navbarIcons) {
     // `kg` is a SITE link rather than a graph of its own -- it is the viewer
-    // over the whole instance, which is why `siteLinks` owns it and the
+    // over the whole layer, which is why `siteLinks` owns it and the
     // visualisation list does not carry it.
     const at =
       icon === "kg"
@@ -437,7 +437,7 @@ function navbarRow(
       if (why && icon !== "close" && icon !== "launcher" && icon !== "fsh-guts" && icon !== "qr") notes[icon] = why;
     }
   }
-  // THIS INSTANCE'S OWN CONTROLLED FOLDERS — owner: *"next on navbar then is
+  // THIS LAYER'S OWN CONTROLLED FOLDERS — owner: *"next on navbar then is
   // is library docs/ and other controlled folders"*. Resolved here beside the
   // icon row because they come from the same tile, and a client that joined
   // the harnesses array itself would be a second answer to "which instance am
@@ -473,7 +473,7 @@ function navbarRow(
 
 type NavFolder = { kind: string; label?: string; within?: string; path?: string; note?: string; stagingOnly?: true };
 
-/** One instance's visualisations as folder rows — see the note in `navbarRow`. */
+/** One layer's visualisations as folder rows — see the note in `navbarRow`. */
 function foldersOf(
   vis: readonly { kind: string; label?: string; sameAs?: string; within?: string; path?: string | null; note?: string; stagingOnly?: true }[] | undefined,
 ): NavFolder[] {
@@ -487,13 +487,13 @@ function foldersOf(
 }
 
 /**
- * THE INSTANCES A PAGE CAN BE INSIDE, for the rail's PAGES and FOLDERS
+ * THE LAYERS A PAGE CAN BE INSIDE, for the rail's PAGES and FOLDERS
  * (issue #1902). Owner, viewing a DAK IG's root (paraphrased): 101 pages were
  * listed under that IG's path where only the IG's TOC was expected — the rail
  * was showing all the folio's pages rather than the harnessed IG's own, and
  * the same for 'folders'.
  *
- * A scope is an instance whose tile goes to its OWN THEMED ROOT
+ * A scope is a layer whose tile goes to its OWN THEMED ROOT
  * (`hrefKind: "folio"`) at a path of its own. Two kinds of href are not a
  * scope and are left out, each for a reason a reader could check:
  *
@@ -501,17 +501,17 @@ function foldersOf(
  * - `viewer` / `handled` — the href is a page some OTHER thing publishes
  *   (`/processes/` is bootstrap's tile and the whole site's process viewer),
  *   so "every page under it belongs to this instance" would be false.
- * - an anchor (`/#harness-…`) or `/` — the instance's root IS the site's
+ * - an anchor (`/#harness-…`) or `/` — the layer's root IS the site's
  *   landing, so every page would be inside it, which is the unscoped answer
  *   the client already gives.
  *
  * SORTED LONGEST HREF FIRST, so `head_custom.html` can take the first prefix
- * of `page.url` that matches and stop: a nested instance wins over the one
- * that holds it. Nothing here names an instance.
+ * of `page.url` that matches and stop: a nested layer wins over the one
+ * that holds it. Nothing here names a layer.
  *
  * NOT IN `navbar`, and that is a byte budget rather than tidiness: `navbar` is
  * inlined into every page's head, and the whole list is ~1.8 KB that only the
- * pages inside one instance need ~250 B of. Liquid resolves `page.url` --
+ * pages inside one layer need ~250 B of. Liquid resolves `page.url` --
  * which carries no baseurl, so a staging prefix cannot make it miss -- and
  * emits the ONE matching scope as `#fa-rail-scope`, or nothing.
  */
@@ -536,7 +536,7 @@ function railScopes(
  *
  * THE QUALIFIER is the declaring harness's title (bean `ob3m` finding 6):
  * a `repository`-scoped entry is the checkout root's, every other one this
- * instance's own. Two "Docs" tiles are then "Docs · C@T Harness" and
+ * layer's own. Two "Docs" tiles are then "Docs · C@T Harness" and
  * "Docs · Folio Assistant", one base name each. */
 const tileDirs = siteDirectories(decl?.directories ?? [], LANDING_DIR, REPO_ROOT);
 const tiles = withTileCounts(
@@ -548,6 +548,22 @@ const tiles = withTileCounts(
       return owner ? harnessTitle(owner) : undefined;
     },
     allHarnesses.map((h) => h.name),
+    // One name per destination (cat-harness-tools#1701): an undeclared tile
+    // takes the name the harness rows give its page, so the glass cannot
+    // disagree with FOLDERS, the sidebar and the landing viewers.
+    (() => {
+      const byDest = new Map<string, string>();
+      for (const h of allHarnesses) {
+        for (const r of h.visualisations ?? []) {
+          const at = r.path ? normaliseDestination(r.path) : undefined;
+          if (at !== undefined && r.label && !byDest.has(at)) byDest.set(at, r.label);
+        }
+      }
+      return (href: string) => {
+        const at = normaliseDestination(href);
+        return at === undefined ? undefined : byDest.get(at);
+      };
+    })(),
   ),
   scanTileCounts(join(ROOT, siteDirFor(ROOT), "assets")),
 );
@@ -600,11 +616,11 @@ const payload = {
     landingChoice.kind === "hub"
       ? { kind: "hub", names: landingChoice.names, flagged: landingChoice.flagged }
       : { kind: "instance", name: landingChoice.name, by: landingChoice.by },
-  // THE KINDS THIS INSTANCE DECLARES — for the avatar fan (bean `4kj4`).
+  // THE KINDS THIS LAYER DECLARES — for the avatar fan (bean `4kj4`).
   //
   // Owner: *"shows the DECLared kinds for that instance, not inheritance."*
   // That is a real distinction and not a shade of one: `resolveDirectories`
-  // overlays a dependency's directories onto an instance's, so the EFFECTIVE
+  // overlays a dependency's directories onto a layer's, so the EFFECTIVE
   // set is strictly larger than the declared set. Reading the resolved set
   // here would show a reader kinds this repository never claimed, which is
   // the opposite of what the panel is for.
@@ -638,16 +654,16 @@ const payload = {
   /**
    * THE GLASS STRIP'S PINS, resolved to tile ids — owner, 2026-10-01, bean
    * `ob3m` finding 10: *"Pinned tiles first, plus '+N more'"*. Declared as
-   * `glassStrip` on the instance and inherited along `needs`, like
+   * `glassStrip` on the layer and inherited along `needs`, like
    * `navbarIcons`; resolved HERE so the page reads ids and never re-derives
    * which tile a kind means. Absent when nothing in the stack declared one —
-   * the page then pins only its own chrome, which is not the same as an
-   * instance that declared `[]`.
+   * the page then pins only its own chrome, which is not the same as a
+   * layer that declared `[]`.
    */
   ...(glassStrip === undefined ? {} : { glassStrip }),
   harnesses: allHarnesses,
   /**
-   * THE NAVBAR ICON ROW for THIS instance — which icons, and where each goes.
+   * THE NAVBAR ICON ROW for THIS layer — which icons, and where each goes.
    *
    * Owner, 2026-09-22: *"max is 6 and one for todos one for beans one for
    * processes viewer/ (the factory flow) one for KG viewer"*, and on where the
@@ -657,8 +673,8 @@ const payload = {
    *
    * THE LIST IS RESOLVED, the DESTINATIONS ARE LOOKED UP, and neither is
    * written down here. `resolveNavbarIcons` walks `needs`; the hrefs come from
-   * the instance's own declared visualisations and from `siteLinks`. So an
-   * icon whose graph this instance does not publish gets NO href and the
+   * the layer's own declared visualisations and from `siteLinks`. So an
+   * icon whose graph this layer does not publish gets NO href and the
    * template renders it as a non-link rather than a dead one -- `pb04`, the
    * same rule the harness tabs and the rail already follow.
    *
@@ -667,10 +683,10 @@ const payload = {
    * look like navigation.
    */
   navbar: navbarRow(allHarnesses, decl?.name, links, checkoutGraphOwner(REPO_ROOT)),
-  /** The instances a page can be inside, for the rail's PAGES and FOLDERS (#1902). See {@link railScopes}. */
+  /** The layers a page can be inside, for the rail's PAGES and FOLDERS (#1902). See {@link railScopes}. */
   railScopes: railScopes(allHarnesses),
   /**
-   * EVERY INSTANCE'S VERSION, and its release addresses where it declares an
+   * EVERY LAYER'S VERSION, and its release addresses where it declares an
    * `iriBase` — so a page writes `{{ site.data.harness.releases.bootstrap.version }}`
    * and never a number that goes stale on the next bump (owner, 2026-09-29:
    * "make variables of version available to minimize drift"). `agent`, for

@@ -201,7 +201,7 @@ export function dcValue(rec: Json, element: string, qualifier?: string): string 
 }
 
 /**
- * The catalogue node naming this entry (`libraryId`), in its instance's
+ * The catalogue node naming this entry (`libraryId`), in its layer's
  * declared `catalogue` graph, and the Dublin Core record it points at.
  *
  * A node that names a record which is absent or will not parse goes into
@@ -217,7 +217,7 @@ export function catalogueRecordFor(
   try {
     cats = directoriesForGraph(instanceRoot, "catalogue");
   } catch {
-    // A staged entry outside any instance has no catalogue to ask.
+    // A staged entry outside any layer has no catalogue to ask.
     return undefined;
   }
   for (const cat of cats) {
@@ -339,7 +339,7 @@ export function readTitleCorrection(dir: string): { ok: true; correction?: Title
  *
  * `structure` and `referenced` are passed in when the caller has already read
  * them, so the generator does not parse a file twice. The catalogue lives at
- * the INSTANCE root, two levels above `library/<slug>` — above `locatedAt`,
+ * the LAYER root, two levels above `library/<slug>` — above `locatedAt`,
  * which differs from `dir` only for a staged entry being built for the
  * library it will be promoted into (bean `apui`).
  */

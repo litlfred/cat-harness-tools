@@ -13,7 +13,7 @@
  * - No store operation that writes is reachable from it.
  *
  * The beans come through the work-plan store the deployment names
- * (`workPlanStoreFor`, Q-BSD-2 A); the instances from the checkout's
+ * (`workPlanStoreFor`, Q-BSD-2 A); the layers from the checkout's
  * `workflows/`. The rows carry no drawing or page links: the page keeps the
  * ones it was built with and replaces only what moves.
  *
@@ -60,7 +60,7 @@ function asBeanNode(b: BeanFields): BeanNode {
   } as BeanNode;
 }
 
-/** The payload, read now. Throws when the store or the instances cannot be read. */
+/** The payload, read now. Throws when the store or the layers cannot be read. */
 export function beansProcessedNow(repoRoot: string, env: Readonly<Record<string, string | undefined>>, now: Date) {
   const { store, tool, deployment } = workPlanStoreFor(repoRoot, env);
   const beans = [...store.list({}), ...store.list({ archived: true })].map(asBeanNode);

@@ -37,7 +37,7 @@ export interface FolioContentConfig {
   viewerPort?: number;
 }
 
-/** Read the instance's own `<name>.config.json`, with the defaults that stand when there is none. */
+/** Read the layer's own `<name>.config.json`, with the defaults that stand when there is none. */
 export function readFolioContentConfig(repoRoot: string): FolioContentConfig {
   const declaredFeedback = resolveDeclaredFeedbackDir(repoRoot);
   const out: FolioContentConfig = {
@@ -46,9 +46,9 @@ export function readFolioContentConfig(repoRoot: string): FolioContentConfig {
     feedbackDir: declaredFeedback ?? resolve(repoRoot, LEGACY_FEEDBACK_DIRNAME),
   };
 
-  // The instance's own config, INDEX FIRST (bean `ymvt`): its
+  // The layer's own config, INDEX FIRST (bean `ymvt`): its
   // `index.config.json` entry, else `<name>.config.json` as a legacy fallback
-  // (reported). `absent` with no `from` = nothing declares an instance here,
+  // (reported). `absent` with no `from` = nothing declares a layer here,
   // so there is no config to prefer and the defaults above stand.
   const eff = readEffectiveConfig(repoRoot);
   if (eff.state === "ok") {

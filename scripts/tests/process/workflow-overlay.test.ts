@@ -35,7 +35,7 @@ afterAll(() => {
 });
 
 /**
- * A root instance depending on cat-harness, and optionally a diagram of its own.
+ * A root layer depending on cat-harness, and optionally a diagram of its own.
  *
  * It depended on cat-harness alone until placement PR0 (bean `ejye`), then on
  * `large-datasets`, which owned `sample-import` from bean `cjvs` — a root that
@@ -46,7 +46,7 @@ afterAll(() => {
 function rootWithDependency(ownDiagram?: string): string {
   const root = mkdtempSync(join(tmpdir(), "wf-overlay-"));
   made.push(root);
-  // Mirrors cat-harness's own `processes` entry, the shape a real instance declares.
+  // Mirrors cat-harness's own `processes` entry, the shape a real layer declares.
   const directories = ownDiagram ? [{ id: "processes", path: "processes/", graphTypologies: ["processes"] }] : [];
   writeFileSync(join(root, "t.json"), JSON.stringify({ name: "t", version: "0.0.0", title: "t", directories }));
   writeFileSync(

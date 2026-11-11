@@ -14,7 +14,7 @@
  * @module scripts/tests/tool-coverage-uncovered-by-design
  *
  * The tests of this file that read the whole checkout (triages the skills of
- * every instance in the checkout) live in
+ * every layer in the checkout) live in
  * `test/tool-coverage-uncovered-by-design-checkout.test.ts` (bean `7zz1`):
  * standing alone, cat-harness has none of it.
  */

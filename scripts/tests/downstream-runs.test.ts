@@ -59,7 +59,7 @@ describe("the per-Tool verdict", () => {
   });
 });
 
-/** An instance root whose record directory exists and is empty: a determined "no records". */
+/** A layer root whose record directory exists and is empty: a determined "no records". */
 const emptyListed = (): string => {
   const root = mkdtempSync(join(tmpdir(), "tool-run-"));
   mkdirSync(join(root, TOOL_RUNS_DIR), { recursive: true });

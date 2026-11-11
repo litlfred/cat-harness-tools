@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * The journeys viewer: write the pages of the `journeys-viewer` visualiser an
- * instance declares — an index of every journey in the checkout, one page per
+ * The journeys viewer: write the pages of the `journeys-viewer` visualiser a
+ * layer declares — an index of every journey in the checkout, one page per
  * journey, and the workshop layer — into a site being built.
  *
  * @module scripts/gen-journeys-viz
@@ -12,15 +12,15 @@
  *
  * The pages go to the route of the visualiser `--instance` declares
  * `renderedBy: "journeys-viewer"`, `<site>/<locale>/<instance>/<id>/`
- * (`visualiserRoute`). An instance that declares none gets nothing and the
+ * (`visualiserRoute`). A layer that declares none gets nothing and the
  * run exits 78 (not applicable), so a site build running every declared
  * writer (`visualiser-writers.ts`) reads it as declined rather than failed.
- * Without `--site` the pages go under the instance's own site directory.
+ * Without `--site` the pages go under the layer's own site directory.
  *
  * WHAT is drawn is read from the declarations (`journeys/read.ts`): every
- * `user-scenario` and `workshop` directory of every instance in the checkout,
+ * `user-scenario` and `workshop` directory of every layer in the checkout,
  * so a downstream's site shows its own journeys and those of the layers it
- * mounts, each instance a sub-graph page. HOW is `journeys/render.ts`.
+ * mounts, each layer a sub-graph page. HOW is `journeys/render.ts`.
  *
  * Nothing is committed: like `archimate:pages --out`, the pages are a build
  * product of the site, and a re-run with the same inputs writes the same
@@ -39,7 +39,9 @@ import { planSlugs } from "../archimate/schemas/slugs.ts";
 import { archimateDir, configPath, localDirOf, readConfig } from "../archimate/scripts/check-archimate.ts";
 import { declaredPageRoot } from "../archimate/scripts/gen-archimate-pages.ts";
 import { readJourneyCorpus, type JourneyCorpus } from "./journeys/read.ts";
-import { renderJourneyPages, TOOL_ID, type PageFile, type SiteLinks } from "./journeys/render.ts";
+import { renderJourneyPages, TOOL_ID, type ArchimateElementLink, type ArchimateViewLink, type ArchitectureBox, type ArchitecturePanel, type PageFile, type SiteLinks } from "./journeys/render.ts";
+import type { ArchimateModel } from "../archimate/schemas/archimate.ts";
+import { typeLabel } from "../archimate/scripts/render-view.ts";
 import { subjectHref } from "./lib/subject-pages.ts";
 import { panelFile } from "./lib/task-panel.ts";
 
@@ -58,20 +60,98 @@ function readDecl(root: string): Decl {
   return JSON.parse(readFileSync(join(root, file), "utf8")) as Decl;
 }
 
-/** The route the instance declares for this Tool, site-relative with no trailing slash; undefined when it declares none. */
+/** The route the layer declares for this Tool, site-relative with no trailing slash; undefined when it declares none. */
 export function journeysRoute(root: string): string | undefined {
   const d = readDecl(root);
   const v = (d.visualisers ?? []).find((x) => x.renderedBy === TOOL_ID);
   return v === undefined ? undefined : visualiserRoute(pageParts({ harness: d.name, visualiser: v.id })).replace(/\/$/, "");
 }
 
+/**
+ * The architecture panel How it works opens with (JV-13), read from the
+ * ArchiMate graph alone. Rows: the groupings `root` aggregates. Columns: the
+ * `countries` groupings. A country's systems are the elements its grouping
+ * aggregates, less its instances of reference blocks (those that specialize
+ * one); a system's parts are what it is composed of or realizes (itself when
+ * nothing). A part goes in the row of the reference block it realizes, through
+ * its country's instance (Realization, then Specialization); its moments come
+ * from the `bpmn` property of the processes its system serves. Undefined when
+ * a ref names nothing in the model.
+ */
+export function architecturePanel(
+  model: ArchimateModel,
+  element: (id: string) => ArchimateElementLink | undefined,
+  spec: { root: string; countries: readonly { group: string }[]; shared?: string },
+): ArchitecturePanel | undefined {
+  const byId = new Map(model.elements.map((x) => [x.id, x]));
+  if (![spec.root, ...spec.countries.map((c) => c.group), ...(spec.shared ? [spec.shared] : [])].every((id) => byId.has(id))) return undefined;
+  const rels = model.relationships;
+  const holds = (t: string) => t === "Aggregation" || t === "Composition";
+  const children = (id: string) => rels.filter((r) => holds(r.type) && r.source === id).map((r) => r.target);
+  const parents = (id: string) => rels.filter((r) => holds(r.type) && r.target === id).map((r) => r.source);
+  const prop = (id: string, key: string) => byId.get(id)?.properties.find((p) => p.key === key)?.value;
+  const specializes = (id: string) => rels.find((r) => r.type === "Specialization" && r.source === id)?.target;
+  const layers = children(spec.root).filter((id) => byId.get(id)?.type === "Grouping");
+  const layerSet = new Set(layers);
+  // A block some layers share (the DPI-F Information Mediator is also cross-cutting) sits in the first of them.
+  const layerOf = (id: string): string | undefined => {
+    const seen = new Set<string>();
+    const found = new Set<string>();
+    const queue = [id];
+    while (queue.length) {
+      const x = queue.shift()!;
+      if (seen.has(x)) continue;
+      seen.add(x);
+      if (layerSet.has(x)) found.add(x);
+      else queue.push(...parents(x));
+    }
+    return layers.find((l) => found.has(l));
+  };
+  // A row's own blocks (descending through sub-groupings), named when no country has a part there.
+  const blocksIn = (id: string): string[] => children(id).flatMap((c) => (byId.get(c)?.type === "Grouping" ? blocksIn(c) : [c]));
+  const rows = layers.map((l) => ({ layer: element(l)!, cells: spec.countries.map((): ArchitectureBox[] => []), blocks: blocksIn(l).flatMap((b) => element(b) ?? []) }));
+  spec.countries.forEach((c, ci) => {
+    for (const sys of children(c.group)) {
+      if (specializes(sys) !== undefined) continue; // the country's instance of a reference block, not a system
+      const bpmn = rels
+        .filter((r) => r.type === "Serving" && r.source === sys && byId.get(r.target)?.type === "BusinessProcess")
+        .flatMap((r) => prop(r.target, "bpmn") ?? []);
+      const parts = rels
+        // A Device realizes its app; an app's Realization of its country's instance is not a part.
+        .filter((r) => r.source === sys && (r.type === "Composition" || (r.type === "Realization" && specializes(r.target) === undefined)))
+        .map((r) => r.target)
+        .filter((id) => byId.get(id)?.type === "ApplicationComponent");
+      for (const part of parts.length ? parts : [sys]) {
+        let block: string | undefined;
+        for (const r of rels) {
+          if (r.type !== "Realization" || r.source !== part) continue;
+          const b = specializes(r.target) ?? r.target;
+          if (layerOf(b) !== undefined) { block = b; break; }
+        }
+        if (block === undefined) continue;
+        const row = rows[layers.indexOf(layerOf(block)!)]!;
+        const link = element(part)!;
+        if (row.cells[ci]!.some((x) => x.page === link.page)) continue;
+        const ig = prop(part, "ig");
+        row.cells[ci]!.push({ ...link, block: element(block)!, ...(ig ? { ig } : {}), bpmn });
+      }
+    }
+  });
+  return {
+    countries: spec.countries.map((c) => element(c.group)!),
+    rows,
+    ...(spec.shared ? { shared: { group: element(spec.shared)!, members: children(spec.shared).flatMap((id) => element(id) ?? []) } } : {}),
+  };
+}
+
 /** Where the links that leave the viewer go: the processes viewer's sub-graph pages, and ArchiMate views. */
 export function siteLinks(corpus: JourneyCorpus, route: string, title: string): SiteLinks {
   const processes = declaredVisualisers(corpus.checkout).find((v) => v.renderedBy === "processes-viewer");
-  const views = new Map<string, Map<string, { svg: string; page: string; name: string }> | null>();
-  const archimateFor = (instance: string) => {
-    if (views.has(instance)) return views.get(instance) ?? undefined;
-    let out: Map<string, { svg: string; page: string; name: string }> | null = null;
+  type Placed = { views: Map<string, ArchimateViewLink>; blocks: Map<string, ArchimateElementLink[]>; models: Map<string, { model: ArchimateModel; element: (id: string) => ArchimateElementLink | undefined }> };
+  const placed = new Map<string, Placed | null>();
+  const archimateFor = (instance: string): Placed | undefined => {
+    if (placed.has(instance)) return placed.get(instance) ?? undefined;
+    let out: Placed | null = null;
     const info = corpus.instances.get(instance);
     try {
       if (info && configPath(info.root) !== undefined) {
@@ -79,23 +159,44 @@ export function siteLinks(corpus: JourneyCorpus, route: string, title: string): 
         const decl = readDecl(info.root);
         const graphPath = localDirOf(info.root, archimateDir(info.root, config)).replace(/\/$/, "");
         const pageRoot = declaredPageRoot(decl as never, config.directory);
-        out = new Map();
+        out = { views: new Map(), blocks: new Map(), models: new Map() };
         for (const cm of config.models) {
           const model = readArchimate(readFileSync(join(archimateDir(info.root, config), cm.file)));
           const slugOf = planSlugs(model);
+          // The pages and drawings `gen-archimate-pages.ts` writes: singular kind segments (Q-THIN-4 = A).
+          const byId = new Map(model.elements.map((el) => [el.id, el]));
+          const element = (id: string): ArchimateElementLink | undefined => {
+            const el = byId.get(id);
+            return el ? { name: el.name || typeLabel(el.type), type: typeLabel(el.type), page: `${posix.join(pageRoot, cm.id, "element", slugOf.get(id) ?? id)}/` } : undefined;
+          };
+          out.models.set(cm.id, { model, element });
           for (const v of model.views) {
-            out.set(`${cm.id}\0${v.id}`, {
-              svg: posix.join(graphPath, cm.id, "views", `${v.id}.svg`),
-              page: `${posix.join(pageRoot, cm.id, "views", slugOf.get(v.id) ?? v.id)}/`,
+            const shown = [...new Set(v.nodes.flatMap((n) => (n.kind === "element" && n.ref ? [n.ref] : [])))];
+            out.views.set(`${cm.id}\0${v.id}`, {
+              svg: posix.join(graphPath, cm.id, "view", `${v.id}.svg`),
+              page: `${posix.join(pageRoot, cm.id, "view", slugOf.get(v.id) ?? v.id)}/`,
               name: v.name,
+              elements: shown.flatMap((id) => element(id) ?? []),
             });
+          }
+          // A block's elements: those whose `buildingBlocks` property names it (the overlay writes it, comma-separated).
+          for (const el of model.elements) {
+            for (const p of el.properties) {
+              if (p.key !== "buildingBlocks") continue;
+              for (const b of p.value.split(/[\s,]+/).filter(Boolean)) {
+                const list = out.blocks.get(b) ?? [];
+                const link = element(el.id)!;
+                if (!list.some((x) => x.page === link.page)) list.push(link);
+                out.blocks.set(b, list);
+              }
+            }
           }
         }
       }
     } catch {
-      out = null; // no ArchiMate pages for this instance: the view is drawn as unresolved
+      out = null; // no ArchiMate pages for this layer: the view is drawn as unresolved
     }
-    views.set(instance, out);
+    placed.set(instance, out);
     return out ?? undefined;
   };
   return {
@@ -108,7 +209,12 @@ export function siteLinks(corpus: JourneyCorpus, route: string, title: string): 
           processPanel: (_instance: string, bpmn: string) => visualiserRoute({ ...pageParts({ harness: processes.harness, visualiser: processes.id }), asset: panelFile(posix.basename(bpmn, ".bpmn")) }),
         }
       : {}),
-    archimateView: (instance, model, view) => archimateFor(instance)?.get(`${model}\0${view}`),
+    archimateView: (instance, model, view) => archimateFor(instance)?.views.get(`${model}\0${view}`),
+    archimateBlock: (instance, block) => archimateFor(instance)?.blocks.get(block) ?? [],
+    archimateArchitecture: (instance, spec) => {
+      const m = archimateFor(instance)?.models.get(spec.model);
+      return m ? architecturePanel(m.model, m.element, spec) : undefined;
+    },
     // A step's page as the KG site's own BPMN rendering links it
     // (`render-bpmn.ts`): its subject IRI, where a page is published for it.
     stepPage: (instance, bpmn, process, task) => {

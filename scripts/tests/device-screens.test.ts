@@ -1,6 +1,6 @@
 /**
  * Device screens in the journeys viewer, over a fixture checkout: one
- * instance holding actors (one with an avatar), two journeys, a workshop that
+ * layer holding actors (one with an avatar), two journeys, a workshop that
  * still names an app to frame, and `device-screen` nodes for its steps.
  *
  * What is asserted is what the owner asked for (2026-11-06): the screens are
@@ -19,7 +19,7 @@ import { checkJourneyRefs } from "../journeys/check.ts";
 import { presentationOf, screensFor } from "../journeys/present.ts";
 import { readJourneyCorpus } from "../journeys/read.ts";
 import { renderJourneyPages, ROOT_MARK, type PageFile, type PersonaView } from "../journeys/render.ts";
-import { blockHtml, demoScreensOf, qrMatrix, qrSvg, renderDevice, rowsFromExample, type ScreenContext } from "../journeys/screens.ts";
+import { blockHtml, demoScreensOf, qrMatrix, qrSvg, renderDevice, rowsFromExample, statusBar, type ScreenContext } from "../journeys/screens.ts";
 import { clearDeclaredVisualisers } from "../viewer-declarations.ts";
 
 const REPO = mkdtempSync(join(tmpdir(), "device-screens-"));
@@ -115,10 +115,32 @@ describe("device screens: read, ordered, linked", () => {
     const none = { ...w, workshop: { ...w.workshop, presentation: undefined } };
     expect(demoScreensOf(bare, none, p.steps)).toEqual({ source: "none", screens: [] });
   });
+  test("JV-15: the journey stages are pills in the header band, labelled by step and title, the current one on", () => {
+    const page = at(`${base}/demo/P4-scanner/index.html`);
+    const band = /<\/header>\n<nav class="jp-stagebar"[^]*?<\/nav>/.exec(page)?.[0];
+    expect(band).toBeDefined();
+    expect(band).toMatch(/<a class="jp-stage-pill is-on" href="\.\.\/P4-scanner\/"[^>]*aria-current="page"><code>P4<\/code> /);
+    expect(page.indexOf("jp-stagebar")).toBeLessThan(page.indexOf("jp-note"));
+  });
+  test("JV-17: every device has a status bar; wider ones name the app and its version from the screen's client", () => {
+    for (const f of files.filter((x) => /\/demo\/[^/]+\/index\.html$/.test(x.path) && String(x.content).includes("ds-device"))) expect(String(f.content)).toContain('class="ds-statusbar');
+    const screen = corpus.screens[0]!.screen;
+    const wide = { ...screen, device: "tablet" as const, client: { name: "OHS Facility Client", version: "2.4.1", time: "10:14 AM", config: "Tablet EMR" } };
+    const bar = statusBar(wide);
+    expect(bar).toContain('<span class="ds-client"><b>OHS Facility Client</b><small>v2.4.1</small></span>');
+    expect(bar).toContain("<span>10:14 AM</span>");
+    expect(statusBar({ ...screen, device: "phone" })).toContain('class="ds-notch"');
+    expect(parseDeviceScreen({ ...screen, $schema: "device-screen/0.1.0", client: wide.client }).client?.version).toBe("2.4.1");
+  });
   test("a screen's page draws the device, its owner, and the moments it shows; no iframe", () => {
     const page = at(`${base}/demo/P4-scanner/index.html`);
     expect(page).toContain('<figure class="ds-device ds-scanner" data-screen="P4-scanner">');
-    expect(page).toContain("<b>Reem</b><small>Scanner · Nurse</small>");
+    // JV-16: whose screen it is, in VaxLink's line rather than a chip over the device.
+    expect(page).toContain("You are looking at what Reem (Nurse) sees at this moment.");
+    expect(page).not.toContain('class="ds-owner');
+    expect(page).toContain('<a class="jp-back" href="../../walkthrough/P4/">');
+    expect(page).toContain("Handheld scanner");
+    expect(page).toContain("data-jp-expand");
     expect(page).toContain('href="../../walkthrough/P4/"');
     expect(page).toContain("Moments this screen shows");
     expect(page).not.toContain("<iframe");
@@ -131,6 +153,10 @@ describe("device screens: read, ordered, linked", () => {
     expect(p4).toContain('href="../../demo/P4-scanner/"');
     expect(p4).toMatch(/See what Reem sees <small>\(screen P4-scanner\)/);
     expect(p4).toMatch(/See what Kamal sees <small>\(screen P2\)/);
+    // JV-10: at the right column's foot, after the facilitator cue, as VaxLink's full-width button.
+    const right = p4.slice(p4.indexOf('<div class="jp-walk-r">'), p4.indexOf('<div class="jp-hood-toggle">'));
+    expect(right).toContain('<div class="jp-sees"><a class="jp-see"');
+    expect(p4.slice(0, p4.indexOf('<div class="jp-walk-r">'))).not.toContain("jp-see");
   });
   test("the demo index lists each screen with its device and owner", () => {
     const idx = at(`${base}/demo/index.html`);
@@ -194,6 +220,18 @@ describe("drawing a screen", () => {
     expect(html).toContain("<b>Penicillin</b>");
     expect(html).not.toContain("Composition");
     expect(html).toContain('href="https://ig.example/Bundle-ips.html"');
+  });
+  test("Inspect JSON on a QR code and a record list opens the page's drawer on that example, only when the drawer has it", () => {
+    const screen = parseDeviceScreen({
+      $schema: "device-screen/0.1.0", id: "S", title: "t", device: "phone", owner: "kamal", steps: [{ scenario: "a", step: "A" }],
+      blocks: [{ type: "qr", payload: "x", example: "Bundle/ips" }, { type: "recordList", title: "Record", example: "Bundle/ips" }, { type: "qr", payload: "y", example: "Bundle/none" }],
+    });
+    const on = { ...ctx, inspectable: (k: string) => ctx.exampleJson(k) !== undefined };
+    const html = screen.blocks.map((b) => blockHtml(b, on));
+    expect(html[0]).toContain('<button type="button" class="jp-inspect ds-inspect" data-jp-inspect="Bundle/ips">Inspect JSON</button>');
+    expect(html[1]).toContain('data-jp-inspect="Bundle/ips"');
+    expect(html[2]).not.toContain("data-jp-inspect");
+    expect(blockHtml(screen.blocks[0]!, ctx)).not.toContain("data-jp-inspect");
   });
   test("rowsFromExample reads a lone resource, and nothing from what is not JSON", () => {
     expect(rowsFromExample(JSON.stringify({ resourceType: "Immunization", status: "completed", vaccineCode: { text: "Hep B" }, occurrenceDateTime: "2025-10-28", lotNumber: "TH-4821" }))).toEqual([

@@ -21,7 +21,7 @@
  * must match and never something an agent dispatches, and every plan says
  * whether the repository declares it. This file keeps no list of them. So:
  *
- * - **a declared site first**: a repository whose instance config (its
+ * - **a declared site first**: a repository whose layer config (its
  *   `index.config.json` entry; a legacy `<instance>.config.json` is a reported fallback)
  *   carries `site.build` is built by `build-instance-site.ts` from its own
  *   package scripts ({@link declaredRecipe}, {@link stageDeclared});
@@ -130,8 +130,9 @@ import {
 import { decide, readTip } from "./staging-push-gate.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
-import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
+import { buildInstanceSite, recipeFromConfig, siteFields, siteScopeOf, type SiteRecipe } from "./build-instance-site.ts";
 import { makeRecord, RECORD_FILE } from "./preview-record.ts";
+import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
 import { isPreviewPath, PREVIEW_PREFIX, previewPath } from "./lib/preview-prefix.ts";
 import { ensurePublishBranch } from "./lib/publish-branch.ts";
 import { editedMountsIn, relayAdvice } from "./remote-mount.ts";
@@ -720,6 +721,8 @@ export interface PublisherHost {
   run: typeof run;
   git: typeof git;
   platformScript: typeof platformScript;
+  /** The advisory size review a publisher runs on its built site before the push ({@link sizeReview}). */
+  sizeReview?: typeof sizeReview;
 }
 
 /** A site publisher a layer above declares: its workflows, and how it stages a repository that calls one. */
@@ -727,7 +730,19 @@ export interface SitePublisher extends PublisherWorkflows {
   stage(run: PublisherRun, host: PublisherHost): Promise<StageResult>;
 }
 
-const HOST: PublisherHost = { formatPlan, pushLoop, writeArtifact, listSite, run, git, platformScript };
+const HOST: PublisherHost = { formatPlan, pushLoop, writeArtifact, listSite, run, git, platformScript, sizeReview };
+
+/**
+ * The size review (`site-size.ts`; owner, 2026-11-10: "add size review as part
+ * of authoring process"): printed before the push, compared with the local
+ * `origin/gh-pages`, its report written to `<repo>/../<name>-site/site-size.json`,
+ * beside the build and never in the published site. Advisory: it never stops a publish.
+ */
+export function sizeReview(repo: string, site: string, name: string, log: (s: string) => void): void {
+  const out = join(resolve(repo), "..", `${name}-site`);
+  mkdirSync(out, { recursive: true });
+  reviewSiteSize({ site, out: join(out, SITE_SIZE_FILE), repo, log });
+}
 
 /**
  * Mounts an earlier attempt left "modified" (an IG's first agent publish, 2026-11-06): a
@@ -836,11 +851,11 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   if (target === "preview") {
     git(repo, ["fetch", "-q", "origin", base]);
     // The ChangeSet and the rendered impact are a content layer's, above this
-    // one: found in whichever of the platform's instances carries them, never
+    // one: found in whichever of the platform's layers carries them, never
     // named here. A platform without them gets no review data, and the review
     // page says so, as the workflow does when it has no renderer.
-    // declared-path-literal: a path INSIDE another platform instance, resolved
-    // by inPlatform against each instance's root, never against this one.
+    // declared-path-literal: a path INSIDE another platform layer, resolved
+    // by inPlatform against each layer's root, never against this one.
     const changeset = inPlatform(platform, "schemas/changeset.ts");
     if (changeset) run(repo, "bun", ["run", changeset, "--folio", inputs.folio_dir, "--base", `origin/${base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json"), "--structure-out", join(site, "changeset-structure.json")]);
     else log("· this platform has no ChangeSet tool: no review data on this preview");
@@ -861,6 +876,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   }
 
   if (target === "preview") writePreviewRecord(repo, site, { slug, sha, base, log });
+  sizeReview(repo, site, name, log);
 
   if (o.artifact) return done({ bundle: writeArtifact(site, o.artifact, platform, { slug, branch, sha }, log) });
 
@@ -872,7 +888,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
 }
 
 /**
- * The instance a checkout declares at its root, and the `site.build` recipe its
+ * The layer a checkout declares at its root, and the `site.build` recipe its
  * config carries (its `index.config.json` entry, index first), or undefined when it declares none. A
  * repository that declares a recipe builds its site from its own package
  * scripts, through `build-instance-site.ts`, rather than from a workflow file.
@@ -931,6 +947,8 @@ export async function stageDeclared(
   log(`plan: ${d.instance}'s declared site (site.build) → ${target === "main" ? "the publish root" : `${PREVIEW_PREFIX}/ preview of ${branch}`}`);
   log(agentRunLine(agentRunOf(repo)).trimStart());
   log(`via         build-instance-site.ts --instance ${d.instance}${target === "preview" ? ` --staging ${branch}` : ""}${publish ? " --publish" : ""}`);
+  const scope = siteScopeOf(repo, d.instance);
+  log(`scope       ${scope ? `${scope.join(", ")}: the other layers' pages are linked on their own sites, not written here` : "every instance the checkout mounts"}`);
   log(`pre         ${d.recipe.pre.join(", ") || "(none)"}`);
   log(`source      ${d.recipe.sourceSteps.join(", ") || "(none)"}`);
   log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
@@ -965,6 +983,7 @@ export async function stageDeclared(
       previewData(repo, { instance: d.instance, branch, sha, base, owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log);
       writePreviewRecord(repo, site, { slug: branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, ""), sha, base, log });
     } } : {}),
+    ...(scope ? { scope } : {}),
     mount: true,
     fresh: false,
     publish,
@@ -1080,7 +1099,7 @@ export function previewData(
   log: (s: string) => void,
 ): void {
   git(repo, ["fetch", "-q", "origin", f.base]);
-  // declared-path-literal: the conventional `<repo>/folio/<instance>` root of a `site.build` folio, and a path INSIDE another platform instance resolved by inPlatform against each instance's root.
+  // declared-path-literal: the conventional `<repo>/folio/<instance>` root of a `site.build` folio, and a path INSIDE another platform layer resolved by inPlatform against each layer's root.
   const folio = join("folio", f.instance);
   const changeset = inPlatform(repo, "schemas/changeset.ts");
   if (!changeset) log("· this platform has no ChangeSet tool: no review data on this preview");
@@ -1186,6 +1205,16 @@ const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run
   --bare-ig          IG: publish the IG Publisher's output as its workflow lays it, even where the
                      repository is harnessed (index.config.json) and would publish its folio site`;
 
+/**
+ * The publisher this checkout's `index.config.json` names in `site.publisher`,
+ * the default when `--publisher` is not given (cat-harness-tools#1879).
+ * Undefined when it names none, or when the file is absent or unreadable.
+ */
+export function configuredPublisher(repo: string): Publisher | undefined {
+  const r = readIndexConfig(resolve(repo));
+  return r.state === "ok" ? r.config.site?.publisher : undefined;
+}
+
 function publisherOf(s: string): Publisher {
   if (!/^[a-z][a-z0-9-]*$/.test(s)) throw new Error(`--publisher is folio or a declared publisher's kind, not '${s}'`);
   return s;
@@ -1203,7 +1232,9 @@ if (import.meta.main) {
   };
   try {
     const repoArg = opt("repo") ?? process.cwd();
-    const declared = opt("publisher") !== undefined && opt("publisher") !== FOLIO_PUBLISHER_KIND ? undefined : declaredRecipe(repoArg);
+    const chosen = opt("publisher") ?? configuredPublisher(repoArg);
+    if (opt("publisher") === undefined && chosen !== undefined) console.log(`· publisher ${chosen}, from index.config.json site.publisher`);
+    const declared = chosen !== undefined && chosen !== FOLIO_PUBLISHER_KIND ? undefined : declaredRecipe(repoArg);
     if (declared !== undefined) {
       const d = await stageDeclared(
         {
@@ -1231,7 +1262,7 @@ if (import.meta.main) {
       fresh: argv.includes("--fresh"),
       ...(opt("artifact") ? { artifact: opt("artifact")! } : {}),
       ...(opt("workflow-source") ? { workflowSource: opt("workflow-source")! } : {}),
-      ...(opt("publisher") ? { publisher: publisherOf(opt("publisher")!) } : {}),
+      ...(chosen ? { publisher: publisherOf(chosen) } : {}),
       ...(argv.includes("--bare-ig") ? { bareIg: true } : {}),
     });
     const { plan: _plan, ...rest } = r;

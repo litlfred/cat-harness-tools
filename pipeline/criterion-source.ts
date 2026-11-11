@@ -44,9 +44,9 @@ import { QA_CRITERIA_BY_ID, getCriterionSourceFile } from "./qa-criteria-registr
 /** A criterion's checker, located. */
 export interface CriterionSource {
   /**
-   * Absolute directory `sourceFile` is relative to: the instance that holds
+   * Absolute directory `sourceFile` is relative to: the layer that holds
    * the file, which for a core criterion is the declaring root or the one
-   * instance implementing it (`implementingRootFor`).
+   * layer implementing it (`implementingRootFor`).
    */
   root: string;
   /** The file defining the checker, relative to `root`. */
@@ -128,7 +128,7 @@ export function resolveCriterionSource(
   }
 
   // The recorded label stays the path as declared, and the BYTES are read from
-  // the instance that implements it (owner ruling T7, 2026-10-01, bean `70lx`):
+  // the layer that implements it (owner ruling T7, 2026-10-01, bean `70lx`):
   // core's checkers move to the layer above while their sidecars stay here, and
   // a sidecar that had to name that layer would be the harness naming upward.
   // So `source_file` is unchanged and only the root it is read against moves.

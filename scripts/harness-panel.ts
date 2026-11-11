@@ -82,7 +82,7 @@ export interface PanelSubscribed {
   url: string;
   /** ✎ goes to the substrate's OWN repository, never this checkout's. */
   editHref: string;
-  /** The subscription's id in the declaring instance. */
+  /** The subscription's id in the declaring layer. */
   subscription: string;
   /** Whether the subscription CHOSE this harness for instantiation (it is still not instantiated here). */
   chosen: boolean;

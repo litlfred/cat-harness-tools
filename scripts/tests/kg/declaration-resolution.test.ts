@@ -59,8 +59,28 @@ describe("checkDeclarationResolution over a checkout", () => {
       needs: "check:instance-graph",
     });
     expect(r.findings.find((f) => f.field === "directories")!.subject).toContain("gone");
-    expect(r.examined).toEqual({ declaration: 1, directories: 2, assets: 1, visualisers: 1, needs: 1, enableSubgraphs: 0 });
+    expect(r.examined).toEqual({ declaration: 1, directories: 2, assets: 1, visualisers: 1, needs: 1, enableSubgraphs: 0, optInLinks: 0 });
     // A certain finding is never hidden behind "no Tool loaded".
+    expect(exitCodeOf(r)).toBe(1);
+  });
+
+  test("a link from an always-on page into an opt-in sub-graph is a finding of check:optin-links", () => {
+    const root = fixture({
+      "demo.json": decl({
+        directories: [
+          { id: "present", path: "present/", graphTypologies: ["docs"] },
+          { id: "extra", path: "extra/", optIn: true, graphTypologies: ["docs"] },
+        ],
+      }),
+      "present/page.md": "See [g](../extra/g.md).\n",
+      "extra/g.md": "Back to [page](../present/page.md).\n",
+    });
+    const r = checkDeclarationResolution(root);
+    const links = r.findings.filter((f) => f.field === "optInLinks");
+    expect(links).toEqual([
+      expect.objectContaining({ instance: "demo", subject: "present/page.md", by: "check:optin-links", detail: expect.stringContaining("demo.extra") }),
+    ]);
+    expect(r.examined.optInLinks).toBe(2);
     expect(exitCodeOf(r)).toBe(1);
   });
 

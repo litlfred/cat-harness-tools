@@ -48,10 +48,10 @@ const HARNESS_ROOT = resolve(import.meta.dir, "..", "..", "cat-harness");
 const TOOLS_LAYER_ROOT = resolve(import.meta.dir, "..");
 
 /**
- * Which layer owns a group: the name of the instance whose Tool node declares
+ * Which layer owns a group: the name of the layer whose Tool node declares
  * it (`cat-harness`, a content layer above it, …). A string rather than a closed
  * list of three since the groups are discovered across the dependency tree
- * (bean riit, 3c): a list here would have to name every instance above.
+ * (bean riit, 3c): a list here would have to name every layer above.
  */
 export type ToolGroupLayer = string;
 
@@ -94,12 +94,12 @@ export async function registerDeclaredToolGroups(
   server: unknown,
   groups: readonly ToolGroupDeclaration[],
   /**
-   * The DECLARING instance's root: the declared modules are relative to it.
+   * The DECLARING layer's root: the declared modules are relative to it.
    *
-   * A module is looked up there first and then in the one instance that
+   * A module is looked up there first and then in the one layer that
    * implements it (`resolveImplementingPath`), so a Tool node declared here
-   * keeps resolving after its module moves up to the instance that implements
-   * this one, with no path of that instance written into the definition
+   * keeps resolving after its module moves up to the layer that implements
+   * this one, with no path of that layer written into the definition
    * (owner, split plan "Trap 1", 2026-10-01).
    */
   root: string,
@@ -119,7 +119,7 @@ export async function registerDeclaredToolGroups(
     const where = resolveImplementingPath(root, g.module);
     if (where.state === "ambiguous") {
       // Never resolved by checkout order: picking one would serve another
-      // instance's tools and report them as these.
+      // layer's tools and report them as these.
       out.push({
         id: g.id,
         state: "failed",
@@ -182,7 +182,7 @@ export async function registerDeclaredToolGroups(
 }
 
 /**
- * The tool groups a server serves, DERIVED from the Tool nodes its instance
+ * The tool groups a server serves, DERIVED from the Tool nodes its layer
  * declares — one group per (module, registrar) among the nodes served over MCP
  * in-process.
  *
@@ -214,7 +214,7 @@ export function toolGroupsFromNodes(nodes: readonly ToolDefinition[], layer: Too
   return [...groups.values()];
 }
 
-/** One instance's served groups: its Tool nodes' modules resolve from `root`. */
+/** One layer's served groups: its Tool nodes' modules resolve from `root`. */
 export interface InstanceToolGroups {
   instance: string;
   root: string;
@@ -222,8 +222,8 @@ export interface InstanceToolGroups {
 }
 
 /**
- * The tool groups a server serves for a folio, from EVERY instance in its
- * dependency tree: each instance's declared `tools` graph, read through
+ * The tool groups a server serves for a folio, from EVERY layer in its
+ * dependency tree: each layer's declared `tools` graph, read through
  * `discoverTools`, grouped by {@link toolGroupsFromNodes}.
  *
  * Owner, 2026-10-05 (bean riit, 3c): both MCP servers serve every Tool node
@@ -231,20 +231,20 @@ export interface InstanceToolGroups {
  * serves — the last such list was `TOOL_GROUPS` in the viewer server.
  *
  * Deepest dependency first, the folio last (`declarationChain`). A group is
- * resolved against ITS instance's root, never the folio's, because a Tool
+ * resolved against ITS layer's root, never the folio's, because a Tool
  * node's `inProcess.module` is instance-relative. A tools graph that cannot be
- * loaded is a `failures` entry, never an instance with no tools (`dh4f`).
+ * loaded is a `failures` entry, never a layer with no tools (`dh4f`).
  *
  * **Opt-in sub-graphs are the FOLIO's to switch on** (cat-harness#991 step
  * 23.1): a Tool node inside a switched-off one — `work-plan`'s bean Tool in a
- * layer that has not enabled it — is not served, by any instance, the
+ * layer that has not enabled it — is not served, by any layer, the
  * `always` ones included. The folio root's `enableSubgraphs` (and
  * `CAT_SUBGRAPHS`) decides, never the declaring layer's.
  */
 export function servedToolGroups(
   folioRoot: string,
   /**
-   * Instances served whatever the chain says, deepest first — the harness.
+   * Layers served whatever the chain says, deepest first — the harness.
    * A folio that declares nothing has an empty chain, and the generic tools
    * (`folio_init` above all) must still be served there (bean `zmdo`).
    */
@@ -258,7 +258,7 @@ export function servedToolGroups(
   for (const link of [...always.map((a) => ({ ...a, root: resolve(a.root) })), ...chain]) {
     if (seen.has(link.root)) continue;
     seen.add(link.root);
-    // The instance's PARENT is scanned, restricted to this instance: discovery
+    // The layer's PARENT is scanned, restricted to this layer: discovery
     // walks one level of instance roots, and this one is a root beside its
     // siblings there whether it is a platform layer or the folio itself.
     const d = discoverTools(dirname(link.root), undefined, link.root, { enabledSubgraphs: enabled });

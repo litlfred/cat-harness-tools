@@ -29,7 +29,7 @@ afterEach(() => {
 function store(beans: Array<[string, string, string, string]>): string {
   const root = mkdtempSync(join(tmpdir(), "beanparents-"));
   made.push(root);
-  // `root` IS a repository root — a fixture has no enclosing instance, so
+  // `root` IS a repository root — a fixture has no enclosing layer, so
   // `repoRootFor(root)` is `/tmp` and every store this made was the same one.
   const dir = join(root, "beans", "defs");
   mkdirSync(dir, { recursive: true });

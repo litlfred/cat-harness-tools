@@ -39,9 +39,9 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 /** Tracked shell scripts and workflows: the places a `$?` is written. */
 function shellSources(): string[] {
   // `gitCorpus`, not a bare `git ls-files`: in the composed checkout every
-  // instance is a REMOTE MOUNT, ignored by the index repository's git, so
+  // layer is a REMOTE MOUNT, ignored by the index repository's git, so
   // `ls-files` at the root listed the index's own scripts and none of the
-  // instances' -- a scan that went on passing over a corpus it had silently
+  // layers' -- a scan that went on passing over a corpus it had silently
   // lost. `gitCorpus` counts a mount's files as a submodule's were counted.
   const r = gitCorpus(REPO, ["*.sh", "*.bash", ".github/workflows/*.yml", ".github/workflows/*.yaml"]);
   if (r === undefined) throw new Error(`git could not list the files in ${REPO}`);

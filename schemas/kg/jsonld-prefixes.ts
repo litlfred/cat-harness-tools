@@ -1,15 +1,15 @@
 /**
- * `jsonldPrefixes`: the external vocabularies an instance's JSON-LD speaks, as
+ * `jsonldPrefixes`: the external vocabularies a layer's JSON-LD speaks, as
  * declared data — prefix → namespace IRI.
  *
- * Each instance declares the namespaces it speaks, and its published context
+ * Each layer declares the namespaces it speaks, and its published context
  * is GENERATED from the prefixes its documents actually use, flattened with
- * the contexts of the instances it `needs`. So a vocabulary belonging to a
+ * the contexts of the layers it `needs`. So a vocabulary belonging to a
  * higher layer is bound there, and a bound-but-unused prefix cannot exist.
  *
  * This module is the declaration and the pure merge. It reads no files and runs
  * no generator: the generator and the gate live in the tools layer, and they
- * read every instance's table as data, so no layer has to import the one above.
+ * read every layer's table as data, so no layer has to import the one above.
  *
  * @graphNode schema
  * @module cat-harness/schemas/jsonld-prefixes
@@ -43,21 +43,21 @@ export const JsonldPrefixTableSchema = z.record(JsonldPrefixSchema, NamespaceIri
 });
 export type JsonldPrefixTable = z.infer<typeof JsonldPrefixTableSchema>;
 
-/** One instance's table, as the merge sees it. */
+/** One layer's table, as the merge sees it. */
 export interface DeclaredPrefixes {
   instance: string;
   prefixes: JsonldPrefixTable;
 }
 
-/** A prefix two instances bind to different namespaces. */
+/** A prefix two layers bind to different namespaces. */
 export interface PrefixConflict {
   prefix: string;
   bindings: { instance: string; iri: string }[];
 }
 
 /**
- * Flatten tables in dependency order (an instance's `needs` first, itself last):
- * the merged table, plus every prefix two instances bind differently.
+ * Flatten tables in dependency order (a layer's `needs` first, itself last):
+ * the merged table, plus every prefix two layers bind differently.
  *
  * A conflict is reported, never resolved by order: the published terms are
  * `@protected`, so a higher layer silently redefining a lower one's prefix is

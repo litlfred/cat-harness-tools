@@ -68,7 +68,7 @@ const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
 /**
  * The docs source being projected. Every docs source in the checkout is
  * (owner, 2026-10-23, "A1" — the same set `gen-docs-pages.ts` renders): the
- * base instance's first, unchanged, then each instance above it, whose
+ * base layer's first, unchanged, then each layer above it, whose
  * documents land in ITS source and ITS docs directory's `site/`.
  */
 let CUR: DocsSource;
@@ -83,7 +83,7 @@ let docsSubgraph = declaredSubgraphNode(INSTANCE_ROOT, "docs");
  * (`@id` in the content context), and `check:content-keys` refuses a file
  * path there: a reader resolving a relative path against the node's own IRI
  * lands somewhere that is not the file. The asset's `source` is relative to
- * this instance, and may now leave it (`../<instance>/processes/…`, since a
+ * this layer, and may now leave it (`../<instance>/processes/…`, since a
  * content-type process lives with its skill), so it is resolved against the
  * REPOSITORY and published as the forge's view URL — one rule for every asset,
  * moved or not.
@@ -103,7 +103,7 @@ function serialise(doc: Record<string, unknown>): string {
 }
 
 function emit(path: string, doc: Record<string, unknown>): void {
-  // Names the context of the instance `path` sits in (bean folio-assistant-63q4).
+  // Names the context of the layer `path` sits in (bean folio-assistant-63q4).
   const next = serialise(atInstanceContext(doc, path));
   const prev = existsSync(path) ? readFileSync(path, "utf-8") : undefined;
   if (prev === next) {
@@ -130,11 +130,11 @@ let SITE_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
 /**
  * A page's (or node's) IRI, relative to the site base: where the document is
  * PUBLISHED. A source above the base is composed into the site under its
- * instance's name, and so are the documents beside its pages.
+ * layer's name, and so are the documents beside its pages.
  */
 const pageIri = (slug: string, node?: string): string => sourceSiteNodePath(CUR, slug, node);
 
-/** The source directory as its instance spells it — `docs/source` for the base. */
+/** The source directory as its layer spells it — `docs/source` for the base. */
 const srcRel = (): string => relative(CUR.root, SRC_DIR).split("\\").join("/");
 
 /**

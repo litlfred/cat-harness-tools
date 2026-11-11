@@ -52,7 +52,7 @@ export interface FallbackUse {
  * Every declared role id, across every declared knowledge-graph root.
  *
  * Through `kgRoots` and `readRoleGraph` rather than a literal path: the
- * `kg` directory is declared in `harness.json` and an instance may put it
+ * `kg` directory is declared in `harness.json` and a layer may put it
  * anywhere, so a hardcoded `scenarios/roles.json` is one relocation away
  * from checking nothing. `check:declared-paths` caught exactly that in the
  * first draft of this file.
@@ -77,25 +77,25 @@ export function declaredCapabilityFacts(root: string): Map<string, CapabilityFac
   const out = new Map<string, CapabilityFacts>();
   // The declared home inside `scenarios` (bean rqao) — the same place
   // `src/tools/capabilities.ts` reads. Both bases are still tried, because a
-  // caller may hand this an instance root or the repository root.
+  // caller may hand this a layer root or the repository root.
   for (const base of new Set([root, resolve(root, "..")])) readCapabilityDir(capabilitiesDir(base) ?? "", out);
   return out;
 }
 
 /**
- * Every capability the CHECKOUT declares: each instance's own `capabilities`
+ * Every capability the CHECKOUT declares: each layer's own `capabilities`
  * registry inside its declared `scenarios` graph.
  *
  * {@link declaredCapabilityFacts} reads the platform's registry only, and a
- * capability is declared by the instance its subject belongs to: the Lean pair
+ * capability is declared by the layer its subject belongs to: the Lean pair
  * moved up to the layer that writes papers, and the platform's registry has no
- * `fallbackTo` left. The instances are DISCOVERED (`instanceRootsIn`), never
+ * `fallbackTo` left. The layers are DISCOVERED (`instanceRootsIn`), never
  * named, because this layer may not name the layers above it.
  */
 export function checkoutCapabilityFacts(repoRoot: string): Map<string, CapabilityFacts> {
   const out = new Map<string, CapabilityFacts>();
   for (const root of instanceRootsIn(repoRoot)) {
-    // Its OWN `scenarios` directories: an instance may declare more than one,
+    // Its OWN `scenarios` directories: a layer may declare more than one,
     // and a dependency's, which it can see, is read where that one is visited.
     for (const scenarios of instanceDirectoriesForGraph(root, "scenarios")) {
       readCapabilityDir(join(scenarios, CAPABILITIES_DIRNAME), out);
@@ -391,7 +391,7 @@ if (import.meta.main) {
   }
 
   if (circular.size > 0) {
-    // GATED as of 2026-09-20, once the one instance was resolved.
+    // GATED as of 2026-09-20, once the one layer was resolved.
     //
     // It shipped reporting-only for a few hours, on `check:agents-xref`'s
     // precedent — "had a backlog and rightly reported before it gated" —

@@ -90,7 +90,7 @@ export function resolveDeclaredFeedbackDir(repoOrTodosRoot: string): string | un
     const declaredTodos = directoryForGraph(root, "todos");
     if (declaredTodos) candidates.push(declaredTodos);
   } catch {
-    // No instance declaration at `root` — fall through to convention.
+    // No layer declaration at `root` — fall through to convention.
   }
   candidates.push(join(root, DEFAULT_TODO_GRAPH_ROOT));
 
@@ -477,7 +477,7 @@ function candidateGraphDirs(
     const declared = directoriesForGraph(instanceRoot, graphKind);
     if (declared.length > 0) return [...declared];
   } catch {
-    // No instance declaration at `instanceRoot` — fall back to conventional subdirectories.
+    // No layer declaration at `instanceRoot` — fall back to conventional subdirectories.
   }
   return fallbackSubdirs.map((sub) => join(instanceRoot, sub));
 }
@@ -626,7 +626,7 @@ function readProcessesAndTasksIndex(instanceRoot: string): {
 }
 
 /**
- * Build a {@link KgIndex} from an instance's declared `roles`, `processes`,
+ * Build a {@link KgIndex} from a layer's declared `roles`, `processes`,
  * `tasks` and `actors` directories.
  *
  * Preserves the three-valued contract (`undefined` ≠ empty):

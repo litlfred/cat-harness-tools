@@ -7,7 +7,7 @@
  * the scripts are spelled `bun run cat-harness-tools/scripts/…`: they assume a
  * composed checkout as cwd. In a bare sibling layout this gives the parent
  * directory the two files a composed checkout's root has and the scripts
- * read — `index.config.json`, naming each sibling as a LOCAL instance, and a
+ * read — `index.config.json`, naming each sibling as a LOCAL layer, and a
  * `package.json` carrying the `cat` alias (`bun run cat <name>`).
  *
  * ## What it never does

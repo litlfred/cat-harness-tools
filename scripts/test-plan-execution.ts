@@ -9,7 +9,7 @@
  *
  * Rules:
  * 1. If `plan.exitCriteria` names a decision table, resolve it dynamically
- *    relative to provided bases (instance root, workflow directory, etc.).
+ *    relative to provided bases (layer root, workflow directory, etc.).
  * 2. If unresolvable (file does not exist, malformed reference, or decision
  *    not found in the DMN), return state "unknown" / could-not-determine and
  *    route the gateway to "undetermined". NEVER silently fall back to the default!
@@ -141,7 +141,7 @@ export async function evaluatePlanExitCriteria(
 }
 
 /**
- * Open the bean this instance tracks, so the next enabled step is `A_Request`.
+ * Open the bean this layer tracks, so the next enabled step is `A_Request`.
  *
  * `test-plan-execution.bpmn` starts `Start_Request → Call_BeanOpen →
  * GW_BeanYours → A_Request`: the claim is drawn once, in `bean-open.bpmn`, and
@@ -211,7 +211,7 @@ export interface FileCertificationInput {
   /** Who signed (the attestation-service lane), as `qa-report-signing.bpmn` returned it. */
   signer: CertificationEntry["signer"];
   signature?: CertificationEntry["signature"];
-  /** The report this certifies, relative to the instance. Required: a certification points at what it certifies. */
+  /** The report this certifies, relative to the layer. Required: a certification points at what it certifies. */
   reportPath: string;
   reqId?: CertificationEntry["reqId"];
   /** ISO time of signing; defaults to now. */
@@ -226,7 +226,7 @@ export type FileCertificationOutcome =
   | { state: "unknown"; path: string; reason: string };
 
 /**
- * File a signed certification under the instance's declared `attestations`
+ * File a signed certification under the layer's declared `attestations`
  * graph — the step `A_FileCertification` names, which had no writer until
  * this (bean `zaui`). A judgement, so it goes on main (D2 (a), D5 default),
  * never to `qa-reports`.

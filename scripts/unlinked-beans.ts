@@ -16,7 +16,7 @@
  *
  * The instance half is the join of `workflow-view.ts` ({@link beansNamedBy}),
  * widened to the subprocesses and history notes the bean names. The diagrams
- * are found the way `gen-processes-viz` finds them: every instance root's
+ * are found the way `gen-processes-viz` finds them: every layer root's
  * declared `processes` graphs (`workflowFiles`), `.bpmn` only
  * ({@link declaredDiagramIds}). Every id in the corpus carries a `_` or `-`,
  * so a whole-token match does not catch an English word.
@@ -588,7 +588,7 @@ export function diagramIdsOf(xml: string, file: string): DiagramId[] {
 
 /**
  * Every process and activity id the declared diagrams hold, from the files
- * `gen-processes-viz` and the workflow tools resolve: each instance root's
+ * `gen-processes-viz` and the workflow tools resolve: each layer root's
  * `workflowFiles`, `.bpmn` only. Read from the XML rather than through
  * `loadProcessModel`, which keeps only a file's FIRST process (measured
  * 2026-10-24: the DAK lifecycle diagram's other five processes, 60 ids, were

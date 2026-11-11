@@ -147,9 +147,9 @@ export function namesSelf(rel: string, spelled: string): boolean {
 
 /**
  * Every file of the checkout at `root`, repo-relative: `trackedPaths`'s
- * answer, widened to the mounted instances.
+ * answer, widened to the mounted layers.
  *
- * In a composed checkout every instance is a REMOTE MOUNT, laid down from
+ * In a composed checkout every layer is a REMOTE MOUNT, laid down from
  * `index.lock.json` and ignored by the index repository's git, so a bare
  * `git ls-files` at the root lists none of their files. `gitCorpus` counts a
  * mount's files as it counted a submodule's, and is tracked-plus-untracked

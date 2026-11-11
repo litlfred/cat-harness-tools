@@ -115,7 +115,7 @@ export function declaredPageUrl(harnessRoot: string, id: string, rest: Pick<Visu
  */
 export function firstPaintBlock(siteDir: string): string {
   // The include is the site CHROME's (semantic subgraphs, slice 1): resolve it
-  // across the declared site layers of the instance this site directory is in.
+  // across the declared site layers of the layer this site directory is in.
   const file = join(dirname(siteDir), siteFileFor(dirname(siteDir), "_includes/head_custom.html"));
   const head = readFileSync(file, "utf8");
   const m = /<!-- fa-first-paint:begin -->([\s\S]*?)<!-- fa-first-paint:end -->/.exec(head);

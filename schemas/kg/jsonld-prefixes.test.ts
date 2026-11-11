@@ -1,6 +1,6 @@
 /**
  * `jsonldPrefixes` (bean folio-assistant-63q4): the shape, the flattening over
- * `needs`, and agreement between this instance's declared table and the
+ * `needs`, and agreement between this layer's declared table and the
  * hand-kept `CONTENT_CONTEXT` it will replace.
  */
 import { describe, expect, test } from "bun:test";

@@ -3,7 +3,7 @@
  * cat-harness holds no code: every source file under it is a ratcheted debt.
  *
  * @module cat-harness-tools/scripts/check-content-code-free
- * @covers code — every tracked file under the cat-harness instance, read by extension only
+ * @covers code — every tracked file under the cat-harness layer, read by extension only
  *
  * The harness is content: its manifests, Tool definitions and skill records
  * are JSON data that the tools validate on read, and code lives in
@@ -49,7 +49,7 @@ export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "content-code-free-b
 export const CODE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs", ".py", ".sh", ".rb"] as const;
 
 /** Directories whose `.js`/`.mjs` files are shipped browser assets, not code. */
-// declared-path-literal: a classifier over repo-relative paths from any instance, not a read; no one declaration answers it
+// declared-path-literal: a classifier over repo-relative paths from any layer, not a read; no one declaration answers it
 export const BROWSER_ASSET_DIRS = ["site-chrome/assets/", "site-chrome/_includes/", "docs/assets/"] as const;
 
 export const isBrowserAsset = (rel: string): boolean =>

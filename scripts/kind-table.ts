@@ -19,13 +19,13 @@ import { graphTypologyLayer } from "../schemas/kg/graph-typology-registry.ts";
 import "../schemas/kg/folio-graph-typology.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** The instance root this reader is relative to. */
+/** The layer root this reader is relative to. */
 export const KIND_TABLE_ROOT = join(HARNESS_ROOT);
 /**
  * The page the table is published on, built at publish (cat-harness's
  * `builtAtPublish`, owner 2026-10-14: "1"). It was a region of the skill
  * `skills/kg/kg-core/directory-conventions.md`, and that made the skill a
- * pin-dependent artefact: every kind any instance in the checkout declares is
+ * pin-dependent artefact: every kind any layer in the checkout declares is
  * a row, so the committed skill went stale at each re-pin that brought a
  * layer's new kind. The skill keeps its prose and names this page.
  */

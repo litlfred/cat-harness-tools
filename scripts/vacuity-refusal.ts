@@ -12,7 +12,7 @@
  *
  * "0 files validated" does not say whether a directory is missing,
  * present-and-empty, or present with nothing matching the filter, and those are
- * three different repairs: a wrong path, an empty instance, a filter that has
+ * three different repairs: a wrong path, an empty layer, a filter that has
  * stopped matching what the corpus is named. Reporting the state per source
  * turns a refusal into an action.
  *

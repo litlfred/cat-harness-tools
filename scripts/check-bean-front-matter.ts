@@ -288,7 +288,7 @@ export interface FrontMatterReport {
   /**
    * WHICH absence, when {@link beans} is `null`.
    *
-   * `absent` is an instance that legitimately has no bean store and is a pass;
+   * `absent` is a layer that legitimately has no bean store and is a pass;
    * `declared-but-absent` is one whose declaration names a directory that is
    * not there, which is `dh4f` and is not. Both were `null` until `t6s7`, and
    * both printed *"no store in this repository, nothing to check"*, exit 0.

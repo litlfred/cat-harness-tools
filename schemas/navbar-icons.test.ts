@@ -10,12 +10,12 @@
  *
  * | declaration | means | resolves to |
  * |---|---|---|
- * | absent | *this instance has not decided* | whatever its `needs` chain, or the floor, decided |
+ * | absent | *this layer has not decided* | whatever its `needs` chain, or the floor, decided |
  * | `[]` | *show none* — the owner asked for it by name | `[]`, and the walk STOPS |
- * | a list | *this instance's own answer* | that list |
+ * | a list | *this layer's own answer* | that list |
  *
  * A guard written as `if (own)` collapses the middle row into the top one, and
- * the resulting page is indistinguishable from an un-migrated instance's. The
+ * the resulting page is indistinguishable from an un-migrated layer's. The
  * implementation guards on `!== undefined` for that reason; the tests below are
  * what stops it drifting back.
  *
@@ -78,7 +78,7 @@ describe("three states, and the middle one is the point", () => {
 
   test("`[]` means SHOW NONE, and stops the walk rather than inheriting over it", () => {
     // The failure this pins: `if (own)` is falsy for `[]`, so the resolver
-    // would walk past an instance that said "none" and hand back six icons.
+    // would walk past a layer that said "none" and hand back six icons.
     // Empty and absent are different answers; only one of them is a decision.
     const { declared, needs } = world({
       leaf: { icons: [], needs: ["base"] },
@@ -89,7 +89,7 @@ describe("three states, and the middle one is the point", () => {
 
   test("`undefined` is the THIRD state — nobody decided, and that is not `[]`", () => {
     // A caller that renders this as an empty row reports an un-migrated
-    // instance as a deliberate one. The resolver must say "nobody said".
+    // layer as a deliberate one. The resolver must say "nobody said".
     const { declared, needs } = world({ lonely: {} });
     expect(resolveNavbarIcons("lonely", declared, needs)).toBeUndefined();
     // ...and it is distinguishable from the row above, which is the whole test.
@@ -102,7 +102,7 @@ describe("three states, and the middle one is the point", () => {
       floor: { icons: ["launcher"] },
     });
     expect(resolveNavbarIcons("island", declared, needs, "floor")).toEqual(["launcher"]);
-    // ...and it does not override an instance that DID decide, including `[]`.
+    // ...and it does not override a layer that DID decide, including `[]`.
     const quiet = world({ island: { icons: [] }, floor: { icons: ["launcher"] } });
     expect(resolveNavbarIcons("island", quiet.declared, quiet.needs, "floor")).toEqual([]);
   });
@@ -141,8 +141,8 @@ describe("the walk is breadth-first, and it terminates", () => {
 
 describe("the schema holds the owner's cap", () => {
   test("eight is allowed; a ninth is REFUSED, never truncated", () => {
-    // Truncating drops whichever the instance listed last, silently. An
-    // instance that declared eight made a decision, and overruling it without
+    // Truncating drops whichever the layer listed last, silently. A
+    // layer that declared eight made a decision, and overruling it without
     // saying so is the failure the `.max(8)` message names.
     expect(NavbarIconsSchema.safeParse([...NAVBAR_ICONS]).success).toBe(true);
     expect(NAVBAR_ICONS.length).toBe(8);

@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { UsageError, parseArgs, resolveRun } from "../wireframe-check.mjs";
 import { checkWireframes } from "../check-wireframes.ts";
 
-/** An index-shaped checkout: one instance holding an as-is wireframe and a design proposal. */
+/** An index-shaped checkout: one layer holding an as-is wireframe and a design proposal. */
 const ROOT = mkdtempSync(join(tmpdir(), "wireframe-check-"));
 const WF = join(ROOT, "cat-harness", "docs", "wireframes");
 const PROP = join(ROOT, "cat-harness", "docs", "proposals");

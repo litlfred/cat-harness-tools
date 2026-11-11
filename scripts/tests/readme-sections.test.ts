@@ -9,7 +9,7 @@
  * region the folio explicitly marked.
  *
  * The tests of this file that read the whole checkout (reads the root
- * instance's declaration (`memory/`) or the checkout's own submodule layout)
+ * layer's declaration (`memory/`) or the checkout's own submodule layout)
  * live in `test/readme-sections-checkout.test.ts` (bean `7zz1`): standing
  * alone, cat-harness has none of it.
  */
@@ -47,8 +47,8 @@ afterEach(() => {
 function folio(files: Record<string, string> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "folio-sec-"));
   dirs.push(root);
-  // A config filename is composed from the instance's NAME, so a fixture that
-  // hands `folio()` a `FIXTURE_CONFIG` entry has to be an instance called
+  // A config filename is composed from the layer's NAME, so a fixture that
+  // hands `folio()` a `FIXTURE_CONFIG` entry has to be a layer called
   // `fixture` for that name to be the one anything looks for. Pinned rather
   // than taken from the mkdtemp basename, which is random per run.
   declareInstance(root, FIXTURE_INSTANCE);
@@ -340,7 +340,7 @@ describe("cat-harness:instances — both entries, per instance (issue #592)", ()
 
   it("every instance in THIS repository now carries both entries", () => {
     // The state the fixtures above deliberately do not depend on: eight
-    // instances were mute when this section was written, and none is now.
+    // layers were mute when this section was written, and none is now.
     const rows = out.markdown.split("\n").filter((l) => l.startsWith("| `"));
     for (const row of rows) expect(row).toContain("AGENTS.md");
     expect(out.markdown).not.toContain("declare no `agent-instructions`");

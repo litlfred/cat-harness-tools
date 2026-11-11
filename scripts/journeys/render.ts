@@ -18,8 +18,8 @@
  *
  * | path | page |
  * |---|---|
- * | `index.html` | every journey in the checkout, by instance, then by `partOf`, ordered along `follows`; every workshop |
- * | `<instance>/index.html` | the same for one instance: the sub-graph page |
+ * | `index.html` | every journey in the checkout, by layer, then by `partOf`, ordered along `follows`; every workshop |
+ * | `<instance>/index.html` | the same for one layer: the sub-graph page |
  * | `<instance>/<journey id>/index.html` | one journey |
  * | `<instance>/workshops/<workshop id>/index.html` | one workshop |
  * | `<instance>/workshops/<workshop id>/<module>/index.html` | one module |
@@ -68,21 +68,59 @@ export const FONT_FILES = ["PlusJakartaSans-Regular.woff2", "PlusJakartaSans-Med
 
 export interface PageFile {
   path: string;
-  /** A page or an asset as text; an illustration copied from its instance as bytes. */
+  /** A page or an asset as text; an illustration copied from its layer as bytes. */
   content: string | Uint8Array;
 }
 
+/** An ArchiMate element's page, site-relative, with what to call it. */
+export interface ArchimateElementLink {
+  name: string;
+  /** Its ArchiMate type, in words ("Application Component"). */
+  type: string;
+  page: string;
+}
+
+/** An ArchiMate view, drawn and paged, site-relative. */
+export interface ArchimateViewLink {
+  svg: string;
+  page: string;
+  name: string;
+  /** The elements its boxes show, once each, in drawing order. */
+  elements?: ArchimateElementLink[];
+}
+
 /** Where things are in the site, for links that leave the viewer. */
+/** One system part in the architecture panel: its reference block names its kind and row. */
+export interface ArchitectureBox extends ArchimateElementLink {
+  /** The reference block its country's instance specializes (the box's small-capitals kind). */
+  block: ArchimateElementLink;
+  /** An `ig` property on the part: its page in the implementation guide. */
+  ig?: string;
+  /** BPMN files (layer-relative) of the processes its system serves, from their `bpmn` property. */
+  bpmn: string[];
+}
+/** The architecture panel's model, read from the ArchiMate graph (JV-13). */
+export interface ArchitecturePanel {
+  countries: ArchimateElementLink[];
+  /** One per child grouping of the root, in the model's order; `cells` one list of boxes per country. */
+  rows: { layer: ArchimateElementLink; cells: ArchitectureBox[][]; blocks: ArchimateElementLink[] }[];
+  shared?: { group: ArchimateElementLink; members: ArchimateElementLink[] };
+}
+
 export interface SiteLinks extends StepPageLinks {
   /** Site-relative route of the viewer, no trailing slash: `en/<harness>/<id>`. */
   route: string;
-  /** Site-relative page of each process drawing's viewer, by instance; absent when no processes viewer is declared. */
+  /** Site-relative page of each process drawing's viewer, by layer; absent when no processes viewer is declared. */
   processesPage?: (instance: string) => string | undefined;
   /** Site-relative ⓘ panel sidecar of a BPMN file (instance-relative) the processes viewer draws; absent when no processes viewer is declared. */
   processPanel?: (instance: string, bpmn: string) => string | undefined;
-  /** An ArchiMate view's drawing and page, site-relative; absent when it cannot be placed. */
-  archimateView?: (instance: string, model: string, view: string) => { svg: string; page: string; name: string } | undefined;
-  /** Title of the site's declaring instance, for the index heading. */
+  /** An ArchiMate view's drawing and page, and the elements it shows, site-relative; absent when it cannot be placed. */
+  archimateView?: (instance: string, model: string, view: string) => ArchimateViewLink | undefined;
+  /** The ArchiMate elements that deploy a building block (their `buildingBlocks` property names it), with their pages, site-relative. */
+  archimateBlock?: (instance: string, block: string) => ArchimateElementLink[];
+  /** The architecture panel a workshop's `presentation.architecture` declares, resolved; absent when the model or a ref cannot be. */
+  archimateArchitecture?: (instance: string, spec: { model: string; root: string; countries: readonly { group: string }[]; shared?: string }) => ArchitecturePanel | undefined;
+  /** Title of the site's declaring layer, for the index heading. */
   title: string;
 }
 
@@ -256,7 +294,7 @@ function partMarks(part: Part | undefined): string {
   return marks.map(([w, t]) => `<span class="jv-part-mark" title="${e(t!)}">${e(w!)}</span>`).join("");
 }
 
-/** The journeys of one instance at the top of its `partOf` tree. */
+/** The journeys of one layer at the top of its `partOf` tree. */
 function rootsOf(corpus: JourneyCorpus, instance: string): Journey[] {
   const mine = corpus.journeys.filter((j) => j.instance === instance);
   return orderByFollows(mine.filter((j) => parentOf(corpus, j) === undefined));
@@ -401,7 +439,7 @@ ${problems.length ? `<div class="jv-problems"><h3>Files that would not load</h3>
 </section>`;
 }
 
-/** The instances with anything to show, the declaring instance first. */
+/** The layers with anything to show, the declaring layer first. */
 export function instancesWithJourneys(corpus: JourneyCorpus, first?: string): string[] {
   const names = new Set([...corpus.journeys.map((j) => j.instance), ...corpus.workshops.map((w) => w.instance), ...corpus.problems.map((p) => p.instance)]);
   return [...names].sort((a, b) => (a === first ? -1 : b === first ? 1 : a.localeCompare(b)));
@@ -941,7 +979,7 @@ function lines(n: number): string {
 export function sheetsHtml(corpus: JourneyCorpus, w: WorkshopEntry): string {
   const ws = w.workshop;
   const scales = ws.assessment?.scales ?? [];
-  return (ws.sheets ?? [])
+  return [coverSheet(w), ...(ws.sheets ?? [])
     .map((sh) => {
       const mods = sh.modules.map((id) => ws.modules.find((m) => m.id === id)).filter((m): m is NonNullable<typeof m> => m !== undefined);
       const qBlocks = mods
@@ -964,8 +1002,28 @@ export function sheetsHtml(corpus: JourneyCorpus, w: WorkshopEntry): string {
 <div class="jv-sheet-body">${qBlocks}${tables.map((t) => tableHtml(t, true)).join("")}${(sh.fields ?? []).map((f) => `<section class="jv-field"><h3>${e(f.label)}</h3>${lines(f.lines)}</section>`).join("")}</div>
 ${strip}
 </article>`;
-    })
+    })].filter(Boolean)
     .join("\n");
+}
+
+/**
+ * The cover the sheets open with (JV-14): the blanks a table fills in, the
+ * workshop's scope promise, and the ways to start from the table the
+ * presentation names. On its own page, the first sheet's size.
+ */
+export function coverSheet(w: WorkshopEntry): string {
+  const ws = w.workshop;
+  if (!ws.sheets?.length) return "";
+  const cover = ws.presentation?.cover;
+  const fields = cover?.fields ?? ["Country", "Delegation", "Table", "Facilitator"];
+  const table = cover?.table ? ws.tables?.find((t) => t.id === cover.table) : undefined;
+  const size = ws.sheets[0]!.size.toLowerCase();
+  return `<article class="jv-sheet jv-sheet-${e(size)} jv-cover" id="sheet-cover">
+<header class="jv-sheet-head"><div><p class="jv-kicker">${e(ws.title)}</p><h2>Cover</h2></div></header>
+<div class="jv-cover-fields">${fields.map((f) => `<label class="jv-cover-field"><span>${e(f)}</span>${lines(1)}</label>`).join("")}</div>
+${ws.promise ? `<p class="jv-promise"><b>The scope promise.</b> ${e(ws.promise)}</p>` : ""}
+${table ? `<section class="jv-ways" aria-label="${e(table.title)}">${table.rows.map((r) => `<div class="jv-way"><b>${e(r.label)}</b>${r.what ? `<p>${e(r.what)}</p>` : ""}${r.example ? `<small>e.g. ${e(r.example)}</small>` : ""}</div>`).join("")}</section>` : ""}
+</article>`;
 }
 
 function sheetsPage(corpus: JourneyCorpus, w: WorkshopEntry): string {

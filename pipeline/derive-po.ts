@@ -370,7 +370,7 @@ export function derive(
   locales: string[],
   opts: { docsDir?: string } = {},
 ): DeriveResult {
-  // `siteRoot` rather than a `docs` literal: two directories in this instance
+  // `siteRoot` rather than a `docs` literal: two directories in this layer
   // declare that path (`docs` instance-scoped, `root-docs` repository-scoped),
   // so `directoryForGraph` would throw on the ambiguity — and `siteRoot`
   // CONFIRMS the directory by finding `_config.yml` in it rather than scanning
@@ -509,7 +509,7 @@ export function translationPathFor(docs: string, page: string, locale: string): 
 }
 
 /**
- * Every (page, locale) this instance PUBLISHES a translation for.
+ * Every (page, locale) this layer PUBLISHES a translation for.
  *
  * **The CLI hard-coded five page names, and that is why a translation batch needed
  * a code edit to be catalogued.** PR #1404 published `architecture`,
@@ -557,7 +557,7 @@ export function publishedPairs(
   sourceLocale: string,
   opts: { instanceRoot?: string } = {},
 ): { pages: string[]; locales: string[]; findings: string[] } {
-  // The index is built from the instance root, while this function's contract is
+  // The index is built from the layer root, while this function's contract is
   // a site directory — the two differ by the declared site segment, and a caller
   // that already knows the root passes it rather than having it inferred.
   const instanceRoot = opts.instanceRoot ?? dirname(docs);

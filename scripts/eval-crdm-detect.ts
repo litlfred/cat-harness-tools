@@ -126,7 +126,7 @@ console.log(
 // PROCESS. The skill is in the process basis deliberately — it is what the
 // phrase list is derived FROM, so editing it can change the result without
 // touching a line of this script, which is exactly the `cv10` failure.
-// declared-path-literal: the harness's own QA results, joined under HARNESS_ROOT; it names no other instance's test/results/, though any instance declaring that path spells it the same.
+// declared-path-literal: the harness's own QA results, joined under HARNESS_ROOT; it names no other layer's test/results/, though any layer declaring that path spells it the same.
 // A gate computing this run without writing the tree points it at a
 // temporary directory (test-run-compute.ts, #1191).
 const OUT_DIR = process.env[TEST_RUN_OUT_ENV];

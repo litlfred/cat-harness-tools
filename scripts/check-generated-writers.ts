@@ -9,7 +9,7 @@
  *
  * - **No list of generators here.** A writer is real when the checkout can
  *   find it: a script file at the path the marker names (from the file's own
- *   directory up to the checkout root, or from any instance root), or a task
+ *   directory up to the checkout root, or from any layer root), or a task
  *   in the script table (`bun run cat <task>`).
  * - **All four markers are accepted**, as they are written today: a top-level
  *   `_generated` in JSON, `generated:` front matter, a `$schema` the graph-kind
@@ -23,7 +23,7 @@
  *
  * A generated file with NO marker is found through the `writes` declaration:
  * each writer task lists the committed files it writes (`task-io.ts`'s
- * `OWN_WRITES`, or an instance's `taskIo.<task>.writes`). Every file a glob
+ * `OWN_WRITES`, or a layer's `taskIo.<task>.writes`). Every file a glob
  * matches must carry a marker, and a glob that matches nothing is reported
  * too. A writer that declares nothing is not checked for unmarked files.
  *
@@ -103,7 +103,7 @@ export interface Finding {
 }
 
 /**
- * Judge one marker. `roots` are the instance roots; a path resolves from the
+ * Judge one marker. `roots` are the layer roots; a path resolves from the
  * file's directory and each directory above it up to `repo`, or from a root.
  */
 export function judge(abs: string, m: Marker, o: { repo: string; roots: readonly string[]; tasks: ReadonlySet<string> }): string | undefined {

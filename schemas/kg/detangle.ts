@@ -60,7 +60,7 @@ export interface DetangleNode {
  * Which way a group's boundary edges point.
  *
  * - `sink` — the rest depends on it; it depends on little. Lifts out as a
- *   DEPENDENCY: other instances declare they need it.
+ *   DEPENDENCY: other layers declare they need it.
  * - `source` — it depends on the rest; nothing depends on it. Lifts out as a
  *   DEPENDENT: it declares what it needs. Equally separable, opposite
  *   declaration direction.

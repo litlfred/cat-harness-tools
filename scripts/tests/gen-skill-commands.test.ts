@@ -18,6 +18,7 @@ import {
   isGenerated,
   isMountedInstance,
   packagesFor,
+  pointerTarget,
   reconcile,
   runSkillCommands,
   write,
@@ -230,6 +231,95 @@ describe("instance vs index scope (bean t5zb)", () => {
     expect(r.mountedFindings[0]).toContain("mounted-layer");
     expect(r.mountedFindings[0]).toContain(".claude/commands/m.md");
     expect(r.mountedFindings[0]).toContain("not rewritten");
+  });
+});
+
+describe("a mount that leaves out an opt-in sub-graph (cat-harness-tools#1754)", () => {
+  /** An index root with one whole-mounted layer whose lock entry carries `except`. */
+  function mountedWithExcept(except: string[] | undefined): { indexRoot: string; layer: string } {
+    const indexRoot = mkdtempSync(join(tmpdir(), "skill-except-"));
+    made.push(indexRoot);
+    const layer = join(indexRoot, "layer");
+    mkdirSync(join(layer, "skills", "core"), { recursive: true });
+    mkdirSync(join(layer, ".claude", "commands"), { recursive: true });
+    writeFileSync(
+      join(layer, "layer.json"),
+      JSON.stringify({
+        $schema: "cat-harness-declaration/1.0.0",
+        name: "layer",
+        directories: [
+          { id: "skills", path: "skills", graphTypologies: ["skills"] },
+          { id: "sdlc", path: "sdlc", optIn: true, graphTypologies: ["skills"] },
+        ],
+      }),
+    );
+    writeFileSync(join(layer, "skills", "core", "kept.md"), skill("kept", true));
+    // `sdlc/` is NOT on disk: the mount left it out. Its command was committed upstream.
+    const pointer = (name: string, rel: string) =>
+      ["---", `description: "The ${name} skill."`, 'argument-hint: "[what to run it on]"', "generated: cat-harness-tools/scripts/gen-skill-commands.ts", "---", "", `# /${name}`, "", `Run the \`${name}\` skill. Read [\`${rel}\`](../../${rel}) and follow it.`, ""].join("\n");
+    writeFileSync(join(layer, ".claude", "commands", "watch.md"), pointer("watch", "sdlc/skills/sdlc-core/watch.md"));
+    // A generated command pointing at a path the mount DID bring, with no skill there: a real orphan.
+    writeFileSync(join(layer, ".claude", "commands", "gone.md"), pointer("gone", "skills/core/gone.md"));
+    writeFileSync(
+      join(indexRoot, "index.config.json"),
+      JSON.stringify({ $schema: "folio-index-config/v1", instances: [{ name: "layer", source: { remote: { repository: "o/layer", ref: "a".repeat(40) } } }] }),
+    );
+    writeFileSync(
+      join(indexRoot, "index.lock.json"),
+      JSON.stringify({
+        $schema: "cat-harness-mount-lock/v1",
+        mounts: [{ harness: "layer", repository: "o/layer", ref: "a".repeat(40) }],
+        instances: [
+          {
+            instance: "layer",
+            repository: "o/layer",
+            sha: "a".repeat(40),
+            upstreamRoot: "",
+            path: "layer",
+            via: "layer",
+            pinnedBy: "declared",
+            declaration: { file: "layer.json", sha256: "0".repeat(64) },
+            directories: [{ id: "*", path: "layer", upstreamPath: ".", treeDigest: "0".repeat(64), files: 4, ...(except ? { except } : {}) }],
+            trust: { basis: "consent", by: "test", on: "2026-11-10", ref: "a".repeat(40), approver: "declared" },
+          },
+        ],
+      }),
+    );
+    return { indexRoot, layer };
+  }
+
+  test("pointerTarget reads the skill path out of a generated pointer", () => {
+    expect(pointerTarget("Read [`sdlc/skills/x.md`](../../sdlc/skills/x.md) and follow it.")).toBe("sdlc/skills/x.md");
+    expect(pointerTarget("no link here")).toBeUndefined();
+  });
+
+  test("a command whose skill is in an excluded sub-graph is skipped — not orphaned, not removed", () => {
+    const { indexRoot, layer } = mountedWithExcept(["sdlc"]);
+    const pkgs = { core: join(layer, "skills") };
+    const r = reconcile(layer, pkgs);
+    expect(r.notMounted.map((n) => [n.name, n.skill])).toEqual([["watch", "sdlc/skills/sdlc-core/watch.md"]]);
+    // The real orphan is still found: the rule is about where the skill lives, not a blanket pass.
+    expect(r.findings.map((f) => [f.kind, f.name])).toContainEqual(["orphaned", "gone"]);
+    expect(r.findings.map((f) => f.name)).not.toContain("watch");
+
+    const run = runSkillCommands({ baseRoot: indexRoot, check: false });
+    expect(run.mountedFindings.some((m) => m.includes("watch.md"))).toBe(false);
+    expect(run.lines.some((l) => l.includes("leaves out (sdlc)"))).toBe(true);
+    expect(existsSync(join(layer, ".claude", "commands", "watch.md"))).toBe(true);
+  });
+
+  test("without `except` in the lock the same command is still an orphan (the lock decides)", () => {
+    const { layer } = mountedWithExcept(undefined);
+    const r = reconcile(layer, { core: join(layer, "skills") });
+    expect(r.notMounted).toEqual([]);
+    expect(r.findings.map((f) => [f.kind, f.name])).toContainEqual(["orphaned", "watch"]);
+  });
+
+  test("an unmounted checkout never skips: its own orphan is still removed by write()", () => {
+    const { root, pkgs } = repo({}, { "watch.md": commandText({ name: "watch", path: "/nowhere/sdlc/watch.md" } as never, "/nowhere") });
+    const r = reconcile(root, pkgs);
+    expect(r.notMounted).toEqual([]);
+    expect(r.findings.map((f) => f.kind)).toEqual(["orphaned"]);
   });
 });
 

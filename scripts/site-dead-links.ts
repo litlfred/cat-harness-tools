@@ -32,12 +32,12 @@
  *    segments, the longest tail that matches), the link goes to that file on
  *    GitHub, at the commit the index pins (`index.lock.json`). Two or more
  *    candidates are left alone: a guess is worse than a reported dead link.
- * 3. **In a preview, a page of an instance the preview does not carry.** A
- *    preview builds only the composed instances its branch reaches
+ * 3. **In a preview, a page of a layer the preview does not carry.** A
+ *    preview builds only the composed layers its branch reaches
  *    (`compose-docs.ts`, `carriedInstances`), so a link into one it left out
  *    is dead here and live on the published site. When the build is a
  *    preview (`--base-path …/branches/<slug>`), the target's first segment is
- *    a composed instance, and that instance's composed directory holds the
+ *    a composed layer, and that layer's composed directory holds the
  *    page's source, the link goes to the same path on the published site.
  *    A canonical build never takes this rule: there a missing page is a
  *    finding.
@@ -318,8 +318,8 @@ export function publishedRootOf(basePath: string): string | undefined {
 }
 
 /**
- * Rule 3: the published-site path for a target inside a composed instance this
- * preview did not carry, or undefined. `instances` maps the instance's site
+ * Rule 3: the published-site path for a target inside a composed layer this
+ * preview did not carry, or undefined. `instances` maps the layer's site
  * segment to its composed directory; the page counts only when that directory
  * holds its source (`x.html` as `x.md` or itself), so a page nobody wrote stays
  * reported.
@@ -342,7 +342,7 @@ export function checkSite(opts: {
   basePath: string;
   fix: boolean;
   resolveSource: (rel: string) => string | undefined;
-  /** Rule 3, preview builds only: where a page of an uncarried instance is published. */
+  /** Rule 3, preview builds only: where a page of an uncarried layer is published. */
   resolvePublished?: (target: string) => string | undefined;
 }): { dead: DeadLink[]; repointed: Repoint[]; pages: number } {
   const dead: DeadLink[] = [];

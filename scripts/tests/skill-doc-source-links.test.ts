@@ -13,7 +13,7 @@
  * @module scripts/tests/skill-doc-source-links.test
  *
  * The tests of this file that read the whole checkout (resolves skill sources
- * across every instance in the checkout) live in
+ * across every layer in the checkout) live in
  * `test/skill-doc-source-links-checkout.test.ts` (bean `7zz1`): standing
  * alone, cat-harness has none of it.
  */

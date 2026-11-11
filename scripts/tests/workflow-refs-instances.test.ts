@@ -3,7 +3,7 @@
  *
  * ## What happened
  *
- * `bootstrap` was added to that checker's instance list on 2026-09-19 with a
+ * `bootstrap` was added to that checker's layer list on 2026-09-19 with a
  * stated reason: *"a dangling `<…:skill ref>` in a diagram this checker never
  * opens is a broken reference reported as clean."* It was written as
  * `join(INSTANCE_ROOT, "bootstrap")` — and `INSTANCE_ROOT` is `cat-harness/`
@@ -73,10 +73,10 @@ describe("bootstrap is where the checker looks for it", () => {
   });
 
   /**
-   * Dependency instances ARE reached by the root's walk, and stating it here
+   * Dependency layers ARE reached by the root's walk, and stating it here
    * stops the next reader over-generalising from bootstrap. Bean `bjzs` claimed
    * *"render:bpmn never lists a nested diagram"*; measured, two of the three
-   * nested instances are reached and only bootstrap is not, because only
+   * nested layers are reached and only bootstrap is not, because only
    * bootstrap's process directory is undeclared at the root.
    */
   test("a DEPENDENCY instance's diagrams are reached — the gap is bootstrap alone", () => {
@@ -110,10 +110,10 @@ describe("the checker, run as a command", () => {
 });
 
 /**
- * `render:bpmn` walks EVERY instance, which is wider than this checker's two.
+ * `render:bpmn` walks EVERY layer, which is wider than this checker's two.
  *
  * Bean `oqdr`, merged from a sibling's branch as `#1394`. The assertions below
- * are about bootstrap specifically, because that is the instance whose diagrams
+ * are about bootstrap specifically, because that is the layer whose diagrams
  * nothing reached — but the fix is not a second hand-built list: `bpmnSources()`
  * unions `workflowFiles` over `instanceRootsIn`, and it **throws** on a basename
  * collision rather than reporting one. This branch's own first attempt named
@@ -137,7 +137,7 @@ describe("render:bpmn covers bootstrap, whatever the walk's shape", () => {
   // (beans `x4a6`, `wggr`) and `check:site-dir` refuses a hardcoded one. It
   // caught this line, which is the gate doing exactly its job.
   const assets = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "assets", "img", "workflows");
-  // A drawing of another instance's diagram is written at publish and gitignored (bean w1gy F18).
+  // A drawing of another layer's diagram is written at publish and gitignored (bean w1gy F18).
   const svgs = diagrams(BOOTSTRAP).map((f) => join(assets, `${basename(f, ".bpmn")}.svg`));
   test.skipIf(svgs.length > 0 && siteNotBuilt("bootstrap's diagrams as `render:bpmn` draws them at publish (gitignored)", ...svgs))("every bootstrap diagram has a rendered SVG in the site assets", () => {
     for (const f of diagrams(BOOTSTRAP)) {

@@ -13,12 +13,79 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, pathState, preloadScripts, recordRun, inlineCodeOf, splitArgs, testGates, unquote } from "../../ci-cone.ts";
+import { decideRun, excluded, gitReplayable, keepRecords, loadRecords, parseTrace, pathState, preloadScripts, recordRun, inlineCodeOf, splitArgs, testGates, touchedOf, unquote } from "../../ci-cone.ts";
 import { BUILD_OUTPUT_DIRS, FileDigests, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
 import { NOT_INSTANCE_DIRS } from "../../../schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
 
 const ROOT = "/work/repo";
+
+describe("touchedOf — what a run touched, for a runner that traces several at once (Q-ACT-1 A)", () => {
+  test("reads, listed directories, writes (creates, deletes, renames) and git, from one trace", () => {
+    const t = touchedOf(
+      [
+        `10 openat(AT_FDCWD</work/repo>, "data/a.json", O_RDONLY|O_CLOEXEC) = 3</work/repo/data/a.json>`,
+        `10 getdents64(4</work/repo/data>, 0x55, 32768) = 120`,
+        `10 openat(AT_FDCWD</work/repo>, "out.json", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 5</work/repo/out.json>`,
+        `10 unlink("/work/repo/old.json") = 0`,
+        `10 rename("/work/repo/x.tmp", "/work/repo/x.json") = 0`,
+      ].join("\n"),
+      ROOT,
+    );
+    expect(t).toEqual({ reads: ["data", "data/a.json"], listed: ["data"], writes: ["old.json", "out.json", "x.json", "x.tmp"], git: 0 });
+  });
+
+  test("a read then rewritten path is both read and written; a failed create is a probe, not a write", () => {
+    const t = touchedOf(
+      [
+        `10 openat(AT_FDCWD</work/repo>, "a.json", O_RDONLY|O_CLOEXEC) = 3</work/repo/a.json>`,
+        `10 openat(AT_FDCWD</work/repo>, "a.json", O_WRONLY|O_TRUNC, 0644) = 4</work/repo/a.json>`,
+        `10 mkdirat(AT_FDCWD</work/repo>, "d", 0755) = -1 EEXIST (File exists)`,
+      ].join("\n"),
+      ROOT,
+    );
+    expect(t).toMatchObject({ reads: ["a.json", "d"], writes: ["a.json"] });
+  });
+
+  test("a probe of a path that does not exist yet is a read, so a neighbour creating it is caught", () => {
+    const t = touchedOf(`10 newfstatat(AT_FDCWD</work/repo>, "x/new.json", 0x7ffc, 0) = -1 ENOENT (No such file or directory)`, ROOT);
+    expect(t).toMatchObject({ reads: ["x/new.json"], writes: [] });
+  });
+
+  test("no trace is undetermined, with the reason", () => {
+    expect(touchedOf(undefined, ROOT, "not traced — x")).toEqual({ undetermined: "not traced — x" });
+  });
+
+  test("a git command the cone cannot replay is counted as git, not undetermined; its writes still show", () => {
+    const trace = [
+      `20 getcwd("/work/repo", 4096) = 11`,
+      // input-site: inert #b95de63a — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
+      `20 execve("/usr/bin/git", ["git", "--git-dir=/work/repo/.git/qa-store.git", "log", "-1"], 0x1 /* 3 vars */) = 0`,
+      `10 openat(AT_FDCWD</work/repo>, "out.json", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 5</work/repo/out.json>`,
+    ].join("\n");
+    expect(touchedOf(trace, ROOT)).toMatchObject({ writes: ["out.json"], git: 1 });
+    // A record still refuses it: it could not replay the call.
+    expect("undetermined" in parseTrace(trace, ROOT)).toBe(true);
+  });
+});
+
+describe("keepRecords — records concurrent runs wrote to their own files", () => {
+  test("a kept record goes into the record file; a null record removes the old one", () => {
+    const root = mkdtempSync(join(tmpdir(), "cone-keep-"));
+    const rec = { sha: "new", base: "fp", reads: { "b/x.json": "file 1" }, git: {} };
+    const a = join(root, "a.json");
+    const b = join(root, "b.json");
+    writeFileSync(a, JSON.stringify({ script: "check:a", sha: "new", run: "new run 1", recordedAt: "t", record: rec }));
+    writeFileSync(b, JSON.stringify({ script: "check:b", sha: "new", run: "new run 1", recordedAt: "t", record: null }));
+    const notes = keepRecords(root, [a]);
+    expect(notes[0]).toContain("check:a: recorded (1 paths");
+    expect(loadRecords(root)?.checks["check:a"]).toEqual(rec as never);
+    writeFileSync(a, JSON.stringify({ script: "check:a", sha: "new", run: "new run 1", recordedAt: "t", record: null }));
+    keepRecords(root, [a, b]);
+    expect(loadRecords(root)?.checks["check:a"]).toBeUndefined();
+    rmSync(root, { recursive: true, force: true });
+  });
+});
 
 describe("parseTrace — what a traced run read, or why that cannot be enumerated", () => {
   const read = (text: string) => parseTrace(text, ROOT);

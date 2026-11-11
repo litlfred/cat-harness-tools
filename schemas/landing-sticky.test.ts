@@ -41,7 +41,7 @@ import { declaredDocsSources } from "../scripts/lib/docs-sources.ts";
 import { dirname } from "node:path";
 
 const REPO = join(dirname(HARNESS_ROOT));
-/** This instance's root — where its own declaration and site live. */
+/** This layer's root — where its own declaration and site live. */
 const INSTANCE = join(HARNESS_ROOT);
 const NOW = "2026-09-20T00:00:00.000Z";
 
@@ -92,7 +92,7 @@ function contributionsOf(rel: string): DeclaredContribution[] {
  * that changes both. That is the general hazard, not a lapse in this file.
  *
  * So this asserts a RELATION instead: which declared sticky ids differ from
- * their own instance directory. A sweep collapsing the divergence makes the
+ * their own layer directory. A sweep collapsing the divergence makes the
  * differing set EMPTY, and a sweep introducing a new one makes it larger.
  * Neither can be satisfied by renaming both sides, because "they differ" is
  * not a string any sed matches.
@@ -103,11 +103,11 @@ function contributionsOf(rel: string): DeclaredContribution[] {
  * `sticky.id === directory`, and `folio-assistant-core` is the ONE that
  * differs. So divergence is the exception rather than the rule here, which is
  * why the assertion is an exact set rather than a count — a count of one would
- * still pass if the divergence moved to a different instance, and that is a
+ * still pass if the divergence moved to a different layer, and that is a
  * different repository from this one.
  */
 describe("a published card id does not move with its directory", () => {
-  /** Every (instance directory, declared sticky id) pair, from the real files. */
+  /** Every (layer directory, declared sticky id) pair, from the real files. */
   const pairs = ["bootstrap", "cat-harness", "folio-assistant-core"].flatMap((rel) =>
     (decl(rel).stickies ?? []).map((s) => ({ dir: rel, id: s.id })),
   );
@@ -170,7 +170,7 @@ describe("a sticky is a CONTRIBUTION from a layer, not an entry in one list", ()
   test("the built sticky records which layer contributed it", () => {
     expect(sticky(BOOT, "bootstrap").contributedBy).toBe("bootstrap");
     // `cat-harness`, the DECLARED NAME, since the owner's 2026-09-20 ruling that
-    // the three instances are distinct. It read `folio-assistant` while the
+    // the three layers are distinct. It read `folio-assistant` while the
     // harness layer and the repository shared that name — which is the
     // collision the ruling ended, and this line could not have told them apart.
     expect(sticky(CAT, "cat-harness").contributedBy).toBe("cat-harness");
@@ -240,7 +240,7 @@ describe("order is DECLARED, not inherited from dependency resolution", () => {
   test("the description comes first and bootstrap's card comes last", () => {
     // The cost the work-plan item named before any of this was written: a
     // composed set with no declared order renders deepest-dependency-first,
-    // which would put bootstrap above the instance's own description.
+    // which would put bootstrap above the layer's own description.
     const ids = built([...BOOT, ...CORE, ...CAT]).map((s) => s.id);
     expect(ids[0]).toBe("cat-harness");
     expect(ids.at(-1)).toBe("bootstrap");
@@ -354,7 +354,7 @@ describe("`bodyFrom` reads the DECLARING layer's fields", () => {
     // `startsWith` rather than equality: a card may APPEND to its description
     // (`bodyAppend`), which is how the scope line is added without copying the
     // sentence above it. What must hold is that the description is read from
-    // the DECLARING instance and comes first, verbatim.
+    // the DECLARING layer and comes first, verbatim.
     expect(boot.comment.startsWith(decl("bootstrap").description!)).toBe(true);
     expect(boot.comment.startsWith(decl("cat-harness").description!)).toBe(false);
   });
@@ -503,8 +503,8 @@ describe("an href may not resolve by luck — bean blv9", () => {
 describe("the four default links point at pages that EXIST", () => {
   // `siteDirFor` rather than the literal: the site root is one answer, derived
   // from the declaration, and `site-dir-single-answer.test.ts` fails any source
-  // file that spells it out. A hardcoded one here would be right until an
-  // instance chose differently, and then silently check nothing.
+  // file that spells it out. A hardcoded one here would be right until a
+  // layer chose differently, and then silently check nothing.
   const DOCS = join(INSTANCE, siteDirFor(INSTANCE));
 
   test.each(DEFAULT_ONBOARDING_LINKS.map((l) => l.href))("%s resolves to a source page", (href) => {
@@ -548,9 +548,9 @@ describe("EVERY declared link resolves to a page that exists", () => {
     (_label, href) => {
       const stem = href.replace(/^\//, "").replace(/\.html$/, "");
       const candidates = (s: string) => [`${s}.md`, join(s, "index.md"), `${s}.html`];
-      // `/<instance>/<page>` is a page an instance above this one renders
+      // `/<instance>/<page>` is a page a layer above this one renders
       // into a docs directory it declares (`lib/docs-sources.ts`), composed
-      // into the one site under the instance's own name.
+      // into the one site under the layer's own name.
       const [head, ...rest] = stem.split("/");
       const roots = [
         ...candidates(stem).map((c) => join(DOCS, c)),
@@ -745,7 +745,7 @@ describe("bootstrap's card links to its source and does NOT invent a site", () =
 
   test("it offers no link to a bootstrap site, because there is none", () => {
     // The owner asked for "link back to the source code + ghpaghes for boot
-    // strrap". Bootstrap has no site — this instance's canonicalUrl is
+    // strrap". Bootstrap has no site — this layer's canonicalUrl is
     // cat-harness's — and a declared link to a page that does not exist is a
     // 404 on the landing page.
     const site = decl("cat-harness").canonicalUrl!;
@@ -772,7 +772,7 @@ describe("sourceLinks — where a card's declaration can be read and edited", ()
     // land in a text box.
     //
     // A file the index checkout itself holds, since cat-harness, like every
-    // other instance, became a remote mount of its own repository
+    // other layer, became a remote mount of its own repository
     // (2026-10-09): `index.config.json` is the checkout's own.
     expect(sourceLinks(REPO, "index.config.json", "main")).toEqual({
       viewHref: `${REPO}/blob/main/index.config.json`,
@@ -783,7 +783,7 @@ describe("sourceLinks — where a card's declaration can be read and edited", ()
   // Both read the index checkout's mount lock, which a standalone
   // cat-harness checkout does not have (bean `ho66`).
   test.skipIf(!inAggregate())("a file in a remote mount is read and edited in the mount's own repository", () => {
-    // Since the cutovers every instance here is a remote mount, and the lock
+    // Since the cutovers every layer here is a remote mount, and the lock
     // says where it came from: this checkout's forge holds no copy of it.
     expect(sourceLinks(REPO, "cat-harness/cat-harness.json", "main")).toEqual({
       viewHref: "https://github.com/litlfred/cat-harness/blob/main/cat-harness.json",
@@ -809,7 +809,7 @@ describe("sourceLinks — where a card's declaration can be read and edited", ()
   });
 
   test.skipIf(!inAggregate())("the path is the CONTRIBUTING instance's, not a default", () => {
-    // The falsifier that matters. Three instances contribute today, so a
+    // The falsifier that matters. Three layers contribute today, so a
     // resolver that always answered `cat-harness/harness.json` would be
     // silently right one time in three.
     const a = sourceLinks(REPO, "cat-harness/cat-harness.json", "main")!;

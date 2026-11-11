@@ -6,7 +6,7 @@
  *
  * The page fetches the graph document, which is named after the repository
  * (`<stub>.jsonld`). The exporter already knows the stub and writes it in, so
- * the page neither hardcodes one instance's stub nor composes a name at
+ * the page neither hardcodes one layer's stub nor composes a name at
  * runtime.
  *
  * It fetches the graph **relative to its own location**, so the same bytes work
@@ -78,7 +78,7 @@ const ROOT = join(HARNESS_ROOT);
 /**
  * The viewer's id among the harness's visualisers: the page is a viewer of the
  * whole graph, so it is published at a viewer's route,
- * `<locale>/<stub>/kg/`, and `<stub>/` is left to the instance as itself.
+ * `<locale>/<stub>/kg/`, and `<stub>/` is left to the layer as itself.
  * Owner, 2026-10-20, on the collision of the two at `<base>/<stub>/`:
  * "move graph viewer so aligns" (folio-assistant bean `o7eq`).
  */
@@ -97,7 +97,7 @@ export function upFrom(route: string): string {
 /**
  * Write the viewer at its route under `site`, and a forwarding page at the
  * address it had until 2026-10-20, `<stub>/` — unless a page is already there,
- * which is the instance's own page and wins (the same refusal
+ * which is the layer's own page and wins (the same refusal
  * `writeForwardingPages` makes).
  */
 export function writeViewer(

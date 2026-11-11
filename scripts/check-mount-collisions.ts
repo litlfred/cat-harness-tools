@@ -51,7 +51,7 @@ export interface CheckCollisionsResult {
 }
 
 /**
- * Audit a repository / instance root for mount path and visualiser route collisions.
+ * Audit a repository / layer root for mount path and visualiser route collisions.
  */
 export function checkAllCollisions(root: string): CheckCollisionsResult {
   const absRoot = resolve(root);
@@ -63,7 +63,7 @@ export function checkAllCollisions(root: string): CheckCollisionsResult {
     path: m.overrides?.[m.harness]?.path,
   }));
 
-  // 2. Gather downstream declared directories and local instances
+  // 2. Gather downstream declared directories and local layers
   const decl = readDeclaration(absRoot);
   const declaredDirs: string[] = (decl?.directories ?? []).map((d) => d.path);
 

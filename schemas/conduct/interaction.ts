@@ -18,7 +18,7 @@
  * `default` block carries that). `note` and `source` are optional.
  *
  * Unknown keys are ALLOWED (a non-strict object), on the rule `KgAssetSchema`
- * states: a downstream instance may carry a key this layer does not know yet.
+ * states: a downstream layer may carry a key this layer does not know yet.
  * Anything this layer relies on is named here.
  */
 import { z } from "zod";
@@ -43,7 +43,7 @@ export const InteractionProfileSchema = z.object({
   /**
    * Named profiles, e.g. `low-dexterity`. Free strings on purpose: the
    * vocabulary is open and a closed enum here would reject a profile a
-   * downstream instance has a name for and this layer does not.
+   * downstream layer has a name for and this layer does not.
    */
   profiles: z.array(z.string()),
   /** What the profile means for this person, in their terms or the agent's. */

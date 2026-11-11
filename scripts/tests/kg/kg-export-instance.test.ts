@@ -1,16 +1,16 @@
 /**
- * The generic half of the exporter serves an instance that is NOT this one.
+ * The generic half of the exporter serves a layer that is NOT this one.
  *
  * @module scripts/tests/kg-export-instance.test
  *
- * Bean `gn4l`. These assertions run against **bootstrap**, a real instance in
+ * Bean `gn4l`. These assertions run against **bootstrap**, a real layer in
  * this repository that has a declaration, two skills, no `tools/`, no
  * `package.json` and no `.claude/` — which is exactly the shape the exporter
  * was never written for.
  *
  * It had no BPMN too, until this branch gave it `workflows/bootstrap.bpmn`.
  * Anything asserting on an absence here is asserting on a property of a
- * REAL instance that is still being built, so it belongs in a fixture — see
+ * REAL layer that is still being built, so it belongs in a fixture — see
  * the workflow-directory test below, which was written against bootstrap and
  * broke the day bootstrap grew the feature.
  */
@@ -21,6 +21,7 @@ import { join, resolve } from "node:path";
 
 import { COLLECTOR_SCOPE, collectInstanceNodes } from "../../kg-export.js";
 import { repoRootFor } from "../../../schemas/kg/cat-harness.js";
+import { termIri } from "../../../schemas/kg/namespaces.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
@@ -29,7 +30,7 @@ const BASE = "https://example.org";
 const DOC = "https://example.org/x.jsonld";
 
 /**
- * The ROOT instance's collection, made once for this file — see the same
+ * The ROOT layer's collection, made once for this file — see the same
  * pair in `instance-graph-isolation.test.ts` for the measurement (7.1 s cold
  * before bean `tdir` made Tools generic, 9.2 s after, 5.3 s warm: each call
  * alone was past bun's 5 s default). Both readers only read the nodes.
@@ -97,8 +98,26 @@ describe("what was not looked for is not reported as clean", () => {
     // different facts. Collapsing them is the `dh4f` defect.
     const { omitted } = await collectInstanceNodes(join(repoRootFor(ROOT), "bootstrap"), DOC, BASE, []);
     // `tools` left this list with bean `tdir`: discovery reads every
-    // instance's declared `tools` graph, so it IS looked for now.
-    expect([...omitted].sort()).toEqual(["packages", "registry", "schemas"]);
+    // layer's declared `tools` graph, so it IS looked for now. `schemas` left
+    // it the same way: `collectSchemas` reads the layer's own `schemas` graph.
+    expect([...omitted].sort()).toEqual(["packages", "registry"]);
+  });
+
+  test("a layer's own schema modules are Schema nodes in its export", async () => {
+    // A content layer's declared `schemas/` had no nodes, so no pages, while
+    // `schemas` was instance-bound: only the harness's own modules were read.
+    const root = mkdtempSync(join(tmpdir(), "kgx-schemas-"));
+    mkdirSync(join(root, "schemas"), { recursive: true });
+    writeFileSync(join(root, "schemas", "record.ts"), "/**\n * A record.\n *\n * @graphNode schema\n */\nexport const x = 1;\n");
+    writeFileSync(join(root, "schemas", "helper.ts"), "/**\n * Helpers.\n *\n * @graphNode none — helpers, not a schema\n */\nexport const y = 1;\n");
+    writeDeclaration(root, JSON.stringify({
+        name: "schemalayer",
+        directories: [{ id: "layer-schemas", path: "schemas/", graphTypologies: ["schemas"] }],
+      }));
+    const { nodes } = await collectInstanceNodes(root, DOC, BASE, []);
+    rmSync(root, { recursive: true, force: true });
+    const schemas = nodes.filter((n) => n["@type"] === termIri("Schema"));
+    expect(schemas.map((n) => [n.name, n.module, n.summary])).toEqual([["record", "schemas/record.ts", "A record."]]);
   });
 
   test("a declared directory holding no diagrams is a NOTE, not a crash and not a problem", async () => {
@@ -139,7 +158,7 @@ describe("what was not looked for is not reported as clean", () => {
     // empty: looked, found none. The ENOENT-safety this test was written for
     // (a directory found under one root and joined against another) is still
     // what it guards — nothing throws — and the finding is still emitted; it
-    // simply no longer fails the instance.
+    // simply no longer fails the layer.
     expect(notes.filter((n) => /no directory containing \.bpmn files was found/.test(n)))
       .toHaveLength(1);
     expect(problems).toEqual([]);
@@ -203,5 +222,10 @@ describe("the scope table says what it means", () => {
     // `--instance ./smart-base` published none of its 11 Tools.
     expect(COLLECTOR_SCOPE.generic).toContain("tools");
     expect(COLLECTOR_SCOPE.instanceBound).not.toContain("tools");
+  });
+
+  test("`schemas` is generic: `collectSchemas` reads the exported layer's declared graph", () => {
+    expect(COLLECTOR_SCOPE.generic).toContain("schemas");
+    expect(COLLECTOR_SCOPE.instanceBound).not.toContain("schemas");
   });
 });

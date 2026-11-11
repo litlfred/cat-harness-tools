@@ -16,7 +16,7 @@ afterAll(() => rmSync(DIR, { recursive: true, force: true }));
 const PLAN = join(import.meta.dir, "fixtures", "test-plan-execution", "tiny.test-plan.json");
 
 let n = 0;
-/** An instance root with one report file and one certification file holding `entries`. */
+/** A layer root with one report file and one certification file holding `entries`. */
 function instance(entries: unknown[], raw?: string): { root: string; files: string[] } {
   const root = join(DIR, `i${n++}`);
   mkdirSync(join(root, "reports"), { recursive: true });

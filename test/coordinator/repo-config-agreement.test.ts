@@ -1,5 +1,5 @@
 /**
- * This repository's content root and its instance config AGREE — bean `zkgs`.
+ * This repository's content root and its layer config AGREE — bean `zkgs`.
  *
  * @module test/repo-config-agreement
  * @graphNode none — a test
@@ -16,7 +16,7 @@
  *
  * It was fixed incidentally, by per-instance config names
  * (`<instance>.config.json`) and a resolver that walks outward from the
- * instance root. This test is the part that was missing: it runs the REAL
+ * layer root. This test is the part that was missing: it runs the REAL
  * resolution on the REAL repository, not a fixture, so the next rename that
  * separates them fails here instead of silently re-scoping QA.
  *
@@ -67,15 +67,15 @@ describe("this repository's content root and its config agree — bean `zkgs`", 
   });
 
   /**
-   * THE NESTED INSTANCE RESOLVES TO ITS OWN CONFIG, not the root's.
+   * THE NESTED LAYER RESOLVES TO ITS OWN CONFIG, not the root's.
    *
    * Added 2026-09-23 from a duplicate investigation of this bean. `cat-harness/`
    * is the directory the walk USED to stop at, and the root the one it used to
    * miss -- the two ends of the defect. In the composed checkout cat-harness IS
    * the content root, and its config is its OWN index entry: a resolver that
-   * answered some other instance's entry (or cat-harness's own nested
+   * answered some other layer's entry (or cat-harness's own nested
    * `index.config.json`, which names it with no `contentType` -- the mount-scope
-   * defect cat-harness#19 fixed) would hand every instance the wrong
+   * defect cat-harness#19 fixed) would hand every layer the wrong
    * `contentType`.
    */
   test("`cat-harness/` resolves to its OWN entry, not another instance's", () => {

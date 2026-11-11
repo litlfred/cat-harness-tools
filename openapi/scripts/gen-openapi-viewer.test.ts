@@ -1,7 +1,7 @@
 /**
  * `gen-openapi-viewer.ts`: the `openapi` viewer's pages, written into a site.
  *
- * A scratch checkout of three instances. `harness` declares the visualiser
+ * A scratch checkout of three layers. `harness` declares the visualiser
  * (`renderedBy: openapi-pages`, `subgraphs: "instance"`). `api` declares a
  * served `openapi` graph holding one ingested document. `broken` declares an
  * `openapi` directory with no config, which the hub must call unknown rather
@@ -82,7 +82,7 @@ describe("gen-openapi-viewer --site", () => {
   it("writes everything under the declared route: the hub, and per instance its pages", () => {
     expect(first.exitCode).toBe(0);
     expect(files().every((f) => f.startsWith(route))).toBe(true);
-    for (const f of ["index.html", "api/index.html", "api/gateway/index.html", "api/gateway/getX/index.html", "api/gateway/getX.jsonld", "broken/index.html"]) {
+    for (const f of ["index.html", "api/index.html", "api/gateway/index.html", "api/gateway/operation/getX/index.html", "api/gateway/operation/getX.jsonld", "broken/index.html"]) {
       expect(files()).toContain(join(route, f));
     }
     for (const f of files().filter((x) => x.endsWith(".html"))) expect(readFileSync(join(site, f), "utf8")).toMatch(/rendered-by: openapi-pages|<meta name="rendered-by" content="openapi-pages">/);
@@ -102,7 +102,7 @@ describe("gen-openapi-viewer --site", () => {
   });
 
   it("authored text is escaped, and never reaches Liquid", () => {
-    expect(read("api/gateway/getX/index.html")).toContain("Read &lt;x&gt;");
+    expect(read("api/gateway/operation/getX/index.html")).toContain("Read &lt;x&gt;");
     expect(read("index.html")).toMatch(/^---\n[\s\S]*?render_with_liquid: false[\s\S]*?\n---\n/);
   });
 

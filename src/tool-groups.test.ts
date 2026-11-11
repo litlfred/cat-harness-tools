@@ -57,7 +57,7 @@ describe("tool groups derived from Tool nodes (zmdo)", () => {
 /**
  * The Tool nodes THIS layer declares (`tools/index.ts`): a node whose
  * in-process module is code here is declared here, so its module path is
- * relative to this layer and names no other instance (owner, 2026-10-14). A
+ * relative to this layer and names no other layer (owner, 2026-10-14). A
  * declared MCP name ending in `*` is a family (`workflow_*`): every name the
  * registrar serves must fall in it, and it must serve at least one.
  */
@@ -91,9 +91,9 @@ describe("this layer's own Tool nodes are served from this layer", () => {
 });
 
 /**
- * A Tool node's `invoke.inProcess.module` is written relative to the instance
+ * A Tool node's `invoke.inProcess.module` is written relative to the layer
  * that DECLARES it, and stays that way when the code moves (owner, split plan
- * "Trap 1"): the loader finds the module in the one instance that implements
+ * "Trap 1"): the loader finds the module in the one layer that implements
  * the declarer through its own `needs`. Same fixture shape as
  * `cat-harness-tools/scripts/tests/tools/implementing-path.test.ts`.
  */

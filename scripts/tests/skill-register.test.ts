@@ -204,7 +204,7 @@ test("a step's arguments are a non-empty list, and its head is what runs", () =>
 
 /* ────────────────────────── the declaration audit ────────────────────────── */
 
-/** A throwaway instance with one skill package, shaped as the real tree is. */
+/** A throwaway layer with one skill package, shaped as the real tree is. */
 function fixture(
   pkg: string,
   listed: string[],
@@ -450,8 +450,8 @@ describe("the report", () => {
     // The defect this pins, measured 2026-09-26: `writeReport` was called with
     // `process.cwd()`, so running the command from the repository root wrote
     // `test/results/skill-register.qa-results.json` — a fresh top-level
-    // directory no instance declares and no sweep reads. `writeQaResult`
-    // composes `<root>/test/results/`, so the root must be the instance's.
+    // directory no layer declares and no sweep reads. `writeQaResult`
+    // composes `<root>/test/results/`, so the root must be the layer's.
     const dir = mkdtempSync(join(tmpdir(), "skill-register-report-"));
     try {
       const at = writeReport(

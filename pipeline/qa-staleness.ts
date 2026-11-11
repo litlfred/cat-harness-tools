@@ -111,10 +111,10 @@ interface BlockReport {
 }
 
 function run(): void {
-  // The instance whose criteria this reads. Resolved here rather than at module
+  // The layer whose criteria this reads. Resolved here rather than at module
   // scope, and BY ID through `qaCriteriaByIdFor` rather than the static index:
-  // since bean `btuv` the voice-overlay criteria are derived from the voices an
-  // instance ships, so a static lookup returns `undefined` for every one of them
+  // since bean `btuv` the voice-overlay criteria are derived from the voices a
+  // layer ships, so a static lookup returns `undefined` for every one of them
   // and this file would report four registered criteria as unknown.
   const INSTANCE_ROOT = join(HARNESS_ROOT);
   const criteriaById = qaCriteriaByIdFor(INSTANCE_ROOT);
@@ -150,7 +150,7 @@ function run(): void {
   let totalStale = 0;
   let totalFresh = 0;
 
-  // The instance root a verdict path is resolved against — see qa-paths.ts.
+  // The layer root a verdict path is resolved against — see qa-paths.ts.
   // Computed once: it walks up from cwd and every block in this scan shares it.
   const repoRoot = findContentRepoRoot();
 

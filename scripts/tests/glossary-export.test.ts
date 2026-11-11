@@ -19,7 +19,7 @@
  * the tests written to prevent it.
  *
  * The tests of this file that read the whole checkout (reads roles another
- * instance (folio-assistant-core) draws) live in
+ * layer (folio-assistant-core) draws) live in
  * `test/glossary-export-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
@@ -36,6 +36,7 @@ import {
   buildGlossary,
   glossaryIri,
   kindsDeclaredBy,
+  ledgerNotOursReason,
   ledgerPath,
   liveLedgerEntry,
   pendingKind,
@@ -51,7 +52,7 @@ import { notApplicableAlone } from "../../test/support/checkout.js";
 
 /**
  * The committed ledger is the retirement record of the CHECKOUT's roles: it is
- * written with the higher instances present, and standing alone their roles
+ * written with the higher layers present, and standing alone their roles
  * (sci's Lean and compute agents, fhir-harness's fhir-modeller, ...) read as
  * newly retired. Only a composed checkout can say whether it is current.
  */
@@ -64,6 +65,12 @@ const REPO =
     existsSync(join(d, "AGENTS.md")) || (existsSync(join(d, ".git")) && existsSync(join(d, "bootstrap"))),
   ) ?? resolve(dirname(HARNESS_ROOT));
 const HARNESS = resolve(HARNESS_ROOT);
+/**
+ * A content root (an IG mounting cat-harness, cat-harness-tools#1701): the
+ * ledger is the harness index's, and `glossary:check` reports not applicable
+ * there, so the "is current" corpus assertions have nothing to assert.
+ */
+const LEDGER_NOT_OURS = ledgerNotOursReason(HARNESS, resolve(dirname(HARNESS_ROOT))) !== null;
 const BOOTSTRAP = join(REPO, "bootstrap");
 
 type Node = Record<string, unknown>;
@@ -190,7 +197,7 @@ describe("bootstrap — the instance with the one varying performer", () => {
 
   test("it is bootstrap's own graph, not cat-harness's under bootstrap's name", () => {
     // `7u3g`: two earlier sessions widened a scan instead of running a second
-    // pass, and published one instance's content under another's identity.
+    // pass, and published one layer's content under another's identity.
     expect(report.concepts).toBeGreaterThan(0);
     // ROLES, not every concept: since work item folio-assistant-dkqd the
     // glossary also defines bootstrap's own graph kinds, which are bootstrap's
@@ -219,7 +226,7 @@ describe("bootstrap — the instance with the one varying performer", () => {
 
 // ── Retirement ──────────────────────────────────────────────────
 
-/** A throwaway instance root carrying only a ledger, for the retirement path. */
+/** A throwaway layer root carrying only a ledger, for the retirement path. */
 function withLedger(concepts: Ledger["concepts"]): string {
   const dir = mkdtempSync(join(tmpdir(), "gloss-"));
   mkdirSync(join(dir, GLOSSARY_DIR), { recursive: true });
@@ -232,7 +239,7 @@ function withLedger(concepts: Ledger["concepts"]): string {
 
 describe("retirement — reported, never deleted", () => {
   test("a term the corpus no longer derives is KEPT, deprecated and dated", () => {
-    // An instance that derives nothing, with a ledger that remembers two
+    // A layer that derives nothing, with a ledger that remembers two
     // terms. That is the extreme of the case the ruling is about: a derived
     // document has no memory, so without the ledger both would simply stop
     // appearing — which is what "never existed" also looks like.
@@ -278,8 +285,8 @@ describe("retirement — reported, never deleted", () => {
       [someLiveKey]: { ...live.ledger.concepts[someLiveKey]!, retiredOn: "2025-01-01" },
     });
     try {
-      // The temp instance derives nothing, so instead assert the pure rule on
-      // the real instance: nothing live is ever left carrying a retiredOn.
+      // The temp layer derives nothing, so instead assert the pure rule on
+      // the real layer: nothing live is ever left carrying a retiredOn.
       const after = buildGlossary({ today: () => "2026-09-22" });
       for (const [k, v] of Object.entries(after.ledger.concepts)) {
         if (after.report.retired.includes(k)) continue;
@@ -311,7 +318,7 @@ describe("retirement — reported, never deleted", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  test.skipIf(NO_HIGHER_ROLES)("the committed ledger is CURRENT — this is the staleness gate", () => {
+  test.skipIf(NO_HIGHER_ROLES || LEDGER_NOT_OURS)("the committed ledger is CURRENT — this is the staleness gate", () => {
     expect(buildGlossary({ today: () => "2026-09-21" }).report.ledgerStale).toBe(false);
     expect(buildGlossary({ instanceRoot: BOOTSTRAP, today: () => "2026-09-21" }).report.ledgerStale).toBe(false);
   });
@@ -344,7 +351,7 @@ describe("glossaryIri", () => {
     // Bean `dyd3`: a document's path decides it, wherever that is — the
     // host's root `<stub>.jsonld` until #603 decision 1b, and every layer's
     // `<name>/<stub>.jsonld` since. A caller that recomposes the path gets
-    // one instance's answer for every instance.
+    // one layer's answer for every layer.
     expect(glossaryIri("https://x.test", "cat-harness.jsonld")).toBe("https://x.test/cat-harness-glossary.jsonld");
     expect(glossaryIri("https://x.test/", "bootstrap/bootstrap.jsonld")).toBe(
       "https://x.test/bootstrap/bootstrap-glossary.jsonld",
@@ -371,7 +378,7 @@ describe("an old-layout --out names the same site (placedOut)", () => {
     expect(placedOut("./_site/cat-harness.jsonld", P, L)).toEqual({ out: "./_site/cat-harness/cat-harness.jsonld", moved: true });
     expect(placedOut("./_site/cat-harness/cat-harness.jsonld", P, L)).toEqual({ out: "./_site/cat-harness/cat-harness.jsonld", moved: false });
     expect(placedOut("/tmp/x/doc.jsonld", P, L)).toEqual({ out: "/tmp/x/doc.jsonld", moved: false });
-    // A foreign instance has no old address: nothing is moved.
+    // A foreign layer has no old address: nothing is moved.
     expect(placedOut("./_site/cat-harness.jsonld", P, undefined)).toEqual({ out: "./_site/cat-harness.jsonld", moved: false });
   });
 });
@@ -473,7 +480,7 @@ describe("graph kinds, node kinds and the harness are glossary terms", () => {
     expect(own).toContain("beans");
     // bootstrap's base kinds are bootstrap's.
     for (const k of kindsDeclaredBy(BOOTSTRAP)) expect(own).not.toContain(k);
-    // A directory that declares no instance owns nothing.
+    // A directory that declares no layer owns nothing.
     expect(kindsDeclaredBy(mkdtempSync(join(tmpdir(), "glossary-kinds-")))).toEqual([]);
   });
 
@@ -522,7 +529,7 @@ describe("graph kinds, node kinds and the harness are glossary terms", () => {
     expect([...new Set(dupes)]).toEqual([]);
   });
 
-  test.skipIf(NO_KIND_TABLES || NO_HIGHER_ROLES)("the committed ledger is current with every family built", async () => {
+  test.skipIf(NO_KIND_TABLES || NO_HIGHER_ROLES || LEDGER_NOT_OURS)("the committed ledger is current with every family built", async () => {
     expect((await buildFullGlossary({ today: () => "2026-09-21" })).report.ledgerStale).toBe(false);
   });
 });
@@ -532,7 +539,7 @@ describe("graph kinds, node kinds and the harness are glossary terms", () => {
 describe("pending — a graph kind defined in code, not yet in the ledger", () => {
   // The ledger is cat-harness's file; the registry that defines a base kind is
   // cat-harness-tools' code, a layer above, and each layer's PR is judged
-  // against the other's main. Built from the instance's own ledger with ONE
+  // against the other's main. Built from the layer's own ledger with ONE
   // entry taken out or changed, so each case differs from current by one fact.
   const today = () => "2026-09-21";
   const current = (): Ledger => buildGlossary({ today }).ledger;
@@ -591,5 +598,44 @@ describe("pending — a graph kind defined in code, not yet in the ledger", () =
     expect(pendingKind(def)).toBe(true);
     expect(pendingKind({ ...def, [DECLARED_BY]: { prefix: "x", name: "x", root: "/x", namespace: "https://x/" } })).toBe(false);
     expect(pendingKind(undefined)).toBe(false);
+  });
+});
+
+describe("a mounted layer's ledger, judged from a content root (cat-harness-tools#1701)", () => {
+  const tree = (gatesWorkflow: boolean): string => {
+    const root = mkdtempSync(join(tmpdir(), "glossary-na-"));
+    mkdirSync(join(root, "cat-harness"));
+    if (gatesWorkflow) {
+      mkdirSync(join(root, ".github", "workflows"), { recursive: true });
+      writeFileSync(join(root, ".github", "workflows", "code-quality-gates.yml"), "jobs: {}\n");
+    }
+    return root;
+  };
+
+  test("content root + a mounted layer's ledger: not applicable, with a reason", () => {
+    const root = tree(false);
+    try {
+      expect(ledgerNotOursReason(join(root, "cat-harness"), root)).toContain("content root");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a content root's OWN ledger is still judged", () => {
+    const root = tree(false);
+    try {
+      expect(ledgerNotOursReason(root, root)).toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a harness root judges the mounted ledger as before", () => {
+    const root = tree(true);
+    try {
+      expect(ledgerNotOursReason(join(root, "cat-harness"), root)).toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

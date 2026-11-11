@@ -1,23 +1,23 @@
 #!/usr/bin/env bun
 /**
- * check-import-direction.ts — no module imports from an instance built on top
+ * check-import-direction.ts — no module imports from a layer built on top
  * of the one it lives in.
  *
  * ## Why beside three similar checks
  *
- * `check:partition` is rooted at ONE instance, `check:instance-graph` judges
+ * `check:partition` is rooted at ONE layer, `check:instance-graph` judges
  * declarations and never imports, and `kg:detangle:direction` reaches only
  * the directories in its `SCAN` list. `check:reference-direction` is the
  * PROSE axis (a name mentioned), not this one (a module loaded).
  *
- * This check has no scan list. It walks every declared instance in the
- * checkout, assigns each file to the INNERMOST instance root containing it,
- * and asks: does anything it loads live in an instance that is not itself or
+ * This check has no scan list. It walks every declared layer in the
+ * checkout, assigns each file to the INNERMOST layer root containing it,
+ * and asks: does anything it loads live in a layer that is not itself or
  * something it (transitively) `needs`? The direction computation is the one
  * `check:reference-direction` and `kg:detangle` use — `allowedFromNeeds` over
  * `ancestorsOf` — so the axes cannot disagree.
  *
- * **No instance is named here.** The allowed set is read from each
+ * **No layer is named here.** The allowed set is read from each
  * `<instance>.json`'s `needs`, so a new `needs` edge legalises its imports
  * without an edit here.
  *
@@ -27,23 +27,23 @@
  *   and `require()`, parsed by bootstrap-tools' `specifiersOf` (comments and
  *   non-specifier strings stripped, so a docblock quoting an import is not one).
  *   Relative and absolute specifiers are resolved as paths. A bare specifier
- *   is judged when it names an instance's PACKAGE — `@litlfred/cat-harness/…`
- *   is the instance whose `package.json` `name` is `@litlfred/cat-harness` —
+ *   is judged when it names a layer's PACKAGE — `@litlfred/cat-harness/…`
+ *   is the layer whose `package.json` `name` is `@litlfred/cat-harness` —
  *   and skipped otherwise, as a third-party module from `node_modules`.
  * - **Module-path literals**: a string such as `"../<layer>/adapters/paper/index.ts"`
  *   handed to a VARIABLE `import(abs)`. A literal that climbs out with `../`
  *   and names a module file (`.ts`/`.js`/…) is judged as if it were imported,
- *   resolved against both the file's directory and its instance root.
+ *   resolved against both the file's directory and its layer root.
  * - **Reported, not graded — variable specifiers**: `import(expr)` whose
  *   argument is not a literal. What it loads cannot be read from the source, so
  *   the count is printed as COULD NOT DETERMINE rather than folded into a zero.
- * - **Reported, not graded — `undetermined` edges**: an importer or target in an
- *   instance that declares no `needs`. Absent is nobody-has-said, not `[]`.
+ * - **Reported, not graded — `undetermined` edges**: an importer or target in a
+ *   layer that declares no `needs`. Absent is nobody-has-said, not `[]`.
  *
- * ## Which instances fail the build
+ * ## Which layers fail the build
  *
- * `--gate <name>` (repeatable) makes a wrong-direction edge FROM that instance
- * exit 1; `--all` gates every instance that holds code. Every other instance's
+ * `--gate <name>` (repeatable) makes a wrong-direction edge FROM that layer
+ * exit 1; `--all` gates every layer that holds code. Every other layer's
  * edges are printed. A check becomes an error only once its count is zero;
  * CI runs `--all`.
  *
@@ -97,7 +97,7 @@ export interface ImportEdge {
 
 export interface ImportDirectionReport {
   instances: string[];
-  /** Instances whose `needs` nobody declared — every edge from them is undetermined. */
+  /** Layers whose `needs` nobody declared — every edge from them is undetermined. */
   undeclaredNeeds: string[];
   filesRead: Map<string, number>;
   findings: ImportEdge[];
@@ -117,8 +117,8 @@ export function readInstances(repoRoot: string): Instance[] {
 }
 
 /**
- * Each instance's package name → its root, from the `package.json` beside its
- * declaration. An instance without one has no name to import it by.
+ * Each layer's package name → its root, from the `package.json` beside its
+ * declaration. A layer without one has no name to import it by.
  */
 export function packageRoots(all: readonly Instance[]): Map<string, string> {
   const out = new Map<string, string>();
@@ -131,7 +131,7 @@ export function packageRoots(all: readonly Instance[]): Map<string, string> {
   return out;
 }
 
-/** Where a bare specifier lands when it names an instance's package; `undefined` for any other package. */
+/** Where a bare specifier lands when it names a layer's package; `undefined` for any other package. */
 export function packageTarget(spec: string, packages: ReadonlyMap<string, string>): string | undefined {
   for (const [name, root] of packages) {
     if (spec === name) return root;
@@ -140,7 +140,7 @@ export function packageTarget(spec: string, packages: ReadonlyMap<string, string
   return undefined;
 }
 
-/** The INNERMOST declaring root containing `abs` — the root instance contains every other one. */
+/** The INNERMOST declaring root containing `abs` — the root layer contains every other one. */
 export function ownerOf(abs: string, all: readonly Instance[]): Instance | undefined {
   let best: Instance | undefined;
   for (const i of all) {
@@ -261,12 +261,12 @@ export function analyse(repoRoot = REPO_ROOT): ImportDirectionReport {
 
     for (const lit of stringLiterals(src)) {
       if (seen.has(lit) || !lit.startsWith("../") || !MODULE_FILE.test(lit) || /[\s${}]/.test(lit)) continue;
-      // Only a literal that climbs out and then NAMES another instance's
+      // Only a literal that climbs out and then NAMES another layer's
       // directory — `../<instance>/…`. Resolved against the file's own
-      // directory and against its instance root, because a variable import
+      // directory and against its layer root, because a variable import
       // usually joins the literal onto a ROOT constant (`builtin-adapters.ts`
-      // did). A bare `../x.ts` names no instance and is a sibling file far more
-      // often than a crossing; judging it against the instance root measured
+      // did). A bare `../x.ts` names no layer and is a sibling file far more
+      // often than a crossing; judging it against the layer root measured
       // five false findings in one run.
       const named = lit.split("/").find((s) => s !== "..");
       const candidates = all.filter((i) => i !== from && i.root.endsWith(sep + named));
@@ -301,13 +301,13 @@ if (import.meta.main) {
   }
 
   const r = analyse();
-  // `--all`: every declared instance that HOLDS code. One with no code files is
+  // `--all`: every declared layer that HOLDS code. One with no code files is
   // reported, not gated — `--gate` on it refuses, and `--all` must not either
   // pass or refuse on its behalf.
   if (args.includes("--all")) for (const n of r.instances) if ((r.filesRead.get(n) ?? 0) > 0) gated.add(n);
   const unknownGates = [...gated].filter((g) => !r.instances.includes(g));
   if (unknownGates.length > 0) {
-    // A gate over an instance that is not here checks nothing — refused, not passed.
+    // A gate over a layer that is not here checks nothing — refused, not passed.
     console.error(`✗ --gate names no declared instance: ${unknownGates.join(", ")}. Nothing was checked for it, which is not a pass.`);
     process.exit(2);
   }

@@ -2,11 +2,11 @@
  * A repository-scoped store's nested declarations get an owner.
  *
  * `promoteFromWithin` never follows a `scope: "repository"` entry, because
- * such an entry usually points at ANOTHER instance's directory, and what that
+ * such an entry usually points at ANOTHER layer's directory, and what that
  * directory declares from within belongs to its owner. In the index checkout
- * there is no other owner. Its root declares no instance (owner, 2026-10-08),
+ * there is no other owner. Its root declares no layer (owner, 2026-10-08),
  * so `beans/beans.json`'s `defs` and `todos/todos.json`'s `items` were
- * attributed to `(root)`, an instance that does not exist (measured
+ * attributed to `(root)`, a layer that does not exist (measured
  * 2026-10-09). These tests pin both halves: an undeclared root lets the
  * declarer own the nested entries, and a declared root keeps them away.
  */

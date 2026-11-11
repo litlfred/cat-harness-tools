@@ -3,7 +3,7 @@
  *
  * @module cat-harness/schemas/theme-by-ref.test
  *
- * Synthetic instances in a temp "repository" for the mechanism, and one test
+ * Synthetic layers in a temp "repository" for the mechanism, and one test
  * over this repository for the reference that motivated it.
  *
  * The tests of this file that read the whole checkout (resolves who-iris's own
@@ -25,7 +25,7 @@ afterAll(() => {
 
 const THEME_TS = resolve(import.meta.dir, "theme.ts");
 
-/** A repository holding one instance, optionally with a themes directory and module. */
+/** A repository holding one layer, optionally with a themes directory and module. */
 function repo(opts: { themesDir?: boolean; module?: string }): string {
   const root = mkdtempSync(join(tmpdir(), "theme-by-ref-"));
   made.push(root);
@@ -123,7 +123,7 @@ export const INSTANCE_THEMES = [
 ];
 `;
 
-/** A repository with several instances, each declaring a themes directory with a sticky theme. */
+/** A repository with several layers, each declaring a themes directory with a sticky theme. */
 function multiRepo(instances: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "theme-by-ref-multi-"));
   made.push(root);

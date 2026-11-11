@@ -1,5 +1,5 @@
 /**
- * Which checkout holds this instance, and whether it is the AGGREGATE.
+ * Which checkout holds this layer, and whether it is the AGGREGATE.
  *
  * ## Why a test needs to ask (bean `ho66`)
  *
@@ -7,8 +7,8 @@
  * tracked files, and its declared closure's, laid out as sibling clones with
  * nothing above them (`probeStandalone` in `cat-harness-tools/scripts/seed-ready.ts`).
  * A handful of tests read what only the aggregate checkout holds — the bean
- * store and the todo graph at its root, another instance's tree, or a
- * committed output that was generated with the higher instances present.
+ * store and the todo graph at its root, another layer's tree, or a
+ * committed output that was generated with the higher layers present.
  * Run alone, they fail on a missing input rather than on a defect, and that
  * failure looks exactly like a regression.
  *
@@ -19,7 +19,7 @@
  * ## Derived, never configured
  *
  * The answer comes from the filesystem and the declarations — git's own
- * toplevel, and whether that toplevel holds instances other than this one —
+ * toplevel, and whether that toplevel holds layers other than this one —
  * never from an environment variable or a hardcoded path. A switch somebody
  * sets is a switch somebody forgets, and then the test is skipped in the one
  * checkout where it can run.
@@ -47,7 +47,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { instanceRootsIn, siteDirFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
-/** The cat-harness instance root — the directory this file's `test/` sits in. */
+/** The cat-harness layer root — the directory this file's `test/` sits in. */
 export const INSTANCE = resolve(HARNESS_ROOT);
 
 /**
@@ -69,10 +69,10 @@ export function checkoutHolding(dir: string): string {
 
 /**
  * Whether `instanceRoot` sits inside a checkout that aggregates other
- * instances — the monorepo — rather than being a checkout of its own.
+ * layers — the monorepo — rather than being a checkout of its own.
  *
- * True when git's toplevel is not the instance itself AND declares at least
- * one instance besides it. A standalone clone is its own toplevel, so false.
+ * True when git's toplevel is not the layer itself AND declares at least
+ * one layer besides it. A standalone clone is its own toplevel, so false.
  */
 export function inAggregate(instanceRoot: string = INSTANCE): boolean {
   const inst = resolve(instanceRoot);
@@ -167,7 +167,7 @@ export function noRootManifest(repo: string, needs: string): boolean {
 }
 
 /**
- * The `test/results/` directory of every instance in `repo`: where a full
+ * The `test/results/` directory of every layer in `repo`: where a full
  * `docs:pages` run re-derives committed QA witnesses, and so what
  * {@link restoringTracked} protects around one.
  */

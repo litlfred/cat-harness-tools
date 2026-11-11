@@ -26,7 +26,10 @@ import { join } from "node:path";
 
 import {
   CannotAsk,
-  evaluate,
+  evaluate as evaluateAny,
+  advisoryCi,
+  isRelease,
+  RELEASE_LABEL,
   fetchPull,
   getAll,
   isBotMerge,
@@ -40,6 +43,8 @@ import {
   SELF_WORKFLOW_FILE,
   NOT_WAITED_FOR_WORKFLOW_FILES,
   DEPLOY_ONLY_STEP,
+  AGENT_BUILD_CONTEXT,
+  agentBuildStatus,
   type CheckId,
   type GuardOptions,
   type GuardRun,
@@ -85,6 +90,10 @@ function real(n: 1937 | 1957 | 1960): GuardSnapshot {
   return s;
 }
 
+// The checks below judge CI as it gates a RELEASE merge (owner, card Q-CIB-4 A,
+// 2026-11-08). A non-release merge gets the same judgement as advisory; that
+// is tested on its own at the end of this file.
+const evaluate = (s: GuardSnapshot, o: GuardOptions = {}) => evaluateAny(s, { release: true, ...o });
 const status = (s: GuardSnapshot, id: CheckId, o: GuardOptions = {}) => evaluate(s, o).checks.find((c) => c.id === id)!;
 
 const STEWARD = "session_01StewardStewardSteward";
@@ -379,6 +388,28 @@ describe("check 5 — the head's own pull_request CI", () => {
         s.runs.runs.push(rerun);
       }
     }
+    expect(status(s, "ci").status).toBe("pass");
+  });
+
+  test("a later all-skipped run (a no-op `labeled` run) never displaces an earlier verdict", () => {
+    const s = real(1937);
+    if (s.runs.state !== "has-run") throw new Error("fixture");
+    for (const r of [...(s.runs.runs as GuardRun[])]) {
+      if (r.event === "pull_request") {
+        const noop: GuardRun = { ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "skipped" };
+        s.runs.runs.push(noop);
+      }
+    }
+    const c = status(s, "ci");
+    expect(c.status).toBe("refuse");
+    expect(c.detail).toContain("Code-quality gates: failure");
+  });
+
+  test("an all-skipped run stands when it is the only run of its workflow", () => {
+    const s = real(1957);
+    if (s.runs.state !== "has-run") throw new Error("fixture");
+    const only: GuardRun = { id: 99_999_999_998, name: "Release-only checks", event: "pull_request", status: "completed", conclusion: "skipped", html_url: "" };
+    s.runs.runs.push(only);
     expect(status(s, "ci").status).toBe("pass");
   });
 
@@ -785,6 +816,79 @@ describe("check 5 — Feature Staging is judged once finished, never waited for"
 });
 
 /**
+ * folio-assistant#2881: when Feature Staging defers to an agent-built preview,
+ * its run builds and checks nothing and goes green; the verify rebuild reports
+ * the built-site checks only as the `preview/agent-build` status. Check 5
+ * judges that status as it judges Feature Staging: red refuses, pending is not
+ * waited for.
+ */
+describe("check 5 — the agent-built preview's verify status (folio-assistant#2881)", () => {
+  const green = () => {
+    const s = real(1937);
+    if (s.runs.state !== "has-run") throw new Error("fixture");
+    for (const r of s.runs.runs) if (r.event === "pull_request") r.conclusion = "success";
+    return s;
+  };
+  const withStatus = (state: string, description = "") => {
+    const s = green();
+    s.agentBuild = { context: AGENT_BUILD_CONTEXT, state, description };
+    return s;
+  };
+
+  test("control: every run green and no agent build passes", () => {
+    const s = green();
+    s.agentBuild = null;
+    expect(status(s, "ci").status).toBe("pass");
+  });
+
+  test("verify red: refused as a defect, with its description", () => {
+    const c = status(withStatus("failure", "3 paths differ"), "ci");
+    expect(c.status).toBe("refuse");
+    expect(c.kind).toBe("defect");
+    expect(c.detail).toContain(`${AGENT_BUILD_CONTEXT}: failure (3 paths differ)`);
+  });
+
+  test("verify errored: refused too", () => {
+    expect(status(withStatus("error"), "ci").status).toBe("refuse");
+  });
+
+  test("verify pending: passes, and says it did not wait", () => {
+    const c = status(withStatus("pending"), "ci");
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain(`${AGENT_BUILD_CONTEXT} (pending: the verify rebuild has not reported)`);
+  });
+
+  test("verify green: passes", () => {
+    expect(status(withStatus("success"), "ci").status).toBe("pass");
+  });
+
+  test("the statuses could not be read: unknown, never a pass", () => {
+    const s = green();
+    s.agentBuild = { unknown: "HTTP 502" };
+    expect(status(s, "ci").status).toBe("unknown");
+  });
+
+  test("a non-release merge reports the red verify as advisory", () => {
+    const c = evaluateAny(withStatus("failure")).checks.find((x) => x.id === "ci")!;
+    expect(c.status).not.toBe("refuse");
+  });
+
+  test("agentBuildStatus takes the newest status of that context, ignoring others", () => {
+    expect(agentBuildStatus([{ context: "merge-guard", state: "failure" }])).toBeNull();
+    const got = agentBuildStatus([
+      { context: AGENT_BUILD_CONTEXT, state: "pending", created_at: "2026-11-09T10:00:00Z" },
+      { context: "merge-guard", state: "failure", created_at: "2026-11-09T12:00:00Z" },
+      { context: AGENT_BUILD_CONTEXT, state: "success", created_at: "2026-11-09T11:00:00Z" },
+    ]);
+    expect(got?.state).toBe("success");
+    expect(agentBuildStatus([
+      { context: AGENT_BUILD_CONTEXT, state: "failure" },
+      { context: AGENT_BUILD_CONTEXT, state: "pending" },
+    ])?.state).toBe("failure");
+  });
+});
+
+/**
  * Check 8, bean `vihx`. Check 5 judges the head's `pull_request` runs, which
  * tested the head merged with main AS MAIN WAS when it was pushed. #1898 was
  * signed, green and labelled, passed checks 1-7, and conflicted with main by
@@ -911,5 +1015,47 @@ describe("fetchPull — re-asks while GitHub has not computed `mergeable`", () =
     const b = serve([{ mergeable: null, state: "closed" }]);
     await fetchPull("litlfred/folio-assistant", 1898, { fetchImpl: b.impl, sleep: b.sleep, waitsMs: [1, 2] });
     expect(b.asked()).toBe(1);
+  });
+});
+
+describe("check 5 gates a release only (owner, card Q-CIB-4 A, 2026-11-08)", () => {
+  const red = () => real(1937);
+  const nonRelease = (s: GuardSnapshot) => evaluateAny(s, {}).checks.find((c) => c.id === "ci")!;
+
+  test("a non-release merge: red CI is reported, and the check passes as advisory", () => {
+    const c = nonRelease(red());
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain("advisory, not a gate");
+    expect(c.detail).toContain("is not green");
+  });
+
+  test("a release merge: the same red CI still refuses", () => {
+    expect(evaluateAny(red(), { release: true }).checks.find((c) => c.id === "ci")!.status).toBe("refuse");
+  });
+
+  test("the `release` label makes it a release without the flag", () => {
+    const s = red();
+    s.pr.labels.push({ name: RELEASE_LABEL });
+    expect(isRelease(s)).toBe(true);
+    expect(nonRelease(s).status).toBe("refuse");
+  });
+
+  test("CI that could not be read is advisory on a non-release merge, never a silent pass", () => {
+    const c = advisoryCi({ n: 5, id: "ci", status: "unknown", detail: "could not read the head's runs: HTTP 502" });
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain("could not be judged");
+    expect(c.detail).toContain("HTTP 502");
+  });
+
+  test("green CI says it was advisory", () => {
+    const c = advisoryCi({ n: 5, id: "ci", status: "pass", detail: "3 workflows green" });
+    expect(c.detail).toBe("3 workflows green (advisory: not a gate on a non-release merge)");
+  });
+
+  test("advisory CI lifts only check 5: every other refusal still stands", () => {
+    const v = evaluateAny(red(), {});
+    expect(v.checks.filter((c) => c.id !== "ci" && c.status === "refuse").length).toBe(
+      evaluateAny(red(), { release: true }).checks.filter((c) => c.id !== "ci" && c.status === "refuse").length,
+    );
   });
 });

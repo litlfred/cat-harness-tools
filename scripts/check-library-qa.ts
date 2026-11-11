@@ -10,7 +10,7 @@
  * whether what is there is any GOOD (a title equal to the slug passes every
  * completeness test).
  *
- * Every finding names the entry, its instance, and the FIELD it read.
+ * Every finding names the entry, its layer, and the FIELD it read.
  *
  * Title authority order: editor's `title_correction` → catalogue record
  * (Dublin Core) → `referenced.json` → PDF Info `/Title` → corroborated
@@ -172,7 +172,7 @@ export function readEntryFacts(dir: string, id: string, instance: string): Entry
     ...fr(tabularFile, "source.file", tsource.file),
   ];
 
-  // The catalogue lives at the INSTANCE root: up from `library/<slug>`, or
+  // The catalogue lives at the LAYER root: up from `library/<slug>`, or
   // from `library/<group>/<slug>` when the entry is filed (bean `6fez`).
   const instanceRoot = dirname(libraryOfEntry(dir));
   const cat = catalogueRecordFor(instanceRoot, id, unreadable);

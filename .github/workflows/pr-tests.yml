@@ -77,18 +77,37 @@
 # a job that fails when `playwright test --list` collects fewer than the specs
 # on disk, and runs them.
 
-# DRAFT PRs RUN THE FAST TIER ONLY (owner, 2026-10-23, "1y"; bean `dft1`).
-# On a draft, `pin` and `typecheck` run. The tests, the standalone measurement
-# and the index's own gates (`tests-*`, `standalone-*`) are skipped. Each
-# "(no new failures)" job then passes with "draft: full tier skipped" in its
-# summary, so no check is left pending. `ready_for_review` is a trigger, so
-# the full tier runs as soon as the PR is marked ready. The green draft run is
-# never the newest run on a head that is ready for review.
+# NON-RELEASE PRs RUN THE FAST TIER ONLY (release-gated CI, owner, card
+# Q-CIB-4 A, 2026-11-08: "CI not gate on non-release merge to main";
+# cat-harness#1158). This replaces the 2026-10-23 draft rule (bean `dft1`).
+# On a PR without the `release` label, `pin` and `typecheck` run. The tests,
+# the standalone measurement, the index's own gates and the base side
+# (`tests-*`, `standalone-*`) are skipped, and "Tests (no new failures)"
+# passes with "fast tier" in its summary. merge-guard's check 5 treats CI on
+# a non-release merge as advisory. A PR labelled `release` runs the full tier.
+#
+# ADDING THE `release` LABEL STARTS THE FULL TIER (`labeled` is a trigger;
+# owner, 2026-11-11, card B: every PR passes the full tier before merge).
+# Before, the label started nothing, and a re-run replays the original
+# payload with the OLD labels, so the only ways to start it were an empty
+# commit or a close and reopen, both forbidden. A `labeled` run for the
+# `release` label joins the PR's concurrency group and replaces a fast-tier
+# run in flight on the same head (the full tier is a superset). Any OTHER
+# label (`ready-to-merge`, ...) is a no-op: every job skips, and its group is
+# its own (keyed by the run id), so it never cancels the PR's real run. An
+# all-skipped run judges nothing; merge-guard's check 5 lets it never
+# displace an earlier run of this workflow on the same head.
+#
+# MAIN'S INTEGRATION RUN IS BATCHED. A push to main runs the base side and
+# records main's answer only for the first push of each hour (`pin` stamps the
+# hour); the hour's later pushes run nothing.
+
 name: PR checks
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
+    # `labeled`: only the `release` label does any work (header above).
+    types: [opened, synchronize, reopened, ready_for_review, closed, labeled]
   # main's own run keeps main's answer where every PR can read it (#1263).
   push:
     branches: [main]
@@ -102,7 +121,9 @@ concurrency:
   # `closed` event GitHub sets the ref to the BASE branch, so the closing
   # run of a merged PR joined main's group and cancelled main's push run,
   # the one that records main's answer (run 41322304221, the merge of #1266).
-  group: pr-checks-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  # A `labeled` run for any label but `release` is a no-op in a group of its
+  # own: in the PR's group it would cancel the PR's real run.
+  group: pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release') && format('noop-label-{0}', github.run_id) || (github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref) }}
   # A push to main is never cancelled while it runs; a newer push waiting
   # behind it replaces an older waiting one, so the newest main is recorded.
   cancel-in-progress: ${{ github.event_name != 'push' }}
@@ -116,9 +137,10 @@ jobs:
     # timing (cat-harness-tools#217, #223).
     # On `closed`, the workflow triggers in the same concurrency group so
     # `cancel-in-progress: true` cancels any running PR check run immediately,
-    # and this job skips in 0s (bean cis3).
+    # and this job skips in 0s (bean cis3). A `labeled` event for any label
+    # but `release` skips it too, and every job that needs it with it.
     name: Pin cat-harness and the index
-    if: github.event.action != 'closed'
+    if: github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     outputs:
@@ -133,7 +155,40 @@ jobs:
       tier: ${{ steps.tier.outputs.tier }}
       base: ${{ steps.keys.outputs.base }}
       matched: ${{ steps.lookup.outputs.cache-matched-key }}
+      # True on a push to main whose window's integration run already started
+      # (release-gated CI, below): the base side and the record are not run.
+      batched: ${{ steps.integ-lookup.outputs.cache-hit == 'true' }}
     steps:
+      # Main's integration run is batched (release-gated CI, owner, card
+      # Q-CIB-4 A, 2026-11-08): the first push to main in each hour runs the
+      # full suite and stamps the hour; the hour's later pushes run nothing,
+      # and the next hour's first push judges every merge since. Nothing that
+      # started is cancelled (Q-CIS-1).
+      - name: Is main's integration run due this hour? (a push)
+        id: integ-bucket
+        if: github.event_name == 'push'
+        run: echo "bucket=$(( $(date -u +%s) / 3600 ))" >> "$GITHUB_OUTPUT"
+      - name: Has this hour's integration run started?
+        id: integ-lookup
+        if: steps.integ-bucket.outcome == 'success'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/integration-stamp
+          key: integration-stamp-v1-${{ github.repository }}-${{ steps.integ-bucket.outputs.bucket }}
+          lookup-only: true
+      - name: Stamp this hour's integration run
+        if: steps.integ-bucket.outcome == 'success' && steps.integ-lookup.outputs.cache-hit != 'true'
+        run: mkdir -p "$RUNNER_TEMP/integration-stamp" && echo "$GITHUB_SHA $GITHUB_RUN_ID" > "$RUNNER_TEMP/integration-stamp/stamp"
+      - name: Save the stamp
+        if: steps.integ-bucket.outcome == 'success' && steps.integ-lookup.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/integration-stamp
+          key: integration-stamp-v1-${{ github.repository }}-${{ steps.integ-bucket.outputs.bucket }}
+      - name: Batched push
+        if: steps.integ-lookup.outputs.cache-hit == 'true'
+        run: |
+          echo "main's integration run already started this hour: this push runs nothing, and the next hour's first push judges it" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Read which instances are taken at main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -157,7 +212,7 @@ jobs:
       # issue #1263). See "MAIN IS RECORDED ONCE PER COMMIT" in the header. It was its own
       # job, `main-answer`; folded in here to save a runner wait (Q-CIB-1).
       - name: Check out the PR's judging scripts
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.draft != true
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'release')
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
@@ -170,7 +225,7 @@ jobs:
       # scripts (the PR's own, as both sides run them), main's commit, the
       # mains the pin job read and the index. Same computation on a push.
       - name: Key main's answer
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.draft != true
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'release')
         id: keys
         working-directory: src
         env:
@@ -193,7 +248,7 @@ jobs:
             echo "key=pr-tests-main-v1-$judge-$base-$MAINS_KEY-$INDEX"
           } >> "$GITHUB_OUTPUT"
       - name: Exact answer (attempt 2 and later), else this main's, else the newest
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.draft != true
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'release')
         id: lookup
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -201,7 +256,7 @@ jobs:
           key: ${{ steps.keys.outputs.key }}
           restore-keys: ${{ github.run_attempt == '1' && format('{0}{1}{2}', steps.keys.outputs.same, fromJSON('"\n"'), steps.keys.outputs.any) || '' }}
       - name: Which answer it is
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.draft != true
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'release')
         id: tier
         env:
           MATCHED: ${{ steps.lookup.outputs.cache-matched-key }}
@@ -236,7 +291,7 @@ jobs:
             esac
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Hand main's answer to the judges
-        if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.draft != true && steps.tier.outputs.tier != 'none'
+        if: github.event_name == 'pull_request' && github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'release') && steps.tier.outputs.tier != 'none'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: main-answer
@@ -329,7 +384,7 @@ jobs:
     name: bun test (head, ${{ matrix.shard }}/4)
     needs: pin
     # The full tier: not on a draft, not on a push (see the header).
-    if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.draft != true
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'release')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -438,8 +493,9 @@ jobs:
     needs: pin
     if: >-
       !cancelled() && needs.pin.result == 'success' &&
-      (github.event_name != 'pull_request' ||
-       !contains(fromJSON('["exact", "same-main", "older-main"]'), needs.pin.outputs.tier))
+      ((github.event_name != 'pull_request' && needs.pin.outputs.batched != 'true') ||
+       (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release') &&
+        !contains(fromJSON('["exact", "same-main", "older-main"]'), needs.pin.outputs.tier)))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -466,7 +522,7 @@ jobs:
     # the closure anyway.
     name: standalone (head)
     needs: pin
-    if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.event.pull_request.draft != true
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'release')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -519,8 +575,9 @@ jobs:
     needs: pin
     if: >-
       !cancelled() && needs.pin.result == 'success' &&
-      (github.event_name != 'pull_request' ||
-       !contains(fromJSON('["exact", "same-main", "older-main"]'), needs.pin.outputs.tier))
+      ((github.event_name != 'pull_request' && needs.pin.outputs.batched != 'true') ||
+       (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release') &&
+        !contains(fromJSON('["exact", "same-main", "older-main"]'), needs.pin.outputs.tier)))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -663,16 +720,18 @@ jobs:
     # On a draft the full tier above was skipped: pass, and say so.
     # Never skipped on a PR: a skipped required check reads as passed, so a
     # side that failed fails here instead.
-    if: github.event_name == 'pull_request' && github.event.action != 'closed' && !cancelled()
+    # Skipped only on `closed` and on a no-op `labeled` run (any label but
+    # `release`), which judges nothing and must not report a verdict.
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && !cancelled()
     runs-on: ubuntu-latest
     steps:
-      - name: Draft
-        if: github.event.pull_request.draft == true
+      - name: Fast tier (a non-release PR)
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'release') }}
         run: |
-          echo "draft: full tier skipped; it runs when the PR is marked ready for review" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "fast tier: the tests, the standalone measure and the index's gates run on main's integration run and on a PR labelled \`release\` (release-gated CI, owner, card Q-CIB-4 A, 2026-11-08)" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Every side ran
         id: sides
-        if: github.event.pull_request.draft != true
+        if: contains(github.event.pull_request.labels.*.name, 'release')
         env:
           TESTS_HEAD: ${{ needs.tests-head.result }}
           TESTS_BASE: ${{ needs.tests-base.result }}
@@ -690,18 +749,18 @@ jobs:
             case "$r" in success|skipped) ;; *) echo "::error::a main side did not finish ($r): could not determine"; exit 2 ;; esac
           done
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        if: github.event.pull_request.draft != true
+        if: contains(github.event.pull_request.labels.*.name, 'release')
         with:
           sparse-checkout: |
             .github/scripts
             scripts/standalone-baseline.json
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        if: github.event.pull_request.draft != true
+        if: contains(github.event.pull_request.labels.*.name, 'release')
         with:
           path: art
       - name: Which main the PR is judged against
         id: main
-        if: github.event.pull_request.draft != true
+        if: contains(github.event.pull_request.labels.*.name, 'release')
         run: |
           set -euo pipefail
           if [ -d art/junit-base-exact-1 ] || [ -d art/standalone-base-exact ]; then src=exact; echo "Judged against main computed exactly (the record showed new failures)." >> "$GITHUB_STEP_SUMMARY"
@@ -710,7 +769,7 @@ jobs:
           echo "src=$src" >> "$GITHUB_OUTPUT"
       - name: Compare PR failures with main
         id: tests
-        if: github.event.pull_request.draft != true
+        if: contains(github.event.pull_request.labels.*.name, 'release')
         continue-on-error: true
         env:
           SRC: ${{ steps.main.outputs.src }}
@@ -725,7 +784,7 @@ jobs:
           python3 .github/scripts/compare-test-failures.py base.xml head.xml
       - name: Judge the standalone measure against main and the baseline
         id: standalone
-        if: github.event.pull_request.draft != true && !cancelled() && steps.main.outcome == 'success'
+        if: contains(github.event.pull_request.labels.*.name, 'release') && !cancelled() && steps.main.outcome == 'success'
         continue-on-error: true
         env:
           SRC: ${{ steps.main.outputs.src }}
@@ -739,7 +798,7 @@ jobs:
           python3 .github/scripts/compare-standalone.py scripts/standalone-baseline.json cat-harness-tools "$base" art/standalone-head/standalone.json
       - name: Compare the index's own gates with main
         id: gates
-        if: github.event.pull_request.draft != true && !cancelled() && steps.main.outcome == 'success'
+        if: contains(github.event.pull_request.labels.*.name, 'release') && !cancelled() && steps.main.outcome == 'success'
         continue-on-error: true
         env:
           SRC: ${{ steps.main.outputs.src }}
@@ -756,7 +815,7 @@ jobs:
           done
           python3 .github/scripts/layer-pr-checks/compare-gates.py "$base" art/junit-head-1/root-gates.json
       - name: The verdict (tests, standalone, index gates)
-        if: github.event.pull_request.draft != true && !cancelled() && steps.main.outcome == 'success'
+        if: contains(github.event.pull_request.labels.*.name, 'release') && !cancelled() && steps.main.outcome == 'success'
         env:
           TESTS: ${{ steps.tests.outcome }}
           STANDALONE: ${{ steps.standalone.outcome }}

@@ -12,15 +12,14 @@
  * @module scripts/tests/process-index
  */
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { harnessLayout } from "../lib/harness-layout.ts";
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { declaredDiagrams, diagramPath, framedInstances, publishedProcesses, unframedProcesses } from "../check-process-index.ts";
 import { firstSentence } from "../kg-export.ts";
 import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
-import { repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { repoRootFor, resolveDirectories, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { inAggregate, siteNotBuilt } from "../../test/support/checkout.ts";
 
 const HARNESS = HARNESS_ROOT;
@@ -163,12 +162,12 @@ describe("the committed subgraph JSON-LD", () => {
     expect(problems).toEqual([]);
   });
   // The committed JSON-LD is generated in the AGGREGATE and frames the higher
-  // instances' diagrams too; cat-harness run as its own clone declares none of
+  // layers' diagrams too; cat-harness run as its own clone declares none of
   // them, so the comparison has one side only there. Skipped, not passed, until
   // the outputs are self-contained (bean `vj2p`; `ho66`).
   test.skipIf(!inAggregate())("every diagram an instance in this graph declares is a Process node, and nothing else is", () => {
     const want = [...declared].filter(([, inst]) => framed.has(inst)).map(([p]) => p).sort();
-    // Each `sourcePath` against the instance whose tree it is in (bean `4ak5` item 2).
+    // Each `sourcePath` against the layer whose tree it is in (bean `4ak5` item 2).
     expect(processes.map((p) => diagramPath(p, REPO)).sort()).toEqual(want);
   });
   test("bootstrap's diagrams are not re-carried into this graph (pve3, #432)", () => {
@@ -195,12 +194,21 @@ describe("the committed subgraph JSON-LD", () => {
   // level inside a named sub-graph: `sdlc/processes/` since cat-harness#1014
   // (cat-harness#991 step 23.2), and `library/processes/` since
   // cat-harness#1032 moved the library diagrams into the `library` sub-graph.
-  const VIEWED = [
-    "cat-harness/processes",
-    ...(harnessLayout(HARNESS) === "subgraphs" ? ["cat-harness/sdlc/processes"] : []),
-    ...(existsSync(join(HARNESS, "library", "processes")) ? ["cat-harness/library/processes"] : []),
-    "folio-assistant-core/processes",
-  ];
+  //
+  // Read from each layer's declaration rather than listed here: every
+  // `processes` directory it declares, top level or from within a sub-graph,
+  // opt-in or not (the viewer walks them all). A list went stale when
+  // `kg-ops/processes/` and core's `dsa/processes/` became sub-graphs, and the
+  // count below came up three short with nothing naming why.
+  const processDirs = (layer: string, root: string): string[] =>
+    !existsSync(root)
+      ? []
+      : resolveDirectories([{ name: layer, root, own: true }], undefined, { enabledSubgraphs: "all" })
+          .filter((d) => d.own && (d.graphTypologies ?? []).includes("processes") && existsSync(d.absPath))
+          .map((d) => relative(root, d.absPath).replace(/[\\/]+$/, ""))
+          .filter((p) => p !== "" && !p.startsWith("..") && !/(^|\/)processes\/./.test(p))
+          .map((p) => `${layer}/${p}`);
+  const VIEWED = [...new Set([...processDirs("cat-harness", HARNESS), ...processDirs("folio-assistant-core", join(REPO, "folio-assistant-core"))])].sort();
   // Standing alone the hydrated subgraphs are not built: `subgraph:jsonld`
   // writes them at publish and the subgraph tree is gitignored (bean w1gy F18).
   test.skipIf(

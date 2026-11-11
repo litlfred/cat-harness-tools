@@ -47,7 +47,7 @@ import { buildTranslationIndex, siteRoot } from "../pipeline/translation-index.t
 import { catalogueFor, fileForUrl } from "../pipeline/translation-drift.ts";
 
 /**
- * This instance's root — `cat-harness/`, one level up from `scripts/`.
+ * This layer's root — `cat-harness/`, one level up from `scripts/`.
  *
  * Computed the same way `pot-for-pages.ts` computes it rather than imported,
  * because no module exports it: every consumer derives it from its own location,

@@ -6,8 +6,8 @@
  * Two fields were retired from `SkillDefinition` on 2026-09-20 — `schemaRefs`
  * (beans `3w0i`, `t2yg`) and `roles` (bean `y1w9`) — and both were retired
  * the same way: the property stayed **optional and deprecated** so a
- * downstream instance still validates, while every declaration in this
- * instance was removed. `roles` was then deleted outright in #1168 B8 (the
+ * downstream layer still validates, while every declaration in this
+ * layer was removed. `roles` was then deleted outright in #1168 B8 (the
  * schema is not strict, so data still carrying it still validates); the
  * guard below holds either way.
  *
@@ -101,7 +101,7 @@ function declaresField(file: string, field: string): boolean {
  * standing alone the tests over them are not applicable and say so; composed,
  * they run exactly as before.
  *
- * - The floor of 15 below counts the skill definitions of the instances
+ * - The floor of 15 below counts the skill definitions of the layers
  *   composed ABOVE cat-harness too — `kgRoots` resolves the checkout's skills
  *   roots, and most of the definitions are folio-assistant-sci's (measured
  *   2026-10-09: 24 composed, 15 of them sci's, 8 cat-harness's own).

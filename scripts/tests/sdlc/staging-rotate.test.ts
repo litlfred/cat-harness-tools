@@ -233,7 +233,7 @@ describe("rotate — on a checkout", () => {
 });
 
 describe("the stage job runs the rotation where a lost race re-applies it", () => {
-  // The workflow lives at the REPOSITORY root, one level above this instance.
+  // The workflow lives at the REPOSITORY root, one level above this layer.
   const YML = readFileSync(
     join(repoRootFor(resolve(HARNESS_ROOT)), ".github", "workflows", "feature-staging.yml"),
     "utf-8",

@@ -395,6 +395,7 @@ import { enabledSubgraphs as enabledSubgraphs_, type EnabledSubgraphs } from "./
 import {
   HUB_LANDING,
   importedConfigFilename,
+  indexHarnessNames,
   inlineOverrides,
   readIndexConfig,
   type IndexConfig,
@@ -828,7 +829,8 @@ export type LandingInstance =
 /**
  * Every instantiated harness at `repoRoot`, sorted.
  *
- * - `index.config.json` present: its `instances[].name` — AUTHORITATIVE, and
+ * - `index.config.json` present: its `harnesses[].name`, or in the old form
+ *   (no `harnesses`) every `instances[].name` — AUTHORITATIVE, and
  *   an unreadable index THROWS rather than falling back to the file scan it
  *   was written to replace.
  * - absent: the stem of each root `<name>.config.json` (`rootConfigStems`),
@@ -843,7 +845,7 @@ export type LandingInstance =
 export function instantiatedHarnessNames(repoRoot: string): string[] {
   const idx = readIndexConfig(repoRoot);
   if (idx.state === "unreadable") throw new Error(`${idx.file} is ${idx.why}`);
-  if (idx.state === "ok") return idx.config.instances.map((e) => e.name).sort();
+  if (idx.state === "ok") return indexHarnessNames(idx.config);
   return rootConfigStems(repoRoot);
 }
 
@@ -908,12 +910,12 @@ export function resolveLandingInstance(repoRoot: string): LandingInstance {
   const idx = readIndexConfig(repoRoot);
   if (idx.state === "unreadable") return { kind: "invalid", names: [], file: idx.file, reason: idx.why };
   const index = idx.state === "ok" ? idx.config : undefined;
-  const names = index ? index.instances.map((e) => e.name).sort() : instantiatedHarnessNames(repoRoot);
+  const names = index ? indexHarnessNames(index) : instantiatedHarnessNames(repoRoot);
   const landing = index?.site?.landing;
   if (landing !== undefined) {
     if (landing === HUB_LANDING) return { kind: "hub", names, flagged: [] };
     if (!names.includes(landing)) {
-      return { kind: "invalid", names, file: idx.file, reason: `site.landing names \`${landing}\`, which ${idx.file} does not list as an instance (${names.join(", ") || "none"})` };
+      return { kind: "invalid", names, file: idx.file, reason: `site.landing names \`${landing}\`, which ${idx.file} does not list as ${index?.harnesses ? "a harness" : "an instance"} (${names.join(", ") || "none"})` };
     }
     return { kind: "instance", name: landing, by: "index", names };
   }
@@ -1851,6 +1853,10 @@ export function declaredSubgraph(start: string, id: string): DeclaredSubgraph | 
  * checkout's scope: anything else naming a repository path is either another
  * instance's directory (the wrong-way arrow) or checkout-level state that
  * belongs to the root. Returned as `<instance>#<id>` so a finding names both.
+ *
+ * Checkout-level state a mounted platform instance declares for EVERY
+ * checkout (cat-harness's `beans`, `todos`, ...) is not one: see the rooted
+ * branch below (cat-harness-tools#1701).
  */
 export function repositoryMirrors(start: string): string[] {
   const root = checkoutRootFor(start);
@@ -1879,8 +1885,20 @@ export function repositoryMirrors(start: string): string[] {
     for (const claims of byPath.values()) if (claims.length > 1) out.push(...claims);
     return out.sort();
   }
-  for (const inst of instanceRootsIn(root)) {
-    if (resolve(inst) === root) continue;
+  // A ROOTED CHECKOUT (an IG repository that is its own index, e.g.
+  // smart-ips-pilgrimage, cat-harness-tools#1701) mounts cat-harness too, and
+  // gets the same checkout-level state the index does: cat-harness declares
+  // `beans/`, `todos/`, `health`, ... "for every checkout", and `state:mount`
+  // reads exactly those entries at this root (absent, or overridden by a root
+  // declaration of the same id). Such an entry is no mirror. What still is:
+  // a non-root entry whose path lies inside ANOTHER instance's directory (the
+  // wrong-way arrow the ruling retired), or two non-root instances claiming
+  // the same repository path. The root's own entries are its own and an
+  // override, never a claim against these.
+  const instances = instanceRootsIn(root).map((r) => resolve(r));
+  const others = instances.filter((r) => r !== root);
+  const byPath = new Map<string, string[]>();
+  for (const inst of others) {
     let decl: ReturnType<typeof readDeclaration>;
     try {
       decl = readDeclaration(inst);
@@ -1888,9 +1906,18 @@ export function repositoryMirrors(start: string): string[] {
       continue;
     }
     for (const d of decl?.directories ?? []) {
-      if (d.scope === "repository") out.push(`${decl!.name}#${d.id}`);
+      if (d.scope !== "repository") continue;
+      const claim = `${decl!.name}#${d.id}`;
+      const abs = resolve(root, d.path);
+      if (others.some((o) => abs === o || abs.startsWith(o + sep))) {
+        out.push(claim);
+        continue;
+      }
+      const key = d.path.replace(/\/+$/, "");
+      byPath.set(key, [...(byPath.get(key) ?? []), claim]);
     }
   }
+  for (const claims of byPath.values()) if (claims.length > 1) out.push(...claims);
   return out.sort();
 }
 

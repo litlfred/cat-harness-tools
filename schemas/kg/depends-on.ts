@@ -2,16 +2,16 @@
  * depends-on.ts — `instance-versioning.md` §3.4's record, and the gaps it
  * cannot fill.
  *
- * `kg-export` emits, per publishable instance, `{packageId, version, uri}`
+ * `kg-export` emits, per publishable layer, `{packageId, version, uri}`
  * per dependency — the fields FHIR's `ImplementationGuide.dependsOn` carries,
- * so an external consumer reads this instance's dependency set as it reads a
+ * so an external consumer reads this layer's dependency set as it reads a
  * FHIR IG's.
  *
  * ## A dependency that cannot be expressed is REPORTED, never dropped
  *
- * Most instances are not publishable (§3.1), so many edges point at something
+ * Most layers are not publishable (§3.1), so many edges point at something
  * with no `id` and no `version`. Emitting `dependsOn: []` would say the
- * instance depends on nothing; a partial record with an empty `version` would
+ * layer depends on nothing; a partial record with an empty `version` would
  * fail a consumer. So each such edge becomes a {@link DependsOnGap} carrying
  * WHICH reason applies — `undecided` (nobody said) and `internal` (somebody
  * said no) are different gaps with different remedies.
@@ -49,7 +49,7 @@ export interface DependsOnRecord {
  * | reason | what happened | remedy |
  * |---|---|---|
  * | `no-uri` | it has an id and a version but no `canonicalUrl`, so FHIR's `uri` role cannot be filled | declare a `canonicalUrl` |
- * | `unresolved` | the name matches no instance in this checkout | it is external, or the name is misspelled |
+ * | `unresolved` | the name matches no layer in this checkout | it is external, or the name is misspelled |
  * | `unreadable` | its declaration did not parse | fix the declaration |
  */
 export type DependsOnGapReason = "no-uri" | "unresolved" | "unreadable";
@@ -62,7 +62,7 @@ export interface DependsOnGap {
 }
 
 export interface DependsOnExport {
-  /** Emitted only when the exporting instance is itself publishable. */
+  /** Emitted only when the exporting layer is itself publishable. */
   records: DependsOnRecord[];
   gaps: DependsOnGap[];
   /**
@@ -98,7 +98,7 @@ function edgesOf(instanceRoot: string): { names: string[]; unresolved: string[] 
 }
 
 /**
- * Build §3.4's record set for one instance.
+ * Build §3.4's record set for one layer.
  *
  * Returns `unavailable` rather than an empty `records` whenever the emptiness
  * means something other than "this instance depends on nothing".
@@ -116,14 +116,14 @@ export function dependsOnFor(instanceRoot: string): DependsOnExport {
     return { records: [], gaps: [], unavailable: "no declaration found at this instance root" };
   }
 
-  // §3.4 USED TO BE withheld from any instance that had not declared
+  // §3.4 USED TO BE withheld from any layer that had not declared
   // `publishable: true`. That gate is gone: the owner's ruling of 2026-09-23
-  // gives every instance an id and a version, and puts them all in `draft`
+  // gives every layer an id and a version, and puts them all in `draft`
   // (`skills/kg/kg-core/instance-publication.md`).
   //
   // What remains is a DIFFERENT obligation, and it is the one §3.4 actually
   // has: the record is `{packageId, version, uri}`, and `canonicalUrl` plays
-  // `uri`. An instance without one cannot be EXPRESSED as a dependency, no
+  // `uri`. A layer without one cannot be EXPRESSED as a dependency, no
   // matter what state it is in. So the block is still withheld sometimes, and
   // the reason is now a fact about the record rather than about permission.
   if (self.canonicalUrl === undefined) {
@@ -146,7 +146,7 @@ export function dependsOnFor(instanceRoot: string): DependsOnExport {
 
   const byName = new Map<string, string>();
   // `siblingScopeFor`, not `repoRootFor` — see its docblock. This is a lookup
-  // of siblings by name, and for the instance declared at the repository root
+  // of siblings by name, and for the layer declared at the repository root
   // `dirname` looks outside the checkout and finds none of them.
   for (const root of instanceRootsIn(siblingScopeFor(abs))) {
     try {

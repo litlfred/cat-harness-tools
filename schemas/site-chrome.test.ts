@@ -261,6 +261,39 @@ describe("first-party asset versions", () => {
 });
 
 /**
+ * A template's explanation is a Liquid comment, never an HTML one (owner,
+ * 2026-11-08: "strip template comments"). An HTML comment in an include is
+ * copied into every page that renders it: head_custom.html's notes were
+ * ~31 KB of each page's 50 KB. Only short `fa-` markers stay, which tests and
+ * scripts locate blocks by.
+ */
+describe("the chrome's includes carry no HTML comments into pages", () => {
+  const includes = join(HARNESS, siteChromeDirFor(HARNESS), "_includes");
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e: Dirent) =>
+      // vendor/ holds third-party includes kept as their authors wrote them.
+      e.isDirectory() ? (e.name === "vendor" ? [] : walk(join(dir, e.name))) : /\.html$/.test(e.name) ? [join(dir, e.name)] : [],
+    );
+  test("every HTML comment outside <script>/<style> is a fa- marker", async () => {
+    // An HTML parser, not a regex: it reports the comments a browser would see,
+    // and a comment-like string inside a <script> or <style> is raw text to it.
+    const offenders: string[] = [];
+    for (const f of walk(includes)) {
+      await new HTMLRewriter()
+        .onDocument({
+          comments(c) {
+            if (c.text.startsWith("[") || /^\s*fa-[a-z0-9:-]+\s*$/.test(c.text)) return;
+            offenders.push(`${f.slice(includes.length + 1)}: ${c.text.trim().slice(0, 60)}`);
+          },
+        })
+        .transform(new Response(readFileSync(f, "utf-8")))
+        .text();
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+/**
  * Same-site links on an HTML page are relative to the page (bean `g196`,
  * 2026-10-23), so a page that did not change is the same bytes in every
  * branches/ preview. `_plugins/fa-root-relative.rb` does the work at build

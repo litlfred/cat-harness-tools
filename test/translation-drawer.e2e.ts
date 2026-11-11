@@ -11,7 +11,7 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  *
  * One control beside the coverage badge opens a `fa-qa-panel` drawer with two
  * scopes: THIS PAGE, from the inline `fa-translation-meta`, and THIS SITE, from
- * the instance's `folio-translation-status/v1` projection fetched on open.
+ * the layer's `folio-translation-status/v1` projection fetched on open.
  * Officiality is the projection's, computed by the officiality gate's reader,
  * so a disagreement between the PO headers and `status.json` is shown as one.
  *

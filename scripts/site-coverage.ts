@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * A built site carries a page for every declared visualiser that has something
- * to show, in this checkout: the root instance and every instance it needs.
+ * to show, in this checkout: the root layer and every layer it needs.
  *
  * @module scripts/site-coverage
  * @graphNode none — a guard over a built site, run by `build-instance-site.ts`
@@ -16,12 +16,12 @@
  * repository's own index, is that repository and its `needs`):
  *   - `<locale>/<harness>/<visualiser>/` when a directory it covers holds
  *     anything;
- *   - with `subgraphs: "instance"`, also `…/<instance>/` for each instance
+ *   - with `subgraphs: "instance"`, also `…/<instance>/` for each layer
  *     whose covered directory holds an ENTRY (a sub-directory): a library
  *     whose only file is its `library.json` has no entries to show. Where the
- *     writer reads its instances with a reader of its own
+ *     writer reads its layers with a reader of its own
  *     ({@link SUBJECT_READERS}), that reader decides instead, so the guard and
- *     the writer cannot disagree about which instances have a page.
+ *     the writer cannot disagree about which layers have a page.
  * A page is there when the route holds `index.html` (the built site) or
  * `index.md` (a Jekyll source).
  *
@@ -45,15 +45,15 @@ export interface ExpectedPage {
   route: string;
   harness: string;
   visualiser: string;
-  /** The instance sub-graph, for a `subgraphs: "instance"` view. */
+  /** The layer sub-graph, for a `subgraphs: "instance"` view. */
   instance?: string;
   /** The same view at its address before the locale segment (`forwardingParts`). */
   legacyRoute: string;
   /**
-   * On the site OF the instance that declares it, the same view at that site's
+   * On the site OF the layer that declares it, the same view at that site's
    * own root: a folio's site reads `/<instance>/…` as `/…` (`ownHref` in
    * `lib/foreign-site-scope.ts`), so the IRIS replica's catalogue tile,
-   * `/<instance>/catalogue/`, lands on `catalogue/`. Set only for that instance.
+   * `/<instance>/catalogue/`, lands on `catalogue/`. Set only for that layer.
    */
   ownSiteRoute?: string;
 }
@@ -69,7 +69,7 @@ function children(dir: string): { files: number; dirs: number } {
   }
 }
 
-/** The covered directories of one visualiser, with the instance each belongs to. */
+/** The covered directories of one visualiser, with the layer each belongs to. */
 function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath: string; under?: string }[] {
   return checkoutDirectories(v.harnessRoot, { stackedOn: v.harnessRoot })
     .filter((d) =>
@@ -85,7 +85,7 @@ function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath:
 }
 
 /**
- * The instances a writer draws a sub-graph page for, read by the WRITER's own
+ * The layers a writer draws a sub-graph page for, read by the WRITER's own
  * reader, keyed by the Tool the visualiser is `renderedBy`.
  *
  * "A sub-directory is an entry" is the right test for a library, an uploads
@@ -96,13 +96,13 @@ function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath:
  * expected `en/cat-harness/tools/<dak-ig>/`, the writer rightly drew
  * nothing (no Tool node there), and the build failed on a page nobody owed.
  * Owner ruling B1: a declaration names only what an index mounting the
- * instance has — a folder that merely matches a declared path is not a graph.
+ * layer has — a folder that merely matches a declared path is not a graph.
  *
  * A writer with no entry here keeps the sub-directory test. A reader that
  * throws (a declared graph that does not load) falls back to it too, so the
  * guard still reports rather than goes quiet.
  */
-/** A writer's own reader: the instances it draws a page for, given the checkout and the visualiser's covered directories. */
+/** A writer's own reader: the layers it draws a page for, given the checkout and the visualiser's covered directories. */
 export type SubjectReader = (root: string, dirs: readonly { instance: string; absPath: string }[]) => readonly string[];
 
 export const SUBJECT_READERS: Readonly<Record<string, SubjectReader>> = {
@@ -115,7 +115,7 @@ export const SUBJECT_READERS: Readonly<Record<string, SubjectReader>> = {
   // directory holding only JSON contracts in `skills/` owes no page.
   "schemas-viewer": (root) => schemaSubjects(root),
   // A journey or a workshop is a FILE in a declared directory, not a
-  // sub-folder, and the writer draws an instance's page when it holds one.
+  // sub-folder, and the writer draws a layer's page when it holds one.
   "journeys-viewer": (root) => {
     const c = readJourneyCorpus(root);
     return [...new Set([...c.journeys.map((j) => j.instance), ...c.workshops.map((w) => w.instance)])].sort();
@@ -123,11 +123,11 @@ export const SUBJECT_READERS: Readonly<Record<string, SubjectReader>> = {
 };
 
 /**
- * The instances whose artefact index this checkout holds, among the
+ * The layers whose artefact index this checkout holds, among the
  * visualiser's covered `fhir-artifact-index` directories: what `ig-pages`
  * (the FHIR layer's `gen-ig-pages.ts`) draws from, `<instance>/fhir-artifact-index/index.json`.
  *
- * Since fhir-harness#124 an IG instance commits no index; `ig-index:build`
+ * Since fhir-harness#124 an IG layer commits no index; `ig-index:build`
  * writes it at publish. A site that builds an IG's index owes that IG's
  * artefact pages. A site that mounts the IG layer and builds none (a
  * document folio such as a reference-architecture folio mounting the DAK layer) owes none: the
@@ -145,7 +145,7 @@ export function igIndexSubjects(_root: string, dirs: readonly { instance: string
  */
 export const INDEX_PAGE_NEEDS_SUBJECTS: ReadonlySet<string> = new Set(["ig-pages"]);
 
-/** The instances `v` owes a sub-graph page, by its writer's reader when it has one, else by the sub-directory test. */
+/** The layers `v` owes a sub-graph page, by its writer's reader when it has one, else by the sub-directory test. */
 export function subjectInstances(
   v: Pick<DeclaredVisualiser, "renderedBy">,
   root: string,
@@ -164,7 +164,7 @@ export function subjectInstances(
 }
 
 /**
- * The sub-graph segment of one instance's page: `<under>/<instance>` when a
+ * The sub-graph segment of one layer's page: `<under>/<instance>` when a
  * directory of it is nested by the visualiser's `subgraphUnder` (the glossary's
  * `instance/`, owner 2026-10-15 "3a"), else `<instance>` — as `viewersOf`
  * composes the tile and the glossary writer writes the page.
@@ -180,7 +180,9 @@ export function instanceSubgraph(instance: string, dirs: readonly { instance: st
  * trashcan kept but not published) is expected in a preview and never on a
  * root publish.
  */
-export function expectedPages(root: string, opts: { staging?: boolean; ownInstance?: string } = {}): ExpectedPage[] {
+export function expectedPages(root: string, opts: { staging?: boolean; ownInstance?: string; scope?: readonly string[] } = {}): ExpectedPage[] {
+  // A scoped site owes the per-instance pages of its scope only; the rest live on their layers' own sites.
+  const scoped = opts.scope === undefined ? undefined : new Set(opts.scope);
   const out: ExpectedPage[] = [];
   const own = (harness: string, legacy: string): { ownSiteRoute?: string } =>
     opts.ownInstance !== undefined && harness === opts.ownInstance && legacy.startsWith(`${harness}/`) ? { ownSiteRoute: legacy.slice(harness.length + 1) } : {};
@@ -192,16 +194,21 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     const parts = pageParts({ harness: v.harness, visualiser: v.id });
     const legacy = visualiserRoute(forwardingParts(parts));
     // A directory the checkout ROOT declares (`(root)`, the index's own
-    // `test/`) belongs to no instance and has no route segment, so no writer
+    // `test/`) belongs to no layer and has no route segment, so no writer
     // draws a page for it (`perInstanceSubjects` in state-visualizer.ts) and
     // none is owed. Composing its route threw, and took the whole guard down.
     const instances = v.subgraphs === "instance" || INDEX_PAGE_NEEDS_SUBJECTS.has(v.renderedBy)
       ? subjectInstances(v, root, dirs).filter((i) => ROUTE_SEGMENT.test(i))
       : [];
     if (INDEX_PAGE_NEEDS_SUBJECTS.has(v.renderedBy) && instances.length === 0) continue;
+    // A scoped site owes a layer's visualiser only when the layer is in scope or
+    // one of its subjects is: the platform's own pages (its processes, skills,
+    // tools, schemas) are linked on the platform's site, not copied (owner, 2026-11-10).
+    if (scoped !== undefined && !scoped.has(v.harness) && !instances.some((i) => scoped.has(i))) continue;
     out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
     for (const instance of instances) {
+      if (scoped !== undefined && !scoped.has(instance)) continue;
       const sub = { ...parts, subgraph: instanceSubgraph(instance, dirs) };
       const subLegacy = visualiserRoute(forwardingParts(sub));
       out.push({ route: visualiserRoute(sub), legacyRoute: subLegacy, ...own(v.harness, subLegacy), harness: v.harness, visualiser: v.id, instance });
@@ -227,7 +234,7 @@ export function legacyOnlyPages(expected: readonly ExpectedPage[], has: (path: s
 }
 
 /** The guard as `build-instance-site.ts` calls it: the missing pages of a built site directory. */
-export function siteCoverageShortfall(root: string, site: string, opts: { staging?: boolean; ownInstance?: string } = {}): ExpectedPage[] {
+export function siteCoverageShortfall(root: string, site: string, opts: { staging?: boolean; ownInstance?: string; scope?: readonly string[] } = {}): ExpectedPage[] {
   return missingPages(expectedPages(root, opts), (p) => existsSync(join(site, p)));
 }
 

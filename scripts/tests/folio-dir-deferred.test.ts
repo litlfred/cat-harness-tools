@@ -34,7 +34,7 @@ function unreadableRoot(): string {
   // Named after the DIRECTORY, and `<name>.json` rather than
   // `<name>.config.json`. Declarations became `<name>.json` on 2026-09-21, and
   // an unparseable file has no `name` to agree with — so it counts as this
-  // instance's broken declaration only when its stem matches the directory or
+  // layer's broken declaration only when its stem matches the directory or
   // a paired `<stem>.config.json` sits beside it. `probe.config.json` matched
   // neither, so this root stopped being unreadable and the precondition below
   // stopped holding, which is exactly the vacuous green it guards against.

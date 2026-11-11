@@ -1,6 +1,6 @@
 /**
  * The per-repository skill index (bean `e0uk`): the `skills:index`
- * region of an instance's AGENTS.md lists the skills that instance publishes.
+ * region of a layer's AGENTS.md lists the skills that layer publishes.
  *
  * What is worth gating: a summary that tells an agent nothing (a heading that
  * only repeats the name), an AGENTS.md pushed past what an agent reads, a
@@ -17,11 +17,12 @@ import {
   SKILLS_INDEX_MARKER,
   firstParagraph,
   ownSkillIndex,
+  renderCompactSkillIndex,
   runReadmeSync,
   skillPurpose,
   skillSummaryLine,
 } from "../../pipeline/readme-sections";
-import { FIXTURE_INSTANCE, declareInstance } from "../../test/support/instance-fixture.js";
+import { FIXTURE_INSTANCE, declareInstance, writeDeclaration } from "../../test/support/instance-fixture.js";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -30,7 +31,7 @@ afterEach(() => {
 
 const REGION = `<!-- ${SKILLS_INDEX_MARKER}:begin -->\n<!-- ${SKILLS_INDEX_MARKER}:end -->\n`;
 
-/** An instance with a README, an AGENTS.md carrying the region, and the given skills under skills/<pkg>/. */
+/** A layer with a README, an AGENTS.md carrying the region, and the given skills under skills/<pkg>/. */
 function instance(skills: Record<string, string>, agentsPrefix = "# Agents\n\nHand-written.\n\n"): string {
   const root = mkdtempSync(join(tmpdir(), "skills-index-"));
   dirs.push(root);
@@ -123,5 +124,47 @@ describe("past the AGENTS.md budget", () => {
     const missing = await runReadmeSync({ root, check: true });
     expect(missing.exitCode).toBe(1);
     expect(missing.text).toContain(`${SKILLS_INDEX_FILE} is missing`);
+  });
+});
+
+describe("skills in an opt-in sub-graph", () => {
+  /** `instance()` plus an opt-in `extra/` group whose skills are declared from within, as `cat-harness.sdlc` is. */
+  function withOptInGroup(): string {
+    const root = instance({ "pkg/alpha.md": withDescription("alpha", "A.") });
+    mkdirSync(join(root, "extra", "skills", "ops"), { recursive: true });
+    writeFileSync(join(root, "extra", "skills", "ops", "gamma.md"), withDescription("gamma", "G."));
+    writeFileSync(
+      join(root, "extra", "graph.json"),
+      JSON.stringify({ name: "extra", directories: [{ id: "extra-skills", path: "skills/", subgraph: true, graphTypologies: ["skills"] }] }),
+    );
+    writeDeclaration(root, {
+      name: FIXTURE_INSTANCE,
+      directories: [
+        { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+        { id: "extra", path: "extra/", optIn: true, graphTypologies: ["cat-harness"] },
+      ],
+      // The declaring layer switches its own group on, as cat-harness does.
+      enableSubgraphs: [`${FIXTURE_INSTANCE}.extra`],
+    });
+    return root;
+  }
+
+  test("are listed by name, unlinked, under a directory marked opt-in", async () => {
+    const root = withOptInGroup();
+    expect((await runReadmeSync({ root })).exitCode).toBe(0);
+    const agents = readFileSync(join(root, "AGENTS.md"), "utf-8");
+    expect(agents).toContain("| [`alpha`](skills/pkg/alpha.md) | A. |");
+    expect(agents).toContain("| `gamma` | G. |");
+    expect(agents).not.toContain("(extra/skills/ops/gamma.md)");
+    expect(agents).toContain("**`extra/skills/ops/`** (1) (opt-in `fixture.extra`)");
+  });
+
+  test("the short form names the directory without a link", () => {
+    const root = withOptInGroup();
+    const p = ownSkillIndex(root).packages.find((x) => x.dir === "extra/skills/ops");
+    expect(p?.optIn).toBe("fixture.extra");
+    const compact = renderCompactSkillIndex(ownSkillIndex(root), AGENTS_MD_BYTE_BUDGET);
+    expect(compact).toContain("| `extra/skills/ops/` (opt-in `fixture.extra`) | 1 |");
+    expect(compact).toContain("| [`skills/pkg/`](skills/pkg/) | 1 |");
   });
 });

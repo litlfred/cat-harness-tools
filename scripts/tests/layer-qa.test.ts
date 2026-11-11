@@ -111,7 +111,7 @@ describe("readQaTreeAtCommit", () => {
 });
 
 describe("the layer a mount came from", () => {
-  /** A minimal `index.lock.json` naming one mounted instance. */
+  /** A minimal `index.lock.json` naming one mounted layer. */
   function lockFor(index: string, repository: string, sha: string): void {
     writeFileSync(
       join(index, "index.lock.json"),

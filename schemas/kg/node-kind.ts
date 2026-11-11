@@ -5,12 +5,12 @@
  * @module schemas/node-kind
  * @graphNode none — a composition function over other modules' schemas, not a schema
  *
- * ## The rule is the instances' rule, from the same module
+ * ## The rule is the layers' rule, from the same module
  *
  * A kind DECLARES its parents. {@link nodeKind} resolves every ancestor, orders
  * them with `flattenDependencies` from `schemas/kg/dependency-order.ts` (deepest
  * first, ties on declared parent order), and composes each ancestor's OWN shape
- * in that order. The instance resolver in `harness-config.ts` calls the same
+ * in that order. The layer resolver in `harness-config.ts` calls the same
  * flattener, so layers and kinds compose in one order.
  *
  * ## Refused, at the moment the kind is defined

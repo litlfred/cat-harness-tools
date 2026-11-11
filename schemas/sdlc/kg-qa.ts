@@ -25,7 +25,7 @@
  * exist, and a consumer following it gets nothing. `major` is a missing join —
  * the graph is intact but a question cannot be answered, e.g. a lane bound to
  * no role, so "who performs this" has no answer. `minor` is coverage: a real
- * gap, but one with legitimate instances (a human signing something off is not
+ * gap, but one with legitimate layers (a human signing something off is not
  * implemented by a markdown file), so failing on it would force a fake ref
  * onto a real step. `kg:audit --check` fails on `critical` only; `--strict`
  * adds `major`.
@@ -73,13 +73,13 @@ export const KG_QA_MANIFEST_SCHEMA = "kg-qa-manifest/v1";
  *
  * ## Why it moved out of `skills/` (2026-09-27)
  *
- * It was `skills/kg-qa.manifest.json`, which was harmless while ONE instance
+ * It was `skills/kg-qa.manifest.json`, which was harmless while ONE layer
  * was audited — cat-harness, which has a `skills/` directory. Auditing every
- * declared instance made it a defect: `kg-audit.ts` writes this file
- * unconditionally, so running the audit against an instance with no skills
+ * declared layer made it a defect: `kg-audit.ts` writes this file
+ * unconditionally, so running the audit against a layer with no skills
  * CREATED a `skills/` directory holding nothing but this manifest. Measured on
- * the first full sweep: six instances (`smart-dak`, `smart-ig`, `smart-l1`,
- * `agent-skills` and two IG instances above this layer) gained one,
+ * the first full sweep: six layers (`smart-dak`, `smart-ig`, `smart-l1`,
+ * `agent-skills` and two IG layers above this layer) gained one,
  * and the generated UML and navbar both moved to report a skills graph that
  * holds no skills.
  *
@@ -90,13 +90,13 @@ export const KG_QA_MANIFEST_SCHEMA = "kg-qa-manifest/v1";
  *
  * It is the CONVENTION rather than a declaration read at run time, and that is
  * deliberate for one consumer's sake: `qa-witness.ts` reads it as
- * `join(repoRoot, KG_QA_MANIFEST_PATH)` and has no instance in hand. All 15
- * declared instances declare `qa` → `test/results/`, so the constant and every
+ * `join(repoRoot, KG_QA_MANIFEST_PATH)` and has no layer in hand. All 15
+ * declared layers declare `qa` → `test/results/`, so the constant and every
  * declaration agree today; if one ever moves its `qa` directory, this is the
  * line that has to learn to ask.
  */
 // declared-path-literal: the convention base case `qa-witness.ts` joins to a repository root it holds
-// without an instance (above). The file is written by `kg:audit` into the `qa` working copy, which is
+// without a layer (above). The file is written by `kg:audit` into the `qa` working copy, which is
 // not committed: it is published to the declared `storage` branch (bean `7mwa`, cat-harness#857).
 export const KG_QA_MANIFEST_PATH = "test/results/kg-qa.manifest.json";
 
@@ -110,7 +110,7 @@ export const KG_QA_MANIFEST_PATH = "test/results/kg-qa.manifest.json";
  */
 export const KG_QA_DIRNAME = "kg-qa";
 
-/** Where KG verdicts live now, relative to the instance root. */
+/** Where KG verdicts live now, relative to the layer root. */
 export const KG_QA_RESULTS_DIR = join("test", "results", "kg-qa");
 
 /**
@@ -137,13 +137,13 @@ export const KG_QA_RESULTS_DIR = join("test", "results", "kg-qa");
  * subjects because of it; mirroring keeps that guarantee while moving the
  * files, and keeps the package legible in the path.
  *
- * ## A subject OUTSIDE the instance has no sidecar here — its owner audits it
+ * ## A subject OUTSIDE the layer has no sidecar here — its owner audits it
  *
  * **Refused, with {@link ForeignSubjectError}.** Until 2026-10-01 an outside
  * subject was re-rooted under `_external/` (bean `7u3g`, 2026-09-20), which
  * fixed a real defect — joining `..` CLIMBED OUT of `kg-qa/`, past the only
  * tree `sweepOrphans` walks — but kept the wrong premise: that a verdict about
- * another instance's subject belongs in THIS instance's tree at all.
+ * another layer's subject belongs in THIS layer's tree at all.
  *
  * It does not. Measured 2026-10-01 (Q-A PR 4, epic `7x5n`): every one of the
  * eight `_external/` sidecars had a byte-for-byte counterpart under its owner's
@@ -157,12 +157,12 @@ export const KG_QA_RESULTS_DIR = join("test", "results", "kg-qa");
  *
  * So this function now answers "there is no such path" rather than inventing
  * one, and the CALLER decides: `kg-audit.ts` drops a subject an owning
- * instance in the checkout audits for itself, and refuses loudly on one no
- * instance owns; `qa-witness.ts` reads no sidecar for it. Use
+ * layer in the checkout audits for itself, and refuses loudly on one no
+ * layer owns; `qa-witness.ts` reads no sidecar for it. Use
  * {@link subjectEscapes} to ask first.
  *
- * A hosted instance (`bootstrap`) is unaffected: its subjects are INSIDE the
- * instance under audit (`--instance ./bootstrap`), and only the `tree` moves.
+ * A hosted layer (`bootstrap`) is unaffected: its subjects are INSIDE the
+ * layer under audit (`--instance ./bootstrap`), and only the `tree` moves.
  *
  * ## The stem is a COMPOSED name, so it is encoded
  *
@@ -176,7 +176,7 @@ export const KG_QA_RESULTS_DIR = join("test", "results", "kg-qa");
  * because substitution would collide — the one guarantee this whole tree
  * exists to provide. See `schemas/kg/portable-path.ts`.
  *
- * @param repoRoot   absolute instance root
+ * @param repoRoot   absolute layer root
  * @param subjectDir absolute directory the subject itself lives in
  * @param stem       the subject's filename without extension, or its id
  */
@@ -184,7 +184,7 @@ export function kgQaSidecarPath(
   repoRoot: string,
   subjectDir: string,
   stem: string,
-  /** The `kg-qa/` tree to write under; the instance's own by default. See `kgQaHomeFor`. */
+  /** The `kg-qa/` tree to write under; the layer's own by default. See `kgQaHomeFor`. */
   tree: string = join(repoRoot, KG_QA_RESULTS_DIR),
 ): string {
   // `relative` rather than string surgery: a subject reached by a different
@@ -205,7 +205,7 @@ export function kgQaSidecarPath(
 }
 
 /**
- * Does `subjectDir` lie outside the instance at `repoRoot`?
+ * Does `subjectDir` lie outside the layer at `repoRoot`?
  *
  * `relative` rather than a string prefix: `/repo/cat-harness-x` starts with
  * `/repo/cat-harness` and is not inside it. An absolute answer from `relative`
@@ -217,7 +217,7 @@ export function subjectEscapes(repoRoot: string, subjectDir: string): boolean {
 }
 
 /**
- * Raised by {@link kgQaSidecarPath} for a subject outside the instance: the
+ * Raised by {@link kgQaSidecarPath} for a subject outside the layer: the
  * owner audits it and holds the one verdict. See that function's docblock.
  */
 export class ForeignSubjectError extends Error {
@@ -234,8 +234,8 @@ export class ForeignSubjectError extends Error {
 }
 
 /**
- * The instance in `instanceRoots` that owns `absPath`: the DEEPEST root
- * containing it, because the repository root is itself an instance
+ * The layer in `instanceRoots` that owns `absPath`: the DEEPEST root
+ * containing it, because the repository root is itself a layer
  * (`folio-assistant`) and contains every other one. `undefined` when none does.
  */
 export function owningInstanceOf(absPath: string, instanceRoots: readonly string[]): string | undefined {
@@ -250,13 +250,13 @@ export function owningInstanceOf(absPath: string, instanceRoots: readonly string
 
 /**
  * Split an audit's reports by who owns their subject — the narrowing that
- * stops the auditor writing a second copy of another instance's verdict.
+ * stops the auditor writing a second copy of another layer's verdict.
  *
  * - `kept` — no recorded path (role, requirement, graph, tool: callers narrow
- *   tools by declaring instance themselves), or a path inside `auditedRoot`.
- * - `skipped` — a path outside `auditedRoot` that another instance in
+ *   tools by declaring layer themselves), or a path inside `auditedRoot`.
+ * - `skipped` — a path outside `auditedRoot` that another layer in
  *   `instanceRoots` owns. That owner's own run writes the verdict.
- * - `unowned` — a path outside `auditedRoot` that NO instance owns. Not
+ * - `unowned` — a path outside `auditedRoot` that NO layer owns. Not
  *   dropped quietly: a subject nobody audits is the clean-run-over-nothing
  *   defect (`dh4f`), so the caller refuses.
  */
@@ -343,7 +343,7 @@ export interface OrphanSidecar {
 export function sweepOrphans(
   root: string,
   written: ReadonlySet<string>,
-  /** The `kg-qa/` tree to sweep; the instance's own by default. */
+  /** The `kg-qa/` tree to sweep; the layer's own by default. */
   tree: string = join(root, KG_QA_RESULTS_DIR),
 ): OrphanSidecar[] {
   const found: OrphanSidecar[] = [];
@@ -421,7 +421,7 @@ export type KgSubjectKind = (typeof KG_SUBJECT_KINDS)[number];
  *
  * Two vocabularies meet here and they are not the same axis. `KG_SUBJECT_KINDS`
  * above says what this audit judges — a process, a role, a skill. The graph-typology
- * registry (`BASE_GRAPH_TYPOLOGIES`) says what an instance DECLARES a directory of.
+ * registry (`BASE_GRAPH_TYPOLOGIES`) says what a layer DECLARES a directory of.
  * A `skill` subject inhabits a `skills` graph; a `tool` subject inhabits a
  * `tools` graph; nothing named `skill` or `tool` is a graph typology.
  *
@@ -475,15 +475,15 @@ export type KgResult = (typeof KG_RESULTS)[number];
 export const KG_SEVERITIES = ["critical", "major", "minor"] as const;
 
 /**
- * The instance roots that can answer a criterion.
+ * The layer roots that can answer a criterion.
  *
- * `instance` — every declared instance can decide it about its own corpus.
+ * `instance` — every declared layer can decide it about its own corpus.
  * `repo` — only the repository can; an instance run records `n/a` and says so.
  * `block` — evaluated at the content-block level within a folio graph.
  *
  * Two states rather than three: there is no "both", because a criterion that
- * the repository AND each instance can answer separately is `instance` and gets
- * asked once per instance, with the repository's own run being one of them.
+ * the repository AND each layer can answer separately is `instance` and gets
+ * asked once per layer, with the repository's own run being one of them.
  */
 export const KG_CRITERION_SCOPES = ["instance", "repo", "block"] as const;
 export type KgCriterionScope = (typeof KG_CRITERION_SCOPES)[number];
@@ -496,15 +496,15 @@ export interface KgCriterionDefinition {
   /** Subject kinds it applies to. Anything else records `n/a`. */
   applies: KgSubjectKind[];
   /**
-   * WHICH INSTANCE ROOT can answer it — the second axis beside {@link applies}.
+   * WHICH LAYER ROOT can answer it — the second axis beside {@link applies}.
    *
    * `applies` asks *what kind of node is this about*; `scope` asks *whose
    * corpus can decide it*. They are independent, and the graph roll-up proves
    * it: `applies: ["graph"]` covers both `skill-in-role-or-process`, which every
-   * instance can answer about its own graph, and `actor-roles-resolve`, which
+   * layer can answer about its own graph, and `actor-roles-resolve`, which
    * only the repository can — because an actor is declared once for the whole
    * repository (`cat-harness/scenarios/actors/`) while a role is a swimlane inside
-   * one instance's diagrams.
+   * one layer's diagrams.
    *
    * **Required, deliberately.** A criterion that has not decided its scope does
    * not compile, for the same reason a graph typology must declare `renderable` and
@@ -780,7 +780,7 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
     scope: "instance",
     // `major`, not `minor`, SINCE the exemptions became declarations.
     //
-    // It was `minor` because it had legitimate instances it could not tell
+    // It was `minor` because it had legitimate layers it could not tell
     // from real gaps — a stakeholder's sign-off and an unwritten skill both
     // showed up as "names no skill", so gating would have forced a fake ref
     // onto a real step. That is no longer true: a `judgementOnly` lane and
@@ -800,7 +800,7 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
   {
     id: "activity-skill-has-tool",
     applies: ["process"],
-    // A process is declared by the instance under audit, so `--instance` must
+    // A process is declared by the layer under audit, so `--instance` must
     // judge ITS diagrams and not the repository's. Same reasoning as every
     // other `process` criterion here.
     scope: "instance",
@@ -909,7 +909,7 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
     scope: "instance",
     severity: "major",
     // `major`. A target resolvable from the repository parent root passes with
-    // the hosting instance recorded in the evidence. A target resolving
+    // the hosting layer recorded in the evidence. A target resolving
     // nowhere is a `fail` (catching typos). `unknown` is kept only when the
     // diagram itself cannot be loaded.
     summary:
@@ -1284,11 +1284,11 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
     applies: ["role"],
     // `instance`, though it consults the repository's actor set — and this is the
     // case that shows why scope follows the SUBJECT rather than the data read.
-    // The subject is one instance's role, and the question is whether the actor
-    // filling that lane is of a fitting kind, which that instance can act on.
+    // The subject is one layer's role, and the question is whether the actor
+    // filling that lane is of a fitting kind, which that layer can act on.
     // MEASURED 2026-09-26: it produced NO findings in the `--instance ./bootstrap`
     // run, because it degrades to `n/a` when no actor declares the role — so it is
-    // safe per instance rather than merely arguably so.
+    // safe per layer rather than merely arguably so.
     scope: "instance",
     severity: "major",
     summary:
@@ -1364,7 +1364,7 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
       "what they came to find out, or what would make the page useless to them.",
   },
   // No `role-declares-voice` (#1168, B2): a voice points at the role it
-  // addresses, from a dependent instance this audit cannot see, so the
+  // addresses, from a dependent layer this audit cannot see, so the
   // coverage is `check:voices`'s — reported from the side that can see both.
   {
     id: "role-has-story",
@@ -1407,16 +1407,16 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
       "bootstrap run, reporting bootstrap's siblings as unread from inside bootstrap — which is the " +
       "root's question being asked in a place that cannot act on it.",
     // `minor`, because the SILENCE is correct and only its invisibility is the
-    // defect. One instance's graph must not carry another's nodes — that is
+    // defect. One layer's graph must not carry another's nodes — that is
     // `instance-graph-isolation.test.ts`, guarding a live 2026-09-19 leak of 88
-    // references. So this audit rightly does not read a nested instance, and
+    // references. So this audit rightly does not read a nested layer, and
     // rightly must not be made to.
     //
     // What was wrong is that nothing said so. On 2026-09-20 a session read
     // "named by no activity" as absolute, concluded the audit had a blind spot,
     // declared the nested directory at the root and re-introduced the leak the
     // test exists to prevent. Scoping the wording stopped that MISreading; this
-    // criterion is the other half — it names the unread instance outright, so
+    // criterion is the other half — it names the unread layer outright, so
     // the gap is a reported number rather than something to be deduced and
     // mis-deduced. Bean `sa8y`.
     severity: "minor",
@@ -1793,7 +1793,7 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
   // rather than a per-block `depends_on: ["feature"]` criterion: tests are not
   // content blocks, and no built-in content adapter declares a `feature`
   // companion, so a block criterion would record `n/a` everywhere outside one
-  // contributed adapter — coverage that is not there. `major`, so an instance
+  // contributed adapter — coverage that is not there. `major`, so a layer
   // that has not backfilled records the gap without failing `--check`.
   // Implemented in `scripts/test-plan-audit.ts`; scanner `scripts/lib/test-gherkin.ts`.
   {

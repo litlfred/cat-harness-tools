@@ -10,7 +10,7 @@
  * Moved again, from `cat-harness-tools/scripts/tests/` to the checkout's own
  * test home `test/` (bean `7zz1`, owner ruling 2026-10-06 "Top-level
  * instance"): what it reads belongs to the whole checkout, which the root
- * instance declares, not to any one layer — so cat-harness-tools stays green
+ * layer declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
  */
 import { beforeAll, describe, expect, it } from "bun:test";
@@ -40,7 +40,7 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 // failing the whole file.
 //
 // Not the whole `derive:publish`. Since B1 (owner, 2026-10-14) that runs
-// every declared `builtAtPublish` writer of every instance: 112 s on run
+// every declared `builtAtPublish` writer of every layer: 112 s on run
 // 38696377785's publish job, and past this hook's 300 s budget in bun-test
 // shards 3 and 4 of main 03ded48, which failed as "(unnamed) a beforeAll hook
 // timed out" with no assertion run. It also rewrote, mid-shard, artefacts

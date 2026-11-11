@@ -6,12 +6,12 @@
  *
  * | | question | kind of property |
  * |---|---|---|
- * | **1** | is this file in a directory some instance DECLARES? | filesystem |
+ * | **1** | is this file in a directory some layer DECLARES? | filesystem |
  * | **2** | is it reachable from a Tool node, and so from a process step? | graph |
  *
  * They fail independently and are fixed by different work: a file can sit in
  * a declared directory and be reachable from nothing, or be reachable from a
- * Tool in a directory no instance names. One percentage would be true of
+ * Tool in a directory no layer names. One percentage would be true of
  * neither, and a rise in one could hide a fall in the other.
  *
  * ## Question 1 has two readings
@@ -114,10 +114,10 @@ export function toolEntryPoints(repoRoot: string): { shells: number; entries: st
 
   const shells: string[] = [];
   for (const root of instanceRootsIn(repoRoot)) {
-    // ASKED OF THE DECLARATION, not composed. An instance says where its
+    // ASKED OF THE DECLARATION, not composed. A layer says where its
     // `tools` graph lives, and `join(root, "tools")` would be this script
     // deciding that a second time — the literal `check:declared-paths`
-    // refuses, and rightly: an instance that declared its tools elsewhere
+    // refuses, and rightly: a layer that declared its tools elsewhere
     // would be silently skipped by a hardcoded path while this reported a
     // clean sweep over it.
     for (const dir of directoriesForGraph(root, "tools")) {

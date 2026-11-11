@@ -24,7 +24,7 @@
  *
  * | region | holds | scrolls |
  * |---|---|---|
- * | `top` | the instance's mark (its open/close control, #1757) and the open document's index when there is one | no |
+ * | `top` | the layer's mark (its open/close control, #1757) and the open document's index when there is one | no |
  * | `graphs` | this KG's own content — `docs/`, `library/`, every declared kind that HAS content | **yes** |
  * | `bottom` | the instantiated harnesses, expandable, each with its avatar (no home row since 2026-10-30: the header's mark, a house by default, is the home link) | no |
  *
@@ -169,7 +169,7 @@ export interface NavItem {
    *
    * The Jekyll sidebar has rendered these since `603s` (`.fa-harness-tab__graphs`)
    * and this rail never has, which is the single largest difference between the
-   * two surfaces: the sidebar lets a reader reach an instance's `library/` from the
+   * two surfaces: the sidebar lets a reader reach a layer's `library/` from the
    * harness row, and the rail stops at the harness. `sjic` calls that *"two
    * implementations of one navbar, disagreeing about whether a reader can reach
    * a graph"*.
@@ -208,6 +208,14 @@ export interface NavItem {
 export interface NavGroup {
   label: string;
   icon?: string;
+  /**
+   * SVG path data in a 24×24 box, drawn as the group's mark instead of
+   * {@link icon}. Owner, 2026-11-08: *"why weird grid icons in left navbar?
+   * use letters if nothing better but i am sure you get a good page and
+   * folder icon"* — the `▥ ▤ ▦` glyphs read as grids, not as pages,
+   * folders and harnesses. {@link GROUP_GLYPHS} holds the three.
+   */
+  glyphPath?: string;
   items: readonly NavItem[];
   /**
    * Render as a `<details>` the reader opens.
@@ -223,10 +231,10 @@ export interface NavGroup {
 }
 
 export interface NavbarModel {
-  /** The instance this navbar belongs to, shown in the fixed top. */
+  /** The layer this navbar belongs to, shown in the fixed top. */
   instance: string;
   /**
-   * The instance's MARK in the header — its avatar image or its registry
+   * The layer's MARK in the header — its avatar image or its registry
    * glyph, whichever `harness-tiles.ts` resolved (bean `2vpn`), or failing
    * both its initial on its tone. Owner, 2026-10-01 (#1757): *"QA flag each page needs
    * avatar or atleast letter to be clickable"*.
@@ -237,8 +245,8 @@ export interface NavbarModel {
    * which the owner asked to be one: *"the hamburger menu thing and [x] seems
    * to replicate same functionality as clicking on avatar. excise"*.
    *
-   * Absent, the header still draws a LETTER: the instance's initial. It never
-   * falls back to a glyph that names an action rather than the instance.
+   * Absent, the header still draws a LETTER: the layer's initial. It never
+   * falls back to a glyph that names an action rather than the layer.
    */
   mark?: Pick<NavItem, "avatar" | "glyphPath" | "tone" | "icon">;
   /**
@@ -246,7 +254,7 @@ export interface NavbarModel {
    * difference between surfaces, beside {@link hrefs} and {@link openControl}.
    *
    * `"none"` on the Jekyll sidebar, and only there: the theme already draws
-   * the instance's avatar as `.site-title`, which `docs-ui.js` makes the
+   * the layer's avatar as `.site-title`, which `docs-ui.js` makes the
    * open/close control from 50rem up. A second header in the footer was the
    * `☰` the owner asked to excise (#1757) — the same control, drawn twice.
    */
@@ -275,13 +283,13 @@ export interface NavbarModel {
    */
   pages?: NavGroup;
   /**
-   * The instance's own themed root — its front door, in the fixed top.
+   * The layer's own themed root — its front door, in the fixed top.
    *
    * NOT inside the graphs group: a group labelled "Graphs" that contains the
-   * instance itself is a label that does not tell the truth, and the root is
+   * layer itself is a label that does not tell the truth, and the root is
    * the one destination that should stay reachable when the graphs are folded
-   * away. The header beside it (the instance's mark) is a TOGGLE, not a link, so this is the
-   * only way to the instance's front page from a page beneath it.
+   * away. The header beside it (the layer's mark) is a TOGGLE, not a link, so this is the
+   * only way to the layer's front page from a page beneath it.
    */
   root?: NavItem;
   /**
@@ -289,7 +297,7 @@ export interface NavbarModel {
    *
    * *"when a document or other indexed object is opened, the document
    * index/idices are shown in a navbar tab/menu"*. It sits in the FIXED top
-   * with the instance, not in the scrollable middle, because it is about the
+   * with the layer, not in the scrollable middle, because it is about the
    * thing the reader is looking at rather than about the graph they are in.
    * `undefined` when nothing is open, and the region is then absent rather
    * than empty — an empty disclosure invites a click that does nothing.
@@ -333,11 +341,18 @@ export interface NavbarModel {
   /**
    * Where the header goes: the site's landing page. Owner, 2026-10-30: *"who
    * eblmen not clicable to go to landing page. also dont need home on bottomof
-   * harnes navbars."* So the instance's mark and name in the header are the
+   * harnes navbars."* So the layer's mark and name in the header are the
    * home link, and the separate home row at the foot of the bar is gone.
    * Absent, the header is only the open/close control, as before.
    */
   headHref?: string;
+  /**
+   * What the header is CALLED when home is a larger site than this one: an IG
+   * composed into smart-html-jtd shows "SMART Guidelines" and the house
+   * (owner, 2026-11-10), not its own name and mark. Absent, the
+   * header is the instance's.
+   */
+  headName?: string;
   /**
    * HOW an href is written — the difference between the two surfaces, DECLARED.
    *
@@ -418,18 +433,27 @@ export {
 } from "./navbar-geometry.js";
 export { NAV_MARK_PX as NAV_GLYPH_PX } from "./navbar-geometry.js";
 
+/** One nesting level in the rail, px (owner, 2026-11-10: a whole 40px mark per level was too much). */
+export const NAV_DEPTH_STEP_PX = 16;
+/** How far a section's listed rows (Folders' kinds) sit in from its own row, px. */
+export const NAV_KIND_INDENT_PX = 8;
+/** The drag edge's limits on the open bar's width, px, and where the width is remembered. */
+export const NAV_RESIZE_MIN_PX = 200;
+export const NAV_RESIZE_MAX_PX = 600;
+export const NAV_WIDTH_KEY = "fa-nav-w";
+
 /**
  * The navbar's stylesheet, scoped to `.fa-nav` so a host page keeps its own.
  *
  * Three ways in, one way back: `:hover` while the pointer is on it,
- * `:focus-visible` inside it for a keyboard, and the header — the instance's mark —
+ * `:focus-visible` inside it for a keyboard, and the header — the layer's mark —
  * which checks a box so it STAYS open, which is what a touch device needs,
  * having no hover at all. The same header unchecks it (#1757: the separate
  * `☰` and `[x]` were two more controls for that one bit). `board-windows`' `l4zi`: an action whose inverse is not
  * reachable is not a toggle.
  *
  * No JavaScript. On a mounted page that is not a preference: those documents
- * are copied verbatim from instances the harness does not control, and
+ * are copied verbatim from layers the harness does not control, and
  * injecting a nav into somebody else's page is one claim while injecting
  * script into it is a larger one.
  */
@@ -451,14 +475,14 @@ export function navbarCss(): string {
     `.fa-nav{position:fixed;top:0;left:0;bottom:0;width:${NAV_COLLAPSED_PX}px;z-index:2147483000;`,
     `background:var(--fa-nav-bg);color:var(--fa-nav-ink);overflow:hidden;transition:width .14s ease;`,
     `font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}`,
-    `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:${NAV_OPEN_PX}px}`,
+    `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_PX}px)}`,
     `.fa-nav:not(:hover):not(:has(:focus-visible)):not(:has(.fa-nav-open:checked)) .fa-glass-handle__label{opacity:0}`,
     `@media(min-width:${NAV_STRIP_MQ_PX}px){`,
-    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:${NAV_OPEN_PX}px}}`,
+    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:var(--fa-nav-w,${NAV_OPEN_PX}px)}}`,
     `@media(min-width:${NAV_WIDE_MQ_PX}px){`,
-    `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:${NAV_OPEN_WIDE_PX}px}`,
-    `.fa-nav-in{width:${NAV_OPEN_WIDE_PX}px}`,
-    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:${NAV_OPEN_WIDE_PX}px}}`,
+    `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}`,
+    `.fa-nav-in{width:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}`,
+    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}}`,
     `@media(prefers-reduced-motion:no-preference){body{transition:padding-left .14s ease}}`,
     // Clipped in place, never parked at `left:-9999px`: on a right-to-left
     // page that is the scrollable side, and it widened the page ~10,000px
@@ -468,7 +492,7 @@ export function navbarCss(): string {
     // child defaults to `min-height:auto`, which refuses to shrink below its
     // content, so the column grows past the viewport and the FIXED BOTTOM
     // scrolls off the screen -- taking the harnesses and home with it.
-    `.fa-nav-in{width:${NAV_OPEN_PX}px;height:100%;display:flex;flex-direction:column}`,
+    `.fa-nav-in{width:var(--fa-nav-w,${NAV_OPEN_PX}px);height:100%;display:flex;flex-direction:column}`,
     `.fa-nav-top{flex:0 0 auto}`,
     `.fa-nav-graphs{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}`,
     `.fa-nav-bottom{flex:0 0 auto;border-top:1px solid var(--fa-nav-line)}`,
@@ -506,8 +530,8 @@ export function navbarCss(): string {
     `.fa-nav-crop{position:relative;overflow:hidden;height:${NAV_GLYPH_PX}px}`,
     `.fa-nav-crop img{position:absolute;width:auto;height:auto;max-width:none}`,
     `.fa-nav-name{font-weight:600}`,
-    `.fa-nav a{display:flex;align-items:center;gap:8px;padding:8px ${NAV_PAD_PX}px;`,
-    `color:var(--fa-nav-ink);text-decoration:none;white-space:nowrap}`,
+    `.fa-nav a{display:flex;align-items:center;gap:8px;padding:6px ${NAV_PAD_PX}px;`,
+    `color:var(--fa-nav-ink);text-decoration:none}`,
     `.fa-nav a:hover{background:var(--fa-nav-hover)}`,
     `.fa-nav a[aria-current="page"]{background:var(--fa-nav-hover);font-weight:600}`,
     // An item with nowhere to go is NOT a link -- `pb04`: a dead link is worse
@@ -519,7 +543,7 @@ export function navbarCss(): string {
     // ONLY signal, so "declared and not built" was carried by contrast alone
     // with no words anywhere on this surface. `.fa-nav-note` is the words.
     // `cursor:default` so the pointer does not promise a click either.
-    `.fa-nav-dead{display:flex;align-items:center;gap:8px;padding:8px ${NAV_PAD_PX}px;`,
+    `.fa-nav-dead{display:flex;align-items:center;gap:8px;padding:6px ${NAV_PAD_PX}px;`,
     `opacity:var(--fa-nav-dim);cursor:default}`,
     // The reason sits BESIDE the label, not under it: the strip is one row per
     // item, and a second line would make these the only rows in the navbar
@@ -548,7 +572,7 @@ export function navbarCss(): string {
     // every other control here.
     `.fa-nav-row--fold{grid-template-columns:1fr auto auto}`,
     `.fa-nav-row--fold>a,.fa-nav-row--fold>.fa-nav-dead{overflow:hidden}`,
-    `.fa-nav-row--fold>a .fa-nav-label,.fa-nav-row--fold>.fa-nav-dead .fa-nav-label{overflow:hidden;text-overflow:ellipsis}`,
+    `.fa-nav-row--fold>a .fa-nav-label,.fa-nav-row--fold>.fa-nav-dead .fa-nav-label{overflow:hidden}`,
     `.fa-nav-twisty{display:none;align-items:center;justify-content:center;min-width:24px;min-height:24px;`,
     `margin-right:${NAV_PAD_PX - 4}px;padding:0;background:none;border:0;border-radius:4px;color:inherit;cursor:pointer;opacity:.75}`,
     `.fa-nav-twisty:hover,.fa-nav-twisty:focus-visible{opacity:1;background:var(--fa-nav-hover)}`,
@@ -579,7 +603,9 @@ export function navbarCss(): string {
     // row's was not — measured on a built IRIS replica page — so the strip showed
     // marks only for the rows that do not open.
     `.fa-nav-group .fa-nav-sub .fa-nav-dead{padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8}px}`,
-    `.fa-nav-group .fa-nav-sub a.fa-nav-kind,.fa-nav-group .fa-nav-sub .fa-nav-dead.fa-nav-kind{padding-left:${NAV_PAD_PX}px}`,
+    // Slightly in from the section's own row (owner, 2026-11-10: "lists of
+    // folders should be slightly indented"), and the mark still inside the strip.
+    `.fa-nav-group .fa-nav-sub a.fa-nav-kind,.fa-nav-group .fa-nav-sub .fa-nav-dead.fa-nav-kind{padding-left:${NAV_PAD_PX + NAV_KIND_INDENT_PX}px}`,
     `.fa-nav-tone{border-radius:3px}`,
     // A TONED MARK CARRIES ITS OWN INK. Its glyph strokes in `currentColor`,
     // which was the rail's ink: light on the dark rail, but #1f2328 on a 28%
@@ -593,7 +619,21 @@ export function navbarCss(): string {
     // is a geometry argument, and a host stylesheet moves where a label starts
     // without touching any of these numbers. `opacity`, not `display:none` --
     // a screen reader should still reach them.
-    `.fa-nav-label{white-space:nowrap;opacity:0;transition:opacity .12s ease}`,
+    // LONG NAMES WRAP (owner, 2026-11-10, option D): a second line rather
+    // than an ellipsis, a hover or a sideways scroll. The column is
+    // `.fa-nav-in`'s fixed width at rest and open alike, so a row's height
+    // does not change when the bar opens.
+    `.fa-nav-label{min-width:0;white-space:normal;overflow-wrap:anywhere;opacity:0;transition:opacity .12s ease}`,
+    // A bullet is a dot, not a 32px mark: its column is the dot's width.
+    `.fa-nav-glyph.fa-nav-bullet{flex-basis:8px}`,
+    `.fa-nav-glyph.fa-nav-bullet:empty{flex-basis:0;margin-right:-8px}`,
+    // THE DRAG EDGE (owner, 2026-11-10, option D): the open bar's right edge
+    // widens it; `wireNavResize` sets `--fa-nav-w` and remembers it.
+    `.fa-nav-resize{position:absolute;top:0;right:0;bottom:0;width:6px;cursor:ew-resize;z-index:1;display:none;touch-action:none}`,
+    `.fa-nav-resize:hover,.fa-nav-resize:focus-visible,.fa-nav-resize[data-active]{background:#58a6ff;outline:none}`,
+    `.fa-nav:hover .fa-nav-resize,.fa-nav:has(:focus-visible) .fa-nav-resize,.fa-nav:has(.fa-nav-open:checked) .fa-nav-resize{display:block}`,
+    `:root[data-fa-nav-resizing],:root[data-fa-nav-resizing] *{cursor:ew-resize!important;user-select:none!important}`,
+    `:root[data-fa-nav-resizing] .fa-nav,:root[data-fa-nav-resizing] body{transition:none!important}`,
     `.fa-nav:hover .fa-nav-label,.fa-nav:has(:focus-visible) .fa-nav-label,`,
     `.fa-nav:has(.fa-nav-open:checked) .fa-nav-label{opacity:1}`,
     `@media print{.fa-nav{display:none}body{padding-left:0}}`,
@@ -649,9 +689,9 @@ function railTipCss(): string[] {
     // Beyond the strip at whatever width it has: open, the controls it names
     // sit inside a wider rail and the tooltip moves out with its edge.
     `.fa-nav:hover [data-fa-tip]::after,.fa-nav:has(:focus-visible) [data-fa-tip]::after,`,
-    `.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:${at(NAV_OPEN_PX)}}`,
+    `.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:calc(var(--fa-nav-w,${NAV_OPEN_PX}px) + 8px)}`,
     `@media(min-width:${NAV_WIDE_MQ_PX}px){.fa-nav:hover [data-fa-tip]::after,`,
-    `.fa-nav:has(:focus-visible) [data-fa-tip]::after,.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:${at(NAV_OPEN_WIDE_PX)}}}`,
+    `.fa-nav:has(:focus-visible) [data-fa-tip]::after,.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:calc(var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px) + 8px)}}`,
     `@media(prefers-reduced-motion:no-preference){.fa-nav [data-fa-tip]::after{transition:opacity .12s ease}}`,
   ];
 }
@@ -708,7 +748,7 @@ function mark(i: NavItem, c: Ctx): string {
       `left:${pct(-r.x / r.w)};top:${pct(-r.y / r.h)}"></span>`
     );
   }
-  // Themed blank mark: an instance or kind with no declared avatar draws a blank
+  // Themed blank mark: a layer or kind with no declared avatar draws a blank
   // in its theme's colour rather than an initial letter or generic question mark.
   if (i.blank || i.glyphPath === BLANK_AVATAR.glyph) {
     const blankTone = typeof i.tone === "number" ? ` style="--fa-nav-hue:${i.tone}"` : "";
@@ -724,7 +764,9 @@ function mark(i: NavItem, c: Ctx): string {
     );
   }
   const glyph = i.icon ?? i.label.slice(0, 1).toUpperCase();
-  return `<span class="fa-nav-glyph fa-nav-tone"${tone} aria-hidden="true">${esc(glyph)}</span>`;
+  // A bullet (or no mark at all) takes a dot's width, not a 32px mark's.
+  const bullet = glyph === "\u00b7" || glyph === "" ? " fa-nav-bullet" : "";
+  return `<span class="fa-nav-glyph fa-nav-tone${bullet}"${tone} aria-hidden="true">${esc(glyph)}</span>`;
 }
 
 function itemHtml(i: NavItem, c: Ctx): string {
@@ -745,9 +787,10 @@ function itemHtml(i: NavItem, c: Ctx): string {
   // Indent by PADDING rather than by a nested list: a nested `<ul>` would make
   // the document index a different shape from every other group here, and the
   // rows are links either way.
-  // `depth + 1`: these rows sit in a group, whose rows are already one step
-  // in. `depth` alone gave a child exactly its parent's indent (#1757).
-  const d = i.depth && i.depth > 0 ? ` style="padding-left:${NAV_PAD_PX + (NAV_GLYPH_PX + 8) * (i.depth + 1)}px"` : "";
+  // One NAV_DEPTH_STEP_PX per level past the group's own rows, which sit at
+  // the glyph column already. 40px a level (a whole mark) was "too much space"
+  // (owner, 2026-11-10); a child still sits right of its parent (#1757).
+  const d = i.depth && i.depth > 0 ? ` style="padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8 + NAV_DEPTH_STEP_PX * i.depth}px"` : "";
   let row: string;
   if (i.href === undefined) {
     // The note is part of the row's TEXT, inside the same element, so an
@@ -844,9 +887,91 @@ export function wireNavFolds(doc: Document): void {
   });
 }
 
-/** {@link wireNavFolds} as an inline script, for a rail rendered into the page. */
+/**
+ * THE DRAG EDGE (owner, 2026-11-10, option D: "wrap and drag to widen"). A
+ * thin handle on the open bar's right edge: drag it, or focus it and use the
+ * arrow keys, to set `--fa-nav-w` on the root, which every open-width rule
+ * reads. The width is remembered in this browser (`fa-nav-w`); a double click
+ * or Home forgets it. Self-contained, since it is inlined as text as well as
+ * bundled: the limits are written here, and {@link NAV_RESIZE_MIN_PX} and
+ * {@link NAV_RESIZE_MAX_PX} say the same (a test holds them equal).
+ */
+export function wireNavResize(doc: Document): void {
+  const MIN = 200;
+  const MAX = 600;
+  const KEY = "fa-nav-w";
+  const root = doc.documentElement;
+  const clamp = (w: number) => Math.max(MIN, Math.min(MAX, Math.min(w, (doc.defaultView?.innerWidth ?? MAX) - 160)));
+  const apply = (w: number | undefined) => {
+    if (w === undefined) root.style.removeProperty("--fa-nav-w");
+    else root.style.setProperty("--fa-nav-w", `${Math.round(clamp(w))}px`);
+  };
+  let saved: number | undefined;
+  try {
+    const v = Number(doc.defaultView?.localStorage.getItem(KEY));
+    if (v > 0) saved = v;
+  } catch {
+    /* storage blocked: the default width */
+  }
+  apply(saved);
+  const remember = (w: number | undefined) => {
+    try {
+      if (w === undefined) doc.defaultView?.localStorage.removeItem(KEY);
+      else doc.defaultView?.localStorage.setItem(KEY, String(Math.round(clamp(w))));
+    } catch {
+      /* storage blocked: this page only */
+    }
+  };
+  doc.querySelectorAll("nav.fa-nav").forEach((nav) => {
+    if (nav.querySelector(":scope > .fa-nav-resize")) return;
+    const h = doc.createElement("div");
+    h.className = "fa-nav-resize";
+    h.setAttribute("role", "separator");
+    h.setAttribute("aria-orientation", "vertical");
+    h.setAttribute("aria-label", "Drag to widen or narrow the navigation");
+    h.setAttribute("data-fa-tip", "Drag to widen or narrow the navigation");
+    h.tabIndex = 0;
+    const width = () => (nav as HTMLElement).getBoundingClientRect().width;
+    h.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      h.setPointerCapture(e.pointerId);
+      h.setAttribute("data-active", "");
+      root.setAttribute("data-fa-nav-resizing", "");
+      const move = (m: PointerEvent) => apply(m.clientX);
+      const up = () => {
+        h.removeEventListener("pointermove", move);
+        h.removeEventListener("pointerup", up);
+        h.removeEventListener("pointercancel", up);
+        h.removeAttribute("data-active");
+        root.removeAttribute("data-fa-nav-resizing");
+        remember(width());
+      };
+      h.addEventListener("pointermove", move);
+      h.addEventListener("pointerup", up);
+      h.addEventListener("pointercancel", up);
+    });
+    h.addEventListener("dblclick", () => {
+      apply(undefined);
+      remember(undefined);
+    });
+    h.addEventListener("keydown", (e) => {
+      const step = e.key === "ArrowRight" ? 16 : e.key === "ArrowLeft" ? -16 : 0;
+      if (e.key === "Home") {
+        apply(undefined);
+        remember(undefined);
+      } else if (step) {
+        apply(width() + step);
+        remember(width() + step);
+      } else return;
+      e.preventDefault();
+    });
+    nav.appendChild(h);
+  });
+}
+
+/** {@link wireNavFolds} and {@link wireNavResize} as an inline script, for a rail rendered into the page. */
 export function navFoldsScript(): string {
-  return `<script data-fa-nav-folds>(${wireNavFolds.toString()})(document);</script>`;
+  return `<script data-fa-nav-folds>(${wireNavFolds.toString()})(document);(${wireNavResize.toString()})(document);</script>`;
 }
 
 /** Does this row, or any row beneath it, stand for the page being read? */
@@ -869,12 +994,31 @@ function graphsOnArrival(g: NavGroup, hasOwnSection: boolean): NavGroup {
   return g.items.some(holdsCurrent) ? { ...g, open: true } : g;
 }
 
+/**
+ * The marks of the navbar's three section groups (owner, 2026-11-08, see
+ * {@link NavGroup.glyphPath}): a ruled page, a folder, and a cat's framed
+ * face for the harnesses — the same "framed face with ears" the cat-harness
+ * avatar reads as.
+ */
+export const GROUP_GLYPHS = {
+  pages: "M6 3h12v18H6z M9 8h6 M9 12h6 M9 16h4",
+  folders: "M3 6.5h6.5l2 2H21V19H3z",
+  harnesses: "M4 20V4.5l5 5h6l5-5V20z M8.5 14h1.5 M14 14h1.5 M11 17.5h2",
+} as const;
+
+function groupMark(g: NavGroup): string {
+  if (g.glyphPath) {
+    return `<span class="fa-nav-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="${esc(g.glyphPath)}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+  }
+  return `<span class="fa-nav-glyph" aria-hidden="true">${esc(g.icon ?? "▸")}</span>`;
+}
+
 function groupHtml(g: NavGroup, c: Ctx): string {
   const items = g.items.map((i) => itemHtml(i, c)).join("");
   if (!g.collapsible) return items;
   return (
     `<details class="fa-nav-group"${g.open ? " open" : ""}>` +
-    `<summary><span class="fa-nav-glyph" aria-hidden="true">${esc(g.icon ?? "▸")}</span>` +
+    `<summary>${groupMark(g)}` +
     `<span class="fa-nav-label">${esc(g.label)}</span></summary>` +
     `<div class="fa-nav-sub">${items}</div></details>`
   );
@@ -905,10 +1049,10 @@ export function navbarOpenInputHtml(): string {
 }
 
 /**
- * The header: the instance's mark and name, as ONE label for the open box.
+ * The header: the layer's mark and name, as ONE label for the open box.
  *
  * `aria-hidden` stays off the mark when it is an image with `alt=""` — the
- * image is already silent — and the label's name is the instance, so a
+ * image is already silent — and the label's name is the layer, so a
  * screen reader hears "cat-harness" and the `title` says what a click does.
  */
 /** The dead fish (`7vhe`), the same drawing `docs-ui.js` uses for fsh-guts. */
@@ -944,6 +1088,7 @@ export const HOME_GLYPH = "M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5";
 
 /** The header's mark: the declared one, or {@link HOME_GLYPH} when there is none. */
 export function headMark(m: NavbarModel): NavItem {
+  if (m.headName !== undefined) return { label: m.headName, glyphPath: HOME_GLYPH };
   const declared = m.mark ?? {};
   const own = declared.avatar !== undefined || declared.icon !== undefined ||
     (declared.glyphPath !== undefined && declared.glyphPath !== BLANK_AVATAR.glyph);
@@ -953,7 +1098,8 @@ export function headMark(m: NavbarModel): NavItem {
 
 export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
   const item = headMark(m);
-  const inner = mark(item, c) + `<span class="fa-nav-name fa-nav-label">${esc(m.instance)}</span>`;
+  const name = m.headName ?? m.instance;
+  const inner = mark(item, c) + `<span class="fa-nav-name fa-nav-label">${esc(name)}</span>`;
   if (m.headHref === undefined) {
     return `<label class="fa-nav-head" for="fa-nav-open" title="Open or close navigation">` + inner + `</label>`;
   }
@@ -964,7 +1110,7 @@ export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
   // become the link to the landing page.
   return (
     `<div class="fa-nav-head fa-nav-head--home">` +
-    `<a class="fa-nav-head-link" href="${href(m.headHref, c)}" title="${esc(m.instance)}: landing page">` +
+    `<a class="fa-nav-head-link" href="${href(m.headHref, c)}" title="${esc(name)}: landing page">` +
     inner +
     `</a>` +
     `<label class="fa-nav-head-toggle" for="fa-nav-open" aria-label="Open or close navigation" data-fa-tip="Open or close navigation">` +
@@ -991,7 +1137,7 @@ export function navbarRegionsHtml(m: NavbarModel): string {
     // NO `[x]` AND NO `☰` (#1757). The header below is a label for the same
     // checkbox, so it already opens AND closes: a label toggles. The `[x]`
     // was a second label for that box and the `☰` was this one wearing a
-    // glyph that named the action instead of the instance.
+    // glyph that named the action instead of the layer.
     `<div class="fa-nav-in">` +
     `<div class="fa-nav-top">` +
     (m.head === "none" ? "" : headHtml(m, c)) +
@@ -1041,7 +1187,8 @@ export function injectNavbar(html: string, m: NavbarModel, o: { cssHref?: string
   const style = o.cssHref ? `<link rel="stylesheet" href="${o.cssHref}">` : `<style>${navbarCss()}</style>`;
   const nav = navbarHtml(m);
   // The fold toggles need their few lines of script where no `navbar.js` runs.
-  const folds = nav.includes("fa-nav-twisty") ? navFoldsScript() : "";
+  // The fold toggles and the drag edge need their few lines of script where no `navbar.js` runs.
+  const folds = navFoldsScript();
   return html.slice(0, at) + style + nav + folds + html.slice(at);
 }
 
@@ -1092,7 +1239,7 @@ export const NAVBAR_CSS = "assets/css/navbar.css";
  *
  * - `pages` — the site's own page tree (the theme's site-nav).
  * - `onThisPage` — the open document's headings.
- * - `folders` — the instance's graphs, one row per folder.
+ * - `folders` — the layer's graphs, one row per folder.
  * - `harnesses` — the harnesses this site is built on.
  *
  * The home row is not a section: it is named after the site.
@@ -1125,7 +1272,7 @@ export const RAIL_SECTION_LABELS = {
  * ## `h2` and `h3` only
  *
  * `h1` is the document's title, which the reader is already looking at, and
- * the navbar names the instance directly above. Below `h3` an index stops
+ * the navbar names the layer directly above. Below `h3` an index stops
  * being a way in and becomes the document again — and this region is in the
  * FIXED top, so every row it takes is a row the scrollable middle does not
  * get.
@@ -1246,6 +1393,16 @@ export function visualiserNavDeclaration(entries: readonly VisualiserNavEntry[])
 }
 
 /**
+ * A declared entry's fold, named for what it holds: "9 pages" when every
+ * child is a page of its own, "3 entries" when they are places on this one.
+ */
+function foldedEntries(kids: readonly NavItem[]): string {
+  const n = kids.length;
+  const pages = kids.every((k) => k.href !== undefined && !k.href.startsWith("#"));
+  return pages ? (n === 1 ? "1 page" : `${n} pages`) : n === 1 ? "1 entry" : `${n} entries`;
+}
+
+/**
  * A visualiser's DECLARED navigation, read off the page it is injected into.
  *
  * Owner, 2026-10-01 (#1757): *"make a qa flag to define LHS navbar for any
@@ -1289,22 +1446,27 @@ export function visualiserNavOf(html: string, label: string): NavGroup | undefin
           // A BULLET, not the row's initial. A letter per row read as a
           // column of unrelated marks (B, T, P, D — #1757 screenshot); the
           // initial is the mark for a harness, which these rows are not.
-          icon: depth > 0 ? "·" : "▸",
+          // No ▸ here: a ▸ in the glyph column read as a toggle that did
+          // nothing (2026-11-10). A row with items gets the fold's own ▸
+          // button below; a row without is a plain bullet.
+          icon: "·",
           ...(typeof e.href === "string" && e.href ? { href: e.href } : {}),
           ...(depth > 0 ? { depth } : {}),
         }
       : undefined;
+  // An entry's items are its CHILDREN, folded under the entry's own row, so
+  // the ▸ beside a group opens and closes it (owner, 2026-11-10, on an IG's
+  // "Home" and "Business Requirements": *"expand collapse on LHS navbar not
+  // working"*). Laid out flat after the row, the ▸ was a picture of a toggle
+  // over a list that was always open.
   const items: NavItem[] = [];
   for (const e of raw as Entry[]) {
     const r = row(e, 0);
     if (!r) continue;
-    items.push(r);
-    if (Array.isArray(e.items)) {
-      for (const k of e.items as Entry[]) {
-        const kr = row(k, 1);
-        if (kr) items.push(kr);
-      }
-    }
+    const kids = Array.isArray(e.items)
+      ? (e.items as Entry[]).map((k) => row(k, 1)).filter((k): k is NavItem => k !== undefined)
+      : [];
+    items.push(kids.length ? { ...r, icon: "", children: kids, fold: foldedEntries(kids) } : r);
   }
   if (items.length === 0) return undefined;
   return { label, icon: "§", items, collapsible: true, open: true };

@@ -27,7 +27,7 @@
  *
  * ## No JavaScript, and here it is not a preference
  *
- * These documents are copied verbatim from instances the harness does not
+ * These documents are copied verbatim from layers the harness does not
  * control. Injecting a nav into somebody else's page is one claim; injecting
  * script into it is a larger one.
  *
@@ -46,17 +46,17 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { GROUP_GLYPHS, NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
-  /** The instance whose page this is. */
+  /** The layer whose page this is. */
   instance: string;
   /** Path back to the site root from this page — `..`, `../..`, … */
   toRoot: string;
-  /** The instance's own themed root, for the fixed top — never inside the graphs group. */
+  /** The layer's own themed root, for the fixed top — never inside the graphs group. */
   root?: NavItem;
-  /** This instance's own graphs — the scrollable middle. */
+  /** This layer's own graphs — the scrollable middle. */
   links: readonly NavItem[];
   /**
    * The instantiated harnesses, for the fixed bottom.
@@ -73,6 +73,19 @@ export interface RailOptions {
    * `pagesNav` (`lib/jekyll-pages-nav.ts`). Absent, no Pages section.
    */
   pages?: readonly NavItem[];
+  /**
+   * Where the header's home link goes, when the page's site is one part of a
+   * larger site: an IG composed into smart-html-jtd is a subgraph of that
+   * site's KG, so its home is the composed site's landing page (owner,
+   * 2026-11-10). Default `${toRoot}/`, the page's own site root.
+   */
+  homeHref?: string;
+  /**
+   * What the header is called when {@link homeHref} is a larger site's
+   * landing page: "SMART Guidelines" on the IGs smart-html-jtd composes
+   * (owner, 2026-11-10). Absent, the header names the instance.
+   */
+  homeName?: string;
   /**
    * Where the PLATFORM's site root is from this page, when it is not `toRoot`
    * — a folio's own Pages site, whose platform links and row files live on the
@@ -127,7 +140,7 @@ export interface RailOptions {
    */
   documentIndex?: NavGroup;
   /**
-   * The instance's mark for the header — avatar, or tone for its initial.
+   * The layer's mark for the header — avatar, or tone for its initial.
    * `instanceMark` in `mount-instance-docs.ts` reads it off the same
    * `_data/harness.json` the harnesses region comes from.
    */
@@ -187,7 +200,7 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
   const harnesses: NavGroup | undefined =
     o.harnesses === undefined
       ? undefined
-      : { label: RAIL_SECTION_LABELS.harnesses, icon: "\u25A6", items: o.harnesses, collapsible: true };
+      : { label: RAIL_SECTION_LABELS.harnesses, icon: "H", glyphPath: GROUP_GLYPHS.harnesses, items: o.harnesses, collapsible: true };
   return {
     instance: o.instance,
     ...(o.mark ? { mark: o.mark } : {}),
@@ -207,12 +220,13 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
     // one of its rows is the current page, so the reader's place stays visible.
     // "Folders", not "Graphs" (owner, 2026-10-15): the theme sidebar's word
     // for the same rows, so the section reads the same on every site.
-    ...(o.pages && o.pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "\u25A5", items: o.pages, collapsible: true, open: false } } : {}),
-    graphs: { label: RAIL_SECTION_LABELS.folders, icon: "\u25A4", items: o.links, collapsible: true, open: false },
+    ...(o.pages && o.pages.length > 0 ? { pages: { label: RAIL_SECTION_LABELS.pages, icon: "P", glyphPath: GROUP_GLYPHS.pages, items: o.pages, collapsible: true, open: false } } : {}),
+    graphs: { label: RAIL_SECTION_LABELS.folders, icon: "F", glyphPath: GROUP_GLYPHS.folders, items: o.links, collapsible: true, open: false },
     ...(harnesses ? { harnesses } : {}),
     // No home row (owner, 2026-10-30: "dont need home on bottomof harnes
     // navbars"): the header's mark and name are the link to the landing page.
-    headHref: `${o.toRoot}/`,
+    headHref: o.homeHref ?? `${o.toRoot}/`,
+    ...(o.homeName ? { headName: o.homeName } : {}),
   };
 }
 
@@ -353,7 +367,7 @@ export function navbarRowJsonOf(html: string, readFile: (file: string) => string
  * WITH `toRoot`, ALSO WHAT DRAWS IT — beans `lhvt`, `9rq1`. The data alone
  * was written onto 2,747 railed pages by #2149, and on the 2,709 of them that
  * never load `docs-ui.js` nothing drew it. `navbar-row.js` and its stylesheet
- * are linked before `</head>`, each once; a row the instance declined (`null`)
+ * are linked before `</head>`, each once; a row the layer declined (`null`)
  * still gets them, so the decline is reported the same way on every page.
  */
 export function withNavbarRow(
@@ -421,7 +435,7 @@ export function withNavbarRow(
  * a 26 KB page — 25 links, each with its glyph, tone and description twice.
  *
  * Split by what varies. SHARED (one file per distinct content, named by its
- * hash, so callers whose rails agree share it): the instance, its mark, root,
+ * hash, so callers whose rails agree share it): the layer, its mark, root,
  * graphs, harnesses and home label. THE PAGE'S OWN: its depth, its published
  * path (for "you are here") and its own section. `navbar.js` — a bundle of
  * THIS module and `navbar.ts`, so the browser runs the same drawing the build
@@ -466,6 +480,13 @@ export interface RailPage {
   root: string;
   here?: string;
   documentIndex?: NavGroup;
+  /**
+   * The header's home link, from the block's `data-fa-home`, when the site is
+   * composed into a larger one (smart-html-jtd sets it). Absent, home is `toRoot`.
+   */
+  home?: string;
+  /** The header's name for that home, from `data-fa-home-name`. Absent, the shared data's or the instance's. */
+  homeName?: string;
 }
 
 /** cyrb53 — a short, stable, dependency-free name for shared content. Not security. */
@@ -543,14 +564,18 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
           const { href: _here, ...rest } = item;
           return { ...rest, current: true };
         });
-  // The same for the page tree, at any depth.
+  // The page tree, at any depth, marks the page too — but KEEPS its link.
+  // Owner, 2026-11-08, on a section landing page: *"you should be able to navigate
+  // to pages like [that one] by click on Page name on LHS navbar but it doesnt
+  // work"*. A page that has children is a section's landing page; as a dead,
+  // dimmed row it read as broken. It stays a link, drawn as current
+  // (`aria-current="page"`), so a click reloads it the way a reader expects.
   const markHere = (items: readonly NavItem[]): NavItem[] =>
     items.map((item) => {
       const kids = item.children ? { children: markHere(item.children) } : {};
       // The site's own pages are linked from the page's own root.
       if (page.here === undefined || item.href !== `${page.toRoot}${page.here}`) return { ...item, ...kids };
-      const { href: _here, ...rest } = item;
-      return { ...rest, ...kids, current: true };
+      return { ...item, ...kids, current: true };
     });
   return navbarRegionsHtml(
     railModel({
@@ -558,7 +583,16 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
       links,
       ...(shared.pages ? { pages: markHere(shared.pages) } : {}),
       toRoot: page.toRoot,
-      ...((page.documentIndex ?? shared.documentIndex) ? { documentIndex: page.documentIndex ?? shared.documentIndex } : {}),
+      ...(page.home ? { homeHref: page.home } : {}),
+      ...(page.homeName ? { homeName: page.homeName } : {}),
+      // A page's own index is already its own; a SHARED one (a guide's
+      // declared menu) is marked here like the page tree, so the fold that
+      // holds the page arrives open.
+      ...(page.documentIndex
+        ? { documentIndex: page.documentIndex }
+        : shared.documentIndex
+          ? { documentIndex: { ...shared.documentIndex, items: markHere(shared.documentIndex.items) } }
+          : {}),
     }),
   );
 }
@@ -612,10 +646,16 @@ export function railDataJson(body: string): string {
 
 /** Read a page's own rail block back, or `undefined` when it has none. */
 export function railPageOf(html: string): RailPage | undefined {
-  const m = new RegExp(`<script type="application/json" id="${RAIL_PAGE_ID}" data-fa-root="([^"]*)" data-fa-to-root="([^"]*)">([^<]*)</script>`).exec(html);
+  const m = new RegExp(`<script type="application/json" id="${RAIL_PAGE_ID}" data-fa-root="([^"]*)" data-fa-to-root="([^"]*)"(?: data-fa-home="([^"]*)")?(?: data-fa-home-name="([^"]*)")?>([^<]*)</script>`).exec(html);
   if (!m) return undefined;
   const unesc = (v: string) => v.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&amp;/g, "&");
-  return { ...(JSON.parse(m[3]!) as Omit<RailPage, "root" | "toRoot">), root: unesc(m[1]!), toRoot: unesc(m[2]!) };
+  return {
+    ...(JSON.parse(m[5]!) as Omit<RailPage, "root" | "toRoot" | "home" | "homeName">),
+    root: unesc(m[1]!),
+    toRoot: unesc(m[2]!),
+    ...(m[3] !== undefined ? { home: unesc(m[3]) } : {}),
+    ...(m[4] !== undefined ? { homeName: unesc(m[4]) } : {}),
+  };
 }
 
 /**

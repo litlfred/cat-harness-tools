@@ -3,8 +3,8 @@
  * each pinned on a THROWAWAY tree and then held against this checkout.
  *
  * - **0a, the checkout aggregates** (cmsl option A). A corpus-wide question is
- *   answered by the checkout's root instance, which `needs` every staged
- *   instance; the platform names none of its dependents.
+ *   answered by the checkout's root layer, which `needs` every staged
+ *   layer; the platform names none of its dependents.
  * - **0b, extension by id.** A dependent's `scenarios/` extends a lower role
  *   (skills), actor (roles, capabilities) or capability (requires), pointing
  *   DOWN at it the way a voice points at the role it addresses.
@@ -64,7 +64,7 @@ function put(root: string, rel: string, body: unknown): void {
 }
 
 /**
- * A checkout: a ROOT instance declared at the top, `base` (the platform's
+ * A checkout: a ROOT layer declared at the top, `base` (the platform's
  * stand-in), and two dependents `a` and `b` that each need `base`.
  */
 function checkout(extra: (root: string) => void = () => {}): string {
@@ -137,6 +137,38 @@ describe("0a — the checkout aggregates", () => {
     );
     expect(repositoryMirrors(root)).toEqual(["base#a-library"]);
     expect(collectInstanceGraph(root).problems.map((p) => p.problem.kind)).toContain("repository-mirror");
+  });
+
+  // cat-harness-tools#1701: a rooted checkout (an IG repository that is its
+  // own index) mounts the platform, which declares checkout-level state for
+  // every checkout. That is no mirror; naming another instance's directory,
+  // or two platform instances claiming one path, still is.
+  test("checkout-level state a platform instance declares for every checkout is not a mirror", () => {
+    const root = checkout((r) =>
+      put(r, "base/base.json", {
+        name: "base",
+        needs: [],
+        directories: [{ id: "todos", path: "todos/", scope: "repository", graphTypologies: ["todos"] }],
+      }),
+    );
+    expect(repositoryMirrors(root)).toEqual([]);
+    expect(collectInstanceGraph(root).problems.map((p) => p.problem.kind)).not.toContain("repository-mirror");
+  });
+
+  test("two non-root instances claiming one repository path are both reported", () => {
+    const root = checkout((r) => {
+      put(r, "base/base.json", {
+        name: "base",
+        needs: [],
+        directories: [{ id: "todos", path: "todos/", scope: "repository", graphTypologies: ["todos"] }],
+      });
+      put(r, "b/b.json", {
+        name: "b",
+        needs: ["base"],
+        directories: [{ id: "todos-too", path: "todos", scope: "repository", graphTypologies: ["todos"] }],
+      });
+    });
+    expect(repositoryMirrors(root)).toEqual(["b#todos-too", "base#todos"]);
   });
 
   test("an instance the root does not reach is unstaged, and the gate refuses it", () => {
@@ -372,13 +404,13 @@ describe("this checkout", () => {
 
   test("falsifier 2: the platform resolved alone names nothing above it", () => {
     // RESTATED 2026-10-09. The checkout-root state graphs (`beans/`, `todos/`,
-    // `fsh-guts/`, `issue-marks/`) were the ROOT instance's until the owner
+    // `fsh-guts/`, `issue-marks/`) were the ROOT layer's until the owner
     // removed that declaration (3d4caf6, 2026-10-08); the platform declares
     // them now, `scope: "repository"` (coordinator decision (b)), so they and
     // their nested nodes resolve from the platform alone. They sit at the
-    // checkout root -- not inside any instance -- so they are not "above" it
+    // checkout root -- not inside any layer -- so they are not "above" it
     // in the sense this falsifier means: a dependent's directory. That stays
-    // forbidden, and is checked directly: no hosted root may be an instance.
+    // forbidden, and is checked directly: no hosted root may be a layer.
     const hosted = (readDeclaration(PLATFORM)?.directories ?? [])
       .filter((d) => d.scope === "repository")
       .map((d) => d.path.replace(/\/+$/, ""));
@@ -396,7 +428,7 @@ describe("this checkout", () => {
   test("the five libraries the mirrors named are all in the corpus", () => {
     // Six until bean `j7ql`: agent-skills/library dissolved into cat-harness/library (#1787).
     const libs = corpusDirectoriesForGraph(PLATFORM, "library").map((p) => relative(REPO, p));
-    for (const l of [`cat-harness/${harnessRel("library/corpus", join(REPO, "cat-harness"))}`, "folio-assistant-core/library", "folio-assistant-sci/library", "smart-base/library", "who-iris/library"]) {
+    for (const l of [`cat-harness/${harnessRel("library/corpus", join(REPO, "cat-harness"))}`, `folio-assistant-core/${harnessRel("library/corpus", join(REPO, "folio-assistant-core"))}`, "folio-assistant-sci/library", "smart-base/library", "who-iris/library"]) {
       expect(libs).toContain(l);
     }
   });

@@ -1,5 +1,5 @@
 /**
- * The navbar tiles point where this instance actually publishes.
+ * The navbar tiles point where this layer actually publishes.
  *
  * Bean `udx8`. The knowledge-graph tile's href was `'/kg/' | relative_url`,
  * written into a Liquid template by convention, and nothing has ever been
@@ -51,7 +51,7 @@ describe("siteLinks", () => {
   test("resolves the viewer and the graph through the published layout", () => {
     const byId = Object.fromEntries(siteLinks(DECL, "https://github.com/o/r").map((l) => [l.id, l]));
     // `<base>/<stub>/` and `<base>/<name>/<stub>.jsonld` — what the Pages
-    // workflow builds. The graph sits under the instance's own directory, the
+    // workflow builds. The graph sits under the layer's own directory, the
     // host's included, since #603 decision 1b (owner, 2026-10-23).
     expect(byId.kg.path).toBe("/folio-assistant/");
     expect(byId.jsonld.path).toBe("/folio-assistant/folio-assistant.jsonld");

@@ -174,13 +174,13 @@ export function scanTree(root: string, roots: readonly string[]): ScanResult {
 const FIXED_ROOTS = [".github", "cat-harness", "beans", "package.json"];
 
 /**
- * The fixed roots plus every PRESENT instance's `skills` and `glossary`
+ * The fixed roots plus every PRESENT layer's `skills` and `glossary`
  * graphs: the agent-authored prose where a pasted credential would land.
  *
- * This named one upper instance's skills and glossary directories until
+ * This named one upper layer's skills and glossary directories until
  * 2026-10-06 — a layer above this one, so the list broke standalone and
- * missed every other instance's skills. Now
- * each instance contributes its own by declaration (bean `0r7u`). Only
+ * missed every other layer's skills. Now
+ * each layer contributes its own by declaration (bean `0r7u`). Only
  * directories that exist are added: a declared-but-absent one would read as
  * `could-not-scan`, and absence is not this check's question.
  */

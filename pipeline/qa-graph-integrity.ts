@@ -24,9 +24,9 @@
  * corruption needs a check of its own. It goes here, and not in any one
  * family's schema test.
  *
- * ## Scope: the DECLARED directories, of every instance
+ * ## Scope: the DECLARED directories, of every layer
  *
- * The directories come from each instance's `<instance>.json`. They are never
+ * The directories come from each layer's `<instance>.json`. They are never
  * hardcoded under a path, because a hardcoded path is how the hosted homes went
  * unseen. A walk covers everything below a declared root, so a hosted home is
  * covered as soon as its host is.
@@ -126,7 +126,7 @@ export function checkQaDirs(dirs: readonly string[]): QaIntegrityReport {
 
 /**
  * Every directory declared as a `qa` or `attestations` graph, by every
- * instance in the checkout. The attestation store is swept too (bean `2gst`):
+ * layer in the checkout. The attestation store is swept too (bean `2gst`):
  * it holds the judgements C1's conflict markers would have destroyed, and its
  * readers now refuse a corrupt file rather than reading it as empty — this is
  * where such a file is reported before a reader meets it.

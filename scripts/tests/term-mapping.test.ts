@@ -177,9 +177,9 @@ describe("termState — the one place the record becomes a per-term answer (bean
 });
 
 describe("rows are keyed by (instance, scheme) (beans wvzp, q3n9)", () => {
-  // `kg-tools` is the id of every instance's Tool extraction. Two instances
+  // `kg-tools` is the id of every layer's Tool extraction. Two layers
   // whose schemes share an id AND a term id must still get one answer each
-  // (owner ruling A on q3n9, 2026-10-24: the instance is the scheme's owner).
+  // (owner ruling A on q3n9, 2026-10-24: the layer is the scheme's owner).
   const schemes = [
     scheme("platform", [authored("Policy")]),
     scheme("kg-tools", [candidate("policy")], "cat-harness"),

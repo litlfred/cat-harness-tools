@@ -109,11 +109,11 @@ export type GraphRead =
   | { state: "undeclared"; id: string; reason: string };
 
 /**
- * The declared directory `id` across this checkout's instances, as the
+ * The declared directory `id` across this checkout's layers, as the
  * presence checks see it.
  *
  * `resolveDirectories` is existence-filtered for `DEFAULT_DIRECTORIES` and for
- * MEMBERS, but **not** for an instance's own declared entries — those are
+ * MEMBERS, but **not** for a layer's own declared entries — those are
  * `byId.set` with no `existsSync` guard. That distinction is load-bearing
  * here and is asserted in the tests rather than taken on trust: a cut-over
  * directory has no files in the checkout, so if a declared entry vanished
@@ -135,8 +135,8 @@ function declaredEntry(
 /**
  * The checkout that holds `root`: the nearest directory at or above it with a
  * `.git`. Mount markers live in THAT checkout's git directory, so a caller
- * that passes an instance root (`test/health/run.ts` passes cat-harness's)
- * must be looked up there: in an index the instance is a mount with no `.git`
+ * that passes a layer root (`test/health/run.ts` passes cat-harness's)
+ * must be looked up there: in an index the layer is a mount with no `.git`
  * of its own, and asking it for markers found none, so a mounted `health`
  * read as "not mounted" and the report could not be written. With no `.git`
  * anywhere above, `root` itself, as before.

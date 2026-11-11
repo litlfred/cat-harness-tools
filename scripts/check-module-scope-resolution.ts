@@ -141,14 +141,14 @@ function isDeferred(line: string): boolean {
 
 export function checkModuleScopeResolution(root = REPO_ROOT): ModuleScopeReport {
   const files: string[] = [];
-  // EVERY instance, not just `cat-harness`. This walked one directory until
-  // 2026-09-21, and on that day the repository grew a contributing instance
+  // EVERY layer, not just `cat-harness`. This walked one directory until
+  // 2026-09-21, and on that day the repository grew a contributing layer
   // with pipeline code of its own (the formal-math layer, bean `rfev`) — so a
   // call site there was invisible to a gate reporting a clean run. Reading the
-  // instance list rather than naming a second directory, because the next
-  // instance would be invisible again.
-  // DEDUPED: `instanceRootsIn` yields the repository root as an instance in its
-  // own right AND each instance directory inside it, so a naive loop walks
+  // layer list rather than naming a second directory, because the next
+  // layer would be invisible again.
+  // DEDUPED: `instanceRootsIn` yields the repository root as a layer in its
+  // own right AND each layer directory inside it, so a naive loop walks
   // `cat-harness/**` twice and reports every finding twice. A doubled count is
   // not a harmless cosmetic — it is a number a reader would quote.
   const seen = new Set<string>();

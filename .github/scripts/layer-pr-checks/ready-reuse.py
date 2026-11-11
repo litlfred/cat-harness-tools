@@ -24,7 +24,7 @@ commits it pinned, and the branch-kept graph tips it mounted (`state.json`).
 
   1. It is a `pull_request` run of this same workflow on this head.
   2. Its "No new failures (tests and gates)" job concluded `success` (a
-     draft's "Draft fast tier only" never counts).
+     fast tier run, "Fast tier only", never counts).
   3. EITHER it recorded `layer-judged-<digest>` equal to this run's
      ("pins"), OR it recorded no `layer-judged-*` at all (a run older than
      the record), the PR's base.sha it lists equals this run's, and it

@@ -95,6 +95,31 @@ describe("three states, and undeclared is the finding", () => {
   });
 });
 
+// cat-harness-tools#1701: in a content repository that is its own index, the
+// script table holds only the layers' share of the index's, so "stale" cannot
+// be decided there; "undeclared" still can.
+describe("a checkout holding part of the declared table", () => {
+  const checks = [{ check: "a:check", script: "a.ts", classification: "no-parsing" as const }];
+  const d = { _comment: "", verified: { "a:check": "x" }, none: { "index-only:check": "reason" }, unchecked: { "gone.ts": "why" } };
+
+  test("an entry the table lacks is excused, not stale, and says so", () => {
+    const r = report(checks, d, [], "a rooted checkout");
+    expect({ stale: r.stale, uncheckedStale: r.uncheckedStale }).toEqual({ stale: [], uncheckedStale: [] });
+    expect(r.excusedStale).toEqual(["index-only:check", "gone.ts"]);
+  });
+
+  test("a check present here with no declaration is still a finding", () => {
+    const r = report([...checks, { check: "new:check", script: "n.ts", classification: "no-parsing" as const }], d, [], "a rooted checkout");
+    expect(r.undeclared).toEqual(["new:check"]);
+  });
+
+  test("without a partial table the same entry is stale, as before", () => {
+    const r = report(checks, d, []);
+    expect(r.stale).toEqual(["index-only:check"]);
+    expect(r.excusedStale).toEqual([]);
+  });
+});
+
 describe("a GENERATOR with no --check is visible too (bean `v556`)", () => {
   // The inventory above is the --check scripts, so an artefact whose generator
   // has NO --check could never be in it. `kg:export` wrote two committed

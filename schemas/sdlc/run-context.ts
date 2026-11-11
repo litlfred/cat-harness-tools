@@ -12,7 +12,7 @@
  * | field | the fact | reused from |
  * |---|---|---|
  * | `platform` | the commit of the checkout that ran | `CommitShaSchema` |
- * | `mounts` | the mount lock's digest, and each mounted instance's pinned commit | `LockedInstanceSchema` |
+ * | `mounts` | the mount lock's digest, and each mounted layer's pinned commit | `LockedInstanceSchema` |
  * | `profile` | the tool profile selected, by name and digest | — |
  * | `releases[]` | every tool and runtime release resolved, or why it could not be | `ToolReleaseRefSchema`, `ReleaseDigestSchema` |
  * | `invoker` | the script, model or person that ran it | `ActorKindSchema` |
@@ -60,7 +60,7 @@ const Sha256Schema = z.string().regex(/^[0-9a-f]{64}$/, "a sha256 digest is 64 l
 export const RunContextRefSchema = z.object({ sha256: Sha256Schema }).strict();
 export type RunContextRef = z.infer<typeof RunContextRefSchema>;
 
-/** One mounted instance, as the run saw it: which instance, from where, at which commit. */
+/** One mounted layer, as the run saw it: which layer, from where, at which commit. */
 export const RunMountSchema = LockedInstanceSchema.pick({ instance: true, repository: true, sha: true });
 
 /** The mounts a run ran over. Three states — see the module doc. */

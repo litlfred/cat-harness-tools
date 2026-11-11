@@ -39,7 +39,7 @@ describe("the site root is derived, not baked", () => {
 
   test("a path outside the instance returns null rather than a guess", () => {
     // A real state. A client that guessed would request two assets that 404
-    // on every page of an instance that mis-declared its route — which reads
+    // on every page of a layer that mis-declared its route — which reads
     // as a broken site rather than as a wrong configuration.
     expect(siteRootOf("/somewhere/else/page.html", WHO_IRIS)).toBeNull();
   });

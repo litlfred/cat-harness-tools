@@ -27,13 +27,14 @@
  * A question is a question: a module asks a room to NAME, not to decide.
  *
  * The workshop's steps name a scenario and a step id. A scenario id is looked
- * up first in the workshop's own instance and then in every instance the
- * checkout mounts, so a workshop may teach from journeys another instance
+ * up first in the workshop's own layer and then in every layer the
+ * checkout mounts, so a workshop may teach from journeys another layer
  * holds.
  */
 import { z } from "zod";
 
 import { nodeKind } from "../kg/node-kind.ts";
+import { JourneyGlyphSchema } from "./user-scenario.ts";
 
 export const WORKSHOP_V01 = "workshop/0.1.0";
 
@@ -113,7 +114,7 @@ const StepTagSchema = z.object({ table: Id, row: Id, why: Text.optional() }).str
 
 export const WorkshopStepSchema = z
   .object({
-    /** The scenario id (`user-scenario`), looked up in this instance first. */
+    /** The scenario id (`user-scenario`), looked up in this layer first. */
     scenario: Id,
     /** The step id in that scenario. */
     step: Text,
@@ -187,6 +188,28 @@ export const WorkshopPresentationSchema = z
      * title without its code in front.
      */
     chapterTitles: z.record(Id, Text).optional(),
+    /**
+     * How a walkthrough step's policy card groups the rows of the tables it
+     * tags, in this order: each row a label, an optional glyph and the tables
+     * it gathers (VaxLink: "Forces" = decision rights + legal basis, "Cost
+     * driver", "If it is missing" = substitution patterns). Absent: one row
+     * per table, titled by the table.
+     */
+    tagRows: z.array(z.object({ label: Text, icon: JourneyGlyphSchema.optional(), tables: z.array(Id).min(1) }).strict()).optional(),
+    /**
+     * The table sheets' cover (JV-14), printed before Sheet 1: the blanks a
+     * table fills in (`fields`; absent: Country, Delegation, Table,
+     * Facilitator), the workshop's `promise`, and the `table` whose rows
+     * are the ways to start (VaxLink: the substitution patterns).
+     */
+    cover: z.object({ fields: z.array(Text).optional(), table: Id.optional() }).strict().optional(),
+    /**
+     * The payload drawer's bar in the workshop's words (VaxLink: "FHIR R4 &
+     * WHO GDHCN payload inspector", the trust list's key "DEV Key: 916ffa…
+     * (XXR)", "Click to inspect raw FHIR / CBOR payload"). Absent: "FHIR
+     * payload inspector", no key, a plain hint.
+     */
+    inspector: z.object({ title: Text.optional(), key: Text.optional(), hint: Text.optional() }).strict().optional(),
     /** The presenter's note on the overview; a step's note is its `facilitatorCue`. */
     presenterNote: Text.optional(),
     /** A band on the overview naming what the walkthrough demonstrates, with `links`. */
@@ -201,9 +224,34 @@ export const WorkshopPresentationSchema = z
     /**
      * The ArchiMate views How it works shows first (the systems, the journeys
      * as use cases), before the views each taught journey names: a model id of
-     * the instance's `cat-archimate.config.json` and a view id in it.
+     * the layer's `cat-archimate.config.json` and a view id in it.
      */
     views: z.array(z.object({ model: Text, view: Text, label: Text.optional() }).strict()).optional(),
+    /**
+     * How it works opens with the architecture panel (JV-13): the countries
+     * side by side, one row per layer of a reference architecture, each box a
+     * system part, all read from the ArchiMate model `model` of the layer's
+     * `cat-archimate.config.json`. Element refs are the model's ids.
+     * `root` is the grouping whose child groupings are the rows; each of
+     * `countries` a grouping that aggregates a country's systems; `shared` the
+     * grouping drawn as the foundation band under both. A part's row and box
+     * label come from the reference block its country's instance specializes;
+     * its moments from the steps realised by the BPMN of the processes its
+     * system serves.
+     */
+    architecture: z
+      .object({
+        model: Text,
+        root: Text,
+        countries: z.array(z.object({ group: Text, label: Text.optional(), code: Text.optional() }).strict()).min(1),
+        shared: Text.optional(),
+        title: Text.optional(),
+        intro: Text.optional(),
+        /** Sentences under the foundation band (how trust crosses the border). */
+        notes: z.array(Text).optional(),
+      })
+      .strict()
+      .optional(),
     /** The line the Discussion view opens with ("The technology works. What do countries need to agree on to make it real?"). */
     closingQuestion: Text.optional(),
     /**
@@ -221,7 +269,7 @@ export const WorkshopPresentationSchema = z
       .strict()
       .optional(),
     /**
-     * The instance's own device demo: an app that shows each moment's screen.
+     * The layer's own device demo: an app that shows each moment's screen.
      * The viewer does not draw the screens; its Device Demo view frames the
      * app's own page for each (`href` + `#/demo/<id>` unless `route` says
      * otherwise) and links each screen and the steps it shows both ways.
@@ -320,6 +368,9 @@ export const WorkshopKind = nodeKind(
         else if (!rows.has(tag.row)) issue(`step ${s.step} tags row "${tag.row}", which table ${tag.table} does not have`);
       }
     }
+    for (const r of w.presentation?.tagRows ?? []) for (const t of r.tables) if (!tables.has(t)) issue(`presentation.tagRows "${r.label}" names table "${t}", which the workshop does not list`);
+    const ct = w.presentation?.cover?.table;
+    if (ct !== undefined && !tables.has(ct)) issue(`presentation.cover names table "${ct}", which the workshop does not list`);
     for (const d of w.discussion ?? []) mod(`discussion ${d.id}`, d.module);
     for (const s of w.sheets ?? []) for (const m of s.modules) mod(`sheet ${s.id}`, m);
     for (const r of w.resources ?? []) for (const m of r.modules ?? []) mod(`resource ${r.id}`, m);

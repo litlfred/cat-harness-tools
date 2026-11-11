@@ -25,6 +25,33 @@ Feature: Ingest provenance
     And with --title "Given" it is "Given", from --title
     And for an entry the catalogue does not name it is undefined
 
+  @test:scripts/tests/library/ingest-provenance.test.ts::OCR_language_hint_(owner,_2026-11-10)::the_languages_reach_the_OCR_rung_only,_once,_and_never_over_an_explicit_--lang
+  Scenario: The document's languages reach the OCR rung and nothing else
+    Given a plan of a pdf-ocr step then a pdf-pages --from-ocr step
+    When the languages fr and en are applied
+    Then the pdf-ocr step ends with --lang-hint fr,en
+    And the pdf-pages step is unchanged
+    And applying another hint adds no second --lang-hint
+    And a pdf-ocr step with an explicit --lang is left alone
+    And no languages change nothing
+
+  @test:scripts/tests/library/ingest-provenance.test.ts::OCR_language_hint_(owner,_2026-11-10)::--lang-hint_wins;_otherwise_the_catalogue's_dc.language.iso;_otherwise_nothing
+  Scenario: The OCR languages come from --lang-hint, then the catalogue, then nowhere
+    Given an instance whose catalogue node for library id 10665-174143 cites a record with dc.language.iso ru, en, ru
+    When the languages are read with no --lang-hint
+    Then they are ru and en, once each, citing that record
+    And with --lang-hint "ar, fa" they are ar and fa, from --lang-hint
+    And for an entry the catalogue does not name they are undefined
+
+  @test:scripts/tests/library/ingest-provenance.test.ts::OCR_language_hint_(owner,_2026-11-10)::pdf-ocr's_language_choice_holds_(scripts/tests/pdf-ocr-language.test.py)
+  Scenario: pdf-ocr narrows each page to the hinted languages in its script, and marks right-to-left pages
+    Given the Python checks in scripts/tests/pdf-ocr-language.test.py
+    When they run
+    Then a Latin page of a French and English record reads as fra+eng, an Arabic page as ara+eng, a Persian record's page as fas+eng
+    And a hinted pack that is missing is reported rather than swapped for English
+    And Arabic and Persian pages are marked right to left
+    And a partial OCR cache, fewer pages than the PDF has, is OCR'd again rather than served
+
   @test:scripts/tests/library/ingest-provenance.test.ts::which_software_ran,_as_a_folio-run-context/v1_(turh,_gap_2)::the_Python_writer_produces_a_context_the_schema_accepts,_with_runContextRef's_digest
   Scenario: The Python run-context writer agrees with the TypeScript schema and digest
     Given a git checkout holding an input PDF and an index.lock.json

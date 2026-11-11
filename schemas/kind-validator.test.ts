@@ -193,9 +193,9 @@ describe("per-family node schemas (bean rdkm)", () => {
       // `kg-qa-manifest/v1` joined the `qa` kind on 2026-09-27, from `skills`.
       // The manifest records the auditor's identity for the `kg-qa/v1` files
       // beside it, and it used to live in `skills/` — harmless while ONE
-      // instance was audited, a defect once every instance was: `kg-audit.ts`
+      // layer was audited, a defect once every layer was: `kg-audit.ts`
       // writes it unconditionally, so that home CREATED a `skills/` directory
-      // holding no skills in each of the six instances that have none. The
+      // holding no skills in each of the six layers that have none. The
       // registration had to move with the file: a kind claiming a `$schema`
       // whose files live in another kind's directory is a validator aimed at
       // nothing. The list grew because the KIND did.
@@ -279,7 +279,7 @@ describe("instance-qualified references (bean quda)", () => {
   test("the running layer's own name resolves where no sibling search reaches it (bean w1gy)", async () => {
     const { rootOf } = await import("./kg/kind-validator.ts");
     const toolsRoot = resolve(import.meta.dir, "..");
-    // An instance that is its own checkout: `siblingScopeFor` searches no
+    // A layer that is its own checkout: `siblingScopeFor` searches no
     // siblings for it (ruling 68k7), which is the harness standing alone.
     const alone = mkdtempSync(join(tmpdir(), "alone-"));
     try {

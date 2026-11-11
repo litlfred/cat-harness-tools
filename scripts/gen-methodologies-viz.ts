@@ -27,6 +27,7 @@
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts --check
  */
+import { inScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, posix } from "node:path";
 
@@ -56,8 +57,8 @@ const VIEWER_TOOL = "methodologies-viewer";
 /**
  * Every page this writes declares itself generated in its own front matter —
  * the `generated:` key `check:reference-direction` reads (bean `ws99`), as
- * `gen-processes-viz.ts` does. A page lists the methodologies and the instances that adopt them, which belong to every
- * instance in the checkout, so without the key those names read as authored
+ * `gen-processes-viz.ts` does. A page lists the methodologies and the layers that adopt them, which belong to every
+ * layer in the checkout, so without the key those names read as authored
  * prose in the committing layer naming the layers above it.
  */
 const GENERATED_FM = "generated: gen-methodologies-viz.ts — do not hand-edit; run `bun run cat methodologies:viz`";
@@ -75,10 +76,10 @@ export interface MethodologyRow {
   readonly origin: string;
   readonly appliesWhen: string;
   /**
-   * WHICH instance declared it — `cat-harness`, or a layer above it such as a DAK base layer.
+   * WHICH layer declared it — `cat-harness`, or a layer above it such as a DAK base layer.
    *
    * The graph spans all three, and a page that did not say which would make
-   * `grade` read as this instance's own adoption when it is the WHO material's.
+   * `grade` read as this layer's own adoption when it is the WHO material's.
    * See {@link instanceOf} for why this is resolved rather than split.
    */
   readonly instance: string;
@@ -89,19 +90,19 @@ export interface MethodologyRow {
 }
 
 /**
- * Which instance declared a node, from its path.
+ * Which layer declared a node, from its path.
  *
  * RESOLVED, not split. `methodologyNodes` spells every path relative to the
- * INSTANCE root, so a sibling instance's node arrives as
+ * LAYER root, so a sibling layer's node arrives as
  * `../<instance>/methodologies/diig.md` — and taking the first segment of that
  * gives `..`, which is what the first version of this page printed in the
- * "declared by" column for two of its nine rows, and what made its instance
+ * "declared by" column for two of its nine rows, and what made its layer
  * count say 2 where the graph spans 3. Found by reading the rendered page, not
  * the code.
  *
- * So the path is resolved against the instance root and re-expressed against
+ * So the path is resolved against the layer root and re-expressed against
  * the repository root, which is the only spelling in which the first segment
- * IS an instance. Pure path arithmetic — nothing here touches the filesystem,
+ * IS a layer. Pure path arithmetic — nothing here touches the filesystem,
  * so the join stays testable without one.
  */
 export function instanceOf(node: string, instanceRoot: string, repoRoot: string): string {
@@ -114,7 +115,7 @@ export function instanceOf(node: string, instanceRoot: string, repoRoot: string)
   const rel = relative(repoRoot, resolved);
   const seg = rel.split("/")[0] ?? "";
   // Still `..` means the node sits OUTSIDE the repository, which no declared
-  // graph should. Reported as itself rather than guessed at: a wrong instance
+  // graph should. Reported as itself rather than guessed at: a wrong layer
   // name on a row is worse than a visibly impossible one.
   return seg === "" ? "?" : seg;
 }
@@ -132,9 +133,9 @@ export function methodologyRows(
   instanceRoot = INSTANCE_ROOT,
   repoRoot = REPO,
 ): MethodologyRow[] {
-  // Indexed by NODE PATH, not by name. Two instances may adopt methods with
+  // Indexed by NODE PATH, not by name. Two layers may adopt methods with
   // the same name — `raci` and `rasci` already differ by one letter — and a
-  // name-keyed join would silently attribute one instance's evidence to
+  // name-keyed join would silently attribute one layer's evidence to
   // another's node.
   const dangling = new Set(report.unresolved.map((f) => f.node));
   const none = new Set(report.noEvidence.map((f) => f.node));
@@ -284,6 +285,45 @@ export function evidenceLine(e: string, links?: LibraryResolver, fromPage = ""):
 }
 
 /**
+ * Code spans in a node's prose (`applies-when`, `origin`) that name something
+ * the page can place become links (owner, 2026-11-10: the DIIG entry's
+ * `grade`, `kepner-tregoe`, `madr` and `who-iris/library/9789240010567-eng/`
+ * read as cross-references but were plain text).
+ *
+ * - a methodology on this site → its section on the list page, `#<name>`
+ *   (`listHref` is the list page relative to where the text sits: `""` on the
+ *   list page itself, `../../` on a node page);
+ * - `[<layer>/]library/<slug>[/]` → the library viewer, the same target an
+ *   `evidence:` line links (`evidenceLine`), relative to `fromPage`.
+ *
+ * Anything it cannot place stays code, never a link that 404s.
+ */
+export function linkProse(
+  text: string,
+  names: ReadonlySet<string>,
+  listHref = "",
+  links?: LibraryResolver,
+  fromPage = "",
+): string {
+  return text.replace(/(\[?)`([^`]+)`(\]\()?/g, (all, open: string, inner: string, close: string | undefined) => {
+    // Already link text: leave it as written.
+    if (open && close) return all;
+    const span = `\`${inner}\``;
+    let href: string | undefined;
+    if (names.has(inner)) href = `${listHref}#${inner}`;
+    else {
+      const m = /^(?:([^/\s]+)\/)?library\/([^/#\s]+)\/?$/.exec(inner);
+      const l = m && links ? (links.links(m[2]!, m[1]) ?? links.links(m[2]!)) : undefined;
+      if (l?.viewer !== undefined) {
+        const [path, hash] = l.viewer.split("#");
+        href = `${posix.relative(posix.dirname(fromPage), path!) || "."}/#${hash}`;
+      }
+    }
+    return href === undefined ? all : `${open}[${span}](${href})${close ?? ""}`;
+  });
+}
+
+/**
  * Where a node's full method is read: the file on its repository host, through
  * the same mount-aware `forgeAt` the library's source links use. The page draws
  * only each node's front matter; the method an agent extracted from the source
@@ -346,7 +386,7 @@ export interface AppliedBy {
 
 /**
  * Which skills apply each methodology, by name: every skill in the checkout's
- * instances that declares `uses-methodology` (cat-harness `schemas/process/methodology.ts`).
+ * layers that declares `uses-methodology` (cat-harness `schemas/process/methodology.ts`).
  * The edge is the skill's; the methodology's page reads it back.
  */
 export function appliedByIndex(repoRoot = REPO, nodeHref?: (path: string) => string | undefined): Map<string, AppliedBy[]> {
@@ -369,8 +409,10 @@ export function nodePage(
   fromPage = "",
   nodeHref?: (path: string) => string | undefined,
   appliedBy: readonly AppliedBy[] = [],
+  names: ReadonlySet<string> = new Set(),
 ): string {
   const q = (v: string): string => JSON.stringify(cell(v));
+  const prose = (v: string): string => linkProse(cell(v), names, "../../", links, fromPage);
   const file = r.path && nodeHref ? nodeHref(r.path) : undefined;
   const b: string[] = [
     "---",
@@ -385,9 +427,9 @@ export function nodePage(
     "",
     `\`${cell(r.name)}\` — declared by \`${cell(r.instance)}\` — ${BADGE[r.state]}`,
     "",
-    `**Applies when.** ${cell(r.appliesWhen)}`,
+    `**Applies when.** ${prose(r.appliesWhen)}`,
     "",
-    `**Origin.** ${cell(r.origin)}`,
+    `**Origin.** ${prose(r.origin)}`,
     "",
   ];
   if (r.evidence.length > 0) {
@@ -420,6 +462,8 @@ export function page(
 ): string {
   const byState = (s: MethodologyRow["state"]): number => rows.filter((r) => r.state === s).length;
   const instances = [...new Set(rows.map((r) => r.instance))].sort();
+  const names = new Set(rows.map((r) => r.name));
+  const prose = (v: string): string => linkProse(v, names, "", links, fromPage);
 
   const b: string[] = [
     "---",
@@ -460,7 +504,7 @@ export function page(
 
   for (const r of rows) {
     b.push(
-      `| **[${cell(r.title)}](#${r.name})**<br>\`${cell(r.name)}\` | ${cell(r.appliesWhen)} | ` +
+      `| **[${cell(r.title)}](#${r.name})**<br>\`${cell(r.name)}\` | ${prose(cell(r.appliesWhen))} | ` +
         `${BADGE[r.state]} | \`${cell(r.instance)}\` |`,
     );
   }
@@ -489,9 +533,9 @@ export function page(
       "",
       `\`${cell(r.name)}\` — declared by \`${cell(r.instance)}\` — ${BADGE[r.state]}`,
       "",
-      `**Applies when.** ${cell(r.appliesWhen)}`,
+      `**Applies when.** ${prose(cell(r.appliesWhen))}`,
       "",
-      `**Origin.** ${cleanOrigin}`,
+      `**Origin.** ${prose(cleanOrigin)}`,
       "",
     );
     if (r.path && nodeHref) b.push(`**The method, as extracted:** [read it](${nodePageDir(r)})`, "");
@@ -563,11 +607,18 @@ if (import.meta.main) {
     process.exit(2);
   }
 
-  const rows = methodologyRows(methodologyNodes(INSTANCE_ROOT), report);
-  if (rows.length === 0) {
+  const allRows = methodologyRows(methodologyNodes(INSTANCE_ROOT), report);
+  if (allRows.length === 0) {
     console.error("::error::gen-methodologies-viz: the methodology graph yielded no valid nodes");
     process.exit(1);
   }
+  // A scoped site (`--scope`, owner 2026-11-08 Q-SZ-2 "B") lists and writes its
+  // scope's methodologies only; the others are on their own layer's site.
+  const scope = siteScope();
+  const rows = allRows.filter((r) => inScope(scope, r.instance));
+  // The methodologies this site lists: a code span naming one links to it.
+  const names = new Set(rows.map((r) => r.name));
+  if (scope !== undefined) console.log(`  scope ${scopeArg(scope)}: ${rows.length} of ${allRows.length} methodolog(ies)`);
 
   const PAGE = pageRelPath(REPO);
   if (PAGE === undefined) {
@@ -575,17 +626,17 @@ if (import.meta.main) {
     process.exit(1);
   }
 
+  const docsBase = siteTarget(localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO));
   const rendered = withRenderedByFrontMatter(
-    page(rows, report, libraryResolver(REPO, INSTANCE_ROOT), PAGE, nodeHrefResolver(REPO)),
+    page(rows, report, libraryResolver(REPO, INSTANCE_ROOT, docsBase), PAGE, nodeHrefResolver(REPO)),
     VIEWER_TOOL,
   );
-  const docsBase = siteTarget(localSiteDir(INSTANCE_ROOT) ?? baseDocsDir(REPO));
   const out = join(docsBase, PAGE);
 
   // BUILT AT PUBLISH (owner, 2026-10-14, "B1"; 2026-10-15). The page joins
   // every methodology node the checkout's composition declares to every
   // declared library (`libraryResolver` reads the library projection and each
-  // instance's READMEs), so it moved with the index's pins. The instance
+  // layer's READMEs), so it moved with the index's pins. The layer
   // declares the route `builtAtPublish` with this script as its writer, and
   // `derive:publish` runs it; under `--check` a declared page has no committed
   // bytes to compare, so it is skipped there (the `folio:viz` rule).
@@ -599,13 +650,13 @@ if (import.meta.main) {
       console.error(`::error::gen-methodologies-viz: ${PAGE} is stale — run \`bun run cat methodologies:viz\``);
       process.exit(1);
     }
-    const links = libraryResolver(REPO, INSTANCE_ROOT);
+    const links = libraryResolver(REPO, INSTANCE_ROOT, docsBase);
     const hrefOf = nodeHrefResolver(REPO);
     const applied = appliedByIndex(REPO, hrefOf);
     for (const r of rows) {
       if (!r.path) continue;
       const rel = nodePageRel(PAGE, r);
-      const want = withRenderedByFrontMatter(nodePage(r, bodyOf(readFileSync(join(REPO, r.path), "utf-8")), links, rel, hrefOf, applied.get(r.name)), VIEWER_TOOL);
+      const want = withRenderedByFrontMatter(nodePage(r, bodyOf(readFileSync(join(REPO, r.path), "utf-8")), links, rel, hrefOf, applied.get(r.name), names), VIEWER_TOOL);
       const dest = join(docsBase, rel);
       if ((existsSync(dest) ? readFileSync(dest, "utf-8") : "") !== want) {
         console.error(`::error::gen-methodologies-viz: ${rel} is stale — run \`bun run cat methodologies:viz\``);
@@ -616,10 +667,10 @@ if (import.meta.main) {
   } else {
     mkdirSync(join(out, ".."), { recursive: true });
     writeFileSync(out, rendered);
-    // One page per node under the list page. Each instance's directory is
+    // One page per node under the list page. Each layer's directory is
     // this writer's alone, so it is cleared first: a node renamed or removed
     // leaves no page behind.
-    const links = libraryResolver(REPO, INSTANCE_ROOT);
+    const links = libraryResolver(REPO, INSTANCE_ROOT, docsBase);
     const hrefOf = nodeHrefResolver(REPO);
     const applied = appliedByIndex(REPO, hrefOf);
     for (const inst of new Set(rows.map((r) => r.instance))) rmSync(join(out, "..", inst), { recursive: true, force: true });
@@ -629,7 +680,7 @@ if (import.meta.main) {
       const dest = join(docsBase, rel);
       mkdirSync(join(dest, ".."), { recursive: true });
       const body = bodyOf(readFileSync(join(REPO, r.path), "utf-8"));
-      writeFileSync(dest, withRenderedByFrontMatter(nodePage(r, body, links, rel, hrefOf, applied.get(r.name)), VIEWER_TOOL));
+      writeFileSync(dest, withRenderedByFrontMatter(nodePage(r, body, links, rel, hrefOf, applied.get(r.name), names), VIEWER_TOOL));
     }
     console.log(`methodologies viewer: ${rows.length} node(s) → ${PAGE}, and one page each under it`);
     console.log(

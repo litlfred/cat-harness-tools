@@ -39,7 +39,7 @@ export const CRITERION_ID = "redundant-rendered-content-audit";
 export const DEFAULT_THRESHOLD_BYTES = 500;
 export const DEFAULT_MIN_OCCURRENCES = 2;
 /**
- * The sidecar's NAME. Its directory is the instance's declared `qa` tree
+ * The sidecar's NAME. Its directory is the layer's declared `qa` tree
  * (`kgQaHomeFor`) under `kg-qa/`, asked at run time rather than spelled here.
  */
 export const DEFAULT_SIDECAR_NAME = "rendered-content-bloat.kg-qa.json";
@@ -105,7 +105,7 @@ export interface AuditRenderedBloatOptions {
   sidecarPath?: string;
   /** Whether to write the sidecar JSON to disk (default: true). */
   writeSidecar?: boolean;
-  /** Instance / repository root. */
+  /** Layer / repository root. */
   repoRoot?: string;
 }
 

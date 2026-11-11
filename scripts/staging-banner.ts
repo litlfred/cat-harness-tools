@@ -279,19 +279,22 @@ export function previewRootOf(pathname: string): string | null {
 }
 
 /**
- * The client half, inlined verbatim into every page.
+ * The client half, served ONCE per preview as {@link BANNER_SCRIPT} at the
+ * preview root, beside `staging.json`.
  *
- * Inlined rather than referenced as an asset for one reason: a `<script src>`
- * would have to be document-relative, so its href would vary with the page's
- * DEPTH — reintroducing per-page variation to remove per-page variation. The
- * cost is ~2 KB repeated 530 times inside pages that are now identical to each
- * other's next rebuild, which git stores once.
+ * It used to be inlined into every page, because a `<script src>` would have
+ * to be document-relative and so vary with the page's DEPTH. The loader in
+ * {@link FRAGMENT} answers that the way this script already finds
+ * `staging.json`: it derives the preview root from `location.pathname`, so
+ * the fragment stays constant and only the root is named. Inlined, the client
+ * was about 6.5 KB of every page's 12 KB on an IG's thin artefact pages
+ * (757 of them on one IG preview, 2026-11-10; fhir-harness#325).
  *
  * `previewRootOf` above is the same expression; `staging-banner.test.ts`
  * asserts they agree, so the tested function cannot drift from the shipped
  * string.
  */
-const CLIENT = `(function(){
+export const CLIENT = `(function(){
 function el(t,a,x){var e=document.createElement(t);if(a)for(var k in a)e.setAttribute(k,a[k]);if(x!=null)e.textContent=x;return e;}
 function link(href,text,extra){var a=el('a',{href:href,style:'color:#fff;text-decoration:underline'},text);if(extra)a.setAttribute('style',a.getAttribute('style')+';'+extra);return a;}
 function chip(text){return el('span',{style:${JSON.stringify(CHIP)}},text);}
@@ -408,6 +411,26 @@ if(document.readyState!=='loading')go();else document.addEventListener('DOMConte
 window.addEventListener('resize',measure);window.addEventListener('load',measure);
 })();`;
 
+/** The client's file at the preview root, written by {@link run} beside `staging.json`. */
+export const BANNER_SCRIPT = "staging-banner.js";
+
+/**
+ * The inline half: reserve the banner's height before the first paint (the
+ * banner is fixed, so the page would otherwise jump when the client loads),
+ * then load {@link CLIENT} from the preview root. Off a preview path, or when
+ * the client cannot be fetched, it says so in the banner: the static text
+ * already says FEATURE BRANCH, and nothing here can make it say otherwise.
+ */
+export const LOADER = `(function(){
+var b=document.querySelector('[data-fa-staging-banner]'),d=document.querySelector('[data-fa-staging-detail]');
+if(b)document.documentElement.style.setProperty('--fa-staging-offset',b.getBoundingClientRect().height+'px');
+var m=location.pathname.match(/^(.*\\/(?:branches|STAGING)\\/[^/]+\\/)/);
+if(!m){if(d)d.textContent='\\u2014 build details unavailable (not served from a preview path)';return;}
+var s=document.createElement('script');s.src=m[1]+'${BANNER_SCRIPT}';
+s.onerror=function(){if(d)d.textContent='\\u2014 build details unavailable';};
+(document.head||document.documentElement).appendChild(s);
+})();`;
+
 /**
  * The fragment injected after the opening `<body>` tag. **Constant** — it
  * takes no argument, which is the whole property this change buys and is why
@@ -429,7 +452,7 @@ export const FRAGMENT =
   `<div data-fa-staging-banner lang="en" dir="ltr" style="${BANNER_STYLE}">\u{1F500} <b>FEATURE BRANCH</b> ` +
   `<span data-fa-staging-detail>— loading build details…</span></div>` +
   OFFSET_STYLE +
-  `<script>${CLIENT}</script>`;
+  `<script>${LOADER}</script>`;
 
 /**
  * Every `*.html` under `dir`, as absolute paths — except the pinned pdf.js
@@ -515,6 +538,7 @@ export function run(
   facts: StagingFacts,
 ): { injected: number; skipped: number; noBody: string[]; redirects: number } {
   writeFileSync(join(site, "staging.json"), JSON.stringify(facts, null, 2) + "\n");
+  writeFileSync(join(site, BANNER_SCRIPT), CLIENT + "\n");
   let injected = 0;
   let skipped = 0;
   let redirects = 0;

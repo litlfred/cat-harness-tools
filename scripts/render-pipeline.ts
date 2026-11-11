@@ -125,9 +125,9 @@ export function pipeline(scratch: string): RenderStep[] {
       fatal: true,
       inputs: ["README.md"],
       label: "the repository README's generated sections — fatal: it is the file a reader opens first",
-      // `--dir .` is the REPOSITORY instance. Without it the sync resolves to
-      // whichever instance carries a `folio/`, which is cat-harness — whose
-      // README carries no markers, so the root's instances table would go
+      // `--dir .` is the REPOSITORY layer. Without it the sync resolves to
+      // whichever layer carries a `folio/`, which is cat-harness — whose
+      // README carries no markers, so the root's layers table would go
       // stale while the command reported success.
       run: ["bun", "run", "cat", "readme:sync", "--dir", "."],
     },
@@ -176,7 +176,7 @@ export function pipeline(scratch: string): RenderStep[] {
       id: "kg-dynamic",
       // Declared ALWAYS-RUN rather than left input-less. Its stuck states are
       // measured against the clock (a token unmoved for a week is stuck), so
-      // the same committed instance files give a different document tomorrow,
+      // the same committed layer files give a different document tomorrow,
       // and there is no source hash that would make caching it correct.
       // Saying so is different from not saying: an undeclared step also
       // always runs, but nobody can tell whether that was a decision.

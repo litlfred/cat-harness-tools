@@ -101,7 +101,7 @@ export const CacheSchema = z
     $schema: z.literal(CACHE_SCHEMA_TAG),
     id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
     title: z.string().min(1),
-    /** The instance whose workflows and scripts hold it. */
+    /** The layer whose workflows and scripts hold it. */
     instance: z.string().min(1),
     kind: CacheKindSchema,
     trustClass: TrustClassSchema,
