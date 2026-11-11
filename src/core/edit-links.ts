@@ -1105,7 +1105,10 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     "html.fa-bp .main-content .anchor-heading{right:-3rem;width:2.25rem;padding:0 .375rem}" +
     "html.fa-bp .main-content .anchor-heading svg{width:1.5rem;height:1.5rem}" +
     "html.fa-bp .main-content .block-actions{width:2.25rem;margin-right:-4rem}" +
-    "html.fa-bp .main-content .fa-sec-actions{right:-3rem}" +
+    // A section box is placed by its right offset, not by the margin above, so it
+    // must not pick up that -4rem margin too: with both, it sat 7rem past the
+    // text and off the right edge of the window (smart-trust-demo, 11-11).
+    "html.fa-bp .main-content .fa-sec-actions{right:-3rem;margin:0}" +
     "html.fa-bp .fa-page-main.main-content:has(>.fa-sec-actions){margin-right:3.25rem}" +
     "html.fa-bp .block-actions>.ba-trigger,html.fa-bp .block-actions>.ba-bookmark{width:30px;height:30px;font-size:20px}" +
     "html.fa-bp .block-actions>.ba-trigger .ba-n{top:-5px;right:-8px;font-size:12px;padding:0 4px}}" +
