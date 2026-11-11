@@ -778,6 +778,20 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 
 /* ── device screens (scripts/journeys/screens.ts) ─────────────────────── */
 .ds-stage { display: flex; justify-content: center; padding: 8px 0 24px; overflow-x: auto; }
+.ds-state { display: contents; }
+.ds-state[hidden], .ds-states[hidden], .ds-state-try[hidden] { display: none; }
+.ds-states { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; margin: 4px 0 8px; }
+.ds-states-l { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--s500); }
+.ds-states-b { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 999px; background: var(--s200); }
+.ds-state-btn { min-height: 36px; padding: 6px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.ds-state-btn:hover { background: color-mix(in srgb, var(--cobalt) 12%, transparent); }
+.ds-state-btn:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+.ds-state-btn.is-on { background: var(--cobalt); color: #fff; }
+.ds-state-try { flex-basis: 100%; justify-content: center; margin: 0; }
+.ds-device.is-bare .ds-frame { background: none; padding: 0; box-shadow: none; border-radius: 0; }
+.ds-device.is-bare .ds-frame::before, .ds-device.is-bare .ds-frame::after { display: none; }
+.ds-device.is-bare .ds-screen { border-radius: 8px; box-shadow: var(--shadow-sm); border: 1px solid var(--divider); }
+.ds-device.is-bare { padding-bottom: 0; }
 .ds-device { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .ds-owner { display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border-radius: 999px; background: #fff; border: 1px solid var(--divider); box-shadow: var(--shadow-sm); }
 .ds-owner b { display: block; font-size: 14px; color: var(--ink); }
@@ -979,6 +993,8 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-devline-src { font-size: 12px; }
 .jp .jp-expand { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: #0284c7; font-size: 12px; cursor: pointer; padding: 0; }
 .jp-expand .jp-i { width: 13px; height: 13px; }
+.jp .jp-expand[hidden] { display: none; }
+.jp .jp-expand[aria-pressed="false"] { color: var(--s500); }
 .ds-stage:fullscreen { background: var(--s100, #f1f5f9); display: grid; place-items: center; overflow: auto; }
 .ds-statusbar-wide { background: #0b1220; color: #e2e8f0; padding: 8px 22px; font-weight: 500; }
 .ds-statusbar-wide .ds-client { display: inline-flex; align-items: baseline; gap: 8px; }
@@ -990,3 +1006,81 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .ds-moments-h { border-bottom: 1px solid var(--s100); padding-bottom: 10px; margin-bottom: 10px; }
 .ds-moments-h h3 { font-size: 20px; font-weight: 700; color: var(--ink); margin: 2px 0 4px; }
 .ds-moments-h p { font-size: 14px; color: var(--s600); }
+
+/* ── the Discussion view as a lab (workshop.lab), after DPI-H Lab ─────── */
+.jp-answer { display: block; width: 100%; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--s300); border-radius: 8px; background: #fff; color: var(--ink); font: 14px/1.45 var(--sans); resize: vertical; }
+.jp-answer:focus { outline: 2px solid var(--sky500); outline-offset: 1px; border-color: var(--sky500); }
+.jp-qs li > span + .jp-answer { flex-basis: 100%; }
+.jp-qs li:has(.jp-answer) { flex-wrap: wrap; }
+.jp-lab-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; scroll-margin-top: 120px; }
+.jp-lab-tab { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 6px; border-radius: 999px; border: 1px solid var(--s200); background: #fff; font-size: 14px; font-weight: 600; color: var(--s800) !important; }
+.jp-lab-tab span { width: 24px; height: 24px; border-radius: 50%; background: var(--s100); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+.jp-lab-tab:hover { background: var(--s50); }
+.jp-lab-tab.is-on { background: #1e293b; border-color: #1e293b; color: #fff !important; }
+.jp-lab-tab.is-on span { background: #fff; color: #1e293b; }
+.jp-lab { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+@media (min-width: 1100px) { .jp-lab { grid-template-columns: minmax(0, 1fr) 300px; } .jp-lab-aside { position: sticky; top: 140px; } }
+.jp-lab-steps { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.jp-lab-step { padding: 24px; display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 140px; }
+.jp-lab-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.jp-lab-kick { font: 700 12px/16px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--s600); }
+.jp-lab-head h3 { font-size: 22px; line-height: 1.3; font-weight: 700; margin-top: 4px; }
+.jp-lab-lede { font-size: 15px; color: var(--s600); margin-top: 4px; }
+.jp-lab-timer { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--s300); background: var(--s100); font: 600 13px/18px var(--mono) !important; color: var(--s800); }
+.jp-lab-timer.is-on { background: #1e293b; color: #fff; border-color: #1e293b; }
+.jp-lab-timer.is-up { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+.jp-lab-discuss { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; border: 1px solid #f59e0b; background: #fffbeb; font-size: 15px; color: var(--s800); }
+.jp-lab-discuss b { flex-shrink: 0; font: 700 11px/20px var(--mono); letter-spacing: .06em; text-transform: uppercase; background: #b45309; color: #fff; padding: 2px 8px; border-radius: 4px; }
+.jp-lab-note { padding: 10px 14px; border-radius: 8px; background: var(--s100); font-size: 14px; color: var(--s700); }
+.jp-lab-field { display: flex; flex-direction: column; gap: 2px; }
+.jp-lab-field b { font-size: 14px; }
+.jp-lab-field small { font-size: 12px; color: var(--s500); }
+.jp-lab-sub { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.jp-lab-sub small { font-weight: 400; color: var(--s500); font-size: 12px; }
+.jp-ucs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.jp-uc { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 12px; border: 1px solid var(--s200); background: #fff; cursor: pointer; }
+.jp-uc input { position: absolute; top: 14px; right: 14px; width: 18px; height: 18px; accent-color: #4f46e5; }
+.jp-uc-n { font-weight: 700; color: #6d28d9; }
+.jp-uc b { font-size: 15px; line-height: 1.3; padding-right: 22px; }
+.jp-uc small { font-size: 13px; color: var(--s600); line-height: 1.4; }
+.jp-uc em { font-style: normal; font-size: 11px; font-weight: 600; color: #3730a3; }
+.jp-uc:has(input:checked) { border-color: #4f46e5; box-shadow: 0 0 0 2px #c7d2fe; background: #f5f3ff; }
+.jp-lab-grps { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 900px) { .jp-lab-grps { grid-template-columns: 1fr 1fr; } }
+.jp-lab-grp { border: 1px solid var(--s200); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.jp-lab-grp h4 { font: 700 11px/16px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--s600); }
+.jp-lab-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 600; }
+.jp-lab-cmom { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--s100); }
+.jp-lab-qs { display: flex; flex-direction: column; gap: 12px; }
+.jp-lab-qs li { display: flex; align-items: flex-start; gap: 8px; }
+.jp-lab-qs li > div { flex: 1; min-width: 0; font-size: 14px; color: var(--s800); }
+.jp-pick input { width: 16px; height: 16px; accent-color: #4f46e5; vertical-align: -2px; }
+.jp-pick:has(input:checked) { border-color: #4f46e5; background: #f5f3ff; }
+.jp-lab-res { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; }
+.jp-lab-nav { display: flex; justify-content: flex-end; }
+.jp-lab-aside { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.jp-lab-aside h4 { font: 700 11px/16px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--s600); }
+.jp-lab-aside p { font-size: 15px; }
+.jp-lab-aside-ucs { display: flex; flex-wrap: wrap; gap: 6px; }
+.jp-lab-aside-ucs .jp-pill { font-size: 12px; }
+.jp-lab-step > .jp-btn-line { align-self: flex-start; }
+.jp-lab-sum-act { display: flex; flex-wrap: wrap; gap: 8px; }
+.jp-lab-sum { display: flex; flex-direction: column; gap: 12px; }
+.jp-lab-sum-sec { border: 1px solid var(--s200); border-radius: 12px; padding: 12px 16px; break-inside: avoid; }
+.jp-lab-sum-sec h4 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.jp-lab-sum-sec dl { display: grid; grid-template-columns: minmax(140px, 30%) 1fr; gap: 4px 14px; font-size: 13px; }
+.jp-lab-sum-sec dt { font-weight: 600; color: var(--s600); }
+.jp-lab-sum-sec dd { color: var(--ink); overflow-wrap: anywhere; }
+@media (max-width: 640px) { .jp-lab-sum-sec dl { grid-template-columns: 1fr; } .jp-lab-step { padding: 16px; } }
+.jp-lab-credit { font-size: 12px; color: var(--s600); padding: 12px 16px; border-radius: 10px; background: var(--s100); }
+@media print {
+  .jp-lab-tabs, .jp-lab-aside { display: none !important; }
+  .jp-lab-step[hidden] { display: flex !important; }
+  .jp-print-lab .jp-wrap > :not(.jp-lab):not(.jp-lab-credit), .jp-print-lab .jp-lab-step:not(.jp-lab-summary) { display: none !important; }
+  .jp-print-lab .jp-lab-summary .jp-gapreport, .jp-print-lab .jp-lab-summary .jp-lab-discuss { display: none !important; }
+  .jp-print-lab .jp-lab { display: block; }
+  /* The gap report sits in the lab's summary step: print it alone there too. */
+  .jp-print-report .jp-wrap > .jp-lab:has(.jp-gapreport) { display: block !important; }
+  .jp-print-report .jp-lab-step:not(.jp-lab-summary), .jp-print-report .jp-lab-summary > :not(.jp-gapreport) { display: none !important; }
+  .jp-print-report .jp-lab-summary { border: 0; box-shadow: none; padding: 0; }
+}

@@ -67,6 +67,19 @@ export function kgRenderScript(): string {
   return readFileSync(join(import.meta.dir, "templates", "kg-render.js"), "utf8");
 }
 
+/**
+ * The Contents card (issue #1885): the IG sites' table-of-contents card, as a
+ * script that defines `window.faContentsCard(scope)` and its stylesheet, for a
+ * generator to bundle with the renderer that draws its pages.
+ */
+export function contentsCardScript(): string {
+  return readFileSync(join(import.meta.dir, "templates", "contents-card.js"), "utf8");
+}
+/** The Contents card's style (`templates/contents-card.css`). */
+export function contentsCardStyle(): string {
+  return readFileSync(join(import.meta.dir, "templates", "contents-card.css"), "utf8");
+}
+
 /** The namespaces a page's classes are written in: prefix → namespace IRI (slash, no `#`). */
 export type Prefixes = Readonly<Record<string, string>>;
 

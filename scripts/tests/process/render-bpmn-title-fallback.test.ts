@@ -19,12 +19,17 @@ import { join } from "node:path";
 
 import { TOOLS_ROOT } from "../../lib/roots.ts";
 import { processTarget } from "../../process-presentations.js";
+import { stepAnchor } from "../../gen-processes-viz.ts";
 
 const src = readFileSync(join(TOOLS_ROOT, "scripts", "render-bpmn.ts"), "utf8");
 
 describe("a step with no page of its own still has a title link", () => {
-  test("the subject page wins, else the process's own page", () => {
-    expect(src).toMatch(/subjectHref\(file, "process", `\$\{s\.process\}\/node\/\$\{s\.id\}`\) \?\?\s*SITE_UP \+ processTarget\(basename\(file, "\.bpmn"\), undefined\)/);
+  test("the subject page wins, else the step's entry on its process's page", () => {
+    expect(src).toMatch(/subjectHref\(file, "process", `\$\{s\.process\}\/node\/\$\{s\.id\}`\) \?\?\s*SITE_UP \+ stepOnProcessPage\(basename\(file, "\.bpmn"\), s\.id\)/);
+    // The step's anchor, as the processes viewer writes it: without it a title in a drawing shown
+    // ON that page linked the page itself, and a click did nothing (smart-trust-demo J3, 2026-11-11).
+    expect(src).toContain("return `${processTarget(home, undefined)}#step-${step}`;");
+    expect(stepAnchor("Task_Verify")).toBe("step-Task_Verify");
   });
 
   test("every step is linked, not only those with a subject page", () => {

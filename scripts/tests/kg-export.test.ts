@@ -38,7 +38,7 @@ import * as bootstrapExport from "@litlfred/bootstrap-tools/scripts/export-graph
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
-import { buildExport, exportIdentity, publishedDocument, writeSubjectDocuments, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
+import { buildExport, exportIdentity, publishedDocument, roleHome, writeSubjectDocuments, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
 import { subjectPathOf } from "../lib/subject-iri.ts";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";
 import { declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
@@ -1711,5 +1711,30 @@ describe("a document links the schemas its instance publishes (bean 4ak5 follow-
     expect(EXPORT_ALT.conformsTo).toStartWith(`${ALT_BASE}/`);
     // And the host still carries no `omitted`: every collector runs.
     expect(EXPORT.omitted).toBeUndefined();
+  });
+});
+
+describe("a lane's role links into the document of the layer that declares it (cat-harness-tools#1894)", () => {
+  // folio-assistant-core's lanes bind cat-harness's `user`; minted in the
+  // process's own document, 461 links on the folio-assistant site pointed at
+  // `folio-assistant-core/role/user`, a page no export writes.
+  const BASE = "https://example.invalid/fa";
+  const roots = instanceRootsIn(repoRootFor(resolve(import.meta.dir, "../..")));
+  const ids = (r: string) => new Set((readRoleGraph(join(r, "scenarios"))?.roles ?? []).map((x) => x.id));
+
+  test("a role this layer declares, an unknown role, and no base all stay in this document", () => {
+    for (const r of roots) for (const id of ids(r)) expect(roleHome(BASE, "OWN", id, r)).toBe("OWN");
+    expect(roleHome(BASE, "OWN", "no-layer-declares-this-role", roots[0] ?? ".")).toBe("OWN");
+    expect(roleHome(undefined, "OWN", "user", roots[0] ?? ".")).toBe("OWN");
+  });
+
+  test("a role only another layer declares is minted in that layer's document", () => {
+    const pair = roots
+      .flatMap((own) => roots.filter((o) => o !== own).flatMap((o) => [...ids(o)].filter((id) => !ids(own).has(id)).map((id) => ({ own, id }))))
+      .at(0);
+    if (pair === undefined) return; // a checkout with one layer: nothing to cross
+    const home = roleHome(BASE, "OWN", pair.id, pair.own);
+    expect(home).not.toBe("OWN");
+    expect(roots.some((r) => ids(r).has(pair.id) && publishedIdentity(r, BASE).docIri === home)).toBe(true);
   });
 });

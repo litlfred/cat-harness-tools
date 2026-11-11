@@ -8,6 +8,9 @@
      remembered in this browser;
    - the gap strip's answers, remembered in this browser only;
    - zoom on a BPMN drawing;
+   - the device frame on or off, remembered in this browser;
+   - a device screen's state switch (a valid card, a tampered one), and
+     ?state=<id> to open on one;
    - the journey map's Focus on, its two toggles, and a click on a column;
    - tabs (the ArchiMate views, the payload drawer), the drawer, Inspect JSON
      and Copy;
@@ -423,6 +426,272 @@
     draw();
   }
 
+  // Write-ins and ticks kept in this browser (jv:<name>), as the gap strip keeps its
+  // ratings: a journey question's answer is one key on the walkthrough and the lab.
+  function keepText(el) {
+    var key = "jv:" + el.name;
+    var v = store(key);
+    if (v !== null) el.value = v;
+    el.addEventListener("input", function () {
+      store(key, el.value);
+    });
+  }
+  function keepCheck(el) {
+    var key = "jv:" + el.name;
+    var v = store(key);
+    if (v !== null) el.checked = v === "1";
+    el.addEventListener("change", function () {
+      store(key, el.checked ? "1" : "0");
+    });
+  }
+  function forget(key) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch (_e) {
+      /* storage unavailable */
+    }
+  }
+
+  // A step's timer: one click starts it, another stops it.
+  function timer(b) {
+    var label = b.querySelector("span");
+    var start = label.textContent;
+    var mins = Number(b.getAttribute("data-jp-timer"));
+    var t = null;
+    function show(left) {
+      var m = Math.floor(left / 60);
+      var sec = left % 60;
+      label.textContent = "Stop · " + m + ":" + (sec < 10 ? "0" : "") + sec;
+    }
+    b.addEventListener("click", function () {
+      if (t) {
+        clearInterval(t);
+        t = null;
+        b.classList.remove("is-on", "is-up");
+        label.textContent = start;
+        return;
+      }
+      var end = Date.now() + mins * 60000;
+      b.classList.add("is-on");
+      b.classList.remove("is-up");
+      show(mins * 60);
+      t = setInterval(function () {
+        var left = Math.max(0, Math.round((end - Date.now()) / 1000));
+        show(left);
+        if (left === 0) {
+          clearInterval(t);
+          t = null;
+          b.classList.remove("is-on");
+          b.classList.add("is-up");
+          label.textContent = "Time’s up · restart";
+        }
+      }, 1000);
+    });
+  }
+
+  // The lab: one step at a time, chosen by its tab, the address (#lab-<id>) or
+  // the last one this browser showed; the aside shows the use case as it is now.
+  function lab(box) {
+    var ws = box.getAttribute("data-jp-lab");
+    var steps = box.querySelectorAll("[data-jp-lab-step]");
+    var tabs = doc.querySelectorAll("[data-jp-lab-tab]");
+    function show(id, scroll) {
+      var found = false;
+      Array.prototype.forEach.call(steps, function (s) {
+        var on = s.getAttribute("data-jp-lab-step") === id;
+        s.hidden = !on;
+        found = found || on;
+      });
+      if (!found) return show(steps[0].getAttribute("data-jp-lab-step"), scroll);
+      Array.prototype.forEach.call(tabs, function (t) {
+        var on = t.getAttribute("data-jp-lab-tab") === id;
+        t.classList.toggle("is-on", on);
+        if (on) t.setAttribute("aria-current", "step");
+        else t.removeAttribute("aria-current");
+      });
+      store("jp:lab:" + ws, id);
+      if (history.replaceState) history.replaceState(null, "", "#lab-" + id);
+      if (scroll) {
+        var nav = doc.querySelector(".jp-lab-tabs");
+        if (nav) nav.scrollIntoView({ block: "start" });
+      }
+      if (id === "summary" || box.querySelector('[data-jp-lab-step="' + id + '"] [data-jp-lab-summary]')) drawSummary();
+    }
+    Array.prototype.forEach.call(doc.querySelectorAll("[data-jp-lab-tab], [data-jp-lab-go]"), function (a) {
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        show(a.getAttribute("data-jp-lab-tab") || a.getAttribute("data-jp-lab-go"), a.hasAttribute("data-jp-lab-go"));
+      });
+    });
+    var m = /^#lab-(.+)$/.exec(location.hash);
+    show(m ? m[1] : store("jp:lab:" + ws) || steps[0].getAttribute("data-jp-lab-step"), false);
+
+    // The aside: the statement's first line and the ticked use cases.
+    var text = box.querySelector("[data-jp-usecase]");
+    var shown = box.querySelector("[data-jp-usecase-show]");
+    var ticks = box.querySelector("[data-jp-usecase-ticks]");
+    function aside() {
+      if (text && shown) shown.textContent = (text.value.split("\n")[0] || "No use case agreed yet. Agree one together in step 1.").trim();
+      if (!ticks) return;
+      ticks.textContent = "";
+      Array.prototype.forEach.call(box.querySelectorAll(".jp-uc input:checked"), function (c) {
+        var pill = doc.createElement("span");
+        pill.className = "jp-pill";
+        pill.textContent = c.parentNode.querySelector("b").textContent;
+        ticks.appendChild(pill);
+      });
+    }
+    box.addEventListener("input", aside);
+    box.addEventListener("change", aside);
+    aside();
+
+    // The summary: every step's answers, read back from this browser.
+    var src = box.querySelector("[data-jp-lab-model]");
+    var out = box.querySelector("[data-jp-lab-summary]");
+    var model = [];
+    try {
+      model = src ? JSON.parse(src.textContent) : [];
+    } catch (_e) {
+      model = [];
+    }
+    function value(it) {
+      var v = store("jv:" + it.name);
+      if (v === null && it.value !== undefined) v = it.value;
+      if (it.type === "choice") {
+        var o = (it.options || []).filter(function (x) {
+          return x.id === v;
+        })[0];
+        return { raw: v, text: o ? o.label : "", index: o ? it.options.indexOf(o) : -1 };
+      }
+      if (it.type === "check") return { raw: v, text: v === "1" ? "✓" : "" };
+      return { raw: v, text: (v || "").trim() };
+    }
+    function rows() {
+      var r = [];
+      model.forEach(function (sec) {
+        sec.items.forEach(function (it) {
+          var v = value(it);
+          if (v.text) r.push({ sec: sec, it: it, v: v });
+        });
+      });
+      return r;
+    }
+    function el(tag, cls, t) {
+      var n = doc.createElement(tag);
+      if (cls) n.className = cls;
+      if (t !== undefined) n.textContent = t;
+      return n;
+    }
+    function drawSummary() {
+      if (!out) return;
+      out.textContent = "";
+      var any = false;
+      model.forEach(function (sec) {
+        var block = el("section", "jp-lab-sum-sec");
+        block.appendChild(el("h4", null, sec.n + ". " + sec.label));
+        var dl = el("dl");
+        var ticked = {};
+        var counts = {};
+        var worst = [];
+        sec.items.forEach(function (it) {
+          var v = value(it);
+          if (!v.text) return;
+          if (it.type === "check") {
+            var g = it.group || sec.label;
+            (ticked[g] = ticked[g] || []).push(it.label);
+            return;
+          }
+          if (it.type === "choice") {
+            var gname = it.group || sec.label;
+            var c = (counts[gname] = counts[gname] || { opts: it.options, n: {} });
+            c.n[v.raw] = (c.n[v.raw] || 0) + 1;
+            if (v.index === it.options.length - 1) worst.push(it.label);
+            return;
+          }
+          dl.appendChild(el("dt", null, it.label));
+          var dd = el("dd");
+          v.text.split("\n").forEach(function (line, i) {
+            if (i) dd.appendChild(el("br"));
+            dd.appendChild(doc.createTextNode(line));
+          });
+          dl.appendChild(dd);
+        });
+        Object.keys(ticked).forEach(function (g) {
+          dl.appendChild(el("dt", null, g));
+          dl.appendChild(el("dd", null, ticked[g].join(" · ")));
+        });
+        Object.keys(counts).forEach(function (g) {
+          var c = counts[g];
+          dl.appendChild(el("dt", null, g));
+          dl.appendChild(
+            el(
+              "dd",
+              null,
+              c.opts
+                .filter(function (o) {
+                  return c.n[o.id];
+                })
+                .map(function (o) {
+                  return c.n[o.id] + " " + o.label;
+                })
+                .join(" · "),
+            ),
+          );
+        });
+        if (worst.length) {
+          var last = sec.items.filter(function (i) {
+            return i.type === "choice";
+          })[0];
+          dl.appendChild(el("dt", null, last ? last.options[last.options.length - 1].label : "Not yet"));
+          dl.appendChild(el("dd", null, worst.join(" · ")));
+        }
+        if (dl.childNodes.length) {
+          any = true;
+          block.appendChild(dl);
+        } else block.appendChild(el("p", "jp-small", "Nothing written yet."));
+        out.appendChild(block);
+      });
+      if (!any) out.insertBefore(el("p", "jp-small", "Nothing written yet. Work through the steps; what the table writes appears here."), out.firstChild);
+    }
+    var printBtn = box.querySelector("[data-jp-lab-print]");
+    if (printBtn) {
+      printBtn.addEventListener("click", function () {
+        drawSummary();
+        root.classList.add("jp-print-lab");
+        window.print();
+      });
+      window.addEventListener("afterprint", function () {
+        root.classList.remove("jp-print-lab");
+      });
+    }
+    var csvBtn = box.querySelector("[data-jp-lab-csv]");
+    if (csvBtn) {
+      csvBtn.addEventListener("click", function () {
+        function q(x) {
+          return '"' + String(x).replace(/"/g, '""') + '"';
+        }
+        var lines = [["Step", "Item", "Answer"].map(q).join(",")];
+        rows().forEach(function (r) {
+          lines.push([r.sec.n + ". " + r.sec.label, r.it.group ? r.it.group + ": " + r.it.label : r.it.label, r.v.text].map(q).join(","));
+        });
+        var url = URL.createObjectURL(new Blob(["﻿" + lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" }));
+        var a = el("a");
+        a.href = url;
+        a.download = ws + "-summary.csv";
+        doc.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+        }, 1000);
+      });
+    }
+    window.addEventListener("storage", function (ev) {
+      if (ev.key && ev.key.indexOf("jv:") === 0) drawSummary();
+    });
+    drawSummary();
+  }
+
   // Reset Simulation (VaxLink's second bar): forget what this browser keeps for the
   // workshop (the gap strip's answers, jv:<workshop>:…) and for the viewer (the
   // presenter's and the hood's choices, jp:…), then start again at the overview.
@@ -446,8 +715,63 @@
     });
   }
 
+  // A device screen's states: every state is in the page, one shown at a time.
+  function states(sw) {
+    var fig = doc.querySelector('[data-screen="' + sw.getAttribute("data-ds-switch") + '"]');
+    if (!fig) return;
+    function show(id) {
+      var found = false;
+      Array.prototype.forEach.call(sw.querySelectorAll("[data-ds-show]"), function (b) {
+        var on = b.getAttribute("data-ds-show") === id;
+        if (on) found = true;
+        b.classList.toggle("is-on", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+      if (!found) return false;
+      [fig, sw].forEach(function (box) {
+        Array.prototype.forEach.call(box.querySelectorAll("[data-ds-state]"), function (x) {
+          x.hidden = x.getAttribute("data-ds-state") !== id;
+        });
+      });
+      return true;
+    }
+    Array.prototype.forEach.call(sw.querySelectorAll("[data-ds-show]"), function (b) {
+      b.addEventListener("click", function () {
+        var id = b.getAttribute("data-ds-show");
+        show(id);
+        try {
+          var u = new URL(window.location.href);
+          if (b === sw.querySelector("[data-ds-show]")) u.searchParams.delete("state");
+          else u.searchParams.set("state", id);
+          window.history.replaceState(null, "", u.toString());
+        } catch (_e) {
+          /* no URL API: the switch still works */
+        }
+      });
+    });
+    var m = /[?&]state=([a-z0-9-]+)/.exec(window.location.search);
+    if (m) show(m[1]);
+    sw.hidden = false;
+  }
+
   function init() {
     oldAddress();
+    each("[data-ds-switch]", states);
+    // VaxLink's frame toggle: the device's bezel on or off, the screen alone.
+    each("[data-jp-frame]", function (b) {
+      var dev = doc.querySelector("[data-jp-stage] .ds-device");
+      if (!dev) return;
+      function set(on) {
+        dev.classList.toggle("is-bare", !on);
+        b.setAttribute("aria-pressed", String(on));
+        store("jp:frame", on ? "on" : "off");
+      }
+      if (store("jp:frame") === "off") set(false);
+      b.addEventListener("click", function () {
+        set(b.getAttribute("aria-pressed") !== "true");
+      });
+      b.hidden = false;
+    });
     each("[data-jp-reset]", reset);
     // The device demo's Expand: the device, full screen.
     each("[data-jp-expand]", function (b) {
@@ -483,6 +807,21 @@
     if (store("jp:hood") === "off") setHood(false);
     each(".jp-proc", zoom);
     each("input[data-jv-store]", remember);
+    each("[data-jv-text]", keepText);
+    each("input[data-jv-check]", keepCheck);
+    each("[data-jp-text-reset]", function (b) {
+      b.addEventListener("click", function () {
+        var name = b.getAttribute("data-jp-text-reset");
+        var t = doc.getElementsByName(name)[0];
+        if (!t) return;
+        forget("jv:" + name);
+        t.value = t.defaultValue;
+        t.dispatchEvent(new Event("input", { bubbles: true }));
+        forget("jv:" + name);
+      });
+    });
+    each("[data-jp-timer]", timer);
+    each("[data-jp-lab]", lab);
     each("[data-jp-map]", journeyMap);
     each(".jp-am", tabs);
     each("[data-jp-drawer]", drawer);

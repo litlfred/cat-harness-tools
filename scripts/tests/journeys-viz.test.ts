@@ -635,6 +635,73 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
       expect(page).toContain("Click to inspect raw FHIR / CBOR payload");
     }
   });
+  test("the lab: the Discussion view as timed steps, the journey's questions answered under the walkthrough's keys, a summary", () => {
+    // Without a lab the Discussion view keeps its closing-questions layout.
+    expect(discuss).not.toContain("data-jp-lab=");
+    // The walkthrough's questions each have a write-in, kept per workshop and step.
+    expect(p2).toContain('name="policy:q:P2:0" rows="2" data-jv-text');
+    expect(p2).toContain('name="policy:q:P2:1"');
+    const w0 = corpus.workshops[0]!;
+    const lab = {
+      name: "The table's steps",
+      credit: "Adapted from a lab, CC BY 4.0.",
+      creditHref: "https://example.org/lab/",
+      creditLabel: "The lab",
+      useCases: [
+        { id: "immz", label: "Immunisation", journey: true },
+        { id: "ips", label: "Patient summary" },
+      ],
+      useCaseText: "A pilgrim checked at home should be treated abroad.",
+      scale: { id: "ready", label: "Readiness", options: [{ id: "done", label: "Done" }, { id: "not-yet", label: "Not yet" }] },
+      steps: [
+        { id: "team", label: "Team", title: "Who is at the table?", minutes: 2, fields: [{ id: "members", label: "Team members", lines: 3 }], note: "No health data." },
+        { id: "use-case", label: "Use case", title: "Which use cases?", minutes: 5, discuss: "Go round the table.", useCases: true, modules: ["M1"] },
+        { id: "readiness", label: "Readiness", title: "Has your country done these?", rate: ["ready"] },
+        { id: "decide", label: "Who decides", title: "Who holds it?", holders: ["rights"], modules: ["M2"], capabilities: true },
+        { id: "summary", label: "Summary", title: "Our summary", discussion: true, summary: true },
+      ],
+    };
+    const tables = [...(w0.workshop.tables ?? []), { id: "ready", title: "Readiness", rows: [{ id: "strategy", label: "Strategy", group: "Strategy & investment" }, { id: "twg", label: "TWG", group: "Governance" }] }];
+    const ws = { ...w0.workshop, tables, discussion: [{ id: "q1", theme: "Trust", question: "Where does trust begin?", steps: ["p2-treated#P2"] }], lab };
+    expect(WorkshopSchema.safeParse({ ...ws, $schema: "workshop/0.1.0" }).success).toBe(true);
+    const out = renderJourneyPages({ ...corpus, workshops: [{ ...w0, workshop: ws }] }, LINKS, "top");
+    const page = String(out.find((f) => f.path === `${base}/discuss/index.html`)!.content);
+    // A tab per step, numbered from 0, each step with its timer and DISCUSS prompt.
+    expect(page).toContain('data-jp-lab="policy"');
+    expect(page.match(/data-jp-lab-tab="/g)).toHaveLength(5);
+    expect(page).toContain('<a class="jp-lab-tab" href="#lab-team" data-jp-lab-tab="team"><span>0</span>Team</a>');
+    expect(page).toContain('data-jp-timer="5"');
+    expect(page).toContain("<b>Discuss</b><span>Go round the table.</span>");
+    expect(page).toContain('<p class="jp-lab-note">No health data.</p>');
+    // Use cases: any number ticked; the journeys' own come ticked; the statement starts from the journeys and can be reset to them.
+    expect(page).toContain('<input type="checkbox" name="policy:uc:immz" data-jv-check checked>');
+    expect(page).toContain('<input type="checkbox" name="policy:uc:ips" data-jv-check>');
+    const statement = /data-jp-usecase>([^<]*)<\/textarea>/.exec(page)![1]!;
+    expect(statement.startsWith("A pilgrim checked at home should be treated abroad.\n• ")).toBe(true);
+    expect(page).toContain('data-jp-text-reset="policy:lab:use-case"');
+    // The journey's questions: the same keys as the walkthrough's, so an answer written in either shows in both.
+    expect(page).toContain('name="policy:q:P2:0"');
+    expect(page).toContain('name="policy:q:P1:0"');
+    expect(page).toContain('name="policy:q:P2:1"');
+    // Readiness rows grouped and rated; decision rights with who holds them; the gap strip's own radios.
+    expect(page).toContain("<h4>Strategy &amp; investment</h4>");
+    expect(page).toContain('name="policy:rate:ready:twg" value="not-yet"');
+    expect(page).toContain('name="policy:hold:rights:anchor"');
+    expect(page).toContain('name="policy:viewer:status" value="no"');
+    // The summary: one model of every answer, the gap report, the closing questions with a write-in, and the credit.
+    const model = JSON.parse(/<script type="application\/json" data-jp-lab-model>([\s\S]*?)<\/script>/.exec(page)![1]!);
+    expect(model.map((x: { id: string }) => x.id)).toEqual(["team", "use-case", "readiness", "decide", "summary"]);
+    const names = model.flatMap((x: { items: { name: string }[] }) => x.items.map((i) => i.name));
+    expect(names).toEqual(expect.arrayContaining(["policy:lab:team:members", "policy:uc:immz", "policy:lab:use-case", "policy:rate:ready:strategy", "policy:hold:rights:anchor", "policy:q:P2:1", "policy:viewer:status", "policy:dq:q1"]));
+    expect(page).toContain("data-jp-gapreport");
+    expect(page).toContain("data-jp-lab-csv");
+    expect(page).toContain('name="policy:dq:q1"');
+    expect(page).toContain('href="https://example.org/lab/"');
+    expect(page).toMatch(/Adapted from a lab, CC BY 4\.0\. <a class="jp-ext" href="https:\/\/example\.org\/lab\/"[^>]*>The lab/);
+    // A lab naming a table it does not list is refused.
+    const bad = WorkshopSchema.safeParse({ ...ws, $schema: "workshop/0.1.0", lab: { ...lab, steps: [{ id: "x", label: "X", title: "X", holders: ["nowhere"] }] } });
+    expect(bad.success).toBe(false);
+  });
   test("JV-07: every page's header has Reset Simulation, scoped to the workshop, returning to the overview", () => {
     for (const path of ["overview", "walkthrough/P2", "map", "how", "demo/S2"]) {
       const page = at(`${base}/${path}/index.html`);

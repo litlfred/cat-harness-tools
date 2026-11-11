@@ -48,4 +48,14 @@ describe("needs-at-main", () => {
     expect(l.get("smart-base")).toEqual({ repository: "litlfred/smart-base", upstreamRoot: "smart-base" });
     expect(l.get("cat-harness")?.upstreamRoot).toBe("");
   });
+
+  test("the current lock's mounts carry the owner, so a layer moved to another owner is fetched from there", () => {
+    writeFileSync(
+      join(root, "index.lock.json"),
+      JSON.stringify({ mounts: [{ harness: "smart-base", repository: "WorldHealthOrganization/smart-base", ref: "a".repeat(40) }, { harness: "dpi-h-ra", repository: "WorldHealthOrganization/smart-ra", ref: "b".repeat(40) }] }),
+    );
+    const l = lockedInstances(root);
+    expect(l.get("smart-base")?.repository).toBe("WorldHealthOrganization/smart-base");
+    expect(l.get("dpi-h-ra")?.repository).toBe("WorldHealthOrganization/smart-ra");
+  });
 });
