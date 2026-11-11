@@ -12,6 +12,9 @@ import { join } from "node:path";
 import { buildCommand, installCommand, parseWebApp, WEB_APP_V01 } from "../../schemas/ui/web-app.ts";
 import { indexHtml, markChromeless, readApp, routeClashes, type DeclaredApp } from "../gen-web-apps.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
+import { appPoPath, appPot, localeStrings, potCurrent, readCatalog } from "../web-app-strings.ts";
+import { extractTemplates, injectStrings, targetLocales } from "../gen-web-apps.ts";
+import { existsSync, readFileSync } from "node:fs";
 
 const tmp = mkdtempSync(join(tmpdir(), "web-apps-"));
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
@@ -77,8 +80,8 @@ describe("readApp", () => {
 describe("routeClashes", () => {
   test("two layers declaring one app id are both named", () => {
     const app = parseWebApp(manifest());
-    const a: DeclaredApp = { layer: "smart-trust", directory: "onboarding-game", dir: "/a", app };
-    const b: DeclaredApp = { layer: "smart-trust-demo", directory: "game", dir: "/b", app };
+    const a: DeclaredApp = { layer: "smart-trust", layerRoot: "/st", directory: "onboarding-game", dir: "/a", app };
+    const b: DeclaredApp = { layer: "smart-trust-demo", layerRoot: "/std", directory: "game", dir: "/b", app };
     const [c] = routeClashes([a, b]);
     expect(c).toContain("smart-trust/onboarding-game");
     expect(c).toContain("smart-trust-demo/game");
@@ -115,5 +118,56 @@ describe("indexHtml", () => {
   });
   test("says so when nothing is declared", () => {
     expect(indexHtml([])).toContain("No directory of kind");
+  });
+});
+
+describe("translation through the harness's process", () => {
+  const catalog = { "title.start": "Start onboarding", "splash.liveIn": "Live in {domains}." };
+  const po = (entries: [string, string, string][]) =>
+    entries.map(([ctx, id, str]) => `msgctxt "${ctx}"\nmsgid "${id}"\nmsgstr "${str}"\n`).join("\n");
+
+  test("the template carries one ui-string per key, the key as msgctxt", () => {
+    const pot = appPot({ id: "onboarding-game", title: "Join the Network" }, catalog, "onboarding-game/i18n/en.json", "fr");
+    expect(pot).toContain('msgctxt "title.start"');
+    expect(pot).toContain('msgid "Live in {domains}."');
+    expect(pot).toContain('"Language: fr\\n"');
+    expect(potCurrent(pot.replace(/POT-Creation-Date: [^\\]*/, "POT-Creation-Date: 1999"), pot)).toBe(true);
+    expect(potCurrent(undefined, pot)).toBe(false);
+  });
+  test("a locale: translated, missing, placeholder dropped, stale", () => {
+    const r = localeStrings(
+      catalog,
+      po([
+        ["title.start", "Start onboarding", "Commencer"],
+        ["splash.liveIn", "Live in {domains}.", "En service."],
+        ["gone", "Old text", "Ancien"],
+      ]),
+    );
+    expect(r.strings).toEqual({ "title.start": "Commencer" });
+    expect(r.placeholderErrors).toEqual(["splash.liveIn"]);
+    expect(r.stale).toEqual(["gone"]);
+    expect(localeStrings(catalog, "").missing.sort()).toEqual(["splash.liveIn", "title.start"]);
+  });
+  test("a catalog must be flat strings", () => {
+    expect(() => readCatalog({ a: 1 }, "x")).toThrow(/not a non-empty string at a/);
+    expect(() => readCatalog([], "x")).toThrow(/flat JSON object/);
+  });
+  test("templates are written per target locale in the layer, and the build writes each locale's JSON", () => {
+    const layerRoot = join(tmp, "layer");
+    const dir = join(layerRoot, "game");
+    mkdirSync(join(dir, "i18n"), { recursive: true });
+    writeFileSync(join(dir, "i18n", "en.json"), JSON.stringify(catalog));
+    const app = parseWebApp(manifest({ locales: ["en", "fr", "ar"], i18n: { catalog: "i18n/en.json", out: "public/i18n" } }));
+    const a = { layer: "l", layerRoot, directory: "game", dir, app };
+    expect(targetLocales(app)).toEqual(["fr", "ar"]);
+    expect(extractTemplates(a, true)).toHaveLength(2);
+    expect(extractTemplates(a, false)).toEqual([]);
+    expect(existsSync(join(layerRoot, appPoPath(app, "ar", "pot")))).toBe(true);
+    expect(extractTemplates(a, true)).toEqual([]);
+    mkdirSync(join(layerRoot, "translations", "fr", "apps"), { recursive: true });
+    writeFileSync(join(layerRoot, appPoPath(app, "fr", "po")), po([["title.start", "Start onboarding", "Commencer"]]));
+    expect(injectStrings(a, false)).toEqual([]);
+    expect(JSON.parse(readFileSync(join(dir, "public", "i18n", "fr.json"), "utf-8"))).toEqual({ "title.start": "Commencer" });
+    expect(JSON.parse(readFileSync(join(dir, "public", "i18n", "ar.json"), "utf-8"))).toEqual({});
   });
 });

@@ -77,6 +77,17 @@ export const WebAppKind = nodeKind(
     chrome: z.literal("none").default("none"),
     /** BCP 47 tags of the languages it ships. */
     locales: z.array(z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]+)*$/)).min(1),
+    /**
+     * Its UI strings, translated through the harness's translation process
+     * (`multi-locale-translation`, `translation-refresh`) like any other
+     * template: `catalog` is a flat JSON object `{ key: text }` in the first of
+     * `locales`; `web-apps:build --extract` writes it to
+     * `translations/<locale>/apps/<id>.pot` in the declaring layer; the build
+     * writes each locale's translated strings to `<out>/<locale>.json` before
+     * the app builds, so building IS the injection. The app falls back to the
+     * source text per string.
+     */
+    i18n: z.object({ catalog: InnerPath, out: InnerPath }).strict().optional(),
     /** The declaring layer's directory ids it reads at build time. */
     contentFrom: z.array(z.string().min(1)).default([]),
     /** The size its build may reach, in MB, before the size review flags it. */

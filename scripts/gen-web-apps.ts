@@ -25,13 +25,22 @@
  *   bun run cat web-apps:build                     # build every app into the harness's own site
  *   bun run cat web-apps:build -- --site <dir>     # into a site being built
  *   bun run cat web-apps:build -- --only <id>      # one app
- *   bun run cat web-apps:build -- --check          # validate the declarations only; build nothing
+ *   bun run cat web-apps:build -- --check          # validate the declarations and translations; build nothing
+ *   bun run cat web-apps:build -- --extract        # write each app's translation templates
+ *
+ * ## Translation
+ *
+ * An app that declares `i18n` is translated through the harness's own
+ * process (`multi-locale-translation`, `translation-refresh`): `--extract` is
+ * the "refresh the templates" step, writing `translations/<locale>/apps/<id>.pot`
+ * in the declaring layer; the build reads each `.po` and writes
+ * `<i18n.out>/<locale>.json` before the app builds. See `web-app-strings.ts`.
  *
  * Exit: 0 built (or nothing declared) · 1 a manifest is invalid or a build failed.
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 
 import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { buildCommand, installCommand, parseWebApp, WEB_APP_FILE, type WebApp } from "../schemas/ui/web-app.ts";
@@ -40,6 +49,7 @@ import { declaredPageRoute, withRenderedBy, withRenderedByFrontMatter } from "./
 import { themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { appPoPath, appPot, localeStrings, potCurrent, readCatalog } from "./web-app-strings.ts";
 
 export const TOOL_ID = "web-app-build";
 export const KIND = "web-app";
@@ -47,6 +57,8 @@ export const KIND = "web-app";
 /** One declared app: where it is, and what its manifest says. */
 export interface DeclaredApp {
   layer: string;
+  /** Absolute path of the declaring layer's root, where its `translations/` are. */
+  layerRoot: string;
   directory: string;
   /** Absolute path of the app's directory. */
   dir: string;
@@ -63,7 +75,7 @@ export function declaredApps(repoRoot: string): DeclaredApp[] {
     for (const d of decl?.directories ?? []) {
       if (!(d.graphTypologies ?? []).includes(KIND)) continue;
       const dir = join(root, d.path);
-      out.push({ layer: decl!.name, directory: d.id, dir, ...readApp(dir) });
+      out.push({ layer: decl!.name, layerRoot: root, directory: d.id, dir, ...readApp(dir) });
     }
   }
   return out;
@@ -99,6 +111,59 @@ export function routeClashes(apps: readonly DeclaredApp[]): string[] {
     else seen.set(a.app.id, a);
   }
   return out;
+}
+
+/** The locales an app translates into: all but its source, the first. */
+export const targetLocales = (app: WebApp): string[] => app.locales.slice(1);
+
+const readText = (f: string): string | undefined => (existsSync(f) ? readFileSync(f, "utf-8") : undefined);
+
+/** An app's catalog, or a problem in words. */
+export function appCatalog(a: DeclaredApp & { app: WebApp }): { catalog?: Record<string, string>; problem?: string } {
+  if (a.app.i18n === undefined) return {};
+  const file = join(a.dir, a.app.i18n.catalog);
+  try {
+    return { catalog: readCatalog(JSON.parse(readFileSync(file, "utf-8")), file) };
+  } catch (e) {
+    return { problem: (e as Error).message };
+  }
+}
+
+/** Write (or with `check`, compare) each target locale's template. Returns the problems. */
+export function extractTemplates(a: DeclaredApp & { app: WebApp }, check: boolean): string[] {
+  const { catalog, problem } = appCatalog(a);
+  if (problem !== undefined) return [problem];
+  if (catalog === undefined) return [];
+  const problems: string[] = [];
+  for (const locale of targetLocales(a.app)) {
+    const file = join(a.layerRoot, appPoPath(a.app, locale, "pot"));
+    const fresh = appPot(a.app, catalog, relative(a.layerRoot, join(a.dir, a.app.i18n!.catalog)), locale);
+    if (potCurrent(readText(file), fresh)) continue;
+    if (check) problems.push(`${relative(a.layerRoot, file)} is ${existsSync(file) ? "stale" : "missing"}: run web-apps:build --extract`);
+    else { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, fresh); console.log(`  wrote ${relative(a.layerRoot, file)}`); }
+  }
+  return problems;
+}
+
+/** Check each locale's `.po`, and unless `check`, write `<out>/<locale>.json`. Returns the problems; prints coverage. */
+export function injectStrings(a: DeclaredApp & { app: WebApp }, check: boolean): string[] {
+  const { catalog, problem } = appCatalog(a);
+  if (problem !== undefined) return [problem];
+  if (catalog === undefined) return [];
+  const problems: string[] = [];
+  const total = Object.keys(catalog).length;
+  for (const locale of targetLocales(a.app)) {
+    const r = localeStrings(catalog, readText(join(a.layerRoot, appPoPath(a.app, locale, "po"))) ?? "");
+    for (const k of r.placeholderErrors) problems.push(`${locale}: "${k}" drops or adds a {placeholder}`);
+    for (const k of r.stale) problems.push(`${locale}: a translation for "${k}", which the catalog no longer has`);
+    console.log(`  ${a.app.id} ${locale}: ${Object.keys(r.strings).length}/${total} translated${r.missing.length > 0 ? ` (${r.missing.length} fall back to ${a.app.locales[0]})` : ""}`);
+    if (!check) {
+      const out = join(a.dir, a.app.i18n!.out, `${locale}.json`);
+      mkdirSync(dirname(out), { recursive: true });
+      writeFileSync(out, `${JSON.stringify(r.strings, null, 2)}\n`);
+    }
+  }
+  return problems;
 }
 
 /**
@@ -174,6 +239,8 @@ function run(argv: string[], cwd: string): boolean {
 
 /** Build one app and copy its output to `dest`, marking every page. Returns the bytes written, or a problem. */
 export function buildApp(a: DeclaredApp & { app: WebApp }, dest: string): { bytes?: number; problem?: string } {
+  const strings = injectStrings(a, false);
+  if (strings.length > 0) return { problem: strings.join("; ") };
   if (!run(installCommand(a.app), a.dir)) return { problem: "install failed" };
   if (!run(buildCommand(a.app), a.dir)) return { problem: "build failed" };
   const out = join(a.dir, a.app.build.outDir);
@@ -192,6 +259,7 @@ export function buildApp(a: DeclaredApp & { app: WebApp }, dest: string): { byte
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const check = args.includes("--check");
+  const extract = args.includes("--extract");
   const only = args.includes("--only") ? args[args.indexOf("--only") + 1] : undefined;
   const repoRoot = repoRootFor(HARNESS_ROOT);
   const route = declaredPageRoute(HARNESS_ROOT, TOOL_ID);
@@ -204,8 +272,15 @@ if (import.meta.main) {
   let failed = clashes.length > 0;
   for (const c of clashes) console.error(`  ✗ ${c}`);
   for (const a of apps) if (a.problem !== undefined) { console.error(`  ✗ ${a.layer}/${a.directory}: ${a.problem}`); failed = true; }
-  if (check) {
-    for (const a of apps) if (a.problem === undefined) console.log(`  ✓ ${a.layer}/${a.directory}: ${a.app!.id}`);
+  if (check || extract) {
+    for (const a of apps) {
+      if (a.problem !== undefined) continue;
+      const ok = a as DeclaredApp & { app: WebApp };
+      const problems = [...extractTemplates(ok, check), ...(check ? injectStrings(ok, true) : [])];
+      for (const p of problems) console.error(`  ✗ ${a.layer}/${a.app!.id}: ${p}`);
+      if (problems.length > 0) failed = true;
+      else if (check) console.log(`  ✓ ${a.layer}/${a.directory}: ${a.app!.id}`);
+    }
     process.exit(failed ? 1 : 0);
   }
   const site = siteTarget(join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT)));
