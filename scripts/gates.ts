@@ -1505,6 +1505,15 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "own to judge, so `bun run cat layers:check` here would only report `skipped`",
   },
   {
+    script: "lock:coherence:check",
+    kind: "covered-by",
+    reason:
+      "runs in the CALLER'S CI, not this layer's: job `lock-coherence` of `layer-pr-checks.yml` runs it at the commit the " +
+      "caller's lock pins, on every pull request that changes `index.lock.json` (owner, 2026-11-11: a lock whose harness " +
+      "pins disagree with the pinned harnesses' own locks may not reach main, after who-iris main went red at a43a4d27). " +
+      "This layer has no lock of its own to judge, so `bun run cat lock:coherence:check` here only reports nothing to check",
+  },
+  {
     script: "translate-user-scenarios:check",
     kind: "no-folio",
     reason:
