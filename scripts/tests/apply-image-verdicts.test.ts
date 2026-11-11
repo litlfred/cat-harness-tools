@@ -129,6 +129,24 @@ describe("runStaging — what it writes", () => {
     expect(out.images[0].narrative[0].text).toBe(LOGO.draft);
   });
 
+  test("translations land as one draft per language, beside the primary", () => {
+    // The six UN languages (owner, 2026-11-11): one narrative per language.
+    const f = fixture();
+    const v = { ...LOGO, translations: { fr: "Logo d'OpenHands : deux mains jaunes levées.", es: "Logotipo de OpenHands: dos manos amarillas alzadas." } };
+    writeVerdicts(f.lib, { [f.docId]: { "img-p003-1": v } });
+    expect(runStaging(f.entry, f.lib, false)).toBe(0);
+
+    const n = JSON.parse(readFileSync(f.path, "utf-8")).images[0].narrative;
+    expect(n.map((x: { lang: string; state: string }) => `${x.lang}:${x.state}`)).toEqual(["en:draft", "fr:draft", "es:draft"]);
+    expect(n[1].text).toBe(v.translations.fr);
+  });
+
+  test("a translation in the verdict's own language is refused", () => {
+    const f = fixture();
+    writeVerdicts(f.lib, { [f.docId]: { "img-p003-1": { ...LOGO, translations: { en: "again" } } } });
+    expect(() => runStaging(f.entry, f.lib, false)).toThrow(/own language/);
+  });
+
   test("the geometry basis is REPLACED by an inspection basis", () => {
     // `logo` cannot sit on a geometry basis at all — the schema refuses it,
     // because no measurement of a placed rectangle distinguishes a mark from a
