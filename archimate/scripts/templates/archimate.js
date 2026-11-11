@@ -180,8 +180,8 @@
   }
 
   function kindOf(c) {
-    if (c.types.indexOf(NS + "Model") >= 0) return "model";
-    if (c.types.indexOf(NS + "Diagram") >= 0) return "view";
+    if (c.types.some(function (t) { return t === NS + "Model"; })) return "model";
+    if (c.types.some(function (t) { return t === NS + "Diagram"; })) return "view";
     return { element: "element", relationship: "relationship" }[c.kind];
   }
 

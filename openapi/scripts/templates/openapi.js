@@ -211,7 +211,7 @@
     host = body;
     var a = function (k) { return c.element.getAttribute("data-kg-" + k); };
     cfg = {
-      kind: c.types.indexOf(WEB_API) >= 0 ? "document" : "operation",
+      kind: c.types.some(function (t) { return t === WEB_API; }) ? "document" : "operation",
       node: c.alternates["application/ld+json"],
       openapi: a("openapi"),
       method: a("method"),

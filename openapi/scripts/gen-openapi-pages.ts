@@ -263,7 +263,7 @@ export function pagesForGraph(o: { instance: string; config: ReturnType<typeof r
  */
 /** Is this page one of ours — by the node it declares, not by its name or its directory? */
 export function isOpenApiPage(html: string): boolean {
-  return pageNodeOf(html)?.rdfa.some((n) => n.types.includes(WEB_API) || n.types.includes(HYDRA_OPERATION)) ?? false;
+  return pageNodeOf(html)?.rdfa.some((n) => n.types.some((t) => t === WEB_API || t === HYDRA_OPERATION)) ?? false;
 }
 
 function orphans(root: string, wanted: Set<string>): string[] {

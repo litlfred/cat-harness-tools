@@ -95,7 +95,7 @@ ${decl.stub}
 
 /** Is this file a todo page — by its own declaration, not by its path? */
 export function isTodoPage(content: string): boolean {
-  return pageNodeOf(content)?.rdfa.some((n) => n.types.includes(TODO_CLASS)) ?? false;
+  return pageNodeOf(content)?.rdfa.some((n) => n.types.some((t) => t === TODO_CLASS)) ?? false;
 }
 
 /** Is this file a todo page written before issue #1830 — by its old config block? For the orphan sweep only. */
