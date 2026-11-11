@@ -1341,10 +1341,15 @@ def _adjust_banner_mark(lines: list[str], pi: int, li: int, span: int = 1) -> tu
     return (pi, li)
 
 
+def _banner(on: bool, lines: list[str], pi: int, li: int, span: int = 1) -> tuple[int, int]:
+    """`_adjust_banner_mark` when `on`, else the heading's own line."""
+    return _adjust_banner_mark(lines, pi, li, span) if on else (pi, li)
+
+
 RE_STEP_TITLE = re.compile(r"^Step \d+\.\s+(.+)$")
 
 
-def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
+def locate_heading(pages: list[str], e: TocEntry, banner: bool = True) -> tuple[int, int] | None:
     """`(page_idx, line_idx)` of the line that prints outline entry `e`, or None.
 
     Searched within two pages either side of the entry's own page. Factored out
@@ -1356,7 +1361,7 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
     # is looked for without it.
     step = RE_STEP_TITLE.match(e.title)
     if step:
-        found = locate_heading(pages, replace(e, title=step.group(1)))
+        found = locate_heading(pages, replace(e, title=step.group(1)), banner)
         if found:
             return found
     needle = _match_key(e.title)[:44]
@@ -1378,9 +1383,9 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
             if li + 1 < len(lines) and re.fullmatch(r"[A-Z0-9]{1,3}(\.[A-Z0-9]{1,3})*\.?", line.strip()):
                 cand = _match_key(line + " " + lines[li + 1])
             if needle in cand and len(cand) < 120:
-                return _adjust_banner_mark(lines, pi, li, 1)
+                return _banner(banner, lines, pi, li, 1)
             if run_in and _starts_run_in(cand, run_in):
-                return _adjust_banner_mark(lines, pi, li, 1)
+                return _banner(banner, lines, pi, li, 1)
         # Multi-line wrapped display headings ("National Trust / Architecture for /
         # the DDCC:VS" on DDCC p. 63; "Generic business processes / and workflows"
         # on DAK p. 36) on the same page before moving to neighbouring pages.
@@ -1390,7 +1395,7 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
                     continue
                 cand = _match_key(" ".join(lines[li : li + span]))
                 if needle in cand and len(cand) < 160:
-                    return _adjust_banner_mark(lines, pi, li, span)
+                    return _banner(banner, lines, pi, li, span)
     # Minor wording inflections between the contents page and the body heading
     # ("Tally sheets..." vs "Tally sheet... - example 1" on LNOB p. 41;
     # "Links..." vs "Linkages..." on DAK p. 23; "Health interventions and
@@ -1409,7 +1414,7 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
                         _pdf_headings.similar(key, ck) >= 0.84
                         or _pdf_headings.similar(key[:40], ck[:40]) >= 0.88
                     ):
-                        return _adjust_banner_mark(lines, pi, li, span)
+                        return _banner(banner, lines, pi, li, span)
     return None
 
 
@@ -1935,7 +1940,8 @@ def print_order_text(page) -> str:
     """A page's text blocks in print order: top to bottom, a band of columns left column first.
 
     A block wider than WIDE_BLOCK of the page (a heading, a full-width figure
-    caption) closes the band of columns above it. Blocks keep their own lines,
+    caption), or one that starts below every block of the band, closes the
+    band of columns above it. Blocks keep their own lines,
     so two columns are never interleaved line by line.
     """
     width = page.rect.width
@@ -1954,13 +1960,23 @@ def print_order_text(page) -> str:
         if b[2] - b[0] > WIDE_BLOCK * width:
             flush()
             out.append(b[4].rstrip("\n"))
-        else:
-            band.append(b)
+            continue
+        # A block that starts a clear gap below everything in the band starts
+        # a new band: 10665-353150 page 72 prints two columns, then "4.5
+        # Contrôle des progrès" 33pt under both, and sorting it into the left
+        # column put the heading above the right column's text. Touching
+        # blocks stay in the band: 10665-342236 page 11's table rows start
+        # where the right column's heading ends.
+        if band and b[1] >= max(x[3] for x in band) + BAND_GAP:
+            flush()
+        band.append(b)
     flush()
     return "\n".join(out) + "\n"
 
 
 WIDE_BLOCK = 0.6
+# Points of empty space above a block that close the band of columns over it.
+BAND_GAP = 12.0
 
 
 def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
@@ -1970,6 +1986,12 @@ def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
 
     for e in toc:
         found = locate_heading(pages, e)
+        if found and found in used and found[1] == 0:
+            # The banner rule moved a heading at a page's foot to line 0, which
+            # another heading already opens. 10665-342236 page 8, read in
+            # print order, ends with "Key figures in 2020" over a chart: it
+            # really is the last heading there, so it keeps its own line.
+            found = locate_heading(pages, e, banner=False)
         if found and found not in used:
             used.add(found)
             marks.append((found[0], found[1], e))
