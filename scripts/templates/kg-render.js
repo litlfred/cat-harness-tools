@@ -2,12 +2,12 @@
 //
 // A page says what it renders in standard markup, not in a script of ours:
 //
-//   <html prefix="archimate: http://www.opengroup.org/xsd/archimate/3.0/">
+//   <html prefix="archimate: http://www.opengroup.org/xsd/archimate/3.0/">   (or `prefix` on the element)
 //   <link rel="alternate" type="application/ld+json" href="../E1.jsonld">
 //   <main resource="https://…/elements/E1" typeof="archimate:ApplicationComponent">
 //
 // This script finds every element carrying `resource` and `typeof`, expands
-// the classes over `<html prefix>`, and hands the element to the renderer a
+// the classes over the `prefix` attributes in scope, and hands the element to the renderer a
 // family registered for one of its classes (an exact class IRI) or for the
 // class's namespace (an IRI ending in `/`), the longest match winning. A
 // family registers without caring which script loads first:
@@ -31,10 +31,18 @@
   });
   var defs = [];
 
-  function prefixes() {
+  // The prefixes in scope at `element`: every `prefix` attribute on it and its
+  // ancestors, the nearest winning (RDFa 1.1). A themed page, whose layout
+  // owns <html>, declares them on the element itself.
+  function prefixes(element) {
     var out = {};
-    var parts = (document.documentElement.getAttribute("prefix") || "").trim().split(/\s+/);
-    for (var i = 0; i + 1 < parts.length; i += 2) out[parts[i].replace(/:$/, "")] = parts[i + 1];
+    for (var n = element; n && n.getAttribute; n = n.parentNode) {
+      var parts = (n.getAttribute("prefix") || "").trim().split(/\s+/);
+      for (var i = 0; i + 1 < parts.length; i += 2) {
+        var k = parts[i].replace(/:$/, "");
+        if (!Object.prototype.hasOwnProperty.call(out, k)) out[k] = parts[i + 1];
+      }
+    }
     return out;
   }
   function expand(curie, px) {
@@ -62,7 +70,7 @@
   }
   function render(element) {
     if (element.hasAttribute("data-kg-rendered")) return;
-    var px = prefixes();
+    var px = prefixes(element);
     var types = element.getAttribute("typeof").trim().split(/\s+/).map(function (t) { return expand(t, px); });
     var def = find(types);
     if (!def) return;

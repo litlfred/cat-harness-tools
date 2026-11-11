@@ -258,7 +258,7 @@ export function thinPageConfigOf(content: string, configId: string): Record<stri
 
 /** What a page declares about its node, read back from its markup. */
 export interface DeclaredNode {
-  /** `<html prefix>`, parsed. */
+  /** Every `prefix` attribute on the page, parsed. */
   prefixes: Record<string, string>;
   /** Every element carrying both `resource` and `typeof`, classes expanded to full IRIs where a prefix is declared. */
   rdfa: Array<{ iri: string; types: string[] }>;
@@ -281,11 +281,13 @@ function expand(curie: string, prefixes: Record<string, string>): string {
  * `undefined` when the page declares no node at all.
  */
 export function pageNodeOf(html: string): DeclaredNode | undefined {
+  // Every `prefix` attribute on the page, on <html> or on the node's own
+  // element (a themed page, whose layout owns <html>). Pages here declare
+  // each prefix once, so scope does not matter for reading them back.
   const prefixes: Record<string, string> = {};
-  const pa = /<html\b[^>]*\sprefix="([^"]*)"/.exec(html)?.[1];
-  if (pa !== undefined) {
-    const parts = unesc(pa).trim().split(/\s+/);
-    for (let i = 0; i + 1 < parts.length; i += 2) prefixes[parts[i]!.replace(/:$/, "")] = parts[i + 1]!;
+  for (const m of html.matchAll(/<[a-zA-Z][\w-]*\b[^>]*\sprefix="([^"]*)"/g)) {
+    const parts = unesc(m[1]!).trim().split(/\s+/);
+    for (let i = 0; i + 1 < parts.length; i += 2) prefixes[parts[i]!.replace(/:$/, "")] ??= parts[i + 1]!;
   }
   const rdfa: DeclaredNode["rdfa"] = [];
   for (const m of html.matchAll(/<[a-zA-Z][\w-]*\b([^>]*)>/g)) {
@@ -296,7 +298,8 @@ export function pageNodeOf(html: string): DeclaredNode | undefined {
     rdfa.push({ iri: unesc(r), types: unesc(t).trim().split(/\s+/).map((x) => expand(x, prefixes)) });
   }
   let stub: DeclaredNode["stub"];
-  const s = /<head>[\s\S]*?<script type="application\/ld\+json">([^<]*)<\/script>[\s\S]*?<\/head>/.exec(html)?.[1];
+  // The stub: the first JSON-LD script, in the head or (a themed page) beside the node's element.
+  const s = /<script type="application\/ld\+json">([^<]*)<\/script>/.exec(html)?.[1];
   if (s !== undefined) {
     try {
       const j = JSON.parse(s) as { "@context"?: Record<string, string>; "@id"?: string; "@type"?: string | string[] };
@@ -317,7 +320,7 @@ export function pageNodeProblems(html: string): string[] {
   const d = pageNodeOf(html);
   if (d === undefined) return [];
   const out: string[] = [];
-  if (d.stub === undefined) out.push("declares a node in RDFa but has no JSON-LD stub in its head");
+  if (d.stub === undefined) out.push("declares a node in RDFa but has no JSON-LD stub");
   const first = d.rdfa[0];
   if (first === undefined) out.push("has a JSON-LD stub but no element carries resource and typeof");
   if (d.stub && first) {
@@ -371,4 +374,19 @@ export function nodeStubPageHtml(p: NodeStubPage): string {
 </body>
 </html>
 `;
+}
+
+/**
+ * The node's declaration for a page whose layout owns `<html>` and `<head>`
+ * (a themed Jekyll page): the RDFa attributes WITH their `prefix` (RDFa 1.1
+ * lets any element declare prefixes), and the JSON-LD stub as a body
+ * element. The caller puts `attrs` on the element the renderer fills and
+ * writes `stub` beside it.
+ */
+export function themedNodeDeclaration(node: PageNode, prefixes: Prefixes): { attrs: string; stub: string } {
+  if (/[#?]/.test(node.iri)) throw new Error(`node IRI ${node.iri} has a '#' or '?' — node IRIs are slash IRIs`);
+  return {
+    attrs: ` prefix="${escHtml(prefixValue(prefixes))}"${nodeAttrs(node)}`,
+    stub: `<script type="application/ld+json">${nodeStub(node, prefixes)}</script>`,
+  };
 }
