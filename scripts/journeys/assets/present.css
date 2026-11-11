@@ -778,6 +778,20 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 
 /* ── device screens (scripts/journeys/screens.ts) ─────────────────────── */
 .ds-stage { display: flex; justify-content: center; padding: 8px 0 24px; overflow-x: auto; }
+.ds-state { display: contents; }
+.ds-state[hidden], .ds-states[hidden], .ds-state-try[hidden] { display: none; }
+.ds-states { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; margin: 4px 0 8px; }
+.ds-states-l { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--s500); }
+.ds-states-b { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 999px; background: var(--s200); }
+.ds-state-btn { min-height: 36px; padding: 6px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.ds-state-btn:hover { background: color-mix(in srgb, var(--cobalt) 12%, transparent); }
+.ds-state-btn:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+.ds-state-btn.is-on { background: var(--cobalt); color: #fff; }
+.ds-state-try { flex-basis: 100%; justify-content: center; margin: 0; }
+.ds-device.is-bare .ds-frame { background: none; padding: 0; box-shadow: none; border-radius: 0; }
+.ds-device.is-bare .ds-frame::before, .ds-device.is-bare .ds-frame::after { display: none; }
+.ds-device.is-bare .ds-screen { border-radius: 8px; box-shadow: var(--shadow-sm); border: 1px solid var(--divider); }
+.ds-device.is-bare { padding-bottom: 0; }
 .ds-device { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .ds-owner { display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border-radius: 999px; background: #fff; border: 1px solid var(--divider); box-shadow: var(--shadow-sm); }
 .ds-owner b { display: block; font-size: 14px; color: var(--ink); }
@@ -979,6 +993,8 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-devline-src { font-size: 12px; }
 .jp .jp-expand { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: #0284c7; font-size: 12px; cursor: pointer; padding: 0; }
 .jp-expand .jp-i { width: 13px; height: 13px; }
+.jp .jp-expand[hidden] { display: none; }
+.jp .jp-expand[aria-pressed="false"] { color: var(--s500); }
 .ds-stage:fullscreen { background: var(--s100, #f1f5f9); display: grid; place-items: center; overflow: auto; }
 .ds-statusbar-wide { background: #0b1220; color: #e2e8f0; padding: 8px 22px; font-weight: 500; }
 .ds-statusbar-wide .ds-client { display: inline-flex; align-items: baseline; gap: 8px; }

@@ -19,7 +19,7 @@ import { checkJourneyRefs } from "../journeys/check.ts";
 import { presentationOf, screensFor } from "../journeys/present.ts";
 import { readJourneyCorpus } from "../journeys/read.ts";
 import { renderJourneyPages, ROOT_MARK, type PageFile, type PersonaView } from "../journeys/render.ts";
-import { blockHtml, demoScreensOf, qrMatrix, qrSvg, renderDevice, rowsFromExample, statusBar, type ScreenContext } from "../journeys/screens.ts";
+import { blockHtml, demoScreensOf, qrMatrix, qrSvg, renderDevice, rowsFromExample, stateSwitch, statusBar, type ScreenContext } from "../journeys/screens.ts";
 import { clearDeclaredVisualisers } from "../viewer-declarations.ts";
 
 const REPO = mkdtempSync(join(tmpdir(), "device-screens-"));
@@ -266,6 +266,32 @@ describe("drawing a screen", () => {
     expect(phone).not.toContain("ds-split");
     expect(phone).toContain("ds-statusbar");
     expect(phone.indexOf("main")).toBeLessThan(phone.indexOf("side"));
+  });
+  test("a screen with states draws every state, the first shown, and a switch that waits for the script", () => {
+    const s = parseDeviceScreen({
+      $schema: "device-screen/0.1.0",
+      id: "S4",
+      title: "t",
+      device: "tablet",
+      owner: "kamal",
+      steps: [{ scenario: "a", step: "A" }],
+      blocks: [{ type: "statusBadge", id: "v", status: "verified", text: "VALID SIG" }, { type: "note", text: "main" }],
+      stateLabel: "Valid card",
+      states: [{ id: "tampered", label: "Tampered card", blocks: [{ type: "statusBadge", id: "v", status: "failed", text: "SIG MISMATCH" }], try: "Ask the room" }],
+    });
+    const html = renderDevice(s, ctx);
+    expect(html).toContain('<div class="ds-state" data-ds-state="default">');
+    expect(html).toContain('<div class="ds-state" data-ds-state="tampered" hidden>');
+    expect(html.indexOf("VALID SIG")).toBeLessThan(html.indexOf("SIG MISMATCH"));
+    expect(html.match(/class="ds-statusbar/g)!.length).toBe(1);
+    const sw = stateSwitch(s);
+    expect(sw).toContain('data-ds-switch="S4" hidden');
+    expect(sw).toContain('data-ds-show="default" aria-pressed="true">Valid card');
+    expect(sw).toContain('data-ds-show="tampered" aria-pressed="false">Tampered card');
+    expect(sw).toContain('data-ds-state="tampered" hidden>');
+    const plain = { ...s, states: undefined, stateLabel: undefined };
+    expect(stateSwitch(plain)).toBe("");
+    expect(renderDevice(plain, ctx)).not.toContain("ds-state");
   });
   test("a QR code is a real one: finder patterns at three corners, the size of a QR version", () => {
     const m = qrMatrix("https://example.org/shl#x");
