@@ -44,7 +44,7 @@ import { readLibraryGraph, referencedCatalogueEntries, type LibraryGraph, type L
 } from "./library-graph.ts";
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
-import { DOCUMENT_VIEW_JS, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
+import { DOCUMENT_VIEW_JS, entryFigureFiles, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
 import { LANGUAGE_TOGGLE_JS, entryLanguages, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
 import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
 import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
@@ -159,6 +159,14 @@ export const VIEWER_CSS = `/* The block content panel — bean lrmo. Tokens only
 .lib-page #document .seg button[aria-selected="true"] { font-weight: 600; }
 .lib-page #document .docbody { padding: 0 16px 8px; }
 .lib-page #document .dockw { padding: 4px 16px; }
+/* Kept figures and transcribed tables (who-iris#224). */
+.lib-page #document .doc-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: .5rem 0 1rem; }
+.lib-page #document .doc-figure { margin: 0; border: 1px solid var(--border, #8884); border-radius: 6px; padding: 6px; background: var(--card, transparent); }
+.lib-page #document .doc-figure img { display: block; width: 100%; height: auto; max-height: 320px; object-fit: contain; background: #fff; border-radius: 4px; }
+.lib-page #document .doc-figure figcaption { font-size: .85em; margin-top: 6px; }
+.lib-page #document .doc-table { margin: .4rem 0; }
+.lib-page #document .doc-table-scroll { overflow-x: auto; max-width: 100%; }
+.lib-page #document .doc-table table { font-size: .85em; }
 .lib-page #document p.kw, .lib-page #document .dockw p.kw { display: inline; margin: 0; }
 .lib-page #document .docsec p.kw { display: block; margin: 2px 0 6px; }
 .lib-page #document p.kw .pill { margin: 0 2px 2px 0; }
@@ -1938,6 +1946,12 @@ if (import.meta.main) {
       entryDataFiles(dataDir, e.id).doc,
       JSON.stringify(doc ?? { $schema: "folio-library-document/v1", id: e.id, absent: true }, null, 2) + "\n",
     );
+    // The figures and table CSVs the document view shows (who-iris#224),
+    // COPIED like the avatars: the entry's directory is not on the site.
+    // A withheld entry shows none, so none is copied.
+    if (doc && !e.withheld)
+      for (const rel of entryFigureFiles(join(repoRoot, e.dir)))
+        emitBytes(join(dataDir, "files", e.id, rel), readFileSync(join(repoRoot, e.dir, rel)));
   }
 
   for (const e of g.entries) {
