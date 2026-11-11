@@ -130,6 +130,9 @@ export const TABULAR_CSVW_SCHEMA_ID = "folio-tabular-csvw/v1";
  */
 export const TABULAR_CSVW_FILENAME = "tabular.csvw.json";
 
+/** Where the CSV files of tables transcribed from a paged source (a PDF) live, as `tables/<slug>.csv`; each record's `url` points there. */
+export const TABULAR_TABLES_DIR = "tables";
+
 /** The context every CSVW metadata document carries (W3C CSVW Metadata §5.2). */
 export const CSVW_CONTEXT = "http://www.w3.org/ns/csvw";
 

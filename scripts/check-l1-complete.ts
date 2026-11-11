@@ -41,7 +41,7 @@ import {
   TabularRecordsSchema,
   isTabularMimetype,
 } from "../schemas/library/tabular-records.ts";
-import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TabularCsvwSchema } from "../schemas/library/tabular-csvw.ts";
+import { TABULAR_CSVW_FILENAME, TABULAR_CSVW_SCHEMA_ID, TABULAR_TABLES_DIR, TabularCsvwSchema } from "../schemas/library/tabular-csvw.ts";
 import {
   RECORDING_FILENAME,
   RECORDING_SCHEMA_ID,
@@ -200,7 +200,8 @@ export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "record
 // gen-library-jsonld under its `GROUPING_DIRS`).
 // `transcript/` is a recording's transcripts, one file per language (bean `1r0p`).
 // `figure-data/` is a figure transcribed as data for a redrawing (owner, 2026-10-31).
-export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR, FIGURE_DATA_DIR, TRANSCRIPT_DIR];
+// `tables/` is the CSV files of tables transcribed from a PDF's pages, named by `tabular.csvw.json` (who-iris#224).
+export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR, FIGURE_DATA_DIR, TRANSCRIPT_DIR, TABULAR_TABLES_DIR];
 
 /** Sidecars an entry may carry beyond {@link KIND_SIDECAR}'s kind markers. */
 export const ENTRY_SIDECARS: readonly string[] = [
