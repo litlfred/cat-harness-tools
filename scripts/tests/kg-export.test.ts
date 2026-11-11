@@ -45,7 +45,7 @@ import { declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } fro
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { hostSchemaBase } from "../lib/host-schema.ts";
-import { artefactStub, findDeclarationFile, findInstanceRoot, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { artefactStub, findDeclarationFile, findInstanceRoot, instanceDirectoryForGraph, instanceRootsIn, optInDirectoriesForGraph, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
 import { termIri } from "../../schemas/kg/namespaces.js";
 import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import { inAggregate } from "../../test/support/checkout.js";
@@ -785,11 +785,15 @@ describe("every self-URL the export publishes resolves to something published", 
       out.add(`tool-types/${n}.schema.json`);
       out.add(`${hostDir}tool-types/${n}.schema.json`);
     }
-    // The Tool folders: `tools/`, and the `work-plan` sub-graph's since
-    // cat-harness#1014 moved eleven of them there (cat-harness#991 step 23.2).
+    // The Tool folders: the layer's own `tools` graph, and the one inside each
+    // opt-in sub-graph that holds one — `work-plan` since cat-harness#1014,
+    // `integrations` and `kg-ops` since the opt-in waves moved Tools there.
+    // Read from the DECLARATION, the way `discoverTools` finds them: a list of
+    // literals here went stale when a sub-graph gained a `tools` graph, and
+    // its Tools' documents read as dead though the deploy writes them.
     // The document beside each is `tools/<id>.jsonld` whichever folder holds it.
-    // declared-path-literal: the two Tool folders the harness has, one per layout (transitional, cat-harness#991 step 23).
-    const toolDirs = [join(HARNESS_ROOT, "tools"), join(HARNESS_ROOT, "work-plan", "tools")].filter((d) => existsSync(d));
+    const ownTools = instanceDirectoryForGraph(HARNESS_ROOT, "tools");
+    const toolDirs = [...(ownTools === undefined ? [] : [ownTools]), ...optInDirectoriesForGraph(HARNESS_ROOT, "tools")].filter((d) => existsSync(d));
     // Beside the document, so under `<name>/` since #603 decision 1b.
     const docDir = docPath.includes("/") ? docPath.slice(0, docPath.lastIndexOf("/") + 1) : "";
     for (const toolDir of toolDirs) {
