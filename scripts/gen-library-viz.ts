@@ -53,7 +53,7 @@ import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
 import { blobUrl, elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
-import { LIBRARY_JSONLD_SITE_DIR, libraryAssetIri, libraryAssetSitePath } from "../schemas/library/library-iri.ts";
+import { LIBRARY_JSONLD_SITE_DIR, libraryAssetIri, libraryAssetSitePath, libraryStubSitePath } from "../schemas/library/library-iri.ts";
 import { termCurie, termIri } from "../schemas/kg/namespaces.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
 import { subgraphOutDir } from "./gen-subgraph-jsonld.ts";
@@ -68,7 +68,7 @@ import { tileCounts } from "../schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
-import { escHtml, themedNodeDeclaration, type PageNode } from "./thin-page.ts";
+import { escHtml, nodeStubPageHtml, themedNodeDeclaration, type PageNode } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "../schemas/kg/harness-config.js";
 import { gateOwnsFile } from "./lib/gate-own.ts";
@@ -1107,7 +1107,7 @@ export function instanceSources(
   return [
     { label: basename(o.dataFile), href: hrefFrom(o.pageDir, o.dataFile), what: "library projection (JSON)" },
     ...(o.subgraph ? [{ label: SUBGRAPH_INDEX_FILE, href: hrefFrom(o.pageDir, o.subgraph), what: "the instance's subgraph (JSON-LD)" }] : []),
-    ...o.manifests.map((m) => ({ label: `${m.id}/manifest.jsonld`, href: hrefFrom(o.pageDir, m.abs), what: "entry JSON-LD" })),
+    ...o.manifests.map((m) => ({ label: `source/${m.id}.jsonld`, href: hrefFrom(o.pageDir, m.abs), what: "entry JSON-LD" })),
   ];
 }
 
@@ -2059,6 +2059,21 @@ if (import.meta.main) {
         wantedJsonld.add(dest);
         emitBytes(dest, readFileSync(src));
         jsonld = relative(shellDir, dest).split(sep).join("/");
+        // The stub AT the IRI (Q-THIN-3 A): it declares the node and points
+        // to the entry's page, so the extensionless IRI resolves to a page.
+        const stub = join(site, libraryStubSitePath(subject, e.id));
+        wantedJsonld.add(stub);
+        const from = (abs: string): string => relative(dirname(stub), abs).split(sep).join("/");
+        emit(
+          stub,
+          nodeStubPageHtml({
+            title: e.title || e.id,
+            node: { iri: libraryAssetIri(subject, e.id), types: [ENTRY_TYPE] },
+            prefixes: ENTRY_PREFIXES,
+            jsonld: from(dest),
+            page: `${from(shellDir)}/`,
+          }),
+        );
       }
       // ── THE ENTRY'S DECLARED SUB-GRAPHS, BESIDE ITS MANIFEST (bean 8pzh) ──
       //

@@ -33,7 +33,7 @@ import { ReferencedSourceSchema } from "../../../schemas/library/referenced-sour
 import { LibraryIndexSchema } from "../../../schemas/ui/site-indexes.ts";
 import { checkEntry } from "../../check-l1-complete.ts";
 import { readDeclaration, siteDirFor, siteFileFor } from "../../../schemas/kg/cat-harness.ts";
-import { DOCS_SITE, libraryAssetSitePath } from "../../../schemas/library/library-iri.ts";
+import { DOCS_SITE, libraryAssetSitePath, libraryStubSitePath } from "../../../schemas/library/library-iri.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { declaredPageRoute } from "../../viewer-declarations.ts";
 import { siteNotBuilt } from "../../../test/support/checkout.ts";
@@ -167,7 +167,7 @@ function alternateOf(html: string): string | undefined {
 describe("the shell template", () => {
   const shell = entryPageHtml("../../../assets/library/index.json", "smart-base", "../../", {
     id: "smart-trust",
-    jsonld: "../../../assets/library/jsonld/smart-base/smart-trust/manifest.jsonld",
+    jsonld: "../../../assets/library/jsonld/smart-base/source/smart-trust.jsonld",
   });
   test("holds identity only — config and alternate — and loads the shared assets", () => {
     expect(libraryConfigOf(shell)).toEqual({
@@ -176,7 +176,7 @@ describe("the shell template", () => {
       libRoot: "../../",
       entry: "smart-trust",
     });
-    expect(alternateOf(shell)).toBe("../../../assets/library/jsonld/smart-base/smart-trust/manifest.jsonld");
+    expect(alternateOf(shell)).toBe("../../../assets/library/jsonld/smart-base/source/smart-trust.jsonld");
     expect(shell).toContain('<script src="../../../assets/library/viewer.js"></script>');
     expect(shell).toContain('<link rel="stylesheet" href="../../../assets/library/viewer.css">');
     expect(shell).not.toContain("<style>");
@@ -187,6 +187,13 @@ describe("the shell template", () => {
     expect(shell).not.toContain('type="application/json"');
     // A library's own page renders no single entry: it declares none.
     expect(pageNodeOf(viewerHtml("../../assets/library/index.json", "smart-base"))).toBeUndefined();
+  });
+  test("the entry IRI is extensionless kind/id; its JSON-LD and stub sit beside it (Q-THIN-6 B)", () => {
+    const iri = libraryAssetIri("smart-base", "smart-trust");
+    expect(iri).toBe(`${DOCS_SITE}assets/library/jsonld/smart-base/source/smart-trust`);
+    expect(libraryAssetSitePath("smart-base", "smart-trust")).toBe("assets/library/jsonld/smart-base/source/smart-trust.jsonld");
+    expect(libraryStubSitePath("smart-base", "smart-trust")).toBe("assets/library/jsonld/smart-base/source/smart-trust.html");
+    expect(iri).not.toMatch(/[#?]/);
   });
   test("is a THEMED page (2026-10-07): the layout's band, no rail, no folio mount, both sources named", () => {
     // On the theme's default layout, which carries the top band and loads
