@@ -38,6 +38,7 @@ import { renderViewPages, VIEW_SEGMENTS } from "./present-views.ts";
 import { demoScreensOf, DEVICE_GLYPH, type DemoScreen, type DemoSource } from "./screens.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
+import { screenExamples } from "../../schemas/process/device-screen.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
 import { blockFor, fromSite, journeyById, lookup, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
@@ -485,7 +486,9 @@ export function screenHref(pr: WorkshopPresentation, id: string, siteRoot: strin
 /**
  * JSON as HTML with each token in a span (`jp-j-key`, `-str`, `-num`,
  * `-lit`, `-pun`), escaped: the payload drawer's syntax colouring, done once
- * at build so the page needs no highlighter.
+ * at build so the page needs no highlighter. A view page's drawer loads the
+ * JSON instead, and `assets/present.js` colours it with the same rule; the
+ * two must agree (`journeys-viz.test.ts` checks they do).
  */
 export function highlightJson(json: string): string {
   const re = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b|([{}[\],])/g;
@@ -716,6 +719,7 @@ ${ladderHtml}
     ...(pr.presenterNote ? { note: pr.presenterNote } : {}),
     ...(first ? { next: walk(first) } : {}),
     body,
+    foot: viewDrawer(corpus, p, stepsExampleKeys(p.steps), toWorkshop, links ? siteRootFrom(root, links) : root),
   });
 }
 
@@ -805,18 +809,64 @@ export function processLinks(corpus: JourneyCorpus, pr: WorkshopPresentation, j:
   return out.join("");
 }
 
-/** The FHIR payload drawer of a step: every example it names whose JSON this build has, highlighted, with a copy button. */
-export function payloadDrawer(corpus: JourneyCorpus, st: ScenarioStep, pageOf?: (key: string) => string | undefined): string {
-  const keys = [...new Set([...(st.examples ?? []), ...(st.fhirChanges ?? []).flatMap((c) => c.examples ?? [])])].filter((k) => corpus.examples.get(k)?.json);
-  if (keys.length === 0) return "";
-  const tabs = keys.map((k, i) => `<button type="button" role="tab" data-jp-tab="${e(k)}" aria-selected="${i === 0}"${i === 0 ? ' class="is-on"' : ""}>${e(k)}</button>`).join("");
-  const panes = keys
-    .map((k, i) => `<div class="jp-pane" role="tabpanel" data-jp-pane="${e(k)}"${i === 0 ? "" : " hidden"}>${pageOf?.(k) ? `<p class="jp-pane-link">${ext(pageOf(k)!, `${k} in the IG`, "", DAK_ATTR)}</p>` : ""}<pre class="jp-json"><code>${highlightJson(corpus.examples.get(k)!.json!)}</code></pre></div>`)
+/** The FHIR examples a step names, its own and its FHIR changes', once each, in order. */
+export function stepExampleKeys(st: ScenarioStep): string[] {
+  return [...new Set([...(st.examples ?? []), ...(st.fhirChanges ?? []).flatMap((c) => c.examples ?? [])])];
+}
+
+/** Where a view page loads a FHIR example's JSON from: one file per example, under the workshop's `payload/`, coloured by `present.js` as {@link highlightJson} colours it. */
+export function payloadFile(key: string): string {
+  return `payload/${key.replace("/", "-")}.json`;
+}
+
+export interface DrawerOpts {
+  /** The example's page in the IG, when there is one. */
+  pageOf?: (key: string) => string | undefined;
+  /** What the count says the resources belong to: "at this moment", "on this screen", "in this view". */
+  scope: string;
+  /**
+   * From the page to the workshop's directory. Given, each pane loads its
+   * JSON from the shared {@link payloadFile} on first show instead of
+   * carrying it, so a view page stays small however many moments it spans.
+   */
+  toWorkshop?: string;
+}
+
+/** A FHIR payload drawer: each example of `keys` whose JSON this build has, highlighted, with a copy button. Empty when none has JSON. */
+export function drawerFor(corpus: JourneyCorpus, keys: readonly string[], o: DrawerOpts): string {
+  const shown = [...new Set(keys)].filter((k) => corpus.examples.get(k)?.json);
+  if (shown.length === 0) return "";
+  const tabs = shown.map((k, i) => `<button type="button" role="tab" data-jp-tab="${e(k)}" aria-selected="${i === 0}"${i === 0 ? ' class="is-on"' : ""}>${e(k)}</button>`).join("");
+  const code = (k: string) =>
+    o.toWorkshop === undefined
+      ? `<pre class="jp-json"><code>${highlightJson(corpus.examples.get(k)!.json!)}</code></pre>`
+      : `<pre class="jp-json" data-jp-src="${e(o.toWorkshop + payloadFile(k))}"><code>Loading ${e(k)}…</code></pre>`;
+  const panes = shown
+    .map((k, i) => {
+      const page = o.pageOf?.(k);
+      return `<div class="jp-pane" role="tabpanel" data-jp-pane="${e(k)}"${i === 0 ? "" : " hidden"}>${page ? `<p class="jp-pane-link">${ext(page, `${k} in the IG`, "", DAK_ATTR)}</p>` : ""}${code(k)}</div>`;
+    })
     .join("");
   return `<aside class="jp-drawer" data-jp-drawer aria-label="FHIR payload inspector">
-<button type="button" class="jp-drawer-bar" data-jp-drawer-toggle aria-expanded="false">${icon("code", "jp-sky3")}<b>FHIR payload inspector</b><span class="jp-drawer-n">${keys.length} resource${keys.length === 1 ? "" : "s"} at this moment</span><span class="jp-drawer-hint">Click to inspect the raw FHIR JSON</span></button>
+<button type="button" class="jp-drawer-bar" data-jp-drawer-toggle aria-expanded="false">${icon("code", "jp-sky3")}<b>FHIR payload inspector</b><span class="jp-drawer-n">${shown.length} resource${shown.length === 1 ? "" : "s"} ${e(o.scope)}</span><span class="jp-drawer-hint">Click to inspect the raw FHIR JSON</span></button>
 <div class="jp-drawer-body" hidden><div class="jp-drawer-tabs" role="tablist">${tabs}<button type="button" class="jp-copy" data-jp-copy>Copy</button></div>${panes}</div>
 </aside>`;
+}
+
+/** The FHIR payload drawer of a step: every example it names whose JSON this build has, highlighted, with a copy button. */
+export function payloadDrawer(corpus: JourneyCorpus, st: ScenarioStep, pageOf?: (key: string) => string | undefined): string {
+  return drawerFor(corpus, stepExampleKeys(st), { scope: "at this moment", ...(pageOf ? { pageOf } : {}) });
+}
+
+/** A view's drawer: the examples of the steps it spans, loaded from the shared payload files. */
+export function viewDrawer(corpus: JourneyCorpus, p: Presentation, keys: readonly string[], toWorkshop: string, siteRoot: string, scope = "in this view"): string {
+  const pr = p.w.workshop.presentation ?? {};
+  return drawerFor(corpus, keys, { scope, toWorkshop, pageOf: (k) => artifactPage(corpus, pr, k, siteRoot) });
+}
+
+/** The examples of a run of steps, once each, in step order. */
+export function stepsExampleKeys(steps: readonly PresentedStep[]): string[] {
+  return [...new Set(steps.flatMap((s) => stepExampleKeys(s.step)))];
 }
 
 function hood(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, links: SiteLinks, root: string): string {
@@ -1021,6 +1071,12 @@ export function renderPresentationPages(corpus: JourneyCorpus, links: SiteLinks)
     out.push({ path: `${base}/overview/index.html`, content: overviewPage(corpus, p, links) });
     for (const s of p.steps) out.push({ path: `${base}/walkthrough/${s.key}/index.html`, content: stepPage(corpus, p, s, links) });
     for (const f of renderViewPages(corpus, p, links)) out.push({ ...f, path: `${base}/${f.path}` });
+    // The JSON the views' drawers load: once per example, not once per page.
+    const keys = new Set([...stepsExampleKeys(p.steps), ...p.screens.flatMap((x) => (x.node ? screenExamples(x.node.screen) : []))]);
+    for (const k of keys) {
+      const json = corpus.examples.get(k)?.json;
+      if (json) out.push({ path: `${base}/${payloadFile(k)}`, content: json });
+    }
   }
   return out;
 }

@@ -267,7 +267,13 @@ const LINKS: SiteLinks = {
   route: "en/top/journeys",
   title: "Top demonstrator",
   stepPage: (instance, bpmn, process, task) => `kg/${instance}/${bpmn.replace(/\.bpmn$/, "")}/${process}/node/${task}/`,
-  archimateView: (instance, model, view) => ({ svg: `archimate/${model}/views/${view}.svg`, page: `en/${instance}/archimate/${model}/views/${view}/`, name: "P2 view" }),
+  archimateView: (instance, model, view) => ({
+    svg: `archimate/${model}/views/${view}.svg`,
+    page: `en/${instance}/archimate/${model}/views/${view}/`,
+    name: "P2 view",
+    elements: [{ name: "Wallet app", type: "Application Component", page: `en/${instance}/archimate/${model}/element/wallet-app/` }],
+  }),
+  archimateBlock: (instance, block) => (block === "wallet" ? [{ name: "Wallet app", type: "Application Component", page: `en/${instance}/archimate/ra/element/wallet-app/` }] : []),
   processPanel: (_instance, bpmn) => `en/kg/processes/${posix.basename(bpmn, ".bpmn")}.tasks.json`,
 };
 const files = renderJourneyPages(corpus, LINKS, "top");
@@ -571,6 +577,43 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(s2).toContain('<iframe class="jp-device jp-device-tablet" src="../../../../../../../../app/#/demo/S2"');
     expect(s2).toContain('href="../../walkthrough/P2/"');
     expect(s2).toContain("Screen S2 — Flip the toggle");
+  });
+  test("JV-01: each view lists its ArchiMate elements, and a block's page the elements that deploy it, each linked", () => {
+    const pagesOf = (html: string, page: string) => hrefsOf(html, DAK_ATTR).map((h) => landsAt(sitePath(page), h));
+    for (const page of [`${base}/how/index.html`, `${base}/how/wallet/index.html`]) {
+      const html = at(page);
+      expect(html).toContain("The 1 element in this view");
+    }
+    expect(pagesOf(at(`${base}/how/wallet/index.html`), `${base}/how/wallet/index.html`)).toContain("en/top/archimate/ra/element/wallet-app/");
+    expect(wallet).toContain("In the architecture (ArchiMate)");
+    expect(wallet).toContain("<small>Application Component</small>");
+    // A block that no element deploys lists none.
+    const other = files.find((f) => f.path.startsWith(`${base}/how/`) && f.path !== `${base}/how/wallet/index.html` && f.path !== `${base}/how/index.html`);
+    if (other) expect(String(other.content)).not.toContain("In the architecture (ArchiMate)");
+  });
+  test("JV-02: every view has the payload drawer; a view page loads each payload from one shared file, a step page carries it", () => {
+    for (const path of ["overview", "map", "personas", "personas/ana", "how", "how/wallet", "discuss", "sheets", "demo", "demo/S2"]) {
+      const page = at(`${base}/${path}/index.html`);
+      expect(page).toContain("data-jp-drawer");
+      expect(page).toContain('data-jp-tab="Bundle/ana-ips"');
+      expect(page).toContain("data-jp-copy");
+      const src = /<pre class="jp-json" data-jp-src="([^"]+)">/.exec(page)?.[1];
+      expect(src).toBeDefined();
+      expect(landsAt(sitePath(`${base}/${path}/index.html`), src!)).toBe(sitePath(`${base}/payload/Bundle-ana-ips.json`));
+    }
+    expect(JSON.parse(at(`${base}/payload/Bundle-ana-ips.json`))).toMatchObject({ resourceType: "Bundle", id: "ana-ips" });
+    expect(files.filter((f) => f.path.endsWith("/payload/Bundle-ana-ips.json"))).toHaveLength(1);
+    expect(at(`${base}/demo/S2/index.html`)).toContain("resource on this screen");
+    // The step page keeps its JSON inline, so it needs no fetch.
+    expect(p2).not.toContain("data-jp-src");
+  });
+  test("the drawer's script colours JSON exactly as the build does", () => {
+    const js = at("assets/present.js");
+    const src = /\n {2}function esc\(t\) \{[\s\S]*?\n {2}\}\n {2}function highlightJson\(json\) \{[\s\S]*?\n {2}\}\n/.exec(js)?.[0];
+    expect(src).toBeDefined();
+    const run = new Function(`${src}; return highlightJson;`)() as (j: string) => string;
+    const json = JSON.stringify({ resourceType: "Bundle", total: -1.5e3, ok: true, none: null, note: 'a "<b>" & \'x\'', entry: [{}] }, null, 2);
+    expect(run(json)).toBe(highlightJson(json));
   });
   test("the font is vendored and copied as bytes, with its licence", () => {
     const woff = files.find((f) => f.path === "assets/fonts/PlusJakartaSans-Bold.woff2");
