@@ -136,9 +136,133 @@ export interface DocumentView {
     figureSequenceGaps?: string[];
     pageLabelConflicts?: { count: number; items: string[] };
   };
+  /**
+   * The entry's KEPT figures (role `figure`, a WebP file on disk), with every
+   * language's description (who-iris#224). Absent when the entry keeps none.
+   * `file` is relative to the entry; the site copies it to
+   * `assets/library/files/<id>/<file>` ({@link entryFigureFiles}).
+   */
+  images?: DocImage[];
+  /** The entry's transcribed tables (`tabular.csvw.json`), cells inline. Absent when it has none. */
+  tables?: DocTable[];
   withheld: boolean;
   /** Present when the caller gave {@link EntryLinks}: the page draws the links. */
   links?: { repo: string; branch: string; dir: string };
+}
+
+/** One kept figure: where it is, and what it shows in each language (`lang` → text). */
+export interface DocImage {
+  id: string;
+  file: string;
+  page: number | null;
+  /** The captions this render shows (`shows`), vector renders only. */
+  shows?: string[];
+  narratives: Record<string, string>;
+  /** Every description here is a draft until a person confirms it. */
+  state: string;
+}
+
+/** One transcribed table: its grid inline, so the page needs no CSV parser. */
+export interface DocTable {
+  label: string;
+  caption: string;
+  pages: number[];
+  columns: { titles: string; group?: string }[];
+  rows: string[][];
+  notes?: string;
+  narratives: Record<string, string>;
+  /** The CSV beside the record, relative to the entry. */
+  csv: string;
+}
+
+interface RawNarrative { text?: string | null; lang?: string; state?: string }
+const narrativeMap = (raw: unknown): { map: Record<string, string>; state: string } => {
+  const list = (Array.isArray(raw) ? raw : raw && typeof raw === "object" ? [raw] : []) as RawNarrative[];
+  const map: Record<string, string> = {};
+  let state = "draft";
+  for (const n of list) {
+    if (!n || !n.text) continue;
+    map[n.lang || "en"] = n.text;
+    if (n.state) state = n.state;
+  }
+  return { map, state };
+};
+
+/** RFC 4180 CSV, enough for the tables this repository writes (quotes, doubled quotes, newlines in a cell). */
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    if (q) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i++; } else q = false;
+      } else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); rows.push(row); row = []; cell = "";
+    } else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+interface RawImage { id: string; file?: string; role?: string; basis?: { page?: number }; narrative?: unknown; shows?: string[] }
+
+/** The kept figures of an entry: raster images and vector renders whose role is `figure` and whose WebP file exists. */
+export function readEntryImages(dir: string): DocImage[] {
+  const out: DocImage[] = [];
+  const add = (r: RawImage, page: number | null) => {
+    if (r.role !== undefined && r.role !== "figure") return;
+    if (!r.file || !r.file.endsWith(".webp") || !existsSync(join(dir, r.file))) return;
+    const { map, state } = narrativeMap(r.narrative);
+    out.push({ id: r.id, file: r.file, page, ...(r.shows?.length ? { shows: r.shows } : {}), narratives: map, state });
+  };
+  const im = readJson<{ images?: RawImage[] }>(join(dir, "images.json"));
+  for (const r of im?.images ?? []) add(r, r.basis?.page ?? null);
+  const vf = readJson<{ figures?: (RawImage & { page?: number })[] }>(join(dir, "vector-figures.json"));
+  for (const r of vf?.figures ?? []) add({ ...r, role: r.role ?? "figure" }, r.page ?? null);
+  return out.sort((a, b) => (a.page ?? 0) - (b.page ?? 0) || a.id.localeCompare(b.id, undefined, { numeric: true }));
+}
+
+interface RawCsvwTable {
+  url: string;
+  tableSchema?: { columns?: { titles?: string; "fac:group"?: string }[] };
+  "fac:label"?: string; "fac:caption"?: string; "fac:pages"?: number[]; "fac:notes"?: string; "fac:narrative"?: unknown;
+  "fac:headerRow"?: number;
+}
+
+/** The transcribed tables of an entry, from `tabular.csvw.json` and the CSVs it names. */
+export function readEntryTables(dir: string): DocTable[] {
+  const rec = readJson<{ tables?: RawCsvwTable[] }>(join(dir, "tabular.csvw.json"));
+  const out: DocTable[] = [];
+  for (const t of rec?.tables ?? []) {
+    const path = join(dir, t.url);
+    if (!existsSync(path)) continue;
+    const grid = parseCsv(readFileSync(path, "utf8"));
+    const body = t["fac:headerRow"] === 0 ? grid : grid.slice(1);
+    out.push({
+      label: t["fac:label"] ?? t.url,
+      caption: t["fac:caption"] ?? "",
+      pages: t["fac:pages"] ?? [],
+      columns: (t.tableSchema?.columns ?? []).map((c) => ({ titles: c.titles ?? "", ...(c["fac:group"] ? { group: c["fac:group"] } : {}) })),
+      rows: body,
+      ...(t["fac:notes"] ? { notes: t["fac:notes"] } : {}),
+      narratives: narrativeMap(t["fac:narrative"]).map,
+      csv: t.url,
+    });
+  }
+  return out;
+}
+
+/**
+ * The files the site copies for an entry's figures: `[entry-relative path]`.
+ * Through {@link readEntryImages}, so the page and the copy can never disagree.
+ */
+export function entryFigureFiles(dir: string): string[] {
+  return [...readEntryImages(dir).map((i) => i.file), ...readEntryTables(dir).map((t) => t.csv)];
 }
 
 /** The raw `structure.json` fields this view reads (schemas/ui/pdf-structure.ts). */
@@ -384,6 +508,14 @@ export function readEntryDocument(
       pageLabel: f.page_label ?? null, confidence: f.confidence, evidence: f.evidence ?? [],
     }));
   }
+  // Figures and tables are the work's own content, so a WITHHELD entry
+  // (bean cw35) shows neither, as it shows no body text.
+  if (!withheld) {
+    const images = readEntryImages(dir);
+    if (images.length) view.images = images;
+    const tables = readEntryTables(dir);
+    if (tables.length) view.tables = tables;
+  }
   if (d.toc_alignment) view.checks.tocAlignment = d.toc_alignment;
   if (Array.isArray(d.figure_sequence_gaps)) view.checks.figureSequenceGaps = d.figure_sequence_gaps;
   if (d.page_label_conflicts) view.checks.pageLabelConflicts = d.page_label_conflicts;
@@ -492,11 +624,73 @@ function docPages(d){
       return '<tr><td class="num">' + p.physical + '</td><td>' + lab + '</td><td>' + secs + '</td><td>' + figs + '</td></tr>';
     }).join("") + '</tbody></table>';
 }
+/* FIGURES AND TABLES SHOWN -- who-iris#224. Each kept figure as its picture
+   with its description in the page's language (else English, else the first),
+   and each transcribed table drawn from its cells. Every description is an
+   agent draft until a person confirms it, and the page says so. */
+function docLang(){
+  var l = (document.documentElement.getAttribute("lang") || "en").toLowerCase().split("-")[0];
+  return l || "en";
+}
+function pickNarrative(m){
+  if (!m) return "";
+  var l = docLang();
+  if (m[l]) return m[l];
+  if (m.en) return m.en;
+  for (var k in m) if (Object.prototype.hasOwnProperty.call(m, k)) return m[k];
+  return "";
+}
+function docFileHref(id, file){
+  var dir = DATA_HREF.slice(0, DATA_HREF.lastIndexOf("/") + 1);
+  return dir + "files/" + encodeURIComponent(id) + "/" + file.split("/").map(encodeURIComponent).join("/");
+}
+function docGallery(d){
+  if (!d.images || !d.images.length) return "";
+  var rtl = { ar: 1, fa: 1, he: 1, ur: 1 }[docLang()] ? ' dir="rtl"' : '';
+  return '<h3>Figures <span class="note">(' + d.images.length + ')</span></h3>' +
+    '<p class="note">Descriptions are drafts written by an agent and not yet reviewed.</p>' +
+    '<div class="doc-gallery">' + d.images.map(function(im){
+      var text = pickNarrative(im.narratives);
+      return '<figure class="doc-figure" id="fig-' + esc(im.id) + '">' +
+        '<a href="' + esc(docFileHref(DOC_ID, im.file)) + '" target="_blank" rel="noopener">' +
+        '<img loading="lazy" src="' + esc(docFileHref(DOC_ID, im.file)) + '" alt="' + esc(text) + '"></a>' +
+        '<figcaption' + rtl + '>' + (im.shows && im.shows.length ? '<strong>' + esc(im.shows.join(", ")) + '.</strong> ' : '') +
+        esc(text) + ' <span class="note">' + pageText(im.page, null) + '</span></figcaption></figure>';
+    }).join("") + '</div>';
+}
+function docTable(t){
+  var groups = t.columns.some(function(c){ return c.group; });
+  var head = "";
+  if (groups) {
+    var cells = [], i = 0;
+    while (i < t.columns.length) {
+      var g = t.columns[i].group || "", n = 1;
+      while (i + n < t.columns.length && (t.columns[i + n].group || "") === g && g) n++;
+      cells.push('<th' + (n > 1 ? ' colspan="' + n + '"' : '') + '>' + esc(g) + '</th>');
+      i += n;
+    }
+    head += '<tr>' + cells.join("") + '</tr>';
+  }
+  head += '<tr>' + t.columns.map(function(c){ return '<th>' + esc(c.titles) + '</th>'; }).join("") + '</tr>';
+  var body = t.rows.map(function(r){ return '<tr>' + r.map(function(c){ return '<td>' + esc(c) + '</td>'; }).join("") + '</tr>'; }).join("");
+  var text = pickNarrative(t.narratives);
+  return '<details class="doc-table"><summary><strong>' + esc(t.caption || t.label) + '</strong> <span class="note">' +
+    (t.pages.length ? 'p' + t.pages.join("\u2013") : '') + ', ' + t.rows.length + ' rows</span></summary>' +
+    (text ? '<p>' + esc(text) + '</p>' : '') +
+    '<div class="doc-table-scroll"><table>' + '<thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
+    (t.notes ? '<p class="note">' + esc(t.notes) + '</p>' : '') +
+    '<p class="note"><a href="' + esc(docFileHref(DOC_ID, t.csv)) + '">CSV</a></p></details>';
+}
+function docTables(d){
+  if (!d.tables || !d.tables.length) return "";
+  return '<h3>Tables <span class="note">(' + d.tables.length + ', transcribed from the pages; drafts)</span></h3>' + d.tables.map(docTable).join("");
+}
 function docFigures(d){
-  if (!d.figures) return notRecorded("Figures and tables");
-  if (!d.figures.length) return '<p class="empty">No captions found. Nothing failed — none opens a line with a label and number.</p>';
+  var shown = docGallery(d) + docTables(d);
+  if (!d.figures) return shown + notRecorded("Figures and tables");
+  if (!d.figures.length) return shown + '<p class="empty">No captions found. Nothing failed — none opens a line with a label and number.</p>';
   var gaps = (d.checks.figureSequenceGaps || []);
-  return (gaps.length ? '<p class="note">Numbering gaps in the document: ' + esc(gaps.join(", ")) + '.</p>' : '') +
+  return shown + (shown ? '<h3>Captions in the text</h3>' : '') + (gaps.length ? '<p class="note">Numbering gaps in the document: ' + esc(gaps.join(", ")) + '.</p>' : '') +
     '<table><thead><tr><th>kind</th><th>no.</th><th>caption</th><th>page</th><th>confidence</th></tr></thead><tbody>' +
     d.figures.map(function(f){
       return '<tr><td>' + esc(f.kind) + '</td><td>' + esc(f.number) + '</td><td>' + (f.title ? esc(f.title) : '<span class="note">withheld</span>') +
