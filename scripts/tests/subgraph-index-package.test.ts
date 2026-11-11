@@ -12,7 +12,8 @@ import { dirname, join } from "node:path";
 
 import { BinaryReleaseSchema } from "../../schemas/sdlc/binary-release.ts";
 import { SubgraphIndexManifestSchema, subgraphIndexPackage } from "../../schemas/kg/subgraph-manifest.ts";
-import { fetchPackage } from "../mount-from-lock.ts";
+import { createServer } from "node:net";
+import { download, downloadArgs, DOWNLOAD_LIMITS, fetchPackage } from "../mount-from-lock.ts";
 import { fetchSubgraphIndex, packSubgraphIndex, type PackageUrlFor } from "../subgraph-index-package.ts";
 
 const PIN = "0123456789abcdef0123456789abcdef01234567";
@@ -148,4 +149,31 @@ describe("fetch", () => {
     expect(bad).toMatchObject({ ok: false, refused: true });
     expect(fetchPackage(`file://${join(out, "nope.tgz")}`, sha)).toMatchObject({ ok: false, absent: true });
   });
+});
+
+describe("download limits (cat-harness-tools#1712)", () => {
+  test("D1. every download carries a connect timeout, a stall limit and a hard limit", () => {
+    const args = downloadArgs("https://example.org/x", join(base, "x"));
+    expect(args).toEqual(expect.arrayContaining(["--connect-timeout", String(DOWNLOAD_LIMITS.connectS), "--speed-time", String(DOWNLOAD_LIMITS.stallS), "--max-time", String(DOWNLOAD_LIMITS.maxS)]));
+  });
+
+  test("D2. a server that accepts and never answers is a failed fetch within the limit — never a hang, never an absence", async () => {
+    // The kernel completes the handshake once the socket listens, so curl's
+    // request is sent and nothing ever comes back.
+    const server = createServer(() => {});
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    const { port } = server.address() as { port: number };
+    try {
+      // input-site: inert #23cfbd9b — a duration bound on the download, not a value the answer depends on
+      const started = Date.now();
+      const r = download(`http://127.0.0.1:${port}/never`, join(base, "silent", "x"), { connectS: 2, stallS: 1, minBytesPerS: 1, maxS: 1 });
+      expect(r).toMatchObject({ ok: false, absent: false });
+      if (!r.ok) expect(r.error).toContain("timed out");
+      // three attempts (--retry 2) of at most 1 s each, plus curl's back-off
+      // input-site: inert #6507a3f4 — a duration bound on the download, not a value the answer depends on
+      expect(Date.now() - started).toBeLessThan(15_000);
+    } finally {
+      server.close();
+    }
+  }, 20_000);
 });
