@@ -1863,6 +1863,7 @@ def label_runs(sections: list[Section]) -> set[tuple[str, int]]:
 # top, the page is read in print order.
 LATE_HEADING = 0.5
 EARLY_HEADING = 0.2
+LATE_HEADING_INFERRED = 0.3
 
 
 def _heading_offset(page: str, e: TocEntry) -> float | None:
@@ -1874,7 +1875,8 @@ def _heading_offset(page: str, e: TocEntry) -> float | None:
     return found[1] / n
 
 
-def print_order_pages(pages: list[str], outline: list[TocEntry], sorted_page) -> tuple[list[str], list[int]]:
+def print_order_pages(pages: list[str], outline: list[TocEntry], sorted_page,
+                      late: float = LATE_HEADING) -> tuple[list[str], list[int]]:
     """`pages` with each page whose first outline heading is printed late re-read by `sorted_page(i)`.
 
     `sorted_page` returns the text of 0-based page i in print order, or None.
@@ -1888,7 +1890,7 @@ def print_order_pages(pages: list[str], outline: list[TocEntry], sorted_page) ->
     redone: list[int] = []
     for pno, e in sorted(first.items()):
         at = _heading_offset(pages[pno - 1], e)
-        if at is None or at < LATE_HEADING:
+        if at is None or at < late:
             continue
         alt = sorted_page(pno - 1)
         if not alt:
@@ -1898,6 +1900,26 @@ def print_order_pages(pages: list[str], outline: list[TocEntry], sorted_page) ->
             out[pno - 1] = alt
             redone.append(pno)
     return out, redone
+
+
+def print_order_inferred(pages: list[str], toc: list[TocEntry], lines, sorted_page) -> tuple[list[str], list[int]]:
+    """`print_order_pages` for an inferred contents, with the furniture of each re-read page stripped.
+
+    10665-329296 (French, two columns, no outline) stores page 17's right
+    column, references 15-27, before the left column's "RÉFÉRENCES
+    BIBLIOGRAPHIQUES" heading, so references 15-27 landed in the section
+    before, "Membres du personnel de l'OMS". The outline case re-reads such a
+    page in print order before the furniture is stripped; here the furniture
+    is already gone from the other pages, so only the re-read ones are
+    stripped again. The heading there sits 49.5% down the stored text, under
+    LATE_HEADING, so an inferred contents re-reads from LATE_HEADING_INFERRED;
+    the re-read is still kept only when it puts the heading near the top.
+    """
+    alt, redone = print_order_pages(pages, toc, sorted_page, late=LATE_HEADING_INFERRED)
+    if not redone:
+        return pages, []
+    clean, _ = strip_furniture(alt, lines)
+    return [clean[i] if i + 1 in redone else pages[i] for i in range(len(pages))], redone
 
 
 def _pymupdf_sorted(path: str):
@@ -2367,6 +2389,8 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
     tidied: list[dict[str, Any]] = []
     if not paged and inferred:
         toc, tidied = tidy_inferred(toc, pages)
+        if not ocr_used:
+            pages, resorted = print_order_inferred(pages, toc, lines, _pymupdf_sorted(path))
     sections = split_pages(pages) if paged else split_sections(pages, toc)
     if not paged and inferred:
         labels = label_runs(sections)

@@ -195,6 +195,16 @@ def main() -> int:
     got, redone = s.print_order_pages([early], ov, lambda i: late)
     check("a page already in print order is left alone", got == [early] and redone == [])
 
+    refs = [E(1, "RÉFÉRENCES BIBLIOGRAPHIQUES", 1, "inferred")]
+    stored = "15. Mazanderani AH.\n" * 12 + "RÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13
+    printed = "17\nRÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13 + "15. Mazanderani AH.\n" * 12
+    got, redone = s.print_order_inferred([stored], refs, None, lambda i: printed)
+    check("10665/329296: a heading under half way down an inferred page still triggers the print-order read",
+          redone == [1] and got[0].lstrip("17\n").startswith("RÉFÉRENCES"))
+    mid = "body line\n" * 12 + "RÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13
+    got, redone = s.print_order_inferred([mid], refs, None, lambda i: mid)
+    check("a heading truly in mid page is left where it is", got == [mid] and redone == [])
+
     o = load("pdf-ocr.py")
     have = {"ara", "eng", "fra", "rus", "chi_sim", "fas"}
     check("an Arabic page may add Latin, Cyrillic, Han", o.second_script_candidates("ara", have) == ["ara+eng", "ara+rus", "ara+chi_sim"])
