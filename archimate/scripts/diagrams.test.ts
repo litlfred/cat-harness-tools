@@ -23,8 +23,7 @@ import {
   sequencesPuml,
 } from "../schemas/diagrams.ts";
 import { diagramsFor, formatDiagrams, reportDiagrams } from "./archimate-diagrams.ts";
-import { PAGE_CONFIG_ID, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
-import { thinPageConfigOf } from "../../scripts/thin-page.ts";
+import { pageDataOf, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
 
 const DATA_AND_SEQ_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="RA_D5" id="id-model" version="5.0.0">
@@ -435,7 +434,7 @@ describe("integration with archimate-pages and archimate-diagrams", () => {
         let checked = 0;
         for (const f of run.files.filter((x) => x.page)) {
           const refs = [...f.content.matchAll(/(?:href|src|data)="([^"#:]+)"/g)].map((m) => m[1]!);
-          const cfg = f.path !== "index.html" ? thinPageConfigOf(f.content, PAGE_CONFIG_ID)! : {};
+          const cfg = f.path !== "index.html" ? pageDataOf(f.content) as Record<string, unknown> : {};
           for (const k of ["node", "model", "svg", "metamodel"]) if (typeof cfg[k] === "string") refs.push(cfg[k] as string);
           for (const r of refs) expect({ from: at(f), ref: r, ok: resolves(at(f), r) }).toEqual({ from: at(f), ref: r, ok: true });
           checked += refs.length;

@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join, posix } from "node:path";
 import type { ArchimateModel } from "../schemas/archimate.ts";
 import { SLUG_MAX, planSlugs, slugify } from "../schemas/slugs.ts";
-import { PAGE_CONFIG_ID, pagesFor, sitePathOf } from "./gen-archimate-pages.ts";
-import { thinPageConfigOf } from "../../scripts/thin-page.ts";
+import { pageNodeOf, pageNodeProblems } from "../../scripts/thin-page.ts";
+import { pageDataOf, pagesFor, sitePathOf } from "./gen-archimate-pages.ts";
 
 /** A model of named elements and views, nothing drawn: all {@link planSlugs} reads. */
 function model(elements: Array<[string, string, string?]>, views: Array<[string, string, string?]> = []): ArchimateModel {
@@ -105,7 +105,10 @@ describe("pages at slugs", () => {
       const files = pagesFor(root).files;
       const at = (p: string) => files.find((f) => f.path === p);
       const view = at("1.0.0/views/1-central-health-workforce-registry/index.html")!;
-      expect(thinPageConfigOf(view.content, PAGE_CONFIG_ID)).toMatchObject({ kind: "view", id: "id-v1", node: "../id-v1.jsonld", svg: "../id-v1.svg" });
+      expect(pageDataOf(view.content)).toMatchObject({ node: "../id-v1.jsonld", svg: "../id-v1.svg" });
+      // The page declares its node: the id IRI, extensionless, in RDFa and in the JSON-LD stub alike.
+      expect(pageNodeOf(view.content)!.rdfa[0]).toEqual({ iri: "https://example.org/tiny/archimate/1.0.0/views/id-v1", types: ["http://www.opengroup.org/xsd/archimate/3.0/Diagram"] });
+      expect(pageNodeProblems(view.content)).toEqual([]);
       expect(at("1.0.0/elements/lookup/index.html")).toBeDefined();
       expect(at("1.0.0/elements/lookup-c9/index.html")).toBeDefined();
       // Relationships keep id paths.
@@ -114,7 +117,7 @@ describe("pages at slugs", () => {
       expect(at("1.0.0/views/id-v1/index.html")).toBeUndefined();
       expect(at("1.0.0/elements/id-a/index.html")).toBeUndefined();
       // The IRI is the id, as before.
-      expect(JSON.parse(at("1.0.0/views/id-v1.jsonld")!.content)["@id"]).toBe("https://example.org/tiny/archimate/1.0.0/views/id-v1.jsonld");
+      expect(JSON.parse(at("1.0.0/views/id-v1.jsonld")!.content)["@id"]).toBe("https://example.org/tiny/archimate/1.0.0/views/id-v1");
       // The drawing, the rail and the loader all link the slug.
       expect(at("1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/health-worker-registry/"');
       expect(at("1.0.0/index.html")!.content).toContain('"href":"./views/1-central-health-workforce-registry/"');
@@ -132,7 +135,7 @@ describe("pages at slugs", () => {
       const written = new Set(files.map(at));
       for (const f of files.filter((x) => x.page || x.path.endsWith(".svg"))) {
         const refs = [...f.content.matchAll(/(?:href|src|data)="([^"#:]+)"/g)].map((m) => m[1]!);
-        const cfg = f.page && f.path !== "index.html" ? (thinPageConfigOf(f.content, PAGE_CONFIG_ID) ?? {}) : {};
+        const cfg = f.page && f.path !== "index.html" ? (pageDataOf(f.content) as Record<string, unknown>) : {};
         for (const k of ["node", "model", "svg"]) if (typeof cfg[k] === "string") refs.push(cfg[k] as string);
         for (const r of refs) {
           const target = posix.normalize(posix.join(posix.dirname(at(f)), r));

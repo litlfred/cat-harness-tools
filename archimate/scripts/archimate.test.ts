@@ -6,8 +6,8 @@ import { deflateRawSync } from "node:zlib";
 import { ARCHIMATE_MODEL_TAG, ArchimateConfigSchema, ArchimateModelSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "../schemas/archimate.ts";
 import { renderViewSvg, wrap } from "./render-view.ts";
 import { checkCommitted } from "./check-archimate.ts";
-import { PAGE_CONFIG_ID, figureTargets, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
-import { thinPageConfigOf } from "../../scripts/thin-page.ts";
+import { pageNodeProblems } from "../../scripts/thin-page.ts";
+import { pageDataOf, figureTargets, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
 import { renderedByOf } from "../../scripts/viewer-declarations.ts";
 
 /** A small Archi model: two elements in a group, a serving and an access relationship, a note. */
@@ -322,24 +322,26 @@ describe("an instance", () => {
       expect(pages.length).toBe(1 + 1 + 1 + 3 + 2);
       expect(files.some((f) => f.path === "1.0.0/views/id-v1.svg")).toBe(true);
       for (const f of files.filter((x) => x.path.endsWith(".jsonld"))) {
-        expect(JSON.parse(f.content)["@id"]).toBe(`https://example.org/tiny/archimate/${f.path}`);
+        expect(JSON.parse(f.content)["@id"]).toBe(`https://example.org/tiny/archimate/${f.path.replace(/\.jsonld$/, "")}`);
       }
       const el = JSON.parse(files.find((f) => f.path === "1.0.0/elements/id-a.jsonld")!.content);
       expect(el["@type"]).toBe("archimate:ApplicationComponent");
       const rel = JSON.parse(files.find((f) => f.path === "1.0.0/relationships/id-r1.jsonld")!.content);
-      expect(rel["archimate:source"]["@id"]).toBe("https://example.org/tiny/archimate/1.0.0/elements/id-b.jsonld");
+      expect(rel["archimate:source"]["@id"]).toBe("https://example.org/tiny/archimate/1.0.0/elements/id-b");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it("a page copies none of the model's documentation, properties or notes: its config points at the normalised model relative to itself", () => {
+  it("a page copies none of the model's documentation, properties or notes: it declares its node and points at the normalised model relative to itself", () => {
     const root = make(config);
     try {
       for (const p of pagesFor(root).files.filter((f) => f.path.endsWith("/index.html"))) {
-        const cfg = thinPageConfigOf(p.content, PAGE_CONFIG_ID)!;
+        const cfg = pageDataOf(p.content) as Record<string, unknown>;
         const depth = p.path.split("/").length;
-        expect(cfg.model).toBe(depth === 2 ? "./model.json" : depth === 3 ? "../model.json" : "../../model.json");
+        // The metamodel page is drawn at build time: it points its renderer at nothing.
+        expect(cfg.model).toBe(depth === 2 ? "./model.json" : depth === 3 ? undefined : "../../model.json");
+        expect(pageNodeProblems(p.content)).toEqual([]);
         for (const text of ["Holds the records.", "owner", "WHO", "A note", "its text"]) expect({ page: p.path, text, copied: p.content.includes(text) }).toEqual({ page: p.path, text, copied: false });
       }
     } finally {
@@ -388,13 +390,13 @@ describe("an instance", () => {
       };
       for (const f of files.filter((x) => x.page || x.path.endsWith(".svg"))) {
         const refs = [...f.content.matchAll(/(?:href|src|data)="([^"#:]+)"/g)].map((m) => m[1]!);
-        const cfg = f.page && f.path !== "index.html" ? thinPageConfigOf(f.content, PAGE_CONFIG_ID)! : {};
+        const cfg = f.page && f.path !== "index.html" ? pageDataOf(f.content) as Record<string, unknown> : {};
         for (const k of ["node", "model", "svg"]) if (typeof cfg[k] === "string") refs.push(cfg[k] as string);
         for (const r of refs) expect({ from: at(f), ref: r, ok: resolves(at(f), r) }).toEqual({ from: at(f), ref: r, ok: true });
       }
       // The page reaches the model in the data tree, not beside itself.
       const view = files.find((f) => f.path === "1.0.0/views/overview/index.html")!;
-      expect(thinPageConfigOf(view.content, PAGE_CONFIG_ID)!.model).toBe("../../../../../../archimate/1.0.0/model.json");
+      expect(pageDataOf(view.content).model).toBe("../../../../../../archimate/1.0.0/model.json");
       // In the graph (no site), nothing changes: pages beside their data, and no route to name.
       const inGraph = pagesFor(root);
       expect(inGraph.pageRoot).toBe("archimate");
