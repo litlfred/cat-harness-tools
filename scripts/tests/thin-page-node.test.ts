@@ -4,7 +4,7 @@
  * namespaces, and a JSON-LD stub in the head with the same identity.
  */
 import { describe, expect, it } from "bun:test";
-import { kgRenderScript, nodeAttrs, pageNodeOf, pageNodeProblems, thinPageHtml, type PageNode, type ThinPage } from "../thin-page.ts";
+import { kgRenderScript, nodeAttrs, nodeStubPageHtml, pageNodeOf, pageNodeProblems, thinPageHtml, type PageNode, type ThinPage } from "../thin-page.ts";
 
 const NS = "https://example.org/ns/";
 const node: PageNode = { iri: "https://example.org/tiny/widget/w1", types: ["ex:Widget"] };
@@ -70,5 +70,15 @@ describe("a thin page that declares its node", () => {
     const js = kgRenderScript();
     expect(js).toContain("[resource][typeof]");
     expect(js).toContain("window.kgRenderers");
+  });
+
+  it("writes the small page at a node's IRI with the same declaration, a link and a redirect, and no script", () => {
+    const html = nodeStubPageHtml({ title: "Widget w1", node, prefixes: { ex: NS }, jsonld: "w1.jsonld", page: "../../en/x/widget/w1/" });
+    expect(pageNodeProblems(html)).toEqual([]);
+    expect(pageNodeOf(html)!.rdfa[0]!.iri).toBe(node.iri);
+    expect(html).toContain('<meta http-equiv="refresh" content="0; url=../../en/x/widget/w1/">');
+    expect(html).toContain('<link rel="canonical" href="../../en/x/widget/w1/">');
+    expect(html).not.toContain("<script src=");
+    expect(Buffer.byteLength(html)).toBeLessThan(1000);
   });
 });

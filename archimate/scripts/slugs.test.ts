@@ -104,23 +104,23 @@ describe("pages at slugs", () => {
     try {
       const files = pagesFor(root).files;
       const at = (p: string) => files.find((f) => f.path === p);
-      const view = at("1.0.0/views/1-central-health-workforce-registry/index.html")!;
+      const view = at("1.0.0/view/1-central-health-workforce-registry/index.html")!;
       expect(pageDataOf(view.content)).toMatchObject({ node: "../id-v1.jsonld", svg: "../id-v1.svg" });
       // The page declares its node: the id IRI, extensionless, in RDFa and in the JSON-LD stub alike.
-      expect(pageNodeOf(view.content)!.rdfa[0]).toEqual({ iri: "https://example.org/tiny/archimate/1.0.0/views/id-v1", types: ["http://www.opengroup.org/xsd/archimate/3.0/Diagram"] });
+      expect(pageNodeOf(view.content)!.rdfa[0]).toEqual({ iri: "https://example.org/tiny/archimate/1.0.0/view/id-v1", types: ["http://www.opengroup.org/xsd/archimate/3.0/Diagram"] });
       expect(pageNodeProblems(view.content)).toEqual([]);
-      expect(at("1.0.0/elements/lookup/index.html")).toBeDefined();
-      expect(at("1.0.0/elements/lookup-c9/index.html")).toBeDefined();
+      expect(at("1.0.0/element/lookup/index.html")).toBeDefined();
+      expect(at("1.0.0/element/lookup-c9/index.html")).toBeDefined();
       // Relationships keep id paths.
-      expect(at("1.0.0/relationships/id-r1/index.html")).toBeDefined();
+      expect(at("1.0.0/relationship/id-r1/index.html")).toBeDefined();
       // A clean break: no page at the old id path.
-      expect(at("1.0.0/views/id-v1/index.html")).toBeUndefined();
-      expect(at("1.0.0/elements/id-a/index.html")).toBeUndefined();
+      expect(at("1.0.0/view/id-v1/index.html")).toBeUndefined();
+      expect(at("1.0.0/element/id-a/index.html")).toBeUndefined();
       // The IRI is the id, as before.
-      expect(JSON.parse(at("1.0.0/views/id-v1.jsonld")!.content)["@id"]).toBe("https://example.org/tiny/archimate/1.0.0/views/id-v1");
+      expect(JSON.parse(at("1.0.0/view/id-v1.jsonld")!.content)["@id"]).toBe("https://example.org/tiny/archimate/1.0.0/view/id-v1");
       // The drawing, the rail and the loader all link the slug.
-      expect(at("1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/health-worker-registry/"');
-      expect(at("1.0.0/index.html")!.content).toContain('"href":"./views/1-central-health-workforce-registry/"');
+      expect(at("1.0.0/view/id-v1.svg")!.content).toContain('href="../element/health-worker-registry/"');
+      expect(at("1.0.0/index.html")!.content).toContain('"href":"./view/1-central-health-workforce-registry/"');
       expect(JSON.parse(at("1.0.0/model.json")!.content).slugs).toMatchObject({ "id-v1": "1-central-health-workforce-registry", "id-c9": "lookup-c9" });
     } finally {
       rmSync(root, { recursive: true, force: true });

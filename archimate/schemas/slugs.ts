@@ -11,8 +11,8 @@
  *
  * ## The id stays the IRI; the slug is where the page is
  *
- * A node's `@id` is still `<m>/views/<archi id>.jsonld`: Archi's ids are what
- * the RA mapper keys on. Only the PAGE is at a slug, `<m>/views/<slug>/`.
+ * A node's `@id` is still `<m>/view/<archi id>` (data at `.jsonld`): Archi's ids are what
+ * the RA mapper keys on. Only the PAGE is at a slug, `<m>/view/<slug>/`.
  * Relationships are almost all unnamed (smart-ra 0.2.0: 6 of 284), so their
  * pages stay at their ids.
  *

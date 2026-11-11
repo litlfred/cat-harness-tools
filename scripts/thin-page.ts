@@ -332,3 +332,43 @@ export function pageNodeProblems(html: string): string[] {
   }
   return out;
 }
+
+/** The page served AT a node's IRI when its rendering lives elsewhere (Q-THIN-3 = A, issue #1830). */
+export interface NodeStubPage {
+  title: string;
+  node: PageNode;
+  prefixes: Prefixes;
+  /** The node's data, relative to the stub (`<id>.jsonld`). */
+  jsonld: string;
+  /** The rendering page, relative to the stub. */
+  page: string;
+  lang?: string;
+}
+
+/**
+ * The small page at a node's IRI: the same declaration as its rendering —
+ * RDFa on `<main>`, the JSON-LD stub, the `.jsonld` alternate — and a link
+ * and a redirect to the page that draws it. A static host serves `<id>.html`
+ * at the extensionless IRI, so the IRI opens in a browser and stays
+ * processable without any script. No content, no rail, no script.
+ */
+export function nodeStubPageHtml(p: NodeStubPage): string {
+  if (/[#?]/.test(p.node.iri)) throw new Error(`stub "${p.title}": node IRI ${p.node.iri} has a '#' or '?' — node IRIs are slash IRIs`);
+  const page = escHtml(p.page);
+  return `<!doctype html>
+<html lang="${escHtml(p.lang ?? "en")}" prefix="${escHtml(prefixValue(p.prefixes))}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escHtml(p.title)}</title>
+<link rel="canonical" href="${page}">
+<link rel="alternate" type="application/ld+json" href="${escHtml(p.jsonld)}">
+<script type="application/ld+json">${nodeStub(p.node, p.prefixes)}</script>
+<meta http-equiv="refresh" content="0; url=${page}">
+</head>
+<body>
+<main${nodeAttrs(p.node)}><h1>${escHtml(p.title)}</h1><p><a href="${page}">Open its page</a> · <a href="${escHtml(p.jsonld)}">its JSON-LD</a></p></main>
+</body>
+</html>
+`;
+}

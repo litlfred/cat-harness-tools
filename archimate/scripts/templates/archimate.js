@@ -8,7 +8,7 @@
 // it shows; an element's or a relationship's documentation, properties,
 // relationships and views (`visualizer-loading`). Which of those a node is
 // comes from its class and, for elements and relationships, from the kind in
-// its IRI (`…/elements/<id>`, `…/relationships/<id>`).
+// its IRI (`…/element/<id>`, `…/relationship/<id>`).
 //
 // No dependencies, and no `innerHTML` of anything read from the model: every
 // string it shows is set as text, because the model is its authors'. A view's
@@ -49,9 +49,9 @@
   var root = "../../";
   var slugs = {};
   function seg(id) { return encodeURIComponent(Object.prototype.hasOwnProperty.call(slugs, id) ? slugs[id] : id); }
-  function elHref(id) { return root + "elements/" + seg(id) + "/"; }
-  function relHref(id) { return root + "relationships/" + encodeURIComponent(id) + "/"; }
-  function viewHref(id) { return root + "views/" + seg(id) + "/"; }
+  function elHref(id) { return root + "element/" + seg(id) + "/"; }
+  function relHref(id) { return root + "relationship/" + encodeURIComponent(id) + "/"; }
+  function viewHref(id) { return root + "view/" + seg(id) + "/"; }
 
   function index(m) {
     var ix = { el: {}, rel: {}, view: {}, out: {}, inc: {} };
@@ -182,7 +182,7 @@
   function kindOf(c) {
     if (c.types.indexOf(NS + "Model") >= 0) return "model";
     if (c.types.indexOf(NS + "Diagram") >= 0) return "view";
-    return { elements: "element", relationships: "relationship" }[c.kind];
+    return { element: "element", relationship: "relationship" }[c.kind];
   }
 
   function render(c) {

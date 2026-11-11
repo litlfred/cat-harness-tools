@@ -282,10 +282,10 @@ describe("derived data class diagrams (D5)", () => {
     expect(mmd).toContain(`id_gp --> "0..*" id_pc : classification`);
 
     const dot = dataModelDot(dm, {
-      href: { element: (id) => `elements/${id}/`, relationship: (id) => `relationships/${id}/` },
+      href: { element: (id) => `element/${id}/`, relationship: (id) => `relationship/${id}/` },
     });
-    expect(dot).toContain(`URL="elements/id-pmd/"`);
-    expect(dot).toContain(`URL="relationships/id-r-gp-pc/"`);
+    expect(dot).toContain(`URL="element/id-pmd/"`);
+    expect(dot).toContain(`URL="relationship/id-r-gp-pc/"`);
 
     const md = dataModelMarkdown(dm);
     expect(md).toContain("## Data Class Diagram (RA_D5)");
