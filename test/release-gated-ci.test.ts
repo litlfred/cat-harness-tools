@@ -18,8 +18,30 @@ const RELEASE = "contains(github.event.pull_request.labels.*.name, 'release')";
 type Step = { id?: string; name?: string; if?: string; with?: Record<string, string> };
 type Job = { if?: string; needs?: string[]; outputs?: Record<string, string>; steps?: Step[] };
 
+// Adding the `release` label starts the full tier; any other label is a no-op
+// (owner, 2026-11-11, card B: every PR passes the full tier before merge).
+const ONLY_RELEASE_LABEL = "(github.event.action != 'labeled' || github.event.label.name == 'release')";
+const NOOP_GROUP = "(github.event.action == 'labeled' && github.event.label.name != 'release') && format('noop-label-{0}', github.run_id)";
+
 describe("pr-tests.yml (this repository's own checks)", () => {
-  const jobs = wf("pr-tests.yml").jobs as Record<string, Job>;
+  const doc = wf("pr-tests.yml");
+  const jobs = doc.jobs as Record<string, Job>;
+
+  test("adding the `release` label starts a run: `labeled` is a pull_request type", () => {
+    expect(doc.on.pull_request.types).toContain("labeled");
+  });
+
+  test("a `labeled` run for another label skips every job and never joins the PR's concurrency group", () => {
+    expect(doc.concurrency.group).toContain(NOOP_GROUP);
+    // pin gates every job that needs it; the verdict job runs with !cancelled(), so it is gated itself.
+    expect(jobs.pin!.if).toContain(ONLY_RELEASE_LABEL);
+    expect(jobs.tests!.if).toContain(ONLY_RELEASE_LABEL);
+    for (const [name, j] of Object.entries(jobs)) {
+      if (name === "pin" || name === "tests") continue;
+      const needs = typeof j.needs === "string" ? [j.needs] : (j.needs ?? []);
+      expect({ name, needsPin: needs.includes("pin") }).toEqual({ name, needsPin: true });
+    }
+  });
 
   test("the head side of the full tier runs on a PR only with the release label", () => {
     for (const j of ["tests-head", "standalone-head"]) {
@@ -57,6 +79,14 @@ describe("layer-pr-checks.yml (every layer)", () => {
   const doc = wf("layer-pr-checks.yml");
   const jobs = doc.jobs as Record<string, Job & { name?: string }>;
   const FAST = `(github.event_name == 'pull_request' && !${RELEASE})`;
+
+  test("a `labeled` run for another label judges nothing and never joins the PR's concurrency group", () => {
+    expect(doc.concurrency.group).toContain(NOOP_GROUP);
+    for (const j of ["prepare-head", "prepare-base", "compare"]) expect(jobs[j]!.if).toContain(ONLY_RELEASE_LABEL);
+    // `run` needs prepare-head (a PR) or prepare-base (a push) to succeed; `ready-reuse` runs on ready_for_review only.
+    expect(jobs.run!.needs).toEqual(["prepare-head", "prepare-base"]);
+    expect(jobs["ready-reuse"]!.if).toContain("github.event.action == 'ready_for_review'");
+  });
 
   test("prepare-base does not run on the fast tier", () => {
     expect(jobs["prepare-base"]!.if).toContain(`!${FAST}`);
