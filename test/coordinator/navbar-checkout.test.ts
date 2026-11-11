@@ -31,7 +31,12 @@ describe("every declared graph reaches the navbar, linked or not", () => {
   const K = (kind: string): string => kindTitle(kind);
   // Kinds who-iris is gaining or dropping across layer pins (see the first
   // test). Expected exactly when the mounted who-iris declares them.
-  const IN_TRANSIT = ["attestations", "uploads"];
+  // `references` joins while it is in transit: who-iris declared its
+  // `references/` graph (one `folio-reference/v1` node per cited work, written
+  // by `references-extract`; owner, 2026-11-11) on main, and the index's pin
+  // of who-iris may predate it. It moves to the pinned list once every pin
+  // this test runs under has it.
+  const IN_TRANSIT = ["attestations", "references", "uploads"];
   const declaredNow = new Set(kinds());
   const expectedKinds = (pinned: string[]): string[] =>
     [...pinned, ...IN_TRANSIT.filter((k) => declaredNow.has(K(k)))].sort().map(K);

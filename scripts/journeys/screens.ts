@@ -20,8 +20,12 @@
  *
  * {@link renderDevice} draws a screen's blocks inside a CSS frame for its
  * device (phone, tablet, scanner, desktop, kiosk), with the owner's avatar
- * and name beside it. Nothing is interactive: a toggle is drawn in the state
- * the node says, a button is a label. A `qr` block is a real QR code of its
+ * and name beside it. Nothing in a screen is interactive: a toggle is drawn
+ * in the state the node says, a button is a label. The one live control is
+ * the switch between a screen's `states` (a valid card, a tampered one):
+ * every state is drawn at build time, the first shown, and the viewer's
+ * script shows one at a time (`?state=<id>` opens on one). Without the
+ * script the page shows the first state and no switch. A `qr` block is a real QR code of its
  * payload, made at build time by the encoder the site chrome already vendors
  * (`assets/js/vendor/qrcode.js`, cross-checked by `scripts/tests/qr.test.ts`);
  * no package is added for it.
@@ -33,7 +37,7 @@ import { join } from "node:path";
 import { createContext, runInContext } from "node:vm";
 
 import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
-import { isWide, type BlockOf, type Device, type DeviceScreen, type ScreenBlock } from "../../schemas/process/device-screen.ts";
+import { blocksIn, DEFAULT_STATE, isWide, screenStates, type BlockOf, type Device, type DeviceScreen, type ScreenBlock } from "../../schemas/process/device-screen.ts";
 import { escHtml } from "../thin-page.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import type { JourneyCorpus, ScreenEntry, WorkshopEntry } from "./read.ts";
@@ -312,7 +316,8 @@ export function statusBar(screen: DeviceScreen): string {
   return `<div class="ds-statusbar ds-statusbar-wide" aria-hidden="true"><span class="ds-client">${c ? `<b>${e(c.name)}</b>${c.version ? `<small>v${e(c.version.replace(/^v/, ""))}</small>` : ""}` : ""}</span><span class="ds-sys"><span>${e(c?.time ?? "9:41 AM")}</span>${sys}</span></div>`;
 }
 
-export function renderDevice(screen: DeviceScreen, ctx: ScreenContext, opts: { caption?: boolean } = {}): string {
+/** One state's blocks, laid out: the side column on a wide device, full-width blocks across. */
+function screenBody(screen: DeviceScreen, blocks: readonly ScreenBlock[], ctx: ScreenContext): string {
   const wide = isWide(screen.device) && screen.blocks.some((b) => b.column === "side");
   const parts: string[] = [];
   let main: string[] = [];
@@ -324,17 +329,45 @@ export function renderDevice(screen: DeviceScreen, ctx: ScreenContext, opts: { c
     main = [];
     side = [];
   };
-  for (const b of screen.blocks) {
+  for (const b of blocks) {
     if (fullWidth(b)) {
       flush();
       parts.push(blockHtml(b, ctx));
     } else (wide && b.column === "side" ? side : main).push(blockHtml(b, ctx));
   }
   flush();
-  const owner = ctx.person(screen.owner);
+  return parts.join("");
+}
+
+/**
+ * The switch between a screen's states, drawn above the device: one button
+ * per state, the first pressed, and each state's "try" under it. Hidden
+ * until the viewer's script wires it, so a page without the script shows
+ * no switch that does nothing. Empty for a screen with no states.
+ */
+export function stateSwitch(screen: DeviceScreen): string {
+  const states = screenStates(screen);
+  if (!states.length) return "";
+  const btns = states
+    .map((st, i) => `<button type="button" class="ds-state-btn${i === 0 ? " is-on" : ""}" data-ds-show="${e(st.id)}" aria-pressed="${i === 0}">${e(st.label)}</button>`)
+    .join("");
+  const tries = states
+    .map((st, i) => (st.try ? `<p class="ds-state-try jp-try" data-ds-state="${e(st.id)}"${i === 0 ? "" : " hidden"}>${glyph("sparkles")} ${e(st.try)}</p>` : ""))
+    .join("");
+  return `<div class="ds-states" data-ds-switch="${e(screen.id)}" hidden><span class="ds-states-l">Show</span><div class="ds-states-b" role="group" aria-label="Screen state">${btns}</div>${tries}</div>`;
+}
+
+export function renderDevice(screen: DeviceScreen, ctx: ScreenContext, opts: { caption?: boolean } = {}): string {
+  const states = screenStates(screen);
   const chrome = statusBar(screen);
+  const inner = states.length
+    ? states
+        .map((st, i) => `<div class="ds-state" data-ds-state="${e(st.id)}"${i === 0 ? "" : " hidden"}>${screenBody(screen, blocksIn(screen, st.id), ctx)}</div>`)
+        .join("")
+    : screenBody(screen, blocksIn(screen, DEFAULT_STATE), ctx);
+  const owner = ctx.person(screen.owner);
   const ownerHtml = owner
     ? `<figcaption class="ds-owner" style="--c:${e(owner.color)}">${avatar(owner, "lg")}<span><b>${e(owner.name)}</b><small>${e(DEVICE_LABEL[screen.device])}${owner.role ? ` · ${e(owner.role)}` : ""}</small></span></figcaption>`
     : `<figcaption class="ds-owner ds-unresolved">${e(screen.owner)}</figcaption>`;
-  return `<figure class="ds-device ds-${screen.device}" data-screen="${e(screen.id)}">${opts.caption === false ? "" : ownerHtml}<div class="ds-frame"><div class="ds-screen">${chrome}${parts.join("")}</div></div></figure>`;
+  return `<figure class="ds-device ds-${screen.device}" data-screen="${e(screen.id)}">${opts.caption === false ? "" : ownerHtml}<div class="ds-frame"><div class="ds-screen">${chrome}${inner}</div></div></figure>`;
 }

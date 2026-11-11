@@ -49,6 +49,8 @@ test("each IG heading gets one right-gutter box, nothing inside the heading", as
   const box = await page.locator("#summary + .fa-sec-actions").boundingBox();
   const p = await page.locator("#summary + .fa-sec-actions + p").boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(p!.x + p!.width);
+  // ...and inside the window, not pushed off its right edge.
+  expect(box!.x + box!.width).toBeLessThanOrEqual(1200);
 
   // ✎ goes to the heading's own line in its own file; 📣 to the IG's repository.
   const edit = page.locator("#background--purpose + .fa-sec-actions a[data-fa-link=edit]");

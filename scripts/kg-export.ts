@@ -1640,6 +1640,12 @@ async function collectProcesses(
   base?: string,
   /** Whose directories are read — see {@link ExportOptions.scope}. */
   scope: CorpusScope = corpusScopeFor(root),
+  /**
+   * The publication base. With it, a lane's role and a step's skill that
+   * ANOTHER layer declares link into that layer's document ({@link roleHome},
+   * {@link skillHome}); without it (a fixture) every link stays in `doc`.
+   */
+  pubBase?: string,
 ): Promise<Node[]> {
   const nodes: Node[] = [];
   const dirs = findBpmnDirs(root, scope);
@@ -1870,7 +1876,7 @@ async function collectProcesses(
             name: g.name,
             ...publishableDocumentation(g.documentation),
             bpmnType: g.type,
-            requires: g.skills.map((k) => makeIri(doc, "skill", k)),
+            requires: g.skills.map((k) => makeIri(pubBase === undefined ? doc : skillHome(pubBase, doc, k, scope, root), "skill", k)),
             sourcePath: relative(root, g.source),
             sourceUrl: forgeOf(g.source),
           });
@@ -1930,7 +1936,7 @@ async function collectProcesses(
           "@type": termIri("Lane"),
           name: lane.name ?? lane.id,
           partOf: makeIri(doc, "process", m.id),
-          bindsRole: lane.roleRef === undefined ? undefined : makeIri(doc, "role", lane.roleRef),
+          bindsRole: lane.roleRef === undefined ? undefined : makeIri(roleHome(pubBase, doc, lane.roleRef, root, scope), "role", lane.roleRef),
         });
       }
       for (const n of m.nodes.values()) {
@@ -1952,10 +1958,10 @@ async function collectProcesses(
           // `performedBy` reaches the REGISTRY role through the lane's
           // `roleRef` (#1168, B9b): the role that performs, not the lane it
           // performs in. `inLane` is the lane.
-          performedBy: n.roleRef === undefined ? undefined : makeIri(doc, "role", n.roleRef),
+          performedBy: n.roleRef === undefined ? undefined : makeIri(roleHome(pubBase, doc, n.roleRef, root, scope), "role", n.roleRef),
           inLane: n.laneId === undefined ? undefined : makeIri(doc, "process", `${m.id}/lane/${n.laneId}`),
           // `requires` (dcterms), was `implementedBy` — see `buildContext`.
-          requires: n.skills.map((k) => makeIri(doc, "skill", k)),
+          requires: n.skills.map((k) => makeIri(pubBase === undefined ? doc : skillHome(pubBase, doc, k, scope, root), "skill", k)),
           touchesWorkPlan: n.touchesWorkPlan,
           workPlanOp: n.workPlanOp,
           relaxable: n.relaxable,
@@ -2419,18 +2425,7 @@ function collectDeclaredRoles(
   // layout (`bootstrap/`, `crdm/`) would report a clean run over the roots
   // this never visited. First declaration of a role id wins, so a later root
   // cannot silently redefine one.
-  const roles: RoleDef[] = [];
-  const seen = new Set<string>();
-  // The checkout's view on the platform's own run (placement PR0b): a
-  // dependent's extension adds skills to a role here, by id.
-  for (const kgRoot of scope === "checkout" ? [root] : kgRoots(root, scope)) {
-    const g = scope === "checkout" ? roleGraphFor(root, "checkout") : readRoleGraph(kgRoot);
-    for (const r of g?.roles ?? []) {
-      if (seen.has(r.id)) continue;
-      seen.add(r.id);
-      roles.push(r);
-    }
-  }
+  const roles = declaredRoles(root, scope);
   // NAMED by the table glossary-export applies to the same IRI (bean `lodp`,
   // finding D3; owner default applied, option 1, 2026-10-02): the display
   // name is `skos:prefLabel` and, derived from it, `dcterms:title`; the id is
@@ -2451,6 +2446,54 @@ function collectDeclaredRoles(
       makeIri(base !== undefined && resolve(root) === resolve(ROOT) ? skillHome(base, doc, n, scope) : doc, "skill", n),
     ),
   }));
+}
+
+/**
+ * The roles the layer at `root` declares, first declaration of an id winning,
+ * so a later root cannot silently redefine one. The checkout's view on the
+ * platform's own run (placement PR0b): a dependent's extension adds skills to
+ * a role here, by id.
+ */
+function declaredRoles(root: string, scope: CorpusScope = corpusScopeFor(root)): RoleDef[] {
+  const roles: RoleDef[] = [];
+  const seen = new Set<string>();
+  for (const kgRoot of scope === "checkout" ? [root] : kgRoots(root, scope)) {
+    const g = scope === "checkout" ? roleGraphFor(root, "checkout") : readRoleGraph(kgRoot);
+    for (const r of g?.roles ?? []) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      roles.push(r);
+    }
+  }
+  return roles;
+}
+
+const roleIdsByRoot = new Map<string, Set<string>>();
+const declaredRoleIds = (root: string, scope: CorpusScope = corpusScopeFor(root)): Set<string> => {
+  const key = `${resolve(root)}\0${scope}`;
+  let ids = roleIdsByRoot.get(key);
+  if (ids === undefined) roleIdsByRoot.set(key, (ids = new Set(declaredRoles(root, scope).map((r) => r.id))));
+  return ids;
+};
+
+/**
+ * The document a role's IRI is minted in: the one whose layer DECLARES it,
+ * as {@link skillHome} does for skills. A lane of a folio-assistant-core
+ * process binding cat-harness's `user` linked
+ * `<site>/folio-assistant-core/role/user`, a page no export writes, because
+ * the IRI was minted in the process's own document (461 dead links on the
+ * folio-assistant site, cat-harness-tools#1894). This document wins when it
+ * declares the role; a role nobody declares keeps this document's IRI, so it
+ * still reads as the dangling link it is.
+ */
+export function roleHome(base: string | undefined, ownDoc: string, roleId: string, ownRoot: string = ROOT, scope: CorpusScope = corpusScopeFor(ownRoot)): string {
+  if (base === undefined || declaredRoleIds(ownRoot, scope).has(roleId)) return ownDoc;
+  for (const instance of instanceRootsIn(repoRootFor(ROOT))) {
+    if (resolve(instance) === resolve(ownRoot)) continue;
+    if (!declaredRoleIds(instance).has(roleId)) continue;
+    return publishedIdentity(instance, base || undefined).docIri;
+  }
+  return ownDoc;
 }
 
 function collectGraphTypologies(root: string = ROOT): Node[] {
@@ -2715,7 +2758,7 @@ export async function collectInstanceNodes(
   const notes: string[] = [];
   const nodes = [
     ...collectSkills(doc, base, problems, root, corpusScopeFor(root), baseUrl),
-    ...(await collectProcesses(doc, problems, root, notes, siteBase)),
+    ...(await collectProcesses(doc, problems, root, notes, siteBase, corpusScopeFor(root), base)),
     ...collectGraphTypologies(root),
     ...collectDeclaredRoles(doc, root),
     ...collectDeclaration(doc, problems, root),
@@ -3327,7 +3370,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
           ...collectSkills(docIri, base, problems, ROOT, scope, opts.baseUrl),
           ...collectRegistryNodes(docIri, problems),
           ...collectPackages(docIri, problems, scope),
-          ...(await collectProcesses(docIri, problems, ROOT, undefined, base, scope)),
+          ...(await collectProcesses(docIri, problems, ROOT, undefined, base, scope, base)),
           ...collectTools(docIri, base, problems, scope, ROOT, base || undefined),
           ...collectSchemas(docIri, base, scope),
           ...collectExternalSchemas(docIri),
