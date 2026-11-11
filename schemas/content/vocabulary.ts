@@ -521,6 +521,7 @@ export const PROPERTY_GLOSSES: Readonly<Record<string, TermGloss>> = {
   maintains: { gloss: "An artefact this tool generates and keeps current." },
   maintainsFrom: { gloss: "The source a maintained artefact is generated from." },
   maintainedBy: { gloss: "The tool that generates and keeps this artefact current." },
+  jsonSchema: { gloss: "The published JSON Schema rendering of one of a schema module's public exports." },
 
   // ── Schemas and the standards a graph conforms to ────────────────────
   conformsTo: { gloss: "A published specification this node's files are written in, e.g. BPMN 2.0 for a process.", replacedBy: "dcterms:conformsTo" },
