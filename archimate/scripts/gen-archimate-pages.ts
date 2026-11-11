@@ -75,7 +75,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, relative, resolve } from "node:path";
 import { DOCS_SITE_BASE } from "../../schemas/kg/jsonld.ts";
-import { KG_RENDER_ASSET, escHtml, kgRenderScript, nodeAttrs, nodeStubPageHtml, pageNodeOf, thinPageHtml, type PageNode } from "../../scripts/thin-page.ts";
+import { KG_RENDER_ASSET, contentsCardScript, contentsCardStyle, escHtml, kgRenderScript, nodeAttrs, nodeStubPageHtml, pageNodeOf, thinPageHtml, type PageNode } from "../../scripts/thin-page.ts";
 import { visualiserNavDeclaration, type VisualiserNavEntry } from "../../scripts/lib/navbar.ts";
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
@@ -441,11 +441,12 @@ export function pagesFor(
       `\n</body></html>\n`,
   }));
   files.push(
-    { path: LOADER, content: readFileSync(join(TEMPLATES, "archimate.js"), "utf8") },
+    // The Contents card rides in the renderer's own files (issue #1885), so a page loads nothing more.
+    { path: LOADER, content: contentsCardScript() + "\n" + readFileSync(join(TEMPLATES, "archimate.js"), "utf8") },
     { path: KG_RENDER_ASSET, content: kgRenderScript() },
     // `color-scheme: light dark` alone follows the OS, not the navbar switch
     // (`data-fa-scheme`, issue #2208): pin the scheme the reader picked.
-    { path: STYLE, content: readFileSync(join(TEMPLATES, "archimate.css"), "utf8") + darkRules(":root { color-scheme: dark; }") + "\n" },
+    { path: STYLE, content: readFileSync(join(TEMPLATES, "archimate.css"), "utf8") + contentsCardStyle() + darkRules(":root { color-scheme: dark; }") + "\n" },
   );
   return { graphPath, pageRoot, files };
 }

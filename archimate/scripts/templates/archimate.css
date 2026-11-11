@@ -30,3 +30,7 @@ body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 
 .am-ends { font-size: 1.05rem; }
 .am-error { color: #b42318; font-weight: 600; }
 .am-links { margin-top: 2rem; font-size: .9rem; }
+/* The Contents card (contents-card.css, issue #1885) floats at the top right of a page's body, as on the IG sites; lists and headings beside it narrow round it. */
+.am-body>.igi-contents{float:right;width:18rem;margin:0 0 1rem 1.5rem}
+.am-body>.igi-contents~h2,.am-body>.igi-contents~ul,.am-body>.igi-contents~.am-text,.am-body>.igi-contents~table{display:flow-root}
+@media (max-width:50rem){.am-body>.igi-contents{float:none;width:auto;margin:1rem 0}}
