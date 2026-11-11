@@ -187,6 +187,28 @@ describe("build-instance-site — a checkout that only mounts layers (an IG repo
     expect(rep.selfAddress).toEqual([{ page: "index.html", href: "https://litlfred.github.io/demo/ActorDefinition-A.html" }]);
     expect(rep.unresolved).toEqual([]);
   });
+
+  test("links inside a diagram resolve against the .svg file and are reported apart", async () => {
+    const site = mkdtempSync(join(tmpdir(), "bis-svg-"));
+    mkdirSync(join(site, "img"));
+    mkdirSync(join(site, "artifact"));
+    writeFileSync(join(site, "artifact", "CodeSystem-T.html"), "ok");
+    writeFileSync(join(site, "index.html"), "<p>home</p>");
+    writeFileSync(
+      join(site, "img", "flow.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">' +
+        '<a href="../artifact/CodeSystem-T.html#T-a"><text>ok</text></a>' +
+        '<a xlink:href="../CodeSystem-T.html#T-b"><text>dead</text></a>' +
+        '<a href="https://litlfred.github.io/demo/CodeSystem-T.html"><text>dead self</text></a>' +
+        "</svg>",
+    );
+    const r = await checkLinks(site, "/demo/", new Set(), selfAddressOf("litlfred", "demo"));
+    expect(r.diagrams).toBe(1);
+    expect(r.diagramMisses).toEqual(["img/flow.svg: ../CodeSystem-T.html#T-b", "img/flow.svg: https://litlfred.github.io/demo/CodeSystem-T.html"]);
+    expect(r.misses).toEqual([]);
+    writeLinkReport(site, r);
+    expect(JSON.parse(readFileSync(join(site, LINK_REPORT), "utf-8")).inDiagrams).toHaveLength(2);
+  });
 });
 
 describe("build-instance-site — whose chrome the shell carries (smart-trust, 2026-10-14)", () => {
