@@ -1488,6 +1488,14 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "check:optin-links",
+    kind: "covered-by",
+    reason:
+      "COMPOSED into `check:declaration-resolution`, which CI runs: its findings are that gate's `optInLinks` field, so a " +
+      "step of its own would report every link twice. Kept as a script to list the links alone (owner, 2026-11-11: a gate " +
+      "fails on links into a switched-off opt-in sub-graph, each fixed by hand)",
+  },
+  {
     script: "layers:check",
     kind: "covered-by",
     reason:
