@@ -205,6 +205,29 @@ export const IndexSiteSchema = z
      */
     agentRun: z.boolean().optional(),
     /**
+     * Which site publisher `stage-local.ts` uses for this checkout when no
+     * `--publisher` is given: `folio`, or the kind of a publisher a mounted
+     * layer declares (`ig`, an IG layer's `site-publisher-ig`). Absent: the
+     * declared `site.build` recipe, else the publisher the repository's own
+     * workflows call, as before. It exists for a repository that has both, such as a
+     * DAK whose instance declares a folio recipe while its site is the IG
+     * (smart-trust-demo). Agents had to remember `--publisher ig` for that
+     * repository, and the shared `folio-site-publish.yml` that runs on every
+     * push to main had no way of knowing it (owner, 2026-11-11: "i want that
+     * it publishes once merge to main, update QA reports etc.";
+     * cat-harness-tools#1879).
+     */
+    publisher: z.string().regex(/^[a-z][a-z0-9-]*$/, "folio, or a declared publisher's kind such as ig").optional(),
+    /**
+     * Workflow files under `.github/workflows/` whose run on the SAME commit
+     * the push-to-main publish waits for, before it builds (cat-harness-tools#1879).
+     * An IG's site is built from its AST cache, which its `ig-ast-refresh.yml`
+     * seeds on the same push. A publish that starts first finds the cache
+     * stale and is refused. A workflow that did not run on that commit is not
+     * waited for.
+     */
+    publishAfter: z.array(z.string().regex(/^[\w.-]+\.ya?ml$/, "a workflow file name under .github/workflows/")).optional(),
+    /**
      * Whether the ⓘ task panel on this site's BPMN drawings shows skills: the
      * skills a task requires and the skills its lane's role has. Absent or
      * `true` shows them, as every knowledge-graph site does; `false` hides

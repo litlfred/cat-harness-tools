@@ -36,6 +36,7 @@
     "scripts/lib/jekyll-permalink.ts",
     "scripts/lib/skill-edges.ts",
     "scripts/lib/skill-pages.ts",
+    "scripts/site-publish-caller.ts",
     "scripts/site-publisher.ts",
     "scripts/stage-workflow-local.ts",
     "scripts/tests/compose-docs.test.ts",

@@ -2428,3 +2428,61 @@ jobs:
           done
           echo "::error::this PR re-pins index.lock.json but its layers cache ref is not published. Whoever re-pinned runs \`bun run cat layers:publish\` from their checkout (mount:remote does it after a re-pin); from a sandbox it lands on a claude/cat-layers/ branch that layers-move.yml moves."
           exit 1
+
+  # The lock's harness pins agree with the pinned harnesses' own locks (owner,
+  # 2026-11-11, after a content layer's main went red on pins skewed between
+  # new and old mains). A layer that pins harness X at A while another pinned
+  # harness Y, at its pin, pins X at B must have A contain B: Y was built and
+  # tested against X at B. And every pin is FRESH (owner, 2026-11-11, card
+  # "A: Agree check + freshness"): at its repository's main HEAD when the run
+  # looks, or a descendant of it, so a re-pin moves every layer together. Every
+  # pull request that changes `index.lock.json`, in either mode, on the fast
+  # tier; one that leaves the lock alone passes. `check-lock-coherence.ts`
+  # says why "contains" and not "equals", and why freshness too.
+  lock-coherence:
+    name: Lock pins agree with each other and are at main
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 2
+          path: fa
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.4
+      - name: Do this lock's harness pins agree, and are they at main?
+        run: |
+          set -euo pipefail
+          [ -f fa/index.lock.json ] || { echo "no index.lock.json: nothing to check"; exit 0; }
+          base='HEAD^1'
+          git -C fa rev-parse -q --verify 'HEAD^2' >/dev/null || base='HEAD~1'
+          if git -C fa diff --quiet "$base" HEAD -- index.lock.json 2>/dev/null; then
+            echo "index.lock.json is unchanged by this PR: nothing to check"
+            exit 0
+          fi
+          # The judging script at the cat-harness-tools commit the lock pins,
+          # as layers-ref takes its replayer.
+          read -r repo sha < <(bun -e '
+            const l = JSON.parse(require("node:fs").readFileSync("fa/index.lock.json", "utf-8"));
+            const m = (l.mounts ?? []).find((x) => x.harness === "cat-harness-tools");
+            console.log(m ? `${m.repository} ${m.ref}` : "- -");
+          ')
+          [ "$repo" != "-" ] || { echo "::notice::the lock pins no cat-harness-tools: the gate is not enabled"; exit 0; }
+          work="$(mktemp -d)" && git -C "$work" init -q
+          git -C "$work" fetch -q --depth 1 --filter=blob:none "https://github.com/${repo}.git" "$sha"
+          if ! git -C "$work" checkout -q FETCH_HEAD -- scripts/check-lock-coherence.ts scripts/git-ancestry.ts 2>/dev/null; then
+            echo "::notice::the pinned cat-harness-tools (${sha:0:12}) predates lock:coherence:check; the gate starts with the next re-pin"
+            exit 0
+          fi
+          set +e
+          bun "$work/scripts/check-lock-coherence.ts" --lock fa/index.lock.json --cache "$RUNNER_TEMP/lock-coherence"
+          code=$?
+          set -e
+          case "$code" in
+            0) exit 0 ;;
+            1) echo "::error::this PR's index.lock.json pins a harness older than (or diverged from) what another pinned harness's own lock pins it at, or behind its repository's main. Re-pin every harness named above to its current main in one re-pin (\`bun run cat mount:remote\`), so every layer runs against what it was tested with." ;;
+            *) echo "::error::could not determine whether this lock's pins agree and are at main (exit $code): a fetch or an ancestry query failed, and that is never read as a pass. Re-run the job; if it persists, read the reasons above." ;;
+          esac
+          exit 1
