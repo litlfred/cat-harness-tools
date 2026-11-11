@@ -21,13 +21,28 @@
  * its pins were half new mains and half old, and 7 tests failed on main until
  * who-iris#234 re-pinned all five to current mains.
  *
+ * ## Fresh: every pin at its repository's main, or ahead of it
+ *
+ * Agreement alone does not catch the a43a4d27 skew itself: who-iris pinned
+ * cat-harness and cat-harness-tools AHEAD of folio-assistant-core's own pins
+ * of them, while core was left at an old commit, and no lock records that a
+ * lower layer moved past what an upper one was built for. So the second rule
+ * (owner, 2026-11-11, card "A: Agree check + freshness"): on a pull request
+ * that changes `index.lock.json`, every pinned harness is at its
+ * repository's `main` HEAD as the run finds it, or at a descendant of it. A
+ * pin behind main, or diverged from it, fails, naming the harness, the
+ * pinned SHA, main's SHA and the fix (re-pin to main). A re-pin therefore
+ * moves every layer together, which is what who-iris#234 did to go green.
+ * `--no-freshness` judges agreement alone.
+ *
  * ## Three states, never two
  *
  * A lower lock that is absent at the pin (bootstrap-tools has none) has
  * nothing to disagree with. A fetch that failed, or an ancestry git could not
  * evaluate, is `could-not-determine`, reported with its reason and never
- * read as agreement. Exit: 0 every pin agrees · 1 a pair disagrees · 2 none
- * disagrees but some pair could not be determined.
+ * read as agreement; a main that could not be read is never read as fresh.
+ * Exit: 0 every pin agrees and is fresh · 1 a pair disagrees or a pin is
+ * stale · 2 neither, but something could not be determined.
  *
  * ## The network
  *
@@ -39,7 +54,8 @@
  * "no".
  *
  * Usage:
- *   bun run cat lock:coherence:check                        # ./index.lock.json
+ *   bun run cat lock:coherence:check                        # ./index.lock.json: agreement and freshness
+ *   bun run cat lock:coherence:check -- --no-freshness      # agreement alone
  *   bun run cat lock:coherence:check -- --lock <file>       # another lock file
  *   bun run cat lock:coherence:check -- --repo litlfred/who-iris@main
  *                                                           # a repository's lock at a ref, read with git
@@ -97,6 +113,83 @@ export interface Undetermined {
   via: Pin;
   lowerRef?: string;
   reason: string;
+}
+
+/** A pin that is not at its repository's main, nor ahead of it. */
+export interface Stale {
+  harness: string;
+  repository: string;
+  /** The lock's pin. */
+  ref: string;
+  /** Main's HEAD when the run looked. */
+  main: string;
+  /** `behind`: the pin is an ancestor of main · `diverged`: neither contains the other. */
+  relation: "behind" | "diverged";
+  fix: string;
+}
+
+/** Main's HEAD of a repository, or why it could not be read. */
+export type MainHead = { sha: string } | { reason: string };
+
+export interface FreshnessReport {
+  checked: number;
+  fresh: number;
+  stale: Stale[];
+  undetermined: Undetermined[];
+}
+
+/**
+ * Judge every pin against its repository's main: at main, or descending from
+ * it, is fresh. Pure, as {@link judgeLockCoherence}.
+ */
+export function judgeFreshness(
+  root: readonly Pin[],
+  mainOf: (pin: Pin) => MainHead,
+  relate: (repository: string, a: string, b: string) => Relation,
+): FreshnessReport {
+  const out: FreshnessReport = { checked: 0, fresh: 0, stale: [], undetermined: [] };
+  for (const p of root) {
+    out.checked++;
+    const m = mainOf(p);
+    if ("reason" in m) {
+      out.undetermined.push({ harness: p.harness, via: p, reason: `main of ${p.repository}: ${m.reason}` });
+      continue;
+    }
+    const r = relate(p.repository, p.ref, m.sha);
+    if (r.rel === "same" || r.rel === "a-descends") {
+      out.fresh++;
+      continue;
+    }
+    if (r.rel === "unknown") {
+      out.undetermined.push({ harness: p.harness, via: p, lowerRef: m.sha, reason: `against main: ${r.reason}` });
+      continue;
+    }
+    out.stale.push({
+      harness: p.harness,
+      repository: p.repository,
+      ref: p.ref,
+      main: m.sha,
+      relation: r.rel === "b-descends" ? "behind" : "diverged",
+      fix: `re-pin ${p.harness} to main (${m.sha}), with the other layers in the same re-pin`,
+    });
+  }
+  return out;
+}
+
+export function formatFreshness(r: FreshnessReport, label: string): string {
+  const verdict = r.stale.length ? "FAILED" : r.undetermined.length ? "COULD NOT DETERMINE" : "OK";
+  const lines = [
+    `lock:freshness ${label}: ${verdict} — ${r.checked} pin(s), ${r.fresh} at or ahead of main, ` +
+      `${r.stale.length} stale, ${r.undetermined.length} undetermined`,
+  ];
+  for (const s of r.stale) {
+    lines.push(
+      `  ✗ ${s.harness}: pinned at ${s.ref}, main of ${s.repository} is ${s.main} ` +
+        `(${s.relation === "behind" ? "the pin is BEHIND main" : "the pin has diverged from main"}). Fix: ${s.fix}.`,
+    );
+  }
+  for (const u of r.undetermined) lines.push(`  ? ${u.harness}@${u.via.ref.slice(0, 12)}: ${u.reason}`);
+  return lines.join("\n");
 }
 
 export interface CoherenceReport {
@@ -194,9 +287,9 @@ export function judgeLockCoherence(
 }
 
 /** 0 agree · 1 a pair disagrees · 2 none disagrees but some could not be determined. */
-export function exitCodeOf(r: CoherenceReport): 0 | 1 | 2 {
-  if (r.disagreements.length) return 1;
-  if (r.undetermined.length) return 2;
+export function exitCodeOf(r: CoherenceReport, f?: FreshnessReport): 0 | 1 | 2 {
+  if (r.disagreements.length || f?.stale.length) return 1;
+  if (r.undetermined.length || f?.undetermined.length) return 2;
   return 0;
 }
 
@@ -286,6 +379,15 @@ export class LockReader {
     }
   }
 
+  /** Main's HEAD of `repository`, fetched now (`--filter=tree:0`). */
+  mainOf(repository: string, branch = "main"): MainHead {
+    const dir = this.dirOf(repository);
+    const f = git(dir, "fetch", "-q", "--filter=tree:0", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`);
+    if (f.status !== 0) return { reason: `git fetch ${branch} failed: ${(f.stderr || "").trim().split("\n").pop()}` };
+    const r = git(dir, "rev-parse", "--verify", "-q", `refs/remotes/origin/${branch}^{commit}`);
+    return r.status === 0 ? { sha: r.stdout.trim() } : { reason: `${branch} did not resolve after the fetch` };
+  }
+
   relate(repository: string, a: string, b: string): Relation {
     if (a === b) return { rel: "same" };
     const why = this.fetch(repository, [a, b]);
@@ -303,7 +405,7 @@ function argOf(argv: readonly string[], flag: string): string | undefined {
 
 export function main(argv: readonly string[]): number {
   if (argv.includes("--help")) {
-    console.log("usage: lock:coherence:check [--lock <file> | --repo <owner/name>[@<ref>]] [--changed-from <base>] [--cache <dir>] [--json]");
+    console.log("usage: lock:coherence:check [--lock <file> | --repo <owner/name>[@<ref>]] [--changed-from <base>] [--no-freshness] [--cache <dir>] [--json]");
     return 0;
   }
   const cache = resolve(argOf(argv, "--cache") ?? join(process.env.RUNNER_TEMP || tmpdir(), "cat-lock-coherence"));
@@ -350,8 +452,19 @@ export function main(argv: readonly string[]): number {
     (p) => reader.lockAt(p.repository, p.ref),
     (repo, a, b) => reader.relate(repo, a, b),
   );
-  console.log(argv.includes("--json") ? JSON.stringify({ lock: label, ...report }, null, 2) : formatReport(report, label));
-  return exitCodeOf(report);
+  const freshness = argv.includes("--no-freshness")
+    ? undefined
+    : judgeFreshness(
+        root,
+        (p) => reader.mainOf(p.repository),
+        (repo, a, b) => reader.relate(repo, a, b),
+      );
+  if (argv.includes("--json")) console.log(JSON.stringify({ lock: label, ...report, freshness }, null, 2));
+  else {
+    console.log(formatReport(report, label));
+    if (freshness) console.log(formatFreshness(freshness, label));
+  }
+  return exitCodeOf(report, freshness);
 }
 
 if (import.meta.main) process.exit(main(process.argv.slice(2)));

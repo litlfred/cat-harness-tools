@@ -16,11 +16,14 @@ import type { Relation } from "../git-ancestry.ts";
 import {
   LockReader,
   exitCodeOf,
+  formatFreshness,
   formatReport,
+  judgeFreshness,
   judgeLockCoherence,
   pinsOf,
   repoKey,
   type LowerLock,
+  type MainHead,
   type Pin,
 } from "../check-lock-coherence.ts";
 
@@ -130,6 +133,68 @@ describe("the rule: this lock's pin of X contains every pinned harness's pin of 
   });
 });
 
+describe("freshness: every pin at its repository's main, or ahead of it", () => {
+  const mains = (m: Record<string, string>) => (p: Pin): MainHead => (m[p.harness] ? { sha: m[p.harness]! } : { reason: "fetch failed" });
+  const agreeing = judgeLockCoherence([], () => ({ state: "absent" }), relate);
+
+  test("pins at main, or descending from it, are fresh", () => {
+    const f = judgeFreshness([pin("tools", sha("3")), pin("harness", sha("b"))], mains({ tools: sha("2"), harness: sha("b") }), relate);
+    expect(f).toMatchObject({ checked: 2, fresh: 2, stale: [], undetermined: [] });
+    expect(exitCodeOf(agreeing, f)).toBe(0);
+  });
+
+  test("a pin behind main fails, naming the harness, both SHAs and the re-pin", () => {
+    const f = judgeFreshness([pin("tools", sha("3")), pin("harness", sha("a"))], mains({ tools: sha("3"), harness: sha("b") }), relate);
+    expect(f.stale).toEqual([
+      expect.objectContaining({ harness: "harness", ref: sha("a"), main: sha("b"), relation: "behind" }),
+    ]);
+    expect(f.stale[0]!.fix).toContain(`re-pin harness to main (${sha("b")})`);
+    expect(exitCodeOf(agreeing, f)).toBe(1);
+    const text = formatFreshness(f, "fixture");
+    expect(text).toContain("FAILED");
+    expect(text).toContain(sha("a"));
+    expect(text).toContain(sha("b"));
+  });
+
+  test("the a43a4d27 shape: lower layers ahead of core's pins agree, but a stale core fails freshness", () => {
+    // The layer pins tools at t3 and harness at b, ahead of what core's lock pins; core itself is old.
+    const root = [pin("core", sha("c")), pin("harness", sha("b")), pin("tools", sha("3"))];
+    const agree = judgeLockCoherence(root, lowers(sha("2"), sha("a"), sha("2")), relate);
+    expect(agree.disagreements).toEqual([]);
+    const coreRelate = (repo: string, a: string, b: string): Relation =>
+      repoKey(repo) === "litlfred/core" ? (a === b ? { rel: "same" } : { rel: "b-descends" }) : relate(repo, a, b);
+    const f = judgeFreshness(root, mains({ core: sha("d"), harness: sha("b"), tools: sha("3") }), coreRelate);
+    expect(f.stale.map((s) => s.harness)).toEqual(["core"]);
+    expect(exitCodeOf(agree, f)).toBe(1);
+  });
+
+  test("a pin diverged from main fails", () => {
+    const f = judgeFreshness([pin("tools", SIDE)], mains({ tools: sha("3") }), relate);
+    expect(f.stale.map((s) => s.relation)).toEqual(["diverged"]);
+  });
+
+  test("a main that cannot be read is undetermined (exit 2), never fresh", () => {
+    const f = judgeFreshness([pin("tools", sha("3"))], mains({}), relate);
+    expect(f.fresh).toBe(0);
+    expect(f.undetermined).toHaveLength(1);
+    expect(exitCodeOf(agreeing, f)).toBe(2);
+  });
+
+  test("an ancestry against main that cannot be evaluated is undetermined (exit 2)", () => {
+    const f = judgeFreshness([pin("tools", sha("7"))], mains({ tools: sha("3") }), relate);
+    expect(f.undetermined).toHaveLength(1);
+    expect(exitCodeOf(agreeing, f)).toBe(2);
+  });
+
+  test("a disagreement still fails with every pin fresh", () => {
+    const root = [pin("core", sha("c")), pin("tools", sha("1"))];
+    const r = judgeLockCoherence(root, lowers(sha("3"), sha("b"), sha("1")), relate);
+    const f = judgeFreshness(root, mains({ core: sha("c"), tools: sha("1") }), relate);
+    expect(f.stale).toEqual([]);
+    expect(exitCodeOf(r, f)).toBe(1);
+  });
+});
+
 // ── The git reader, over local repositories ─────────────────────────────────
 
 function g(dir: string, ...args: string[]): string {
@@ -199,6 +264,22 @@ describe("the git reader: real commits, real locks", () => {
     expect(r.disagreements).toEqual([
       expect.objectContaining({ harness: "tools", layerRef: t1, lowerRef: t2, relation: "behind" }),
     ]);
+  });
+
+  test("freshness: a pin at main passes, one behind main fails, naming main's SHA", () => {
+    const rd = reader();
+    const fresh = judgeFreshness([pin("tools", t2)], (p) => rd.mainOf(p.repository), (r, a, b) => rd.relate(r, a, b));
+    expect(fresh).toMatchObject({ fresh: 1, stale: [], undetermined: [] });
+    const rd2 = reader();
+    const stale = judgeFreshness([pin("tools", t1)], (p) => rd2.mainOf(p.repository), (r, a, b) => rd2.relate(r, a, b));
+    expect(stale.stale).toEqual([expect.objectContaining({ harness: "tools", ref: t1, main: t2, relation: "behind" })]);
+  });
+
+  test("freshness: a repository whose main cannot be fetched is undetermined", () => {
+    const rd = new LockReader(join(root, "cache-missing"), () => `file://${join(root, "nope")}`);
+    const f = judgeFreshness([pin("tools", t2)], (p) => rd.mainOf(p.repository), (r, a, b) => rd.relate(r, a, b));
+    expect(f.undetermined).toHaveLength(1);
+    expect(exitCodeOf(judgeLockCoherence([], () => ({ state: "absent" }), () => ({ rel: "same" })), f)).toBe(2);
   });
 
   test("a pin that cannot be fetched is undetermined", () => {
