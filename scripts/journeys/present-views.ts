@@ -79,7 +79,7 @@ interface At {
   siteRoot: string;
 }
 /** The drawer of a view over these steps, every page's foot. */
-const drawerOf = (corpus: JourneyCorpus, p: Presentation, a: At, steps: readonly PresentedStep[], scope?: string): string => viewDrawer(corpus, p, stepsExampleKeys(steps), a.toWorkshop, a.siteRoot, scope);
+const drawerOf = (corpus: JourneyCorpus, p: Presentation, a: At, steps: readonly PresentedStep[], stage: string, scope?: string): string => viewDrawer(corpus, p, stepsExampleKeys(steps), a.toWorkshop, a.siteRoot, scope, stage);
 
 const at = (depth: number, links: SiteLinks): At => {
   const root = "../".repeat(3 + depth);
@@ -277,7 +277,7 @@ ${focus}
 ${[chapters, moments, lanes, record, pain, enabler, cat ? techHead + layerRows : "", moveRow, handoffRow, procRow].join("\n")}
 </div></div>
 ${panels}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "map", title: `Journey map — ${presentationName(p)}`, ...note(p, "map"), body, foot: drawerOf(corpus, p, a, p.steps) });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "map", title: `Journey map — ${presentationName(p)}`, ...note(p, "map"), body, foot: drawerOf(corpus, p, a, p.steps, "Journey map") });
 }
 
 // ── the persona lens ─────────────────────────────────────────────────────
@@ -353,7 +353,7 @@ function personaPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, w
 <section><h3 class="jp-h jp-h-pad">${e(who.name)}’s touchpoints (${mine.length})</h3><ol class="jp-tps">${touch}</ol></section>
 </div>
 </div>`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "personas", title: `${who.name} — persona lens — ${presentationName(p)}`, ...note(p, "personas"), body, foot: drawerOf(corpus, p, a, mine, `in ${who.name}’s moments`) });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "personas", title: `${who.name} — persona lens — ${presentationName(p)}`, ...note(p, "personas"), body, foot: drawerOf(corpus, p, a, mine, who.name, `in ${who.name}’s moments`) });
 }
 
 // ── how it works ─────────────────────────────────────────────────────────
@@ -478,7 +478,7 @@ ${ideasHtml}
 <div class="jp-howgrid">${matrix}${detail}</div>
 ${viewsHtml}
 ${procHtml}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "how", title: `${b ? `${b.name} — ` : ""}How it works — ${presentationName(p)}`, ...note(p, "how"), body, foot: b ? drawerOf(corpus, p, a, blockUsage(p, b.id).map((x) => x.s), `where ${b.short ?? b.name} is used`) : drawerOf(corpus, p, a, steps) });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "how", title: `${b ? `${b.name} — ` : ""}How it works — ${presentationName(p)}`, ...note(p, "how"), body, foot: b ? drawerOf(corpus, p, a, blockUsage(p, b.id).map((x) => x.s), b.short ?? b.name, `where ${b.short ?? b.name} is used`) : drawerOf(corpus, p, a, steps, "How it works") });
 }
 
 // ── the discussion ───────────────────────────────────────────────────────
@@ -525,7 +525,7 @@ ${byModule ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("message",
 ${tables}
 ${gap}
 ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(gap ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps) });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(gap ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
 }
 
 // ── the gap report ───────────────────────────────────────────────────────
@@ -591,7 +591,7 @@ function sheetsPageFramed(corpus: JourneyCorpus, p: Presentation, links: SiteLin
     head: `<link rel="stylesheet" href="${a.root}assets/journeys.css">`,
     bodyClass: "jv-print-sheets",
     body,
-    foot: drawerOf(corpus, p, a, p.steps),
+    foot: drawerOf(corpus, p, a, p.steps, "Table sheets"),
   });
 }
 
@@ -647,7 +647,7 @@ function demoIndex(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): st
       : `One screen per moment, in the instance’s own app. A screen opens framed here, with the moments it shows; ${ext(fromSite(pr.deviceDemo!.href, a.siteRoot), "open the app")} to use it on its own.`;
   const body = `<section class="jp-vhead"><h2>${e(label)}: what each person sees</h2><p>${lede}</p></section>
 <div class="jp-screens">${cards}</div>`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "demo", title: `${label} — ${presentationName(p)}`, ...note(p, "demo"), body, foot: drawerOf(corpus, p, a, p.screens.flatMap((x) => x.steps)) });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "demo", title: `${label} — ${presentationName(p)}`, ...note(p, "demo"), body, foot: drawerOf(corpus, p, a, p.screens.flatMap((x) => x.steps), label) });
 }
 
 function demoPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, i: number): string {
@@ -690,7 +690,7 @@ ${moments}`;
     ...(next ? { next: `../${next.id}/` } : {}),
     body,
     // The screen's own payloads first, so the drawer opens on what it shows.
-    foot: viewDrawer(corpus, p, [...(x.node ? screenExamples(x.node.screen) : []), ...stepsExampleKeys(x.steps)], a.toWorkshop, a.siteRoot, "on this screen"),
+    foot: viewDrawer(corpus, p, [...(x.node ? screenExamples(x.node.screen) : []), ...stepsExampleKeys(x.steps)], a.toWorkshop, a.siteRoot, "on this screen", [x.id, ...x.steps.map((s) => s.step.id)].join(" · ")),
   });
 }
 

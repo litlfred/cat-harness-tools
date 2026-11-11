@@ -607,6 +607,32 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     // The step page keeps its JSON inline, so it needs no fetch.
     expect(p2).not.toContain("data-jp-src");
   });
+  test("JV-08: the drawer's bar names the active stage, and the workshop's inspector title, key and hint", () => {
+    expect(p2).toContain('<span class="jp-drawer-chip">Active Stage: P2</span>');
+    expect(at(`${base}/map/index.html`)).toContain("Active Stage: Journey map");
+    expect(at(`${base}/demo/S2/index.html`)).toContain("Active Stage: S2 · P2");
+    expect(p2).toContain("<b>FHIR payload inspector</b>");
+    expect(p2).not.toContain("jp-drawer-key");
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, inspector: { title: "FHIR R4 & WHO GDHCN payload inspector", key: "DEV Key: 916ffa (XXR)", hint: "Click to inspect raw FHIR / CBOR payload" } } } };
+    const out = renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top");
+    for (const path of ["walkthrough/P2", "map", "demo/S2"]) {
+      const page = String(out.find((f) => f.path === `${base}/${path}/index.html`)!.content);
+      expect(page).toContain("<b>FHIR R4 &amp; WHO GDHCN payload inspector</b>");
+      expect(page).toMatch(/<span class="jp-drawer-key"><svg[^>]*>[\s\S]*?<\/svg>DEV Key: 916ffa \(XXR\)<\/span>/);
+      expect(page).toContain("Click to inspect raw FHIR / CBOR payload");
+    }
+  });
+  test("JV-07: every page's header has Reset Simulation, scoped to the workshop, returning to the overview", () => {
+    for (const path of ["overview", "walkthrough/P2", "map", "how", "demo/S2"]) {
+      const page = at(`${base}/${path}/index.html`);
+      const depth = path.split("/").length;
+      expect(page).toContain(`data-jp-reset="policy" data-jp-reset-to="${"../".repeat(depth)}overview/"`);
+      expect(page).toContain("<span>Reset Simulation</span>");
+    }
+    const js = at("assets/present.js");
+    expect(js).toContain('each("[data-jp-reset]", reset)');
+  });
   test("the drawer's script colours JSON exactly as the build does", () => {
     const js = at("assets/present.js");
     const src = /\n {2}function esc\(t\) \{[\s\S]*?\n {2}\}\n {2}function highlightJson\(json\) \{[\s\S]*?\n {2}\}\n/.exec(js)?.[0];

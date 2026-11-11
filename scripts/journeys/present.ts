@@ -251,6 +251,8 @@ export function avatar(p: PersonaView, size: "sm" | "md" | "lg" = "md"): string 
 
 // Small line icons (24×24, stroked), drawn for these pages.
 const ICON: Record<string, string> = {
+  up: '<path d="M18 15l-6-6-6 6"/>',
+  reset: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
   eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   route: '<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H17a3.5 3.5 0 0 0 0-7H7a3.5 3.5 0 0 1 0-7h8.5"/>',
@@ -594,7 +596,7 @@ ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="n
       ? `<a${o.view === "demo" ? ' class="is-on" aria-current="page"' : ""} href="${e(`${o.toWorkshop}demo/`)}">${icon("phone", "jp-sky")}<span>${e(demoLabel(o.p))}</span></a>`
       : `<span class="jp-mode-off" aria-disabled="true" title="No device screen shows a step of this workshop">${icon("phone", "jp-sky")}<span>Device Demo</span></span>`
   }</div>
-<div class="jp-links">${links}</div>
+<div class="jp-links">${links}<button type="button" class="jp-btn-link jp-reset" data-jp-reset="${e(ws.id)}" data-jp-reset-to="${e(`${o.toWorkshop}overview/`)}" title="Forget this workshop's answers and the presenter's choices in this browser, and go back to the overview">${icon("reset")}<span>Reset Simulation</span></button></div>
 </div>
 </header>
 ${o.note ? `<div class="jp-note jp-presenter-only"><div><span class="jp-note-tag">PRESENTER NOTE</span><span>${e(o.note)}</span></div><button type="button" data-jp-dismiss>Dismiss</button></div>` : ""}
@@ -719,7 +721,7 @@ ${ladderHtml}
     ...(pr.presenterNote ? { note: pr.presenterNote } : {}),
     ...(first ? { next: walk(first) } : {}),
     body,
-    foot: viewDrawer(corpus, p, stepsExampleKeys(p.steps), toWorkshop, links ? siteRootFrom(root, links) : root),
+    foot: viewDrawer(corpus, p, stepsExampleKeys(p.steps), toWorkshop, links ? siteRootFrom(root, links) : root, undefined, "Overview"),
   });
 }
 
@@ -830,6 +832,10 @@ export interface DrawerOpts {
    * carrying it, so a view page stays small however many moments it spans.
    */
   toWorkshop?: string;
+  /** The bar's "Active Stage" chip: the step, the screen or the view the page shows. */
+  stage?: string;
+  /** The workshop's own words for the bar (`presentation.inspector`). */
+  inspector?: WorkshopPresentation["inspector"];
 }
 
 /** A FHIR payload drawer: each example of `keys` whose JSON this build has, highlighted, with a copy button. Empty when none has JSON. */
@@ -848,20 +854,20 @@ export function drawerFor(corpus: JourneyCorpus, keys: readonly string[], o: Dra
     })
     .join("");
   return `<aside class="jp-drawer" data-jp-drawer aria-label="FHIR payload inspector">
-<button type="button" class="jp-drawer-bar" data-jp-drawer-toggle aria-expanded="false">${icon("code", "jp-sky3")}<b>FHIR payload inspector</b><span class="jp-drawer-n">${shown.length} resource${shown.length === 1 ? "" : "s"} ${e(o.scope)}</span><span class="jp-drawer-hint">Click to inspect the raw FHIR JSON</span></button>
+<button type="button" class="jp-drawer-bar" data-jp-drawer-toggle aria-expanded="false" title="${e(`${shown.length} resource${shown.length === 1 ? "" : "s"} ${o.scope}`)}">${icon("code", "jp-sky3")}<b>${e(o.inspector?.title ?? "FHIR payload inspector")}</b>${o.stage ? `<span class="jp-drawer-chip">Active Stage: ${e(o.stage)}</span>` : ""}${o.inspector?.key ? `<span class="jp-drawer-key">${glyph("shield-check")}${e(o.inspector.key)}</span>` : ""}<span class="jp-drawer-n">${shown.length} resource${shown.length === 1 ? "" : "s"} ${e(o.scope)}</span><span class="jp-drawer-hint">${e(o.inspector?.hint ?? "Click to inspect the raw FHIR payload")}${icon("up")}</span></button>
 <div class="jp-drawer-body" hidden><div class="jp-drawer-tabs" role="tablist">${tabs}<button type="button" class="jp-copy" data-jp-copy>Copy</button></div>${panes}</div>
 </aside>`;
 }
 
 /** The FHIR payload drawer of a step: every example it names whose JSON this build has, highlighted, with a copy button. */
-export function payloadDrawer(corpus: JourneyCorpus, st: ScenarioStep, pageOf?: (key: string) => string | undefined): string {
-  return drawerFor(corpus, stepExampleKeys(st), { scope: "at this moment", ...(pageOf ? { pageOf } : {}) });
+export function payloadDrawer(corpus: JourneyCorpus, st: ScenarioStep, pageOf?: (key: string) => string | undefined, inspector?: WorkshopPresentation["inspector"]): string {
+  return drawerFor(corpus, stepExampleKeys(st), { scope: "at this moment", stage: st.id, ...(pageOf ? { pageOf } : {}), ...(inspector ? { inspector } : {}) });
 }
 
 /** A view's drawer: the examples of the steps it spans, loaded from the shared payload files. */
-export function viewDrawer(corpus: JourneyCorpus, p: Presentation, keys: readonly string[], toWorkshop: string, siteRoot: string, scope = "in this view"): string {
+export function viewDrawer(corpus: JourneyCorpus, p: Presentation, keys: readonly string[], toWorkshop: string, siteRoot: string, scope = "in this view", stage?: string): string {
   const pr = p.w.workshop.presentation ?? {};
-  return drawerFor(corpus, keys, { scope, toWorkshop, pageOf: (k) => artifactPage(corpus, pr, k, siteRoot) });
+  return drawerFor(corpus, keys, { scope, toWorkshop, pageOf: (k) => artifactPage(corpus, pr, k, siteRoot), ...(stage ? { stage } : {}), ...(pr.inspector ? { inspector: pr.inspector } : {}) });
 }
 
 /** The examples of a run of steps, once each, in step order. */
@@ -1055,7 +1061,7 @@ ${hood(corpus, p, s, links, root)}`;
     ...(prev ? { prev } : { prev: "../../overview/" }),
     next,
     body,
-    foot: payloadDrawer(corpus, st, (k) => artifactPage(corpus, pr, k, siteRoot)),
+    foot: payloadDrawer(corpus, st, (k) => artifactPage(corpus, pr, k, siteRoot), pr.inspector),
   });
 }
 
