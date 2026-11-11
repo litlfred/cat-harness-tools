@@ -306,7 +306,7 @@ def needs_ocr(pages: list[str]) -> tuple[bool, str]:
 def detect_script(png: str) -> str:
     """Tesseract's orientation-and-script guess for one page, or ''."""
     try:
-        out = subprocess.run(["tesseract", png, "stdout", "--psm", "0"],
+        out = subprocess.run(["tesseract", png, "stdout", "--psm", "0"], env=_tesseract_env(),
                              capture_output=True, text=True, timeout=90).stdout
     except Exception:
         return ""
@@ -374,8 +374,13 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
         for i, png in enumerate(pngs, 1):
             use = lang or (first if i == 1 or not hints else detect_lang(png, hints))
             if lang:
-                txt = subprocess.run(["tesseract", png, "stdout", "-l", use],
-                                     capture_output=True, text=True).stdout
+                try:
+                    txt = subprocess.run(["tesseract", png, "stdout", "-l", use], capture_output=True,
+                                         text=True, env=_tesseract_env(), timeout=PAGE_TIMEOUT).stdout
+                except subprocess.TimeoutExpired:
+                    print(f"  {os.path.basename(png)}: Tesseract ran past {PAGE_TIMEOUT}s; page left empty",
+                          file=sys.stderr)
+                    txt = ""
             else:
                 txt, use = read_page(png, use, have_langs)
             open(os.path.join(cache, f"page-{i:03d}.txt"), "w",
@@ -406,13 +411,38 @@ LOW_CONFIDENCE = 70.0
 MIN_GAIN = 10.0
 # The scripts a page may mix in, one pack each, tried in this order.
 SECOND_SCRIPTS = ["eng", "ara", "rus", "chi_sim", "fas"]
+# A second-script read is an attempt to do better; it gets less time than the first.
+SECOND_READ_TIMEOUT = 180
 
 
-def _ocr_with_confidence(png: str, lang: str) -> tuple[str, float]:
-    """Tesseract's text for `png` read as `lang`, and its mean word confidence (0-100)."""
+# One page's read may not run longer than this. Measured 2026-11-11 on the
+# IRIS re-derive: four ingests side by side, each Tesseract left to start one
+# OpenMP thread per core, read single A4 pages for over 30 minutes each (a
+# normal read takes seconds). So Tesseract runs single-threaded unless the
+# caller set OMP_THREAD_LIMIT, and a read past the limit is given up: a second-
+# script retry is skipped, a first read leaves the page empty and says so.
+PAGE_TIMEOUT = 600
+
+
+def _tesseract_env() -> dict:
+    env = dict(os.environ)
+    env.setdefault("OMP_THREAD_LIMIT", "1")
+    return env
+
+
+def _ocr_with_confidence(png: str, lang: str, timeout: int = PAGE_TIMEOUT) -> tuple[str, float]:
+    """Tesseract's text for `png` read as `lang`, and its mean word confidence (0-100).
+
+    ("", -1.0) when the read ran past `timeout` seconds.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         base = os.path.join(tmp, "o")
-        subprocess.run(["tesseract", png, base, "-l", lang, "txt", "tsv"], capture_output=True, text=True)
+        try:
+            subprocess.run(["tesseract", png, base, "-l", lang, "txt", "tsv"], capture_output=True, text=True,
+                           env=_tesseract_env(), timeout=timeout)
+        except subprocess.TimeoutExpired:
+            print(f"  {os.path.basename(png)}: Tesseract ({lang}) ran past {timeout}s; given up", file=sys.stderr)
+            return "", -1.0
         try:
             txt = open(base + ".txt", encoding="utf-8").read()
         except OSError:
@@ -459,11 +489,11 @@ def read_page(png: str, lang: str, have: set[str]) -> tuple[str, str]:
     the first read is sure of costs nothing more. Returns (text, lang used).
     """
     txt, conf = _ocr_with_confidence(png, lang)
-    if conf >= LOW_CONFIDENCE:
-        return txt, lang
+    if conf >= LOW_CONFIDENCE or conf < 0:
+        return txt, lang  # sure enough, or the page outran the time limit: no retry
     best = (txt, conf, lang)
     for cand in second_script_candidates(lang, have):
-        t, c = _ocr_with_confidence(png, cand)
+        t, c = _ocr_with_confidence(png, cand, timeout=SECOND_READ_TIMEOUT)
         if c > best[1]:
             best = (t, c, cand)
     if best[1] - conf >= MIN_GAIN:
