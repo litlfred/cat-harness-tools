@@ -553,6 +553,28 @@ export function rangeLabel(steps: readonly { step: { id: string } }[], scope?: s
   return `${first === last ? first : `${first} → ${last}`}${scope ? ` (${scope})` : ""}`;
 }
 
+/**
+ * Give every section heading of a view (`h2`–`h4`) that has no `id` one, from
+ * its text, so a section can be linked to (owner, 2026-11-11: "sections and
+ * steps need anchors"). Unique on the page: a slug already used, by another
+ * heading or any other element, takes `-2`, `-3`… Deterministic.
+ */
+export function anchorHeadings(html: string): string {
+  const used = new Set([...html.matchAll(/\sid="([^"]*)"/g)].map((m) => m[1]!));
+  return html.replace(/<(h[234])(\s[^>]*)?>([\s\S]*?)<\/\1>/g, (all, tag: string, attrs: string | undefined, inner: string) => {
+    if (attrs && /\sid=/.test(attrs)) return all;
+    const text = inner
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&[a-z]+;|&#\d+;/gi, " ")
+      .toLowerCase();
+    const slug = text.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "section";
+    let id = slug;
+    for (let n = 2; used.has(id); n++) id = `${slug}-${n}`;
+    used.add(id);
+    return `<${tag} id="${id}"${attrs ?? ""}>${inner}</${tag}>`;
+  });
+}
+
 export function frame(o: FrameOpts): string {
   const ws = o.p.w.workshop;
   const pr = ws.presentation ?? {};
@@ -615,7 +637,7 @@ ${o.band ?? ""}
 ${o.note ? `<div class="jp-note jp-presenter-only"><div><span class="jp-note-tag">PRESENTER NOTE</span><span>${e(o.note)}</span></div><button type="button" data-jp-dismiss>Dismiss</button></div>` : ""}
 <main class="jp-main"><div class="jp-wrap">
 ${o.view === "demo" ? "" : `<nav class="jp-tabs" aria-label="Views">${nav}</nav>`}
-${o.body.trim()}
+${anchorHeadings(o.body.trim())}
 </div></main>
 ${o.foot ?? ""}
 <footer class="jp-foot">Drawn by the journeys viewer from the <code>workshop</code>, <code>user-scenario</code>${o.view === "demo" && o.p.demo === "screens" ? " and <code>device-screen</code>" : ""} nodes of ${e(o.p.w.instance)}. Every person is fictional.</footer>
