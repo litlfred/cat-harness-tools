@@ -17,22 +17,22 @@
  * Y against a newer X, which is what every re-pin of X does until Y follows,
  * and is what the standing re-pinner produces. Equality would fail every
  * layer between the two re-pins. A layer BEHIND Y on X is the skew that broke
- * who-iris main at a43a4d27 (owner, 2026-11-11): the PR's fast tier was green,
+ * a content layer's main (owner, 2026-11-11): the PR's fast tier was green,
  * its pins were half new mains and half old, and 7 tests failed on main until
- * who-iris#234 re-pinned all five to current mains.
+ * a re-pin moved all five to current mains.
  *
  * ## Fresh: every pin at its repository's main, or ahead of it
  *
- * Agreement alone does not catch the a43a4d27 skew itself: who-iris pinned
- * cat-harness and cat-harness-tools AHEAD of folio-assistant-core's own pins
- * of them, while core was left at an old commit, and no lock records that a
+ * Agreement alone does not catch that skew itself: the layer pinned
+ * cat-harness and cat-harness-tools AHEAD of its content core's own pins
+ * of them, while the core was left at an old commit, and no lock records that a
  * lower layer moved past what an upper one was built for. So the second rule
  * (owner, 2026-11-11, card "A: Agree check + freshness"): on a pull request
  * that changes `index.lock.json`, every pinned harness is at its
  * repository's `main` HEAD as the run finds it, or at a descendant of it. A
  * pin behind main, or diverged from it, fails, naming the harness, the
  * pinned SHA, main's SHA and the fix (re-pin to main). A re-pin therefore
- * moves every layer together, which is what who-iris#234 did to go green.
+ * moves every layer together, which is what turned that main green.
  * `--no-freshness` judges agreement alone.
  *
  * ## Three states, never two
@@ -57,7 +57,7 @@
  *   bun run cat lock:coherence:check                        # ./index.lock.json: agreement and freshness
  *   bun run cat lock:coherence:check -- --no-freshness      # agreement alone
  *   bun run cat lock:coherence:check -- --lock <file>       # another lock file
- *   bun run cat lock:coherence:check -- --repo litlfred/who-iris@main
+ *   bun run cat lock:coherence:check -- --repo <owner>/<layer>@main
  *                                                           # a repository's lock at a ref, read with git
  *   bun run cat lock:coherence:check -- --changed-from <base>
  *                                                           # pass at once when index.lock.json is unchanged since <base>

@@ -2400,7 +2400,7 @@ jobs:
           exit 1
 
   # The lock's harness pins agree with the pinned harnesses' own locks (owner,
-  # 2026-11-11, after who-iris main went red at a43a4d27 on pins skewed between
+  # 2026-11-11, after a content layer's main went red on pins skewed between
   # new and old mains). A layer that pins harness X at A while another pinned
   # harness Y, at its pin, pins X at B must have A contain B: Y was built and
   # tested against X at B. And every pin is FRESH (owner, 2026-11-11, card
