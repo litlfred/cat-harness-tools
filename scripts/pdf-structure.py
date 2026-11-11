@@ -95,6 +95,7 @@ from _pypdf_compat import import_pypdf  # noqa: E402
 # bean `rlp5`, where `-o` meant two different things and the OCR step did not
 # compose with this one.
 from _pdf_text import join_soft_hyphens  # noqa: E402
+from _text_quality import page_problem  # noqa: E402
 from _pdf_doc_id import (  # noqa: E402
     derive_doc_id,
     find_ocr_cache,
@@ -1463,6 +1464,160 @@ def _starts_run_in(cand: str, keys: list[str]) -> bool:
     return False
 
 
+# ------------------------------------------- outlines that are not contents
+#
+# Owner, 2026-11-11 (who-iris, card Q-ODD-1 = A): "split single blocks that
+# hold a whole book". Six IRIS PDFs came out as ONE section of 10,000 to
+# 101,000 words, every one of them because an outline was present, was taken
+# as the document's answer (bean `6xaz`), and located no heading on any page,
+# so `split_sections` kept the whole text. Measured 2026-11-11:
+#
+# - 10665/353150 (fr) and 353151 (es): 101 entries, all Word bookmark names
+#   ("_tyjcwt", "_4d34og8").
+# - 10665/385385: one entry, "Blank Page". 10665/259268: one, "_TOC_250000".
+# - 10665/44118: three, the names of the files merged into the PDF
+#   ("9789241547727_eng_Chapter1-4").
+# - 10665/331525, Russian edition: 20 real entries, in English ("Chapter 1.
+#   Introduction and approach"), over Russian pages.
+#
+# A machine bookmark is not a heading, and an outline whose titles the pages do
+# not print cannot place one. Either way the outline is set aside and the
+# contents are inferred, as for a PDF with no outline; the inference must still
+# pass its own trust tests, else the document is split by page.
+
+# Bookmark names that word processors and PDF tools write, never a heading.
+MACHINE_BOOKMARK = re.compile(
+    r"^(_[A-Za-z0-9_.]+|Blank Page|Bookmark\s*\d*|Page\s*\d+|\d{9,13}[_-][A-Za-z]{3}([_-].*)?)$")
+# Below this share of entries located on their pages, an outline is not used.
+MIN_OUTLINE_LOCATED = 0.5
+
+
+def machine_bookmark(title: str) -> bool:
+    """A title a tool wrote, not a heading: `_GoBack`, `_Hlk62546849`, "Blank Page". Pure."""
+    return bool(MACHINE_BOOKMARK.match(title.strip()))
+
+
+def trusted_outline(outline: list[TocEntry], pages: list[str]) -> tuple[list[TocEntry], str | None]:
+    """The outline with machine bookmarks dropped, or `[]` and why it was not used.
+
+    10665/341997 mixes its 11 real chapters with 19 bookmark names
+    ("_Hlk62546849", "_GoBack"): the bookmarks are dropped and the chapters
+    kept. When nothing is left, or under half of what is left names a line
+    the pages print, the outline is set aside (see the block above).
+    """
+    if not outline:
+        return outline, None
+    kept = [e for e in outline if not machine_bookmark(e.title)]
+    if not kept:
+        return [], (f"all {len(outline)} outline entries are machine bookmark names "
+                    f"(\"{outline[0].title}\"), not headings")
+    located = sum(1 for e in kept if locate_heading(pages, e))
+    if located < MIN_OUTLINE_LOCATED * len(kept):
+        return [], (f"{located} of {len(kept)} outline entries name a heading the pages print "
+                    f"(< {int(MIN_OUTLINE_LOCATED * 100)}%), e.g. \"{kept[0].title}\"")
+    return kept, None
+
+
+# A section is too long to be one block when it holds more than half of a
+# document of at least OVERSIZED_MIN_PAGES pages and more than
+# OVERSIZED_HALF_WORDS words, or more than OVERSIZED_WORDS words wherever it is.
+# The smallest measured case, 10665/259268, is 36 pages and 10,725 words in one
+# section; a long proof in a 40-page paper is usually under 8,000.
+OVERSIZED_MIN_PAGES = 20
+OVERSIZED_HALF_WORDS = 8000
+OVERSIZED_WORDS = 20000
+
+
+def oversized_section(s: "Section", n_pages: int) -> bool:
+    """Too long to be one block (see OVERSIZED_*). Pure."""
+    span = s.page_end - s.page_start + 1
+    if span < 2:
+        return False
+    return (n_pages >= OVERSIZED_MIN_PAGES and span > n_pages / 2 and s.n_words > OVERSIZED_HALF_WORDS) \
+        or s.n_words > OVERSIZED_WORDS
+
+
+def by_page(s: "Section", pages: list[str]) -> list["Section"]:
+    """`s` as one section per page, titled by page; "Page N" for a whole document. Pure."""
+    whole = s.title == "Document" and s.number is None
+    return [replace(p, title=p.title if whole else f"{s.title} (page {p.page_start})",
+                    level=s.level if whole else s.level + 1)
+            for p in split_pages(pages)[s.page_start - 1:s.page_end]]
+
+
+def split_oversized(sections: list["Section"], pages: list[str],
+                    candidates: list[TocEntry]) -> tuple[list["Section"], list[dict[str, Any]]]:
+    """Each oversized section cut at the headings inferred inside it, else by page.
+
+    10665/75211 (National eHealth strategy toolkit) infers 71 headings, and
+    the last, "G. Definitions of terms", runs from page 104 to 223 (36,800
+    words) because the headings of Parts 2 and 3 were not inferred. A section
+    that size is cut at the candidate headings that fall inside its pages, or,
+    when fewer than two do, one section per page. Ids are renumbered in order.
+    """
+    out: list[Section] = []
+    report: list[dict[str, Any]] = []
+    for s in sections:
+        if not oversized_section(s, len(pages)):
+            out.append(s)
+            continue
+        inside = [e for e in candidates
+                  if e.page is not None and s.page_start < e.page <= s.page_end
+                  and _match_key(e.title) != _match_key(s.title)]
+        sub: list[Section] = []
+        if len(inside) >= 2:
+            # The pages before the section blanked and those after it cut, so
+            # every part ends inside the section.
+            span = [pages[i] if i >= s.page_start - 1 else "" for i in range(s.page_end)]
+            parts = split_sections(span, inside)
+            # The text before the first inside heading stays with the section's own title.
+            for p in parts:
+                if p.id == "sec-front-matter":
+                    p = replace(p, id="", number=s.number, title=s.title, level=s.level, page_start=s.page_start)
+                # A part still too long is cut by page.
+                sub.extend(by_page(p, pages) if oversized_section(p, len(pages)) else [p])
+            by = "headings"
+        if len(sub) < 2:
+            sub = by_page(s, pages)
+            by = "pages"
+        report.append({"title": s.title, "page_start": s.page_start, "page_end": s.page_end,
+                       "words": s.n_words, "by": by, "into": len(sub)})
+        out.extend(sub)
+    if not report:
+        return sections, []
+    renumbered = []
+    i = 0
+    for s in out:
+        if s.id == "sec-front-matter":
+            renumbered.append(s)
+            continue
+        renumbered.append(replace(s, id=f"sec-{i:03d}-" + slugify(f"{s.number + ' ' if s.number else ''}{s.title}")))
+        i += 1
+    return renumbered, report
+
+
+def replace_failing_pages(pages: list[str], ocr: list[str], langs: list[str]) -> tuple[list[str], list[dict[str, Any]]]:
+    """Each page whose text layer fails `_text_quality.page_problem`, read from OCR instead.
+
+    Owner, 2026-11-11 (who-iris, card Q-ODD-1 = A): "force OCR when a page's
+    text layer fails a quality check". A document is routed to OCR whole only
+    when its text layer as a whole is unusable; one with a few broken pages
+    (an Arabic abstract in a French article, a page of fake-bold headings)
+    keeps its own text everywhere else. Needs the OCR cache, one page per PDF
+    page (`pdf-ocr.py` first); without it nothing is replaced.
+    """
+    if len(ocr) != len(pages):
+        return pages, []
+    out = list(pages)
+    replaced: list[dict[str, Any]] = []
+    for i, text in enumerate(pages):
+        why = page_problem(text or "", langs)
+        if why and (ocr[i] or "").strip():
+            out[i] = ocr[i]
+            replaced.append({"page": i + 1, "reason": why})
+    return out, replaced
+
+
 def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
     """Slice the document text at heading boundaries."""
     marks: list[tuple[int, int, TocEntry]] = []  # (page_idx, line_idx, entry)
@@ -1819,12 +1974,12 @@ def library_noise_to_stderr():
 
 def process(path: str, outdir: str | None = None, use_ocr: bool = False,
             backend: str = "auto", latex_source: str | None = None,
-            title: str | None = None) -> tuple[dict[str, Any], list[Section]]:
+            title: str | None = None, langs: list[str] | None = None) -> tuple[dict[str, Any], list[Section]]:
     # Everything that touches a PDF backend runs under the redirect. `process`
     # writes nothing to stdout itself — it RETURNS the artefact and its caller
     # prints it — so nothing legitimate is caught by this.
     with library_noise_to_stderr():
-        return _process(path, outdir, use_ocr, backend, latex_source, title)
+        return _process(path, outdir, use_ocr, backend, latex_source, title, langs)
 
 
 def latex_source_for(path: str, given: str | None) -> str | None:
@@ -1839,19 +1994,23 @@ def latex_source_for(path: str, given: str | None) -> str | None:
 
 def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
              backend: str = "auto", latex_source: str | None = None,
-             title: str | None = None) -> tuple[dict[str, Any], list[Section]]:
+             title: str | None = None, langs: list[str] | None = None) -> tuple[dict[str, Any], list[Section]]:
     reader = open_backend(path, backend)
     pages = reader.page_texts()
     ocr_used = False
+    replaced: list[dict[str, Any]] = []
     if use_ocr and text_is_unusable(pages):
         cached = ocr_pages(path, outdir)
         if cached:
             pages, ocr_used = cached, True
+    elif use_ocr:
+        pages, replaced = replace_failing_pages(pages, ocr_pages(path, outdir), langs or [])
     # Soft hyphens joined before anything splits the text into sections, so
     # every downstream reader sees whole words (bean `3spu`).
     pages = [join_soft_hyphens(p) for p in pages]
 
     outline, outline_reordered = repair_outline(_toc_entries(reader.raw_toc()), pages)
+    outline, outline_rejected = trusted_outline(outline, pages)
     # An inferred table of contents is asked to justify itself; an outline is
     # the document's own answer and is not second-guessed (bean `6xaz`).
     # The page layout, read once for the TOC, the figures and the contents
@@ -1880,6 +2039,12 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
     # and, unlike the single whole-document section, it can still be cited.
     paged = not toc and bool(pages)
     sections = split_pages(pages) if paged else split_sections(pages, toc)
+    oversized: list[dict[str, Any]] = []
+    if not paged:
+        candidates = inferred
+        if outline and lines is not None and any(oversized_section(s, len(pages)) for s in sections):
+            candidates = [e for e in infer_toc(lines, pages)[0] if (e.confidence or 0) >= 0.6]
+        sections, oversized = split_oversized(sections, pages, candidates)
     figures, figure_gaps = infer_figures(path, lines)
     page_rows, label_conflicts = infer_page_labels(path, lines, len(pages),
                                                    pages if ocr_used else None)
@@ -1955,6 +2120,9 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
             # the run context `pdf-ocr.py` wrote beside the pages. Absent for
             # an embedded text layer, and for an OCR cache older than it.
             **ocr_run_context_ref(path, outdir, ocr_used),
+            # Pages whose text layer failed the page check and were read from
+            # the OCR cache instead (`replace_failing_pages`).
+            **({"ocr_pages": replaced} if replaced else {}),
         },
         "metadata": meta,
         "toc": [asdict(e) for e in toc],
@@ -2023,6 +2191,10 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
             # The outline was flat and ran against its own pages, so it was put
             # in page order (`repair_outline`). Absent when it was not.
             **({"outline_reordered": True} if outline_reordered else {}),
+            # The outline was found and not used, and why (`trusted_outline`).
+            **({"outline_rejected": outline_rejected} if outline_rejected else {}),
+            # Sections too long for one block, and how each was cut (`split_oversized`).
+            **({"oversized_split": oversized} if oversized else {}),
         },
     }
     return artefact, sections
@@ -2072,6 +2244,9 @@ def main() -> int:
     ap.add_argument("--ocr", action="store_true",
                     help="for a PDF whose text layer is absent or mojibake, use the "
                          "cached OCR text written by pdf-ocr.py (which must be run first)")
+    ap.add_argument("--lang-hint", default="",
+                    help="the document's languages as ISO 639 codes, e.g. fr,en (from dc.language.iso): "
+                         "with --ocr, the page check (_text_quality.py) judges each page against them")
     ap.add_argument("--latex-source", default=None,
                     help="LaTeX source (directory or e-print) whose \\section commands give the "
                          "headings when the PDF has no outline. Default: the entry's own source/ "
@@ -2097,7 +2272,8 @@ def main() -> int:
     ok = failed = 0
     for path in targets:
         try:
-            artefact, sections = process(path, args.outdir, args.ocr, args.backend, args.latex_source, args.title)
+            artefact, sections = process(path, args.outdir, args.ocr, args.backend, args.latex_source, args.title,
+                                         [h for h in args.lang_hint.split(",") if h.strip()])
         except Exception as exc:
             failed += 1
             print(f"FAIL  {os.path.basename(path)}: {type(exc).__name__}: {exc}",

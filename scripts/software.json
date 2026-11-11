@@ -84,7 +84,8 @@
         "scripts/pdf-cover.py",
         "scripts/pdf-images.py",
         "scripts/pdf-vector-figures.py",
-        "scripts/pdf-vector-labels.py"
+        "scripts/pdf-vector-labels.py",
+        "scripts/pdf-footnotes.py"
       ],
       "why": "The PDF backend ingest-document probes with; without it every PDF's rung is `undetermined`."
     },
