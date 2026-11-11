@@ -90,6 +90,23 @@ export interface ArchimateViewLink {
 }
 
 /** Where things are in the site, for links that leave the viewer. */
+/** One system part in the architecture panel: its reference block names its kind and row. */
+export interface ArchitectureBox extends ArchimateElementLink {
+  /** The reference block its country's instance specializes (the box's small-capitals kind). */
+  block: ArchimateElementLink;
+  /** An `ig` property on the part: its page in the implementation guide. */
+  ig?: string;
+  /** BPMN files (layer-relative) of the processes its system serves, from their `bpmn` property. */
+  bpmn: string[];
+}
+/** The architecture panel's model, read from the ArchiMate graph (JV-13). */
+export interface ArchitecturePanel {
+  countries: ArchimateElementLink[];
+  /** One per child grouping of the root, in the model's order; `cells` one list of boxes per country. */
+  rows: { layer: ArchimateElementLink; cells: ArchitectureBox[][]; blocks: ArchimateElementLink[] }[];
+  shared?: { group: ArchimateElementLink; members: ArchimateElementLink[] };
+}
+
 export interface SiteLinks extends StepPageLinks {
   /** Site-relative route of the viewer, no trailing slash: `en/<harness>/<id>`. */
   route: string;
@@ -101,6 +118,8 @@ export interface SiteLinks extends StepPageLinks {
   archimateView?: (instance: string, model: string, view: string) => ArchimateViewLink | undefined;
   /** The ArchiMate elements that deploy a building block (their `buildingBlocks` property names it), with their pages, site-relative. */
   archimateBlock?: (instance: string, block: string) => ArchimateElementLink[];
+  /** The architecture panel a workshop's `presentation.architecture` declares, resolved; absent when the model or a ref cannot be. */
+  archimateArchitecture?: (instance: string, spec: { model: string; root: string; countries: readonly { group: string }[]; shared?: string }) => ArchitecturePanel | undefined;
   /** Title of the site's declaring layer, for the index heading. */
   title: string;
 }
