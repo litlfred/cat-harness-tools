@@ -253,6 +253,7 @@ export function avatar(p: PersonaView, size: "sm" | "md" | "lg" = "md"): string 
 // Small line icons (24×24, stroked), drawn for these pages.
 const ICON: Record<string, string> = {
   up: '<path d="M18 15l-6-6-6 6"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   reset: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
   eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
@@ -758,13 +759,24 @@ ${prev ? `<a class="jp-pbtn" href="${e(prev)}" aria-label="Previous moment">${ic
 </div>`;
 }
 
+/** Where a table's answer to a step's question is kept (`jv:` + this, in the browser): one key for the walkthrough and the Discussion view. */
+export function questionKey(workshop: string, s: PresentedStep, i: number): string {
+  return `${workshop}:q:${s.key}:${i}`;
+}
+
+/** A write-in kept in the browser under `name` (present.js, `data-jv-text`); `value` is its text until the table writes its own. */
+export function answerBox(name: string, label: string, lines = 2, value = ""): string {
+  return `<textarea class="jp-answer" name="${e(name)}" rows="${lines}" data-jv-text aria-label="${e(`Our answer: ${label}`)}" placeholder="Our answer…">${e(value)}</textarea>`;
+}
+
 function policyPanel(p: Presentation, s: PresentedStep, toWorkshop: string): string {
   const ws = s.ws;
   if (!ws) return "";
   const w = p.w.workshop;
   const mod = (id: string) => w.modules.find((m) => m.id === id);
+  // Each question has a write-in: the same answer the Discussion view's lab shows (`questionKey`).
   const qs = (ws.questions ?? [])
-    .map((q) => `<li><a class="jp-mod" href="${e(`${toWorkshop}${moduleSegment(q.module)}/`)}" title="${e(mod(q.module)?.title ?? q.module)}">${e(q.module)}</a><span>${e(q.text)}</span></li>`)
+    .map((q, i) => `<li><a class="jp-mod" href="${e(`${toWorkshop}${moduleSegment(q.module)}/`)}" title="${e(mod(q.module)?.title ?? q.module)}">${e(q.module)}</a><span>${e(q.text)}</span>${answerBox(questionKey(w.id, s, i), q.text)}</li>`)
     .join("");
   // The rows of the card's foot: the workshop's `tagRows` (VaxLink's Forces / Cost driver /
   // If it is missing), else one row per table the step touches, in the workshop's table order.
