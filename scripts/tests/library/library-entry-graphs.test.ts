@@ -88,9 +88,9 @@ describe("entryGraphFiles", () => {
 });
 
 describe("entryGraphSitePath", () => {
-  test("beside the entry's manifest, keeping the path inside the entry", () => {
+  test("under the entry IRI, keeping the path inside the entry", () => {
     expect(entryGraphSitePath("some-instance", "an-entry", "l1-extraction/recommendations.l1.json")).toBe(
-      "assets/library/jsonld/some-instance/an-entry/l1-extraction/recommendations.l1.json",
+      "assets/library/jsonld/some-instance/source/an-entry/l1-extraction/recommendations.l1.json",
     );
   });
 });

@@ -91,7 +91,7 @@ describe("figure theme", () => {
 });
 
 describe("render-poster", () => {
-  const svg = renderPosterSvg(m, view, { starLabel: "Core component", marks: true, elementHref: (id) => `../elements/${id}/` });
+  const svg = renderPosterSvg(m, view, { starLabel: "Core component", marks: true, elementHref: (id) => `../element/${id}/` });
   it("colours every card by its ArchiMate layer, never by its band", () => {
     for (const f of ["#ccccff", "#b5ffff", "#c9e7b7"]) expect(svg).toContain(`fill="${f}"`);
     expect(rectBefore(svg, "Trusted data").fill).toBe(fillOfType("Goal"));
@@ -154,7 +154,7 @@ describe("render-poster", () => {
   it("escapes the model's text and links each card", () => {
     expect(svg).toContain("Client Registry &lt;b&gt;");
     expect(svg).not.toContain("<b>");
-    expect(svg).toContain('href="../elements/a1/"');
+    expect(svg).toContain('href="../element/a1/"');
     expect(svg).toContain("Poster &lt;test&gt;");
   });
   it("leaves the key out when nothing is starred or marked", () => {

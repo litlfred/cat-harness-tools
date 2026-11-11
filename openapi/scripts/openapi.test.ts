@@ -5,8 +5,8 @@ import { join, resolve } from "node:path";
 import { OpenApiConfigSchema, fallbackOperationId, operationsOf, type OpenApiDocument } from "../schemas/openapi.ts";
 import { checkCommitted, configPath, provenanceFor } from "./ingest-openapi.ts";
 import { igOpenapiGraph, igSiteOpenapi } from "./ig-site-openapi.ts";
-import { PAGE_CONFIG_ID, pagesFor } from "./gen-openapi-pages.ts";
-import { thinPageConfigOf } from "../../scripts/thin-page.ts";
+import { pagesFor } from "./gen-openapi-pages.ts";
+import { pageNodeOf, pageNodeProblems } from "../../scripts/thin-page.ts";
 import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "../../schemas/kg/graph-typology-registry.ts";
 import { isZodSchema, resolveNodeSchemas } from "../../schemas/kg/kind-validator.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
@@ -115,17 +115,21 @@ describe.skipIf(!hasSmartTrust)("pages", () => {
     expect(pages.length).toBe(ops.length + 1);
   });
 
-  it("every operation's @id is the address of its own JSON-LD", () => {
-    for (const f of files.filter((x) => /^gateway\/[^/]+\.jsonld$/.test(x.path))) {
-      expect(JSON.parse(f.content)["@id"]).toBe(`https://litlfred.github.io/folio-assistant/smart-trust/openapi/${f.path}`);
+  it("every operation's @id is its JSON-LD's address less `.jsonld`, under the singular kind `operation/`", () => {
+    const nodes = files.filter((x) => /^gateway\/operation\/[^/]+\.jsonld$/.test(x.path));
+    expect(nodes.length).toBe(22);
+    for (const f of nodes) {
+      expect(JSON.parse(f.content)["@id"]).toBe(`https://litlfred.github.io/folio-assistant/smart-trust/openapi/${f.path.replace(/\.jsonld$/, "")}`);
     }
   });
 
-  it("a page copies nothing of the API: its config names the document relative to itself", () => {
+  it("a page copies nothing of the API: it declares its node, at its IRI, and names the document relative to itself", () => {
     for (const p of pages) {
-      const cfg = thinPageConfigOf(p.content, PAGE_CONFIG_ID)!;
       const depth = p.path.split("/").length - 1;
-      expect(cfg.openapi).toBe(`${"../".repeat(depth)}gateway.openapi.json`);
+      expect(/\sdata-kg-openapi="([^"]*)"/.exec(p.content)![1]).toBe(`${"../".repeat(depth)}gateway.openapi.json`);
+      expect(pageNodeProblems(p.content)).toEqual([]);
+      // The page sits in the directory its node's IRI names, so the host serves it at the IRI.
+      expect(pageNodeOf(p.content)!.rdfa[0]!.iri).toBe(`https://litlfred.github.io/folio-assistant/smart-trust/openapi/${p.path.replace(/\/index\.html$/, "")}`);
       expect(p.content).not.toContain("Base64 encoded CMS");
     }
   });
@@ -183,11 +187,11 @@ describe("ig-site:openapi — an IG repository's OpenAPI pages, with no declarat
     const root = ig();
     const site = mkdtempSync(join(tmpdir(), "ig-site-"));
     const paths = igSiteOpenapi({ site, ig: root, log: () => {} });
-    for (const p of ["openapi/gateway.openapi.json", "openapi/gateway.source.json", "openapi/index.html", "openapi/gateway/index.html", "openapi/gateway/getX/index.html", "openapi/gateway/getX.jsonld"]) {
+    for (const p of ["openapi/gateway.openapi.json", "openapi/gateway.source.json", "openapi/index.html", "openapi/gateway/index.html", "openapi/gateway/operation/getX/index.html", "openapi/gateway/operation/getX.jsonld"]) {
       expect(paths).toContain(p);
       expect(existsSync(join(site, p))).toBe(true);
     }
-    expect(readFileSync(join(site, "openapi", "gateway", "getX.jsonld"), "utf8")).toContain("/openapi/gateway/getX.jsonld");
+    expect(readFileSync(join(site, "openapi", "gateway", "operation", "getX.jsonld"), "utf8")).toContain("/openapi/gateway/operation/getX\"");
   });
 
   it("refuses to write over a path the site already holds", () => {
