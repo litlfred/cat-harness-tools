@@ -31,7 +31,7 @@ import { escHtml } from "../thin-page.ts";
 import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
 import { moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
-import { DEVICE_FORM, DEVICE_LABEL, renderDevice, type DemoScreen, type ScreenContext } from "./screens.ts";
+import { DEVICE_FORM, DEVICE_LABEL, renderDevice, stateSwitch, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
 import {
   avatar,
@@ -735,7 +735,7 @@ function demoPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, i: n
   let device: string;
   let open = "";
   if (x.node) {
-    device = `<div class="ds-stage" data-jp-stage>${renderDevice(x.node.screen, screenContext(corpus, p, x.node.instance, a.siteRoot), { caption: false })}</div>`;
+    device = `${stateSwitch(x.node.screen)}<div class="ds-stage" data-jp-stage>${renderDevice(x.node.screen, screenContext(corpus, p, x.node.instance, a.siteRoot), { caption: false })}</div>`;
     const src = sourceHref(corpus, x.node.instance, x.node.file);
     if (src) open = ext(src, "Screen source", "jp-devline-src");
   } else {
@@ -751,7 +751,7 @@ function demoPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, i: n
       : ""
   }</section>`;
   const body = `<section class="jp-screen-h"><div class="jp-screen-row">${back}${looking}</div>
-<div class="jp-devline"><span>${deviceGlyph(x)} ${e(DEVICE_FORM[x.device])}${config ? ` <code>(${e(config)})</code>` : ""}</span><span class="jp-devline-r">${open}<button type="button" class="jp-expand" data-jp-expand>${icon("expand")} Expand</button></span></div></section>
+<div class="jp-devline"><span>${deviceGlyph(x)} ${e(DEVICE_FORM[x.device])}${config ? ` <code>(${e(config)})</code>` : ""}</span><span class="jp-devline-r">${open}${x.node ? `<button type="button" class="jp-expand" data-jp-frame aria-pressed="true" hidden>${icon("phone")} Frame</button>` : ""}<button type="button" class="jp-expand" data-jp-expand>${icon("expand")} Expand</button></span></div></section>
 ${device}
 ${moments}`;
   const stage = [...x.steps.map((s) => s.step.id), ...x.unresolved].join(", ") || x.id;

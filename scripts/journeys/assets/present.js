@@ -8,6 +8,9 @@
      remembered in this browser;
    - the gap strip's answers, remembered in this browser only;
    - zoom on a BPMN drawing;
+   - the device frame on or off, remembered in this browser;
+   - a device screen's state switch (a valid card, a tampered one), and
+     ?state=<id> to open on one;
    - the journey map's Focus on, its two toggles, and a click on a column;
    - tabs (the ArchiMate views, the payload drawer), the drawer, Inspect JSON
      and Copy;
@@ -446,8 +449,63 @@
     });
   }
 
+  // A device screen's states: every state is in the page, one shown at a time.
+  function states(sw) {
+    var fig = doc.querySelector('[data-screen="' + sw.getAttribute("data-ds-switch") + '"]');
+    if (!fig) return;
+    function show(id) {
+      var found = false;
+      Array.prototype.forEach.call(sw.querySelectorAll("[data-ds-show]"), function (b) {
+        var on = b.getAttribute("data-ds-show") === id;
+        if (on) found = true;
+        b.classList.toggle("is-on", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+      if (!found) return false;
+      [fig, sw].forEach(function (box) {
+        Array.prototype.forEach.call(box.querySelectorAll("[data-ds-state]"), function (x) {
+          x.hidden = x.getAttribute("data-ds-state") !== id;
+        });
+      });
+      return true;
+    }
+    Array.prototype.forEach.call(sw.querySelectorAll("[data-ds-show]"), function (b) {
+      b.addEventListener("click", function () {
+        var id = b.getAttribute("data-ds-show");
+        show(id);
+        try {
+          var u = new URL(window.location.href);
+          if (b === sw.querySelector("[data-ds-show]")) u.searchParams.delete("state");
+          else u.searchParams.set("state", id);
+          window.history.replaceState(null, "", u.toString());
+        } catch (_e) {
+          /* no URL API: the switch still works */
+        }
+      });
+    });
+    var m = /[?&]state=([a-z0-9-]+)/.exec(window.location.search);
+    if (m) show(m[1]);
+    sw.hidden = false;
+  }
+
   function init() {
     oldAddress();
+    each("[data-ds-switch]", states);
+    // VaxLink's frame toggle: the device's bezel on or off, the screen alone.
+    each("[data-jp-frame]", function (b) {
+      var dev = doc.querySelector("[data-jp-stage] .ds-device");
+      if (!dev) return;
+      function set(on) {
+        dev.classList.toggle("is-bare", !on);
+        b.setAttribute("aria-pressed", String(on));
+        store("jp:frame", on ? "on" : "off");
+      }
+      if (store("jp:frame") === "off") set(false);
+      b.addEventListener("click", function () {
+        set(b.getAttribute("aria-pressed") !== "true");
+      });
+      b.hidden = false;
+    });
     each("[data-jp-reset]", reset);
     // The device demo's Expand: the device, full screen.
     each("[data-jp-expand]", function (b) {
