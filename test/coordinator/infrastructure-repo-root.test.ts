@@ -13,24 +13,26 @@
  * standing alone too.
  */
 import { describe, test, expect } from "bun:test";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { INSTANCE_ROOT, REPO_ROOT } from "../../scripts/tests/helpers.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { folioTemplates } from "../../scripts/init-folio.ts";
 
 /**
- * The workflows that run in the paper-assistant container: the platform's
- * own `publish.yml`, and the Lean templates `folio_init` writes into a paper
- * folio (`lean-build.yml`, `blueprint.yml`), which left `.github/workflows/`
- * under bean `52dz` and are read from the templates directory instead.
+ * The workflows that run in the paper-assistant container: the Lean templates
+ * `folio_init` writes into a paper folio (`lean-build.yml`, `blueprint.yml`),
+ * which left `.github/workflows/` under bean `52dz` and are read from the
+ * templates directory instead. The platform's own `publish.yml` was one too,
+ * until folio-assistant#3066 (2026-11-10) dropped it with the qou split: it
+ * ran a folio's `cd content` pipeline, which exists in neither repository.
  */
 function containerisedWorkflows(): string[] {
   const lean = folioTemplates("paper")
     .filter((t) => ["lean-build.yml", "blueprint.yml"].some((n) => t.target.endsWith(`/${n}`)))
     .map((t) => t.source);
   expect(lean.length).toBe(2);
-  return [join(REPO_ROOT, ".github/workflows/publish.yml"), ...lean];
+  return lean;
 }
 
 // ── Unified Docker image ───────────────────────────────────────
@@ -76,8 +78,8 @@ describe("Unified paper-assistant image", () => {
   test("no containerised workflow hardcodes a folio's image", () => {
     // The platform builds exactly ONE image: `paper-assistant`. A builder
     // image belonging to a folio (its TeX set and its licence are the
-    // folio's) must not be named here — publish.yml takes it as a required
-    // `builder_image` input instead, so the pipeline stays folio-agnostic.
+    // folio's) must not be named here — publish.yml took it as a required
+    // `builder_image` input instead, so the pipeline stayed folio-agnostic.
     //
     // Guard against the specific regression: `publish.yml` used to pin
     // `ghcr.io/litlfred/qou-paper-builder:latest` in four container jobs,
@@ -94,13 +96,19 @@ describe("Unified paper-assistant image", () => {
     }
   });
 
-  test("publish.yml is callable by folios and takes builder_image", () => {
-    // It is invoked via `uses: .../publish.yml@main`, which requires a
-    // `workflow_call` trigger — absent until now, so every such call failed
-    // to start.
-    const content = readFileSync(join(repoRootFor(INSTANCE_ROOT), ".github/workflows/publish.yml"), "utf-8");
-    expect(content).toContain("workflow_call:");
-    expect(content).toContain("builder_image:");
+  test("publish.yml is gone with the qou split, and no workflow here still calls it", () => {
+    // It used to be callable by folios (`workflow_call`, taking `builder_image`).
+    // folio-assistant#3066 dropped it (2026-11-10): the scripts it ran exist in
+    // neither repository. A `uses:` left pointing at it would fail to start, and
+    // only when that workflow next runs — so that is what this looks for.
+    const dir = join(repoRootFor(INSTANCE_ROOT), ".github/workflows");
+    expect(existsSync(join(dir, "publish.yml"))).toBe(false);
+    const callers = existsSync(dir)
+      ? readdirSync(dir)
+          .filter((f) => /\.ya?ml$/.test(f))
+          .filter((f) => /uses:\s*\S*\.github\/workflows\/publish\.yml\b/.test(readFileSync(join(dir, f), "utf-8")))
+      : [];
+    expect(callers).toEqual([]);
   });
 
   test("the deprecated image workflows are gone, with their images", () => {

@@ -283,6 +283,22 @@ describe("the queue leaves out blocks that already have a current summary", () =
     expect(() => record(f, root)).toThrow(/already has a current draft/);
   });
 
+  test("a draft in another language is added beside a current summary, which is kept (e1lo)", () => {
+    const { root, entry } = fixture({ a: "A." });
+    // Built while the block is still in the backlog, which is where draftFor reads its hash.
+    const fr = { ...draftFor(root, ["a"], "Un résumé en français."), lang: "fr" };
+    record(draftFor(root, ["a"], "An English summary."), root);
+    decide(queue(root)[0]!, "confirm", { by: HUMAN, root });
+    record(fr, root);
+    const [rec] = JSON.parse(readFileSync(join(entry, SUMMARIES_FILE), "utf-8")).summaries;
+    expect(rec.narrative.map((n: { lang: string; state: string }) => `${n.lang}:${n.state}`)).toEqual(["en:confirmed", "fr:draft"]);
+    expect(rec.superseded).toBeUndefined();
+    // The same language again is still refused, so nothing is overwritten.
+    expect(() => record(fr, root)).toThrow(/already has a current .* in "fr"/);
+    // The block is not back in the backlog.
+    expect(backlog(root)).toHaveLength(0);
+  });
+
   test("an empty section is not prose to summarise, and not backlog", () => {
     const { root, entry } = fixture({ a: "A.", e: "" });
     expect(entryItems(entry).find((i) => i.block === id("e"))?.status).toBe("empty");
