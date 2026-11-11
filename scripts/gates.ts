@@ -1531,6 +1531,16 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "layer on refs this commit does not change; it becomes a gate in each repository's own CI once that repository is pinned",
   },
   {
+    script: "check:site-publish-caller",
+    kind: "report",
+    reason:
+      "RED UNTIL THE ROLLOUT (owner, 2026-11-11: \"i want that it publishes once merge to main, update QA reports etc.\"; " +
+      "cat-harness-tools#1879): it judges the calling repository's own `.github/workflows/*` for the canonical caller of " +
+      "`folio-site-publish.yml`, and most layers still carry a dispatch-only copy or none. Here it judges nothing (this " +
+      "layer holds the template). Wiring it now would red every layer's PRs on files their change does not touch; it " +
+      "becomes a gate in each repository's own CI once that repository carries the caller",
+  },
+  {
     script: "check:lock-consistency",
     kind: "report",
     reason:
