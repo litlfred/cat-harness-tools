@@ -1,6 +1,6 @@
 /**
  * LANGUAGE VERSIONS of a library entry, and the summary its catalogue record
- * gives — owner, 2026-11-10 (who-iris#217): *"where is summary, sections,
+ * gives — owner, 2026-11-10: *"where is summary, sections,
  * keywords etc? I should be able to toggle between source language and
  * chosen locale translation when viewing a non source locale artefact."*
  *
