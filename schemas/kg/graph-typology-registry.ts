@@ -2616,6 +2616,27 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       reads: "a package on a hook — a library pulled in by an import, at the version its lockfile pins",
     },
   },
+  // A web app a layer holds as source and publishes as its own chrome-less
+  // page (owner, 2026-11-11, cards Q-GAME-5 A and Q-GAME-7 A): so a content
+  // layer carrying an app (the GDHCN onboarding game) need not be a harness,
+  // and no layer keeps a one-off publish script for it. Authored, so
+  // `content`; drawn by the harness's `apps` visualiser (`web-app-build`).
+  "web-app": {
+    anyLayer: true,
+    description:
+      "a web app the layer holds as source (`package.json`, a lockfile, the app's code and media) and publishes as a page of its own: one `web-app/0.1.0` file, `web-app.json`, at the directory's root names its id, title, how it builds, the languages it ships and the layer directories it reads at build time. The harness's `apps` visualiser, rendered by the `web-app-build` Tool, builds it at publish and writes the build to `<locale>/<harness>/apps/<id>/`, with no site chrome; nothing else loads it, so a reader downloads it only by opening its route. Shape in `schemas/ui/web-app.ts`.",
+    title: "Web apps",
+    renderable: false,
+    holds: "content",
+    // declared-path-literal: this table IS the declaration, as on `device-screen`.
+    schema: "schemas/ui/web-app.ts",
+    nodeSchemas: {
+      "web-app/0.1.0": {},
+    },
+    summary:
+      "A web app held as source and published as its own chrome-less page, built at publish by " +
+      "the web-app-build Tool and loaded only when a reader opens its route.",
+  },
   // A published static site, as a graph (bean `lehh`, owner 2026-10-05). Two
   // capability tiers, both declared now so a real CDN has a kind to land in:
   // `basic-cdn-site` serves files by path and nothing more (GitHub Pages);
