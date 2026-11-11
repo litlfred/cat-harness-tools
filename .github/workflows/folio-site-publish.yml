@@ -178,6 +178,23 @@ jobs:
         with:
           ruby-version: "3.3"
 
+      - name: Install Chromium, for the site steps that draw through a browser
+        # `render:bpmn` (bootstrap-tools' render-bpmn.ts) draws the process
+        # pages' BPMN with bpmn-js in Chromium, as in layer-pr-checks.yml and
+        # layer-post-merge-regen.yml. mount-layers' `bun install` brings
+        # Playwright but no browser, so without this the publish failed at
+        # that pre-step (smart-trust run 43028650284: "Executable doesn't
+        # exist at .../chromium_headless_shell-1243"; issue #1906). The
+        # repository's own Playwright installs it, so the build is the one
+        # that Playwright expects: a bare `npx playwright` may fetch another.
+        timeout-minutes: 15
+        run: |
+          if [ -x node_modules/.bin/playwright ]; then
+            node_modules/.bin/playwright install --with-deps chromium
+          else
+            echo "no playwright in the repository: no browser installed"
+          fi
+
       - name: Install the document export tools, when a site step exports
         # A document folio's site:export step (folio-assistant-core's
         # document-export.ts) writes the public-comment PDF and .docx with
