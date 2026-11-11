@@ -1205,6 +1205,16 @@ const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run
   --bare-ig          IG: publish the IG Publisher's output as its workflow lays it, even where the
                      repository is harnessed (index.config.json) and would publish its folio site`;
 
+/**
+ * The publisher this checkout's `index.config.json` names in `site.publisher`,
+ * the default when `--publisher` is not given (cat-harness-tools#1879).
+ * Undefined when it names none, or when the file is absent or unreadable.
+ */
+export function configuredPublisher(repo: string): Publisher | undefined {
+  const r = readIndexConfig(resolve(repo));
+  return r.state === "ok" ? r.config.site?.publisher : undefined;
+}
+
 function publisherOf(s: string): Publisher {
   if (!/^[a-z][a-z0-9-]*$/.test(s)) throw new Error(`--publisher is folio or a declared publisher's kind, not '${s}'`);
   return s;
@@ -1222,7 +1232,9 @@ if (import.meta.main) {
   };
   try {
     const repoArg = opt("repo") ?? process.cwd();
-    const declared = opt("publisher") !== undefined && opt("publisher") !== FOLIO_PUBLISHER_KIND ? undefined : declaredRecipe(repoArg);
+    const chosen = opt("publisher") ?? configuredPublisher(repoArg);
+    if (opt("publisher") === undefined && chosen !== undefined) console.log(`· publisher ${chosen}, from index.config.json site.publisher`);
+    const declared = chosen !== undefined && chosen !== FOLIO_PUBLISHER_KIND ? undefined : declaredRecipe(repoArg);
     if (declared !== undefined) {
       const d = await stageDeclared(
         {
@@ -1250,7 +1262,7 @@ if (import.meta.main) {
       fresh: argv.includes("--fresh"),
       ...(opt("artifact") ? { artifact: opt("artifact")! } : {}),
       ...(opt("workflow-source") ? { workflowSource: opt("workflow-source")! } : {}),
-      ...(opt("publisher") ? { publisher: publisherOf(opt("publisher")!) } : {}),
+      ...(chosen ? { publisher: publisherOf(chosen) } : {}),
       ...(argv.includes("--bare-ig") ? { bareIg: true } : {}),
     });
     const { plan: _plan, ...rest } = r;
