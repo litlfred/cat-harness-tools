@@ -196,6 +196,13 @@ export const WorkshopPresentationSchema = z
      * per table, titled by the table.
      */
     tagRows: z.array(z.object({ label: Text, icon: JourneyGlyphSchema.optional(), tables: z.array(Id).min(1) }).strict()).optional(),
+    /**
+     * The payload drawer's bar in the workshop's words (VaxLink: "FHIR R4 &
+     * WHO GDHCN payload inspector", the trust list's key "DEV Key: 916ffa…
+     * (XXR)", "Click to inspect raw FHIR / CBOR payload"). Absent: "FHIR
+     * payload inspector", no key, a plain hint.
+     */
+    inspector: z.object({ title: Text.optional(), key: Text.optional(), hint: Text.optional() }).strict().optional(),
     /** The presenter's note on the overview; a step's note is its `facilitatorCue`. */
     presenterNote: Text.optional(),
     /** A band on the overview naming what the walkthrough demonstrates, with `links`. */

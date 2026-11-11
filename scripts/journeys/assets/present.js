@@ -423,8 +423,32 @@
     draw();
   }
 
+  // Reset Simulation (VaxLink's second bar): forget what this browser keeps for the
+  // workshop (the gap strip's answers, jv:<workshop>:…) and for the viewer (the
+  // presenter's and the hood's choices, jp:…), then start again at the overview.
+  function reset(b) {
+    b.addEventListener("click", function () {
+      if (!window.confirm("Reset the simulation? This forgets the room's answers and choices kept in this browser.")) return;
+      var ws = "jv:" + b.getAttribute("data-jp-reset") + ":";
+      try {
+        var drop = [];
+        for (var i = 0; i < window.localStorage.length; i++) {
+          var k = window.localStorage.key(i);
+          if (k && (k.indexOf(ws) === 0 || k.indexOf("jp:") === 0)) drop.push(k);
+        }
+        drop.forEach(function (k) {
+          window.localStorage.removeItem(k);
+        });
+      } catch (_e) {
+        /* storage unavailable: nothing kept */
+      }
+      window.location.href = b.getAttribute("data-jp-reset-to");
+    });
+  }
+
   function init() {
     oldAddress();
+    each("[data-jp-reset]", reset);
     each("[data-jp-presenter]", function (b) {
       b.addEventListener("click", function () {
         setPresenter(root.getAttribute("data-presenter") !== "on");
