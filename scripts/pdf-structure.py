@@ -1545,9 +1545,108 @@ def by_page(s: "Section", pages: list[str]) -> list["Section"]:
             for p in split_pages(pages)[s.page_start - 1:s.page_end]]
 
 
+# A running head printed on at least this share of an oversized section's pages
+# names the volume or part, not a chapter: a page that prints only it stays
+# with the chapter before, unless the part itself changes there.
+RUNNING_HEAD_SHARED = 0.4
+RE_PAGE_FOLIO = re.compile(r"^\s*page\s+[ivxlc\d]+\s*$", re.I)
+RE_HEAD_FOLIO = re.compile(r"\s*(?:[»›|•·:–-]\s*)?page\s+[ivxlc\d]+\s*$", re.I)
+
+
+def running_heads(lines: list | None, start: int, end: int) -> dict[int, str]:
+    """The chapter each page of `start`..`end` names in its running heads.
+
+    10665-75211 is three volumes bound in one PDF; its contents page lists Part 1
+    only, so Annex G ran from page 104 to the end and was cut into 120 sections
+    all titled "Definitions of terms used in the Toolkit (page N)". Every page
+    prints its part at the top and its chapter at the foot ("Chapter 3. Manage
+    the process » page 6"). Of the margin lines on a page, the one whose
+    form (digits ignored) recurs on the fewest pages of the range is the most
+    specific, and names the page's chapter; a head shared by many pages names
+    only the part (RUNNING_HEAD_SHARED). Pages with no head are left out.
+    """
+    if not lines:
+        return {}
+    bsize = _pdf_headings.body_size(lines)
+    top: dict[int, list[str]] = defaultdict(list)
+    for l in lines:
+        h = l.page_height or 0
+        text = _printed(l.text)
+        in_margin = l.y0 < FURNITURE_MARGIN * h or l.y1 > (1 - FURNITURE_MARGIN) * h if h else False
+        if (not h or not (start <= l.page <= end) or not in_margin
+                or l.size > FURNITURE_MAX_SCALE * bsize or not text
+                or RE_FOLIO.match(text) or RE_PAGE_FOLIO.match(text)):
+            continue
+        top[l.page].append(text)
+    pages_of: dict[str, set[int]] = defaultdict(set)
+    for page, texts in top.items():
+        for t in texts:
+            pages_of[_furniture_key(t)].add(page)
+    # A margin line printed once is body text that reached the margin, unless
+    # it carries its own folio ("Introduction » page 1").
+    for page in list(top):
+        top[page] = [t for t in top[page]
+                     if len(pages_of[_furniture_key(t)]) >= 2 or RE_HEAD_FOLIO.search(t)]
+    span = end - start + 1
+    heads: dict[int, str] = {}
+    prev_shared = None
+    for page in range(start, end + 1):
+        texts = top.get(page) or []
+        if not texts:
+            continue
+        # Fewest pages first; on a tie, the head that carries its own folio
+        # ("Annex G. Definitions » page 88") names the chapter.
+        best = min(texts, key=lambda t: (len(pages_of[_furniture_key(t)]), not RE_HEAD_FOLIO.search(t)))
+        shared = len(pages_of[_furniture_key(best)]) >= RUNNING_HEAD_SHARED * span
+        title = RE_HEAD_FOLIO.sub("", best).strip(" »›|•·:–-")
+        if not title:
+            continue
+        if shared:
+            # Only the part's head is printed here: it starts a section only
+            # where the part changes (a new volume's cover and front matter).
+            if _furniture_key(best) == prev_shared:
+                continue
+            prev_shared = _furniture_key(best)
+        heads[page] = title
+    return heads
+
+
+def by_running_head(s: "Section", pages: list[str], lines: list | None) -> list["Section"]:
+    """`s` cut where the chapter named in its pages' running heads changes. Pure.
+
+    Fewer than two parts, or a head on under half the pages, gives [] so the
+    caller falls back to one section per page.
+    """
+    heads = running_heads(lines, s.page_start, s.page_end)
+    span = s.page_end - s.page_start + 1
+    if len(heads) < span / 2:
+        return []
+    per_page = split_pages(pages)[s.page_start - 1:s.page_end]
+    groups: list[tuple[str, list[Section]]] = []
+    for p in per_page:
+        head = heads.get(p.page_start)
+        if head is None or (groups and _match_key(head) == _match_key(groups[-1][0])):
+            if groups:
+                groups[-1][1].append(p)
+            else:
+                groups.append((s.title, [p]))
+        else:
+            groups.append((head, [p]))
+    if len(groups) < 2:
+        return []
+    out = []
+    for i, (title, ps) in enumerate(groups):
+        text = "\n\n".join(x.text for x in ps)
+        first = i == 0 and title == s.title
+        out.append(Section("", s.number if first else None, title, s.level if first else s.level + 1,
+                           ps[0].page_start, ps[-1].page_end, len(text), len(text.split()), text))
+    return out
+
+
 def split_oversized(sections: list["Section"], pages: list[str],
-                    candidates: list[TocEntry]) -> tuple[list["Section"], list[dict[str, Any]]]:
-    """Each oversized section cut at the headings inferred inside it, else by page.
+                    candidates: list[TocEntry], lines: list | None = None) -> tuple[list["Section"], list[dict[str, Any]]]:
+    """Each oversized section cut at the headings inferred inside it, else at its
+    running heads (`by_running_head`), else by page.
 
     10665/75211 (National eHealth strategy toolkit) infers 71 headings, and
     the last, "G. Definitions of terms", runs from page 104 to 223 (36,800
@@ -1577,6 +1676,9 @@ def split_oversized(sections: list["Section"], pages: list[str],
                 # A part still too long is cut by page.
                 sub.extend(by_page(p, pages) if oversized_section(p, len(pages)) else [p])
             by = "headings"
+        if len(sub) < 2:
+            sub = by_running_head(s, pages, lines)
+            by = "running heads"
         if len(sub) < 2:
             sub = by_page(s, pages)
             by = "pages"
@@ -1685,6 +1787,18 @@ def rejoin_wrapped(e: TocEntry, pages: list[str]) -> TocEntry | None:
     return None
 
 
+# A contents page that also lists the figures, tables and boxes gives each
+# caption a heading of its own. 10665-353150 (DIIG, French) then titled the
+# chapter's opening text "Schéma 5.1" and the figure's text "Tableau 5.2": the
+# caption sits under or beside its figure, not where the text it would head
+# begins, so every title was one block off. Captions are figures' labels
+# (`figures` in structure.json), not sections.
+RE_CAPTION_ENTRY = re.compile(
+    r"^(?:figure|fig\.|table|box|panel|tableau|encadré|schéma|graphique|cuadro|recuadro|gráfico|figura|"
+    r"diagrama|esquema|рисунок|рис\.|таблица|вставка|схема|图|表|框|الشكل|شكل|الجدول|جدول|الإطار|إطار)"
+    r"\s*[\dA-Z][\d.\-–A-Z]*\b", re.I)
+
+
 def tidy_inferred(toc: list[TocEntry], pages: list[str]) -> tuple[list[TocEntry], list[dict[str, Any]]]:
     """Inferred headings that do not read as headings rejoined or dropped (see above). Pure.
 
@@ -1707,6 +1821,9 @@ def tidy_inferred(toc: list[TocEntry], pages: list[str]) -> tuple[list[TocEntry]
         words = t.split()
         if not e.number and len(words) == 1 and len(t) <= 3:
             report.append({"title": t, "page": e.page, "action": "dropped", "why": "a single short word"})
+            continue
+        if RE_CAPTION_ENTRY.match(t):
+            report.append({"title": t, "page": e.page, "action": "dropped", "why": "a figure, table or box caption"})
             continue
         if t.endswith(","):
             # "YOUNG," — the first author of a reference, set in capitals.
@@ -2263,7 +2380,7 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
         candidates = inferred
         if outline and lines is not None and any(oversized_section(s, len(pages)) for s in sections):
             candidates = [e for e in infer_toc(lines, pages)[0] if (e.confidence or 0) >= 0.6]
-        sections, oversized = split_oversized(sections, pages, candidates)
+        sections, oversized = split_oversized(sections, pages, candidates, lines)
     figures, figure_gaps = infer_figures(path, lines)
     page_rows, label_conflicts = infer_page_labels(path, lines, len(pages),
                                                    pages if ocr_used else None)
