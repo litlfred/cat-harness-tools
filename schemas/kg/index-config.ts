@@ -207,7 +207,7 @@ export const IndexSiteSchema = z
     /**
      * Which site publisher `stage-local.ts` uses for this checkout when no
      * `--publisher` is given: `folio`, or the kind of a publisher a mounted
-     * layer declares (`ig`, fhir-harness's `site-publisher-ig`). Absent: the
+     * layer declares (`ig`, an IG layer's `site-publisher-ig`). Absent: the
      * declared `site.build` recipe, else the publisher the repository's own
      * workflows call, as before. It exists for a repository that has both, such as a
      * DAK whose instance declares a folio recipe while its site is the IG
