@@ -55,6 +55,18 @@ describe("touchedOf — what a run touched, for a runner that traces several at 
   test("no trace is undetermined, with the reason", () => {
     expect(touchedOf(undefined, ROOT, "not traced — x")).toEqual({ undetermined: "not traced — x" });
   });
+
+  test("a git command the cone cannot replay is counted as git, not undetermined; its writes still show", () => {
+    const trace = [
+      `20 getcwd("/work/repo", 4096) = 11`,
+      // input-site: inert #b95de63a — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
+      `20 execve("/usr/bin/git", ["git", "--git-dir=/work/repo/.git/qa-store.git", "log", "-1"], 0x1 /* 3 vars */) = 0`,
+      `10 openat(AT_FDCWD</work/repo>, "out.json", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 5</work/repo/out.json>`,
+    ].join("\n");
+    expect(touchedOf(trace, ROOT)).toMatchObject({ writes: ["out.json"], git: 1 });
+    // A record still refuses it: it could not replay the call.
+    expect("undetermined" in parseTrace(trace, ROOT)).toBe(true);
+  });
 });
 
 describe("keepRecords — records concurrent runs wrote to their own files", () => {

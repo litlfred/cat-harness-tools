@@ -63,6 +63,8 @@ elif cmd == "run" and os.environ.get("CI_CONE_TOUCHED_OUT"):
     script = sys.argv[2]
     time.sleep(spec.get("sleep", 0))
     json.dump(spec.get("touched", {}).get(script, {"reads": [], "listed": [], "writes": [], "git": 0}), open(os.environ["CI_CONE_TOUCHED_OUT"], "w"))
+    if script in spec.get("failBeside", []):
+        sys.exit(1)
     record = {"sha": "new", "base": "fp", "reads": {"b/x.json": "file 1"}, "git": {}} if script in spec.get("record", []) else None
     json.dump({"script": script, "sha": "new", "run": "new", "recordedAt": "t", "record": record}, open(os.environ["CI_CONE_RECORD_OUT"], "w"))
 elif cmd == "run":
@@ -86,6 +88,8 @@ interface Spec {
   /** Parallel tracing: what each traced run reports it touched, and how long each run takes (s). */
   touched?: Record<string, object>;
   sleep?: number;
+  /** Gates whose traced run fails beside others (and passes alone). */
+  failBeside?: string[];
 }
 
 /** A root with two layers: `c` (the caller) needs `b`. Each declares three gates, which pass (the root's `cat` script is `true`). */
@@ -360,6 +364,28 @@ describe("run-gates.py GATE_CONE=record", () => {
     // b-two's own reads met no write, so its record is kept.
     expect(r.log.filter((l) => l === "run check:b-one")).toHaveLength(2);
     expect(r.log.filter((l) => l === "run check:b-two")).toHaveLength(1);
+  });
+
+  test.if(strace)("a gate that fails beside others keeps no record and is judged by a run alone; its neighbours keep theirs", () => {
+    const r = runGates(
+      fixture(),
+      "record",
+      {
+        decisions: { "check:b-one": CANDIDATE("x"), "check:b-two": CANDIDATE("x"), "check:c-one": CANDIDATE("x") },
+        record: ["check:b-one", "check:b-two", "check:c-one"],
+        failBeside: ["check:b-one"],
+        sleep: 0.3,
+      },
+      PARALLEL,
+    );
+    expect(r.status).toBe(0);
+    expect(r.gates["b:check:b-one"]!.exit).toBe(0);
+    expect(r.log.filter((l) => l === "run check:b-one")).toHaveLength(2);
+    expect(r.log.filter((l) => l === "run check:b-two")).toHaveLength(1);
+    expect(r.stdout).toContain("b:check:b-one runs again alone: it failed beside other gates");
+    const keep = r.log.filter((l) => l.startsWith("keep "));
+    expect(keep).toHaveLength(1);
+    expect(keep[0]!.split(" ")).toHaveLength(3); // b-two's and c-one's records
   });
 
   test.if(strace)("GATE_CONE_PARALLEL=0, or a ci-cone.ts without the touched report, traces one at a time with the shared record file", () => {

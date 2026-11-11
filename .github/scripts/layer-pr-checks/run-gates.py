@@ -873,9 +873,15 @@ def run_traced(root, cli, traced, jobs, tmp, alone):
         if keep:
             k = run(root, "cone:keep", shlex.join([*cli, "keep", *keep]))
             print(k[3], flush=True)
-        print(f"ci cone: traced {len(pool_names)} gate(s) {jobs} at a time; {len(clashes)} met a neighbour's writes and run again alone", flush=True)
+        # A gate that failed beside others was not asked again there: its
+        # verdict comes from a run alone (ci-cone.ts, CI_CONE_TOUCHED_OUT).
+        failed = [n for n in pool_names if n not in clashes and outcomes[n][2] != 0]
+        print(f"ci cone: traced {len(pool_names)} gate(s) {jobs} at a time; {len(clashes)} met a neighbour's writes and {len(failed)} failed, and run again alone", flush=True)
         for n, why in sorted(clashes.items()):
             print(f"ci cone: {n} runs again alone: {why}", flush=True)
+            lone.append(n)
+        for n in failed:
+            print(f"ci cone: {n} runs again alone: it failed beside other gates", flush=True)
             lone.append(n)
     else:
         lone = list(traced)
