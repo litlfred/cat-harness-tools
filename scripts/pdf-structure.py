@@ -1618,6 +1618,203 @@ def replace_failing_pages(pages: list[str], ocr: list[str], langs: list[str]) ->
     return out, replaced
 
 
+# An inferred heading is a heading only if it reads as one. Measured on the
+# IRIS pilot (owner, 2026-11-11, card Q-ODD-1 = A, "shifted section boundaries
+# and titles"):
+# - 10665/354399 (Spanish) sets "3.4 / Acceso a los centros de salud ... /
+#   telemedicina entre el paciente y / el prestador" over four lines in two
+#   fonts, and only the last lines were taken: sections titled "sanitaria
+#   universal", "paciente y el prestador". Such a title is rejoined with the
+#   lines above it, up to the bare number that opens it.
+# - 10665/264857 (French, 1982) took body words set apart by a font change as
+#   headings: "un", "comme", "On", "bonne". A title that opens in lower case
+#   and has no number above it, or is one word of three letters or fewer, is
+#   not a heading.
+# - 10665/329296 (French) read the labels of an annex flowchart as headings:
+#   runs of two or more sections on one page, of a few words each (a heading
+#   with no words of its own, a parent of the next, is not a label).
+RE_BARE_NUMBER = re.compile(r"^\s*(\d+(?:\.\d+)*)\.?\s*$")
+LABEL_RUN = 2
+LABEL_WORDS = 30
+
+
+def _opens_lower(title: str) -> bool:
+    first = next((c for c in title if c.isalpha()), "")
+    return bool(first) and first.islower() and first != first.upper()
+
+
+def rejoin_wrapped(e: TocEntry, pages: list[str]) -> TocEntry | None:
+    """`e` with the lines of its title above it, up to its number; None if there is no number. Pure."""
+    if not e.page or not (1 <= e.page <= len(pages)):
+        return None
+    lines = [l.strip() for l in pages[e.page - 1].splitlines()]
+    key = _match_key(e.title)
+    for i, l in enumerate(lines):
+        lk = _match_key(l)
+        # The line that opens the title, or that ends with it ("cobertura
+        # sanitaria universal" for the title "sanitaria universal").
+        if not key or len(lk) < 3:
+            continue
+        if not (key.startswith(lk) or key in lk
+                or any(lk.endswith(key[:n]) for n in range(min(len(key), len(lk)), 7, -1))):
+            continue
+        above: list[str] = []
+        for j in range(i - 1, max(-1, i - 6), -1):
+            m = RE_BARE_NUMBER.match(lines[j])
+            if m:
+                tail = [lines[i]]
+                k = i + 1
+                while k < len(lines) and key not in _match_key(" ".join(tail)) and len(tail) < 4:
+                    tail.append(lines[k])
+                    k += 1
+                title = " ".join(reversed(above)) + " " + " ".join(tail)
+                return replace(e, title=re.sub(r"\s+", " ", title).strip(), number=e.number or m.group(1))
+            if not lines[j] or len(lines[j]) > 90 or lines[j].endswith((".", ";")):
+                break
+            above.append(lines[j])
+        # No number above this line: the title may be printed again further down.
+    return None
+
+
+def tidy_inferred(toc: list[TocEntry], pages: list[str]) -> tuple[list[TocEntry], list[dict[str, Any]]]:
+    """Inferred headings that do not read as headings rejoined or dropped (see above). Pure.
+
+    Entries from the document's own outline pass unchanged.
+    """
+    out: list[TocEntry] = []
+    report: list[dict[str, Any]] = []
+    for e in toc:
+        if e.source != "inferred":
+            out.append(e)
+            continue
+        t = e.title.strip()
+        if _opens_lower(t):
+            fixed = rejoin_wrapped(e, pages)
+            report.append({"title": t, "page": e.page, "action": "rejoined" if fixed else "dropped",
+                           **({"as": fixed.title} if fixed else {}), "why": "opens in lower case"})
+            if fixed:
+                out.append(fixed)
+            continue
+        words = t.split()
+        if not e.number and len(words) == 1 and len(t) <= 3:
+            report.append({"title": t, "page": e.page, "action": "dropped", "why": "a single short word"})
+            continue
+        if t.endswith(","):
+            # "YOUNG," — the first author of a reference, set in capitals.
+            report.append({"title": t, "page": e.page, "action": "dropped", "why": "ends with a comma"})
+            continue
+        out.append(e)
+    return out, report
+
+
+def label_runs(sections: list[Section]) -> set[tuple[str, int]]:
+    """(title, page) of sections in a run of LABEL_RUN+ one-page sections under LABEL_WORDS words. Pure."""
+    found: set[tuple[str, int]] = set()
+    run: list[Section] = []
+
+    def close() -> None:
+        if len(run) >= LABEL_RUN:
+            found.update((s.title, s.page_start) for s in run)
+
+    for s in sections:
+        short = s.id != "sec-front-matter" and s.page_start is not None and 0 < s.n_words < LABEL_WORDS
+        if short and run and s.page_start in (run[-1].page_start, run[-1].page_end):
+            run.append(s)
+            continue
+        close()
+        run = [s] if short else []
+    close()
+    return found
+
+
+# A page whose text stream runs against its print order. 10665/342236 (CFE
+# annual report 2020) prints "2020 OVERVIEW / About the WHO Contingency Fund"
+# at the top of page 8, but the PDF draws a side panel and the body first and
+# the headings last, so the outline's first heading on the page landed after
+# its whole text and every section below it took the wrong words. When the
+# first outline heading of a page sits in the later half of its text, and the
+# page read in print order (top to bottom, left to right) puts it near the
+# top, the page is read in print order.
+LATE_HEADING = 0.5
+EARLY_HEADING = 0.2
+
+
+def _heading_offset(page: str, e: TocEntry) -> float | None:
+    """Where on `page` the line printing `e` starts, as a share of its lines. Pure."""
+    found = locate_heading([page], replace(e, page=1))
+    if not found or found[0] != 0:
+        return None
+    n = max(1, len(page.splitlines()))
+    return found[1] / n
+
+
+def print_order_pages(pages: list[str], outline: list[TocEntry], sorted_page) -> tuple[list[str], list[int]]:
+    """`pages` with each page whose first outline heading is printed late re-read by `sorted_page(i)`.
+
+    `sorted_page` returns the text of 0-based page i in print order, or None.
+    Returns the pages and the 1-based numbers of those re-read.
+    """
+    first: dict[int, TocEntry] = {}
+    for e in outline:
+        if e.page and 1 <= e.page <= len(pages) and e.page not in first:
+            first[e.page] = e
+    out = list(pages)
+    redone: list[int] = []
+    for pno, e in sorted(first.items()):
+        at = _heading_offset(pages[pno - 1], e)
+        if at is None or at < LATE_HEADING:
+            continue
+        alt = sorted_page(pno - 1)
+        if not alt:
+            continue
+        at2 = _heading_offset(alt, e)
+        if at2 is not None and at2 <= EARLY_HEADING:
+            out[pno - 1] = alt
+            redone.append(pno)
+    return out, redone
+
+
+def _pymupdf_sorted(path: str):
+    try:
+        import pymupdf  # noqa: F401
+    except ImportError:
+        return lambda i: None
+    doc = pymupdf.open(path)
+    return lambda i: join_soft_hyphens(print_order_text(doc[i]))
+
+
+def print_order_text(page) -> str:
+    """A page's text blocks in print order: top to bottom, a band of columns left column first.
+
+    A block wider than WIDE_BLOCK of the page (a heading, a full-width figure
+    caption) closes the band of columns above it. Blocks keep their own lines,
+    so two columns are never interleaved line by line.
+    """
+    width = page.rect.width
+    mid = page.rect.x0 + width / 2
+    blocks = sorted((b for b in page.get_text("blocks") if b[6] == 0 and b[4].strip()),
+                    key=lambda b: (round(b[1]), b[0]))
+    out: list[str] = []
+    band: list = []
+
+    def flush() -> None:
+        band.sort(key=lambda b: (0 if (b[0] + b[2]) / 2 < mid else 1, b[1], b[0]))
+        out.extend(b[4].rstrip("\n") for b in band)
+        band.clear()
+
+    for b in blocks:
+        if b[2] - b[0] > WIDE_BLOCK * width:
+            flush()
+            out.append(b[4].rstrip("\n"))
+        else:
+            band.append(b)
+    flush()
+    return "\n".join(out) + "\n"
+
+
+WIDE_BLOCK = 0.6
+
+
 def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
     """Slice the document text at heading boundaries."""
     marks: list[tuple[int, int, TocEntry]] = []  # (page_idx, line_idx, entry)
@@ -2011,6 +2208,9 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
 
     outline, outline_reordered = repair_outline(_toc_entries(reader.raw_toc()), pages)
     outline, outline_rejected = trusted_outline(outline, pages)
+    resorted: list[int] = []
+    if outline and not ocr_used:
+        pages, resorted = print_order_pages(pages, outline, _pymupdf_sorted(path))
     # An inferred table of contents is asked to justify itself; an outline is
     # the document's own answer and is not second-guessed (bean `6xaz`).
     # The page layout, read once for the TOC, the figures and the contents
@@ -2038,7 +2238,17 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
     # worse to read than a chapter and better than a chapter that is fiction —
     # and, unlike the single whole-document section, it can still be cited.
     paged = not toc and bool(pages)
+    tidied: list[dict[str, Any]] = []
+    if not paged and inferred:
+        toc, tidied = tidy_inferred(toc, pages)
     sections = split_pages(pages) if paged else split_sections(pages, toc)
+    if not paged and inferred:
+        labels = label_runs(sections)
+        if labels:
+            tidied += [{"title": t, "page": p, "action": "dropped", "why": "a label in a run of short sections"}
+                       for t, p in sorted(labels, key=lambda x: x[1])]
+            toc = [e for e in toc if (e.title, e.page) not in labels]
+            sections = split_sections(pages, toc)
     oversized: list[dict[str, Any]] = []
     if not paged:
         candidates = inferred
@@ -2123,6 +2333,7 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
             # Pages whose text layer failed the page check and were read from
             # the OCR cache instead (`replace_failing_pages`).
             **({"ocr_pages": replaced} if replaced else {}),
+            **({"languages": list(langs)} if langs else {}),
         },
         "metadata": meta,
         "toc": [asdict(e) for e in toc],
@@ -2195,6 +2406,8 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
             **({"outline_rejected": outline_rejected} if outline_rejected else {}),
             # Sections too long for one block, and how each was cut (`split_oversized`).
             **({"oversized_split": oversized} if oversized else {}),
+            **({"headings_tidied": tidied} if tidied else {}),
+            **({"pages_read_in_print_order": resorted} if resorted else {}),
         },
     }
     return artefact, sections

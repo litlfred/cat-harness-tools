@@ -18,6 +18,9 @@ checks can run without the PDFs.
 5. `pdf-ocr.py` tries a second script only from another script family.
 6. `pdf-footnotes.py` recognises a foot-of-page note opening with a mark, and
    not a line of body-size text.
+7. Inferred headings that do not read as headings are rejoined (a title cut to
+   its last line) or dropped (a body word, a reference's author, a diagram's
+   labels), and a page drawn out of print order is read in print order.
 """
 import importlib.util
 import os
@@ -117,6 +120,34 @@ def main() -> int:
     check("only the failing page is taken from OCR", got == [french_ok, "ocr two"] and [r["page"] for r in replaced] == [2])
     got, replaced = s.replace_failing_pages([french_ok, greek], ["ocr one"], ["fr"])
     check("an incomplete OCR cache replaces nothing", got == [french_ok, greek] and replaced == [])
+
+    p354 = ["Antecedentes\nTexto del cuerpo de la sección.\n1.2\t\nFunción de la salud digital en el \n"
+            "fortalecimiento del sistema sanitario y la \ncobertura sanitaria universal\nLa meta de la Cobertura "
+            "Sanitaria Universal es garantizar la calidad.\n"]
+    wrapped = E(1, "sanitaria universal", 1, "inferred")
+    fixed, rep = s.tidy_inferred([wrapped], p354)
+    check("10665/354399: a title cut to its last line is rejoined up to its number",
+          len(fixed) == 1 and fixed[0].number == "1.2" and fixed[0].title.startswith("Función de la salud digital")
+          and fixed[0].title.endswith("cobertura sanitaria universal") and rep[0]["action"] == "rejoined")
+    words = [E(1, "un", 1, "inferred"), E(1, "On", 1, "inferred"), E(1, "YOUNG,", 1, "inferred", "10"),
+             E(1, "Programme", 1, "inferred"), E(1, "un", 1, "outline")]
+    kept, rep = s.tidy_inferred(words, ["un On YOUNG, Programme\n"])
+    check("10665/264857: body words set apart by a font are not headings; an outline entry is kept",
+          [(e.title, e.source) for e in kept] == [("Programme", "inferred"), ("un", "outline")])
+    sec = lambda t, p, w: s.Section("sec-001-x", None, t, 1, p, p, 0, w, "")
+    flow = [sec("Annexe 1", 18, 103), sec("Suivre les lignes", 18, 22), sec("Demander un nouvel", 18, 6),
+            sec("Annexe 2", 19, 46), sec("ANNEXES", 19, 0)]
+    check("10665/329296: a run of short sections on one page is a diagram's labels",
+          s.label_runs(flow) == {("Suivre les lignes", 18), ("Demander un nouvel", 18)})
+
+    late = "The CFE enabled WHO to respond.\n" + "body line\n" * 30 + "OVERVIEW\nAbout the WHO Contingency Fund\n"
+    early = "OVERVIEW\nAbout the WHO Contingency Fund\nThe CFE enabled WHO to respond.\n" + "body line\n" * 30
+    ov = [E(1, "OVERVIEW", 1, "outline"), E(2, "About the WHO Contingency Fund", 1, "outline")]
+    got, redone = s.print_order_pages([late], ov, lambda i: early)
+    check("10665/342236: a page whose headings come last in its text is read in print order",
+          got == [early] and redone == [1])
+    got, redone = s.print_order_pages([early], ov, lambda i: late)
+    check("a page already in print order is left alone", got == [early] and redone == [])
 
     o = load("pdf-ocr.py")
     have = {"ara", "eng", "fra", "rus", "chi_sim", "fas"}

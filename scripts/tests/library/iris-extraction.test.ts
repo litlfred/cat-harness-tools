@@ -17,7 +17,7 @@ import { pagesToOcr, planFor, withLanguageHint } from "../../ingest-document.ts"
 const SCRIPTS = join(import.meta.dir, "..", "..");
 const LIB = "/tmp/lib";
 
-const draft = [{ text: "The title says June 2006; the introduction says June 2005.", lang: "en", state: "draft", drafted_by: { kind: "agent", id: "claude-code", model: "claude-opus-4-8" } }];
+const draft = [{ text: "The title says June 2006; the introduction says June 2005.", lang: "en", state: "draft", drafted_by: { kind: "agent", id: "claude-code", model: "not-disclosed", session: "https://claude.ai/code/session_01Qmmkt69YZtQn3UstRNcFjd" } }];
 
 function entry(slug: string): string {
   const root = mkdtempSync(join(tmpdir(), "iris-x-"));
@@ -57,7 +57,7 @@ describe("failing pages go to OCR", () => {
 });
 
 describe("errata in the L1 document schema", () => {
-  const ok = { $schema: "folio-document-errata/v1", entry: "10665-205022", errata: [{ id: "e1", kind: "inconsistency", block: "library/10665-205022/blocks/prose-sec-000", quote: "June 2006", reading: "June 2005", evidence: "Introduction, p. 5: 'held in June 2005'", narrative: draft }] };
+  const ok = { $schema: "folio-document-errata/v1", entry: "10665-205022", errata: [{ id: "e1", kind: "inconsistency", block: "library/10665-205022/blocks/prose-sec-000", quote: "6 to 10 June 2005", reading: "6 to 10 June 2006", evidence: "The cover (p. 1) and the programme (p. 20, 'Tuesday, 6 June 2006') give 2006", narrative: draft }] };
 
   test("an erratum names where it is, quotes the source, and carries a note", () => {
     expect(DocumentErrataSchema.safeParse(ok).success).toBe(true);
