@@ -334,8 +334,12 @@ permissions:
 # closing run joined main's group and, being a pull_request run, cancelled
 # main's running push run and the new one (a downstream layer's run 41395643928,
 # "higher priority waiting request"). pr-tests.yml is keyed the same way.
+# A push run is keyed by its commit as well: even with cancel-in-progress off,
+# GitHub keeps only ONE pending run per group and cancels the older pending
+# one, so three quick merges cancelled the middle main run (fhir-harness run
+# 42917495047, 2026-11-10) and mailed "Some jobs were not successful".
 concurrency:
-  group: layer-pr-checks-${{ github.repository }}-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  group: layer-pr-checks-${{ github.repository }}-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.ref, github.event_name == 'push' && github.sha || 'run') }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The instance, once: the input when given, else (layer mode) the calling
@@ -2384,6 +2388,13 @@ jobs:
             echo "::notice::the pinned cat-harness-tools (${sha:0:12}) predates layers:check; the gate starts with the next re-pin"
             exit 0
           fi
-          CAT_LAYERS_URL="https://github.com/${{ github.repository }}.git" \
-            bun "$work/scripts/mount-from-lock.ts" --check-layers --root fa --changed-from "$base" \
-            || { echo "::error::this PR re-pins index.lock.json but its layers cache ref is not published. Whoever re-pinned runs \`bun run cat layers:publish\` from their checkout (mount:remote does it after a re-pin)."; exit 1; }
+          # A sandbox's publish waits on its claude/cat-layers/<key> branch
+          # until layers-move.yml moves it (state `pending`): wait for it.
+          for i in $(seq 1 30); do
+            out="$(CAT_LAYERS_URL="https://github.com/${{ github.repository }}.git" \
+              bun "$work/scripts/mount-from-lock.ts" --check-layers --root fa --changed-from "$base" 2>&1)" && { echo "$out"; exit 0; }
+            echo "$out"
+            case "$out" in *"(pending)"*) sleep 20 ;; *) break ;; esac
+          done
+          echo "::error::this PR re-pins index.lock.json but its layers cache ref is not published. Whoever re-pinned runs \`bun run cat layers:publish\` from their checkout (mount:remote does it after a re-pin); from a sandbox it lands on a claude/cat-layers/ branch that layers-move.yml moves."
+          exit 1

@@ -45,13 +45,16 @@ import { readLibraryGraph, referencedCatalogueEntries, type LibraryGraph, type L
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
 import { DOCUMENT_VIEW_JS, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
+import { LANGUAGE_TOGGLE_JS, entryLanguages, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
+import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
 import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
 import { blobUrl, elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
-import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "../schemas/library/library-iri.ts";
+import { LIBRARY_JSONLD_SITE_DIR, libraryAssetIri, libraryAssetSitePath, libraryStubSitePath } from "../schemas/library/library-iri.ts";
+import { termCurie, termIri } from "../schemas/kg/namespaces.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
 import { subgraphOutDir } from "./gen-subgraph-jsonld.ts";
 import { SUBGRAPH_INDEX_FILE } from "../schemas/kg/subgraph-manifest.ts";
@@ -65,7 +68,7 @@ import { tileCounts } from "../schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
-import { escHtml, thinPageConfigOf } from "./thin-page.ts";
+import { escHtml, nodeStubPageHtml, themedNodeDeclaration, type PageNode } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "../schemas/kg/harness-config.js";
 import { gateOwnsFile } from "./lib/gate-own.ts";
@@ -238,6 +241,15 @@ html[data-fa-scheme="light"] .lib-page {
 .lib-page .lib-view-absent p { margin:0; }
 .lib-page .lib-record { padding:6px 0; border-bottom:1px solid var(--line); }
 .lib-page .lib-record p { margin:0; }
+.lib-page .lib-summary { padding:6px 0 10px; border-bottom:1px solid var(--line); }
+.lib-page .lib-summary h2 { margin:.4rem 0; }
+.lib-page .lib-summary p { margin:.3rem 0; max-width:60rem; }
+.lib-page .lib-versions { padding:6px 0; border-bottom:1px solid var(--line); }
+.lib-page .lib-versions p { margin:0; }
+.lib-page .lib-lang-toggle { margin:.5rem 0 0; }
+.lib-page .lib-lang-toggle a.seg-link { display:inline-block; min-height:24px; line-height:24px; padding:2px 10px; border:1px solid var(--line); text-decoration:none; }
+.lib-page details.lib-all { padding:10px 0; border-top:1px solid var(--line); }
+.lib-page details.lib-all > summary { cursor:pointer; font-size:1rem; min-height:24px; }
 .lib-page .toolbar { padding:10px 0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-bottom:1px solid var(--line); }
 .lib-page input, .lib-page select, .lib-page button { font:inherit; color:var(--fg); background:var(--box);
   border:1px solid var(--line); border-radius:6px; padding:6px 9px; }
@@ -382,12 +394,16 @@ export const VIEWER_JS = `"use strict";
 var G = null, SORT = { key: "id", dir: 1 }, VIEW = "list";
 /* THE PAGE'S IDENTITY, and the only thing a page carries -- owner,
    2026-10-02 (#1881): every page is a thin shell that loads its content from
-   the published assets. A JSON data block rather than script, so a shell
+   the published assets. Attributes on the page's own element rather than script, so a shell
    holds no code of its own. DATA_HREF is made ABSOLUTE here, once, before
    anything can rewrite the address bar (see honourAddress). */
 var CONFIG = (function(){
-  var el = document.getElementById("fa-library-config");
-  try { return JSON.parse(el ? el.textContent : "{}") || {}; } catch (_e) { return {}; }
+  /* data-kg-* on the page's .lib-page element (issue #1830) -- no private block. */
+  var el = document.querySelector(".lib-page");
+  var d = el ? el.dataset : {};
+  var c = { data: d.kgData || "", scope: d.kgScope || "", libRoot: d.kgLibRoot };
+  if (d.kgEntry !== undefined) c.entry = d.kgEntry;
+  return c;
 })();
 var DATA_HREF = new URL(String(CONFIG.data || ""), location.href).href;
 /* ARRIVING AT #lib-view OPENS THE VIEW PANEL -- the folio glass's eye links
@@ -921,7 +937,7 @@ fetch(DATA_HREF).then(function(r){
   $("listing").innerHTML = '<p class="empty">The projection at <code>' + esc(DATA_HREF) + '</code> could not be read. ' +
     "That is not an empty corpus \\u2014 it is a corpus that could not be loaded, and the page says so rather than showing nothing.</p>";
 });
-`;
+${LANGUAGE_TOGGLE_JS}`;
 
 /** The entry a shell is about, when it is one — its identity only, never its content. */
 export interface ShellEntry {
@@ -936,6 +952,11 @@ export interface ShellEntry {
   notHeld?: { file: string; elsewhere: { label: string; href: string }[] };
   /** The entry's catalogue record (its Dublin Core) and upstream Handle — {@link recordHtml}. */
   record?: readonly SourceLink[];
+  /** The entry's title, for the page heading. */
+  title?: string;
+  /** Its language versions and toggle, and its summary, as HTML (`scripts/lib/library-languages.ts`). */
+  versions?: string;
+  summary?: string;
 }
 
 // ── WHAT A PAGE IS RENDERED FROM, LINKED ON THE PAGE (owner, 2026-10-15) ──
@@ -1086,7 +1107,7 @@ export function instanceSources(
   return [
     { label: basename(o.dataFile), href: hrefFrom(o.pageDir, o.dataFile), what: "library projection (JSON)" },
     ...(o.subgraph ? [{ label: SUBGRAPH_INDEX_FILE, href: hrefFrom(o.pageDir, o.subgraph), what: "the instance's subgraph (JSON-LD)" }] : []),
-    ...o.manifests.map((m) => ({ label: `${m.id}/manifest.jsonld`, href: hrefFrom(o.pageDir, m.abs), what: "entry JSON-LD" })),
+    ...o.manifests.map((m) => ({ label: `source/${m.id}.jsonld`, href: hrefFrom(o.pageDir, m.abs), what: "entry JSON-LD" })),
   ];
 }
 
@@ -1243,8 +1264,17 @@ export function catalogueRecordLinks(o: {
   return out;
 }
 
-/** The config block's id — how a library page names itself, and how this generator recognises its own output. */
-export const LIBRARY_CONFIG_ID = "fa-library-config";
+/**
+ * The element every library page's viewer reads its identity from — the
+ * `data-kg-*` attributes on `<div class="lib-page">` (issue #1830: no private
+ * config block). An entry's page also declares its node there, in RDFa, with
+ * a JSON-LD stub beside it.
+ */
+const LIBRARY_MOUNT = "lib-page";
+
+/** An entry's class: the library's `SourceDocument`, as its manifest types it (`gen-library-jsonld.ts`). */
+const ENTRY_TYPE = termCurie("SourceDocument");
+const ENTRY_PREFIXES = { [ENTRY_TYPE.split(":")[0]!]: termIri("SourceDocument").slice(0, -"SourceDocument".length) };
 
 /**
  * The skeleton {@link VIEWER_JS} fills — this head, then the view panel when
@@ -1277,6 +1307,22 @@ const VIEWER_BODY = `<div class="toolbar">
   <section id="queue" class="wrap"></section>
 </div>`;
 
+/**
+ * An ENTRY page's body — owner, 2026-11-10 (who-iris#217): the entry's
+ * summary, sections and keywords were drawn BELOW the whole library's
+ * listing, so a reader arriving at one document saw a table of every other
+ * one first. Here the document comes first and the library listing folds
+ * away under it. Same ids as {@link VIEWER_BODY}, so the script is unchanged.
+ */
+const ENTRY_BODY = `<div class="lib-main">
+  <section id="document" class="wrap" hidden aria-live="polite"></section>
+  <section id="blocks" class="wrap" hidden aria-live="polite"></section>
+</div>
+<details class="lib-all">
+<summary>The whole library</summary>
+${VIEWER_BODY.replace(/\n\s*<section id="(?:document|blocks)"[^\n]*<\/section>/g, "")}
+</details>`;
+
 /** The shared stylesheet and script sit beside the projection. */
 const assetsOf = (dataHref: string): string => dataHref.slice(0, dataHref.lastIndexOf("/") + 1);
 
@@ -1286,8 +1332,10 @@ interface LibraryPage {
   title: string;
   /** The projection's href, relative to the page. The shared assets sit beside it. */
   dataHref: string;
-  /** The page's identity, read by {@link VIEWER_JS}. Never an entry's content. */
-  config: Record<string, unknown>;
+  /** The page's identity, read by {@link VIEWER_JS} from `data-kg-*`. Never an entry's content. */
+  config: { data: string; scope: string; libRoot: string; entry?: string };
+  /** The entry this page renders, declared in RDFa and a JSON-LD stub. Absent on a library's own page. */
+  node?: PageNode;
   /** The `<noscript>` content, as HTML; the caller escapes what it interpolates. */
   noscript: string;
   /** The entry's published JSON-LD, relative to the page — its `alternate`. */
@@ -1300,6 +1348,12 @@ interface LibraryPage {
   view?: string;
   /** The entry's catalogue record line, as HTML — {@link recordHtml}. Drawn right under the head. */
   record?: string;
+  /** Set on an entry page: its title for the heading, and {@link ENTRY_BODY} in place of {@link VIEWER_BODY}. */
+  entryTitle?: string;
+  /** The entry's language versions and toggle, as HTML — `versionsHtml`. */
+  versions?: string;
+  /** The entry's summary, as HTML — `summaryHtml`. */
+  summary?: string;
 }
 
 /**
@@ -1327,7 +1381,11 @@ interface LibraryPage {
  */
 function libraryPageHtml(p: LibraryPage): string {
   const assets = assetsOf(p.dataHref);
-  const config = JSON.stringify(p.config).replace(/</g, "\\u003c");
+  const attrs = Object.entries({ data: p.config.data, scope: p.config.scope, "lib-root": p.config.libRoot, entry: p.config.entry })
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => ` data-kg-${k}="${escHtml(v!)}"`)
+    .join("");
+  const decl = p.node ? themedNodeDeclaration(p.node, ENTRY_PREFIXES) : undefined;
   return themedPage({
     title: p.title,
     generator: "cat-harness-tools/scripts/gen-library-viz.ts",
@@ -1337,13 +1395,12 @@ function libraryPageHtml(p: LibraryPage): string {
       alternate_jsonld: p.alternate,
     },
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
-<div class="lib-page" data-fa-no-filter>
-${VIEWER_HEAD}
-${p.record ? `${p.record}\n` : ""}${p.view ? `${p.view}\n` : ""}${VIEWER_BODY}
+<div class="${LIBRARY_MOUNT}" data-fa-no-filter${decl?.attrs ?? ""}${attrs}>
+${decl ? `${decl.stub}\n` : ""}${p.entryTitle === undefined ? VIEWER_HEAD : VIEWER_HEAD.replace("Library — the L1 corpus", escHtml(p.entryTitle))}
+${p.record ? `${p.record}\n` : ""}${p.versions ? `${p.versions}\n` : ""}${p.summary ? `${p.summary}\n` : ""}${p.view ? `${p.view}\n` : ""}${p.entryTitle === undefined ? VIEWER_BODY : ENTRY_BODY}
 ${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>
-<script type="application/json" id="${LIBRARY_CONFIG_ID}">${config}</script>
 <script src="${escHtml(assets)}viewer.js"></script>`,
   });
 }
@@ -1393,6 +1450,8 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     title: `${entry.id} — ${scope} library`,
     dataHref,
     config: { data: dataHref, scope, libRoot, entry: entry.id },
+    // The entry's IRI is its manifest's (`library-iri.ts`), declared only when the manifest is published.
+    ...(entry.jsonld ? { node: { iri: libraryAssetIri(scope, entry.id), types: [ENTRY_TYPE] } } : {}),
     noscript: `<p class="note">This page loads its entries from <a href="${escHtml(dataHref)}">the library projection</a>${
       entry.jsonld ? ` and this entry from <a href="${escHtml(entry.jsonld)}">its JSON-LD</a>` : ""
     }; it needs JavaScript to draw them.</p>${
@@ -1406,6 +1465,9 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     sources: sourcesHtml(entry.sources ?? []),
     view: viewPanelHtml(entry.sources ?? []) || (entry.notHeld ? notHeldHtml(entry.notHeld) : ""),
     record: recordHtml(entry.record ?? []),
+    entryTitle: entry.title ?? entry.id,
+    ...(entry.versions ? { versions: entry.versions } : {}),
+    ...(entry.summary ? { summary: entry.summary } : {}),
     searchExclude: true,
   });
 }
@@ -1416,7 +1478,22 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
  * later run prune its own stale output and nothing else.
  */
 export function libraryConfigOf(content: string): { data?: unknown; scope?: unknown; libRoot?: unknown; entry?: unknown } | undefined {
-  return thinPageConfigOf(content, LIBRARY_CONFIG_ID);
+  const tag = new RegExp(`<div class="${LIBRARY_MOUNT}"[^>]*>`).exec(content)?.[0];
+  if (tag === undefined) return undefined;
+  const get = (k: string): string | undefined => {
+    const v = new RegExp(`\\sdata-kg-${k}="([^"]*)"`).exec(tag)?.[1];
+    return v === undefined ? undefined : v.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  };
+  const data = get("data");
+  if (data === undefined) return undefined;
+  const out: { data?: unknown; scope?: unknown; libRoot?: unknown; entry?: unknown } = { data };
+  const scope = get("scope");
+  const libRoot = get("lib-root");
+  const entry = get("entry");
+  if (scope !== undefined) out.scope = scope;
+  if (libRoot !== undefined) out.libRoot = libRoot;
+  if (entry !== undefined) out.entry = entry;
+  return out;
 }
 
 /**
@@ -1967,6 +2044,10 @@ if (import.meta.main) {
     // the entry, so it is copied as-is rather than re-expressed, and each
     // shell names it as its `alternate`.
     const mine = g.entries.filter((e) => e.instance === subject);
+    const languages = entryLanguages(
+      mine.map((e) => ({ id: e.id, ...(e.catalogue?.node ? { node: join(repoRoot, e.catalogue.node) } : {}) })),
+      new Set(mine.map((e) => e.id)),
+    );
     for (const e of mine) {
       const shellDir = join(sub.pageDir, e.id);
       const src = join(repoRoot, e.dir, "manifest.jsonld");
@@ -1978,6 +2059,21 @@ if (import.meta.main) {
         wantedJsonld.add(dest);
         emitBytes(dest, readFileSync(src));
         jsonld = relative(shellDir, dest).split(sep).join("/");
+        // The stub AT the IRI (Q-THIN-3 A): it declares the node and points
+        // to the entry's page, so the extensionless IRI resolves to a page.
+        const stub = join(site, libraryStubSitePath(subject, e.id));
+        wantedJsonld.add(stub);
+        const from = (abs: string): string => relative(dirname(stub), abs).split(sep).join("/");
+        emit(
+          stub,
+          nodeStubPageHtml({
+            title: e.title || e.id,
+            node: { iri: libraryAssetIri(subject, e.id), types: [ENTRY_TYPE] },
+            prefixes: ENTRY_PREFIXES,
+            jsonld: from(dest),
+            page: `${from(shellDir)}/`,
+          }),
+        );
       }
       // ── THE ENTRY'S DECLARED SUB-GRAPHS, BESIDE ITS MANIFEST (bean 8pzh) ──
       //
@@ -2007,13 +2103,25 @@ if (import.meta.main) {
         join(shellDir, "index.html"),
         entryPageHtml(`../${sub.dataHref}`, subject, "../../", {
           id: e.id,
+          title: e.title || e.id,
+          ...(() => {
+            const l = languages.get(e.id);
+            if (!l) return {};
+            const versions = versionsHtml(e.id, l, (id) => `../${encodeURIComponent(id)}/`);
+            const summary = summaryHtml(l.abstract);
+            return { ...(versions ? { versions } : {}), ...(summary ? { summary } : {}) };
+          })(),
           ...(jsonld ? { jsonld } : {}),
           ...(graphs.length ? { graphs } : {}),
           ...(() => {
             // No viewable source held, and the entry names one: say so where the panel would be.
             const held = sourceFileOf(repoRoot, e, g.uploads);
             return !held && e.sourceFile && e.provenance !== "referenced"
-              ? { notHeld: { file: e.sourceFile, elsewhere: [...elsewhereLinks(e), ...(e.upstream ?? [])] } }
+              ? { notHeld: { file: e.sourceFile, elsewhere: [...elsewhereLinks(e), ...(e.upstream ?? []), ...(() => {
+                  // The file this entry was derived from, at its source (script./lib/library-upstream-pdf.ts).
+                  const u = upstreamPdfOf(e.catalogue?.node ? join(repoRoot, e.catalogue.node) : undefined, e.id);
+                  return u ? [{ label: `${u.file} at its source`, href: u.href }] : [];
+                })()] } }
               : {};
           })(),
           ...(() => {

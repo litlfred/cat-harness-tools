@@ -14,11 +14,11 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { checkLayers, digestOf, LAYERS_MAIN_REF, layersKey, layersRef, layersSummaryLine, publishLayers, pruneLayers, run, type LockInstance } from "../mount-from-lock.ts";
+import { checkLayers, digestOf, LAYERS_BRANCH_PREFIX, LAYERS_MAIN_REF, layersKey, layersRef, layersSummaryLine, moveLayers, publishLayers, pruneLayers, run, type LockInstance } from "../mount-from-lock.ts";
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 function git(cwd: string, ...args: string[]): string {
@@ -263,5 +263,43 @@ describe("layers:check — the re-pinner's gate", () => {
     expect(after.ok).toBe(true);
     expect(after.state).toBe("published");
     expect(after.key).toBe(layersKey([a.inst(), b.inst()]));
+  });
+});
+
+describe("layers:move — a sandbox's publish, moved by the runner", () => {
+  test("a remote that refuses refs/cat gets the claude/cat-layers/ branch; the mover moves it and deletes the branch", () => {
+    const { origin, work } = index([a.inst(), b.inst()]);
+    replay(work);
+    const key = layersKey([a.inst(), b.inst()]);
+    // The sandbox's git proxy: only claude/ branches may be pushed.
+    const hook = join(origin, "hooks", "pre-receive");
+    writeFileSync(hook, "#!/bin/sh\nwhile read o n r; do case \"$r\" in refs/heads/claude/*) ;; *) echo refused >&2; exit 1 ;; esac; done\n");
+    chmodSync(hook, 0o755);
+    const p = publishLayers(work);
+    expect(p.ok).toBe(true);
+    expect(p.viaBranch).toBe(true);
+    expect(p.refs).toEqual([`${LAYERS_BRANCH_PREFIX}${key}`]);
+    const pending = checkLayers(work);
+    expect(pending.ok).toBe(false);
+    expect(pending.state).toBe("pending");
+    // The runner's token may push any ref.
+    rmSync(hook);
+    const m = moveLayers(work);
+    expect(m.ok).toBe(true);
+    expect(m.state).toBe("published");
+    expect(checkLayers(work).state).toBe("published");
+    expect(git(work, "ls-remote", origin, `${LAYERS_BRANCH_PREFIX}${key}`).trim()).toBe("");
+    // A second run finds the ref and moves nothing.
+    expect(moveLayers(work).state).toBe("published");
+  });
+
+  test("the mover refuses a branch that does not hold this lock's layers commit", () => {
+    const { origin, work } = index([a.inst()]);
+    replay(work);
+    const key = layersKey([a.inst()]);
+    git(work, "push", "-q", origin, `HEAD:${LAYERS_BRANCH_PREFIX}${key}`);
+    const m = moveLayers(work);
+    expect(m.state).toBe("error");
+    expect(m.detail).toContain("is not this lock's layers commit");
   });
 });

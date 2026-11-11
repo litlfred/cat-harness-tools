@@ -41,6 +41,7 @@
  *   bun run cat layers:publish             # (= --publish) build the overlay of the verified mounts, push refs/cat/layers/<key>
  *   bun run cat layers:publish -- --main --prune 20 [--keep <key>]… [--url <index remote>] [--no-push]
  *   bun run cat layers:check               # (= --check-layers) gate: refs/cat/layers/<key> for THIS lock exists at the index remote
+ *   … --move-layers                        # runner: move claude/cat-layers/<key> (a sandbox's publish) to refs/cat/layers/<key>
  *   bun run cat layers:check -- --changed-from <base> # the same, only when index.lock.json differs from <base> (a re-pin)
  *
  * The FAST PATH: before fetching layer by layer, the replay tries ONE
@@ -1125,6 +1126,16 @@ export function layersKey(instances: readonly LockInstance[]): string {
 export const layersRef = (key: string): string => `${LAYERS_REF_PREFIX}${key}`;
 
 /**
+ * Where a publisher that may push only `claude/` branches (an agent sandbox)
+ * leaves a layers commit instead: `refs/heads/claude/cat-layers/<key>`. The
+ * layers-move workflow (`layer-layers-move.yml`) moves it to
+ * `refs/cat/layers/<key>` and deletes the branch; the runner only moves a
+ * ref, it never builds one (owner, 2026-11-10, card "B. Branch + small mover").
+ */
+export const LAYERS_BRANCH_PREFIX = "refs/heads/claude/cat-layers/";
+export const layersBranchOf = (ref: string): string => `${LAYERS_BRANCH_PREFIX}${ref.slice(LAYERS_REF_PREFIX.length)}`;
+
+/**
  * Where the cache lives: `CAT_LAYERS_URL`, else the root's `origin`.
  * `CAT_LAYERS_CACHE=0` turns the fast path off.
  */
@@ -1142,7 +1153,8 @@ export function layersUrl(root: string): string | undefined {
 export interface LayersCheck {
   ok: boolean;
   /** `skipped` when `--changed-from` was given and the lock did not change. */
-  state: "published" | "missing" | "skipped" | "error";
+  /** `pending` when the commit waits on its `claude/cat-layers/` branch for the mover. */
+  state: "published" | "pending" | "missing" | "skipped" | "error";
   key?: string;
   detail: string;
 }
@@ -1176,6 +1188,10 @@ export function checkLayers(root: string, opts: { url?: string; changedFrom?: st
   const ls = git(root, ["ls-remote", url, ref]);
   if (ls.status !== 0) return { ok: false, state: "error", key, detail: `git ls-remote ${url} failed: ${ls.stderr.trim().split("\n").pop()}` };
   if (ls.stdout.trim()) return { ok: true, state: "published", key, detail: `${ref.slice(0, LAYERS_REF_PREFIX.length + 12)}… is at ${url}` };
+  const branch = git(root, ["ls-remote", url, layersBranchOf(ref)]);
+  if (branch.status === 0 && branch.stdout.trim()) {
+    return { ok: false, state: "pending", key, detail: `${ref.slice(0, LAYERS_REF_PREFIX.length + 12)}… waits on ${layersBranchOf(ref).slice("refs/heads/".length, LAYERS_BRANCH_PREFIX.length + 12)}… at ${url} for the layers-move workflow` };
+  }
   return {
     ok: false,
     state: "missing",
@@ -1286,6 +1302,37 @@ export interface PublishResult {
   commit?: string;
   refs?: string[];
   pruned?: string[];
+  /** The commit was left on its `claude/cat-layers/` branch for the mover. */
+  viaBranch?: boolean;
+}
+
+/**
+ * The mover (runner side): for THIS lock's key, take the commit a sandbox left
+ * on `claude/cat-layers/<key>`, check that it is a layers commit for that key,
+ * push it to `refs/cat/layers/<key>` and delete the branch. It builds nothing.
+ */
+export function moveLayers(root: string, opts: { url?: string; changedFrom?: string } = {}): LayersCheck {
+  const c = checkLayers(root, opts);
+  if (c.state !== "pending") return c;
+  const ref = layersRef(c.key!);
+  const branch = layersBranchOf(ref);
+  // input-site: env CAT_LAYERS_URL #fd0cb617 — the remote the layers cache is fetched from
+  const url = opts.url ?? process.env.CAT_LAYERS_URL?.trim() ?? layersUrl(root)!;
+  const scratch = mkdtempSync(join(tmpdir(), "layers-move-"));
+  try {
+    const run = (args: string[]) => git(scratch, args);
+    if (run(["init", "-q"]).status !== 0) return { ok: false, state: "error", key: c.key, detail: "git init failed" };
+    const f = run(["fetch", "-q", "--depth", "1", "--filter=blob:none", url, branch]);
+    if (f.status !== 0) return { ok: false, state: "error", key: c.key, detail: `fetching ${branch} failed: ${f.stderr.trim().split("\n").pop()}` };
+    const subject = run(["log", "-1", "--format=%s", "FETCH_HEAD"]).stdout.trim();
+    if (subject !== `cat layers ${c.key}`) return { ok: false, state: "error", key: c.key, detail: `${branch} is not this lock's layers commit (its subject is "${subject}")` };
+    const sha = run(["rev-parse", "FETCH_HEAD"]).stdout.trim();
+    const p = run(["push", "-q", "--force", url, `${sha}:${ref}`, `:${branch}`]);
+    if (p.status !== 0) return { ok: false, state: "error", key: c.key, detail: `moving ${sha.slice(0, 12)} to ${ref} failed: ${p.stderr.trim().split("\n").pop()}` };
+    return { ok: true, state: "published", key: c.key, detail: `moved ${sha.slice(0, 12)} from ${branch.slice("refs/heads/".length)} to ${ref.slice(0, LAYERS_REF_PREFIX.length + 12)}…` };
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 }
 
 const IDENTITY = { GIT_AUTHOR_NAME: "cat layers", GIT_AUTHOR_EMAIL: "cat-layers@users.noreply.github.com", GIT_COMMITTER_NAME: "cat layers", GIT_COMMITTER_EMAIL: "cat-layers@users.noreply.github.com" };
@@ -1355,7 +1402,13 @@ export function publishLayers(root: string, opts: { url?: string; main?: boolean
     const refs = [layersRef(key), ...(opts.main ? [LAYERS_MAIN_REF] : [])];
     if (opts.push === false) return { ok: true, key, commit: sha, refs: [], detail: `built ${sha.slice(0, 12)} for ${key.slice(0, 12)} (${entries.length} files); not pushed` };
     const push = gitEnv(root, ["push", "-q", "--force", url!, ...refs.map((r) => `${sha}:${r}`)], env);
-    if (push.status !== 0) return { ok: false, key, commit: sha, detail: `git push failed: ${push.stderr.trim().split("\n").pop()}` };
+    if (push.status !== 0) {
+      // A sandbox that may push only `claude/` branches: leave the commit on its branch for the mover.
+      const branches = refs.map(layersBranchOf);
+      const viaBranch = gitEnv(root, ["push", "-q", "--force", url!, ...branches.map((b) => `${sha}:${b}`)], env);
+      if (viaBranch.status !== 0) return { ok: false, key, commit: sha, detail: `git push failed: ${push.stderr.trim().split("\n").pop()}; to the claude/cat-layers/ branch too: ${viaBranch.stderr.trim().split("\n").pop()}` };
+      return { ok: true, key, commit: sha, refs: branches, viaBranch: true, detail: `pushing ${refs.join(", ")} was refused, so ${sha.slice(0, 12)} (${entries.length} files) is on ${branches.map((b) => b.slice("refs/heads/".length)).join(", ")}; the layers-move workflow moves it to the ref when the PR's checks run` };
+    }
     const pruned = opts.prune !== undefined ? pruneLayers(url!, opts.prune, [key, ...(opts.keep ?? [])]) : [];
     return { ok: true, key, commit: sha, refs, pruned, detail: `pushed ${sha.slice(0, 12)} (${entries.length} files) to ${refs.join(", ")}${pruned.length ? `; pruned ${pruned.length}` : ""}` };
   } finally {
@@ -1488,6 +1541,12 @@ if (import.meta.main) {
     const i = argv.indexOf(flag);
     return i >= 0 ? argv[i + 1] : undefined;
   };
+  if (argv.includes("--move-layers")) {
+    const r = moveLayers(root, { url: val("--url"), changedFrom: val("--changed-from") });
+    // Nothing to move (`missing`) is the layers-ref gate's to report, not the mover's.
+    console.log(`layers:move: ${r.state === "error" ? "FAILED" : "OK"} (${r.state}) — ${r.detail}`);
+    process.exit(r.state === "error" ? 1 : 0);
+  }
   if (argv.includes("--check-layers")) {
     const r = checkLayers(root, { url: val("--url"), changedFrom: val("--changed-from") });
     console.log(`layers:check: ${r.ok ? "OK" : "FAILED"} (${r.state}) — ${r.detail}`);

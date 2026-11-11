@@ -33,7 +33,7 @@ import {
 } from "../../lib/navbar.js";
 import { NAVBAR_LINKED, NAVBAR_ROW_CSS, NAVBAR_ROW_INLINE, NAVBAR_ROW_JS, declinesNavbar, expandRail, injectRail, railDataJson, railPageOf, wantsLinkedRail, railModel, withNavbarRow } from "../../lib/harness-rail.js";
 import { injectRailOnce } from "../../lib/rail-once.js";
-import { HOME_GLYPH, NAVBAR_CSS, documentIndexOf, numberedHeading, visualiserLabelOf } from "../../lib/navbar.js";
+import { HOME_GLYPH, NAVBAR_CSS, NAV_RESIZE_MAX_PX, NAV_RESIZE_MIN_PX, NAV_WIDTH_KEY, documentIndexOf, numberedHeading, visualiserLabelOf, wireNavResize } from "../../lib/navbar.js";
 import { BLANK_AVATAR } from "../../../schemas/ui/blank-avatar.js";
 import { thinPageHtml } from "../../thin-page.js";
 import {
@@ -272,8 +272,23 @@ describe("at rest it is a strip, and opens three ways", () => {
 
   it("opens on hover, on keyboard focus, and on the pinned checkbox", () => {
     expect(css).toContain(
-      `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:${NAV_OPEN_PX}px}`,
+      `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_PX}px)}`,
     );
+  });
+
+  it("opens to the width the reader dragged it to, else the default (owner, 2026-11-10, option D)", () => {
+    // Every open width reads `--fa-nav-w`: the bar, its column and the page's padding.
+    expect(css).not.toMatch(new RegExp(`(?<!--fa-nav-w,)\\b${NAV_OPEN_PX}px`));
+    expect(css).toContain(`.fa-nav-in{width:var(--fa-nav-w,${NAV_OPEN_PX}px)`);
+    expect(css).toContain(`padding-left:var(--fa-nav-w,${NAV_OPEN_PX}px)`);
+    // The drag edge's limits and key are stated once: the inlined function says the same.
+    const src = wireNavResize.toString();
+    expect(src).toContain(String(NAV_RESIZE_MIN_PX));
+    expect(src).toContain(String(NAV_RESIZE_MAX_PX));
+    expect(src).toContain(`"${NAV_WIDTH_KEY}"`);
+    // Long names wrap rather than being cut.
+    expect(css).toContain(".fa-nav-label{min-width:0;white-space:normal");
+    expect(css).not.toContain("text-overflow:ellipsis");
   });
 
   it("renders no [x] and no ☰ — the header is the one control (#1757)", () => {
@@ -372,6 +387,40 @@ describe("the rail is an adapter, not a second navbar", () => {
     expect(m.graphs.items).toEqual(model.graphs.items);
     expect(m.graphs.collapsible).toBe(true);
     expect(m.headHref).toBe("../");
+  });
+
+  it("sends home to the composed site when the page names one (data-fa-home)", () => {
+    // Owner, 2026-11-10: an IG composed into smart-html-jtd is a subgraph of
+    // that site's KG, so the rail's home is the composed site's landing page.
+    expect(railModel({ ...opts, homeHref: "/smart-html-jtd/" }).headHref).toBe("/smart-html-jtd/");
+    const files = new Map<string, string>();
+    const railed = injectRailOnce(`<html><body><h2 id="a">A</h2></body></html>`, { ...opts, emitRailData: (f: string, b: string) => void files.set(f, b) })!;
+    const read = (n: string) => railDataJson(files.get(`assets/navbar/${n}.js`)!);
+    const own = expandRail(railed, read);
+    expect(own).toContain('<a class="fa-nav-head-link" href="../"');
+    const composed = railed.replace(/(id="fa-rail" data-fa-root="[^"]*" data-fa-to-root="[^"]*")/, '$1 data-fa-home="/smart-html-jtd/"');
+    expect(railPageOf(composed)!.home).toBe("/smart-html-jtd/");
+    expect(railPageOf(railed)!.home).toBeUndefined();
+    const home = expandRail(composed, read);
+    expect(home).toContain('<a class="fa-nav-head-link" href="/smart-html-jtd/"');
+    // Only home moves: the rest of the rail is the same.
+    expect(home.replace('href="/smart-html-jtd/"', 'href="../"').replace(' data-fa-home="/smart-html-jtd/"', "")).toBe(own);
+  });
+
+  it("names the header for a LARGER home: SMART Guidelines on a composed IG (2026-11-10)", () => {
+    const files = new Map<string, string>();
+    const emit = { ...opts, emitRailData: (f: string, b: string) => void files.set(f, b) };
+    const read = (n: string) => railDataJson(files.get(`assets/navbar/${n}.js`)!);
+    const head = (html: string) => /<div class="fa-nav-head fa-nav-head--home">[\s\S]*?<\/div>/.exec(html)![0];
+    // From the page's block — a composing site (`data-fa-home-name`).
+    const own = injectRailOnce(`<html><body><h2 id="a">A</h2></body></html>`, emit)!;
+    const composed = own.replace(/(id="fa-rail" data-fa-root="[^"]*" data-fa-to-root="[^"]*")/, '$1 data-fa-home="/smart-html-jtd/" data-fa-home-name="SMART Guidelines"');
+    expect(railPageOf(composed)!.homeName).toBe("SMART Guidelines");
+    const h = head(expandRail(composed, read));
+    expect(h).toContain('href="/smart-html-jtd/" title="SMART Guidelines: landing page"');
+    expect(h).toContain('<span class="fa-nav-name fa-nav-label">SMART Guidelines</span>');
+    expect(h).toContain(`d="${HOME_GLYPH}"`);
+    expect(head(expandRail(own, read))).toContain('title="who-iris: landing page"');
   });
 
   it("OMITS the harnesses region when it could not be read", () => {
@@ -729,6 +778,23 @@ describe("the document index — `documentIndexOf`", () => {
     const graphs = region(html!, "fa-nav-graphs");
     expect(graphs).toContain('href="#todo-t1"');
     expect(graphs).not.toContain('href="#a"');
+  });
+
+  it("folds a declared entry's items under its row, open only where the page is (IG menu, 2026-11-10)", () => {
+    const decl = `<script type="application/json" data-fa-visualiser-nav>` +
+      `[{"label":"Home","items":[{"label":"Summary","href":"./index.html"},{"label":"Changes","href":"./changes.html"}]},` +
+      `{"label":"Indices","items":[{"label":"Artifacts","href":"./artifacts.html"}]}]</script>`;
+    const files = new Map<string, string>();
+    const opts = { instance: "ig", toRoot: ".", links: [], emitRailData: (f: string, b: string) => void files.set(f, b) };
+    const read = (n: string) => railDataJson(files.get(`assets/navbar/${n}.js`)!);
+    const html = expandRail(injectRailOnce(page(decl), { ...opts, here: "/changes.html" })!, read);
+    const graphs = region(html, "fa-nav-graphs");
+    // Each group is a row with a twisty, and its pages sit inside the fold.
+    const twisties = [...graphs.matchAll(/<button type="button" class="fa-nav-twisty" aria-expanded="(true|false)" aria-controls="([^"]+)"/g)];
+    expect(twisties.map((m) => m[1])).toEqual(["true", "false"]);
+    expect(graphs).toMatch(new RegExp(`<div class="fa-nav-kids" id="${twisties[0]![2]}">[\\s\\S]*?href="./changes.html"[^>]*aria-current="page"`));
+    expect(graphs).toMatch(new RegExp(`<div class="fa-nav-kids" id="${twisties[1]![2]}" hidden>[\\s\\S]*?href="./artifacts.html"`));
+    expect(graphs).toContain('data-fa-fold="2 pages"');
   });
 
   it("injectRailOnce drops the declaration once the rail has read it, and keeps a malformed one (gp2f)", () => {
@@ -1368,10 +1434,11 @@ describe("a fold opens from its parent's row — owner, 2026-10-15: \"what is 26
   it("no row in any rail is a bare count", () => {
     expect(html).not.toMatch(/<span class="fa-nav-label">\d+ (?:pages?|sub-sections?)<\/span>/);
   });
-  it("a rail rendered INTO a page carries the toggle's script; one with no fold does not", () => {
+  it("a rail rendered INTO a page carries its script: the fold toggles and the drag edge", () => {
     const page = "<!doctype html><html><head></head><body><p>x</p></body></html>";
     expect(injectNavbar(page, { instance: "x", pages: { label: "Pages", items, collapsible: true } })!).toContain("<script data-fa-nav-folds>");
-    expect(injectNavbar(page, { instance: "x" })!).not.toContain("data-fa-nav-folds");
+    // With no fold the drag edge still needs it (owner, 2026-11-10, option D).
+    expect(injectNavbar(page, { instance: "x" })!).toContain("wireNavResize");
   });
 });
 

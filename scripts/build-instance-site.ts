@@ -116,6 +116,7 @@ import { scopeArg } from "./lib/site-scope.ts";
 import { instanceRoots, writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
+import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
 import { PREVIEW_PREFIX, PREVIEW_PREFIXES, previewPath } from "./lib/preview-prefix.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
@@ -222,9 +223,9 @@ export function sharedAssetsOf(root: string): string | undefined {
  * The instances whose pages a site writes: its own only, when it lands on
  * another layer. The landing layer lends the site its chrome and theme, not
  * its pages; those, and every other layer's, are linked on the platform's
- * site (owner, 2026-11-10: "smart-base etc should not be in
- * smart-immunizations... only cross referenced", superseding Q-SZ-2 "B",
- * which kept the landing layer's pages).
+ * site (owner, 2026-11-10: the base IG's pages should not be in an IG's
+ * site, only cross referenced; this supersedes Q-SZ-2 "B", which kept the
+ * landing layer's pages).
  */
 export function siteScopeOf(root: string, instance: string): string[] | undefined {
   const file = join(root, "index.config.json");
@@ -472,7 +473,14 @@ export function buildConfig(configYml: string): string {
   return lines.join("\n");
 }
 
-/** The override layered on top: what the declaration and the remote say, never a guess. */
+/**
+ * The override layered on top: what the declaration and the remote say, never a guess.
+ *
+ * And no Sass source maps: jekyll-sass-converter 3 writes a `.css.map` beside
+ * each compiled stylesheet by default (the theme's three colour schemes, about
+ * 0.3 MB on every site) and a `sourceMappingURL` comment naming it. A published
+ * site has no use for either, so neither is written.
+ */
 export function overrideConfig(o: { title: string; description?: string; baseurl: string; url: string }): string {
   const q = (s: string) => JSON.stringify(s);
   return [
@@ -481,6 +489,8 @@ export function overrideConfig(o: { title: string; description?: string; baseurl
     `baseurl: ${q(o.baseurl)}`,
     `url: ${q(o.url)}`,
     "theme: just-the-docs",
+    "sass:",
+    "  sourcemap: never",
     "",
   ].join("\n");
 }
@@ -795,7 +805,7 @@ export function siteStepEnv(v: { instance: string; title: string; baseurl: strin
  */
 /** The ruling a scoped site's parity guard quotes for a directory of another layer's pages. */
 export const SCOPE_RULING =
-  "owner, 2026-11-10: \"smart-base etc should not be in smart-immunizations... only cross referenced\" — another layer's pages are linked on its own site, not copied into a scoped (IG) site";
+  "owner, 2026-11-10: the base IG's pages should not be in an IG's site, only cross referenced — another layer's pages are linked on its own site, not copied into a scoped (IG) site";
 
 /** The routes, current and old, of the pages an unscoped build owes and a scoped one does not. */
 export function notOwedInScope(root: string, scope: readonly string[], staging: boolean): string[] {
@@ -807,13 +817,13 @@ export function notOwedInScope(root: string, scope: readonly string[], staging: 
  * The top-level directories of the published root that this scoped build
  * leaves out BECAUSE they hold only other layers' pages: every file lies under
  * an out-of-scope instance's name (as the directory, or one level down:
- * `docs/who-iris/`, `ar/folio-assistant-core/`) or under a page route the
+ * `docs/<layer>/`, `ar/<layer>/`) or under a page route the
  * scope no longer owes. Anything else stays a shortfall for the guard.
  */
 export function scopeDropped(current: string, candidate: string, scope: readonly string[], instances: readonly string[], notOwed: readonly string[]): DroppedByRuling[] {
   const inScope = new Set(scope);
   const others = new Set(instances.filter((i) => !inScope.has(i)));
-  // An out-of-scope layer's page at its own-site route (`who-iris/catalogue/` served at `catalogue/`)
+  // An out-of-scope layer's page at its own-site route (`<layer>/catalogue/` served at `catalogue/`)
   // is that layer's too: the unscoped build put it at the root for the layer, not for this site.
   const ownSite = notOwed.flatMap((r) => {
     const seg = r.split("/").filter(Boolean);
@@ -1026,8 +1036,9 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
 
   // The root's guard: the built site carries everything the root it replaces carries.
   const keep = [...new Set([...PREVIEW_PREFIXES, PC_PREFIX, "_render-log", ...(o.keep ?? [])])];
+  let publishedTree: string | undefined;
   if (!staging && (o.parity ?? "refuse") !== "off") {
-    const against = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined);
+    const against = (publishedTree = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined));
     if (against === undefined) console.log("parity: no published root to compare with — nothing to lose");
     else {
       const outOfScope = o.scope ? scopeDropped(against, site, o.scope, [...instanceRoots(root).keys()], notOwedInScope(root, o.scope, Boolean(staging))) : [];
@@ -1083,6 +1094,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   for (const p of anchors.problems.slice(0, 20)) console.log(`  · ${p.page}: ${p.reason}`);
 
   o.beforePublish?.(site);
+
+  // The size review (owner, 2026-11-10: "add size review as part of authoring process"):
+  // advisory, printed on every build, its report beside the build and never in the site.
+  reviewSiteSize({ site, out: join(out, SITE_SIZE_FILE), repo: root, self: [o.instance], exclude: keep.map((k) => `${k}/`), ...(publishedTree ? { againstDir: publishedTree } : {}), log: (l) => console.log(l) });
 
   if (o.publish) {
     if (!o.remote) throw new Error("--publish needs --remote <git url>");

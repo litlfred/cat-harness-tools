@@ -228,6 +228,7 @@ const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
   "check:wireframes": TREE_READER,
   "check:workflow-coverage": TREE_READER,
   "check:workflow-injection": TREE_READER,
+  "check:workflow-tools": TREE_READER,
   "check:workflow-paths": TREE_READER,
   "check:workflow-policy": TREE_READER,
   "check:workflow-refs": TREE_READER,

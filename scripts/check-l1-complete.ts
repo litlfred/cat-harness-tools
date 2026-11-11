@@ -81,7 +81,7 @@ import { SUMMARIES_FILE } from "../schemas/content/block-summary.ts";
 import { DocumentErrataSchema, ERRATA_FILE } from "../schemas/content/document-errata.ts";
 import { DocumentFootnotesSchema, FOOTNOTES_FILE } from "../schemas/content/document-footnotes.ts";
 import { KEYWORDS_FILE } from "../schemas/library/library-keywords.ts";
-import { entryDirs, entryItems, sidecarDefects, tally } from "./summaries.ts";
+import { entryDirs, entryItems, sidecarDefects, summaryLangs, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
 import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "../schemas/library/referenced-source.ts";
@@ -929,7 +929,18 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
     if (defects.length) {
       out.push({ name: "block-summaries", state: "unmet", detail: defects.slice(0, 2).join("; ") });
     } else {
-      const t = tally(entryItems(dir));
+      const items = entryItems(dir);
+      const t = tally(items);
+      // Summaries are owed in each configured locale, like image descriptions
+      // (owner, 2026-11-11). Advisory too: the gap is reported, not failed on.
+      const locales = entryLocales(dir);
+      const gaps = new Map<string, number>();
+      for (const it of items) {
+        const langs = summaryLangs(it);
+        if (!langs.length) continue;
+        for (const l of locales) if (!langs.includes(l)) gaps.set(l, (gaps.get(l) ?? 0) + 1);
+      }
+      const owed = gaps.size ? `; missing a configured language: ${[...gaps].map(([l, n]) => `${l} (${n})`).join(", ")}` : "";
       out.push({
         name: "block-summaries",
         state: "met",
@@ -939,7 +950,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
             ? "no prose block with text to summarise"
             : `${t.summarised} of ${t.prose} prose block(s) summarised ` +
               `(${t.draft} draft, ${t.confirmed} confirmed); backlog ${t.backlog} ` +
-              `(${t.stale} stale, ${t.rejected} rejected) — advisory`,
+              `(${t.stale} stale, ${t.rejected} rejected)${owed} — advisory`,
       });
     }
   }

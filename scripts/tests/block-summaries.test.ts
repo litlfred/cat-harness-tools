@@ -31,7 +31,7 @@ import {
   type BlockSummary,
 } from "../../schemas/content/block-summary.ts";
 import { NarrativeSchema } from "../../schemas/content/narrative.ts";
-import { backlog, entryDirs, entryItems, next, record, sidecarDefects, tally } from "../summaries.ts";
+import { backlog, entryDirs, entryItems, langBacklog, next, record, sidecarDefects, summaryLocales, tally } from "../summaries.ts";
 import { decide, queue } from "../narratives.ts";
 import { checkEntry } from "../check-l1-complete.ts";
 import { readEntryBlocks } from "../library-graph.ts";
@@ -281,6 +281,40 @@ describe("the queue leaves out blocks that already have a current summary", () =
     const f = draftFor(root, ["a"]);
     record(f, root);
     expect(() => record(f, root)).toThrow(/already has a current draft/);
+  });
+
+  test("a draft in another language is added beside a current summary, which is kept (e1lo)", () => {
+    const { root, entry } = fixture({ a: "A." });
+    // Built while the block is still in the backlog, which is where draftFor reads its hash.
+    const fr = { ...draftFor(root, ["a"], "Un résumé en français."), lang: "fr" };
+    record(draftFor(root, ["a"], "An English summary."), root);
+    decide(queue(root)[0]!, "confirm", { by: HUMAN, root });
+    record(fr, root);
+    const [rec] = JSON.parse(readFileSync(join(entry, SUMMARIES_FILE), "utf-8")).summaries;
+    expect(rec.narrative.map((n: { lang: string; state: string }) => `${n.lang}:${n.state}`)).toEqual(["en:confirmed", "fr:draft"]);
+    expect(rec.superseded).toBeUndefined();
+    // The same language again is still refused, so nothing is overwritten.
+    expect(() => record(fr, root)).toThrow(/already has a current .* in "fr"/);
+    // The block is not back in the backlog.
+    expect(backlog(root)).toHaveLength(0);
+  });
+
+  test("--lang serves summarised blocks missing that language, with their current summaries (e1lo)", () => {
+    const { root, entry } = fixture({ a: "A.", b: "B.", c: "C." });
+    const fr = { ...draftFor(root, ["a"], "Un résumé."), lang: "fr" };
+    record(draftFor(root, ["a", "b"], "A summary."), root);
+    // c has no summary at all: it is in the summary backlog, not the translation one.
+    expect(langBacklog(root, "fr").map((i) => i.block)).toEqual([id("a"), id("b")]);
+    const [n] = next(root, { n: 1, lang: "fr" });
+    expect(n?.lang).toBe("fr");
+    expect(n?.summaries).toEqual({ en: "A summary." });
+    record(fr, root);
+    expect(langBacklog(root, "fr").map((i) => i.block)).toEqual([id("b")]);
+    expect(langBacklog(root, "en")).toHaveLength(0);
+    // The plain queue is unchanged by translations.
+    expect(backlog(root).map((i) => i.block)).toEqual([id("c")]);
+    // With no translation config, the six UN languages are owed.
+    expect(summaryLocales(entry).sort()).toEqual(["ar", "en", "es", "fr", "ru", "zh"]);
   });
 
   test("an empty section is not prose to summarise, and not backlog", () => {

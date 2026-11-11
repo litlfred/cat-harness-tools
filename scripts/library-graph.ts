@@ -32,6 +32,7 @@
  * No ingestion is triggered and nothing is written; upload, process and
  * materialise-into-a-folio are writes, and live elsewhere.
  */
+import { ENDONYM, languageOfFile, slugOfLocal } from "./lib/library-languages.ts";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 import type { LibraryRef } from "./library-refs.ts";
@@ -751,7 +752,11 @@ function dcXmlSitePath(instanceRoot: string, record: string): string | undefined
   const stem = basename(record).replace(/\.dc\.json$/, "");
   if (root === undefined || stem === basename(record)) return undefined;
   const file = `${stem}.dc.xml`;
-  return existsSync(join(root, "dublin-core", file)) ? `${basename(instanceRoot)}/dublin-core/${file}` : undefined;
+  // The site serves the layer at its DECLARED name, not at whatever the
+  // checkout directory is called (a clone at `who-iris-217/` is still `/who-iris/`).
+  const name = (readDeclaration(instanceRoot) as { name?: unknown } | undefined)?.name;
+  const served = typeof name === "string" && name ? name : basename(instanceRoot);
+  return existsSync(join(root, "dublin-core", file)) ? `${served}/dublin-core/${file}` : undefined;
 }
 const catalogueInfoCache = new Map<string, Map<string, CatalogueEntryInfo>>();
 function catalogueInfo(instanceRoot: string): Map<string, CatalogueEntryInfo> {
@@ -762,15 +767,35 @@ function catalogueInfo(instanceRoot: string): Map<string, CatalogueEntryInfo> {
     const nodes = join(cat, "nodes");
     if (!existsSync(nodes)) continue;
     for (const f of readdirSync(nodes).filter((n) => n.endsWith(".json")).sort()) {
-      const node = readJson<{ libraryId?: unknown; title?: unknown; metadataRef?: unknown; handle?: unknown }>(join(nodes, f));
-      if (typeof node?.libraryId !== "string" || out.has(node.libraryId)) continue;
+      const node = readJson<{
+        libraryId?: unknown; title?: unknown; metadataRef?: unknown; handle?: unknown;
+        bitstreams?: { name?: unknown; bundle?: unknown; materialization?: { provenance?: { local?: unknown } } }[];
+      }>(join(nodes, f));
+      if (typeof node?.libraryId !== "string") continue;
+      const langOf = new Map<string, string>();
+      for (const b of node.bitstreams ?? []) {
+        const sl = slugOfLocal(b.materialization?.provenance?.local);
+        const lg = typeof b.name === "string" ? languageOfFile(b.name) : undefined;
+        if (sl && lg) langOf.set(sl, lg);
+      }
+      // The entry it names, and every entry one of its ORIGINAL bitstreams was
+      // derived into (`provenance.local` = `library/<slug>/structure.json#source`):
+      // the other language editions IRIS keeps on the same item (who-iris#217).
+      const slugs = [node.libraryId, ...(node.bitstreams ?? [])
+        .filter((b) => b.bundle === "ORIGINAL")
+        .map((b) => slugOfLocal(b.materialization?.provenance?.local))
+        .filter((x): x is string => !!x)].filter((x) => !out.has(x));
+      if (slugs.length === 0) continue;
       // `metadataRef` is relative to the layer root (`catalogue/records/<x>.dc.json`).
       const record = typeof node.metadataRef === "string" && node.metadataRef && !node.metadataRef.includes("..")
         ? join(instanceRoot, node.metadataRef)
         : undefined;
       const xml = record && existsSync(record) ? dcXmlSitePath(instanceRoot, record) : undefined;
-      out.set(node.libraryId, {
-        ...(typeof node.title === "string" && node.title.trim() ? { title: node.title.trim() } : {}),
+      for (const slug of new Set(slugs)) out.set(slug, {
+        // Another edition of the item is titled as the item, with its language.
+        ...(typeof node.title === "string" && node.title.trim()
+          ? { title: slug !== node.libraryId && langOf.has(slug) ? `${node.title.trim()} (${ENDONYM[langOf.get(slug)!] ?? langOf.get(slug)})` : node.title.trim() }
+          : {}),
         ...(record && existsSync(record) ? { record } : {}),
         ...(xml ? { xml } : {}),
         node: join(nodes, f),
@@ -1139,13 +1164,16 @@ if (import.meta.main) {
  * NOT part of {@link readLibraryGraph}: the L1 checks, the narrative queue and
  * the MCP roots read that graph as "what was ingested", and an entry with no
  * structure would read to them as a failed ingest. Only the library's pages
- * add these. An id a held entry already uses is skipped.
+ * add these. An id a held entry already uses, in any layer, is skipped, and
+ * an id two layers' catalogues both hold is listed once (first layer by path).
  */
 export function referencedCatalogueEntries(roots: string[], repoRoot: string, taken: ReadonlySet<string>): LibraryEntry[] {
   const libDirs = new Set<string>();
   for (const r of roots) for (const d of corpusDirectoriesForGraph(r, "library")) libDirs.add(d);
   const out: LibraryEntry[] = [];
   const seen = new Set<string>();
+  // `taken` is keyed `<instance>/<id>`; an id held in ANY layer is taken.
+  const takenIds = new Set([...taken].map((k) => k.slice(k.lastIndexOf("/") + 1)));
   for (const libDir of [...libDirs].sort()) {
     if (!existsSync(libDir)) continue;
     const instanceRoot = dirname(libDir);
@@ -1166,9 +1194,11 @@ export function referencedCatalogueEntries(roots: string[], repoRoot: string, ta
         if (!existsSync(record)) continue;
         const id = basename(record).replace(/\.dc\.json$/, "");
         if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) continue;
-        const key = `${instance}/${id}`;
-        if (taken.has(key) || seen.has(key)) continue;
-        seen.add(key);
+        // By id alone: the site publishes one `entries/<id>.json` per id and
+        // the library slice keys on it, and several layers' catalogues hold the
+        // same record (each smart-* layer cites `who-smart-guidelines`).
+        if (takenIds.has(id) || seen.has(id)) continue;
+        seen.add(id);
         const files = (node.bitstreams ?? []).filter(
           (b) => b.bundle === "ORIGINAL" && b.materialization?.state === "referenced" &&
             typeof b.materialization.provenance?.upstream === "string" && /^https:\/\//.test(b.materialization.provenance.upstream as string),

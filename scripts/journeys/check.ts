@@ -116,6 +116,14 @@ export interface RefReport {
    * publish and so absent here. Non-empty, the report is NOT a pass (exit 2).
    */
   couldNotDetermine: RefFinding[];
+  /**
+   * What a workshop's VaxLink overview (`overview/`) will be missing because
+   * its journeys do not declare it: no `presentation.story`, a journey with no
+   * `scene` or `trustLadder`, a step with no `illustration` or `record`, no
+   * device screen. Each one is a part the viewer leaves out silently, so it is
+   * reported (`overview-gap`); it never fails the check.
+   */
+  warnings: RefFinding[];
   /** Set when the checkout's declarations could not be read: the report is NOT a pass. */
   undetermined?: string;
 }
@@ -149,6 +157,7 @@ const ACTOR_ID = /^[a-z0-9][a-z0-9-]*$/;
 export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
   const findings: RefFinding[] = corpus.problems.map((p) => ({ instance: p.instance, file: p.file, at: "(root)", message: `does not parse: ${p.message}` }));
   const couldNotDetermine: RefFinding[] = [];
+  const warnings: RefFinding[] = [];
   let references = 0;
   const archimate = siteLinks(corpus, "journeys", "journeys").archimateView;
   /** An artefact-index key (a FHIR example, a DAK asset): found, missing, or — while an artifact index is built at publish — undetermined. */
@@ -304,6 +313,30 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
     for (const k of new Set(screenExamples(sc))) example(x.instance, x.file, "blocks", k);
   }
 
+  // What each workshop's overview will leave out (skill journey-maps, "The VaxLink overview").
+  for (const w of corpus.workshops) {
+    const warn = (at: string, message: string) => warnings.push({ instance: w.instance, file: w.file, at, message: `overview-gap: ${message}` });
+    const pr = w.workshop.presentation;
+    if (!pr?.story) warn("presentation.story", "no story in one sentence; the overview's hero shows the workshop description instead");
+    const taught = w.workshop.scenarios.flatMap((id) => {
+      const j = journeyById(corpus, w.instance, id);
+      return j ? [j] : [];
+    });
+    const ids = (js: readonly Journey[]) => js.map((j) => j.scenario.id).join(", ");
+    const noScene = taught.filter((j) => !j.scenario.scene?.length);
+    if (noScene.length) warn("scenarios", `no scene (the icon strip under a moment) on ${ids(noScene)}`);
+    const noLadder = taught.filter((j) => j.scenario.trustLadder === undefined);
+    if (noLadder.length) warn("scenarios", `no trustLadder ("Follow the record") on ${ids(noLadder)}`);
+    const steps = taught.flatMap((j) => j.scenario.steps.map((st) => ({ j, st })));
+    const noRecord = steps.filter(({ j, st }) => j.scenario.trustLadder !== undefined && st.record === undefined);
+    if (noRecord.length) warn("scenarios", `no record.state on step(s) ${noRecord.map(({ st }) => st.id).join(", ")}`);
+    const noPicture = steps.filter(({ st }) => st.illustration === undefined);
+    if (noPicture.length) warn("scenarios", `no illustration on step(s) ${noPicture.map(({ st }) => st.id).join(", ")}`);
+    if (pr?.recordOf === undefined && noLadder.length < taught.length) warn("presentation.recordOf", "a trust ladder is declared but not whose record it follows");
+    const shown = new Set(corpus.screens.filter((x) => x.instance === w.instance).flatMap((x) => x.screen.steps.map((st) => st.scenario)));
+    if (!taught.some((j) => shown.has(j.scenario.id)) && pr?.deviceDemo === undefined) warn("scenarios", "no device screen shows any step it teaches (the Device Demo is empty)");
+  }
+
   // A persona's avatar is a file of the actor's layer.
   for (const actors of corpus.actors.values()) {
     for (const a of actors.values()) {
@@ -320,6 +353,7 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
     references,
     findings,
     couldNotDetermine,
+    warnings,
     ...(corpus.undetermined !== undefined ? { undetermined: corpus.undetermined } : {}),
   };
 }

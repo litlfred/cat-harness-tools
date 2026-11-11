@@ -724,16 +724,10 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
   // `qa-sweep.yml`, `qa-sweep-nightly.yml`, `section-title-audit.yml` and the
   // four Lean workflows are now templates `folio_init` writes, so the
   // `qa-staleness` and `qa-section-title-audit.ts` entries went with them.
+  // `pipeline/build.ts`, `check-witnesses`, `render-atlas` and
+  // `latex-overfull-report.ts` went with `publish.yml` and `witness-refresh.yml`
+  // when folio-assistant#3066 (2026-11-10) moved those to qou or dropped them.
   // What remains below still matches a workflow in `.github/workflows/`.
-  {
-    match: "pipeline/build.ts",
-    kind: "no-folio",
-    reason:
-      "runs after `cd content`, so it names a FOLIO's build. `cat-harness/" +
-      "pipeline/build.ts` does exist — a different file sharing the " +
-      "basename — so resolving to it would be a wrong fix that looks right " +
-      "(bean `52dz`, 2026-09-20)",
-  },
   {
     // Since `52dz` the only match is the reusable `folio-staging.yml`, which
     // runs inside a FOLIO's staging job and sweeps that folio's `folio_dir`.
@@ -743,21 +737,6 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
       "runs inside a FOLIO's staging job (`folio-staging.yml`, a reusable " +
       "workflow) over that folio's blocks; the platform carries no folio. " +
       "The standalone qa-sweep workflows are folio_init templates (bean `52dz`)",
-  },
-  {
-    match: "check-witnesses",
-    kind: "no-folio",
-    reason: "witness files are produced from a folio's computations; the platform has none",
-  },
-  {
-    match: "render-atlas",
-    kind: "no-folio",
-    reason: "renders a folio's Lean atlas",
-  },
-  {
-    match: "latex-overfull-report.ts",
-    kind: "no-folio",
-    reason: "reads `main.log` from a folio's LaTeX run",
   },
   // ── Needs something a checkout does not have ────────────────────────
   {
@@ -1508,6 +1487,14 @@ export interface ScriptExemption {
  * whole difference, since the comment silently covered six of nine.
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
+  {
+    script: "check:optin-links",
+    kind: "covered-by",
+    reason:
+      "COMPOSED into `check:declaration-resolution`, which CI runs: its findings are that gate's `optInLinks` field, so a " +
+      "step of its own would report every link twice. Kept as a script to list the links alone (owner, 2026-11-11: a gate " +
+      "fails on links into a switched-off opt-in sub-graph, each fixed by hand)",
+  },
   {
     script: "layers:check",
     kind: "covered-by",

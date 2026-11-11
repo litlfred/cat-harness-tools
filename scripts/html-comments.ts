@@ -18,10 +18,10 @@
  * @module scripts/html-comments
  */
 
-/** Half-open `[start, end)` ranges of every HTML comment in `html`. */
+/** Half-open `[start, end)` ranges of every HTML or Liquid template comment in `html`. */
 export function commentRanges(html: string): Array<[number, number]> {
   const out: Array<[number, number]> = [];
-  for (const m of html.matchAll(/<!--[\s\S]*?-->/g)) {
+  for (const m of html.matchAll(/<!--[\s\S]*?-->|\{%-?\s*comment\s*-?%\}[\s\S]*?\{%-?\s*endcomment\s*-?%\}/g)) {
     out.push([m.index!, m.index! + m[0].length]);
   }
   return out;

@@ -41,6 +41,11 @@ describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => 
     expect(o).toContain('baseurl: "/who-iris"');
   });
 
+  test("the override turns off Sass source maps, so no .css.map is published", () => {
+    const o = Bun.YAML.parse(overrideConfig({ title: "T", baseurl: "/r", url: "https://o.github.io" })) as { sass?: { sourcemap?: string } };
+    expect(o.sass).toEqual({ sourcemap: "never" });
+  });
+
   test("a link resolves relative to its page, a base-rooted one against the base, an outside one is a miss", () => {
     expect(targetOf("../a/b.html#x", "docs/p/index.html", "/r/")).toBe("docs/a/b.html");
     expect(targetOf("/r/catalogue/", "index.html", "/r/")).toBe("catalogue/");

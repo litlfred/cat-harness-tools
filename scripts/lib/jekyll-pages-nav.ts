@@ -263,12 +263,12 @@ export function pagesNav(
           : p.parent === parent.title && (p.grandParent === undefined || p.grandParent === grand?.title) && p !== parent,
       )
       .sort(cmp);
-  const row = (p: JekyllNavPage, grand: JekyllNavPage | undefined, depth: number): NavItem => {
+  const row = (p: JekyllNavPage, grand: JekyllNavPage | undefined, depth: number, parent?: JekyllNavPage): NavItem => {
     // just-the-docs nests three levels; deeper is not navigation.
-    const kids = depth < 2 ? kidsOf(p, grand).map((k) => row(k, p, depth + 1)) : [];
+    const kids = depth < 2 ? kidsOf(p, grand).map((k) => row(k, p, depth + 1, p)) : [];
     const here = o.here !== undefined && o.here === p.url;
     return {
-      label: p.title,
+      label: parent === undefined ? p.title : labelUnder(p.title, parent.title),
       // Indented one step per level, as the theme's nested lists are.
       ...(depth > 0 ? { depth } : {}),
       ...(here ? { current: true } : { href: `${prefix}${p.url}` }),
@@ -334,6 +334,22 @@ export function titlePrefix(label: string): { head: string; rest: string } | und
   const head = m[1]!.trim();
   const rest = m[2]!.trim();
   return head && rest ? { head, rest } : undefined;
+}
+
+/**
+ * A child row's label without what its parent row already says: under
+ * `Bibliography`, the page `Bibliography: smart-immunizations-catalogue` reads
+ * `smart-immunizations-catalogue`; under that, `Bibliography:
+ * smart-immunizations-catalogue/who-handbook` reads `who-handbook` (owner,
+ * 2026-11-10: bibliography entry pages nest under Bibliography). Any other
+ * title is left as it is.
+ */
+export function labelUnder(title: string, parentTitle: string): string {
+  const p = titlePrefix(title);
+  if (!p) return title;
+  const pp = titlePrefix(parentTitle);
+  if (p.head !== parentTitle && p.head !== pp?.head) return title;
+  return pp && p.rest.startsWith(`${pp.rest}/`) ? p.rest.slice(pp.rest.length + 1) : p.rest;
 }
 
 /**

@@ -2,7 +2,9 @@
  * Assets every IG site carries, loaded once from a shared host instead
  * (owner, 2026-11-09, Q-SZ-7 "A"): the LHC-Forms build, the ✍ editor bundle
  * (Crepe) and the harness's landing images, about 15 MB per site, and the
- * NLM Form Builder's bundle, about 10 MB more (owner, 2026-11-10).
+ * NLM Form Builder's bundle, about 10 MB more (owner, 2026-11-10), and the
+ * vendored SQLite and Graphviz WebAssembly builds, about 2.2 MB more (owner,
+ * 2026-11-10, "Low-risk trio").
  *
  * The host is a site on the SAME github.io origin as the IG sites (the
  * owner: "shared assets ... as part of smart-html"), so a frame or a service
@@ -18,12 +20,22 @@
  * References are rewritten where they are addresses, never in prose:
  * a CSS `url(…)`, an HTML `src`/`href`/`data-*` attribute, the rail's
  * `@fa-rail-root@/` prefix, and a percent-encoded `../…/` query value (the
- * Form Builder's worker). The ✍ editor finds its bundle at run time, so it
+ * Form Builder's worker), and, in a script, a quoted `./`/`../` literal
+ * that resolves into the directory from the script's own place (the
+ * `new URL("./vendor/…", import.meta.url)` the SQLite and Graphviz loaders
+ * pass to `import()`). The ✍ editor finds its bundle at run time, so it
  * reads the `fa-shared-asset` meta this pass adds to each page instead.
+ *
+ * Cross-origin: a module a page or a Worker `import()`s, and the `.wasm` it
+ * fetches beside itself, may come from another origin when the host answers
+ * with CORS, which GitHub Pages does (`Access-Control-Allow-Origin: *`). A
+ * Worker's own script may not, so a shared directory never holds a Worker
+ * entry point: the SQLite Worker (`slice-sqlite-worker.js`) stays on the
+ * site and only imports the shared module.
  */
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { join, posix, relative, sep } from "node:path";
 
 /**
  * The parents whose every version directory a site may share: the LHC-Forms
@@ -32,9 +44,22 @@ import { join, relative, sep } from "node:path";
  */
 export const VERSIONED_SHARED: readonly string[] = ["assets/lhc-forms/", "assets/formbuilder-bundle/"];
 
-/** The directories a site may share: fixed ones, and every version under {@link VERSIONED_SHARED}. */
+/**
+ * The fixed directories a site may share: the harness images, the ✍ editor
+ * bundle, and the vendored SQLite (`vendor-sqlite-wasm.ts`) and Graphviz
+ * (`vendor-graphviz-wasm.ts`) WebAssembly builds, which their loaders reach
+ * by a script-relative `import()`.
+ */
+export const FIXED_SHARED: readonly string[] = [
+  "assets/img/harness/",
+  "assets/vendor/crepe/",
+  "assets/js/vendor/sqlite-wasm/",
+  "assets/js/vendor/wasm-graphviz/",
+];
+
+/** The directories a site may share: {@link FIXED_SHARED}, and every version under {@link VERSIONED_SHARED}. */
 export function sharedDirsIn(site: string): string[] {
-  const out = ["assets/img/harness/", "assets/vendor/crepe/"].filter((d) => existsSync(join(site, d)));
+  const out = FIXED_SHARED.filter((d) => existsSync(join(site, d)));
   for (const parent of VERSIONED_SHARED) {
     const abs = join(site, parent);
     if (existsSync(abs)) for (const v of readdirSync(abs).sort()) if (statSync(join(abs, v)).isDirectory()) out.push(`${parent}${v}/`);
@@ -83,8 +108,14 @@ export function sharedUrl(host: string, dir: string, digest: string): string {
 
 const esc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Rewrite the addresses of `dir` in one file's text to `url`. Returns the text and how many changed. */
-export function rewriteRefs(text: string, dir: string, url: string): { text: string; n: number } {
+const SCRIPT = /\.(js|mjs)$/i;
+
+/**
+ * Rewrite the addresses of `dir` in one file's text to `url`. Returns the
+ * text and how many changed. `from`, the file's own path in the site, lets a
+ * script's relative literals be resolved: without it they are left alone.
+ */
+export function rewriteRefs(text: string, dir: string, url: string, from?: string): { text: string; n: number } {
   const d = esc(dir);
   // A path prefix before the directory: nothing, ./ or ../ steps, or a root-absolute path.
   const pre = String.raw`(?:(?:\.{1,2}\/)*|\/[^'"()\s]*?\/)`;
@@ -99,6 +130,15 @@ export function rewriteRefs(text: string, dir: string, url: string): { text: str
   // A query value relative to the file that names it, percent-encoded: `..%2F..%2Flhc-forms%2F44.1.0%2F`.
   const tail = dir.replace(/^assets\//, "");
   t = t.replace(new RegExp(String.raw`(?:\.\.%2F)+${esc(encodeURIComponent(tail))}`, "g"), () => count(encodeURIComponent(url)));
+  // A quoted literal in a script, relative to the script: `"./vendor/sqlite-wasm/index.mjs"` in
+  // `assets/js/slice-sqlite.js`. Only `./` and `../` forms, so a bare path in a comment stays.
+  if (from && SCRIPT.test(from)) {
+    const rel = posix.relative(posix.dirname(from), dir.replace(/\/$/, ""));
+    if (rel && !rel.startsWith("/")) {
+      const lit = rel.startsWith("..") ? `${rel}/` : `./${rel}/`;
+      t = t.replace(new RegExp(String.raw`(['"\x60])${esc(lit)}`, "g"), (_m, q: string) => count(`${q}${url}`));
+    }
+  }
   return { text: t, n };
 }
 
@@ -139,7 +179,7 @@ export async function shareAssets(site: string, host: string, served: (url: stri
     const before = readFileSync(abs, "utf-8");
     let text = before;
     for (const p of plan) {
-      const w = rewriteRefs(text, p.dir, p.url);
+      const w = rewriteRefs(text, p.dir, p.url, f);
       text = w.text;
       refs.set(p.dir, refs.get(p.dir)! + w.n);
     }

@@ -75,10 +75,10 @@ test("the smart-trust entry's own IRI renders it from the published data", async
   expect(ld.status()).toBe(200);
   const asset = (await ld.json()) as { title?: string; "@id"?: string };
   expect(asset.title).toBe("WHO SMART Trust");
-  // The ASSET's IRI is its published file's address — a different resource
+  // The ASSET's IRI is extensionless (…/source/<id>); its JSON-LD is at <IRI>.jsonld — a different resource
   // from this page, which only renders it (owner, 2026-10-02).
   expect(asset["@id"]).toBe(
-    "https://litlfred.github.io/folio-assistant/assets/library/jsonld/smart-base/smart-trust/manifest.jsonld",
+    "https://litlfred.github.io/folio-assistant/assets/library/jsonld/smart-base/source/smart-trust",
   );
   expect(errors).toEqual([]);
 });

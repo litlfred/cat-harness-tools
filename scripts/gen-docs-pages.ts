@@ -54,8 +54,9 @@ import { todoDefaultTheme } from "./todos.js";
 import { graphReadPath } from "./graph-read.ts";
 import { publishedTodoFiles } from "./todo-source.js";
 import { declaredSubgraphNode } from "./kg-export.ts";
-import { TODO_GRAPH_SITE_PATH, serialiseJsonld, todoDocument, todoGraphDocument, todoPageSitePath, todoSitePath } from "./todo-graph.ts";
-import { isTodoPage, todoPageHtml } from "./todo-page.ts";
+import { TODO_GRAPH_SITE_PATH, TODO_SITE_DIR, serialiseJsonld, todoDocument, todoGraphDocument, todoPageSitePath, todoSitePath } from "./todo-graph.ts";
+import { isLegacyTodoPage, isTodoPage, todoPageHtml } from "./todo-page.ts";
+import { KG_RENDER_ASSET, kgRenderScript } from "./thin-page.ts";
 import { beanDefsDir, beanFindings, blockEdges, blockedBy, blocksOf, readBeans } from "./beans.js";
 import { branchKeptHref, branchKeptLocation } from "./branch-kept-href.js";
 import { milestoneRollup } from "./milestone-rollup.js";
@@ -1943,25 +1944,31 @@ function processHierarchy(): Record<string, string[]> {
     // A todo that is gone takes its files with it. Only OUR output is touched:
     // a `.jsonld`/`.json` beside the pages, or a directory whose `index.html`
     // declares itself a todo page. `todos/index.html` (the board page,
-    // `state-visualizer.ts`) is neither and is never considered.
-    const todoDir = join(OUT_DIR, "todos");
-    for (const e of existsSync(todoDir) ? readdirSync(todoDir, { withFileTypes: true }) : []) {
-      const p = join(todoDir, e.name);
-      const ours = e.isDirectory()
-        ? existsSync(join(p, "index.html")) && isTodoPage(readFileSync(join(p, "index.html"), "utf-8"))
-        : /\.(jsonld|json)$/.test(e.name);
-      const target = e.isDirectory() ? join(p, "index.html") : p;
-      if (!ours || wanted.has(target)) continue;
-      if (check) {
-        console.error(`  ✗ ${target} is an orphan — no todo publishes it`);
-        stale++;
-      } else {
-        rmSync(e.isDirectory() ? p : target, { recursive: true });
-        console.log(`  - removed orphaned ${target}`);
+    // `state-visualizer.ts`) is neither and is never considered. The old
+    // per-todo path `todos/<id>` (before issue #1830, now `todo/<id>`) is
+    // swept too, its pages recognised by their old config block.
+    for (const [dir, isPage] of [[TODO_SITE_DIR, isTodoPage], ["todos", isLegacyTodoPage]] as const) {
+      const todoDir = join(OUT_DIR, dir);
+      for (const e of existsSync(todoDir) ? readdirSync(todoDir, { withFileTypes: true }) : []) {
+        const p = join(todoDir, e.name);
+        const ours = e.isDirectory()
+          ? existsSync(join(p, "index.html")) && isPage(readFileSync(join(p, "index.html"), "utf-8"))
+          : /\.(jsonld|json)$/.test(e.name);
+        const target = e.isDirectory() ? join(p, "index.html") : p;
+        if (!ours || wanted.has(target)) continue;
+        if (check) {
+          console.error(`  ✗ ${target} is an orphan — no todo publishes it`);
+          stale++;
+        } else {
+          rmSync(e.isDirectory() ? p : target, { recursive: true });
+          console.log(`  - removed orphaned ${target}`);
+        }
       }
     }
+    // The generic renderer every todo page loads first (issue #1830).
+    if (items.length > 0) emit(join(OUT_DIR, KG_RENDER_ASSET), kgRenderScript(), "data");
     console.log(
-      `  ${check ? "·" : "✓"} todos.jsonld + ${items.length} todo(s) as JSON-LD, each with a page at todos/<id>/`,
+      `  ${check ? "·" : "✓"} todos.jsonld + ${items.length} todo(s) as JSON-LD, each with a page at ${TODO_SITE_DIR}/<id>/`,
     );
   }
 

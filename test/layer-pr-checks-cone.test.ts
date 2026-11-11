@@ -44,6 +44,27 @@ if cmd == "decide-all":
     out, names = sys.argv[2], sys.argv[3:]
     d = spec.get("decisions", {})
     json.dump({"records": spec.get("sha"), "decisions": {n: d.get(n, {"skip": False, "why": "no record", "candidate": False}) for n in names}}, open(out, "w"))
+elif cmd == "keep":
+    path = os.path.join("build", "ci-cone", "records.json")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        rec = json.load(open(path))
+    except (OSError, ValueError):
+        rec = {"version": 2, "recipe": 1, "sha": "new", "checks": {}}
+    for f in sys.argv[2:]:
+        got = json.load(open(f))
+        if got["record"] is None:
+            rec["checks"].pop(got["script"], None)
+        else:
+            rec["checks"][got["script"]] = got["record"]
+    json.dump(rec, open(path, "w"))
+elif cmd == "run" and os.environ.get("CI_CONE_TOUCHED_OUT"):
+    import time
+    script = sys.argv[2]
+    time.sleep(spec.get("sleep", 0))
+    json.dump(spec.get("touched", {}).get(script, {"reads": [], "listed": [], "writes": [], "git": 0}), open(os.environ["CI_CONE_TOUCHED_OUT"], "w"))
+    record = {"sha": "new", "base": "fp", "reads": {"b/x.json": "file 1"}, "git": {}} if script in spec.get("record", []) else None
+    json.dump({"script": script, "sha": "new", "run": "new", "recordedAt": "t", "record": record}, open(os.environ["CI_CONE_RECORD_OUT"], "w"))
 elif cmd == "run":
     script = sys.argv[2]
     path = os.path.join("build", "ci-cone", "records.json")
@@ -62,6 +83,9 @@ interface Spec {
   decideExit?: number;
   record?: string[];
   sha?: string;
+  /** Parallel tracing: what each traced run reports it touched, and how long each run takes (s). */
+  touched?: Record<string, object>;
+  sleep?: number;
 }
 
 /** A root with two layers: `c` (the caller) needs `b`. Each declares three gates, which pass (the root's `cat` script is `true`). */
@@ -281,6 +305,69 @@ describe("run-gates.py GATE_CONE=record", () => {
     const r = runGates(fixture(records), "record", { decisions: { "check:b-one": SKIP("old") } });
     const cone = JSON.parse(readFileSync(join(r.out, "cone-records.json"), "utf-8"));
     expect(cone.checks["check:b-one"].sha).toBe("old");
+  });
+
+  const PARALLEL = { GATE_JOBS: "4", GATE_CONE_PARALLEL: "1" };
+  const CANDIDATE = (why: string) => ({ skip: false, why, candidate: true });
+
+  test.if(strace)("pooled candidates are traced side by side; a record whose reads a neighbour wrote is dropped and the gate runs again alone", () => {
+    const r = runGates(
+      fixture(),
+      "record",
+      {
+        decisions: { "check:b-one": CANDIDATE("x"), "check:b-two": CANDIDATE("x"), "check:c-three": CANDIDATE("x"), "check:c-one": CANDIDATE("x") },
+        record: ["check:b-one", "check:b-two", "check:c-three", "check:c-one"],
+        touched: {
+          "check:b-one": { reads: ["b/x.json"], listed: [], writes: [], git: 0 },
+          "check:b-two": { reads: ["b"], listed: ["b"], writes: [], git: 0 },
+          "check:c-three": { reads: ["c/a"], listed: [], writes: ["b/x.json", "b/new.json"], git: 0 },
+          "check:c-one": { reads: ["b/new.json"], listed: [], writes: [], git: 0 },
+        },
+        sleep: 0.5,
+      },
+      PARALLEL,
+    );
+    expect(r.status).toBe(0);
+    const runs = r.log.filter((l) => l.startsWith("run "));
+    // Three side by side, then b-one (read what c-three wrote) and b-two
+    // (listed the directory c-three wrote into) again alone.
+    expect(runs.sort()).toEqual(["run check:b-one", "run check:b-one", "run check:b-two", "run check:b-two", "run check:c-one", "run check:c-one", "run check:c-three"]);
+    const keep = r.log.filter((l) => l.startsWith("keep "));
+    expect(keep).toHaveLength(1);
+    expect(keep[0]!.split(" ")).toHaveLength(2); // c-three's record only
+    expect(r.stdout).toContain("b:check:b-one runs again alone: c:check:c-three wrote b/x.json, which it read");
+    expect(r.stdout).toContain("b:check:b-two runs again alone: c:check:c-three wrote b/new.json into a directory it listed");
+    // c-one probed b/new.json before it existed; c-three created it beside it.
+    expect(r.stdout).toContain("c:check:c-one runs again alone: c:check:c-three wrote b/new.json, which it read");
+    expect(r.stdout).toContain("check:c-three wrote inside the checkout while judging");
+    const cone = JSON.parse(readFileSync(join(r.out, "cone-records.json"), "utf-8"));
+    expect(Object.keys(cone.checks).sort()).toEqual(["check:b-one", "check:b-two", "check:c-one", "check:c-three"]);
+  });
+
+  test.if(strace)("a neighbour whose writes are not known disturbs every run beside it; runs that did not overlap are kept", () => {
+    const r = runGates(
+      fixture(),
+      "record",
+      {
+        decisions: { "check:b-one": CANDIDATE("x"), "check:b-two": CANDIDATE("x") },
+        record: ["check:b-one", "check:b-two"],
+        touched: { "check:b-two": { undetermined: "not traced — fingerprint undetermined" } },
+        sleep: 0.5,
+      },
+      PARALLEL,
+    );
+    expect(r.stdout).toContain("b:check:b-one runs again alone: b:check:b-two ran beside it and what it wrote is not known");
+    // b-two's own reads met no write, so its record is kept.
+    expect(r.log.filter((l) => l === "run check:b-one")).toHaveLength(2);
+    expect(r.log.filter((l) => l === "run check:b-two")).toHaveLength(1);
+  });
+
+  test.if(strace)("GATE_CONE_PARALLEL=0, or a ci-cone.ts without the touched report, traces one at a time with the shared record file", () => {
+    const r = runGates(fixture(), "record", { decisions: { "check:b-one": CANDIDATE("x"), "check:b-two": CANDIDATE("x") }, record: ["check:b-one"] }, { GATE_JOBS: "4" });
+    expect(r.log.filter((l) => l.startsWith("keep "))).toEqual([]);
+    expect(r.log.filter((l) => l.startsWith("run ")).sort()).toEqual(["run check:b-one", "run check:b-two"]);
+    const cone = JSON.parse(readFileSync(join(r.out, "cone-records.json"), "utf-8"));
+    expect(Object.keys(cone.checks)).toEqual(["check:b-one"]);
   });
 
   test("without strace nothing is traced, and it says so; a match still skips", () => {

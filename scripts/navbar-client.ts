@@ -11,7 +11,7 @@
  * @module cat-harness/scripts/navbar-client
  */
 import { RAIL_PAGE_ID, renderRailRegions, type RailPage } from "./lib/harness-rail.ts";
-import { wireNavFolds } from "./lib/navbar.ts";
+import { wireNavFolds, wireNavResize } from "./lib/navbar.ts";
 
 declare const self: { FaRailData?: Record<string, string> };
 
@@ -25,6 +25,9 @@ function draw(): void {
       ...(JSON.parse(block.textContent || "{}") as Omit<RailPage, "root" | "toRoot">),
       root: block.getAttribute("data-fa-root") ?? ".",
       toRoot: block.getAttribute("data-fa-to-root") ?? ".",
+      // Set by a site that composes this one into a larger site (smart-html-jtd).
+      ...(block.getAttribute("data-fa-home") ? { home: block.getAttribute("data-fa-home")! } : {}),
+      ...(block.getAttribute("data-fa-home-name") ? { homeName: block.getAttribute("data-fa-home-name")! } : {}),
     };
   } catch {
     console.warn("navbar: #fa-rail is not valid JSON; the rail keeps its Home link only.");
@@ -42,3 +45,5 @@ function draw(): void {
 draw();
 // The fold toggles on parent rows (owner, 2026-10-15): one delegated handler.
 wireNavFolds(document);
+// The drag edge (owner, 2026-11-10): after `draw`, which replaces the rail's contents.
+wireNavResize(document);

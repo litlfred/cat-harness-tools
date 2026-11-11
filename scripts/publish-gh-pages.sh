@@ -58,7 +58,20 @@
 # Env: SITE, STATE, COMMIT_SHA, PAGES_DIR (all required; no defaults, because a
 # silent default here publishes the wrong directory to the live site). STATE is
 # restore-staging's record file; `$STATE.keep` is keep-shared-payloads' directory.
+# Each may instead be passed as a flag (`--site`, `--state`, `--commit`,
+# `--pages-dir`), the form the `publish-gh-pages` Tool projects for the CLI
+# (`bun run cat pages:publish`) and MCP. A flag wins over the variable.
 set -euo pipefail
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --site) SITE="$2"; shift 2 ;;
+    --state) STATE="$2"; shift 2 ;;
+    --commit) COMMIT_SHA="$2"; shift 2 ;;
+    --pages-dir) PAGES_DIR="$2"; shift 2 ;;
+    *) echo "::error::publish-gh-pages: unknown argument $1" >&2; exit 2 ;;
+  esac
+done
 
 for v in SITE STATE COMMIT_SHA PAGES_DIR; do
   if [ -z "${!v:-}" ]; then echo "::error::publish-gh-pages: $v is unset" >&2; exit 2; fi

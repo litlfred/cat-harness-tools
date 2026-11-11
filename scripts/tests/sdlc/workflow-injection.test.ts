@@ -452,9 +452,32 @@ describe("`script:` blocks are JavaScript, and the same values land in them (bea
     // in that surface silently disappears and the gate goes green having looked
     // at one of two surfaces. `could not determine` is never rendered as clean,
     // and neither is `did not look`.
-    const found = scanWorkflows();
-    const scripts = found.filter((i) => i.surface === "script");
-    expect(scripts.length).toBeGreaterThan(0);
+    //
+    // This asked for a live `script:` FINDING until folio-assistant#3066
+    // (2026-11-10) dropped `publish.yml`, which held the only one. A clean
+    // corpus is the outcome the gate wants, so the guard cannot depend on a
+    // finding staying unfixed. It holds instead on the corpus's own `script:`
+    // blocks: each is copied with one free-text expression planted on its first
+    // line, and the scanner must report it there, as `script`. A walker that
+    // stops seeing `script:` in a real workflow's shape fails here.
+    const dir = join(import.meta.dir, "..", "..", "..", "..", ".github", "workflows");
+    const planted = mkdtempSync(join(tmpdir(), "injection-corpus-"));
+    let blocks = 0;
+    for (const f of readdirSync(dir).filter((n) => /\.ya?ml$/.test(n))) {
+      const lines = readFileSync(join(dir, f), "utf-8").split("\n");
+      lines.forEach((line, i) => {
+        const stripped = line.trimStart();
+        if (!/^-?\s*script:\s*[|>][-+]?\s*$/.test(stripped)) return;
+        const indent = " ".repeat(line.length - stripped.length + 2);
+        const copy = [...lines];
+        copy.splice(i + 1, 0, `${indent}const planted = "\${{ github.event.comment.body }}";`);
+        const name = `${blocks++}-${f}`;
+        writeFileSync(join(planted, name), copy.join("\n"));
+      });
+    }
+    expect(blocks).toBeGreaterThan(0);
+    const found = scanWorkflows(planted).filter((i) => i.expression === "github.event.comment.body");
+    expect(found.map((i) => i.surface)).toEqual(Array(blocks).fill("script"));
   });
 });
 

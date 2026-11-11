@@ -12,6 +12,8 @@ name: Folio site publish
 # fixes that once. A caller:
 #
 #   on:
+#     push:
+#       branches: [main]
 #     workflow_dispatch:
 #       inputs:
 #         plan: { type: boolean, default: false }
@@ -21,7 +23,9 @@ name: Folio site publish
 #     publish:
 #       uses: litlfred/cat-harness-tools/.github/workflows/folio-site-publish.yml@main
 #       with:
-#         plan: ${{ inputs.plan }}
+#         plan: ${{ inputs.plan == true }}
+#
+# A push to main (a merged PR) publishes on its own (owner, 2026-11-10).
 #
 # On the default branch it publishes the gh-pages root (keeping branches/ and
 # _render-log/); on any other branch, the preview at branches/<branch>/.

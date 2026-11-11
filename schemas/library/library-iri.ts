@@ -7,9 +7,14 @@
  * resource with its own IRI, which points TO the asset and is never named by
  * it.
  *
- * `assets/library/jsonld/<instance>/<id>/manifest.jsonld` mirrors the source
- * layout `<instance>/library/<id>/manifest.jsonld`, so the entry's other nodes
- * (`blocks/`, `sections/`) can later be published under the same directory.
+ * The IRI is `…/assets/library/jsonld/<instance>/source/<id>`: extensionless,
+ * its last two segments the node's kind and id (`source`, from the entry's
+ * class `SourceDocument`; issue #1830, Q-THIN-2 A, Q-THIN-6 B). Beside it:
+ *
+ *   <IRI>.jsonld   the entry's manifest, as committed
+ *   <IRI>.html     a stub that declares the node and points to its rendering
+ *   <IRI>/…        the entry's other published files (`l1-extraction/`, …)
+ *
  * It sits under `assets/library/`, not `/library/<instance>/`, which is each
  * instance's own mount route (`mount-instance-docs.ts`, rule 2). Block ids are
  * not published addresses: they key `summaries.json`, LSI indexes and kg-qa
@@ -35,12 +40,25 @@ export const DOCS_SITE = ownNamespace("docs-site");
 /** Where every entry's JSON-LD is published, site-relative — the publisher's to prune. */
 export const LIBRARY_JSONLD_SITE_DIR = "assets/library/jsonld";
 
-/** The entry's JSON-LD, SITE-relative: where the publisher writes it under the site directory. */
-export function libraryAssetSitePath(instance: string, docId: string): string {
-  return `${LIBRARY_JSONLD_SITE_DIR}/${encodeURIComponent(instance)}/${encodeURIComponent(docId)}/manifest.jsonld`;
+/** The kind segment of an entry's IRI: the entry is a `SourceDocument`. */
+export const LIBRARY_ENTRY_KIND = "source";
+
+/** The entry's IRI path, SITE-relative and extensionless: `<dir>/<instance>/source/<id>`. */
+export function libraryEntrySitePath(instance: string, docId: string): string {
+  return `${LIBRARY_JSONLD_SITE_DIR}/${encodeURIComponent(instance)}/${LIBRARY_ENTRY_KIND}/${encodeURIComponent(docId)}`;
 }
 
-/** The entry's IRI — absolute, dereferenceable, instance-qualified. */
+/** The entry's JSON-LD, SITE-relative: where the publisher writes it under the site directory. */
+export function libraryAssetSitePath(instance: string, docId: string): string {
+  return `${libraryEntrySitePath(instance, docId)}.jsonld`;
+}
+
+/** The stub page at the entry's IRI, SITE-relative: it declares the node and points to its rendering. */
+export function libraryStubSitePath(instance: string, docId: string): string {
+  return `${libraryEntrySitePath(instance, docId)}.html`;
+}
+
+/** The entry's IRI — absolute, dereferenceable, instance-qualified, `…/source/<id>`. */
 export function libraryAssetIri(instance: string, docId: string): string {
-  return `${DOCS_SITE}${libraryAssetSitePath(instance, docId)}`;
+  return `${DOCS_SITE}${libraryEntrySitePath(instance, docId)}`;
 }

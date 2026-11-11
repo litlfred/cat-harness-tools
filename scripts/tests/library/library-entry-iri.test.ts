@@ -26,12 +26,14 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { ADDRESS_JS } from "../../lib/library-address.ts";
+import { pageNodeOf, pageNodeProblems } from "../../thin-page.ts";
+import { libraryAssetIri } from "../../../schemas/library/library-iri.ts";
 import { entryPageHtml, isEntryShellFor, isSubjectShell, libraryConfigOf, VIEWER_JS, viewerHtml } from "../../gen-library-viz.ts";
 import { ReferencedSourceSchema } from "../../../schemas/library/referenced-source.ts";
 import { LibraryIndexSchema } from "../../../schemas/ui/site-indexes.ts";
 import { checkEntry } from "../../check-l1-complete.ts";
 import { readDeclaration, siteDirFor, siteFileFor } from "../../../schemas/kg/cat-harness.ts";
-import { DOCS_SITE, libraryAssetSitePath } from "../../../schemas/library/library-iri.ts";
+import { DOCS_SITE, libraryAssetSitePath, libraryStubSitePath } from "../../../schemas/library/library-iri.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { declaredPageRoute } from "../../viewer-declarations.ts";
 import { siteNotBuilt } from "../../../test/support/checkout.ts";
@@ -122,9 +124,11 @@ describe("a row's TITLE opens the entry's own page (owner, 2026-10-02)", () => {
   ) as (...a: unknown[]) => { COLS: { k: string; f: (e: unknown) => string }[] };
   const { COLS } = run(
     {
-      getElementById: () => ({ textContent: JSON.stringify({ data: "../../../assets/library/index.json", scope: "smart-base", libRoot: "../" }) }),
+      getElementById: () => null,
       addEventListener: () => {},
-      querySelector: () => null,
+      // The page's identity is data-kg-* on its .lib-page element (issue #1830).
+      querySelector: (sel: string) =>
+        sel === ".lib-page" ? { dataset: { kgData: "../../../assets/library/index.json", kgScope: "smart-base", kgLibRoot: "../" } } : null,
     },
     { href: pageUrl, pathname: new URL(pageUrl).pathname, hash: "" },
     () => new Promise(() => {}),
@@ -163,7 +167,7 @@ function alternateOf(html: string): string | undefined {
 describe("the shell template", () => {
   const shell = entryPageHtml("../../../assets/library/index.json", "smart-base", "../../", {
     id: "smart-trust",
-    jsonld: "../../../assets/library/jsonld/smart-base/smart-trust/manifest.jsonld",
+    jsonld: "../../../assets/library/jsonld/smart-base/source/smart-trust.jsonld",
   });
   test("holds identity only — config and alternate — and loads the shared assets", () => {
     expect(libraryConfigOf(shell)).toEqual({
@@ -172,10 +176,24 @@ describe("the shell template", () => {
       libRoot: "../../",
       entry: "smart-trust",
     });
-    expect(alternateOf(shell)).toBe("../../../assets/library/jsonld/smart-base/smart-trust/manifest.jsonld");
+    expect(alternateOf(shell)).toBe("../../../assets/library/jsonld/smart-base/source/smart-trust.jsonld");
     expect(shell).toContain('<script src="../../../assets/library/viewer.js"></script>');
     expect(shell).toContain('<link rel="stylesheet" href="../../../assets/library/viewer.css">');
     expect(shell).not.toContain("<style>");
+  });
+  test("declares its entry in RDFa and a JSON-LD stub, with no private config block (issue #1830)", () => {
+    expect(pageNodeProblems(shell)).toEqual([]);
+    expect(pageNodeOf(shell)!.rdfa[0]!.iri).toBe(libraryAssetIri("smart-base", "smart-trust"));
+    expect(shell).not.toContain('type="application/json"');
+    // A library's own page renders no single entry: it declares none.
+    expect(pageNodeOf(viewerHtml("../../assets/library/index.json", "smart-base"))).toBeUndefined();
+  });
+  test("the entry IRI is extensionless kind/id; its JSON-LD and stub sit beside it (Q-THIN-6 B)", () => {
+    const iri = libraryAssetIri("smart-base", "smart-trust");
+    expect(iri).toBe(`${DOCS_SITE}assets/library/jsonld/smart-base/source/smart-trust`);
+    expect(libraryAssetSitePath("smart-base", "smart-trust")).toBe("assets/library/jsonld/smart-base/source/smart-trust.jsonld");
+    expect(libraryStubSitePath("smart-base", "smart-trust")).toBe("assets/library/jsonld/smart-base/source/smart-trust.html");
+    expect(iri).not.toMatch(/[#?]/);
   });
   test("is a THEMED page (2026-10-07): the layout's band, no rail, no folio mount, both sources named", () => {
     // On the theme's default layout, which carries the top band and loads
@@ -233,11 +251,20 @@ describe("the committed tree: one materialized shell per entry", () => {
     expect(have.sort()).toEqual(want);
   });
   test.skipIf(NOT_BUILT)("each shell's alternate JSON-LD is published", () => {
-    for (const e of index.entries) {
+    for (const e of index.entries.filter((x) => x.hasManifest)) {
       const f = join(LIB, e.instance, e.id, "index.html");
       const alt = alternateOf(readFileSync(f, "utf-8"));
       expect(alt, `${e.instance}/${e.id} names no JSON-LD`).toBeDefined();
       expect(existsSync(resolve(join(LIB, e.instance, e.id), alt!)), `${e.instance}/${e.id}: ${alt}`).toBe(true);
+    }
+  });
+  // An item catalogued by reference holds no manifest, so it publishes no
+  // JSON-LD (#1765): its shell names no `alternate` rather than a missing one,
+  // the case the shell template's own test pins.
+  test.skipIf(NOT_BUILT)("a shell whose entry holds no manifest names no alternate", () => {
+    for (const e of index.entries.filter((x) => !x.hasManifest)) {
+      const f = join(LIB, e.instance, e.id, "index.html");
+      expect(alternateOf(readFileSync(f, "utf-8")), `${e.instance}/${e.id}`).toBeUndefined();
     }
   });
 });
@@ -254,7 +281,7 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
     expect(DOCS_SITE).toBe(`${url}${baseurl}/`);
   });
   test.skipIf(NOT_BUILT)("the rendering points TO the asset: its alternate resolves to the asset's file", () => {
-    for (const e of index.entries) {
+    for (const e of index.entries.filter((x) => x.hasManifest)) {
       const shellDir = join(LIB, e.instance, e.id);
       const alt = alternateOf(readFileSync(join(shellDir, "index.html"), "utf-8"));
       expect(resolve(shellDir, alt!)).toBe(join(SITE, libraryAssetSitePath(e.instance, e.id)));
@@ -273,7 +300,7 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
     }
   });
   test.skipIf(NOT_BUILT)("the asset never references a rendering of itself", () => {
-    for (const e of index.entries) {
+    for (const e of index.entries.filter((x) => x.hasManifest)) {
       const text = readFileSync(join(SITE, libraryAssetSitePath(e.instance, e.id)), "utf-8");
       expect(text, e.id).not.toMatch(/subjectOf|foaf:page|"page"|\/library\/[^"]*\/index\.html|cat-harness\/library\//);
     }

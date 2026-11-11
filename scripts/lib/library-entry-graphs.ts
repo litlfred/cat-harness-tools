@@ -21,7 +21,7 @@
  *
  * Beside the entry's manifest, at its path relative to the entry:
  * `<entry>/l1-extraction/recommendations.l1.json` is published at
- * `assets/library/jsonld/<instance>/<entry>/l1-extraction/recommendations.l1.json`.
+ * `assets/library/jsonld/<instance>/source/<entry>/l1-extraction/recommendations.l1.json`.
  * That is the layout `schemas/library/library-iri.ts` reserved for exactly this — *"the
  * entry's other nodes have an obvious place to be published under the same
  * directory later"* — and it keeps the source layout, so a relative reference
@@ -40,7 +40,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { findInstanceRoot, instanceDirectories, readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "../../schemas/kg/graph-typology-registry.ts";
 import { findDeclarationFile } from "../../schemas/kg/instance-roots.ts";
-import { libraryAssetSitePath } from "../../schemas/library/library-iri.ts";
+import { libraryEntrySitePath } from "../../schemas/library/library-iri.ts";
 import { presentGroupsIn } from "../concern-groups.ts";
 
 /** One file of a sub-graph declared inside a library entry. */
@@ -176,9 +176,9 @@ export function entryGraphFiles(entryDir: string, registry: GraphTypologyRegistr
   return [...byRel.values()].sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
 }
 
-/** Where `rel` (from {@link entryGraphFiles}) is published, SITE-relative: beside the entry's manifest. */
+/** Where `rel` (from {@link entryGraphFiles}) is published, SITE-relative: under the entry's IRI. */
 export function entryGraphSitePath(instance: string, docId: string, rel: string): string {
-  const base = dirname(libraryAssetSitePath(instance, docId));
+  const base = libraryEntrySitePath(instance, docId);
   return `${base}/${rel.split("/").map(encodeURIComponent).join("/")}`;
 }
 

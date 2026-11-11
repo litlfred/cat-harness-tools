@@ -87,6 +87,25 @@ describe("rewriteRefs — addresses change, prose does not", () => {
     expect(r.text).toContain("index=..%2F..%2Fterminology");
   });
 
+  test("a script's relative module literal, resolved from the script (the SQLite and Graphviz loaders)", () => {
+    const S = "https://o.github.io/hub/shared/assets/js/vendor/sqlite-wasm/k/";
+    const src = [
+      `const SQLITE_URL = new URL("./vendor/sqlite-wasm/index.mjs", import.meta.url).href;`,
+      ` * vendored under assets/js/vendor/sqlite-wasm/, never fetched from a third party`,
+      `const W = new URL("./slice-sqlite-worker.js", import.meta.url);`,
+    ].join("\n");
+    const r = rewriteRefs(src, "assets/js/vendor/sqlite-wasm/", S, "assets/js/slice-sqlite.js");
+    expect(r.n).toBe(1);
+    expect(r.text).toContain(`new URL("${S}index.mjs", import.meta.url)`);
+    // The comment's path and the Worker, which must stay same-origin, are left alone.
+    expect(r.text).toContain(" * vendored under assets/js/vendor/sqlite-wasm/");
+    expect(r.text).toContain(`"./slice-sqlite-worker.js"`);
+    // From a deeper script the literal climbs; without `from`, or in a page, it is not resolved.
+    expect(rewriteRefs(`import('../js/vendor/sqlite-wasm/index.mjs')`, "assets/js/vendor/sqlite-wasm/", S, "assets/x/a.mjs").text).toBe(`import('${S}index.mjs')`);
+    expect(rewriteRefs(src, "assets/js/vendor/sqlite-wasm/", S).n).toBe(0);
+    expect(rewriteRefs(`"./vendor/sqlite-wasm/index.mjs"`, "assets/js/vendor/sqlite-wasm/", S, "assets/js/a.html").n).toBe(0);
+  });
+
   test("a page names each shared directory in a meta", () => {
     expect(withMeta("<html><head><title>t</title>", [{ dir: "assets/vendor/crepe/", url: "https://h/c/" }])).toBe(
       `<html><head><meta name="fa-shared-asset" data-dir="assets/vendor/crepe/" content="https://h/c/"><title>t</title>`,
@@ -112,6 +131,30 @@ describe("shareAssets — the site points at the host and drops its copies", () 
     expect(page).toContain(`data-lhc="assets/lhc-forms/44.1.0/"`);
     // Only a directory a script finds at run time is named in a meta.
     expect(page).not.toContain("fa-shared-asset");
+    rmSync(d, { recursive: true });
+  });
+
+  test("the vendored SQLite and Graphviz builds are shared; the SQLite Worker stays on the site", async () => {
+    const d = site({
+      "assets/js/slice-sqlite.js": `const SQLITE_URL = new URL("./vendor/sqlite-wasm/index.mjs", import.meta.url).href;\nnew Worker(new URL("./slice-sqlite-worker.js", import.meta.url), { type: "module" });`,
+      "assets/js/slice-sqlite-worker.js": `import { openInScope } from "./slice-sqlite.js";`,
+      "assets/js/kg-graph.js": `const GRAPHVIZ = new URL("./vendor/wasm-graphviz/index.js", import.meta.url).href;`,
+      "assets/js/vendor/sqlite-wasm/index.mjs": `new URL("sqlite3.wasm", import.meta.url)`,
+      "assets/js/vendor/sqlite-wasm/sqlite3.wasm": "w",
+      "assets/js/vendor/wasm-graphviz/index.js": "g",
+    });
+    expect(sharedDirsIn(d)).toEqual(["assets/js/vendor/sqlite-wasm/", "assets/js/vendor/wasm-graphviz/"]);
+    const sq = sharedUrl(HOST, "assets/js/vendor/sqlite-wasm/", dirKey(join(d, "assets/js/vendor/sqlite-wasm")));
+    const gv = sharedUrl(HOST, "assets/js/vendor/wasm-graphviz/", dirKey(join(d, "assets/js/vendor/wasm-graphviz")));
+    const r = await shareAssets(d, HOST, async () => true);
+    expect(r.shared.map((s) => [s.dir, s.refs])).toEqual([["assets/js/vendor/sqlite-wasm/", 1], ["assets/js/vendor/wasm-graphviz/", 1]]);
+    expect(existsSync(join(d, "assets/js/vendor/sqlite-wasm"))).toBe(false);
+    expect(existsSync(join(d, "assets/js/vendor/wasm-graphviz"))).toBe(false);
+    const loader = readFileSync(join(d, "assets/js/slice-sqlite.js"), "utf-8");
+    expect(loader).toContain(`new URL("${sq}index.mjs", import.meta.url)`);
+    expect(loader).toContain(`new URL("./slice-sqlite-worker.js", import.meta.url)`);
+    expect(existsSync(join(d, "assets/js/slice-sqlite-worker.js"))).toBe(true);
+    expect(readFileSync(join(d, "assets/js/kg-graph.js"), "utf-8")).toContain(`new URL("${gv}index.js", import.meta.url)`);
     rmSync(d, { recursive: true });
   });
 
