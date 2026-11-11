@@ -75,7 +75,7 @@ jobs:
   # What this run does besides the publish, read from the repository at the
   # pushed commit: whether it also publishes QA, and what it waits for.
   decide:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -129,7 +129,7 @@ jobs:
 
   publish:
     needs: decide
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Wait for this commit's runs the site is built from
         # `site.publishAfter` (index.config.json): an IG's ig-ast-refresh.yml
@@ -218,6 +218,19 @@ jobs:
             pandoc --version | head -1; soffice --version; pdfinfo -v 2>&1 | head -1; fc-match Cambria; fc-match Calibri
           else
             echo "no document-export step: nothing to install"
+          fi
+
+      - name: Install the browser render:bpmn draws with
+        # stage-local's render:bpmn step draws BPMN with bpmn-js in Chromium,
+        # and this job installed none (smart-trust run 43028650284: the
+        # chromium headless shell is missing). The index's own Playwright
+        # installs it, so the build matches the one it expects.
+        timeout-minutes: 10
+        run: |
+          if [ -x node_modules/.bin/playwright ]; then
+            node_modules/.bin/playwright install --with-deps chromium
+          else
+            echo "no playwright in the index: no browser installed"
           fi
 
       - name: Identify the publishing commit's author, and let it push

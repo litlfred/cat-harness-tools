@@ -386,7 +386,7 @@ jobs:
     # Nor on a no-op `labeled` event (any label but `release`).
     needs: [ready-reuse]
     if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && github.event_name != 'push' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       SIDE: head
@@ -1322,7 +1322,7 @@ jobs:
   ready-reuse:
     name: Already judged? (marked ready for review)
     if: github.event_name == 'pull_request' && github.event.action == 'ready_for_review'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
       reuse: ${{ steps.decide.outputs.reuse }}
@@ -1379,7 +1379,7 @@ jobs:
     # nor on a no-op `labeled` event (any label but `release`).
     needs: [ready-reuse]
     if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       SIDE: base
@@ -1714,7 +1714,7 @@ jobs:
     if: >-
       !cancelled() && inputs.writer-skip && inputs.writer-record-on-runners && inputs.mode == 'layer' && github.event_name == 'push' &&
       needs.prepare-base.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
       SIDE: base
@@ -1790,7 +1790,7 @@ jobs:
       !cancelled() && needs.prepare-base.result == 'success' && (
         (github.event_name == 'push' && needs.prepare-base.outputs.prepared == 'true') ||
         (github.event_name != 'push' && needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip != 'true' && needs.prepare-head.outputs.quick != 'true'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 150
     strategy:
       fail-fast: false
@@ -2030,7 +2030,7 @@ jobs:
     # A no-op `labeled` run (any label but `release`) judged nothing, so it
     # reports no verdict.
     if: ${{ !cancelled() && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       main-verdict: ${{ steps.main-verdict.outputs.verdict }}
       main-failures: ${{ steps.main-verdict.outputs.failures }}
@@ -2383,7 +2383,7 @@ jobs:
   layers-ref:
     name: Layers cache ref for a re-pinned lock
     if: inputs.mode == 'index' && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -2442,7 +2442,7 @@ jobs:
   lock-coherence:
     name: Lock pins agree with each other and are at main
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
