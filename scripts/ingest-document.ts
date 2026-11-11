@@ -520,7 +520,11 @@ export function bibSlug(file: string): string {
     "print(m.derive_doc_id_from_pdf(sys.argv[1]))\n";
   // input-site: spawned #ae0c4e79 — python3 on a document this tool was handed; the cone audits the child from its read set
   const r = Bun.spawnSync(["python3", "-c", py, file]);
-  const out = new TextDecoder().decode(r.stdout).trim();
+  // The answer is the LAST line: MuPDF writes its own warnings to stdout
+  // ("MuPDF error: format error: cmsOpenProfileFromMem failed", a broken
+  // colour profile in 10665/67211 and 67212), and the whole stream once became
+  // the slug, so the entry was staged under a directory named after the error.
+  const out = new TextDecoder().decode(r.stdout).trim().split("\n").at(-1)?.trim() ?? "";
   if (r.exitCode !== 0 || !out) {
     throw new Error(
       `cannot determine the doc id for ${file}: scripts/_pdf_doc_id.py did not answer. ` +

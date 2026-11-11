@@ -163,6 +163,15 @@ def main() -> int:
     check("a French page may add Arabic but not English", "fra+eng" not in o.second_script_candidates("fra", have)
           and "fra+ara" in o.second_script_candidates("fra", have))
 
+    calls = []
+    real = o._ocr_with_confidence
+    o._ocr_with_confidence = lambda png, lang, timeout=0: (calls.append(lang), ("", -1.0))[1]
+    check("a page that outran the time limit is not read again in other scripts",
+          o.read_page("p.png", "fra", have) == ("", "fra") and calls == ["fra"])
+    o._ocr_with_confidence = real
+    check("Tesseract runs single-threaded unless told otherwise",
+          o._tesseract_env().get("OMP_THREAD_LIMIT") == os.environ.get("OMP_THREAD_LIMIT", "1"))
+
     f = load("pdf-footnotes.py")
     span = lambda t, size, flags=0, y1=100.0: {"text": t, "size": size, "flags": flags, "bbox": [0, y1 - size, 10, y1]}
     note = {"spans": [span("3", 6, 1), span(" Resolution WHA58.28 (2005): www.who.int", 8)], "size": 8, "y0": 700, "y1": 710,
