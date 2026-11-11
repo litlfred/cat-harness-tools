@@ -220,6 +220,31 @@ export const WorkshopPresentationSchema = z
      * the layer's `cat-archimate.config.json` and a view id in it.
      */
     views: z.array(z.object({ model: Text, view: Text, label: Text.optional() }).strict()).optional(),
+    /**
+     * How it works opens with the architecture panel (JV-13): the countries
+     * side by side, one row per layer of a reference architecture, each box a
+     * system part, all read from the ArchiMate model `model` of the layer's
+     * `cat-archimate.config.json`. Element refs are the model's ids.
+     * `root` is the grouping whose child groupings are the rows; each of
+     * `countries` a grouping that aggregates a country's systems; `shared` the
+     * grouping drawn as the foundation band under both. A part's row and box
+     * label come from the reference block its country's instance specializes;
+     * its moments from the steps realised by the BPMN of the processes its
+     * system serves.
+     */
+    architecture: z
+      .object({
+        model: Text,
+        root: Text,
+        countries: z.array(z.object({ group: Text, label: Text.optional(), code: Text.optional() }).strict()).min(1),
+        shared: Text.optional(),
+        title: Text.optional(),
+        intro: Text.optional(),
+        /** Sentences under the foundation band (how trust crosses the border). */
+        notes: z.array(Text).optional(),
+      })
+      .strict()
+      .optional(),
     /** The line the Discussion view opens with ("The technology works. What do countries need to agree on to make it real?"). */
     closingQuestion: Text.optional(),
     /**

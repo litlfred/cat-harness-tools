@@ -30,7 +30,7 @@ import type { BuildingBlock } from "../../schemas/process/user-scenario.ts";
 import { escHtml } from "../thin-page.ts";
 import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
-import { moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
+import { moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_LABEL, renderDevice, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
 import {
@@ -399,7 +399,7 @@ function howPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, selec
   const chip = (id: string) => {
     const b = cat?.blocks.get(id);
     if (!b) return `<span class="jp-bchip jp-unresolved" title="not in the catalogue">${e(id)}</span>`;
-    return `<a class="jp-bchip jp-layer-${toneOf(b.layer)}${selected === id ? " is-on" : ""}" href="${e(`${toHow}${id}/`)}">${e(b.short ?? b.name)}</a>`;
+    return `<a class="jp-bchip jp-layer-${toneOf(b.layer)}${selected === id ? " is-on" : ""}" href="${e(`${toHow}${id}/#jp-blocks`)}">${e(b.short ?? b.name)}</a>`;
   };
   const ideas = cat?.ideas ?? [];
   const ideasHtml = ideas.length
@@ -422,7 +422,7 @@ ${layers
       .map((b) => {
         const on = selected === b.id;
         const dim = selected !== undefined && !on;
-        return `<a class="jp-mx-block${on ? " is-on" : ""}${dim ? " is-dim" : ""} jp-layer-${tone}" href="${e(`${toHow}${b.id}/`)}"${on ? ' aria-current="true"' : ""}><i class="jp-dot jp-layer-${tone}"></i>${e(b.short ?? b.name)}</a>${steps
+        return `<a class="jp-mx-block${on ? " is-on" : ""}${dim ? " is-dim" : ""} jp-layer-${tone}" href="${e(`${toHow}${b.id}/#jp-blocks`)}"${on ? ' aria-current="true"' : ""}><i class="jp-dot jp-layer-${tone}"></i>${e(b.short ?? b.name)}</a>${steps
           .map((s) => {
             const u = (s.step.uses ?? []).find((x) => x.block === b.id);
             return `<div class="jp-mx-cell${on ? " is-on" : ""}${dim ? " is-dim" : ""} jp-layer-${tone}">${u ? `<a class="jp-dot jp-dot-lg jp-layer-${tone}" href="${e(walkHref(a, s))}" title="${e(`${s.step.id}: ${u.role}`)}" aria-label="${e(`${s.step.id}: ${u.role}`)}"></a>` : ""}</div>`;
@@ -479,13 +479,68 @@ ${views
         })
         .join("")}</ul></section>`
     : "";
+  const archHtml = pr.architecture ? architectureHtml(p, a, pr.architecture, links.archimateArchitecture?.(p.w.instance, pr.architecture)) : "";
   const igLinks = (pr.links ?? []).filter((l) => l.frame).map((l) => ext(fromSite(l.href, a.siteRoot), l.label)).join(" · ");
   const body = `<section class="jp-vhead"><h2>How it works: from journey to architecture</h2><p>Every moment in the journey depends on a few standards and open tools. Pick a big idea or a building block to see which moments it makes possible, or a moment to present it with its technical layer.${igLinks ? ` Specified in ${igLinks}.` : ""}</p></section>
-${ideasHtml}
-<div class="jp-howgrid">${matrix}${detail}</div>
+${archHtml}
 ${viewsHtml}
+${ideasHtml}
+<div class="jp-howgrid" id="jp-blocks">${matrix}${detail}</div>
 ${procHtml}`;
   return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "how", title: `${b ? `${b.name} — ` : ""}How it works — ${presentationName(p)}`, ...note(p, "how"), body, foot: b ? drawerOf(corpus, p, a, blockUsage(p, b.id).map((x) => x.s), b.short ?? b.name, `where ${b.short ?? b.name} is used`) : drawerOf(corpus, p, a, steps, "How it works") });
+}
+
+// ── the architecture panel (JV-13) ───────────────────────────────────────
+
+type ArchitectureSpec = NonNullable<NonNullable<Presentation["w"]["workshop"]["presentation"]>["architecture"]>;
+
+/**
+ * The countries side by side on the rows of the reference architecture, each
+ * box a system part linked to its element page (and its IG page when it has
+ * one), tagged with the moments whose processes its system serves; the shared
+ * grouping as the foundation band beneath. All of it from the ArchiMate graph.
+ */
+function architectureHtml(p: Presentation, a: At, spec: ArchitectureSpec, panel: ArchitecturePanel | undefined): string {
+  const title = spec.title ?? "Architecture: the countries on one trust foundation";
+  if (!panel) return `<section class="jp-card jp-pad jp-arch"><h3 class="jp-h2">${e(title)}</h3><p class="jp-small jp-unresolved">The ArchiMate model <code>${e(spec.model)}</code> or a grouping the workshop names in <code>presentation.architecture</code> is not in this layer's ArchiMate graph.</p></section>`;
+  const n = panel.countries.length;
+  const el = (x: ArchimateElementLink, label = x.name) => ext(a.siteRoot + x.page, label, "", DAK_ATTR);
+  const moments = (bpmn: readonly string[]) => p.steps.filter((s) => (s.step.realisedBy ?? []).some((r) => bpmn.includes(r.process)));
+  const heads = panel.countries
+    .map((c, i) => {
+      const spc = spec.countries[i]!;
+      const code = spc.code ?? c.name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase();
+      return `<div class="jp-arch-c"><span class="jp-arch-code">${e(code)}</span><b>${el(c, spc.label ?? c.name)}</b></div>`;
+    })
+    .join("");
+  const rows = panel.rows
+    .map((r) => {
+      const label = `<div class="jp-arch-l">${el(r.layer)}</div>`;
+      if (r.cells.every((c) => c.length === 0)) {
+        return `${label}<div class="jp-arch-std" style="grid-column:span ${n}">${r.blocks.length ? r.blocks.map((b) => el(b)).join("") : `<i>Not needed in this journey</i>`}</div>`;
+      }
+      return `${label}${r.cells
+        .map(
+          (cell) =>
+            `<div class="jp-arch-cell">${
+              cell.length
+                ? cell
+                    .map((b) => {
+                      const ms = moments(b.bpmn);
+                      return `<div class="jp-arch-box"><small>${el(b.block)}</small><b>${el(b)}</b>${b.ig ? ext(b.ig, "IG page", "jp-arch-ig") : ""}${ms.length ? `<span class="jp-arch-ms">${ms.map((s) => stepChip(a, s, s.step.id)).join("")}</span>` : ""}</div>`;
+                    })
+                    .join("")
+                : `<i>Not needed in this journey</i>`
+            }</div>`,
+        )
+        .join("")}`;
+    })
+    .join("");
+  const found = panel.shared
+    ? `<div class="jp-arch-found"><div class="jp-arch-found-h">${glyph("shield-check")} <b>Foundation:</b> ${panel.shared.members.map((m) => el(m)).join(", ") || el(panel.shared.group)}</div>${spec.notes?.length ? `<ul>${spec.notes.map((x) => `<li>${e(x)}</li>`).join("")}</ul>` : ""}</div>`
+    : "";
+  return `<section class="jp-card jp-pad jp-arch"><h3 class="jp-h2">${e(title)}</h3>${spec.intro ? `<p class="jp-small">${e(spec.intro)}</p>` : ""}
+<div class="jp-arch-scroll"><div class="jp-arch-grid" style="--n:${n}"><div></div>${heads}${rows}</div></div>${found}</section>`;
 }
 
 // ── the discussion ───────────────────────────────────────────────────────

@@ -473,6 +473,8 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-mfilter label { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
 .jp-map-scroll { overflow-x: auto; }
 .jp-mapgrid { display: grid; grid-template-columns: 160px repeat(var(--n), minmax(170px, 1fr)); min-width: calc(160px + var(--n) * 170px); font-size: 12px; }
+/* Desktop: narrow fixed-minimum moment columns so eight moments fit at 1400px (JV-11); scroll only below. */
+@media (min-width: 1280px) { .jp-mapgrid { grid-template-columns: 132px repeat(var(--n), minmax(136px, 1fr)); min-width: calc(132px + var(--n) * 136px); } }
 .jp-mr { display: contents; }
 .jp-ml { position: sticky; left: 0; z-index: 2; background: #fff; border-right: 1px solid var(--s200); border-bottom: 1px solid var(--s100); padding: 10px; display: flex; align-items: flex-start; gap: 8px; }
 .jp-ml b { display: block; font-size: 12px; color: var(--s900); }
@@ -491,11 +493,17 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-mc p { line-height: 1.4; color: var(--s700); }
 .jp-mc small { display: block; font-size: 10px; color: var(--s500); margin-top: 4px; }
 .jp-mc.is-sel { background: rgb(240 249 255 / .7); }
-.jp-mchap { background: var(--s900); color: #fff; padding: 8px 10px; display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--s700); min-width: 0; }
-.jp-mchap b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.jp-mchap { background: var(--s900); color: #fff; padding: 8px 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; border-left: 1px solid var(--s700); min-width: 0; }
+/* The chapter's name wraps under its scene rather than being cut, however few moments it spans. */
+.jp-mchap b { font-size: 14px; line-height: 1.25; min-width: 0; }
 .jp-mchap small { font-size: 10px; color: var(--s400); white-space: nowrap; }
 .jp-mchap-n { font: 700 12px var(--sans); color: var(--s300); }
 .jp-mchap .jp-scene { margin: 0; padding: 4px 8px; background: #fff; flex-shrink: 0; }
+/* Compact enough that a one-moment chapter's scene fits its column. */
+.jp-mchap .jp-scene { gap: 3px; padding: 4px 6px; }
+.jp-mchap .jp-scene-i { padding: 3px; }
+.jp-mchap .jp-scene-i .jp-i { width: 16px; height: 16px; }
+.jp-mchap .jp-scene .jp-scene-arrow { width: 10px; height: 10px; }
 .jp-mmoment { display: flex; flex-direction: column; gap: 2px; }
 .jp-mmoment b { font-size: 12px; line-height: 1.3; color: var(--s900); }
 .jp-mmoment small { margin: 0; }
@@ -925,3 +933,26 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-amels { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .jp-amels small { color: var(--s500); }
 .jp-json-open { color: var(--sky300); text-decoration: underline; }
+
+/* ── How it works: the architecture panel (JV-13) ───────────────────── */
+.jp-arch-scroll { overflow-x: auto; margin-top: 12px; }
+.jp-arch-grid { display: grid; grid-template-columns: 150px repeat(var(--n), minmax(260px, 1fr)); gap: 8px; min-width: calc(150px + var(--n) * 260px); font-size: 12px; }
+.jp-arch-c { display: flex; align-items: center; gap: 8px; padding: 4px 8px; }
+.jp-arch-c b { font-size: 14px; color: var(--s900); }
+.jp-arch-c b a { color: inherit; }
+.jp-arch-code { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #fef3c7; color: #92400e; font: 700 10px var(--sans); }
+.jp-arch-l { border: 1px solid #a5f3fc; background: #ecfeff; border-radius: 6px; padding: 8px 10px; font-weight: 600; color: var(--s800, #1e293b); }
+.jp-arch-l a { color: inherit; }
+.jp-arch-cell { border: 1px dashed #67e8f9; background: rgb(236 254 255 / .6); border-radius: 6px; padding: 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.jp-arch-cell > i, .jp-arch-std > i { grid-column: 1 / -1; color: var(--s400); font-size: 11px; }
+.jp-arch-box { background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jp-arch-box small a { font: 10px var(--mono); text-transform: uppercase; letter-spacing: .03em; color: var(--s500); }
+.jp-arch-box b { font-size: 13px; line-height: 1.3; }
+.jp-arch-ig { font-size: 10px; }
+.jp-arch-ms { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.jp-arch-std { border: 1px solid var(--s200); border-radius: 6px; padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+.jp-arch-found { margin-top: 12px; border: 2px solid #fcd34d; background: #fffbeb; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--s700); }
+.jp-arch-found-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; color: var(--s900); }
+.jp-arch-found-h > .jp-i { width: 20px; height: 20px; color: #d97706; }
+.jp-arch-found ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; }
+@media (min-width: 1024px) { .jp-arch-found ul { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-left: 0; list-style: none; } }
