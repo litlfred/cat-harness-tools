@@ -51,7 +51,8 @@ import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
 import { blobUrl, elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
 import { ADDRESS_JS } from "./lib/library-address.ts";
-import { LIBRARY_JSONLD_SITE_DIR, libraryAssetSitePath } from "../schemas/library/library-iri.ts";
+import { LIBRARY_JSONLD_SITE_DIR, libraryAssetIri, libraryAssetSitePath } from "../schemas/library/library-iri.ts";
+import { termCurie, termIri } from "../schemas/kg/namespaces.ts";
 import { entryGraphFiles, entryGraphSitePath, type EntryGraphFile } from "./lib/library-entry-graphs.ts";
 import { subgraphOutDir } from "./gen-subgraph-jsonld.ts";
 import { SUBGRAPH_INDEX_FILE } from "../schemas/kg/subgraph-manifest.ts";
@@ -65,7 +66,7 @@ import { tileCounts } from "../schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
-import { escHtml, thinPageConfigOf } from "./thin-page.ts";
+import { escHtml, themedNodeDeclaration, type PageNode } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "../schemas/kg/harness-config.js";
 import { gateOwnsFile } from "./lib/gate-own.ts";
@@ -382,12 +383,16 @@ export const VIEWER_JS = `"use strict";
 var G = null, SORT = { key: "id", dir: 1 }, VIEW = "list";
 /* THE PAGE'S IDENTITY, and the only thing a page carries -- owner,
    2026-10-02 (#1881): every page is a thin shell that loads its content from
-   the published assets. A JSON data block rather than script, so a shell
+   the published assets. Attributes on the page's own element rather than script, so a shell
    holds no code of its own. DATA_HREF is made ABSOLUTE here, once, before
    anything can rewrite the address bar (see honourAddress). */
 var CONFIG = (function(){
-  var el = document.getElementById("fa-library-config");
-  try { return JSON.parse(el ? el.textContent : "{}") || {}; } catch (_e) { return {}; }
+  /* data-kg-* on the page's .lib-page element (issue #1830) -- no private block. */
+  var el = document.querySelector(".lib-page");
+  var d = el ? el.dataset : {};
+  var c = { data: d.kgData || "", scope: d.kgScope || "", libRoot: d.kgLibRoot };
+  if (d.kgEntry !== undefined) c.entry = d.kgEntry;
+  return c;
 })();
 var DATA_HREF = new URL(String(CONFIG.data || ""), location.href).href;
 /* ARRIVING AT #lib-view OPENS THE VIEW PANEL -- the folio glass's eye links
@@ -1243,8 +1248,17 @@ export function catalogueRecordLinks(o: {
   return out;
 }
 
-/** The config block's id — how a library page names itself, and how this generator recognises its own output. */
-export const LIBRARY_CONFIG_ID = "fa-library-config";
+/**
+ * The element every library page's viewer reads its identity from — the
+ * `data-kg-*` attributes on `<div class="lib-page">` (issue #1830: no private
+ * config block). An entry's page also declares its node there, in RDFa, with
+ * a JSON-LD stub beside it.
+ */
+const LIBRARY_MOUNT = "lib-page";
+
+/** An entry's class: the library's `SourceDocument`, as its manifest types it (`gen-library-jsonld.ts`). */
+const ENTRY_TYPE = termCurie("SourceDocument");
+const ENTRY_PREFIXES = { [ENTRY_TYPE.split(":")[0]!]: termIri("SourceDocument").slice(0, -"SourceDocument".length) };
 
 /**
  * The skeleton {@link VIEWER_JS} fills — this head, then the view panel when
@@ -1286,8 +1300,10 @@ interface LibraryPage {
   title: string;
   /** The projection's href, relative to the page. The shared assets sit beside it. */
   dataHref: string;
-  /** The page's identity, read by {@link VIEWER_JS}. Never an entry's content. */
-  config: Record<string, unknown>;
+  /** The page's identity, read by {@link VIEWER_JS} from `data-kg-*`. Never an entry's content. */
+  config: { data: string; scope: string; libRoot: string; entry?: string };
+  /** The entry this page renders, declared in RDFa and a JSON-LD stub. Absent on a library's own page. */
+  node?: PageNode;
   /** The `<noscript>` content, as HTML; the caller escapes what it interpolates. */
   noscript: string;
   /** The entry's published JSON-LD, relative to the page — its `alternate`. */
@@ -1327,7 +1343,11 @@ interface LibraryPage {
  */
 function libraryPageHtml(p: LibraryPage): string {
   const assets = assetsOf(p.dataHref);
-  const config = JSON.stringify(p.config).replace(/</g, "\\u003c");
+  const attrs = Object.entries({ data: p.config.data, scope: p.config.scope, "lib-root": p.config.libRoot, entry: p.config.entry })
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => ` data-kg-${k}="${escHtml(v!)}"`)
+    .join("");
+  const decl = p.node ? themedNodeDeclaration(p.node, ENTRY_PREFIXES) : undefined;
   return themedPage({
     title: p.title,
     generator: "cat-harness-tools/scripts/gen-library-viz.ts",
@@ -1337,13 +1357,12 @@ function libraryPageHtml(p: LibraryPage): string {
       alternate_jsonld: p.alternate,
     },
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
-<div class="lib-page" data-fa-no-filter>
-${VIEWER_HEAD}
+<div class="${LIBRARY_MOUNT}" data-fa-no-filter${decl?.attrs ?? ""}${attrs}>
+${decl ? `${decl.stub}\n` : ""}${VIEWER_HEAD}
 ${p.record ? `${p.record}\n` : ""}${p.view ? `${p.view}\n` : ""}${VIEWER_BODY}
 ${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>
-<script type="application/json" id="${LIBRARY_CONFIG_ID}">${config}</script>
 <script src="${escHtml(assets)}viewer.js"></script>`,
   });
 }
@@ -1393,6 +1412,8 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
     title: `${entry.id} — ${scope} library`,
     dataHref,
     config: { data: dataHref, scope, libRoot, entry: entry.id },
+    // The entry's IRI is its manifest's (`library-iri.ts`), declared only when the manifest is published.
+    ...(entry.jsonld ? { node: { iri: libraryAssetIri(scope, entry.id), types: [ENTRY_TYPE] } } : {}),
     noscript: `<p class="note">This page loads its entries from <a href="${escHtml(dataHref)}">the library projection</a>${
       entry.jsonld ? ` and this entry from <a href="${escHtml(entry.jsonld)}">its JSON-LD</a>` : ""
     }; it needs JavaScript to draw them.</p>${
@@ -1416,7 +1437,22 @@ export function entryPageHtml(dataHref: string, scope: string, libRoot: string, 
  * later run prune its own stale output and nothing else.
  */
 export function libraryConfigOf(content: string): { data?: unknown; scope?: unknown; libRoot?: unknown; entry?: unknown } | undefined {
-  return thinPageConfigOf(content, LIBRARY_CONFIG_ID);
+  const tag = new RegExp(`<div class="${LIBRARY_MOUNT}"[^>]*>`).exec(content)?.[0];
+  if (tag === undefined) return undefined;
+  const get = (k: string): string | undefined => {
+    const v = new RegExp(`\\sdata-kg-${k}="([^"]*)"`).exec(tag)?.[1];
+    return v === undefined ? undefined : v.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  };
+  const data = get("data");
+  if (data === undefined) return undefined;
+  const out: { data?: unknown; scope?: unknown; libRoot?: unknown; entry?: unknown } = { data };
+  const scope = get("scope");
+  const libRoot = get("lib-root");
+  const entry = get("entry");
+  if (scope !== undefined) out.scope = scope;
+  if (libRoot !== undefined) out.libRoot = libRoot;
+  if (entry !== undefined) out.entry = entry;
+  return out;
 }
 
 /**

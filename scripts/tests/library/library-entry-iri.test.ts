@@ -26,6 +26,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { ADDRESS_JS } from "../../lib/library-address.ts";
+import { pageNodeOf, pageNodeProblems } from "../../thin-page.ts";
+import { libraryAssetIri } from "../../../schemas/library/library-iri.ts";
 import { entryPageHtml, isEntryShellFor, isSubjectShell, libraryConfigOf, VIEWER_JS, viewerHtml } from "../../gen-library-viz.ts";
 import { ReferencedSourceSchema } from "../../../schemas/library/referenced-source.ts";
 import { LibraryIndexSchema } from "../../../schemas/ui/site-indexes.ts";
@@ -122,9 +124,11 @@ describe("a row's TITLE opens the entry's own page (owner, 2026-10-02)", () => {
   ) as (...a: unknown[]) => { COLS: { k: string; f: (e: unknown) => string }[] };
   const { COLS } = run(
     {
-      getElementById: () => ({ textContent: JSON.stringify({ data: "../../../assets/library/index.json", scope: "smart-base", libRoot: "../" }) }),
+      getElementById: () => null,
       addEventListener: () => {},
-      querySelector: () => null,
+      // The page's identity is data-kg-* on its .lib-page element (issue #1830).
+      querySelector: (sel: string) =>
+        sel === ".lib-page" ? { dataset: { kgData: "../../../assets/library/index.json", kgScope: "smart-base", kgLibRoot: "../" } } : null,
     },
     { href: pageUrl, pathname: new URL(pageUrl).pathname, hash: "" },
     () => new Promise(() => {}),
@@ -176,6 +180,13 @@ describe("the shell template", () => {
     expect(shell).toContain('<script src="../../../assets/library/viewer.js"></script>');
     expect(shell).toContain('<link rel="stylesheet" href="../../../assets/library/viewer.css">');
     expect(shell).not.toContain("<style>");
+  });
+  test("declares its entry in RDFa and a JSON-LD stub, with no private config block (issue #1830)", () => {
+    expect(pageNodeProblems(shell)).toEqual([]);
+    expect(pageNodeOf(shell)!.rdfa[0]!.iri).toBe(libraryAssetIri("smart-base", "smart-trust"));
+    expect(shell).not.toContain('type="application/json"');
+    // A library's own page renders no single entry: it declares none.
+    expect(pageNodeOf(viewerHtml("../../assets/library/index.json", "smart-base"))).toBeUndefined();
   });
   test("is a THEMED page (2026-10-07): the layout's band, no rail, no folio mount, both sources named", () => {
     // On the theme's default layout, which carries the top band and loads
