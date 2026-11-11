@@ -17,6 +17,7 @@
   "usedBy": [
     "playwright.config.ts",
     "scripts/block-screenshots.ts",
+    "test/bar-controls.e2e.ts",
     "test/beans-count-agrees.e2e.ts",
     "test/beans-page-search.e2e.ts",
     "test/conduct/glass-interactions.e2e.ts",
