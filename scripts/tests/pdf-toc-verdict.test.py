@@ -353,7 +353,12 @@ def main() -> int:
     # it passing — measured, and the mutation survived until this arm existed.
     # The corpus contains no concentrated outline, so the test builds one.
     tmp2 = os.path.join(ROOT, "scripts", "tests", ".toc-verdict-outline.pdf")
-    body = ["Chapter text. " * 60, "Glossary entries. " * 60, "Index. " * 60]
+    # Page 2 prints the nine headings: an outline its pages do not print at all
+    # is set aside by `trusted_outline` (10665/331525-rus carries its English
+    # edition's outline), which is a different question from concentration.
+    body = ["Chapter text. " * 60,
+            "".join(f"Entry {i}\n" + "Glossary entries. " * 7 + "\n" for i in range(9)),
+            "Index. " * 60]
     concentrated = [(f"Entry {i}", 2) for i in range(9)]
     if _write_pdf(tmp2, body, outline=concentrated):
         try:
