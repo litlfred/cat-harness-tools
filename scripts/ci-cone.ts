@@ -433,6 +433,13 @@ export function parseTrace(
     rewriteAsInput?: (rel: string) => boolean;
     /** Paths whose successful opens for reading are counted into `opened` (`read-projections.ts`). */
     countOpens?: ReadonlySet<string>;
+    /**
+     * `count`: a git command the cone cannot replay (`--git-dir=`, a write
+     * subcommand) is counted in `git` as it was run, not refused. For what a
+     * run TOUCHED only: its syscalls still name every path it wrote, and
+     * `git` makes any neighbour's write a clash. A record never uses it.
+     */
+    gitUnreplayable?: "refuse" | "count";
   } = {},
 ): ReadSet {
   const parsed = calls(text);
@@ -545,8 +552,11 @@ export function parseTrace(
         gitPids.add(c.pid);
         if (where === undefined) return { undetermined: `git ${argv.slice(1).join(" ")} ran outside the checkout, or where the trace does not say` };
         const call = gitReplayable(where, argv.slice(1), (abs) => repoRelative(roots, abs));
-        if ("undetermined" in call) return call;
-        git.set(JSON.stringify(call), call);
+        if ("undetermined" in call) {
+          if (opts.gitUnreplayable !== "count") return call;
+          const asRun: GitCall = { cwd: where, args: argv.slice(1) };
+          git.set(JSON.stringify(asRun), asRun);
+        } else git.set(JSON.stringify(call), call);
       }
       if (c.name === "chdir") {
         if (/^0\b/.test(c.ret)) me.dir = abs;
@@ -1298,7 +1308,7 @@ export function keepRecords(root: string, files: readonly string[]): string[] {
 /** What a run touched, for {@link TOUCHED_OUT_ENV}: from its trace, or undetermined. */
 export function touchedOf(text: string | undefined, root: string, why = "not traced"): Record<string, unknown> {
   if (text === undefined) return { undetermined: why };
-  const t = parseTrace(text, root, { writes: "collect", rewriteAsInput: () => true });
+  const t = parseTrace(text, root, { writes: "collect", rewriteAsInput: () => true, gitUnreplayable: "count" });
   if ("undetermined" in t) return { undetermined: t.undetermined };
   return {
     reads: t.paths,
@@ -1389,6 +1399,18 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
     env: cmdEnv(trace.env),
   });
   let code = r.exitCode ?? 1;
+  // input-site: traced #022c9b80 — whether a concurrent runner will ask a failed check again alone, on the record path only
+  inputSiteReached("ci-cone: failed beside others");
+  if (code !== 0 && process.env[TOUCHED_OUT_ENV]) {
+    // Beside neighbours, a failed traced run is not asked again here: an
+    // untraced run would write what nobody sees while they run. It reports
+    // what its trace saw it touch, and the runner asks it again alone, where
+    // the step below makes the verdict the check's own.
+    const text = existsSync(log) && statSync(log).size <= MAX_TRACE_BYTES ? readFileSync(log, "utf-8") : undefined;
+    rmSync(log, { force: true });
+    writeTouched(o.root, text, "the trace is absent or too large");
+    return { code, note: `not recorded — the traced run exited ${r.exitCode ?? r.signalCode} beside other gates; it runs again alone` };
+  }
   if (code !== 0) {
     // The verdict must be the check's, never the tracer's. A traced run that
     // failed is asked again, untraced, and THAT exit status is the answer.
