@@ -39,7 +39,7 @@ export interface LockedInstance {
  * `instance → where to fetch it`, from the index lock when present: its
  * `mounts` (`harness`, cat-harness-mount-lock/v1) and the older `instances`
  * (`instance`). The lock's `repository` carries the owner, so a layer that
- * lives under another owner (smart-base under WHO, say) is fetched from there.
+ * lives under another owner is fetched from there.
  */
 export function lockedInstances(root: string): Map<string, LockedInstance> {
   const out = new Map<string, LockedInstance>();

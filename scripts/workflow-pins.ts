@@ -21,7 +21,7 @@
  *
  * The owner is not fixed. A line is first-party when its owner is this
  * repository's owner or the owner of any layer in the lock (layers can live
- * under different owners, e.g. smart-* under WHO and the harness under
+ * under different owners, e.g. content layers under one org and the harness under
  * litlfred). A first-party call to a layer the lock mounts is rewritten to the
  * lock's `repository`, so moving a layer to a new owner is a re-pin away.
  * Calls under any other owner (actions/checkout, …) are left alone.
@@ -79,7 +79,7 @@ function mountRepoName(m: LockMount): string | undefined {
 
 /**
  * The mounts of index.lock.json, repository name → commit (also keyed by the
- * harness name when it differs, e.g. dpi-h-ra in litlfred/smart-ra); empty
+ * harness name when it differs); empty
  * when there is no lock.
  */
 export function lockedRefs(root: string): Map<string, string> {
