@@ -179,11 +179,29 @@
     var bar = d.querySelector("[data-jp-drawer-toggle]");
     var body = d.querySelector(".jp-drawer-body");
     // A view page's panes name their JSON (data-jp-src) instead of carrying
-    // it: one shared, pre-highlighted file per example, fetched when shown.
+    // it: one shared file per example, fetched and coloured when shown.
+    // Opened from disk (file://) a browser refuses the fetch, so the pane
+    // links the file instead: the browser opens a local JSON file itself.
+    function offline(pre, why) {
+      var src = pre.getAttribute("data-jp-src");
+      var code = pre.querySelector("code");
+      code.textContent = why + " ";
+      var a = doc.createElement("a");
+      a.href = src;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.className = "jp-json-open";
+      a.textContent = "Open " + src.replace(/^.*\//, "");
+      code.appendChild(a);
+    }
     function load() {
       if (body.hidden) return;
       var pre = d.querySelector("[data-jp-pane]:not([hidden]) pre[data-jp-src]");
       if (!pre || pre.hasAttribute("data-jp-loading")) return;
+      if (location.protocol === "file:") {
+        offline(pre, "This page is open from disk, so the JSON is in its own file:");
+        return;
+      }
       pre.setAttribute("data-jp-loading", "");
       fetch(pre.getAttribute("data-jp-src"))
         .then(function (r) {
@@ -195,7 +213,7 @@
           pre.removeAttribute("data-jp-src");
         })
         .catch(function () {
-          pre.querySelector("code").textContent = "Could not load this payload.";
+          offline(pre, "Could not load this payload here.");
         })
         .then(function () {
           pre.removeAttribute("data-jp-loading");

@@ -613,7 +613,9 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(src).toBeDefined();
     const run = new Function(`${src}; return highlightJson;`)() as (j: string) => string;
     const json = JSON.stringify({ resourceType: "Bundle", total: -1.5e3, ok: true, none: null, note: 'a "<b>" & \'x\'', entry: [{}] }, null, 2);
-    expect(run(json)).toBe(highlightJson(json));
+    expect(run(json)).toBe(highlightJson(json));    // Opened from disk, the fetch is refused: the pane links the file instead.
+    expect(js).toContain('location.protocol === "file:"');
+    expect(js).toContain("jp-json-open");
   });
   test("the font is vendored and copied as bytes, with its licence", () => {
     const woff = files.find((f) => f.path === "assets/fonts/PlusJakartaSans-Bold.woff2");

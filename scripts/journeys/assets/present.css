@@ -914,3 +914,4 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-amel summary { cursor: pointer; color: var(--s700); font-weight: 600; }
 .jp-amels { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .jp-amels small { color: var(--s500); }
+.jp-json-open { color: var(--sky300); text-decoration: underline; }
