@@ -20,7 +20,7 @@ import jsonld from "jsonld";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { DOCS_SITE_BASE, SITE_DOCUMENT_CONTEXT, ContentContextSchema, siteNodeIri } from "../../schemas/kg/jsonld.ts";
 import { TodoIndexSchema, type TodoIndexItem } from "../../schemas/sdlc/todo-index.ts";
-import { thinPageConfigOf, thinPageHtml } from "../thin-page.ts";
+import { pageNodeOf, pageNodeProblems, thinPageConfigOf, thinPageHtml } from "../thin-page.ts";
 import { propertyIri, termIri } from "../../schemas/kg/namespaces.ts";
 import { subgraphPublicationFindings } from "../subgraph-node.ts";
 import {
@@ -31,7 +31,7 @@ import {
   todoPageSitePath,
   todoSitePath,
 } from "../todo-graph.ts";
-import { TODO_PAGE_CONFIG_ID, isTodoPage, todoPageHtml } from "../todo-page.ts";
+import { isLegacyTodoPage, isTodoPage, todoPageHtml } from "../todo-page.ts";
 import { renderTodoListing } from "../todo-listing.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { docsSources, siteNodeOf } from "../lib/docs-sources.ts";
@@ -76,13 +76,14 @@ const ITEM: TodoIndexItem = {
 };
 
 describe("todo IRIs", () => {
-  test("a todo's IRI is the address of its published JSON-LD, under the site", () => {
-    expect(todoSitePath("a-todo")).toBe("todos/a-todo.jsonld");
-    expect(todoIri("a-todo")).toBe(`${DOCS_SITE_BASE}todos/a-todo.jsonld`);
+  test("a todo's IRI is extensionless under the singular kind, its data the IRI plus .jsonld (issue #1830)", () => {
+    expect(todoSitePath("a-todo")).toBe("todo/a-todo.jsonld");
+    expect(todoIri("a-todo")).toBe(`${DOCS_SITE_BASE}todo/a-todo`);
     expect(DOCS_SITE_BASE).toBe("https://litlfred.github.io/folio-assistant/");
   });
-  test("the rendering is a different resource — a directory", () => {
-    expect(todoPageSitePath("a-todo")).toBe("todos/a-todo/");
+  test("the rendering is the directory the IRI names, so the host serves it at the IRI", () => {
+    expect(todoPageSitePath("a-todo")).toBe("todo/a-todo/");
+    expect(`${DOCS_SITE_BASE}${todoPageSitePath("a-todo")}`).toBe(`${todoIri("a-todo")}/`);
   });
   test("a segment never carries a character that would end a Liquid string", () => {
     expect(segment("it's")).toBe("it%27s");
@@ -151,7 +152,7 @@ describe("the JSON-LD", () => {
 });
 
 describe("the thin page", () => {
-  test("themed, JSON-LD alternate, no content written in, config readable back", () => {
+  test("themed, JSON-LD alternate, no content written in, declares its todo (issue #1830)", () => {
     const html = todoPageHtml(ITEM, { targetHref: "../../p.html#n" });
     // On the site's layout since 2026-10-07, so it carries the top band; the
     // layout writes the alternate from the front matter.
@@ -161,7 +162,14 @@ describe("the thin page", () => {
     expect(html).toContain('<h1 id="fa-todo-summary">');
     expect(html).not.toContain(ITEM.summary);
     expect(isTodoPage(html)).toBe(true);
-    expect(thinPageConfigOf(html, TODO_PAGE_CONFIG_ID)).toMatchObject({ id: "a-todo", targetHref: "../../p.html#n" });
+    expect(pageNodeProblems(html)).toEqual([]);
+    expect(pageNodeOf(html)!.rdfa[0]).toEqual({ iri: todoIri("a-todo"), types: ["http://www.w3.org/2002/12/cal/ical#Vtodo"] });
+    expect(html).toContain(' data-kg-target-href="../../p.html#n"');
+    expect(html).not.toContain('type="application/json"');
+    expect(html.indexOf("assets/kg-render.js")).toBeLessThan(html.indexOf("assets/todos/todo-page.js"));
+    // The orphan sweep still knows a page from before #1830 by its old block, and a new page is not one.
+    expect(isLegacyTodoPage('<script type="application/json" id="fa-todo-page-config">{}</script>')).toBe(true);
+    expect(isLegacyTodoPage(html)).toBe(false);
   });
   test("a config cannot close its own script element", () => {
     const html = thinPageHtml({ title: "t", jsonld: "x.jsonld", script: "s.js", configId: "c", config: { x: "</script>" }, body: "" });
@@ -173,7 +181,7 @@ describe("the thin page", () => {
 describe("the no-JS floor", () => {
   test("links each todo to its own page", () => {
     const html = renderTodoListing([ITEM], { todoPageHref: (id) => `/${todoPageSitePath(id)}` });
-    expect(html).toContain(`<a href="/todos/a-todo/">Open this todo</a>`);
+    expect(html).toContain(`<a href="/todo/a-todo/">Open this todo</a>`);
   });
 });
 
