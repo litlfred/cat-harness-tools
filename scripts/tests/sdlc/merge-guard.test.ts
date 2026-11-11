@@ -391,6 +391,28 @@ describe("check 5 — the head's own pull_request CI", () => {
     expect(status(s, "ci").status).toBe("pass");
   });
 
+  test("a later all-skipped run (a no-op `labeled` run) never displaces an earlier verdict", () => {
+    const s = real(1937);
+    if (s.runs.state !== "has-run") throw new Error("fixture");
+    for (const r of [...(s.runs.runs as GuardRun[])]) {
+      if (r.event === "pull_request") {
+        const noop: GuardRun = { ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "skipped" };
+        s.runs.runs.push(noop);
+      }
+    }
+    const c = status(s, "ci");
+    expect(c.status).toBe("refuse");
+    expect(c.detail).toContain("Code-quality gates: failure");
+  });
+
+  test("an all-skipped run stands when it is the only run of its workflow", () => {
+    const s = real(1957);
+    if (s.runs.state !== "has-run") throw new Error("fixture");
+    const only: GuardRun = { id: 99_999_999_998, name: "Release-only checks", event: "pull_request", status: "completed", conclusion: "skipped", html_url: "" };
+    s.runs.runs.push(only);
+    expect(status(s, "ci").status).toBe("pass");
+  });
+
   test("could not read the runs is unknown — and unknown outranks every refusal: exit 2", () => {
     const s = real(1937);
     s.runs = { state: "cannot-ask", reason: "HTTP 502" };

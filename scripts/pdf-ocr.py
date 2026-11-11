@@ -382,7 +382,7 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
                           file=sys.stderr)
                     txt = ""
             else:
-                txt, use = read_page(png, use, have_langs)
+                txt, use = read_page_with_latin(png, use, have_langs)
             open(os.path.join(cache, f"page-{i:03d}.txt"), "w",
                  encoding="utf-8").write(txt)
             for p in use.split("+"):
@@ -474,6 +474,89 @@ def second_script_candidates(lang: str, have: set[str]) -> list[str]:
     return out
 
 
+# A Latin word from the `+eng` read replaces the primary read's word under it
+# only at this confidence or above. Measured on 10665-94830-per page 28: "HIV"
+# and "WHO" read at 75-95, the junk the English pack makes of Persian words
+# ("chy", "Shee", "leg!") at 42-72.
+LATIN_RESCUE_CONFIDENCE = 80.0
+RE_LATIN_WORD = re.compile(r"[A-Za-z]")
+# Arabic-Indic and Persian digit runs: what a Latin word read as Arabic script becomes.
+RE_EASTERN_DIGITS = re.compile(r"[\u0660-\u0669\u06f0-\u06f9]{2,}")
+
+
+def _tsv_words(png: str, lang: str, timeout: int) -> list[dict]:
+    """Tesseract's words for `png` as `lang`: text, confidence, box, line key. [] on a timeout."""
+    with tempfile.TemporaryDirectory() as tmp:
+        base = os.path.join(tmp, "o")
+        try:
+            subprocess.run(["tesseract", png, base, "-l", lang, "tsv"], capture_output=True, text=True,
+                           env=_tesseract_env(), timeout=timeout)
+            rows = open(base + ".tsv", encoding="utf-8").read().splitlines()[1:]
+        except (subprocess.TimeoutExpired, OSError):
+            return []
+    words = []
+    for row in rows:
+        c = row.split("\t")
+        if len(c) < 12 or not c[11].strip():
+            continue
+        try:
+            words.append({"text": c[11].strip(), "conf": float(c[10]),
+                          "box": tuple(int(x) for x in c[6:10]), "line": tuple(int(x) for x in c[2:5])})
+        except ValueError:
+            continue
+    return words
+
+
+def _overlap(a: tuple, b: tuple) -> float:
+    """Share of box `a` (left, top, width, height) that box `b` covers. Pure."""
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    w = min(ax + aw, bx + bw) - max(ax, bx)
+    h = min(ay + ah, by + bh) - max(ay, by)
+    return (w * h) / (aw * ah) if w > 0 and h > 0 and aw * ah else 0.0
+
+
+def latin_rescues(primary: list[dict], mixed: list[dict]) -> list[tuple[str, str]]:
+    """(primary word, Latin word) pairs where the `+eng` read is sure of a Latin word. Pure.
+
+    10665-94830-per was read as Persian only, so every Latin acronym came out
+    as Persian digits ("HPV" as "۲۱۳۷", "VIA" as "۷۱۸"). Reading the page as
+    `fas+eng` gets the acronyms right but turns some Persian words into English
+    junk, so neither read is kept whole: each confident Latin word of the mixed
+    read replaces the primary word whose box it covers.
+
+    Only a primary word with no letters is replaced: the fault is Latin read
+    as digits, and a word of the page's own script stays as it was read.
+    """
+    out = []
+    for m in mixed:
+        word = m["text"].strip("\u200e\u200f")
+        if m["conf"] < LATIN_RESCUE_CONFIDENCE or len(word) < 2 or not RE_LATIN_WORD.search(word):
+            continue
+        under = max(primary, key=lambda p: _overlap(m["box"], p["box"]), default=None)
+        if under and _overlap(m["box"], under["box"]) >= 0.5 and not any(ch.isalpha() for ch in under["text"]):
+            out.append((under["text"], word))
+    return out
+
+
+def rescue_latin(png: str, txt: str, lang: str, have: set[str]) -> str:
+    """`txt` (read as `lang`) with the Latin words a `lang+eng` read is sure of put back.
+
+    Only for a read with no Latin pack: a page read as `fra` or `fas+eng` has
+    its Latin words already.
+    """
+    packs = lang.split("+")
+    if "eng" not in have or any(TESS_SCRIPT.get(p) == "Latin" for p in packs):
+        return txt
+    if not RE_EASTERN_DIGITS.search(txt):
+        return txt  # nothing that could be a misread Latin word: no second read
+    primary = _tsv_words(png, lang, SECOND_READ_TIMEOUT)
+    mixed = _tsv_words(png, f"{lang}+eng", SECOND_READ_TIMEOUT)
+    for old, new in latin_rescues(primary, mixed):
+        txt = txt.replace(old, new, 1)
+    return txt
+
+
 def read_page(png: str, lang: str, have: set[str]) -> tuple[str, str]:
     """One page's text, read again with a second script when the first read is unsure.
 
@@ -499,6 +582,12 @@ def read_page(png: str, lang: str, have: set[str]) -> tuple[str, str]:
     if best[1] - conf >= MIN_GAIN:
         return best[0], best[2]
     return txt, lang
+
+
+def read_page_with_latin(png: str, lang: str, have: set[str]) -> tuple[str, str]:
+    """`read_page`, then the Latin words of a non-Latin read put back (`rescue_latin`)."""
+    txt, use = read_page(png, lang, have)
+    return rescue_latin(png, txt, use, have), use
 
 
 def pdf_pages(pdf: str) -> int | None:

@@ -84,8 +84,19 @@
 # the standalone measurement, the index's own gates and the base side
 # (`tests-*`, `standalone-*`) are skipped, and "Tests (no new failures)"
 # passes with "fast tier" in its summary. merge-guard's check 5 treats CI on
-# a non-release merge as advisory. A PR labelled `release` runs the full tier
-# (add the label, then push or re-run: `labeled` is not a trigger).
+# a non-release merge as advisory. A PR labelled `release` runs the full tier.
+#
+# ADDING THE `release` LABEL STARTS THE FULL TIER (`labeled` is a trigger;
+# owner, 2026-11-11, card B: every PR passes the full tier before merge).
+# Before, the label started nothing, and a re-run replays the original
+# payload with the OLD labels, so the only ways to start it were an empty
+# commit or a close and reopen, both forbidden. A `labeled` run for the
+# `release` label joins the PR's concurrency group and replaces a fast-tier
+# run in flight on the same head (the full tier is a superset). Any OTHER
+# label (`ready-to-merge`, ...) is a no-op: every job skips, and its group is
+# its own (keyed by the run id), so it never cancels the PR's real run. An
+# all-skipped run judges nothing; merge-guard's check 5 lets it never
+# displace an earlier run of this workflow on the same head.
 #
 # MAIN'S INTEGRATION RUN IS BATCHED. A push to main runs the base side and
 # records main's answer only for the first push of each hour (`pin` stamps the
@@ -95,7 +106,8 @@ name: PR checks
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
+    # `labeled`: only the `release` label does any work (header above).
+    types: [opened, synchronize, reopened, ready_for_review, closed, labeled]
   # main's own run keeps main's answer where every PR can read it (#1263).
   push:
     branches: [main]
@@ -109,7 +121,9 @@ concurrency:
   # `closed` event GitHub sets the ref to the BASE branch, so the closing
   # run of a merged PR joined main's group and cancelled main's push run,
   # the one that records main's answer (run 41322304221, the merge of #1266).
-  group: pr-checks-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  # A `labeled` run for any label but `release` is a no-op in a group of its
+  # own: in the PR's group it would cancel the PR's real run.
+  group: pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release') && format('noop-label-{0}', github.run_id) || (github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref) }}
   # A push to main is never cancelled while it runs; a newer push waiting
   # behind it replaces an older waiting one, so the newest main is recorded.
   cancel-in-progress: ${{ github.event_name != 'push' }}
@@ -123,9 +137,10 @@ jobs:
     # timing (cat-harness-tools#217, #223).
     # On `closed`, the workflow triggers in the same concurrency group so
     # `cancel-in-progress: true` cancels any running PR check run immediately,
-    # and this job skips in 0s (bean cis3).
+    # and this job skips in 0s (bean cis3). A `labeled` event for any label
+    # but `release` skips it too, and every job that needs it with it.
     name: Pin cat-harness and the index
-    if: github.event.action != 'closed'
+    if: github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     outputs:
@@ -705,7 +720,9 @@ jobs:
     # On a draft the full tier above was skipped: pass, and say so.
     # Never skipped on a PR: a skipped required check reads as passed, so a
     # side that failed fails here instead.
-    if: github.event_name == 'pull_request' && github.event.action != 'closed' && !cancelled()
+    # Skipped only on `closed` and on a no-op `labeled` run (any label but
+    # `release`), which judges nothing and must not report a verdict.
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Fast tier (a non-release PR)

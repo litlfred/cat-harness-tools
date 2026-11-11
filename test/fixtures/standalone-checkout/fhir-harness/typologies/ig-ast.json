@@ -16,5 +16,5 @@
     "tone": 152,
     "reads": "a tree from one root to three leaves — an IG's syntax tree, ingested into the folio"
   },
-  "rationale": "INGESTED into the folio that uses the IG (bean lehh). Owner, 2026-10-04: an IG's semi-static KG may stay remote, but its AST is still ingested into the folio, and a remote AST may also be materialised onto a local branch. So the CONSUMING instance declares the directory, on `storage.keyedBy: \"family\"` over `cat/fhir-harness/fhir-ast/<package id>`. `derived`: the IG Publisher computes it from the IG's source and it is regenerated, never edited."
+  "rationale": "INGESTED into the folio that uses the IG (bean lehh). Owner, 2026-10-04: an IG's semi-static KG may stay remote, but its AST is still ingested into the folio, and a remote AST may also be materialised onto a local branch. So the CONSUMING layer declares the directory, on `storage.keyedBy: \"family\"` over `cat/fhir-harness/fhir-ast/<package id>`. `derived`: the IG Publisher computes it from the IG's source and it is regenerated, never edited."
 }

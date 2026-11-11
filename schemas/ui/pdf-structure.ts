@@ -335,8 +335,8 @@ export const PdfDiagnosticsSchema = z
     /**
      * Sections too long to be one block (more than half of a document of 20
      * pages or more, or over 20,000 words) and how each was cut: at the
-     * headings inferred inside it, else one section per page. Absent when no
-     * section was cut.
+     * headings inferred inside it, else where the chapter in its running heads
+     * changes, else one section per page. Absent when no section was cut.
      */
     oversized_split: z
       .array(
@@ -346,7 +346,7 @@ export const PdfDiagnosticsSchema = z
             page_start: z.number().int().min(1),
             page_end: z.number().int().min(1),
             words: z.number().int().min(0),
-            by: z.enum(["headings", "pages"]),
+            by: z.enum(["headings", "running heads", "pages"]),
             into: z.number().int().min(1),
           })
           .strict(),
