@@ -395,7 +395,10 @@ describe("check 5 — the head's own pull_request CI", () => {
     const s = real(1937);
     if (s.runs.state !== "has-run") throw new Error("fixture");
     for (const r of [...(s.runs.runs as GuardRun[])]) {
-      if (r.event === "pull_request") s.runs.runs.push({ ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "skipped" });
+      if (r.event === "pull_request") {
+        const noop: GuardRun = { ...r, id: (r.id ?? 0) + 1_000_000, status: "completed", conclusion: "skipped" };
+        s.runs.runs.push(noop);
+      }
     }
     const c = status(s, "ci");
     expect(c.status).toBe("refuse");
@@ -405,7 +408,8 @@ describe("check 5 — the head's own pull_request CI", () => {
   test("an all-skipped run stands when it is the only run of its workflow", () => {
     const s = real(1957);
     if (s.runs.state !== "has-run") throw new Error("fixture");
-    s.runs.runs.push({ id: 99_999_999_998, name: "Release-only checks", event: "pull_request", status: "completed", conclusion: "skipped", html_url: "" });
+    const only: GuardRun = { id: 99_999_999_998, name: "Release-only checks", event: "pull_request", status: "completed", conclusion: "skipped", html_url: "" };
+    s.runs.runs.push(only);
     expect(status(s, "ci").status).toBe("pass");
   });
 
