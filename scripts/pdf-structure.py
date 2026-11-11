@@ -1631,10 +1631,15 @@ def replace_failing_pages(pages: list[str], ocr: list[str], langs: list[str]) ->
 #   and has no number above it, or is one word of three letters or fewer, is
 #   not a heading.
 # - 10665/329296 (French) read the labels of an annex flowchart as headings:
-#   runs of two or more sections on one page, of a few words each (a heading
-#   with no words of its own, a parent of the next, is not a label).
+#   runs of three or more sections on one page, of a few words each (a heading
+#   with no words of its own, a parent of the next, is not a label). Two are
+#   not enough: 10665/259268 sets a part heading and its first chapter heading
+#   one above the other with a word between them.
 RE_BARE_NUMBER = re.compile(r"^\s*(\d+(?:\.\d+)*)\.?\s*$")
-LABEL_RUN = 2
+# The number and the first words of a title on one line ("4.1 \t Identifier et
+# sélectionner les interventions", 10665/353150).
+RE_NUMBERED_LINE = re.compile(r"^\s*(\d+(?:\.\d+)+|\d+\.)\s+(\S.*)$")
+LABEL_RUN = 3
 LABEL_WORDS = 30
 
 
@@ -1661,6 +1666,10 @@ def rejoin_wrapped(e: TocEntry, pages: list[str]) -> TocEntry | None:
         above: list[str] = []
         for j in range(i - 1, max(-1, i - 6), -1):
             m = RE_BARE_NUMBER.match(lines[j])
+            n = None if m else RE_NUMBERED_LINE.match(lines[j])
+            if n and len(lines[j]) <= 90:
+                above.append(n.group(2))
+                m = n
             if m:
                 tail = [lines[i]]
                 k = i + 1
@@ -1668,7 +1677,7 @@ def rejoin_wrapped(e: TocEntry, pages: list[str]) -> TocEntry | None:
                     tail.append(lines[k])
                     k += 1
                 title = " ".join(reversed(above)) + " " + " ".join(tail)
-                return replace(e, title=re.sub(r"\s+", " ", title).strip(), number=e.number or m.group(1))
+                return replace(e, title=re.sub(r"\s+", " ", title).strip(), number=e.number or m.group(1).rstrip("."))
             if not lines[j] or len(lines[j]) > 90 or lines[j].endswith((".", ";")):
                 break
             above.append(lines[j])

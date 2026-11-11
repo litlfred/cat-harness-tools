@@ -129,6 +129,11 @@ def main() -> int:
     check("10665/354399: a title cut to its last line is rejoined up to its number",
           len(fixed) == 1 and fixed[0].number == "1.2" and fixed[0].title.startswith("Función de la salud digital")
           and fixed[0].title.endswith("cobertura sanitaria universal") and rep[0]["action"] == "rejoined")
+    p353 = ["Texte.\n4.1 \t Identifier et sélectionner les interventions  \nde santé numérique pour les défis prioritaires  \n"
+            "liés au système de santé\nAu cours des vingt dernières années.\n"]
+    fixed, rep = s.tidy_inferred([E(1, "liés au système de santé", 1, "inferred")], p353)
+    check("10665/353150: a number on the title's first line is found too",
+          len(fixed) == 1 and fixed[0].number == "4.1" and fixed[0].title.startswith("Identifier et sélectionner"))
     words = [E(1, "un", 1, "inferred"), E(1, "On", 1, "inferred"), E(1, "YOUNG,", 1, "inferred", "10"),
              E(1, "Programme", 1, "inferred"), E(1, "un", 1, "outline")]
     kept, rep = s.tidy_inferred(words, ["un On YOUNG, Programme\n"])
@@ -136,9 +141,12 @@ def main() -> int:
           [(e.title, e.source) for e in kept] == [("Programme", "inferred"), ("un", "outline")])
     sec = lambda t, p, w: s.Section("sec-001-x", None, t, 1, p, p, 0, w, "")
     flow = [sec("Annexe 1", 18, 103), sec("Suivre les lignes", 18, 22), sec("Demander un nouvel", 18, 6),
-            sec("Annexe 2", 19, 46), sec("ANNEXES", 19, 0)]
+            sec("Analyse ultérieure", 18, 6), sec("Annexe 2", 19, 46), sec("ANNEXES", 19, 0)]
     check("10665/329296: a run of short sections on one page is a diagram's labels",
-          s.label_runs(flow) == {("Suivre les lignes", 18), ("Demander un nouvel", 18)})
+          s.label_runs(flow) == {("Suivre les lignes", 18), ("Demander un nouvel", 18), ("Analyse ultérieure", 18)})
+    parts = [sec("Promote, prevent and protect maternal and perinatal health", 9, 1), sec("Antenatal care", 9, 3),
+             sec("Nutrition", 9, 400)]
+    check("10665/259268: a part heading over its first chapter heading is not a label", s.label_runs(parts) == set())
 
     late = "The CFE enabled WHO to respond.\n" + "body line\n" * 30 + "OVERVIEW\nAbout the WHO Contingency Fund\n"
     early = "OVERVIEW\nAbout the WHO Contingency Fund\nThe CFE enabled WHO to respond.\n" + "body line\n" * 30
