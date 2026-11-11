@@ -55,6 +55,7 @@ import { declarationPathIn, readDeclaration, repoRootFor, resolveDirectories } f
 import { specimenSections } from "../schemas/content/section-verdicts.ts";
 import { corpusDirectoriesForGraph, declarationChain } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { readHarnessConfig, TranslationConfigSchema } from "../schemas/kg/harness-config.ts";
 import { libraryEntryDir, libraryEntryDirs, libraryOfEntry } from "./lib/library-entry-graphs.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -270,6 +271,49 @@ export function backlog(root = ROOT, opts: { entry?: string } = {}): SummaryItem
   return out;
 }
 
+/**
+ * The locales a library entry's summaries are owed in: the
+ * `translation.supportedLocales` its layer declares, else the schema default
+ * (the six UN languages). The entry is `<layer>/library/<slug>`. Same rule as
+ * `check:l1-complete`'s image descriptions.
+ */
+export function summaryLocales(entryDir: string): string[] {
+  let raw: unknown = {};
+  try {
+    raw = (readHarnessConfig(resolve(entryDir, "..", "..")) as { translation?: unknown } | null)?.translation ?? {};
+  } catch {
+    raw = {};
+  }
+  const parsed = TranslationConfigSchema.safeParse(raw);
+  return (parsed.success ? parsed.data : TranslationConfigSchema.parse({})).supportedLocales;
+}
+
+/** The languages a block's CURRENT summary is held in (none when it has no current one). */
+export function summaryLangs(it: SummaryItem): string[] {
+  if ((it.status !== "draft" && it.status !== "confirmed") || !it.record) return [];
+  return narrativesOfSlot(it.record.narrative)
+    .filter((n) => n.state === "draft" || n.state === "confirmed")
+    .map((n) => n.lang ?? DEFAULT_NARRATIVE_LANG);
+}
+
+/**
+ * The TRANSLATION backlog for one language: blocks whose summary is current
+ * in some language but has none in `lang` (bean `cat-tools-e1lo`; owner,
+ * 2026-11-11: summaries in all six UN languages). A block with no summary at
+ * all is in {@link backlog}, not here: it is summarised first, then translated.
+ */
+export function langBacklog(root = ROOT, lang: string, opts: { entry?: string } = {}): SummaryItem[] {
+  const out: SummaryItem[] = [];
+  for (const dir of entryDirs(root)) {
+    if (opts.entry && basename(dir) !== opts.entry) continue;
+    for (const it of entryItems(dir)) {
+      const langs = summaryLangs(it);
+      if (langs.length && !langs.includes(lang)) out.push(it);
+    }
+  }
+  return out;
+}
+
 /** What `summaries:next` hands an agent for one block. */
 export interface NextBlock {
   entry: string;
@@ -285,6 +329,10 @@ export interface NextBlock {
   rejected?: { text: string; reason: string };
   /** Present for a SPECIMEN page: how to summarise it (bean `fnqn`). */
   instruction?: string;
+  /** With `--lang`: the language to write in, and the block's current
+   *  summaries by language, which the new one must say the same as. */
+  lang?: string;
+  summaries?: Record<string, string>;
   text: string;
 }
 
@@ -295,8 +343,29 @@ export const SPECIMEN_INSTRUCTION =
   "Summarise what the page EXHIBITS (e.g. a cover layout, a font sample) and keep its real guidance line; " +
   "do not summarise or translate the filler.";
 
-export function next(root = ROOT, opts: { n?: number; entry?: string } = {}): NextBlock[] {
+export function next(root = ROOT, opts: { n?: number; entry?: string; lang?: string } = {}): NextBlock[] {
   const k = opts.n ?? 5;
+  if (opts.lang !== undefined) {
+    const lang = opts.lang;
+    return langBacklog(root, lang, { entry: opts.entry })
+      .slice(0, k)
+      .map((it) => ({
+        entry: it.entry,
+        block: it.block,
+        title: it.title,
+        pages: pagesOf(it),
+        source: it.source ?? "",
+        source_hash: it.hash ?? "",
+        status: it.status,
+        lang,
+        summaries: Object.fromEntries(
+          narrativesOfSlot(it.record!.narrative)
+            .filter((n) => n.state === "draft" || n.state === "confirmed")
+            .map((n) => [n.lang ?? DEFAULT_NARRATIVE_LANG, n.text ?? ""]),
+        ),
+        text: it.body ?? "",
+      }));
+  }
   return backlog(root, { entry: opts.entry })
     .slice(0, k)
     .map((it) => {
@@ -309,12 +378,7 @@ export function next(root = ROOT, opts: { n?: number; entry?: string } = {}): Ne
         entry: it.entry,
         block: it.block,
         title: it.title,
-        pages:
-          it.pageStart === null
-            ? ""
-            : it.pageEnd !== null && it.pageEnd !== it.pageStart
-              ? `${it.pageStart}-${it.pageEnd}`
-              : String(it.pageStart),
+        pages: pagesOf(it),
         source: it.source ?? "",
         source_hash: it.hash ?? "",
         status: it.status,
@@ -325,6 +389,11 @@ export function next(root = ROOT, opts: { n?: number; entry?: string } = {}): Ne
         text: it.body ?? "",
       };
     });
+}
+
+function pagesOf(it: SummaryItem): string {
+  if (it.pageStart === null) return "";
+  return it.pageEnd !== null && it.pageEnd !== it.pageStart ? `${it.pageStart}-${it.pageEnd}` : String(it.pageStart);
 }
 
 /** An agent's drafts, as `summaries:record` reads them. */
@@ -519,6 +588,29 @@ function listing(root: string): void {
       (all.unreadable ? ` ${all.unreadable} block(s) have unreadable text.` : "") +
       (all.empty ? ` ${all.empty} block(s) have empty text and nothing to summarise.` : ""),
   );
+  // The translation backlog: summarised blocks missing a configured language.
+  const owed = new Map<string, number>();
+  for (const dir of entryDirs(root)) {
+    let items: SummaryItem[];
+    try {
+      items = entryItems(dir);
+    } catch {
+      continue;
+    }
+    const locales = summaryLocales(dir);
+    for (const it of items) {
+      const langs = summaryLangs(it);
+      if (!langs.length) continue;
+      for (const l of locales) if (!langs.includes(l)) owed.set(l, (owed.get(l) ?? 0) + 1);
+    }
+  }
+  console.log(
+    owed.size
+      ? `Translations owed (summarised blocks missing a configured language): ` +
+          [...owed].map(([l, n]) => `${l} ${n}`).join(", ") +
+          " — bun run cat summaries:next -- --lang <tag> --n 5"
+      : "Every summarised block has a summary in each configured language.",
+  );
   console.log("Advisory: drained a few at a time — bun run cat summaries:next -- --n 5");
 }
 
@@ -534,7 +626,7 @@ if (import.meta.main) {
     if (mode === "next") {
       const n = Number(flag(argv, "--n") ?? "5");
       if (!Number.isInteger(n) || n < 1) throw new Error("--n takes a positive integer");
-      console.log(JSON.stringify(next(ROOT, { n, entry: flag(argv, "--entry") }), null, 2));
+      console.log(JSON.stringify(next(ROOT, { n, entry: flag(argv, "--entry"), lang: flag(argv, "--lang") }), null, 2));
     } else if (mode === "record") {
       const f = argv[1];
       if (!f) throw new Error("usage: bun run cat summaries:record -- <drafts.json>");
