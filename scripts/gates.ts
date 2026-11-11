@@ -1505,6 +1505,16 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "own to judge, so `bun run cat layers:check` here would only report `skipped`",
   },
   {
+    script: "lock:coherence:check",
+    kind: "covered-by",
+    reason:
+      "runs in the CALLER'S CI, not this layer's: job `lock-coherence` of `layer-pr-checks.yml` runs it at the commit the " +
+      "caller's lock pins, on every pull request that changes `index.lock.json` (owner, 2026-11-11: a lock whose harness " +
+      "pins disagree with the pinned harnesses' own locks, or lag their repositories' main, may not reach main, after " +
+      "a content layer's main went red on skewed pins). " +
+      "This layer has no lock of its own to judge, so `bun run cat lock:coherence:check` here only reports nothing to check",
+  },
+  {
     script: "translate-user-scenarios:check",
     kind: "no-folio",
     reason:
@@ -1529,6 +1539,16 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "`.github/workflows/*`, and every layer still calls `litlfred/*@main` until its index.lock.json is re-pinned past the " +
       "commit that adds this script and `bun run cat workflow-pins` is run there. Wiring it now would red every PR in every " +
       "layer on refs this commit does not change; it becomes a gate in each repository's own CI once that repository is pinned",
+  },
+  {
+    script: "check:site-publish-caller",
+    kind: "report",
+    reason:
+      "RED UNTIL THE ROLLOUT (owner, 2026-11-11: \"i want that it publishes once merge to main, update QA reports etc.\"; " +
+      "cat-harness-tools#1879): it judges the calling repository's own `.github/workflows/*` for the canonical caller of " +
+      "`folio-site-publish.yml`, and most layers still carry a dispatch-only copy or none. Here it judges nothing (this " +
+      "layer holds the template). Wiring it now would red every layer's PRs on files their change does not touch; it " +
+      "becomes a gate in each repository's own CI once that repository carries the caller",
   },
   {
     script: "check:lock-consistency",
