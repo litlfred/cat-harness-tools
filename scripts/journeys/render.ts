@@ -979,7 +979,7 @@ function lines(n: number): string {
 export function sheetsHtml(corpus: JourneyCorpus, w: WorkshopEntry): string {
   const ws = w.workshop;
   const scales = ws.assessment?.scales ?? [];
-  return (ws.sheets ?? [])
+  return [coverSheet(w), ...(ws.sheets ?? [])
     .map((sh) => {
       const mods = sh.modules.map((id) => ws.modules.find((m) => m.id === id)).filter((m): m is NonNullable<typeof m> => m !== undefined);
       const qBlocks = mods
@@ -1002,8 +1002,28 @@ export function sheetsHtml(corpus: JourneyCorpus, w: WorkshopEntry): string {
 <div class="jv-sheet-body">${qBlocks}${tables.map((t) => tableHtml(t, true)).join("")}${(sh.fields ?? []).map((f) => `<section class="jv-field"><h3>${e(f.label)}</h3>${lines(f.lines)}</section>`).join("")}</div>
 ${strip}
 </article>`;
-    })
+    })].filter(Boolean)
     .join("\n");
+}
+
+/**
+ * The cover the sheets open with (JV-14): the blanks a table fills in, the
+ * workshop's scope promise, and the ways to start from the table the
+ * presentation names. On its own page, the first sheet's size.
+ */
+export function coverSheet(w: WorkshopEntry): string {
+  const ws = w.workshop;
+  if (!ws.sheets?.length) return "";
+  const cover = ws.presentation?.cover;
+  const fields = cover?.fields ?? ["Country", "Delegation", "Table", "Facilitator"];
+  const table = cover?.table ? ws.tables?.find((t) => t.id === cover.table) : undefined;
+  const size = ws.sheets[0]!.size.toLowerCase();
+  return `<article class="jv-sheet jv-sheet-${e(size)} jv-cover" id="sheet-cover">
+<header class="jv-sheet-head"><div><p class="jv-kicker">${e(ws.title)}</p><h2>Cover</h2></div></header>
+<div class="jv-cover-fields">${fields.map((f) => `<label class="jv-cover-field"><span>${e(f)}</span>${lines(1)}</label>`).join("")}</div>
+${ws.promise ? `<p class="jv-promise"><b>The scope promise.</b> ${e(ws.promise)}</p>` : ""}
+${table ? `<section class="jv-ways" aria-label="${e(table.title)}">${table.rows.map((r) => `<div class="jv-way"><b>${e(r.label)}</b>${r.what ? `<p>${e(r.what)}</p>` : ""}${r.example ? `<small>e.g. ${e(r.example)}</small>` : ""}</div>`).join("")}</section>` : ""}
+</article>`;
 }
 
 function sheetsPage(corpus: JourneyCorpus, w: WorkshopEntry): string {

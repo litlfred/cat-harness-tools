@@ -429,9 +429,10 @@ describe("the workshop layer", () => {
   test("a module's tables are drawn on its page", () => {
     expect(at("top/workshops/policy/m2/index.html")).toContain("Trust anchor");
   });
-  test("the sheets page carries one sheet per declared sheet, with its assessment strip", () => {
+  test("the sheets page carries the cover and one sheet per declared sheet, with its assessment strip", () => {
     const sheets = at("top/workshops/policy/sheets/index.html");
-    expect((sheets.match(/class="jv-sheet /g) ?? []).length).toBe(1);
+    expect((sheets.match(/class="jv-sheet /g) ?? []).length).toBe(2);
+    expect((sheets.match(/class="jv-sheet [^"]*jv-cover"/g) ?? []).length).toBe(1);
     expect(sheets).toContain('class="jv-strip"');
     expect(sheets).toContain("A viewer");
   });
@@ -823,6 +824,27 @@ describe("presentation helpers", () => {
     // A row naming a table the workshop does not list is refused.
     expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0" }).success).toBe(false);
     expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", presentation: { ...w.workshop.presentation, tagRows: [{ label: "Forces", icon: "scale", tables: ["rights"] }] } }).success).toBe(true);
+  });
+  test("JV-14: the sheets open with a cover, its own page: the blanks, the scope promise, the ways to start", () => {
+    const sheets = at("top/workshops/policy/sheets/index.html");
+    // The default cover: the four blanks, before Sheet 1, the size of the first sheet.
+    expect(sheets).toContain('<article class="jv-sheet jv-sheet-a3 jv-cover" id="sheet-cover">');
+    expect(sheets.indexOf('id="sheet-cover"')).toBeLessThan(sheets.indexOf('id="sheet-s1"'));
+    for (const f of ["Country", "Delegation", "Table", "Facilitator"]) expect(sheets).toContain(`<span>${f}</span>`);
+    expect(sheets).not.toContain("jv-ways");
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, promise: "You will leave knowing where you stand.", presentation: { ...w0.workshop.presentation, cover: { fields: ["Country", "Table"], table: "rights" } } } };
+    const out = renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top");
+    const page = String(out.find((f) => f.path === "top/workshops/policy/sheets/index.html")!.content);
+    expect(page).toContain('<p class="jv-promise"><b>The scope promise.</b> You will leave knowing where you stand.</p>');
+    expect(page).toContain('<section class="jv-ways" aria-label="Decision rights"><div class="jv-way"><b>Trust anchor</b>');
+    expect(page).not.toContain("<span>Delegation</span>");
+    expect(page).toContain("A cover and 1 sheet,");
+    // Printed, every sheet (the cover too) breaks to its own page.
+    expect(at("assets/journeys.css")).toContain(".jv-print-sheets .jv-sheet { break-after: page;");
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0" }).success).toBe(true);
+    const bad = WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", presentation: { ...w.workshop.presentation, cover: { table: "nowhere" } } });
+    expect(bad.success).toBe(false);
   });
   test("presentation.cast orders the cast everywhere; presentation.chapterTitles names a chapter", () => {
     const w0 = corpus.workshops[0]!;
