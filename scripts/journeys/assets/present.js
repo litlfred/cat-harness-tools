@@ -754,7 +754,7 @@
     each("[data-jp-text-reset]", function (b) {
       b.addEventListener("click", function () {
         var name = b.getAttribute("data-jp-text-reset");
-        var t = doc.querySelector('[name="' + name.replace(/"/g, '\\"') + '"]');
+        var t = doc.getElementsByName(name)[0];
         if (!t) return;
         forget("jv:" + name);
         t.value = t.defaultValue;
