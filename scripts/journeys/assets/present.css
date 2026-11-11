@@ -128,6 +128,7 @@ html[data-presenter="on"] .jp-off-only, html[data-presenter="off"] .jp-on-only, 
 .jp-av { border-radius: 50%; background: var(--c); color: #fff; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--shadow-sm); }
 .jp-av-sm { width: 24px; height: 24px; font-size: 9px; }
 .jp-av-md { width: 32px; height: 32px; font-size: 11px; }
+.jp-av-icon .jp-i { width: 62%; height: 62%; }
 .jp-named { white-space: nowrap; }
 .jp-named { font-weight: 600; }
 .jp-ext { display: inline-flex; align-items: center; gap: 2px; color: var(--sky700) !important; }
@@ -298,7 +299,8 @@ html[data-presenter="on"] .jp-off-only, html[data-presenter="off"] .jp-on-only, 
 .jp-mod { font: 700 10px/15px var(--mono); padding: 2px 6px; border-radius: 4px; background: #e0e7ff; color: #3730a3 !important; flex-shrink: 0; }
 .jp-forces { display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
 .jp-forces > div { display: flex; align-items: flex-start; gap: 8px; }
-.jp-forces dt { font-weight: 700; color: var(--s600); width: 112px; flex-shrink: 0; }
+.jp-forces dt { font-weight: 700; color: var(--s600); width: 112px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+.jp-forces dt .jp-i { width: 14px; height: 14px; color: var(--s500); }
 .jp-forces dd { color: var(--s800); line-height: 1.6; }
 .jp-forces dd > * { margin-right: 4px; }
 .jp-pill { display: inline-block; line-height: 16px; padding: 2px 8px; border-radius: 9999px; background: #f5f3ff; border: 1px solid #ddd6fe; color: #5b21b6; font-weight: 600; }
@@ -439,10 +441,11 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-scene-violet { --ls: #f5f3ff; --lb: #ddd6fe; --lt: #6d28d9; }
 .jp-av .jp-i { width: 60%; height: 60%; }
 .jp-av-lg { width: 48px; height: 48px; font-size: 15px; }
-.jp-sees { display: flex; flex-wrap: wrap; gap: 8px; }
-.jp-see { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--sky200); background: var(--sky50); color: var(--sky800) !important; font-size: 13px; font-weight: 600; }
-.jp-see:hover { background: var(--sky100); }
-.jp-see small { font-weight: 500; color: var(--sky700); }
+/* "See what … sees": full width at the right column's foot, as VaxLink (ref/02). */
+.jp-sees { display: flex; flex-direction: column; gap: 8px; }
+.jp-see { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--s200); background: #fff; color: var(--s800) !important; font-size: 13px; font-weight: 500; box-shadow: var(--shadow-sm); }
+.jp-see:hover { background: var(--s50); border-color: var(--s300); }
+.jp-see small { font-weight: 500; color: inherit; font-size: inherit; }
 
 /* ── a view's heading, buttons ──────────────────────────────────────── */
 .jp-vhead h2 { font-size: 16px; line-height: 24px; font-weight: 700; color: var(--ink); }
@@ -556,7 +559,7 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-cv-band { fill: var(--s50); }
 .jp-cv-grid { stroke: var(--s100); }
 .jp-cv-zero { stroke: var(--s200); stroke-dasharray: 4 4; }
-.jp-cv-face { font-size: 13px; fill: var(--s400); }
+.jp-cv-face { fill: #fde68a; stroke: #b45309; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
 .jp-cv-code { font: 10px var(--mono); fill: var(--s400); }
 .jp-cv-ch { font: 600 12px var(--sans); fill: var(--s600); }
 .jp-cv-line { stroke: var(--c); stroke-width: 2.5; }

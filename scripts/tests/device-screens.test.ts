@@ -131,6 +131,10 @@ describe("device screens: read, ordered, linked", () => {
     expect(p4).toContain('href="../../demo/P4-scanner/"');
     expect(p4).toMatch(/See what Reem sees <small>\(screen P4-scanner\)/);
     expect(p4).toMatch(/See what Kamal sees <small>\(screen P2\)/);
+    // JV-10: at the right column's foot, after the facilitator cue, as VaxLink's full-width button.
+    const right = p4.slice(p4.indexOf('<div class="jp-walk-r">'), p4.indexOf('<div class="jp-hood-toggle">'));
+    expect(right).toContain('<div class="jp-sees"><a class="jp-see"');
+    expect(p4.slice(0, p4.indexOf('<div class="jp-walk-r">'))).not.toContain("jp-see");
   });
   test("the demo index lists each screen with its device and owner", () => {
     const idx = at(`${base}/demo/index.html`);

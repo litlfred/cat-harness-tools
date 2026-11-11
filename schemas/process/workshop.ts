@@ -34,6 +34,7 @@
 import { z } from "zod";
 
 import { nodeKind } from "../kg/node-kind.ts";
+import { JourneyGlyphSchema } from "./user-scenario.ts";
 
 export const WORKSHOP_V01 = "workshop/0.1.0";
 
@@ -187,6 +188,14 @@ export const WorkshopPresentationSchema = z
      * title without its code in front.
      */
     chapterTitles: z.record(Id, Text).optional(),
+    /**
+     * How a walkthrough step's policy card groups the rows of the tables it
+     * tags, in this order: each row a label, an optional glyph and the tables
+     * it gathers (VaxLink: "Forces" = decision rights + legal basis, "Cost
+     * driver", "If it is missing" = substitution patterns). Absent: one row
+     * per table, titled by the table.
+     */
+    tagRows: z.array(z.object({ label: Text, icon: JourneyGlyphSchema.optional(), tables: z.array(Id).min(1) }).strict()).optional(),
     /** The presenter's note on the overview; a step's note is its `facilitatorCue`. */
     presenterNote: Text.optional(),
     /** A band on the overview naming what the walkthrough demonstrates, with `links`. */
@@ -320,6 +329,7 @@ export const WorkshopKind = nodeKind(
         else if (!rows.has(tag.row)) issue(`step ${s.step} tags row "${tag.row}", which table ${tag.table} does not have`);
       }
     }
+    for (const r of w.presentation?.tagRows ?? []) for (const t of r.tables) if (!tables.has(t)) issue(`presentation.tagRows "${r.label}" names table "${t}", which the workshop does not list`);
     for (const d of w.discussion ?? []) mod(`discussion ${d.id}`, d.module);
     for (const s of w.sheets ?? []) for (const m of s.modules) mod(`sheet ${s.id}`, m);
     for (const r of w.resources ?? []) for (const m of r.modules ?? []) mod(`resource ${r.id}`, m);
