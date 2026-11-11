@@ -296,7 +296,14 @@ def extract(pdf: Path, outdir: Path, dry_run: bool, role_threshold: float | None
                 target.parent.mkdir(parents=True, exist_ok=True)
                 try:
                     pix = pymupdf.Pixmap(doc, xref)
-                    if pix.n - pix.alpha >= 4:      # CMYK has no PNG encoding
+                    # PNG takes only DeviceGray and DeviceRGB. CMYK, and a
+                    # one-channel DeviceN or Separation ink (MuPDF calls it
+                    # gray, but the PNG writer refuses it: "pixmap must be
+                    # grayscale or rgb"), are converted to RGB first. Measured
+                    # 2026-11-11 on WHO IRIS 10665-44118-rus, where ten
+                    # DeviceN(Black) photographs were written as empty files.
+                    if pix.colorspace and pix.colorspace.name not in (
+                            pymupdf.csGRAY.name, pymupdf.csRGB.name):
                         pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
                     # A PDF image's transparency lives in a SEPARATE soft-mask
                     # object, which `Pixmap(doc, xref)` does not apply. Without
@@ -323,7 +330,14 @@ def extract(pdf: Path, outdir: Path, dry_run: bool, role_threshold: float | None
                         # as a broken extraction.
                         if pix.alpha:
                             pix = pymupdf.Pixmap(pix, 0)
-                        pix = pymupdf.Pixmap(pix, pymupdf.Pixmap(doc, smask))
+                        mask = pymupdf.Pixmap(doc, smask)
+                        # A soft mask may be drawn at another resolution than
+                        # its image (10665-44118-rus p214: a 145x64 logo with a
+                        # 434x192 mask). MuPDF wants them the same size, so the
+                        # mask is scaled to the image.
+                        if (mask.width, mask.height) != (pix.width, pix.height):
+                            mask = pymupdf.Pixmap(mask, pix.width, pix.height, None)
+                        pix = pymupdf.Pixmap(pix, mask)
                     pix.save(target)
                 except Exception as exc:  # noqa: BLE001
                     # The ENTRY stands; only the file is missing. Reporting the
