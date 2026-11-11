@@ -956,3 +956,37 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-arch-found-h > .jp-i { width: 20px; height: 20px; color: #d97706; }
 .jp-arch-found ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; }
 @media (min-width: 1024px) { .jp-arch-found ul { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-left: 0; list-style: none; } }
+
+/* ── the device demo: journey stages, compact header, status bar (JV-15..17) ── */
+.jp-stagebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 6px; padding: 10px 32px; background: #fff; border-bottom: 1px solid var(--s200); }
+.jp-stagebar-l { font: 600 12px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--s600); margin-right: 8px; }
+.jp .jp-stage-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--s200); background: #fff; color: var(--s700); font-size: 13px; white-space: nowrap; }
+.jp-stage-pill code { font: 11px var(--mono); color: var(--s400); }
+.jp .jp-stage-pill:hover { border-color: var(--s300); }
+.jp .jp-stage-pill.is-on { background: #0284c7; border-color: #0284c7; color: #fff; font-weight: 600; }
+.jp-stage-pill.is-on code { color: #e0f2fe; }
+.jp-stage-sep { color: var(--s300); font-size: 14px; }
+.jp-demo .jp-screen-h { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px; margin: 0 auto; width: 100%; max-width: 1024px; }
+.jp-demo .jp-screen-row { justify-content: flex-start; }
+.jp-screen-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; color: var(--s600); }
+.jp .jp-back { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 6px; border: 1px solid #fecaca; background: #fff1f2; color: #be123c; font-size: 13px; }
+.jp-back .jp-i { width: 14px; height: 14px; }
+.jp-devline { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--s700); }
+.jp-devline > span { display: inline-flex; align-items: center; gap: 6px; }
+.jp-devline code { font: 11px var(--mono); color: var(--s400); }
+.jp-devline .jp-i { width: 15px; height: 15px; color: #0284c7; }
+.jp-devline-r { gap: 14px !important; }
+.jp-devline-src { font-size: 12px; }
+.jp .jp-expand { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: #0284c7; font-size: 12px; cursor: pointer; padding: 0; }
+.jp-expand .jp-i { width: 13px; height: 13px; }
+.ds-stage:fullscreen { background: var(--s100, #f1f5f9); display: grid; place-items: center; overflow: auto; }
+.ds-statusbar-wide { background: #0b1220; color: #e2e8f0; padding: 8px 22px; font-weight: 500; }
+.ds-statusbar-wide .ds-client { display: inline-flex; align-items: baseline; gap: 8px; }
+.ds-statusbar-wide .ds-client b { font: 600 13px var(--sans); color: #fff; }
+.ds-statusbar-wide .ds-client small { font: 11px var(--mono); color: #94a3b8; }
+.ds-statusbar-wide .ds-sys { display: inline-flex; align-items: center; gap: 12px; font: 12px var(--mono); }
+.ds-statusbar-wide .jp-i { width: 15px; height: 15px; }
+.ds-statusbar-wide .ds-sys .jp-i:first-of-type { color: #34d399; }
+.ds-moments-h { border-bottom: 1px solid var(--s100); padding-bottom: 10px; margin-bottom: 10px; }
+.ds-moments-h h3 { font-size: 20px; font-weight: 700; color: var(--ink); margin: 2px 0 4px; }
+.ds-moments-h p { font-size: 14px; color: var(--s600); }

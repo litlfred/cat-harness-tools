@@ -197,6 +197,13 @@ export const WorkshopPresentationSchema = z
      */
     tagRows: z.array(z.object({ label: Text, icon: JourneyGlyphSchema.optional(), tables: z.array(Id).min(1) }).strict()).optional(),
     /**
+     * The table sheets' cover (JV-14), printed before Sheet 1: the blanks a
+     * table fills in (`fields`; absent: Country, Delegation, Table,
+     * Facilitator), the workshop's `promise`, and the `table` whose rows
+     * are the ways to start (VaxLink: the substitution patterns).
+     */
+    cover: z.object({ fields: z.array(Text).optional(), table: Id.optional() }).strict().optional(),
+    /**
      * The payload drawer's bar in the workshop's words (VaxLink: "FHIR R4 &
      * WHO GDHCN payload inspector", the trust list's key "DEV Key: 916ffa…
      * (XXR)", "Click to inspect raw FHIR / CBOR payload"). Absent: "FHIR
@@ -362,6 +369,8 @@ export const WorkshopKind = nodeKind(
       }
     }
     for (const r of w.presentation?.tagRows ?? []) for (const t of r.tables) if (!tables.has(t)) issue(`presentation.tagRows "${r.label}" names table "${t}", which the workshop does not list`);
+    const ct = w.presentation?.cover?.table;
+    if (ct !== undefined && !tables.has(ct)) issue(`presentation.cover names table "${ct}", which the workshop does not list`);
     for (const d of w.discussion ?? []) mod(`discussion ${d.id}`, d.module);
     for (const s of w.sheets ?? []) for (const m of s.modules) mod(`sheet ${s.id}`, m);
     for (const r of w.resources ?? []) for (const m of r.modules ?? []) mod(`resource ${r.id}`, m);

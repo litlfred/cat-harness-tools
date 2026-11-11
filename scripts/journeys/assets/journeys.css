@@ -284,3 +284,13 @@ body.jv {
 
 /* A persona's name that opens its page in the IG. */
 .jv-people b a[data-jv-dak] { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+/* The sheets' cover (JV-14): the table's blanks, the scope promise, the ways to start. */
+.jv-cover-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 32px; max-width: 70%; margin-bottom: 18px; }
+.jv-cover-field span { display: block; font-size: 0.8rem; font-weight: 600; }
+.jv-promise { border: 2px solid #111; border-radius: 4px; padding: 10px 14px; max-width: 70%; font-size: 1rem; line-height: 1.5; margin: 0 0 16px; }
+.jv-ways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 80%; }
+.jv-way { border: 1px solid #999; border-radius: 4px; padding: 10px 12px; break-inside: avoid; }
+.jv-way b { display: block; font-size: 0.86rem; }
+.jv-way p { margin: 2px 0 6px; font-size: 0.84rem; }
+.jv-way small { color: #666; font-size: 0.76rem; }
+.jv-sheet .jv-promise { margin-bottom: 22px; }

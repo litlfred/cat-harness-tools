@@ -298,7 +298,21 @@ const fullWidth = (b: ScreenBlock): boolean => b.type === "header" || b.type ===
  * the blocks marked `column: "side"` go in a second column; full-width
  * blocks (header, banner, actions) stay where they are in the order.
  */
-export function renderDevice(screen: DeviceScreen, ctx: ScreenContext): string {
+export const DEVICE_FORM: Record<Device, string> = { phone: "Phone 390px", tablet: "Tablet / Web 1024px", scanner: "Handheld scanner", desktop: "Desktop / Web 1280px", kiosk: "Kiosk 600px" };
+
+/**
+ * The device's status bar (JV-17): on a phone the clock, the notch and the
+ * signal; on anything wider a dark bar with the app's name and version from
+ * the screen's `client`, the clock, signal and battery.
+ */
+export function statusBar(screen: DeviceScreen): string {
+  const c = screen.client;
+  const sys = `${glyph("wifi")}${glyph("battery")}`;
+  if (screen.device === "phone") return `<div class="ds-statusbar" aria-hidden="true"><span>${e(c?.time ?? "9:41")}</span><span class="ds-notch"></span><span>${sys}</span></div>`;
+  return `<div class="ds-statusbar ds-statusbar-wide" aria-hidden="true"><span class="ds-client">${c ? `<b>${e(c.name)}</b>${c.version ? `<small>v${e(c.version.replace(/^v/, ""))}</small>` : ""}` : ""}</span><span class="ds-sys"><span>${e(c?.time ?? "9:41 AM")}</span>${sys}</span></div>`;
+}
+
+export function renderDevice(screen: DeviceScreen, ctx: ScreenContext, opts: { caption?: boolean } = {}): string {
   const wide = isWide(screen.device) && screen.blocks.some((b) => b.column === "side");
   const parts: string[] = [];
   let main: string[] = [];
@@ -318,9 +332,9 @@ export function renderDevice(screen: DeviceScreen, ctx: ScreenContext): string {
   }
   flush();
   const owner = ctx.person(screen.owner);
-  const chrome = screen.device === "phone" ? `<div class="ds-statusbar" aria-hidden="true"><span>9:41</span><span class="ds-notch"></span><span>${glyph("wifi")}</span></div>` : "";
+  const chrome = statusBar(screen);
   const ownerHtml = owner
     ? `<figcaption class="ds-owner" style="--c:${e(owner.color)}">${avatar(owner, "lg")}<span><b>${e(owner.name)}</b><small>${e(DEVICE_LABEL[screen.device])}${owner.role ? ` · ${e(owner.role)}` : ""}</small></span></figcaption>`
     : `<figcaption class="ds-owner ds-unresolved">${e(screen.owner)}</figcaption>`;
-  return `<figure class="ds-device ds-${screen.device}" data-screen="${e(screen.id)}">${ownerHtml}<div class="ds-frame"><div class="ds-screen">${chrome}${parts.join("")}</div></div></figure>`;
+  return `<figure class="ds-device ds-${screen.device}" data-screen="${e(screen.id)}">${opts.caption === false ? "" : ownerHtml}<div class="ds-frame"><div class="ds-screen">${chrome}${parts.join("")}</div></div></figure>`;
 }
