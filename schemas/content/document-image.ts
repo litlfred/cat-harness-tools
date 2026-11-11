@@ -370,6 +370,20 @@ export const DocumentImageSchema = z
      * agrees. The distance is recorded because the threshold is a claim about a
      * corpus, and a reader should be able to re-judge it.
      */
+    /**
+     * The file is NOT HELD, on purpose: the source asks that its images not be
+     * distributed further, so the record and its description stay and the
+     * pixels do not (who-iris#224, 10665-381036). `file` still names where the
+     * extraction would write, so lifting the hold needs no renaming. A reader
+     * must not treat the absent file as a broken link.
+     */
+    withheld: z
+      .object({
+        /** Why, in a sentence a reviewer can check against the source. */
+        reason: z.string().min(1),
+      })
+      .strict()
+      .optional(),
     same_as: z
       .object({
         /** Repository-relative path of the asset `file` now points at. */

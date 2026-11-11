@@ -87,6 +87,16 @@ describe("a verdict must show its working", () => {
   });
 });
 
+describe("a file withheld on purpose", () => {
+  test("`withheld` with a reason is accepted", () => {
+    expect(DocumentImageSchema.safeParse({ ...FIGURE, withheld: { reason: "the source asks that its images not be distributed further" } }).success).toBe(true);
+  });
+
+  test("`withheld` without a reason is refused", () => {
+    expect(DocumentImageSchema.safeParse({ ...FIGURE, withheld: {} }).success).toBe(false);
+  });
+});
+
 describe("only a figure is worth describing", () => {
   test("a page scan carrying a narrative is refused", () => {
     const r = DocumentImageSchema.safeParse({

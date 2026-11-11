@@ -249,6 +249,7 @@ def main() -> int:
     # `image-descriptions` demanded a narrative for a file that was not there.
     # Three of the eight images in `2509.06388v1.pdf` were in that state.
     figure_files = 0
+    withheld = 0
     for path in sorted(glob.glob(os.path.join(os.path.dirname(ROOT), "*/library/*/images.json"))):
         with open(path, encoding="utf-8") as fh:
             side = json.load(fh)
@@ -256,10 +257,15 @@ def main() -> int:
         for i in (side.get("images") or []):
             if i.get("role") != "figure" or not i.get("file"):
                 continue
+            if i.get("withheld"):
+                # Not held on purpose (the source restricts redistribution);
+                # the record says so, so an absent file is not a broken link.
+                withheld += 1
+                continue
             figure_files += 1
             check(f"{os.path.basename(root)}/{i['id']}: the figure's file is on disk",
                   os.path.exists(os.path.join(root, i["file"])))
-    print(f"  ...checked {figure_files} figure file(s) across the committed corpus")
+    print(f"  ...checked {figure_files} figure file(s) across the committed corpus, {withheld} withheld on purpose")
 
     # The OPTIONAL role threshold -- bean `ay3x`, owner 2026-10-03: "an
     # optional one can be set, default none". The value below is ARBITRARY: it
