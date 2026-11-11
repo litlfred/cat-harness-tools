@@ -7,6 +7,7 @@
  * every journey in the checkout, each journey alone, journeys in sub-graphs
  * (per layer, and by `partOf` within one), and the didactic layer on top.
  */
+import { WorkshopSchema } from "../../schemas/process/workshop.ts";
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -534,9 +535,14 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(ana).toContain('<a href="../../walkthrough/P2/"><title>P2 Step P2: Worried</title>');
     expect(ana).toContain("Ana’s touchpoints (2)");
     expect(at(`${base}/personas/index.html`)).toContain('href="ana/"');
-    // One chip style for everyone, the baby too: initials, never a glyph among them (owner, 2026-11-06).
-    expect(at(`${base}/personas/cleo/index.html`)).toMatch(/class="jp-av jp-av-lg"[^>]*title="Cleo"[^>]*>C<\/span>/);
-    expect(map).not.toMatch(/class="jp-av[^"]*"[^>]*><svg/);
+    // JV-06: a persona with an icon wears it in every avatar, as VaxLink's baby does (owner's
+    // review, 2026-11-11, superseding initials for everyone of 2026-11-06); the rest keep initials.
+    expect(at(`${base}/personas/cleo/index.html`)).toMatch(/class="jp-av jp-av-lg jp-av-icon"[^>]*title="Cleo"[^>]*><svg/);
+    expect(map).toMatch(/class="jp-av[^"]* jp-av-icon"[^>]*title="Cleo"/);
+    expect(map).toMatch(/class="jp-av jp-av-sm"[^>]*title="Ana"[^>]*>A<\/span>/);
+    // JV-12: the curve's axis is three faces, not characters.
+    const curve = at(`${base}/personas/ana/index.html`);
+    for (const f of ["happy", "neutral", "sad"]) expect(curve).toContain(`class="jp-cv-face" aria-label="${f}"`);
   });
   test("how it works: the big ideas, the grid, a block's detail with the moments that use it", () => {
     expect(how).toContain("Carry it yourself");
@@ -565,6 +571,8 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(p2).toContain('href="../../demo/S2/"');
     expect(p2).toContain("<small>(screen S2)</small>");
     expect(p2).toContain('data-jp-inspect="Bundle/ana-ips"');
+    // JV-18: an example's link reads as its title, the id its tooltip.
+    expect(p2).toMatch(/<a class="jp-ext jp-exlabel" href="[^"]*Bundle-ana-ips\.html" data-jv-dak title="Bundle\/ana-ips"[^>]*>Ana&#39;s IPS</);
     expect(p2).toContain('<span class="jp-j-key">&quot;resourceType&quot;</span>');
     expect(p2).toContain("Read, not stored");
     expect(p2).toContain("Intl profile");
@@ -670,6 +678,19 @@ describe("presentation helpers", () => {
     expect(card2.indexOf('class="jp-moment-sum"')).toBeLessThan(card2.indexOf('class="jp-moment-foot"'));
     expect(card2).toContain('jp-scene jp-scene-md');
     expect(card2).toContain('<span class="jp-scene-l">A clinic</span>');
+  });
+  test("JV-09: presentation.tagRows groups a step's tags into the policy card's rows, with their glyphs, in its order", () => {
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, tagRows: [{ label: "Cost driver", icon: "coins" as const, tables: ["nowhere"] }, { label: "Forces", icon: "scale" as const, tables: ["rights"] }] } } };
+    const page = String(renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top").find((f) => f.path === "top/workshops/policy/walkthrough/P2/index.html")!.content);
+    const forces = /<dl class="jp-forces">([\s\S]*?)<\/dl>/.exec(page)![1]!;
+    expect(forces).toMatch(/<dt><svg[^>]*>[\s\S]*?<\/svg>Forces<\/dt><dd><span class="jp-pill"[^>]*>Trust anchor ★<\/span>/);
+    expect(forces).not.toContain("Decision rights");
+    // A row none of the step's tags fall in is left out.
+    expect(forces).not.toContain("Cost driver");
+    // A row naming a table the workshop does not list is refused.
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0" }).success).toBe(false);
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", presentation: { ...w.workshop.presentation, tagRows: [{ label: "Forces", icon: "scale", tables: ["rights"] }] } }).success).toBe(true);
   });
   test("presentation.cast orders the cast everywhere; presentation.chapterTitles names a chapter", () => {
     const w0 = corpus.workshops[0]!;

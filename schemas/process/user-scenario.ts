@@ -107,7 +107,7 @@ export const BUILDING_BLOCKS_V01 = "building-blocks/0.1.0";
 export const JOURNEY_GLYPHS = [
   "baby", "person", "family", "clinician", "health-worker", "hospital", "clinic", "home", "phone", "tablet",
   "qr", "paper", "wifi-off", "wifi", "shield-check", "calendar-check", "stethoscope", "link", "transfer",
-  "globe", "key", "lock", "database", "tent", "bus", "plane",
+  "globe", "key", "lock", "database", "tent", "bus", "plane", "scale", "coins", "shuffle",
 ] as const;
 export const JourneyGlyphSchema = z.enum(JOURNEY_GLYPHS);
 export type JourneyGlyph = z.infer<typeof JourneyGlyphSchema>;
