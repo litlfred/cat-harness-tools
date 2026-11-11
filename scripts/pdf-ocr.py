@@ -368,12 +368,16 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
         # often French on the left-hand pages and English on the right, or
         # one language per half, and page 1 alone would pick one for all.
         first = lang or detect_lang(pngs[0], hints)
+        have_langs = langs_present()
         used: list[str] = []
         pages_meta: list[dict] = []
         for i, png in enumerate(pngs, 1):
             use = lang or (first if i == 1 or not hints else detect_lang(png, hints))
-            txt = subprocess.run(["tesseract", png, "stdout", "-l", use],
-                                 capture_output=True, text=True).stdout
+            if lang:
+                txt = subprocess.run(["tesseract", png, "stdout", "-l", use],
+                                     capture_output=True, text=True).stdout
+            else:
+                txt, use = read_page(png, use, have_langs)
             open(os.path.join(cache, f"page-{i:03d}.txt"), "w",
                  encoding="utf-8").write(txt)
             for p in use.split("+"):
@@ -394,6 +398,77 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
         models = use.split("+") + ([] if lang else ["osd"])
         write_ocr_run_context(pdf, root, cache, models)
         return len(pngs), use
+
+
+# Below this mean word confidence a page is read again with a second script.
+LOW_CONFIDENCE = 70.0
+# A second read is kept only when it is this many points more confident.
+MIN_GAIN = 10.0
+# The scripts a page may mix in, one pack each, tried in this order.
+SECOND_SCRIPTS = ["eng", "ara", "rus", "chi_sim", "fas"]
+
+
+def _ocr_with_confidence(png: str, lang: str) -> tuple[str, float]:
+    """Tesseract's text for `png` read as `lang`, and its mean word confidence (0-100)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        base = os.path.join(tmp, "o")
+        subprocess.run(["tesseract", png, base, "-l", lang, "txt", "tsv"], capture_output=True, text=True)
+        try:
+            txt = open(base + ".txt", encoding="utf-8").read()
+        except OSError:
+            return "", 0.0
+        confs = []
+        try:
+            for row in open(base + ".tsv", encoding="utf-8").read().splitlines()[1:]:
+                cols = row.split("\t")
+                if len(cols) >= 12 and cols[11].strip():
+                    try:
+                        c = float(cols[10])
+                    except ValueError:
+                        continue
+                    if c >= 0:
+                        confs.append(c)
+        except OSError:
+            pass
+    return txt, (sum(confs) / len(confs) if confs else 0.0)
+
+
+def second_script_candidates(lang: str, have: set[str]) -> list[str]:
+    """`lang` plus one more installed pack of ANOTHER script, for each such pack. Pure."""
+    packs = lang.split("+")
+    scripts = {TESS_SCRIPT.get(p) for p in packs}
+    out = []
+    for extra in SECOND_SCRIPTS:
+        if extra in have and extra not in packs and TESS_SCRIPT.get(extra) not in scripts:
+            out.append(f"{lang}+{extra}")
+    return out
+
+
+def read_page(png: str, lang: str, have: set[str]) -> tuple[str, str]:
+    """One page's text, read again with a second script when the first read is unsure.
+
+    Owner, 2026-11-11 (who-iris, card Q-ODD-1 = A). Tesseract reads a page in
+    the script its detector names, and a page often holds two: the Arabic
+    abstract of a French EMHJ article (10665/117378) read as `fra` came out as
+    "er ie obus AU ball Aélroll"; the Latin URLs of an Arabic toolkit's
+    references (10665/75211, page 221) read as `ara` came out as Arabic
+    letters, mean word confidence 54. Read as `ara+eng` the same page gives
+    "http://www.health.gov.au/internet/main/..." at confidence 86. So a page
+    under LOW_CONFIDENCE is read again with each other installed script added,
+    and the most confident read is kept when it gains MIN_GAIN points. A page
+    the first read is sure of costs nothing more. Returns (text, lang used).
+    """
+    txt, conf = _ocr_with_confidence(png, lang)
+    if conf >= LOW_CONFIDENCE:
+        return txt, lang
+    best = (txt, conf, lang)
+    for cand in second_script_candidates(lang, have):
+        t, c = _ocr_with_confidence(png, cand)
+        if c > best[1]:
+            best = (t, c, cand)
+    if best[1] - conf >= MIN_GAIN:
+        return best[0], best[2]
+    return txt, lang
 
 
 def pdf_pages(pdf: str) -> int | None:

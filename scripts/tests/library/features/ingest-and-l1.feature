@@ -286,7 +286,7 @@ Feature: The ingest rung decision and the L1 completeness gate
   Scenario: The derived arms follow a PDF rung only
     Given a pdf-pages plan of one step
     When the derived arms are added
-    Then there are 9 steps: the rung, latex-math-overlay, pdf-images, pdf-vector-labels, pdf-vector-figures, l1-blocks, extract-candidates, apply-image-verdicts and pdf-cover
+    Then there are 10 steps: the rung, latex-math-overlay, pdf-images, pdf-vector-labels, pdf-vector-figures, l1-blocks, pdf-footnotes, extract-candidates, apply-image-verdicts and pdf-cover
     And each arm is given its stated source, staging root, entry, library or cover path
     And an archive, tabular or undetermined plan keeps its one step
 

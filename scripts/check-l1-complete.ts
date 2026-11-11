@@ -78,6 +78,8 @@ function slotStates(slot: NarrativeSlot): string {
     .join(", ");
 }
 import { SUMMARIES_FILE } from "../schemas/content/block-summary.ts";
+import { DocumentErrataSchema, ERRATA_FILE } from "../schemas/content/document-errata.ts";
+import { DocumentFootnotesSchema, FOOTNOTES_FILE } from "../schemas/content/document-footnotes.ts";
 import { KEYWORDS_FILE } from "../schemas/library/library-keywords.ts";
 import { entryDirs, entryItems, sidecarDefects, summaryLangs, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
@@ -212,6 +214,12 @@ export const ENTRY_SIDECARS: readonly string[] = [
   VECTOR_FIGURES_FILE,
   "manifest.jsonld",
   SUMMARIES_FILE,
+  // Authored: errors in the source's own text, recorded beside it and never
+  // substituted for it (owner, 2026-11-11, "add to L1 doc schema errata").
+  ERRATA_FILE,
+  // The PDF's footnotes and the marks that call them, written by the
+  // `pdf-footnotes.py` arm (owner, 2026-11-11, "also foot notes/marks").
+  FOOTNOTES_FILE,
   // LEGACY: the entry's LSI keywords, once written here by `library-keywords.ts`
   // (issue #2302). Keywords are now built at publish into docs/assets/keywords/
   // (cat-harness#1144); still allowed until the committed files are removed,
@@ -892,6 +900,18 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
           ? "no narrative in any bearing file"
           : tally,
     });
+  }
+
+  // Errata — errors in the SOURCE's own text (owner, 2026-11-11, who-iris
+  // card Q-ODD-1 = A, "add to L1 doc schema errata"). Optional and authored:
+  // an entry with none is not incomplete. Unmet only when the file does not
+  // mean what it says: it will not parse, names another entry, or points at a
+  // block the entry does not have.
+  {
+    const r = errataRequirement(dir);
+    if (r) out.push(r);
+    const f = footnotesRequirement(dir);
+    if (f) out.push(f);
   }
 
   // Block summaries — the agent-summary QA sidecar (owner, 2026-09-24).
@@ -1983,4 +2003,72 @@ if (import.meta.main) {
     );
   }
   process.exit(reports.some((r) => blockingUnmet(r.requirements).length > 0) ? 1 : 0);
+}
+
+/**
+ * The `errata` requirement for one entry, or `undefined` when it has no
+ * `errata.json` (no errata recorded is not a defect). Exported for tests.
+ */
+export function errataRequirement(dir: string): Requirement | undefined {
+  const f = join(dir, ERRATA_FILE);
+  if (!existsSync(f)) return undefined;
+  let doc: unknown;
+  try {
+    doc = JSON.parse(readFileSync(f, "utf-8"));
+  } catch (e) {
+    return { name: "errata", state: "unmet", detail: `${ERRATA_FILE} unparseable: ${String(e)}` };
+  }
+  const parsed = DocumentErrataSchema.safeParse(doc);
+  if (!parsed.success) {
+    const i = parsed.error.issues[0];
+    return { name: "errata", state: "unmet", detail: `${ERRATA_FILE}: ${i?.path.join(".")} ${i?.message}` };
+  }
+  const slug = dir.replace(/\/+$/, "").split("/").pop() ?? "";
+  if (parsed.data.entry !== slug) {
+    return { name: "errata", state: "unmet", detail: `${ERRATA_FILE} names entry ${parsed.data.entry}, not ${slug}` };
+  }
+  const missing = parsed.data.errata.filter((e) => {
+    if (!e.block) return false;
+    const name = e.block.split("/").pop() ?? "";
+    return !existsSync(join(dir, "blocks", `${name}.jsonld`));
+  });
+  if (missing.length) {
+    return {
+      name: "errata",
+      state: "unmet",
+      detail: `${missing.length} erratum/errata name a block this entry does not have (${missing[0]!.id}: ${missing[0]!.block})`,
+    };
+  }
+  return { name: "errata", state: "met", detail: `${parsed.data.errata.length} erratum/errata recorded against the source's own text` };
+}
+
+/**
+ * The `footnotes` requirement for one entry, or `undefined` when it has no
+ * `footnotes.json` (an entry ingested before the arm existed, or not a PDF).
+ * Unmet only when the file will not parse or names another entry.
+ */
+export function footnotesRequirement(dir: string): Requirement | undefined {
+  const f = join(dir, FOOTNOTES_FILE);
+  if (!existsSync(f)) return undefined;
+  let doc: unknown;
+  try {
+    doc = JSON.parse(readFileSync(f, "utf-8"));
+  } catch (e) {
+    return { name: "footnotes", state: "unmet", detail: `${FOOTNOTES_FILE} unparseable: ${String(e)}` };
+  }
+  const parsed = DocumentFootnotesSchema.safeParse(doc);
+  if (!parsed.success) {
+    const i = parsed.error.issues[0];
+    return { name: "footnotes", state: "unmet", detail: `${FOOTNOTES_FILE}: ${i?.path.join(".")} ${i?.message}` };
+  }
+  const slug = dir.replace(/\/+$/, "").split("/").pop() ?? "";
+  if (parsed.data.entry !== slug) {
+    return { name: "footnotes", state: "unmet", detail: `${FOOTNOTES_FILE} names entry ${parsed.data.entry}, not ${slug}` };
+  }
+  const d = parsed.data;
+  return {
+    name: "footnotes",
+    state: "met",
+    detail: `${d.footnotes.length} footnote(s) called from the text, ${d.uncalled_notes.length} uncalled, ${d.unlinked_marks.length} mark(s) unlinked (${d.status})`,
+  };
 }

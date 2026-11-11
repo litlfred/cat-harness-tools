@@ -24,6 +24,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { NarrativeSchema, NarrativeSlotSchema, REJECTION_REASONS, narrativesOfSlot, type Narrative } from "../schemas/content/narrative.ts";
 import { SUMMARIES_FILE } from "../schemas/content/block-summary.ts";
+import { ERRATA_FILE } from "../schemas/content/document-errata.ts";
 import { TABULAR_CSVW_FILENAME } from "../schemas/library/tabular-csvw.ts";
 import { VECTOR_FIGURES_FILE } from "../schemas/content/vector-figure.ts";
 import { FIGURE_DESCRIPTIONS_FILE } from "../schemas/content/figure-description.ts";
@@ -56,6 +57,9 @@ export const NARRATIVE_BEARING = [
   // `summaries[i].narrative`, like `images.json` — and like it, useless here
   // without the matching branch in {@link narrativesIn}.
   SUMMARIES_FILE,
+  // Errata of the source's own text (owner, 2026-11-11): MANY per file, at
+  // `errata[i].narrative`, with the matching branch in {@link narrativesIn}.
+  ERRATA_FILE,
   // Drafted descriptions of the vector arm's figure renders, MANY per file at
   // `figures[i].narrative` (bean `ay3x`). Missing until 2026-10-21, so the
   // queue never offered one to a person, and the e1lo language migration,
@@ -181,6 +185,18 @@ export function slotsIn(doc: Record<string, unknown>): SlotAt[] {
       const r = rec as Record<string, unknown>;
       const subject = typeof r.block === "string" ? r.block.split("/").pop() : undefined;
       if ("narrative" in r) out.push({ at: ["summaries", i, "narrative"], value: r.narrative, subject });
+    });
+  }
+
+  // Errata (`errata.json`). The subject is the erratum's id and its block or page.
+  const errata = doc.errata;
+  if (Array.isArray(errata)) {
+    errata.forEach((rec, i) => {
+      if (typeof rec !== "object" || rec === null) return;
+      const r = rec as Record<string, unknown>;
+      const where = typeof r.block === "string" ? r.block.split("/").pop() : typeof r.page === "number" ? `p. ${r.page}` : undefined;
+      const subject = typeof r.id === "string" ? `erratum ${r.id}${where ? ` (${where})` : ""}` : where;
+      if ("narrative" in r) out.push({ at: ["errata", i, "narrative"], value: r.narrative, subject });
     });
   }
   return out;

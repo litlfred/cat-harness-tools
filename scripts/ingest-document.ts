@@ -249,7 +249,7 @@ export function libraryChoice(argv: string[]): string | undefined {
 
 /** Which rung a document needs, and the evidence that chose it. */
 export interface Plan {
-  rung: "archive" | "tabular" | "notebook" | "slides" | "referenced" | "text" | "pdf-structure" | "pdf-pages" | "pdf-ocr+pdf-pages" | "undetermined";
+  rung: "archive" | "tabular" | "notebook" | "slides" | "referenced" | "text" | "pdf-structure" | "pdf-pages" | "pdf-ocr+pdf-pages" | "pdf-ocr+pdf-structure" | "undetermined";
   why: string;
   /** Commands to run, in order, each as argv. */
   steps: string[][];
@@ -372,7 +372,7 @@ export function withDerivedArms(
   if (plan.rung === "notebook" || plan.rung === "text") {
     return { ...plan, steps: [...plan.steps, ["bun", "run", tsHelper("l1-blocks.ts"), "-o", staging], aspectsArm(staging)] };
   }
-  const PDF_RUNGS = ["pdf-structure", "pdf-pages", "pdf-ocr+pdf-pages"];
+  const PDF_RUNGS = ["pdf-structure", "pdf-pages", "pdf-ocr+pdf-pages", "pdf-ocr+pdf-structure"];
   // A deck writes the same `structure.json` + `sections/` a paged PDF does, and
   // its own `images.json` (the images are package members, so there is no
   // raster layer to recover and no vector labels to read). So it takes the two
@@ -442,6 +442,11 @@ export function withDerivedArms(
       // `l1-blocks.ts` reads what the rung already wrote, so it takes the
       // ENTRY directory and no source at all. See the table above.
       ["bun", "run", tsHelper("l1-blocks.ts"), "-o", staging],
+      // Footnotes and the marks that call them (owner, 2026-11-11, "also foot
+      // notes/marks"). After `l1-blocks.ts`, because each note names the block
+      // that holds its page; it reads the PDF's layout, never changes a block,
+      // and writes `footnotes.json` (`schemas/content/document-footnotes.ts`).
+      ["python3", pyHelper("pdf-footnotes.py"), staging, pdf],
       aspectsArm(staging),
       // ── The fourth arm, and it must come AFTER `pdf-images.py` — bean `8suc`
       //
@@ -552,6 +557,12 @@ export interface Probe {
   arabicLigatureReversed?: number;
   /** Letters by script (latin, arabic, cyrillic, han), for the wrong-script check in {@link textLayerUnreadable}. */
   scriptLetters?: Partial<Record<Script, number>>;
+  /**
+   * Every page whose text layer fails `scripts/_text_quality.py` (1-based page,
+   * reason), over the WHOLE document, and the page count. See {@link pagesToOcr}.
+   */
+  pagesFailing?: [number, string][];
+  pagesTotal?: number;
   error?: string;
 }
 
@@ -681,7 +692,7 @@ const VECTOR_ARM_SIDECARS: Record<string, string> = {
   "pdf-vector-figures.py": "vector-figures.json",
 };
 
-export function probe(pdf: string): Probe {
+export function probe(pdf: string, langs: readonly string[] = []): Probe {
   // `pymupdf`, NOT `fitz`. The legacy alias still imports, and that is the
   // trap: it prints a deprecation warning TO STDOUT before anything else, so
   // the JSON parse below saw `warning: The \`fitz\` API is deprecated…` and
@@ -697,6 +708,10 @@ except Exception as e:
     print(json.dumps({"error": f"no PDF backend: {e}"})); sys.exit(0)
 try:
     d = pymupdf.open(sys.argv[1])
+    sys.path.insert(0, sys.argv[2])
+    from _text_quality import failing_pages
+    langs = [l for l in sys.argv[3].split(",") if l]
+    failing = [[n, why] for n, why in failing_pages([pg.get_text() for pg in d], langs)]
     text = "".join(d[i].get_text() for i in range(min(len(d), 20)))
     chars = len(text)
     nonspace = sum(1 for c in text if not c.isspace())
@@ -739,12 +754,14 @@ try:
         "arabicWords": len(arabic),
         "arabicLigatureReversed": reversed_lig,
         "scriptLetters": scripts,
+        "pagesFailing": failing,
+        "pagesTotal": len(d),
     }))
 except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
   // input-site: spawned #363b130f — python3 on a document this tool was handed; the cone audits the child from its read set
-  const r = Bun.spawnSync(["python3", "-c", py, pdf]);
+  const r = Bun.spawnSync(["python3", "-c", py, pdf, dirname(pyHelper("_text_quality.py")), langs.join(",")]);
   const raw = parseProbe(new TextDecoder().decode(r.stdout)) as Probe & {
     toc?: [string, number][];
   };
@@ -977,7 +994,7 @@ export function planFor(
       steps: [["python3", pyHelper("archive-contents.py"), "-o", lib, pdf]],
     };
   }
-  return planForPdf(pdf, p ?? probe(pdf), lib, langs);
+  return planForPdf(pdf, p ?? probe(pdf, langs), lib, langs);
 }
 
 function planForPdf(pdf: string, p: Probe, lib: string, langs: readonly string[] = []): Plan {
@@ -1006,6 +1023,19 @@ function planForPdf(pdf: string, p: Probe, lib: string, langs: readonly string[]
       steps: [],
     };
   }
+  const ocrPages = pagesToOcr(p);
+  if (ocrPages && ((p.outlineUsable ?? 0) > 0 || !ocrPages.most)) {
+    return {
+      rung: "pdf-ocr+pdf-structure",
+      why:
+        `${ocrPages.why} — OCR reads every page and pdf-structure takes the OCR text for those pages ` +
+        `only, keeping the ${(p.outlineUsable ?? 0) > 0 ? "outline and the " : ""}text layer of the rest`,
+      steps: [
+        ["python3", pyHelper("pdf-ocr.py"), "-o", lib, pdf],
+        ["python3", pyHelper("pdf-structure.py"), "-o", lib, "--ocr", pdf],
+      ],
+    };
+  }
   if ((p.outlineUsable ?? 0) > 0) {
     return {
       rung: "pdf-structure",
@@ -1025,7 +1055,7 @@ function planForPdf(pdf: string, p: Probe, lib: string, langs: readonly string[]
       ? `an outline of ${p.outline} entries, none of which can carry a chapter ` +
         `(page labels and entries with no destination) — present, but not a structure. `
       : "";
-  const unreadable = textLayerUnreadable(p, langs);
+  const unreadable = textLayerUnreadable(p, langs) ?? (ocrPages?.most ? ocrPages.why : undefined);
   if (unreadable) {
     return {
       rung: "pdf-ocr+pdf-pages",
@@ -1147,15 +1177,45 @@ export function knownLanguages(
   return langs.length ? { langs, from: `${cat.file} dc.language.iso` } : undefined;
 }
 
-/** `plan` with `--lang-hint` handed to the OCR rung. Pure. */
+/**
+ * `plan` with `--lang-hint` handed to the OCR rung and to `pdf-structure`,
+ * whose page check needs the document's languages (`_text_quality.py`). Pure.
+ */
 export function withLanguageHint(plan: Plan, langs: readonly string[] | undefined): Plan {
   if (!langs || langs.length === 0) return plan;
   return {
     ...plan,
     steps: plan.steps.map((s) =>
-      basename(s[1] ?? "") === "pdf-ocr.py" && !s.includes("--lang-hint") && !s.includes("--lang") ? [...s, "--lang-hint", langs.join(",")] : s,
+      ["pdf-ocr.py", "pdf-structure.py"].includes(basename(s[1] ?? "")) && !s.includes("--lang-hint") && !s.includes("--lang")
+        ? [...s, "--lang-hint", langs.join(",")]
+        : s,
     ),
   };
+}
+
+/** At least this share of pages failing the page check sends a document with no outline to OCR whole. */
+export const MOST_PAGES_FAILING = 0.5;
+
+/**
+ * Which pages' text layers fail the page check, and whether that is most of
+ * the document, or `undefined` when none does. Pure.
+ *
+ * Owner, 2026-11-11 (who-iris, card Q-ODD-1 = A): "force OCR when a page's
+ * text layer fails a quality check". {@link textLayerUnreadable} judges the
+ * first 20 pages as one text, and is never asked at all when the PDF has a
+ * usable outline: the French WER 75(02) (10665/231031, accents mapped to
+ * Greek letters on all 5 pages), the Persian cervical-screening guideline
+ * (10665/94830, 43 of 68 pages in the wrong Arabic code points) and the
+ * French article with an Arabic abstract (10665/117378) all kept their broken
+ * text. The page check (`scripts/_text_quality.py`) runs over every page.
+ */
+export function pagesToOcr(p: Probe): { pages: number[]; most: boolean; why: string } | undefined {
+  const f = p.pagesFailing ?? [];
+  if (f.length === 0) return undefined;
+  const total = p.pagesTotal ?? f.length;
+  const most = f.length >= MOST_PAGES_FAILING * total;
+  const list = f.slice(0, 8).map(([n]) => n).join(", ") + (f.length > 8 ? ", …" : "");
+  return { pages: f.map(([n]) => n), most, why: `${f.length} of ${total} pages fail the text-layer check (pages ${list}; page ${f[0]![0]}: ${f[0]![1]})` };
 }
 
 /**
