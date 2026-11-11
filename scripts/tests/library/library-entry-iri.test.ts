@@ -233,11 +233,20 @@ describe("the committed tree: one materialized shell per entry", () => {
     expect(have.sort()).toEqual(want);
   });
   test.skipIf(NOT_BUILT)("each shell's alternate JSON-LD is published", () => {
-    for (const e of index.entries) {
+    for (const e of index.entries.filter((x) => x.hasManifest)) {
       const f = join(LIB, e.instance, e.id, "index.html");
       const alt = alternateOf(readFileSync(f, "utf-8"));
       expect(alt, `${e.instance}/${e.id} names no JSON-LD`).toBeDefined();
       expect(existsSync(resolve(join(LIB, e.instance, e.id), alt!)), `${e.instance}/${e.id}: ${alt}`).toBe(true);
+    }
+  });
+  // An item catalogued by reference holds no manifest, so it publishes no
+  // JSON-LD (#1765): its shell names no `alternate` rather than a missing one,
+  // the case the shell template's own test pins.
+  test.skipIf(NOT_BUILT)("a shell whose entry holds no manifest names no alternate", () => {
+    for (const e of index.entries.filter((x) => !x.hasManifest)) {
+      const f = join(LIB, e.instance, e.id, "index.html");
+      expect(alternateOf(readFileSync(f, "utf-8")), `${e.instance}/${e.id}`).toBeUndefined();
     }
   });
 });
@@ -254,7 +263,7 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
     expect(DOCS_SITE).toBe(`${url}${baseurl}/`);
   });
   test.skipIf(NOT_BUILT)("the rendering points TO the asset: its alternate resolves to the asset's file", () => {
-    for (const e of index.entries) {
+    for (const e of index.entries.filter((x) => x.hasManifest)) {
       const shellDir = join(LIB, e.instance, e.id);
       const alt = alternateOf(readFileSync(join(shellDir, "index.html"), "utf-8"));
       expect(resolve(shellDir, alt!)).toBe(join(SITE, libraryAssetSitePath(e.instance, e.id)));
@@ -273,7 +282,7 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
     }
   });
   test.skipIf(NOT_BUILT)("the asset never references a rendering of itself", () => {
-    for (const e of index.entries) {
+    for (const e of index.entries.filter((x) => x.hasManifest)) {
       const text = readFileSync(join(SITE, libraryAssetSitePath(e.instance, e.id)), "utf-8");
       expect(text, e.id).not.toMatch(/subjectOf|foaf:page|"page"|\/library\/[^"]*\/index\.html|cat-harness\/library\//);
     }
