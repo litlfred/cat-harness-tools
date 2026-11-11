@@ -178,8 +178,32 @@
 # treats CI on a non-release merge as advisory.
 #
 # A PR labelled `release` runs the full tier, as every ready PR did before.
-# Add the label before the push (or re-run): the callers' `pull_request`
-# types do not include `labeled`.
+#
+# ADDING THE `release` LABEL STARTS THE FULL TIER, once the caller lists
+# `labeled` in its `pull_request` types (owner, 2026-11-11, card B: every PR
+# passes the full tier before merge). Without it the label starts nothing,
+# and a re-run replays the original payload with the OLD labels. A `labeled`
+# run for the `release` label is a full-tier run like any other and replaces
+# a fast-tier run in flight. Any OTHER label (`ready-to-merge`, ...) is a
+# no-op here: prepare-head, prepare-base and compare skip, so nothing is
+# judged and no verdict is reported, and its concurrency group is its own
+# (keyed by the run id), so it never cancels the PR's real run. A caller that
+# adds `labeled` should also skip its `checks` job on such an event and key
+# its OWN concurrency group the same way (a caller-level group keyed by
+# `github.ref` with cancel-in-progress would still cancel the real run):
+#
+#   on:
+#     pull_request:
+#       types: [opened, synchronize, reopened, ready_for_review, labeled]
+#   concurrency:
+#     group: harness-pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release') && format('noop-label-{0}', github.run_id) || github.ref }}
+#     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+#   jobs:
+#     checks:
+#       if: github.event.action != 'labeled' || github.event.label.name == 'release'
+#
+# An all-skipped run judges nothing; merge-guard's check 5 lets it never
+# displace an earlier run of the same workflow on the head.
 #
 # Main's full suite runs on main's INTEGRATION run: a push to main, at most
 # once per `integration-minutes` window (prepare-base). This replaces the
@@ -338,8 +362,10 @@ permissions:
 # GitHub keeps only ONE pending run per group and cancels the older pending
 # one, so three quick merges cancelled the middle main run (fhir-harness run
 # 42917495047, 2026-11-10) and mailed "Some jobs were not successful".
+# A `labeled` run for any label but `release` is a no-op, in a group of its
+# own: in the PR's group it would cancel the PR's real run.
 concurrency:
-  group: layer-pr-checks-${{ github.repository }}-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.ref, github.event_name == 'push' && github.sha || 'run') }}
+  group: layer-pr-checks-${{ github.repository }}-${{ (github.event.action == 'labeled' && github.event.label.name != 'release') && format('noop-label-{0}', github.run_id) || github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.ref, github.event_name == 'push' && github.sha || 'run') }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The instance, once: the input when given, else (layer mode) the calling
@@ -357,8 +383,9 @@ jobs:
     name: Prepare the PR side (and typecheck)
     # A push to main has no PR side: it records main's side (the CI cone).
     # Not when `ready-reuse` found this PR already judged on these inputs.
+    # Nor on a no-op `labeled` event (any label but `release`).
     needs: [ready-reuse]
-    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && github.event_name != 'push' }}
+    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && github.event_name != 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -1348,9 +1375,10 @@ jobs:
     name: Prepare the main side, unless main's answer is cached
     # Not on the fast tier (a non-release PR): it has no full tier to compare
     # against. `run` then skips too, because it needs this job to succeed.
-    # Nor when `ready-reuse` found this PR already judged on these inputs.
+    # Nor when `ready-reuse` found this PR already judged on these inputs,
+    # nor on a no-op `labeled` event (any label but `release`).
     needs: [ready-reuse]
-    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) }}
+    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -1999,7 +2027,9 @@ jobs:
     # (https://github.com/litlfred/fhir-harness/pull/167 and #169, 2026-10-24).
     name: ${{ (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && 'Fast tier only (advisory; the full checks gate a release)' || 'No new failures (tests and gates)' }}
     needs: [ready-reuse, prepare-head, prepare-base, run]
-    if: ${{ !cancelled() && github.event.action != 'closed' }}
+    # A no-op `labeled` run (any label but `release`) judged nothing, so it
+    # reports no verdict.
+    if: ${{ !cancelled() && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') }}
     runs-on: ubuntu-latest
     outputs:
       main-verdict: ${{ steps.main-verdict.outputs.verdict }}

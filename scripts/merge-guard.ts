@@ -701,12 +701,23 @@ function runOrder(r: GuardRun): number {
   return r.id ?? Number(r.html_url?.match(/\/runs\/(\d+)/)?.[1] ?? 0);
 }
 
-/** The latest run per workflow name, by {@link runOrder}. */
+/** A finished run whose every job was skipped: it judged nothing. */
+const allSkipped = (r: GuardRun) => r.status === "completed" && r.conclusion === "skipped";
+
+/**
+ * The latest run per workflow name, by {@link runOrder}. A run whose every job
+ * skipped judged nothing, so it never displaces another run of the same
+ * workflow on the head: a `labeled` run for a label other than `release`
+ * (`ready-to-merge`, added after the full tier) skips every job, and taken as
+ * the latest it would read a red full tier as passed (owner, 2026-11-11,
+ * card B). It stands only when no run of that workflow judged anything.
+ */
 function latestByName(runs: readonly GuardRun[]): Map<string, GuardRun> {
   const latest = new Map<string, GuardRun>();
   for (const r of runs) {
     const prev = latest.get(r.name);
-    if (!prev || runOrder(r) > runOrder(prev)) latest.set(r.name, r);
+    const newer = !prev || runOrder(r) > runOrder(prev);
+    if (!prev || (allSkipped(prev) && !allSkipped(r)) || (newer && (!allSkipped(r) || allSkipped(prev)))) latest.set(r.name, r);
   }
   return latest;
 }
