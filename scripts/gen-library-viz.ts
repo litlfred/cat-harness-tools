@@ -1308,7 +1308,7 @@ const VIEWER_BODY = `<div class="toolbar">
 </div>`;
 
 /**
- * An ENTRY page's body — owner, 2026-11-10 (who-iris#217): the entry's
+ * An ENTRY page's body — owner, 2026-11-10: the entry's
  * summary, sections and keywords were drawn BELOW the whole library's
  * listing, so a reader arriving at one document saw a table of every other
  * one first. Here the document comes first and the library listing folds

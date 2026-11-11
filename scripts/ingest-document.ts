@@ -1269,7 +1269,7 @@ export function mayPromote(requirements: readonly Requirement[], qaLater = false
  * `image-descriptions`) still unmet, and say so. Off by default, so a person
  * ingesting one document by hand still meets the full gate.
  *
- * Owner, 2026-11-10 (who-iris#207): items catalogued by reference have their
+ * Owner, 2026-11-10: items catalogued by reference have their
  * library KG derived in bulk ("retrieve PDF/source document locally, run KG
  * ingestion routines/derivative KGs ... do all 144"). One of them, the Global
  * strategy on digital health, places 125 images; the narratives are written
