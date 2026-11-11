@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps } from "../../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps } from "../../build-instance-site.ts";
 import type { DeclaredArtefact } from "../../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -157,6 +157,35 @@ describe("build-instance-site — a checkout that only mounts layers (an IG repo
     const r = await checkLinks(site, "/repo/", new Set(["sub/b.html"]));
     expect(r.misses).toEqual(["index.html: gone.html"]);
     expect(r.upstreamMisses).toEqual(["sub/b.html: ../StructureDefinition-x.html"]);
+  });
+
+  test("an absolute link to the site's own address is checked too (fhir-harness#380)", async () => {
+    // smart-trust-demo's journey actors linked the root ActorDefinition-….html, which no build writes.
+    const site = mkdtempSync(join(tmpdir(), "self-links-"));
+    mkdirSync(join(site, "artifact"));
+    writeFileSync(join(site, "artifact", "ActorDefinition-A.html"), "ok");
+    const own = selfAddressOf("LitlFred", "demo");
+    expect(own).toBe("https://litlfred.github.io/demo/");
+    writeFileSync(
+      join(site, "index.html"),
+      '<a href="https://litlfred.github.io/demo/ActorDefinition-A.html">dead</a>' +
+        '<a href="https://litlfred.github.io/demo/artifact/ActorDefinition-A.html#x">ok</a>' +
+        '<a href="https://litlfred.github.io/demo/">home</a>' +
+        '<a href="https://litlfred.github.io/other/ActorDefinition-A.html">another site</a>',
+    );
+    const r = await checkLinks(site, "/demo/", new Set(), own);
+    expect(r.selfMisses).toEqual(["index.html: https://litlfred.github.io/demo/ActorDefinition-A.html"]);
+    expect(r.misses).toEqual([]);
+    // Without the address, absolute links stay unchecked, as before.
+    expect((await checkLinks(site, "/demo/", new Set())).selfMisses).toEqual([]);
+    expect(selfTargetOf("https://LITLFRED.github.io/demo/a%20b.html?q=1", own)).toBe("a b.html");
+    expect(selfTargetOf("https://litlfred.github.io/demo", own)).toBe("");
+    expect(selfTargetOf("https://litlfred.github.io/demox/a.html", own)).toBeUndefined();
+    // The result is on the site for its QA report.
+    writeLinkReport(site, r);
+    const rep = JSON.parse(readFileSync(join(site, LINK_REPORT), "utf-8"));
+    expect(rep.selfAddress).toEqual([{ page: "index.html", href: "https://litlfred.github.io/demo/ActorDefinition-A.html" }]);
+    expect(rep.unresolved).toEqual([]);
   });
 });
 
