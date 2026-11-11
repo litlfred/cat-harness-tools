@@ -219,6 +219,14 @@ export const AVATARS: Readonly<Record<string, Avatar>> = {
     tone: 184,
     reads: "a globe with an arrow at its rim: served by path, and redirected and re-headed on the way",
   },
+  // An app a layer carries (web-app kind, owner 2026-11-11, Q-GAME-5): a
+  // window of its own with a play mark, since it draws its own frame and
+  // runs rather than reads.
+  "web-app": {
+    glyph: "M3 5h18v14H3zM3 9h18M10 12v5l4.5-2.5z",
+    tone: 262,
+    reads: "a window of its own with a play mark: an app that draws its own frame and runs when opened",
+  },
   "merge-queue": {
     glyph: "M5 7h5M5 12h5M5 17h5M10 7q4 0 4 5M10 17q4 0 4-5M10 12h9",
     tone: 205,
