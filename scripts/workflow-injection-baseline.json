@@ -4,7 +4,6 @@
     "feature-staging.yml (run): github.event.pull_request.number",
     "feature-staging.yml (run): github.event.pull_request.number || ''",
     "feature-staging.yml (run): github.event.pull_request.number || 'n/a'",
-    "feature-staging.yml (run): github.event.repository.name",
-    "publish.yml (script): github.event.pull_request.base.ref"
+    "feature-staging.yml (run): github.event.repository.name"
   ]
 }
