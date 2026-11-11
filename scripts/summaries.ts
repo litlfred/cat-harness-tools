@@ -351,8 +351,10 @@ export interface DraftFile {
  * - a `source_hash` that is not the text's hash NOW — the agent summarised
  *   something that has since changed, and recording it would make a stale
  *   summary look current from its first moment;
- * - a block whose summary is already a current draft or confirmation — a
- *   person's `confirmed` is never overwritten by a new draft.
+ * - a block whose summary is already a current draft or confirmation IN THE
+ *   SAME LANGUAGE — a person's `confirmed` is never overwritten by a new
+ *   draft. A draft in a language the slot does not hold yet is added beside
+ *   the existing narratives, which are kept unchanged.
  *
  * A rejected or stale record is replaced, and the narrative it held is kept
  * under `superseded`, so a rejection's reason outlives the redraft.
@@ -389,14 +391,26 @@ export function record(file: DraftFile, root = ROOT): { written: string[]; block
     if (d.source_hash !== it.hash) {
       throw new Error(`${d.block}: source_hash does not match the text as it is now — re-run summaries:next`);
     }
-    if (it.status === "draft" || it.status === "confirmed") {
-      throw new Error(`${d.block}: already has a current ${it.status} summary — nothing to drain here`);
-    }
     const lang = d.lang ?? file.lang ?? DEFAULT_NARRATIVE_LANG;
     const narrative: Narrative = { text: d.text.trim(), lang, state: "draft", drafted_by: by.data, drafted_at: at };
     const nr = NarrativeSchema.safeParse(narrative);
     if (!nr.success) throw new Error(`${d.block}: ${nr.error.issues[0]?.message ?? "invalid narrative"}`);
     const prior = it.record;
+    if (it.status === "draft" || it.status === "confirmed") {
+      // A current summary in ANOTHER language is no reason to refuse: the slot
+      // holds one narrative per language (bean `cat-tools-e1lo`), so a
+      // translation is added beside it and every existing entry is kept as is.
+      const held = prior ? narrativesOfSlot(prior.narrative) : [];
+      const langs = held.map((n) => n.lang ?? DEFAULT_NARRATIVE_LANG);
+      if (!prior || langs.includes(lang)) {
+        throw new Error(`${d.block}: already has a current ${it.status} summary in "${lang}" — nothing to drain here`);
+      }
+      const rec: BlockSummary = { ...prior, narrative: [...held, nr.data] };
+      const slot = byEntry.get(it.entry) ?? { dir: it.entryDir, recs: [] };
+      slot.recs.push(rec);
+      byEntry.set(it.entry, slot);
+      continue;
+    }
     // Every entry of the replaced slot is kept, one per language if it held several.
     const superseded = prior ? [...(prior.superseded ?? []), ...narrativesOfSlot(prior.narrative)] : undefined;
     const rec: BlockSummary = {
