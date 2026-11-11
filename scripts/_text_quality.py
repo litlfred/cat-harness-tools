@@ -17,6 +17,8 @@ one of those PDFs; none is a guess.
   it; but a third of them are letters neither Arabic nor Persian writes.
 - **Letters spaced apart.** A text layer that places each glyph alone
   ("l e t t r e") reads as one-letter words.
+- **Arabic letters placed apart.** 10665/192500 sets each Arabic letter as its
+  own word ("ال ج د و ل"); the Latin stray-letter check leaves Arabic out.
 - **Words doubled.** Fake bold drawn by printing each word twice or more
   (10665/67211, 10665/67212: "words repeated up to 5 times").
 
@@ -47,6 +49,12 @@ MAX_FOREIGN_ARABIC = 0.10
 # 10665/83270: the text layer breaks words where the font's kerning does.
 MAX_STRAY_LETTERS = 0.02
 SINGLE_LETTER_WORDS = set("aàáeéiíoóuúyAÀEÉIOUYвиксуояaВИКСУОЯА")
+# One-letter words among a page's Arabic-script words. A43/10's Arabic edition
+# (10665/192500) places each letter apart ("ال ج د و ل" for "الجدول"): 66-79%
+# of its words are one letter; the Arabic text layers that read well measure
+# 0-3% (10665/44118, 10665/379160).
+MIN_ARABIC_WORDS = 40
+MAX_ARABIC_SINGLE_LETTERS = 0.30
 # Words equal to the word before them.
 MAX_DOUBLED_WORDS = 0.20
 
@@ -112,6 +120,12 @@ def page_problem(text: str, langs=()) -> str | None:
             if foreign > MAX_FOREIGN_ARABIC * len(arabic):
                 return (f"{foreign} of {len(arabic)} Arabic-script letters are not in the "
                         f"{'/'.join(arabic_langs)} alphabet: the font maps glyphs to the wrong code points")
+    arabic_words = [w for w in re.findall(r"\S+", text) if all(_is_arabic_letter(c) for c in w)]
+    if len(arabic_words) >= MIN_ARABIC_WORDS:
+        alone = sum(1 for w in arabic_words if len(w) == 1)
+        if alone > MAX_ARABIC_SINGLE_LETTERS * len(arabic_words):
+            return (f"{alone} of {len(arabic_words)} Arabic-script words are one letter: "
+                    "the text layer places each letter apart")
     words = re.findall(r"[^\W\d_]+", text)
     spaced = [w for w in re.findall(r"\S+", text) if not any(_is_arabic_letter(c) or 0x3400 <= ord(c) <= 0x9FFF for c in w)]
     if len(spaced) >= 100:

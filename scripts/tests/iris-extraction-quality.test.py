@@ -12,15 +12,17 @@ checks can run without the PDFs.
    initials and list marks, a statistical table and a formula with Greek.
 2. `pdf-structure.py` drops machine bookmark names from an outline and sets the
    outline aside when nothing usable is left or under half of it is printed.
-3. An oversized section is cut at the headings inside it, else by page, and a
+3. An oversized section is cut at the headings inside it, else where the
+   chapter in its running heads changes, else by page, and a
    section of ordinary length is left alone.
 4. Failing pages, and only those, are replaced from the OCR cache.
-5. `pdf-ocr.py` tries a second script only from another script family.
+5. `pdf-ocr.py` tries a second script only from another script family, and
+   puts back Latin words a non-Latin read turned into digits.
 6. `pdf-footnotes.py` recognises a foot-of-page note opening with a mark, and
    not a line of body-size text.
 7. Inferred headings that do not read as headings are rejoined (a title cut to
    its last line) or dropped (a body word, a reference's author, a diagram's
-   labels), and a page drawn out of print order is read in print order.
+   labels, a figure or table caption), and a page drawn out of print order is read in print order.
 """
 import importlib.util
 import os
@@ -56,6 +58,10 @@ def main() -> int:
                  "des États-Unis concernant l'élimination progressive du thiomersal, un composé chimique contenant "
                  "du mercure utilisé en quantités infimes dans certains procédés de fabrication des vaccins. ") * 2
     check("plain French passes", q.page_problem(french_ok, ["fr", "en"]) is None)
+    split_ar = ("ال ج د و ل ب ل د ا ن نامي ت أ خر ى صفحة " * 12)
+    check("10665/192500: Arabic letters placed apart fail", "one letter" in (q.page_problem(split_ar, ["ar"]) or ""))
+    whole_ar = ("الجدول البلدان النامية الأخرى في الصفحة التالية تقرير مرحلي وتقييمي للبرنامج الموسع " * 6)
+    check("ordinary Arabic passes", q.page_problem(whole_ar, ["ar"]) is None)
     greek = french_ok.replace("é", "Θ").replace("'", "Æ")
     check("10665/231031: accents mapped to Greek fail", "Greek" in (q.page_problem(greek, ["fr", "en"]) or ""))
     formula = ("The rate α was estimated with confidence β and a variance σ for each country in the region. " * 6)
@@ -112,6 +118,28 @@ def main() -> int:
     out, rep = s.split_oversized([big], book, heads)
     check("an oversized section is cut at the headings inside it", rep and rep[0]["by"] == "headings"
           and [x.title for x in out][:3] == ["Part One", "Part Two", "Part Three"])
+    # 10665/75211: three volumes in one PDF, the contents page lists Part 1
+    # only. Each page prints its part at the top and its chapter at the foot;
+    # the oversized tail is cut where the chapter changes, not page by page.
+    import _pdf_headings as ph
+    def L(page, text, top):
+        y0 = 15 if top else 750
+        return ph.Line(page, text, 9.0, False, False, False, "F", 1.0, 50, y0, 400, y0 + 9, 792, 612)
+    margins = []
+    for pg in range(1, n + 1):
+        part = "Toolkit • Part 1: Vision" if pg < 20 else "Toolkit • Part 2: Action plan"
+        chapter = "Chapter 1. Context" if pg < 12 else "Annex G. Definitions" if pg < 20 else \
+            "Chapter 2. Manage" if pg < 31 else "Chapter 3. Engage"
+        margins += [L(pg, part, True), L(pg, f"{chapter} » page {pg}", False),
+                    ph.Line(pg, "body " * 10, 10.0, False, False, False, "F", 1.0, 50, 300, 500, 310, 792, 612)]
+    margins = [m for m in margins if not (m.page in (20, 21) and m.y0 > 700)]  # a part's cover and its title page
+    tail = s.Section("sec-009-annex-g", None, "Definitions", 1, 12, n, 0, 12000, "")
+    out, rep = s.split_oversized([tail], book, [], margins)
+    check("an oversized section with running heads is cut where the chapter changes",
+          rep and rep[0]["by"] == "running heads"
+          and [(x.title, x.page_start, x.page_end) for x in out] == [
+              ("Annex G. Definitions", 12, 19), ("Toolkit • Part 2: Action plan", 20, 21),
+              ("Chapter 2. Manage", 22, 30), ("Chapter 3. Engage", 31, 40)])
     small = s.Section("sec-001-intro", None, "Intro", 1, 2, 4, 0, 900, "")
     out, rep = s.split_oversized([small], book, heads)
     check("a section of ordinary length is left alone", out == [small] and rep == [])
@@ -139,6 +167,16 @@ def main() -> int:
     kept, rep = s.tidy_inferred(words, ["un On YOUNG, Programme\n"])
     check("10665/264857: body words set apart by a font are not headings; an outline entry is kept",
           [(e.title, e.source) for e in kept] == [("Programme", "inferred"), ("un", "outline")])
+    caps = [E(1, "CHAPITRE 5 : PLANIFIER LA MISE EN ŒUVRE", 75, "inferred"),
+            E(1, "Schéma 5.1. Composants essentiels de la mise en œuvre", 78, "inferred"),
+            E(1, "Tableau 5.2. Considérations illustratives", 78, "inferred"),
+            E(1, "Encadré 5.1.1. Ressource sur la gestion du matériel", 81, "inferred"),
+            E(2, "Considérations relatives à l'infrastructure", 81, "inferred", "5.1"),
+            E(1, "Figure 3", 9, "outline")]
+    kept, rep = s.tidy_inferred(caps, [""] * 90)
+    check("10665/353150: figure, table and box captions from a contents page are not headings",
+          [e.title for e in kept] == ["CHAPITRE 5 : PLANIFIER LA MISE EN ŒUVRE",
+                                      "Considérations relatives à l'infrastructure", "Figure 3"])
     sec = lambda t, p, w: s.Section("sec-001-x", None, t, 1, p, p, 0, w, "")
     flow = [sec("Annexe 1", 18, 103), sec("Suivre les lignes", 18, 22), sec("Demander un nouvel", 18, 6),
             sec("Analyse ultérieure", 18, 6), sec("Annexe 2", 19, 46), sec("ANNEXES", 19, 0)]
@@ -162,6 +200,17 @@ def main() -> int:
     check("an Arabic page may add Latin, Cyrillic, Han", o.second_script_candidates("ara", have) == ["ara+eng", "ara+rus", "ara+chi_sim"])
     check("a French page may add Arabic but not English", "fra+eng" not in o.second_script_candidates("fra", have)
           and "fra+ara" in o.second_script_candidates("fra", have))
+    # 10665/94830-per page 28: read as Persian only, "HIV" came out as "۳۱۱۷";
+    # read as fas+eng it is "HIV" at 95, beside English junk at 42-72.
+    w = lambda t, c, x: {"text": t, "conf": c, "box": (x, 10, 40, 12), "line": (1, 1, 1)}
+    primary = [w("وضعیت", 90, 100), w("۳۱۱۷", 88, 60), w("منفی", 91, 10)]
+    mixed = [w("وضعیت", 90, 100), w("HIV\u200f", 95, 60), w("Shee", 42, 10)]
+    check("a sure Latin word replaces the digits read under it, junk does not",
+          o.latin_rescues(primary, mixed) == [("۳۱۱۷", "HIV")])
+    check("a word of the page's own script is never replaced",
+          o.latin_rescues([w("یا", 90, 10)], [w("La", 90, 10)]) == [])
+    check("only a read with eastern digits gets the second read", o.RE_EASTERN_DIGITS.search("زنان ۲۱۷ منفی")
+          and not o.RE_EASTERN_DIGITS.search("زنان منفی ۴"))
 
     calls = []
     real = o._ocr_with_confidence

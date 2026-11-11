@@ -11,6 +11,8 @@ import { join } from "node:path";
 
 import { DocumentErrataSchema } from "../../../schemas/content/document-errata.ts";
 import { DocumentFootnotesSchema } from "../../../schemas/content/document-footnotes.ts";
+import { PdfDiagnosticsSchema } from "../../../schemas/ui/pdf-structure.ts";
+import { readFileSync } from "node:fs";
 import { errataRequirement, footnotesRequirement } from "../../check-l1-complete.ts";
 import { pagesToOcr, planFor, withLanguageHint } from "../../ingest-document.ts";
 
@@ -26,6 +28,20 @@ function entry(slug: string): string {
   writeFileSync(join(dir, "blocks", "prose-sec-000.jsonld"), "{}");
   return dir;
 }
+
+describe("how an oversized section was cut", () => {
+  test("every way pdf-structure.py reports is one the schema accepts", () => {
+    // 10665-75211 was refused by l1-blocks when the running-head cut first ran:
+    // the Python wrote a `by` the schema did not list.
+    const py = readFileSync(join(SCRIPTS, "pdf-structure.py"), "utf-8");
+    const written = [...py.matchAll(/^\s*by = "([^"]+)"$/gm)].map((m) => m[1]!);
+    expect(written.sort()).toEqual(["headings", "pages", "running heads"]);
+    const shape = PdfDiagnosticsSchema.shape.oversized_split;
+    for (const by of written) {
+      expect(shape.safeParse([{ title: "Annex G", page_start: 104, page_end: 223, words: 36773, by, into: 30 }]).success).toBe(true);
+    }
+  });
+});
 
 describe("failing pages go to OCR", () => {
   test("no failing page, no OCR", () => {
