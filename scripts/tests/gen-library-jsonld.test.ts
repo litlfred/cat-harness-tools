@@ -343,12 +343,12 @@ describe("a whole library entry, through the real branch — bean `p67i`", () =>
       o.state === "built" ? JSON.parse(o.files.find((f) => f.path === "manifest.jsonld")!.content)["@id"] : o.state;
 
     // Without a destination the staging tree's own layer answers — the defect.
-    expect(manifestId(buildEntryNodes("d", staged))).toContain("/stager/d/");
+    expect(manifestId(buildEntryNodes("d", staged))).toContain("/stager/source/d");
     // With one, the destination's — and the bytes are those the corpus walk
     // will compute once the entry sits there, which is what `--check` compares.
     const dest = join(root, "sib", "library", "d");
     const minted = manifestId(buildEntryNodes("d", staged, dest));
-    expect(minted).toContain("/sib/d/");
+    expect(minted).toContain("/sib/source/d");
     mkdirSync(dest, { recursive: true });
     writeFileSync(join(dest, "tabular.jsonld"), readFileSync(join(staged, "tabular.jsonld")));
     expect(manifestId(buildEntryNodes("d", dest))).toBe(minted);

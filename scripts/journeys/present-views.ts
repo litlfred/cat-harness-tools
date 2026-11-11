@@ -49,6 +49,7 @@ import {
   frame,
   glyph,
   icon,
+  iconPaths,
   LAYER_TONES,
   ladderOf,
   fromSite,
@@ -282,6 +283,12 @@ ${panels}`;
 
 // ── the persona lens ─────────────────────────────────────────────────────
 
+/** The curve's vertical axis label: a small face, happy at the top, neutral, sad at the foot (VaxLink, ref/06). */
+function axisFace(v: number, y: number): string {
+  const [label, ic] = v > 0 ? ["happy", "smile"] : v < 0 ? ["sad", "frown"] : ["neutral", "meh"];
+  return `<svg x="4" y="${y - 7}" width="14" height="14" viewBox="0 0 24 24" class="jp-cv-face" aria-label="${label}"><title>${label}</title>${iconPaths(ic)}</svg>`;
+}
+
 /** The curve's points: the steps a person is in, by position, with how they feel there. */
 export function feelingPoints(p: Presentation, actor: string): { index: number; emotion: number }[] {
   return p.steps.flatMap((s) => {
@@ -311,7 +318,7 @@ function curveSvg(p: Presentation, person: PersonaView, toWorkshop: string): str
       return `${ci % 2 ? `<rect x="${x0.toFixed(1)}" y="${top - 8}" width="${(x1 - x0).toFixed(1)}" height="${bottom - top + 16}" class="jp-cv-band"/>` : ""}<text x="${((x0 + x1) / 2).toFixed(1)}" y="${H - 6}" class="jp-cv-ch" text-anchor="middle">${ci + 1}. ${e(c.title)}</text>`;
     })
     .join("");
-  const grid = [2, 0, -2].map((v) => `<line x1="${L - 10}" x2="${W - R + 10}" y1="${yOf(v)}" y2="${yOf(v)}" class="${v === 0 ? "jp-cv-zero" : "jp-cv-grid"}"/><text x="8" y="${yOf(v) + 4}" class="jp-cv-face">${v > 0 ? "☺" : v < 0 ? "☹" : "·"}</text>`).join("");
+  const grid = [2, 0, -2].map((v) => `<line x1="${L - 10}" x2="${W - R + 10}" y1="${yOf(v)}" y2="${yOf(v)}" class="${v === 0 ? "jp-cv-zero" : "jp-cv-grid"}"/>${axisFace(v, yOf(v))}`).join("");
   const codes = p.steps.map((s) => `<text x="${xOf(s.index).toFixed(1)}" y="${bottom + 26}" class="jp-cv-code" text-anchor="middle">${e(s.step.id)}</text>`).join("");
   const segs = pts
     .slice(1)
