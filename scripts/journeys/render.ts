@@ -72,6 +72,23 @@ export interface PageFile {
   content: string | Uint8Array;
 }
 
+/** An ArchiMate element's page, site-relative, with what to call it. */
+export interface ArchimateElementLink {
+  name: string;
+  /** Its ArchiMate type, in words ("Application Component"). */
+  type: string;
+  page: string;
+}
+
+/** An ArchiMate view, drawn and paged, site-relative. */
+export interface ArchimateViewLink {
+  svg: string;
+  page: string;
+  name: string;
+  /** The elements its boxes show, once each, in drawing order. */
+  elements?: ArchimateElementLink[];
+}
+
 /** Where things are in the site, for links that leave the viewer. */
 export interface SiteLinks extends StepPageLinks {
   /** Site-relative route of the viewer, no trailing slash: `en/<harness>/<id>`. */
@@ -80,8 +97,10 @@ export interface SiteLinks extends StepPageLinks {
   processesPage?: (instance: string) => string | undefined;
   /** Site-relative ⓘ panel sidecar of a BPMN file (instance-relative) the processes viewer draws; absent when no processes viewer is declared. */
   processPanel?: (instance: string, bpmn: string) => string | undefined;
-  /** An ArchiMate view's drawing and page, site-relative; absent when it cannot be placed. */
-  archimateView?: (instance: string, model: string, view: string) => { svg: string; page: string; name: string } | undefined;
+  /** An ArchiMate view's drawing and page, and the elements it shows, site-relative; absent when it cannot be placed. */
+  archimateView?: (instance: string, model: string, view: string) => ArchimateViewLink | undefined;
+  /** The ArchiMate elements that deploy a building block (their `buildingBlocks` property names it), with their pages, site-relative. */
+  archimateBlock?: (instance: string, block: string) => ArchimateElementLink[];
   /** Title of the site's declaring layer, for the index heading. */
   title: string;
 }

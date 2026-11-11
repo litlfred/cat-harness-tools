@@ -30,11 +30,14 @@ import type { BuildingBlock } from "../../schemas/process/user-scenario.ts";
 import { escHtml } from "../thin-page.ts";
 import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
-import { moduleSegment, personaOf, sheetsHtml, sourceHref, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
+import { moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_LABEL, renderDevice, type DemoScreen, type ScreenContext } from "./screens.ts";
+import { screenExamples } from "../../schemas/process/device-screen.ts";
 import {
   avatar,
   chapterScene,
+  stepsExampleKeys,
+  viewDrawer,
   countryTones,
   demoLabel,
   deviceGlyph,
@@ -75,6 +78,9 @@ interface At {
   toWorkshop: string;
   siteRoot: string;
 }
+/** The drawer of a view over these steps, every page's foot. */
+const drawerOf = (corpus: JourneyCorpus, p: Presentation, a: At, steps: readonly PresentedStep[], scope?: string): string => viewDrawer(corpus, p, stepsExampleKeys(steps), a.toWorkshop, a.siteRoot, scope);
+
 const at = (depth: number, links: SiteLinks): At => {
   const root = "../".repeat(3 + depth);
   return { root, toWorkshop: "../".repeat(depth), siteRoot: siteRootFrom(root, links) };
@@ -271,7 +277,7 @@ ${focus}
 ${[chapters, moments, lanes, record, pain, enabler, cat ? techHead + layerRows : "", moveRow, handoffRow, procRow].join("\n")}
 </div></div>
 ${panels}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "map", title: `Journey map — ${presentationName(p)}`, ...note(p, "map"), body });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "map", title: `Journey map — ${presentationName(p)}`, ...note(p, "map"), body, foot: drawerOf(corpus, p, a, p.steps) });
 }
 
 // ── the persona lens ─────────────────────────────────────────────────────
@@ -347,7 +353,7 @@ function personaPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, w
 <section><h3 class="jp-h jp-h-pad">${e(who.name)}’s touchpoints (${mine.length})</h3><ol class="jp-tps">${touch}</ol></section>
 </div>
 </div>`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "personas", title: `${who.name} — persona lens — ${presentationName(p)}`, ...note(p, "personas"), body });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "personas", title: `${who.name} — persona lens — ${presentationName(p)}`, ...note(p, "personas"), body, foot: drawerOf(corpus, p, a, mine, `in ${who.name}’s moments`) });
 }
 
 // ── how it works ─────────────────────────────────────────────────────────
@@ -422,11 +428,15 @@ ${layers
 </div></section>`
     : `<section class="jp-card jp-pad"><p class="jp-small">No building-block catalogue is declared for ${e(p.w.instance)}: declare one (a directory of the <code>building-blocks</code> kind) and the grid draws.</p></section>`;
   const b = selected ? cat?.blocks.get(selected) : undefined;
+  const elementList = (els: readonly ArchimateElementLink[]) =>
+    `<ul class="jp-amels">${els.map((x) => `<li>${ext(a.siteRoot + x.page, x.name, "", DAK_ATTR)} <small>${e(x.type)}</small></li>`).join("")}</ul>`;
+  const blockEls = b ? (links.archimateBlock?.(p.w.instance, b.id) ?? []) : [];
   const detail = b
     ? `<aside class="jp-card jp-bdetail"><span class="jp-lchip jp-layer-${toneOf(b.layer)}">${e(layers.find((l) => l.id === b.layer)?.label ?? b.layer)}</span><h3>${e(b.name)}</h3><small>${glyph("clinic")} ${e([b.owner, b.jurisdiction].filter(Boolean).join(" · "))}</small>
 <div><div class="jp-label">What it is</div><p>${e(b.what)}</p></div>
 ${b.soWhat ? `<div class="jp-sowhat-box"><div class="jp-label jp-amber8">So what for the journey</div><p>${e(b.soWhat)}</p></div>` : ""}
 ${b.links?.length ? `<div><div class="jp-label">Learn more</div><ul class="jp-blinks">${b.links.map((l) => `<li>${ext(l.url, l.label)}</li>`).join("")}</ul></div>` : ""}
+${blockEls.length ? `<div><div class="jp-label">In the architecture (ArchiMate)</div>${elementList(blockEls)}</div>` : ""}
 <div><div class="jp-label">Moments it makes possible</div><ul class="jp-buses">${blockUsage(p, b.id)
         .map(({ s, role }) => `<li><a href="${e(walkHref(a, s))}"><span><b class="jp-mono">${e(s.step.id)}</b> ${e(s.step.title)}</span><small>${e(role)}</small></a></li>`)
         .join("") || `<li class="jp-small">No step of this walkthrough uses it.</li>`}</ul></div></aside>`
@@ -441,7 +451,7 @@ ${b.links?.length ? `<div><div class="jp-label">Learn more</div><ul class="jp-bl
 ${views
   .map(
     (x, i) =>
-      `<div class="jp-ampane" data-jp-pane="am-${i}"${i ? " hidden" : ""}><div class="jp-amlinks"><b>${e(x.t.name)}</b>${ext(toSite + x.t.page, "View page", "", DAK_ATTR)}${ext(`${toSite}${x.t.page}../../`, "All views and elements", "", DAK_ATTR)}</div><object type="image/svg+xml" data-jp-fit data="${e(toSite + x.t.svg)}" aria-label="${e(x.t.name)}"><a href="${e(toSite + x.t.page)}">${e(x.t.name)}</a></object></div>`,
+      `<div class="jp-ampane" data-jp-pane="am-${i}"${i ? " hidden" : ""}><div class="jp-amlinks"><b>${e(x.t.name)}</b>${ext(toSite + x.t.page, "View page", "", DAK_ATTR)}${ext(`${toSite}${x.t.page}../../`, "All views and elements", "", DAK_ATTR)}</div><object type="image/svg+xml" data-jp-fit data="${e(toSite + x.t.svg)}" aria-label="${e(x.t.name)}"><a href="${e(toSite + x.t.page)}">${e(x.t.name)}</a></object>${x.t.elements?.length ? `<details class="jp-amel"><summary>The ${x.t.elements.length} element${x.t.elements.length === 1 ? "" : "s"} in this view</summary>${elementList(x.t.elements)}</details>` : ""}</div>`,
   )
   .join("")}</section>`
     : "";
@@ -468,7 +478,7 @@ ${ideasHtml}
 <div class="jp-howgrid">${matrix}${detail}</div>
 ${viewsHtml}
 ${procHtml}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "how", title: `${b ? `${b.name} — ` : ""}How it works — ${presentationName(p)}`, ...note(p, "how"), body });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "how", title: `${b ? `${b.name} — ` : ""}How it works — ${presentationName(p)}`, ...note(p, "how"), body, foot: b ? drawerOf(corpus, p, a, blockUsage(p, b.id).map((x) => x.s), `where ${b.short ?? b.name} is used`) : drawerOf(corpus, p, a, steps) });
 }
 
 // ── the discussion ───────────────────────────────────────────────────────
@@ -515,7 +525,7 @@ ${byModule ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("message",
 ${tables}
 ${gap}
 ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(gap ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(gap ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps) });
 }
 
 // ── the gap report ───────────────────────────────────────────────────────
@@ -581,6 +591,7 @@ function sheetsPageFramed(corpus: JourneyCorpus, p: Presentation, links: SiteLin
     head: `<link rel="stylesheet" href="${a.root}assets/journeys.css">`,
     bodyClass: "jv-print-sheets",
     body,
+    foot: drawerOf(corpus, p, a, p.steps),
   });
 }
 
@@ -614,6 +625,8 @@ function screenContext(corpus: JourneyCorpus, p: Presentation, instance: string,
     },
     exampleHref: (key) => examplePage(corpus, p.w.workshop.presentation ?? {}, key, siteRoot),
     exampleJson: (key) => corpus.examples.get(key)?.json,
+    // The demo page's drawer carries a tab for every example with JSON.
+    inspectable: (key) => corpus.examples.get(key)?.json !== undefined,
   };
 }
 
@@ -634,7 +647,7 @@ function demoIndex(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): st
       : `One screen per moment, in the instance’s own app. A screen opens framed here, with the moments it shows; ${ext(fromSite(pr.deviceDemo!.href, a.siteRoot), "open the app")} to use it on its own.`;
   const body = `<section class="jp-vhead"><h2>${e(label)}: what each person sees</h2><p>${lede}</p></section>
 <div class="jp-screens">${cards}</div>`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "demo", title: `${label} — ${presentationName(p)}`, ...note(p, "demo"), body });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "demo", title: `${label} — ${presentationName(p)}`, ...note(p, "demo"), body, foot: drawerOf(corpus, p, a, p.screens.flatMap((x) => x.steps)) });
 }
 
 function demoPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, i: number): string {
@@ -676,6 +689,8 @@ ${moments}`;
     ...(prev ? { prev: `../${prev.id}/` } : {}),
     ...(next ? { next: `../${next.id}/` } : {}),
     body,
+    // The screen's own payloads first, so the drawer opens on what it shows.
+    foot: viewDrawer(corpus, p, [...(x.node ? screenExamples(x.node.screen) : []), ...stepsExampleKeys(x.steps)], a.toWorkshop, a.siteRoot, "on this screen"),
   });
 }
 

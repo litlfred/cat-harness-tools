@@ -195,6 +195,18 @@ describe("drawing a screen", () => {
     expect(html).not.toContain("Composition");
     expect(html).toContain('href="https://ig.example/Bundle-ips.html"');
   });
+  test("Inspect JSON on a QR code and a record list opens the page's drawer on that example, only when the drawer has it", () => {
+    const screen = parseDeviceScreen({
+      $schema: "device-screen/0.1.0", id: "S", title: "t", device: "phone", owner: "kamal", steps: [{ scenario: "a", step: "A" }],
+      blocks: [{ type: "qr", payload: "x", example: "Bundle/ips" }, { type: "recordList", title: "Record", example: "Bundle/ips" }, { type: "qr", payload: "y", example: "Bundle/none" }],
+    });
+    const on = { ...ctx, inspectable: (k: string) => ctx.exampleJson(k) !== undefined };
+    const html = screen.blocks.map((b) => blockHtml(b, on));
+    expect(html[0]).toContain('<button type="button" class="jp-inspect ds-inspect" data-jp-inspect="Bundle/ips">Inspect JSON</button>');
+    expect(html[1]).toContain('data-jp-inspect="Bundle/ips"');
+    expect(html[2]).not.toContain("data-jp-inspect");
+    expect(blockHtml(screen.blocks[0]!, ctx)).not.toContain("data-jp-inspect");
+  });
   test("rowsFromExample reads a lone resource, and nothing from what is not JSON", () => {
     expect(rowsFromExample(JSON.stringify({ resourceType: "Immunization", status: "completed", vaccineCode: { text: "Hep B" }, occurrenceDateTime: "2025-10-28", lotNumber: "TH-4821" }))).toEqual([
       { icon: "syringe", label: "Hep B", detail: "2025-10-28 · Lot TH-4821", status: { text: "completed", tone: "neutral" } },

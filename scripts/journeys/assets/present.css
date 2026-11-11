@@ -419,6 +419,7 @@ a.jp-dak-a:hover { text-decoration: underline; }
 a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-dak-text { background: var(--s50); border-color: var(--s200); color: var(--s600) !important; }
 .jp-inspect { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--sky700); background: none; border: 0; padding: 0; text-decoration: underline; }
+.ds-inspect { display: block; margin: 6px 0 0 auto; }
 
 /* ── the scene: a journey's small picture ───────────────────────────── */
 .jp-scene { margin: 8px 0 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; border-radius: 12px; border: 1px solid var(--lb); background: linear-gradient(to bottom right, var(--ls), #fff); color: var(--lt); }
@@ -907,3 +908,10 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .ds-row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .ds-row-top .ds-chip { white-space: normal; text-align: right; flex: 0 1 auto; max-width: 60%; }
 .ds-row-t code { overflow-wrap: anywhere; }
+
+/* ArchiMate elements, linked: under each view drawing, and in a block's detail. */
+.jp-amel { margin-top: 8px; font-size: 13px; }
+.jp-amel summary { cursor: pointer; color: var(--s700); font-weight: 600; }
+.jp-amels { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.jp-amels small { color: var(--s500); }
+.jp-json-open { color: var(--sky300); text-decoration: underline; }

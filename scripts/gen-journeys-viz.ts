@@ -39,7 +39,8 @@ import { planSlugs } from "../archimate/schemas/slugs.ts";
 import { archimateDir, configPath, localDirOf, readConfig } from "../archimate/scripts/check-archimate.ts";
 import { declaredPageRoot } from "../archimate/scripts/gen-archimate-pages.ts";
 import { readJourneyCorpus, type JourneyCorpus } from "./journeys/read.ts";
-import { renderJourneyPages, TOOL_ID, type PageFile, type SiteLinks } from "./journeys/render.ts";
+import { renderJourneyPages, TOOL_ID, type ArchimateElementLink, type ArchimateViewLink, type PageFile, type SiteLinks } from "./journeys/render.ts";
+import { typeLabel } from "../archimate/scripts/render-view.ts";
 import { subjectHref } from "./lib/subject-pages.ts";
 import { panelFile } from "./lib/task-panel.ts";
 
@@ -68,10 +69,11 @@ export function journeysRoute(root: string): string | undefined {
 /** Where the links that leave the viewer go: the processes viewer's sub-graph pages, and ArchiMate views. */
 export function siteLinks(corpus: JourneyCorpus, route: string, title: string): SiteLinks {
   const processes = declaredVisualisers(corpus.checkout).find((v) => v.renderedBy === "processes-viewer");
-  const views = new Map<string, Map<string, { svg: string; page: string; name: string }> | null>();
-  const archimateFor = (instance: string) => {
-    if (views.has(instance)) return views.get(instance) ?? undefined;
-    let out: Map<string, { svg: string; page: string; name: string }> | null = null;
+  type Placed = { views: Map<string, ArchimateViewLink>; blocks: Map<string, ArchimateElementLink[]> };
+  const placed = new Map<string, Placed | null>();
+  const archimateFor = (instance: string): Placed | undefined => {
+    if (placed.has(instance)) return placed.get(instance) ?? undefined;
+    let out: Placed | null = null;
     const info = corpus.instances.get(instance);
     try {
       if (info && configPath(info.root) !== undefined) {
@@ -79,23 +81,43 @@ export function siteLinks(corpus: JourneyCorpus, route: string, title: string): 
         const decl = readDecl(info.root);
         const graphPath = localDirOf(info.root, archimateDir(info.root, config)).replace(/\/$/, "");
         const pageRoot = declaredPageRoot(decl as never, config.directory);
-        out = new Map();
+        out = { views: new Map(), blocks: new Map() };
         for (const cm of config.models) {
           const model = readArchimate(readFileSync(join(archimateDir(info.root, config), cm.file)));
           const slugOf = planSlugs(model);
+          // The pages and drawings `gen-archimate-pages.ts` writes: singular kind segments (Q-THIN-4 = A).
+          const byId = new Map(model.elements.map((el) => [el.id, el]));
+          const element = (id: string): ArchimateElementLink | undefined => {
+            const el = byId.get(id);
+            return el ? { name: el.name || typeLabel(el.type), type: typeLabel(el.type), page: `${posix.join(pageRoot, cm.id, "element", slugOf.get(id) ?? id)}/` } : undefined;
+          };
           for (const v of model.views) {
-            out.set(`${cm.id}\0${v.id}`, {
-              svg: posix.join(graphPath, cm.id, "views", `${v.id}.svg`),
-              page: `${posix.join(pageRoot, cm.id, "views", slugOf.get(v.id) ?? v.id)}/`,
+            const shown = [...new Set(v.nodes.flatMap((n) => (n.kind === "element" && n.ref ? [n.ref] : [])))];
+            out.views.set(`${cm.id}\0${v.id}`, {
+              svg: posix.join(graphPath, cm.id, "view", `${v.id}.svg`),
+              page: `${posix.join(pageRoot, cm.id, "view", slugOf.get(v.id) ?? v.id)}/`,
               name: v.name,
+              elements: shown.flatMap((id) => element(id) ?? []),
             });
+          }
+          // A block's elements: those whose `buildingBlocks` property names it (the overlay writes it, comma-separated).
+          for (const el of model.elements) {
+            for (const p of el.properties) {
+              if (p.key !== "buildingBlocks") continue;
+              for (const b of p.value.split(/[\s,]+/).filter(Boolean)) {
+                const list = out.blocks.get(b) ?? [];
+                const link = element(el.id)!;
+                if (!list.some((x) => x.page === link.page)) list.push(link);
+                out.blocks.set(b, list);
+              }
+            }
           }
         }
       }
     } catch {
       out = null; // no ArchiMate pages for this layer: the view is drawn as unresolved
     }
-    views.set(instance, out);
+    placed.set(instance, out);
     return out ?? undefined;
   };
   return {
@@ -108,7 +130,8 @@ export function siteLinks(corpus: JourneyCorpus, route: string, title: string): 
           processPanel: (_instance: string, bpmn: string) => visualiserRoute({ ...pageParts({ harness: processes.harness, visualiser: processes.id }), asset: panelFile(posix.basename(bpmn, ".bpmn")) }),
         }
       : {}),
-    archimateView: (instance, model, view) => archimateFor(instance)?.get(`${model}\0${view}`),
+    archimateView: (instance, model, view) => archimateFor(instance)?.views.get(`${model}\0${view}`),
+    archimateBlock: (instance, block) => archimateFor(instance)?.blocks.get(block) ?? [],
     // A step's page as the KG site's own BPMN rendering links it
     // (`render-bpmn.ts`): its subject IRI, where a page is published for it.
     stepPage: (instance, bpmn, process, task) => {
