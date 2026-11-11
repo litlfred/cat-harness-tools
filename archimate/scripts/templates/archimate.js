@@ -206,6 +206,8 @@
         var parts = draw(m);
         host.textContent = "";
         parts.forEach(function (p) { if (p) host.appendChild(p); });
+        // The IG sites' Contents card over the sections just drawn (issue #1885), bundled ahead of this file.
+        if (window.faContentsCard) window.faContentsCard(host);
       })
       .catch(function (e) {
         host.textContent = "";

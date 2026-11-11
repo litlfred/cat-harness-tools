@@ -195,6 +195,33 @@ def main() -> int:
     got, redone = s.print_order_pages([early], ov, lambda i: late)
     check("a page already in print order is left alone", got == [early] and redone == [])
 
+    class Rect: x0, width = 0.0, 595.0
+    class Page:
+        rect = Rect()
+        def __init__(self, blocks): self.blocks = blocks
+        def get_text(self, kind): return self.blocks
+    p72 = Page([(45, 56, 287, 155, "left column\n", 0, 0), (304, 56, 551, 155, "right column\n", 1, 0),
+                (45, 188, 268, 214, "4.5 Contrôle des progrès\n", 2, 0)])
+    check("10665/353150 p72: a heading under both columns stays after them",
+          s.print_order_text(p72).split("\n")[:3] == ["left column", "right column", "4.5 Contrôle des progrès"])
+    p11 = Page([(305, 127, 440, 146, "Replenishing the CFE\n", 0, 0), (43, 128, 250, 141, "Table 1\n", 1, 0),
+                (47, 146, 286, 159, "Event\n", 2, 0), (305, 154, 554, 232, "The CFE was conceived\n", 3, 0)])
+    check("10665/342236 p11: a table row touching the band above stays in its column",
+          s.print_order_text(p11).split("\n")[:4] == ["Table 1", "Event", "Replenishing the CFE", "The CFE was conceived"])
+    p17 = Page([(305, 105, 558, 777, "15. Mazanderani\n", 0, 0), (40, 34, 251, 102, "RÉFÉRENCES\n", 1, 0),
+                (40, 106, 291, 780, "1. UNAIDS\n", 2, 0)])
+    check("10665/329296 p17: two columns under a heading read left column first",
+          s.print_order_text(p17).split("\n")[:3] == ["RÉFÉRENCES", "1. UNAIDS", "15. Mazanderani"])
+    refs = [E(1, "RÉFÉRENCES BIBLIOGRAPHIQUES", 1, "inferred")]
+    stored = "15. Mazanderani AH.\n" * 12 + "RÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13
+    printed = "17\nRÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13 + "15. Mazanderani AH.\n" * 12
+    got, redone = s.print_order_inferred([stored], refs, None, lambda i: printed)
+    check("10665/329296: a heading under half way down an inferred page still triggers the print-order read",
+          redone == [1] and got[0].lstrip("17\n").startswith("RÉFÉRENCES"))
+    mid = "body line\n" * 12 + "RÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13
+    got, redone = s.print_order_inferred([mid], refs, None, lambda i: mid)
+    check("a heading truly in mid page is left where it is", got == [mid] and redone == [])
+
     o = load("pdf-ocr.py")
     have = {"ara", "eng", "fra", "rus", "chi_sim", "fas"}
     check("an Arabic page may add Latin, Cyrillic, Han", o.second_script_candidates("ara", have) == ["ara+eng", "ara+rus", "ara+chi_sim"])

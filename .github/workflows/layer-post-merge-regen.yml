@@ -163,7 +163,7 @@ env:
 jobs:
   regen:
     name: ${{ inputs.mode == 'pr' && 'Derived artefacts regenerated in this PR' || inputs.mode == 'release' && 'Regenerate derived artefacts for the release' || 'Check post-merge derived artefacts' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     outputs:
       artifact: ${{ steps.upload.outputs.name }}

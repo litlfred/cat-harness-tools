@@ -333,6 +333,21 @@ describe("an instance", () => {
     }
   });
 
+  it("bundles the IG sites' Contents card with the renderer, and draws it over a page's sections (issue #1885)", () => {
+    const root = make(config);
+    try {
+      const { files } = pagesFor(root);
+      const js = files.find((f) => f.path === "assets/archimate.js")!.content;
+      const css = files.find((f) => f.path === "assets/archimate.css")!.content;
+      expect(js.indexOf("window.faContentsCard = card")).toBeGreaterThanOrEqual(0);
+      expect(js.indexOf("window.faContentsCard = card")).toBeLessThan(js.indexOf("window.faContentsCard(host)"));
+      expect(css).toContain(".igi-contents{");
+      expect(css).toContain(".am-body>.igi-contents{float:right");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("serves a small page AT each node's IRI that declares the node and links its page, in the graph and in a site", () => {
     const root = make(config);
     try {

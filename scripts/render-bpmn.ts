@@ -181,6 +181,17 @@ const presentations = await checkoutProcessPresentations(ROOT);
 const SITE_UP = `${relative(OUT_DIR, join(ROOT, siteDirFor(ROOT))).split("\\").join("/")}/`;
 
 /**
+ * A step's own entry on its process's page in the processes viewer: the page
+ * plus the step's anchor (`gen-processes-viz.ts` `stepAnchor`). Without the
+ * anchor every title of a drawing shown ON that page linked the page itself,
+ * so a click did nothing (smart-trust-demo, J3 "Verify each HCERT against the
+ * trust list", 2026-11-11).
+ */
+export function stepOnProcessPage(home: string, step: string): string {
+  return `${processTarget(home, undefined)}#step-${step}`;
+}
+
+/**
  * Where a call activity should take a reader who clicks it: the called
  * process's own page, `<doc dir>/process/P` (#603), where one is published.
  *
@@ -310,9 +321,7 @@ for (const file of sources) {
   const stepName = new Map(steps.map((s) => [s.id, s.name]));
   const titles = new Map<string, { href: string; name: string }>();
   for (const s of steps) {
-    const href =
-      subjectHref(file, "process", `${s.process}/node/${s.id}`) ??
-      SITE_UP + processTarget(basename(file, ".bpmn"), undefined);
+    const href = subjectHref(file, "process", `${s.process}/node/${s.id}`) ?? SITE_UP + stepOnProcessPage(basename(file, ".bpmn"), s.id);
     titles.set(s.id, { href, name: s.name });
   }
   const expands = new Map([...subprocessLinks(xml)].map(([id, href]) => [id, { href, name: stepName.get(id) ?? id }]));

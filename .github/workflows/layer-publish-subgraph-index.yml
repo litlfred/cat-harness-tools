@@ -69,7 +69,7 @@ env:
 jobs:
   publish:
     name: Publish the subgraph index package for this pin
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       contents: write

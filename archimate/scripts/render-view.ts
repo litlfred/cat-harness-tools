@@ -122,7 +122,18 @@ export type Pt = { x: number; y: number };
 const centre = (n: ArchimateViewNode): Pt => ({ x: n.x + n.w / 2, y: n.y + n.h / 2 });
 
 /** Where the segment from a box's centre towards `p` leaves the box. */
-function clip(n: ArchimateViewNode, toward: Pt): Pt {
+function clip(n: ArchimateViewNode, toward: Pt): Pt;
+/** Where the segment from `from` (inside the box) towards `toward` leaves the box. */
+function clip(n: ArchimateViewNode, from: Pt, toward: Pt): Pt;
+function clip(n: ArchimateViewNode, a: Pt, b?: Pt): Pt {
+  if (b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const tx = dx > 0 ? (n.x + n.w - a.x) / dx : dx < 0 ? (n.x - a.x) / dx : Infinity;
+    const ty = dy > 0 ? (n.y + n.h - a.y) / dy : dy < 0 ? (n.y - a.y) / dy : Infinity;
+    const t = Math.min(tx, ty, 1);
+    return { x: a.x + dx * t, y: a.y + dy * t };
+  }
+  const toward = a;
   const c = centre(n);
   const dx = toward.x - c.x;
   const dy = toward.y - c.y;
@@ -169,6 +180,12 @@ function lineStyle(r: ArchimateRelationship | undefined): { start?: string; end?
 const STALE = 40;
 /** The gap between side-by-side lines joining the same two boxes. */
 const PARALLEL_GAP = 8;
+/** How far, in px, two bendpoints may be off a shared x or y and still be drawn as one straight run. */
+const SNAP = 12;
+/** How far inside a box's edge a square-on end must stay, so it never meets the box at a corner. */
+const INSET = 6;
+/** How much two boxes' x (or y) ranges must overlap for a line between them to be drawn straight across. */
+const OVERLAP = 2 * INSET;
 
 const MARKERS = `<defs>
 <marker id="arrow-open" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="11" markerHeight="11" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L11 6 L1 11" fill="none" stroke="#333" stroke-width="1.3"/></marker>
@@ -519,6 +536,7 @@ export function routeConnections(view: ArchimateView): RoutedConnection[] {
     const cs = centre(s), ct = centre(t);
     return c.bendpoints.some((b) => Math.hypot(cs.x + b.startX - ct.x - b.endX, cs.y + b.startY - ct.y - b.endY) > STALE);
   };
+  const taken = new Map<string, number[]>();
   const straight = new Map<string, string[]>();
   for (const c of pending) {
     if (c.bendpoints.length && !stale(c)) continue;
@@ -538,11 +556,8 @@ export function routeConnections(view: ArchimateView): RoutedConnection[] {
         const wgt = (j + 1) / (k + 1);
         return { x: (1 - wgt) * (s.at.x + b.startX) + wgt * (t.at.x + b.endX), y: (1 - wgt) * (s.at.y + b.startY) + wgt * (t.at.y + b.endY) };
       });
-      const first = bends[0] ?? t.at;
-      const last = bends[k - 1] ?? s.at;
-      const a = s.node ? clip(s.node, first) : s.at;
-      const z = t.node ? clip(t.node, last) : t.at;
-      const pts = [a, ...bends, z].map((p) => ({ ...p }));
+      const [a, inner, z] = squareUp(s, t, bends, taken);
+      const pts = [a, ...inner, z].map((p) => ({ ...p }));
       const twins = k === 0 ? straight.get(pairKey(c.source, c.target)) ?? [] : [];
       if (twins.length > 1) {
         // Shift sideways along the normal of the pair's own direction, so a line
@@ -559,6 +574,121 @@ export function routeConnections(view: ArchimateView): RoutedConnection[] {
     }
   }
   return routed;
+}
+
+const inside = (n: ArchimateViewNode, p: Pt, m = 0): boolean => p.x >= n.x - m && p.x <= n.x + n.w + m && p.y >= n.y - m && p.y <= n.y + n.h + m;
+
+/**
+ * Where a line leaves box `n` heading for `p`: square-on where it can be. When
+ * `p` lies above or below the box, within its x range, the line leaves the top
+ * or bottom edge at `p`'s x; beside it, within its y range, the left or right
+ * edge at `p`'s y. Otherwise it is clipped towards `p` from the centre, as
+ * before.
+ */
+function attach(n: ArchimateViewNode, p: Pt): Pt {
+  const inX = p.x >= n.x + INSET && p.x <= n.x + n.w - INSET;
+  const inY = p.y >= n.y + INSET && p.y <= n.y + n.h - INSET;
+  if (inX && !inY) return { x: p.x, y: p.y < n.y ? n.y : n.y + n.h };
+  if (inY && !inX) return { x: p.x < n.x ? n.x : n.x + n.w, y: p.y };
+  return clip(n, p);
+}
+
+/** The overlap of [a0, a1] and [b0, b1], kept INSET clear of either end, if it is at least OVERLAP long. */
+function overlapOf(a0: number, a1: number, b0: number, b1: number): [number, number] | undefined {
+  const lo = Math.max(a0, b0), hi = Math.min(a1, b1);
+  return hi - lo >= OVERLAP ? [lo + INSET, hi - INSET] : undefined;
+}
+
+/**
+ * Where in [lo, hi] a straight-across line runs: the middle, else the nearest
+ * place PARALLEL_GAP·2 clear of the lines already run across the same axis
+ * into either box (`taken`), so two lines into one box never lie on top of
+ * each other.
+ */
+function freeSpot(lo: number, hi: number, taken: readonly number[]): number {
+  const mid = (lo + hi) / 2;
+  const gap = PARALLEL_GAP * 2;
+  for (let step = 0; step <= (hi - lo) / gap + 1; step++) {
+    for (const c of step ? [mid - step * gap, mid + step * gap] : [mid]) {
+      if (c < lo || c > hi) continue;
+      if (taken.every((u) => Math.abs(u - c) >= gap)) return c;
+    }
+  }
+  return mid;
+}
+
+/**
+ * A line's two ends and the bends between them, straightened (cat-harness-tools#1886):
+ * bends lying inside an end box are dropped; bends a few px off a shared x or y
+ * (as Archi stores them) are snapped onto it; each end meets its box square-on
+ * where the next point allows; and a line with no bends between boxes whose x
+ * (or y) ranges overlap runs vertically (horizontally) through the overlap.
+ */
+function squareUp(s: { at: Pt; node?: ArchimateViewNode }, t: { at: Pt; node?: ArchimateViewNode }, raw: readonly Pt[], taken: Map<string, number[]> = new Map()): [Pt, Pt[], Pt] {
+  const bends = raw.filter((b) => !(s.node && inside(s.node, b)) && !(t.node && inside(t.node, b))).map((b) => ({ ...b }));
+  for (let i = 1; i < bends.length; i++) {
+    const p = bends[i - 1]!, q = bends[i]!;
+    if (Math.abs(q.x - p.x) < SNAP && Math.abs(q.x - p.x) <= Math.abs(q.y - p.y)) q.x = p.x;
+    else if (Math.abs(q.y - p.y) < SNAP) q.y = p.y;
+  }
+  if (!bends.length && s.node && t.node) {
+    const sn = s.node, tn = t.node;
+    const ox = overlapOf(sn.x, sn.x + sn.w, tn.x, tn.x + tn.w);
+    const oy = overlapOf(sn.y, sn.y + sn.h, tn.y, tn.y + tn.h);
+    // Claim a spot on both boxes along the line's axis.
+    const spot = (axis: "x" | "y", [lo, hi]: [number, number]): number => {
+      const keys = [`${sn.id} ${axis}`, `${tn.id} ${axis}`];
+      const c = freeSpot(lo, hi, keys.flatMap((k) => taken.get(k) ?? []));
+      for (const k of keys) taken.set(k, [...(taken.get(k) ?? []), c]);
+      return c;
+    };
+    if (ox && !oy) {
+      const x = spot("x", ox);
+      const down = tn.y > sn.y;
+      return [{ x, y: down ? sn.y + sn.h : sn.y }, [], { x, y: down ? tn.y : tn.y + tn.h }];
+    }
+    if (oy && !ox) {
+      const y = spot("y", oy);
+      const right = tn.x > sn.x;
+      return [{ x: right ? sn.x + sn.w : sn.x, y }, [], { x: right ? tn.x : tn.x + tn.w, y }];
+    }
+    if (!ox && !oy) {
+      // Apart on both axes: corner to facing corner (each INSET in), so the
+      // line keeps to the outside and does not cut across the lines that leave
+      // the boxes' sides square-on.
+      const near = (n: ArchimateViewNode, o: ArchimateViewNode): Pt => ({
+        x: o.x > n.x + n.w ? n.x + n.w - INSET : n.x + INSET,
+        y: o.y > n.y + n.h ? n.y + n.h - INSET : n.y + INSET,
+      });
+      const a = near(sn, tn), z = near(tn, sn);
+      return [clip(sn, a, z), [], clip(tn, z, a)];
+    }
+  }
+  const first = bends[0] ?? t.at;
+  const last = bends[bends.length - 1] ?? s.at;
+  const a = s.node ? (bends.length ? attach(s.node, first) : clip(s.node, first)) : s.at;
+  const z = t.node ? (bends.length ? attach(t.node, last) : clip(t.node, last)) : t.at;
+  // An end that came out square-on pulls its neighbouring bend onto its line,
+  // so the leg into the box is exactly horizontal or vertical.
+  if (bends.length) {
+    const fix = (end: Pt, b: Pt, n?: ArchimateViewNode) => {
+      if (!n) return;
+      if (end.x === b.x || end.y === b.y) return;
+      if (Math.abs(end.x - b.x) < SNAP) b.x = end.x;
+      else if (Math.abs(end.y - b.y) < SNAP) b.y = end.y;
+    };
+    fix(a, bends[0]!, s.node);
+    fix(z, bends[bends.length - 1]!, t.node);
+    // Record a square-on end, so a straight line drawn later into the same box keeps clear of it.
+    const claim = (end: Pt, b: Pt, n?: ArchimateViewNode) => {
+      if (!n) return;
+      const axis = end.x === b.x ? "x" : end.y === b.y ? "y" : undefined;
+      if (axis) taken.set(`${n.id} ${axis}`, [...(taken.get(`${n.id} ${axis}`) ?? []), end[axis]]);
+    };
+    claim(a, bends[0]!, s.node);
+    claim(z, bends[bends.length - 1]!, t.node);
+  }
+  return [a, bends, z];
 }
 
 // ── The key ──────────────────────────────────────────────────────────────

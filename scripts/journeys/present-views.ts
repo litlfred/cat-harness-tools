@@ -31,7 +31,7 @@ import { escHtml } from "../thin-page.ts";
 import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
 import { moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
-import { DEVICE_FORM, DEVICE_LABEL, renderDevice, type DemoScreen, type ScreenContext } from "./screens.ts";
+import { DEVICE_FORM, DEVICE_LABEL, renderDevice, stateSwitch, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
 import {
   avatar,
@@ -63,10 +63,13 @@ import {
   screensFor,
   siteRootFrom,
   trustColor,
+  answerBox,
+  questionKey,
   type Presentation,
   type PresentedStep,
   type View,
 } from "./present.ts";
+import type { WorkshopLab, WorkshopLabStep, WorkshopTable } from "../../schemas/process/workshop.ts";
 
 const e = escHtml;
 
@@ -546,6 +549,7 @@ function architectureHtml(p: Presentation, a: At, spec: ArchitectureSpec, panel:
 // ── the discussion ───────────────────────────────────────────────────────
 
 function discussPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): string {
+  if (p.w.workshop.lab) return labPage(corpus, p, links, p.w.workshop.lab);
   const a = at(1, links);
   const ws = p.w.workshop;
   const pr = ws.presentation ?? {};
@@ -588,6 +592,202 @@ ${tables}
 ${gap}
 ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}`;
   return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(gap ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
+}
+
+// ── the discussion as a lab ──────────────────────────────────────────────
+
+/** One answer the lab's summary reads back: a write-in, a choice on a scale, or a tick. */
+export interface LabSummaryItem {
+  label: string;
+  /** The browser key, without `jv:`. */
+  name: string;
+  type: "text" | "choice" | "check";
+  /** A choice's scale. */
+  options?: { id: string; label: string }[];
+  /** A write-in's text, or a tick's state ("1"), until the table changes it. */
+  value?: string;
+  /** The heading a choice is counted under ("Governance"). */
+  group?: string;
+}
+export interface LabSummarySection {
+  id: string;
+  n: number;
+  label: string;
+  items: LabSummaryItem[];
+}
+
+/**
+ * The use-case statement a table starts from: the lab's own text, then one
+ * line per taught journey (its chapter title and description), so the room
+ * edits what the journeys already say rather than a blank.
+ */
+export function labUseCaseText(p: Presentation, lab: WorkshopLab): string {
+  const first = (t: string) => /^([\s\S]+?[.!?])(?=\s|$)/.exec(t.trim())?.[1] ?? t.trim();
+  const lines = p.chapters.map((c) => `• ${c.title}: ${first(c.journey.scenario.description)}`);
+  return [lab.useCaseText?.trim(), ...lines].filter(Boolean).join("\n");
+}
+
+const labKey = (ws: string, ...parts: string[]): string => [ws, ...parts].join(":");
+
+function labTableRows(t: WorkshopTable, row: (r: WorkshopTable["rows"][number]) => string): string {
+  const groups: { name: string | undefined; rows: WorkshopTable["rows"] }[] = [];
+  for (const r of t.rows) {
+    const last = groups[groups.length - 1];
+    if (last && last.name === r.group) last.rows.push(r);
+    else groups.push({ name: r.group, rows: [r] });
+  }
+  return groups
+    .map((g) => `<div class="jp-lab-grp">${g.name ? `<h4>${e(g.name)}</h4>` : ""}${g.rows.map(row).join("")}</div>`)
+    .join("");
+}
+
+/**
+ * The Discussion view as a lab (`workshop.lab`): one tab per step, each with
+ * its timer and DISCUSS prompt, the parts it names, and a summary assembled
+ * from all of them in this browser. The journey's questions are answerable
+ * here and on the walkthrough under one key (`questionKey`); the gap strip's
+ * ratings likewise. Without script every step shows, one under the other.
+ */
+function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: WorkshopLab): string {
+  const a = at(1, links);
+  const ws = p.w.workshop;
+  const pr = ws.presentation ?? {};
+  const tables = new Map((ws.tables ?? []).map((t) => [t.id, t]));
+  const mod = (id: string | undefined) => (id ? `<a class="jp-mod" href="${e(`${a.toWorkshop}${moduleSegment(id)}/`)}" title="${e(ws.modules.find((m) => m.id === id)?.title ?? id)}">${e(id)}</a>` : "");
+  const forcedBy = (t: string, r: string) => p.steps.filter((s) => (s.ws?.tags ?? []).some((g) => g.table === t && g.row === r));
+  const scales = ws.assessment?.scales ?? [];
+  const summary: LabSummarySection[] = [];
+  const useCaseText = labUseCaseText(p, lab);
+  const model = gapReportModel(p, (s) => walkHref(a, s));
+
+  const radios = (name: string, options: { id: string; label: string }[], label: string, more = false) =>
+    `<div class="jp-choices${more ? " jp-choices-more" : ""}" role="radiogroup" aria-label="${e(label)}">${options
+      .map((o, oi) => `<label class="jp-choice jp-choice-${oi}"><input type="radio" name="${e(name)}" value="${e(o.id)}" data-jv-store${oi === 0 ? ' class="jp-first"' : ""}><span>${e(o.label)}</span></label>`)
+      .join("")}</div>`;
+
+  const part = (st: WorkshopLabStep, items: LabSummaryItem[]): string => {
+    const out: string[] = [];
+    for (const f of st.fields ?? []) {
+      const name = labKey(ws.id, "lab", st.id, f.id);
+      items.push({ label: f.label, name, type: "text" });
+      out.push(`<label class="jp-lab-field"><b>${e(f.label)}</b>${f.hint ? `<small>${e(f.hint)}</small>` : ""}<textarea class="jp-answer" name="${e(name)}" rows="${f.lines}" data-jv-text></textarea></label>`);
+    }
+    if (st.useCases && lab.useCases?.length) {
+      const cards = lab.useCases
+        .map((u, i) => {
+          const name = labKey(ws.id, "uc", u.id);
+          items.push({ label: u.label, name, type: "check", ...(u.journey ? { value: "1" } : {}), group: "Use cases" });
+          return `<label class="jp-uc"><input type="checkbox" name="${e(name)}" data-jv-check${u.journey ? " checked" : ""}><span class="jp-uc-n">${i + 1}</span><b>${e(u.label)}</b>${u.description ? `<small>${e(u.description)}</small>` : ""}${u.journey ? `<em>From the journeys</em>` : ""}</label>`;
+        })
+        .join("");
+      const name = labKey(ws.id, "lab", "use-case");
+      items.push({ label: "Our use case", name, type: "text", value: useCaseText });
+      out.push(`<h4 class="jp-lab-sub">Use case or health goal <small>Tick as many as apply</small></h4><div class="jp-ucs">${cards}</div>
+<label class="jp-lab-field"><b>Our use case is…</b><small>Filled in from the journeys. Change it to your country’s words.</small><textarea class="jp-answer" name="${e(name)}" rows="${Math.min(12, useCaseText.split("\n").length + 1)}" data-jv-text data-jp-usecase>${e(useCaseText)}</textarea></label>
+<button type="button" class="jp-btn-line jp-noprint" data-jp-text-reset="${e(name)}">${icon("reset")} Back to the journeys’ text</button>`);
+    }
+    for (const id of st.rate ?? []) {
+      const t = tables.get(id)!;
+      const sc = lab.scale!;
+      const body = labTableRows(t, (r) => {
+        const name = labKey(ws.id, "rate", t.id, r.id);
+        items.push({ label: r.label, name, type: "choice", options: sc.options, ...(r.group ? { group: r.group } : {}) });
+        return `<div class="jp-lab-row"><span title="${e(r.what ?? r.question ?? "")}">${e(r.label)}</span>${radios(name, sc.options, `${r.label}: ${sc.label}`)}</div>`;
+      });
+      out.push(`<div class="jp-lab-tbl">${t.description ? `<p class="jp-small">${e(t.description)}</p>` : ""}<div class="jp-lab-grps">${body}</div></div>`);
+    }
+    for (const id of st.holders ?? []) {
+      const t = tables.get(id)!;
+      const rows = t.rows
+        .map((r) => {
+          const name = labKey(ws.id, "hold", t.id, r.id);
+          items.push({ label: `${t.title}: ${r.label}`, name, type: "text" });
+          const f = forcedBy(t.id, r.id);
+          return `<div class="jp-card jp-dt"><b>${e(r.label)}</b>${r.question || r.what ? `<p>${e(r.question ?? r.what!)}</p>` : ""}<input class="jp-answer" type="text" name="${e(name)}" data-jv-text aria-label="${e(`Who holds it today: ${r.label}`)}" placeholder="Who holds it today?">${f.length ? `<div class="jp-dq-rev"><span>Forced by:</span>${f.map((s) => stepChip(a, s, s.step.id)).join("")}</div>` : ""}</div>`;
+        })
+        .join("");
+      out.push(`<h4 class="jp-lab-sub">${e(t.title)}${t.module ? ` ${mod(t.module)}` : ""}</h4>${t.description ? `<p class="jp-small">${e(t.description)}</p>` : ""}<div class="jp-dts">${rows}</div>`);
+    }
+    for (const id of st.pick ?? []) {
+      const t = tables.get(id)!;
+      const rows = t.rows
+        .map((r) => {
+          const name = labKey(ws.id, "pick", t.id, r.id);
+          items.push({ label: r.label, name, type: "check", group: t.title });
+          const f = forcedBy(t.id, r.id);
+          return `<label class="jp-card jp-dt jp-pick"><span><input type="checkbox" name="${e(name)}" data-jv-check> <b>${e(r.label)}</b></span>${r.question || r.what ? `<p>${e(r.question ?? r.what!)}</p>` : ""}${r.example ? `<small>e.g. ${e(r.example)}</small>` : ""}${f.length ? `<div class="jp-dq-rev"><span>Forced by:</span>${f.map((s) => stepChip(a, s, s.step.id)).join("")}</div>` : ""}</label>`;
+        })
+        .join("");
+      out.push(`<h4 class="jp-lab-sub">${e(t.title)}${t.module ? ` ${mod(t.module)}` : ""}</h4>${t.description ? `<p class="jp-small">${e(t.description)}</p>` : ""}<div class="jp-dts">${rows}</div>`);
+    }
+    if (st.capabilities && scales.length) {
+      const rows = p.steps
+        .filter((s) => s.ws?.capabilities?.length)
+        .map((s) => `<div class="jp-lab-cmom"><div class="jp-lab-cmom-h">${stepChip(a, s, s.step.id, true)}</div>${s.ws!.capabilities!.map((c) => (items.push({ label: `${s.step.id} · ${c.label}`, name: `${ws.id}:${c.id}:${scales[0]!.id}`, type: "choice", options: scales[0]!.options, group: s.step.id }), c)).map((c) => `<div class="jp-cap"><div class="jp-cap-label">${e(c.label)}</div>${scales.map((sc, si) => radios(`${ws.id}:${c.id}:${sc.id}`, sc.options, `${c.label}: ${sc.label}`, si > 0)).join("")}</div>`).join("")}</div>`)
+        .join("");
+      out.push(`<div class="jp-gap jp-lab-caps">${rows}${ws.assessment?.standingLine ? `<p class="jp-standing">${e(ws.assessment.standingLine)}</p>` : ""}<p class="jp-small">The same ratings as each moment’s gap strip in the walkthrough. The gap report is in the summary.</p></div>`);
+    }
+    for (const m of st.modules ?? []) {
+      const module = ws.modules.find((x) => x.id === m);
+      const qs = p.steps.flatMap((s) => (s.ws?.questions ?? []).map((q, i) => ({ s, q, i })).filter((x) => x.q.module === m));
+      if (!module || qs.length === 0) continue;
+      for (const { s, q, i } of qs) items.push({ label: `${s.step.id} · ${q.text}`, name: questionKey(ws.id, s, i), type: "text" });
+      out.push(`<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m)}<b>${e(module.title)}</b></div>${module.carries ? `<p class="jp-dm-c">${e(module.carries)}</p>` : ""}<ul class="jp-lab-qs">${qs.map(({ s, q, i }) => `<li>${stepChip(a, s, s.step.id)}<div><span>${e(q.text)}</span>${answerBox(questionKey(ws.id, s, i), q.text)}</div></li>`).join("")}</ul></div>`);
+    }
+    if (st.discussion && ws.discussion?.length) {
+      const cards = ws.discussion
+        .map((d, i) => {
+          const name = labKey(ws.id, "dq", d.id);
+          items.push({ label: d.theme, name, type: "text" });
+          return `<div class="jp-card jp-dq"><div class="jp-dq-h"><span class="jp-dq-n">${i + 1}</span><b>${e(d.theme)}</b>${mod(d.module)}</div><p>${e(d.question)}</p>${d.steps?.length ? `<div class="jp-dq-rev"><span>Revisit:</span>${d.steps.map((r) => stepChip(a, stepByRef(corpus, p, r), r, true)).join("")}</div>` : ""}${answerBox(name, d.question, 2)}</div>`;
+        })
+        .join("");
+      out.push(`<div class="jp-dqs">${cards}</div>`);
+    }
+    if (st.resources?.length) {
+      const rs = st.resources.map((id) => ws.resources!.find((r) => r.id === id)!).map((r) => (r.href ? ext(fromSite(r.href, a.siteRoot), r.title) : `<span>${e(r.title)}</span>`));
+      out.push(`<p class="jp-lab-res">${icon("book")} ${rs.join(" ")}</p>`);
+    }
+    return out.join("\n");
+  };
+
+  const steps = lab.steps.map((st, n) => {
+    const items: LabSummaryItem[] = [];
+    const body = part(st, items);
+    if (items.length) summary.push({ id: st.id, n, label: st.label, items });
+    return { st, n, body };
+  });
+  const takeaways = p.steps.filter((s) => s.step.policy);
+  const summaryBody = `<div class="jp-lab-sum-act jp-noprint"><button type="button" class="jp-btn-line" data-jp-lab-print>${icon("printer")} Print / Save as PDF</button><button type="button" class="jp-btn-line" data-jp-lab-csv>${icon("file")} Download CSV</button></div>
+<p class="jp-small">Assembled from every step, <b>in this browser only</b>: nothing is sent anywhere.</p>
+<script type="application/json" data-jp-lab-model>${jsonInHtml(summary)}</script>
+<div class="jp-lab-sum" data-jp-lab-summary></div>
+${model ? `<section class="jp-card jp-pad jp-gapreport" data-jp-gapreport><div class="jp-row"><h3 class="jp-h">${icon("clipboard", "jp-rose")} Gap report</h3><span class="jp-gap-act jp-noprint"><span class="jp-small"><b data-jp-gap-count>0</b> of ${model.items.length} capabilities marked as gaps</span><button type="button" class="jp-btn-line" data-jp-report-print>${icon("printer")} Print gap report</button><button type="button" class="jp-btn-line" data-jp-report-csv>${icon("file")} Gap report CSV</button><button type="button" class="jp-btn-line" data-jp-gap-clear>Clear</button></span></div><p class="jp-small">${e(ws.assessment?.standingLine ?? "")}</p>
+<script type="application/json" data-jp-gapreport-model>${jsonInHtml(model)}</script>
+<div data-jp-gapreport-body></div><p class="jp-small jp-gap-none" data-jp-gap-none>Nothing marked ${e(scales[0]!.options.slice(1).map((o) => o.label.toLowerCase()).join(" or "))} yet.</p></section>` : ""}
+${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}`;
+
+  const tabs = steps.map(({ st, n }) => `<a class="jp-lab-tab" href="#lab-${e(st.id)}" data-jp-lab-tab="${e(st.id)}"><span>${n}</span>${e(st.label)}</a>`).join("");
+  const sections = steps
+    .map(({ st, n, body }) => {
+      const next = steps[n + 1];
+      return `<section class="jp-card jp-lab-step${st.summary ? " jp-lab-summary" : ""}" id="lab-${e(st.id)}" data-jp-lab-step="${e(st.id)}">
+<div class="jp-lab-head"><div><span class="jp-lab-kick">${n}. ${e(st.label)}</span><h3>${e(st.title)}</h3>${st.lede ? `<p class="jp-lab-lede">${e(st.lede)}</p>` : ""}</div>${st.minutes ? `<button type="button" class="jp-lab-timer jp-noprint" data-jp-timer="${st.minutes}">${icon("clock")} <span>Start ${st.minutes} min timer</span></button>` : ""}</div>
+${st.discuss ? `<div class="jp-lab-discuss"><b>Discuss</b><span>${e(st.discuss)}</span></div>` : ""}
+${body}
+${st.summary ? summaryBody : ""}
+${st.note ? `<p class="jp-lab-note">${e(st.note)}</p>` : ""}
+${next ? `<div class="jp-lab-nav jp-noprint"><a class="jp-btn-dark" href="#lab-${e(next.st.id)}" data-jp-lab-go="${e(next.st.id)}">${e(next.st.label)} ${icon("right")}</a></div>` : ""}
+</section>`;
+    })
+    .join("\n");
+  const aside = `<aside class="jp-card jp-lab-aside"><h4>Our use case</h4><p data-jp-usecase-show>${e(useCaseText.split("\n")[0] ?? "")}</p><div class="jp-lab-aside-ucs" data-jp-usecase-ticks></div>${ws.promise ? `<p class="jp-small"><b>The scope promise.</b> ${e(ws.promise)}</p>` : ""}</aside>`;
+  const credit = lab.credit ? `<p class="jp-lab-credit">${lab.creditHref ? `${e(lab.credit)} ${ext(lab.creditHref, lab.creditLabel ?? lab.name ?? "Source")}` : e(lab.credit)}</p>` : "";
+  const body = `<section class="jp-dhero"><span class="jp-kicker">${icon("message")} ${e(lab.name ?? "Questions for the room")}</span><h2>${e(pr.closingQuestion ?? "Closing discussion")}</h2>${lab.intro ? `<p>${e(lab.intro)}</p>` : ""}</section>
+<nav class="jp-lab-tabs" aria-label="Steps">${tabs}</nav>
+<div class="jp-lab" data-jp-lab="${e(ws.id)}"><div class="jp-lab-steps">${sections}</div>${aside}</div>
+${credit}`;
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(model ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
 }
 
 // ── the gap report ───────────────────────────────────────────────────────
@@ -735,7 +935,7 @@ function demoPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, i: n
   let device: string;
   let open = "";
   if (x.node) {
-    device = `<div class="ds-stage" data-jp-stage>${renderDevice(x.node.screen, screenContext(corpus, p, x.node.instance, a.siteRoot), { caption: false })}</div>`;
+    device = `${stateSwitch(x.node.screen)}<div class="ds-stage" data-jp-stage>${renderDevice(x.node.screen, screenContext(corpus, p, x.node.instance, a.siteRoot), { caption: false })}</div>`;
     const src = sourceHref(corpus, x.node.instance, x.node.file);
     if (src) open = ext(src, "Screen source", "jp-devline-src");
   } else {
@@ -751,7 +951,7 @@ function demoPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, i: n
       : ""
   }</section>`;
   const body = `<section class="jp-screen-h"><div class="jp-screen-row">${back}${looking}</div>
-<div class="jp-devline"><span>${deviceGlyph(x)} ${e(DEVICE_FORM[x.device])}${config ? ` <code>(${e(config)})</code>` : ""}</span><span class="jp-devline-r">${open}<button type="button" class="jp-expand" data-jp-expand>${icon("expand")} Expand</button></span></div></section>
+<div class="jp-devline"><span>${deviceGlyph(x)} ${e(DEVICE_FORM[x.device])}${config ? ` <code>(${e(config)})</code>` : ""}</span><span class="jp-devline-r">${open}${x.node ? `<button type="button" class="jp-expand" data-jp-frame aria-pressed="true" hidden>${icon("phone")} Frame</button>` : ""}<button type="button" class="jp-expand" data-jp-expand>${icon("expand")} Expand</button></span></div></section>
 ${device}
 ${moments}`;
   const stage = [...x.steps.map((s) => s.step.id), ...x.unresolved].join(", ") || x.id;
