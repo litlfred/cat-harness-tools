@@ -4,7 +4,7 @@
  * `index.lock.json` pins, never at a branch.
  *
  * @module scripts/workflow-pins
- * @covers cat-harness — the instance axis: every `uses: litlfred/<layer>/…` line in .github is pinned to the commit index.lock.json mounts for that layer
+ * @covers cat-harness — the instance axis: every `uses: <owner>/<layer>/…` line in .github is pinned to the commit index.lock.json mounts for that layer, under the owner the lock names
  *
  * A `uses: litlfred/cat-harness-tools/.github/workflows/x.yml@main` line runs
  * whatever that branch holds when the run starts, so one bad push to a lower
@@ -18,6 +18,13 @@
  * | this repository's own workflow, as a job | `./.github/workflows/<file>` (same commit) |
  * | this repository's own action, as a step | `@<a commit whose copy of the action is main's or this tree's>` |
  * | anything else | a 40-hex commit, kept as it is; a branch or tag is an error |
+ *
+ * The owner is not fixed. A line is first-party when its owner is this
+ * repository's owner or the owner of any layer in the lock (layers can live
+ * under different owners, e.g. smart-* under WHO and the harness under
+ * litlfred). A first-party call to a layer the lock mounts is rewritten to the
+ * lock's `repository`, so moving a layer to a new owner is a re-pin away.
+ * Calls under any other owner (actions/checkout, …) are left alone.
  *
  * A job that calls `layer-pr-checks.yml` must not pass `tools-ref: <branch>`:
  * the judging scripts follow the lock too (`tools-ref: lock`, the default).
@@ -40,10 +47,11 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
-const OWNER = "litlfred";
+/** The owner assumed when nothing else names one (no CI env, no origin). */
+export const DEFAULT_OWNER = "litlfred";
 const SHA = /^[0-9a-f]{40}$/;
-/** `  - uses: litlfred/<repo>/<path>@<ref>  # comment` — groups: lead, step dash, repo, path, ref. */
-const USES = /^(\s*(-\s+)?uses:\s*)litlfred\/([A-Za-z0-9_.-]+)\/(\S+?)@(\S+)(\s+#.*)?$/;
+/** `  - uses: <owner>/<repo>/<path>@<ref>  # comment` — groups: lead, step dash, owner, repo, path, ref. */
+const USES = /^(\s*(-\s+)?uses:\s*)([A-Za-z0-9_-][A-Za-z0-9_.-]*)\/([A-Za-z0-9_.-]+)\/(\S+?)@(\S+)(\s+#.*)?$/;
 const TOOLS_REF = /^(\s*)tools-ref:\s*["']?([^"'\s#]+)["']?/;
 
 export interface Finding {
@@ -56,22 +64,66 @@ export interface Finding {
   trailing?: boolean;
 }
 
-/** The mounts of index.lock.json, harness name → commit; empty when there is no lock. */
-export function lockedRefs(root: string): Map<string, string> {
+type LockMount = { harness?: string; repository?: string; ref?: string };
+
+function lockMounts(root: string): LockMount[] {
   const f = join(root, "index.lock.json");
+  if (!existsSync(f)) return [];
+  return (JSON.parse(readFileSync(f, "utf8")) as { mounts?: LockMount[] }).mounts ?? [];
+}
+
+/** The repository name of a lock mount: the name part of `repository`, else the harness name. */
+function mountRepoName(m: LockMount): string | undefined {
+  return m.repository?.split("/")[1] ?? m.harness;
+}
+
+/**
+ * The mounts of index.lock.json, repository name → commit (also keyed by the
+ * harness name when it differs, e.g. dpi-h-ra in litlfred/smart-ra); empty
+ * when there is no lock.
+ */
+export function lockedRefs(root: string): Map<string, string> {
   const out = new Map<string, string>();
-  if (!existsSync(f)) return out;
-  const lock = JSON.parse(readFileSync(f, "utf8")) as { mounts?: { harness?: string; ref?: string }[] };
-  for (const m of lock.mounts ?? []) if (m.harness && m.ref && SHA.test(m.ref)) out.set(m.harness, m.ref);
+  for (const m of lockMounts(root)) {
+    if (!m.ref || !SHA.test(m.ref)) continue;
+    const name = mountRepoName(m);
+    if (name) out.set(name, m.ref);
+    if (m.harness) out.set(m.harness, m.ref);
+  }
+  return out;
+}
+
+/** The mounts of index.lock.json, repository name → `owner/repo` as the lock names it. */
+export function lockedRepos(root: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of lockMounts(root)) {
+    const name = mountRepoName(m);
+    if (name && m.repository?.includes("/")) out.set(name, m.repository);
+  }
   return out;
 }
 
 /** This repository's name on GitHub: GITHUB_REPOSITORY, else origin's URL, else the directory. */
 export function ownName(root: string): string {
+  return ownSlug(root).repo;
+}
+
+/**
+ * This repository's owner and name on GitHub: GITHUB_REPOSITORY, else
+ * origin's URL, else {@link DEFAULT_OWNER} and the directory.
+ */
+export function ownSlug(root: string): { owner: string; repo: string } {
   // input-site: env GITHUB_REPOSITORY #bd3896fa — this repository's name, when CI says it
   const env = process.env.GITHUB_REPOSITORY;
-  if (env?.startsWith(`${OWNER}/`)) return env.slice(OWNER.length + 1);
-  return checkoutName(root);
+  const e = env?.match(/^([^/\s]+)\/([^/\s]+)$/);
+  if (e) return { owner: e[1], repo: e[2] };
+  return { owner: originOwner(root) ?? DEFAULT_OWNER, repo: checkoutName(root) };
+}
+
+/** The owner in origin's URL (`github.com/<owner>/<repo>` or `github.com:<owner>/<repo>`), else null. */
+function originOwner(root: string): string | null {
+  const url = git(root, ["remote", "get-url", "origin"]);
+  return url?.match(/[/:]([^/:]+)\/[^/]+?(\.git)?$/)?.[1] ?? null;
 }
 
 /**
@@ -140,8 +192,18 @@ export function workflowFiles(root: string): string[] {
  * Judge (and with `write`, fix) one file's lines. Pure but for the git calls
  * a self-pinned action needs.
  */
-export function judgeFile(root: string, file: string, text: string, own: string, refs: Map<string, string>): { findings: Finding[]; text: string } {
+export function judgeFile(
+  root: string,
+  file: string,
+  text: string,
+  own: string,
+  refs: Map<string, string>,
+  repos: Map<string, string> = new Map(),
+  ownOwner: string = DEFAULT_OWNER,
+): { findings: Finding[]; text: string } {
   const lines = text.split("\n");
+  /** Owners whose calls this check judges: this repository's and every locked layer's. */
+  const firstParty = new Set([ownOwner, ...[...repos.values()].map((r) => r.split("/")[0])]);
   const findings: Finding[] = [];
   const rel = relative(root, file);
   let callsChecks = false;
@@ -153,29 +215,32 @@ export function judgeFile(root: string, file: string, text: string, own: string,
     if (callIndent >= 0 && l.trim() !== "" && indent < callIndent) callsChecks = false;
     const m = l.match(USES);
     if (m) {
-      const [, lead, dash, repo, path, ref] = m;
+      const [, lead, dash, owner, repo, path, ref] = m;
+      if (!firstParty.has(owner)) continue;
       callsChecks = path.endsWith("layer-pr-checks.yml");
       callIndent = indent;
       let want: string | null = null;
       let why = "";
-      if (repo === own && !dash && path.startsWith(".github/workflows/")) {
+      if (repo === own && owner === ownOwner && !dash && path.startsWith(".github/workflows/")) {
         want = `${lead}./${path}`;
         why = "this repository's own workflow: call it at the same commit";
-      } else if (repo === own) {
+      } else if (repo === own && owner === ownOwner) {
         const dir = path.replace(/\/action\.ya?ml$/, "");
         const head = treeAt(root, "HEAD", dir);
         const pinned = SHA.test(ref) ? treeAt(root, ref, dir) : null;
         const main = treeAt(root, "origin/main", dir);
         if (pinned !== null && (pinned === head || pinned === main)) continue;
         const c = lastTouch(root, dir);
-        want = c ? `${lead}litlfred/${repo}/${path}@${c} # last change to ${dir}` : null;
+        want = c ? `${lead}${owner}/${repo}/${path}@${c} # last change to ${dir}` : null;
         why = c ? "this repository's own action: pin the commit that last changed it" : "this repository's own action: history too shallow to find the commit that last changed it; fetch more and re-run";
       } else if (refs.has(repo)) {
         const sha = refs.get(repo)!;
-        if (ref === sha) continue;
-        want = `${lead}litlfred/${repo}/${path}@${sha} # index.lock.json`;
-        why = `index.lock.json mounts ${repo} at ${sha.slice(0, 8)}`;
-        if (SHA.test(ref)) {
+        const slug = repos.get(repo) ?? `${owner}/${repo}`;
+        const moved = slug !== `${owner}/${repo}`;
+        if (ref === sha && !moved) continue;
+        want = `${lead}${slug}/${path}@${sha} # index.lock.json`;
+        why = moved ? `index.lock.json mounts ${repo} from ${slug} at ${sha.slice(0, 8)}, not ${owner}/${repo}` : `index.lock.json mounts ${repo} at ${sha.slice(0, 8)}`;
+        if (SHA.test(ref) && !moved) {
           findings.push({ file: rel, line: i + 1, have: l.trim(), want: want.trim(), why: `${why}; this pin trails it until an agent session runs workflow-pins`, trailing: true });
           lines[i] = want;
           continue;
@@ -202,12 +267,13 @@ export function judgeFile(root: string, file: string, text: string, own: string,
 
 export function run(root: string, write: boolean): { findings: Finding[]; fixed: number } {
   const refs = lockedRefs(root);
-  const own = ownName(root);
+  const repos = lockedRepos(root);
+  const { owner: ownOwner, repo: own } = ownSlug(root);
   const all: Finding[] = [];
   let fixed = 0;
   for (const f of workflowFiles(root)) {
     const before = readFileSync(f, "utf8");
-    const { findings, text } = judgeFile(root, f, before, own, refs);
+    const { findings, text } = judgeFile(root, f, before, own, refs, repos, ownOwner);
     all.push(...findings);
     if (write && text !== before) {
       writeFileSync(f, text);
@@ -232,7 +298,7 @@ if (import.meta.main) {
   }
   console.log("Shared workflows pinned to index.lock.json:");
   if (result.findings.length === 0) {
-    console.log("  ✓ every litlfred/… call is pinned");
+    console.log("  ✓ every first-party call is pinned");
     process.exit(0);
   }
   for (const f of result.findings) {

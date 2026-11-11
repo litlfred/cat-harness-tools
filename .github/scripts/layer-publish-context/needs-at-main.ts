@@ -18,7 +18,10 @@
  *
  * Imports only `node:*`: it runs before `bun install`.
  *
- * Usage: bun needs-at-main.ts <index-root> <instance> [--always cat-harness-tools] [--owner litlfred]
+ * Usage: bun needs-at-main.ts <index-root> <instance> [--always cat-harness-tools] [--owner <owner>]
+ *
+ * `--owner` (default `HARNESS_OWNER`, else litlfred) is used only for a layer
+ * the lock does not name; a locked layer is fetched from the lock's `repository`.
  *
  * @module .github/scripts/layer-publish-context/needs-at-main
  */
@@ -32,17 +35,28 @@ export interface LockedInstance {
   upstreamRoot: string;
 }
 
-/** `instance → where to fetch it`, from the index lock when present. */
+/**
+ * `instance → where to fetch it`, from the index lock when present: its
+ * `mounts` (`harness`, cat-harness-mount-lock/v1) and the older `instances`
+ * (`instance`). The lock's `repository` carries the owner, so a layer that
+ * lives under another owner (smart-base under WHO, say) is fetched from there.
+ */
 export function lockedInstances(root: string): Map<string, LockedInstance> {
   const out = new Map<string, LockedInstance>();
   const file = join(root, "index.lock.json");
   if (!existsSync(file)) return out;
-  const lock = JSON.parse(readFileSync(file, "utf-8")) as { instances?: Array<{ instance?: string; repository?: string; upstreamRoot?: string }> };
-  for (const i of lock.instances ?? []) {
-    if (typeof i.instance === "string" && typeof i.repository === "string") out.set(i.instance, { repository: i.repository, upstreamRoot: i.upstreamRoot ?? "" });
+  type Entry = { instance?: string; harness?: string; repository?: string; upstreamRoot?: string };
+  const lock = JSON.parse(readFileSync(file, "utf-8")) as { instances?: Entry[]; mounts?: Entry[] };
+  for (const i of [...(lock.instances ?? []), ...(lock.mounts ?? [])]) {
+    const name = i.instance ?? i.harness;
+    if (typeof name === "string" && typeof i.repository === "string" && !out.has(name))
+      out.set(name, { repository: i.repository, upstreamRoot: i.upstreamRoot ?? "" });
   }
   return out;
 }
+
+/** The owner for a layer the lock does not name: `HARNESS_OWNER`, else litlfred (where the harness lives). */
+export const DEFAULT_OWNER = process.env.HARNESS_OWNER || "litlfred";
 
 /** The `needs` a declaration names, or none. */
 export function needsOf(root: string, name: string): string[] {
@@ -100,7 +114,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   const always: string[] = [];
-  let owner = "litlfred";
+  let owner = DEFAULT_OWNER;
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === "--always") always.push(rest[++i]!);
     else if (rest[i] === "--owner") owner = rest[++i]!;
