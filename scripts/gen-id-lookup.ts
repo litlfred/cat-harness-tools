@@ -34,7 +34,7 @@
  *   bun run cat id-lookup -- --source <name> # one layer's only
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, posix, relative, resolve } from "node:path";
 
 import { checkoutDirectories } from "../schemas/kg/harness-config.ts";
 import { buildIdLookup, CatalogueNodeReadSchema, type IdEntry } from "../schemas/kg/id-lookup.js";
@@ -86,12 +86,30 @@ export function outDirFor(source: string): string {
   return d.absPath;
 }
 
-/** The catalogue nodes directory, through the source layer's declaration. */
-export function catalogueNodesDir(source: string): string {
+/** The source layer's catalogue directory entry and its `catalogue.json`'s `nodesDir`. */
+function catalogueOf(source: string): { dir: { path: string; absPath: string }; nodesDir: string } {
   const d = dirsOf(source).find((x) => x.graphTypologies.includes("catalogue" as never));
   if (!d) throw new Error(`${source} declares no directory of graph typology "catalogue"`);
   const cat = JSON.parse(readFileSync(join(d.absPath, "catalogue.json"), "utf8")) as { nodesDir: string };
-  return join(d.absPath, cat.nodesDir);
+  return { dir: d, nodesDir: cat.nodesDir };
+}
+
+/** The catalogue nodes directory, through the source layer's declaration. */
+export function catalogueNodesDir(source: string): string {
+  const { dir, nodesDir } = catalogueOf(source);
+  return join(dir.absPath, nodesDir);
+}
+
+/**
+ * The manifest's `selection`: the nodes directory spelled from the SOURCE
+ * LAYER's declaration (`<declared path>/<nodesDir>/`), never from the
+ * checkout. Spelled `relative(REPO, …)` it read `catalogue/nodes/` where the
+ * layer is the checkout root and `who-iris/catalogue/nodes/` where a consumer
+ * mounts it, so the committed lookup was stale in every checkout but one.
+ */
+export function nodesSelection(dir: { path: string }, nodesDir: string): string {
+  const rel = posix.join(dir.path.replace(/\\/g, "/"), nodesDir.replace(/\\/g, "/")).replace(/^\.\/+/, "").replace(/\/+$/, "");
+  return `every node under ${rel}/ whose materialization.state is "referenced"`;
 }
 
 /** The library directory of `source`, through its declaration. */
@@ -147,12 +165,9 @@ export function staleness(files: Map<string, string>, dir: string): string[] {
 }
 
 export function build(source: string): Map<string, string> {
-  const nodesDir = catalogueNodesDir(source);
-  const entries = referencedEntries(nodesDir);
-  return buildIdLookup(entries, {
-    source,
-    selection: `every node under ${relative(REPO, nodesDir)}/ whose materialization.state is "referenced"`,
-  }).files;
+  const { dir, nodesDir } = catalogueOf(source);
+  const entries = referencedEntries(join(dir.absPath, nodesDir));
+  return buildIdLookup(entries, { source, selection: nodesSelection(dir, nodesDir) }).files;
 }
 
 if (import.meta.main) {

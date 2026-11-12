@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import * as client from "../id-lookup/lookup.js";
-import { build as buildFor, catalogueNodesDir, defaultSource, outDirFor, referencedEntries, staleness } from "../scripts/gen-id-lookup.ts";
+import { build as buildFor, catalogueNodesDir, defaultSource, nodesSelection, outDirFor, referencedEntries, staleness } from "../scripts/gen-id-lookup.ts";
 import { rng, syntheticCorpus, uuidV4 } from "../scripts/bench-id-lookup.ts";
 import {
   buildIdLookup,
@@ -223,5 +223,26 @@ describe("the client and the build name shards the same way", () => {
       for (const n of [0, 1, 2, 3, 4]) expect(client.shardFile(s.ns, s.local, n)).toBe(shardFile(s.ns, s.local, n));
     }
     expect(shardFile("item", "a/b", 3)).toBe("item/pa~2fb.json");
+  });
+});
+
+describe("the manifest's selection does not depend on where the checkout sits", () => {
+  // Spelled from the checkout root it read `catalogue/nodes/` with the layer
+  // at the root and `who-iris/catalogue/nodes/` in a consumer checkout, so the
+  // committed lookup was stale in one of the two. It is the declaration's.
+  test("the whole build carries no checkout path in its manifest", () => {
+    const files = buildFor(defaultSource());
+    const manifest = files.get("manifest.json");
+    expect(manifest).toBeDefined();
+    const sel = (JSON.parse(manifest!) as { selection?: string }).selection ?? "";
+    // The declared path, whatever directory the layer was mounted at.
+    expect(sel).toMatch(/^every node under [^/]/);
+    expect(sel).not.toContain(`${defaultSource()}/`);
+  });
+
+  test("spellings of the declared path agree", () => {
+    for (const p of ["catalogue", "catalogue/", "./catalogue/", "catalogue//"]) {
+      expect(nodesSelection({ path: p }, "nodes/")).toBe('every node under catalogue/nodes/ whose materialization.state is "referenced"');
+    }
   });
 });
