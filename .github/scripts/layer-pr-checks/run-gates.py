@@ -110,7 +110,7 @@ from concurrent.futures import ThreadPoolExecutor
 # Beside this file, found by its path: the tests and `python3 -I` put no
 # script directory on sys.path.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gate_diagnostics import diagnostics  # noqa: E402
+from gate_diagnostics import diagnostics, producer  # noqa: E402
 
 # Scoped to the instance where the check takes a scope (kg-audit, kg-export,
 # import-direction). check-tools and declaration-resolution read the whole
@@ -1272,7 +1272,7 @@ def main():
             print(text[-4000:], flush=True)
             print("::endgroup::", flush=True)
             results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds,
-                             "diagnostics": diagnostics(text, root)}
+                             "diagnostics": diagnostics(text, root), "producer": producer(root, name)}
         with open(out_path, "w") as f:
             json.dump(results, f, indent=1)
         sys.exit(0)
@@ -1355,7 +1355,7 @@ def main():
         # The findings it printed, so a gate red on main too still fails the
         # PR that adds one (compare-gates.py; folio-assistant-core#630, #1457).
         results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds,
-                         "diagnostics": diagnostics(text, root)}
+                         "diagnostics": diagnostics(text, root), "producer": producer(root, name)}
     ran = list(results)
     for name, entry in unchanged.items():
         print(f"{name}: SKIPPED — {entry['skipped']} — {entry['command']}", flush=True)
