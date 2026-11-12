@@ -490,10 +490,66 @@ function rendersExactly(fixed: string, msgstr: string, locale: string): boolean 
   if (locale === "zh") return t.includes(f);
   if (locale === "ar") {
     f = f.replace(/(^|\s)ال/g, "$1");
-    return f.split(/\s+/).filter(Boolean).every((w) => t.includes(w));
+    const toks = t.match(/[\p{L}\p{N}_]+/gu) ?? [];
+    return f.split(/\s+/).filter(Boolean).every((w) => t.includes(w) || toks.some((x) => arabicFormOf(w, x)));
   }
   const toks = t.match(/[\p{L}\p{N}_]+/gu) ?? [];
   return (f.match(/[\p{L}\p{N}_]+/gu) ?? []).every((w) => stems(w, locale).some((s) => toks.some((x) => x.startsWith(s))));
+}
+
+// ── Arabic inflected forms (owner, Q-GLOSS-REST A, 2026-11-12) ──
+//
+// A fixed rendering is one word form, «المهارة», and the substring match
+// above finds it only where that form, less its article, appears. Correct
+// Arabic inflects it: «مهارات» (plural), «مهاراتك» (plural + possessive),
+// «مهمته» (the tāʾ marbūṭa becomes ت before a suffix), «الأدوار» (a broken
+// plural of «الدور»). cat-harness#1279 left 12 such uses reported as not
+// rendered. A token counts as a form of the word when, after its proclitics
+// and enclitics are removed, its stem is the word's — but only if a SUFFIX
+// was removed (a plural, a possessive) or it is the word's broken plural:
+// the bare stem, with or without the article («مهم», «المهم», "important"),
+// is a different word, not a form of «مهمة».
+// Strings here are already `norm`ed: no tashkeel, أإآ→ا, ى→ي, ة→ه.
+
+const AR_PROCLITICS = ["وبال", "وال", "فال", "بال", "كال", "لل", "ال", "و", "ف", "ب", "ك", "ل"];
+const AR_ENCLITICS = ["كما", "هما", "هم", "هن", "كم", "كن", "نا", "ها", "ه", "ك", "ي"];
+// Only the sound feminine plural and the tāʾ marbūṭa: the masculine plural
+// and dual endings (ون، ين، ان) also end unrelated words («الدوران»,
+// "rotation", is not «الدور»), and no recorded use needs them.
+const AR_INFLECTIONS = ["ات", "ه", "ت"];
+
+/** The word's stem: a final ه (from ة) dropped. */
+function arabicStem(word: string): string {
+  return word.length > 2 && word.endsWith("ه") ? word.slice(0, -1) : word;
+}
+
+/** The candidate stems of a token, each with whether a suffix was removed to reach it. */
+function arabicStems(token: string): Array<{ stem: string; affixed: boolean }> {
+  const out: Array<{ stem: string; affixed: boolean }> = [];
+  const bases = [token, ...AR_PROCLITICS.filter((p) => token.startsWith(p) && token.length - p.length >= 2).map((p) => token.slice(p.length))];
+  for (const b of bases) {
+    const enc = [b, ...AR_ENCLITICS.filter((s) => b.endsWith(s) && b.length - s.length >= 2).map((s) => b.slice(0, -s.length))];
+    for (const e of enc) {
+      out.push({ stem: arabicStem(e), affixed: e !== b });
+      for (const s of AR_INFLECTIONS) {
+        if (e.endsWith(s) && e.length - s.length >= 2) out.push({ stem: e.slice(0, -s.length), affixed: true });
+      }
+    }
+  }
+  return out;
+}
+
+/** The afʿāl broken plural of a three-letter stem: «دور» → «ادوار». */
+function arabicBrokenPlural(stem: string): string | undefined {
+  const c = [...stem];
+  return c.length === 3 ? `ا${c[0]}${c[1]}ا${c[2]}` : undefined;
+}
+
+/** Is `token` an inflected form of the fixed rendering's `word` (both `norm`ed, the word without its article)? */
+export function arabicFormOf(word: string, token: string): boolean {
+  const stem = arabicStem(word);
+  const broken = arabicBrokenPlural(stem);
+  return arabicStems(token).some((c) => (c.stem === stem && c.affixed) || (broken !== undefined && c.stem === broken));
 }
 
 /** Is `term` a word of the prose in `msgid` — not inside an identifier, a path, code or a placeholder? */
