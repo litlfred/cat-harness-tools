@@ -334,6 +334,10 @@ export interface GraphTypologyDef {
    * kind is not a ruling on its contents.
    */
   holds: GraphLayer;
+  /**
+   * Whether a directory of this kind owes json, jsonld and schema.json at its URL (check:subgraph-coverage). Absent: owed unless `holds` is `state`. `false` for kinds whose files are not graph nodes: code, built pages, fixtures. Owner Q-SER-1 C / Q-SER-2 A, 2026-11-12: not all directories need to be harnessed.
+   */
+  serialised?: boolean;
   summary: string;
   /**
    * What every navigation surface CALLS a destination of this kind: the
@@ -1158,6 +1162,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // explains, and you would RE-AUTHOR it rather than arrive at it by
     // re-running anything. Same layer as `cat-harness`, `schemas` and `voices`.
     holds: "content",
+    serialised: false,
     // declared-path-literal: this table IS the declaration, as on `health`.
     nodeSchemas: {
       "folio-todo-index/v1": {},
@@ -1327,6 +1332,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // page (`check:docs-populated`) and why this arc keys the family by
     // `route` rather than by `tip`.
     holds: "derived",
+    serialised: false,
     validatorNotApplicable:
       "its nodes are generated index PAGES — HTML and markdown with no fixed JSON shape — so a registry " +
       "validator would be a category error, as on `proposals`. What is checked mechanically is the " +
@@ -1687,6 +1693,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // `ConcernGroupsSchema`.
     renderable: false,
     holds: "content",
+    serialised: false,
     validatorNotApplicable:
       "its nodes are TypeScript — 1793 files, counted 2026-09-24. `tsc` is the validator for code, and " +
       "`check:partition` plus `check-code-accounting` grade the graph over it.",
@@ -1828,6 +1835,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     title: "Fixed test data sets",
     renderable: false,
     holds: "content",
+    serialised: false,
     summary:
       "Fixed test data sets — one `test-data-fixed/1.0.0` document per curated set (`kind: \"fixed\"`), " +
       "living in its own declared directory separate from `test-data-generated` and self-identifying from " +
@@ -1848,6 +1856,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     title: "Generated test data recipes",
     renderable: false,
     holds: "content",
+    serialised: false,
     summary:
       "Generated test data recipes — one `test-data-generated/1.0.0` document per recipe (`kind: \"generated\"`, " +
       "`template`, `params`, `seed`, `specialisation`, `sha256`), never stored materialised, living in a " +
@@ -2493,6 +2502,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     title: "CI caches",
     renderable: false,
     holds: "content",
+    serialised: false,
     // declared-path-literal: this table IS the declaration, as on `binary-release`.
     schema: "schemas/sdlc/cache.ts",
     nodeSchemas: {
@@ -2663,6 +2673,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     title: "Basic CDN site",
     renderable: false,
     holds: "derived",
+    serialised: false,
     // declared-path-literal: this table IS the declaration, as on `binary-release`.
     schema: "schemas/kg/site.ts",
     nodeSchemas: {
@@ -2679,6 +2690,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     title: "CDN site",
     renderable: false,
     holds: "derived",
+    serialised: false,
     // declared-path-literal: this table IS the declaration.
     schema: "schemas/kg/site.ts",
     nodeSchemas: {
@@ -3080,6 +3092,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     title: "Substrate snapshots",
     renderable: false,
     holds: "derived",
+    serialised: false,
     // declared-path-literal: this table IS the declaration, as on `health`.
     // ONE family, so `validator` rather than `nodeSchemas`: a `nodeSchemas`
     // map claims nodes exist to route, and `check:kind-validators` fails one

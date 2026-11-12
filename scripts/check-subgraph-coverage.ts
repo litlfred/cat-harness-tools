@@ -39,6 +39,7 @@ import {
   checkoutRootFor,
   repoRootFor,
   instanceRootFor,
+  directoryOwesSerialisations,
   owesVisualiser,
   resolveCoveragePath,
   type CatHarnessDeclaration,
@@ -138,6 +139,8 @@ export interface InstanceCoverage {
   ownDocs?: { severity: Severity; detail: string };
   /** Waivers honoured, with the reason each one gave. */
   exempted: Array<{ directory: string; criterion: Criterion; reason: string }>;
+  /** Directories no kind of which owes serialisations (state, code or pages): not a waiver, the kind's answer. */
+  serialisationsNotOwed?: string[];
   reason?: string;
 }
 
@@ -444,6 +447,7 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
 
   const findings: CoverageFinding[] = [];
   const exempted: InstanceCoverage["exempted"] = [];
+  const notOwed: string[] = [];
   const dirs = decl.directories ?? [];
   // Who governs what, read from the skills; and how far a kind claim reaches —
   // this layer, every layer it depends on, and the PLATFORM layer
@@ -467,6 +471,14 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
       // being in the KG."* Rendering, documenting and governing are choices
       // about effort; addressability is the claim that the nodes are in the
       // graph at all.
+      //
+      // What is NOT owed is the kind's answer, not a waiver (owner, Q-SER-2
+      // A, 2026-11-12): only a directory of a node-graph kind owes
+      // serialisations, and it owes when ANY of its kinds does.
+      if (criterion === "serialisations" && !directoryOwesSerialisations(dir.graphTypologies)) {
+        notOwed.push(dir.id);
+        continue;
+      }
       const waiver = criterion === "serialisations" ? undefined : dir.coverage?.exempt?.[criterion];
       if (waiver !== undefined) {
         exempted.push({ directory: dir.id, criterion, reason: waiver });
@@ -500,13 +512,12 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
         // this file's own header says somebody switches off. What changes is
         // that the 20 stop being indistinguishable from the kinds that never
         // owed anything.
-        // SERIALISATIONS are owed by every declared directory, with no
-        // by-kind test — the owner's rule is "all dir urls". That is not the
-        // usual shape here and `hfkl` is the reason it is right: bootstrap is
-        // excused a VISUALISER precisely because its json/jsonld "is its
-        // existence", so the thing it is excused into cannot itself be
-        // excusable by kind. The visualiser is the courtesy; the serialisation
-        // is the existence claim.
+        // SERIALISATIONS are owed by every directory of a node-graph kind
+        // (`owesSerialisations`; the rest were skipped above), and waivable by
+        // none. `hfkl` is the reason it takes no waiver: bootstrap is excused a
+        // VISUALISER precisely because its json/jsonld "is its existence", so
+        // the thing it is excused into cannot itself be excusable. The
+        // visualiser is the courtesy; the serialisation is the existence claim.
         const unmetObligation =
           criterion === "serialisations" ||
           (criterion === "visualiser" && dir.graphTypologies.some((g) => owesVisualiser(g)));
@@ -518,7 +529,7 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
           unmet: "undeclared",
           detail:
             criterion === "serialisations"
-              ? `no serialisations declared — every declared directory owes json, jsonld and ` +
+              ? `no serialisations declared — every directory of a node-graph kind owes json, jsonld and ` +
                 `schema.json at its own URL, and this one is excused nothing`
               : unmetObligation
                 ? `no visualiser declared, and ${dir.graphTypologies.filter((g) => owesVisualiser(g)).join(", ")} owes one — ` +
@@ -598,6 +609,7 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
     declared: dirs.length,
     findings,
     exempted,
+    serialisationsNotOwed: notOwed,
     readme,
     agentInstructions,
     ownDocs,
@@ -652,6 +664,7 @@ export function formatReport(rs: InstanceCoverage[]): string {
   // instance" and "is there anything to read once inside" do not collapse into
   // one number just because one set happens to contain the other.
   const noOwnDocs = rs.filter((r) => r.ownDocs !== undefined).length;
+  const notOwed = rs.reduce((n, r) => n + (r.serialisationsNotOwed?.length ?? 0), 0);
   const undet = rs.filter((r) => r.verdict === "undetermined").length;
   const all = rs.flatMap((r) => r.findings);
   const major = all.filter((f) => f.severity === "major").length;
@@ -659,6 +672,9 @@ export function formatReport(rs: InstanceCoverage[]): string {
   out.push(
     `${all.length} finding(s) across ${rs.length - undet} instance(s) — ${major} major, ${all.length - major} minor.`,
   );
+  if (notOwed) {
+    out.push(`${notOwed} director(ies) not owed serialisations (state, code or pages): no kind of theirs is a node graph.`);
+  }
   if (noReadme) {
     out.push(
       `${noReadme} instance(s) have no starting README OF THEIR OWN — an instance a reader cannot enter.`,

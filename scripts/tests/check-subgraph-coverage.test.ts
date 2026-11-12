@@ -23,6 +23,8 @@ import {
 } from "../check-subgraph-coverage";
 import {
   INSTANCE_README_ROLE,
+  directoryOwesSerialisations,
+  owesSerialisations,
   owesVisualiser,
   GraphTypologyRegistry,
   resolveCoveragePath,
@@ -814,5 +816,81 @@ describe("coverage.process is a declared-only criterion", () => {
     expect(f.detail).toContain("demo-flow");
     expect(f.detail).toContain("thing/");
     cleanup();
+  });
+});
+
+describe("only a node-graph kind owes serialisations (owner, Q-SER-2 A, 2026-11-12)", () => {
+  // The kinds named in the ruling, classified as the layers that declare them
+  // do. A registry of its own, because several are declared above this layer
+  // and the default registry is whatever the checkout mounts.
+  const registry = new GraphTypologyRegistry({
+    attestations: { renderable: false, holds: "state", summary: "Attestation records: a store's running state." },
+    "todo-items": { renderable: false, holds: "state", summary: "Todo items: a store's running state." },
+    "public-comments": { renderable: false, holds: "state", summary: "Public comments: a store's running state." },
+    code: { renderable: false, holds: "content", serialised: false, summary: "Source code." },
+    docs: { renderable: true, holds: "content", serialised: false, summary: "Built documentation pages." },
+    glossary: { renderable: false, holds: "content", summary: "Glossary terms: graph nodes." },
+  });
+
+  it.each([
+    ["attestations (state)", ["attestations"], false],
+    ["id-lookup (code)", ["code"], false],
+    ["docs (built pages)", ["docs"], false],
+    ["glossary (a node graph)", ["glossary"], true],
+    ["an unregistered kind", ["no-such-kind"], true],
+    ["[todo-items, public-comments] (both state)", ["todo-items", "public-comments"], false],
+    ["[state, content]: one kind owes, so the directory owes", ["attestations", "glossary"], true],
+  ] as const)("%s", (_label, kinds, owes) => {
+    expect(directoryOwesSerialisations(kinds, registry)).toBe(owes);
+  });
+
+  it("the kind's own `serialised` flag wins over `holds`", () => {
+    const r = new GraphTypologyRegistry({
+      "state-graph": { renderable: false, holds: "state", serialised: true, summary: "A state kind whose files are nodes." },
+      "content-code": { renderable: false, holds: "content", serialised: false, summary: "Content that is not nodes." },
+    });
+    expect(owesSerialisations("state-graph", r)).toBe(true);
+    expect(owesSerialisations("content-code", r)).toBe(false);
+  });
+
+  it("the base registry marks code, built pages, caches, fixtures and snapshots as not serialised", () => {
+    for (const k of ["code", "docs", "cache", "test-data-fixed", "test-data-generated", "auto-docs", "basic-cdn-site", "cdn-site", "substrate-snapshot"]) {
+      expect(owesSerialisations(k)).toBe(false);
+    }
+  });
+
+  function dirOf(kinds: string[]): ReturnType<typeof auditInstance> {
+    const { root, cleanup } = instance(undefined, { graphTypologies: kinds });
+    try {
+      return auditInstance(root);
+    } finally {
+      cleanup();
+    }
+  }
+
+  it("the checker: a state directory, a code directory and a docs directory owe nothing", () => {
+    for (const kinds of [["attestations"], ["code"], ["docs"], ["todo-items", "beans"]]) {
+      const r = dirOf(kinds);
+      expect(r.findings.map((f) => f.criterion)).not.toContain("serialisations");
+      expect(r.serialisationsNotOwed).toEqual(["thing"]);
+      // Not owed is the kind's answer, not a waiver.
+      expect(r.exempted.map((e) => e.criterion)).not.toContain("serialisations");
+    }
+  });
+
+  // An unregistered kind never reaches the checker (the declaration is
+  // refused as unreadable), so it is pinned above, against the registry.
+  it("the checker: a content kind, or [state, content], still owes, and it is major", () => {
+    for (const kinds of [["cat-harness"], ["attestations", "cat-harness"]]) {
+      const r = dirOf(kinds);
+      const f = r.findings.find((x) => x.criterion === "serialisations");
+      expect(f?.severity).toBe("major");
+      expect(f?.detail).toContain("every directory of a node-graph kind owes");
+      expect(r.serialisationsNotOwed ?? []).toEqual([]);
+    }
+  });
+
+  it("the report counts the directories not owed", () => {
+    expect(formatReport([dirOf(["attestations"])])).toContain("1 director(ies) not owed serialisations (state, code or pages)");
   });
 });
