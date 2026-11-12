@@ -2125,7 +2125,75 @@ export function currentPerLock(root: string): CheckResult | undefined {
   const c = checkRemote({ instanceRoot: root });
   if (c.state !== "mounted" && c.state !== "unverified-approver") return undefined;
   if (c.outcomes.length === 0 || c.outcomes.some((o) => o.state !== "mounted" && o.state !== "unverified-approver")) return undefined;
+  if (optInDriftFromLock(root).length > 0) return undefined;
   return c;
+}
+
+/**
+ * The whole-layer mounts whose recorded `except` no longer matches what the
+ * root's `enableSubgraphs` leaves out now, each as `<layer>: <why>`. Empty
+ * when every one matches, or when there is no lock to compare.
+ *
+ * The lock check judges bytes against the lock, and the lock's `except` was
+ * computed from the enabled set at mount time. So a downstream that switches
+ * an opt-in sub-graph on (say `cat-harness.proposals`) still reads
+ * as current, and without this the fast path never laid the newly enabled
+ * group down (only `--fresh` did).
+ *
+ * Nothing is fetched: the expected `except` is recomputed from the mounted
+ * layer's own declarations on disk ({@link switchedOffOptInPaths}). A path
+ * the lock left out is absent, so a nested declaration under it cannot be
+ * read here; that cannot change the answer, because `except` keeps only the
+ * outermost switched-off path. Only opt-in directories found on disk are
+ * compared. A layer whose declarations cannot be read here is reported as
+ * drift, so the full mount decides.
+ */
+export function optInDriftFromLock(root: string): string[] {
+  let lock: MountLock;
+  try {
+    const ds = downstreamOf({ instanceRoot: root });
+    const r = readMountLock(mountLockPathFor(ds.instanceRoot, ds.name));
+    if (!r.ok) return [];
+    lock = r.lock;
+  } catch {
+    return [];
+  }
+  const enabled = enabledSubgraphs(root);
+  const drift: string[] = [];
+  for (const inst of lock.instances) {
+    const whole = inst.directories.find((d) => d.id === WHOLE_INSTANCE_ID);
+    if (!whole) continue;
+    const layerRoot = join(root, inst.path);
+    let optIn: Array<{ id: string; path: string; optIn?: boolean }>;
+    let expected: string[];
+    try {
+      // Read structurally, as the planner's mount fields are: a full read
+      // needs kinds the mounts themselves supply (bean qump).
+      const declFile = join(layerRoot, inst.declaration.file);
+      const raw = JSON.parse(readFileSync(declFile, "utf-8")) as { directories?: unknown };
+      const top = (Array.isArray(raw.directories) ? raw.directories : [])
+        .filter((d): d is { id: string; path: string; optIn?: unknown } => typeof d?.id === "string" && typeof d?.path === "string")
+        .map((d) => ({ id: d.id, path: d.path, ...(d.optIn === true ? { optIn: true } : {}) }));
+      let nested: Array<{ id: string; path: string; optIn?: boolean }> = [];
+      try {
+        nested = instanceDirectories(layerRoot).map((d) => ({ id: d.id, path: d.path, ...((d as { optIn?: unknown }).optIn === true ? { optIn: true } : {}) }));
+      } catch {
+        // As at the pin: unreadable nested declarations leave only the top level.
+      }
+      optIn = [...top, ...nested].filter((d) => d.optIn === true);
+      expected = switchedOffOptInPaths(inst.instance, top, nested, enabled);
+    } catch (e) {
+      drift.push(`${inst.instance}: its declaration could not be read here (${(e as Error).message.split("\n")[0]})`);
+      continue;
+    }
+    const recorded = new Set(whole.except ?? []);
+    const want = new Set(expected);
+    const changed = [...new Set(optIn.map((d) => strip(d.path).replace(/^\.\//, "")))].filter((p) => recorded.has(p) !== want.has(p)).sort();
+    if (changed.length) {
+      drift.push(`${inst.instance}: ${changed.map((p) => `${p} is ${want.has(p) ? "now switched off" : "now switched on"}`).join(", ")} (\`enableSubgraphs\` changed since the lock was written)`);
+    }
+  }
+  return drift;
 }
 
 /**
@@ -2143,6 +2211,8 @@ export function currentPerLock(root: string): CheckResult | undefined {
 export function editedOnlyPerLock(root: string): CheckResult | undefined {
   const c = checkRemote({ instanceRoot: root });
   if (c.outcomes.length === 0) return undefined;
+  // A changed opt-in set is something a mount WOULD change.
+  if (optInDriftFromLock(root).length > 0) return undefined;
   const off = c.outcomes.filter((o) => o.state !== "mounted" && o.state !== "unverified-approver");
   if (off.length === 0 || !off.every((o) => o.state === "missing" && o.edited === true)) return undefined;
   return c;
