@@ -41,6 +41,9 @@ describe("contentInstanceCode — this checkout", () => {
       // The IRIS CDN exporter (who-iris#103) and the cover fetch and
       // preview renderer, all IRIS-specific, and the exporter's test.
       "scripts/iris-cdn/bag.ts",
+      // The re-derive of referenced items that keeps authored sidecars
+      // (who-iris errata, 2026-11).
+      "scripts/iris-cdn/derive-referenced.py",
       "scripts/iris-cdn/rest-feed.ts",
       "scripts/iris-cdn/run.ts",
       "scripts/iris-cdn/signing.ts",
