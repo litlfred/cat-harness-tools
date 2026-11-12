@@ -252,7 +252,7 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     expect(added.length > 0).toBe(report.composed.length > 0);
     rmSync(join(dest, ".."), { recursive: true, force: true });
     // Composes the whole real tree twice and reads every byte: over bun's 5 s
-    // default on a busy runner (6.3 s on who-iris main, 2026-11-12), so it
+    // default on a busy runner (6.3 s on a content layer's main, 2026-11-12), so it
     // carries the real-tree budget the cut's compose already has.
   }, 30_000);
 
@@ -533,7 +533,7 @@ describe("the cut, on the REAL tree", () => {
     tree("cut");
   }, 120_000);
   // Removing the two composed trees is real-tree work too: under the default
-  // 5 s it failed as "(unnamed)" at 7.2 s on fhir-harness main (2026-11-11).
+  // 5 s it failed as "(unnamed)" at 7.2 s on a layer main (2026-11-11).
   afterAll(() => {
     for (const { dir } of trees.values()) rmSync(join(dir, ".."), { recursive: true, force: true });
   }, 60_000);
