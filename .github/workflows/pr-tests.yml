@@ -405,7 +405,10 @@ jobs:
           path: src
           fetch-depth: 2
       - name: Keep the PR's root-gate runner, so both sides run the same one
-        run: cp -r src/.github/scripts/layer-pr-checks judge
+        # And its Chromium installer, which the base side may not have yet.
+        run: |
+          cp -r src/.github/scripts/layer-pr-checks judge
+          mkdir -p pw/.github/scripts && cp -r src/.github/scripts/playwright-chromium pw/.github/scripts/
       - &base-side
         # Both sides check out the PR's merge commit; the base side steps to its
         # first parent, the main it merges into. Never `pull_request.base.sha`:
@@ -456,7 +459,8 @@ jobs:
         working-directory: fa
         run: |
           if [ -x node_modules/.bin/playwright ]; then
-            node_modules/.bin/playwright install --with-deps chromium
+            # Browser always; apt only when a system library is missing.
+            bash ../pw/.github/scripts/playwright-chromium/install.sh node_modules/.bin/playwright
           else
             echo "no playwright in the index: no browser installed"
           fi

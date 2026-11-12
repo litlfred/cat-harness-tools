@@ -465,7 +465,9 @@ jobs:
           repository: ${{ env.HARNESS_OWNER }}/cat-harness-tools
           ref: ${{ steps.tools-lock.outputs.ref }}
           path: ci
-          sparse-checkout: .github/scripts/layer-pr-checks
+          sparse-checkout: |
+            .github/scripts/layer-pr-checks
+            .github/scripts/playwright-chromium
       # One pin time per run attempt, shared by every job through the cache
       # (cat-harness-tools#397). It replaces the `pin` job, which cost the run
       # a second wait for a runner before anything else could start (5 min on
@@ -902,7 +904,10 @@ jobs:
         working-directory: fa
         run: |
           if [ -x node_modules/.bin/playwright ]; then
-            node_modules/.bin/playwright install --with-deps chromium
+            # Browser always; apt only when a system library is missing
+            # (runners lost the Ubuntu mirrors on 2026-11-11, and apt exit
+            # 100 failed the tier although nothing needed installing).
+            bash ../ci/.github/scripts/playwright-chromium/install.sh node_modules/.bin/playwright
           else
             echo "no playwright in the index: no browser installed"
           fi
@@ -1813,7 +1818,9 @@ jobs:
           repository: ${{ env.HARNESS_OWNER }}/cat-harness-tools
           ref: ${{ matrix.side == 'base' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           path: ci
-          sparse-checkout: .github/scripts/layer-pr-checks
+          sparse-checkout: |
+            .github/scripts/layer-pr-checks
+            .github/scripts/playwright-chromium
       - name: Check out the root, at the commit this run pinned
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
