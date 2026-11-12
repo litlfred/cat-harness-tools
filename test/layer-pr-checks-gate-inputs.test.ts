@@ -88,7 +88,7 @@ describe("run-gates.py gate inputs", () => {
     expect(why).toContain("live state");
   });
 
-  test("check:upstream-pins is skipped as live-state: an upstream release, not the diff, turns it red (smart-ra, 2026-11-11)", () => {
+  test("check:upstream-pins is skipped as live-state: an upstream release, not the diff, turns it red", () => {
     const [kind, why] = py("run-gates.py", `m.skip_reason(".", "check:upstream-pins")`) as [string, string];
     expect(kind).toBe("live-state");
     expect(why).toContain("live state");

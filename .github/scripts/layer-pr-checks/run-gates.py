@@ -212,7 +212,7 @@ LIVE_STATE_SCRIPTS = {
     # Asks upstream (`git ls-remote --tags`) whether a newer release exists:
     # the answer changes when a project upstream tags a release, not with any
     # diff, so a PR's head and its cached base answer disagree on every open PR
-    # the day a release lands (smart-ra, 2026-11-11: PlantUML 1.2026.10 made 20
+    # the day a release lands (a content layer, 2026-11-11: PlantUML 1.2026.10 made 20
     # committee PRs red). `gates.ts` already lists it `scheduled`; the
     # `upstream-pins.yml` watchdog in folio-assistant runs it weekly and keeps
     # its tracking issue, and a bump PR follows from that.
