@@ -24,7 +24,9 @@ cancelled gate run that gave no verdict: nothing is touched. A cancelled gate
 run that still gave a green or red VERDICT is judged by that verdict: main's
 gate set finished, and only a later job (the writer record) was cancelled.
 
-Exits 1 when main is red, so the QA run itself is red; 0 otherwise.
+Exits 1 when main is red, so the QA run itself is red; 2 when main's verdict
+is unknown (its answer could not be read: could-not-determine is never
+green) and SHA is still main's head; 0 otherwise.
 """
 import hashlib
 import json
@@ -171,12 +173,21 @@ def main():
         verdict = "red"
     if not verdict:
         verdict = "green" if run.get("conclusion") == "success" else "unknown"
-    if verdict == "unknown":
-        summary(f"Main's verdict for `{sha[:12]}` is unknown ({failures.get('error', 'no answer')}): "
-                f"the `{LABEL}` issue is not touched.")
-        return 0
     default = gh(f"repos/{REPO}")["default_branch"]
     head = gh(f"repos/{REPO}/commits/{default}")["sha"]
+    if verdict == "unknown":
+        # Could not determine is not green: red, and the issue left alone,
+        # since nothing says main is red either. A superseded commit is the
+        # newer push's to judge.
+        why = failures.get("error", "no answer")
+        if head != sha:
+            summary(f"Main's verdict for `{sha[:12]}` is unknown ({why}), but main has moved on to "
+                    f"`{head[:12]}`: that push's run reports, and the `{LABEL}` issue is not touched.")
+            return 0
+        print(f"::error::main's verdict for {sha[:12]} could not be determined: {why}")
+        summary(f"Main's verdict for `{sha[:12]}` is **unknown** ({why}): could not determine, so this run is red. "
+                f"The `{LABEL}` issue is not touched.")
+        return 2
     if head != sha:
         summary(f"main is **{verdict}** at `{sha[:12]}`, but main has moved on to `{head[:12]}`: "
                 f"that push's run reports, and the `{LABEL}` issue is not touched.")

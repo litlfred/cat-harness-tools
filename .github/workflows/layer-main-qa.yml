@@ -15,8 +15,10 @@
 #     newest successful push run of the gate workflow on main). This job is
 #     then red too.
 #   - green: the open issue is closed.
-#   - the gate run was cancelled, or main's answer could not be read: nothing
-#     is touched.
+#   - the gate run was cancelled: nothing is touched.
+#   - main's answer could not be read (verdict `unknown`): the issue is not
+#     touched, and this job is red while that commit is still main's head
+#     (could not determine is never green).
 # Only the NEWEST main reports: a report whose commit is no longer main's
 # head leaves the issue to the newer push. The report itself is never
 # cancelled (owner, 2026-11-01, card Q-CIS-1 A): it is a job of the layer's
