@@ -1,6 +1,6 @@
 /**
  * A main publish whose commit a newer push replaced is SUPERSEDED, not failed:
- * the newer push publishes the site (who-iris 7f80259, 2026-11-12). A local
+ * the newer push publishes the site. A local
  * commit nobody pushed is still an error.
  *
  * @module scripts/tests/stage-local-superseded.test
