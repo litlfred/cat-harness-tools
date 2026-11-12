@@ -17,6 +17,7 @@ import { join } from "node:path";
 
 import { defaultEnabledSubgraphs, resolveDirectories } from "../../../schemas/kg/cat-harness.js";
 import { WHOLE_INSTANCE_ID } from "../../../schemas/kg/remote-mount.js";
+import { judgeSatisfiesTarget, switchedOffSkillHomes } from "../../check-tools.ts";
 import { knownSkills, workflowFiles } from "../../known-skills.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 
@@ -127,5 +128,44 @@ describe("a layer no mount placed keeps its own list", () => {
     expect(ids(own)).not.toContain("extra");
     expect(knownSkills(own).has("ops-skill")).toBe(true);
     expect(knownSkills(own).has("extra-skill")).toBe(false);
+  });
+});
+
+describe("check:tools: a `satisfies` target in a group the mounting root switched off (card Q-SKILL-TOOL-LINK B)", () => {
+  // The three cases the owner's B separates: switched off → not judged;
+  // switched on but missing → dangling; a name no layer holds → dangling.
+  test("left out by the mount: a Tool of the mounted layer naming a skill there is not judged", () => {
+    const up = consumer([]);
+    const off = switchedOffSkillHomes([up]);
+    expect(off.leftOut.get(up)?.sort()).toEqual(["up.extra", "up.ops"]);
+    expect(judgeSatisfiesTarget("ops-skill", up, off)?.groups.sort()).toEqual(["up.extra", "up.ops"]);
+  });
+
+  test("switched off but still on disk: judged by name — held is not judged, absent is dangling", () => {
+    const own = mkdtempSync(join(tmpdir(), "optin-own-tools-"));
+    made.push(own);
+    upstream(own, ["ops", "extra"]); // `extra` is off for `up` itself, and on disk
+    const off = switchedOffSkillHomes([own]);
+    expect(off.leftOut.size).toBe(0);
+    expect(judgeSatisfiesTarget("extra-skill", own, off)).toEqual({ groups: ["up.extra"], reason: expect.stringContaining("switched off") });
+    expect(judgeSatisfiesTarget("no-such-skill", own, off)).toBeUndefined();
+  });
+
+  test("a group the mounting root switched ON that is missing: dangling", () => {
+    const up = consumer(["extra"]);
+    rmSync(join(up, "extra"), { recursive: true, force: true });
+    const off = switchedOffSkillHomes([up]);
+    // `ops` is off and left out; `extra` is on, so its absence excuses nothing.
+    expect(off.leftOut.get(up)).toEqual(["up.ops"]);
+    expect(off.held.has("extra-skill")).toBe(false);
+    // A Tool of ANOTHER layer gets no pass from `up`'s left-out groups.
+    expect(judgeSatisfiesTarget("extra-skill", "/elsewhere", off)).toBeUndefined();
+  });
+
+  test("a name no layer holds, from a Tool whose layer left nothing out: dangling", () => {
+    const up = consumer(["ops", "extra"]);
+    const off = switchedOffSkillHomes([up]);
+    expect(off.leftOut.size).toBe(0);
+    expect(judgeSatisfiesTarget("no-such-skill", up, off)).toBeUndefined();
   });
 });

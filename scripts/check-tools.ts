@@ -19,7 +19,7 @@
  * @module scripts/check-tools
  * @covers tools, skills
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { tools, toolsOf } from "../tools/discover.js";
@@ -27,8 +27,11 @@ import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf } from "../schemas/tools/to
 import { alternativesWithoutSelection, danglingRemedies, networkToolsWithoutRemedies } from "../schemas/tools/tool.js";
 import { toJsonSchema } from "../schemas/kg/to-json-schema.js";
 import { contractFile, skillContracts } from "./skill-contracts.js";
-import { corpusScopeFor, knownSkills as knownSkillsIn, workflowFiles } from "./known-skills.js";
-import { instanceDirectoryForGraph, instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.js";
+import { corpusScopeFor, isSkillMd, knownSkills as knownSkillsIn, workflowFiles } from "./known-skills.js";
+import { defaultEnabledSubgraphs, instanceDirectoryForGraph, instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.js";
+import { optInRootsOf } from "../schemas/kg/opt-in-roots.js";
+import { isSubgraphEnabled } from "../schemas/kg/opt-in-subgraphs.js";
+import { leftOutByMount } from "../schemas/kg/remote-mount.js";
 import { inlineToolDeclarations } from "../schemas/tools/tool-folders.js";
 import { resolveImplementingPath } from "../schemas/kg/harness-config.js";
 import type { ToolDefinition } from "../schemas/tools/tool.js";
@@ -282,6 +285,12 @@ function jsonTypeOf(vocabularyName: string): string | undefined {
 
 export interface ToolCheck {
   danglingSatisfies: Array<{ tool: string; skill: string }>;
+  /**
+   * NOT JUDGED HERE: a `satisfies` whose skill sits in an opt-in sub-graph
+   * the MOUNTING root switched off (owner, 2026-11-12, cards Q-OPTIN-DIRS A
+   * and Q-SKILL-TOOL-LINK B). See {@link judgeSatisfiesTarget}.
+   */
+  notJudgedSatisfies: Array<{ tool: string; skill: string; groups: string[]; reason: string }>;
   unknownTypes: Array<{ tool: string; port: string; ref: string }>;
   /** Command-line inputs whose type can express a shell payload. */
   unsafeArgs: Array<{ tool: string; port: string; type: string }>;
@@ -358,6 +367,19 @@ function declaredProcessIds(instance: string = ROOT): Set<string> {
   for (const inst of new Set([resolve(instance), ...instanceRootsIn(siblingScopeFor(instance)).map((r) => resolve(r))])) {
     for (const f of workflowFiles(inst)) {
       if (f.endsWith(".bpmn")) out.add(f.replace(/^.*\//, "").slice(0, -".bpmn".length));
+    }
+  }
+  return out;
+}
+
+/** Each Tool id → the root of the layer whose `tools` graph declares it. */
+function toolLayers(layers: readonly string[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const l of layers) {
+    try {
+      for (const t of toolsOf(l)) if (!out.has(t.id)) out.set(t.id, l);
+    } catch {
+      // discovery failures are reported by `check:tools` itself
     }
   }
   return out;
@@ -454,6 +476,78 @@ export function inlineToolFindings(
   );
 }
 
+/**
+ * What the root that mounted each layer switched off, as far as a check can
+ * see it (owner, 2026-11-12, card Q-SKILL-TOOL-LINK B: a Tool keeps its
+ * `satisfies`, and a target in a switched-off group is not judged here).
+ *
+ * - `held`: skill name → the switched-off groups holding it, for a group
+ *   still on disk (a mount that predates `except`, or a checkout's own).
+ * - `leftOut`: layer root → its switched-off groups the mount LEFT OUT
+ *   (`leftOutByMount`). Their skills cannot be listed: nothing is on disk.
+ */
+export function switchedOffSkillHomes(layers: readonly string[]): { held: Map<string, string[]>; leftOut: Map<string, string[]> } {
+  const held = new Map<string, string[]>();
+  const leftOut = new Map<string, string[]>();
+  const walk = (dir: string, group: string): void => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p, group);
+      else if (e.name.endsWith(".md") && isSkillMd(p)) {
+        const name = e.name.slice(0, -3);
+        held.set(name, [...new Set([...(held.get(name) ?? []), group])]);
+      }
+    }
+  };
+  for (const layer of layers) {
+    let enabled;
+    try {
+      enabled = defaultEnabledSubgraphs(layer);
+    } catch {
+      continue; // an unreadable declaration is `check:harness-dirs`' finding
+    }
+    for (const g of optInRootsOf(layer)) {
+      if (isSubgraphEnabled(enabled, g.id)) continue;
+      if (existsSync(g.abs)) walk(g.abs, g.id);
+      else if (leftOutByMount(layer, g.abs)) leftOut.set(layer, [...(leftOut.get(layer) ?? []), g.id]);
+    }
+  }
+  return { held, leftOut };
+}
+
+/**
+ * Whether a `satisfies` target no visible layer holds is a defect HERE.
+ *
+ * - Held in a group the mounting root switched off: not judged — absent by
+ *   consent, judged where the group is switched on.
+ * - The Tool's OWN layer has switched-off groups the mount left out: not
+ *   judged — the skill may be in one, and nothing here can say. The layer
+ *   that declares the Tool judges it in its own checkout, where those groups
+ *   are on. A Tool of any OTHER layer gets no such pass: a consumer's own
+ *   Tool naming a skill it has switched off is a real dangling edge.
+ * - Otherwise: dangling. A target in a group the root switched ON and that
+ *   is missing, and a name no layer declares, both land here.
+ */
+export function judgeSatisfiesTarget(
+  skill: string,
+  toolLayer: string | undefined,
+  off: { held: ReadonlyMap<string, readonly string[]>; leftOut: ReadonlyMap<string, readonly string[]> },
+): { groups: string[]; reason: string } | undefined {
+  const held = off.held.get(skill);
+  if (held !== undefined) return { groups: [...held], reason: "held in an opt-in sub-graph the mounting root switched off" };
+  const unseen = toolLayer === undefined ? undefined : off.leftOut.get(toolLayer);
+  if (unseen !== undefined && unseen.length > 0) {
+    return { groups: [...unseen], reason: "not visible here: the Tool's own layer has opt-in sub-graphs the mount left out, and the skill may be in one; judged where they are switched on" };
+  }
+  return undefined;
+}
+
 export function checkTools(instance?: string): ToolCheck {
   // Coverage is asked of THE AUDITED layer's skills; resolution is asked of
   // every declared one. Two questions, two sets — see `satisfiableSkills`.
@@ -464,6 +558,11 @@ export function checkTools(instance?: string): ToolCheck {
   const resolvable = satisfiableSkills(instance);
   const typeNames = new Set(Object.keys(TOOL_TYPES));
   const dangling: Array<{ tool: string; skill: string }> = [];
+  const notJudged: ToolCheck["notJudgedSatisfies"] = [];
+  // Computed only when a target resolves nowhere, which a clean run never reaches.
+  let off: ReturnType<typeof switchedOffSkillHomes> | undefined;
+  let layerOfTool: Map<string, string> | undefined;
+  const layersHere = (): string[] => [...new Set([resolve(instance ?? ROOT), ...instanceRootsIn(siblingScopeFor(instance ?? ROOT)).map((r) => resolve(r))])];
   const unknownTypes: Array<{ tool: string; port: string; ref: string }> = [];
   const unsafeArgs: Array<{ tool: string; port: string; type: string }> = [];
   const unmetContracts: ToolCheck["unmetContracts"] = [];
@@ -484,7 +583,13 @@ export function checkTools(instance?: string): ToolCheck {
       if (skills.has(s)) covered.add(s);
       // Resolvable-but-not-ours is neither covered nor dangling: the edge is
       // real and this layer is not accountable for the skill.
-      else if (!resolvable.has(s)) dangling.push({ tool: t.id, skill: s });
+      else if (!resolvable.has(s)) {
+        off ??= switchedOffSkillHomes(layersHere());
+        layerOfTool ??= toolLayers(layersHere());
+        const why = judgeSatisfiesTarget(s, layerOfTool.get(t.id), off);
+        if (why !== undefined) notJudged.push({ tool: t.id, skill: s, ...why });
+        else dangling.push({ tool: t.id, skill: s });
+      }
 
       // ## What is compared
       //
@@ -547,6 +652,7 @@ export function checkTools(instance?: string): ToolCheck {
 
   return {
     danglingSatisfies: dangling,
+    notJudgedSatisfies: notJudged,
     unknownTypes,
     unsafeArgs,
     unmetContracts,
@@ -573,6 +679,10 @@ if (import.meta.main) {
   console.log("  Tool still has its mechanism inlined in its prose.");
 
   let bad = false;
+  if (r.notJudgedSatisfies.length > 0) {
+    console.log(`\n· ${r.notJudgedSatisfies.length} satisfies not judged here (opt-in sub-graphs switched off by this checkout's root):`);
+    for (const n of r.notJudgedSatisfies) console.log(`    ${n.tool} → ${n.skill} (${n.groups.join(", ")}): ${n.reason}`);
+  }
   if (r.danglingSatisfies.length > 0) {
     bad = true;
     console.error(`\n✗ ${r.danglingSatisfies.length} satisfies naming no skill:`);
