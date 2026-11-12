@@ -87,7 +87,7 @@
  * declaration, so "mounted", "missing" and "could not determine" are three
  * answers and never one.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 import { z } from "zod";
@@ -419,7 +419,7 @@ export function mountedInstanceRoots(scope: string): Map<string, string> {
   // than guess which one is true.
   const names = lockFilesIn(dir).files;
   for (const n of names) {
-    const lock = readMountLock(join(dir, n));
+    const lock = readMountLockShared(join(dir, n));
     if (!lock.ok) continue;
     for (const inst of lock.lock.instances) {
       // Metadata only: nothing there to import from or resolve `needs` to.
@@ -475,7 +475,7 @@ export function mountChoiceOf(instanceRoot: string, absDir: string): { chosen: b
   const within = (a: string, b: string): boolean => a === b || a.startsWith(`${b}/`);
   for (const name of lockFilesIn(scope).files) {
     const file = join(scope, name);
-    const r = readMountLock(file);
+    const r = readMountLockShared(file);
     if (!r.ok) continue;
     const entry = r.lock.instances.find((i) => resolve(scope, i.path) === inst);
     if (entry === undefined) continue;
@@ -487,6 +487,46 @@ export function mountChoiceOf(instanceRoot: string, absDir: string): { chosen: b
     return { chosen, lock: name };
   }
   return undefined;
+}
+
+/**
+ * ABSENT BY CONSENT: `absDir` is not on disk, and the lock that placed the
+ * layer at `instanceRoot` did not take it ({@link mountChoiceOf} answers
+ * `chosen: false`) — a whole mount's `except` (an opt-in sub-graph the
+ * downstream has switched off) or a partial mount that never chose it.
+ *
+ * A third state beside present and missing: nothing is here to judge, and
+ * the upstream keeps it. `false` for a directory on disk, for one the mount
+ * took, and for a layer no lock placed — each of those absences is still a
+ * defect for the caller to report.
+ */
+export function leftOutByMount(instanceRoot: string, absDir: string): boolean {
+  if (existsSync(absDir)) return false;
+  return mountChoiceOf(instanceRoot, absDir)?.chosen === false;
+}
+
+/**
+ * {@link readMountLock} for the two READERS above, which never change what
+ * they are handed: one parse per lock file while its size and mtime stand.
+ * `resolveDirectories` asks {@link mountChoiceOf} about every switched-on
+ * opt-in sub-graph that is not on disk, and resolution runs thousands of
+ * times a gate; a parse of the whole lock each time is the cost this avoids.
+ * Never handed to a caller that edits a lock: that one calls `readMountLock`.
+ */
+const sharedLocks = new Map<string, { stamp: string; read: ReturnType<typeof readMountLock> }>();
+function readMountLockShared(file: string): ReturnType<typeof readMountLock> {
+  let stamp: string;
+  try {
+    const st = statSync(file);
+    stamp = `${st.size}:${st.mtimeMs}`;
+  } catch {
+    return readMountLock(file);
+  }
+  const hit = sharedLocks.get(file);
+  if (hit !== undefined && hit.stamp === stamp) return hit.read;
+  const read = readMountLock(file);
+  sharedLocks.set(file, { stamp, read });
+  return read;
 }
 
 /** Parse a lock file: absent, unreadable and malformed are three different answers. */

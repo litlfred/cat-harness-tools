@@ -5505,11 +5505,36 @@ export function resolveDirectories(
   // own list — a dependency's `enableSubgraphs` is that layer's, for itself.
   const enabled: EnabledSubgraphs =
     opts.enabledSubgraphs ?? enabledSubgraphsFrom(rootLink ? (readDeclaration(rootLink.root, registry)?.enableSubgraphs ?? declaredEnableSubgraphs(rootLink.root)) : undefined);
+  // Each layer's root by the name its entries carry in `declaredBy`, for
+  // `optInLeftOutByMount`. Filled as the chain is read below.
+  const layerRoots = new Map<string, string>();
+  if (rootLink) layerRoots.set(rootLink.name, rootLink.root);
+  /**
+   * LEFT OUT BY THE MOUNT: the opt-in sub-graph is not on disk, and the lock
+   * that placed its layer did not take it (`mountChoiceOf`). The downstream
+   * that mounted the layer had it switched off, so the whole mount left it
+   * out (`switchedOffOptInPaths`, the lock's `except`); the mounted layer's
+   * own `enableSubgraphs` still names it, because that list is the layer's,
+   * for itself. The folio decided, and its decision is the lock: read as
+   * switched off here, not as a declared directory gone missing.
+   *
+   * Only for the default resolution. A caller that passes `enabledSubgraphs`
+   * has said what is on (a folio's set, or `"all"` for what is declared).
+   * A directory the mount DID take, or one no lock placed, that is absent
+   * stays exactly what it was: a declared directory that is not there.
+   */
+  const optInLeftOutByMount = (e: ResolvedDirectory): boolean => {
+    if (opts.enabledSubgraphs !== undefined) return false;
+    const layerRoot = e.declaredBy === undefined ? undefined : layerRoots.get(e.declaredBy);
+    return layerRoot !== undefined && leftOutByMount(layerRoot, e.absPath);
+  };
   /** The entry's nearest opt-in sub-graph, given its parent's; `null` when that one is switched off. */
   const optInOf = (e: ResolvedDirectory, parent?: string): string | undefined | null => {
     const own = ownOptInId(e);
     const q = own ?? parent;
-    return q !== undefined && !isSubgraphEnabled(enabled, q) ? null : q;
+    if (q !== undefined && !isSubgraphEnabled(enabled, q)) return null;
+    if (own !== undefined && optInLeftOutByMount(e)) return null;
+    return q;
   };
   if (rootLink) {
     for (const dir of DEFAULT_DIRECTORIES) {
@@ -5522,6 +5547,7 @@ export function resolveDirectories(
   for (const link of chain) {
     const decl = readDeclaration(link.root, registry);
     if (!decl) continue;
+    if (!layerRoots.has(decl.name)) layerRoots.set(decl.name, link.root);
     for (const dir of decl.directories) {
       // A REPOSITORY-scoped entry is not inherited. `beans/` and `todos/` are
       // this repository's work plan and this person's outstanding items; a
@@ -7705,6 +7731,7 @@ import { ThemeRefSchema, type ThemeRef } from "../ui/theme";
 import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
 import { projectedRead } from "../sdlc/read-projections";
 import { declaredEnableSubgraphs, enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
+import { leftOutByMount } from "./remote-mount";
 // Layer DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this
 // file, which imports the registry. Re-exported here so no caller moves.

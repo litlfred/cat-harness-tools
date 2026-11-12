@@ -205,6 +205,18 @@ export function kgQaSidecarPath(
 }
 
 /**
+ * The subject directory a results file under `tree` mirrors: the inverse of
+ * {@link kgQaSidecarPath}'s directory segments, for a file found by walking
+ * the tree rather than composed from a subject (an orphan sweep). `undefined`
+ * for a file outside `tree`.
+ */
+export function mirroredSubjectDir(file: string, tree: string, repoRoot: string): string | undefined {
+  const rel = relative(resolve(tree), resolve(file, ".."));
+  if (rel.startsWith("..") || isAbsolute(rel)) return undefined;
+  return join(resolve(repoRoot), rel);
+}
+
+/**
  * Does `subjectDir` lie outside the layer at `repoRoot`?
  *
  * `relative` rather than a string prefix: `/repo/cat-harness-x` starts with

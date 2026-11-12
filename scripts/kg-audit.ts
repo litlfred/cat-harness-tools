@@ -105,6 +105,7 @@ import {
   tally,
   worstSeverity,
   gradedKgFindings,
+  mirroredSubjectDir,
   type KgCriterionEntry,
   type KgFinding,
   type KgQaManifest,
@@ -113,6 +114,7 @@ import {
   type KgSeverity,
   type KgSubjectKind,
 } from "../schemas/sdlc/kg-qa.js";
+import { leftOutByMount } from "../schemas/kg/remote-mount.js";
 import {
   laneBinding,
   readRoleGraph,
@@ -3276,7 +3278,25 @@ function attestationOrphans(): string[] {
   walk(KG_ATT_TREE);
   return out.sort();
 }
-const attOrphans = attestationOrphans();
+// NOT JUDGED HERE: an attestation whose subject is in a directory the mount
+// that placed this layer left out (`leftOutByMount`: an opt-in sub-graph the
+// downstream has switched off, so the whole mount did not lay it down). No
+// report covers it because its subject is not in this checkout by consent;
+// the layer that switches the sub-graph on judges it. A subject the mount
+// took, or a layer no mount placed, is still an orphan and still fails.
+const attNotHere: string[] = [];
+const attOrphans = attestationOrphans().filter((o) => {
+  const subject = mirroredSubjectDir(join(root, o), KG_ATT_TREE, root);
+  if (subject === undefined || !leftOutByMount(root, subject)) return true;
+  attNotHere.push(o);
+  return false;
+});
+if (attNotHere.length > 0) {
+  console.log(
+    `\n  · ${attNotHere.length} attestation file(s) not judged here: their subject is in a directory the mount ` +
+      "that placed this layer left out (switched off for this checkout); the layer that switches it on judges them.",
+  );
+}
 if (attOrphans.length > 0) {
   console.error(`\n\u2717 ${attOrphans.length} attestation file(s) judge a subject no report covers:`);
   for (const o of attOrphans) {

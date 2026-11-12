@@ -53,6 +53,7 @@ import {
   type QaResult,
 } from "./qa-results.ts";
 import { checkoutInstanceRoots, declaredVisualisers as harnessVisualisers } from "./viewer-declarations.js";
+import { leftOutByMount } from "../schemas/kg/remote-mount.js";
 
 const INSTANCE_ROOT = HARNESS_ROOT;
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
@@ -77,6 +78,34 @@ export interface WireframeReport {
   incomplete: { wireframe: string; problem: string }[];
   missingViewport: { wireframe: string; candidate: string; viewport: string }[];
   failing: { wireframe: string; candidate: string; viewport: string; criterion: string; notes?: string }[];
+  /**
+   * NOT JUDGED HERE: a harness's visualiser with no wireframe in a checkout
+   * whose mount left that harness's own wireframes out ({@link wireframesLeftOut}).
+   * Not a gap and not a pass: whether it is covered is decided where the
+   * wireframes are, by the layer that switches them on.
+   */
+  notJudged: { ref: string; reason: string }[];
+}
+
+/**
+ * The harnesses whose OWN wireframes the mount that placed them left out:
+ * `<site>/wireframes/` is an opt-in sub-graph (`cat-harness.wireframes`,
+ * owner 2026-11-10, card Q-SG-1 C — "design work for this harness, which no
+ * layer below reads"), so a downstream that has not switched it on gets no
+ * wireframes and no `index.json` saying what they cover. Absent by consent
+ * (`leftOutByMount`), never merely absent: a harness whose wireframes the
+ * mount took, or that no mount placed, is judged as before.
+ */
+export function wireframesLeftOut(harnessRoot: string = INSTANCE_ROOT): string[] {
+  let dir: string;
+  try {
+    dir = join(harnessRoot, siteDirFor(harnessRoot), "wireframes");
+  } catch {
+    return [];
+  }
+  if (!leftOutByMount(harnessRoot, dir)) return [];
+  const name = (readDeclaration(harnessRoot) as { name?: string } | undefined)?.name;
+  return name === undefined ? [] : [name];
 }
 
 /** Every declared visualiser, by route key `<harness>/<visualiser>`, across every layer in the checkout. */
@@ -145,6 +174,8 @@ export function wireframeSources(repoRoot: string = REPO_ROOT): { dir: string; p
 export function checkWireframes(
   repoRoot: string = REPO_ROOT,
   dirs: string | { dir: string; prefix: string }[] = wireframeSources(repoRoot),
+  /** Harnesses whose own wireframes are left out here ({@link wireframesLeftOut}). */
+  leftOut: readonly string[] = wireframesLeftOut(),
 ): WireframeReport {
   const sources = typeof dirs === "string" ? [{ dir: dirs, prefix: "" }] : dirs;
   const r: WireframeReport = {
@@ -155,6 +186,7 @@ export function checkWireframes(
     incomplete: [],
     missingViewport: [],
     failing: [],
+    notJudged: [],
   };
   const coverer = new Map<string, string>();
   for (const { dir, prefix } of sources) {
@@ -201,7 +233,9 @@ export function checkWireframes(
   }
   for (const ref of r.declared) {
     const w = coverer.get(ref);
+    const off = leftOut.find((h) => ref.startsWith(`${h}/`));
     if (w) r.covered.push({ ref, wireframe: w });
+    else if (off !== undefined) r.notJudged.push({ ref, reason: `${off}'s wireframes are switched off here: the mount left them out` });
     else r.uncovered.push({ ref });
   }
   return r;
@@ -227,6 +261,10 @@ export function wireframesDocument(r: WireframeReport): QaResult {
         entries: r.missingViewport,
       },
       failing: { summary: "A mechanical check that failed: renders, no-overflow or no-placeholder.", entries: r.failing },
+      // Only when there is one, so a checkout that judges everything writes the sidecar it always did.
+      ...(r.notJudged.length
+        ? { "not-judged": { summary: "A visualiser whose harness's wireframes the mount left out here: judged where they are switched on.", entries: r.notJudged } }
+        : {}),
     },
   });
 }
@@ -257,6 +295,7 @@ if (import.meta.main) {
     for (const i of jr.incomplete) console.error(`  ✗ ${i.wireframe}: ${i.problem}`);
     for (const m of jr.missingViewport) console.error(`  ✗ ${m.wireframe}/${m.candidate}: no ${m.viewport} check`);
     for (const f of jr.failing) console.error(`  ✗ ${f.wireframe}/${f.candidate}: ${f.viewport} ${f.criterion} failed`);
+    if (jr.notJudged.length) console.error(`  · ${jr.notJudged.length} visualiser(s) not judged here: ${jr.notJudged[0]!.reason}`);
     process.exit(
       concludeJudgement({
         gate: GATE,
@@ -281,6 +320,7 @@ if (import.meta.main) {
     for (const i of r.incomplete) console.log(`  ✗ ${i.wireframe}: ${i.problem}`);
     for (const m of r.missingViewport) console.log(`  ✗ ${m.wireframe}/${m.candidate}: no ${m.viewport} check`);
     for (const f of r.failing) console.log(`  ✗ ${f.wireframe}/${f.candidate}: ${f.viewport} ${f.criterion} failed`);
+    if (r.notJudged.length) console.log(`  · ${r.notJudged.length} visualiser(s) not judged here: ${r.notJudged[0]!.reason}`);
   }
   if (wireframeGaps(r) > 0) process.exit(1);
 }

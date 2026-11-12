@@ -162,6 +162,7 @@ describe("check:wireframes", () => {
       incomplete: [],
       missingViewport: [],
       failing: [],
+      notJudged: [],
     };
     expect(exitOf(judgeWireframes(clean))).toBe(0);
     expect(exitOf(judgeWireframes({ ...clean, declared: [], covered: [] }))).toBe(2);
