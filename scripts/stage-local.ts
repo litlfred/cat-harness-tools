@@ -170,8 +170,8 @@ export function notTipError(repo: string, sha: string, tip: string, branch: stri
  * commit's, and its own push runs the publish (`folio-site-publish.yml` queues
  * runs per repository, never cancelling one in progress). So this run has
  * nothing to publish, and it ends as SUPERSEDED, exit 0, rather than as a
- * failure that emails the owner about a commit nobody will publish
- * (who-iris 7f80259, 2026-11-12: superseded by 2868ff4 within a minute).
+ * failure that emails the owner about a commit nobody will publish (a content
+ * layer's publish on 2026-11-12 was replaced by the next push within a minute).
  * A local run that is simply behind origin is told the same, and still
  * publishes nothing.
  */
