@@ -72,6 +72,43 @@ describe("matching", () => {
   });
 });
 
+describe("Arabic: a fixed rendering in its plural, possessive and broken-plural forms (owner, Q-GLOSS-REST A)", () => {
+  // The 13 Arabic uses cat-harness#1279 left reported, as they stand in
+  // cat-harness's translations/ar catalogues. Twelve render the fixed term in
+  // correct inflected Arabic, which the substring match after stripping «ال»
+  // could not see. The thirteenth uses «Reference» in another sense (the
+  // verb), and stays unmatched: it needs a translator's other-sense verdict,
+  // not a looser matcher.
+  const rendered: Array<[term: string, fixed: string, msgstr: string]> = [
+    ["Skill", "المهارة", "إن folio-assistant قابل للتوسيع — تتم معالجة كل نوع محتوى بواسطة محول محتوى وحزمة مهارات مطابقة."],
+    ["Skill", "المهارة", "حزمة المهارات"],
+    ["Skill", "المهارة", "قابل للتوسيع — أضف محولاً جديدًا + حزمة مهارات"],
+    ["Skill", "المهارة", "البدء — توصيل خادم MCP بنموذجك اللغوي وتشغيل مهاراتك الأولى."],
+    ["Role", "الدور", "المهارات والأدوار — جميع المهارات والأدوار، وكيفية عملها مع النموذج اللغوي الكبير."],
+    ["Skill", "المهارة", "المهارات والأدوار — جميع المهارات والأدوار، وكيفية عملها مع النموذج اللغوي الكبير."],
+    ["Role", "الدور", "تعيين الأدوار"],
+    ["Skill", "المهارة", "إن folio-assistant هو خادم MCP يضم طبقة محولات محتوى قابلة للتوصيل، ونظام مهارات، ونموذج كائنات محتوى"],
+    ["Skill", "المهارة", "المهارات وحزم المهارات"],
+    ["Skill", "المهارة", "ويتم دعم كل نوع من أنواع المحتوى بواسطة حزمة مهارات"],
+    ["Task", "المهمة", "مفروضة: دور المسار فقط هو المخول بتنفيذ مهمته"],
+    ["Skill", "المهارة", "مراجع المهارات المجمعة"],
+  ];
+  test.each(rendered)("%s «%s» is rendered in «%s»", (_term, fixed, msgstr) => {
+    expect(renders(fixed, msgstr, "ar")).toBe(true);
+  });
+
+  test("Reference in another sense (the verb) is still not rendered", () => {
+    expect(renders("المرجع", "الإشارة إلى المصدر في التعليق على المسألة (برابط أو مرفق)", "ar")).toBe(false);
+  });
+
+  test("a different word sharing the stem is not a form of it", () => {
+    // «مهم» / «المهم» ("important") are not «المهمة» ("the task").
+    expect(renders("المهمة", "هذا أمر مهم", "ar")).toBe(false);
+    expect(renders("المهمة", "المهم هو الاختبار", "ar")).toBe(false);
+    expect(renders("المهارة", "مهارة", "ar")).toBe(true);
+  });
+});
+
 describe("termBase — the lower layer fixes, a higher one may only add", () => {
   let lower: string, higher: string, mine: string, ref: string;
   beforeAll(() => {
