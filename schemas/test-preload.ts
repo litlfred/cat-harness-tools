@@ -35,12 +35,51 @@ import "./kg/folio-graph-typology.js";
  * The assertion never failed; the timer did. That is what "fails under gates,
  * never alone, never in CI" was.
  *
- * 20 s is more than four times the worst time measured under load. A real hang
- * still fails in seconds, not minutes. Set here, not in `bunfig.toml`, because
+ * 20 s was more than four times the worst time measured under load (now 30 s,
+ * below). A real hang still fails in seconds, not minutes. Set here, not in `bunfig.toml`, because
  * bun 1.3.11 ignores a `[test] timeout` key there: measured, not assumed, with
  * a 6 s test that still failed at 5 s. A test that needs more still says so
  * with its own third argument, as the Lean and locale-export tests already do.
  */
+import { plugin } from "bun";
 import { setDefaultTimeout } from "bun:test";
 
-setDefaultTimeout(20_000);
+/**
+ * The suite's default, in milliseconds. Raised from 20 s to 30 s by the owner
+ * (card Q-TMO-1 A, 2026-11-12) as the corpus the whole-layer tests walk grew.
+ */
+export const SUITE_TIMEOUT_MS = 30_000;
+
+/*
+ * EVERY FILE, not the first one. Measured 2026-11-12 on bun 1.4.4: a
+ * `setDefaultTimeout` called here governs only the FIRST test file the run
+ * loads; every later file is back at bun's 5 s. Three files of one 5.5 s test
+ * each, this preload calling `setDefaultTimeout(30000)`: the first passed, the
+ * other two "timed out after 5000ms", with and without `--shard`, and a
+ * `beforeAll` here is too late (a test's timeout is fixed when it registers).
+ * So the 20 s above had silently stopped applying, and whole-layer tests failed
+ * at 5 s in CI (attribution's real-corpus scan, 6.1 s, run 43180658945),
+ * flipping NEW and fixed on PRs that touch neither, one failure email each.
+ *
+ * The one hook that runs before each file's tests register is the loader, so
+ * a test file's source is loaded with the call in front of it, on its first
+ * line so no line number moves. A file that sets its own default, or a test
+ * that passes its own third argument, still overrides it: both run after.
+ * `--timeout` on the command line would do the same, but every workflow that
+ * runs `bun test` would have to pass it, and bun 1.4.4 ignores a
+ * `[test] timeout` key in bunfig.toml.
+ */
+setDefaultTimeout(SUITE_TIMEOUT_MS);
+plugin({
+  name: "suite-default-timeout",
+  setup(build) {
+    build.onLoad({ filter: /\.test\.[cm]?[jt]sx?$/ }, async ({ path }) => {
+      const text = await Bun.file(path).text();
+      const loader = /\.[cm]?jsx?$/.test(path) ? (path.endsWith("x") ? "jsx" : "js") : path.endsWith("x") ? "tsx" : "ts";
+      return {
+        contents: `import { setDefaultTimeout as __suiteDefaultTimeout } from "bun:test"; __suiteDefaultTimeout(${SUITE_TIMEOUT_MS}); ${text}`,
+        loader,
+      };
+    });
+  },
+});
