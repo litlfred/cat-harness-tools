@@ -130,9 +130,9 @@ export function views(svg: string, alt: string, interactive?: { dot: string; lab
 // matters: this picture was drawn from the current source.
 
 export const PLANTUML = {
-  version: "1.2026.9",
-  url: "https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml/1.2026.9/plantuml-1.2026.9.jar",
-  sha256: "96ace11f947a04a4320a413a0a2c6bad8b87daaac1869fe51e82622d812fe13c",
+  version: "1.2026.10",
+  url: "https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml/1.2026.10/plantuml-1.2026.10.jar",
+  sha256: "71972b58fe9208a78bbed614c806042b8404ca5f24022581d986bd9a1cc9463e",
 };
 
 /**
