@@ -36,7 +36,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { regenPass, writerFor, type Runner } from "../../scripts/regen-after-merge.ts";
+import { regenPass, writerFor, type Outcome, type Runner } from "../../scripts/regen-after-merge.ts";
 import { chromiumExecutable } from "../../scripts/bpmn-render.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
@@ -166,7 +166,7 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
       // red run above already redrew the artefact and regen finds it
       // current. Either way the effect asserted below is the same: the
       // staled bytes are gone and the check is green.
-      const repaired = checkRunsItsWriter(c.check) ? ["regenerated", "current"] : ["regenerated"];
+      const repaired: Outcome[] = checkRunsItsWriter(c.check) ? ["regenerated", "current"] : ["regenerated"];
       // `unrepaired` means the check is still red after its writer ran. That
       // is this case's failure only if the stale was the cause: a check
       // already red on the clean tree (render:bpmn:check over every mounted
