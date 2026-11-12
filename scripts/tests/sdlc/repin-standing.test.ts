@@ -12,10 +12,13 @@ import { dirname, join } from "node:path";
 
 import type { StandingConsent } from "../../../schemas/kg/mount-trust.js";
 import type { RemoteMount } from "../../../schemas/kg/remote-mount.js";
+import { readDeclaration } from "../../../schemas/kg/cat-harness.ts";
+import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 import {
   alignToHeldPins,
   applyRepin,
   candidateFor,
+  cascadeOf,
   extendExplicitDirectories,
   inCheckoutDirectoryIds,
   movesSince,
@@ -378,5 +381,30 @@ describe("movesSince + applyRepin({ seed: false }): step 4a after the pins alrea
     expect(upEntry.ref).toBe(up.first);
     expect(upEntry.trust).toEqual(trustBefore);
     expect(upEntry.overrides).toEqual({ up: { directories: ["library", "scenarios"] } });
+  });
+});
+
+describe("cascadeOf: a site whose directories name kinds this job does not mount (standing re-pin, ig-ast)", () => {
+  test("reads only name and needs, so an unregistered kind in the site's declaration does not stop the re-pin", async () => {
+    const base = mkdtempSync(join(tmpdir(), "repin-cascade-"));
+    try {
+      // The site declares a directory of a kind only an unmounted layer registers.
+      writeDeclaration(base, {
+        name: "site-x",
+        needs: ["ig-x"],
+        directories: [{ id: "site-x-ast", path: "ast/", graphTypologies: ["ig-ast-unmounted"] }],
+      });
+      for (const [dir, name, needs] of [["ig", "ig-x", ["harness-x"]], ["harness", "harness-x", ["floor-x"]], ["floor", "floor-x", []]] as const) {
+        mkdirSync(join(base, dir), { recursive: true });
+        writeDeclaration(join(base, dir), { name, needs });
+      }
+      // The full read is what failed: it judges every directory's kind.
+      expect(() => readDeclaration(base)).toThrow(/unknown graph typology/);
+      const c = await cascadeOf(base, join(base, "harness"));
+      expect(c.harness).toBe("harness-x");
+      expect([...c.below]).toEqual(["floor-x"]);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
   });
 });

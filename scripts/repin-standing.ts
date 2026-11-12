@@ -170,14 +170,21 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
  * The harness and the layers below it, as this checkout declares them —
  * the same derivation `bpmn-checklist.ts` uses to decide whose checklists the
  * harness commits.
+ *
+ * Only each declaration's `name` and `needs` are read, structurally
+ * (`needsOfRoots`). A full read validates every directory's kind against the
+ * registry, and a site's declaration names kinds that a layer it mounts
+ * declares (`ig-ast`, from the FHIR layer), which this job does not mount:
+ * the standing re-pin of every IG with such a directory failed on
+ * "declares unknown graph typology" before it read a pin.
  */
 export async function cascadeOf(root: string, harnessRoot?: string): Promise<{ harness: string; below: Set<string> }> {
-  const { instanceRootsIn, readDeclaration } = await import("../schemas/kg/cat-harness.ts");
+  const { instanceRootsIn } = await import("../schemas/kg/cat-harness.ts");
+  const { needsOfRoots } = await import("./declarations-retag.ts");
   const { belowHarness } = await import("./lib/needs-reach.ts");
   harnessRoot ??= (await import("./lib/roots.ts")).HARNESS_ROOT;
-  const decls = instanceRootsIn(root).map((r) => readDeclaration(r)).filter((d) => d?.name !== undefined);
-  const needs = new Map(decls.map((d) => [d!.name!, (d!.needs ?? []) as readonly string[]] as const));
-  const harness = readDeclaration(harnessRoot)?.name ?? "";
+  const needs = needsOfRoots(instanceRootsIn(root));
+  const harness = [...needsOfRoots([harnessRoot]).keys()][0] ?? "";
   return { harness, below: harness ? belowHarness(harness, needs) : new Set<string>() };
 }
 
