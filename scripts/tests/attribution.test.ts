@@ -254,7 +254,10 @@ describe("the real corpus", () => {
       // The zero is REPORTED, not inferred from silence.
       expect(q?.detail).toContain("0 narrative");
     }
-  });
+    // A scan of every library entry in the checkout: 6.1 s on a CI shard once
+    // the largest layer's reference corpus grew (2026-11-12), past bun's 5 s
+    // default, so it flipped NEW and fixed on PRs that touch neither.
+  }, 30_000);
 });
 
 describe("MODEL_NOT_DISCLOSED — the declared non-identifier (owner, 2026-09-30)", () => {
