@@ -61,10 +61,34 @@ const OUT = join(ROOT, subgraphOutDir(ROOT));
  * The base layer's own path when no source holds it, so a missing page is
  * still reported where it was expected.
  */
-const PAGE_BLOCK = join("process-publication-workflow", "every-workflow-in-the-repo.md");
-const PAGE =
-  docsSources(ROOT).map((s) => join(s.srcDir, PAGE_BLOCK)).find((f) => existsSync(f)) ??
-  join(docsSourceDirFor(ROOT), PAGE_BLOCK);
+export const PAGE_BLOCK = join("process-publication-workflow", "every-workflow-in-the-repo.md");
+
+/**
+ * The page that mounts the process view: in a docs source stacked on the
+ * base layer (`docsSources`), else in ANY layer of the checkout that holds
+ * it. cat-harness#445 moved it up to the content core; a walk of the base
+ * layer's dependents alone did not reach the core in every checkout
+ * (smart-ra#242's simulation), so the gate demanded the page at the base
+ * layer's old path, which nothing writes any more. Only when NO layer holds
+ * it is the base layer's path named, as the place it was expected — a page
+ * gone from every layer is still the defect this gate reports.
+ */
+export function processIndexPage(root: string = ROOT, repo: string = REPO): string {
+  const stacked = docsSources(root).map((s) => join(s.srcDir, PAGE_BLOCK)).find((f) => existsSync(f));
+  if (stacked !== undefined) return stacked;
+  for (const layer of instanceRootsIn(repo)) {
+    let src: string;
+    try {
+      src = docsSourceDirFor(layer);
+    } catch {
+      continue; // no readable declaration: not a docs source
+    }
+    const f = join(src, PAGE_BLOCK);
+    if (existsSync(f)) return f;
+  }
+  return join(docsSourceDirFor(root), PAGE_BLOCK);
+}
+const PAGE = processIndexPage();
 
 type Doc = Record<string, unknown>;
 const list = (v: unknown): unknown[] => (v == null ? [] : Array.isArray(v) ? v : [v]);

@@ -55,7 +55,9 @@ import {
   requirementSignoffPath,
   RequirementSignoffAttestationsSchema,
 } from "../schemas/sdlc/qa-attestations.ts";
-import { nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { defaultEnabledSubgraphs, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { isSubgraphEnabled, qualifiedSubgraphId } from "../schemas/kg/opt-in-subgraphs.ts";
+import { leftOutByMount, mountScopeFor } from "../schemas/kg/remote-mount.ts";
 import { kgRoots } from "./known-skills.ts";
 
 const REPO = join(import.meta.dir, "..", "..");
@@ -210,6 +212,20 @@ function slugsIn(dir: string): string[] {
  * declares none or several, or the directory is missing.
  */
 export function declaredDirFor(instanceRoot: string, kind: string): string {
+  const r = judgedDirFor(instanceRoot, kind);
+  if ("notJudged" in r) throw new Error(`\`${kind}\` is not judged here: ${r.notJudged}`);
+  return r.dir;
+}
+
+/**
+ * {@link declaredDirFor}, with the third state a consumer needs: the
+ * directory is in an opt-in sub-graph the root that MOUNTED this layer has
+ * switched off (a layer no mount placed judges what is on disk) (owner, 2026-11-12, card Q-OPTIN-DIRS A), or the mount left
+ * it out (`leftOutByMount`). Then nothing here is judged — the layer that
+ * switches it on judges it — and that is said, not thrown. A directory that
+ * is switched on (or placed by no mount) and missing still throws.
+ */
+export function judgedDirFor(instanceRoot: string, kind: string): { dir: string } | { notJudged: string } {
   const decl = readDeclaration(instanceRoot);
   if (!decl) throw new Error(`no declaration could be read at ${instanceRoot}`);
   const all = [...(decl.directories ?? []), ...nestedDirectories(instanceRoot, decl)];
@@ -217,9 +233,21 @@ export function declaredDirFor(instanceRoot: string, kind: string): string {
   if (hits.length !== 1) {
     throw new Error(`the instance declares ${hits.length} directories of kind \`${kind}\`; exactly one is expected`);
   }
-  const dir = join(instanceRoot, hits[0].path);
-  if (!existsSync(dir)) throw new Error(`\`${kind}\` is declared at ${hits[0].path}, which does not exist`);
-  return dir;
+  const hit = hits[0] as { id: string; path: string; optIn?: boolean };
+  const dir = join(instanceRoot, hit.path);
+  // Only for a MOUNTED layer: there the root that mounted it decides. A layer
+  // no mount placed is its own checkout and judges what it has on disk, as
+  // before — cat-harness does not list its own `proposals`, and its CI still
+  // checks them.
+  if (hit.optIn === true && mountScopeFor(instanceRoot) !== undefined) {
+    const q = qualifiedSubgraphId(decl.name, hit.id);
+    if (!isSubgraphEnabled(defaultEnabledSubgraphs(instanceRoot), q)) return { notJudged: `opt-in \`${q}\` is switched off by this checkout's root` };
+  }
+  if (!existsSync(dir)) {
+    if (leftOutByMount(instanceRoot, dir)) return { notJudged: `${hit.path} is left out by the mount that placed this layer` };
+    throw new Error(`\`${kind}\` is declared at ${hit.path}, which does not exist`);
+  }
+  return { dir };
 }
 
 if (import.meta.main) {
@@ -235,7 +263,9 @@ if (import.meta.main) {
     let inline: SignOff[] = [];
     try {
       for (const kind of ["requirements", "proposals"]) {
-        for (const s of setsIn(declaredDirFor(INSTANCE, kind))) {
+        const at = judgedDirFor(INSTANCE, kind);
+        if ("notJudged" in at) continue;
+        for (const s of setsIn(at.dir)) {
           const v = s.raw as { id?: string; signOffs?: SignOff[] };
           if (v.id === setId) inline = v.signOffs ?? [];
         }
@@ -247,18 +277,20 @@ if (import.meta.main) {
       process.exit(2);
     }
   }
-  let reqDir: string, propDir: string;
+  let reqDir: string, propDir: string | undefined;
   try {
     reqDir = declaredDirFor(INSTANCE, "requirements");
-    propDir = declaredDirFor(INSTANCE, "proposals");
+    const prop = judgedDirFor(INSTANCE, "proposals");
+    if ("notJudged" in prop) console.log(`  · proposals not judged here: ${prop.notJudged}; the layer that switches them on judges them`);
+    else propDir = prop.dir;
   } catch (e) {
     console.error(`  ✗ ${(e as Error).message}`);
     process.exit(1);
   }
   const reqSlugs = slugsIn(reqDir);
-  const propSlugs = slugsIn(propDir);
+  const propSlugs = propDir === undefined ? [] : slugsIn(propDir);
   console.log(`Requirements — ${reqSlugs.length} filed in ${relative(REPO, reqDir)}/, ` +
-    `${propSlugs.length} proposal(s) in ${relative(REPO, propDir)}/`);
+    (propDir === undefined ? "proposals not judged here" : `${propSlugs.length} proposal(s) in ${relative(REPO, propDir)}/`));
   const problems: Problem[] = [];
   for (const slug of reqSlugs) {
     const file = join(reqDir, `${slug}.md`);
@@ -304,7 +336,7 @@ if (import.meta.main) {
     return undefined;
   };
   let setCount = 0;
-  for (const dir of [reqDir, propDir]) {
+  for (const dir of propDir === undefined ? [reqDir] : [reqDir, propDir]) {
     for (const s of setsIn(dir)) {
       setCount++;
       const id = (s.raw as { id?: unknown })?.id;
