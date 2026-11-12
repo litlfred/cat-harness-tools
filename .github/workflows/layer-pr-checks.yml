@@ -903,11 +903,17 @@ jobs:
         # exist at .../chromium_headless_shell-1243").
         working-directory: fa
         run: |
-          if [ -x node_modules/.bin/playwright ]; then
+          if [ -x node_modules/.bin/playwright ] && [ -f ../ci/.github/scripts/playwright-chromium/install.sh ]; then
             # Browser always; apt only when a system library is missing
             # (runners lost the Ubuntu mirrors on 2026-11-11, and apt exit
             # 100 failed the tier although nothing needed installing).
             bash ../ci/.github/scripts/playwright-chromium/install.sh node_modules/.bin/playwright
+          elif [ -x node_modules/.bin/playwright ]; then
+            # The judging scripts are at the cat-harness-tools commit the
+            # layer's lock pins, which may predate the installer
+            # (cat-harness-tools#1916): install as that commit did.
+            echo "the pinned cat-harness-tools has no playwright-chromium/install.sh: installing with --with-deps, as it did"
+            node_modules/.bin/playwright install --with-deps chromium
           else
             echo "no playwright in the index: no browser installed"
           fi
