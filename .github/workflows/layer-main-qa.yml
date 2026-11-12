@@ -129,4 +129,22 @@ jobs:
           CHECKS_RESULT: ${{ inputs.checks-result }}
           GATE_RUN_ID: ${{ inputs.gate-run-id != '' && inputs.gate-run-id || github.run_id }}
           SHA: ${{ inputs.sha != '' && inputs.sha || github.sha }}
-        run: python3 -I qa/.github/scripts/layer-main-qa/report.py
+        # Could not determine is never green. report.py says so itself since
+        # cat-harness-tools#1961, but it is the copy at the caller's pin
+        # (above), and a pin from before #1961 exits 0 on an `unknown`
+        # verdict. This guard lives in the workflow, which every layer calls
+        # at main, so it holds before each layer re-pins and is a no-op
+        # after: red while the judged commit is still main's head, and the
+        # `main-red` issue left alone (report.py does not touch it).
+        run: |
+          code=0
+          python3 -I qa/.github/scripts/layer-main-qa/report.py || code=$?
+          if [ "$code" = 0 ] && [ "$VERDICT" = unknown ]; then
+            branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)"
+            head="$(gh api "repos/$GITHUB_REPOSITORY/commits/$branch" --jq .sha)"
+            if [ "$head" = "$SHA" ]; then
+              echo "::error::main's verdict for ${SHA:0:12} could not be determined (verdict unknown): could not determine is never green"
+              code=2
+            fi
+          fi
+          exit "$code"
