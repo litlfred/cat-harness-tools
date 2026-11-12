@@ -272,7 +272,7 @@ export type TranslationArtefact = CompanionRole | "po";
  * `translation-semantic-roundtrip` declared against the generic spine.
  *
  * This IS the round trip `translation-manager.md` describes, restated in the
- * vocabulary of `sdlc/skills/sdlc-core/untainted-verification.md` — the first
+ * vocabulary of `skills/process/process-core/untainted-verification.md` — the first
  * instantiation of it, and the one that showed the spine's own abstraction was
  * a notch too narrow.
  *

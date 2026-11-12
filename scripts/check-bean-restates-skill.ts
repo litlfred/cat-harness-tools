@@ -41,7 +41,7 @@
  * ## What this does NOT do
  *
  * **It does not read `## Done when`**, the house shape for a work plan that
- * [`opening-brief.md`](../sdlc/skills/sdlc-core/opening-brief.md) asks for;
+ * [`opening-brief.md`](../skills/conduct/conduct-core/opening-brief.md) asks for;
  * whether one restates a skill is a judgement about meaning, left to the
  * reader.
  *

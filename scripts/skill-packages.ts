@@ -186,11 +186,12 @@ export function discoverLocalPackages(root: string, scope?: CorpusScope): Record
  * 2. Otherwise, if it is the layer's **only** directly-held directory, it
  *    takes the layer's name, because there is nothing to disambiguate it
  *    from and the layer's name is the better one.
- * 3. Otherwise it takes its **basename** — `theming/`, `sdlc/skills/crdm/`.
+ * 3. Otherwise it takes its **basename** — `theming/`, `skills/process/crdm/`.
  *
  * Rule 2 is the one that needs the set, and stating it as "unique" rather than
  * "first" is the whole point: FIRST-WINS was the defect. `cat-harness`
- * declares `src/skills/`, `theming/`, `sdlc/skills/crdm/` and
+ * declared `src/skills/`, `theming/`, `sdlc/skills/crdm/` (now
+ * `skills/process/crdm/`, cat-harness#1266) and
  * `skills/process/raci/` — four directly-held directories, all resolving to the
  * name `folio-assistant`, with the last assignment winning. Measured on
  * 2026-09-20 (bean `1hvo`): three packages were found and silently dropped,

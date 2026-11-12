@@ -38,7 +38,7 @@ import { harnessPath } from "../lib/harness-layout.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 // declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
-const DIAGRAM = harnessPath("sdlc/processes/options-analysis.bpmn", INSTANCE_ROOT);
+const DIAGRAM = harnessPath("processes/process/options-analysis.bpmn", INSTANCE_ROOT);
 
 const names = (ids: string[]): string[] => [...ids].sort();
 

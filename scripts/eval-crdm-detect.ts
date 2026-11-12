@@ -4,7 +4,7 @@
  *
  * ## What this measures, and what it does not
  *
- * `sdlc/skills/crdm/crdm-detect.md` is prose for a model to read. It lists
+ * `skills/process/crdm/crdm-detect.md` is prose for a model to read. It lists
  * five categories of phrasing plus an explicit "what is NOT a feature request"
  * list. This script implements the PHRASE SIGNALS mechanically, so it is a
  * LOWER BOUND on an agent that also applies judgement: low recall here means
@@ -39,7 +39,7 @@ const verbose = process.argv.includes("--verbose");
 interface Item { number: number; title: string; isFeature: boolean; why: string; text: string }
 
 // declared-path-literal: written in the new layout and answered in whichever the harness has — transitional, cat-harness#991 step 23 (scripts/lib/harness-layout.ts); remove after cat-harness#1014 merges.
-const SKILL = harnessPath("sdlc/skills/crdm/crdm-detect.md", root);
+const SKILL = harnessPath("skills/process/crdm/crdm-detect.md", root);
 const skillExclusions = parseSkillExclusions(readFileSync(SKILL, "utf-8"));
 
 const corpus: Item[] = JSON.parse(
@@ -142,7 +142,7 @@ const run = buildTestRun({
     "cat-harness-tools/scripts/eval-crdm-detect.ts",
     "cat-harness-tools/src/crdm/detect-signals.ts",
     // declared-path-literal: a provenance record (`processInputs`), written into the evaluation report as repo-relative names; it is not read from disk here.
-    `cat-harness/${harnessRel("sdlc/skills/crdm/crdm-detect.md", root)}`,
+    `cat-harness/${harnessRel("skills/process/crdm/crdm-detect.md", root)}`,
   ],
   outcome: {
     population: corpus.length,

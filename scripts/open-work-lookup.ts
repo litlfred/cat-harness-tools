@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Does a path, a path prefix or a bean id exist on main or any open PR head —
- * the `open-work-lookup` Tool (cat-harness `tools/open-work-lookup/`).
+ * the `open-work-lookup` Tool (cat-harness `work-plan/tools/open-work-lookup/`).
  *
  * GitHub REST only (`gh api`), since cloud sessions are refused GraphQL.
  * Whatever could not be read is listed under `unread`, so an empty answer is

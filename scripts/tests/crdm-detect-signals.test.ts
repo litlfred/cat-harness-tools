@@ -29,7 +29,7 @@ import { harnessPath } from "../lib/harness-layout.ts";
 
 const root = resolve(HARNESS_ROOT);
 // declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
-const skillPath = harnessPath("sdlc/skills/crdm/crdm-detect.md", root);
+const skillPath = harnessPath("skills/process/crdm/crdm-detect.md", root);
 const skillMarkdown = readFileSync(skillPath, "utf-8");
 const skill = parseSkillExclusions(skillMarkdown);
 const skillCategories = parseSkillCategories(skillMarkdown);

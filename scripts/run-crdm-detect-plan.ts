@@ -169,7 +169,7 @@ if (import.meta.main) {
       "cat-harness-tools/scripts/run-crdm-detect-plan.ts",
       "cat-harness-tools/src/crdm/detect-signals.ts",
       // declared-path-literal: provenance records written into the run as repo-relative names; read through the plan path above, not here.
-      `cat-harness/${harnessRel("sdlc/skills/crdm/crdm-detect.md")}`,
+      `cat-harness/${harnessRel("skills/process/crdm/crdm-detect.md")}`,
       "cat-harness/test/plans/crdm-detect-evaluation.test-plan.json",
     ],
     outcome: measure(corpus, outputs),
