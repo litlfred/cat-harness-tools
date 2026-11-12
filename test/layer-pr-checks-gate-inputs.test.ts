@@ -88,6 +88,12 @@ describe("run-gates.py gate inputs", () => {
     expect(why).toContain("live state");
   });
 
+  test("check:upstream-pins is skipped as live-state: an upstream release, not the diff, turns it red (smart-ra, 2026-11-11)", () => {
+    const [kind, why] = py("run-gates.py", `m.skip_reason(".", "check:upstream-pins")`) as [string, string];
+    expect(kind).toBe("live-state");
+    expect(why).toContain("live state");
+  });
+
   test("ingest:ig-chrome:check is skipped as needs-input because it requires external --layer template checkouts (smart-base#239)", () => {
     const [kind, why] = py("run-gates.py", `m.skip_reason(".", "ingest:ig-chrome:check")`) as [string, string];
     expect(kind).toBe("needs-input");
