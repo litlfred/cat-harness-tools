@@ -43,7 +43,7 @@ const PAGES: { name: string; path: string; wrapper: string; ready: string; ready
   { name: "folio", path: `${declaredPageUrl(HARNESS_ROOT, "folio")}index.html`, wrapper: ".fo-page", ready: "#badges .badge" },
   { name: "catalogue", path: `${servedUrl(REPO, declaredPageDirIn(REPO, "who-iris", "catalogue"))}index.html`, wrapper: ".ic-page", ready: "#ic-nodes" },
   // The todo page draws itself from its JSON-LD: the meta list fills only if the script ran.
-  { name: "todo", path: `${DOCS}/todos/what-kick-off-means-for-a-ci-watcher/index.html`, wrapper: ".fa-todo-page", ready: "#fa-todo-meta dt" },
+  { name: "todo", path: `${DOCS}/todo/what-kick-off-means-for-a-ci-watcher/index.html`, wrapper: ".fa-todo-page", ready: "#fa-todo-meta dt" },
   // Last, and with room: a ~1.9 MB projection and ~1700 list rows, so its
   // load and its axe pass are the slow ones.
   { name: "schemas", path: `${declaredPageUrl(HARNESS_ROOT, "schemas")}index.html`, wrapper: ".sc-page", ready: "#counts", readyText: /declarations/ },
