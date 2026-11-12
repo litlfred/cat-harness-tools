@@ -205,6 +205,7 @@
     "check:structure-accessor": "bun run cat-harness-tools/scripts/check-structure-accessor.ts",
     "check:reference-direction": "bun run cat-harness-tools/scripts/check-reference-direction.ts",
     "check:optin-links": "bun run cat-harness-tools/scripts/check-optin-links.ts",
+    "check:optin-refs": "bun run cat-harness-tools/scripts/check-optin-refs.ts",
     "check:generated-writers": "bun run cat-harness-tools/scripts/check-generated-writers.ts",
     "check:process-bindings": "bun run cat-harness-tools/scripts/check-process-bindings.ts",
     "check:document-kind-sources": "bun run cat-harness-tools/scripts/check-document-kind-sources.ts",
