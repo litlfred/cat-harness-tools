@@ -595,22 +595,55 @@ export function packageFetchUrl(url: string): string {
 }
 
 /**
- * Download `url` to `dest` with curl, following redirects (a release asset
- * redirects to its storage). `absent` is a 404 — or, for `file://`, no such
- * file — which a caller may read as "not published"; every other failure is a
- * fetch that failed, never an absence.
+ * How long one download may take. Without a limit curl waits for ever on a
+ * server that accepts and sends nothing, and the mount waits with it (the
+ * hydrated-mount test flake, cat-harness-tools#1712). The connection must open
+ * within `connectS`. A transfer slower than `minBytesPerS` for `stallS` seconds
+ * is a stall and is dropped. No attempt runs past `maxS` (curl's `--retry`
+ * makes up to three). Each case is a fetch that failed (curl exit 28), never
+ * an absence.
  */
-export function download(url: string, dest: string): { ok: true } | { ok: false; absent: boolean; error: string } {
+export interface DownloadLimits {
+  connectS: number;
+  stallS: number;
+  minBytesPerS: number;
+  maxS: number;
+}
+export const DOWNLOAD_LIMITS: DownloadLimits = { connectS: 15, stallS: 30, minBytesPerS: 1024, maxS: 600 };
+
+/** The curl arguments {@link download} runs. */
+export function downloadArgs(url: string, dest: string, limits: DownloadLimits = DOWNLOAD_LIMITS): string[] {
+  return [
+    "-fsSL",
+    "--retry", "2",
+    "--connect-timeout", String(limits.connectS),
+    "--speed-limit", String(limits.minBytesPerS),
+    "--speed-time", String(limits.stallS),
+    "--max-time", String(limits.maxS),
+    "-o", dest,
+    url,
+  ];
+}
+
+/**
+ * Download `url` to `dest` with curl, following redirects (a release asset
+ * redirects to its storage), within {@link DOWNLOAD_LIMITS}. `absent` is a 404
+ * — or, for `file://`, no such file — which a caller may read as "not
+ * published"; every other failure, a timeout included, is a fetch that failed,
+ * never an absence.
+ */
+export function download(url: string, dest: string, limits: DownloadLimits = DOWNLOAD_LIMITS): { ok: true } | { ok: false; absent: boolean; error: string } {
   mkdirSync(dirname(dest), { recursive: true });
-  // input-site: traced #5bf8756b — a download over the network: a run that downloads records no hash
+  // input-site: traced #8d8b4703 — a download over the network: a run that downloads records no hash
   inputSiteReached("mount-from-lock: download");
-  const r = spawnSync("curl", ["-fsSL", "--retry", "2", "-o", dest, url], { encoding: "utf-8" });
+  const r = spawnSync("curl", downloadArgs(url, dest, limits), { encoding: "utf-8" });
   if (r.error) return { ok: false, absent: false, error: `curl could not run: ${r.error.message}` };
   if (r.status === 0) return { ok: true };
   rmSync(dest, { force: true });
   // 22: an HTTP error (curl -f) — a 404 for an unpublished asset; 37: a file:// that is not there.
   const absent = r.status === 37 || (r.status === 22 && /\b404\b/.test(r.stderr ?? ""));
-  return { ok: false, absent, error: (r.stderr ?? "").trim().split("\n").pop() || `curl exited ${r.status}` };
+  const timedOut = r.status === 28 ? ` (timed out: no answer within ${limits.connectS} s, a stall of ${limits.stallS} s, or over ${limits.maxS} s)` : "";
+  return { ok: false, absent, error: ((r.stderr ?? "").trim().split("\n").pop() || `curl exited ${r.status}`) + timedOut };
 }
 
 /**

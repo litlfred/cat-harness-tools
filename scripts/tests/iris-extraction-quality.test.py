@@ -195,6 +195,33 @@ def main() -> int:
     got, redone = s.print_order_pages([early], ov, lambda i: late)
     check("a page already in print order is left alone", got == [early] and redone == [])
 
+    class Rect: x0, width = 0.0, 595.0
+    class Page:
+        rect = Rect()
+        def __init__(self, blocks): self.blocks = blocks
+        def get_text(self, kind): return self.blocks
+    p72 = Page([(45, 56, 287, 155, "left column\n", 0, 0), (304, 56, 551, 155, "right column\n", 1, 0),
+                (45, 188, 268, 214, "4.5 Contrôle des progrès\n", 2, 0)])
+    check("10665/353150 p72: a heading under both columns stays after them",
+          s.print_order_text(p72).split("\n")[:3] == ["left column", "right column", "4.5 Contrôle des progrès"])
+    p11 = Page([(305, 127, 440, 146, "Replenishing the CFE\n", 0, 0), (43, 128, 250, 141, "Table 1\n", 1, 0),
+                (47, 146, 286, 159, "Event\n", 2, 0), (305, 154, 554, 232, "The CFE was conceived\n", 3, 0)])
+    check("10665/342236 p11: a table row touching the band above stays in its column",
+          s.print_order_text(p11).split("\n")[:4] == ["Table 1", "Event", "Replenishing the CFE", "The CFE was conceived"])
+    p17 = Page([(305, 105, 558, 777, "15. Mazanderani\n", 0, 0), (40, 34, 251, 102, "RÉFÉRENCES\n", 1, 0),
+                (40, 106, 291, 780, "1. UNAIDS\n", 2, 0)])
+    check("10665/329296 p17: two columns under a heading read left column first",
+          s.print_order_text(p17).split("\n")[:3] == ["RÉFÉRENCES", "1. UNAIDS", "15. Mazanderani"])
+    refs = [E(1, "RÉFÉRENCES BIBLIOGRAPHIQUES", 1, "inferred")]
+    stored = "15. Mazanderani AH.\n" * 12 + "RÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13
+    printed = "17\nRÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13 + "15. Mazanderani AH.\n" * 12
+    got, redone = s.print_order_inferred([stored], refs, None, lambda i: printed)
+    check("10665/329296: a heading under half way down an inferred page still triggers the print-order read",
+          redone == [1] and got[0].lstrip("17\n").startswith("RÉFÉRENCES"))
+    mid = "body line\n" * 12 + "RÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13
+    got, redone = s.print_order_inferred([mid], refs, None, lambda i: mid)
+    check("a heading truly in mid page is left where it is", got == [mid] and redone == [])
+
     o = load("pdf-ocr.py")
     have = {"ara", "eng", "fra", "rus", "chi_sim", "fas"}
     check("an Arabic page may add Latin, Cyrillic, Han", o.second_script_candidates("ara", have) == ["ara+eng", "ara+rus", "ara+chi_sim"])
@@ -209,6 +236,15 @@ def main() -> int:
           o.latin_rescues(primary, mixed) == [("۳۱۱۷", "HIV")])
     check("a word of the page's own script is never replaced",
           o.latin_rescues([w("یا", 90, 10)], [w("La", 90, 10)]) == [])
+    check("a rescue replaces a whole word, not the start of a longer number",
+          o.replace_word("بخش ۷۱۸۵ و ۷۱۸ پایان", "۷۱۸", "VIA") == "بخش ۷۱۸۵ و VIA پایان")
+    check("a word read alone is kept only as a capitalised acronym",
+          all(o.RE_ACRONYM.match(w) for w in ("HPV", "VIA", "LEEP", "CIN2+"))
+          and not any(o.RE_ACRONYM.match(w) for w in ("Veee", "(YY", "VV/\\eeee", "pole")))
+    chars = [(30, 0, 34, 10, "\u0660"), (20, 0, 24, 10, "\u0669"), (10, 0, 14, 10, "\u0669"),
+             (0, 0, 4, 10, "\u0661"), (40, 0, 44, 10, "\u0639"), (60, 0, 64, 10, "\u0662")]
+    check("the layer's digits inside a box come left to right, letters and outside digits dropped",
+          o.layer_digits(chars, (0, 0, 100, 25), 2.0) == "\u0661\u0669\u0669\u0660")
     check("only a read with eastern digits gets the second read", o.RE_EASTERN_DIGITS.search("زنان ۲۱۷ منفی")
           and not o.RE_EASTERN_DIGITS.search("زنان منفی ۴"))
 
@@ -217,6 +253,10 @@ def main() -> int:
     o._ocr_with_confidence = lambda png, lang, timeout=0: (calls.append(lang), ("", -1.0))[1]
     check("a page that outran the time limit is not read again in other scripts",
           o.read_page("p.png", "fra", have) == ("", "fra") and calls == ["fra"])
+    reads = {"ara": 40.0, "ara+eng": 53.8, "ara+rus": 54.4}
+    o._ocr_with_confidence = lambda png, lang, timeout=0: (lang, reads[lang])
+    check("a later script must beat the best read so far by the full margin, not tie it",
+          o.read_page("p.png", "ara", {"ara", "eng", "rus"}) == ("ara+eng", "ara+eng"))
     o._ocr_with_confidence = real
     check("Tesseract runs single-threaded unless told otherwise",
           o._tesseract_env().get("OMP_THREAD_LIMIT") == os.environ.get("OMP_THREAD_LIMIT", "1"))

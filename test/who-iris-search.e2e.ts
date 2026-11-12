@@ -12,6 +12,22 @@ import { test, expect } from "@playwright/test";
  * 5. Multi-lingual availability on translated replicas (e.g. /fr/index.html and /fr/search.html)
  */
 
+/**
+ * A MeSH facet value, as a reader reaches it: the facet shows its top values
+ * first, so one further down is reached with "Show more". Which values make the
+ * top depends on the catalogue, which grows (MeSH indexing added subjects
+ * that now outrank "Guidelines as Topic"), so the test does not rely on it.
+ */
+async function meshFacetLink(page: import("@playwright/test").Page, label: string) {
+  const link = page.locator('#is-facets a[data-facet="mesh"]').filter({ hasText: label }).first();
+  for (let i = 0; i < 50 && !(await link.isVisible()); i++) {
+    const more = page.locator('#is-facets button[data-more="mesh"]');
+    if (!(await more.isVisible())) break;
+    await more.click();
+  }
+  return link;
+}
+
 test.describe("WHO-IRIS search & faceted exploration", () => {
   test("landing page renders search bar forwarding to search.html, and search.html renders dynamic facets", async ({ page }) => {
     const res = await page.goto("/who-iris/site/index.html");
@@ -63,10 +79,7 @@ test.describe("WHO-IRIS search & faceted exploration", () => {
   test("clicking a dynamic subject facet on search.html filters results and renders an applied filter chip", async ({ page }) => {
     await page.goto("/who-iris/site/search.html");
 
-    const facetLink = page
-      .locator('#is-facets a[data-facet="mesh"]')
-      .filter({ hasText: "Guidelines as Topic" })
-      .first();
+    const facetLink = await meshFacetLink(page, "Guidelines as Topic");
     await expect(facetLink).toBeVisible();
     await facetLink.click();
 
@@ -88,10 +101,7 @@ test.describe("WHO-IRIS search & faceted exploration", () => {
     await page.goto("/who-iris/site/search.html");
 
     // Apply MeSH facet "Guidelines as Topic"
-    const meshLink = page
-      .locator('#is-facets a[data-facet="mesh"]')
-      .filter({ hasText: "Guidelines as Topic" })
-      .first();
+    const meshLink = await meshFacetLink(page, "Guidelines as Topic");
     await meshLink.click();
     expect(await page.locator("#is-results .is-card").count()).toBeGreaterThanOrEqual(2);
 

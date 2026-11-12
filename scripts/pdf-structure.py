@@ -1341,10 +1341,15 @@ def _adjust_banner_mark(lines: list[str], pi: int, li: int, span: int = 1) -> tu
     return (pi, li)
 
 
+def _banner(on: bool, lines: list[str], pi: int, li: int, span: int = 1) -> tuple[int, int]:
+    """`_adjust_banner_mark` when `on`, else the heading's own line."""
+    return _adjust_banner_mark(lines, pi, li, span) if on else (pi, li)
+
+
 RE_STEP_TITLE = re.compile(r"^Step \d+\.\s+(.+)$")
 
 
-def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
+def locate_heading(pages: list[str], e: TocEntry, banner: bool = True) -> tuple[int, int] | None:
     """`(page_idx, line_idx)` of the line that prints outline entry `e`, or None.
 
     Searched within two pages either side of the entry's own page. Factored out
@@ -1356,7 +1361,7 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
     # is looked for without it.
     step = RE_STEP_TITLE.match(e.title)
     if step:
-        found = locate_heading(pages, replace(e, title=step.group(1)))
+        found = locate_heading(pages, replace(e, title=step.group(1)), banner)
         if found:
             return found
     needle = _match_key(e.title)[:44]
@@ -1378,9 +1383,9 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
             if li + 1 < len(lines) and re.fullmatch(r"[A-Z0-9]{1,3}(\.[A-Z0-9]{1,3})*\.?", line.strip()):
                 cand = _match_key(line + " " + lines[li + 1])
             if needle in cand and len(cand) < 120:
-                return _adjust_banner_mark(lines, pi, li, 1)
+                return _banner(banner, lines, pi, li, 1)
             if run_in and _starts_run_in(cand, run_in):
-                return _adjust_banner_mark(lines, pi, li, 1)
+                return _banner(banner, lines, pi, li, 1)
         # Multi-line wrapped display headings ("National Trust / Architecture for /
         # the DDCC:VS" on DDCC p. 63; "Generic business processes / and workflows"
         # on DAK p. 36) on the same page before moving to neighbouring pages.
@@ -1390,7 +1395,7 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
                     continue
                 cand = _match_key(" ".join(lines[li : li + span]))
                 if needle in cand and len(cand) < 160:
-                    return _adjust_banner_mark(lines, pi, li, span)
+                    return _banner(banner, lines, pi, li, span)
     # Minor wording inflections between the contents page and the body heading
     # ("Tally sheets..." vs "Tally sheet... - example 1" on LNOB p. 41;
     # "Links..." vs "Linkages..." on DAK p. 23; "Health interventions and
@@ -1409,7 +1414,7 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
                         _pdf_headings.similar(key, ck) >= 0.84
                         or _pdf_headings.similar(key[:40], ck[:40]) >= 0.88
                     ):
-                        return _adjust_banner_mark(lines, pi, li, span)
+                        return _banner(banner, lines, pi, li, span)
     return None
 
 
@@ -1863,6 +1868,7 @@ def label_runs(sections: list[Section]) -> set[tuple[str, int]]:
 # top, the page is read in print order.
 LATE_HEADING = 0.5
 EARLY_HEADING = 0.2
+LATE_HEADING_INFERRED = 0.3
 
 
 def _heading_offset(page: str, e: TocEntry) -> float | None:
@@ -1874,7 +1880,8 @@ def _heading_offset(page: str, e: TocEntry) -> float | None:
     return found[1] / n
 
 
-def print_order_pages(pages: list[str], outline: list[TocEntry], sorted_page) -> tuple[list[str], list[int]]:
+def print_order_pages(pages: list[str], outline: list[TocEntry], sorted_page,
+                      late: float = LATE_HEADING) -> tuple[list[str], list[int]]:
     """`pages` with each page whose first outline heading is printed late re-read by `sorted_page(i)`.
 
     `sorted_page` returns the text of 0-based page i in print order, or None.
@@ -1888,7 +1895,7 @@ def print_order_pages(pages: list[str], outline: list[TocEntry], sorted_page) ->
     redone: list[int] = []
     for pno, e in sorted(first.items()):
         at = _heading_offset(pages[pno - 1], e)
-        if at is None or at < LATE_HEADING:
+        if at is None or at < late:
             continue
         alt = sorted_page(pno - 1)
         if not alt:
@@ -1898,6 +1905,26 @@ def print_order_pages(pages: list[str], outline: list[TocEntry], sorted_page) ->
             out[pno - 1] = alt
             redone.append(pno)
     return out, redone
+
+
+def print_order_inferred(pages: list[str], toc: list[TocEntry], lines, sorted_page) -> tuple[list[str], list[int]]:
+    """`print_order_pages` for an inferred contents, with the furniture of each re-read page stripped.
+
+    10665-329296 (French, two columns, no outline) stores page 17's right
+    column, references 15-27, before the left column's "RÉFÉRENCES
+    BIBLIOGRAPHIQUES" heading, so references 15-27 landed in the section
+    before, "Membres du personnel de l'OMS". The outline case re-reads such a
+    page in print order before the furniture is stripped; here the furniture
+    is already gone from the other pages, so only the re-read ones are
+    stripped again. The heading there sits 49.5% down the stored text, under
+    LATE_HEADING, so an inferred contents re-reads from LATE_HEADING_INFERRED;
+    the re-read is still kept only when it puts the heading near the top.
+    """
+    alt, redone = print_order_pages(pages, toc, sorted_page, late=LATE_HEADING_INFERRED)
+    if not redone:
+        return pages, []
+    clean, _ = strip_furniture(alt, lines)
+    return [clean[i] if i + 1 in redone else pages[i] for i in range(len(pages))], redone
 
 
 def _pymupdf_sorted(path: str):
@@ -1913,7 +1940,8 @@ def print_order_text(page) -> str:
     """A page's text blocks in print order: top to bottom, a band of columns left column first.
 
     A block wider than WIDE_BLOCK of the page (a heading, a full-width figure
-    caption) closes the band of columns above it. Blocks keep their own lines,
+    caption), or one that starts below every block of the band, closes the
+    band of columns above it. Blocks keep their own lines,
     so two columns are never interleaved line by line.
     """
     width = page.rect.width
@@ -1932,13 +1960,23 @@ def print_order_text(page) -> str:
         if b[2] - b[0] > WIDE_BLOCK * width:
             flush()
             out.append(b[4].rstrip("\n"))
-        else:
-            band.append(b)
+            continue
+        # A block that starts a clear gap below everything in the band starts
+        # a new band: 10665-353150 page 72 prints two columns, then "4.5
+        # Contrôle des progrès" 33pt under both, and sorting it into the left
+        # column put the heading above the right column's text. Touching
+        # blocks stay in the band: 10665-342236 page 11's table rows start
+        # where the right column's heading ends.
+        if band and b[1] >= max(x[3] for x in band) + BAND_GAP:
+            flush()
+        band.append(b)
     flush()
     return "\n".join(out) + "\n"
 
 
 WIDE_BLOCK = 0.6
+# Points of empty space above a block that close the band of columns over it.
+BAND_GAP = 12.0
 
 
 def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
@@ -1948,6 +1986,12 @@ def split_sections(pages: list[str], toc: list[TocEntry]) -> list[Section]:
 
     for e in toc:
         found = locate_heading(pages, e)
+        if found and found in used and found[1] == 0:
+            # The banner rule moved a heading at a page's foot to line 0, which
+            # another heading already opens. 10665-342236 page 8, read in
+            # print order, ends with "Key figures in 2020" over a chart: it
+            # really is the last heading there, so it keeps its own line.
+            found = locate_heading(pages, e, banner=False)
         if found and found not in used:
             used.add(found)
             marks.append((found[0], found[1], e))
@@ -2367,6 +2411,8 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
     tidied: list[dict[str, Any]] = []
     if not paged and inferred:
         toc, tidied = tidy_inferred(toc, pages)
+        if not ocr_used:
+            pages, resorted = print_order_inferred(pages, toc, lines, _pymupdf_sorted(path))
     sections = split_pages(pages) if paged else split_sections(pages, toc)
     if not paged and inferred:
         labels = label_runs(sections)

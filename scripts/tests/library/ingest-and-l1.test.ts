@@ -366,7 +366,9 @@ describe("L1 completeness", () => {
       r.requirements.filter((q) => q.state === "unmet").map((q) => `${r.slug}: ${q.name} — ${q.detail}`),
     );
     expect(bad).toEqual([]);
-  });
+    // A real-corpus walk, over bun's 5 s default on a busy runner (7.6 s on
+    // cat-harness-tools#1715). The same budget as the other real-corpus tests.
+  }, 30_000);
 });
 
 describe("the verdict as a committed sidecar", () => {
@@ -557,7 +559,8 @@ describe("the bearing list is SHARED with the review queue", () => {
       .join(" | ");
     const drafts = [...details.matchAll(/(\d+) draft/g)].reduce((n, m) => n + Number(m[1]), 0);
     expect(drafts).toBeGreaterThan(0);
-  });
+    // A real-corpus walk too: the same budget, for the same reason.
+  }, 30_000);
 });
 
 
