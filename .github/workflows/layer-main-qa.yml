@@ -138,8 +138,8 @@ jobs:
         # (batched into the window's integration run, or pins only) with
         # `"deferred"` in its failures, and that is not a failure, whatever
         # the pinned report.py says: a pin from #1961 on exits 2 on EVERY
-        # `unknown`, deferred or not (who-iris 60687101, folio-assistant-core
-        # b2cec256, 2026-11-12), so a deferred `unknown` ends at 0 here. The
+        # `unknown`, deferred or not (two layers' main went red that way,
+        # 2026-11-12), so a deferred `unknown` ends at 0 here. The
         # `main-red` issue is never touched by this guard.
         run: |
           code=0

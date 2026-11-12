@@ -68,7 +68,7 @@ describe("layer-main-qa.yml: an unknown verdict is red even with a pinned report
     expect(run("unknown", 0, SHA, JSON.stringify({ deferred: "pins-only: this push changes only the caller's pins" })).status).toBe(0);
   });
 
-  test("a pinned report.py from #1961 on exits 2 on every unknown; a DEFERRED one still ends green (who-iris 60687101, core b2cec256)", () => {
+  test("a pinned report.py from #1961 on exits 2 on every unknown; a DEFERRED one still ends green (two layers' main went red that way, 2026-11-12)", () => {
     const batched = JSON.stringify({ deferred: "batched: this window's integration run (window 9) already started", "judged-by": "the next window's first push" });
     const r = run("unknown", 2, SHA, batched);
     expect(r.status).toBe(0);
