@@ -623,7 +623,7 @@ export const LibraryDocumentViewSchema = z
       .strict(),
     /**
      * The entry's KEPT figures (role `figure`, a WebP on disk), each with every
-     * language's description (who-iris#224). Absent when it keeps none.
+     * language's description. Absent when it keeps none.
      */
     images: z
       .array(
