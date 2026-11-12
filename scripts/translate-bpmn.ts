@@ -47,6 +47,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { instanceRootsIn, localeDirIn, translationsHomeFor } from "../schemas/kg/cat-harness.js";
+import { notJudgedInSwitchedOff, switchedOffGroups } from "../schemas/kg/opt-in-roots.js";
 import { gateOwnsFile } from "./lib/gate-own.ts";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -318,10 +319,13 @@ if (wantCheck) {
   // — which is how a template that did not move with its diagram is caught.
   const ownedIn = new Map<string, Set<string>>();
   const homeList = new Map<string, ReturnType<typeof translationsHomeFor>>();
+  /** The layer whose diagrams each home holds templates for. */
+  const ownerOf = new Map<string, string>();
   for (const f of diagrams) {
     const h = homeFor(f);
     const key = `${h.root}\u0000${h.scope.join("/")}`;
     homeList.set(key, h);
+    if (!ownerOf.has(key)) ownerOf.set(key, ownerRootOf(f));
     const set = ownedIn.get(key) ?? new Set<string>();
     set.add(basename(f, ".bpmn"));
     ownedIn.set(key, set);
@@ -330,7 +334,16 @@ if (wantCheck) {
     homeList.set(`${HOME.root}\u0000${HOME.scope.join("/")}`, HOME);
     ownedIn.set(`${HOME.root}\u0000${HOME.scope.join("/")}`, new Set());
   }
+  if (!ownerOf.has(`${HOME.root}\u0000${HOME.scope.join("/")}`)) ownerOf.set(`${HOME.root}\u0000${HOME.scope.join("/")}`, resolve(root));
   const orphaned: string[] = [];
+  // NOT JUDGED HERE (owner, 2026-11-12, card Q-OPTIN-DIRS A): a template
+  // whose diagram is in an opt-in sub-graph the root that MOUNTED the owning
+  // layer switched off. The writer files every diagram's template in its
+  // layer's one `translations/` home, so a switched-off group's templates
+  // stay there while its diagrams are not resolved (or not mounted). They are
+  // judged where the group is switched on.
+  const notJudged: string[] = [];
+  const offGroups = new Map<string, ReturnType<typeof switchedOffGroups>>();
   for (const loc of [...gating].sort()) {
     for (const [key, h] of homeList) {
       // `localeDirIn`, NOT a join on the home's root — a hosted layer's
@@ -345,8 +358,20 @@ if (wantCheck) {
         continue;
       }
       const owned = ownedIn.get(key)!;
+      const owner = ownerOf.get(key) ?? resolve(root);
       for (const n of names.sort()) {
-        if (!owned.has(basename(n, ".pot"))) orphaned.push(`${relative(REPO_ROOT, dir)}/${n}`);
+        if (owned.has(basename(n, ".pot"))) continue;
+        let groups = offGroups.get(owner);
+        if (groups === undefined) {
+          try {
+            groups = switchedOffGroups(owner);
+          } catch {
+            groups = { onDisk: [], leftOut: [] };
+          }
+          offGroups.set(owner, groups);
+        }
+        if (notJudgedInSwitchedOff(basename(n, ".pot"), ".bpmn", owner, groups) !== undefined) notJudged.push(`${relative(REPO_ROOT, dir)}/${n}`);
+        else orphaned.push(`${relative(REPO_ROOT, dir)}/${n}`);
       }
     }
   }
@@ -357,6 +382,7 @@ if (wantCheck) {
   console.log(`  ${stale.length ? "✗" : "✓"} ${String(stale.length).padStart(3)}  out of date`);
   if (unreadable.length) console.log(`  ✗ ${String(unreadable.length).padStart(3)}  could not be read`);
   console.log(`  ${orphaned.length ? "✗" : "✓"} ${String(orphaned.length).padStart(3)}  template with no diagram`);
+  if (notJudged.length) console.log(`  · ${String(notJudged.length).padStart(3)}  template of a diagram in an opt-in sub-graph switched off here — not judged`);
   for (const [loc, n] of [...notTarget].sort()) {
     console.log(`  · ${String(n).padStart(3)}  ${loc} — not a workflow-translation target yet, so not demanded`);
   }
