@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { buildCommand, installCommand, parseWebApp, WEB_APP_V01 } from "../../schemas/ui/web-app.ts";
-import { indexHtml, markChromeless, readApp, routeClashes, type DeclaredApp } from "../gen-web-apps.ts";
+import { declaredApps, indexHtml, markChromeless, readApp, routeClashes, unmountedApps, type DeclaredApp } from "../gen-web-apps.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { appPoPath, appPot, localeStrings, potCurrent, readCatalog } from "../web-app-strings.ts";
 import { extractTemplates, injectStrings, targetLocales } from "../gen-web-apps.ts";
@@ -169,5 +169,36 @@ describe("translation through the harness's process", () => {
     expect(injectStrings(a, false)).toEqual([]);
     expect(JSON.parse(readFileSync(join(dir, "public", "i18n", "fr.json"), "utf-8"))).toEqual({ "title.start": "Commencer" });
     expect(JSON.parse(readFileSync(join(dir, "public", "i18n", "ar.json"), "utf-8"))).toEqual({});
+  });
+});
+
+describe("an app the mount did not bring", () => {
+  // A downstream mounts only the directories its index lists: a lock may
+  // mount a layer's glossary and translations, not its game. The
+  // declaration still names the game, so the build must say "not here" rather
+  // than fail on a missing web-app.json.
+  test("is listed as unmounted and never read, while a held one is read", () => {
+    const repo = join(tmp, "repo-unmounted");
+    const layer = join(repo, "lay");
+    mkdirSync(layer, { recursive: true });
+    writeFileSync(
+      join(layer, "lay.json"),
+      JSON.stringify({
+        $schema: "cat-harness-declaration/1.0.0",
+        name: "lay",
+        version: "0.1.0",
+        title: "lay",
+        description: "a fixture layer",
+        directories: [
+          { id: "held-game", path: "held-game/", graphTypologies: ["web-app"], description: "held" },
+          { id: "away-game", path: "away-game/", graphTypologies: ["web-app"], description: "not mounted" },
+        ],
+      }),
+    );
+    mkdirSync(join(layer, "held-game"));
+    expect(unmountedApps(repo).map((a) => a.directory)).toEqual(["away-game"]);
+    const held = declaredApps(repo);
+    expect(held.map((a) => a.directory)).toEqual(["held-game"]);
+    expect(held[0]!.problem).toMatch(/no web-app.json/);
   });
 });

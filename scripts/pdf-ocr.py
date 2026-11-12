@@ -69,6 +69,7 @@ import argparse
 import glob
 import os
 import re
+from collections import Counter
 import shutil
 import subprocess
 import sys
@@ -383,6 +384,7 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
                     txt = ""
             else:
                 txt, use = read_page_with_latin(png, use, have_langs)
+                txt = rescue_digits(pdf, i, png, txt, use, dpi)
             open(os.path.join(cache, f"page-{i:03d}.txt"), "w",
                  encoding="utf-8").write(txt)
             for p in use.split("+"):
@@ -480,8 +482,18 @@ def second_script_candidates(lang: str, have: set[str]) -> list[str]:
 # ("chy", "Shee", "leg!") at 42-72.
 LATIN_RESCUE_CONFIDENCE = 80.0
 RE_LATIN_WORD = re.compile(r"[A-Za-z]")
-# Arabic-Indic and Persian digit runs: what a Latin word read as Arabic script becomes.
-RE_EASTERN_DIGITS = re.compile(r"[\u0660-\u0669\u06f0-\u06f9]{2,}")
+# A word read alone (`_read_word_as_acronym`) is kept only as a capitalised
+# acronym of 2-6 letters ("HPV", "VIA", "LEEP", "CIN2+"), at this confidence.
+RE_ACRONYM = re.compile(r"^[A-Z][A-Z0-9]{1,5}\+?$")
+ACRONYM_CONFIDENCE = 75.0
+# At most this many words of one page are read alone (each is a Tesseract run).
+MAX_WORD_READS = 80
+# Arabic-Indic and Persian digit runs: what a Latin word read as Arabic script
+# becomes. A run may mix in Western digits: 10665-94830-per page 16 prints
+# "VIA" and "HPV" and the OCR reads "۷1۸" and "11۳۷", which a run of eastern
+# digits alone never matched.
+RE_EASTERN_DIGITS = re.compile(
+    r"(?=[0-9\u0660-\u0669\u06f0-\u06f9]*[\u0660-\u0669\u06f0-\u06f9])[0-9\u0660-\u0669\u06f0-\u06f9]{2,}")
 
 
 def _tsv_words(png: str, lang: str, timeout: int) -> list[dict]:
@@ -552,9 +564,143 @@ def rescue_latin(png: str, txt: str, lang: str, have: set[str]) -> str:
         return txt  # nothing that could be a misread Latin word: no second read
     primary = _tsv_words(png, lang, SECOND_READ_TIMEOUT)
     mixed = _tsv_words(png, f"{lang}+eng", SECOND_READ_TIMEOUT)
-    for old, new in latin_rescues(primary, mixed):
-        txt = txt.replace(old, new, 1)
+    pairs = latin_rescues(primary, mixed)
+    # What the mixed read left as digits, or read unsure: each other
+    # eastern-digit word is read alone as English, and kept only if it reads
+    # as an acronym. A text rescued n times above skips its first n words.
+    rescued = Counter(o for o, _ in pairs)
+    left = []
+    for p in primary:
+        t = p["text"]
+        if not RE_EASTERN_DIGITS.search(t) or any(ch.isalpha() for ch in t):
+            continue
+        if rescued[t] > 0:
+            rescued[t] -= 1
+            continue
+        left.append(p)
+    pairs += [(p["text"], w) for p in left[:MAX_WORD_READS] if (w := _read_word_as_acronym(png, p["box"]))]
+    # A lone digit is never taken for an acronym: replace_word changes the
+    # first "۷" on the page, and 10665-94830-per page 35 lost "Recommendation
+    # 7" ("توصیه ۷") to "توصیه HPV" that way.
+    pairs = [(old, new) for old, new in pairs if len(RE_DIGIT.findall(old)) >= 2]
+    for old, new in pairs:
+        txt = replace_word(txt, old, new)
     return txt
+
+
+RE_DIGIT = re.compile(r"[0-9\u0660-\u0669\u06f0-\u06f9]")
+RE_NUMBER_WORD = re.compile(r"^[\W\d_\u0660-\u0669\u06f0-\u06f9]+$")
+
+
+def layer_digits(chars: list[tuple[float, float, float, float, str]], box: tuple, scale: float) -> str:
+    """The digits the text layer prints inside `box`, left to right. Pure.
+
+    `chars` are the page's text-layer characters as (x0, y0, x1, y1, char) in
+    PDF points; `box` is an OCR word's (left, top, width, height) in pixels
+    rendered at `scale` pixels per point. A character counts when its centre
+    falls in the box.
+    """
+    x, y, w, h = box
+    inside = [c for c in chars if RE_DIGIT.match(c[4])
+              and x <= (c[0] + c[2]) / 2 * scale <= x + w and y <= (c[1] + c[3]) / 2 * scale <= y + h]
+    return "".join(c[4] for c in sorted(inside, key=lambda c: c[0]))
+
+
+def rescue_digits(pdf: str, page: int, png: str, txt: str, lang: str, dpi: int) -> str:
+    """`txt` with each number word replaced by the digits the PDF's text layer prints there.
+
+    10665-192500 (WHA42/10, Arabic, 1989) sets each letter apart in its text
+    layer, so the page is OCR'd; but Tesseract reads its typewriter digits
+    badly ("8٠١" for 80, "٠٠*؟" for 2000). The text layer has the digits right,
+    in visual order ("٠٩٩١" read right to left is 1990), so a number word of the
+    OCR takes the layer's digits in its box, sorted left to right. Only words of
+    digits and punctuation are touched, and only where the layer has digits.
+    """
+    if not RE_DIGIT.search(txt):
+        return txt
+    try:
+        import pymupdf
+        doc = pymupdf.open(pdf)
+        raw = doc[page - 1].get_text("rawdict")
+    except Exception:
+        return txt
+    chars = [(*c["bbox"], c["c"]) for b in raw.get("blocks", []) for l in b.get("lines", [])
+             for sp in l.get("spans", []) for c in sp.get("chars", [])]
+    if not any(RE_DIGIT.match(c[4]) for c in chars):
+        return txt
+    scale = dpi / 72.0
+    for wd in _tsv_words(png, lang, SECOND_READ_TIMEOUT):
+        t = wd["text"]
+        if not RE_DIGIT.search(t) or not RE_NUMBER_WORD.match(t):
+            continue
+        lead = re.match(r"^\D*", t).group(0)
+        tail = re.search(r"\D*$", t).group(0)
+        core = t[len(lead):len(t) - len(tail)]
+        if len(core) < 2 or not core.isdigit():
+            # "1-3", "1/5": a separator the layer's digits would lose. One
+            # digit is a paragraph or list number ("١-"), and its box often
+            # takes in the layer's neighbouring digits.
+            continue
+        digits = layer_digits(chars, wd["box"], scale)
+        # Fewer digits than the OCR read means the box caught only part of
+        # the number: leave it rather than make it shorter.
+        if digits and digits != core and len(digits) >= len(core):
+            txt = replace_word(txt, t, f"{lead}{digits}{tail}")
+    return txt
+
+
+def replace_word(txt: str, old: str, new: str) -> str:
+    """`txt` with the first WHOLE occurrence of `old` replaced: "۷۱۸" is not the
+    start of "۷۱۸۵". Pure."""
+    edge = r"[\u0660-\u0669\u06f0-\u06f9\w]"
+    return re.sub(f"(?<!{edge}){re.escape(old)}(?!{edge})", lambda _m: new, txt, count=1)
+
+
+def _read_word_as_acronym(png: str, box: tuple) -> str | None:
+    """The word in `box` read alone as English, if it is a sure acronym. None otherwise.
+
+    10665-94830-per page 35: the page-wide `fas+eng` read still gave "۲۱۳۷" (57)
+    for one HPV and "VIA" at 55-67 for others. Read alone, cropped, the word has
+    no Persian context to pull it to digits. Only a capitalised acronym
+    (RE_ACRONYM) read at ACRONYM_CONFIDENCE or above is taken, so a number
+    written in Persian digits is never turned into Latin junk.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    x, y, w, h = box
+    pad = max(4, h // 3)
+    with tempfile.TemporaryDirectory() as tmp:
+        crop = os.path.join(tmp, "w.png")
+        with Image.open(png) as im:
+            im.crop((max(0, x - pad), max(0, y - pad), x + w + pad, y + h + pad)).save(crop)
+        words = _tsv_words_psm(crop, "eng", "8")
+    if len(words) != 1:
+        return None
+    t = words[0]["text"].strip("\u200e\u200f()[]{}.,;:")
+    return t if words[0]["conf"] >= ACRONYM_CONFIDENCE and RE_ACRONYM.match(t) else None
+
+
+def _tsv_words_psm(png: str, lang: str, psm: str) -> list[dict]:
+    """`_tsv_words` with a page segmentation mode (8: one word)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        base = os.path.join(tmp, "o")
+        try:
+            subprocess.run(["tesseract", png, base, "-l", lang, "--psm", psm, "tsv"], capture_output=True,
+                           text=True, env=_tesseract_env(), timeout=60)
+            rows = open(base + ".tsv", encoding="utf-8").read().splitlines()[1:]
+        except (subprocess.TimeoutExpired, OSError):
+            return []
+    out = []
+    for row in rows:
+        c = row.split("\t")
+        if len(c) >= 12 and c[11].strip():
+            try:
+                out.append({"text": c[11].strip(), "conf": float(c[10])})
+            except ValueError:
+                pass
+    return out
 
 
 def read_page(png: str, lang: str, have: set[str]) -> tuple[str, str]:
@@ -574,14 +720,40 @@ def read_page(png: str, lang: str, have: set[str]) -> tuple[str, str]:
     txt, conf = _ocr_with_confidence(png, lang)
     if conf >= LOW_CONFIDENCE or conf < 0:
         return txt, lang  # sure enough, or the page outran the time limit: no retry
+    # Each read must gain MIN_GAIN on the best so far, the first read included,
+    # so an earlier script in SECOND_SCRIPTS wins a near tie. 10665-192500
+    # page 1, an Arabic page under an English/French letterhead: `ara+eng`
+    # read 53.8, `ara+rus` 54.4, and the near-even Cyrillic read turned
+    # "WORLD HEALTH ORGANIZATION" into "WORLD НЕАТТН ORGANIZATION".
     best = (txt, conf, lang)
     for cand in second_script_candidates(lang, have):
         t, c = _ocr_with_confidence(png, cand, timeout=SECOND_READ_TIMEOUT)
-        if c > best[1]:
+        if c - best[1] >= MIN_GAIN and script_words_sure(
+                _tsv_words(png, cand, SECOND_READ_TIMEOUT), cand.split("+")[-1]):
             best = (t, c, cand)
-    if best[1] - conf >= MIN_GAIN:
-        return best[0], best[2]
-    return txt, lang
+    return best[0], best[2]
+
+
+# The words a second script adds must themselves be read this surely (mean
+# word confidence) for its read to be kept. Measured 2026-11-11 on
+# 10665-192500 page 1 at 200 dpi: `ara+rus` read 66.3 overall against 58.7
+# for `ara+eng`, but its Cyrillic words, the English/French letterhead read
+# as "WORLD НЕАТТН ORGANIZATION", averaged 35.6. Real Russian reads at 80+.
+SCRIPT_WORD_CONFIDENCE = 60.0
+SCRIPT_CHARS = {
+    "Latin": r"[A-Za-z]", "Cyrillic": r"[\u0400-\u04ff]",
+    "Arabic": r"[\u0600-\u06ff\u0750-\u077f]", "Han": r"[\u4e00-\u9fff]",
+}
+
+
+def script_words_sure(words: list[dict], pack: str) -> bool:
+    """True when the words in `pack`'s script are read at SCRIPT_WORD_CONFIDENCE
+    on average, or there are none to judge. Pure."""
+    rx = SCRIPT_CHARS.get(TESS_SCRIPT.get(pack, ""))
+    if not rx:
+        return True
+    confs = [w["conf"] for w in words if re.search(rx, w["text"])]
+    return not confs or sum(confs) / len(confs) >= SCRIPT_WORD_CONFIDENCE
 
 
 def read_page_with_latin(png: str, lang: str, have: set[str]) -> tuple[str, str]:

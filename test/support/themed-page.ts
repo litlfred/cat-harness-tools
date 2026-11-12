@@ -118,9 +118,12 @@ export const THEME_LINK: Record<Scheme, string> = { dark: "#2c84fa", light: "#72
 /** The stand-in document around a themed page, with the THEME's real link colour. */
 export function themedShell(page: string, scheme: Scheme = "dark", title = "Themed page"): string {
   const t = THEME[scheme];
+  // The `alternate` link `head_custom.html` writes from `alternate_jsonld`: a
+  // thin page (a todo) finds its data through it, as on the site.
+  const alt = parseThemed(page)?.frontMatter.alternate_jsonld;
   return `<!doctype html><html lang="en" data-fa-scheme="${scheme}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>
-<style>html,body{background:${t.ground};color:${t.ink}}a{color:${THEME_LINK[scheme]}}body{margin:0;font:16px/1.5 system-ui,sans-serif}
+${alt ? `<link rel="alternate" type="application/ld+json" href="${esc(alt)}">\n` : ""}<style>html,body{background:${t.ground};color:${t.ink}}a{color:${THEME_LINK[scheme]}}body{margin:0;font:16px/1.5 system-ui,sans-serif}
 .main-content{max-width:50rem;margin:0 auto;padding:1rem}</style></head><body>
 <main class="main-content" id="main-content">
 ${themedBody(page)}

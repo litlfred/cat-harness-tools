@@ -195,6 +195,64 @@ def main() -> int:
     got, redone = s.print_order_pages([early], ov, lambda i: late)
     check("a page already in print order is left alone", got == [early] and redone == [])
 
+    class Rect: x0, width = 0.0, 595.0
+    class Page:
+        rect = Rect()
+        def __init__(self, blocks): self.blocks = blocks
+        def get_text(self, kind): return self.blocks
+    p72 = Page([(45, 56, 287, 155, "left column\n", 0, 0), (304, 56, 551, 155, "right column\n", 1, 0),
+                (45, 188, 268, 214, "4.5 Contrôle des progrès\n", 2, 0)])
+    check("10665/353150 p72: a heading under both columns stays after them",
+          s.print_order_text(p72).split("\n")[:3] == ["left column", "right column", "4.5 Contrôle des progrès"])
+    p11 = Page([(305, 127, 440, 146, "Replenishing the CFE\n", 0, 0), (43, 128, 250, 141, "Table 1\n", 1, 0),
+                (47, 146, 286, 159, "Event\n", 2, 0), (305, 154, 554, 232, "The CFE was conceived\n", 3, 0)])
+    check("10665/342236 p11: a table row touching the band above stays in its column",
+          s.print_order_text(p11).split("\n")[:4] == ["Table 1", "Event", "Replenishing the CFE", "The CFE was conceived"])
+    p17 = Page([(305, 105, 558, 777, "15. Mazanderani\n", 0, 0), (40, 34, 251, 102, "RÉFÉRENCES\n", 1, 0),
+                (40, 106, 291, 780, "1. UNAIDS\n", 2, 0)])
+    check("10665/329296 p17: two columns under a heading read left column first",
+          s.print_order_text(p17).split("\n")[:3] == ["RÉFÉRENCES", "1. UNAIDS", "15. Mazanderani"])
+    refs = [E(1, "RÉFÉRENCES BIBLIOGRAPHIQUES", 1, "inferred")]
+    stored = "15. Mazanderani AH.\n" * 12 + "RÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13
+    printed = "17\nRÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13 + "15. Mazanderani AH.\n" * 12
+    got, redone = s.print_order_inferred([stored], refs, None, lambda i: printed)
+    check("10665/329296: a heading under half way down an inferred page still triggers the print-order read",
+          redone == [1] and got[0].lstrip("17\n").startswith("RÉFÉRENCES"))
+    mid = "body line\n" * 12 + "RÉFÉRENCES BIBLIOGRAPHIQUES\n" + "1. UNAIDS.\n" * 13
+    got, redone = s.print_order_inferred([mid], refs, None, lambda i: mid)
+    check("a heading truly in mid page is left where it is", got == [mid] and redone == [])
+
+    # 10665/94830 p28: four GRADE marks drawn as 7pt circles between two words.
+    marks = [(448.1, 260.3, 455.3, 267.6), (457.4, 260.3, 464.6, 267.6),
+             (466.5, 260.3, 473.7, 267.6), (475.9, 260.3, 483.1, 267.6)]
+    check("10665/94830: four same-size marks in a row are one GRADE run",
+          s.grade_runs(marks + [(10, 10, 300, 20), (500, 260.3, 507.2, 267.6)]) == [[0, 1, 2, 3]])
+    check("a lone mark or a mark of another size is no run",
+          s.grade_runs([(0, 0, 7, 7), (20, 0, 40, 20), (41, 0, 61, 20)]) == [])
+    w = lambda x0, x1, y, t: (x0, y - 6, x1, y + 6, t)
+    line = [w(321.7, 356.4, 264, "(strong"), w(359.2, 445.3, 264, "recommendation,"), w(485.9, 532.5, 264, "evidence)")]
+    check("a run sits before the word just right of it", s.grade_run_slot(line, 448.1, 483.1, 264) == 2)
+    # 10665/94830 p30: a run ending the left column, the right column on the same line.
+    cols = [w(163.1, 249.3, 558, "recommendation,"), w(85, 131.6, 572, "evidence)"), w(322, 333, 558, "be")]
+    check("10665/94830 p30: a run ending its column comes before the next word in content order, not the other column's",
+          s.grade_run_slot(cols, 252.0, 285.0, 558) == 1)
+    def drawn(plus: bool, ring: bool = True, filled: bool = False):
+        red, bg = (230, 96, 84), (255, 255, 255)
+        def at(fx, fy):
+            r = ((fx - 0.5) ** 2 + (fy - 0.5) ** 2) ** 0.5
+            bar = abs(fy - 0.5) < 0.08 and r < 0.4 or plus and abs(fx - 0.5) < 0.08 and r < 0.4
+            return red if (ring and 0.4 <= r <= 0.5) or bar or (filled and r <= 0.5) else bg
+        return at
+    check("a ringed plus reads ⊕ and a ringed minus ⊖",
+          s.grade_mark_shape(drawn(True)) == "⊕" and s.grade_mark_shape(drawn(False)) == "⊖")
+    check("10665/353150, 311941: a filled disc or a bar with no ring is no GRADE mark",
+          s.grade_mark_shape(drawn(False, filled=True)) is None and s.grade_mark_shape(drawn(True, ring=False)) is None)
+    check("marks go between their two words",
+          s._put_between("(strong recommendation,\n evidence)", "recommendation,", "evidence)", "⊕⊖⊖⊖", 0)[0]
+          == "(strong recommendation, ⊕⊖⊖⊖ evidence)")
+    check("marks with no matching words are not written",
+          s._put_between("other text", "recommendation,", "evidence)", "⊕", 0) is None)
+
     o = load("pdf-ocr.py")
     have = {"ara", "eng", "fra", "rus", "chi_sim", "fas"}
     check("an Arabic page may add Latin, Cyrillic, Han", o.second_script_candidates("ara", have) == ["ara+eng", "ara+rus", "ara+chi_sim"])
@@ -209,6 +267,27 @@ def main() -> int:
           o.latin_rescues(primary, mixed) == [("۳۱۱۷", "HIV")])
     check("a word of the page's own script is never replaced",
           o.latin_rescues([w("یا", 90, 10)], [w("La", 90, 10)]) == [])
+    check("a rescue replaces a whole word, not the start of a longer number",
+          o.replace_word("بخش ۷۱۸۵ و ۷۱۸ پایان", "۷۱۸", "VIA") == "بخش ۷۱۸۵ و VIA پایان")
+    check("a word read alone is kept only as a capitalised acronym",
+          all(o.RE_ACRONYM.match(w) for w in ("HPV", "VIA", "LEEP", "CIN2+"))
+          and not any(o.RE_ACRONYM.match(w) for w in ("Veee", "(YY", "VV/\\eeee", "pole")))
+    chars = [(30, 0, 34, 10, "\u0660"), (20, 0, 24, 10, "\u0669"), (10, 0, 14, 10, "\u0669"),
+             (0, 0, 4, 10, "\u0661"), (40, 0, 44, 10, "\u0639"), (60, 0, 64, 10, "\u0662")]
+    check("the layer's digits inside a box come left to right, letters and outside digits dropped",
+          o.layer_digits(chars, (0, 0, 100, 25), 2.0) == "\u0661\u0669\u0669\u0660")
+    check("Russian read surely passes the script-word check",
+          o.script_words_sure([{"text": "здоровья", "conf": 91.0}, {"text": "HIV", "conf": 20.0}], "rus"))
+    check("a pack with no letters to judge passes", o.script_words_sure([{"text": "1990", "conf": 10.0}], "rus"))
+    check("10665/94830-per p16: a run mixing Western digits in is a candidate too",
+          all(o.RE_EASTERN_DIGITS.search(w) for w in ("۷1۸", "11۳۷")) and not o.RE_EASTERN_DIGITS.search("2020"))
+    real_tsv, real_one = o._tsv_words, o._read_word_as_acronym
+    o._tsv_words = lambda png, lang, timeout: [w("۷", 60, 10), w("۲۱۳۷", 60, 60)] if lang == "fas" \
+        else [w("HPV", 95, 10), w("HPV", 95, 60)]
+    o._read_word_as_acronym = lambda png, box: None
+    check("10665/94830-per p35: a lone digit is never replaced by an acronym",
+          o.rescue_latin("p.png", "توصیه ۷ و ۲۱۳۷", "fas", {"fas", "eng"}) == "توصیه ۷ و HPV")
+    o._tsv_words, o._read_word_as_acronym = real_tsv, real_one
     check("only a read with eastern digits gets the second read", o.RE_EASTERN_DIGITS.search("زنان ۲۱۷ منفی")
           and not o.RE_EASTERN_DIGITS.search("زنان منفی ۴"))
 
@@ -217,6 +296,18 @@ def main() -> int:
     o._ocr_with_confidence = lambda png, lang, timeout=0: (calls.append(lang), ("", -1.0))[1]
     check("a page that outran the time limit is not read again in other scripts",
           o.read_page("p.png", "fra", have) == ("", "fra") and calls == ["fra"])
+    reads = {"ara": 40.0, "ara+eng": 53.8, "ara+rus": 54.4}
+    o._ocr_with_confidence = lambda png, lang, timeout=0: (lang, reads[lang])
+    real_tsv = o._tsv_words
+    o._tsv_words = lambda png, lang, timeout: []
+    check("a later script must beat the best read so far by the full margin, not tie it",
+          o.read_page("p.png", "ara", {"ara", "eng", "rus"}) == ("ara+eng", "ara+eng"))
+    reads = {"ara": 55.7, "ara+eng": 58.7, "ara+rus": 66.3}
+    junk = [{"text": t, "conf": c} for t, c in (("НЕАТТН", 87.5), ("МОМРАТЕ", 31.5), ("с", 0.0), ("РАЯ", 27.4))]
+    o._tsv_words = lambda png, lang, timeout: junk if lang.endswith("rus") else []
+    check("10665/192500 p1: a second script whose own words are unsure is not kept",
+          o.read_page("p.png", "ara", {"ara", "eng", "rus"}) == ("ara", "ara"))
+    o._tsv_words = real_tsv
     o._ocr_with_confidence = real
     check("Tesseract runs single-threaded unless told otherwise",
           o._tesseract_env().get("OMP_THREAD_LIMIT") == os.environ.get("OMP_THREAD_LIMIT", "1"))

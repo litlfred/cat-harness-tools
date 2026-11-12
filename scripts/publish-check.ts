@@ -314,7 +314,7 @@ if (import.meta.main) {
   };
   const PREREQ_WRITERS: Readonly<Record<string, readonly string[]>> = {
     "navbar:include": ["docs:harness"],
-    "slice:sqlite": ["docs:pages", "library:viz"],
+    "slice:sqlite": ["docs:pages", "library:viz", "subgraph:jsonld"],
     "uml:overview": ["glossary:page"],
   };
   const prereqs = new Set<string>([
