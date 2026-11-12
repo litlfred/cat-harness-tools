@@ -49,11 +49,16 @@ function upstream(up: string): void {
   });
 }
 
-/** A downstream scope that mounts `up` whole; `except` is what the mount left out (none: it took everything). */
+/**
+ * A downstream scope that mounts `up` whole; `except` is what the mount left
+ * out (none: it took everything). The downstream switches on exactly the
+ * groups its mount took, as a real mount's `except` follows its list.
+ */
 function mounted(except: string[] | undefined): string {
   const scope = mkdtempSync(join(tmpdir(), "optin-left-out-"));
   made.push(scope);
-  writeDeclaration(scope, { name: "down", directories: [] });
+  const on = ["grp", "kept"].filter((g) => !(except ?? []).includes(g)).map((g) => `up.${g}`);
+  writeDeclaration(scope, { name: "down", enableSubgraphs: on, directories: [] });
   const up = join(scope, "up");
   upstream(up);
   writeFileSync(
