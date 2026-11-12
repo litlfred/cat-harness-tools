@@ -236,6 +236,15 @@ def main() -> int:
           o.latin_rescues(primary, mixed) == [("۳۱۱۷", "HIV")])
     check("a word of the page's own script is never replaced",
           o.latin_rescues([w("یا", 90, 10)], [w("La", 90, 10)]) == [])
+    check("a rescue replaces a whole word, not the start of a longer number",
+          o.replace_word("بخش ۷۱۸۵ و ۷۱۸ پایان", "۷۱۸", "VIA") == "بخش ۷۱۸۵ و VIA پایان")
+    check("a word read alone is kept only as a capitalised acronym",
+          all(o.RE_ACRONYM.match(w) for w in ("HPV", "VIA", "LEEP", "CIN2+"))
+          and not any(o.RE_ACRONYM.match(w) for w in ("Veee", "(YY", "VV/\\eeee", "pole")))
+    chars = [(30, 0, 34, 10, "\u0660"), (20, 0, 24, 10, "\u0669"), (10, 0, 14, 10, "\u0669"),
+             (0, 0, 4, 10, "\u0661"), (40, 0, 44, 10, "\u0639"), (60, 0, 64, 10, "\u0662")]
+    check("the layer's digits inside a box come left to right, letters and outside digits dropped",
+          o.layer_digits(chars, (0, 0, 100, 25), 2.0) == "\u0661\u0669\u0669\u0660")
     check("only a read with eastern digits gets the second read", o.RE_EASTERN_DIGITS.search("زنان ۲۱۷ منفی")
           and not o.RE_EASTERN_DIGITS.search("زنان منفی ۴"))
 
@@ -244,6 +253,10 @@ def main() -> int:
     o._ocr_with_confidence = lambda png, lang, timeout=0: (calls.append(lang), ("", -1.0))[1]
     check("a page that outran the time limit is not read again in other scripts",
           o.read_page("p.png", "fra", have) == ("", "fra") and calls == ["fra"])
+    reads = {"ara": 40.0, "ara+eng": 53.8, "ara+rus": 54.4}
+    o._ocr_with_confidence = lambda png, lang, timeout=0: (lang, reads[lang])
+    check("a later script must beat the best read so far by the full margin, not tie it",
+          o.read_page("p.png", "ara", {"ara", "eng", "rus"}) == ("ara+eng", "ara+eng"))
     o._ocr_with_confidence = real
     check("Tesseract runs single-threaded unless told otherwise",
           o._tesseract_env().get("OMP_THREAD_LIMIT") == os.environ.get("OMP_THREAD_LIMIT", "1"))
