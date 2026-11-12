@@ -27,7 +27,6 @@
  * | `<instance>/workshops/<workshop id>/overview/`, `…/walkthrough/<step>/` | the workshop told in a room, with no site chrome (`present.ts`) |
  * | `assets/journeys.css`, `assets/journeys.js` | the style and the script |
  * | `assets/present.css`, `assets/present.js` | the presentation pages' style and script |
- * | `assets/fonts/` | Plus Jakarta Sans (WOFF2, five weights) and its OFL, from the vendored bundle |
  */
 import { readFileSync } from "node:fs";
 import { extname, join, posix } from "node:path";
@@ -62,9 +61,6 @@ import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaA
 export const TOOL_ID = "journeys-viewer";
 const ASSET_DIR = join(import.meta.dir, "assets");
 export const ASSETS = ["journeys.css", "journeys.js", ...PRESENT_ASSETS] as const;
-/** The presentation pages' typeface: a vendored bundle, copied as bytes to `assets/fonts/` with its licence. */
-export const FONT_BUNDLE = "vendor/plus-jakarta-sans/2.7.1";
-export const FONT_FILES = ["PlusJakartaSans-Regular.woff2", "PlusJakartaSans-Medium.woff2", "PlusJakartaSans-SemiBold.woff2", "PlusJakartaSans-Bold.woff2", "PlusJakartaSans-ExtraBold.woff2", "OFL.txt"] as const;
 
 export interface PageFile {
   path: string;
@@ -1082,6 +1078,5 @@ export function renderJourneyPages(corpus: JourneyCorpus, links: SiteLinks, decl
   // The common task panel's client and styles, the text the processes viewer writes beside its sidecars.
   out.push({ path: posix.join("assets", PANEL_CLIENT.script), content: `${PANEL_SCRIPT}\n` });
   out.push({ path: posix.join("assets", PANEL_CLIENT.style), content: `${PANEL_CSS}\n` });
-  for (const f of FONT_FILES) out.push({ path: posix.join("assets", "fonts", f), content: new Uint8Array(readFileSync(join(ASSET_DIR, FONT_BUNDLE, f))) });
   return out;
 }

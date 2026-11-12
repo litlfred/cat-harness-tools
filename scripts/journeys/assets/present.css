@@ -2,14 +2,10 @@
    scripts/journeys/present.ts): a workshop's overview and walkthrough, in
    the VaxLink walkthrough's own frame and palette. Plain CSS reproducing the
    Tailwind utilities VaxLink uses (its tailwind.config.js tokens: clinical,
-   dpi, verified, unverified, tampered); no framework, no CDN. Plus Jakarta
-   Sans is self-hosted (fonts/, copied from vendor/plus-jakarta-sans/2.7.1/,
-   SIL OFL 1.1, the licence beside it); JetBrains Mono is used where installed. */
-@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/PlusJakartaSans-Regular.woff2") format("woff2"); }
-@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/PlusJakartaSans-Medium.woff2") format("woff2"); }
-@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url("fonts/PlusJakartaSans-SemiBold.woff2") format("woff2"); }
-@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/PlusJakartaSans-Bold.woff2") format("woff2"); }
-@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 800; font-display: swap; src: url("fonts/PlusJakartaSans-ExtraBold.woff2") format("woff2"); }
+   dpi, verified, unverified, tampered); no framework, no CDN. The type is the
+   operating system's own (owner, 2026-11-12: "slides use system fonts too"):
+   the same sans and mono stacks as the docs sites' --fa-font-* tokens, and no
+   font is shipped. */
 :root {
   --alabaster: #f8fafc;
   --surface: #ffffff;
@@ -24,8 +20,8 @@
   --s500: #64748b; --s600: #475569; --s700: #334155; --s800: #1e293b; --s900: #0f172a;
   --sky50: #f0f9ff; --sky100: #e0f2fe; --sky200: #bae6fd; --sky300: #7dd3fc; --sky400: #38bdf8;
   --sky500: #0ea5e9; --sky600: #0284c7; --sky700: #0369a1; --sky800: #075985; --sky900: #0c4a6e; --sky950: #082f49;
-  --sans: "Plus Jakarta Sans", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   color-scheme: light;
 }
