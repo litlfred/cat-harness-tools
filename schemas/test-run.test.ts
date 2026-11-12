@@ -96,7 +96,7 @@ describe("criterion 1 — both hashes, neither derivable from the other", () => 
       subject: "crdm-detect phrase signals against the issue corpus",
       dataInputs: ["cat-harness-tools/scripts/eval/crdm-detect-corpus.json"],
       // declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
-      processInputs: ["cat-harness-tools/scripts/eval-crdm-detect.ts", `cat-harness/${harnessRel("sdlc/skills/crdm/crdm-detect.md")}`],
+      processInputs: ["cat-harness-tools/scripts/eval-crdm-detect.ts", `cat-harness/${harnessRel("skills/process/crdm/crdm-detect.md")}`],
       outcome: {},
     });
     expect(run.data.hash).not.toBe(UNKNOWN_HASH);

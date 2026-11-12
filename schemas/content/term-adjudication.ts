@@ -15,8 +15,8 @@
  * Only **the extractor vs. the terminology**: the corpus uses a word the
  * authorised vocabulary spells differently or does not carry. Two judges
  * disagreeing about a mapping is
- * [`adjudication`](../sdlc/skills/sdlc-core/adjudication.md) plus
- * [`untainted-verification`](../sdlc/skills/sdlc-core/untainted-verification.md),
+ * [`adjudication`](../skills/process/process-core/adjudication.md) plus
+ * [`untainted-verification`](../skills/process/process-core/untainted-verification.md),
  * not built yet; rejecting an automated match belongs there.
  *
  * ## The subject: a DETERMINED disagreement, as the check reported it

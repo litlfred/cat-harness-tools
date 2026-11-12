@@ -545,7 +545,7 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // instead. The old keys would not have failed loudly — they would simply
   // never match, and the generator throws naming the id it wanted, which is
   // how this was caught rather than shipped as two uncategorised packages.
-  crdm: "CRDM requirements methodology (sdlc/skills/crdm)",
+  crdm: "CRDM requirements methodology (skills/process/crdm)",
   raci: "RACI involvement model (skills/process/raci)",
   "spec-kit": "Spec Kit spec-driven development (sdlc/skills/spec-kit)",
   // Synced from claude-scientific-skills at a pinned commit (issue #556):

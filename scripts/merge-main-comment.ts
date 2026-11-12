@@ -37,7 +37,7 @@
  * place, carrying the signature), its line in the job summary, a warning
  * annotation, and its own red member job. It loses only the repeat emails.
  *
- * Governed by {@link sdlc/skills/sdlc-core/ci-health.md} §"The second instance:
+ * Governed by {@link skills/process/process-core/ci-health.md} §"The second instance:
  * merge-main's in-place comment".
  *
  * Usage (from the workflow; inputs in the environment, as the step sets them):
