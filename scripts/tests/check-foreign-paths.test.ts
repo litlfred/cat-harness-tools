@@ -4,7 +4,11 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { foreignTargets, judge, notThisCheckouts, scanText, type InstanceDirs } from "../check-foreign-paths.ts";
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
+
+import { foreignTargets, judge, notThisCheckouts, overLines, scanText, type InstanceDirs } from "../check-foreign-paths.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
 const ROOT: InstanceDirs = { name: "root", root: "", dirs: ["beans", "fsh-guts", "themes", "uploads"] };
 const HARNESS: InstanceDirs = { name: "harness", root: "harness", dirs: ["harness/themes", "harness/skills"] };
@@ -106,5 +110,43 @@ describe("notThisCheckouts — mounted code spelling the root's own directories"
 
   test("nothing is excused when the file's layer is not mounted by the lock", () => {
     expect(notThisCheckouts(scan, [root, fhir], []).excused).toHaveLength(0);
+  });
+});
+
+describe("a block that MOVES between files is the same finding (dth-sc#24)", () => {
+  // CI judges a gate red on main by the `✗` keys `gate_diagnostics.py` reads
+  // from its output; run that parser itself, so the test is about CI's reading.
+  const keys = (out: string[]): string[] => {
+    const py = join(TOOLS_ROOT, ".github", "scripts", "layer-pr-checks");
+    const r = spawnSync(
+      "python3",
+      ["-I", "-c", `import sys; sys.path.insert(0, ${JSON.stringify(py)}); from gate_diagnostics import diagnostics; print("\\n".join(diagnostics(sys.stdin.read())))`],
+      { input: out.join("\n") + "\n", encoding: "utf-8" },
+    );
+    expect(r.status).toBe(0);
+    return r.stdout.split("\n").filter((l) => l.length > 0).sort();
+  };
+  const at = (file: string, n: number) =>
+    scanText('const A = "fsh-guts/page-008.md";\nconst B = "uploads/x";\n'.repeat(n), file, "harness", targets);
+  const report = (file: string, n = 1) => {
+    const s = at(file, n);
+    return overLines(judge(Object.fromEntries([[file, s.counted.length]]), {}), s);
+  };
+
+  test("moved unchanged: the keys CI compares are identical", () => {
+    const before = keys(report("harness/front-matter/p-front-page-008.ts"));
+    const after = keys(report("harness/glossary/p-front-page-008.ts"));
+    expect(before).toHaveLength(2);
+    expect(after).toEqual(before);
+  });
+
+  test("a site really ADDED is still one more of its key", () => {
+    const before = keys(report("harness/front-matter/p.ts"));
+    const after = keys(report("harness/glossary/p.ts", 2));
+    expect(after).toHaveLength(before.length * 2);
+  });
+
+  test("where it sits is still printed, under the finding", () => {
+    expect(report("harness/glossary/p.ts").join("\n")).toContain("at harness/glossary/p.ts:1");
   });
 });

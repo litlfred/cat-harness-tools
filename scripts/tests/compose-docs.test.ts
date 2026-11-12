@@ -251,7 +251,10 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     const added = [...after.keys()].filter((p) => !before.has(p) && !stubs.has(p));
     expect(added.length > 0).toBe(report.composed.length > 0);
     rmSync(join(dest, ".."), { recursive: true, force: true });
-  });
+    // Composes the whole real tree twice and reads every byte: over bun's 5 s
+    // default on a busy runner (6.3 s on a content layer's main, 2026-11-12), so it
+    // carries the real-tree budget the cut's compose already has.
+  }, 30_000);
 
   test("the overlay's own dotfile does NOT become a published page", () => {
     // `docs/.gitkeep` carries the overlay's documentation. Jekyll ignores
@@ -529,9 +532,11 @@ describe("the cut, on the REAL tree", () => {
     tree("all");
     tree("cut");
   }, 120_000);
+  // Removing the two composed trees is real-tree work too: under the default
+  // 5 s it failed as "(unnamed)" at 7.2 s on a layer main (2026-11-11).
   afterAll(() => {
     for (const { dir } of trees.values()) rmSync(join(dir, ".."), { recursive: true, force: true });
-  });
+  }, 60_000);
 
   test("every composed instance gets exactly one decision", () => {
     // Reported rather than inferred: a tree quietly missing a layer's
