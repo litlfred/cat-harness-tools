@@ -36,7 +36,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { regenPass, writerFor, type Runner } from "../../scripts/regen-after-merge.ts";
+import { regenPass, writerFor, type Outcome, type Runner } from "../../scripts/regen-after-merge.ts";
 import { chromiumExecutable } from "../../scripts/bpmn-render.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
@@ -166,8 +166,25 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
       // red run above already redrew the artefact and regen finds it
       // current. Either way the effect asserted below is the same: the
       // staled bytes are gone and the check is green.
-      const repaired = checkRunsItsWriter(c.check) ? ["regenerated", "current"] : ["regenerated"];
-      expect(repaired).toContain(results[0]?.outcome);
+      const repaired: Outcome[] = checkRunsItsWriter(c.check) ? ["regenerated", "current"] : ["regenerated"];
+      // `unrepaired` means the check is still red after its writer ran. That
+      // is this case's failure only if the stale was the cause: a check
+      // already red on the clean tree (render:bpmn:check over every mounted
+      // layer's diagrams, red on a layer main for a diagram this test never
+      // touched, 2026-11-12) stays red whatever regen does, and the test then
+      // flipped with that main rather than with the diff under review. So on
+      // `unrepaired`, put the original back and ask again: still red means
+      // the red is not the stale's, and what this case can still judge is
+      // that the writer removed the staled bytes.
+      let outcome = results[0]?.outcome;
+      if (outcome === "unrepaired") {
+        const after = readFileSync(abs, "utf-8");
+        writeFileSync(abs, original);
+        const redWithoutStale = !(await runner(c.check));
+        writeFileSync(abs, after);
+        if (redWithoutStale) outcome = repaired[0];
+      }
+      expect(repaired).toContain(outcome);
       expect(results[0]).toMatchObject({ check: c.check, writer });
       expect(readFileSync(abs, "utf-8"), `${writer} left ${rel} staled`).not.toBe(staled);
     } finally {
@@ -195,6 +212,10 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
   test.skipIf(skip("render:bpmn:check"))(
     "render:bpmn:check: red on a staled artefact, green after regen runs its writer",
     run("render:bpmn:check"),
-    120_000,
+    // Each render:bpmn:check draws every mounted layer's diagrams (47 s as a
+    // gate on a CI runner, 2026-11-12), and this case runs it up to four
+    // times: the red control, regen's check, regen's re-check, and the clean
+    // re-check on `unrepaired`. 120 s timed out mid-regen.
+    300_000,
   );
 });
