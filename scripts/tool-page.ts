@@ -39,6 +39,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, posix, relative, resolve, sep } from "node:path";
+import { instanceDirectoriesForGraph } from "../schemas/kg/cat-harness.ts";
 import { z } from "zod";
 import { parse as parseYaml } from "yaml";
 
@@ -458,8 +459,9 @@ export function skillDocuments(dirs: readonly string[], repo: string): Map<strin
 
 /** A skill's declared I/O contracts, in any layer: `<layer>/schemas/skills/<skill>/<io>.schema.json`. */
 export function skillIoContracts(skill: string, roots: readonly string[], repo: string): SkillInfo["io"] {
-  for (const r of roots) {
-    const dir = join(r, "schemas", "skills", skill);
+  // Each layer's declared `schemas` graphs, not a `schemas/` found by name.
+  // declared-path-literal: `skills/<skill>/` is the I/O-contract folder INSIDE a schemas graph, that graph's own convention — not the `skills` graph.
+  for (const dir of roots.flatMap((r) => instanceDirectoriesForGraph(r, "schemas")).map((d) => join(d, "skills", skill))) {
     if (!existsSync(dir)) continue;
     const out: SkillInfo["io"] = [];
     for (const f of readdirSync(dir).filter((x) => x.endsWith(".schema.json")).sort()) {

@@ -11,7 +11,6 @@
     "scripts/validate-skills.ts": 1
   },
   "resolves": [
-    "docs/source/guides-beans-and-todos/guides-beans-and-todos.json::sdlc/processes/bean-lifecycle.bpmn",
     "docs/source/process-crdm-methodology/process-crdm-methodology.json::processes/process/crdm-requirements.bpmn",
     "schemas/kg/detangle.ts::schemas/kg/detangle.ts",
     "schemas/kg/graph-typology-registry.ts::schemas/conduct/interaction.ts",
