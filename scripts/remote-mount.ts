@@ -2136,7 +2136,7 @@ export function currentPerLock(root: string): CheckResult | undefined {
  *
  * The lock check judges bytes against the lock, and the lock's `except` was
  * computed from the enabled set at mount time. So a downstream that switches
- * an opt-in sub-graph on (smart-base's `cat-harness.proposals`) still reads
+ * an opt-in sub-graph on (say `cat-harness.proposals`) still reads
  * as current, and without this the fast path never laid the newly enabled
  * group down (only `--fresh` did).
  *
