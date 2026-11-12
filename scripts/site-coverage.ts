@@ -38,6 +38,7 @@ import { processSubjects } from "./gen-processes-viz.ts";
 import { schemaSubjects } from "./gen-schema-viz.ts";
 import { readJourneyCorpus } from "./journeys/read.ts";
 import { declaredVisualisers, forwardingParts, pageParts, type DeclaredVisualiser } from "./viewer-declarations.ts";
+import { WEB_APP_FILE } from "../schemas/ui/web-app.ts";
 
 /** One page the declarations say the site must carry. */
 export interface ExpectedPage {
@@ -111,6 +112,8 @@ export const SUBJECT_READERS: Readonly<Record<string, SubjectReader>> = {
   // still owes a page; a folder of DMN tables or global tasks owes none.
   "processes-viewer": (root) => [...processSubjects(root).keys()],
   "ig-pages": igIndexSubjects,
+  // An app manifest, not a sub-folder: a web-app directory without one builds nothing.
+  "web-app-build": webAppSubjects,
   // A schema MODULE or source descriptor, not a sub-folder: a `schemas`
   // directory holding only JSON contracts in `skills/` owes no page.
   "schemas-viewer": (root) => schemaSubjects(root),
@@ -139,11 +142,26 @@ export function igIndexSubjects(_root: string, dirs: readonly { instance: string
 }
 
 /**
+ * The layers whose declared `web-app` directories hold an app manifest
+ * (`web-app.json`): what the `apps` visualiser (`web-app-build`,
+ * `gen-web-apps.ts`) builds. The `apps` visualiser is cat-harness's, so a
+ * site scoped to the layer that carries an app (a content layer's
+ * onboarding game, Q-GAME-5) owes `<locale>/cat-harness/apps/` only when the guard
+ * knows that layer is a subject; without this reader it never did, the
+ * writer never ran, and the game was never published.
+ */
+export function webAppSubjects(_root: string, dirs: readonly { instance: string; absPath: string }[]): string[] {
+  return [...new Set(dirs.filter((d) => existsSync(join(d.absPath, WEB_APP_FILE))).map((d) => d.instance))].sort();
+}
+
+/**
  * Writers whose page at the visualiser's own route is owed only when their
  * reader finds a subject: `ig-pages` draws its index page from the indexes it
  * reads, so with none there is nothing at `<harness>/artifact-index/` either.
+ * `web-app-build` likewise: its index lists the apps it built, and a scoped
+ * site owes it exactly when a layer in scope carries an app.
  */
-export const INDEX_PAGE_NEEDS_SUBJECTS: ReadonlySet<string> = new Set(["ig-pages"]);
+export const INDEX_PAGE_NEEDS_SUBJECTS: ReadonlySet<string> = new Set(["ig-pages", "web-app-build"]);
 
 /** The layers `v` owes a sub-graph page, by its writer's reader when it has one, else by the sub-directory test. */
 export function subjectInstances(

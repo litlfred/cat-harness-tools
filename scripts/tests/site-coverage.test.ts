@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { expectedPages, igIndexSubjects, INDEX_PAGE_NEEDS_SUBJECTS, legacyOnlyPages, instanceSubgraph, missingPages, SUBJECT_READERS, subjectInstances, type ExpectedPage } from "../site-coverage.ts";
+import { expectedPages, igIndexSubjects, INDEX_PAGE_NEEDS_SUBJECTS, legacyOnlyPages, instanceSubgraph, missingPages, SUBJECT_READERS, subjectInstances, webAppSubjects, type ExpectedPage } from "../site-coverage.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 
@@ -115,6 +115,27 @@ describe("ig-pages: an IG's artefact pages are owed only where its index is buil
     expect(igIndexSubjects(at, dirs)).toEqual(["smart-trust"]);
     expect(subjectInstances({ renderedBy: "ig-pages" }, at, dirs)).toEqual(["smart-trust"]);
     expect(igIndexSubjects(at, [dirs[0]!])).toEqual([]);
+    rmSync(at, { recursive: true, force: true });
+  });
+});
+
+describe("web-app-build: a layer that carries an app owes the apps page on its own scoped site (smart-trust onboarding game)", () => {
+  test("the guard reads the apps writer's subjects, and owes its index page only with one", () => {
+    expect(SUBJECT_READERS["web-app-build"]).toBe(webAppSubjects);
+    expect(INDEX_PAGE_NEEDS_SUBJECTS.has("web-app-build")).toBe(true);
+  });
+
+  test("only a directory holding web-app.json is a subject", () => {
+    const at = mkdtempSync(join(tmpdir(), "site-coverage-web-app-"));
+    const game = join(at, "smart-trust", "onboarding-game");
+    const empty = join(at, "other", "apps");
+    mkdirSync(join(game, "src"), { recursive: true });
+    mkdirSync(join(empty, "src"), { recursive: true });
+    writeFileSync(join(game, "web-app.json"), "{}");
+    const dirs = [{ instance: "other", absPath: empty }, { instance: "smart-trust", absPath: game }];
+    expect(webAppSubjects(at, dirs)).toEqual(["smart-trust"]);
+    expect(subjectInstances({ renderedBy: "web-app-build" }, at, dirs)).toEqual(["smart-trust"]);
+    expect(webAppSubjects(at, [dirs[0]!])).toEqual([]);
     rmSync(at, { recursive: true, force: true });
   });
 });
