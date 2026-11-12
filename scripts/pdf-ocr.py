@@ -720,9 +720,32 @@ def read_page(png: str, lang: str, have: set[str]) -> tuple[str, str]:
     best = (txt, conf, lang)
     for cand in second_script_candidates(lang, have):
         t, c = _ocr_with_confidence(png, cand, timeout=SECOND_READ_TIMEOUT)
-        if c - best[1] >= MIN_GAIN:
+        if c - best[1] >= MIN_GAIN and script_words_sure(
+                _tsv_words(png, cand, SECOND_READ_TIMEOUT), cand.split("+")[-1]):
             best = (t, c, cand)
     return best[0], best[2]
+
+
+# The words a second script adds must themselves be read this surely (mean
+# word confidence) for its read to be kept. Measured 2026-11-11 on
+# 10665-192500 page 1 at 200 dpi: `ara+rus` read 66.3 overall against 58.7
+# for `ara+eng`, but its Cyrillic words, the English/French letterhead read
+# as "WORLD НЕАТТН ORGANIZATION", averaged 35.6. Real Russian reads at 80+.
+SCRIPT_WORD_CONFIDENCE = 60.0
+SCRIPT_CHARS = {
+    "Latin": r"[A-Za-z]", "Cyrillic": r"[\u0400-\u04ff]",
+    "Arabic": r"[\u0600-\u06ff\u0750-\u077f]", "Han": r"[\u4e00-\u9fff]",
+}
+
+
+def script_words_sure(words: list[dict], pack: str) -> bool:
+    """True when the words in `pack`'s script are read at SCRIPT_WORD_CONFIDENCE
+    on average, or there are none to judge. Pure."""
+    rx = SCRIPT_CHARS.get(TESS_SCRIPT.get(pack, ""))
+    if not rx:
+        return True
+    confs = [w["conf"] for w in words if re.search(rx, w["text"])]
+    return not confs or sum(confs) / len(confs) >= SCRIPT_WORD_CONFIDENCE
 
 
 def read_page_with_latin(png: str, lang: str, have: set[str]) -> tuple[str, str]:
