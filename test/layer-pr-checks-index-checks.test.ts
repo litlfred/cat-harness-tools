@@ -69,6 +69,15 @@ describe("gate_diagnostics.py: the harness's own finding shapes", () => {
     ]);
   });
 
+  test("who-iris#239: a re-pin that only changes the commits a finding names is not a new key", () => {
+    const main = diag("✗ bootstrap: the index pins 1c36aef5ab70, cat-harness's own lock pins 823e7921d9c7 — re-pin bottom-up");
+    const pr = diag("✗ bootstrap: the index pins f5c124f1a806, cat-harness's own lock pins 9f478d4d9fcd — re-pin bottom-up");
+    expect(pr).toEqual(main);
+    expect(main).toEqual(["bootstrap: the index pins <commit>, cat-harness's own lock pins <commit> — re-pin bottom-up"]);
+    // A word made of hex letters only, or a plain number, is not a commit.
+    expect(diag("✗ decade 2026 facade")).toEqual(["decade # facade"]);
+  });
+
   test("a count that went down, a duration or a temporary directory is not a new key", () => {
     const a = diag("✗ 6 finding(s):\n    a: stale\n\n✗ b took 1.5 s in /tmp/abc123/x");
     const b = diag("✗ 5 finding(s):\n    a: stale\n\n✗ b took 12 s in /tmp/zz9/x");
