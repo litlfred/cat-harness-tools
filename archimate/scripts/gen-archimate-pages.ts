@@ -63,6 +63,18 @@
  * keeps the id IRI. Nothing redirects from the old id paths: a clean break
  * (owner, cat-harness-tools#1054).
  *
+ * ## Elements reused from another model
+ *
+ * A layer that draws on another layer's model (an IG on smart-ra's reference
+ * architecture, a DTH overlay) keeps the copied element under its own id,
+ * and so under this layer's IRI. Each copy names the node it copies in the
+ * property {@link BASE_PROPERTY}, whose value is that node's IRI. Its node
+ * then carries `dcterms:source` to that IRI, and its page links there. An
+ * element of the layer's own that Realizes or Specializes such a copy, at
+ * any depth, links on its page to the node the copy came from, so a
+ * country's system leads back to the reference architecture's block it
+ * plays (smart-trust-demo, issue #1949).
+ *
  * ## Vocabularies — borrowed, not minted
  *
  * The Open Group's ArchiMate exchange-format namespace names the types —
@@ -100,6 +112,69 @@ export const ARCHIMATE_NS = "http://www.opengroup.org/xsd/archimate/3.0/";
 const PREFIXES = { archimate: ARCHIMATE_NS };
 /** The Tool node these pages are drawn by (`cat-harness/tools/index.ts`), which a layer names in its `visualisers`. */
 export const TOOL_ID = "archimate-pages";
+/**
+ * The property a copied element or relationship carries: the IRI of the node
+ * in another layer's model that it copies (dth-hrh's `overlay:base`, read by
+ * core's `check:dth-glossary`). See §"Elements reused from another model".
+ */
+export const BASE_PROPERTY = "overlay:base";
+/** The relationships an element of a layer's own follows to the copy it plays: it is, or does, that block. */
+const PLAYS = new Set(["Realization", "Specialization"]);
+
+/**
+ * The IRI a node copies, from its {@link BASE_PROPERTY}; only an absolute
+ * http(s) IRI counts. The DTH overlays wrote it before the slash IRIs
+ * (Q-THIN-2 A, issue #1830), as `…/elements/<id>.jsonld`; that is read as the
+ * node's IRI now, `…/element/<id>`, so the link reaches the page and not a
+ * file the upstream no longer writes.
+ */
+export function baseIriOf(properties: ReadonlyArray<{ key: string; value: string }>): string | undefined {
+  const v = properties.find((p) => p.key === BASE_PROPERTY)?.value.trim();
+  if (v === undefined || !/^https?:\/\/\S+$/.test(v)) return undefined;
+  return v.replace(/\/(element|relationship|view)s\/([^/]+)\.jsonld$/, "/$1/$2");
+}
+
+/**
+ * What a reader calls the model an IRI is in: its layer and model segment,
+ * `smart-ra 0.3.0-draft.1`, read from `<host>/<layer>/…/<model>/<kind>/<id>`;
+ * else the IRI's host and path.
+ */
+export function sourceLabel(iri: string): string {
+  const u = new URL(iri);
+  const parts = u.pathname.split("/").filter(Boolean);
+  const k = parts.findIndex((p) => /^(element|relationship|view)s?$/.test(p));
+  if (k >= 2) return `${parts[0]} ${parts[k - 1]}`;
+  return `${u.host}${u.pathname}`;
+}
+
+/**
+ * The copies an element plays: following its own Realization and
+ * Specialization relationships outward, breadth first, the first copies
+ * (elements with a {@link baseIriOf}) on each path. Empty for a copy itself.
+ */
+export function playedCopies(model: ArchimateModel, id: string): Array<{ id: string; iri: string; via: string[] }> {
+  const byId = new Map(model.elements.map((e) => [e.id, e]));
+  if (byId.get(id) && baseIriOf(byId.get(id)!.properties)) return [];
+  const out = new Map<string, string[]>();
+  for (const r of model.relationships) if (PLAYS.has(r.type)) out.set(r.source, [...(out.get(r.source) ?? []), r.target]);
+  const found: Array<{ id: string; iri: string; via: string[] }> = [];
+  const seen = new Set([id]);
+  let frontier: Array<{ id: string; via: string[] }> = [{ id, via: [] }];
+  while (frontier.length > 0) {
+    const next: typeof frontier = [];
+    for (const f of frontier) {
+      for (const t of out.get(f.id) ?? []) {
+        if (seen.has(t) || !byId.has(t)) continue;
+        seen.add(t);
+        const iri = baseIriOf(byId.get(t)!.properties);
+        if (iri !== undefined) found.push({ id: t, iri, via: f.via });
+        else next.push({ id: t, via: [...f.via, t] });
+      }
+    }
+    frontier = next;
+  }
+  return found;
+}
 const LOADER = "assets/archimate.js";
 const STYLE = "assets/archimate.css";
 // declared-path-literal: this module's own templates under cat-harness-tools/archimate/, not a layer's archimate/ directory.
@@ -250,6 +325,22 @@ export function pagesFor(
     const slugOf = planSlugs(model);
     // The path segment of a view's or an element's page: its slug, else its id.
     const seg = (id: string): string => slugOf.get(id) ?? id;
+    // The line under a page's kind naming where a reused node comes from
+    // (§"Elements reused from another model"): the node it copies, or, for
+    // an element of the layer's own, the copies it Realizes or Specializes.
+    const reusedFrom = (id: string, properties: ReadonlyArray<{ key: string; value: string }>): string => {
+      const own = baseIriOf(properties);
+      const link = (iri: string, text: string) => `<a href="${escHtml(iri)}">${escHtml(text)}</a>`;
+      if (own !== undefined) return `<p class="am-from">Reused from ${link(own, sourceLabel(own))}</p>`;
+      const played = playedCopies(model, id);
+      if (played.length === 0) return "";
+      return `<p class="am-from">Plays ${played
+        .map((p) => {
+          const via = p.via.map((v) => elements.get(v)?.name || v);
+          return `${link(p.iri, elements.get(p.id)?.name || p.id)} in ${escHtml(sourceLabel(p.iri))}${via.length ? ` (through ${via.map(escHtml).join(", ")})` : ""}`;
+        })
+        .join("; ")}</p>`;
+    };
 
     json(m, {
       "@context": CONTEXT,
@@ -395,6 +486,7 @@ export function pagesFor(
         "schema:name": e.name,
         ...(e.documentation ? { "schema:description": e.documentation } : {}),
         "schema:category": e.layer,
+        ...(baseIriOf(e.properties) ? { "dcterms:source": { "@id": baseIriOf(e.properties) } } : {}),
         "dcterms:isPartOf": modelIri,
       });
       const ep = `${m}/element/${seg(e.id)}`;
@@ -402,7 +494,7 @@ export function pagesFor(
       stubAt(`${m}/element`, e.id, `${e.name || typeLabel(e.type)} — ${title}`, elNode, seg(e.id));
       files.push(page(`${ep}/index.html`, 3, `${e.name || typeLabel(e.type)} — ${title}`, toData(ep, `../${e.id}.jsonld`), elNode,
         `${mount(elNode, "am", { model: toData(ep, "../../model.json") })}<p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(e.name || "(unnamed)")}</h1>` +
-          `<p class="am-kind">${escHtml(typeLabel(e.type))} · ${escHtml(e.layer)}</p><div class="am-body" aria-live="polite"><p>Loading the element…</p></div></main>`));
+          `<p class="am-kind">${escHtml(typeLabel(e.type))} · ${escHtml(e.layer)}</p>${reusedFrom(e.id, e.properties)}<div class="am-body" aria-live="polite"><p>Loading the element…</p></div></main>`));
     }
 
     for (const r of model.relationships) {
@@ -415,6 +507,7 @@ export function pagesFor(
         ...(r.documentation ? { "schema:description": r.documentation } : {}),
         "archimate:source": { "@id": elements.has(r.source) ? elIri(r.source) : relIri(r.source) },
         "archimate:target": { "@id": elements.has(r.target) ? elIri(r.target) : relIri(r.target) },
+        ...(baseIriOf(r.properties) ? { "dcterms:source": { "@id": baseIriOf(r.properties) } } : {}),
         "dcterms:isPartOf": modelIri,
       });
       const label = `${typeLabel(r.type)}: ${elements.get(r.source)?.name ?? r.source} → ${elements.get(r.target)?.name ?? r.target}`;
@@ -423,7 +516,7 @@ export function pagesFor(
       stubAt(`${m}/relationship`, r.id, `${label} — ${title}`, relNode, r.id);
       files.push(page(`${rp}/index.html`, 3, `${label} — ${title}`, toData(rp, `../${r.id}.jsonld`), relNode,
         `${mount(relNode, "am", { model: toData(rp, "../../model.json") })}<p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(r.name || typeLabel(r.type))}</h1>` +
-          `<p class="am-kind">${escHtml(typeLabel(r.type))} relationship</p><div class="am-body" aria-live="polite"><p>Loading the relationship…</p></div></main>`));
+          `<p class="am-kind">${escHtml(typeLabel(r.type))} relationship</p>${reusedFrom(r.id, r.properties)}<div class="am-body" aria-live="polite"><p>Loading the relationship…</p></div></main>`));
     }
 
   }
