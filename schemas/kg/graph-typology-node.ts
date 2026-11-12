@@ -62,6 +62,8 @@ export const GraphTypologyNodeSchema = z
     renderable: z.boolean(),
     /** Its markdown is shown on a published page (an IG annex appended to its page), so its links address that page. */
     shownOnPublishedPages: z.literal(true).optional(),
+    /** Its directories are source a build Tool publishes at its own route, so the mount pass never copies them. */
+    publishedByBuild: z.literal(true).optional(),
     recordsWork: z.boolean().optional(),
     holds: z.enum(["content", "context", "state", "derived"]),
     summary: z.string().min(1),
