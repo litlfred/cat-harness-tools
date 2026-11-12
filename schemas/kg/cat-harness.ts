@@ -5486,6 +5486,29 @@ export function ownDirectoryById(root: string, id: string, fallback: string): st
   return found?.absPath ?? join(root, fallback);
 }
 
+/**
+ * The opt-in sub-graphs a resolution rooted at `root` sees when its caller
+ * names none.
+ *
+ * - A layer no mount placed (the checkout's own, or the checkout root):
+ *   its own `enableSubgraphs`, adjusted by `CAT_SUBGRAPHS`.
+ * - A layer a MOUNT placed: the list of the root that mounted it
+ *   (`mountScopeFor`), never the mounted layer's own. Owner, 2026-11-12, card
+ *   Q-OPTIN-DIRS A: *"CI checks should align on opt in/out"*. The mount laid
+ *   the layer down with that root's list (`defaultMountDirectoryIds`,
+ *   `switchedOffOptInPaths`), so a check resolving the mounted layer by the
+ *   layer's own list judged groups the consumer had switched off — and
+ *   missed ones the consumer had switched on and the layer had not.
+ *
+ * The mounting root's list is read structurally (`declaredEnableSubgraphs`):
+ * its declaration may name kinds only its own layers register.
+ */
+export function defaultEnabledSubgraphs(root: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EnabledSubgraphs {
+  const mounting = mountScopeFor(root);
+  if (mounting !== undefined) return enabledSubgraphsFrom(declaredEnableSubgraphs(mounting));
+  return enabledSubgraphsFrom(readDeclaration(root, registry)?.enableSubgraphs ?? declaredEnableSubgraphs(root));
+}
+
 export function resolveDirectories(
   chain: Array<{ name: string; root: string; own?: boolean }>,
   registry: GraphTypologyRegistry = defaultGraphTypologies,
@@ -5501,10 +5524,9 @@ export function resolveDirectories(
   // a layer chose, and `own` is false: a default is not the layer's own
   // declaration, it is what it did not have to write.
   const rootLink = chain.find((l) => l.own === true) ?? chain[chain.length - 1];
-  // OPT-IN SUB-GRAPHS (cat-harness#991 step 23.1): the ROOT decides, from its
-  // own list — a dependency's `enableSubgraphs` is that layer's, for itself.
-  const enabled: EnabledSubgraphs =
-    opts.enabledSubgraphs ?? enabledSubgraphsFrom(rootLink ? (readDeclaration(rootLink.root, registry)?.enableSubgraphs ?? declaredEnableSubgraphs(rootLink.root)) : undefined);
+  // OPT-IN SUB-GRAPHS (cat-harness#991 step 23.1): the ROOT decides — and
+  // for a root a mount placed, the root that MOUNTED it ({@link defaultEnabledSubgraphs}).
+  const enabled: EnabledSubgraphs = opts.enabledSubgraphs ?? (rootLink ? defaultEnabledSubgraphs(rootLink.root, registry) : enabledSubgraphsFrom(undefined));
   // Each layer's root by the name its entries carry in `declaredBy`, for
   // `optInLeftOutByMount`. Filled as the chain is read below.
   const layerRoots = new Map<string, string>();
@@ -6350,7 +6372,7 @@ export function ownDirectories(
   opts: ResolveOptions = {},
 ): ResolvedDirectory[] {
   const decl = readDeclaration(link.root, registry);
-  const enabled: EnabledSubgraphs = opts.enabledSubgraphs ?? enabledSubgraphsFrom(decl?.enableSubgraphs ?? declaredEnableSubgraphs(link.root));
+  const enabled: EnabledSubgraphs = opts.enabledSubgraphs ?? defaultEnabledSubgraphs(link.root, registry);
 
   // The conventional set FIRST, existence-filtered, and then declared entries
   // override it by id — which is `resolveDirectories`' order, and now this
@@ -7731,7 +7753,7 @@ import { ThemeRefSchema, type ThemeRef } from "../ui/theme";
 import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
 import { projectedRead } from "../sdlc/read-projections";
 import { declaredEnableSubgraphs, enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
-import { leftOutByMount } from "./remote-mount";
+import { leftOutByMount, mountScopeFor } from "./remote-mount";
 // Layer DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this
 // file, which imports the registry. Re-exported here so no caller moves.

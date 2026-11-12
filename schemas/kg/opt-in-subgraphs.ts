@@ -18,6 +18,12 @@
  * downstream of a mount, the layer whose own resolution it is — never of
  * the layer that declared the sub-graph.
  *
+ * **A mounted layer is resolved for the root that mounted it.** Owner,
+ * 2026-11-12, card Q-OPTIN-DIRS A: *"CI checks should align on opt in/out"*.
+ * The mount laid the layer down with the mounting root's list, so a check
+ * resolving the mounted layer reads that list too, never the layer's own
+ * (`defaultEnabledSubgraphs` in `cat-harness.ts`).
+ *
  * **A development override.** `CAT_SUBGRAPHS` (`+cat-harness.sdlc,-x.y`)
  * adjusts the root's list, so a dev session in any checkout can turn one on
  * without editing a declaration. Unset in CI, and in every agent test context.
