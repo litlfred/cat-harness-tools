@@ -42,6 +42,8 @@ import { createHash } from "node:crypto";
 
 import { z } from "zod";
 
+import { nodeKind } from "../kg/node-kind.js";
+
 import { ReleaseDigestSchema } from "./binary-release";
 import { CommitShaSchema, LockedInstanceSchema } from "../kg/remote-mount";
 import { ActorKindSchema } from "../kg/skill-package";
@@ -127,30 +129,45 @@ export const RunInvokerSchema = z
   });
 
 /** One run's context, as a `folio-run-context/v1` document. */
-export const RunContextSchema = z
-  .object({
-    $schema: z.literal(RUN_CONTEXT_SCHEMA_TAG),
-    platform: z.object({ commit: CommitShaSchema }).strict(),
-    mounts: RunMountsSchema,
-    /** The tool profile selected. Absent: the run selected none, and `releases[]` lists what it resolved anyway. */
-    profile: z.object({ name: z.string().min(1), sha256: Sha256Schema }).strict().optional(),
-    releases: z.array(RunReleaseSchema),
-    invoker: RunInvokerSchema,
-    inputs: z.array(HashBasisSchema),
-    /** The PROV activity that records this context as `prov:used`. Absent until the run records one (step 3). */
-    prov: z.object({ activity: z.string().min(1) }).strict().optional(),
-  })
-  .strict()
-  .superRefine((c, ctx) => {
-    const seen = new Set<string>();
-    c.releases.forEach((r, i) => {
-      if (seen.has(r.release)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["releases", i, "release"], message: `\`${r.release}\` is listed twice — one run, one answer per release` });
-      }
-      seen.add(r.release);
-    });
+/** The fields of a run context: the {@link RunContextKind}'s own, and the schema's. */
+const runContextFields = {
+  $schema: z.literal(RUN_CONTEXT_SCHEMA_TAG),
+  platform: z.object({ commit: CommitShaSchema }).strict(),
+  mounts: RunMountsSchema,
+  /** The tool profile selected. Absent: the run selected none, and `releases[]` lists what it resolved anyway. */
+  profile: z.object({ name: z.string().min(1), sha256: Sha256Schema }).strict().optional(),
+  releases: z.array(RunReleaseSchema),
+  invoker: RunInvokerSchema,
+  inputs: z.array(HashBasisSchema),
+  /** The PROV activity that records this context as `prov:used`. Absent until the run records one (step 3). */
+  prov: z.object({ activity: z.string().min(1) }).strict().optional(),
+};
+
+/** One run, one answer per release: no release is listed twice. */
+function releasesListedOnce(c: { releases: readonly { release: string }[] }, ctx: z.RefinementCtx): void {
+  const seen = new Set<string>();
+  c.releases.forEach((r, i) => {
+    if (seen.has(r.release)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["releases", i, "release"], message: `\`${r.release}\` is listed twice — one run, one answer per release` });
+    }
+    seen.add(r.release);
   });
+}
+
+export const RunContextSchema = z.object(runContextFields).strict().superRefine(releasesListedOnce);
 export type RunContext = z.infer<typeof RunContextSchema>;
+
+/**
+ * `folio-run-context/v1` as a node kind, the validator of the library kind's
+ * family of that name (`validators/library-run-context.json`). It judges a
+ * file exactly as {@link RunContextSchema} does.
+ */
+export const RunContextKind = nodeKind(RUN_CONTEXT_SCHEMA_TAG, [], runContextFields, {
+  strict: true,
+  refine: releasesListedOnce,
+  term: "Run context",
+  summary: "What one run resolved: the platform commit, the mounted layers, the tool profile and releases, the invoker and the inputs it hashed.",
+});
 
 /** Key-sorted JSON, so the bytes do not depend on the order a writer set fields in. */
 function canonical(v: unknown): unknown {

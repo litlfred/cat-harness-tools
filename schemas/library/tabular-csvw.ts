@@ -43,6 +43,8 @@
  */
 import { z } from "zod";
 
+import { nodeKind } from "../kg/node-kind.js";
+
 import { NarrativeSlotSchema } from "../content/narrative";
 
 /** How a value was arrived at. `undetermined` is a finding, never a default. */
@@ -175,7 +177,8 @@ export const CsvwTableSchema = z
     path: ["fac:stub"],
   });
 
-export const TabularCsvwSchema = z.object({
+/** The fields of a CSVW sidecar: the {@link TabularCsvwKind}'s own, and the schema's. */
+const tabularCsvwFields = {
   $schema: z.literal(TABULAR_CSVW_SCHEMA_ID),
   doc_id: z.string().min(1),
   /** One per sheet. A CSV has exactly one; a workbook is a `csvw:TableGroup`. */
@@ -196,8 +199,20 @@ export const TabularCsvwSchema = z.object({
    * record v1 carries. Required on the same terms as `source`.
    */
   narrative: NarrativeSlotSchema,
-});
+};
+
+export const TabularCsvwSchema = z.object(tabularCsvwFields);
 export type TabularCsvw = z.infer<typeof TabularCsvwSchema>;
+
+/**
+ * `folio-tabular-csvw/v1` as a node kind, the validator of the library kind's
+ * family of that name (`validators/library-tabular-csvw.json`). It judges a
+ * file exactly as {@link TabularCsvwSchema} does: not strict, as the schema is not.
+ */
+export const TabularCsvwKind = nodeKind(TABULAR_CSVW_SCHEMA_ID, [], tabularCsvwFields, {
+  term: "Tabular CSVW",
+  summary: "One spreadsheet or CSV source read as CSVW, one table per sheet, with the technical metadata and narrative every ingest sidecar carries.",
+});
 
 /**
  * What an extractor returns: the tables, before the ingest runner adds

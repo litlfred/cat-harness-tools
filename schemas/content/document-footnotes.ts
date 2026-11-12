@@ -20,6 +20,8 @@
  */
 import { z } from "zod";
 
+import { nodeKind } from "../kg/node-kind.js";
+
 /** The `$schema` tag every footnotes sidecar carries. */
 export const DOCUMENT_FOOTNOTES_SCHEMA = "folio-document-footnotes/v1" as const;
 
@@ -54,26 +56,42 @@ export type Footnote = z.infer<typeof FootnoteSchema>;
 
 export const UncalledNoteSchema = z.object(NoteBase).strict();
 
-export const DocumentFootnotesSchema = z
-  .object({
-    $schema: z.literal(DOCUMENT_FOOTNOTES_SCHEMA),
-    entry: z.string().min(1),
-    /**
-     * `undetermined` when every page was OCR'd: OCR text has no fonts, so no
-     * mark or note can be told from the body. `determined` otherwise, with the
-     * OCR'd pages that were not read in `pages_unread`.
-     */
-    status: z.enum(["determined", "undetermined"]),
-    pages_unread: z.array(z.number().int().min(1)).optional(),
-    /** The span size carrying the most characters: what "smaller than the body" is measured against. */
-    body_size: z.number().min(0),
-    footnotes: z.array(FootnoteSchema),
-    uncalled_notes: z.array(UncalledNoteSchema),
-    unlinked_marks: z.array(z.object({ page: z.number().int().min(1), mark: z.string().min(1), context: z.string() }).strict()),
-  })
-  .strict()
-  .refine((s) => new Set([...s.footnotes, ...s.uncalled_notes].map((n) => n.id)).size === s.footnotes.length + s.uncalled_notes.length, {
-    message: "note ids are unique within an entry",
-    path: ["footnotes"],
-  });
+/** The fields of a footnotes sidecar: the {@link DocumentFootnotesKind}'s own, and the schema's. */
+const documentFootnotesFields = {
+  $schema: z.literal(DOCUMENT_FOOTNOTES_SCHEMA),
+  entry: z.string().min(1),
+  /**
+   * `undetermined` when every page was OCR'd: OCR text has no fonts, so no
+   * mark or note can be told from the body. `determined` otherwise, with the
+   * OCR'd pages that were not read in `pages_unread`.
+   */
+  status: z.enum(["determined", "undetermined"]),
+  pages_unread: z.array(z.number().int().min(1)).optional(),
+  /** The span size carrying the most characters: what "smaller than the body" is measured against. */
+  body_size: z.number().min(0),
+  footnotes: z.array(FootnoteSchema),
+  uncalled_notes: z.array(UncalledNoteSchema),
+  unlinked_marks: z.array(z.object({ page: z.number().int().min(1), mark: z.string().min(1), context: z.string() }).strict()),
+};
+
+/** Note ids are unique within an entry, across footnotes and uncalled notes. */
+function noteIdsUnique(s: { footnotes: readonly { id: string }[]; uncalled_notes: readonly { id: string }[] }, ctx: z.RefinementCtx): void {
+  if (new Set([...s.footnotes, ...s.uncalled_notes].map((n) => n.id)).size !== s.footnotes.length + s.uncalled_notes.length) {
+    ctx.addIssue({ code: "custom", message: "note ids are unique within an entry", path: ["footnotes"] });
+  }
+}
+
+export const DocumentFootnotesSchema = z.object(documentFootnotesFields).strict().superRefine(noteIdsUnique);
 export type DocumentFootnotes = z.infer<typeof DocumentFootnotesSchema>;
+
+/**
+ * `folio-document-footnotes/v1` as a node kind, the validator of the library
+ * kind's family of that name (`validators/library-document-footnotes.json`).
+ * It judges a file exactly as {@link DocumentFootnotesSchema} does.
+ */
+export const DocumentFootnotesKind = nodeKind(DOCUMENT_FOOTNOTES_SCHEMA, [], documentFootnotesFields, {
+  strict: true,
+  refine: noteIdsUnique,
+  term: "Document footnotes",
+  summary: "The footnotes of one library entry's source, the marks in its text that call them, and the small-font notes and marks that matched nothing.",
+});

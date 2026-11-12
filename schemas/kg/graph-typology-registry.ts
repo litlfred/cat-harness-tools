@@ -2391,7 +2391,9 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // schemas/content/document-errata.ts), the OCR run's context
       // (`ocr/run-context.json`, schemas/sdlc/run-context.ts) and a table read
       // as CSVW (`*.csvw.json`, schemas/library/tabular-csvw.ts). Unlisted,
-      // check:kind-validators reports each as an unmapped family.
+      // check:kind-validators reports each as an unmapped family. Each is a
+      // node kind, joined here by its `validators/library-*.json` node, so
+      // check:node-kinds holds none of them as a new unkinded family.
       "folio-document-footnotes/v1": {},
       "folio-document-errata/v1": {},
       "folio-run-context/v1": {},
