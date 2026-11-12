@@ -371,6 +371,9 @@ concurrency:
 # The instance, once: the input when given, else (layer mode) the calling
 # repository's name, which is the instance's name for every layer.
 env:
+  # The GitHub owner of the harness layers (folio-assistant, cat-harness-tools,
+  # and the @litlfred/* code layers). Callers may live under any owner.
+  HARNESS_OWNER: litlfred
   INSTANCE: ${{ inputs.instance != '' && inputs.instance || (inputs.mode == 'layer' && github.event.repository.name || '') }}
 
 jobs:
@@ -435,7 +438,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$WANT" != "lock" ]; then ref="$WANT"
-          elif [ "$GITHUB_REPOSITORY" = "litlfred/cat-harness-tools" ]; then ref="$SHA"
+          elif [ "$GITHUB_REPOSITORY" = "${HARNESS_OWNER}/cat-harness-tools" ]; then ref="$SHA"
           else
             lock() { curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" \
               "$GITHUB_API_URL/repos/$1/contents/index.lock.json?ref=$2"; }
@@ -443,12 +446,12 @@ jobs:
             # lock of its own judges with the commit the folio-assistant
             # index pins, which is still a pin and not a branch tip.
             if body="$(lock "$GITHUB_REPOSITORY" "$SHA")"; then from="$GITHUB_REPOSITORY index.lock.json at $SHA"
-            else body="$(lock litlfred/folio-assistant "$INDEX_REF")"; from="litlfred/folio-assistant index.lock.json at $INDEX_REF"; fi
+            else body="$(lock ${HARNESS_OWNER}/folio-assistant "$INDEX_REF")"; from="${HARNESS_OWNER}/folio-assistant index.lock.json at $INDEX_REF"; fi
             ref="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
             # A layer below cat-harness-tools (cat-harness) keeps a lock that
             # cannot mount it: same fall-back, to the index's pin.
-            if [ -z "$ref" ] && [[ "$from" != litlfred/folio-assistant* ]]; then
-              body="$(lock litlfred/folio-assistant "$INDEX_REF")"; from="litlfred/folio-assistant index.lock.json at $INDEX_REF ($GITHUB_REPOSITORY's lock mounts no cat-harness-tools)"
+            if [ -z "$ref" ] && [[ "$from" != ${HARNESS_OWNER}/folio-assistant* ]]; then
+              body="$(lock ${HARNESS_OWNER}/folio-assistant "$INDEX_REF")"; from="${HARNESS_OWNER}/folio-assistant index.lock.json at $INDEX_REF ($GITHUB_REPOSITORY's lock mounts no cat-harness-tools)"
               ref="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
             fi
             [ -n "$ref" ] || { echo "::error::$from pins no cat-harness-tools: mount it, or pass tools-ref"; exit 2; }
@@ -459,7 +462,7 @@ jobs:
         name: The judging scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          repository: litlfred/cat-harness-tools
+          repository: ${{ env.HARNESS_OWNER }}/cat-harness-tools
           ref: ${{ steps.tools-lock.outputs.ref }}
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
@@ -506,7 +509,7 @@ jobs:
           # live per side, they were minutes apart, and a bean pushed in
           # between was charged to the PR (the trial PR, run 38884159693).
           # A remote that cannot be read is left out, and mounts live.
-          for repo in $([ "$MODE" = "layer" ] && echo litlfred/folio-assistant) "$GITHUB_REPOSITORY"; do
+          for repo in $([ "$MODE" = "layer" ] && echo ${HARNESS_OWNER}/folio-assistant) "$GITHUB_REPOSITORY"; do
             if tips="$(git ls-remote "https://github.com/${repo}.git" 'refs/heads/cat/*')"; then
               printf '%s\n' "$tips" > "$RUNNER_TEMP/pin/state-${repo//\//__}.tsv"
             fi
@@ -573,8 +576,8 @@ jobs:
           layers_at="$(cat "$RUNNER_TEMP/pin/layers-at" 2>/dev/null || echo "$at")"
           resolve=ci/.github/scripts/layer-pr-checks/resolve-at.sh
           index=""
-          [ "$MODE" = "index" ] || index="$(bash "$resolve" litlfred/folio-assistant "$INDEX_REF" "$layers_at")"
-          tools="$(bash "$resolve" litlfred/cat-harness-tools "$TOOLS_REF" "$at")"
+          [ "$MODE" = "index" ] || index="$(bash "$resolve" ${HARNESS_OWNER}/folio-assistant "$INDEX_REF" "$layers_at")"
+          tools="$(bash "$resolve" ${HARNESS_OWNER}/cat-harness-tools "$TOOLS_REF" "$at")"
           # The judging scripts at the pinned commit, not wherever the ref
           # moved since this job checked it out.
           git -C ci fetch -q --depth 1 origin "$tools"
@@ -627,7 +630,7 @@ jobs:
         name: Check out the root (the folio-assistant index, or the caller in index mode)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
+          repository: ${{ inputs.mode == 'index' && github.repository || format('{0}/folio-assistant', env.HARNESS_OWNER) }}
           # Index mode: the PR's merge commit on both sides; the base side then
           # steps to its first parent (below). Never `pull_request.base.sha`:
           # it is the base as of the PR's last push, older than the main the
@@ -847,11 +850,11 @@ jobs:
           # sides, and every shard after them, take the same lower layers.
           for r in $LAYERS; do
             [ "$r" = "$INSTANCE" ] && continue
-            sha="$(bash ci/.github/scripts/layer-pr-checks/resolve-at.sh "litlfred/$r" main "$PIN_AT")"
+            sha="$(bash ci/.github/scripts/layer-pr-checks/resolve-at.sh "${HARNESS_OWNER}/$r" main "$PIN_AT")"
             echo "$r at main: $sha"
             rm -rf "fa/$r"
             git init -q "fa/$r"
-            git -C "fa/$r" fetch -q --depth 1 "https://github.com/litlfred/$r" "$sha"
+            git -C "fa/$r" fetch -q --depth 1 "https://github.com/${HARNESS_OWNER}/$r" "$sha"
             git -C "fa/$r" checkout -q FETCH_HEAD
             rm -rf "fa/$r/.git"
           done
@@ -1497,7 +1500,7 @@ jobs:
           lower=""
           for r in $LAYERS; do
             [ "$r" = "$INSTANCE" ] && continue
-            lower="$lower $r=$(bash ci/.github/scripts/layer-pr-checks/resolve-at.sh "litlfred/$r" main "$PIN_AT")"
+            lower="$lower $r=$(bash ci/.github/scripts/layer-pr-checks/resolve-at.sh "${HARNESS_OWNER}/$r" main "$PIN_AT")"
           done
           scripts="$(cd ci/.github/scripts/layer-pr-checks && find . -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)"
           # The graphs kept on branches (`cat/<instance>/<graph>`: beans,
@@ -1508,7 +1511,7 @@ jobs:
           # that cannot be read is a miss, never a hit.
           # The tips this run pinned (the pin step), which both sides mount.
           state="$(sha256sum < "$RUNNER_TEMP/pin/state.json" | cut -d' ' -f1)"
-          for repo in $([ "$MODE" = "layer" ] && echo litlfred/folio-assistant) "$GITHUB_REPOSITORY"; do
+          for repo in $([ "$MODE" = "layer" ] && echo ${HARNESS_OWNER}/folio-assistant) "$GITHUB_REPOSITORY"; do
             python3 -c 'import json,sys; sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1])) else 1)' "$RUNNER_TEMP/pin/state.json" "$repo" \
               || state="$state $repo=unreadable-$(date +%s%N)"
           done
@@ -1807,14 +1810,14 @@ jobs:
       - name: The judging scripts, at the commit this run pinned
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          repository: litlfred/cat-harness-tools
+          repository: ${{ env.HARNESS_OWNER }}/cat-harness-tools
           ref: ${{ matrix.side == 'base' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
       - name: Check out the root, at the commit this run pinned
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
+          repository: ${{ inputs.mode == 'index' && github.repository || format('{0}/folio-assistant', env.HARNESS_OWNER) }}
           ref: ${{ inputs.mode == 'index' && (github.event_name == 'push' && github.sha || github.ref) || (matrix.side == 'base' && needs.prepare-base.outputs.index || needs.prepare-head.outputs.index) }}
           fetch-depth: ${{ inputs.mode == 'index' && 2 || 1 }}
           path: fa
@@ -2097,7 +2100,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: steps.pins-only.outputs.only != 'true' || github.event_name == 'push'
         with:
-          repository: litlfred/cat-harness-tools
+          repository: ${{ env.HARNESS_OWNER }}/cat-harness-tools
           ref: ${{ github.event_name == 'push' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           sparse-checkout: .github/scripts/layer-pr-checks
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
