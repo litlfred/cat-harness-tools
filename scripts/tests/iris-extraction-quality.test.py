@@ -245,6 +245,9 @@ def main() -> int:
              (0, 0, 4, 10, "\u0661"), (40, 0, 44, 10, "\u0639"), (60, 0, 64, 10, "\u0662")]
     check("the layer's digits inside a box come left to right, letters and outside digits dropped",
           o.layer_digits(chars, (0, 0, 100, 25), 2.0) == "\u0661\u0669\u0669\u0660")
+    check("Russian read surely passes the script-word check",
+          o.script_words_sure([{"text": "здоровья", "conf": 91.0}, {"text": "HIV", "conf": 20.0}], "rus"))
+    check("a pack with no letters to judge passes", o.script_words_sure([{"text": "1990", "conf": 10.0}], "rus"))
     check("only a read with eastern digits gets the second read", o.RE_EASTERN_DIGITS.search("زنان ۲۱۷ منفی")
           and not o.RE_EASTERN_DIGITS.search("زنان منفی ۴"))
 
@@ -255,8 +258,16 @@ def main() -> int:
           o.read_page("p.png", "fra", have) == ("", "fra") and calls == ["fra"])
     reads = {"ara": 40.0, "ara+eng": 53.8, "ara+rus": 54.4}
     o._ocr_with_confidence = lambda png, lang, timeout=0: (lang, reads[lang])
+    real_tsv = o._tsv_words
+    o._tsv_words = lambda png, lang, timeout: []
     check("a later script must beat the best read so far by the full margin, not tie it",
           o.read_page("p.png", "ara", {"ara", "eng", "rus"}) == ("ara+eng", "ara+eng"))
+    reads = {"ara": 55.7, "ara+eng": 58.7, "ara+rus": 66.3}
+    junk = [{"text": t, "conf": c} for t, c in (("НЕАТТН", 87.5), ("МОМРАТЕ", 31.5), ("с", 0.0), ("РАЯ", 27.4))]
+    o._tsv_words = lambda png, lang, timeout: junk if lang.endswith("rus") else []
+    check("10665/192500 p1: a second script whose own words are unsure is not kept",
+          o.read_page("p.png", "ara", {"ara", "eng", "rus"}) == ("ara", "ara"))
+    o._tsv_words = real_tsv
     o._ocr_with_confidence = real
     check("Tesseract runs single-threaded unless told otherwise",
           o._tesseract_env().get("OMP_THREAD_LIMIT") == os.environ.get("OMP_THREAD_LIMIT", "1"))
