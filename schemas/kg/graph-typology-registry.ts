@@ -237,6 +237,19 @@ export interface GraphTypologyDef {
    */
   shownOnPublishedPages?: true;
   /**
+   * Is a directory of this kind SOURCE that a build Tool turns into pages at
+   * publish, so the directory itself is never copied to the site?
+   *
+   * A `web-app` directory holds an `index.html` that is the bundler's input,
+   * not a page, and after the build a `node_modules/` beside it. The mount
+   * pass copies any declared directory with an `index.html` to
+   * `/<kind>/<instance>/`, so without this it published the app's source and
+   * its installed dependencies' READMEs, whose dead links stopped the publish
+   * (smart-trust's staging preview, 2026-11-12). The build Tool's own route
+   * is the only place such a kind is published. Absent means no.
+   */
+  publishedByBuild?: true;
+  /**
    * Does a graph of this kind record WORK — something somebody is partway
    * through, that an arriving agent could pick up?
    *
@@ -2639,6 +2652,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "a web app the layer holds as source (`package.json`, a lockfile, the app's code and media) and publishes as a page of its own: one `web-app/0.1.0` file, `web-app.json`, at the directory's root names its id, title, how it builds, the languages it ships and the layer directories it reads at build time. The harness's `apps` visualiser, rendered by the `web-app-build` Tool, builds it at publish and writes the build to `<locale>/<harness>/apps/<id>/`, with no site chrome; nothing else loads it, so a reader downloads it only by opening its route. Shape in `schemas/ui/web-app.ts`.",
     title: "Web apps",
     renderable: false,
+    publishedByBuild: true,
     holds: "content",
     // declared-path-literal: this table IS the declaration, as on `device-screen`.
     schema: "schemas/ui/web-app.ts",

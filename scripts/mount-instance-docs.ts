@@ -84,6 +84,7 @@ import { renderAvatarsCss } from "./gen-avatars-css.ts";
 import { renderThemesCss } from "./gen-themes-css.ts";
 import { DOCS_SITE_BASE } from "../schemas/kg/jsonld.js";
 import { isPublished } from "../schemas/kg/url-space.js";
+import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { instanceSitePath } from "./instance-exports.ts";
 import { inScope, siteScope } from "./lib/site-scope.ts";
 
@@ -1899,6 +1900,10 @@ export function mountable(repo = REPO): Mountable[] {
     if (entry.composed === true) continue;
     // Built into the layer's own IG site by `stage-ig-sites.ts` (bean `mftp`); mounting it too would publish it twice.
     if (entry.igSite === true) continue;
+    // Source a build Tool publishes at its own route (`publishedByBuild`, the
+    // `web-app` kind): its `index.html` is the bundler's input, not a page.
+    const kinds = entry.graphTypologies ?? [];
+    if (kinds.length > 0 && kinds.every((k) => defaultGraphTypologies.get(k)?.publishedByBuild === true)) continue;
     if (!existsSync(abs) || !statSync(abs).isDirectory()) continue;
     if (!existsSync(join(abs, "index.html"))) continue;
     // The directory's own declared visualiser, if it has one. Read here

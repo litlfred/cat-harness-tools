@@ -100,7 +100,7 @@ describe("tool-release keeps its four rules on the core", () => {
   });
 
   test("a tool release does NOT inherit the core's sha512, nor a scoped name", () => {
-    const raw = JSON.parse(readFileSync(join(HARNESS, "tool-releases", "plantuml-1.2026.9.json"), "utf-8")) as Record<string, unknown>;
+    const raw = JSON.parse(readFileSync(join(HARNESS, "tool-releases", "plantuml-1.2026.10.json"), "utf-8")) as Record<string, unknown>;
     expect(ToolReleaseSchema.safeParse({ ...raw, digest: { algorithm: "sha512", digest: SHA512 } }).success).toBe(false);
     expect(ToolReleaseSchema.safeParse({ ...raw, name: "@scope/plantuml" }).success).toBe(false);
     const { entry: _e, ...noEntry } = raw;
