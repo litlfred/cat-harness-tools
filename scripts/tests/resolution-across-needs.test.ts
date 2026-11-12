@@ -149,10 +149,8 @@ const auditInstance = (rel: string) =>
 function startAudits(first: readonly string[] = []): void {
   // The pool runs at most LIMIT audits and queues the rest in the order they
   // are started, so the calling test's own subjects go first. Started in
-  // INSTANCES order, the skill test waited behind audits it never reads (the
-  // largest layer's included) and timed out at 240 s on a 4-core runner
-  // (2026-11-12), red or green by where that layer sorted rather than by the
-  // diff. The rest still start here, so the later tests find them running.
+  // INSTANCES order, the skill test could wait behind audits it never reads.
+  // The rest still start here, so the later tests find them running.
   for (const inst of first) void auditInstance(`./${relative(REPO, inst)}`);
   void audit(WRITE_FREE);
   for (const inst of INSTANCES) void auditInstance(`./${relative(REPO, inst)}`);
