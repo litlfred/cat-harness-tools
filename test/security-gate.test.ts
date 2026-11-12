@@ -182,6 +182,9 @@ describe("layer checkout support (bean cat-tools-q8gk)", () => {
     );
   });
 
+  // securityGate spawns every SECURITY_CHECKS script as its own process over
+  // the whole layer, so bun's 5 s default is less than a loaded runner needs
+  // (it timed out at 5016 ms on folio-assistant-core#760); 60 s as id-lookup.
   test("from a layer checkout, each check either runs or reports a named unknown without a stack trace", () => {
     const layerRoot = resolve(import.meta.dir, "..");
     const results = securityGate(layerRoot);
@@ -191,5 +194,5 @@ describe("layer checkout support (bean cat-tools-q8gk)", () => {
       expect(r.detail).not.toContain("Cannot find module");
       expect(r.detail).not.toMatch(/\bat\s+\S+\s+\(/);
     }
-  });
+  }, 60_000);
 });
