@@ -152,6 +152,37 @@ export interface ArtifactBundle {
 }
 
 /**
+ * Why HEAD is not the pushed tip. Behind it (an ancestor of the tip): a newer
+ * push replaced it, SUPERSEDED. Anything else (a local commit nobody pushed,
+ * a diverged branch) stays an error: that is not main's site, and nobody else
+ * will publish it.
+ */
+export function notTipError(repo: string, sha: string, tip: string, branch: string): Error {
+  const behind = spawnSync("git", ["-C", repo, "merge-base", "--is-ancestor", sha, tip]).status === 0;
+  return behind
+    ? new SupersededError(sha, tip, branch)
+    : new Error(`HEAD ${sha.slice(0, 7)} is not origin/${branch}'s tip ${tip.slice(0, 7)}; the main site is published from the pushed default branch only`);
+}
+
+/**
+ * The commit asked for is no longer the pushed default branch's tip: a newer
+ * push replaced it while this run waited or built. The main site is that newer
+ * commit's, and its own push runs the publish (`folio-site-publish.yml` queues
+ * runs per repository, never cancelling one in progress). So this run has
+ * nothing to publish, and it ends as SUPERSEDED, exit 0, rather than as a
+ * failure that emails the owner about a commit nobody will publish (a content
+ * layer's publish on 2026-11-12 was replaced by the next push within a minute).
+ * A local run that is simply behind origin is told the same, and still
+ * publishes nothing.
+ */
+export class SupersededError extends Error {
+  constructor(readonly sha: string, readonly tip: string, readonly branch: string) {
+    super(`HEAD ${sha.slice(0, 7)} is not origin/${branch}'s tip ${tip.slice(0, 7)}; the main site is published from the pushed default branch only`);
+    this.name = "SupersededError";
+  }
+}
+
+/**
  * Which files of a built site fit one Artifact publish. Pure over the listing:
  * `files` maps each site-relative path to its size. Whole top-level
  * directories are dropped, most files first, until the rest fits; a site whose
@@ -800,7 +831,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
     // event names. A local commit nobody has pushed is not main's site.
     git(repo, ["fetch", "-q", "origin", defaultBranch ?? branch]);
     const tip = git(repo, ["rev-parse", "FETCH_HEAD"]);
-    if (tip !== sha) throw new Error(`HEAD ${sha.slice(0, 7)} is not origin/${defaultBranch ?? branch}'s tip ${tip.slice(0, 7)}; the main site is published from the pushed default branch only`);
+    if (tip !== sha) throw notTipError(repo, sha, tip, defaultBranch ?? branch);
   }
   const caller = `.github/workflows/${detected.caller}`;
   const workflow = `${detected.uses.owner}/${detected.uses.repo}/${detected.uses.path}@${detected.uses.ref}`;
@@ -940,7 +971,7 @@ export async function stageDeclared(
   if (target === "main" && !o.plan) {
     git(repo, ["fetch", "-q", "origin", defaultBranch ?? branch]);
     const tip = git(repo, ["rev-parse", "FETCH_HEAD"]);
-    if (tip !== sha) throw new Error(`HEAD ${sha.slice(0, 7)} is not origin/${defaultBranch ?? branch}'s tip ${tip.slice(0, 7)}; the main site is published from the pushed default branch only`);
+    if (tip !== sha) throw notTipError(repo, sha, tip, defaultBranch ?? branch);
   }
   const url = `https://${owner}.github.io/${name}/${target === "preview" ? `${PREVIEW_PREFIX}/${branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")}/` : ""}`;
   const publish = !o.plan && !o.dryRun;
@@ -1268,6 +1299,12 @@ if (import.meta.main) {
     const { plan: _plan, ...rest } = r;
     console.log(JSON.stringify(rest));
   } catch (e) {
+    if (e instanceof SupersededError) {
+      // Not a failure: the newer commit's own push publishes the site.
+      console.log(`· superseded: ${e.message}. ${e.tip.slice(0, 7)}'s own push publishes the site; nothing to publish here.`);
+      if (process.env.GITHUB_ACTIONS === "true") console.log(`::notice title=Superseded::${e.sha.slice(0, 7)} was replaced on ${e.branch} by ${e.tip.slice(0, 7)}, whose run publishes the site`);
+      process.exit(0);
+    }
     console.error(`✗ stage-local (${basename(process.argv[1] ?? "")}): ${(e as Error).message}`);
     process.exit(1);
   }

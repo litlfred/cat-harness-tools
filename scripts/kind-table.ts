@@ -18,6 +18,7 @@ import { graphTypologyLayer } from "../schemas/kg/graph-typology-registry.ts";
 // content layer's `typologies/` graph since folio-assistant#2598.
 import "../schemas/kg/folio-graph-typology.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { groupOf, optInRootsOf, type OptInRoot } from "../schemas/kg/opt-in-roots.ts";
 
 /** The layer root this reader is relative to. */
 export const KIND_TABLE_ROOT = join(HARNESS_ROOT);
@@ -127,6 +128,27 @@ export function rebaseKindLinks(text: string, to: string = posix.dirname(KIND_TA
   });
 }
 
+/**
+ * A description's links into an OPT-IN sub-graph of the harness (`sdlc`,
+ * `work-plan`, ...), written as their text alone. The table is an always-on
+ * page and the sub-graph is absent wherever it is switched off, so such a
+ * link is dead there (`check:optin-links`, cat-harness main 65a51c0: five
+ * links into `cat-harness.sdlc` and `cat-harness.work-plan`). The same rule
+ * as a generated list that names what is inside one without linking it
+ * (`readme:sync`). Links are read relative to {@link KIND_LINK_BASE} under
+ * `root`, before they are rebased.
+ */
+export function unlinkOptIn(text: string, root: string, roots: readonly OptInRoot[] = optInRootsOf(root)): string {
+  if (roots.length === 0) return text;
+  return text.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (whole, label: string, target: string) => {
+    if (/^(?:[a-z][a-z0-9+.-]*:|#|\/)/i.test(target)) return whole;
+    const path = decodeURI(target.split("#")[0]!.split("?")[0]!);
+    if (path === "") return whole;
+    const abs = join(root, KIND_LINK_BASE, path).replace(/[\\/]+$/, "");
+    return groupOf(abs, roots) === undefined ? whole : label;
+  });
+}
+
 /** The table, header to last row, from the registry: bootstrap, harness, core, then each declaring harness. */
 export function renderKindTable(root: string = KIND_TABLE_ROOT): string {
   const names = defaultGraphTypologies.names();
@@ -139,10 +161,11 @@ export function renderKindTable(root: string = KIND_TABLE_ROOT): string {
     .map((k, i) => ({ k, i, g: group(k) }))
     .sort((a, b) => (a.g === b.g ? a.i - b.i : a.g < b.g ? -1 : 1))
     .map((x) => x.k);
+  const optIn = optInRootsOf(root);
   const rows = ordered.map((k) => {
     const d = defaultGraphTypologies.get(k)!;
     // Escape a bare pipe; one already escaped in the prose stays as it is.
-    const contents = rebaseKindLinks(d.description ?? d.summary).replace(/(?<!\\)\|/g, "\\|");
+    const contents = rebaseKindLinks(unlinkOptIn(d.description ?? d.summary, root, optIn)).replace(/(?<!\\)\|/g, "\\|");
     const rendered = `${d.renderable ? "**yes**" : "no"}${d.renderableNote ? ` — ${d.renderableNote}` : ""}`;
     return `| \`${k}\` | ${declaredByCell(k, root)} | ${contents} | ${rendered} |`;
   });
