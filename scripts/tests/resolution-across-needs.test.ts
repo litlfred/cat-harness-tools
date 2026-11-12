@@ -146,7 +146,12 @@ const auditInstance = (rel: string) =>
  * Start every audit this file reads — each layer's and the default run's —
  * so they overlap; the tests then await the ones they judge.
  */
-function startAudits(): void {
+function startAudits(first: readonly string[] = []): void {
+  // The pool runs at most LIMIT audits and queues the rest in the order they
+  // are started, so the calling test's own subjects go first. Started in
+  // INSTANCES order, the skill test could wait behind audits it never reads.
+  // The rest still start here, so the later tests find them running.
+  for (const inst of first) void auditInstance(`./${relative(REPO, inst)}`);
   void audit(WRITE_FREE);
   for (const inst of INSTANCES) void auditInstance(`./${relative(REPO, inst)}`);
 }
@@ -208,7 +213,7 @@ describe("skill refs resolve across the `needs` chain", () => {
 
   test("a skill held anywhere in an instance's `needs` closure is not reported dangling", async () => {
     const offences: string[] = [];
-    startAudits();
+    startAudits(REACHES_DOWN);
 
     for (const inst of REACHES_DOWN) {
       const rel = `./${relative(REPO, inst)}`;
@@ -243,7 +248,11 @@ describe("skill refs resolve across the `needs` chain", () => {
     }
 
     expect(offences).toEqual([]);
-  }, 240_000);
+    // The first test to await the pool pays for it: one `kg:audit` per layer,
+    // LIMIT at a time. At 240 s it timed out on a 4-core runner once the
+    // largest layer's reference corpus grew (2026-11-12), flipping between NEW
+    // and fixed on PRs that touch neither; the later tests reuse the runs.
+  }, 480_000);
 
   /**
    * The third state, which is a rule rather than a courtesy — and which this

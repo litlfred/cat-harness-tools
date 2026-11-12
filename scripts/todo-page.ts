@@ -44,7 +44,8 @@ export interface TodoPageOptions {
 }
 
 /**
- * The page, for a todo at `<site>/todos/<id>/` — every href is two levels below the site root.
+ * The page, for a todo at `<site>/todo/<id>/` — every href is two levels below the site root.
+ * "All todos" goes to the board, which stays at `todos/`, not to `todo/`, which serves nothing.
  *
  * A THEMED Jekyll page since 2026-10-07 (`lib/themed-page.ts`): on the site's
  * `default` layout, so it carries the top band (search, Folio, language) that
@@ -76,7 +77,7 @@ export function todoPageHtml(item: TodoIndexItem, opts: TodoPageOptions = {}): s
     body: `<link rel="stylesheet" href="${escHtml(`${toRoot}${TODO_PAGE_STYLESHEET}`)}">
 <div class="fa-todo-page" id="fa-todo-page"${decl.attrs}${data}>
 ${decl.stub}
-<p class="fa-todo-page-up"><a href="../">All todos</a></p>
+<p class="fa-todo-page-up"><a href="${escHtml(`${toRoot}todos/`)}">All todos</a></p>
 <h1 id="fa-todo-summary">${escHtml(item.id)}</h1>
 <p class="fa-todo-page-status" id="fa-todo-status" role="status">loading…</p>
 <dl class="fa-todo-page-meta" id="fa-todo-meta"></dl>
