@@ -266,7 +266,9 @@ describe("the real corpus", () => {
       expect(`${r.slug}: ${q?.state}`).toBe(`${r.slug}: met`);
       expect(q?.detail).toContain("not an archive");
     }
-  });
+    // It reads the whole mounted library: 6.5 s on a busy CI runner
+    // (cat-harness-tools#1950, run 43191767163), past bun's 5 s default.
+  }, 60_000);
 });
 
 // ── The record is real JSON-LD — bean `yh6u` ───────────────────────────────
