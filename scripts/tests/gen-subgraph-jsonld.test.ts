@@ -10,7 +10,7 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, extname, join, resolve } from "node:path";
+import { basename, extname, join, relative, resolve, sep } from "node:path";
 import {
   SUBGRAPH_CONTEXT_PATH,
   auditPayloadTree,
@@ -41,7 +41,7 @@ import {
   SubgraphIndexSchema,
   type PayloadLink,
 } from "../../schemas/kg/subgraph-manifest.js";
-import { ownDirectoryById } from "../../schemas/kg/cat-harness.ts";
+import { optInDirectoriesForGraph } from "../../schemas/kg/cat-harness.ts";
 import { harnessLayout } from "../lib/harness-layout.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
@@ -139,19 +139,25 @@ describe("gen-subgraph-jsonld", () => {
   test("tools/ is a named subgraph: every Tool of this instance, one fetch, each in its own folder (bean mo75 G1)", () => {
     // The oracle is discovery's own list, not the plan: which Tools this
     // layer defines, and the IRI kg-export gives each.
-    // The Tools of the opt-in `work-plan` sub-graph sit in ITS tools graph,
-    // `work-plan/tools/` (cat-harness#991 step 23.2), and are checked below.
-    // declared-path-literal: the fallback only — read by the declared id `work-plan-tools`.
-    const workPlanIds = new Set(
-      SUBGRAPHS
-        ? readdirSync(ownDirectoryById(ROOT, "work-plan-tools", "work-plan/tools"), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
-        : [],
-    );
-    expect(workPlanIds.size > 0).toBe(SUBGRAPHS);
-    const expected = toolsOf(ROOT).filter((t) => !workPlanIds.has(t.id)).map((t) => toolIri(HOST_DOC, t.id)).sort();
-    const workPlanExpected = toolsOf(ROOT).filter((t) => workPlanIds.has(t.id)).map((t) => toolIri(HOST_DOC, t.id)).sort();
-    expect(workPlanExpected.length).toBe(workPlanIds.size);
-    if (SUBGRAPHS) expect([...indexMembers("work-plan/tools/")].filter((id) => workPlanExpected.includes(id)).sort()).toEqual(workPlanExpected);
+    // The Tools of every OPT-IN sub-graph sit in that sub-graph's own tools
+    // graph — `work-plan/tools/` (cat-harness#991 step 23.2), and since owner
+    // card Q-CORE-SKILLS A (2026-11-12) `sdlc/tools/`, `integrations/tools/`,
+    // `kg-ops/tools/` and the rest — so each is checked below against its own
+    // index, not against `tools/`. The set is the declaration's, read the way
+    // discovery reads it, so a sub-graph added later needs no edit here.
+    const optIn = optInDirectoriesForGraph(ROOT, "tools").map((dir) => ({
+      subgraph: `${relative(ROOT, dir).split(sep).join("/")}/`,
+      ids: new Set(readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)),
+    }));
+    expect(optIn.some((o) => o.subgraph === "work-plan/tools/")).toBe(SUBGRAPHS);
+    const optInToolIds = new Set(optIn.flatMap((o) => [...o.ids]));
+    for (const o of optIn) {
+      expect(o.ids.size > 0, `${o.subgraph} holds no Tool`).toBe(true);
+      const want = toolsOf(ROOT).filter((t) => o.ids.has(t.id)).map((t) => toolIri(HOST_DOC, t.id)).sort();
+      expect(want.length).toBe(o.ids.size);
+      if (SUBGRAPHS) expect([...indexMembers(o.subgraph)].filter((id) => want.includes(id)).sort()).toEqual(want);
+    }
+    const expected = toolsOf(ROOT).filter((t) => !optInToolIds.has(t.id)).map((t) => toolIri(HOST_DOC, t.id)).sort();
     expect(expected.length).toBeGreaterThan(0);
     expect(read("", SUBGRAPH_INDEX_FILE).hasSubgraph).toContain(iriOf("tools/"));
     const tools = read("tools/", SUBGRAPH_INDEX_FILE);
@@ -165,7 +171,7 @@ describe("gen-subgraph-jsonld", () => {
     const rootIds = ((read("", SUBGRAPH_INDEX_FILE).hasMember ?? []) as Array<{ "@id": string }>).map((m) => m["@id"]);
     expect(rootIds.filter((id) => expected.includes(id))).toEqual([]);
     // `<tools dir>/<id>/<id>.ts`: the folder is the Tool's own subgraph.
-    const [first] = toolsOf(ROOT).filter((t) => !workPlanIds.has(t.id));
+    const [first] = toolsOf(ROOT).filter((t) => !optInToolIds.has(t.id));
     const own = read(`tools/${first!.id}/`, SUBGRAPH_HYDRATED_FILE);
     expect((own.hasMember as Array<Record<string, unknown>>).map((m) => m["@id"])).toContain(toolIri(HOST_DOC, first!.id));
     expect((own.hasMember as Array<Record<string, unknown>>).find((m) => m.name === first!.id)?.invoke).toBeDefined();

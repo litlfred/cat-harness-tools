@@ -31,10 +31,15 @@ const ROOT = resolve(HARNESS_ROOT);
 const model = () => loadProcessModel(workflowFile(HARNESS, "actor-role-administration.bpmn"));
 
 describe("what it adds over code-change-review", () => {
-  test("it CALLS that process rather than restating its steps", async () => {
+  test("it NAMES that process rather than restating its steps", async () => {
+    // Not a call: `code-change-review` is in the opt-in `sdlc` sub-graph, and
+    // an always-on diagram may not call what a layer without it does not have
+    // (owner card Q-OPTIN-CALLS A, 2026-11-12, cat-harness#1269). The step
+    // names the process in its documentation instead, and calls nothing.
     const m = await model();
-    const call = m.nodes.get("CallActivity_CodeChangeReview");
-    expect(call?.calledElement).toBe("Process_CodeChangeReview");
+    const step = m.nodes.get("CallActivity_CodeChangeReview");
+    expect(step?.calledElement).toBeUndefined();
+    expect(step?.documentation).toContain("Process_CodeChangeReview");
   });
 
   test("the audit runs after the call, not before", async () => {
