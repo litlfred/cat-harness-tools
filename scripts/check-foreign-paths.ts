@@ -305,6 +305,32 @@ export function judge(current: Record<string, number>, baseline: Record<string, 
   return { exit: over.length > 0 ? 1 : 0, over, under };
 }
 
+/**
+ * The report for the files above their count: each file's rise as a plain
+ * line, and each of its sites as a `✗` finding keyed by WHAT it spells, never
+ * by the file it sits in.
+ *
+ * Why the file is kept out of the `✗` text: CI judges a gate already red on
+ * main by its `✗` lines (`gate_diagnostics.py`, every number read as `#`), so
+ * a finding keyed by its file reads as NEW whenever its block MOVES. dth-sc#24
+ * moved two pages from `front-matter/` to `glossary/` unchanged, and the same
+ * two literals came back as two "new" errors. Keyed by the literal and the
+ * directory it lands in, a move is the same finding, and a real new site is
+ * still one more of it (the comparison counts repeats). Where it sits is
+ * printed on the line under it, which the comparison does not read.
+ */
+export function overLines(j: Judgement, scan: ForeignScan): string[] {
+  const out: string[] = [];
+  for (const o of j.over) {
+    out.push(`  over its count: ${o.file}: ${o.was} → ${o.now}`);
+    for (const s of scan.counted.filter((x) => x.file === o.file)) {
+      out.push(`  ✗ "${s.literal}" spells ${s.owner}'s ${s.target}/`);
+      out.push(`      at ${s.file}:${s.line}`);
+    }
+  }
+  return out;
+}
+
 const COMMENT =
   "Per-file counts of literals that spell a path into ANOTHER instance's declared directories (bean `gz47`), in non-test source. A RATCHET, one way: a file above its count is red; a file below it is reported with `bun run cat foreign-paths:baseline`, which lowers the list. WRITTEN by that command; a higher count is a diff somebody reviews. See the module header of cat-harness/scripts/check-foreign-paths.ts.";
 
@@ -337,11 +363,7 @@ if (import.meta.main) {
         `${excused[0]!.owner}'s own directories, and that code's ratchet is kept in the platform index (cat-harness-tools#1701)`,
     );
   }
-  for (const o of j.over) {
-    console.log(`  ✗ ${o.file}: ${o.was} → ${o.now}`);
-    for (const s of scan.counted.filter((x) => x.file === o.file))
-      console.log(`      ${s.file}:${s.line}  "${s.literal}"  → ${s.owner}'s ${s.target}/`);
-  }
+  for (const l of overLines(j, scan)) console.log(l);
   if (j.under.length > 0) {
     console.log(`  ${j.under.length} file(s) are below the baseline — \`bun run cat foreign-paths:baseline\` lowers the list (not a failure).`);
   }
