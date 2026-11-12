@@ -16,7 +16,7 @@ import { declarationPathIn } from "../../schemas/kg/cat-harness.js";
 import { gitCorpus } from "../../schemas/sdlc/git-corpus.js";
 import { baseDocsDir } from "../../scripts/compose-docs.js";
 import { docsPages, documentingPages } from "../../scripts/docs-declarations.js";
-import { page, publishedPage, pageRelPath, skillIds, toolRows, toolSubjects } from "../../scripts/gen-tools-viz.js";
+import { allPages, page, pageRelPath, skillIds, toolPageRelPath, toolRows, toolSubjects } from "../../scripts/gen-tools-viz.js";
 import { discoverTools } from "../../tools/discover.ts";
 import { siteNotBuilt } from "../support/checkout.ts";
 
@@ -170,19 +170,24 @@ describe("the generator writes where the declaration says", () => {
   // read by auto-discovery, with one sub-graph page per layer.
   const { subjects, empty } = toolSubjects(REPO);
 
+  // Drawn once for the three tests below: reading every process diagram takes
+  // seconds, and three reads would time each test out.
+  let memo: ReturnType<typeof allPages> | undefined;
+  const drawn = () => (memo ??= allPages(toolRows(discoverTools(REPO).tools), pageRelPath(REPO)!, skillIds(REPO), REPO));
+
   // Standing alone the page is not built: `tools:viz` writes it at publish and
   // `tools/` is gitignored (bean w1gy F18).
   const toolsPage = pageRelPath(REPO);
   it.skipIf(
     toolsPage !== undefined && siteNotBuilt("the Tools page `tools:viz` writes at publish (gitignored)", join(DOCS, toolsPage)),
-  )("and the committed page is current", () => {
+  )("and the committed page is current", async () => {
     // The gate runs this too; asserting it here means a stale page fails the
     // unit suite rather than only the gate, which is where it is noticed first.
+    // The same assembly the writer runs (`allPages`), so the two cannot differ.
     const rel = pageRelPath(REPO)!;
-    const all = toolRows(discoverTools(REPO).tools);
-    const scope = { subjects: subjects.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })) };
-    expect(readFileSync(join(DOCS, rel), "utf-8")).toBe(publishedPage(all, skillIds(REPO), REPO, scope));
-  });
+    const { pages } = await drawn();
+    expect(readFileSync(join(DOCS, rel), "utf-8")).toBe(pages.get(rel)!);
+  }, 60_000);
 
   // Standing alone the per-instance pages are not built: `tools:viz` writes
   // them at publish and `tools/` is gitignored (bean w1gy F18). A subject with
@@ -194,16 +199,54 @@ describe("the generator writes where the declaration says", () => {
   it.skipIf(
     subjectPages.length > 0 &&
       siteNotBuilt("the per-instance Tools pages `tools:viz` writes at publish (gitignored)", ...subjectPages),
-  )("draws one current page per instance that declares Tools, and none for an empty graph", () => {
+  )("draws one current page per instance that declares Tools, and none for an empty graph", async () => {
     // Vacuity guard: more than cat-harness's own graph is drawn.
     expect(subjects.length).toBeGreaterThan(1);
+    const { pages } = await drawn();
     for (const x of subjects) {
       const rel = pageRelPath(REPO, x.name)!;
       expect(rel).toEndWith(`/tools/${x.name}/index.md`);
-      expect(readFileSync(join(DOCS, rel), "utf-8")).toBe(
-        publishedPage(x.rows, skillIds(REPO), REPO, { instance: x.name, upHref: "../" }),
-      );
+      expect(readFileSync(join(DOCS, rel), "utf-8")).toBe(pages.get(rel)!);
     }
     for (const n of empty) expect(existsSync(join(DOCS, pageRelPath(REPO, n)!))).toBe(false);
-  });
+  }, 60_000);
+
+  // Owner, 2026-11-12: "each tool in a harness should have its own page … with
+  // IRI and viewer", and the tools table "should then link to that viewer".
+  it.skipIf(
+    subjectPages.length > 0 &&
+      siteNotBuilt("the per-Tool pages `tools:viz` writes at publish (gitignored)", ...subjectPages),
+  )("draws one page per Tool, carrying its IRI, and every row links to it", async () => {
+    const { pages } = await drawn();
+    for (const x of subjects) {
+      const layerPage = pages.get(pageRelPath(REPO, x.name)!)!;
+      for (const r of x.rows) {
+        const rel = toolPageRelPath(REPO, x.name, r.id)!;
+        const tool = pages.get(rel);
+        expect(tool, `${x.name}/${r.id} has no page`).toBeDefined();
+        expect(tool!).toContain(`| Tool | \`${r.id}\` |`);
+        expect(tool!).toContain('<script type="application/ld+json">');
+        expect(tool!).toContain("## Skills it satisfies");
+        expect(tool!).toContain("## How it is deployed and reached");
+        expect(layerPage).toContain(`[\`${r.id}\`](${encodeURIComponent(r.id)}/)`);
+      }
+    }
+  }, 60_000);
+
+  // Owner, 2026-11-12: "go ahead with the OpenAPI generation and MCP tool list".
+  it.skipIf(
+    subjectPages.length > 0 &&
+      siteNotBuilt("the API documents `tools:viz` writes at publish (gitignored)", ...subjectPages),
+  )("publishes an OpenAPI document, an MCP tool list and an API reference per layer, linked from its page", async () => {
+    const { pages } = await drawn();
+    for (const x of subjects) {
+      const dir = pageRelPath(REPO, x.name)!.replace(/index\.md$/, "");
+      const doc = JSON.parse(pages.get(`${dir}openapi.json`)!) as { openapi: string; paths: Record<string, unknown> };
+      expect(doc.openapi).toBe("3.1.0");
+      expect(Object.keys(doc.paths).sort()).toEqual(x.rows.map((r) => `/tools/${r.id}`).sort());
+      expect(JSON.parse(pages.get(`${dir}mcp-tools.json`)!).tools).toBeArray();
+      expect(pages.get(`${dir}api/index.md`)).toContain("## Operations");
+      expect(pages.get(pageRelPath(REPO, x.name)!)).toContain("[OpenAPI document](openapi.json)");
+    }
+  }, 60_000);
 });

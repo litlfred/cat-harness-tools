@@ -64,6 +64,28 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 import { localSiteDir } from "./lib/local-site-dir.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { deriveAlternatives, type ToolDefinition } from "../schemas/tools/tool.js";
+import { toolIri } from "../schemas/tools/tool-folders.js";
+import { termIri } from "../schemas/kg/namespaces.js";
+import { publishedIdentity } from "./kg-export.ts";
+import { pageRelPath as processesPageRelPath, processRows, stepAnchor, type ProcessRow } from "./gen-processes-viz.ts";
+import {
+  forgeHrefFor,
+  mcpServersOf,
+  pageHref,
+  relativeImports,
+  resolveScriptKey,
+  scriptPaths,
+  skillDocuments,
+  skillIoContracts,
+  toolPage,
+  workflowNeedles,
+  workflowUses,
+  type ProcessUse,
+  type SkillInfo,
+  type ToolPageData,
+} from "./tool-page.ts";
+import { apiReferencePage, mcpToolList, openApiFor, resolveModule, type McpToolEntry } from "./tool-api.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "tools-viewer";
@@ -99,6 +121,8 @@ export interface ToolRow {
   readonly qaVerdict?: string;
   /** The Tool's provenance log, rendered (`provenance-footer.ts`), when it has one with entries. */
   readonly provenance?: string;
+  /** Whether a GitHub workflow in the checkout runs its command — the `action` surface of the filter. */
+  readonly action?: boolean;
 }
 
 /** A `satisfies` entry, however it was written. */
@@ -403,6 +427,9 @@ export function pageRelPath(repo = REPO, subgraph?: string): string | undefined 
 export interface ToolSubject {
   readonly name: string;
   readonly rows: ToolRow[];
+  /** The layer root, and its Tool nodes as loaded: what each Tool's own page is drawn from. */
+  readonly root?: string;
+  readonly defs?: readonly ToolDefinition[];
 }
 
 /**
@@ -422,9 +449,10 @@ export function toolSubjects(repo = REPO): { subjects: ToolSubject[]; empty: str
     const p = declarationPathIn(inst);
     const name = p && existsSync(p) ? (JSON.parse(readFileSync(p, "utf-8")) as { name?: string }).name : undefined;
     if (!name) continue;
-    const rows = toolRows(toolsOf(inst), repo, { instanceRoot: inst });
+    const defs = toolsOf(inst);
+    const rows = toolRows(defs, repo, { instanceRoot: inst });
     if (rows.length === 0) empty.push(name);
-    else subjects.push({ name, rows });
+    else subjects.push({ name, rows, root: inst, defs });
   }
   return { subjects, empty };
 }
@@ -437,6 +465,10 @@ export interface PageScope {
   readonly subjects?: readonly { name: string; count: number; href: string }[];
   /** The full view, relative to a sub-graph page. */
   readonly upHref?: string;
+  /** A Tool's own page, relative to this one; absent, the id links to its row. */
+  readonly toolHref?: (id: string) => string | undefined;
+  /** The API documents for the Tools this page shows, relative to it. */
+  readonly api?: { openapi: string; mcp: string; reference: string };
 }
 
 /** The base docs layer — the same answer `compose-docs.ts` uses. */
@@ -452,6 +484,11 @@ const CSS = `
 .tg-mcp{color:#b9a8ec}     /* 7.06:1 */
 .tg-inproc{color:#86b8f2}  /* 7.26:1 */
 .tg-manual{color:#f5a070}  /* 7.25:1 */
+.tg-action{color:#e6c07b}
+:root[data-fa-scheme="light"] .tg-action{color:#7a5a00}
+.tg-filter{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.5rem 0}
+.tg-filter button{font:inherit;font-size:.8rem;padding:.15rem .6rem;border-radius:3px;border:1px solid rgba(128,128,128,.5);background:transparent;color:inherit;cursor:pointer}
+.tg-filter button[aria-pressed="true"]{border-color:currentColor;font-weight:600}
 :root[data-fa-scheme="light"] .tg-shell{color:#0d6e5e}
 :root[data-fa-scheme="light"] .tg-mcp{color:#6b5b95}
 :root[data-fa-scheme="light"] .tg-inproc{color:#1d5fa8}
@@ -490,6 +527,8 @@ const CSS = `
 `;
 
 const INVOKE_CLASS: Record<string, string> = {
+  action: "tg-action",
+  container: "tg-shell",
   shell: "tg-shell",
   mcp: "tg-mcp",
   inProcess: "tg-inproc",
@@ -497,8 +536,30 @@ const INVOKE_CLASS: Record<string, string> = {
 };
 
 function badge(kind: string): string {
-  return `<span class="tg-tag ${INVOKE_CLASS[kind] ?? ""}">${kind}</span>`;
+  return `<span class="tg-tag ${INVOKE_CLASS[kind] ?? ""}" data-surface="${kind}">${SURFACE_LABEL[kind] ?? kind}</span>`;
 }
+
+/** How a surface reads to someone choosing one: `shell` is the command line, `action` a GitHub workflow. */
+const SURFACE_LABEL: Record<string, string> = { shell: "cli", action: "github action" };
+
+/**
+ * The surface filter over the "Every tool" table (owner, 2026-11-12: the MCP
+ * services view "could just be a filter on the tools", and so could GitHub
+ * Actions "and other things like this"). Each row's invocation cell carries one
+ * badge per surface, `data-surface`; with JS off every row shows.
+ */
+const FILTER_SCRIPT = `
+(function(){
+  var bar=document.getElementById('tg-filter'); if(!bar) return;
+  var t=bar.nextElementSibling; while(t && !t.querySelector('table')) t=t.nextElementSibling; if(!t) return;
+  var rows=t.querySelectorAll('tbody tr'), out=document.getElementById('tg-shown');
+  bar.addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
+    bar.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',String(x===b));});
+    var s=b.getAttribute('data-surface'), n=0;
+    rows.forEach(function(r){ var ok=!s || !!r.querySelector('[data-surface="'+s+'"]'); r.hidden=!ok; if(ok) n++; });
+    if(out) out.textContent=String(n); });
+})();
+`;
 
 /** Escape a cell so a pipe in a description cannot break the table. */
 function cell(v: string): string {
@@ -553,6 +614,12 @@ export function page(
     ...(scope.instance !== undefined
       ? [
           `The Tool nodes **${scope.instance}** declares in its \`tools\` graph${scope.upHref ? ` — one instance's slice of [every instance's tools](${scope.upHref})` : ""}.`,
+          "",
+        ]
+      : []),
+    ...(scope.api
+      ? [
+          `**As an API:** [OpenAPI document](${scope.api.openapi}) · [MCP tool list](${scope.api.mcp}) · [API reference](${scope.api.reference}).`,
           "",
         ]
       : []),
@@ -640,7 +707,17 @@ export function page(
     );
   }
 
-  b.push("## Every tool", "", "| tool | what it does | invoked | satisfies | i/o | qa |", "|---|---|---|---|---|---|");
+  const surfaces = [...new Set(rows.flatMap((r) => [...r.invoke, ...(r.action ? ["action"] : [])]))].sort();
+  b.push(
+    "## Every tool",
+    "",
+    `<div class="tg-filter" id="tg-filter" role="group" aria-label="Filter by how a tool is reached"><span>Reached as:</span><button type="button" aria-pressed="true" data-surface="">all</button>${surfaces
+      .map((s) => `<button type="button" aria-pressed="false" data-surface="${s}">${SURFACE_LABEL[s] ?? s} (${rows.filter((r) => (s === "action" ? r.action : r.invoke.includes(s))).length})</button>`)
+      .join("")}<span><span id="tg-shown">${rows.length}</span> of ${rows.length} shown</span></div>`,
+    "",
+    "| tool | what it does | invoked | satisfies | i/o | qa |",
+    "|---|---|---|---|---|---|",
+  );
   for (const r of rows) {
     const sat = r.satisfies.length
       ? r.satisfies
@@ -655,17 +732,18 @@ export function page(
       : r.qaVerdict
         ? `\`${cell(r.qaVerdict)}\``
         : "**—**";
+    const own = scope.toolHref?.(r.id);
     b.push(
-      `| <a id="${cell(r.id)}"></a>[\`${cell(r.id)}\`](#${cell(r.id)})<br>${cell(r.title)} | ${cell(r.description)} | ` +
-        `${r.invoke.map(badge).join(" ")} | ${sat} | ${r.inputs} in / ${r.outputs} out | ${qa} |`,
+      `| <a id="${cell(r.id)}"></a>[\`${cell(r.id)}\`](${own ?? `#${cell(r.id)}`})<br>${cell(r.title)} | ${cell(r.description)} | ` +
+        `${[...r.invoke, ...(r.action ? ["action"] : [])].map(badge).join(" ")} | ${sat} | ${r.inputs} in / ${r.outputs} out | ${qa} |`,
     );
   }
-  b.push("");
+  b.push("", `<script>${FILTER_SCRIPT}</script>`, "");
 
-  // THE PROVENANCE OF EACH TOOL (owner, 2026-11-05, "2B"): a Tool has no page
-  // of its own, so its log is shown here, collapsed, under its id. A tool with
-  // no log is not listed.
-  const withLog = rows.filter((r) => r.provenance !== undefined);
+  // THE PROVENANCE OF EACH TOOL (owner, 2026-11-05, "2B"): shown here,
+  // collapsed, under its id, only where a Tool has no page of its own. Since
+  // 2026-11-12 each Tool has one (`toolPages`), and its log is on it.
+  const withLog = scope.toolHref === undefined ? rows.filter((r) => r.provenance !== undefined) : [];
   if (withLog.length > 0) {
     b.push(
       "## Provenance",
@@ -697,6 +775,277 @@ export function publishedPage(
   );
 }
 
+/** Where a Tool's own page goes: one directory under its layer's sub-graph page. */
+export function toolPageRelPath(repo: string, instance: string, id: string): string | undefined {
+  const sub = pageRelPath(repo, instance);
+  return sub === undefined ? undefined : posixJoin(dirname(sub), encodeURIComponent(id), "index.md");
+}
+
+const posixJoin = (...p: string[]): string => p.join("/").split(sep).join("/").replace(/\/+/g, "/");
+
+/**
+ * Every Tool's page, keyed by its site-relative path, with each row's
+ * `action` surface found on the way (the workflows that run its command).
+ *
+ * Owner, 2026-11-12: a page per Tool, with its IRI and viewer, its skills and
+ * their I/O contracts, the processes and tasks it serves, how it is deployed
+ * and reached (MCP, CLI, GitHub Action), and what it is made of.
+ */
+export async function toolPages(
+  subjects: readonly ToolSubject[],
+  repo = REPO,
+): Promise<{
+  pages: Map<string, string>;
+  actions: Set<string>;
+  hrefOf: (fromPage: string, id: string) => string | undefined;
+  /** Each layer's API documents, site-relative, for its page to link. */
+  apiOf: (instance: string) => { openapi: string; mcp: string; reference: string } | undefined;
+}> {
+  const roots = instanceRootsIn(repo);
+  const forge = forgeHrefFor(repo, repoWebFor(repo));
+  const all = subjects.flatMap((x) => (x.defs ?? []).map((d) => ({ d, x })));
+  const pageOf = new Map(all.map(({ d, x }) => [d.id, toolPageRelPath(repo, x.name, d.id)]));
+  const hrefOf = (fromPage: string, id: string): string | undefined => {
+    const to = pageOf.get(id);
+    return to === undefined ? undefined : pageHref(fromPage, to);
+  };
+
+  // The skills: every document the checkout holds, and their I/O contracts.
+  const platform = join(repo, "cat-harness");
+  const skillDirs = existsSync(platform) ? kgRoots(platform) : [];
+  const docs = skillDocuments([...skillDirs, ...roots], repo);
+  const skillPages = skillPagesOf(repo);
+  const bySkill = new Map<string, string[]>();
+  for (const { d } of all) for (const s of d.satisfies.map(skillId)) bySkill.set(s, [...(bySkill.get(s) ?? []), d.id]);
+  const alternatives = deriveAlternatives(all.map(({ d }) => d));
+
+  // The processes, read once by the processes viewer's own reader.
+  let rows: ProcessRow[] = [];
+  let processesRead = true;
+  try {
+    rows = await processRows(repo);
+  } catch {
+    processesRead = false;
+  }
+  const procPage = (() => {
+    try {
+      return processesPageRelPath(repo);
+    } catch {
+      return undefined;
+    }
+  })();
+  const mcpServers = mcpServersOf(repo);
+  const typeIri = termIri("Tool");
+
+  // EACH LAYER'S DOCUMENT IRI, and so each Tool's (`toolIri`, as kg-export mints it).
+  const docIriOf = new Map<string, string | undefined>();
+  for (const x of subjects) {
+    try {
+      docIriOf.set(x.name, x.root ? publishedIdentity(x.root).docIri : undefined);
+    } catch {
+      docIriOf.set(x.name, undefined);
+    }
+  }
+  const iriOf = new Map(all.map(({ d, x }) => [d.id, docIriOf.get(x.name) ? toolIri(docIriOf.get(x.name)!, d.id) : undefined]));
+
+  // THE MCP TOOL LIST, read from the registrars (`tool-api.ts`).
+  const mcp = await mcpToolList(
+    all.filter(({ x }) => x.root).map(({ d, x }) => ({ def: d, root: x.root!, ...(iriOf.get(d.id) ? { iri: iriOf.get(d.id)! } : {}) })),
+    roots,
+  );
+  for (const pr of mcp.problems) console.error(`  · mcp tool list: ${pr}`);
+  const mcpOf = (id: string): McpToolEntry[] => mcp.tools.filter((m) => m._meta.tool === id);
+
+  const pages = new Map<string, string>();
+  const actions = new Set<string>();
+
+  // THE API DOCUMENTS, per layer and for every layer together (owner, 2026-11-12).
+  const contracts = (s: string) => skillIoContracts(s, roots, repo).map((c) => ({ io: c.io, schema: c.schema }));
+  const apiFiles = new Map<string, { openapi: string; mcp: string; reference: string }>();
+  const writeApi = (dir: string, title: string, version: string, defs: readonly ToolDefinition[], upHref: string, key?: string) => {
+    const files = { openapi: posixJoin(dir, "openapi.json"), mcp: posixJoin(dir, "mcp-tools.json"), reference: posixJoin(dir, "api", "index.md") };
+    const doc = openApiFor(defs, {
+      title,
+      version,
+      toolIri: (id) => iriOf.get(id),
+      toolPage: (id) => hrefOf(files.openapi, id),
+      skillContracts: contracts,
+      mcpNames: (id) => mcpOf(id).map((m) => m.name),
+    });
+    const ids = new Set(defs.map((d) => d.id));
+    const list = mcp.tools.filter((m) => ids.has(m._meta.tool));
+    pages.set(files.openapi, JSON.stringify(doc, null, 2) + "\n");
+    pages.set(files.mcp, JSON.stringify({ tools: list }, null, 2) + "\n");
+    pages.set(
+      files.reference,
+      withRenderedByFrontMatter(
+        apiReferencePage({
+          title: title.replace(/^Tools — /, ""),
+          generatedFm: GENERATED_FM,
+          openapi: doc,
+          mcp: list,
+          openapiHref: "../openapi.json",
+          mcpHref: "../mcp-tools.json",
+          toolHref: (id) => hrefOf(files.reference, id),
+          upHref,
+        }),
+        VIEWER_TOOL,
+      ),
+    );
+    if (key !== undefined) apiFiles.set(key, files);
+  };
+  const versionOf = (root: string | undefined): string => {
+    try {
+      return String((root && readDeclaration(root)?.version) ?? "0.0.0");
+    } catch {
+      return "0.0.0";
+    }
+  };
+  const indexPage = pageRelPath(repo);
+  if (indexPage !== undefined) {
+    writeApi(dirname(indexPage), "Tools — every layer", versionOf(join(repo, "cat-harness")), all.map(({ d }) => d), "../", "");
+  }
+  for (const x of subjects) {
+    const sub = pageRelPath(repo, x.name);
+    if (sub === undefined || !x.defs) continue;
+    if (x.defs.some((d) => d.id === "api")) {
+      console.error(`  · ${x.name}: a Tool named \`api\` would collide with the API reference page; it is not drawn`);
+      continue;
+    }
+    writeApi(dirname(sub), `Tools — ${x.name}`, versionOf(x.root), x.defs, "../", x.name);
+  }
+
+  for (const x of subjects) {
+    const root = x.root;
+    if (!root || !x.defs) continue;
+    const docIri = docIriOf.get(x.name);
+    const toolsDir = instanceDirectoryForGraph(root, KIND);
+    for (const def of x.defs) {
+      const rel = toolPageRelPath(repo, x.name, def.id);
+      if (rel === undefined) continue;
+      const row = x.rows.find((r) => r.id === def.id);
+      const repoRel = (abs: string) => relative(repo, abs).split(sep).join("/");
+      const file = toolsDir
+        ? [".ts", ".json"].map((e) => join(toolsDir, def.id, `${def.id}${e}`)).find((f) => existsSync(f))
+        : undefined;
+      const satisfies = def.satisfies.map(skillId);
+      const skills = new Map<string, SkillInfo | undefined>(
+        satisfies.map((s) => {
+          const doc = docs.get(s);
+          return [s, doc ? { ...doc, io: skillIoContracts(s, roots, repo) } : undefined];
+        }),
+      );
+      const script = def.invoke.shell ? resolveScriptKey(def.invoke.shell, [repo, ...roots], repo) : undefined;
+
+      const parts: ToolPageData["parts"] = [];
+      const part = (role: string, abs: string) => parts.push({ role, file: repoRel(abs), href: forge(repoRel(abs)), exists: existsSync(abs) });
+      if (file) part("definition", file);
+      const provLog = file && join(dirname(file), `${def.id}.prov.jsonld`);
+      if (provLog && existsSync(provLog)) part("provenance log", provLog);
+      let moduleImports: ToolPageData["moduleImports"] = [];
+      if (def.invoke.inProcess) {
+        const mod = resolveModule(def.invoke.inProcess.module, root, roots) ?? join(root, def.invoke.inProcess.module);
+        part("in-process module", mod);
+        moduleImports = relativeImports(mod, repo).map((f) => ({ file: f, href: forge(f) }));
+      }
+      for (const p of [...scriptPaths(def.invoke.shell ?? ""), ...scriptPaths(script?.command ?? "")]) {
+        part("script", join(repo, p));
+      }
+      for (const m of def.maintains ?? []) part("maintained source", join(root, String((m as { source: unknown }).source)));
+      for (const sp of def.subprocesses ?? []) {
+        const r = rows.find((pr) => pr.id === sp || pr.stem === sp);
+        if (r) part("subprocess diagram", join(repo, r.file));
+      }
+
+      const procHref = (r: ProcessRow, step?: string) =>
+        procPage === undefined ? undefined : `${pageHref(rel, posixJoin(dirname(procPage), `${r.stem}.html`))}${step ? `#${stepAnchor(step)}` : ""}`;
+      const processes: ProcessUse[] = [];
+      for (const sp of def.subprocesses ?? []) {
+        const r = rows.find((pr) => pr.id === sp || pr.stem === sp);
+        processes.push({ process: sp, processName: r?.name ?? sp, ...(r && procHref(r) ? { href: procHref(r) } : {}) });
+      }
+      for (const r of rows) {
+        for (const st of r.steps ?? []) {
+          const via = st.skills.find((s) => satisfies.includes(s));
+          if (!via) continue;
+          const href = procHref(r, st.id);
+          processes.push({ process: r.id, processName: r.name, step: { id: st.id, name: st.name, lane: st.lane }, via, ...(href ? { href } : {}) });
+        }
+      }
+
+      const workflows = workflowUses(repo, roots, workflowNeedles(def, script), forge);
+      if (workflows.length) actions.add(def.id);
+      const data: ToolPageData = {
+        def,
+        instance: x.name,
+        ...(docIri ? { docIri, iri: toolIri(docIri, def.id) } : {}),
+        typeIri,
+        ...(file ? { source: { file: repoRel(file), ...(forge(repoRel(file)) ? { href: forge(repoRel(file)) } : {}) } } : {}),
+        skills,
+        skillHref: (s) => skillPageHref(s, rel, skillPages),
+        toolHref: (id) => hrefOf(rel, id),
+        siblings: bySkill,
+        alternatives: alternatives.get(def.id) ?? [],
+        processes,
+        processesRead,
+        ...(script ? { script } : {}),
+        parts,
+        moduleImports,
+        mcpServers: def.invoke.mcp ? mcpServers : [],
+        mcpTools: mcpOf(def.id),
+        ...(apiFiles.has(x.name)
+          ? { api: { reference: `${pageHref(rel, apiFiles.get(x.name)!.reference)}#${def.id}`, openapi: pageHref(rel, apiFiles.get(x.name)!.openapi), mcp: pageHref(rel, apiFiles.get(x.name)!.mcp) } }
+          : {}),
+        workflows,
+        ...(row?.qaHref ? { qaHref: row.qaHref } : {}),
+        ...(row?.qaVerdict ? { qaVerdict: row.qaVerdict } : {}),
+        ...(row?.provenance ? { provenance: row.provenance } : {}),
+      };
+      pages.set(rel, withRenderedByFrontMatter(toolPage(data, GENERATED_FM), VIEWER_TOOL));
+    }
+  }
+  return { pages, actions, hrefOf, apiOf: (instance) => apiFiles.get(instance) };
+}
+
+/**
+ * Every page the viewer draws, site-relative, with its content: the full KG,
+ * one per layer, and one per Tool. One function, so the writer and the test
+ * that asserts the written pages are current cannot assemble them differently.
+ */
+export async function allPages(
+  allRows: readonly ToolRow[],
+  PAGE: string,
+  known: ReadonlySet<string>,
+  repo = REPO,
+): Promise<{ pages: Map<string, string>; rows: ToolRow[]; subjects: ToolSubject[]; empty: string[] }> {
+  const { subjects: plain, empty } = toolSubjects(repo);
+  const built = await toolPages(plain, repo);
+  const withAction = (rs: readonly ToolRow[]): ToolRow[] => rs.map((r) => (built.actions.has(r.id) ? { ...r, action: true } : r));
+  const subjects = plain.map((x) => ({ ...x, rows: withAction(x.rows) }));
+  const rows = withAction(allRows);
+  const pages = new Map<string, string>();
+  pages.set(
+    PAGE,
+    publishedPage(rows, known, repo, {
+      subjects: subjects.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })),
+      toolHref: (id) => built.hrefOf(PAGE, id),
+      ...(built.apiOf("") ? { api: { openapi: "openapi.json", mcp: "mcp-tools.json", reference: "api/" } } : {}),
+    }),
+  );
+  for (const x of subjects) {
+    const rel = pageRelPath(repo, x.name)!;
+    pages.set(rel, publishedPage(x.rows, known, repo, {
+        instance: x.name,
+        upHref: "../",
+        toolHref: (id) => built.hrefOf(rel, id),
+        ...(built.apiOf(x.name) ? { api: { openapi: "openapi.json", mcp: "mcp-tools.json", reference: "api/" } } : {}),
+      }));
+  }
+  // ONE PAGE PER TOOL, under its layer's page (owner, 2026-11-12).
+  for (const [rel, rendered] of built.pages) pages.set(rel, rendered);
+  return { pages, rows, subjects, empty };
+}
+
 if (import.meta.main) {
   const check = process.argv.includes("--check");
   // Every declared `tools` graph, not cat-harness's alone (bean 1nu0). A
@@ -706,8 +1055,8 @@ if (import.meta.main) {
     for (const f of found.failures) console.error(`::error::gen-tools-viz: ${f.dir ?? f.instance}: ${f.reason}`);
     process.exit(1);
   }
-  const rows = toolRows(found.tools);
-  if (rows.length === 0) {
+  const rows0 = toolRows(found.tools);
+  if (rows0.length === 0) {
     // A declared graph that yields nothing is the `dh4f` shape — scanning
     // nothing and reporting a clean run. Refuse rather than write an empty page.
     console.error("::error::gen-tools-viz: the tools graph yielded no nodes");
@@ -719,22 +1068,9 @@ if (import.meta.main) {
     process.exit(1);
   }
   const known = skillIds(REPO);
-  const { subjects, empty } = toolSubjects(REPO);
+  const { pages, rows, subjects, empty } = await allPages(rows0, PAGE, known, REPO);
   const localDocs = localSiteDir(resolve(HARNESS_ROOT));
   const site = siteTarget(localDocs ?? baseDocsDir(REPO));
-
-  /** Every page this run draws, site-relative, with its content. */
-  const pages = new Map<string, string>();
-  pages.set(
-    PAGE,
-    publishedPage(rows, known, REPO, {
-      subjects: subjects.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })),
-    }),
-  );
-  for (const x of subjects) {
-    const rel = pageRelPath(REPO, x.name)!;
-    pages.set(rel, publishedPage(x.rows, known, REPO, { instance: x.name, upHref: "../" }));
-  }
 
   // ORPHANS: a sub-graph page this viewer drew for a layer that no
   // longer declares Tools. Only a page that says it is ours is touched.
@@ -742,13 +1078,24 @@ if (import.meta.main) {
   const drawn = new Set(subjects.map((x) => x.name));
   const orphans = existsSync(viewDir)
     ? readdirSync(viewDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory() && !drawn.has(e.name))
+        .filter((e) => e.isDirectory() && !drawn.has(e.name) && !pages.has(posixJoin(dirname(PAGE), e.name, "index.md")))
         .map((e) => join(viewDir, e.name))
         .filter((d) => {
           const f = join(d, "index.md");
           return existsSync(f) && renderedByOf(readFileSync(f, "utf-8")) === VIEWER_TOOL;
         })
     : [];
+
+  // ORPHANED TOOL PAGES: a Tool page under a drawn layer whose Tool is gone.
+  for (const x of subjects) {
+    const dir = join(site, pageRelPath(REPO, x.name)!, "..");
+    if (!existsSync(dir)) continue;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (!e.isDirectory() || pages.has(posixJoin(relative(site, dir), e.name, "index.md"))) continue;
+      const f = join(dir, e.name, "index.md");
+      if (existsSync(f) && renderedByOf(readFileSync(f, "utf-8")) === VIEWER_TOOL) orphans.push(join(dir, e.name));
+    }
+  }
 
   // A page cat-harness declares it builds at publish (`builtAtPublish`), by its
   // path in cat-harness's own site: the same site-relative path is asked under
