@@ -23,7 +23,7 @@ import { declarationChain } from "../../schemas/kg/harness-config.ts";
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { RemoteSourceSchema, resolveSubgraphSource } from "../../schemas/kg/subgraph-source.ts";
 import { MountLockSchema, mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
-import { AGENT_SURFACE_GENERATORS, checkRemote, editedOnlyPerLock, exitCode, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise, switchedOffOptInPaths } from "../remote-mount.ts";
+import { AGENT_SURFACE_GENERATORS, checkRemote, currentPerLock, editedOnlyPerLock, optInDriftFromLock, exitCode, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise, switchedOffOptInPaths } from "../remote-mount.ts";
 import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "../../schemas/kg/index-config.ts";
 import { run as replayLocks } from "../mount-from-lock.ts";
 import { gitCorpus } from "../../schemas/sdlc/git-corpus.ts";
@@ -695,6 +695,47 @@ describe("a whole mount leaves out the opt-in sub-graphs the downstream has not 
     expect(readFileSync(join(root, "opt/extra/big.txt"), "utf-8")).toBe("big\n");
     const lock2 = MountLockSchema.parse(JSON.parse(readFileSync(join(root, "index.lock.json"), "utf-8")));
     expect(lock2.instances.find((i) => i.instance === "opt")!.directories[0]!.except).toBeUndefined();
+  });
+
+  test("W3. a changed `enableSubgraphs` is not current per the lock, so a plain mount lays the group down (no `--fresh`)", () => {
+    const opt = bareRepo(base, "opt-w3", {
+      "opt.json": decl("opt", {
+        directories: [
+          { id: "opt-schemas", path: "schemas/", graphTypologies: ["code"] },
+          { id: "extra", path: "extra/", optIn: true, graphTypologies: ["code"] },
+        ],
+      }),
+      "package.json": '{"name":"opt"}\n',
+      "schemas/a.ts": "export const a = 1;\n",
+      "extra/big.txt": "big\n",
+    });
+    const local = (r: string): string => (r === "o/opt" ? `file://${opt.bare}` : urlFor(r));
+    const root = join(base, `down-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    const down = (enable?: string[]) =>
+      write(root, { "down.json": decl("down", { ...(enable ? { enableSubgraphs: enable } : {}), mountApprovers: ["test"], remoteMounts: [{ harness: "opt", repository: "o/opt", ref: opt.sha, ...consentFor(opt.sha), overrides: { opt: { whole: true } } }] }) });
+    down();
+    expect(summarise(mountRemote({ instanceRoot: root, urlFor: local }).plan.outcomes).state).toBe("mounted");
+    // Unchanged: the fast path holds.
+    expect(optInDriftFromLock(root)).toEqual([]);
+    expect(currentPerLock(root)?.state).toBe("mounted");
+
+    // Switched on: the bytes still hash to the lock, but the lock left the group out.
+    down(["opt.extra"]);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+    expect(optInDriftFromLock(root)).toEqual([expect.stringContaining("opt: extra is now switched on")]);
+    expect(currentPerLock(root)).toBeUndefined();
+    expect(editedOnlyPerLock(root)).toBeUndefined();
+    mountRemote({ instanceRoot: root, urlFor: local });
+    expect(readFileSync(join(root, "opt/extra/big.txt"), "utf-8")).toBe("big\n");
+    expect(optInDriftFromLock(root)).toEqual([]);
+    expect(currentPerLock(root)?.state).toBe("mounted");
+
+    // Switched off again: the same, the other way.
+    down();
+    expect(optInDriftFromLock(root)).toEqual([expect.stringContaining("opt: extra is now switched off")]);
+    expect(currentPerLock(root)).toBeUndefined();
   });
 });
 
