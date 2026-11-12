@@ -31,8 +31,9 @@
  * workflow file each layer resolves. Not read: a Tool inside an opt-in
  * sub-graph (it is switched off with the group it names).
  *
- * ADVISORY: no gate runs it yet. `check:optin-links` was turned on once every
- * link was fixed; this follows the same path.
+ * GATED: composed into `check:declaration-resolution` as its `optInRefs`
+ * field, which CI runs (owner, 2026-11-12, card Q-OPTINREFS-CI B: wire it
+ * now and fix every finding at its source), as `check:optin-links` is.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-optin-refs.ts [--json]

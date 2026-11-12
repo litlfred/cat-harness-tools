@@ -18,6 +18,7 @@
  * | `needs` | `check:instance-graph` → `resolveInstanceGraph` | every dependency resolves, no cycle |
  * | `enableSubgraphs` | here → `enableSubgraphsProblems` | each id names an opt-in sub-graph of this layer or its `needs` closure |
  * | `optInLinks` (the opt-in `directories`, as link targets) | `check:optin-links` → `checkOptInLinks` | no always-on page links into an opt-in sub-graph, which is absent wherever it is switched off |
+| `optInRefs` (the opt-in `directories`, as skill homes) | `check:optin-refs` → `checkOptInRefs` | no always-on Tool's `satisfies` or workflow's skill ref names a skill only an opt-in sub-graph holds |
  *
  * It also resolves `visualisers[].coversKinds`, a graph typology, which
  * `checkVisualiserRoutes` drops unjudged (it filters to PUBLISHED kinds).
@@ -61,9 +62,10 @@ import { auditInstance as auditDirs } from "./check-declared-dirs.ts";
 import { auditInstance as auditAssets } from "./check-declared-assets.ts";
 import { checkVisualiserRoutes } from "./check-visualiser-routes.ts";
 import { checkOptInLinks } from "./check-optin-links.ts";
+import { checkOptInRefs } from "./check-optin-refs.ts";
 
 /** The fields a declaration names paths or layers in, and the declaration itself (it must parse for any to be read). */
-export const RESOLVED_FIELDS = ["declaration", "directories", "assets", "visualisers", "needs", "enableSubgraphs", "optInLinks"] as const;
+export const RESOLVED_FIELDS = ["declaration", "directories", "assets", "visualisers", "needs", "enableSubgraphs", "optInLinks", "optInRefs"] as const;
 export type ResolvedField = (typeof RESOLVED_FIELDS)[number];
 
 export interface ResolutionFinding {
@@ -118,7 +120,7 @@ export function coverageFindings(
 export function checkDeclarationResolution(rootArg: string): ResolutionReport {
   const root = resolve(rootArg);
   const roots = instanceRootsIn(root);
-  const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0, enableSubgraphs: 0, optInLinks: 0 };
+  const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0, enableSubgraphs: 0, optInLinks: 0, optInRefs: 0 };
   const findings: ResolutionFinding[] = [];
   const undetermined: string[] = [];
   const names = new Map<string, string>();
@@ -275,6 +277,31 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     }
   } catch (e) {
     undetermined.push(`check:optin-links could not run — ${(e as Error).message.split("\n")[0]}`);
+  }
+
+  // The same defect for references that are not Markdown links: an always-on
+  // Tool's `satisfies`, or a workflow's skill ref, naming a skill only an
+  // opt-in sub-graph holds — check:optin-refs (owner, 2026-11-12, card
+  // Q-OPTINREFS-CI B: gated now, each finding fixed at its source).
+  // `optInRefs` counts the Tools and workflow files read.
+  try {
+    const refs = checkOptInRefs(root);
+    examined.optInRefs = refs.tools + refs.workflows;
+    const own = [...names.entries()].sort((a, b) => b[0].length - a[0].length);
+    for (const f of refs.findings) {
+      const abs = resolve(root, f.from);
+      // A Tool is named by id (discovery keeps no file), so it stands as its own subject.
+      const layer = f.kind === "workflow" ? own.find(([dir]) => abs === dir || abs.startsWith(dir + "/")) : undefined;
+      findings.push({
+        instance: layer?.[1] ?? (f.kind === "workflow" ? f.from.split("/")[0]! : f.from),
+        field: "optInRefs",
+        subject: f.from,
+        by: "check:optin-refs",
+        detail: `names skill ${f.ref} (${f.kind}), held only inside opt-in ${f.groups.map((g) => `\`${g}\``).join(", ")} — dangling wherever that group is switched off; fix it at its source by hand`,
+      });
+    }
+  } catch (e) {
+    undetermined.push(`check:optin-refs could not run — ${(e as Error).message.split("\n")[0]}`);
   }
 
   // A kind problem is reported once per needs edge by every dependent; say each once.
