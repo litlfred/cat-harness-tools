@@ -85,6 +85,7 @@ import {
   type SkillInfo,
   type ToolPageData,
 } from "./tool-page.ts";
+import { apiReferencePage, mcpToolList, openApiFor, resolveModule, type McpToolEntry } from "./tool-api.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "tools-viewer";
@@ -466,6 +467,8 @@ export interface PageScope {
   readonly upHref?: string;
   /** A Tool's own page, relative to this one; absent, the id links to its row. */
   readonly toolHref?: (id: string) => string | undefined;
+  /** The API documents for the Tools this page shows, relative to it. */
+  readonly api?: { openapi: string; mcp: string; reference: string };
 }
 
 /** The base docs layer — the same answer `compose-docs.ts` uses. */
@@ -611,6 +614,12 @@ export function page(
     ...(scope.instance !== undefined
       ? [
           `The Tool nodes **${scope.instance}** declares in its \`tools\` graph${scope.upHref ? ` — one instance's slice of [every instance's tools](${scope.upHref})` : ""}.`,
+          "",
+        ]
+      : []),
+    ...(scope.api
+      ? [
+          `**As an API:** [OpenAPI document](${scope.api.openapi}) · [MCP tool list](${scope.api.mcp}) · [API reference](${scope.api.reference}).`,
           "",
         ]
       : []),
@@ -785,7 +794,13 @@ const posixJoin = (...p: string[]): string => p.join("/").split(sep).join("/").r
 export async function toolPages(
   subjects: readonly ToolSubject[],
   repo = REPO,
-): Promise<{ pages: Map<string, string>; actions: Set<string>; hrefOf: (fromPage: string, id: string) => string | undefined }> {
+): Promise<{
+  pages: Map<string, string>;
+  actions: Set<string>;
+  hrefOf: (fromPage: string, id: string) => string | undefined;
+  /** Each layer's API documents, site-relative, for its page to link. */
+  apiOf: (instance: string) => { openapi: string; mcp: string; reference: string } | undefined;
+}> {
   const roots = instanceRootsIn(repo);
   const forge = forgeHrefFor(repo, repoWebFor(repo));
   const all = subjects.flatMap((x) => (x.defs ?? []).map((d) => ({ d, x })));
@@ -822,17 +837,88 @@ export async function toolPages(
   const mcpServers = mcpServersOf(repo);
   const typeIri = termIri("Tool");
 
+  // EACH LAYER'S DOCUMENT IRI, and so each Tool's (`toolIri`, as kg-export mints it).
+  const docIriOf = new Map<string, string | undefined>();
+  for (const x of subjects) {
+    try {
+      docIriOf.set(x.name, x.root ? publishedIdentity(x.root).docIri : undefined);
+    } catch {
+      docIriOf.set(x.name, undefined);
+    }
+  }
+  const iriOf = new Map(all.map(({ d, x }) => [d.id, docIriOf.get(x.name) ? toolIri(docIriOf.get(x.name)!, d.id) : undefined]));
+
+  // THE MCP TOOL LIST, read from the registrars (`tool-api.ts`).
+  const mcp = await mcpToolList(
+    all.filter(({ x }) => x.root).map(({ d, x }) => ({ def: d, root: x.root!, ...(iriOf.get(d.id) ? { iri: iriOf.get(d.id)! } : {}) })),
+    roots,
+  );
+  for (const pr of mcp.problems) console.error(`  · mcp tool list: ${pr}`);
+  const mcpOf = (id: string): McpToolEntry[] => mcp.tools.filter((m) => m._meta.tool === id);
+
   const pages = new Map<string, string>();
   const actions = new Set<string>();
+
+  // THE API DOCUMENTS, per layer and for every layer together (owner, 2026-11-12).
+  const contracts = (s: string) => skillIoContracts(s, roots, repo).map((c) => ({ io: c.io, schema: c.schema }));
+  const apiFiles = new Map<string, { openapi: string; mcp: string; reference: string }>();
+  const writeApi = (dir: string, title: string, version: string, defs: readonly ToolDefinition[], upHref: string, key?: string) => {
+    const files = { openapi: posixJoin(dir, "openapi.json"), mcp: posixJoin(dir, "mcp-tools.json"), reference: posixJoin(dir, "api", "index.md") };
+    const doc = openApiFor(defs, {
+      title,
+      version,
+      toolIri: (id) => iriOf.get(id),
+      toolPage: (id) => hrefOf(files.openapi, id),
+      skillContracts: contracts,
+      mcpNames: (id) => mcpOf(id).map((m) => m.name),
+    });
+    const ids = new Set(defs.map((d) => d.id));
+    const list = mcp.tools.filter((m) => ids.has(m._meta.tool));
+    pages.set(files.openapi, JSON.stringify(doc, null, 2) + "\n");
+    pages.set(files.mcp, JSON.stringify({ tools: list }, null, 2) + "\n");
+    pages.set(
+      files.reference,
+      withRenderedByFrontMatter(
+        apiReferencePage({
+          title: title.replace(/^Tools — /, ""),
+          generatedFm: GENERATED_FM,
+          openapi: doc,
+          mcp: list,
+          openapiHref: "../openapi.json",
+          mcpHref: "../mcp-tools.json",
+          toolHref: (id) => hrefOf(files.reference, id),
+          upHref,
+        }),
+        VIEWER_TOOL,
+      ),
+    );
+    if (key !== undefined) apiFiles.set(key, files);
+  };
+  const versionOf = (root: string | undefined): string => {
+    try {
+      return String((root && readDeclaration(root)?.version) ?? "0.0.0");
+    } catch {
+      return "0.0.0";
+    }
+  };
+  const indexPage = pageRelPath(repo);
+  if (indexPage !== undefined) {
+    writeApi(dirname(indexPage), "Tools — every layer", versionOf(join(repo, "cat-harness")), all.map(({ d }) => d), "../", "");
+  }
+  for (const x of subjects) {
+    const sub = pageRelPath(repo, x.name);
+    if (sub === undefined || !x.defs) continue;
+    if (x.defs.some((d) => d.id === "api")) {
+      console.error(`  · ${x.name}: a Tool named \`api\` would collide with the API reference page; it is not drawn`);
+      continue;
+    }
+    writeApi(dirname(sub), `Tools — ${x.name}`, versionOf(x.root), x.defs, "../", x.name);
+  }
+
   for (const x of subjects) {
     const root = x.root;
     if (!root || !x.defs) continue;
-    let docIri: string | undefined;
-    try {
-      docIri = publishedIdentity(root).docIri;
-    } catch {
-      docIri = undefined;
-    }
+    const docIri = docIriOf.get(x.name);
     const toolsDir = instanceDirectoryForGraph(root, KIND);
     for (const def of x.defs) {
       const rel = toolPageRelPath(repo, x.name, def.id);
@@ -858,7 +944,7 @@ export async function toolPages(
       if (provLog && existsSync(provLog)) part("provenance log", provLog);
       let moduleImports: ToolPageData["moduleImports"] = [];
       if (def.invoke.inProcess) {
-        const mod = join(root, def.invoke.inProcess.module);
+        const mod = resolveModule(def.invoke.inProcess.module, root, roots) ?? join(root, def.invoke.inProcess.module);
         part("in-process module", mod);
         moduleImports = relativeImports(mod, repo).map((f) => ({ file: f, href: forge(f) }));
       }
@@ -906,6 +992,10 @@ export async function toolPages(
         parts,
         moduleImports,
         mcpServers: def.invoke.mcp ? mcpServers : [],
+        mcpTools: mcpOf(def.id),
+        ...(apiFiles.has(x.name)
+          ? { api: { reference: `${pageHref(rel, apiFiles.get(x.name)!.reference)}#${def.id}`, openapi: pageHref(rel, apiFiles.get(x.name)!.openapi), mcp: pageHref(rel, apiFiles.get(x.name)!.mcp) } }
+          : {}),
         workflows,
         ...(row?.qaHref ? { qaHref: row.qaHref } : {}),
         ...(row?.qaVerdict ? { qaVerdict: row.qaVerdict } : {}),
@@ -914,7 +1004,7 @@ export async function toolPages(
       pages.set(rel, withRenderedByFrontMatter(toolPage(data, GENERATED_FM), VIEWER_TOOL));
     }
   }
-  return { pages, actions, hrefOf };
+  return { pages, actions, hrefOf, apiOf: (instance) => apiFiles.get(instance) };
 }
 
 /**
@@ -939,11 +1029,17 @@ export async function allPages(
     publishedPage(rows, known, repo, {
       subjects: subjects.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })),
       toolHref: (id) => built.hrefOf(PAGE, id),
+      ...(built.apiOf("") ? { api: { openapi: "openapi.json", mcp: "mcp-tools.json", reference: "api/" } } : {}),
     }),
   );
   for (const x of subjects) {
     const rel = pageRelPath(repo, x.name)!;
-    pages.set(rel, publishedPage(x.rows, known, repo, { instance: x.name, upHref: "../", toolHref: (id) => built.hrefOf(rel, id) }));
+    pages.set(rel, publishedPage(x.rows, known, repo, {
+        instance: x.name,
+        upHref: "../",
+        toolHref: (id) => built.hrefOf(rel, id),
+        ...(built.apiOf(x.name) ? { api: { openapi: "openapi.json", mcp: "mcp-tools.json", reference: "api/" } } : {}),
+      }));
   }
   // ONE PAGE PER TOOL, under its layer's page (owner, 2026-11-12).
   for (const [rel, rendered] of built.pages) pages.set(rel, rendered);
@@ -982,7 +1078,7 @@ if (import.meta.main) {
   const drawn = new Set(subjects.map((x) => x.name));
   const orphans = existsSync(viewDir)
     ? readdirSync(viewDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory() && !drawn.has(e.name))
+        .filter((e) => e.isDirectory() && !drawn.has(e.name) && !pages.has(posixJoin(dirname(PAGE), e.name, "index.md")))
         .map((e) => join(viewDir, e.name))
         .filter((d) => {
           const f = join(d, "index.md");

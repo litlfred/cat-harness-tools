@@ -44,6 +44,7 @@ import { parse as parseYaml } from "yaml";
 
 import { TOOL_TYPES, toolTypeNameOf } from "../schemas/tools/tool-types.js";
 import type { ToolDefinition } from "../schemas/tools/tool.js";
+import type { McpToolEntry } from "./tool-api.ts";
 
 /** A skill as a Tool page shows it. */
 export interface SkillInfo {
@@ -104,6 +105,10 @@ export interface ToolPageData {
   moduleImports: { file: string; href?: string }[];
   /** `.mcp.json` servers in the checkout. */
   mcpServers: { name: string; command: string }[];
+  /** The MCP tools it serves, as `tools/list` would list them. */
+  mcpTools?: McpToolEntry[];
+  /** Its operation in its layer's API documents. */
+  api?: { reference: string; openapi: string; mcp: string };
   workflows: WorkflowUse[];
   qaHref?: string;
   qaVerdict?: string;
@@ -318,6 +323,21 @@ export function toolPage(d: ToolPageData, generatedFm: string): string {
   b.push(...surfaces.map((s) => `- ${s}`), "");
   if (d.workflows.length) {
     b.push("| workflow | line | |", "|---|---|---|", ...d.workflows.map((w) => `| ${link(code(w.file), w.href)} | ${w.line} | ${code(cell(w.text.trim()))} |`), "");
+  }
+  if (d.mcpTools?.length) {
+    b.push(`The MCP tool${d.mcpTools.length > 1 ? "s it serves" : " it serves"}, as \`tools/list\` answers:`, "");
+    for (const m of d.mcpTools) {
+      b.push(`**${code(m.name)}** — ${m._meta.source === "registrar" ? "read from its registrar" : "built from the Tool's declared inputs"}.`, "");
+      const rows = schemaRows(m.inputSchema);
+      if (rows.length) b.push("| parameter | type | required | description |", "|---|---|---|---|", ...rows, "");
+      else b.push("It takes no parameters.", "");
+    }
+  }
+  if (d.api) {
+    b.push(
+      `As an API: [its operation](${d.api.reference}) in the [OpenAPI document](${d.api.openapi}) and the [MCP tool list](${d.api.mcp}) of its layer.`,
+      "",
+    );
   }
   const inst = Object.entries(t.install).map(([k, v]) => (v === true ? code(k) : `${code(k)}: ${code(String(v))}`));
   b.push("| | |", "|---|---|", `| install | ${inst.join(", ") || "—"} |`);

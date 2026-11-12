@@ -232,4 +232,21 @@ describe("the generator writes where the declaration says", () => {
       }
     }
   }, 60_000);
+
+  // Owner, 2026-11-12: "go ahead with the OpenAPI generation and MCP tool list".
+  it.skipIf(
+    subjectPages.length > 0 &&
+      siteNotBuilt("the API documents `tools:viz` writes at publish (gitignored)", ...subjectPages),
+  )("publishes an OpenAPI document, an MCP tool list and an API reference per layer, linked from its page", async () => {
+    const { pages } = await drawn();
+    for (const x of subjects) {
+      const dir = pageRelPath(REPO, x.name)!.replace(/index\.md$/, "");
+      const doc = JSON.parse(pages.get(`${dir}openapi.json`)!) as { openapi: string; paths: Record<string, unknown> };
+      expect(doc.openapi).toBe("3.1.0");
+      expect(Object.keys(doc.paths).sort()).toEqual(x.rows.map((r) => `/tools/${r.id}`).sort());
+      expect(JSON.parse(pages.get(`${dir}mcp-tools.json`)!).tools).toBeArray();
+      expect(pages.get(`${dir}api/index.md`)).toContain("## Operations");
+      expect(pages.get(pageRelPath(REPO, x.name)!)).toContain("[OpenAPI document](openapi.json)");
+    }
+  }, 60_000);
 });
