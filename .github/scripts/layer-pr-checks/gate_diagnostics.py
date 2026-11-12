@@ -152,7 +152,7 @@ def producer(root, name):
 
     `compare-gates.py` matches a red gate's diagnostics by text only when both
     sides ran the same code. A re-pin that changes the gate's own code can
-    reword every finding it prints (smart-trust#203: cat-harness-tools#1953
+    reword every finding it prints (a downstream re-pin: cat-harness-tools#1953
     reworded 146 `check:subgraph-coverage` findings and none was new), so
     each side records which pin produced them. None for the root's own
     gates, which the lock does not pin: those keep the text match.

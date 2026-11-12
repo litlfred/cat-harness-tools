@@ -82,7 +82,7 @@ function compareProduced(base: { producer?: string; diagnostics: string[] }, hea
 }
 
 describe("compare-gates.py when the gate's own code moved between main and the PR", () => {
-  // smart-trust#203: a re-pin of cat-harness-tools reworded every finding of
+  // A downstream re-pin of cat-harness-tools (2026-11-12) reworded every finding of
   // check:subgraph-coverage; none was new, and head had fewer than main.
   const old = (d: string) => `${d} / serialisations: no serialisations declared — every declared directory owes json`;
   const reworded = (d: string) => `${d} / serialisations: no serialisations declared — every directory of a node-graph kind owes json`;
@@ -110,7 +110,7 @@ describe("gate_diagnostics.producer", () => {
       "import importlib.util, json, sys",
       `sys.path.insert(0, ${JSON.stringify(DIR)})`,
       "import gate_diagnostics as g",
-      `print(json.dumps([g.producer(${JSON.stringify(root)}, "cat-harness-tools:check:foreign-paths"), g.producer(${JSON.stringify(root)}, "smart-trust:check:x")]))`,
+      `print(json.dumps([g.producer(${JSON.stringify(root)}, "cat-harness-tools:check:foreign-paths"), g.producer(${JSON.stringify(root)}, "site:check:x")]))`,
     ].join("\n");
     const r = spawnSync("python3", ["-I", "-c", code], { encoding: "utf-8" });
     expect(r.status).toBe(0);

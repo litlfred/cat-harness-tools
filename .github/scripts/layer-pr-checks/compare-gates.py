@@ -37,7 +37,7 @@ sides, red on both stays "failing on main too".
 When both sides also carry a `producer` (`gate_diagnostics.producer`: the pin
 of the harness the gate is named for) and the pins differ, the gate's own
 code changed between main and the PR, and its findings may be reworded
-rather than new (smart-trust#203: cat-harness-tools#1953 reworded 146
+rather than new (a downstream re-pin, 2026-11-12: cat-harness-tools#1953 reworded 146
 `check:subgraph-coverage` findings; head had 479 against main's 566). Text
 cannot be matched across that change, so the findings are counted instead:
 head holding more than base is NEW; as many or fewer is "failing on main
