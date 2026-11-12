@@ -212,7 +212,7 @@ describe("the workflow's wiring", () => {
   test("a full-tier PR run records its key; compare reports the reuse under the full verdict's name", () => {
     const key = jobs["prepare-head"].steps.find((s: { id?: string }) => s.id === "judged-key");
     expect(key.if).toContain("github.event_name == 'pull_request'");
-    expect(key.if).toContain("labels.*.name, 'release'");
+    expect(key.if).toContain("needs.tier.outputs.full == 'true'");
     expect(jobs.compare.needs).toContain("ready-reuse");
     const pinsOnly = jobs.compare.steps.find((s: { id?: string }) => s.id === "pins-only");
     expect(pinsOnly.env.REUSED).toContain("needs.ready-reuse.outputs.reuse == 'true'");

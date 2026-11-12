@@ -78,18 +78,21 @@ describe("pr-tests.yml (this repository's own checks)", () => {
 describe("layer-pr-checks.yml (every layer)", () => {
   const doc = wf("layer-pr-checks.yml");
   const jobs = doc.jobs as Record<string, Job & { name?: string }>;
-  const FAST = `(github.event_name == 'pull_request' && !${RELEASE})`;
+  // The tier comes from the `tier` job, which reads the PR's live labels
+  // (owner, card Q-TIER-1 A; test/layer-pr-checks-live-labels.test.ts).
+  const FULL = "needs.tier.outputs.full == 'true'";
 
   test("a `labeled` run for another label judges nothing and never joins the PR's concurrency group", () => {
     expect(doc.concurrency.group).toContain(NOOP_GROUP);
     for (const j of ["prepare-head", "prepare-base", "compare"]) expect(jobs[j]!.if).toContain(ONLY_RELEASE_LABEL);
     // `run` needs prepare-head (a PR) or prepare-base (a push) to succeed; `ready-reuse` runs on ready_for_review only.
-    expect(jobs.run!.needs).toEqual(["prepare-head", "prepare-base"]);
+    expect(jobs.run!.needs).toEqual(["tier", "prepare-head", "prepare-base"]);
     expect(jobs["ready-reuse"]!.if).toContain("github.event.action == 'ready_for_review'");
   });
 
   test("prepare-base does not run on the fast tier", () => {
-    expect(jobs["prepare-base"]!.if).toContain(`!${FAST}`);
+    expect(jobs["prepare-base"]!.if).toContain(FULL);
+    expect(jobs["prepare-base"]!.needs).toContain("tier");
   });
 
   test("the verdict job is named for the tier it judged", () => {

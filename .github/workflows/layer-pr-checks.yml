@@ -377,6 +377,54 @@ env:
   INSTANCE: ${{ inputs.instance != '' && inputs.instance || (inputs.mode == 'layer' && github.event.repository.name || '') }}
 
 jobs:
+  # Which tier this run is, from the PR's labels AS THEY ARE NOW (owner, card
+  # Q-TIER-1 A, 2026-11-12), read once here and used by every tier condition
+  # below (`needs.tier.outputs.full`). The event payload's labels are a
+  # snapshot taken when the event fired: the merge flow adds `ready-to-merge`,
+  # removes `release` and toggles draft, so the final ready_for_review run
+  # read "no release" and ran the fast tier only (cat-harness#1275, and two
+  # PRs of a layer above). `ready-to-merge` counts as `release`. A push is always the
+  # full tier. If the labels cannot be read (the API refuses the token, and
+  # the anonymous read too), the payload decides, as before, with a warning.
+  tier:
+    name: Which tier (the PR's live labels)
+    # A no-op `labeled` run (any label but `release`) judges nothing; every
+    # job below skips it, and so does this one.
+    if: github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      full: ${{ steps.tier.outputs.full }}
+    steps:
+      - name: Full tier or fast tier?
+        id: tier
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          PAYLOAD_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'release') || contains(github.event.pull_request.labels.*.name, 'ready-to-merge') }}
+        run: |
+          set -uo pipefail
+          if [ "$EVENT" != pull_request ]; then echo "full=true" >> "$GITHUB_OUTPUT"; echo "not a PR: the full tier"; exit 0; fi
+          api="${GITHUB_API_URL:-https://api.github.com}/repos/$REPO/issues/$PR/labels?per_page=100"
+          body="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api" 2>/dev/null)" \
+            || body="$(curl -fsSL -H "Accept: application/vnd.github+json" "$api" 2>/dev/null)" \
+            || body=""
+          names="$(printf '%s' "$body" | python3 -Ic 'import json,sys
+          try: d = json.load(sys.stdin)
+          except ValueError: sys.exit(1)
+          if not isinstance(d, list): sys.exit(1)
+          print(" ".join(sorted(str(l.get("name", "")) for l in d if isinstance(l, dict))))')" || names="UNREAD"
+          if [ "$names" = UNREAD ]; then
+            echo "::warning::the PR's labels could not be read from the API; the event payload decides the tier (release or ready-to-merge: $PAYLOAD_FULL)"
+            full="$PAYLOAD_FULL"
+          else
+            full=false
+            for l in $names; do case "$l" in release|ready-to-merge) full=true ;; esac; done
+            echo "live labels: ${names:-none} -> $([ "$full" = true ] && echo 'full tier' || echo 'fast tier')"
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
   # Each side is prepared ONCE, by its own job, and handed to its shards
   # (cat-harness-tools#397): mount, lower layers at main, the caller swapped
   # in, the graphs kept on branches, the IG pages and `derive:publish`. Every
@@ -387,7 +435,7 @@ jobs:
     # A push to main has no PR side: it records main's side (the CI cone).
     # Not when `ready-reuse` found this PR already judged on these inputs.
     # Nor on a no-op `labeled` event (any label but `release`).
-    needs: [ready-reuse]
+    needs: [tier, ready-reuse]
     if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && github.event_name != 'push' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -598,7 +646,7 @@ jobs:
       - &judged-key
         name: What this run judges (for a later ready-for-review)
         id: judged-key
-        if: github.event_name == 'pull_request' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release'))
+        if: github.event_name == 'pull_request' && needs.tier.outputs.full == 'true'
         continue-on-error: true  # no record means no later reuse, never a red run
         env:
           GH_TOKEN: ${{ github.token }}
@@ -893,7 +941,7 @@ jobs:
         name: Install Chromium, for the checks that draw through a browser
         # Not on the fast tier (a non-release PR): only derive:publish and the
         # gates draw, and a draft runs neither (owner, 2026-10-23, "1y").
-        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true'
         # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
         # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
         # the same reason). The index's OWN Playwright installs it, so the
@@ -984,7 +1032,7 @@ jobs:
         # layer it wrote into read "modified" (smart-ips-pilgrimage run
         # 42455839636, 8 of 9). Judged here, on the tree the lock produced;
         # the shards take this answer (run-gates.py `--as-mounted-record`).
-        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true'
         working-directory: fa
         env:
           OWN: ${{ env.INSTANCE != '' && format('--instance {0}', env.INSTANCE) || '' }}
@@ -997,7 +1045,7 @@ jobs:
         # fatal: recorded, and judged by the compare job against main.
         # Part of the full tier: skipped on the fast tier (a non-release PR),
         # with the shard hand-off steps below.
-        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true'
         working-directory: fa
         run: |
           python3 ../ci/.github/scripts/layer-pr-checks/run-root-gates.py . \
@@ -1009,7 +1057,7 @@ jobs:
         # keyed by each writer's inputs and script closure (#409), so a stale
         # entry is a key defect, which the derive log's "reused" lines show.
         # Saved per side and run; restored from the newest of this repository.
-        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/derive-cache
@@ -1032,7 +1080,7 @@ jobs:
       # Not found: the Actions cache below, as before.
       - &writer-ref
         name: Fetch the published writer records (refs/cat/writer-records)
-        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true'
         env:
           REPO_DIR: ${{ inputs.mode == 'layer' && 'src' || 'fa' }}
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -1050,7 +1098,7 @@ jobs:
           echo "writer records: no published ref for $BASE or main; the Actions cache is tried"
       - &writer-cone
         name: Restore main's derive:publish writer records (bean fwtz)
-        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true' && hashFiles('fa/build/writer-cone/records.json') == ''
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true' && hashFiles('fa/build/writer-cone/records.json') == ''
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/writer-cone
@@ -1067,7 +1115,7 @@ jobs:
         # Not on the fast tier (a non-release PR) (owner, 2026-10-23, "1y"):
         # only the tests and gates read these pages, and a draft runs neither.
         # The typecheck does not read them. A ready_for_review run builds them.
-        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true'
         # B1 (owner, 2026-10-14; cat-harness#194, cb280cd): the pages an
         # instance declares `builtAtPublish` are no longer committed, and
         # `bun run cat derive:publish` builds them over the mounts, as
@@ -1289,7 +1337,7 @@ jobs:
           exit 0
       - &timings-restore
         name: The gate seconds the last run of this repository recorded
-        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/timings
@@ -1298,7 +1346,7 @@ jobs:
             layer-pr-checks-timings-v1-${{ github.repository }}-
       - &snapshot-save
         name: Hand this side's prepared root to its shards
-        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prepared"
@@ -1312,7 +1360,7 @@ jobs:
           ls -la "$RUNNER_TEMP/prepared"
       - &upload-prepared
         name: Upload this side's prepared root
-        if: steps.skip-prep.outputs.hit != 'true' && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && steps.quick.outputs.quick != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && needs.tier.outputs.full == 'true' && steps.quick.outputs.quick != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: prepared-${{ env.SIDE }}
@@ -1391,8 +1439,8 @@ jobs:
     # against. `run` then skips too, because it needs this job to succeed.
     # Nor when `ready-reuse` found this PR already judged on these inputs,
     # nor on a no-op `labeled` event (any label but `release`).
-    needs: [ready-reuse]
-    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && !(github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) }}
+    needs: [tier, ready-reuse]
+    if: ${{ !cancelled() && needs.ready-reuse.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && needs.tier.outputs.full == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -1728,7 +1776,7 @@ jobs:
   # on it but the run's own end.
   record-writers:
     name: Record main's page-build scripts (bean fwtz)
-    needs: [prepare-base]
+    needs: [tier, prepare-base]
     # Every push (cat-harness-tools#1702): a full record once per
     # `writer-record-hours` window, an incremental one otherwise. LAYER mode
     # only (owner 2026-11-08, hybrid): a layer's PRs take the lower layers at
@@ -1807,7 +1855,7 @@ jobs:
   # run 38866215814: 2267 s in one shard, 626 s in another).
   run:
     name: ${{ matrix.side }} — tests and gates, shard ${{ matrix.shard }}/${{ inputs.gate-shards }}
-    needs: [prepare-head, prepare-base]
+    needs: [tier, prepare-head, prepare-base]
     # A PR: both prepare jobs succeeded and the PR changes more than its pins.
     # A push: main's side was prepared (prepare-head does not run, so the
     # default `success()` would skip this job).
@@ -2052,8 +2100,8 @@ jobs:
     # "No new failures": that green was read as the full verdict when a draft
     # was marked ready and merged before the full run reported
     # (https://github.com/litlfred/fhir-harness/pull/167 and #169, 2026-10-24).
-    name: ${{ (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release')) && 'Fast tier only (advisory; the full checks gate a release)' || 'No new failures (tests and gates)' }}
-    needs: [ready-reuse, prepare-head, prepare-base, run]
+    name: ${{ needs.tier.outputs.full != 'true' && 'Fast tier only (advisory; the full checks gate a release)' || 'No new failures (tests and gates)' }}
+    needs: [tier, ready-reuse, prepare-head, prepare-base, run]
     # A no-op `labeled` run (any label but `release`) judged nothing, so it
     # reports no verdict.
     if: ${{ !cancelled() && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') }}
@@ -2068,7 +2116,7 @@ jobs:
           SKIP: ${{ needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip == 'true' }}
           PUSH: ${{ github.event_name == 'push' }}
           PREPARED: ${{ needs.prepare-base.outputs.prepared }}
-          DRAFT: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'release') }}
+          DRAFT: ${{ needs.tier.outputs.full != 'true' }}
           QUICK: ${{ needs.prepare-head.outputs.quick == 'true' }}
           REUSED: ${{ needs.ready-reuse.result == 'success' && needs.ready-reuse.outputs.reuse == 'true' }}
           REUSED_RUN: ${{ needs.ready-reuse.outputs.run-url }}
