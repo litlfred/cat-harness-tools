@@ -36,6 +36,8 @@
  */
 import { z } from "zod";
 
+import { nodeKind } from "../kg/node-kind.js";
+
 import { NarrativeSlotSchema, narrativesOfSlot } from "./narrative.ts";
 
 /** The `$schema` tag every errata sidecar carries. */
@@ -92,16 +94,32 @@ export const ErratumSchema = z
   });
 export type Erratum = z.infer<typeof ErratumSchema>;
 
-export const DocumentErrataSchema = z
-  .object({
-    $schema: z.literal(DOCUMENT_ERRATA_SCHEMA),
-    /** The library entry's slug, the directory this file sits in. */
-    entry: z.string().min(1),
-    errata: z.array(ErratumSchema).min(1),
-  })
-  .strict()
-  .refine((s) => new Set(s.errata.map((e) => e.id)).size === s.errata.length, {
-    message: "erratum ids are unique within an entry",
-    path: ["errata"],
-  });
+/** The fields of an errata sidecar: the {@link DocumentErrataKind}'s own, and the schema's. */
+const documentErrataFields = {
+  $schema: z.literal(DOCUMENT_ERRATA_SCHEMA),
+  /** The library entry's slug, the directory this file sits in. */
+  entry: z.string().min(1),
+  errata: z.array(ErratumSchema).min(1),
+};
+
+/** Erratum ids are unique within an entry. */
+function errataIdsUnique(s: { errata: readonly { id: string }[] }, ctx: z.RefinementCtx): void {
+  if (new Set(s.errata.map((e) => e.id)).size !== s.errata.length) {
+    ctx.addIssue({ code: "custom", message: "erratum ids are unique within an entry", path: ["errata"] });
+  }
+}
+
+export const DocumentErrataSchema = z.object(documentErrataFields).strict().superRefine(errataIdsUnique);
 export type DocumentErrata = z.infer<typeof DocumentErrataSchema>;
+
+/**
+ * `folio-document-errata/v1` as a node kind, the validator of the library
+ * kind's family of that name (`validators/library-document-errata.json`). It
+ * judges a file exactly as {@link DocumentErrataSchema} does.
+ */
+export const DocumentErrataKind = nodeKind(DOCUMENT_ERRATA_SCHEMA, [], documentErrataFields, {
+  strict: true,
+  refine: errataIdsUnique,
+  term: "Document errata",
+  summary: "The errors recorded against one library entry's own source, each placed at a block or a page.",
+});
