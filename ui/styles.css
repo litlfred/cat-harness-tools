@@ -18,15 +18,15 @@
   --svg-f:none;
 }
 [data-font="paper"] {
-  --f-body:'Crimson Pro','Georgia',serif;
-  --f-head:'Inter','Helvetica Neue',sans-serif;
-  --f-mono:'JetBrains Mono','Consolas',monospace;
+  --f-body:Georgia, "Times New Roman", Times, serif;
+  --f-head:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --f-mono:ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
   --f-sz:18px; --f-lh:1.72;
 }
 [data-font="web"] {
-  --f-body:'Literata','Georgia',serif;
-  --f-head:'Inter','Helvetica Neue',sans-serif;
-  --f-mono:'JetBrains Mono','Consolas',monospace;
+  --f-body:Georgia, "Times New Roman", Times, serif;
+  --f-head:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --f-mono:ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
   --f-sz:16px; --f-lh:1.62;
 }
 

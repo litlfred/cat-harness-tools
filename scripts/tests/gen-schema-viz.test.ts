@@ -40,7 +40,7 @@ describe("schemas visualiser wireframe fixes (folio-assistant-nnpk)", () => {
 
   it("Finding 4: field table prevents mid-token identifier breakage", () => {
     // Table td code has word-break: normal and overflow-wrap: anywhere
-    expect(html).toContain("td code { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; word-break: normal; overflow-wrap: anywhere; }");
+    expect(html).toContain("td code { font-family: var(--fa-font-mono,Menlo,Consolas,monospace); font-size: .82rem; word-break: normal; overflow-wrap: anywhere; }");
     expect(html).toContain("#detail table td code { word-break: normal; overflow-wrap: anywhere; }");
     // Field name identifiers in first column stay on one line
     expect(html).toContain("#detail table td:first-child code { white-space: nowrap; }");

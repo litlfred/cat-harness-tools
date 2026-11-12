@@ -4,9 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Source relevance</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     /* Theme tokens mirror ui/bib-qa.html so the two dashboards read as one tool. */
     :root { --ease: cubic-bezier(0.4,0,0.2,1); }
@@ -27,12 +24,12 @@
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       background: var(--bg); color: var(--fg);
-      font-family: 'Inter','Helvetica Neue',sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
       font-size: 14px; line-height: 1.5; min-height: 100vh;
     }
     a { color: var(--ac); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    code, .mono { font-family: 'JetBrains Mono', monospace; font-size: .85em; }
+    code, .mono { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .85em; }
 
     .top-bar {
       position: sticky; top: 0; z-index: 100;
@@ -105,7 +102,7 @@
     ul.results li .use { color: var(--fg-d); display: block; margin-top: .2rem; }
     ul.actions li { border-left-color: var(--ac-d); }
     ul.actions li .act {
-      font-family: 'JetBrains Mono', monospace; font-size: .78rem;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .78rem;
       color: var(--grn); font-weight: 500;
     }
     ul.actions li .tgt { color: var(--fg-b); }

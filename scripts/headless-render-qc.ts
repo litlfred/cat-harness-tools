@@ -92,19 +92,19 @@ const html = `<!DOCTYPE html>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <style>
-  body { font-family: 'Georgia', serif; font-size: 16px; line-height: 1.6;
+  body { font-family: Georgia, "Times New Roman", Times, serif; font-size: 16px; line-height: 1.6;
          max-width: 800px; margin: 2rem auto; padding: 0 1rem;
          background: #fafafa; color: #2c2c34; }
-  [data-font="paper"] { --f-body: Georgia, serif; --f-head: sans-serif;
-    --f-mono: monospace; --f-sz: 16px; --f-lh: 1.6; }
+  [data-font="paper"] { --f-body: Georgia, "Times New Roman", Times, serif; --f-head: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --f-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; --f-sz: 16px; --f-lh: 1.6; }
   .test-block { margin: 2rem 0; border: 1px solid #ddd; border-radius: 6px;
     padding: 1rem; background: #fff; }
-  .test-meta { font-size: .7rem; color: #888; font-family: monospace;
+  .test-meta { font-size: .7rem; color: #888; font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
     margin-bottom: .5rem; border-bottom: 1px solid #eee; padding-bottom: .4rem; }
   .test-meta .reason { color: #2a6bc4; }
   .issue { background: #fee; border-color: #c44; }
-  .issue-msg { color: #c44; font-family: monospace; font-size: .7rem; margin-top: .5rem; }
-  #summary { font-family: monospace; font-size: .8rem; padding: 1rem;
+  .issue-msg { color: #c44; font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .7rem; margin-top: .5rem; }
+  #summary { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .8rem; padding: 1rem;
     background: #f0f0f4; border-radius: 4px; margin-bottom: 2rem; }
 </style>
 </head>

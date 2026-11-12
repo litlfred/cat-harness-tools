@@ -17,7 +17,7 @@ body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 
 .oa-ops { list-style: none; padding: 0; }
 .oa-ops li { margin: .3rem 0; }
 .oa-ops a { text-decoration: none; }
-.oa-type { font-family: ui-monospace, monospace; font-size: .85rem; opacity: .85; }
+.oa-type { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .85rem; opacity: .85; }
 .oa-desc, .oa-enum { opacity: .8; }
 .oa-req { color: #b42318; font-weight: 700; margin-left: .1rem; }
 .oa-props { list-style: none; margin: .2rem 0 .2rem 1.1rem; padding-left: .6rem; border-left: 1px solid rgba(128,128,128,.35); }

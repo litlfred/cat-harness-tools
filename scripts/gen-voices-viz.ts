@@ -156,19 +156,19 @@ export function viewerHtml(dataHref: string, scope = "", subjects: readonly stri
 .vo-page .voice > summary::before { content:"\\25B8"; display:inline-block; width:1em; color:var(--muted); }
 .vo-page .voice[open] > summary::before { content:"\\25BE"; }
 .vo-page .vhead { display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; }
-.vo-page .vhead .id { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.85rem; color:var(--muted); }
+.vo-page .vhead .id { font-family:var(--fa-font-mono,Menlo,Consolas,monospace); font-size:.85rem; color:var(--muted); }
 .vo-page .vmeta { margin:6px 0 0 1em; color:var(--muted); font-size:.84rem; }
 .vo-page .vmeta code { font-size:.95em; }
 .vo-page .rules { padding:4px 14px 14px; }
 .vo-page .rule { border-top:1px solid var(--line); padding:12px 0 2px; }
 .vo-page .rule:first-child { border-top:0; }
 .vo-page .rtitle { font-weight:600; }
-.vo-page .rid { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.8rem; color:var(--muted); margin-left:6px; }
+.vo-page .rid { font-family:var(--fa-font-mono,Menlo,Consolas,monospace); font-size:.8rem; color:var(--muted); margin-left:6px; }
 .vo-page .rdesc { margin:4px 0 0; font-size:.9rem; }
 .vo-page blockquote { margin:8px 0 6px; padding:8px 12px; border-left:3px solid var(--accent);
   background:var(--accent-soft); font-size:.9rem; }
 .vo-page blockquote .cite { display:block; margin-top:6px; color:var(--muted); font-size:.82rem;
-  font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+  font-family:var(--fa-font-mono,Menlo,Consolas,monospace); }
 .vo-page .chips { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
 .vo-page .chip { border:1px solid var(--line); border-radius:999px; padding:2px 9px; font-size:.78rem; background:var(--panel); }
 .vo-page .chip.sev-critical { color:var(--crit); background:var(--crit-soft); border-color:var(--crit); }

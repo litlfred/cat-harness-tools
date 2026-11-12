@@ -4,9 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Glossary Curator</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     /* ── Theme ──────────────────────────────────────────── */
     [data-theme="dark"] {
@@ -27,12 +24,12 @@
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       background: var(--bg); color: var(--fg);
-      font-family: 'Inter','Helvetica Neue',sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
       font-size: 14px; line-height: 1.5; min-height: 100vh;
     }
     a { color: var(--ac); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    code { font-family: 'JetBrains Mono', monospace; font-size: .85em; }
+    code { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .85em; }
 
     /* ── Top bar ────────────────────────────────────────── */
     .top-bar {
@@ -46,12 +43,12 @@
     }
     .top-bar .spacer { flex: 1; }
     .top-bar .meta {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .65rem; color: var(--fg-d);
     }
     .top-bar button {
       background: var(--bg-r); border: 1px solid var(--brd);
-      color: var(--fg-d); font-family: 'JetBrains Mono', monospace;
+      color: var(--fg-d); font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .65rem; padding: .25rem .7rem; border-radius: 3px;
       cursor: pointer; transition: all .15s;
     }
@@ -72,7 +69,7 @@
     }
     .card .num { font-size: 1.6rem; font-weight: 600; }
     .card .lbl {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .6rem; color: var(--fg-d); margin-top: .15rem;
     }
     .card.green .num { color: var(--grn); }
@@ -92,7 +89,7 @@
     }
     .controls input:focus { outline: none; border-color: var(--ac); }
     .filter-btn {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .6rem; padding: .25rem .6rem; border-radius: 3px;
       border: 1px solid var(--brd); background: var(--bg-r);
       color: var(--fg-d); cursor: pointer; transition: all .15s;
@@ -115,13 +112,13 @@
       align-items: center; gap: .8rem;
       padding: .8rem 1rem;
     }
-    .slug-name { font-family: 'JetBrains Mono', monospace;
+    .slug-name { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .8rem; color: var(--ac); font-weight: 500; }
     .slug-visible {
       font-size: .85rem; color: var(--fg-b); margin-top: .15rem;
     }
     .slug-decision {
-      font-family: 'JetBrains Mono', monospace; font-size: .65rem;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .65rem;
       color: var(--grn); white-space: nowrap;
     }
 
@@ -138,7 +135,7 @@
     .candidate:last-child { border-bottom: none; }
     .candidate-info { min-width: 0; }
     .candidate-label {
-      font-family: 'JetBrains Mono', monospace; font-size: .75rem;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .75rem;
       color: var(--fg-b); font-weight: 500;
     }
     .candidate-meta {
@@ -150,7 +147,7 @@
     }
     .candidate-kind {
       display: inline-block;
-      font-family: 'JetBrains Mono', monospace; font-size: .55rem;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .55rem;
       padding: .1rem .4rem; border-radius: 3px;
       border: 1px solid var(--brd); margin-right: .4rem;
       color: var(--fg-d);
@@ -162,7 +159,7 @@
     .candidate-kind.lemma { color: var(--grn); border-color: var(--grn); }
 
     .candidate-pick {
-      font-family: 'JetBrains Mono', monospace; font-size: .65rem;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .65rem;
       padding: .35rem .8rem; border-radius: 3px; cursor: pointer;
       border: 1px solid var(--brd); background: var(--bg-r);
       color: var(--fg-d); transition: all .15s;
@@ -178,7 +175,7 @@
       margin-top: .4rem;
     }
     .skip-btn {
-      font-family: 'JetBrains Mono', monospace; font-size: .6rem;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: .6rem;
       padding: .2rem .6rem; border-radius: 3px; cursor: pointer;
       border: 1px solid var(--brd); background: transparent;
       color: var(--fg-d);

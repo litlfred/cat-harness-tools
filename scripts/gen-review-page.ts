@@ -156,7 +156,7 @@ const STYLE = `
   ul { list-style: none; padding: 0; }
   li { padding: .5rem .25rem; border-bottom: 1px solid var(--rule); }
   .kind { font-weight: 600; margin-right: .5rem; }
-  .label { font-family: ui-monospace, monospace; }
+  .label { font-family: var(--fa-font-mono,Menlo,Consolas,monospace); }
   .links a { margin-right: 1rem; }
   .muted { color: var(--muted); }
   .source-docs { margin: -.25rem 0 .75rem; font-size: 1.05rem; font-weight: 600; }
@@ -167,7 +167,7 @@ const STYLE = `
   .meta-only { margin: .25rem 0 .5rem; padding: .4rem .7rem; border-left: 3px solid #b26b00; background: color-mix(in srgb, #ffb84d 18%, transparent); border-radius: 0 .3rem .3rem 0; }
   .comments { margin: .25rem 0 0 1rem; padding-left: .75rem; border-left: 3px solid var(--rule); }
   .comment { padding: .15rem 0; }
-  .tagline { font-family: ui-monospace, monospace; font-size: .9rem; }
+  .tagline { font-family: var(--fa-font-mono,Menlo,Consolas,monospace); font-size: .9rem; }
   .layout select { font: inherit; min-height: 2.75rem; padding: .25rem .5rem; color: var(--fg); background: var(--bg); border: 1px solid var(--muted); border-radius: .4rem; }
   .layout select:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
   .viewrow { margin: .5rem 0 .25rem; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }

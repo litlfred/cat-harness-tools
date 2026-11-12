@@ -1000,7 +1000,7 @@ const PAGE_CSS = `<style>
   .da-page td:first-child { width: 20rem; }
   /* A repo-relative path is long and has no spaces, so it breaks mid-word
      unless the breakpoints are named. Slashes are where a reader expects it. */
-  .da-page .p { opacity: .9; font-size: .8rem; font-family: ui-monospace, monospace; word-break: normal; overflow-wrap: anywhere; line-break: anywhere; }
+  .da-page .p { opacity: .9; font-size: .8rem; font-family: var(--fa-font-mono,Menlo,Consolas,monospace); word-break: normal; overflow-wrap: anywhere; line-break: anywhere; }
   .da-page .none { opacity: .9; font-style: italic; }
   .da-page .f { margin-top: .35rem; font-size: .85rem; opacity: .9; }
   .da-page .f .k { display: inline-block; min-width: 5.2rem; font-weight: 600; }
