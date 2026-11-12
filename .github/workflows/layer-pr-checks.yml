@@ -1418,6 +1418,12 @@ jobs:
       # Whether this job built main's side for its shards. The `run` job reads
       # it on a push, where there is no PR side to wait for.
       prepared: ${{ steps.skip-prep.outputs.hit != 'true' }}
+      # A push that ran nothing ON PURPOSE (owner, Q-MQA-2 A): `batched` (this
+      # window's integration run already started; `window` names it) or
+      # `pins-only`. Empty otherwise. Main's verdict is then `unknown` and
+      # deferred, never "could not determine".
+      deferred: ${{ steps.skip-prep.outputs.deferred }}
+      window: ${{ steps.integ-bucket.outputs.bucket }}
       # True on the first harness PR: main had no lock, so main's side is
       # the PR's own tree (see the base-root step).
       first-setup: ${{ steps.base-root.outputs.first-setup == 'true' }}
@@ -1670,14 +1676,19 @@ jobs:
           CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
         run: |
           hit=false
-          if [ "$PINS_ONLY" = "true" ] || [ "$QUICK" = "true" ]; then hit=true
+          # Why nothing runs, for main's verdict on a push (owner, Q-MQA-2 A):
+          # `batched` and `pins-only` are deferred on purpose, never "could
+          # not determine".
+          deferred=""
+          if [ "$PINS_ONLY" = "true" ] || [ "$QUICK" = "true" ]; then hit=true; [ "$PINS_ONLY" = "true" ] && deferred=pins-only
           elif [ "$PUSH" = "true" ] && [ "$BATCHED" = "true" ]; then
-            hit=true
+            hit=true; deferred=batched
             echo "main's integration run already started in this window: this push runs nothing, and the next window's first push judges it" | tee -a "$GITHUB_STEP_SUMMARY"
           elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
           elif [ "$BASE_HIT" = "true" ]; then hit=true
           fi
           echo "hit=$hit" >> "$GITHUB_OUTPUT"
+          echo "deferred=$deferred" >> "$GITHUB_OUTPUT"
       - name: Stamp this window's integration run
         if: steps.integ-bucket.outcome == 'success' && steps.integ-lookup.outputs.cache-hit != 'true' && steps.skip-prep.outputs.hit != 'true'
         run: mkdir -p "$RUNNER_TEMP/integration-stamp" && echo "$GITHUB_SHA $GITHUB_RUN_ID" > "$RUNNER_TEMP/integration-stamp/stamp"
@@ -2336,10 +2347,49 @@ jobs:
         if: ${{ !cancelled() && github.event_name == 'push' }}
         env:
           JOINED: ${{ steps.join.outcome == 'success' }}
+          DEFERRED: ${{ needs.prepare-base.outputs.deferred }}
+          WINDOW: ${{ needs.prepare-base.outputs.window }}
+        # A push that ran nothing on purpose (owner, Q-MQA-2 A) has no answer
+        # to read, so main-verdict.py says `unknown`. That is DEFERRED, and
+        # the failures say so: `{"deferred": ..., "judged-by": ...}`, which
+        # layer-main-qa.yml does not count as could-not-determine. The script
+        # is the pinned one; this wrapper is in the workflow every layer
+        # calls at main.
         run: |
+          set -euo pipefail
           dir="$RUNNER_TEMP/base-results"
           [ "$JOINED" = "true" ] && dir=merged/base
-          python3 .github/scripts/layer-pr-checks/main-verdict.py "$dir" caller-declared/.github/main-qa-gates.json
+          out="$RUNNER_TEMP/main-verdict.out"
+          : > "$out"
+          GITHUB_OUTPUT="$out" python3 .github/scripts/layer-pr-checks/main-verdict.py "$dir" caller-declared/.github/main-qa-gates.json
+          verdict="$(sed -n 's/^verdict=//p' "$out" | tail -n 1)"
+          if [ "$verdict" = unknown ] && [ -n "$DEFERRED" ]; then
+            case "$DEFERRED" in
+              batched) reason="batched: this window's integration run (window ${WINDOW:-?}) already started"; by="the next window's first push" ;;
+              *) reason="$DEFERRED: this push changes only the caller's pins"; by="the next push that changes more than pins" ;;
+            esac
+            failures="$(REASON="$reason" BY="$by" python3 -Ic 'import json,os; print(json.dumps({"deferred": os.environ["REASON"], "judged-by": os.environ["BY"]}))')"
+            { echo "verdict=unknown"; echo "failures=$failures"; } >> "$GITHUB_OUTPUT"
+            echo "Main's verdict: deferred ($reason); judged by $by." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            cat "$out" >> "$GITHUB_OUTPUT"
+          fi
+      # A push that should have been judged (not batched, not pins-only) and
+      # has no answer is a hole, not a deferral (owner, Q-MQA-2 B): main's
+      # side ran nothing, or ran and kept no gates.json, and before this the
+      # job went green with main's verdict `unknown`.
+      - name: A push that should have been judged has main's answer
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        env:
+          VERDICT: ${{ steps.main-verdict.outputs.verdict }}
+          DEFERRED: ${{ needs.prepare-base.outputs.deferred }}
+          PREPARED: ${{ needs.prepare-base.outputs.prepared }}
+        run: |
+          if [ "$VERDICT" = unknown ] && [ -z "$DEFERRED" ]; then
+            echo "::error::this push should have been judged (not batched, not pins-only; main's side prepared: $PREPARED) but main's answer could not be read: no base-results/gates.json. Could not determine is never green."
+            exit 1
+          fi
+          echo "main's verdict: ${VERDICT:-none}${DEFERRED:+ (deferred: $DEFERRED)}"
       - name: Tests
         id: tests
         if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push'
