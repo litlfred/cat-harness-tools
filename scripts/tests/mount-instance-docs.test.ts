@@ -294,6 +294,27 @@ describe("which kind answers at the instance's own route", () => {
     expect(withRoutes(found).candidates.map((c) => c.route).sort()).toEqual(["docs/wi", "wi"]);
   });
 
+  it("a directory of a kind a build Tool publishes (web-app) is never mounted, though it holds an index.html", () => {
+    // smart-trust's onboarding game, 2026-11-12: its Vite index.html made the
+    // mount pass copy the source and node_modules to /web-app/smart-trust/.
+    const repo = mkdtempSync(join(tmpdir(), "web-app-not-mounted-"));
+    for (const d of ["game", "docs"]) {
+      mkdirSync(join(repo, "wa", d), { recursive: true });
+      writeFileSync(join(repo, "wa", d, "index.html"), "<html><body></body></html>");
+    }
+    writeFileSync(
+      join(repo, "wa", "wa.json"),
+      JSON.stringify({
+        name: "wa",
+        directories: [
+          { id: "game", path: "game/", graphTypologies: ["web-app"] },
+          { id: "wa-docs", path: "docs/", graphTypologies: ["docs"] },
+        ],
+      }),
+    );
+    expect(mountable(repo).filter((m) => m.name === "wa").map((m) => m.kind)).toEqual(["docs"]);
+  });
+
   it("one instance being undetermined does not implicate another", () => {
     const { undetermined } = withRoutes([
       m("x", "docs"),

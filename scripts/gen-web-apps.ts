@@ -67,18 +67,33 @@ export interface DeclaredApp {
   problem?: string;
 }
 
-/** Every `web-app` directory the checkout's layers declare, with its manifest read and checked. */
-export function declaredApps(repoRoot: string): DeclaredApp[] {
+/**
+ * The declared app directories this checkout does not hold. A downstream
+ * mounts only the directories its index lists (a lock may mount a layer's
+ * glossary and translations but not its game), so the layer's declaration
+ * names an app whose directory is simply not here. That is not a broken
+ * declaration, and the layer's own checkout, which holds the
+ * directory, still builds and judges it.
+ */
+export function unmountedApps(repoRoot: string): DeclaredApp[] {
+  return appDeclarations(repoRoot).filter((a) => !existsSync(a.dir));
+}
+
+function appDeclarations(repoRoot: string): DeclaredApp[] {
   const out: DeclaredApp[] = [];
   for (const root of instanceRootsIn(repoRoot)) {
     const decl = readDeclaration(root);
     for (const d of decl?.directories ?? []) {
       if (!(d.graphTypologies ?? []).includes(KIND)) continue;
-      const dir = join(root, d.path);
-      out.push({ layer: decl!.name, layerRoot: root, directory: d.id, dir, ...readApp(dir) });
+      out.push({ layer: decl!.name, layerRoot: root, directory: d.id, dir: join(root, d.path) });
     }
   }
   return out;
+}
+
+/** Every `web-app` directory the checkout's layers declare AND hold, with its manifest read and checked ({@link unmountedApps}: the rest). */
+export function declaredApps(repoRoot: string): DeclaredApp[] {
+  return appDeclarations(repoRoot).filter((a) => existsSync(a.dir)).map((a) => ({ ...a, ...readApp(a.dir) }));
 }
 
 /** Read and check one app directory. Never throws: a problem is returned in words. */
@@ -267,6 +282,7 @@ if (import.meta.main) {
     console.log(`  · no visualiser declared rendered by ${TOOL_ID} — nothing to publish`);
     process.exit(0);
   }
+  for (const a of unmountedApps(repoRoot)) console.log(`  · ${a.layer}/${a.directory}: not in this checkout (the mount did not bring it), so not built here`);
   const apps = declaredApps(repoRoot).filter((a) => only === undefined || a.app?.id === only || a.directory === only);
   const clashes = routeClashes(apps);
   let failed = clashes.length > 0;

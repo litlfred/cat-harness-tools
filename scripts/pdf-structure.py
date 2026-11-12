@@ -1936,6 +1936,151 @@ def _pymupdf_sorted(path: str):
     return lambda i: join_soft_hyphens(print_order_text(doc[i]))
 
 
+# GRADE quality-of-evidence marks drawn as vector circles, not text.
+# 10665-94830 page 28 prints "(strong recommendation, ⊕⊖⊖⊖ evidence)" with
+# the four marks as filled drawings 7pt across, so the text reads
+# "(strong recommendation,  evidence)" and the evidence quality is lost.
+GRADE_MARK_SIZE = (4.0, 12.0)  # points, width and height of one mark
+GRADE_MARK_GAP = 4.0           # points between marks of one run
+GRADE_SLOT_GAP = 12.0          # points from a run to the words either side of it
+GRADE_INK_DISTANCE = 150       # summed RGB distance from the background that counts as ink
+
+
+def grade_runs(boxes: list[tuple[float, float, float, float]]) -> list[list[int]]:
+    """Indices of `boxes` grouped into runs of 2-4 same-size marks on one line. Pure.
+
+    A box is (x0, y0, x1, y1). Marks of a run share their top within 1pt and
+    follow each other within GRADE_MARK_GAP.
+    """
+    lo, hi = GRADE_MARK_SIZE
+    marks = sorted((i for i, b in enumerate(boxes)
+                    if lo <= b[2] - b[0] <= hi and lo <= b[3] - b[1] <= hi
+                    and abs((b[2] - b[0]) - (b[3] - b[1])) <= 1.0),
+                   key=lambda i: (round(boxes[i][1]), boxes[i][0]))
+    runs: list[list[int]] = []
+    for i in marks:
+        last = runs[-1][-1] if runs else None
+        if last is not None and abs(boxes[i][1] - boxes[last][1]) <= 1.0 \
+                and 0 <= boxes[i][0] - boxes[last][2] <= GRADE_MARK_GAP:
+            runs[-1].append(i)
+        else:
+            runs.append([i])
+    return [r for r in runs if 2 <= len(r) <= 4]
+
+
+def grade_run_slot(words: list[tuple], x0: float, x1: float, yc: float) -> int | None:
+    """Index of the word a run of marks from `x0` to `x1` on the line through `yc` comes before. Pure.
+
+    `words` are (x0, y0, x1, y1, text, ...) in content order. The slot is the
+    word that starts within GRADE_SLOT_GAP right of the run; a run that ends
+    its line (or its column) comes after the nearest word on its left, so
+    before whatever follows that word in content order. None when the run
+    has no word on either side.
+    """
+    on_line = [k for k, w in enumerate(words) if w[1] <= yc <= w[3]]
+    right = [k for k in on_line if 0 <= words[k][0] - x1 + 1.0 <= GRADE_SLOT_GAP]
+    if right:
+        k = min(right, key=lambda k: words[k][0])
+    else:
+        left = [k for k in on_line if 0 <= x0 - words[k][2] + 1.0 <= GRADE_SLOT_GAP]
+        if not left:
+            return None
+        k = max(left, key=lambda k: words[k][2]) + 1
+    return k if 0 < k < len(words) else None
+
+
+def _put_between(text: str, left: str, right: str, marks: str, start: int) -> tuple[str, int] | None:
+    """`text` with `marks` put between the first `left` `right` pair at or after `start`. Pure.
+
+    Searches from `start` first, so runs of one page are placed in order,
+    then from the top. Returns the text and the offset after the marks.
+    """
+    pat = re.compile(re.escape(left) + r"\s+" + re.escape(right))
+    m = pat.search(text, start) or pat.search(text)
+    if m is None:
+        return None
+    put = m.start() + len(left)
+    new = text[:put] + " " + marks + " " + text[m.end() - len(right):]
+    return new, put + len(marks) + 2
+
+
+def add_grade_marks(path: str, pages: list[str]) -> tuple[list[str], int]:
+    """`pages` with each run of GRADE marks written as ⊕/⊖ before the text that follows it.
+
+    Each mark is read from its rendering (`grade_mark_shape`); a run with any
+    drawing that is not a ringed plus or minus is left alone. The run is put between the words either side of it, so the page text reads
+    "(strong recommendation, ⊕⊖⊖⊖ evidence)". Returns the pages and the
+    number of runs written.
+    """
+    try:
+        import pymupdf
+    except ImportError:
+        return pages, 0
+    try:
+        doc = pymupdf.open(path)
+    except Exception:
+        return pages, 0
+    out = list(pages)
+    written = 0
+    for pno in range(min(len(doc), len(pages))):
+        page = doc[pno]
+        drawings = [d for d in page.get_drawings() if d.get("fill") is not None]
+        boxes = [tuple(d["rect"]) for d in drawings]
+        runs = grade_runs(boxes)
+        if not runs:
+            continue
+        words = page.get_text("words")  # content order: block, line, word
+        cursor = 0
+        for run in runs:
+            x1 = boxes[run[-1]][2]
+            yc = (boxes[run[0]][1] + boxes[run[0]][3]) / 2
+            k = grade_run_slot(words, boxes[run[0]][0], x1, yc)
+            if k is None:
+                continue
+            read = [_grade_mark(page, boxes[i], pymupdf) for i in run]
+            if None in read:
+                continue
+            marks = "".join(read)
+            at = _put_between(out[pno], words[k - 1][4], words[k][4], marks, cursor)
+            if at is None:
+                continue
+            out[pno], cursor = at
+            written += 1
+    return out, written
+
+
+def _grade_mark(page, box, pymupdf) -> str | None:
+    """⊕ or ⊖ for the mark drawn in `box`, None when the drawing is not one.
+
+    Rendered at 600 dpi, a GRADE mark is a ring with a bar through its
+    centre: the corners are background, the ring's left and right edges and
+    the centre are inked, and the space inside the ring off the bars is
+    background. A plus also has ink half way between the centre and the top.
+    Ink is any colour well away from the corners' colour, so a coloured mark
+    on a tinted page reads the same as a black one on white.
+    """
+    x0, y0, x1, y1 = box
+    pix = page.get_pixmap(clip=pymupdf.Rect(x0, y0, x1, y1), dpi=600)
+    w, h = pix.width, pix.height
+    if w < 20 or h < 20:
+        return None
+    return grade_mark_shape(lambda fx, fy: pix.pixel(min(w - 1, int(fx * w)), min(h - 1, int(fy * h)))[:3])
+
+
+def grade_mark_shape(at) -> str | None:
+    """⊕, ⊖ or None from `at(fx, fy)`, the colour at a fraction of the mark's box. Pure."""
+    corners = [at(fx, fy) for fx in (0.02, 0.98) for fy in (0.02, 0.98)]
+    bg = tuple(sum(c[i] for c in corners) / 4 for i in range(3))
+    ink = lambda c: sum(abs(c[i] - bg[i]) for i in range(3)) > GRADE_INK_DISTANCE
+    if any(ink(c) for c in corners):
+        return None
+    ring = ink(at(0.06, 0.5)) and ink(at(0.94, 0.5))
+    hollow = not any(ink(at(fx, fy)) for fx in (0.3, 0.7) for fy in (0.3, 0.7))
+    if not (ring and hollow and ink(at(0.5, 0.5))):
+        return None
+    return "⊕" if ink(at(0.5, 0.3)) else "⊖"
+
+
 def print_order_text(page) -> str:
     """A page's text blocks in print order: top to bottom, a band of columns left column first.
 
@@ -2375,6 +2520,10 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
     # Soft hyphens joined before anything splits the text into sections, so
     # every downstream reader sees whole words (bean `3spu`).
     pages = [join_soft_hyphens(p) for p in pages]
+    if not ocr_used:
+        pages, grade_marks = add_grade_marks(path, pages)
+    else:
+        grade_marks = 0
 
     outline, outline_reordered = repair_outline(_toc_entries(reader.raw_toc()), pages)
     outline, outline_rejected = trusted_outline(outline, pages)
@@ -2580,6 +2729,8 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
             **({"oversized_split": oversized} if oversized else {}),
             **({"headings_tidied": tidied} if tidied else {}),
             **({"pages_read_in_print_order": resorted} if resorted else {}),
+            # Runs of GRADE quality-of-evidence marks drawn as vectors and written back as ⊕/⊖.
+            **({"grade_marks_written": grade_marks} if grade_marks else {}),
         },
     }
     return artefact, sections
