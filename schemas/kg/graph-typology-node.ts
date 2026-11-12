@@ -66,6 +66,8 @@ export const GraphTypologyNodeSchema = z
     publishedByBuild: z.literal(true).optional(),
     recordsWork: z.boolean().optional(),
     holds: z.enum(["content", "context", "state", "derived"]),
+    /** Whether a directory of this kind owes json, jsonld and schema.json at its URL (check:subgraph-coverage). Absent: owed unless `holds` is `state`. `false` for kinds whose files are not graph nodes: code, built pages, fixtures. Owner Q-SER-1 C / Q-SER-2 A, 2026-11-12: not all directories need to be harnessed. */
+    serialised: z.boolean().optional(),
     summary: z.string().min(1),
     schema: z.string().min(1).optional(),
     validator: z.string().min(1).optional(),

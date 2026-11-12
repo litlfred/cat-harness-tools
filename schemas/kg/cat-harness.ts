@@ -1524,9 +1524,14 @@ export const SubgraphCoverageSchema = z.object({
    * `schema.json` at the directory's own URL.
    *
    * The owner, 2026-09-20: *"all dir urls should have json, jsonld,
-   * schema.json like `<base-url>/beans.jsonld`"*.
+   * schema.json like `<base-url>/beans.jsonld`"*, narrowed 2026-11-12
+   * (Q-SER-1 C / Q-SER-2 A, *"not all directories need to be harnessed"*) to
+   * the directories of a NODE-GRAPH kind: {@link owesSerialisations}. A kind
+   * says so itself, in its `serialised` flag (`false` on code, built pages
+   * and fixtures), and absent the flag a kind owes unless it `holds: "state"`.
+   * A directory owes when ANY of its kinds owes.
    *
-   * **This is the one obligation with no by-kind exemption, and `hfkl` is why.**
+   * **This is the one obligation with no WAIVER, and `hfkl` is why.**
    * `bootstrap` is excused a visualiser — *"it is exception to
    * harness/layer not having visualtion/workflow visualizer. but it must have
    * its json/jsonld… that is its existence."* The thing it is excused INTO is
@@ -1536,7 +1541,9 @@ export const SubgraphCoverageSchema = z.object({
    *
    * ## It is NOT WAIVABLE, and that is the one asymmetry in this object
    *
-   * Every other criterion here takes an `exempt.<criterion>` reason, because a
+   * Whether a directory owes at all is its KIND's answer, above; what no
+   * directory can do is waive it. Every other criterion here takes an
+   * `exempt.<criterion>` reason, because a
    * waiver with a reason is how this repository records a considered exception
    * rather than a silence. This one does not, on the owner's ruling,
    * 2026-09-20: *"harnesses cannot override there being in the KG."*
@@ -4863,6 +4870,44 @@ export function owesVisualiser(
   if (!def) return true;
   if (def.renderable) return false;
   return def.holds !== "content";
+}
+
+/**
+ * Does a directory of this kind owe json, jsonld and schema.json at its URL?
+ *
+ * Owner, Q-SER-1 C / Q-SER-2 A, 2026-11-12: *"not all directories need to be
+ * harnessed"*. This narrows the 2026-09-20 ruling ("all dir urls should have
+ * json, jsonld, schema.json") to the kinds whose files are graph nodes. A
+ * directory of code, built pages or fixtures holds no node a serialisation
+ * could address, and a `state` directory is the running record of a store
+ * rather than a declared graph.
+ *
+ * - An UNREGISTERED kind owes, for the reason {@link owesVisualiser} gives: a
+ *   kind nobody has classified must not escape an obligation by being
+ *   unmentioned.
+ * - The kind's own `serialised` flag, when it sets one, is the answer.
+ * - Otherwise a kind owes unless it `holds: "state"`.
+ *
+ * Still no waiver: whether a kind owes is the kind's declaration, never a
+ * directory's `exempt`, so a harness still cannot declare a node-graph
+ * directory into the KG and then make its nodes unreachable.
+ */
+export function owesSerialisations(
+  kind: string,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): boolean {
+  const def = registry.get(kind);
+  if (!def) return true;
+  if (def.serialised !== undefined) return def.serialised;
+  return def.holds !== "state";
+}
+
+/** A directory owes serialisations when ANY of its kinds does ({@link owesSerialisations}). */
+export function directoryOwesSerialisations(
+  kinds: readonly string[],
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): boolean {
+  return kinds.some((k) => owesSerialisations(k, registry));
 }
 
 /**
