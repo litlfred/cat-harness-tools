@@ -2371,6 +2371,18 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "folio-slides-accessibility/v1": {},
       // A source recorded and not held, its text withheld by licence (bean `scfh`).
       "folio-referenced-source/v1": {},
+      // What the PDF arm writes beside `structure.json` for an ingested or
+      // referenced source (IRIS extraction, issue #1925): its footnotes and
+      // marks (`footnotes.json`, schemas/content/document-footnotes.ts), the
+      // errata recorded against the source's own errors (`errata.json`,
+      // schemas/content/document-errata.ts), the OCR run's context
+      // (`ocr/run-context.json`, schemas/sdlc/run-context.ts) and a table read
+      // as CSVW (`*.csvw.json`, schemas/library/tabular-csvw.ts). Unlisted,
+      // check:kind-validators reports each as an unmapped family.
+      "folio-document-footnotes/v1": {},
+      "folio-document-errata/v1": {},
+      "folio-run-context/v1": {},
+      "folio-tabular-csvw/v1": {},
       // A recorded meeting or talk, and one transcript per language
       // (bean `folio-assistant-1r0p`, `schemas/library/recording.ts`).
       "folio-recording/v1": {},
