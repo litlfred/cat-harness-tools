@@ -7,7 +7,7 @@ import { ARCHIMATE_MODEL_TAG, ArchimateConfigSchema, ArchimateModelSchema, layer
 import { renderViewSvg, wrap } from "./render-view.ts";
 import { checkCommitted } from "./check-archimate.ts";
 import { pageNodeOf, pageNodeProblems } from "../../scripts/thin-page.ts";
-import { pageDataOf, figureTargets, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
+import { baseIriOf, pageDataOf, figureTargets, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
 import { renderedByOf } from "../../scripts/viewer-declarations.ts";
 
 /** A small Archi model: two elements in a group, a serving and an access relationship, a note. */
@@ -328,6 +328,43 @@ describe("an instance", () => {
       expect(el["@type"]).toBe("archimate:ApplicationComponent");
       const rel = JSON.parse(files.find((f) => f.path === "1.0.0/relationship/id-r1.jsonld")!.content);
       expect(rel["archimate:source"]["@id"]).toBe("https://example.org/tiny/archimate/1.0.0/element/id-b");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("links a reused element back to the node it copies, and an own element to the copy it plays (issue #1949)", () => {
+    const RA = "https://example.org/ra/archimate/0.3.0/element/id-b";
+    const RAREL = "https://example.org/ra/archimate/0.3.0/relationship/id-r1";
+    const reused = XML.replace(
+      '<element xsi:type="archimate:ApplicationService" name="Lookup" id="id-b"/>',
+      `<element xsi:type="archimate:ApplicationService" name="Lookup" id="id-b"><property key="overlay:base" value="${RA}"/></element>`,
+    )
+      .replace(
+        '<element xsi:type="archimate:ServingRelationship" id="id-r1" source="id-b" target="id-a"/>',
+        `<element xsi:type="archimate:ServingRelationship" id="id-r1" source="id-b" target="id-a"><property key="overlay:base" value="${RAREL}"/></element>` +
+          '<element xsi:type="archimate:RealizationRelationship" id="id-r3" source="id-c" target="id-a"/>' +
+          '<element xsi:type="archimate:RealizationRelationship" id="id-r4" source="id-a" target="id-b"/>',
+      );
+    const root = make(config, (d) => writeFileSync(join(d, "1.0.0", "model.archimate"), reused));
+    try {
+      const { files } = pagesFor(root);
+      const json = (p: string) => JSON.parse(files.find((f) => f.path === p)!.content);
+      const html = (p: string) => files.find((f) => f.path === p)!.content;
+      // The copy names its source, as data and on its page.
+      expect(json("1.0.0/element/id-b.jsonld")["dcterms:source"]).toEqual({ "@id": RA });
+      expect(html("1.0.0/element/lookup/index.html")).toContain(`<p class="am-from">Reused from <a href="${RA}">ra 0.3.0</a></p>`);
+      expect(json("1.0.0/relationship/id-r1.jsonld")["dcterms:source"]).toEqual({ "@id": RAREL });
+      // An own element is no copy: no dcterms:source, but its page names the copy it plays, directly or through another.
+      expect(json("1.0.0/element/id-a.jsonld")["dcterms:source"]).toBeUndefined();
+      const a = files.find((f) => /^1\.0\.0\/element\/registry[^/]*\/index\.html$/.test(f.path))!.content;
+      expect(a).toContain(`Plays <a href="${RA}">Lookup</a> in ra 0.3.0</p>`);
+      expect(html("1.0.0/element/record/index.html")).toContain(`Plays <a href="${RA}">Lookup</a> in ra 0.3.0 (through Registry &lt;script&gt;)</p>`);
+      // The DTH overlays' older form of the IRI is read as the node's IRI now.
+      expect(baseIriOf([{ key: "overlay:base", value: "https://example.org/ra/archimate/0.2.0/relationships/id-r9.jsonld" }])).toBe("https://example.org/ra/archimate/0.2.0/relationship/id-r9");
+      expect(baseIriOf([{ key: "overlay:base", value: "not an IRI" }])).toBeUndefined();
+      // A node with nothing to name says nothing.
+      expect(html("1.0.0/relationship/id-r2/index.html")).not.toContain("am-from");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
