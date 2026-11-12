@@ -21,7 +21,9 @@ moved, or a count that went down, is not new. Five shapes are read:
   (`libraries:check`).
 
 In the last two every number (`3`, `1.5`, `1.4.4`) reads as `#` (cat-harness-tools#1457), so a count
-inside a finding that only went down (`3 contract(s)` to `2`) is not new.
+inside a finding that only went down (`3 contract(s)` to `2`) is not new, and
+every commit id reads as `<commit>`, so a re-pin that leaves a lock mismatch
+main already has is not new either (who-iris#239).
 Repeats are kept, so two findings that differ only in a number count as two.
 `run-gates.py`'s `findings()` is this function.
 
@@ -45,6 +47,11 @@ QA_ADDED = re.compile(r"^\s+\+ (?P<entry>\{.*)$")
 CROSS = re.compile(r"^\s*✗\s*(?P<text>.+?)\s*$")
 COUNTED = re.compile(r"^\d+\b")
 NUMBER = re.compile(r"\d+(?:\.\d+)*")  # 3, 1.5 and 1.4.4 alike
+# A commit id, abbreviated or whole: hex with at least one digit and one letter
+# (an all-digit one is a NUMBER). A re-pin changes the commits a finding names
+# (`check:lock-consistency`: "the index pins 1c36aef5ab70, cat-harness's own
+# lock pins 823e7921d9c7"), not the finding, so it reads as `<commit>`.
+COMMIT = re.compile(r"\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b")
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -73,8 +80,8 @@ def unroot(text, root):
 
 
 def finding_key(text, root):
-    """A `✗` finding's key: run-independent, every number read as `#`."""
-    return NUMBER.sub("#", unroot(text, root))
+    """A `✗` finding's key: run-independent, every commit id read as `<commit>` and every number as `#`."""
+    return NUMBER.sub("#", COMMIT.sub("<commit>", unroot(text, root)))
 
 
 def diagnostics(text, root=None):
