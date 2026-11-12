@@ -129,4 +129,32 @@ jobs:
           CHECKS_RESULT: ${{ inputs.checks-result }}
           GATE_RUN_ID: ${{ inputs.gate-run-id != '' && inputs.gate-run-id || github.run_id }}
           SHA: ${{ inputs.sha != '' && inputs.sha || github.sha }}
-        run: python3 -I qa/.github/scripts/layer-main-qa/report.py
+        # Could not determine is never green (owner, Q-MQA-1 A / Q-MQA-2 A).
+        # report.py is the copy at the caller's pin (above), and a pin from
+        # before cat-harness-tools#1961 exits 0 on an `unknown` verdict, so
+        # the workflow, which every layer calls at main, guards it: red while
+        # the judged commit is still main's head. EXCEPT a deferred push:
+        # layer-pr-checks marks an `unknown` that ran nothing on purpose
+        # (batched into the window's integration run, or pins only) with
+        # `"deferred"` in its failures, and that is not a failure. The
+        # `main-red` issue is never touched by this guard.
+        run: |
+          code=0
+          python3 -I qa/.github/scripts/layer-main-qa/report.py || code=$?
+          if [ "$code" = 0 ] && [ "$VERDICT" = unknown ]; then
+            deferred="$(printf '%s' "${FAILURES:-}" | python3 -Ic 'import json,sys
+          try: d = json.load(sys.stdin)
+          except ValueError: d = {}
+          print(d.get("deferred", "") if isinstance(d, dict) else "")')"
+            if [ -n "$deferred" ]; then
+              echo "main's verdict for ${SHA:0:12} is deferred ($deferred): not a failure"
+            else
+              branch="$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)"
+              head="$(gh api "repos/$GITHUB_REPOSITORY/commits/$branch" --jq .sha)"
+              if [ "$head" = "$SHA" ]; then
+                echo "::error::main's verdict for ${SHA:0:12} could not be determined (verdict unknown, not deferred): could not determine is never green"
+                code=2
+              fi
+            fi
+          fi
+          exit "$code"
