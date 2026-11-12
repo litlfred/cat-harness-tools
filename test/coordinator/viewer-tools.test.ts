@@ -113,6 +113,17 @@ describe("viewer Tools declare what they render", () => {
     "device-screen": "journeys-viewer",
   };
 
+  /**
+   * Kinds held outside AND by a layer some checkouts mount: smart-trust
+   * declares an `archimate` directory since smart-trust#206 (2026-11-12),
+   * while smart-ra still holds the DPI-H models. A checkout without
+   * smart-trust (this layer's own) still needs the HELD_OUTSIDE entry, so
+   * here the kind may be declared; the holder named is the one that may.
+   */
+  const ALSO_HELD_BY: Record<string, string> = {
+    archimate: "smart-trust",
+  };
+
   it("every kind listed as held outside is still rendered here and still not held here", () => {
     const declared = new Set(dirs.flatMap(({ dir }) => dir.graphTypologies ?? []));
     const ids = new Set(all.map((t) => t.id));
@@ -125,6 +136,12 @@ describe("viewer Tools declare what they render", () => {
         continue;
       }
       expect(rendered.has(k), `${k} is no longer rendered by any Tool — drop it from HELD_OUTSIDE`).toBe(true);
+      const also = ALSO_HELD_BY[k];
+      if (also !== undefined) {
+        const holders = [...new Set(dirs.filter(({ dir }) => (dir.graphTypologies ?? []).includes(k)).map(({ instance }) => instance.split("/").pop()))];
+        expect(holders.filter((h) => h !== also), `${k} is declared outside ${also}`).toEqual([]);
+        continue;
+      }
       expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
     }
   });
