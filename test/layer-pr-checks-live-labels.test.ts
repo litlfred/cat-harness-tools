@@ -4,7 +4,7 @@
  *
  * The merge flow adds `ready-to-merge`, removes `release` and toggles draft;
  * the final ready_for_review event's payload then said "no release", and the
- * run was the fast tier only (cat-harness#1275, who-iris#254, #255). The
+ * run was the fast tier only (cat-harness#1275, and two PRs of a layer above). The
  * `tier` job's own script is read out of `layer-pr-checks.yml` and run with a
  * fake `curl`, so what is tested is the shell the workflow runs.
  *

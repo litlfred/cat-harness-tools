@@ -382,8 +382,8 @@ jobs:
   # below (`needs.tier.outputs.full`). The event payload's labels are a
   # snapshot taken when the event fired: the merge flow adds `ready-to-merge`,
   # removes `release` and toggles draft, so the final ready_for_review run
-  # read "no release" and ran the fast tier only (cat-harness#1275, who-iris
-  # #254, #255). `ready-to-merge` counts as `release`. A push is always the
+  # read "no release" and ran the fast tier only (cat-harness#1275, and two
+  # PRs of a layer above). `ready-to-merge` counts as `release`. A push is always the
   # full tier. If the labels cannot be read (the API refuses the token, and
   # the anonymous read too), the payload decides, as before, with a warning.
   tier:
