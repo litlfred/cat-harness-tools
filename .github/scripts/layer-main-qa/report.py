@@ -180,6 +180,13 @@ def main():
         # since nothing says main is red either. A superseded commit is the
         # newer push's to judge.
         why = failures.get("error", "no answer")
+        # A push that ran nothing on purpose (batched into its window's
+        # integration run, or pins only): layer-pr-checks marks it, and it is
+        # deferred to the push that judges it, not could-not-determine.
+        if failures.get("deferred"):
+            summary(f"Main's verdict for `{sha[:12]}` is deferred ({failures['deferred']}); "
+                    f"judged by {failures.get('judged-by', 'a later push')}. The `{LABEL}` issue is not touched.")
+            return 0
         if head != sha:
             summary(f"Main's verdict for `{sha[:12]}` is unknown ({why}), but main has moved on to "
                     f"`{head[:12]}`: that push's run reports, and the `{LABEL}` issue is not touched.")

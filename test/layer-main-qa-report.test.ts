@@ -70,6 +70,13 @@ describe("layer-main-qa report.py: could not determine is never green", () => {
     expect(r.calls.some((c) => c.startsWith("POST") || c.startsWith("PATCH") || c.includes("issues"))).toBe(false);
   });
 
+  test("a DEFERRED unknown on main's head (a batched or pins-only push) is not a failure (exit 0), and the issue is not touched", () => {
+    const r = report("unknown", SHA, JSON.stringify({ deferred: "batched: window 9", "judged-by": "the next window's first push" }));
+    expect(r.status).toBe(0);
+    expect(r.out).toContain("deferred");
+    expect(r.calls.some((c) => c.startsWith("POST") || c.startsWith("PATCH") || c.includes("issues"))).toBe(false);
+  });
+
   test("an unknown verdict on a commit main has moved past is left to the newer push (exit 0)", () => {
     const r = report("unknown", "b".repeat(40));
     expect(r.status).toBe(0);
