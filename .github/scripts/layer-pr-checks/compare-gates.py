@@ -33,6 +33,15 @@ errors and findings it printed, line numbers and counts left out, by
 both: a diagnostic head holds more times than base is NEW, so a gate already
 red on main still fails the PR that adds an error to it. Without them on both
 sides, red on both stays "failing on main too".
+
+When both sides also carry a `producer` (`gate_diagnostics.producer`: the pin
+of the harness the gate is named for) and the pins differ, the gate's own
+code changed between main and the PR, and its findings may be reworded
+rather than new (a downstream re-pin, 2026-11-12: cat-harness-tools#1953 reworded 146
+`check:subgraph-coverage` findings; head had 479 against main's 566). Text
+cannot be matched across that change, so the findings are counted instead:
+head holding more than base is NEW; as many or fewer is "failing on main
+too", with both counts shown.
 """
 import json
 import os
@@ -49,6 +58,14 @@ def new_diagnostics(base_entry, head_entry):
         return []
     extra = Counter(head_entry["diagnostics"]) - Counter(base_entry["diagnostics"])
     return sorted(extra.elements())
+
+
+def producer_changed(base_entry, head_entry):
+    """Both sides name the pin that produced their diagnostics, and the pins differ."""
+    if not isinstance(base_entry, dict):
+        return False
+    b, h = base_entry.get("producer"), head_entry.get("producer")
+    return bool(b and h and b != h)
 
 
 def side_cell(entry):
@@ -111,6 +128,15 @@ def main():
         elif b == 0 or b is None:
             verdict = "NEW FAILURE"
             new.append(name)
+        elif producer_changed(base.get(name), head[name]) and "diagnostics" in base[name] and "diagnostics" in head[name]:
+            nb, nh = len(base[name]["diagnostics"]), len(head[name]["diagnostics"])
+            moved = f"its code moved {str(base[name]['producer'])[:12]} -> {str(head[name]['producer'])[:12]}, so its findings are counted, not matched"
+            if nh > nb:
+                added[name] = new_diagnostics(base.get(name), head[name])
+                verdict = f"failing on main too, and NEW: {nh} finding(s) against main's {nb} ({moved})"
+                new.append(name)
+            else:
+                verdict = f"failing on main too: {nh} finding(s) against main's {nb} ({moved})"
         elif new_diagnostics(base.get(name), head[name]):
             added[name] = new_diagnostics(base.get(name), head[name])
             verdict = f"failing on main too, and NEW: {len(added[name])} error(s) main does not have"

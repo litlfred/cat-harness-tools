@@ -52,7 +52,7 @@ from concurrent.futures import ThreadPoolExecutor
 # Beside this file, found by its path: the tests and `python3 -I` put no
 # script directory on sys.path.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gate_diagnostics import diagnostics  # noqa: E402
+from gate_diagnostics import diagnostics, producer  # noqa: E402
 
 TIMEOUT_S = 1200
 
@@ -70,7 +70,7 @@ def run(root, name, script):
         code, text = 2, out + f"\ntimed out after {TIMEOUT_S} s: could not determine"
     seconds = round(time.monotonic() - start, 1)
     return name, {"command": shlex.join(command), "exit": code, "tail": text[-1500:], "seconds": seconds,
-                  "diagnostics": diagnostics(text, root)}, text
+                  "diagnostics": diagnostics(text, root), "producer": producer(root, name)}, text
 
 
 def read_gates(data):

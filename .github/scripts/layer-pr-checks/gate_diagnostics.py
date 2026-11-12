@@ -29,8 +29,10 @@ Repeats are kept, so two findings that differ only in a number count as two.
 
 A gate that printed none of them is judged by its exit code alone, as before.
 """
+import json
 import os
 import re
+from functools import lru_cache
 
 # `path(line,col): error TS1234: message`, and tsc's file-less `error TS5083: ...`.
 TSC = re.compile(r"^(?P<file>\S.*?)\((?P<line>\d+),(?P<col>\d+)\): error (?P<code>TS\d+): (?P<msg>.*)$")
@@ -132,3 +134,27 @@ def diagnostics(text, root=None):
             continue
         listing = False
     return out
+
+
+@lru_cache(maxsize=None)
+def _pins(root):
+    """harness -> pinned ref, from the root's `index.lock.json`; {} without one."""
+    try:
+        with open(os.path.join(root or ".", "index.lock.json")) as f:
+            lock = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return {m["harness"]: m["ref"] for m in lock.get("mounts", []) if isinstance(m, dict) and m.get("harness") and m.get("ref")}
+
+
+def producer(root, name):
+    """The pin of the harness a gate is named for (`<harness>:<script>`), or None.
+
+    `compare-gates.py` matches a red gate's diagnostics by text only when both
+    sides ran the same code. A re-pin that changes the gate's own code can
+    reword every finding it prints (a downstream re-pin: cat-harness-tools#1953
+    reworded 146 `check:subgraph-coverage` findings and none was new), so
+    each side records which pin produced them. None for the root's own
+    gates, which the lock does not pin: those keep the text match.
+    """
+    return _pins(root).get(name.split(":", 1)[0])
