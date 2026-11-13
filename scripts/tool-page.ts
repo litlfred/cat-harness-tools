@@ -387,12 +387,15 @@ export function toolPage(d: ToolPageData, generatedFm: string): string {
 
   // ── WHAT IT IS MADE OF ───────────────────────────────────────────────────
   b.push("## What it is made of", "");
-  b.push(
-    "| role | file | |",
-    "|---|---|---|",
-    ...d.parts.map((p) => `| ${p.role} | ${link(code(p.file), p.href)} | ${p.exists ? "" : "not in this checkout"} |`),
-    "",
-  );
+  // No parts, no table: kramdown prints a header-only table as a paragraph.
+  if (d.parts.length === 0) b.push("Its definition names no file it is made of.", "");
+  else
+    b.push(
+      "| role | file | |",
+      "|---|---|---|",
+      ...d.parts.map((p) => `| ${p.role} | ${link(code(p.file), p.href)} | ${p.exists ? "" : "not in this checkout"} |`),
+      "",
+    );
   if (d.moduleImports.length) {
     b.push("Its module imports, one hop:", "", ...d.moduleImports.map((m) => `- ${link(code(m.file), m.href)}`), "");
   }

@@ -161,12 +161,39 @@ export interface LeakedTable {
  * A markdown table's DELIMITER row, as it reads once kramdown has given up on it.
  *
  * Kramdown's typographic pass turns `---` into an em dash, so on the page the
- * row is `|—|—|—|—|` rather than `|---|---|`. Both spellings are accepted,
- * plus the `&mdash;` entity and the `:---:` alignment colons, because which one
- * a build emits is the converter's choice and not a fact to rely on.
+ * row is `|—|—|—|—|` rather than `|---|---|` — and a longer run comes out MIXED,
+ * `——-` or `—–`. So a cell is any run of hyphens, en and em dashes (or their
+ * entities), with the `:---:` alignment colons, because which spelling a build
+ * emits is the converter's choice and not a fact to rely on.
+ *
+ * ## Where the row may sit
+ *
+ * Kramdown keeps the paragraph's lines, so the row is usually a line of its
+ * own — but the LAST row of a leaked table closes the paragraph on the same
+ * line, `|—|—|</p>`, and the first may open it, `<p>|—|`. So a row starts at a
+ * line start or straight after a tag's `>`, and ends at a line end or right
+ * before a `<`. A header-only table (no body rows) leaks in exactly that
+ * shape, which is why the first, `$`-anchored version of this pattern missed
+ * every one of them.
+ *
+ * One cell is enough: a one-column table leaks as `|—|`. Without the leading
+ * pipe, GFM still reads `---|---`, so that spelling counts from two cells up.
  */
-const DELIMITER_CELL = String.raw`\s*:?(?:-{3,}|—|&mdash;|&#8212;):?\s*`;
-const DELIMITER_ROW = new RegExp(String.raw`^[ \t]*\|(?:${DELIMITER_CELL}\|){2,}[ \t]*$`, "gm");
+const DASH_RUN = String.raw`(?:[-—–]|&mdash;|&ndash;|&#8212;|&#8211;)+`;
+const DELIMITER_CELL = String.raw`[ \t]*:?${DASH_RUN}:?[ \t]*`;
+const DELIMITER_ROW = new RegExp(
+  String.raw`(?<=^|>)[ \t]*(?:\|(?:${DELIMITER_CELL}\|)+|${DELIMITER_CELL}(?:\|${DELIMITER_CELL})+\|?)[ \t]*(?=$|<)`,
+  "gm",
+);
+
+/**
+ * Blank every region whose text is not prose, preserving byte offsets: the
+ * `<code>`/`<pre>` of {@link blankCodeRegions}, and `<script>`, `<style>` and
+ * `<textarea>`, whose contents are data a page carries, never a table it shows.
+ */
+export function blankRawRegions(html: string): string {
+  return blankCodeRegions(html).replace(/<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi, (m) => " ".repeat(m.length));
+}
 
 /**
  * Find markdown tables that were printed as text.
@@ -180,20 +207,33 @@ const DELIMITER_ROW = new RegExp(String.raw`^[ \t]*\|(?:${DELIMITER_CELL}\|){2,}
  * except for one backtick, and the column test counts pipes. Only the built
  * page shows it — the same lesson as the escaped `<article>`, one syntax over.
  *
+ * ## And the two it then missed
+ *
+ * A table with a header and delimiter but no body row — kramdown drops it and
+ * leaves a paragraph ending `|—|—|</p>` — and a table straight under a heading
+ * with no blank line between. Thirty-one generated pages shipped the first;
+ * neither was reported, because the row did not end its line.
+ *
  * A delimiter row is never prose. Inside `<code>`/`<pre>` it is a document
- * SHOWING a table's source, so those regions are blanked first, as above.
+ * SHOWING a table's source, and inside `<script>`/`<style>`/`<textarea>` it is
+ * data, so those regions are blanked first.
  */
 export function leakedTablesIn(page: string, html: string): LeakedTable[] {
   const found: LeakedTable[] = [];
-  const scannable = blankCodeRegions(html);
+  const scannable = blankRawRegions(html);
   let m: RegExpExecArray | null;
   DELIMITER_ROW.lastIndex = 0;
   while ((m = DELIMITER_ROW.exec(scannable)) !== null) {
-    // The header row is the line above the delimiter: that is what a reader
-    // would recognise, and what names the table in a report.
-    const before = html.slice(0, m.index).split("\n");
-    const header = (before[before.length - 2] ?? "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-    found.push({ page, excerpt: header.slice(0, 110) });
+    // The header row is the text just above the delimiter: that is what a
+    // reader would recognise, and what names the table in a report.
+    const pieces = html
+      .slice(0, m.index)
+      .split(/\n|<br\s*\/?>/i)
+      // Plain text for a report, never HTML: drop the tags, then any angle
+      // bracket a nested or broken tag left behind.
+      .map((x) => x.replace(/<[^>]+>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim())
+      .filter((x) => x.length > 0);
+    found.push({ page, excerpt: (pieces[pieces.length - 1] ?? "").slice(0, 110) });
   }
   return found;
 }
@@ -369,6 +409,93 @@ export function leakingLinesIn(file: string, text: string): SourceLeak[] {
   return out;
 }
 
+/** A markdown pipe table that kramdown will print as a paragraph. */
+export interface SourceTable {
+  /** Path as given to the scanner. */
+  file: string;
+  /** 1-based line number of the table's header row. */
+  line: number;
+  /**
+   * `no-body` — a header and delimiter with no row under them, which kramdown
+   * drops; `no-blank-line` — the header follows a non-blank line (a heading
+   * included), so kramdown reads the table as part of that block.
+   */
+  defect: "no-body" | "no-blank-line";
+  /** The header row, trimmed for the report. */
+  excerpt: string;
+}
+
+/** A GFM delimiter row in SOURCE: hyphen cells, optional colons, at least one pipe. */
+const SOURCE_DELIMITER = /^ {0,3}(?:\|?(?:[ \t]*:?-+:?[ \t]*\|)+(?:[ \t]*:?-+:?[ \t]*)?|[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)+\|?)[ \t]*$/;
+
+/** A line that can be a table row: it carries a pipe and is not indented code. */
+function isPipeRow(line: string): boolean {
+  return line.includes("|") && !/^(?: {4}|\t)/.test(line);
+}
+
+/**
+ * Pipe tables in one markdown source that will not render as tables.
+ *
+ * The built-tree scan above sees these once they have leaked; this sees the
+ * cause, so a pull request fails before the site is built. A table is a pipe
+ * row followed by a {@link SOURCE_DELIMITER} row, where the pipe row is the
+ * FIRST of its block — so a body row of `| - | - |` inside a table is not
+ * mistaken for a second table's delimiter.
+ *
+ * - **no-body** — nothing under the delimiter, or a line with no pipe. A line
+ *   opening a Liquid tag (`{%`) is left alone: the rows may be generated there.
+ * - **no-blank-line** — the line above the header is not blank. A heading
+ *   counts against it too: kramdown needs the blank line after a heading
+ *   before it reads a table.
+ *
+ * Front matter and fenced regions are skipped, as in {@link leakingLinesIn}.
+ */
+export function brokenTablesIn(file: string, text: string): SourceTable[] {
+  const out: SourceTable[] = [];
+  const lines = text.split("\n").map((l) => l.replace(/\r$/, ""));
+  const skip = new Array<boolean>(lines.length).fill(false);
+  let start = 0;
+  if (lines[0]?.trim() === "---") {
+    start = 1;
+    while (start < lines.length && lines[start]?.trim() !== "---") start += 1;
+    start += 1;
+    for (let k = 0; k < Math.min(start, lines.length); k += 1) skip[k] = true;
+  }
+  let fence: string | undefined;
+  for (let i = start; i < lines.length; i += 1) {
+    const opener = /^\s*(```+|~~~+)/.exec(lines[i] ?? "");
+    if (opener !== null) {
+      const marker = opener[1]!.slice(0, 3);
+      if (fence === undefined) fence = marker;
+      else if (marker === fence) fence = undefined;
+      skip[i] = true;
+      continue;
+    }
+    if (fence !== undefined) skip[i] = true;
+  }
+
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const delim = lines[i] ?? "";
+    const header = lines[i - 1] ?? "";
+    if (skip[i] || skip[i - 1] || !SOURCE_DELIMITER.test(delim) || !isPipeRow(header)) continue;
+    const above = i - 2 >= start ? lines[i - 2] : undefined;
+    // The header must OPEN its block: a pipe row above it means this is a body
+    // row of dashes inside a table that began earlier.
+    if (above !== undefined && !skip[i - 2] && isPipeRow(above) && !/^\s*#/.test(above)) continue;
+    const excerpt = header.trim().slice(0, 90);
+
+    const below = lines[i + 1];
+    const liquid = below !== undefined && /^\s*\{%/.test(below);
+    if (!liquid && (below === undefined || skip[i + 1] || !isPipeRow(below) || below.trim() === "")) {
+      out.push({ file, line: i, defect: "no-body", excerpt });
+    }
+    if (above !== undefined && !skip[i - 2] && above.trim() !== "") {
+      out.push({ file, line: i, defect: "no-blank-line", excerpt });
+    }
+  }
+  return out;
+}
+
 /** Every `.md` beneath `dir`, depth-first, skipping the generated trees. */
 export function markdownSources(dir: string): string[] {
   const out: string[] = [];
@@ -395,16 +522,21 @@ export function markdownSources(dir: string): string[] {
 export function checkSourceLeaks(dirs: readonly string[]): {
   files: number;
   found: SourceLeak[];
+  tables: SourceTable[];
 } {
   const found: SourceLeak[] = [];
+  const tables: SourceTable[] = [];
   let files = 0;
   for (const dir of dirs) {
     for (const p of markdownSources(dir)) {
       files += 1;
-      found.push(...leakingLinesIn(relative(process.cwd(), p), readFileSync(p, "utf-8")));
+      const rel = relative(process.cwd(), p);
+      const text = readFileSync(p, "utf-8");
+      found.push(...leakingLinesIn(rel, text));
+      tables.push(...brokenTablesIn(rel, text));
     }
   }
-  return { files, found };
+  return { files, found, tables };
 }
 
 function sourceMain(args: readonly string[]): void {
@@ -423,7 +555,7 @@ function sourceMain(args: readonly string[]): void {
     dirs.push(d);
   }
 
-  const { files, found } = checkSourceLeaks(dirs);
+  const { files, found, tables } = checkSourceLeaks(dirs);
   if (files === 0) {
     // The same vacuity guard the built-tree mode carries, for the same reason:
     // a green run over zero files reads as coverage that is not there (`dh4f`).
@@ -432,6 +564,16 @@ function sourceMain(args: readonly string[]): void {
     process.exit(2);
   }
 
+  if (tables.length > 0) {
+    console.error(`✗ ${tables.length} markdown table(s) that will render as text, across ${files} source(s):\n`);
+    for (const t of tables) console.error(`    · ${t.file}:${t.line}  ${t.defect}  ${t.excerpt}`);
+    console.error(
+      "\nKramdown drops a pipe table with no body row, and reads a table whose header follows a\n" +
+        "non-blank line — a heading included — as part of that block. Either way the page shows\n" +
+        "the rows as a paragraph, the delimiter typeset as dashes. Add a blank line above the\n" +
+        "header; for a table with no rows, write a sentence instead of the table.\n",
+    );
+  }
   if (found.length > 0) {
     console.error(`✗ ${found.length} line(s) open a raw HTML block, across ${files} markdown source(s):\n`);
     for (const f of found) console.error(`    · ${f.file}:${f.line}  <${f.tag}>  ${f.excerpt}`);
@@ -447,7 +589,8 @@ function sourceMain(args: readonly string[]): void {
     );
     process.exit(1);
   }
-  console.log(`✓ no markdown source line opens a raw HTML block, across ${files} source(s)`);
+  if (tables.length > 0) process.exit(1);
+  console.log(`✓ no markdown source line opens a raw HTML block or breaks a table, across ${files} source(s)`);
 }
 
 function main(): void {
