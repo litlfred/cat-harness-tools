@@ -6,9 +6,8 @@ Feature: Signing route decision
   Scenario: The table offers exactly two routes
     Then the signing-route table's possible outcomes are "api" and "human"
 
-  @test:scripts/tests/signing-route.test.ts::the_signing_route_table::the_API_is_reached_from_exactly_one_combination_of_facts
+  @test:scripts/tests/signing-route.test.ts::the_signing_route_table::the_API_is_reached_only_from_internet_or_egress-restricted_reach_with_an_endpoint_configured
   Scenario: The API is reached only with permitting reach and a configured endpoint
-    # Gap: the title says "exactly one combination", but the test asserts the API is reached from exactly TWO: egress-restricted/true and internet/true.
     When every reach value, including unknown, is evaluated with the endpoint configured and not
     Then the API outcome comes from exactly egress-restricted with configured and internet with configured
 

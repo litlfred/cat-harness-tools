@@ -17,5 +17,4 @@ Feature: N-Quads distribution and named queries
     Given a spine partition and one subgraph partition, gzipped, and a manifest naming a third, absent subgraph
     When the manifest is parsed and the named query over the present subgraph is run
     Then it loads 4 quads and returns one row with the community's title
-    And the named query requiring the absent subgraph is expected to reject with a missing partition error
-    # Gap: the missing-partition rejection is asserted with an un-awaited expect(...).rejects, so a failure of that assertion may not fail the test.
+    And the named query requiring the absent subgraph rejects with a missing partition error

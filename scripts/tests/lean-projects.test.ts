@@ -163,14 +163,18 @@ describe.skipIf(!folio).each(LEAN_PACKAGES.map((pkg) => [pkg.name, pkg.lib, pkg]
 
   // Build artifacts not tracked
   test("no .lake/ artifacts tracked in git", () => {
+    // Only git being unavailable is tolerated; the expectation sits outside
+    // the catch, where a failed assertion is not swallowed with it.
+    let tracked: string;
     try {
-      const tracked = execSync(`git ls-files --cached ${pkg.lakeRoot}/.lake/`, {
+      tracked = execSync(`git ls-files --cached ${pkg.lakeRoot}/.lake/`, {
         cwd: INSTANCE_ROOT,
         encoding: "utf-8",
       }).trim();
-      expect(tracked).toBe("");
     } catch {
       // git not available — skip
+      return;
     }
+    expect(tracked).toBe("");
   });
 });

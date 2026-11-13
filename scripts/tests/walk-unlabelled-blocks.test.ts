@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -73,8 +73,7 @@ describe("walkBlocks: unlabelled prose", () => {
     expect(readUnlabelledBlockManifest(join(ch, "nope.ts"))).toBeUndefined();
   });
 
-  test("cleanup", () => {
+  afterAll(() => {
     rmSync(root, { recursive: true, force: true });
-    expect(true).toBe(true);
   });
 });

@@ -85,6 +85,6 @@ Feature: Quiet-claim liveness
 
   @test:scripts/tests/quiet-claim-liveness.test.ts::this_repository::can_establish_how_stale_its_own_refs_are
   Scenario: The freshness probe runs against this repository
-    # Gap: can never fail in practice: an undefined age, i.e. staleness NOT established, passes, so the title's claim is never asserted
+    Given this checkout has origin refs and a FETCH_HEAD, or the test is skipped
     When the age of this repository's fetched refs is read
-    Then it is undefined or zero minutes or more
+    Then it is established, as zero minutes or more

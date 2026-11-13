@@ -37,9 +37,3 @@ Feature: A block manifest is read only from code, not from strings or comments
   Scenario: A missing file has no manifest
     When the block manifest of a file that does not exist is read
     Then there is none
-
-  @test:scripts/tests/read-block-manifest-masking.test.ts::readBlockManifest_ignores_builders_and_labels_inside_strings::cleanup
-  Scenario: The temporary directory is removed
-    # Gap: CAN NEVER FAIL. This is a cleanup step whose only assertion is that true is true.
-    When the fixture directory is removed
-    Then nothing is checked

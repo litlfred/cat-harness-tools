@@ -143,14 +143,17 @@ describe("there is exactly one declaration pattern", () => {
     return [...hits].sort();
   }
 
-  test("neither converged module carries a local pattern any more", () => {
+  test("no module outside the canonical one carries a local pattern any more", () => {
     // The scoped claim, and the only one this change earns. `DECL_RE` lives in
     // the canonical module; `qa-checkers-q-usage` (in folio-assistant-sci
     // since bean saqd) reads it through `declarationStarts` and defines nothing.
-    expect(patternFiles()).not.toContain("cat-harness-tools/pipeline/qa-checkers-q-usage.ts");
+    // It is no longer in this layer, so naming it here could never fail: the
+    // claim is held against every module the scan found instead, and a pattern
+    // reintroduced anywhere but the canonical module fails it.
+    expect(patternFiles().filter((f) => f !== CANONICAL)).toEqual([]);
   });
 
-  test("TWO other modules here still carry their own, and the list may only shrink", () => {
+  test("no other module here carries its own, and the list may only shrink", () => {
     // FOUND BY THIS TEST, not by the bean: `bqrg` said the declaration
     // splitter had "at least two" implementations. It has EIGHT sites across
     // seven files, and every extra one is missing a keyword the union has:
@@ -184,9 +187,13 @@ describe("there is exactly one declaration pattern", () => {
     // on merged content. Converging five more on the strength of one sweep is
     // exactly the "cleanup becomes a silent re-scoring" the bean warns about.
     //
+    // 🛑 The last two rows (`lean-formal-ref`, `lean-coverage`) moved to
+    // folio-assistant-sci too, so the list is down to the canonical module and
+    // the title says so: no other module here carries its own any more.
+    //
     // Asserted by FILE rather than by line, so an unrelated edit above a
-    // pattern does not fail this. The list may only shrink: a third file fails
-    // here, and converging one lets somebody delete a row.
+    // pattern does not fail this. The list may only shrink: a second file fails
+    // here.
     expect(patternFiles()).toEqual([
       "cat-harness-tools/pipeline/lean-lexer.ts",
     ]);
