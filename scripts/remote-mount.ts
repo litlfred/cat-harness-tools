@@ -189,7 +189,7 @@ import {
   checkMountPathCollisions,
 } from "../schemas/kg/remote-mount.js";
 import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
-import { enabledSubgraphs, isSubgraphEnabled, qualifiedSubgraphId, type EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
+import { closeOverRequires, enabledSubgraphs, requiresOfDirectories, isSubgraphEnabled, qualifiedSubgraphId, type EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "../schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { builtAtPublishOf, installDependencies, isInstallArtefact, publishLayers, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutSelfIgnored, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
@@ -762,11 +762,29 @@ function planHydrated(a: {
  * {@link mountRemote} to check out from; {@link planRemote} closes them.
  */
 function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>, packages: Map<string, SubgraphIndexFetch> = new Map()): Plan {
+  // The downstream decides which opt-in sub-graphs come down by default, and
+  // each one it switches on brings what it `requires` (implied; owner,
+  // 2026-11-13). A requirement is read from a layer's declaration at its pin,
+  // so it can name a sub-graph of a layer already planned: plan again with
+  // the grown set until nothing more is switched on. The trees stay cached.
+  let enabled = enabledSubgraphs(downstreamOf(opts).instanceRoot);
+  for (;;) {
+    const before = enabled.size;
+    const { plan, dsEnabled } = resolveClosureWith(opts, trees, packages, new Set(enabled));
+    if (dsEnabled.size === before) return plan;
+    enabled = dsEnabled;
+  }
+}
+
+function resolveClosureWith(
+  opts: RemoteMountOptions,
+  trees: Map<string, RemoteTree>,
+  packages: Map<string, SubgraphIndexFetch>,
+  dsEnabled: Set<string>,
+): { plan: Plan; dsEnabled: Set<string> } {
   const ds = downstreamOf(opts);
-  // The downstream decides which opt-in sub-graphs come down by default.
-  const dsEnabled = enabledSubgraphs(ds.instanceRoot);
   const plan: Plan = { instanceRoot: ds.instanceRoot, downstream: ds.name, mounts: ds.mounts, approvers: ds.approvers, instances: [], outcomes: [] };
-  if (ds.mounts.length === 0) return plan;
+  if (ds.mounts.length === 0) return { plan, dsEnabled };
 
   // Layers the downstream checkout ALREADY holds and did not get from a
   // previous mount: those are local, and a mount never lands on them.
@@ -874,6 +892,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
         continue;
       }
       const { decl } = found;
+      closeOverRequires(dsEnabled, requiresOfDirectories(q.name, decl.directories));
       const path = strip(override?.path ?? decl.mountDefaults?.path ?? decl.livesAt?.path ?? (found.root || q.name));
       if (!MountPathSchema.safeParse(path).success || path === "") {
         plan.outcomes.push({ instance: q.name, state: "could-not-determine", detail: `mount path \`${path}\` is not a repository-relative directory` });
@@ -1016,7 +1035,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
     }
   }
   applyToolChoices(plan, reached, local, pkgAt);
-  return plan;
+  return { plan, dsEnabled };
 }
 
 /** The ids of a declaration's directories whose graph typologies include `tools`. */
