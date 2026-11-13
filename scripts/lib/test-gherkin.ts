@@ -887,11 +887,13 @@ export function joinTestsToScenarios(
 
 // ── Reading a tree ──────────────────────────────────────────────────────────
 
+// input-site: inert #fca76dad — names the directories the walk skips; none of them is read
 const SKIP_DIRS = new Set([".git", "node_modules", "target", "build", "dist", "vendor", ".venv", "venv", "__pycache__", ".gradle"]);
 
 /** The files under `root` (repo-relative, `/`): git's list where there is one, else a walk. */
 export function listFiles(root: string): string[] {
   try {
+    // input-site: tree #6c771fee — the tracked and untracked-unignored files under the root: git's view of the working tree, which the cone replays
     const out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
       cwd: root,
       encoding: "utf-8",
