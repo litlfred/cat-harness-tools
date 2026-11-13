@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  cell, columnsFor, dashboardHtml, dashboardSection, fieldsOf, isKindPages, kindDir, LOCALES, nodeHtml, nodeSection, PAGE_MARK, pageBuiltAtPublish, plannedPages,
+  cell, columnsFor, dashboardHtml, dashboardSection, fieldsOf, hasKindPages, isKindPages, kindDir, LOCALES, nodeHtml, nodeSection, PAGE_MARK, pageBuiltAtPublish, plannedPages,
   unresolvedPages, type FieldInfo,
 } from "../../gen-node-kind-pages.ts";
 import { PUBLISHED_LOCALES } from "../../../schemas/content/translation.ts";
@@ -133,6 +133,14 @@ describe("plannedPages", () => {
     const pages = plannedPages(index, (id) => (id === "todo" ? [node("todo", "alpha", "t/a", {})] : []));
     expect(pages).toEqual(["en/core/todo", "en/core/todo/alpha", "en/core/todo/alpha/t/a"]);
     expect(kindDir("en", kind("todo"))).toBe("en/core/todo");
+  });
+
+  test("a declared kind with no version gets its pages too: the schemas page links it (who-iris, 2026-11-13)", () => {
+    const index = { kinds: [kind("bean"), kind("work-plan", { version: undefined, tag: undefined, parents: ["bean"] })], unkinded: [], collisions: [] };
+    expect(plannedPages(index, () => [])).toEqual(["en/core/bean", "en/core/work-plan"]);
+    expect(hasKindPages(index.kinds[1])).toBe(true);
+    expect(hasKindPages({ declaredBy: undefined })).toBe(false);
+    expect(hasKindPages(undefined)).toBe(false);
   });
 
   test("the locales are cat-harness's PUBLISHED_LOCALES — one list, not a second copy (folio-assistant#2527)", () => {
