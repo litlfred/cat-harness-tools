@@ -51,6 +51,16 @@
 /** One URL segment: lower-case letters, digits and hyphens, starting with a letter or digit. */
 export const ROUTE_SEGMENT = /^[a-z0-9][a-z0-9-]*$/;
 
+/**
+ * A sub-graph id as a route segment: lower-cased, since a URL segment is
+ * lower case (`ROUTE_SEGMENT`) but a layer may name its subgraphs with capitals
+ * (smart-base's `smart-base-L4-skills`, 2026-11-13). Two ids that differ only
+ * in case would share a route; the segment check still refuses anything else.
+ */
+export function subgraphSegment(id: string): string {
+  return id.toLowerCase();
+}
+
 /** The parts of a visualiser route. */
 export interface VisualiserRouteParts {
   /**
@@ -98,7 +108,7 @@ export function visualiserRoute(p: VisualiserRouteParts): string {
     segment("harness", p.harness),
     segment("visualiser", p.visualiser),
   ];
-  if (p.subgraph !== undefined) for (const s of p.subgraph.split("/")) parts.push(segment("sub-graph", s));
+  if (p.subgraph !== undefined) for (const s of p.subgraph.split("/")) parts.push(segment("sub-graph", subgraphSegment(s)));
   const base = `${parts.join("/")}/`;
   if (p.asset === undefined || p.asset === "") return base;
   const asset = p.asset.replace(/^\/+/, "");
