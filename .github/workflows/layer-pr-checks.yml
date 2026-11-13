@@ -2544,8 +2544,9 @@ jobs:
           exit 1
 
   # Every pin of a pull request that changes `index.lock.json` is FRESH: at its
-  # repository's main HEAD when the run looks, or a descendant of it (owner,
-  # 2026-11-11). Only the top-level lock decides (owner, 2026-11-13, "3y 1y"):
+  # repository's main HEAD, or a descendant of it (owner, 2026-11-11), as main
+  # was when the lock was last committed (owner, 2026-11-13, card "Lock gate":
+  # fresh at re-pin time; the script reads that date from fa/). Only the top-level lock decides (owner, 2026-11-13, "3y 1y"):
   # a composition mounts each harness once, at this lock's pin, so whether the
   # pinned harnesses' OWN locks agree with it is reported, not judged; that
   # dropped the serial bottom-up re-pin cascade. One that leaves the lock alone

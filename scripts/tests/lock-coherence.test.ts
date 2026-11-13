@@ -20,10 +20,12 @@ import {
   formatReport,
   judgeFreshness,
   judgeLockCoherence,
+  lockWrittenAt,
   pinsOf,
   repoKey,
   type LowerLock,
   type MainHead,
+  type MainSince,
   type Pin,
 } from "../check-lock-coherence.ts";
 
@@ -223,6 +225,61 @@ describe("only the top-level lock decides (owner, 2026-11-13)", () => {
   });
 });
 
+describe("fresh at re-pin time (owner, 2026-11-13, card \"Lock gate\")", () => {
+  const agreeing = judgeLockCoherence([], () => ({ state: "absent" }), relate);
+  const T = 1_000;
+  // harness: a (pinned) → b on main's first-parent chain; b's date decides.
+  const since = (at: number) => (): MainSince => ({ commits: [{ sha: sha("b"), at }] });
+  const behind = [pin("harness", sha("a"))];
+  const atMain = mains({ harness: sha("b") });
+
+  test("a pin behind main is fresh when every commit main gained after it is newer than T", () => {
+    const f = judgeFreshness(behind, atMain, relate, { writtenAt: { at: T, sha: sha("e") }, mainSince: since(T + 60) });
+    expect(f).toMatchObject({ fresh: 1, stale: [], undetermined: [] });
+    expect(f.freshAtRepin).toEqual([expect.objectContaining({ harness: "harness", ref: sha("a"), main: sha("b") })]);
+    expect(exitCodeOf(agreeing, f)).toBe(0);
+    const text = formatFreshness(f, "fixture");
+    expect(text).toContain("but main moved after the lock was written");
+    expect(text).toContain("fresh at re-pin time");
+  });
+
+  test("a pin behind main is stale when main already had a commit dated at or before T", () => {
+    const f = judgeFreshness(behind, atMain, relate, { writtenAt: { at: T, sha: sha("e") }, mainSince: since(T) });
+    expect(f.stale).toEqual([expect.objectContaining({ harness: "harness", relation: "behind", hadAtT: { sha: sha("b"), at: T } })]);
+    expect(exitCodeOf(agreeing, f)).toBe(1);
+    expect(formatFreshness(f, "fixture")).toContain("the lock was written behind main");
+  });
+
+  test("a diverged pin is stale whatever the dates", () => {
+    const f = judgeFreshness([pin("tools", SIDE)], mains({ tools: sha("3") }), relate, {
+      writtenAt: { at: T, sha: sha("e") },
+      mainSince: since(T + 60),
+    });
+    expect(f.stale.map((s) => s.relation)).toEqual(["diverged"]);
+    expect(exitCodeOf(agreeing, f)).toBe(1);
+  });
+
+  test("a T that cannot be found is undetermined (exit 2), never fresh", () => {
+    const f = judgeFreshness(behind, atMain, relate, { writtenAt: { reason: "not a git repository" }, mainSince: since(T + 60) });
+    expect(f.fresh).toBe(0);
+    expect(f.undetermined).toHaveLength(1);
+    expect(exitCodeOf(agreeing, f)).toBe(2);
+  });
+
+  test("main's history after the pin that cannot be read is undetermined (exit 2)", () => {
+    const f = judgeFreshness(behind, atMain, relate, { writtenAt: { at: T, sha: sha("e") }, mainSince: () => ({ reason: "offline" }) });
+    expect(f.undetermined).toHaveLength(1);
+    expect(exitCodeOf(agreeing, f)).toBe(2);
+  });
+
+  test("at run time (--at-run-time) the same pin is stale: the old rule", () => {
+    const f = judgeFreshness(behind, atMain, relate);
+    expect(f.stale.map((s) => s.harness)).toEqual(["harness"]);
+    expect(f.writtenAt).toBeUndefined();
+    expect(exitCodeOf(agreeing, f)).toBe(1);
+  });
+});
+
 // ── The git reader, over local repositories ─────────────────────────────────
 
 function g(dir: string, ...args: string[]): string {
@@ -234,10 +291,16 @@ function g(dir: string, ...args: string[]): string {
   return r.stdout.trim();
 }
 
-function commit(dir: string, file: string, body: string): string {
+function commit(dir: string, file: string, body: string, date?: string): string {
   writeFileSync(join(dir, file), body);
   g(dir, "add", "-A");
-  g(dir, "commit", "-q", "-m", file);
+  if (date) {
+    const r = spawnSync("git", ["-C", dir, "commit", "-q", "-m", file], {
+      encoding: "utf-8",
+      env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.org", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.org", GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+    });
+    if (r.status !== 0) throw new Error(`git commit: ${r.stderr}`);
+  } else g(dir, "commit", "-q", "-m", file);
   return g(dir, "rev-parse", "HEAD");
 }
 
@@ -308,6 +371,59 @@ describe("the git reader: real commits, real locks", () => {
     const f = judgeFreshness([pin("tools", t2)], (p) => rd.mainOf(p.repository), (r, a, b) => rd.relate(r, a, b));
     expect(f.undetermined).toHaveLength(1);
     expect(exitCodeOf(judgeLockCoherence([], () => ({ state: "absent" }), () => ({ rel: "same" })), f)).toBe(2);
+  });
+
+  test("at re-pin time: T from the lock's own repository, against main's dated first-parent chain", () => {
+    // A repository with dated commits: p1 10:00, p2 10:10 (main 10:20 later).
+    const dir = join(root, "src", "dated");
+    spawnSync("mkdir", ["-p", dir]);
+    g(dir, "init", "-q", "-b", "main");
+    urls["litlfred/dated"] = `file://${dir}`;
+    const p1 = commit(dir, "a.txt", "1", "2026-01-01T10:00:00Z");
+    const p2 = commit(dir, "a.txt", "2", "2026-01-01T10:10:00Z");
+    const p3 = commit(dir, "a.txt", "3", "2026-01-01T10:20:00Z");
+    // The layer's checkout: the lock is written at 10:15, then an unrelated commit at 10:30.
+    const layer = join(root, "src", "layer");
+    spawnSync("mkdir", ["-p", layer]);
+    g(layer, "init", "-q", "-b", "main");
+    const lock = join(layer, "index.lock.json");
+    const repinCommit = commit(layer, "index.lock.json", lockOf([pin("dated", p2)]), "2026-01-01T10:15:00Z");
+    commit(layer, "other.txt", "x", "2026-01-01T10:30:00Z");
+    const T = lockWrittenAt(lock);
+    expect(T).toEqual({ at: Date.parse("2026-01-01T10:15:00Z") / 1000, sha: repinCommit });
+
+    const judgeAt = (ref: string, at?: string) => {
+      const rd = reader();
+      return judgeFreshness(
+        [pin("dated", ref)],
+        (p) => rd.mainOf(p.repository),
+        (r, a, b) => rd.relate(r, a, b),
+        at === "run" ? undefined : { writtenAt: lockWrittenAt(lock), mainSince: (p, m) => rd.mainSince(p.repository, p.ref, m) },
+      );
+    };
+    // p2 was main at 10:15; main gained p3 at 10:20 > T: fresh.
+    const fresh = judgeAt(p2);
+    expect(fresh).toMatchObject({ fresh: 1, stale: [], undetermined: [] });
+    expect(fresh.freshAtRepin).toEqual([expect.objectContaining({ ref: p2, main: p3, firstAfter: { sha: p3, at: Date.parse("2026-01-01T10:20:00Z") / 1000 } })]);
+    // p1 was already behind at 10:15 (p2 at 10:10 ≤ T): stale.
+    const stale = judgeAt(p1);
+    expect(stale.stale).toEqual([expect.objectContaining({ ref: p1, main: p3, relation: "behind", hadAtT: expect.objectContaining({ sha: p2 }) })]);
+    // At run time, p2 is behind main now: stale.
+    expect(judgeAt(p2, "run").stale.map((s) => s.ref)).toEqual([p2]);
+
+    // An uncommitted lock is being written now: T is now.
+    writeFileSync(lock, lockOf([pin("dated", p3)]));
+    expect(lockWrittenAt(lock, "HEAD", () => 42)).toEqual({ at: 42, sha: "uncommitted" });
+  });
+
+  test("T of a lock outside any git repository is unknown", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lock-no-git-"));
+    try {
+      writeFileSync(join(dir, "index.lock.json"), lockOf([]));
+      expect(lockWrittenAt(join(dir, "index.lock.json"))).toEqual({ reason: expect.stringContaining("not in a git repository") });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("a pin that cannot be fetched is undetermined", () => {
