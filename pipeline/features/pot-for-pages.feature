@@ -44,10 +44,10 @@ Feature: Page translation templates
     Then no page starts with "processes/"
 
   @test:pipeline/pot-for-pages.test.ts::the_ownership_boundary_with_translate-bpmn::and_the_real_corpus_has_such_templates_to_be_wrong_about
-  Scenario: The plan holds no template under processes/
-    # Gap: the title claims the corpus holds processes/ templates; the test asserts the plan has none, and never checks they exist
-    Given the plan for the real corpus
-    Then no planned template path contains "processes/"
+  Scenario: The corpus holds processes/ templates, and the plan adopts none of them
+    Given the harness root's translations directory
+    Then at least one locale holds a processes/ directory with a .pot template
+    And no planned template path contains "processes/"
 
   @test:pipeline/pot-for-pages.test.ts::a_template_whose_source_is_gone_is_REPORTED::`sourceExists`_is_false_and_the_entry_survives_in_the_plan
   Scenario: A template whose source is gone stays in the plan, reported

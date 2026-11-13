@@ -11,7 +11,7 @@
  * whole compatibility story and an untested preference is a coin toss.
  */
 import { describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -58,7 +58,7 @@ describe("where a verdict is READ from", () => {
       // Asserted on CONTENT too, not just the path: a preference that returns
       // the right name while something else reads the other file is the defect
       // this is written to exclude.
-      expect(Bun.file(found!).text()).resolves.toContain("results");
+      expect(readFileSync(found!, "utf-8")).toContain("results");
     });
   });
 

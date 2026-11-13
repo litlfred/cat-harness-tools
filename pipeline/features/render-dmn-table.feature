@@ -69,11 +69,11 @@ Feature: Rendering DMN decision tables
 
   @test:pipeline/render-dmn-table.test.ts::reader-facing_text::cells_read_as_words
   Scenario: Cells read as words
-    # Gap: the output-cell assertion compares a call with itself, so output styling is not checked
     When input cells are rendered as plain text
     Then the quoted list a, b reads as chip "a", the word "or", chip "b"
     And not of quoted red reads as the word "not" then chip "red"
     And " - " reads as "any"
+    And quoted go as an output cell reads as one output chip "go" carrying a hue class
 
   @test:pipeline/render-dmn-table.test.ts::placing_the_table_in_the_block::at_the_marker_line,_else_after_the_body
   Scenario: The table goes at the marker line, else after the body
