@@ -3523,9 +3523,9 @@ export class GraphTypologyRegistry {
     // A checkout scanned BEFORE its layers were mounted is scanned again once
     // they are on disk. The standing re-pin reads a site's declaration, then
     // mounts its layers in the same process, then reads it again for the
-    // health step: the first scan, made before the layer that declares the IG
-    // kind was mounted, was cached, so `ig-ast` stayed unknown and every IG's
-    // re-pin reported "declares unknown graph typology" (2026-11-13).
+    // health step: the first scan, before the IG harness layer was mounted,
+    // was cached, so the IG kind `ig-ast` stayed unknown and every IG's re-pin
+    // reported "declares unknown graph typology" (2026-11-13).
     if (this.scannedRoots.includes(abs) && this.scannedLayers.get(abs) === layers) return;
     if (layers === "") return;
     this.ensureDeclared();

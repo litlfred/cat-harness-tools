@@ -123,9 +123,21 @@ test.describe("figure export — SVG, PNG, clipboard (#1270)", () => {
     const link = page.getByRole("link", { name: "Open this diagram in a new tab" });
     await expect(link).toHaveAttribute("href", `${ORIGIN}/uml/overview/cat-harness.svg`);
     await expect(link).toHaveAttribute("target", "_blank");
-    const [tab] = await Promise.all([context.waitForEvent("page"), link.click({ button: "middle" })]);
-    await tab.waitForLoadState();
-    expect(tab.url()).toBe(`${ORIGIN}/uml/overview/cat-harness.svg`);
+    // A middle-click and "Open link in new tab" are the BROWSER's handling of
+    // a link; what the page owns is not getting in their way. So a middle
+    // button's events must reach the link uncancelled.
+    const cancelled = await link.evaluate((a) =>
+      ["mousedown", "mouseup", "auxclick"].filter((type) => !a.dispatchEvent(new MouseEvent(type, { button: 1, bubbles: true, cancelable: true }))),
+    );
+    expect(cancelled).toEqual([]);
+    // The tab is opened with a plain click. A middle-click opens a BACKGROUND
+    // tab, which headless Chromium sometimes never reports as a page, or
+    // never navigates (measured 2026-11-13: about 1 in 3 runs under 8
+    // workers, against 0 of 25 for a plain click), so it timed the test out.
+    // And the tab is waited on by its URL, not its load state: a new tab
+    // starts at about:blank, which counts as loaded before the navigation.
+    const [tab] = await Promise.all([context.waitForEvent("page"), link.click()]);
+    await tab.waitForURL(`${ORIGIN}/uml/overview/cat-harness.svg`);
     expect(await tab.content()).toContain("<rect");
   });
 
@@ -139,8 +151,8 @@ test.describe("figure export — SVG, PNG, clipboard (#1270)", () => {
     const opener = page.getByRole("button", { name: "Open this diagram in a new tab" });
     await opener.focus();
     const [tab] = await Promise.all([context.waitForEvent("page"), page.keyboard.press("Enter")]);
-    await tab.waitForLoadState();
-    expect(tab.url()).toMatch(/^blob:/);
+    // By URL, not load state: the tab is about:blank, and "loaded", first.
+    await tab.waitForURL(/^blob:/);
     expect(await tab.content()).toContain("<circle");
     expect(page.url()).toBe(`${ORIGIN}/inline/`);
   });

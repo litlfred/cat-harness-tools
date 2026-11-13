@@ -360,9 +360,9 @@ Feature: The ingest rung decision and the L1 completeness gate
     And --qa-later is read from the arguments only when given
 
   @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::an_EMPTY_requirement_list_does_not_promote_by_vacuous_truth
-  Scenario: An empty requirement list may promote, but an empty entry never yields one
-    # Gap: the title says an empty list does NOT promote; the body asserts that mayPromote([]) is true, and relies on checkEntry never returning an empty list.
-    Then an empty requirement list may promote
+  Scenario: An empty requirement list never promotes, with or without --qa-later
+    Then an empty requirement list may not promote
+    And it may not promote with --qa-later either
     And the L1 check of an empty directory yields at least one requirement
 
   @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::an_unmet_entry_has_unmet_requirements_to_refuse_ON
@@ -530,3 +530,12 @@ Feature: The ingest rung decision and the L1 completeness gate
     Given a text plan with the derived arms added
     Then there are 3 steps, the second running l1-blocks.ts on the staging entry and the third extract-candidates.py --aspects-only on it
     And a known title adds --title to the text step
+
+  @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::a_text_layer_in_the_wrong_script_for_the_document's_language_is_not_text
+  Scenario: A text layer in the wrong script for the document's language is not text
+    Given a probe whose letters are 5900 Latin and 12 Arabic
+    When it is judged for a document in "ar"
+    Then it is unreadable, with a reason naming "wrong script"
+    And with no language, with "fr", or with the mixed "ar" and "en", nothing is decided
+    And an "ar" probe that is mostly Arabic letters, and a "ru-RU" probe with 2000 Cyrillic letters, decide nothing
+    And a "zh" probe of 5900 Latin and 100 Han letters is unreadable, with a reason naming "han"

@@ -243,6 +243,17 @@ describe("an artifact index built at publish", () => {
     expect(report.couldNotDetermine).toEqual([]);
     expect(report.findings.map((f) => f.message)).toEqual(['FHIR example "Bundle/missing" is in no declared fhir-artifact-index']);
   });
+
+  test("a MOUNTED layer's index written to the layer output root is read there (bean cat-tools-sm8r item 4)", () => {
+    const files = clean();
+    const index = files["base/fhir/index.json"]!;
+    delete files["base/fhir/index.json"];
+    files["index.lock.json"] = { instances: [{ instance: "base", path: "base" }] };
+    files["build/layers/base/fhir/index.json"] = index;
+    const report = checkJourneyRefsAt(checkout(files));
+    expect(report.couldNotDetermine).toEqual([]);
+    expect(report.findings).toEqual([]);
+  });
 });
 
 describe("a step's DAK assets (user-scenario 0.3.0)", () => {

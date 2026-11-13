@@ -20,7 +20,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { RENDER_OBLIGATIONS, isExemptFrom, readDeclaration, renderExemptionProblems, repoRootFor, type RenderExemption, findDeclarationFile } from "./kg/cat-harness.js";
+import { RENDER_OBLIGATIONS, isExemptFrom, readDeclaration, renderExemptionProblems, repoRootFor, type RenderExemption, instanceRootsIn } from "./kg/cat-harness.js";
 import { requireHarnessRoot } from "./harness-root.ts";
 const ROOT = requireHarnessRoot();
 const REPO = repoRootFor(ROOT);
@@ -53,10 +53,12 @@ describe("this repository's actual declaration", () => {
     // The spreading case, measured against the real tree rather than a
     // fixture. `renderExemptionProblems` allows at most one; this asserts the
     // count is 1 rather than 0, so the guard is not vacuously satisfied by a
-    // repository that lost the declaration.
-    const roots = ["bootstrap", "cat-harness", "folio-assist-core", "."].map((r) => join(REPO, r));
+    // repository that lost the declaration. Every instance is DISCOVERED, not
+    // listed: a hand-written list once spelled `folio-assist-core`, so the
+    // layer it meant was never read and a second claimant there would pass.
+    const roots = instanceRootsIn(REPO);
+    expect(roots).toContain(CAT_BOOTSTRAP);
     const claiming = roots
-      .filter((r) => findDeclarationFile(r) !== undefined)
       .map((r) => readDeclaration(r))
       .filter((d) => d?.renderExemption !== undefined);
     expect(claiming.length).toBe(1);

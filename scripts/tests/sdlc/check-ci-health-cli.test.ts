@@ -110,11 +110,9 @@ describe("triggersOnPush distinguishes an unfiltered push from a filtered one", 
     ["dispatch only", "on:\n  workflow_dispatch:\njobs: {}\n", false],
     ["pull_request only", "on:\n  pull_request:\njobs: {}\n", false],
   ];
-  for (const [label, yaml, expected] of cases) {
-    test(label, () => {
-      expect(pushTriggerOf(yaml)).toBe(expected as never);
-    });
-  }
+  test.each(cases)("%s", (_label, yaml, expected) => {
+    expect(pushTriggerOf(yaml)).toBe(expected as never);
+  });
 });
 
 /**

@@ -302,7 +302,7 @@ export function evidenceLine(e: string, links?: LibraryResolver, fromPage = ""):
 /**
  * Code spans in a node's prose (`applies-when`, `origin`) that name something
  * the page can place become links (owner, 2026-11-10: the DIIG entry's
- * `grade`, `kepner-tregoe`, `madr` and `who-iris/library/9789240010567-eng/`
+ * `grade`, `kepner-tregoe`, `madr` and a library entry's directory
  * read as cross-references but were plain text).
  *
  * - a methodology on this site → its section on the list page, `#<name>`

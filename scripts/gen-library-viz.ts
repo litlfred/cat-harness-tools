@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Publish the L1 corpus as a projection, and a viewer over it.
+ * Publish the library as a projection, and a viewer over it.
  *
  * @module scripts/gen-library-viz
  * @graphNode none — a generator over the library graph, not a schema itself
@@ -570,6 +570,9 @@ var COLS = [
   { k:"upload",   t:"source",   n:false, c:"t-source", f:function(e){ var s=uploadState(e);
       var name = '<span class="slug" style="font-size:.72rem;color:var(--muted)">'+esc(e.sourceFile)+"</span>";
       if (e.sourceFile && e.viewable) name = '<a class="src lib-src" href="'+esc(entryHref(e))+'#lib-view" target="_blank" rel="noopener">'+esc(e.sourceFile)+"</a>";
+      /* Owner, 2026-11-13: every source file name is a link. One not viewable
+         here opens its entry page, which says where the file is held. */
+      else if (e.sourceFile) name = '<a class="src lib-src" href="'+esc(entryHref(e))+'">'+esc(e.sourceFile)+"</a>";
       return '<span class="pill '+s.cls+'">'+esc(s.label)+"</span>"+(e.sourceFile?"<br>"+name:""); } }
 ];
 
@@ -672,24 +675,6 @@ function renderDesk(){
   }).join("") || '<p class="empty">Nothing matches.</p>';
 }
 
-function renderQueue(){
-  var h = "<table><thead><tr><th>unit</th><th>queue</th><th>kind</th><th>size</th><th>state</th></tr></thead><tbody>";
-  h += G.uploads.filter(inScope).map(function(u){
-    /* An intake is ONE queued document however many files it declares, and
-       the row says so — otherwise a four-file capture reads as four things
-       waiting. The count comes from the intake's own declared file list. */
-    var kind = u.kind === "intake"
-      ? '<span class="pill info">intake · ' + u.declaredFiles + " file" + (u.declaredFiles === 1 ? "" : "s") + "</span>"
-      : esc(u.ext || "—");
-    var label = esc(u.file) + (u.kind === "intake" && u.title
-      ? '<br><span style="font-family:inherit;color:var(--muted);font-size:.78rem">' + esc(u.title) + "</span>" : "");
-    return '<tr><td class="slug" data-label="unit">' + label + '</td><td data-label="queue"><span class="pill">' + esc(u.instance) +
-      '</span></td><td data-label="kind">' + kind + '</td><td class="num" data-label="size">' + kb(u.bytes) + '</td><td data-label="state">' +
-      (u.ingestedBy ? '<span class="pill ok">ingested → ' + esc(u.ingestedBy) + "</span>"
-                    : '<span class="pill warn">uningested</span>') + "</td></tr>";
-  }).join("") || '<tr><td colspan="5"><p class="empty">No uploads queue for this subject.</p></td></tr>';
-  $("queue").innerHTML = h + "</tbody></table>";
-}
 
 function render(){ if (VIEW === "list") renderList(); else renderDesk(); }
 
@@ -937,7 +922,7 @@ fetch(DATA_HREF).then(function(r){
     renderList();
   });
   render();
-  renderQueue();
+  // The uploads queue has its own page (gen-uploads-viz.ts); the library page shows the corpus only (owner, 2026-11-13).
   honourAddress();
   window.addEventListener("hashchange", honourAddress);
 }).catch(function(e){
@@ -1291,7 +1276,7 @@ const ENTRY_PREFIXES = { [ENTRY_TYPE.split(":")[0]!]: termIri("SourceDocument").
  * config and the page's own path what to draw into it.
  */
 const VIEWER_HEAD = `<div class="lib-head">
-  <h1 id="lib-title">Library — the L1 corpus</h1>
+  <h1 id="lib-title">Library</h1>
   <p class="empty" id="status" style="padding:0">loading…</p>
   <div class="badges" id="badges"></div>
 </div>`;
@@ -1309,10 +1294,6 @@ const VIEWER_BODY = `<div class="toolbar">
   <section id="desktop" hidden></section>
   <section id="document" class="wrap" hidden aria-live="polite"></section>
   <section id="blocks" class="wrap" hidden aria-live="polite"></section>
-  <h2>Uploads — the queue feeding this</h2>
-  <p class="note">A source sitting here reads as <strong>absent</strong> to every consumer while the file is on disk.
-    Queues are counted per declaring instance and never merged.</p>
-  <section id="queue" class="wrap"></section>
 </div>`;
 
 /**
@@ -1404,7 +1385,7 @@ function libraryPageHtml(p: LibraryPage): string {
     },
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
 <div class="${LIBRARY_MOUNT}" data-fa-no-filter${decl?.attrs ?? ""}${attrs}>
-${decl ? `${decl.stub}\n` : ""}${p.entryTitle === undefined ? VIEWER_HEAD : VIEWER_HEAD.replace("Library — the L1 corpus", escHtml(p.entryTitle))}
+${decl ? `${decl.stub}\n` : ""}${p.entryTitle === undefined ? VIEWER_HEAD : VIEWER_HEAD.replace('<h1 id="lib-title">Library</h1>', `<h1 id="lib-title">${escHtml(p.entryTitle)}</h1>`)}
 ${p.record ? `${p.record}\n` : ""}${p.versions ? `${p.versions}\n` : ""}${p.summary ? `${p.summary}\n` : ""}${p.view ? `${p.view}\n` : ""}${p.entryTitle === undefined ? VIEWER_BODY : ENTRY_BODY}
 ${p.sources ?? ""}
 </div>
@@ -1435,7 +1416,7 @@ export function viewerHtml(
 ): string {
   return libraryPageHtml({
     sources: sourcesHtml(sources.links ?? [], sources.libraries ?? []),
-    title: scope ? `${scope} — library` : "Library — the L1 corpus",
+    title: scope ? `${scope} — library` : "Library",
     dataHref,
     config: { data: dataHref, scope, libRoot: libRoot ?? (scope ? "../" : "./") },
     noscript: `<p class="note">This page loads its entries from <a href="${escHtml(dataHref)}">the library projection</a>; it needs JavaScript to draw them.</p>`,

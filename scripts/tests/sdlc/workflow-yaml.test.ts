@@ -40,13 +40,13 @@ describe("GitHub Actions workflows", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  for (const file of files) {
-    test(`${file} parses`, () => {
+  describe.each(files)("%s", (file) => {
+    test("parses", () => {
       const src = readFileSync(join(WORKFLOW_DIR, file), "utf-8");
       expect(() => Bun.YAML.parse(src)).not.toThrow();
     });
 
-    test(`${file} declares a name and triggers`, () => {
+    test("declares a name and triggers", () => {
       // A workflow whose `name:` is missing is reported by file path in the
       // Actions UI — indistinguishable at a glance from the startup-failure
       // presentation above. `on:` missing means it can never run.
@@ -59,7 +59,7 @@ describe("GitHub Actions workflows", () => {
       const triggers = doc?.on ?? (doc as Record<string, unknown>)?.["true"];
       expect(triggers, `${file} has no on: triggers`).toBeDefined();
     });
-  }
+  });
 
   /**
    * `code-quality-gates.yml` runs `bun test`, `bun run cat lint` and
