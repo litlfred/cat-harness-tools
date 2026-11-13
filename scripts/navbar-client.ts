@@ -12,8 +12,29 @@
  */
 import { RAIL_PAGE_ID, renderRailRegions, type RailPage } from "./lib/harness-rail.ts";
 import { wireNavFolds, wireNavResize } from "./lib/navbar.ts";
+import { localiseRail, navbarStringsFile, railLocale } from "./lib/navbar-locale.ts";
 
-declare const self: { FaRailData?: Record<string, string> };
+declare const self: { FaRailData?: Record<string, string>; FaNavStrings?: Record<string, Record<string, string>> };
+
+/**
+ * The rail in the page's language (owner, 2026-11-12): on a page whose
+ * `<html lang>` is not English, load the site's `strings-<locale>.js` and swap
+ * the labels it translates. No file, or no entry, leaves the English as built
+ * (`navbar-locale.ts`). After `draw`, which replaces the rail's contents.
+ */
+function localise(nav: Element, root: string): void {
+  const loc = railLocale(document.documentElement.getAttribute("lang"));
+  if (!loc) return;
+  const apply = (): void => {
+    const map = self.FaNavStrings?.[loc];
+    if (map) localiseRail(nav, map);
+  };
+  if (self.FaNavStrings?.[loc]) return apply();
+  const s = document.createElement("script");
+  s.src = `${root}/${navbarStringsFile(loc)}`;
+  s.onload = apply;
+  document.head.appendChild(s);
+}
 
 function draw(): void {
   const block = document.getElementById(RAIL_PAGE_ID);
@@ -40,6 +61,7 @@ function draw(): void {
   }
   nav.innerHTML = renderRailRegions(shared, page);
   nav.removeAttribute("data-fa-rail");
+  localise(nav, page.root);
 }
 
 draw();

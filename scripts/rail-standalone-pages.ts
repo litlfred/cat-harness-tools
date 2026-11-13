@@ -12,12 +12,18 @@
  * Usage:
  *   bun run cat-harness-tools/scripts/rail-standalone-pages.ts --site ./_site --built cat-harness
  *
+ * Last, the rail in the page's language: each `<translations>/<locale>/navbar.po`
+ * of the checkout it runs in (`--translations`, default `./translations`) becomes
+ * the site's `assets/navbar/strings-<locale>.js`, which `navbar.js` loads on a
+ * page whose `<html lang>` is that locale (`lib/navbar-strings.ts`).
+ *
  * @module scripts/rail-standalone-pages
  */
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { DOCS_SITE_BASE } from "../schemas/kg/jsonld.js";
+import { writeNavbarStrings } from "./lib/navbar-strings.ts";
 import { mountRoutes, railStandalonePages, type ForeignSiteRail } from "./mount-instance-docs.js";
 
 
@@ -30,7 +36,7 @@ function main(): number {
   const site = at("--site");
   const built = at("--built");
   if (!site || !built) {
-    console.error("usage: rail-standalone-pages.ts --site <dir> --built <instance-dir-name> [--theme-source <jekyll source>] [--foreign-site [--home-label <name>] [--instance <name> [--landing]]]");
+    console.error("usage: rail-standalone-pages.ts --site <dir> --built <instance-dir-name> [--theme-source <jekyll source>] [--translations <dir>] [--foreign-site [--home-label <name>] [--instance <name> [--landing]]]");
     return 2;
   }
   // `--foreign-site`: the site is a FOLIO's, not the platform's (folio-staging.yml).
@@ -79,6 +85,15 @@ function main(): number {
     console.log(
       `  pinned chrome: ${r.pinned.copied.length} copied, ${r.pinned.same.length} already identical` +
         (r.pinned.differing.length ? `, ${r.pinned.differing.length} left as the site built them (${r.pinned.differing.join(", ")})` : ""),
+    );
+  }
+  // The rail in the page's language (owner, 2026-11-12): the checkout's own
+  // catalogues, written beside the rail's shared data.
+  const strings = writeNavbarStrings(siteAbs, resolve(at("--translations") ?? "translations"));
+  if (strings.written.length || strings.empty.length) {
+    console.log(
+      `  rail strings: ${strings.written.length ? strings.written.join(", ") : "none"}` +
+        (strings.empty.length ? ` (navbar.po with no translated entry, left English: ${strings.empty.join(", ")})` : ""),
     );
   }
   if (r.skipped.length) {
