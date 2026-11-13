@@ -1332,11 +1332,21 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     if (!d) return null;
     try { const m = JSON.parse(d.textContent); return m && m.blob ? m : null; } catch { return null; }
   };
+  // A docs page says the same of ITSELF in <script id="fa-page-source">,
+  // written by head_custom.html from compose-docs' _data/page_sources.json
+  // (owner, 2026-11-13). Only the headings its own Markdown writes are listed,
+  // so a section an include draws keeps its 📣 alone: "own-text sections only".
+  const pageLines = () => {
+    const d = document.getElementById("fa-page-source");
+    if (!d) return null;
+    try { const m = JSON.parse(d.textContent); return m && m.blob ? m : null; } catch { return null; }
+  };
   const norm = (s) => String(s).toLowerCase().replace(/&[a-z]+;/g, " ").replace(/[^a-z0-9]+/g, " ").trim();
   const sectionBoxes = () => {
     const main = document.querySelector(".main-content");
     if (!main || main.querySelector(".fa-doc, .block-actions")) return;
     const ig = igLines();
+    const own = ig ? null : pageLines();
     const ghRepo = ig ? (/^https:\\/\\/github\\.com\\/([^/]+\\/[^/]+)/.exec(ig.blob) || [])[1] || "" : "";
     const site = ig ? (ig.repo || ghRepo) : siteRepo();
     const used = {};
@@ -1370,18 +1380,20 @@ export const EDIT_LINKS_RUNTIME = `(() => {
         if (qa) box.append(el("p", { className: "fa-sec-qa" }, [qa]));
         nx.remove();
       }
-      if (ig) {
+      const lm = ig || (from ? null : own);
+      if (lm) {
         const k = norm(sec);
-        const lines = Array.isArray(ig.lines) ? ig.lines : [];
+        const lines = Array.isArray(lm.lines) ? lm.lines : [];
         for (let i = 0; i < lines.length; i++) if (!used[i] && norm(lines[i].t) === k) {
           used[i] = 1;
-          src = (lines[i].b || ig.blob) + "#L" + lines[i].l;
+          src = (lines[i].b || lm.blob) + "#L" + lines[i].l;
           break;
         }
         if (src) {
           const e = el("a", { className: "ba-edit", href: src, textContent: "\\u270e edit", title: "Edit this section's source on GitHub" });
           e.dataset.faLink = "edit";
           box.append(e);
+          if (!ig) addSuggest(box);
         }
       }
       const repo = (from && from.dataset.repo) || site;
