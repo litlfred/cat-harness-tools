@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { LAYER_OUTPUT_ROOT, mountedInstances, outputPathFor, outputTwinOf, readPathAt, readPathFor } from "../lib/layer-output.js";
+import { LAYER_OUTPUT_ROOT, mountedInstances, outputPathFor, outputTwinOf, readPathAt, readPathFor, writePathAt } from "../lib/layer-output.js";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -99,5 +99,40 @@ describe("outputTwinOf / readPathAt — a reader holding an absolute path", () =
     expect(readPathAt(root, abs)).toBe(join(twin, "index.json"));
     expect(readPathAt(root, join(root, "upper-ig", "fhir-artifact-index"))).toBe(twin);
     expect(readPathAt(root, join(root, "own", "a.json"))).toBe(join(root, "own", "a.json"));
+  });
+});
+
+describe("writePathAt — a writer holding an absolute path", () => {
+  test("a path in a mounted layer is written at its twin; a local or outside path where it is", () => {
+    const root = checkout(LOCK);
+    expect(writePathAt(root, join(root, "upper-ig", "docs", "_data", "x.json"))).toBe(join(root, LAYER_OUTPUT_ROOT, "upper-ig", "docs", "_data", "x.json"));
+    expect(writePathAt(root, join(root, "own", "docs", "x.json"))).toBe(join(root, "own", "docs", "x.json"));
+    expect(writePathAt(root, "/elsewhere/x")).toBe("/elsewhere/x");
+  });
+
+  test("what a writer wrote is what readPathAt reads back", () => {
+    const root = checkout(LOCK);
+    const abs = join(root, "lower", "docs", "page.html");
+    const at = writePathAt(root, abs);
+    mkdirSync(join(at, ".."), { recursive: true });
+    writeFileSync(at, "computed");
+    expect(readPathAt(root, abs)).toBe(at);
+  });
+});
+
+describe("derive-at-publish built() — an artefact of a mounted layer built at its output root", () => {
+  test("a declared artefact counts as built when only its output-root twin holds it", async () => {
+    const { built } = await import("../derive-at-publish.ts");
+    const root = checkout(LOCK);
+    const file = { abs: join(root, "lower", "docs", "_data", "x.json"), path: "docs/_data/x.json" };
+    const dir = { abs: join(root, "lower", "docs", "pages"), path: "docs/pages/" };
+    expect(built(file, root)).toBe(false);
+    expect(built(dir, root)).toBe(false);
+    for (const [at, body] of [[writePathAt(root, file.abs), "{}"], [join(writePathAt(root, dir.abs), "a", "index.html"), "<p>"]] as const) {
+      mkdirSync(join(at, ".."), { recursive: true });
+      writeFileSync(at, body);
+    }
+    expect(built(file, root)).toBe(true);
+    expect(built(dir, root)).toBe(true);
   });
 });

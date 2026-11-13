@@ -45,6 +45,7 @@ import { classify } from "./check-docs-populated.ts";
 import { isSkillMd, kgRoots, skillMdDirs, corpusScopeFor } from "./known-skills.ts";
 import { readRoleGraph } from "../schemas/process/role-graph.ts";
 import {
+  checkoutRootFor,
   findDeclarationFile,
   findInstanceRoot,
   instanceRootsIn,
@@ -66,6 +67,7 @@ import { publishPlan } from "./derive-at-publish.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { themedPage as sharedThemedPage } from "./lib/themed-page.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { outputTwinOf, readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { inScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import { isGlobalTasksFile } from "../src/workflow/process-model.ts";
 
@@ -104,6 +106,13 @@ const VIEWER_TOOL = "auto-docs-viewer";
 // The HARNESS, not this layer: the script moved up in 70lx B2 and still reads cat-harness's declarations.
 const ROOT = HARNESS_ROOT;
 const REPO_ROOT = repoRootFor(ROOT);
+/**
+ * The checkout holding the layer. Where it MOUNTS cat-harness, every page this
+ * generator computes is written at the layer's output root
+ * (`build/layers/cat-harness/…`, `lib/layer-output.ts`) and read back through
+ * the overlay, so a run leaves the pinned mount as its lock pins it.
+ */
+const CHECKOUT = checkoutRootFor(ROOT);
 const REPO = join(ROOT, "..");
 const check = process.argv.includes("--check");
 
@@ -1375,14 +1384,19 @@ let stale = 0;
  */
 function emitRaw(path: string, content: string): void {
   if (check) {
-    const current = existsSync(path) ? readFileSync(path, "utf-8") : "";
+    // The output root's copy when this checkout wrote one, else the pinned copy.
+    const at = readPathAt(CHECKOUT, path);
+    const current = existsSync(at) ? readFileSync(at, "utf-8") : "";
     if (current === content) return;
-    console.error(`  ✗ ${path} ${existsSync(path) ? "is stale" : "is missing"}`);
+    console.error(`  ✗ ${path} ${existsSync(at) ? "is stale" : "is missing"}`);
     stale++;
     return;
   }
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
+  // Inside a mounted cat-harness, at the layer's output root (bean
+  // `cat-tools-sm8r`, item 4, step 4); in cat-harness's own checkout, `path`.
+  const to = writePathAt(CHECKOUT, path);
+  mkdirSync(dirname(to), { recursive: true });
+  writeFileSync(to, content);
 }
 
 /**
@@ -1614,7 +1628,12 @@ if (import.meta.main) {
     // Orphans — bean `ankg`'s helper, unchanged. A sub-graph that stops
     // contributing items keeps its page otherwise, indexing a set that no
     // longer exists.
-    const { owned, foreign } = orphanSubjectPages(pageDir, populated);
+    // Both copies: the pinned mount's, and what this checkout computed at the output root.
+    const pageTwin = outputTwinOf(CHECKOUT, pageDir);
+    const pinned = orphanSubjectPages(pageDir, populated);
+    const computed = pageTwin !== undefined && existsSync(pageTwin) ? orphanSubjectPages(pageTwin, populated) : { owned: [], foreign: [] };
+    const owned = [...new Set([...pinned.owned, ...computed.owned])];
+    const foreign = [...new Set([...pinned.foreign, ...computed.foreign])];
     for (const name of foreign) {
       console.error(`  ! ${join(pageDir, name)} does not identify itself — left in place`);
     }
@@ -1625,8 +1644,14 @@ if (import.meta.main) {
         stale++;
         continue;
       }
-      rmSync(dir, { recursive: true });
-      console.log(`  ✗ pruned ${dir}`);
+      // Pruned where this run writes. A page left in a pinned mount stays
+      // until the layer is re-pinned: a run never edits a mount.
+      const prune = writePathAt(CHECKOUT, dir);
+      if (existsSync(prune)) {
+        rmSync(prune, { recursive: true });
+        console.log(`  ✗ pruned ${prune}`);
+      }
+      if (prune !== dir && existsSync(dir)) console.log(`  ! ${dir} is an orphan in the pinned mount — left until the layer is re-pinned`);
     }
 
 
@@ -1695,8 +1720,9 @@ if (import.meta.main) {
   if (!check) {
     const tiles = tileCountsForPages(counted, REPO_ROOT, ROOT);
     const sorted = Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b, "en")));
-    mkdirSync(dirname(countFile), { recursive: true });
-    writeFileSync(countFile, JSON.stringify({ ...tileCounts(tiles), [COUNTS_FIELD]: sorted }, null, 2) + "\n");
+    const countAt = writePathAt(CHECKOUT, countFile);
+    mkdirSync(dirname(countAt), { recursive: true });
+    writeFileSync(countAt, JSON.stringify({ ...tileCounts(tiles), [COUNTS_FIELD]: sorted }, null, 2) + "\n");
     console.log(
       `  ✓ tile counts: ${Object.keys(tiles).length} tile(s), page counts: ${Object.keys(sorted).length} → assets/auto-docs/index.json`,
     );
