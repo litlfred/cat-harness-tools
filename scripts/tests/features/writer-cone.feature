@@ -1,9 +1,5 @@
 # Writer records for the rerun-and-measure deploy (bean fwtz, option B).
 # Each Scenario names the test that executes it.
-#
-# The writerRecordOf test whose title holds an escaped quote (a directory only
-# opened is recorded as \"dir\" ...) carries no Scenario yet: a pending checker
-# change (#2065) renames tags with escaped quotes.
 Feature: Writer cone records
 
   @test:scripts/tests/writer-cone.test.ts::parseTrace_in_collect_mode_—_a_writer's_reads_and_writes::what_it_wrote_is_output,_not_input;_a_path_probed_absent_and_then_created_was_absent_before
@@ -75,6 +71,15 @@ Feature: Writer cone records
   @test:scripts/tests/writer-cone.test.ts::writerRecordOf_and_decideWriter::records_nothing_for_a_failed_run,_a_traced_site,_a_moved_fingerprint_or_an_unenumerable_trace
   Scenario: Nothing is recorded for an unreliable run
     Then a failed run, a run reaching the network, a fingerprint that moved, and an undetermined trace each record nothing, with their reason
+
+  @test:scripts/tests/writer-cone.test.ts::writerRecordOf_and_decideWriter::a_directory_only_opened_is_recorded_as_"dir":_a_new_entry_keeps_the_skip,_a_listed_one's_new_entry_does_not_(tools#1265)
+  Scenario: A directory only opened is recorded as "dir"; only a listed directory's new entry stops the skip
+    Given a writer that read the directories "opened" and "listed", and listed only "listed"
+    When its record is made
+    Then "opened" is recorded as "dir" and "listed" as "dir " followed by its listing
+    And a new entry in "opened" keeps the skip
+    And a new entry in "listed" stops it with "listed changed"
+    And "opened" replaced by a file stops it with "opened changed"
 
   @test:scripts/tests/writer-cone.test.ts::writerRecordOf_and_decideWriter::no_records,_or_an_unrecorded_writer,_always_runs
   Scenario: No record means run

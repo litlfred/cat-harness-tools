@@ -36,7 +36,7 @@ Feature: Knowledge-graph export
     And it carries no generatedAt
     And its sourceTree is a 40-character hex hash
 
-  @test:scripts/tests/kg-export.test.ts::kg_export::every_edge_term_is_declared_{\"@type\":_\"@id\"}_—_otherwise_it_is_not_a_graph
+  @test:scripts/tests/kg-export.test.ts::kg_export::every_edge_term_is_declared_{"@type":_"@id"}_—_otherwise_it_is_not_a_graph
   Scenario: Every edge term is declared as an @id-typed term
     Given the export's @context
     Then each of "partOf", "requires", "performedBy", "inPackage", "declaresSkill", "startNode", "from", "to" and "holdsGraph" is declared with "@type" "@id"

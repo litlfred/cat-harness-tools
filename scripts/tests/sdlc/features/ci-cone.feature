@@ -276,14 +276,6 @@ Feature: The CI cone skips a check only when everything its green run read is un
     And the note mentions "re-run untraced, which exited 1"
     And the check runs
 
-  @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::not_{tracked}_in_task-io:_not_a_candidate,_so_it_runs_untraced_and_never_skips
-  Scenario: A check without the tracked input in its task-io is not a candidate, runs untraced and never skips
-    # Skipped: where strace cannot run
-    Given task-io for "x:check" with no inputs
-    When it is recorded
-    Then it exits 0 and the note mentions "not a candidate"
-    And the check runs
-
   @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::no_record,_or_a_record_from_another_tracer_version,_means_run
   Scenario: No record, or a record from another tracer version, makes the check run
     # Skipped: where strace cannot run
@@ -432,3 +424,37 @@ Feature: The CI cone skips a check only when everything its green run read is un
     Then the test runs
     When it is "one" again and the plugin is edited
     Then the test runs
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::every_check_is_a_candidate,_declared_in_task-io_or_not_(owner,_2026-11-13:_every_gate)
+  Scenario: A check with no input declaration, or none naming the tracked set, is still recorded and skipped
+    # Skipped: where strace cannot run
+    Given the fixture check "x:check", with no task-io declaration and then with one declaring only empty outputs
+    When it is recorded on main for each
+    Then it exits 0 and the note contains "recorded"
+    And the check skips
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::an_undeclared_check_still_runs_when_a_path_it_read_changed
+  Scenario: An undeclared check still runs when a path it read changed
+    # Skipped: where strace cannot run
+    Given the fixture check "x:check" with no task-io declaration, recorded on main
+    And the check skips
+    When "data/c.json", read only because "data/a.json" names it, is changed
+    Then the check runs
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::a_push_to_main_records
+  Scenario: A push to main records
+    Given the event "push" on "refs/heads/main"
+    Then the run records
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::a_dispatch_on_main_records_too:_a_train's_merge_starts_no_push_run_(bean_hd58)
+  Scenario: A workflow dispatch on main records too
+    Given the event "workflow_dispatch" on "refs/heads/main"
+    Then the run records
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::nothing_else_records:_a_dispatch_on_another_branch,_a_PR,_a_merge_group
+  Scenario: No other run records
+    Then a workflow dispatch on "refs/heads/repin-train/x" does not record
+    And a pull request on "refs/pull/1/merge" does not record
+    And a merge group on "refs/heads/gh-readonly-queue/main/x" does not record
+    And a push to "refs/heads/feature" does not record
+    And an empty environment does not record

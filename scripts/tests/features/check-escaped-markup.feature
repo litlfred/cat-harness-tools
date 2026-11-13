@@ -122,52 +122,54 @@ Feature: A built page carries no escaped block markup or leaked markdown table
     When leaked tables are found in it
     Then there are none
 
-  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_prose_pipe,_a_dash_rule_or_a_lone_dash_is_not_a_delimiter_row
-  Scenario: A prose pipe, a dash rule or a lone dash is not a delimiter row
-    Given a paragraph "a | b", a paragraph "—", a paragraph "a — b | c" and a horizontal rule
-    When leaked tables are found in them
-    Then there are none
-
-  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_HEADER-ONLY_table_—_no_body_row,_so_the_delimiter_closes_the_paragraph_on_its_line
-  Scenario: A header-only table whose delimiter row closes the paragraph is found
-    Given a heading followed by a paragraph "| role | file | |" and a delimiter row "|—|—|—|" ending in "</p>"
-    When leaked tables are found on "tools/x/index.html"
-    Then exactly one is reported, with excerpt "| role | file | |"
-
-  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_table_straight_under_a_heading_—_read_as_one_paragraph_with_mixed_dash_runs
-  Scenario: A table straight under a heading, with mixed dash runs, is found
-    Given a heading followed by a paragraph holding a header row, a body row and a delimiter row "|——-|——-|——-|", "| —– | :—-: |" or "|&mdash;&ndash;|&#8212;-|"
-    When leaked tables are found in each
-    Then each yields one finding
-
-  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_row_that_opens_straight_after_a_tag,_or_shares_a_line_with_its_header
-  Scenario: A delimiter row straight after a tag, or on its header's line, is found
-    Given a paragraph "<p>|—|—|</p>"
-    And a paragraph "| a | b |<br />|—|—|"
-    When leaked tables are found in each
-    Then the first yields one finding
-    And the second yields exactly one, with excerpt "| a | b |"
-
-  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::one_cell_is_enough_—_a_one-column_table_leaks_as_`|—|`
-  Scenario: A one-column table leaks as "|—|" and is found
-    Given a paragraph "| only |" followed by "|—|"
-    When leaked tables are found in it
-    Then one is reported
-
-  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_delimiter_inside_<script>,_<style>_or_<textarea>_is_data,_not_a_leak
-  Scenario: A delimiter inside script, style or textarea is not a leak
-    Given a pipe table inside each of script, style and textarea
-    When leaked tables are found in each
-    Then there are none
-
-  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_RENDERED_table_is_still_not_a_finding,_whatever_its_cells_hold
-  Scenario: A rendered table whose cells hold dashes or a code delimiter is not a finding
-    Given a real table element whose cells hold "—", "-" and a code span "|---|"
-    When leaked tables are found in it
-    Then there are none
-
   @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::the_tree_scan_reports_it
   Scenario: The tree scan reports a leaked table
     Given a tree whose index.html is the shipped methodologies table
     When the tree is checked
     Then one leaked table is reported
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_prose_pipe,_a_dash_rule_or_a_lone_dash_is_not_a_delimiter_row
+  Scenario: A prose pipe, a lone dash or a horizontal rule is not a leaked table
+    Given paragraphs "a | b", "—" and "a — b | c" and an hr element
+    When leaked tables are found in them
+    Then there are none
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_HEADER-ONLY_table_—_no_body_row,_so_the_delimiter_closes_the_paragraph_on_its_line
+  Scenario: A header-only table whose delimiter closes the paragraph is found
+    Given a paragraph holding "| role | file | |" and "|—|—|—|" ending in the closing p tag
+    When leaked tables are found in "tools/x/index.html"
+    Then there is exactly one finding for that page
+    And its excerpt is "| role | file | |"
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_table_straight_under_a_heading_—_read_as_one_paragraph_with_mixed_dash_runs
+  Scenario: A table joined to the paragraph under a heading is found with mixed dash runs
+    Given an h5 heading followed by a paragraph holding a header, a delimiter and a body row
+    And delimiter rows "|——-|——-|——-|", "| —– | :—-: |" and "|&mdash;&ndash;|&#8212;-|"
+    When leaked tables are found in each
+    Then each yields one finding
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_row_that_opens_straight_after_a_tag,_or_shares_a_line_with_its_header
+  Scenario: A delimiter right after a tag or after a line break in the header's line is found
+    Given a paragraph that is only "|—|—|"
+    When leaked tables are found in it
+    Then there is one finding
+    And given a paragraph "| a | b |" then a br and "|—|—|" on the same line
+    Then there is one finding whose excerpt is "| a | b |"
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::one_cell_is_enough_—_a_one-column_table_leaks_as_`|—|`
+  Scenario: A one-column leaked table is found
+    Given a paragraph holding "| only |" and "|—|"
+    When leaked tables are found in it
+    Then there is one finding
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_delimiter_inside_<script>,_<style>_or_<textarea>_is_data,_not_a_leak
+  Scenario: A table inside script, style or textarea is not a leak
+    Given a header and delimiter row inside each of script, style and textarea
+    When leaked tables are found in each
+    Then there are none
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_RENDERED_table_is_still_not_a_finding,_whatever_its_cells_hold
+  Scenario: A rendered table is not a finding even when its cells hold dashes or pipes
+    Given a real table element whose cells hold "—", "-" and a code "|---|"
+    When leaked tables are found in it
+    Then there are none
