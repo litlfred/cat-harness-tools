@@ -321,3 +321,35 @@ Feature: Composing the docs layers into one site
     When it is composed
     Then "upper/guides/x.md" is written
     And no "upper/source" is written or supplied
+
+  @test:scripts/tests/compose-docs.test.ts::a_MOUNTED_base_layer's_computed_pages_at_the_output_root_(bean_cat-tools-sm8r,_item_4,_step_4)::the_twin_is_laid_directly_over_its_base,_before_the_repository_overlay
+  Scenario: The mounted base layer's output-root twin is laid directly over its base before the repository overlay
+    Given a mounted cat-harness layer with a base page and a computed page at its output-root twin
+    When docsLayers resolves the layers
+    Then the order is "docs", "docs@output", "root-docs"
+
+  @test:scripts/tests/compose-docs.test.ts::a_MOUNTED_base_layer's_computed_pages_at_the_output_root_(bean_cat-tools-sm8r,_item_4,_step_4)::no_twin_layer_while_nothing_was_written_there:_the_composed_tree_is_unchanged
+  Scenario: No twin layer is added while nothing was written at the output root
+    Given a mounted cat-harness layer with no computed files at its output-root twin
+    When docsLayers resolves the layers
+    Then the layers are "docs" and "root-docs"
+
+  @test:scripts/tests/compose-docs.test.ts::a_MOUNTED_base_layer's_computed_pages_at_the_output_root_(bean_cat-tools-sm8r,_item_4,_step_4)::a_computed_page_shadows_the_pinned_copy_and_says_so;_the_overlay_still_wins_over_both
+  Scenario: A computed page shadows the pinned copy and is reported while the repository overlay still wins over both
+    Given a mounted base layer with pinned pages, computed pages at its output-root twin, and a repository overlay page
+    When the docs tree is composed
+    Then the computed page shadows the pinned copy and is recorded in overrides as overridden by "docs@output"
+    And the repository overlay still wins over both the pinned copy and the computed twin
+
+  @test:scripts/tests/compose-docs.test.ts::a_MOUNTED_base_layer's_computed_pages_at_the_output_root_(bean_cat-tools-sm8r,_item_4,_step_4)::a_base_layer_absent_from_the_mount_but_present_at_the_output_root_is_carried,_not_missing
+  Scenario: A base layer absent from the mount but present at the output root is carried and not missing
+    Given a mounted layer whose base directory is absent from the mount but present at the output-root twin
+    When docsLayers resolves the layers
+    Then "docs@output" and "root-docs" are returned and missing is empty
+
+  @test:scripts/tests/compose-docs.test.ts::a_MOUNTED_base_layer's_computed_pages_at_the_output_root_(bean_cat-tools-sm8r,_item_4,_step_4)::a_checkout_that_does_not_mount_the_layer_has_no_twin,_even_with_files_at_that_path
+  Scenario: A checkout that does not mount the layer has no output-root twin even with files at that path
+    Given a checkout whose lock does not mount cat-harness even though files exist under build/layers/cat-harness/docs
+    When docsLayers resolves the layers
+    Then the layers are "docs" and "root-docs" without "docs@output"
+

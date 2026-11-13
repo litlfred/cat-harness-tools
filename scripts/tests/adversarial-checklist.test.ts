@@ -207,6 +207,28 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     }
   });
 
+  it("never passes a node whose file does not exist, nor counts it as reviewed", () => {
+    const root = mkdtempSync(join(tmpdir(), "adv-missing-"));
+    try {
+      const node = {
+        id: "ghost",
+        kind: "tool" as AdversarialContentKind,
+        path: "scripts/ghost.ts",
+        sourceHash: "000000000000",
+      };
+      expect(existsSync(join(root, node.path))).toBe(false);
+      const { review, findings } = reviewNodeAdversarially(node, root);
+      expect(review.result).not.toBe("pass");
+      expect(review.result).toBe("unknown");
+      expect(review.coverage.files_reviewed).toBe(0);
+      expect(review.coverage.skipped).toEqual([{ path: "scripts/ghost.ts", why: "file does not exist" }]);
+      expect(findings).toEqual([]);
+      expect(AdversarialReviewSchema.safeParse(review).success).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   // Walks the whole repository for fan-in, so it runs near the 5s default on CI (5.2s on #1227); same budget as the coverage walks below.
   it("executes backfill batch writing to sidecars and NEVER creates beans", () => {
     const beansDir = join(ROOT, "beans", "defs");

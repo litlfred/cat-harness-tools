@@ -51,20 +51,21 @@ Feature: Release-gated CI workflows
     Given the workflow ".github/workflows/layer-pr-checks.yml"
     Then the concurrency group contains the no-op expression for a non-release label
     And "prepare-head", "prepare-base" and "compare" are each gated on the action not being "labeled" or the label being "release"
-    And the "run" job needs exactly "tier", "prepare-head" and "prepare-base"
-    And the "ready-reuse" job runs only on the "ready_for_review" action
+    And the "run" job needs exactly "prepare-head" and "prepare-base"
 
   @test:test/release-gated-ci.test.ts::layer-pr-checks.yml_(every_layer)::prepare-base_does_not_run_on_the_fast_tier
   Scenario: prepare-base runs only on the full tier
     Given the workflow ".github/workflows/layer-pr-checks.yml"
-    Then the "prepare-base" job condition requires the tier job's "full" output to be "true"
-    And "prepare-base" needs "tier"
+    Then the "prepare-base" job condition requires prepare-head's "full" output to be "true"
+    And "prepare-base" needs "prepare-head"
 
   @test:test/release-gated-ci.test.ts::layer-pr-checks.yml_(every_layer)::the_verdict_job_is_named_for_the_tier_it_judged
   Scenario: The compare job's name states which tier it judged
     Given the workflow ".github/workflows/layer-pr-checks.yml"
     Then the "compare" job name contains "Fast tier only (advisory; the full checks gate a release)"
     And it contains "No new failures (tests and gates)"
+    And the "compare" job is skipped when prepare-head's "full" output is "false"
+    And prepare-head's last step is "Fast tier only (advisory; the full checks gate a release)", run when its tier step says "full=false"
 
   @test:test/release-gated-ci.test.ts::layer-pr-checks.yml_(every_layer)::a_push_to_main_is_batched_per_integration_window,_and_the_stamp_is_saved_under_the_key_it_is_looked_up_by
   Scenario: Pushes to main are batched per integration window under a matching stamp key
