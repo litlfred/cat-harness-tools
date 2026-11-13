@@ -6,6 +6,7 @@
  * @module scripts/lib/navbar-locale
  */
 import { RAIL_DATA_DIR } from "./harness-rail.ts";
+import { PAGE_BAR_CLASS } from "./page-layout-classes.ts";
 
 /** The global the strings files fill, keyed by locale. */
 export const NAV_STRINGS_GLOBAL = "FaNavStrings";
@@ -58,8 +59,16 @@ export function localiseRail(nav: ParentNode, map: Readonly<Record<string, strin
       swapped++;
     });
   });
-  nav.querySelectorAll("[aria-label],[data-fa-tip],[title]").forEach((el) => {
-    for (const attr of ["aria-label", "data-fa-tip", "title"]) {
+  return swapped + swapNames(nav, map);
+}
+
+/** The names and tooltips under `root` that a translation replaces, whole. */
+const NAME_ATTRS = ["aria-label", "data-fa-tip", "title", "placeholder"] as const;
+
+function swapNames(root: ParentNode, map: Readonly<Record<string, string>>): number {
+  let swapped = 0;
+  root.querySelectorAll(NAME_ATTRS.map((a) => `[${a}]`).join(",")).forEach((el) => {
+    for (const attr of NAME_ATTRS) {
       const v = el.getAttribute(attr);
       const to = v ? map[v.trim()] : undefined;
       if (to !== undefined) {
@@ -67,6 +76,47 @@ export function localiseRail(nav: ParentNode, map: Readonly<Record<string, strin
         swapped++;
       }
     }
+  });
+  return swapped;
+}
+
+/** A node as the swap reads it: enough of the DOM for the tests to fake. */
+interface TextTree {
+  nodeType: number;
+  nodeName?: string;
+  textContent: string | null;
+  childNodes?: ArrayLike<TextTree> & Iterable<TextTree>;
+}
+
+/** Text that is code or style, never words: its text nodes are left alone. */
+const NOT_WORDS = new Set(["SCRIPT", "STYLE", "TEMPLATE", "CODE"]);
+
+function swapText(n: TextTree, map: Readonly<Record<string, string>>): number {
+  if (n.nodeType === 3) {
+    const text = n.textContent ?? "";
+    const key = text.trim();
+    const to = key ? map[key] : undefined;
+    if (to === undefined) return 0;
+    n.textContent = text.replace(key, to);
+    return 1;
+  }
+  if (n.nodeType !== 1 || NOT_WORDS.has((n.nodeName ?? "").toUpperCase())) return 0;
+  let swapped = 0;
+  for (const c of Array.from(n.childNodes ?? [])) swapped += swapText(c, map);
+  return swapped;
+}
+
+/**
+ * The page's top bar (the shared layout's {@link PAGE_BAR_CLASS}: an IG's menu
+ * and title) in the page's language, by the same rule as the rail: a text node
+ * or a name is replaced only when its whole trimmed text is a key. A site's
+ * `navbar.po` already holds those labels, since the rail's tree is drawn from
+ * the same menu (owner, 2026-11-13: "translate the top menu bar too").
+ */
+export function localisePageBar(doc: ParentNode, map: Readonly<Record<string, string>>): number {
+  let swapped = 0;
+  doc.querySelectorAll(`.${PAGE_BAR_CLASS}`).forEach((bar) => {
+    swapped += swapText(bar as unknown as TextTree, map) + swapNames(bar, map);
   });
   return swapped;
 }

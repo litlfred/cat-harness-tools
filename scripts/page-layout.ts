@@ -47,12 +47,8 @@ export const PAGE_LAYOUT_JS_FILE = "assets/page-layout.js";
 export const PAGE_LAYOUT_CSS_SOURCE = join(import.meta.dir, "templates", "page-layout.css");
 export const PAGE_LAYOUT_JS_SOURCE = join(import.meta.dir, "templates", "page-layout.js");
 
-/** The classes a page opts in with. */
-export const PAGE_BAR_CLASS = "fa-page-bar";
-export const PAGE_MAIN_CLASS = "fa-page-main";
-export const PAGE_FOOT_CLASS = "fa-page-foot";
-/** A table that fills the content column rather than scrolling inside its own box. */
-export const PAGE_WIDE_TABLE_CLASS = "fa-page-wide";
+/** The classes a page opts in with (browser-safe, in `lib/page-layout-classes.ts`). */
+export { PAGE_BAR_CLASS, PAGE_FOOT_CLASS, PAGE_MAIN_CLASS, PAGE_WIDE_TABLE_CLASS } from "./lib/page-layout-classes.ts";
 
 /** The attribute both tags carry, so a page is never given them twice. */
 export const PAGE_LAYOUT_MARK = "data-fa-page-layout";

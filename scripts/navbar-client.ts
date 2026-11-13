@@ -12,14 +12,15 @@
  */
 import { RAIL_PAGE_ID, renderRailRegions, type RailPage } from "./lib/harness-rail.ts";
 import { wireNavFolds, wireNavResize } from "./lib/navbar.ts";
-import { localiseRail, navbarStringsFile, railLocale, railRootPath } from "./lib/navbar-locale.ts";
+import { localisePageBar, localiseRail, navbarStringsFile, railLocale, railRootPath } from "./lib/navbar-locale.ts";
 
 declare const self: { FaRailData?: Record<string, string>; FaNavStrings?: Record<string, Record<string, string>> };
 
 /**
  * The rail in the page's language (owner, 2026-11-12): on a page whose
  * `<html lang>` is not English, load the site's `strings-<locale>.js` and swap
- * the labels it translates. No file, or no entry, leaves the English as built
+ * the labels it translates, in the rail and in the page's top bar. No file,
+ * or no entry, leaves the English as built
  * (`navbar-locale.ts`). After `draw`, which replaces the rail's contents.
  */
 function localise(nav: Element, siteRoot: string): void {
@@ -27,7 +28,10 @@ function localise(nav: Element, siteRoot: string): void {
   if (!loc) return;
   const apply = (): void => {
     const map = self.FaNavStrings?.[loc];
-    if (map) localiseRail(nav, map);
+    if (!map) return;
+    localiseRail(nav, map);
+    // The page's top bar (an IG's menu) from the same map (owner, 2026-11-13).
+    localisePageBar(document, map);
   };
   if (self.FaNavStrings?.[loc]) return apply();
   // The script's address is built from page data, so both parts are held to
