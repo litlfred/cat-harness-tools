@@ -44,6 +44,20 @@
  * Evaluating without `--merge` (and `--status`, which the workflow posts on
  * every PR) is read-only, and anyone may run it.
  *
+ * ## The `merge-guard` status on every layer PR (`--full-tier`, `--root`)
+ *
+ * Owner, 2026-11-13, card "A. merge-guard required status": every layer
+ * repository posts the `merge-guard` commit status on every PR head, so it
+ * can be a required check on `main`. The reusable workflow
+ * `.github/workflows/layer-merge-guard.yml` does it, running
+ * `merge-guard.ts <pr> --status --full-tier --root <the caller at main>`.
+ * `--full-tier` makes check 5 a gate that ALSO needs the full tier green on
+ * the head ({@link fullTierCheck}); `--root` names the repository whose
+ * `pull_request` workflows check 5 owes. The status is `success` only when
+ * all eight checks pass, so it means: the full tier is green, the
+ * `ready-to-merge` label is on (check 4) and the PR's own session said ready
+ * (check 3). It never merges; only the merge manager does.
+ *
  * ## The eight checks
  *
  * Every refusal names its check, by number and by id:
@@ -303,6 +317,20 @@ export interface GuardSnapshot {
    * read. Absent means not fetched, and nothing is judged.
    */
   agentBuild?: GhStatus | null | { unknown: string };
+  /**
+   * The check runs on the head, for `--full-tier` ({@link fullTierCheck});
+   * `unknown` when they could not be read. Absent means not fetched.
+   */
+  checkRuns?: GhCheckRun[] | { unknown: string };
+}
+
+/** A check run as `GET /repos/{repo}/commits/{ref}/check-runs` returns it. */
+export interface GhCheckRun {
+  id?: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  started_at?: string | null;
 }
 
 /** A commit status as `GET /repos/{repo}/commits/{ref}/statuses` returns it (newest first). */
@@ -338,6 +366,14 @@ export interface GuardOptions {
    * PR, check 5 is advisory. CLI: `--release`.
    */
   release?: boolean;
+  /**
+   * Require the FULL tier on the head (check 5): a check run named as a
+   * full-tier judge ({@link FULL_TIER_JUDGE}) concluded `success`. Implies
+   * {@link release}: check 5 gates. The `merge-guard` status workflow sets it
+   * (`layer-merge-guard.yml`), so the status means "full tier green" and can be
+   * a required check. CLI: `--full-tier`.
+   */
+  fullTier?: boolean;
   /** For a fixture's clock; defaults to {@link READY_WINDOW_MS}. */
   readyWindowMs?: number;
 }
@@ -1091,6 +1127,78 @@ export const RELEASE_LABEL = "release";
 
 const ADVISORY_RULING = 'owner, card Q-CIB-4 A, 2026-11-08: "CI not gate on non-release merge to main"';
 
+/**
+ * A full-tier judge: the job that joins the full tier's verdict —
+ * `layer-pr-checks.yml`'s "No new failures (tests and gates)" and
+ * `pr-tests.yml`'s "Tests (no new failures)". The fast tier reports as "Fast
+ * tier only (advisory; …)", which this does not match.
+ */
+export const FULL_TIER_JUDGE = /no new failures/i;
+
+/**
+ * A check run that judged nothing: `skipped` (the fast tier skips the full
+ * tier's judge), or a job whose name GitHub never rendered (`${{ … }}` still
+ * in it — the skipped judge of a run whose tier was decided in the same job,
+ * whose template text names both tiers). Neither is a full-tier verdict.
+ */
+/**
+ * A test shard: `bun test (head, 2/4)` (`pr-tests.yml`) or `head — tests and
+ * gates, shard 2/3` (`layer-pr-checks.yml`); merge-watch's `SHARD`. The fast
+ * tier skips every shard, and `pr-tests.yml`'s judge still concludes `success`
+ * on it (measured on #2103, 2026-11-13), so the judge alone does not say the
+ * full tier ran: a shard that RAN does.
+ */
+export const SHARD = /(?:shard |, )(\d+)\/(\d+)\b/i;
+
+function judgedNothing(c: GhCheckRun): boolean {
+  return c.conclusion === "skipped" || c.name.includes("${{");
+}
+
+/**
+ * `--full-tier`: did the full tier run on the head and pass? The latest run of
+ * each full-tier judge (by name) must have concluded `success`; a skipped or
+ * unrendered one judged nothing and is not counted; and at least one test
+ * shard ({@link SHARD}) must have run, since a fast-tier judge can be green
+ * too. None at all is
+ * not-ready (only the fast tier ran: label the PR `ready-to-merge` or
+ * `release`, which runs the full tier); one in progress is not-ready; one red
+ * is a defect.
+ */
+export function fullTierCheck(s: GuardSnapshot): CheckResult {
+  if (s.checkRuns === undefined) return R(5, "ci", "unknown", "the head's check runs were not fetched, so the full tier cannot be judged");
+  if (!Array.isArray(s.checkRuns)) return R(5, "ci", "unknown", `could not read the head's check runs: ${s.checkRuns.unknown}`);
+  const latest = new Map<string, GhCheckRun>();
+  for (const c of s.checkRuns.filter((x) => FULL_TIER_JUDGE.test(x.name) && !judgedNothing(x))) {
+    const had = latest.get(c.name);
+    const order = (x: GhCheckRun) => Date.parse(x.started_at ?? "") || x.id || 0;
+    if (!had || order(c) >= order(had)) latest.set(c.name, c);
+  }
+  const judges = [...latest.values()];
+  if (judges.length === 0) {
+    return R(5, "ci", "refuse", "the full tier has not run on the head (no `No new failures` judge; only the fast tier, or nothing). `ready-to-merge` or `release` runs it");
+  }
+  const red = judges.filter((j) => j.status === "completed" && j.conclusion !== "success");
+  if (red.length) return R(5, "ci", "refuse", `full-tier judge red: ${red.map((j) => `${j.name} (${j.conclusion})`).join(", ")}`, "defect");
+  const going = judges.filter((j) => j.status !== "completed");
+  if (going.length) return R(5, "ci", "refuse", `full-tier judge not finished: ${going.map((j) => j.name).join(", ")}`);
+  const ran = s.checkRuns.filter((c) => SHARD.test(c.name) && !judgedNothing(c) && c.status === "completed" && c.conclusion !== "cancelled");
+  if (ran.length === 0) {
+    return R(5, "ci", "refuse", `the full tier has not run on the head: ${judges.map((j) => j.name).join(", ")} is green, but no test shard ran (the fast tier). \`ready-to-merge\` or \`release\` runs it`);
+  }
+  return R(5, "ci", "pass", `full tier green: ${judges.map((j) => j.name).join(", ")}, after ${ran.length} test shard(s) ran`);
+}
+
+/** Check 5 under `--full-tier`: the workflow-run judgement gates, AND the full tier must be green. */
+export function withFullTier(ci: CheckResult, s: GuardSnapshot): CheckResult {
+  const full = fullTierCheck(s);
+  if (ci.status === "pass") return full.status === "pass" ? { ...ci, detail: `${ci.detail}; ${full.detail}` } : full;
+  if (full.status === "pass") return ci;
+  // Both failed: the worse kind wins, and both details are kept.
+  const status = ci.status === "unknown" || full.status === "unknown" ? "unknown" : "refuse";
+  const kind: RefusalKind | undefined = status === "refuse" ? (ci.kind === "defect" || full.kind === "defect" ? "defect" : "not-ready") : undefined;
+  return R(5, "ci", status, `${ci.detail}; ${full.detail}`, kind);
+}
+
 /** A release merge: `--release`, or the PR carries {@link RELEASE_LABEL}. */
 export function isRelease(s: GuardSnapshot, o: GuardOptions = {}): boolean {
   return o.release === true || s.pr.labels.some((l) => l.name === RELEASE_LABEL);
@@ -1115,7 +1223,7 @@ export function evaluate(s: GuardSnapshot, o: GuardOptions = {}): GuardVerdict {
     checkReadyForReview(s, o),
     checkReadyMarker(s),
     checkLabels(s),
-    isRelease(s, o) ? ci : advisoryCi(ci),
+    o.fullTier ? withFullTier(ci, s) : isRelease(s, o) ? ci : advisoryCi(ci),
     checkChecklist(s),
     checkOpenQuestion(s),
     checkMergeable(s),
@@ -1313,7 +1421,13 @@ export async function fetchSnapshot(repo: string, n: number, root: string): Prom
   } catch (e) {
     agentBuild = { unknown: e instanceof Error ? e.message : String(e) };
   }
-  return { pr, comments, timeline, commits, baseMergedAsHeadOf, runs, scan, mergeMainDispatches, failedSteps, agentBuild };
+  let checkRuns: GuardSnapshot["checkRuns"];
+  try {
+    checkRuns = (await getJson<{ check_runs: GhCheckRun[] }>(`repos/${repo}/commits/${pr.head.sha}/check-runs?per_page=100`)).check_runs;
+  } catch (e) {
+    checkRuns = { unknown: e instanceof Error ? e.message : String(e) };
+  }
+  return { pr, comments, timeline, commits, baseMergedAsHeadOf, runs, scan, mergeMainDispatches, failedSteps, agentBuild, checkRuns };
 }
 
 export type MergeOutcome = { merged: true; sha: string } | { merged: false; refused: boolean; reason: string };
@@ -1361,7 +1475,7 @@ export function render(v: GuardVerdict): string {
 }
 
 const USAGE =
-  "usage: bun run cat merge:guard <pr> [--merge --session <id> [--merge-manager-own-pr]] [--release] [--actor <login>] [--repo owner/repo] [--status] [--json]\n" +
+  "usage: bun run cat merge:guard <pr> [--merge --session <id> [--merge-manager-own-pr]] [--release] [--full-tier] [--root <dir>] [--actor <login>] [--repo owner/repo] [--status] [--json]\n" +
   "  --merge is the merge manager's alone (owner, 2026-11-13): no other session runs it.";
 
 async function main(argv: string[]): Promise<number> {
@@ -1387,9 +1501,13 @@ async function main(argv: string[]): Promise<number> {
   const mergeManagerOwnPr = flag("--merge-manager-own-pr") || oldName;
   if (oldName) console.error("--no-merge-manager is now --merge-manager-own-pr: the merge manager landing its own PR. No other session merges.");
   const release = flag("--release");
+  const fullTier = flag("--full-tier");
+  const rootArg = opt("--root");
   const sessionArg = opt("--session");
   const actor = opt("--actor");
-  const root = repoRootFor(resolve(HARNESS_ROOT));
+  // `--root`: the repository whose workflows check 5 owes (the status
+  // workflow checks the caller out at its default branch and names it here).
+  const root = rootArg ? resolve(rootArg) : repoRootFor(resolve(HARNESS_ROOT));
   const repo = opt("--repo") ?? process.env.GITHUB_REPOSITORY ?? ownerRepo(detectRepoUrl(root) ?? "");
   const n = Number(args[0]);
   if (!Number.isInteger(n) || n <= 0 || !repo) {
@@ -1409,7 +1527,7 @@ async function main(argv: string[]): Promise<number> {
     console.error(`merge-guard #${n}: COULD NOT DETERMINE — ${e instanceof Error ? e.message : String(e)}`);
     return 2;
   }
-  const v = evaluate(snapshot, { mergingSession, mergingActor: actor, mergeManagerOwnPr, release });
+  const v = evaluate(snapshot, { mergingSession, mergingActor: actor, mergeManagerOwnPr, release, fullTier });
   console.log(asJson ? JSON.stringify(v, null, 2) : render(v));
   if (doStatus) {
     try {
