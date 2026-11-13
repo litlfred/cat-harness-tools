@@ -122,3 +122,49 @@ describe("layer-merge-guard: what it runs", () => {
     expect(caller.on.workflow_run!.workflows).toEqual([prChecks.name]);
   });
 });
+
+/**
+ * The post step, run as Actions runs it (`bash -e`), with a stub `bun` that
+ * answers as merge-guard would. The first live run (#2103 at 857b26f,
+ * 2026-11-13) died silently on a refusal: `out="$(…)"` under `-e` ends the
+ * step on exit 1.
+ */
+function postStep(guardExit: number, guardOut: string): { code: number; stdout: string; summary: string } {
+  const dir = mkdtempSync(join(tmpdir(), "merge-guard-post-"));
+  writeFileSync(join(dir, "bun"), `#!/usr/bin/env bash\necho '${guardOut}'\nexit ${guardExit}\n`);
+  chmodSync(join(dir, "bun"), 0o755);
+  const summary = join(dir, "summary");
+  writeFileSync(summary, "");
+  const r = spawnSync("bash", ["-e", "-c", named("Post the merge-guard status").run!], {
+    cwd: dir,
+    encoding: "utf8",
+    env: {
+      ...(process.env as Record<string, string>),
+      PATH: `${dir}:${process.env.PATH}`,
+      GITHUB_STEP_SUMMARY: summary,
+      REPO: "litlfred/x",
+      PRS: "7 8",
+      FULL_TIER: "true",
+    },
+  });
+  return { code: r.status ?? -1, stdout: r.stdout, summary: readFileSync(summary, "utf8") };
+}
+
+describe("layer-merge-guard: the post step under bash -e", () => {
+  test("a refusal (exit 1) or an unknown (exit 2) is a verdict: every PR is judged, printed, and the step passes", () => {
+    for (const exit of [1, 2]) {
+      const r = postStep(exit, "merge-guard #7: REFUSED (status: pending)");
+      expect(r.code).toBe(0);
+      expect(r.stdout).toContain(`#7: exit ${exit}`);
+      expect(r.stdout).toContain(`#8: exit ${exit}`);
+      expect(r.summary).toContain("REFUSED (status: pending)");
+    }
+  });
+
+  test("a status that could not be posted fails the step, naming the PRs", () => {
+    const r = postStep(2, "could not post the merge-guard status: HTTP 403");
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain("the merge-guard status could not be posted on: #7 #8");
+  });
+});
+

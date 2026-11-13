@@ -51,3 +51,16 @@ Feature: The merge-guard status on every layer PR
     When it is read
     Then it calls layer-merge-guard.yml on pull_request_target, issue_comment, workflow_run and workflow_dispatch
     And its workflow_run follows the PR checks workflow by name
+
+  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_the_post_step_under_bash_-e::a_refusal_(exit_1)_or_an_unknown_(exit_2)_is_a_verdict:_every_PR_is_judged,_printed,_and_the_step_passes
+  Scenario: Under bash -e a refusal or an unknown verdict does not end the post step
+    Given the "Post the merge-guard status" step run as Actions runs it, with bash -e, for PRs 7 and 8
+    And a guard that exits 1, and then one that exits 2
+    When the step runs
+    Then it passes, prints each PR's exit code, and writes the guard's output to the step summary
+
+  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_the_post_step_under_bash_-e::a_status_that_could_not_be_posted_fails_the_step,_naming_the_PRs
+  Scenario: A status that could not be posted fails the post step
+    Given a guard that says "could not post the merge-guard status" for PRs 7 and 8
+    When the step runs under bash -e
+    Then it fails, naming "#7 #8"

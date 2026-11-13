@@ -173,8 +173,11 @@ jobs:
           for n in $PRS; do
             # Exit 1 (refused) and 2 (unknown) are verdicts, posted as the
             # status; only a status that could not be posted fails this job.
-            out="$(bun tools/cat-harness-tools/scripts/merge-guard.ts "$n" --repo "$REPO" --root site --status "${tier[@]}" 2>&1)"
-            code=$?
+            # Actions runs this step as `bash -e`, and a refusal exits 1: without
+            # `|| code=$?` the step died here, printing nothing (first live run,
+            # #2103 at 857b26f, 2026-11-13).
+            code=0
+            out="$(bun tools/cat-harness-tools/scripts/merge-guard.ts "$n" --repo "$REPO" --root site --status "${tier[@]}" 2>&1)" || code=$?
             printf '%s\n' "$out"
             { echo '```'; printf '%s\n' "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
             if printf '%s' "$out" | grep -q "could not post the merge-guard status"; then failed="$failed #$n"; fi
