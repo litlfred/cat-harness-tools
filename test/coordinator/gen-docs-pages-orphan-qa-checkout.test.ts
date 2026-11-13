@@ -15,28 +15,35 @@
  * read that tree, so running it inside the layer turned nine unrelated tests
  * red in `check:cat-harness-standalone`. Every path below is composed from
  * ORIGIN_DIR, the directory it was written in, so nothing it reads changed.
+ *
+ * It runs the generator over a SCRATCH COPY of the checkout, never the
+ * checkout itself (bean `cat-tools-sm8r` item 4): run in place it rewrote the
+ * committed pages, diagrams and translation templates of every layer, and in
+ * a composed checkout, whose mounts are not git work trees, nothing put them
+ * back. The paths are the same paths, rebased onto the copy.
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { join, relative } from "node:path";
 
 import { readQaGraph } from "../../pipeline/qa-graph-index.ts";
 import { directoryForGraph, siteDirFor } from "../../schemas/kg/cat-harness.ts";
-import { qaResultDirsIn, restoringTracked } from "../support/checkout.ts";
+import { runDocsPagesIn, scratchCheckoutOf } from "../support/checkout.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing it reads changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
-const INSTANCE_ROOT = join(ORIGIN_DIR, "..", "..");
-const REPO_ROOT = join(INSTANCE_ROOT, "..");
-const QA_ASSET_DIR = join(INSTANCE_ROOT, "test", "results", "witnesses");
-const QA_INDEX_PATH = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "assets", "qa", "index.json");
+const ORIGIN_INSTANCE_ROOT = join(ORIGIN_DIR, "..", "..");
+const REPO_ROOT = join(ORIGIN_INSTANCE_ROOT, "..");
 
 describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () => {
   // The generator re-derives the committed witnesses under every layer's
-  // `test/results/`; they are put back as they were afterwards, so the test
-  // leaves no tracked file changed (bean w1gy F24).
-  test("published QA count matches the post-sweep tree, not the tree it started from, and consecutive runs are idempotent", () => restoringTracked(qaResultDirsIn(REPO_ROOT), () => {
+  // `test/results/`, and re-renders every committed page: it runs over a
+  // scratch copy, so the checkout is never written (bean `cat-tools-sm8r`).
+  test("published QA count matches the post-sweep tree, not the tree it started from, and consecutive runs are idempotent", () => {
+    const scratch = scratchCheckoutOf(REPO_ROOT);
+    const INSTANCE_ROOT = join(scratch, relative(REPO_ROOT, ORIGIN_INSTANCE_ROOT));
+    const QA_ASSET_DIR = join(INSTANCE_ROOT, "test", "results", "witnesses");
+    const QA_INDEX_PATH = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "assets", "qa", "index.json");
     const orphanDir = join(QA_ASSET_DIR, "test-orphan-0kbt");
     const orphanPath = join(orphanDir, "orphan.kg.json");
 
@@ -53,10 +60,7 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
       expect(existsSync(orphanPath)).toBe(true);
 
       // Step 2: Run the generator once
-      const r1 = spawnSync("bun", ["cat-harness-tools/scripts/gen-docs-pages.ts"], {
-        cwd: REPO_ROOT,
-        encoding: "utf-8",
-      });
+      const r1 = runDocsPagesIn(scratch, REPO_ROOT);
       if (r1.status !== 0) {
         console.error("r1 stdout:", r1.stdout);
         console.error("r1 stderr:", r1.stderr);
@@ -85,17 +89,14 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
       expect(witnessFamily1?.buckets?.["fail"]).not.toBe(999);
 
       // Step 5: Pin idempotence — a second run on the unchanged tree publishes identical counts
-      const r2 = spawnSync("bun", ["cat-harness-tools/scripts/gen-docs-pages.ts"], {
-        cwd: REPO_ROOT,
-        encoding: "utf-8",
-      });
+      const r2 = runDocsPagesIn(scratch, REPO_ROOT);
       expect(r2.status).toBe(0);
 
       const published2 = JSON.parse(readFileSync(QA_INDEX_PATH, "utf-8")) as typeof published1;
       expect(published2.files).toBe(published1.files);
       expect(published2).toEqual(published1);
     } finally {
-      rmSync(orphanDir, { recursive: true, force: true });
+      rmSync(scratch, { recursive: true, force: true });
     }
-  }), 30000);
+  }, 30000);
 });
