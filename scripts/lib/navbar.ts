@@ -471,19 +471,19 @@ export function navbarCss(): string {
     // The page sits beside the strip; on desktop (>= NAV_STRIP_MQ_PX), opening
     // shrinks/pushes content beside it so they do not overlap (bean `ei4q`).
     // Phone stays an overlay drawer.
-    `body{padding-left:${NAV_COLLAPSED_PX}px}`,
-    `.fa-nav{position:fixed;top:0;left:0;bottom:0;width:${NAV_COLLAPSED_PX}px;z-index:2147483000;`,
+    `body{padding-inline-start:${NAV_COLLAPSED_PX}px}`,
+    `.fa-nav{position:fixed;top:0;inset-inline-start:0;bottom:0;width:${NAV_COLLAPSED_PX}px;z-index:2147483000;`,
     `background:var(--fa-nav-bg);color:var(--fa-nav-ink);overflow:hidden;transition:width .14s ease;`,
     `font:14px/1.5 var(--fa-font-sans,system-ui,sans-serif)}`,
     `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_PX}px)}`,
     `.fa-nav:not(:hover):not(:has(:focus-visible)):not(:has(.fa-nav-open:checked)) .fa-glass-handle__label{opacity:0}`,
     `@media(min-width:${NAV_STRIP_MQ_PX}px){`,
-    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:var(--fa-nav-w,${NAV_OPEN_PX}px)}}`,
+    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-inline-start:var(--fa-nav-w,${NAV_OPEN_PX}px)}}`,
     `@media(min-width:${NAV_WIDE_MQ_PX}px){`,
     `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}`,
     `.fa-nav-in{width:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}`,
-    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-left:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}}`,
-    `@media(prefers-reduced-motion:no-preference){body{transition:padding-left .14s ease}}`,
+    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-inline-start:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}}`,
+    `@media(prefers-reduced-motion:no-preference){body{transition:padding-inline-start .14s ease}}`,
     // Clipped in place, never parked at `left:-9999px`: on a right-to-left
     // page that is the scrollable side, and it widened the page ~10,000px
     // (bean `2r2n`). Same rule as `.fa-nav-open` in docs-ui.css.
@@ -516,8 +516,8 @@ export function navbarCss(): string {
     `.fa-nav-head-toggle>span[aria-hidden]{display:none}`,
     `@media(hover:hover){.fa-nav:hover .fa-nav-head-toggle{display:none}}`,
     `.fa-nav:has(.fa-nav-open:checked) .fa-nav-head-toggle{display:inline-flex;position:static;align-items:center;justify-content:center;`,
-    `min-width:24px;min-height:24px;margin-right:${NAV_PAD_PX - 4}px;border-radius:4px;font-size:18px}`,
-    `.fa-nav:has(.fa-nav-open:checked) .fa-nav-head-toggle>span[aria-hidden]{display:inline}`,
+    `min-width:24px;min-height:24px;margin-inline-end:${NAV_PAD_PX - 4}px;border-radius:4px;font-size:18px}`,
+    `.fa-nav:has(.fa-nav-open:checked) .fa-nav-head-toggle>span[aria-hidden]{display:inline-block}`,
     `.fa-nav-head-toggle:hover{background:var(--fa-nav-hover)}`,
     `.fa-nav-glyph{flex:0 0 ${NAV_GLYPH_PX}px;text-align:center;font-size:16px}`,
     `.fa-nav-glyph.fa-nav-blank{height:${NAV_GLYPH_PX}px;display:inline-block}`,
@@ -550,7 +550,7 @@ export function navbarCss(): string {
     // with a different height. At 11px it is small text, so it needs 4.5:1 in
     // its own right -- which it has, being the same composited ink as the
     // label it sits next to.
-    `.fa-nav-note{margin-left:auto;font-size:11px;font-style:italic;white-space:nowrap}`,
+    `.fa-nav-note{margin-inline-start:auto;font-size:11px;font-style:italic;white-space:nowrap}`,
     // A ROW WITH A CONTROL, and its children beneath both.
     //
     // `grid` rather than flex because the row and its control share one line
@@ -574,10 +574,16 @@ export function navbarCss(): string {
     `.fa-nav-row--fold>a,.fa-nav-row--fold>.fa-nav-dead{overflow:hidden}`,
     `.fa-nav-row--fold>a .fa-nav-label,.fa-nav-row--fold>.fa-nav-dead .fa-nav-label{overflow:hidden}`,
     `.fa-nav-twisty{display:none;align-items:center;justify-content:center;min-width:24px;min-height:24px;`,
-    `margin-right:${NAV_PAD_PX - 4}px;padding:0;background:none;border:0;border-radius:4px;color:inherit;cursor:pointer;opacity:.75}`,
+    `margin-inline-end:${NAV_PAD_PX - 4}px;padding:0;background:none;border:0;border-radius:4px;color:inherit;cursor:pointer;opacity:.75}`,
     `.fa-nav-twisty:hover,.fa-nav-twisty:focus-visible{opacity:1;background:var(--fa-nav-hover)}`,
     `.fa-nav-twisty>span{display:inline-block;transition:transform .12s}`,
     `.fa-nav-twisty[aria-expanded="true"]>span{transform:rotate(90deg)}`,
+    // RIGHT-TO-LEFT (owner, 2026-11-12: *"in RTL, the LHS navbar needs to be
+    // RHS"*). Every edge above is a LOGICAL property, so on a `dir="rtl"` page
+    // the bar, its padding, its indents, its drag edge and its tooltips mirror
+    // with no second set of numbers. Only the two arrow glyphs need saying:
+    // a closed fold points into the line (◂), and the close control points out.
+    `[dir="rtl"] .fa-nav-twisty[aria-expanded="false"]>span,[dir="rtl"] .fa-nav-head-toggle>span[aria-hidden]{transform:scaleX(-1)}`,
     // The control is hidden with the labels rather than on its own timer: at
     // rest the strip shows marks only, and a ⚙ floating beside a mark with no
     // label names nothing. Same trigger as `.fa-nav-label`, so the two cannot
@@ -596,16 +602,16 @@ export function navbarCss(): string {
     `.fa-nav-group>summary::-webkit-details-marker{display:none}`,
     `.fa-nav-group>summary:hover{background:var(--fa-nav-hover)}`,
     `.fa-nav-group[open]>summary{font-weight:600}`,
-    `.fa-nav-group .fa-nav-sub a{padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8}px}`,
+    `.fa-nav-group .fa-nav-sub a{padding-inline-start:${NAV_PAD_PX + NAV_GLYPH_PX + 8}px}`,
     // A graph-typology row carries its OWN mark (bean `yag0`), so it sits in the
     // strip's column like the inert rows beside it. Indented as above, a
     // LINKED row's mark was pushed past the 56px strip at rest while an inert
     // row's was not — measured on a built IRIS replica page — so the strip showed
     // marks only for the rows that do not open.
-    `.fa-nav-group .fa-nav-sub .fa-nav-dead{padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8}px}`,
+    `.fa-nav-group .fa-nav-sub .fa-nav-dead{padding-inline-start:${NAV_PAD_PX + NAV_GLYPH_PX + 8}px}`,
     // Slightly in from the section's own row (owner, 2026-11-10: "lists of
     // folders should be slightly indented"), and the mark still inside the strip.
-    `.fa-nav-group .fa-nav-sub a.fa-nav-kind,.fa-nav-group .fa-nav-sub .fa-nav-dead.fa-nav-kind{padding-left:${NAV_PAD_PX + NAV_KIND_INDENT_PX}px}`,
+    `.fa-nav-group .fa-nav-sub a.fa-nav-kind,.fa-nav-group .fa-nav-sub .fa-nav-dead.fa-nav-kind{padding-inline-start:${NAV_PAD_PX + NAV_KIND_INDENT_PX}px}`,
     `.fa-nav-tone{border-radius:3px}`,
     // A TONED MARK CARRIES ITS OWN INK. Its glyph strokes in `currentColor`,
     // which was the rail's ink: light on the dark rail, but #1f2328 on a 28%
@@ -626,17 +632,17 @@ export function navbarCss(): string {
     `.fa-nav-label{min-width:0;white-space:normal;overflow-wrap:anywhere;opacity:0;transition:opacity .12s ease}`,
     // A bullet is a dot, not a 32px mark: its column is the dot's width.
     `.fa-nav-glyph.fa-nav-bullet{flex-basis:8px}`,
-    `.fa-nav-glyph.fa-nav-bullet:empty{flex-basis:0;margin-right:-8px}`,
+    `.fa-nav-glyph.fa-nav-bullet:empty{flex-basis:0;margin-inline-end:-8px}`,
     // THE DRAG EDGE (owner, 2026-11-10, option D): the open bar's right edge
     // widens it; `wireNavResize` sets `--fa-nav-w` and remembers it.
-    `.fa-nav-resize{position:absolute;top:0;right:0;bottom:0;width:6px;cursor:ew-resize;z-index:1;display:none;touch-action:none}`,
+    `.fa-nav-resize{position:absolute;top:0;inset-inline-end:0;bottom:0;width:6px;cursor:ew-resize;z-index:1;display:none;touch-action:none}`,
     `.fa-nav-resize:hover,.fa-nav-resize:focus-visible,.fa-nav-resize[data-active]{background:#58a6ff;outline:none}`,
     `.fa-nav:hover .fa-nav-resize,.fa-nav:has(:focus-visible) .fa-nav-resize,.fa-nav:has(.fa-nav-open:checked) .fa-nav-resize{display:block}`,
     `:root[data-fa-nav-resizing],:root[data-fa-nav-resizing] *{cursor:ew-resize!important;user-select:none!important}`,
     `:root[data-fa-nav-resizing] .fa-nav,:root[data-fa-nav-resizing] body{transition:none!important}`,
     `.fa-nav:hover .fa-nav-label,.fa-nav:has(:focus-visible) .fa-nav-label,`,
     `.fa-nav:has(.fa-nav-open:checked) .fa-nav-label{opacity:1}`,
-    `@media print{.fa-nav{display:none}body{padding-left:0}}`,
+    `@media print{.fa-nav{display:none}body{padding-inline-start:0}}`,
     `.fa-nav-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}`,
     ...railTipCss(),
   ].join("");
@@ -677,7 +683,7 @@ function railTipCss(): string[] {
   const at = (w: number) => `${w + 8}px`;
   return [
     `.fa-nav [data-fa-tip]::after{content:attr(data-fa-tip);content:attr(data-fa-tip) / "";`,
-    `position:fixed;left:${at(NAV_COLLAPSED_PX)};z-index:2147483001;padding:4px 8px;border-radius:4px;`,
+    `position:fixed;inset-inline-start:${at(NAV_COLLAPSED_PX)};z-index:2147483001;padding:4px 8px;border-radius:4px;`,
     `background:#1f2328;color:#ffffff;border:1px solid #58a6ff;box-shadow:0 2px 8px rgba(0,0,0,.35);`,
     `font:600 13px/1.3 var(--fa-font-sans,system-ui,sans-serif);`,
     `letter-spacing:normal;text-transform:none;white-space:nowrap;pointer-events:none;`,
@@ -689,9 +695,9 @@ function railTipCss(): string[] {
     // Beyond the strip at whatever width it has: open, the controls it names
     // sit inside a wider rail and the tooltip moves out with its edge.
     `.fa-nav:hover [data-fa-tip]::after,.fa-nav:has(:focus-visible) [data-fa-tip]::after,`,
-    `.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:calc(var(--fa-nav-w,${NAV_OPEN_PX}px) + 8px)}`,
+    `.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{inset-inline-start:calc(var(--fa-nav-w,${NAV_OPEN_PX}px) + 8px)}`,
     `@media(min-width:${NAV_WIDE_MQ_PX}px){.fa-nav:hover [data-fa-tip]::after,`,
-    `.fa-nav:has(:focus-visible) [data-fa-tip]::after,.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{left:calc(var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px) + 8px)}}`,
+    `.fa-nav:has(:focus-visible) [data-fa-tip]::after,.fa-nav:has(.fa-nav-open:checked) [data-fa-tip]::after{inset-inline-start:calc(var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px) + 8px)}}`,
     `@media(prefers-reduced-motion:no-preference){.fa-nav [data-fa-tip]::after{transition:opacity .12s ease}}`,
   ];
 }
@@ -790,7 +796,7 @@ function itemHtml(i: NavItem, c: Ctx): string {
   // One NAV_DEPTH_STEP_PX per level past the group's own rows, which sit at
   // the glyph column already. 40px a level (a whole mark) was "too much space"
   // (owner, 2026-11-10); a child still sits right of its parent (#1757).
-  const d = i.depth && i.depth > 0 ? ` style="padding-left:${NAV_PAD_PX + NAV_GLYPH_PX + 8 + NAV_DEPTH_STEP_PX * i.depth}px"` : "";
+  const d = i.depth && i.depth > 0 ? ` style="padding-inline-start:${NAV_PAD_PX + NAV_GLYPH_PX + 8 + NAV_DEPTH_STEP_PX * i.depth}px"` : "";
   let row: string;
   if (i.href === undefined) {
     // The note is part of the row's TEXT, inside the same element, so an
@@ -932,12 +938,16 @@ export function wireNavResize(doc: Document): void {
     h.setAttribute("data-fa-tip", "Drag to widen or narrow the navigation");
     h.tabIndex = 0;
     const width = () => (nav as HTMLElement).getBoundingClientRect().width;
+    // On a right-to-left page the bar is on the right (`navbarCss`), so its
+    // width is the distance from the pointer to the RIGHT edge, and the arrow
+    // that widens it points left.
+    const rtl = () => doc.defaultView?.getComputedStyle(nav as HTMLElement).direction === "rtl";
     h.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       h.setPointerCapture(e.pointerId);
       h.setAttribute("data-active", "");
       root.setAttribute("data-fa-nav-resizing", "");
-      const move = (m: PointerEvent) => apply(m.clientX);
+      const move = (m: PointerEvent) => apply(rtl() ? root.clientWidth - m.clientX : m.clientX);
       const up = () => {
         h.removeEventListener("pointermove", move);
         h.removeEventListener("pointerup", up);
@@ -955,7 +965,9 @@ export function wireNavResize(doc: Document): void {
       remember(undefined);
     });
     h.addEventListener("keydown", (e) => {
-      const step = e.key === "ArrowRight" ? 16 : e.key === "ArrowLeft" ? -16 : 0;
+      const out = rtl() ? "ArrowLeft" : "ArrowRight";
+      const back = rtl() ? "ArrowRight" : "ArrowLeft";
+      const step = e.key === out ? 16 : e.key === back ? -16 : 0;
       if (e.key === "Home") {
         apply(undefined);
         remember(undefined);
