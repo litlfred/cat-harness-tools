@@ -436,8 +436,8 @@ function dependencyRoots(root: string): string[] {
  * (`gen-subgraph-jsonld.ts` writes subgraph `index.jsonld` files) would be a
  * false claim. So each such directory is recorded as AWAITING a producer
  * rather than reported as a finding of its own, and adding a node-graph
- * directory no longer reads as a new failure to the PR gate (smart-base#357,
- * whose two new `collab` entries were the only "new" lines). A declaration
+ * directory no longer reads as a new failure to the PR gate (a layer adding
+ * two `collab` entries, which were the only "new" lines). A declaration
  * that cannot be read counts as no producer, the answer that keeps the
  * obligation listed rather than silently satisfied.
  */
