@@ -76,14 +76,12 @@ describe("the readers", () => {
 });
 
 describe("the gates", () => {
-  for (const gate of ["check-bean-parents.ts", "check-draft-beans.ts", "check-bean-issues.ts", "check-bean-rollup.ts", "check-harness-dirs.ts"]) {
-    test(`${gate}: absent exits ${NOT_APPLICABLE_EXIT}; not mounted stays red`, () => {
-      const run = (root: string) => spawnSync("bun", [join(SCRIPTS, gate)], { cwd: root, encoding: "utf-8" });
-      const absent = run(checkout(true));
-      expect(`${absent.status} ${absent.stdout}`).toContain(`${NOT_APPLICABLE_EXIT} `);
-      expect(absent.stdout).toContain("NOT APPLICABLE");
-      // Not mounted keeps its old answer (2, or 1 where the gate reports it as a problem): never 0 or 78.
-      expect([0, NOT_APPLICABLE_EXIT]).not.toContain(run(checkout(false)).status);
-    });
-  }
+  test.each(["check-bean-parents.ts", "check-draft-beans.ts", "check-bean-issues.ts", "check-bean-rollup.ts", "check-harness-dirs.ts"])("%s: absent exits 78; not mounted stays red", (gate) => {
+    const run = (root: string) => spawnSync("bun", [join(SCRIPTS, gate)], { cwd: root, encoding: "utf-8" });
+    const absent = run(checkout(true));
+    expect(`${absent.status} ${absent.stdout}`).toContain(`${NOT_APPLICABLE_EXIT} `);
+    expect(absent.stdout).toContain("NOT APPLICABLE");
+    // Not mounted keeps its old answer (2, or 1 where the gate reports it as a problem): never 0 or 78.
+    expect([0, NOT_APPLICABLE_EXIT]).not.toContain(run(checkout(false)).status);
+  });
 });

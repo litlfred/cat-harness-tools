@@ -96,14 +96,11 @@ describe("block schemas vs BlockBaseSchema", () => {
     }
   });
 
-  for (const schema of options) {
-    const kind = kindOf(schema);
-    test(`${kind} declares every base field`, () => {
-      const keys = new Set(shapeOf(schema));
-      const missing = baseKeys.filter((k) => !keys.has(k));
-      expect(missing).toEqual([]);
-    });
-  }
+  test.each(options.map((schema) => [kindOf(schema), schema] as const))("%s declares every base field", (_kind, schema) => {
+    const keys = new Set(shapeOf(schema));
+    const missing = baseKeys.filter((k) => !keys.has(k));
+    expect(missing).toEqual([]);
+  });
 });
 
 describe("the four optional-label kinds accept what they used to drop", () => {
@@ -117,23 +114,21 @@ describe("the four optional-label kinds accept what they used to drop", () => {
     ["table", { kind: "table", label: "tbl:x" }],
   ];
 
-  for (const [kind, stub] of cases) {
-    test(kind, () => {
-      const authored = {
-        ...stub,
-        cites: ["someref2020"],
-        defines: ["some-term"],
-        authorNotes: [{ kind: "note" as const, body: "kept" }],
-        computation: {
-          engine: "python" as const,
-          script: "computations/x.py",
-          status: "not_run" as const,
-        },
-      };
-      const parsed = BlockSchema.parse(authored) as Record<string, unknown>;
-      for (const key of ["cites", "defines", "authorNotes", "computation"]) {
-        expect(parsed[key]).toBeDefined();
-      }
-    });
-  }
+  test.each(cases)("%s", (kind, stub) => {
+    const authored = {
+      ...stub,
+      cites: ["someref2020"],
+      defines: ["some-term"],
+      authorNotes: [{ kind: "note" as const, body: "kept" }],
+      computation: {
+        engine: "python" as const,
+        script: "computations/x.py",
+        status: "not_run" as const,
+      },
+    };
+    const parsed = BlockSchema.parse(authored) as Record<string, unknown>;
+    for (const key of ["cites", "defines", "authorNotes", "computation"]) {
+      expect(parsed[key]).toBeDefined();
+    }
+  });
 });
