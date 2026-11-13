@@ -276,25 +276,21 @@ describe("the real e2e specs", () => {
     expect(derivedTreeReads(`const J = sidecar(join(TOOLS_ROOT, "test", "support", "fixtures", "qa-e2e", "kg-witness.json"));`)).toEqual([]);
   });
 
-  for (const { file, src } of specs) {
-    test(`${file} reads no derived results tree (rule 3)`, () => {
-      expect(derivedTreeReads(src)).toEqual([]);
-    });
-  }
+  test.each(specs.map((s) => [s.file, s.src] as const))("%s reads no derived results tree (rule 3)", (_file, src) => {
+    expect(derivedTreeReads(src)).toEqual([]);
+  });
 
-  for (const { file, src } of specs) {
-    test(`${file} takes no verdict from the live corpus`, () => {
-      const found = findCorpusCoupling(src);
-      if (found.length > 0) {
-        const where = found.map((c) => `  ${file}:${c.line} [${c.rule}] ${c.text.trim()}`).join("\n");
-        throw new Error(
-          `e2e spec reads the live QA corpus in a way that can inherit a verdict:\n${where}\n` +
-            `A verdict is content and is SUPPOSED to change; a spec keyed to it goes red when a ` +
-            `finding is correctly adjudicated (78a399ee5, bean iumj). Use a helper in ` +
-            `test/support/: sidecarWithVerdicts/applyVerdicts to pin the verdict under test, ` +
-            `indexWithRows for a badge index, or sidecar() when the spec asserts shape only.`,
-        );
-      }
-    });
-  }
+  test.each(specs.map((s) => [s.file, s.src] as const))("%s takes no verdict from the live corpus", (file, src) => {
+    const found = findCorpusCoupling(src);
+    if (found.length > 0) {
+      const where = found.map((c) => `  ${file}:${c.line} [${c.rule}] ${c.text.trim()}`).join("\n");
+      throw new Error(
+        `e2e spec reads the live QA corpus in a way that can inherit a verdict:\n${where}\n` +
+          `A verdict is content and is SUPPOSED to change; a spec keyed to it goes red when a ` +
+          `finding is correctly adjudicated (78a399ee5, bean iumj). Use a helper in ` +
+          `test/support/: sidecarWithVerdicts/applyVerdicts to pin the verdict under test, ` +
+          `indexWithRows for a badge index, or sidecar() when the spec asserts shape only.`,
+      );
+    }
+  });
 });
