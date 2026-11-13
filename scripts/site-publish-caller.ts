@@ -105,7 +105,7 @@ function triggerSummary(have: Record<string, unknown>): string | undefined {
  * as opposed to naming it in a message. Per line: shell comments, quoted
  * strings and the arguments of `echo`/`printf` are dropped first, so
  * `echo "::notice::... published by stage-local.ts."` is not a call
- * (smart-base#374: ghbuild.yml was reported for its notice alone).
+ * (a layer's ghbuild.yml was once reported for its notice alone).
  */
 export function invokesStageLocal(run: string): boolean {
   return run.split("\n").some((line) => {

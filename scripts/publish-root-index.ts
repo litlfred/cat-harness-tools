@@ -16,8 +16,8 @@
  * refuses to write when one is missing. Until this script only
  * folio-assistant's own `docs-site.yml` wrote those documents, so every site
  * published by `stage-local.ts` / `folio-site-publish.yml` had no
- * `index.jsonld` (litlfred/who-iris, 2026-11-13: "where is index.json(ld)
- * for who-iris? why not published?"). A layer turns it on with
+ * `index.jsonld` (owner, 2026-11-13, asking why a layer's site published
+ * none). A layer turns it on with
  * `site.build.rootIndex: true`, and `build-instance-site.ts` runs this after
  * the platform's writers.
  *
@@ -42,7 +42,7 @@
  * tree is built for"), and that site serves it. So this script frames the
  * index in memory ({@link generateSubgraphs}) and hands it to the root index
  * as a file in a temporary directory: the layer's site does not carry a
- * second copy of the tree (measured for who-iris: 2,377 files, 40 MB), and
+ * second copy of the tree (measured for one layer: 2,377 files, 40 MB), and
  * no mount is written into, so the next build's fixity check still passes.
  *
  * Any step that fails stops the run with exit 1, and nothing is mapped: a

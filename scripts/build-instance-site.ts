@@ -198,7 +198,7 @@ export interface BuildOptions {
    * root index, `index.jsonld` and `index.json` (`publish-root-index.ts`).
    * Opt-in (`site.build.rootIndex: true`): it adds every layer's export to the
    * site, and it refuses the publish rather than map fewer layers than the
-   * checkout declares (litlfred/who-iris, 2026-11-13).
+   * checkout declares (owner, 2026-11-13).
    */
   rootIndex?: boolean;
   /** Root files the built site must hold before it is published (a step's promise, checked). */
@@ -344,8 +344,8 @@ export function gateSteps(pre: readonly string[]): string[] {
 /**
  * The writer of every node-kind page (`/<locale>/<declaring>/<kind>/…`).
  * The schemas visualiser, which every site carries, links each node kind
- * there, so every site owes those pages: who-iris, whose recipe named no
- * site step, published 34 dead node-kind links on its schemas page (owner,
+ * there, so every site owes those pages: a layer whose recipe named no
+ * site step published 34 dead node-kind links on its schemas page (owner,
  * 2026-11-13, node-kind audit). It runs on the built site, as a site step
  * does, for every site.
  */
