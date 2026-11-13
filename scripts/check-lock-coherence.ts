@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Do the harness pins of one `index.lock.json` agree with each other?
+ * Is this lock fresh, and do its harness pins agree with the pinned harnesses' own locks (reported; gating only with `--agreement`)?
  *
  * A layer's lock pins every harness it mounts: `mounts[]`, one
  * `{ harness, repository, ref }` each. Each pinned harness Y has its OWN
@@ -41,8 +41,26 @@
  * nothing to disagree with. A fetch that failed, or an ancestry git could not
  * evaluate, is `could-not-determine`, reported with its reason and never
  * read as agreement; a main that could not be read is never read as fresh.
- * Exit: 0 every pin agrees and is fresh · 1 a pair disagrees or a pin is
- * stale · 2 neither, but something could not be determined.
+ * Exit: 0 every pin is fresh · 1 a pin is stale · 2 neither, but something
+ * could not be determined. Agreement counts toward the exit only with
+ * `--agreement` (see "Only the top-level lock decides").
+ *
+ * ## Only the top-level lock decides (owner, 2026-11-13: "3y 1y")
+ *
+ * A composition mounts each harness ONCE, at the pin of the top-level index
+ * (the instance being built, or the hub). The locks inside the mounted
+ * layers are what each layer was last tested with on its own; they are not
+ * read by the mount. Requiring them to agree with the top-level pins made
+ * every re-pin a serial, bottom-up cascade, and concurrent merges kept
+ * making it stale again. So agreement is REPORTED, as a note on what a lower
+ * layer was last tested with, and does not fail the run. The one rule that
+ * gates is freshness: a pull request that changes the lock pins every harness
+ * at its main or ahead of it, so the top-level composition is current. This
+ * replaces the owner's 2026-11-11 card "A: Agree check + freshness" for the
+ * agreement half. The skew it guarded against (committed generated files
+ * computed from an older lower layer) goes away as option 3 of the same
+ * ruling moves those files from commits to build time.
+ * `--agreement` restores the old gate for a one-off audit.
  *
  * ## The network
  *
@@ -54,8 +72,9 @@
  * "no".
  *
  * Usage:
- *   bun run cat lock:coherence:check                        # ./index.lock.json: agreement and freshness
- *   bun run cat lock:coherence:check -- --no-freshness      # agreement alone
+ *   bun run cat lock:coherence:check                        # ./index.lock.json: freshness gates, agreement reported
+ *   bun run cat lock:coherence:check -- --agreement         # agreement gates too (an audit)
+ *   bun run cat lock:coherence:check -- --no-freshness      # agreement alone, reported
  *   bun run cat lock:coherence:check -- --lock <file>       # another lock file
  *   bun run cat lock:coherence:check -- --repo <owner>/<layer>@main
  *                                                           # a repository's lock at a ref, read with git
@@ -286,16 +305,24 @@ export function judgeLockCoherence(
   return report;
 }
 
-/** 0 agree · 1 a pair disagrees · 2 none disagrees but some could not be determined. */
-export function exitCodeOf(r: CoherenceReport, f?: FreshnessReport): 0 | 1 | 2 {
-  if (r.disagreements.length || f?.stale.length) return 1;
-  if (r.undetermined.length || f?.undetermined.length) return 2;
+/**
+ * 0 fresh · 1 a pin is stale · 2 none stale but some could not be determined.
+ * Agreement counts only with `{ agreement: true }`: then a disagreeing pair is
+ * 1 and an undetermined pair 2, as freshness (owner, 2026-11-13: only the
+ * top-level lock decides).
+ */
+export function exitCodeOf(r: CoherenceReport, f?: FreshnessReport, opts: { agreement?: boolean } = {}): 0 | 1 | 2 {
+  const agreement = opts.agreement === true;
+  if ((agreement && r.disagreements.length) || f?.stale.length) return 1;
+  if ((agreement && r.undetermined.length) || f?.undetermined.length) return 2;
   return 0;
 }
 
-export function formatReport(r: CoherenceReport, label: string): string {
+export function formatReport(r: CoherenceReport, label: string, gates = false): string {
   const lines: string[] = [];
-  const verdict = r.disagreements.length ? "FAILED" : r.undetermined.length ? "COULD NOT DETERMINE" : "OK";
+  const verdict = r.disagreements.length
+    ? gates ? "FAILED" : "DIFFERS (reported, not a failure: only the top-level lock decides)"
+    : r.undetermined.length ? "COULD NOT DETERMINE" : "OK";
   lines.push(
     `lock:coherence:check ${label}: ${verdict} — ${r.compared} pair(s) compared, ${r.agree} agree, ` +
       `${r.disagreements.length} disagree, ${r.undetermined.length} undetermined` +
@@ -405,7 +432,7 @@ function argOf(argv: readonly string[], flag: string): string | undefined {
 
 export function main(argv: readonly string[]): number {
   if (argv.includes("--help")) {
-    console.log("usage: lock:coherence:check [--lock <file> | --repo <owner/name>[@<ref>]] [--changed-from <base>] [--no-freshness] [--cache <dir>] [--json]");
+    console.log("usage: lock:coherence:check [--lock <file> | --repo <owner/name>[@<ref>]] [--changed-from <base>] [--agreement] [--no-freshness] [--cache <dir>] [--json]");
     return 0;
   }
   const cache = resolve(argOf(argv, "--cache") ?? join(process.env.RUNNER_TEMP || tmpdir(), "cat-lock-coherence"));
@@ -452,6 +479,7 @@ export function main(argv: readonly string[]): number {
     (p) => reader.lockAt(p.repository, p.ref),
     (repo, a, b) => reader.relate(repo, a, b),
   );
+  const agreement = argv.includes("--agreement");
   const freshness = argv.includes("--no-freshness")
     ? undefined
     : judgeFreshness(
@@ -461,10 +489,10 @@ export function main(argv: readonly string[]): number {
       );
   if (argv.includes("--json")) console.log(JSON.stringify({ lock: label, ...report, freshness }, null, 2));
   else {
-    console.log(formatReport(report, label));
+    console.log(formatReport(report, label, agreement));
     if (freshness) console.log(formatFreshness(freshness, label));
   }
-  return exitCodeOf(report, freshness);
+  return exitCodeOf(report, freshness, { agreement });
 }
 
 if (import.meta.main) process.exit(main(process.argv.slice(2)));

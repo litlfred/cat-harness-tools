@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 /**
- * Every lock in a composition pins the SAME commit of a shared lower layer.
+ * Where the locks in a composition pin DIFFERENT commits of a shared lower
+ * layer: a report, never a gate (owner, 2026-11-13, "3y 1y": only the
+ * top-level lock decides; see "Since 2026-11-13" below).
  *
  * @module scripts/check-lock-consistency
  * @graphNode none — a check over the index's lock and the locks of the layers it mounts
@@ -16,7 +18,16 @@
  * owner's ruling was "align pins"; this check keeps them aligned, red
  * instead of silent.
  *
- * ## The rule
+ * ## Since 2026-11-13
+ *
+ * A composition mounts each layer once, at the top-level index's pin; the
+ * locks inside the mounted layers are not read by the mount. So a skew this
+ * report lists is what a lower layer was last tested with, not a defect, and
+ * it is no longer a gate to be turned on after the re-pin (the "align pins"
+ * ruling below is replaced). The stale committed files it caught move to
+ * build time under option 3 of the same ruling.
+ *
+ * ## The rule (as reported)
  *
  * For each layer A the index's lock pins at commit `a`, and each mounted
  * layer L whose OWN lock (at the commit the index pins L) pins A at `b`:
