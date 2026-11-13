@@ -124,10 +124,25 @@ export function loadRelaxations(repoRoot: string): Relaxation[] {
  * otherwise sit in the file looking like policy while permitting nothing — and
  * nobody would find out until the day it was needed.
  */
-export function validateRelaxations(relaxations: Relaxation[], models: ProcessModel[]): void {
+export function validateRelaxations(
+  relaxations: Relaxation[],
+  models: ProcessModel[],
+  /**
+   * `unseen`: opt-in sub-graphs the checkout declares but does not hold on
+   * disk (switched off, so the mount left them out). A relaxation naming a
+   * process found nowhere is then UNDETERMINED, not wrong: the process may
+   * be in one of them. It is returned, not passed, so the caller says so.
+   */
+  opts: { unseen?: readonly string[] } = {},
+): Relaxation[] {
   const byId = new Map(models.map((m) => [m.id, m]));
+  const undetermined: Relaxation[] = [];
   for (const r of relaxations) {
     const model = byId.get(r.process);
+    if (!model && (opts.unseen?.length ?? 0) > 0) {
+      undetermined.push(r);
+      continue;
+    }
     if (!model) {
       throw new PolicyError(
         `skills/${r.package}/${POLICY_FILE} relaxes ${r.process}, which is not a process here. ` +
@@ -149,6 +164,7 @@ export function validateRelaxations(relaxations: Relaxation[], models: ProcessMo
       );
     }
   }
+  return undetermined;
 }
 
 export interface GateVerdict {

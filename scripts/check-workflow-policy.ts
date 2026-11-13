@@ -15,18 +15,28 @@
  * @covers none — .github/workflows/ is not a declared graph typology
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { workflowFiles, corpusScopeFor } from "./known-skills.js";
+import { existsSync } from "node:fs";
+import { workflowFiles, corpusScopeFor, declaredKgDirectories } from "./known-skills.js";
 import { loadProcessModel, processDiagrams } from "../src/workflow/process-model.js";
 import { loadRelaxations, validateRelaxations, PolicyError } from "../src/workflow/gate.js";
 
 const root = HARNESS_ROOT;
-// Every declared knowledge-graph directory. A relaxation is validated
-// against the processes it can name, so a process this script cannot see is
-// one whose relaxations go unchecked — the policy gate passing because it
-// never looked.
+const scope = corpusScopeFor(root);
+// Every declared knowledge-graph directory, opt-in sub-graphs INCLUDED,
+// switched on or not. A relaxation is a declaration about a process, and
+// whether this root switches that process's group on does not make the
+// declaration right or wrong: judged against the enabled set only, a correct
+// relaxation of a process in a switched-off group read as "not a process
+// here". A process this script cannot see is one whose relaxations go
+// unchecked, so it reads every group that is on disk.
 const models = await Promise.all(
-  processDiagrams(workflowFiles(root, corpusScopeFor(root))).map((f) => loadProcessModel(f)),
+  processDiagrams(workflowFiles(root, scope, { enabledSubgraphs: "all" })).map((f) => loadProcessModel(f)),
 );
+// Opt-in groups declared but not on disk: the mount leaves a switched-off
+// group out, so a process in one cannot be read here at all.
+const unseen = declaredKgDirectories(root, scope, { enabledSubgraphs: "all" })
+  .filter((d) => d.optInSubgraph !== undefined && !existsSync(d.absPath))
+  .map((d) => `${d.optInSubgraph} (${d.path})`);
 
 console.log("Processes");
 for (const m of models) {
@@ -38,9 +48,10 @@ for (const m of models) {
 }
 
 let relaxations;
+let undetermined: Awaited<ReturnType<typeof loadRelaxations>> = [];
 try {
   relaxations = loadRelaxations(root);
-  validateRelaxations(relaxations, models);
+  undetermined = validateRelaxations(relaxations, models, { unseen });
 } catch (e) {
   console.error(`\n✗ ${e instanceof PolicyError ? e.message : String(e)}\n`);
   process.exit(1);
@@ -54,4 +65,11 @@ for (const r of relaxations) {
   console.log(`  ${r.package} → ${r.process}/${r.activity}\n      ${r.reason}`);
   if (r.scope) console.log(`      scope: ${r.scope}`);
 }
-console.log(`\n✓ ${relaxations.length} relaxation(s), all legal.\n`);
+if (undetermined.length > 0) {
+  console.log(`\nUndetermined: ${undetermined.length} relaxation(s) name a process in no group on disk, and these groups are declared but not mounted here:`);
+  for (const u of unseen) console.log(`  ${u}`);
+  for (const r of undetermined) console.log(`  ? ${r.package} → ${r.process}/${r.activity}`);
+  console.log(`  Judged where those groups are mounted; not counted as legal here.`);
+}
+const legal = relaxations.length - undetermined.length;
+console.log(`\n✓ ${legal} relaxation(s) legal${undetermined.length ? `, ${undetermined.length} undetermined` : ", all legal"}.\n`);
