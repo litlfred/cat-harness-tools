@@ -599,6 +599,8 @@ export const LibraryDocumentViewSchema = z
           extractCut: z.boolean(),
           /** The folio block this section was materialised as, for [edit] (bean zcak). */
           edit: z.object({ path: z.string().min(1), label: z.string().min(1) }).strict().optional(),
+          /** The blocks the section's own `contains` lists, by `@id`, for the Contents tree. */
+          blocks: z.array(z.string().min(1)).optional(),
         })
         .strict(),
     ),
