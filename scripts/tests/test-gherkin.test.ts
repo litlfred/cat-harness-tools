@@ -145,6 +145,24 @@ describe("language adapters", () => {
     ]);
   });
 
+  test("js: a regex literal inside a template's ${} hides no test, even ending in an escaped slash", () => {
+    // `\//` closing the regex once read as a `//` comment, which swallowed the
+    // `}` and the closing backtick: every test after it vanished, unreported.
+    // A division inside ${} stays a division.
+    const src = [
+      "const urlFor = (r: string) => `file://${repos[r.replace(/^test\\//, \"\")]}`;",
+      "const half = (n: number) => `${n / 2} of ${n / 1}`;",
+      'describe("after the template", () => {',
+      '  test("first", () => {});',
+      '  test("second", () => {});',
+      "});",
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("r.test.ts", src))).toEqual([
+      "r.test.ts::after_the_template::first",
+      "r.test.ts::after_the_template::second",
+    ]);
+  });
+
   test("js: a template nested in a template's ${} does not close it; id[${key}] is a fixed name", () => {
     const src = [
       "const conn = (label: string) => `<g>${label ? `<text>${label}</text>` : \"\"}</g>`;",
