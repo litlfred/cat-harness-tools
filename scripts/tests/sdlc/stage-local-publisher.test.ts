@@ -12,7 +12,7 @@ import { join } from "node:path";
 
 import { ContributionRegistry } from "../../../schemas/content/contributions.ts";
 
-import { callerInputs, declaredSitePublishers, detectPublisher, FOLIO_PUBLISHER, isSitePublisher, parseUses, type PublisherWorkflows } from "../../site-publisher.ts";
+import { callerInputs, declaredSitePublishers, detectPublisher, FOLIO_PUBLISHER, isReusableWorkflow, isSitePublisher, parseUses, type PublisherWorkflows } from "../../site-publisher.ts";
 import { chooseTarget, composeMain, mainCommitMessage, parseSymref, platformScript, previewCommitMessage } from "../../stage-local.ts";
 
 const tmp = (p: string) => mkdtempSync(join(tmpdir(), p));
@@ -66,6 +66,27 @@ describe("stage-local: which publisher, read from the repository's own workflows
     expect(() => detectPublisher(new Map([["staging.yml", FOLIO_CALLER]]), ON_OFFER, "ig")).toThrow(/no workflow here calls/);
   });
 
+  test("the repository that DEFINES a publisher's reusable workflow builds with it at the commit being built (smart-base, 2026-11-13)", () => {
+    const DEFINED = "on:\n  workflow_call:\n  workflow_dispatch:\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps: []\n";
+    const site = "on:\n  push:\njobs:\n  publish:\n    uses: litlfred/cat-harness-tools/.github/workflows/folio-site-publish.yml@abc # index.lock.json\n";
+    const self = { owner: "litlfred", repo: "smart-base", ref: "f".repeat(40) };
+    const wf = new Map([["fhirbuild.yml", DEFINED], ["ghbuild.yml", DEFINED], ["site-publish.yml", site]]);
+    // Its own ghbuild.yml, the publisher's preferred workflow, at this commit.
+    expect(detectPublisher(wf, ON_OFFER, undefined, self)).toMatchObject({
+      kind: "ig",
+      caller: "ghbuild.yml",
+      uses: { owner: "litlfred", repo: "smart-base", path: ".github/workflows/ghbuild.yml", ref: self.ref, file: "ghbuild.yml" },
+    });
+    // Without knowing which repository this is, nothing is defined "here": refused as before.
+    expect(() => detectPublisher(wf, ON_OFFER)).toThrow(/nothing to mirror/);
+    // A same-named file that is not reusable is not the publisher's workflow.
+    expect(() => detectPublisher(new Map([["ghbuild.yml", "on:\n  push:\njobs: {}\n"]]), ON_OFFER, undefined, self)).toThrow(/nothing to mirror/);
+    // A repository that also calls the folio's workflow still publishes the folio unless told otherwise.
+    const both = new Map([...wf, ["folio.yml", FOLIO_CALLER]]);
+    expect(detectPublisher(both, ON_OFFER, undefined, self)).toMatchObject({ kind: "folio", alsoCalls: { kind: "ig" } });
+    expect(isReusableWorkflow("on:\n  workflow_call: # reusable\n")).toBe(true);
+    expect(isReusableWorkflow("on: [push]\n")).toBe(false);
+  });
   test("a repository calling neither is refused, naming what it does call", () => {
     expect(() => detectPublisher(new Map([["ci.yml", "jobs:\n  x:\n    uses: o/r/.github/workflows/other.yml@v1\n"]]), ON_OFFER)).toThrow(/other\.yml/);
     expect(() => detectPublisher(new Map(), ON_OFFER)).toThrow(/nothing to mirror/);
