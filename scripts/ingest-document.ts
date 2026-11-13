@@ -764,7 +764,7 @@ try:
 except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
-  // input-site: spawned #363b130f — python3 on a document this tool was handed; the cone audits the child from its read set
+  // input-site: spawned #8cb1d510 — python3 on a document this tool was handed; the cone audits the child from its read set
   const r = Bun.spawnSync(["python3", "-c", py, pdf, dirname(pyHelper("_text_quality.py")), langs.join(",")]);
   const raw = parseProbe(new TextDecoder().decode(r.stdout)) as Probe & {
     toc?: [string, number][];

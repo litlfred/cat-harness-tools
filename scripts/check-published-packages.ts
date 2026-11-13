@@ -29,6 +29,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 function findIndexLockRoot(): string {
   if (existsSync(join(process.cwd(), "index.lock.json"))) return process.cwd();
@@ -108,6 +109,7 @@ function mountedManifests(root: string, filename: string): string[] {
         return;
       }
       for (const e of entries) {
+        // input-site: inert #6adcd2c8 — names the directories the walk skips; none of them is read
         if (e.name.startsWith(".") || e.name === "node_modules" || e.name === "dist") continue;
         const abs = join(dir, e.name);
         if (e.isDirectory()) walk(abs);
@@ -125,6 +127,7 @@ function manifests(root: string, glob: string): string[] {
   // stdout at 1 MiB and sets ENOBUFS rather than truncating. This call is
   // pathspec-scoped so it is far from that limit, but it is the same class,
   // and this is the call site where the consequence was worst.
+  // input-site: tree #3ebaf913 — the tracked files matching a package glob: git's index, which the cone replays
   const r = spawnSync("git", ["ls-files", "-z", "--", glob], { cwd: root, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 });
   if (r.error !== undefined || r.status !== 0) {
     throw new GitUnanswerable(glob, r.error?.message ?? ((r.stderr || "").trim() || `git exited ${String(r.status)}`));
@@ -250,11 +253,14 @@ export const PYTHON_ENV = { PYTHONDONTWRITEBYTECODE: "1" } as const;
 export const PYTEST_ARGS = ["-m", "pytest", "-q", "-p", "no:cacheprovider"] as const;
 
 function preparePython(abs: string): { ok: true } | { ok: false; why: string } {
+  // input-site: spawned #9fae058c — probes python3 for pytest with the environment handed whole; the cone audits the child from its read set
   const probe = spawnSync("python3", ["-c", "import pytest, sys"], { cwd: abs, encoding: "utf-8", env: { ...process.env, ...PYTHON_ENV } });
   if (probe.error !== undefined) {
     return { ok: false, why: `no \`python3\` on PATH — ${probe.error.message}` };
   }
   if (probe.status === 0) return { ok: true };
+  // input-site: traced #42ef5791 — pip installs the package and its test extras from the network: a run that reaches it records no hash
+  inputSiteReached("check-published-packages: pip install");
   const install = spawnSync("python3", ["-m", "pip", "install", "--quiet", "-e", ".[test]"], {
     cwd: abs,
     encoding: "utf-8",
