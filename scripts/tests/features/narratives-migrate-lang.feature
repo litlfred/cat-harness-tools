@@ -19,6 +19,12 @@ Feature: Migrating narratives to language-tagged lists
     Then a not-authored slot is skipped and the text unchanged
     And an existing list is counted as already a list and the text unchanged
 
+  @test:scripts/tests/narratives-migrate-lang.test.ts::narratives:migrate-lang_(e1lo_3d)::a_file_written_with_\u_escapes_keeps_them
+  Scenario: A file written with \u escapes keeps them
+    Given a file whose narrative spells an em dash as the escape \u2014
+    When it is migrated for en
+    Then one narrative is converted, the text still holds \u2014, and no literal em dash appears
+
   @test:scripts/tests/narratives-migrate-lang.test.ts::narratives:migrate-lang_(e1lo_3d)::a_number_written_the_Python_way_(`338.0`,_`1e-05`)_keeps_its_spelling
   Scenario: A number written the Python way keeps its spelling
     Given a file holding 48.96, 338.0 and 1e-05

@@ -25,6 +25,28 @@ Feature: The LaTeX math overlay and the arXiv source reader
     When the overlay runs
     Then the section's result starts with "coverage gate failed" and the section file is unchanged
 
+  @test:scripts/tests/latex-math-overlay.test.ts::latex-math-overlay::a_PDF_section_that_is_a_\subsection_pairs_with_it,_and_its_parent_stops_where_it_starts
+  Scenario: A PDF section that is a LaTeX \subsection pairs with it, and its parent stops where it starts
+    Given a LaTeX \section holding a \subsection, and a PDF that reports the subsection as a section of its own
+    When the overlay runs
+    Then both sections are "overlaid"
+    And the parent section's text does not hold the subsection's prose, and the subsection's text does
+
+  @test:scripts/tests/latex-math-overlay.test.ts::latex-math-overlay::a_\subsection_the_PDF_did_not_report_stays_inside_its_parent
+  Scenario: A \subsection the PDF did not report stays inside its parent
+    Given a LaTeX \section holding a \subsection, and a PDF whose one section holds both texts
+    When the overlay runs
+    Then the section is "overlaid" and its text holds the subsection's prose
+
+  @test:scripts/tests/latex-math-overlay.test.ts::latex-math-overlay::a_LaTeX_2.09_source_(\documentstyle)_is_read;_AMS-TeX_is_not
+  Scenario: A LaTeX 2.09 source is read; an AMS-TeX source is not
+    Given a source beginning \documentstyle[12pt]{article} with the matching \section
+    When the overlay dry-runs with it
+    Then the section is "overlaid"
+    Given an AMS-TeX source beginning \input amstex
+    When the overlay dry-runs with it
+    Then the entry's reason says "none with"
+
   @test:scripts/tests/latex-math-overlay.test.ts::latex-math-overlay::a_section_is_never_paired_by_position
   Scenario: A section is never paired by position
     Given the only LaTeX section has a title unlike the only PDF section's

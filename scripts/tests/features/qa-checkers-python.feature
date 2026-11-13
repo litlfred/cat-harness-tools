@@ -1,9 +1,7 @@
 # The script-quality Python checkers (pipeline/qa-checkers-python.ts). For
 # does_not_default_to_float, a "cast hit" is a hit starting "bare `float(" and
 # a "literal hit" one starting "bare float literal". Each Scenario names the
-# test that executes it. The test 'multiline float(\n "inf",\n) is exempt' has
-# a backslash escape in its title and is not tagged until the checker's
-# naming change (#2065) lands.
+# test that executes it.
 Feature: The Python script-quality checkers
 
   @test:scripts/tests/qa-checkers-python.test.ts::checkDoesNotDefaultToFloat_—_sentinel_exemption::float('inf')_is_exempt
@@ -149,6 +147,12 @@ Feature: The Python script-quality checkers
     Given a Python file 'u = float("inf",)'
     When does_not_default_to_float checks it
     Then there are no hits
+
+  @test:scripts/tests/qa-checkers-python.test.ts::checkDoesNotDefaultToFloat_—_trailing-comma_sentinel_(Black)::multiline_float(\n_"inf",\n)_is_exempt
+  Scenario: A multiline float("inf",) with a trailing comma is exempt
+    Given a Python file whose float( call spans three lines, holding "inf" and a trailing comma
+    When does_not_default_to_float checks it
+    Then there are no casts, no literals and no hits
 
   @test:scripts/tests/qa-checkers-python.test.ts::checkDoesNotDefaultToFloat_—_trailing-comma_sentinel_(Black)::float("nan",)_is_exempt
   Scenario: float("nan",) with a trailing comma is exempt
