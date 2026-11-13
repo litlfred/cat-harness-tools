@@ -104,6 +104,7 @@ describe("gen-landing-data --check when the board is built at publish (owner, 20
     const { parent, checkout } = fixture();
     try {
       const decl = JSON.parse(readFileSync(join(checkout, "folio.json"), "utf8"));
+      // declared-path-literal: a test vector — the board path a fixture declaration names as builtAtPublish, written as a declaration holds it.
       decl.builtAtPublish = [{ path: "docs/_data/stickies.json", writer: ["landing:data"], because: "checkout", reason: "fixture" }];
       writeFileSync(join(checkout, "folio.json"), json(decl));
       const run = spawnSync("bun", ["run", SCRIPT, "--check"], {
