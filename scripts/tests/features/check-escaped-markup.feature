@@ -173,3 +173,15 @@ Feature: A built page carries no escaped block markup or leaked markdown table
     Given a real table element whose cells hold "—", "-" and a code "|---|"
     When leaked tables are found in it
     Then there are none
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_row_after_a_`>`_is_found_even_when_an_earlier_pipe_shares_its_line
+  Scenario: A row that starts after a `>` is found though an earlier pipe sits on its line
+    Given the text "<p>| a |> -| &mdash;</p>"
+    When leaked tables are found in it
+    Then one row is found, named "| a |", the text above it
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_long_page_with_pipes_but_no_row_is_read_in_one_pass
+  Scenario: A long page full of prose pipes is scanned in linear time
+    Given 50,000 paragraphs holding a prose pipe and one leaked one-column table
+    When leaked tables are found in it
+    Then the one table is found within two seconds
