@@ -30,6 +30,7 @@ import {
   igSiteRoots,
   instanceRoute,
   mountable,
+  mountedKindRoutes,
   servedClashes,
   servedDirectories,
   WITHHELD_FILE,
@@ -292,6 +293,31 @@ describe("which kind answers at the instance's own route", () => {
     const found = mountable(repo).filter((m) => m.name === "wi");
     expect(found.length).toBe(2);
     expect(withRoutes(found).candidates.map((c) => c.route).sort()).toEqual(["docs/wi", "wi"]);
+  });
+
+  it("mountedKindRoutes answers the kind route the navbar's Docs row opens, and not the instance root", () => {
+    // who-iris, 2026-11-13: `docs/` (the CDN proposal among it) mounted at
+    // /docs/who-iris/ while the Folders row read "no viewer yet".
+    const repo = mkdtempSync(join(tmpdir(), "kind-route-"));
+    for (const d of ["site", "docs", "guides", "notes"]) {
+      mkdirSync(join(repo, d), { recursive: true });
+      writeFileSync(join(repo, d, "index.html"), "<html><body></body></html>");
+    }
+    writeFileSync(
+      join(repo, "wi.json"),
+      JSON.stringify({
+        name: "wi",
+        directories: [
+          { id: "wi-site", path: "site/", graphTypologies: ["docs"], instanceRoot: true },
+          { id: "wi-docs", path: "docs/", graphTypologies: ["docs"] },
+          // Two of one kind share no route, so neither is THE kind's page.
+          { id: "wi-guides", path: "guides/", graphTypologies: ["processes"] },
+          { id: "wi-notes", path: "notes/", graphTypologies: ["processes"] },
+        ],
+      }),
+    );
+    expect([...mountedKindRoutes(repo, "wi")]).toEqual([["docs", "/docs/wi/"]]);
+    expect(mountedKindRoutes(repo, "nobody").size).toBe(0);
   });
 
   it("a directory of a kind a build Tool publishes (web-app) is never mounted, though it holds an index.html", () => {

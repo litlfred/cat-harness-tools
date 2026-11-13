@@ -1669,6 +1669,38 @@ export function mountRoutes(built: string): string[] {
   return resolve_(candidates).mounts.map((m) => m.route);
 }
 
+/**
+ * Where the mount pass publishes each KIND of one layer — `docs` →
+ * `/docs/who-iris/` — read off the same `mountable()` / `withRoutes` /
+ * `resolve_` the pass itself runs, for `harness-tiles.ts`.
+ *
+ * The navbar's Folders row for a kind links a DECLARED viewer or a page under
+ * the site directory, and nothing else, so a directory the mount publishes at
+ * its kind route read "no viewer yet" over a page the site served. Measured on
+ * litlfred.github.io/who-iris, 2026-11-13: `docs/` (the CDN proposal among
+ * it) mounted at `/docs/who-iris/` and the Docs row was inert. Asking the
+ * mount's own routing is one answer; composing `/<kind>/<name>/` in the tiles
+ * would be a second, free to disagree the day a sibling takes a sub-route.
+ *
+ * Only a kind with exactly ONE kind route is answered. Same-kind siblings that
+ * each take `/<kind>/<name>/<dir>/` have no single page for the row to open,
+ * and picking one would be the alphabet choosing; the instance root
+ * (`/<name>/`) is the layer presenting itself, not a kind's viewer.
+ *
+ * @returns kind → site-absolute route, with a trailing slash
+ */
+export function mountedKindRoutes(repo: string, name: string): Map<string, string> {
+  const { candidates } = withRoutes(mountable(repo), igSiteRoots(repo));
+  const byKind = new Map<string, string[]>();
+  for (const m of resolve_(candidates).mounts) {
+    if (m.name !== name || !m.route.startsWith(`${m.kind}/`)) continue;
+    byKind.set(m.kind, [...(byKind.get(m.kind) ?? []), m.route]);
+  }
+  const out = new Map<string, string>();
+  for (const [kind, routes] of byKind) if (routes.length === 1) out.set(kind, `/${routes[0]}/`);
+  return out;
+}
+
 /** One directory entry as a declaration carries it — only the fields read here. */
 interface DeclaredEntry {
   id?: string;
