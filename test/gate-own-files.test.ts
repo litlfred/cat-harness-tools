@@ -105,20 +105,18 @@ describe("gateDirectoriesForGraph: the subjects a scoped check judges", () => {
 describe("a scoped check whose caller commits none of its subjects passes, never exits 2 or 78", () => {
   // Exit 2 or 78 against a base that passed is a NEW failure in compare-gates.py.
   const env = { ...process.env, [GATE_OWN_ENV]: "no-such-instance" };
-  for (const [script, what] of [
+  test.each([
     ["check-methodology-evidence.ts", "methodology directory"],
     ["check-tabular-stubs.ts", "library directory"],
     ["check-translation-officiality.ts", "translations directory"],
     ["check-schema-nodes.ts", "schemas/*.ts"],
     ["check-concern-groups.ts", "grouping directory"],
     ["check-subgraphs.ts", "markdown in a declared directory"],
-  ] as const) {
-    test(script, () => {
-      const r = spawnSync("bun", [resolve(import.meta.dir, "..", "scripts", script)], { encoding: "utf-8", env });
-      expect(r.status).toBe(0);
-      expect(r.stdout).toContain(`commits no ${what}`);
-    });
-  }
+  ] as const)("%s says its caller commits no %s, and passes", (script, what) => {
+    const r = spawnSync("bun", [resolve(import.meta.dir, "..", "scripts", script)], { encoding: "utf-8", env });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain(`commits no ${what}`);
+  });
 });
 
 describe("gateOwnsFile: a file is the caller's when its deepest instance directory is", () => {
@@ -183,11 +181,9 @@ describe("a generator check judges only the output the caller commits", () => {
   // A layer that commits none of a generator's output is not judged on it,
   // stale or not (owner ruling 2026-11-05, generator checks included).
   const env = { ...process.env, [GATE_OWN_ENV]: "no-such-instance", [GATE_OWN_PATHS_ENV]: "no-such-instance", [GATE_FOREIGN_PATHS_ENV]: "" };
-  for (const script of ["bpmn-checklist.ts", "branch-readme.ts", "../pipeline/obsolete-stale-po.ts", "../pipeline/pot-for-pages.ts"]) {
-    test(`${script} --check passes for a caller that commits none of its output`, () => {
-      const r = spawnSync("bun", [resolve(import.meta.dir, "..", "scripts", script), "--check"], { encoding: "utf-8", env });
-      expect(r.status).toBe(0);
-      expect(r.stdout + r.stderr).not.toContain("✗");
-    });
-  }
+  test.each(["bpmn-checklist.ts", "branch-readme.ts", "../pipeline/obsolete-stale-po.ts", "../pipeline/pot-for-pages.ts"])("%s --check passes for a caller that commits none of its output", (script) => {
+    const r = spawnSync("bun", [resolve(import.meta.dir, "..", "scripts", script), "--check"], { encoding: "utf-8", env });
+    expect(r.status).toBe(0);
+    expect(r.stdout + r.stderr).not.toContain("✗");
+  });
 });

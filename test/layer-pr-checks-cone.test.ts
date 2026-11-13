@@ -194,17 +194,15 @@ describe("run-gates.py GATE_CONE=skip", () => {
     expect(r.log.slice(1)).toEqual([]);
   });
 
-  for (const [what, d] of [
+  test.each([
     ["a skip with no sha", { skip: true, why: "x" }],
     ["a skip that is not literally true", { skip: "yes", sha: "abc" }],
     ["no decision at all", undefined],
-  ] as const) {
-    test(`${what} runs the gate (fail-closed)`, () => {
-      const r = runGates(fixture(), "skip", { decisions: d === undefined ? {} : { "check:b-one": d } });
-      expect(r.gates["b:check:b-one"]!.exit).toBe(0);
-      expect(r.meta.unchanged).toEqual([]);
-    });
-  }
+  ] as const)("%s runs the gate (fail-closed)", (_what, d) => {
+    const r = runGates(fixture(), "skip", { decisions: d === undefined ? {} : { "check:b-one": d } });
+    expect(r.gates["b:check:b-one"]!.exit).toBe(0);
+    expect(r.meta.unchanged).toEqual([]);
+  });
 
   test("decide-all failing runs every gate, and says why", () => {
     const r = runGates(fixture(), "skip", { decideExit: 3, decisions: { "check:b-one": SKIP() } });

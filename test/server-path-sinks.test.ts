@@ -74,11 +74,9 @@ describe("the exact pre-fix spellings are gone", () => {
     ],
   ];
 
-  for (const [spelling, why] of regressions) {
-    it(`does not contain: ${why}`, () => {
-      expect(src).not.toContain(spelling);
-    });
-  }
+  it.each(regressions.map(([spelling, why]) => [why, spelling] as const))("does not contain: %s", (_why, spelling) => {
+    expect(src).not.toContain(spelling);
+  });
 });
 
 describe("each identifier sink validates before the path is built", () => {
