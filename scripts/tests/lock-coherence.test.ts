@@ -76,13 +76,13 @@ describe("the rule: this lock's pin of X contains every pinned harness's pin of 
   test("a mismatched lock fails: tools pinned older than core's own lock pins it", () => {
     const root = [pin("core", sha("c")), pin("harness", sha("b")), pin("tools", sha("1"))];
     const r = judgeLockCoherence(root, lowers(sha("3"), sha("b"), sha("1")), relate);
-    expect(exitCodeOf(r)).toBe(1);
+    expect(exitCodeOf(r, undefined, { agreement: true })).toBe(1);
     expect(r.disagreements).toHaveLength(1);
     const d = r.disagreements[0]!;
     expect(d).toMatchObject({ harness: "tools", layerRef: sha("1"), lowerRef: sha("3"), relation: "behind" });
     expect(d.via.harness).toBe("core");
     expect(d.fix).toContain(`re-pin tools to ${sha("3")} or a later commit`);
-    const text = formatReport(r, "fixture");
+    const text = formatReport(r, "fixture", true);
     expect(text).toContain("FAILED");
     expect(text).toContain(sha("1"));
     expect(text).toContain(sha("3"));
@@ -92,7 +92,7 @@ describe("the rule: this lock's pin of X contains every pinned harness's pin of 
     const root = [pin("core", sha("c")), pin("harness", sha("b")), pin("tools", SIDE)];
     const r = judgeLockCoherence(root, lowers(sha("2"), sha("b"), sha("1")), relate);
     expect(r.disagreements.map((d) => [d.via.harness, d.relation])).toEqual([["core", "diverged"]]);
-    expect(exitCodeOf(r)).toBe(1);
+    expect(exitCodeOf(r, undefined, { agreement: true })).toBe(1);
   });
 
   test("every disagreeing pair is reported, each with both SHAs", () => {
@@ -109,7 +109,7 @@ describe("the rule: this lock's pin of X contains every pinned harness's pin of 
     const root = [pin("core", sha("c")), pin("tools", sha("3"))];
     const r = judgeLockCoherence(root, () => ({ state: "could-not-determine", reason: "fetch failed" }), relate);
     expect(r.undetermined).toHaveLength(2);
-    expect(exitCodeOf(r)).toBe(2);
+    expect(exitCodeOf(r, undefined, { agreement: true })).toBe(2);
   });
 
   test("an unknown ancestry is undetermined, never agreement", () => {
@@ -117,7 +117,7 @@ describe("the rule: this lock's pin of X contains every pinned harness's pin of 
     const r = judgeLockCoherence(root, lowers(sha("2"), sha("b"), sha("3")), relate);
     expect(r.agree).toBe(0);
     expect(r.undetermined.map((u) => u.harness)).toEqual(["tools"]);
-    expect(exitCodeOf(r)).toBe(2);
+    expect(exitCodeOf(r, undefined, { agreement: true })).toBe(2);
   });
 
   test("pins are matched by repository, so a renamed harness is still compared", () => {
@@ -133,8 +133,9 @@ describe("the rule: this lock's pin of X contains every pinned harness's pin of 
   });
 });
 
+const mains = (m: Record<string, string>) => (p: Pin): MainHead => (m[p.harness] ? { sha: m[p.harness]! } : { reason: "fetch failed" });
+
 describe("freshness: every pin at its repository's main, or ahead of it", () => {
-  const mains = (m: Record<string, string>) => (p: Pin): MainHead => (m[p.harness] ? { sha: m[p.harness]! } : { reason: "fetch failed" });
   const agreeing = judgeLockCoherence([], () => ({ state: "absent" }), relate);
 
   test("pins at main, or descending from it, are fresh", () => {
@@ -191,6 +192,33 @@ describe("freshness: every pin at its repository's main, or ahead of it", () => 
     const r = judgeLockCoherence(root, lowers(sha("3"), sha("b"), sha("1")), relate);
     const f = judgeFreshness(root, mains({ core: sha("c"), tools: sha("1") }), relate);
     expect(f.stale).toEqual([]);
+    expect(exitCodeOf(r, f, { agreement: true })).toBe(1);
+  });
+});
+
+describe("only the top-level lock decides (owner, 2026-11-13)", () => {
+  test("by default a disagreement is reported, not a failure, when every pin is fresh", () => {
+    const root = [pin("core", sha("c")), pin("tools", sha("1"))];
+    const r = judgeLockCoherence(root, lowers(sha("3"), sha("b"), sha("1")), relate);
+    const f = judgeFreshness(root, mains({ core: sha("c"), tools: sha("1") }), relate);
+    expect(r.disagreements).toHaveLength(1);
+    expect(exitCodeOf(r, f)).toBe(0);
+    const text = formatReport(r, "fixture");
+    expect(text).toContain("DIFFERS");
+    expect(text).not.toContain("FAILED");
+  });
+
+  test("by default an undetermined lower lock does not fail either", () => {
+    const root = [pin("core", sha("c"))];
+    const r = judgeLockCoherence(root, () => ({ state: "could-not-determine", reason: "offline" }), relate);
+    expect(r.undetermined).toHaveLength(1);
+    expect(exitCodeOf(r)).toBe(0);
+  });
+
+  test("a stale pin still fails by default", () => {
+    const root = [pin("core", sha("c")), pin("tools", sha("1"))];
+    const r = judgeLockCoherence(root, lowers(sha("1"), sha("b"), sha("1")), relate);
+    const f = judgeFreshness(root, mains({ core: sha("c"), tools: sha("2") }), relate);
     expect(exitCodeOf(r, f)).toBe(1);
   });
 });
@@ -260,7 +288,7 @@ describe("the git reader: real commits, real locks", () => {
 
   test("mismatched: tools pinned older than core's lock pins it fails, naming both SHAs", () => {
     const r = judge(t1);
-    expect(exitCodeOf(r)).toBe(1);
+    expect(exitCodeOf(r, undefined, { agreement: true })).toBe(1);
     expect(r.disagreements).toEqual([
       expect.objectContaining({ harness: "tools", layerRef: t1, lowerRef: t2, relation: "behind" }),
     ]);
@@ -285,6 +313,6 @@ describe("the git reader: real commits, real locks", () => {
   test("a pin that cannot be fetched is undetermined", () => {
     const r = judge("f".repeat(40));
     expect(r.disagreements).toEqual([]);
-    expect(exitCodeOf(r)).toBe(2);
+    expect(exitCodeOf(r, undefined, { agreement: true })).toBe(2);
   });
 });
