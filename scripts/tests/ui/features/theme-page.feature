@@ -44,13 +44,13 @@ Feature: The themes page is usable
 
   @test:scripts/tests/ui/theme-page.test.ts::the_themes_viewer_(bean_folio-assistant-6gme)::is_drawn_only_where_a_`themes`_visualiser_is_declared
   Scenario: The themes viewer is drawn at the themes route
-    # Skipped: passes without checking when no themes visualiser is declared
+    # Skipped: when no themes visualiser is declared (reported as skipped, not passed)
     Given the themes viewer built from the harness
     Then its path ends in themes/index.md
 
   @test:scripts/tests/ui/theme-page.test.ts::the_themes_viewer_(bean_folio-assistant-6gme)::names_the_Tool_that_renders_it,_and_opens_with_the_platform's_themes
   Scenario: The themes viewer names the Tool that renders it and opens with the platform's themes
-    # Skipped: passes without checking when no themes visualiser is declared
+    # Skipped: when no themes visualiser is declared (reported as skipped, not passed)
     Given the themes viewer built from the harness
     Then its page carries rendered-by naming the viewer Tool
     And it has a "## The platform" section
@@ -58,7 +58,7 @@ Feature: The themes page is usable
 
   @test:scripts/tests/ui/theme-page.test.ts::the_themes_viewer_(bean_folio-assistant-6gme)::gives_every_instance_it_read_a_section,_and_names_any_it_could_not
   Scenario: The themes viewer gives every instance it read a section and names any it could not
-    # Skipped: passes without checking when no themes visualiser is declared
+    # Skipped: when no themes visualiser is declared (reported as skipped, not passed)
     Given the themes viewer built from the harness
     Then it has at least one more level-2 section than the instances it read
     And it names every instance it could not read
