@@ -37,6 +37,30 @@ import "./kg/folio-graph-typology.js";
 process.env.PYTHONDONTWRITEBYTECODE = "1";
 
 /*
+ * …and so every child sees it. `node:child_process` hands a child the CURRENT
+ * `process.env`; `Bun.spawn` and `Bun.spawnSync` hand it the environment the
+ * process STARTED with, so the line above never reached them (measured on bun
+ * 1.4.4: a preload-set variable read back `unset` in a `Bun.spawnSync` child,
+ * and the PDF importers, which spawn Python that way, kept writing
+ * `scripts/__pycache__/`). Under `bun test` only, a spawn that names no `env`
+ * gets the current one, as `node:child_process` already does; a spawn that
+ * names its own is left exactly as it is.
+ */
+type BunSpawnOptions = { env?: Record<string, string | undefined> } | undefined;
+const currentEnvByDefault = <F extends (...args: never[]) => unknown>(spawn: F): F =>
+  ((cmdOrOptions: unknown, options?: BunSpawnOptions) => {
+    // input-site: inert #09c28de2 — hands this process's environment on to a child, unread here
+    const env = { ...process.env };
+    if (Array.isArray(cmdOrOptions)) return (spawn as (...a: unknown[]) => unknown)(cmdOrOptions, options?.env === undefined ? { ...options, env } : options);
+    const o = cmdOrOptions as BunSpawnOptions;
+    return (spawn as (...a: unknown[]) => unknown)(o?.env === undefined ? { ...o, env } : o);
+  }) as unknown as F;
+// input-site: inert #670a5704 — wraps the spawn, runs nothing itself
+Bun.spawn = currentEnvByDefault(Bun.spawn);
+// input-site: inert #a3023216 — wraps the spawn, runs nothing itself
+Bun.spawnSync = currentEnvByDefault(Bun.spawnSync);
+
+/*
  * THE SUITE'S DEFAULT TIMEOUT — bean `61n5`.
  *
  * bun's default is 5 s, and this repository has a whole class of tests that
