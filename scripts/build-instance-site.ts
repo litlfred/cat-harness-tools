@@ -52,7 +52,8 @@
  *     writes finished pages AFTER the site is built (gen-node-kind-pages says so of itself).
  *     As a source step its pages would pass through Jekyll, which drops every `_`-prefixed
  *     directory: a node at `docs/_data/node-kinds` lost its page that way. Then
- *     mount-instance-docs, pdf-viewer, suggest-editor, set-html-lang, publish-id-lookup,
+ *     gen-node-kind-pages, on every site, unless a site step already ran it (the schemas
+ *     page links every node kind's pages; owner, 2026-11-13). Then mount-instance-docs, pdf-viewer, suggest-editor, set-html-lang, publish-id-lookup,
  *     rail-standalone-pages; then each `--final-step` package script, the same way, for a step
  *     that must see every page of the finished site, the platform's own too (an IG's one bar on
  *     the identifier lookup page; owner, 2026-10-15); then the forwarding pages; then the search
@@ -335,6 +336,33 @@ export const LIBRARY_GATE = "check:l1-complete";
 /** The pre steps a build runs, in order: the library gate first, then the recipe's own, the gate never twice. */
 export function gateSteps(pre: readonly string[]): string[] {
   return [LIBRARY_GATE, ...pre.filter((p) => p !== LIBRARY_GATE)];
+}
+
+/**
+ * The writer of every node-kind page (`/<locale>/<declaring>/<kind>/…`).
+ * The schemas visualiser, which every site carries, links each node kind
+ * there, so every site owes those pages: who-iris, whose recipe named no
+ * site step, published 34 dead node-kind links on its schemas page (owner,
+ * 2026-11-13, node-kind audit). It runs on the built site, as a site step
+ * does, for every site.
+ */
+export const NODE_KIND_PAGES = "gen-node-kind-pages.ts";
+
+/**
+ * Whether one of the recipe's own steps already runs {@link NODE_KIND_PAGES}
+ * (a folio's `site:node-kinds`), so the build does not run it twice: the
+ * step's command in the checkout's package.json names the writer.
+ */
+export function recipeWritesNodeKindPages(root: string, steps: readonly string[]): boolean {
+  const file = join(root, "package.json");
+  if (!existsSync(file)) return false;
+  let scripts: Record<string, unknown> | undefined;
+  try {
+    scripts = (JSON.parse(readFileSync(file, "utf-8")) as { scripts?: Record<string, unknown> }).scripts;
+  } catch {
+    return false;
+  }
+  return steps.some((s) => typeof scripts?.[s] === "string" && (scripts[s] as string).includes(NODE_KIND_PAGES));
 }
 
 /** A package script name: what `--pre` and `--source-step` accept, and nothing that could carry a shell payload. */
@@ -1079,6 +1107,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     );
 
     for (const st of o.siteSteps ?? []) run(`site: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
+    // Every site, whatever its profile: the schemas page links each node kind's pages.
+    if (!recipeWritesNodeKindPages(root, [...(o.siteSteps ?? []), ...(o.finalSteps ?? [])])) {
+      run("node-kind pages", `bun run ${TOOLS}/${NODE_KIND_PAGES} --root . --out ${s}`, root);
+    }
     if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}${o.scope ? ` --scope ${shellQuote(scopeArg(o.scope))}` : ""}`, root);
     // A scoped site installs the viewer only when one of its pages embeds it (Q-SZ-6 "A").
     if (has.has("pdf") && o.scope && !pagesEmbedPdf(site)) console.log("pdf viewer: no page of this scoped site embeds a PDF; not installed");

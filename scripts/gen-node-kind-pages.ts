@@ -261,6 +261,16 @@ const sectionsHtml = (extra: readonly PageSection[]): string =>
 /** Where a kind's pages live, relative to the site root. */
 export const kindDir = (locale: string, k: Pick<NodeKindEntry, "id" | "declaredBy">): string => `${locale}/${k.declaredBy}/${k.id}`;
 
+/**
+ * Whether a kind gets pages: every kind a layer declares, versioned or not.
+ * Until 2026-11-13 a kind declared without a version (cat-harness's
+ * `work-plan` under `bean`, `qa-script`) got none, while the schemas page,
+ * which links every declared kind, linked it: 7 dead links on who-iris's
+ * schemas page (owner, 2026-11-13: every node kind gets pages, no waivers).
+ * Its dashboard lists the nodes of its subclasses; its title is its id.
+ */
+export const hasKindPages = (k: Pick<NodeKindEntry, "declaredBy"> | undefined): k is NodeKindEntry => Boolean(k?.declaredBy);
+
 /** A relative href from page directory `from` to page directory `to`, both site-relative. */
 function href(from: string, to: string): string {
   const r = relative(from, to).split(sep).join("/");
@@ -272,11 +282,10 @@ function lineage(here: string, k: NodeKindEntry, byId: Map<string, NodeKindEntry
   const link = (id: string) => {
     const t = byId.get(id);
     // Linked only where a page is WRITTEN, by the test the writer itself uses
-    // (`declaredBy` and `version`; see plannedPages): a kind declared without
-    // a version, like cat-harness's `work-plan` under `bean`, gets no page,
-    // and linking it published `../work-plan/` as a dead link that refused
-    // dth-hrh's site (run 42342932329).
-    return t?.declaredBy && t.version ? `<a href="${href(here, kindDir(locale, t))}">${esc(id)}</a>` : `<span>${esc(id)}</span>`;
+    // ({@link hasKindPages}; see plannedPages): linking a kind the writer
+    // skipped published `../work-plan/` as a dead link that refused dth-hrh's
+    // site (run 42342932329).
+    return hasKindPages(t) ? `<a href="${href(here, kindDir(locale, t))}">${esc(id)}</a>` : `<span>${esc(id)}</span>`;
   };
   const parts: string[] = [];
   if (k.parents.length) parts.push(`extends ${k.parents.map(link).join(", ")}`);
@@ -437,7 +446,7 @@ export function plannedPages(index: NodeKindIndex, nodesOf: (id: string) => Kind
   const out: string[] = [];
   for (const locale of locales) {
     for (const k of index.kinds) {
-      if (!k.declaredBy || !k.version) continue;
+      if (!hasKindPages(k)) continue;
       const base = kindDir(locale, k);
       out.push(base);
       const nodes = nodesOf(k.id);
@@ -548,11 +557,11 @@ export async function buildNodeKindPages(o: BuildOptions): Promise<{ pages: stri
       nodesOf,
       linkTo: (kindId, n) => {
         const t = byId.get(kindId);
-        return t?.declaredBy && t.version ? href(here, `${kindDir(locale, t)}/${n.harness}/${n.path}`) : undefined;
+        return hasKindPages(t) ? href(here, `${kindDir(locale, t)}/${n.harness}/${n.path}`) : undefined;
       },
     });
     for (const k of index.kinds) {
-      if (!k.declaredBy || !k.version) continue;
+      if (!hasKindPages(k)) continue;
       const nodes = nodesOf(k.id);
       const fields = await fieldsOfKind(k);
       const own = await pagesOf(k);
