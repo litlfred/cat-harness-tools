@@ -404,6 +404,30 @@ describe("gen-slice-sqlite — kg", () => {
       expect(d.probe).toEqual({ phrase: "materialization skill", column: "iri", value: "skill/b" });
     }));
 
+  test("a sequence flow is sliced once: its from/to are edges, the nodes' incoming/outgoing mirrors are not, and the view answers the reverse", () =>
+    withDir((dir) => {
+      const ctx = {
+        ...doc["@context"],
+        from: { "@id": "ex:from", "@type": "@id" },
+        to: { "@id": "ex:to", "@type": "@id" },
+        incoming: { "@id": "ex:incoming", "@type": "@id" },
+        outgoing: { "@id": "ex:outgoing", "@type": "@id" },
+      };
+      const graph = [
+        { "@id": `${DIR}process/p/node/a`, "@type": "https://example.org/ns#ProcessNode", outgoing: [`${DIR}process/p/flow/f`] },
+        { "@id": `${DIR}process/p/node/b`, "@type": "https://example.org/ns#ProcessNode", incoming: [`${DIR}process/p/flow/f`] },
+        { "@id": `${DIR}process/p/flow/f`, "@type": "https://example.org/ns#SequenceFlow", from: `${DIR}process/p/node/a`, to: `${DIR}process/p/node/b` },
+      ];
+      const m = buildSlice(KG_SLICE, kgData({ ...doc, "@context": ctx, "@graph": graph }, emptyPlan()), dir);
+      const db = new Database(join(dir, m.file), { readonly: true });
+      expect(db.query(`SELECT src, rel, dst FROM edges ORDER BY rel`).all()).toEqual([
+        { src: "process/p/flow/f", rel: "from", dst: "process/p/node/a" },
+        { src: "process/p/flow/f", rel: "to", dst: "process/p/node/b" },
+      ]);
+      expect(db.query(`SELECT src FROM incoming WHERE iri = 'process/p/node/a' AND rel = 'from'`).all()).toEqual([{ src: "process/p/flow/f" }]);
+      db.close();
+    }));
+
   test("a one-release tombstone is not a row: it has no type and no text, only a forwarding address (bean 0exf)", () =>
     withDir((dir) => {
       const moved = { "@id": "https://example.org/site/x.jsonld#skill/a", deprecated: true, isReplacedBy: `${DIR}skill/a`, sameAs: `${DIR}skill/a` };
