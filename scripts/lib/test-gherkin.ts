@@ -464,13 +464,16 @@ const LOOPED_ID = /^[^`$\s\[\]]+\[\$\{[^{}`]*\}\]$/;
  * …)` in a plain `.ts` module) declares the call and the files, and its tests
  * are found and named exactly as `test()` ones are.
  */
+/** `s` as a regex that matches it literally. */
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 export function jsAdapter(matches: (f: string) => boolean, extraCalls: readonly string[] = []): TestLanguageAdapter {
   for (const c of extraCalls) {
     if (!/^[A-Za-z_$][\w$]*$/.test(c)) throw new Error(`jsAdapter: \`${c}\` is not a JS identifier`);
   }
   const head = extraCalls.length === 0
     ? JS_HEAD
-    : new RegExp(`(?<![\\w.$])(describe|suite|context|test|it|${extraCalls.map((c) => c.replace(/\$/g, "\\$")).join("|")})(?=\\s*[.(])`, "g");
+    : new RegExp(`(?<![\\w.$])(describe|suite|context|test|it|${extraCalls.map(escapeRegExp).join("|")})(?=\\s*[.(])`, "g");
   return { id: "js", matches, findTests: (file, src) => jsFindTests(file, src, head) };
 }
 

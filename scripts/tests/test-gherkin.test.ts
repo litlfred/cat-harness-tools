@@ -200,6 +200,8 @@ describe("language adapters", () => {
     expect(JS_ADAPTER.matches("tools/suite.ts")).toBe(false);
     expect(JS_ADAPTER.findTests("tools/suite.ts", src)).toEqual([]);
     expect(() => jsAdapter(() => true, ["not-an-identifier"])).toThrow();
+    // A `$` in the call name is matched literally.
+    expect(names(jsAdapter(() => true, ["$run"]).findTests("s.ts", '$run("a b", () => true); xrun("c", () => true);'))).toEqual(["s.ts::a_b"]);
   });
 
   test("a scan reads a declared runner file with its call, and leaves undeclared ones alone", () => {

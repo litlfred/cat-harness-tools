@@ -77,6 +77,7 @@ Feature: Every test has a Gherkin
     And rerun is not taken for a test
     And the default JS adapter neither reads the file nor knows the call
     And a call name that is not a JS identifier is refused
+    And a call name holding a $ is matched literally
 
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::a_scan_reads_a_declared_runner_file_with_its_call,_and_leaves_undeclared_ones_alone
   Scenario: A scan reads a declared runner file, and only that one
