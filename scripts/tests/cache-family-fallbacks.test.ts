@@ -43,19 +43,18 @@ const FAMILIES = {
 } as const;
 
 describe("cache scripts carry the built-in family names newest first, and none unknown", () => {
-  for (const [family, { names, files }] of Object.entries(FAMILIES)) {
-    for (const file of files) {
-      // The script is in the layer that owns the family (`fhir-harness`), a
-      // higher layer a standalone checkout does not hold (bean w1gy F18).
-      const absent = !existsSync(resolve(REPO, file)) && notApplicableAlone(`${file}, in ${file.split("/")[0]}'s checkout (a higher instance)`);
-      test.skipIf(absent)(`${file}: its ${family} fallback list is a newest-first prefix of the known names`, () => {
-        const text = readFileSync(resolve(REPO, file), "utf-8");
-        const m = /for p in ((?:"[^"]+"\s*)+); do/.exec(text);
-        expect(m, `${file} writes its list as one \`for p in "…"; do\` literal`).not.toBeNull();
-        const listed = [...m![1]!.matchAll(/"([^"]+)"/g)].map((x) => x[1]!.replace(/\/$/, ""));
-        expect(listed.length).toBeGreaterThanOrEqual(1);
-        expect(listed).toEqual(names.slice(0, listed.length));
-      });
-    }
-  }
+  const rows = Object.entries(FAMILIES).flatMap(([family, { names, files }]) => files.map((file) => [file, family, names] as const));
+  describe.each(rows)("%s (%s)", (file, family, names) => {
+    // The script is in the layer that owns the family (`fhir-harness`), a
+    // higher layer a standalone checkout does not hold (bean w1gy F18).
+    const absent = !existsSync(resolve(REPO, file)) && notApplicableAlone(`${file}, in ${file.split("/")[0]}'s checkout (a higher instance)`);
+    test.skipIf(absent)("its fallback list is a newest-first prefix of the known names", () => {
+      const text = readFileSync(resolve(REPO, file), "utf-8");
+      const m = /for p in ((?:"[^"]+"\s*)+); do/.exec(text);
+      expect(m, `${file} writes its list as one \`for p in "…"; do\` literal`).not.toBeNull();
+      const listed = [...m![1]!.matchAll(/"([^"]+)"/g)].map((x) => x[1]!.replace(/\/$/, ""));
+      expect(listed.length).toBeGreaterThanOrEqual(1);
+      expect(listed).toEqual(names.slice(0, listed.length));
+    });
+  });
 });

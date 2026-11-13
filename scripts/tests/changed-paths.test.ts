@@ -184,19 +184,17 @@ describe("FALSIFIER over the real declaration table: no declared input can chang
     : scriptsOf(ROOT);
   const narrow = Object.entries(TASK_IO).filter(([, io]) => io.inputs !== undefined && !io.inputs.includes(TRACKED));
 
-  for (const [check] of narrow) {
-    test(`${check}: each declared file, changed alone, asks it`, () => {
-      const io = pairIO(check)!;
-      const fp = footprintOf(ROOT, scripts, [check], io);
-      if (!("files" in fp)) return; // always asked, or {tracked}: nothing narrow to falsify
-      const files = expandGlobs(ROOT, [...(io.inputs ?? []), ...(io.outputs ?? [])]);
-      expect("files" in files).toBe(true);
-      if (!("files" in files)) return;
-      expect(files.files.length).toBeGreaterThan(0);
-      for (const f of files.files) expect(affects(fp, new Set([f])).affected).toBe(true);
-      for (const f of fp.files) expect(affects(fp, new Set([f])).affected).toBe(true);
-    });
-  }
+  test.each(narrow.map(([check]) => check))("%s: each declared file, changed alone, asks it", (check) => {
+    const io = pairIO(check)!;
+    const fp = footprintOf(ROOT, scripts, [check], io);
+    if (!("files" in fp)) return; // always asked, or {tracked}: nothing narrow to falsify
+    const files = expandGlobs(ROOT, [...(io.inputs ?? []), ...(io.outputs ?? [])]);
+    expect("files" in files).toBe(true);
+    if (!("files" in files)) return;
+    expect(files.files.length).toBeGreaterThan(0);
+    for (const f of files.files) expect(affects(fp, new Set([f])).affected).toBe(true);
+    for (const f of fp.files) expect(affects(fp, new Set([f])).affected).toBe(true);
+  });
 });
 
 describe("patternHits", () => {
