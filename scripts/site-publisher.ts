@@ -106,7 +106,27 @@ export interface Detected {
  * there), while another publisher's root deploy may be a clean one that would
  * delete both.
  */
-export function detectPublisher(workflows: Map<string, string>, publishers: readonly PublisherWorkflows[], prefer?: Publisher): Detected {
+/**
+ * The repository being published, for a publisher it HOSTS rather than calls:
+ * its `owner/repo` and the commit being built.
+ */
+export interface SelfRef {
+  owner: string;
+  repo: string;
+  ref: string;
+}
+
+/** Does this workflow text declare a `workflow_call` trigger (is it a reusable workflow)? */
+export function isReusableWorkflow(text: string): boolean {
+  return /^\s*workflow_call\s*:/m.test(text);
+}
+
+export function detectPublisher(
+  workflows: Map<string, string>,
+  publishers: readonly PublisherWorkflows[],
+  prefer?: Publisher,
+  self?: SelfRef,
+): Detected {
   const kindOf = new Map<string, PublisherWorkflows>();
   for (const p of publishers) for (const w of p.workflows) kindOf.set(w, p);
   const found: Detected[] = [];
@@ -121,6 +141,16 @@ export function detectPublisher(workflows: Map<string, string>, publishers: read
       seen.push(`${caller} → ${u.file}`);
       const p = kindOf.get(u.file);
       if (p) found.push({ kind: p.kind, caller, uses: u });
+    }
+    // The repository that DEFINES a publisher's reusable workflow builds with
+    // it too, though no workflow of its own calls it: smart-base keeps the IG
+    // build (fhirbuild.yml, ghbuild.yml) that every IG calls, so its own
+    // site-publish found no caller and failed on every push from 2026-11-11.
+    // Its `uses` is its own file at the commit being built.
+    const hosted = self ? kindOf.get(caller) : undefined;
+    if (hosted && self && isReusableWorkflow(text)) {
+      seen.push(`${caller} (defined here)`);
+      found.push({ kind: hosted.kind, caller, uses: { owner: self.owner, repo: self.repo, path: `.github/workflows/${caller}`, ref: self.ref, file: caller } });
     }
   }
   const offered = publishers.map((p) => `${p.kind} (${p.workflows.join("/")})`).join(", ");
