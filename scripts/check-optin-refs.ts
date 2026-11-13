@@ -23,7 +23,9 @@
  *
  * A reference is a finding when the skill it names exists in the checkout
  * ONLY inside opt-in sub-graphs, and none of them is the one the referring
- * file sits in. A skill also held outside every opt-in sub-graph, and a name
+ * file sits in or one that sub-graph `requires` (transitively: a
+ * requirement is implied, so it is on wherever the referring file is;
+ * owner, 2026-11-13). A skill also held outside every opt-in sub-graph, and a name
  * no layer holds (`check:tools` / `check:workflow-refs` report that), are
  * not findings here.
  *
@@ -44,6 +46,7 @@ import { join, relative, sep } from "node:path";
 
 import { instanceRootsIn } from "../schemas/kg/cat-harness.js";
 import { groupOf, optInRootsOf, type OptInRoot } from "../schemas/kg/opt-in-roots.js";
+import { declaredOptInRequires, requiredBy, type OptInRequires } from "../schemas/kg/opt-in-subgraphs.js";
 import { discoverTools } from "../tools/discover.js";
 import { isSkillMd, skillMdDirs, workflowFiles } from "./known-skills.js";
 
@@ -92,12 +95,19 @@ export function skillHomes(layers: readonly string[], roots: readonly OptInRoot[
   return out;
 }
 
-/** The opt-in sub-graphs `ref` resolves into from a file in `own`; empty when it is not a finding. */
-export function optInOnly(ref: string, homes: SkillHomes, own: string | undefined): string[] {
+/**
+ * The opt-in sub-graphs `ref` resolves into from a file in `own`; empty when
+ * it is not a finding. A skill held in `own`, or in a sub-graph `own`
+ * requires, is on wherever `own` is.
+ */
+export function optInOnly(ref: string, homes: SkillHomes, own: string | undefined, requires: OptInRequires = new Map()): string[] {
   const name = ref.includes("/") ? ref.slice(ref.indexOf("/") + 1) : ref;
   const home = homes.get(name);
   if (home === undefined || home.alwaysOn || home.groups.size === 0) return [];
-  if (own !== undefined && home.groups.has(own)) return [];
+  if (own !== undefined) {
+    const on = requiredBy(own, requires).add(own);
+    if ([...home.groups].some((g) => on.has(g))) return [];
+  }
   return [...home.groups].sort();
 }
 
@@ -112,6 +122,7 @@ export function checkOptInRefs(checkout: string): { layers: number; tools: numbe
   const layers = instanceRootsIn(checkout);
   const roots = layers.flatMap(optInRootsOf);
   const homes = skillHomes(layers, roots);
+  const requires = declaredOptInRequires(checkout);
   const findings: OptInRefFinding[] = [];
 
   // Always-on Tools only: with nothing switched on, a `tools` graph inside an
@@ -134,7 +145,7 @@ export function checkOptInRefs(checkout: string): { layers: number; tools: numbe
   for (const abs of files) {
     const own = groupOf(abs, roots)?.id;
     for (const ref of new Set(workflowSkillRefs(readFileSync(abs, "utf-8")))) {
-      const groups = optInOnly(ref, homes, own);
+      const groups = optInOnly(ref, homes, own, requires);
       if (groups.length) findings.push({ from: relative(checkout, abs).split(sep).join("/"), kind: "workflow", ref, groups });
     }
   }

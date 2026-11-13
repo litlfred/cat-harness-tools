@@ -18,9 +18,12 @@ import { dirname, join } from "node:path";
 import { CatHarnessDeclarationSchema, ownDirectories, readDeclaration, resolveDirectories } from "../schemas/kg/cat-harness.ts";
 import { clearCheckoutCache, declarationChain, resolveSkillDirs } from "../schemas/kg/harness-config.ts";
 import {
+  closeOverRequires,
   enabledSubgraphs,
   enabledSubgraphsFrom,
   enableSubgraphsProblems,
+  requiredBy,
+  requiresProblems,
   parseSubgraphsEnv,
   SUBGRAPHS_ENV,
   switchedOff,
@@ -211,6 +214,53 @@ describe("an enable id that names nothing opt-in is refused", () => {
     ];
     expect(enableSubgraphsProblems("b", ["a.x-inner"], closure)).toEqual([]);
     expect(enableSubgraphsProblems("b", ["c.x"], closure)[0]?.detail).toContain("needs");
+  });
+});
+
+describe("one sub-graph requires another (owner, 2026-11-13: implied)", () => {
+  // `a` gains `y`, opt-in, which requires `a.x`.
+  const withY = {
+    directories: [...A_DECL.directories, { id: "y", path: "y/", graphTypologies: ["cat-harness"], optIn: true, requires: ["a.x"] }],
+  };
+
+  test("closeOverRequires is transitive and adds only what is required", () => {
+    const req = new Map([["l.c", ["l.b"]], ["l.b", ["l.a"]], ["l.z", ["l.q"]]]);
+    expect([...closeOverRequires(new Set(["l.c"]), req)].sort()).toEqual(["l.a", "l.b", "l.c"]);
+    expect([...closeOverRequires(new Set(["l.a"]), req)]).toEqual(["l.a"]);
+    expect([...requiredBy("l.c", req)].sort()).toEqual(["l.a", "l.b"]);
+    // A cycle ends.
+    expect([...closeOverRequires(new Set(["l.p"]), new Map([["l.p", ["l.r"]], ["l.r", ["l.p"]]]))].sort()).toEqual(["l.p", "l.r"]);
+  });
+
+  test("a folio enabling `a.y` gets `a.x` too: its graphs, skills and Tool", () => {
+    const { b } = checkout({ enableSubgraphs: ["a.y"] }, withY);
+    expect([...enabledSubgraphs(b)].sort()).toEqual(["a.x", "a.y"]);
+    expect(ids(b)).toContain("x-skills");
+    expect(resolveSkillDirs(b).some((d) => d.endsWith("/a/x/skills"))).toBe(true);
+    expect(servedModules(b)).toEqual(["src/at.ts", "src/xt.ts"]);
+  });
+
+  test("the requirement implies one way only: enabling `a.x` does not switch `a.y` on", () => {
+    const { b } = checkout({ enableSubgraphs: ["a.x"] }, withY);
+    expect([...enabledSubgraphs(b)]).toEqual(["a.x"]);
+  });
+
+  test("the schema accepts it; requiresProblems refuses a non-opt-in carrier, an unknown id and itself", () => {
+    expect(CatHarnessDeclarationSchema.safeParse({ $schema: "cat-harness-declaration/1.0.0", version: "0.1.0", ...A_DECL, ...withY }).success).toBe(true);
+    const closure = [{ name: "a", directories: [{ id: "x", optIn: true }, { id: "y", optIn: true }, { id: "api" }] }];
+    expect(requiresProblems("a", [{ id: "y", optIn: true, requires: ["a.x"] }], closure)).toEqual([]);
+    expect(requiresProblems("a", [{ id: "api", requires: ["a.x"] }], closure)[0]?.detail).toContain("not an opt-in sub-graph");
+    expect(requiresProblems("a", [{ id: "y", optIn: true, requires: ["a.api"] }], closure)[0]?.detail).toContain("not an opt-in sub-graph");
+    expect(requiresProblems("a", [{ id: "y", optIn: true, requires: ["c.x"] }], closure)[0]?.detail).toContain("needs");
+    expect(requiresProblems("a", [{ id: "y", optIn: true, requires: ["a.y"] }], closure)[0]?.detail).toContain("itself");
+  });
+
+  test("check:declaration-resolution reports a `requires` that names nothing opt-in", () => {
+    const { parent } = checkout({}, { directories: [...A_DECL.directories, { id: "y", path: "y/", graphTypologies: ["cat-harness"], optIn: true, requires: ["a.api"] }] });
+    const r = checkDeclarationResolution(join(parent, "a"));
+    expect(r.findings.filter((f) => f.subject === "y.requires")).toEqual([
+      expect.objectContaining({ instance: "a", field: "enableSubgraphs", detail: expect.stringContaining("a.api") }),
+    ]);
   });
 });
 

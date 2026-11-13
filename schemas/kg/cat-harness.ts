@@ -457,6 +457,9 @@ export interface ContentDirectory extends GraphNodeDirectory {
   /** A named sub-graph that is OFF in every layer, its own included, unless that layer enables it. See the schema field and `opt-in-subgraphs.ts`. */
   optIn?: true;
 
+  /** Opt-in only: the other opt-in sub-graphs this one requires, qualified; switching it on switches them on. See the schema field and `opt-in-subgraphs.ts`. */
+  requires?: string[];
+
   /**
    * What this directory's content is COMPUTED FROM: the declared directory ids
    * of the graphs whose change can invalidate it, resolved across `needs`
@@ -1923,6 +1926,17 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    * See `schemas/kg/opt-in-subgraphs.ts`.
    */
   optIn: z.literal(true).optional(),
+  /**
+   * Opt-in entries only: the other opt-in sub-graphs this one cannot work
+   * without, each qualified `<instance>.<directory id>` — of this layer or its
+   * `needs` closure (owner, 2026-11-13: cat-harness's `sdlc` requires
+   * `cat-harness.work-plan`, whose skills and processes it uses). IMPLIED:
+   * wherever this sub-graph is switched on, everything it requires is
+   * switched on too, transitively, and a reference from inside it into one it
+   * requires is not dangling (`check:optin-refs`). Top-level entries only.
+   * Checked by `check:declaration-resolution` (`requiresProblems`).
+   */
+  requires: z.array(z.string().min(1)).min(1).optional(),
   /** How this directory's tile looks. See {@link TileSchema}. */
   tile: TileSchema.optional(),
   /**
@@ -5505,8 +5519,8 @@ export function ownDirectoryById(root: string, id: string, fallback: string): st
  */
 export function defaultEnabledSubgraphs(root: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EnabledSubgraphs {
   const mounting = mountScopeFor(root);
-  if (mounting !== undefined) return enabledSubgraphsFrom(declaredEnableSubgraphs(mounting));
-  return enabledSubgraphsFrom(readDeclaration(root, registry)?.enableSubgraphs ?? declaredEnableSubgraphs(root));
+  if (mounting !== undefined) return closeOverRequires(enabledSubgraphsFrom(declaredEnableSubgraphs(mounting)), declaredOptInRequires(mounting));
+  return closeOverRequires(enabledSubgraphsFrom(readDeclaration(root, registry)?.enableSubgraphs ?? declaredEnableSubgraphs(root)), declaredOptInRequires(root));
 }
 
 export function resolveDirectories(
@@ -7752,7 +7766,7 @@ import "./folio-graph-typology.js";
 import { ThemeRefSchema, type ThemeRef } from "../ui/theme";
 import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
 import { projectedRead } from "../sdlc/read-projections";
-import { declaredEnableSubgraphs, enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
+import { closeOverRequires, declaredEnableSubgraphs, declaredOptInRequires, enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
 import { leftOutByMount, mountScopeFor } from "./remote-mount";
 // Layer DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this
