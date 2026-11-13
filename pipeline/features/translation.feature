@@ -492,7 +492,7 @@ Feature: Translation extraction and injection
     Then "$x^2 + y^2 = z^2$" and "$$\int_0^1 f(x)\,dx$$" are not translatable
     And "Let $x > 0$ be positive." is
 
-  @test:pipeline/translation.test.ts::bean_h11k_—_G1:_math_protection_through_extraction_and_injection::table_cell_containing_$|\\psi|^2$_is_not_split_at_the_pipe
+  @test:pipeline/translation.test.ts::bean_h11k_—_G1:_math_protection_through_extraction_and_injection::table_cell_containing_$|\psi|^2$_is_not_split_at_the_pipe
   Scenario: A table cell holding $|\psi|^2$ is not split at the pipe
     Given a table whose cell reads "The norm $|\psi|^2$ vanishes at the boundary"
     When it is extracted

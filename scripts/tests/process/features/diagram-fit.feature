@@ -95,21 +95,21 @@ Feature: A BPMN diagram's layout is checked for fit and tangles, and the fixable
     When the flows are straightened
     Then nothing is fixed
 
-  @test:scripts/tests/process/diagram-fit.test.ts::labels_on_arrows_and_lane_lines_(owner,_2026-10-31:_\"need_to_check_for_text_on_arrows\")::a_label_over_the_flow_leaving_its_own_event,_and_across_a_lane_line,_is_reported
+  @test:scripts/tests/process/diagram-fit.test.ts::labels_on_arrows_and_lane_lines_(owner,_2026-10-31:_"need_to_check_for_text_on_arrows")::a_label_over_the_flow_leaving_its_own_event,_and_across_a_lane_line,_is_reported
   Scenario: A label over its event's outgoing flow and across a lane line is reported
     Given a start event A whose label hangs over its flow F and across the line into the next lane
     When the fit is checked
     Then label-on-edge includes "A/F"
     And label-on-lane-line includes "A/L1"
 
-  @test:scripts/tests/process/diagram-fit.test.ts::labels_on_arrows_and_lane_lines_(owner,_2026-10-31:_\"need_to_check_for_text_on_arrows\")::--write_moves_it_to_a_clear_place_inside_its_lane,_and_the_check_is_then_clean
+  @test:scripts/tests/process/diagram-fit.test.ts::labels_on_arrows_and_lane_lines_(owner,_2026-10-31:_"need_to_check_for_text_on_arrows")::--write_moves_it_to_a_clear_place_inside_its_lane,_and_the_check_is_then_clean
   Scenario: Placing labels moves a bad one inside its lane and the check is clean
     Given the same diagram and A's drawn label
     When the labels are placed
     Then A is moved, and its label lies within lane One (y 0 to 100)
     And there are no label-on-edge, label-on-lane-line or label-on-shape findings
 
-  @test:scripts/tests/process/diagram-fit.test.ts::labels_on_arrows_and_lane_lines_(owner,_2026-10-31:_\"need_to_check_for_text_on_arrows\")::a_label_already_clear_is_left_where_it_is
+  @test:scripts/tests/process/diagram-fit.test.ts::labels_on_arrows_and_lane_lines_(owner,_2026-10-31:_"need_to_check_for_text_on_arrows")::a_label_already_clear_is_left_where_it_is
   Scenario: A clear label is not moved
     Given a start event whose label sits clear beside it
     When the labels are placed

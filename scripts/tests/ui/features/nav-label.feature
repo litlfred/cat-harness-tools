@@ -109,7 +109,7 @@ Feature: Navigation labels come from one source
     Then it is labelled "Schemas" on both
     And on the subject page it links "../" and carries no qualifier
 
-  @test:scripts/tests/ui/nav-label.test.ts::a_handler_viewer's_whole-view_row_is_one_more_destination::\"all\"_only_when_no_namer_is_given
+  @test:scripts/tests/ui/nav-label.test.ts::a_handler_viewer's_whole-view_row_is_one_more_destination::"all"_only_when_no_namer_is_given
   Scenario: The whole-view row is "all" only without a namer
     When the subject section's first row is built on subject page "a" with no namer
     Then it is labelled "all" and links "../"
