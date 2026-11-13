@@ -44,17 +44,15 @@ Feature: Lean declaration starts come from one lexer
     When this layer's non-test .ts files outside node_modules are listed
     Then there are more than 200
 
-  @test:scripts/tests/lean-decl-starts-are-shared.test.ts::there_is_exactly_one_declaration_pattern::neither_converged_module_carries_a_local_pattern_any_more
-  Scenario: qa-checkers-q-usage carries no local declaration pattern
+  @test:scripts/tests/lean-decl-starts-are-shared.test.ts::there_is_exactly_one_declaration_pattern::no_module_outside_the_canonical_one_carries_a_local_pattern_any_more
+  Scenario: No module but the canonical lexer carries a local declaration pattern
     When the files whose code lines hold a theorem|lemma|def alternation are found
-    Then pipeline/qa-checkers-q-usage.ts is not among them
-    # Gap: can never fail — qa-checkers-q-usage.ts is no longer in this repository (moved to folio-assistant-sci), so it can never be found.
+    Then none of them is other than pipeline/lean-lexer.ts
 
-  @test:scripts/tests/lean-decl-starts-are-shared.test.ts::there_is_exactly_one_declaration_pattern::TWO_other_modules_here_still_carry_their_own,_and_the_list_may_only_shrink
+  @test:scripts/tests/lean-decl-starts-are-shared.test.ts::there_is_exactly_one_declaration_pattern::no_other_module_here_carries_its_own,_and_the_list_may_only_shrink
   Scenario: Only the canonical lexer carries a declaration pattern
     When the files whose code lines hold a theorem|lemma|def alternation are found
     Then they are exactly pipeline/lean-lexer.ts
-    # Gap: the title says TWO other modules still carry their own pattern; the body asserts the opposite, that none but the canonical lexer does.
 
   @test:scripts/tests/lean-decl-starts-are-shared.test.ts::there_is_exactly_one_declaration_pattern::...and_it_is_used_from_outside,_so_the_rule_is_not_vacuous
   Scenario: The canonical declarationStarts is used from outside its module

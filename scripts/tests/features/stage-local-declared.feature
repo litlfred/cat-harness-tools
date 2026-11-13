@@ -47,6 +47,5 @@ Feature: Staging a site from its declared recipe
 
   @test:scripts/tests/stage-local-declared.test.ts::stageDeclared_--plan::--artifact_is_refused_rather_than_ignored
   Scenario: --artifact is refused
-    # Gap: MAY NEVER FAIL: the `rejects.toThrow` assertion is not awaited, so the test returns before the promise settles and a resolution would not fail it.
     When the declared stage is run with --artifact
     Then it rejects with "--artifact"

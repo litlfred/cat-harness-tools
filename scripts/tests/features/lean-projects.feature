@@ -78,7 +78,6 @@ Feature: Lean projects in the folio
 
   @test:scripts/tests/lean-projects.test.ts::Paper_package:_%s_(lib:_%s)::no_.lake/_artifacts_tracked_in_git
   Scenario: No .lake/ build artifacts are tracked in git
-    # Gap: can never fail: the assertion sits inside a try whose catch swallows every error, the failed expectation included
     Given a folio is attached and a registered paper package
     When git lists the tracked files under its Lake root's .lake/
-    Then the list is empty
+    Then the list is empty, and only git being unavailable is tolerated

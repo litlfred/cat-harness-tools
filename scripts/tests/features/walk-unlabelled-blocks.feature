@@ -29,9 +29,3 @@ Feature: Walking unlabelled prose blocks
   @test:scripts/tests/walk-unlabelled-blocks.test.ts::walkBlocks:_unlabelled_prose::readUnlabelledBlockManifest_declines_a_non-manifest
   Scenario: The unlabelled reader declines a non-manifest
     Then reading the script and a missing file as unlabelled manifests gives nothing
-
-  @test:scripts/tests/walk-unlabelled-blocks.test.ts::walkBlocks:_unlabelled_prose::cleanup
-  Scenario: The fixture is removed
-    # Gap: CAN NEVER FAIL. A cleanup step written as a test; its only assertion is that true is true.
-    When the fixture directory is removed
-    Then true is true

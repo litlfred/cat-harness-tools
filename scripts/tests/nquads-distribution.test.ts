@@ -154,7 +154,7 @@ describe("W3C N-Quads Distribution & Named Query Engine", () => {
     expect(res.rows[0].title).toBe("Global Health Catalogue");
 
     // 2. Graph Availability Guard refusal on missing required subgraph
-    expect(
+    await expect(
       executeNamedQuery({
         dataset: dir,
         queryName: "query-missing-graph",

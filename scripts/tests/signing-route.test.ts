@@ -6,8 +6,9 @@
  * because the policy is an editor's to change; these tests pin the two
  * properties that are NOT policy:
  *
- *  1. **the API row is unique** — reachable from exactly one combination of
- *     facts, and both facts are load-bearing;
+ *  1. **the API row is unique** — reachable only with an endpoint configured
+ *     and reach `internet` or `egress-restricted`, and both facts are
+ *     load-bearing;
  *  2. **every other combination routes to a person**, including `unknown` and
  *     including values not yet in the table.
  *
@@ -41,7 +42,7 @@ describe("the signing route table", () => {
     expect(possibleOutcomes(await table()).sort()).toEqual(["api", "human"]);
   });
 
-  test("the API is reached from exactly one combination of facts", async () => {
+  test("the API is reached only from internet or egress-restricted reach with an endpoint configured", async () => {
     const t = await table();
     const api: string[] = [];
     for (const reach of REACHES) {
