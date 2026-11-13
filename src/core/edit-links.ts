@@ -521,7 +521,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     ".fa-suggest-status{color:#5b6770;font-size:.9rem;margin:.25rem .75rem}",
     ".fa-suggest-status:empty{display:none}",
     ".fa-suggest-editor{flex:1;min-height:8rem;overflow:auto;margin:0}",
-    ".fa-suggest-editor textarea{width:100%;height:100%;min-height:12rem;box-sizing:border-box;font-family:ui-monospace,monospace;font-size:.9rem;border:0;padding:.75rem;resize:none}",
+    ".fa-suggest-editor textarea{width:100%;height:100%;min-height:12rem;box-sizing:border-box;font-family:var(--fa-font-mono,Menlo,Consolas,monospace);font-size:.9rem;border:0;padding:.75rem;resize:none}",
     "dialog.fa-suggest .milkdown .ProseMirror{padding:.75rem 1rem}",
     "dialog.fa-suggest .ProseMirror a{text-decoration-style:dotted}",
     "ins.fa-sg-ins,.fa-sg-ins-block{color:#0b6b2a;background:#e6f4ea;text-decoration:underline 3px;text-underline-offset:3px}",

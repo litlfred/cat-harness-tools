@@ -287,7 +287,7 @@ function loginPage(error?: string): Response {
   <style>
     :root { --bg: #0d1117; --fg: #e6edf3; --card: #161b22; --border: #30363d; --ac: #58a6ff; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
            background: var(--bg); color: var(--fg); min-height: 100vh;
            display: flex; align-items: center; justify-content: center; }
     .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;

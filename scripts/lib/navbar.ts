@@ -474,7 +474,7 @@ export function navbarCss(): string {
     `body{padding-left:${NAV_COLLAPSED_PX}px}`,
     `.fa-nav{position:fixed;top:0;left:0;bottom:0;width:${NAV_COLLAPSED_PX}px;z-index:2147483000;`,
     `background:var(--fa-nav-bg);color:var(--fa-nav-ink);overflow:hidden;transition:width .14s ease;`,
-    `font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}`,
+    `font:14px/1.5 var(--fa-font-sans,system-ui,sans-serif)}`,
     `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_PX}px)}`,
     `.fa-nav:not(:hover):not(:has(:focus-visible)):not(:has(.fa-nav-open:checked)) .fa-glass-handle__label{opacity:0}`,
     `@media(min-width:${NAV_STRIP_MQ_PX}px){`,
@@ -679,7 +679,7 @@ function railTipCss(): string[] {
     `.fa-nav [data-fa-tip]::after{content:attr(data-fa-tip);content:attr(data-fa-tip) / "";`,
     `position:fixed;left:${at(NAV_COLLAPSED_PX)};z-index:2147483001;padding:4px 8px;border-radius:4px;`,
     `background:#1f2328;color:#ffffff;border:1px solid #58a6ff;box-shadow:0 2px 8px rgba(0,0,0,.35);`,
-    `font:600 13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;`,
+    `font:600 13px/1.3 var(--fa-font-sans,system-ui,sans-serif);`,
     `letter-spacing:normal;text-transform:none;white-space:nowrap;pointer-events:none;`,
     // `opacity` alone, not `visibility`: the rail is CLOSED, never hidden, and
     // `navbar.test.ts` holds this stylesheet to carrying no `visibility:hidden`

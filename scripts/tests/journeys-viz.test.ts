@@ -770,11 +770,12 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(js).toContain('location.protocol === "file:"');
     expect(js).toContain("jp-json-open");
   });
-  test("the font is vendored and copied as bytes, with its licence", () => {
-    const woff = files.find((f) => f.path === "assets/fonts/PlusJakartaSans-Bold.woff2");
-    expect(woff?.content).toBeInstanceOf(Uint8Array);
-    expect(files.some((f) => f.path === "assets/fonts/OFL.txt")).toBe(true);
-    expect(at("assets/present.css")).toContain('src: url("fonts/PlusJakartaSans-Bold.woff2") format("woff2")');
+  test("no font is shipped: the slides use the system's own (owner, 2026-11-12)", () => {
+    expect(files.some((f) => f.path.startsWith("assets/fonts/"))).toBe(false);
+    const css = at("assets/present.css");
+    expect(css).not.toContain("@font-face");
+    expect(css).toContain("--sans: system-ui,");
+    expect(css).toContain("--mono: ui-monospace,");
   });
 });
 

@@ -50,7 +50,7 @@ function page(title: string, body: string): string {
   @media (prefers-color-scheme: dark) { :root { --fg: #e6edf3; --bg: #0d1117; --muted: #8d96a0; --line: #30363d; --link: #58a6ff; } }
   body { font: 16px/1.6 system-ui, sans-serif; color: var(--fg); background: var(--bg); max-width: 50rem; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
   a { color: var(--link); }
-  code, pre { font-family: ui-monospace, monospace; font-size: 0.92em; }
+  code, pre { font-family: var(--fa-font-mono,Menlo,Consolas,monospace); font-size: 0.92em; }
   pre { overflow-x: auto; padding: 0.75rem; border: 1px solid var(--line); border-radius: 6px; }
   table { border-collapse: collapse; display: block; overflow-x: auto; }
   th, td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; text-align: left; vertical-align: top; }

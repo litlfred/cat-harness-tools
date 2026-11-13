@@ -158,7 +158,7 @@ export interface StagingFacts {
 }
 
 const CHIP =
-  "font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:rgba(0,0,0,.22);color:#fff;padding:1px 6px;border-radius:3px";
+  "font-family:var(--fa-font-mono,Menlo,Consolas,monospace);background:rgba(0,0,0,.22);color:#fff;padding:1px 6px;border-radius:3px";
 
 /** A `preview` build's banner: muted sage, 5.63:1 against white (see below). */
 export const PREVIEW_BACKGROUND = "#4F6F52";
@@ -188,7 +188,7 @@ export const RELEASE_BACKGROUND = "#6B3FA0";
  * convey was invisible to exactly the readers using the default theme.
  */
 const BANNER_STYLE =
-  `background:${PREVIEW_BACKGROUND};color:#fff;padding:8px 16px;font-size:14px;text-align:center;position:fixed;top:0;left:0;right:0;box-sizing:border-box;z-index:2147483001;font-family:system-ui`;
+  `background:${PREVIEW_BACKGROUND};color:#fff;padding:8px 16px;font-size:14px;text-align:center;position:fixed;top:0;left:0;right:0;box-sizing:border-box;z-index:2147483001;font-family:var(--fa-font-sans,system-ui,sans-serif)`;
 
 /**
  * The banner must PUSH THE FIXED SIDEBAR DOWN, not sit on top of it.

@@ -280,7 +280,7 @@ html[data-fa-scheme="light"] .lib-page {
 .lib-page th[aria-sort="descending"] button::after { content:" ▼"; }
 .lib-page td.num { text-align:right; font-variant-numeric:tabular-nums; }
 .lib-page tbody tr:hover { background:var(--panel); }
-.lib-page .slug { font-family:ui-monospace, Menlo, monospace; }
+.lib-page .slug { font-family:var(--fa-font-mono,Menlo,Consolas,monospace); }
 /* A row's secondary links -- source, README, a referenced entry's own -- are
    24 px targets (WCAG 2.5.8). As plain inline text they were 16 px tall and
    sat closer than 24 px to the title link beside them. */
