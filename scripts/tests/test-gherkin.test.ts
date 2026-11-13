@@ -73,6 +73,36 @@ describe("language adapters", () => {
     ]);
   });
 
+  test("kotlin: a quote inside a backtick name is part of the name, and the class scope survives it", () => {
+    const src = [
+      "class VectorsTest {",
+      "    @Test fun `the vector's kid is the DSC's`() { val c = '{' }",
+      "    @Test fun `the guide's DSC`() {}",
+      "    @Test fun plain() {}",
+      "}",
+    ].join("\n");
+    expect(names(KOTLIN_ADAPTER.findTests("app/VectorsTest.kt", src))).toEqual([
+      "app/VectorsTest.kt::VectorsTest::the_vector's_kid_is_the_DSC's",
+      "app/VectorsTest.kt::VectorsTest::the_guide's_DSC",
+      "app/VectorsTest.kt::VectorsTest::plain",
+    ]);
+  });
+
+  test("js: a file that declares @test-runner is read, and each call of its runner is a test", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-gherkin-runner-"));
+    const suite = [
+      "// @test-runner run",
+      "export function runSuite(h) {",
+      "  const run = (name, body) => body();",
+      '  run("decodes the vector", () => true);',
+      "  for (const k of keys) run(`cross[${k}]`, () => true);",
+      "}",
+    ].join("\n");
+    writeFileSync(join(root, "suite.ts"), suite);
+    writeFileSync(join(root, "helper.ts"), 'const run = (n) => n;\nrun("not a test");\n');
+    expect(names(scanTree(root).tests)).toEqual(["suite.ts::decodes_the_vector", "suite.ts::cross[${k}]"]);
+  });
+
   test("js: test() and it() are named through describe() titles, whitespace as _", () => {
     const src = [
       'import { describe, test } from "bun:test";',

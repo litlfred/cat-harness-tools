@@ -739,3 +739,50 @@ Feature: Each health check fires on the evidence that breaches it, and is unknow
     Given a family row "cat/x/auto-docs/"
     When its members are found on a remote holding only "main"
     Then there are no members and nothing is resolved
+
+  @test:test/health/checks.test.ts::lsi-indexes_(cat-harness#1144:_the_LSI_page's_health_half)::every_needed_index_fresh_is_ok;_another_repository_is_not_applicable;_an_unread_store_is_unknown
+  Scenario: The LSI index check is ok when every needed index is fresh, not applicable without evidence, unknown when unread
+    Given LSI index evidence where one graph passes and one is not applicable
+    When the lsi-indexes check runs
+    Then its state is "ok"
+    And with no LSI index evidence in the context, its reason says "not applicable"
+    And with the store unread, its state is "unknown"
+
+  @test:test/health/checks.test.ts::lsi-indexes_(cat-harness#1144:_the_LSI_page's_health_half)::the_probe_reads_nothing_for_a_repository_that_is_not_the_harness
+  Scenario: The LSI index probe reads nothing for a repository that is not the harness
+    When the LSI indexes are probed for "/some/other/instance" with the harness at "/the/harness"
+    Then the evidence is "absent"
+
+  @test:test/health/checks.test.ts::lsi-indexes_(cat-harness#1144:_the_LSI_page's_health_half)::a_needed_index_that_is_missing_or_stale_is_a_minor_finding_naming_the_command_that_builds_it
+  Scenario: A missing or stale LSI index is a minor finding naming the command that builds it
+    Given LSI index evidence where graph g0 passes, g1 fails and g2 is not applicable, and g0 has 5 near-duplicate pairs
+    When the lsi-indexes check runs
+    Then its state is "finding" with one minor finding
+    And the finding's action names "bun run cat lsi index --instance inst --graph g1"
+    And the "lsi-graphs-needing-index" measurement is 2
+    And the "lsi-near-duplicate-pairs:inst/g0" measurement is 5
+    And the result parses against the health check result schema
+
+  @test:test/health/checks.test.ts::library-keywords_(cat-harness#1144)::every_entry_with_keywords_and_no_legacy_file_is_ok;_no_probe_is_not_applicable;_an_error_is_unknown
+  Scenario: The library keywords check is ok when every entry has keywords and no legacy file, not applicable without evidence, unknown on error
+    Given library keywords evidence of two entries with 12 and 3 keywords and no legacy file
+    When the library-keywords check runs
+    Then its state is "ok"
+    And with no library keywords evidence in the context, its reason says "not applicable"
+    And with unknown evidence, its state is "unknown"
+
+  @test:test/health/checks.test.ts::library-keywords_(cat-harness#1144)::an_entry_with_no_keywords_and_a_committed_keywords.json_are_separate_minor_findings_naming_the_entries
+  Scenario: An entry with no keywords and a committed keywords.json are separate minor findings naming the entries
+    Given library keywords evidence where "lib/e0" has keywords, "lib/e1" has none and "lib/e2" has a legacy file
+    When the library-keywords check runs
+    Then its state is "finding"
+    And the findings are "library-keywords-entries-without" then "library-keywords-legacy-files", both minor
+    And the first names "lib/e1" and the second names "lib/e2"
+    And the result parses against the health check result schema
+
+  @test:test/health/checks.test.ts::library-keywords_(cat-harness#1144)::the_probe:_no_library_is_absent,_a_throw_is_unknown
+  Scenario: The library keywords probe reports no library as absent and a throw as unknown
+    When the library keywords are probed and the reader finds no libraries
+    Then the evidence is "absent"
+    When the library keywords are probed and the reader throws
+    Then the evidence is "unknown"

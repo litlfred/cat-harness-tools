@@ -156,3 +156,26 @@ Feature: Every library entry has its own IRI
     Given the built library projection
     Then the smart-base/smart-trust entry has rung referenced and title "WHO SMART Trust"
     And its links are the published IG and the artefact index at /smart-trust/
+
+  @test:scripts/tests/library/library-entry-iri.test.ts::the_shell_template::declares_its_entry_in_RDFa_and_a_JSON-LD_stub,_with_no_private_config_block_(issue_#1830)
+  Scenario: An entry shell declares its entry in RDFa and a JSON-LD stub, with no private config block
+    Given the entry shell for "smart-trust" in the "smart-base" library
+    Then its page node has no problems
+    And its first RDFa IRI is the library asset IRI of smart-base/smart-trust
+    And it holds no "application/json" script block
+    And the "smart-base" library's own page declares no page node
+
+  @test:scripts/tests/library/library-entry-iri.test.ts::the_shell_template::the_entry_IRI_is_extensionless_kind/id;_its_JSON-LD_and_stub_sit_beside_it_(Q-THIN-6_B)
+  Scenario: The entry IRI is an extensionless kind/id, with its JSON-LD and stub beside it
+    Given the library asset IRI of smart-base/smart-trust
+    Then it is the docs site followed by "assets/library/jsonld/smart-base/source/smart-trust"
+    And its asset site path is the same path ending ".jsonld"
+    And its stub site path is the same path ending ".html"
+    And the IRI holds no "#" or "?"
+
+  @test:scripts/tests/library/library-entry-iri.test.ts::the_committed_tree:_one_materialized_shell_per_entry::a_shell_whose_entry_holds_no_manifest_names_no_alternate
+  Scenario: A committed shell whose entry holds no manifest names no alternate
+    # Skipped: when the library projection index has not been built
+    Given every entry in the published library projection that holds no manifest
+    When the shell at its library instance and id is read
+    Then it declares no alternate JSON-LD

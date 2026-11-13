@@ -234,12 +234,10 @@ describe.skipIf(NO_IGS)("fhir-artifact-index — a viewer inside a COMPOSED dire
   // <visualizer>/<sub-graph>").
   // Not smart-immunizations: it declares no directories in this index since
   // the owner's B1 ruling (2026-10-15, `directories: []`).
-  for (const name of ["smart-trust", "smart-base"]) {
-    it(`${name}'s fhir-artifact-index tile links its declared route, which opens its IG site's artifacts page`, () => {
-      const h = harnesses.find((x) => x.name === name);
-      expect(h, `${name} is not in the report`).toBeDefined();
-      const v = (h!.visualisations ?? []).find((x) => x.kind === "fhir-artifact-index");
-      expect(v?.path).toBe(`/smart-base/artifact-index/${name}/`);
-    });
-  }
+  it.each(["smart-trust", "smart-base"])("%s's fhir-artifact-index tile links its declared route, which opens its IG site's artifacts page", (name) => {
+    const h = harnesses.find((x) => x.name === name);
+    expect(h, `${name} is not in the report`).toBeDefined();
+    const v = (h!.visualisations ?? []).find((x) => x.kind === "fhir-artifact-index");
+    expect(v?.path).toBe(`/smart-base/artifact-index/${name}/`);
+  });
 });

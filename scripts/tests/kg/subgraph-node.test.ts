@@ -42,11 +42,9 @@ export const PUBLISHED = [
 ] as const;
 
 describe("the IRI is the one kg-export mints the node under", () => {
-  for (const id of ["todos", "beans", "a b", "x#y", "p/q"]) {
-    test(JSON.stringify(id), () => {
-      expect(subgraphIri("https://e.org/i.jsonld", id)).toBe(makeIri("https://e.org/i.jsonld", "directory", id));
-    });
-  }
+  test.each(["todos", "beans", "a b", "x#y", "p/q"])("%p", (id) => {
+    expect(subgraphIri("https://e.org/i.jsonld", id)).toBe(makeIri("https://e.org/i.jsonld", "directory", id));
+  });
 });
 
 describe("the check catches each way of getting it wrong", () => {

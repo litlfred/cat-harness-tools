@@ -561,15 +561,13 @@ describe("a msgid does not depend on where the author pressed return (`lvk9`)", 
     ],
   ];
 
-  for (const [name, unwrapped, wrapped] of CASES) {
-    it(name, () => {
-      const a = extractMarkdown(unwrapped, "x").map((e) => `${e.kind}:${e.msgid}`);
-      const b = extractMarkdown(wrapped, "x").map((e) => `${e.kind}:${e.msgid}`);
-      expect(a).toEqual(b);
-      // Anti-vacuity: equal-and-empty would satisfy the above.
-      expect(a.length).toBeGreaterThan(0);
-    });
-  }
+  it.each(CASES)("%s: the wrapped and unwrapped forms extract the same messages", (_name, unwrapped, wrapped) => {
+    const a = extractMarkdown(unwrapped, "x").map((e) => `${e.kind}:${e.msgid}`);
+    const b = extractMarkdown(wrapped, "x").map((e) => `${e.kind}:${e.msgid}`);
+    expect(a).toEqual(b);
+    // Anti-vacuity: equal-and-empty would satisfy the above.
+    expect(a.length).toBeGreaterThan(0);
+  });
 
   it("an UNINDENTED following line is a new paragraph, not a continuation", () => {
     // The over-merge this fix had to avoid. The rule used to SIZE the defect

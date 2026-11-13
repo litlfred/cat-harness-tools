@@ -16,11 +16,9 @@ function resolved(name: string): string[] {
 }
 
 describe("dependency advisory floors (bean d3vq)", () => {
-  for (const [name, floor] of [["undici", "6.29.1"], ["zod", "4.6.6"]] as const) {
-    test(`every resolved ${name} is >= ${floor}`, () => {
-      const versions = resolved(name);
-      expect(versions.length).toBeGreaterThan(0);
-      expect(versions.filter((v) => Bun.semver.order(v, floor) < 0)).toEqual([]);
-    });
-  }
+  test.each([["undici", "6.29.1"], ["zod", "4.6.6"]] as const)("every resolved %s is >= %s", (name, floor) => {
+    const versions = resolved(name);
+    expect(versions.length).toBeGreaterThan(0);
+    expect(versions.filter((v) => Bun.semver.order(v, floor) < 0)).toEqual([]);
+  });
 });
