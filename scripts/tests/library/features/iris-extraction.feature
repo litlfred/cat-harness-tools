@@ -53,3 +53,11 @@ Feature: IRIS extraction quality
     Given an entry with a footnotes file
     Then the requirement is met
     And a file naming another entry is unmet
+
+  @test:scripts/tests/library/iris-extraction.test.ts::how_an_oversized_section_was_cut::every_way_pdf-structure.py_reports_is_one_the_schema_accepts
+  Scenario: Every way pdf-structure.py reports an oversized cut is one the schema accepts
+    # Gap: the Python is not run; the "by" values are read from its source text
+    Given the source of "pdf-structure.py"
+    When every "by = ..." value it writes is collected
+    Then they are exactly "headings", "pages" and "running heads"
+    And an oversized_split entry with each of them passes the PDF diagnostics schema

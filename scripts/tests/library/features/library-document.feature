@@ -83,3 +83,36 @@ Feature: The document view of a library entry
     Given a section with a heading and a Markdown table with a delimiter row, bold text and an escaped pipe
     When it is made plain and its whitespace collapsed
     Then the delimiter row is gone and each row reads as its cells joined by "; "
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::a_figure_with_its_WebP_on_disk_is_shown_with_every_language;_others_are_not
+  Scenario: Only a figure whose WebP is on disk is shown, with every language of its narrative
+    Given an entry listing a figure WebP that is on disk, a decorative PNG, and a figure WebP that is not on disk
+    When the entry's document view is read
+    Then its images are only "img-p002-1"
+    And that image's narratives are "A bar chart." in en and "Un graphique." in fr
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::a_table's_cells_come_from_its_CSV,_header_row_dropped,_quotes_and_newlines_kept
+  Scenario: A table's cells come from its CSV, header row dropped, quotes and newlines kept
+    Given an entry whose table-1.csv has a header row, a quoted cell with a comma and doubled quotes, and a cell with a newline
+    When the entry's document view is read
+    Then the table's rows are 'a, "quoted"' and "2", then "x" and "two" newline "lines"
+    And its first column is titled "A" in group "G"
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::a_withheld_entry_shows_neither
+  Scenario: A withheld entry shows neither figures nor tables
+    Given the same entry with figures and tables on disk
+    When its document view is read as withheld
+    Then it has no images and no tables
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::the_view_the_generator_writes,_with_figures_and_tables,_is_one_the_schema_accepts
+  Scenario: The view the generator writes, with figures and tables, passes the strict document schema
+    Given the same entry, read with repository links
+    When its document view is round-tripped through JSON and checked against the library document schema
+    Then it has one image and one table
+    And the schema reports no issues
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::the_site_copies_exactly_the_files_the_page_shows
+  Scenario: The site copies exactly the files the page shows
+    Given the same entry
+    When its figure files are listed
+    Then they are "images/img-p002-1.webp" and "tables/table-1.csv"
