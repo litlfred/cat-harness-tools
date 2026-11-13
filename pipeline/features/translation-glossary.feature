@@ -156,11 +156,17 @@ Feature: Translation glossary consistency
     And it contains the table row "| `inconsistent` | Actor |"
     And it contains "No findings."
 
-
   @test:pipeline/translation-glossary.test.ts::a_declared_`catalogues`_pattern_(a_smart-base_IG's_input/<area>/translations/<locale>.po)::the_pattern's_files_are_the_locale's_catalogues,_and_its_locales_are_the_layer's
-  Scenario: TODO-SCENARIO the pattern's files are the locale's catalogues, and its locales are the layer's
-    # TODO-STEPS pipeline/translation-glossary.test.ts:327
+  Scenario: A declared catalogues pattern's files are the locale's catalogues
+    Given layer "acme" whose translations directory declares catalogues "input/*/translations/{locale}.po"
+    And fr catalogues under "input/pagecontent" and "input/images", an es catalogue and a .pot template
+    Then the layer's catalogue pattern is "input/*/translations/{locale}.po"
+    And the pattern's catalogues are images es.po as "es", images fr.po as "fr" and pagecontent fr.po as "fr", without the .pot
+    When the fr locale is checked against the glossary fixing "Health worker" as "Agent de santé"
+    Then the only finding is "not-fixed-rendering" for "Health worker" in "input/pagecontent/translations/fr.po"
 
   @test:pipeline/translation-glossary.test.ts::a_declared_`catalogues`_pattern_(a_smart-base_IG's_input/<area>/translations/<locale>.po)::without_the_field,_only_translations/<locale>/_is_read
-  Scenario: TODO-SCENARIO without the field, only translations/<locale>/ is read
-    # TODO-STEPS pipeline/translation-glossary.test.ts:341
+  Scenario: Without the catalogues field, only translations/<locale>/ is read
+    Given the same layer with the catalogues field removed
+    Then the layer has no catalogue pattern
+    And checking the fr locale finds nothing, so the pagecontent catalogue is not read

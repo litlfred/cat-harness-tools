@@ -127,8 +127,3 @@ Feature: Writer cone records
   Scenario: A kept index is found at its own commit
     Then an index kept at "kept-at" is found there
     And anything else is found at the records' own commit
-
-
-  @test:scripts/tests/writer-cone.test.ts::writerRecordOf_and_decideWriter::a_directory_only_opened_is_recorded_as_"dir":_a_new_entry_keeps_the_skip,_a_listed_one's_new_entry_does_not_(tools#1265)
-  Scenario: TODO-SCENARIO a directory only opened is recorded as "dir": a new entry keeps the skip, a listed one's new entry does not (tools#1265)
-    # TODO-STEPS scripts/tests/writer-cone.test.ts:198

@@ -33,15 +33,21 @@ Feature: Relaxations of processes in opt-in groups
     When a relaxation of "Process_Gone" is validated
     Then it throws an error mentioning "not a process here"
 
-
   @test:test/workflow-policy-opt-in.test.ts::relaxations_of_processes_in_opt-in_groups::group_switched_off_but_on_disk:_legal,_and_INACTIVE_rather_than_an_error
-  Scenario: TODO-SCENARIO group switched off but on disk: legal, and INACTIVE rather than an error
-    # TODO-STEPS test/workflow-policy-opt-in.test.ts:41
+  Scenario: A legal relaxation of a process whose group is switched off is inactive, not an error
+    Given process "Process_Editing" on disk and no unseen groups
+    When a relaxation of "Task_SmeReview" is validated
+    Then nothing is returned as undetermined
+    And with no active processes the relaxation is reported as inactive
 
   @test:test/workflow-policy-opt-in.test.ts::relaxations_of_processes_in_opt-in_groups::group_switched_on:_active
-  Scenario: TODO-SCENARIO group switched on: active
-    # TODO-STEPS test/workflow-policy-opt-in.test.ts:47
+  Scenario: A relaxation of a process in a switched-on group is active
+    Given a relaxation of "Process_Editing" "Task_SmeReview"
+    When inactive relaxations are found with "Process_Editing" active
+    Then none is reported
 
   @test:test/workflow-policy-opt-in.test.ts::relaxations_of_processes_in_opt-in_groups::undetermined_is_not_also_inactive
-  Scenario: TODO-SCENARIO undetermined is not also inactive
-    # TODO-STEPS test/workflow-policy-opt-in.test.ts:52
+  Scenario: An undetermined relaxation is not also reported inactive
+    Given a relaxation of "Process_Editing" "Task_SmeReview" that is undetermined
+    When inactive relaxations are found with no active processes
+    Then none is reported

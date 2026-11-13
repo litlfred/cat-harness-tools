@@ -425,23 +425,37 @@ Feature: The CI cone skips a check only when everything its green run read is un
     When it is "one" again and the plugin is edited
     Then the test runs
 
-
   @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::every_check_is_a_candidate,_declared_in_task-io_or_not_(owner,_2026-11-13:_every_gate)
-  Scenario: TODO-SCENARIO every check is a candidate, declared in task-io or not (owner, 2026-11-13: every gate)
-    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:521
+  Scenario: A check with no input declaration, or none naming the tracked set, is still recorded and skipped
+    # Skipped: where strace cannot run
+    Given the fixture check "x:check", with no task-io declaration and then with one declaring only empty outputs
+    When it is recorded on main for each
+    Then it exits 0 and the note contains "recorded"
+    And the check skips
 
   @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::an_undeclared_check_still_runs_when_a_path_it_read_changed
-  Scenario: TODO-SCENARIO an undeclared check still runs when a path it read changed
-    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:533
+  Scenario: An undeclared check still runs when a path it read changed
+    # Skipped: where strace cannot run
+    Given the fixture check "x:check" with no task-io declaration, recorded on main
+    And the check skips
+    When "data/c.json", read only because "data/a.json" names it, is changed
+    Then the check runs
 
   @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::a_push_to_main_records
-  Scenario: TODO-SCENARIO a push to main records
-    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:834
+  Scenario: A push to main records
+    Given the event "push" on "refs/heads/main"
+    Then the run records
 
   @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::a_dispatch_on_main_records_too:_a_train's_merge_starts_no_push_run_(bean_hd58)
-  Scenario: TODO-SCENARIO a dispatch on main records too: a train's merge starts no push run (bean hd58)
-    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:837
+  Scenario: A workflow dispatch on main records too
+    Given the event "workflow_dispatch" on "refs/heads/main"
+    Then the run records
 
   @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::nothing_else_records:_a_dispatch_on_another_branch,_a_PR,_a_merge_group
-  Scenario: TODO-SCENARIO nothing else records: a dispatch on another branch, a PR, a merge group
-    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:840
+  Scenario: No other run records
+    Given a workflow dispatch on "refs/heads/repin-train/x"
+    Or a pull request on "refs/pull/1/merge"
+    Or a merge group on "refs/heads/gh-readonly-queue/main/x"
+    Or a push to "refs/heads/feature"
+    Or an empty environment
+    Then the run does not record

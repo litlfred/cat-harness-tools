@@ -376,7 +376,10 @@ Feature: Input-site audit, runtime trace and the fingerprint's refusals
     Then it is true
     And for a git spawn it is false
 
-
   @test:scripts/tests/input-sites.test.ts::annotations_hold_to_the_data_that_chooses_their_targets::every_Tool's_in-process_registrar_is_a_module_tool-api's_`declared_tool-registrars`_names
-  Scenario: TODO-SCENARIO every Tool's in-process registrar is a module tool-api's `declared tool-registrars` names
-    # TODO-STEPS scripts/tests/input-sites.test.ts:399
+  Scenario: Every Tool's in-process registrar is listed by the tool-registrars declaration
+    Given every Tool in every instance root with an MCP invocation and an in-process module
+    When the module is resolved as tool-api's MCP tool list resolves it
+    Then the "tool-registrars" declaration lists modules
+    And each resolved module is one it names
+    And scripts/tool-api.ts carries a "declared" annotation with source "tool-registrars"

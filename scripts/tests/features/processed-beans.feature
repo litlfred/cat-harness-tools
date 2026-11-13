@@ -124,8 +124,3 @@ Feature: Beans by process
   @test:scripts/tests/processed-beans.test.ts::the_combined_page,_every_store_at_…/beans/beans-processed/_(owner,_2026-11-03)::a_store_may_not_be_named_like_a_page_beside_it
   Scenario: A store may not be named like a page beside it
     Then the reserved store names are bean-processed and beans-processed
-
-
-  @test:scripts/tests/processed-beans.test.ts::the_combined_page,_every_store_at_…/beans/beans-processed/_(owner,_2026-11-03)::each_store's_needs_go_to_the_page,_kept_to_the_stores_on_it,_for_"and_what_it_depends_on"
-  Scenario: TODO-SCENARIO each store's needs go to the page, kept to the stores on it, for "and what it depends on"
-    # TODO-STEPS scripts/tests/processed-beans.test.ts:268

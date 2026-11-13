@@ -237,15 +237,21 @@ Feature: References to the retired harness.json declaration
     Then the markdown result is not null
     And it holds more than zero entries
 
-
   @test:scripts/tests/check-declaration-filename.test.ts::a_line's_paragraph_is_found_in_linear_time::every_non-blank_line_gets_the_paragraph_the_walk_gave_it
-  Scenario: TODO-SCENARIO every non-blank line gets the paragraph the walk gave it
-    # TODO-STEPS scripts/tests/check-declaration-filename.test.ts:484
+  Scenario: Each non-blank line's paragraph matches the old walk
+    Given lines with single and repeated blank lines and a whitespace-only line
+    When the paragraphs of the lines are indexed
+    Then every non-blank line gets the same paragraph the line-by-line walk returns
 
   @test:scripts/tests/check-declaration-filename.test.ts::a_line's_paragraph_is_found_in_linear_time::a_file_with_no_blank_line_at_all_is_one_paragraph
-  Scenario: TODO-SCENARIO a file with no blank line at all is one paragraph
-    # TODO-STEPS scripts/tests/check-declaration-filename.test.ts:492
+  Scenario: A file without blank lines is one paragraph
+    Given the lines "x", "y" and "z"
+    When the paragraph of the middle line is asked for
+    Then it is all three lines joined by newlines
 
   @test:scripts/tests/check-declaration-filename.test.ts::a_line's_paragraph_is_found_in_linear_time::a_20,000-line_block_with_the_retired_name_on_every_line_scans_in_well_under_a_second
-  Scenario: TODO-SCENARIO a 20,000-line block with the retired name on every line scans in well under a second
-    # TODO-STEPS scripts/tests/check-declaration-filename.test.ts:497
+  Scenario: Paragraph lookup over 20,000 lines finishes within a second
+    # Gap: only the paragraph index is timed, not the full declaration-filename scan
+    Given a 20,000-line block naming "harness.json" on every line with no blank line
+    When the paragraph of every line is asked for
+    Then indexing and all lookups together take under 1000 ms

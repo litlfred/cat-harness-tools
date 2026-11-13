@@ -77,47 +77,72 @@ Feature: Escaped markup in markdown sources
     Then the allow-list contains "caption", "details", "summary", "div", "table" and "figure"
     And it does not contain "slide"
 
-
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_fire::a_header-only_table:_a_delimiter_with_no_row_under_it
-  Scenario: TODO-SCENARIO a header-only table: a delimiter with no row under it
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:107
+  Scenario: A header-only table with no body row is a no-body finding
+    Given a heading, a blank line, the header "| role | file | |" and a delimiter row with nothing under it
+    When broken tables are found in it
+    Then there is exactly one finding, on line 3, with defect "no-body"
+    And its excerpt is "| role | file | |"
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_fire::...also_at_the_end_of_the_file,_and_when_the_next_line_is_prose
-  Scenario: TODO-SCENARIO ...also at the end of the file, and when the next line is prose
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:112
+  Scenario: A header-only table is caught at the end of the file and before prose
+    Given a header and delimiter that end the file
+    And a header and delimiter followed by the line "prose after"
+    When broken tables are found in each
+    Then the first finding of each has defect "no-body"
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_fire::a_table_straight_under_a_heading_—_the_heading_does_not_stand_in_for_a_blank_line
-  Scenario: TODO-SCENARIO a table straight under a heading — the heading does not stand in for a blank line
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:117
+  Scenario: A table straight under a heading is a no-blank-line finding
+    Given the heading "##### Content Review Skills" followed directly by a table with a body row
+    When broken tables are found in it
+    Then there is exactly one finding, on line 2, with defect "no-blank-line"
+    And its excerpt is "| Skill | Personas |"
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_fire::a_table_straight_under_a_paragraph_line
-  Scenario: TODO-SCENARIO a table straight under a paragraph line
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:124
+  Scenario: A table straight under a paragraph line is a no-blank-line finding
+    Given the line "Integration points:" followed directly by a table with a body row
+    When broken tables are found in it
+    Then the first finding has defect "no-blank-line"
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_fire::alignment_colons_and_a_one-column_table_count
-  Scenario: TODO-SCENARIO alignment colons and a one-column table count
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:128
+  Scenario: A one-column table with an aligned delimiter is recognised
+    Given a one-column header-only table whose delimiter is "| :---: |"
+    When broken tables are found in it
+    Then there is exactly one finding
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_NOT_fire::a_well-formed_table_after_a_blank_line,_with_a_body
-  Scenario: TODO-SCENARIO a well-formed table after a blank line, with a body
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:134
+  Scenario: A well-formed table after a blank line is not a finding
+    Given a heading, a blank line and a table with a header, delimiter and body row
+    When broken tables are found in it
+    Then there are none
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_NOT_fire::a_table_that_opens_the_file,_or_opens_the_body_after_front_matter
-  Scenario: TODO-SCENARIO a table that opens the file, or opens the body after front matter
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:139
+  Scenario: A table at the start of the file or right after front matter is not a finding
+    Given a table that opens the file
+    And a table that opens the body straight after a front-matter block
+    When broken tables are found in each
+    Then there are none in either
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_NOT_fire::a_body_row_of_dashes_inside_a_table_is_not_a_second_delimiter
-  Scenario: TODO-SCENARIO a body row of dashes inside a table is not a second delimiter
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:144
+  Scenario: A body row of dashes is not read as a second delimiter
+    Given a well-formed table with a body row "| - | - |" between two other body rows
+    When broken tables are found in it
+    Then there are none
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_NOT_fire::a_table_SHOWN_in_a_fence_is_not_a_table
-  Scenario: TODO-SCENARIO a table SHOWN in a fence is not a table
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:149
+  Scenario: A table shown inside a code fence is not judged
+    Given a fenced md block holding a heading followed directly by a header-only table
+    When broken tables are found in it
+    Then there are none
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_NOT_fire::rows_generated_by_Liquid_are_not_judged_from_the_source
-  Scenario: TODO-SCENARIO rows generated by Liquid are not judged from the source
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:154
+  Scenario: Body rows produced by a Liquid loop are not judged from the source
+    Given a header and delimiter followed by a "{% for %}" loop that emits the rows
+    When broken tables are found in it
+    Then there are none
 
   @test:scripts/tests/escaped-markup-source.test.ts::brokenTablesIn_—_must_NOT_fire::a_setext_heading_underline_or_a_thematic_break_is_not_a_delimiter
-  Scenario: TODO-SCENARIO a setext heading underline or a thematic break is not a delimiter
-    # TODO-STEPS scripts/tests/escaped-markup-source.test.ts:158
+  Scenario: A setext underline or a thematic break is not a delimiter
+    Given a setext heading underlined with "-----" and a "---" thematic break between paragraphs
+    When broken tables are found in it
+    Then there are none

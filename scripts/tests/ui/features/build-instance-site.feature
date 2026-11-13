@@ -240,15 +240,23 @@ Feature: Building an instance site
     Then "splitSite(site, root)" appears after the rail standalone pages, the final steps and the forwarding pages
     And it appears before the .nojekyll write, the coverage shortfall and the parity shortfall
 
-
   @test:scripts/tests/ui/build-instance-site.test.ts::every_site_writes_its_node-kind_pages_(who-iris_schemas_page,_owner_2026-11-13)::a_recipe_with_no_step_that_writes_them_gets_them_from_the_build
-  Scenario: TODO-SCENARIO a recipe with no step that writes them gets them from the build
-    # TODO-STEPS scripts/tests/ui/build-instance-site.test.ts:309
+  Scenario: A recipe with no step that writes node-kind pages is not counted as writing them
+    # Gap: only the predicate is checked; that the build then writes the pages is not run
+    Given a folio whose only site step "site:catalogue" runs another script
+    Then the recipe is not counted as writing node-kind pages
+    And a folder with no package.json and no steps is not counted either
 
   @test:scripts/tests/ui/build-instance-site.test.ts::every_site_writes_its_node-kind_pages_(who-iris_schemas_page,_owner_2026-11-13)::a_recipe_whose_own_step_runs_the_writer_(a_folio's_site:node-kinds)_does_not_run_it_twice
-  Scenario: TODO-SCENARIO a recipe whose own step runs the writer (a folio's site:node-kinds) does not run it twice
-    # TODO-STEPS scripts/tests/ui/build-instance-site.test.ts:313
+  Scenario: A recipe whose own step runs the node-kind page writer is counted as writing them
+    Given a folio whose "site:node-kinds" script runs the node-kind page writer
+    Then a recipe naming "site:node-kinds" is counted as writing node-kind pages
+    And the same folio with no steps is not
 
   @test:scripts/tests/ui/build-instance-site.test.ts::every_site_writes_its_node-kind_pages_(who-iris_schemas_page,_owner_2026-11-13)::it_runs_on_the_built_site_after_the_site_steps,_as_a_folio,_and_before_the_rail_and_the_link_check
-  Scenario: TODO-SCENARIO it runs on the built site after the site steps, as a folio, and before the rail and the link check
-    # TODO-STEPS scripts/tests/ui/build-instance-site.test.ts:318
+  Scenario: The node-kind step comes after the site steps and before the rail and the link check
+    # Gap: a source-text order check of buildInstanceSite; no site is built
+    Given the source of buildInstanceSite in scripts/build-instance-site.ts
+    Then it runs the node-kind page writer with "--root . --out" on the site
+    And that comes after the recipe's site steps run
+    And before "rail-standalone-pages.ts" and the link check

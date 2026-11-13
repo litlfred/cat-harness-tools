@@ -48,16 +48,3 @@ Feature: The LaTeX math overlay and the arXiv source reader
   Scenario: Every arXiv id shape is read from the directory name
     When arxiv_id reads new-style, versionless, hyphenated-category, dotted-category and non-arXiv directory names
     Then it returns 0705.1468v1, 2111.06645, hep-th/9901001v2, alg-geom/9408004v1, math.GT/0309136v1, and null for milnorlink
-
-
-  @test:scripts/tests/latex-math-overlay.test.ts::latex-math-overlay::a_PDF_section_that_is_a_\subsection_pairs_with_it,_and_its_parent_stops_where_it_starts
-  Scenario: TODO-SCENARIO a PDF section that is a \subsection pairs with it, and its parent stops where it starts
-    # TODO-STEPS scripts/tests/latex-math-overlay.test.ts:115
-
-  @test:scripts/tests/latex-math-overlay.test.ts::latex-math-overlay::a_\subsection_the_PDF_did_not_report_stays_inside_its_parent
-  Scenario: TODO-SCENARIO a \subsection the PDF did not report stays inside its parent
-    # TODO-STEPS scripts/tests/latex-math-overlay.test.ts:129
-
-  @test:scripts/tests/latex-math-overlay.test.ts::latex-math-overlay::a_LaTeX_2.09_source_(\documentstyle)_is_read;_AMS-TeX_is_not
-  Scenario: TODO-SCENARIO a LaTeX 2.09 source (\documentstyle) is read; AMS-TeX is not
-    # TODO-STEPS scripts/tests/latex-math-overlay.test.ts:139

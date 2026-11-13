@@ -39,20 +39,3 @@ Feature: Variable performer lanes
   Scenario: With no roles declared a ref is dangling
     Given a role graph with no roles
     Then a lane with roleRef "ghost" is dangling with ref "ghost"
-
-
-  @test:scripts/tests/variable-performer.test.ts::a_lane_declaring_<folio:role_variable="true"/>::the_real_diagram_carries_the_declaration_and_it_parses
-  Scenario: TODO-SCENARIO the real diagram carries the declaration and it parses
-    # TODO-STEPS scripts/tests/variable-performer.test.ts:45
-
-  @test:scripts/tests/variable-performer.test.ts::a_lane_declaring_<folio:role_variable="true"/>::a_lane_that_binds_a_role_is_NOT_read_as_varying
-  Scenario: TODO-SCENARIO a lane that binds a role is NOT read as varying
-    # TODO-STEPS scripts/tests/variable-performer.test.ts:54
-
-  @test:scripts/tests/variable-performer.test.ts::a_lane_declaring_<folio:role_variable="true"/>::only_the_exact_string_"true"_counts
-  Scenario: TODO-SCENARIO only the exact string "true" counts
-    # TODO-STEPS scripts/tests/variable-performer.test.ts:64
-
-  @test:scripts/tests/variable-performer.test.ts::a_lane_declaring_<folio:role_variable="true"/>::a_lane_with_neither_ref_nor_the_flag_stays_unflagged
-  Scenario: TODO-SCENARIO a lane with neither ref nor the flag stays unflagged
-    # TODO-STEPS scripts/tests/variable-performer.test.ts:80
