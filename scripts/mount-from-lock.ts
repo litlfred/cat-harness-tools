@@ -1215,7 +1215,7 @@ export function checkLayers(root: string, opts: { url?: string; changedFrom?: st
   }
   const key = layersKey(lock.instances!);
   const ref = layersRef(key);
-  // input-site: env CAT_LAYERS_URL #fd0cb617 — the remote the layers cache is fetched from
+  // input-site: env CAT_LAYERS_URL #f9e8ffa9 — the remote the layers cache is fetched from
   const url = opts.url ?? process.env.CAT_LAYERS_URL?.trim() ?? layersUrl(root);
   if (!url) return { ok: false, state: "error", key, detail: "no index remote to ask (pass --url or set CAT_LAYERS_URL)" };
   const ls = git(root, ["ls-remote", url, ref]);
@@ -1349,8 +1349,9 @@ export function moveLayers(root: string, opts: { url?: string; changedFrom?: str
   if (c.state !== "pending") return c;
   const ref = layersRef(c.key!);
   const branch = layersBranchOf(ref);
-  // input-site: env CAT_LAYERS_URL #fd0cb617 — the remote the layers cache is fetched from
+  // input-site: env CAT_LAYERS_URL #e24189fa — the remote the layers cache is fetched from
   const url = opts.url ?? process.env.CAT_LAYERS_URL?.trim() ?? layersUrl(root)!;
+  // input-site: inert #6f8126bd — the scratch repository a layers move is built in, removed in the finally below; its name never reaches an answer
   const scratch = mkdtempSync(join(tmpdir(), "layers-move-"));
   try {
     const run = (args: string[]) => git(scratch, args);
