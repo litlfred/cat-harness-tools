@@ -30,7 +30,7 @@
  * PROBLEM and the run exits 1 having written nothing.
  *
  * Usage:
- *   bun run cat-harness-tools/scripts/root-index.ts --site ./_site [--base-url URL]
+ *   bun run cat-harness-tools/scripts/root-index.ts --site ./_site [--base-url URL] [--subgraph-index FILE]
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -84,10 +84,14 @@ export interface RootIndexBuild {
  * Build the root index over the site directory the deploy wrote. Pure over
  * the declarations and the files under `site`; writes nothing.
  */
-export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: string } = {}): RootIndexBuild {
+export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: string; subgraphIndex?: string } = {}): RootIndexBuild {
   const repo = opts.repo ?? REPO;
   const problems: string[] = [];
-  const subgraphIndex = join(site, "subgraph", SUBGRAPH_INDEX_FILE);
+  // The repository's subgraph index: the site's own copy by default. A layer
+  // site that does not publish the subgraph tree (it is served at the
+  // harness's canonical site, whose IRIs it carries) names the file it
+  // framed instead (`publish-root-index.ts`, litlfred/who-iris).
+  const subgraphIndex = opts.subgraphIndex ?? join(site, "subgraph", SUBGRAPH_INDEX_FILE);
   const repoIndex = existsSync(subgraphIndex) ? (JSON.parse(readFileSync(subgraphIndex, "utf-8")) as Doc) : undefined;
   if (!repoIndex) problems.push(`${subgraphIndex} is missing — the subgraph roots cannot be named`);
   const roots = list(repoIndex?.hasSubgraph).map(String);
@@ -191,10 +195,11 @@ if (import.meta.main) {
   };
   const site = arg("--site");
   if (!site) {
-    console.error("usage: root-index.ts --site <dir> [--base-url <url>]");
+    console.error("usage: root-index.ts --site <dir> [--base-url <url>] [--subgraph-index <file>]");
     process.exit(2);
   }
-  const { doc, problems } = buildRootIndex(resolve(site), { baseUrl: arg("--base-url") });
+  const subgraphIndex = arg("--subgraph-index");
+  const { doc, problems } = buildRootIndex(resolve(site), { baseUrl: arg("--base-url"), ...(subgraphIndex ? { subgraphIndex: resolve(subgraphIndex) } : {}) });
   if (problems.length) {
     console.error("root-index: not written —");
     for (const p of problems) console.error(`  ✗ ${p}`);

@@ -1011,6 +1011,7 @@ export async function stageDeclared(
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
     ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
+    ...(d.recipe.rootIndex ? { rootIndex: true } : {}),
     ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => {
       previewData(repo, { instance: d.instance, branch, sha, base, owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log);
       writePreviewRecord(repo, site, { slug: branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, ""), sha, base, log });
