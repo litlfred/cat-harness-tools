@@ -189,7 +189,7 @@ import {
   checkMountPathCollisions,
 } from "../schemas/kg/remote-mount.js";
 import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
-import { closeOverRequires, enabledSubgraphs, requiresOfDirectories, isSubgraphEnabled, qualifiedSubgraphId, type EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
+import { closeOverRequires, enabledSubgraphs, requiresDeclared, isSubgraphEnabled, qualifiedSubgraphId, type EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "../schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { builtAtPublishOf, installDependencies, isInstallArtefact, publishLayers, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutSelfIgnored, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
@@ -892,7 +892,8 @@ function resolveClosureWith(
         continue;
       }
       const { decl } = found;
-      closeOverRequires(dsEnabled, requiresOfDirectories(q.name, decl.directories));
+      // From within too: an opt-in group inside an opt-in level (`L2/collab/`).
+      closeOverRequires(dsEnabled, requiresDeclared(q.name, decl.directories, (rel) => tree.readText(found.root ? `${found.root}/${rel}` : rel)));
       const path = strip(override?.path ?? decl.mountDefaults?.path ?? decl.livesAt?.path ?? (found.root || q.name));
       if (!MountPathSchema.safeParse(path).success || path === "") {
         plan.outcomes.push({ instance: q.name, state: "could-not-determine", detail: `mount path \`${path}\` is not a repository-relative directory` });

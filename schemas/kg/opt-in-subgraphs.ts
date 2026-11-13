@@ -49,7 +49,7 @@
  * ignored, and so is a `requires` id ({@link requiresProblems}).
  */
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, posix, resolve } from "node:path";
 
 import { fileStamp, findDeclarationFile, INDEX_CONFIG_FILENAME, instanceRootsIn } from "./instance-roots";
 
@@ -153,6 +153,49 @@ export function requiresOfDirectories(name: string, directories: unknown): Map<s
   return out;
 }
 
+/**
+ * The `requires` of EVERY opt-in entry a layer declares: the top-level ones
+ * ({@link requiresOfDirectories}) and those declared FROM WITHIN a directory,
+ * in its `graph.json` or `<dir>/<dir>.json`, at any depth, the two
+ * conventional names `declaredKinds` also reads. Keyed `<name>.<own id>`, the
+ * id `enableSubgraphs` spells for a from-within entry.
+ *
+ * Read STRUCTURALLY through `readText`, a path relative to the directory the
+ * declaration sits in, so a checkout (the disk) and the mount planner (a
+ * remote tree, before anything is mounted) ask the same question. An opt-in
+ * group inside an opt-in level (an `L2/collab/` inside `L2/`, owner, 2026-11-13)
+ * was invisible to the top-level read, so what it requires was never implied.
+ */
+export function requiresDeclared(
+  name: string,
+  directories: unknown,
+  readText: (relPath: string) => string | undefined,
+  depth = 4,
+): Map<string, string[]> {
+  const out = requiresOfDirectories(name, directories);
+  const walk = (dirs: unknown, base: string, left: number): void => {
+    if (left <= 0 || !Array.isArray(dirs)) return;
+    for (const d of dirs as Array<{ path?: unknown }>) {
+      if (typeof d?.path !== "string") continue;
+      const dir = posix.join(base, d.path.replace(/\/+$/, ""));
+      for (const file of new Set(["graph.json", `${basename(dir)}.json`])) {
+        const text = readText(posix.join(dir, file));
+        if (text === undefined) continue;
+        let nested: { directories?: unknown };
+        try {
+          nested = JSON.parse(text) as { directories?: unknown };
+        } catch {
+          continue; // a nested file that will not parse is check:harness-dirs' finding
+        }
+        for (const [q, req] of requiresOfDirectories(name, nested.directories)) out.set(q, req);
+        walk(nested.directories, dir, left - 1);
+      }
+    }
+  };
+  walk(directories, "", depth);
+  return out;
+}
+
 /** Whether `dir` or a directory above it holds a `.git`. */
 function inGitCheckout(dir: string): boolean {
   for (let d = resolve(dir); ; d = dirname(d)) {
@@ -201,14 +244,33 @@ export function declaredOptInRequires(checkoutRoot: string): Map<string, string[
  * 87 s `kg-audit` over the folio-assistant index (2026-11-13, core #753). A
  * file that fails to read or parse is not cached and throws on every call.
  */
-const requiresByFile = new Map<string, { stamp: string; requires: [string, string[]][] }>();
+/**
+ * A declaration's requires, reused while every file the read touched (the
+ * declaration and each nested `graph.json` / `<dir>/<dir>.json` it looked
+ * for, present or absent) has the same size, mtime and inode. kg-audit asks
+ * this on every `resolveDirectories`, and re-parsing each layer every time
+ * was most of a run (cat-harness-tools#2010).
+ */
+const requiresByFile = new Map<string, { stamps: Map<string, string>; requires: [string, string[]][] }>();
+const stampOrAbsent = (abs: string): string => (existsSync(abs) ? fileStamp(abs) : "absent");
 function requiresOf(abs: string): [string, string[]][] {
-  const stamp = fileStamp(abs);
   const hit = requiresByFile.get(abs);
-  if (hit !== undefined && hit.stamp === stamp) return hit.requires;
+  if (hit !== undefined && [...hit.stamps].every(([f, st]) => stampOrAbsent(f) === st)) return hit.requires;
+  const stamps = new Map<string, string>([[abs, fileStamp(abs)]]);
   const raw = JSON.parse(readFileSync(abs, "utf-8")) as { name?: unknown; directories?: unknown };
-  const requires = typeof raw.name === "string" ? [...requiresOfDirectories(raw.name, raw.directories)] : [];
-  requiresByFile.set(abs, { stamp, requires });
+  if (typeof raw.name !== "string") {
+    requiresByFile.set(abs, { stamps, requires: [] });
+    return [];
+  }
+  const base = dirname(abs);
+  const readText = (rel: string): string | undefined => {
+    const f = join(base, rel);
+    const st = stampOrAbsent(f);
+    stamps.set(f, st);
+    return st === "absent" ? undefined : readFileSync(f, "utf-8");
+  };
+  const requires = [...requiresDeclared(raw.name, raw.directories, readText)];
+  requiresByFile.set(abs, { stamps, requires });
   return requires;
 }
 

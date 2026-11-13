@@ -1933,7 +1933,9 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    * `cat-harness.work-plan`, whose skills and processes it uses). IMPLIED:
    * wherever this sub-graph is switched on, everything it requires is
    * switched on too, transitively, and a reference from inside it into one it
-   * requires is not dangling (`check:optin-refs`). Top-level entries only.
+   * requires is not dangling (`check:optin-refs`). A from-within entry
+   * (`L2/graph.json`'s `L2-collab`) may carry it too, read raw like its
+   * `optIn` (`requiresDeclared`).
    * Checked by `check:declaration-resolution` (`requiresProblems`).
    */
   requires: z.array(z.string().min(1)).min(1).optional(),
