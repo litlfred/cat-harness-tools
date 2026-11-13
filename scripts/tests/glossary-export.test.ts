@@ -276,26 +276,32 @@ describe("retirement — reported, never deleted", () => {
 
   test("a retired term that comes BACK is un-retired and reported", () => {
     // The mirror of the defect above: leaving the flag on would report a live
-    // term as gone for ever. Run against the REAL corpus with one of its own
-    // live roles planted as retired.
+    // term as gone for ever. Run against the REAL corpus, judged against a
+    // ledger that has one of its own live terms planted as retired.
     const live = buildGlossary({ today: () => "2026-09-21" });
-    const someLiveKey = Object.keys(live.ledger.concepts)[0]!;
-    const dir = withLedger({
-      ...live.ledger.concepts,
-      [someLiveKey]: { ...live.ledger.concepts[someLiveKey]!, retiredOn: "2025-01-01" },
-    });
-    try {
-      // The temp layer derives nothing, so instead assert the pure rule on
-      // the real layer: nothing live is ever left carrying a retiredOn.
-      const after = buildGlossary({ today: () => "2026-09-22" });
-      for (const [k, v] of Object.entries(after.ledger.concepts)) {
-        if (after.report.retired.includes(k)) continue;
-        expect(v.retiredOn).toBeNull();
-      }
-      expect(after.report.retired).not.toContain(someLiveKey);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    // A live ROLE: a family this build derives, so the key is in the live set
+    // and not merely carried over (as an unbuilt family's `node-kind/` is).
+    const someLiveKey = Object.keys(live.ledger.concepts).find(
+      (k) => k.startsWith("role/") && live.ledger.concepts[k]!.retiredOn === null,
+    )!;
+    expect(someLiveKey).toBeDefined();
+    const planted: Ledger = {
+      ...live.ledger,
+      concepts: {
+        ...live.ledger.concepts,
+        [someLiveKey]: { ...live.ledger.concepts[someLiveKey]!, retiredOn: "2025-01-01" },
+      },
+    };
+    const after = buildGlossary({ today: () => "2026-09-22", ledger: planted });
+    // Un-retired: the key is live again, keeps its firstSeen, carries no date.
+    expect(after.ledger.concepts[someLiveKey]!.retiredOn).toBeNull();
+    expect(after.ledger.concepts[someLiveKey]!.firstSeen).toBe(live.ledger.concepts[someLiveKey]!.firstSeen);
+    expect(after.report.retired).not.toContain(someLiveKey);
+    // ...and reported: the planted key, and only it, is restored.
+    expect(after.report.restored).toEqual([someLiveKey]);
+    // The ledger the planted one was judged against is now stale — it said
+    // the term was gone.
+    expect(after.report.ledgerStale).toBe(true);
   });
 
   test("firstSeen is preserved across a rebuild — a term is not re-minted daily", () => {

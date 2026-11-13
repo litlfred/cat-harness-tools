@@ -36,12 +36,19 @@ Feature: Audit and benchmark output paths
     And on "beans/run.json" it exits with status 1, saying it "resolves inside declared graph directory 'beans'"
     And on "test/results/run.json" it exits with status 1, saying it "resolves inside declared graph directory 'test/results'"
 
+  @test:scripts/tests/audit-output-paths.test.ts::audit_output_paths::the_forbidden-path_patterns_match_the_literals_they_exist_to_catch
+  Scenario: The forbidden-path patterns fire on the literals they exist to catch
+    Given a "beans/<name>.json" and a "todos/<name>.json" literal, each in double and in single quotes
+    Then the beans pattern matches each beans literal
+    And the todos pattern matches each todos literal
+    And the beans pattern matches neither "build/status-sections.json" nor "build/beans-status.json"
+
   @test:scripts/tests/audit-output-paths.test.ts::audit_output_paths::%s::does_not_default_into_beans/_or_todos/
   Scenario: An audit writer names no beans/ or todos/ JSON path as a string literal
-    # Gap: source-text check only; the beans pattern begins with a word-boundary escape, so it looks for "eans/<name>.json" and cannot match a "beans/<name>.json" literal
+    # Gap: source-text check only; the writers are not run
     Given the source of each pipeline audit writer: audit-status-sections.ts, extract-status-sections.ts, qa-agent-drain-queue.ts and qa-section-title-audit.ts
-    Then it contains no quoted "todos/<name>.json" literal
-    And it contains no quoted literal matching the beans pattern
+    Then it contains no double- or single-quoted "todos/<name>.json" literal
+    And it contains no double- or single-quoted "beans/<name>.json" literal
 
   @test:scripts/tests/audit-output-paths.test.ts::audit_output_paths::%s::defaults_into_build/
   Scenario: An audit writer names a build/ JSON path as a string literal

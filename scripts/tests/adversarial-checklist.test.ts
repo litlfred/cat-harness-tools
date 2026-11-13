@@ -182,14 +182,29 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     const badSkillNode = {
       id: "bad-skill",
       kind: "skill" as AdversarialContentKind,
-      path: "test/fixtures/bad-skill.md",
+      path: "skills/bad-skill.md",
       sourceHash: "111222333444",
     };
+    // A scratch root holding a skill whose narrative quotes the known-broken
+    // command, and the same skill with the command corrected.
+    const root = mkdtempSync(join(tmpdir(), "adv-defect-"));
+    try {
+      mkdirSync(join(root, "skills"), { recursive: true });
+      const file = join(root, badSkillNode.path);
+      writeFileSync(file, "# Bad skill\n\nStart the work with `beans <id> --status in-progress`.\n");
+      const { review, findings } = reviewNodeAdversarially(badSkillNode, root);
+      expect(review.result).toBe("fail");
+      expect(findings.map((f) => f.id)).toEqual(["adv-bad-skill-skill-narrative-asserts-code"]);
+      expect(review.flags.map((f) => f.where)).toEqual(["skills/bad-skill.md:command-invocation"]);
+      expect(AdversarialReviewSchema.safeParse(review).success).toBe(true);
 
-    // Review on synthetic content with broken command
-    const { review } = reviewNodeAdversarially(badSkillNode, ROOT);
-    // Even if path does not exist, review completes
-    expect(review.result).toBe("pass");
+      writeFileSync(file, "# Bad skill\n\nStart the work with `beans update <id> --status in-progress`.\n");
+      const fixed = reviewNodeAdversarially(badSkillNode, root);
+      expect(fixed.review.result).toBe("pass");
+      expect(fixed.findings).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   // Walks the whole repository for fan-in, so it runs near the 5s default on CI (5.2s on #1227); same budget as the coverage walks below.

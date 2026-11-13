@@ -91,22 +91,23 @@ Feature: Spec validation and the spec-before-code gate
     Then the state is "pass" with no findings
     And the issue number is 730
     And the spec result is "pass"
+    And the CLI, fetching the same comment through a stand-in gh, exits 0
 
   @test:scripts/tests/check-spec.test.ts::checkSpecBeforeCode_—_spec-before-code_gate_(Child_3_/_issue_#753)::failing_case:_missing_spec_comment_on_issue_reports_a_finding,_not_silence_(exit_1)
   Scenario: An issue with no spec comment is a finding
-    # Gap: the exit code is not checked, only the result state.
     Given issue 730 whose comments are fetched but hold no spec
     When the gate checks issue 730
     Then the state is "finding"
     And the first finding says it "carries no reachable spec comment"
+    And the CLI, given an empty comment list by a stand-in gh, exits 1
 
   @test:scripts/tests/check-spec.test.ts::checkSpecBeforeCode_—_spec-before-code_gate_(Child_3_/_issue_#753)::failing_case:_invalid_spec_comment_(missing_mandatory_section)_reports_a_finding_(exit_1)
   Scenario: An issue whose spec lacks a mandatory section is a finding
-    # Gap: the exit code is not checked, only the result state.
     Given issue 730 whose spec comment has no "Requirements" section
     When the gate checks issue 730
     Then the state is "finding"
     And a finding reads 'missing mandatory section: "Requirements"'
+    And the CLI, given that comment by a stand-in gh, exits 1
 
   @test:scripts/tests/check-spec.test.ts::checkSpecBeforeCode_—_spec-before-code_gate_(Child_3_/_issue_#753)::failing_case:_spec_with_unresolved_[NEEDS_CLARIFICATION]_when_requireAdjudicated_reports_a_finding
   Scenario: A spec with an unresolved marker is a finding when adjudication is required
@@ -117,11 +118,11 @@ Feature: Spec validation and the spec-before-code gate
 
   @test:scripts/tests/check-spec.test.ts::checkSpecBeforeCode_—_spec-before-code_gate_(Child_3_/_issue_#753)::could-not-determine_case:_unreachable_issue_reports_unknown_(exit_2)
   Scenario: An unreachable issue is reported as unknown
-    # Gap: the exit code is not checked, only the result state.
     Given fetching issue 730's comments fails with a rate-limit or network reason
     When the gate checks issue 730
     Then the state is "unknown"
     And the reason says "could not determine" and "failed to fetch comments for issue #730"
+    And the CLI, whose stand-in gh exits non-zero, exits 2
 
   @test:scripts/tests/check-spec.test.ts::checkSpecBeforeCode_—_spec-before-code_gate_(Child_3_/_issue_#753)::feature_bean_with_referenced_issue_carrying_a_valid_spec_passes
   Scenario: A feature bean whose linked issue carries a valid spec passes

@@ -80,11 +80,15 @@ Feature: Adversarial review checklists, backfill and coverage
     And the reviewer session is set
 
   @test:scripts/tests/adversarial-checklist.test.ts::Adversarial_Backfill_&_Risk-Ranking_(scripts/adversarial-backfill.ts)::detects_known_defect_pattern_in_review_(narrative_asserts_code)
-  Scenario: A review of a skill whose file does not exist still completes with a pass
-    # Gap: no defect pattern is detected or asserted; the test only checks that the review of a missing file passes.
-    Given a skill node "bad-skill" whose path "test/fixtures/bad-skill.md" does not exist
+  Scenario: A skill whose narrative quotes the known-broken command fails its review
+    Given a scratch root holding skill "bad-skill" at "skills/bad-skill.md" quoting "beans <id> --status in-progress"
     When it is reviewed adversarially
-    Then the review result is "pass"
+    Then the review result is "fail"
+    And the only finding is "adv-bad-skill-skill-narrative-asserts-code"
+    And it is flagged at "skills/bad-skill.md:command-invocation"
+    And the review is a valid AdversarialReview
+    When the skill is corrected to "beans update <id> --status in-progress" and reviewed again
+    Then the review result is "pass" with no findings
 
   @test:scripts/tests/adversarial-checklist.test.ts::Adversarial_Backfill_&_Risk-Ranking_(scripts/adversarial-backfill.ts)::executes_backfill_batch_writing_to_sidecars_and_NEVER_creates_beans
   Scenario: A backfill batch writes its sidecars and never creates beans

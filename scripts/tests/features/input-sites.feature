@@ -188,11 +188,15 @@ Feature: Input-site audit, runtime trace and the fingerprint's refusals
     Then it reports nothing
 
   @test:scripts/tests/input-sites.test.ts::the_runtime_trace::without_the_variable_set,_the_hook_writes_nothing_anywhere
-  Scenario: Without the trace variable set, the hook can be called freely
-    # Gap: that nothing is written anywhere is not checked; the test only calls the hook and quietly() without the variable and asserts nothing
-    Given the trace variable is unset
-    When inputSiteReached is called directly and inside quietly()
-    Then the calls complete
+  Scenario: Without the trace variable set, the hook writes nothing anywhere
+    Given a trace opened under a scratch root
+    And a child process, run from that root, whose environment lacks the trace variable
+    When the child calls inputSiteReached directly and inside quietly()
+    Then the child exits 0
+    And the trace reports nothing reached
+    And the scratch root holds only the empty trace directory and the child's source
+    When the same child runs with the trace variable set
+    Then the trace reports "nothing to see"
 
   @test:scripts/tests/input-sites.test.ts::annotations_hold_to_the_data_that_chooses_their_targets::every_instance_a_loader_can_reach_is_one_level_below_the_checkout,_where_the_`*/`_globs_look
   Scenario: Every instance a loader can reach is one level below the checkout
@@ -205,6 +209,13 @@ Feature: Input-site audit, runtime trace and the fingerprint's refusals
     When the ref is resolved against the deepest root that holds the node
     Then the module is one the "plugin-tables" declaration names
     And schemas/kg/harness-config.ts carries a "declared" annotation with source "plugin-tables"
+
+  @test:scripts/tests/input-sites.test.ts::annotations_hold_to_the_data_that_chooses_their_targets::every_Tool's_in-process_registrar_is_a_module_tool-api's_`declared_tool-registrars`_names
+  Scenario: Every Tool's in-process registrar is listed by the tool-registrars declaration
+    Given every MCP Tool with an in-process registrar, in every instance of the checkout
+    When each registrar module is resolved as tool-api's MCP tool list resolves it
+    Then each one that resolves is named by the "tool-registrars" declaration
+    And tool-api.ts carries a "declared" annotation with source "tool-registrars"
 
   @test:scripts/tests/input-sites.test.ts::annotations_hold_to_the_data_that_chooses_their_targets::every_declared_validator_module,_from_any_root_a_caller_passes,_is_one_`declared_validator-refs`_names
   Scenario: Every declared validator module, from any caller's root, is listed by the validator-refs declaration

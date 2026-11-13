@@ -171,11 +171,31 @@ describe("the guards", () => {
     // The rule survives its own reasons going missing, and says so. Without
     // this the first symptom is an agent hitting a prohibition with nothing
     // behind it.
-    const root = fixture({ "skills/folio-core/a.md": "---\nname: a\n---\n\nbody\n" });
+    //
+    // The fixture declares its OWN `fsh-guts/` (no `scope: "repository"`, so
+    // it resolves inside the fixture rather than beside it) and writes the
+    // record of every retirement but the FIRST. A report of every key would
+    // then mean the directory went unresolved, not that a record is missing.
+    const root = fixture({ "skills/folio-core/a.md": "---\nname: a\n---\n\nbody\n" }, false);
     try {
+      writeDeclaration(root, JSON.stringify({
+        name: "fixture",
+        directories: [
+          { id: "skills", path: "skills/", graphTypologies: ["cat-harness"] },
+          { id: "fsh-guts", path: "fsh-guts/", graphTypologies: ["fsh-guts"] },
+        ],
+      }));
+      const [absent, ...present] = RETIRED;
+      for (const r of present) {
+        const abs = resolve(root, "fsh-guts", r.record);
+        mkdirSync(resolve(abs, ".."), { recursive: true });
+        writeFileSync(abs, "---\n$schema: folio-fsh-guts/v1\ntitle: fixture\nkind: retired-field\n---\n");
+      }
+      mkdirSync(resolve(root, "fsh-guts"), { recursive: true });
+      expect(corpusDirectoryForGraph(root, "fsh-guts")).toBe(resolve(root, "fsh-guts"));
       const { findings, missingRecords } = scan(root, root);
       expect(findings).toEqual([]);
-      expect(missingRecords.map((r) => r.key)).toEqual(RETIRED.map((r) => r.key));
+      expect(missingRecords.map((r) => r.key)).toEqual([absent!.key]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -52,7 +52,26 @@ const BENCHMARK_RUNNERS = [
   "formula-benchmark.py",
 ];
 
+/**
+ * A quoted `beans/<name>.json` or `todos/<name>.json` string literal, in
+ * double or single quotes. Not backticks: those also quote paths in prose
+ * comments ("Was hardcoded to `todos/…`"), which name a retired default.
+ */
+const FORBIDDEN_BEANS = /["']beans\/[\w-]+\.json["']/;
+const FORBIDDEN_TODOS = /["']todos\/[\w-]+\.json["']/;
+
 describe("audit output paths", () => {
+  test("the forbidden-path patterns match the literals they exist to catch", () => {
+    // `"\beans/…"` read `\b` as a word boundary and could never match a
+    // `beans/` literal: a pattern is only a check once it is seen to fire.
+    for (const q of ['"', "'"]) {
+      expect(`const out = ${q}beans/status-sections.json${q};`).toMatch(FORBIDDEN_BEANS);
+      expect(`const out = ${q}todos/status-sections.json${q};`).toMatch(FORBIDDEN_TODOS);
+    }
+    expect('const out = "build/status-sections.json";').not.toMatch(FORBIDDEN_BEANS);
+    expect('const out = "build/beans-status.json";').not.toMatch(FORBIDDEN_BEANS);
+  });
+
   describe.each([...WRITERS])("%s", (file) => {
     const src = readFileSync(join(PIPELINE, file), "utf-8");
 
@@ -60,8 +79,8 @@ describe("audit output paths", () => {
       // String literals only — a path assembled at runtime would slip past
       // this, but all four spell theirs out, which is what made the drift
       // invisible and is also what makes it checkable.
-      expect(src).not.toMatch(/"\beans\/[\w-]+\.json"/);
-      expect(src).not.toMatch(/"todos\/[\w-]+\.json"/);
+      expect(src).not.toMatch(FORBIDDEN_BEANS);
+      expect(src).not.toMatch(FORBIDDEN_TODOS);
     });
 
     test("defaults into build/", () => {

@@ -36,7 +36,7 @@ Feature: Knowledge-graph export
     And it carries no generatedAt
     And its sourceTree is a 40-character hex hash
 
-  @test:scripts/tests/kg-export.test.ts::kg_export::every_edge_term_is_declared_{\"@type\":_\"@id\"}_—_otherwise_it_is_not_a_graph
+  @test:scripts/tests/kg-export.test.ts::kg_export::every_edge_term_is_declared_{"@type":_"@id"}_—_otherwise_it_is_not_a_graph
   Scenario: Every edge term is declared as an @id-typed term
     Given the export's @context
     Then each of "partOf", "requires", "performedBy", "inPackage", "declaresSkill", "startNode", "from", "to" and "holdsGraph" is declared with "@type" "@id"
@@ -520,7 +520,7 @@ Feature: Knowledge-graph export
 
   @test:scripts/tests/kg-export.test.ts::a_lane's_role_links_into_the_document_of_the_layer_that_declares_it_(cat-harness-tools#1894)::a_role_only_another_layer_declares_is_minted_in_that_layer's_document
   Scenario: A role only another layer declares is minted in that layer's document
-    # Gap: in a checkout with only one layer the test returns without asserting
+    # Skipped: when no layer of the checkout declares a role another layer does not
     Given a pair of layers where the other declares a role the own layer does not
     When that role's home is computed from the own layer
     Then it is not the own document

@@ -85,10 +85,11 @@ Feature: The folio graph viewer
     Then no directory dir and no node file starts with "/"
 
   @test:scripts/tests/folio-viz.test.ts::the_committed_projection_is_MACHINE-INDEPENDENT::the_SAME_tree_read_from_a_different_base_gives_the_same_paths
-  Scenario: The graph read relative to the repository root gives stable paths
-    # Gap: both reads use the same base; a different base is not tried
-    Given the folio graph read twice relative to the repository root
-    Then both reads give the same node files
+  Scenario: The same tree read from a different base gives the same paths
+    Given the folio graph read relative to the repository root
+    And the same checkout reached through a link from a scratch directory, read relative to that link
+    Then the first read has nodes
+    And both reads give the same node files and the same directories
     And every node file lies under "<harness>/folio/"
 
   @test:scripts/tests/folio-viz.test.ts::node_links_resolve_on_the_page_(qgjh)::an_absolute_http(s)_link_is_used_as_it_is

@@ -91,10 +91,11 @@ Feature: References to the retired harness.json declaration
 
   @test:scripts/tests/check-declaration-filename.test.ts::a_path_to_the_declaration_is_built_from_the_constant::examining_nothing_is_not_a_pass
   Scenario: An empty tree reads no files
-    # Gap: only the zero file count is checked; the runner's non-zero exit is not exercised
+    # Gap: the runner's non-zero exit is not exercised; it scans its own checkout and takes no root
     Given an empty directory
     When the declaration filename is checked
     Then the number of files read is 0
+    And the workflow scan is unknown, not empty
 
   @test:scripts/tests/check-declaration-filename.test.ts::a_workflow_line_is_classified,_not_merely_counted::a_step_that_READS_the_retired_declaration_fails
   Scenario: A workflow step reading the retired declaration is a use
@@ -236,3 +237,21 @@ Feature: References to the retired harness.json declaration
     When the declaration filename is checked
     Then the markdown result is not null
     And it holds more than zero entries
+
+  @test:scripts/tests/check-declaration-filename.test.ts::a_line's_paragraph_is_found_in_linear_time::every_non-blank_line_gets_the_paragraph_the_walk_gave_it
+  Scenario: Every non-blank line gets the paragraph the line-by-line walk gave it
+    Given lines with blank, whitespace-only and non-blank lines in several paragraphs
+    When each non-blank line's paragraph is looked up
+    Then it is the paragraph the retired walk computes for that line
+
+  @test:scripts/tests/check-declaration-filename.test.ts::a_line's_paragraph_is_found_in_linear_time::a_file_with_no_blank_line_at_all_is_one_paragraph
+  Scenario: A file with no blank line is one paragraph
+    Given the lines "x", "y" and "z"
+    When the paragraph of the second line is looked up
+    Then it is all three lines
+
+  @test:scripts/tests/check-declaration-filename.test.ts::a_line's_paragraph_is_found_in_linear_time::a_20,000-line_block_with_the_retired_name_on_every_line_scans_in_well_under_a_second
+  Scenario: A 20,000-line block naming the retired file on every line scans in under a second
+    Given 20,000 consecutive non-blank lines, each naming the retired declaration
+    When every line's paragraph is looked up
+    Then it takes less than 1000 ms

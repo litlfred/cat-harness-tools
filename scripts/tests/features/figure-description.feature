@@ -79,7 +79,7 @@ Feature: Figure descriptions state their basis
 
   @test:scripts/tests/figure-description.test.ts::corpus_—_the_committed_file,_so_this_cannot_pass_on_fixtures_alone::cat-harness/library/figure-descriptions.json_validates
   Scenario: The committed figure-descriptions file validates
-    # Gap: the test passes without asserting when cat-harness/library/figure-descriptions.json does not exist
+    # Skipped: when cat-harness/library/figure-descriptions.json does not exist
     Given the committed cat-harness/library/figure-descriptions.json
     When it is parsed with the file schema
     Then it holds at least one description

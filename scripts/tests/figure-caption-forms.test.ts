@@ -18,7 +18,7 @@ import { declaredFigureCaptions } from "../check-l1-complete.ts";
 const SCRIPTS = join(import.meta.dir, "..");
 
 /** Run `caption_candidates` and `LABEL` from the Python arms over some lines. */
-function python(lines: string[]): { candidates: string[]; labels: (string | null)[] } | null {
+function python(lines: string[]): { candidates: string[]; labels: (string | null)[] } {
   const code = `
 import importlib.util, json, os, sys
 d = sys.argv[1]
@@ -35,17 +35,18 @@ labels = [(m.group(1) if (m := fig.LABEL.match(c)) else None) for c in cands]
 print(json.dumps({"candidates": cands, "labels": labels}))
 `;
   const r = spawnSync("python3", ["-I", "-c", code, SCRIPTS, JSON.stringify(lines)], { encoding: "utf-8" });
-  if (r.status !== 0) {
-    // pdf-vector-figures.py needs PyMuPDF at import time; without it there is
-    // nothing to test here, the same skip the corpus tests use.
-    if (/No module named/.test(r.stderr)) return null;
-    throw new Error(r.stderr);
-  }
+  if (r.status !== 0) throw new Error(r.stderr);
   return JSON.parse(r.stdout);
 }
 
+/**
+ * pdf-vector-figures.py needs PyMuPDF at import time; without it there is
+ * nothing to run, and the test reports a skip rather than a pass.
+ */
+const NO_PYMUPDF = spawnSync("python3", ["-I", "-c", "import fitz"], { encoding: "utf-8" }).status !== 0;
+
 describe("caption patterns accept `Fig N.`", () => {
-  test("the Python arms find `Fig 1.` and still refuse non-captions", () => {
+  test.skipIf(NO_PYMUPDF)("the Python arms find `Fig 1.` and still refuse non-captions", () => {
     const out = python([
       "Fig 1. Public health supply chain partners and processes",
       "Fig. 5. DIIG process for planning and implementing a digital health enterprise",
@@ -55,7 +56,6 @@ describe("caption patterns accept `Fig N.`", () => {
       "Figs 3 and 4 show",
       "Fig 7. Sample workflow . . . . . 17",
     ]);
-    if (!out) return;
     expect(out.candidates).toEqual([
       "Fig 1. Public health supply chain partners and processes",
       "Fig. 5. DIIG process for planning and implementing a digital health enterprise",

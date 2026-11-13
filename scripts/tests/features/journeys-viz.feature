@@ -87,7 +87,7 @@ Feature: The journeys viewer
     And "ghost-story" is drawn unresolved
     And LOW-REQ-404 is drawn as having no req: node
     And it names "Health wallet" and says the unknown block is "not in a catalogue"
-    # Gap: the example "Bundle/ana-ips" resolving is not asserted here
+    And its only FHIR example, "Bundle/ana-ips", links to its IG page "Bundle-ana-ips.html"
 
   @test:scripts/tests/journeys-viz.test.ts::a_journey_page::the_workshop_layer_of_another_instance_shows_under_the_step_it_names
   Scenario: The workshop layer of another instance shows under the step it names
@@ -170,7 +170,8 @@ Feature: The journeys viewer
     And a moment card links to "../walkthrough/P1/" with the title "Checked"
     And it says "Appears in 2 of 2 steps" and links P2
     And it shows the presenter note "Lead with people."
-    # Gap: the ladder itself is not asserted on the overview
+    And its ladder has the rungs "On paper" then "Shared"
+    And the "Shared" rung links P2
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::a_step:_prev_and_next_for_the_keys,_the_last_one_going_on_to_the_discussion
   Scenario: A step page has prev and next links for the keys, the last going on to the discussion
@@ -202,10 +203,13 @@ Feature: The journeys viewer
     And under the hood it shows "Health wallet" with "shows the QR", the Task_Read highlight and the hood toggle
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_pages:_a_workshop_told_in_a_room,_with_no_site_chrome::the_workshop_page_links_to_the_presentation,_and_its_discussion_has_an_anchor
-  Scenario: The workshop page links to the presentation
+  Scenario: The workshop page links to the presentation, and its discussion has an anchor
     Given the policy workshop's page
     Then it links to "overview/"
-    # Gap: the discussion's anchor named in the title is not asserted
+    And it has no discussion anchor, since the workshop declares no closing discussion
+    When the same workshop is rendered with a closing discussion
+    Then its page links to "overview/"
+    And it has a "discussion" section anchor holding the discussion's question
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::every_view_has_a_page,_in_the_frame,_and_the_tabs_link_them
   Scenario: Every view has a page in the frame, and the tabs link them

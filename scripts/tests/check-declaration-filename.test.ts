@@ -251,8 +251,13 @@ describe("a path to the declaration is built from the constant", () => {
 
   test("examining nothing is not a pass", () => {
     const empty = mkdtempSync(join(tmpdir(), "declfile-empty-"));
-    expect(checkDeclarationFilename(empty).filesRead).toBe(0);
-    // The runner exits non-zero on filesRead === 0 — see the module's main.
+    const r = checkDeclarationFilename(empty);
+    expect(r.filesRead).toBe(0);
+    // An unreadable workflow directory is UNKNOWN, not an empty finding
+    // list: the runner exits 2 on a null scan, and 1 on filesRead === 0 —
+    // see the module's main. The runner itself is not spawned here because
+    // it scans its own checkout, never a given root.
+    expect(r.workflows).toBeNull();
   });
 });
 

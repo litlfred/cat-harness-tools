@@ -125,12 +125,13 @@ Feature: Swimlane glossary export
     And the report lists both as retired and the ledger as stale
 
   @test:scripts/tests/glossary-export.test.ts::retirement_—_reported,_never_deleted::a_retired_term_that_comes_BACK_is_un-retired_and_reported
-  Scenario: Nothing live in the real corpus carries a retirement date
-    # Gap: the ledger with a planted retirement is written but never built; the test checks only the real layer's live terms, and no "un-retired" report is checked
-    Given the real corpus's live ledger, and a scratch ledger marking one live key retired
-    When the real glossary is rebuilt on "2026-09-22"
-    Then every ledger entry not reported retired has a null retiredOn
-    And the chosen live key is not reported retired
+  Scenario: A retired term that comes back is un-retired and reported restored
+    Given the real corpus's live ledger, and a planted ledger marking one live role retired on "2025-01-01"
+    When the real glossary is rebuilt on "2026-09-22" against the planted ledger
+    Then the chosen role's ledger entry has a null retiredOn and keeps its firstSeen
+    And the chosen role is not reported retired
+    And the chosen role, and only it, is reported restored
+    And the planted ledger is reported stale
 
   @test:scripts/tests/glossary-export.test.ts::retirement_—_reported,_never_deleted::firstSeen_is_preserved_across_a_rebuild_—_a_term_is_not_re-minted_daily
   Scenario: firstSeen is kept across rebuilds on different days

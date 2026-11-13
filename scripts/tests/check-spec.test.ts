@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, resolve } from "node:path";
 import {
   extractClarificationMarkers,
   extractH2Sections,
@@ -230,6 +233,30 @@ describe("isStatusAdjudicated", () => {
   });
 });
 
+/**
+ * Run the real CLI (`--spec-before-code --issue 730`) with a stand-in `gh` on
+ * PATH, so the exit code the titles name is the one the process returns. The
+ * stand-in prints `stdout` and exits `status`, the two things
+ * `fetchIssueComments` reads from the real one.
+ */
+function runSpecBeforeCodeCli(gh: { stdout: string; status: number }): number | null {
+  const bin = mkdtempSync(resolve(tmpdir(), "check-spec-gh-"));
+  try {
+    writeFileSync(resolve(bin, "gh.out"), gh.stdout);
+    const stub = resolve(bin, "gh");
+    writeFileSync(stub, `#!/bin/sh\ncat "${resolve(bin, "gh.out")}"\nexit ${gh.status}\n`);
+    chmodSync(stub, 0o755);
+    const res = spawnSync(
+      process.execPath,
+      [resolve(import.meta.dir, "../check-spec.ts"), "--spec-before-code", "--issue", "730"],
+      { encoding: "utf-8", env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH ?? ""}` } },
+    );
+    return res.status;
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+}
+
 describe("checkSpecBeforeCode — spec-before-code gate (Child 3 / issue #753)", () => {
   const validSpecText = `
 # Feature Specification: Test Feature
@@ -274,6 +301,9 @@ Scenario.
     expect(res.findings).toEqual([]);
     expect(res.issueNumber).toBe(730);
     expect(res.specResult?.state).toBe("pass");
+    // The same input through the CLI exits 0: the stand-in `gh` reaches the
+    // gate, so the non-zero exits below are the gate's and not the harness's.
+    expect(runSpecBeforeCodeCli({ stdout: JSON.stringify([{ body: validSpecText }]), status: 0 })).toBe(0);
   });
 
   test("failing case: missing spec comment on issue reports a finding, not silence (exit 1)", () => {
@@ -286,6 +316,7 @@ Scenario.
     expect(res.state).toBe("finding");
     expect(res.findings.length).toBeGreaterThan(0);
     expect(res.findings[0]).toContain("carries no reachable spec comment");
+    expect(runSpecBeforeCodeCli({ stdout: "[]", status: 0 })).toBe(1);
   });
 
   test("failing case: invalid spec comment (missing mandatory section) reports a finding (exit 1)", () => {
@@ -298,6 +329,9 @@ Scenario.
     expect(res.state).toBe("finding");
     expect(res.findings.length).toBeGreaterThan(0);
     expect(res.findings.some((f) => f.includes('missing mandatory section: "Requirements"'))).toBe(true);
+    expect(
+      runSpecBeforeCodeCli({ stdout: JSON.stringify([{ body: invalidSpecTextMissingReq }]), status: 0 }),
+    ).toBe(1);
   });
 
   test("failing case: spec with unresolved [NEEDS CLARIFICATION] when requireAdjudicated reports a finding", () => {
@@ -338,6 +372,7 @@ SC-001: Done.
     expect(res.state).toBe("unknown");
     expect(res.reason).toContain("could not determine");
     expect(res.reason).toContain("failed to fetch comments for issue #730");
+    expect(runSpecBeforeCodeCli({ stdout: "", status: 1 })).toBe(2);
   });
 
   test("feature bean with referenced issue carrying a valid spec passes", () => {

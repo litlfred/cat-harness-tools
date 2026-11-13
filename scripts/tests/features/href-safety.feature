@@ -23,11 +23,11 @@ Feature: Every rendered href goes through the scheme check
     Then the only one is the download link built with "href: url, download: name"
 
   @test:scripts/tests/href-safety.test.ts::every_href_in_the_client_goes_through_the_check::the_client's_allow-list_is_the_same_list_as_the_model's
-  Scenario: The client's allow-list is http, https, mailto and tel
-    # Gap: the list is compared to a literal, not read from the model's safe-url module
+  Scenario: The client's allow-list is the model's allow-list
     Given the source of the site client docs-ui.js
-    Then it declares an ALLOWED_URL_SCHEMES list
-    And the list is "http:", "https:", "mailto:", "tel:" in that order
+    And the model's ALLOWED_URL_SCHEMES from the safe-url module, which is not empty
+    Then the client declares an ALLOWED_URL_SCHEMES list
+    And the client's list is the model's list, in the same order
 
   @test:scripts/tests/href-safety.test.ts::every_href_in_the_navbar_row's_own_script_goes_through_the_check::there_IS_an_href_site
   Scenario: The navbar row script has an href site
