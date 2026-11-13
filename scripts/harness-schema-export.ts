@@ -22,7 +22,7 @@
  * @covers schemas, cat-harness
  */
 import { writeFileSync, mkdirSync, readFileSync, readdirSync, existsSync } from "node:fs";
-import { basename, dirname, join, posix, relative } from "node:path";
+import { basename, dirname, join, posix, relative, sep } from "node:path";
 import type { z } from "zod";
 import { namedJsonSchema, toJsonSchema } from "../schemas/kg/to-json-schema.ts";
 
@@ -41,33 +41,28 @@ import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { withConcernGroupDirs } from "./concern-groups.ts";
+import { layerContracts } from "./skill-contracts.ts";
 import { hostSchemaBase, hostSchemaPath, legacyHostSchemaPath, movedSchema } from "./lib/host-schema.ts";
 
-/**
- * Where a layer keeps its skills' I/O contracts: `<root>/schemas/skills/`.
+/*
+ * Where a layer keeps its skills' I/O contracts: wherever its skills' refs
+ * point (`input:`/`output:` front matter, #1168 B3b), relative to its layer
+ * root — the root `schemas/skills/` or a subgraph's own, such as smart-base's
+ * `L2/schemas/skills/` (bean `cat-tools-st4q`). `layerContracts` in
+ * `skill-contracts.ts` is the one reader.
  *
- * declared-path-literal: the contract-ref convention itself. A skill names its
- * contract in front matter as `input: schemas/skills/<skill>/input.schema.json`,
- * RELATIVE TO ITS LAYER ROOT (`contractRefProblem` in `skill-contracts.ts`),
- * and `kg-export` mints an IRI only for a ref of that shape. So the directory is
- * fixed by the refs that name it, not by the declared `schemas` graph.
- *
- * It read the declared `schemas` directory (`instanceDirectoryForGraph`) until
- * bean `4ak5` item 1 generalised this to every layer, and for the host the
- * two agree. They do not agree elsewhere: the formal-math layer declares
- * `sources/` as its `schemas` graph (source descriptors) and keeps its six
- * contracts under `schemas/skills/`, where its skills' refs point; the FHIR IG
- * harness and a DAK base layer declare no `schemas` graph at all and hold eight and two
- * (measured 2026-10-05). Reading the declaration would have published none of
- * the sixteen.
+ * It read one fixed `<root>/schemas/skills/` until then, and before that the
+ * declared `schemas` directory (`instanceDirectoryForGraph`), until bean
+ * `4ak5` item 1 generalised it to every layer: the formal-math layer declares
+ * `sources/` as its `schemas` graph and keeps its contracts under
+ * `schemas/skills/`, and the FHIR IG harness and a DAK base layer declare no
+ * `schemas` graph at all. The refs answer for all of them.
  *
  * Bean `a02m`'s concern is not reopened: that was `directoriesForGraph(...)[0]`
- * picking up a DEPENDENCY's directory through the overlay. This joins onto the
- * layer root it is handed, so it cannot reach another layer.
+ * picking up a DEPENDENCY's directory through the overlay. `layerContracts`
+ * keeps only skills whose holding layer IS the root it is handed, so it
+ * cannot reach another layer.
  */
-function contractsDir(root: string): string {
-  return join(root, "schemas", "skills");
-}
 
 const ROOT = join(HARNESS_ROOT);
 
@@ -261,35 +256,32 @@ export function buildSkillIoContracts(opts: SchemaExportOptions = {}): SkillIoCo
     opts.schemaBase !== undefined
       ? opts.schemaBase.replace(/\/+$/, "")
       : hostSchemaBase(opts.baseUrl ?? readDeclaration(ROOT)?.canonicalUrl ?? "");
-  const dir = contractsDir(root);
-  if (!existsSync(dir)) return [];
-
   const out: SkillIoContract[] = [];
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    if (!e.isDirectory()) continue;
-    for (const f of readdirSync(join(dir, e.name))) {
-      if (!f.endsWith(".schema.json")) continue;
-      const io = f.slice(0, -".schema.json".length);
-      const source = join(relative(root, dir), e.name, f);
-      const stored = JSON.parse(readFileSync(join(root, source), "utf-8")) as Record<string, unknown>;
-      // With no base the stored `$id` is DROPPED, so the contract publishes
-      // with no identity rather than the hand-written one this function exists
-      // not to trust. Measured on a fixture (bean `4ak5` item 1): spreading the
-      // file let a stale `$id` through whenever no base was known. With a base
-      // the computed one replaces it IN PLACE, keeping the key order — so the
-      // host's published bytes are unchanged.
-      const { $id: _dropped, ...unidentified } = stored;
-      out.push({
-        skill: e.name,
-        io,
-        source,
-        // declared-path-literal: an OUTPUT path inside the published schema/ tree (`<stub>/schema/skills/...`), not a source directory a declaration answers.
-        published: join("skills", e.name, f),
-        // Absolute or absent, never relative and never composed by hand.
-        // Same rule the three documents above follow.
-        schema: base ? { ...stored, $id: skillIoIri(base, e.name, io) } : unidentified,
-      });
-    }
+  // Found through the skills' own refs, wherever they point — the root
+  // `schemas/skills/` or a subgraph's — plus whatever still sits at the root
+  // unnamed (`layerContracts`, bean `cat-tools-st4q`). The published path and
+  // `$id` are keyed by skill, so a contract that moves beside its skill keeps
+  // its address.
+  for (const { skill, io, source } of layerContracts(root).contracts) {
+    const f = `${io}.schema.json`;
+    const stored = JSON.parse(readFileSync(join(root, source), "utf-8")) as Record<string, unknown>;
+    // With no base the stored `$id` is DROPPED, so the contract publishes
+    // with no identity rather than the hand-written one this function exists
+    // not to trust. Measured on a fixture (bean `4ak5` item 1): spreading the
+    // file let a stale `$id` through whenever no base was known. With a base
+    // the computed one replaces it IN PLACE, keeping the key order — so the
+    // host's published bytes are unchanged.
+    const { $id: _dropped, ...unidentified } = stored;
+    out.push({
+      skill,
+      io,
+      source: source.split("/").join(sep),
+      // declared-path-literal: an OUTPUT path inside the published schema/ tree (`<stub>/schema/skills/...`), not a source directory a declaration answers.
+      published: join("skills", skill, f),
+      // Absolute or absent, never relative and never composed by hand.
+      // Same rule the three documents above follow.
+      schema: base ? { ...stored, $id: skillIoIri(base, skill, io) } : unidentified,
+    });
   }
   return out.sort((a, b) => a.source.localeCompare(b.source));
 }
@@ -625,7 +617,7 @@ export const PUBLIC_SCHEMA_EXPORT = /Schema$/;
  *
  * Its DECLARED `schemas` graph when it declares one, else `<root>/schemas/` by
  * convention — the fallback `schemasRoot` in `gen-schema-docs.ts` already uses.
- * Unlike {@link contractsDir}, nothing NAMES these modules by path, so the
+ * Unlike the skill contracts (which skills name by ref), nothing NAMES these modules by path, so the
  * declaration is the authority here. Measured 2026-10-05: the formal-math layer
  * and the IRIS replica declare `sources/` (source descriptors, JSON only), so they
  * are scanned there and hold none; the FHIR IG harness, a DAK base layer and the other
