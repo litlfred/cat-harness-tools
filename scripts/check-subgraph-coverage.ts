@@ -141,6 +141,16 @@ export interface InstanceCoverage {
   exempted: Array<{ directory: string; criterion: Criterion; reason: string }>;
   /** Directories no kind of which owes serialisations (state, code or pages): not a waiver, the kind's answer. */
   serialisationsNotOwed?: string[];
+  /**
+   * Directories that OWE serialisations and declare none, while no layer in the
+   * checkout declares a producer of serialisations at all
+   * ({@link serialisationsProducerDeclared}). Not a waiver and not "not owed":
+   * the obligation stands, and it is listed here rather than as a finding
+   * because there is nothing a directory could declare that would be true
+   * (owner, card "collab gate" B, 2026-11-13). The day one layer declares a
+   * producer, every directory here becomes a major finding again.
+   */
+  serialisationsAwaitingProducer?: string[];
   reason?: string;
 }
 
@@ -415,7 +425,40 @@ function dependencyRoots(root: string): string[] {
   }
 }
 
-export function auditInstance(root: string, repoRoot: string = checkoutRootFor(root)): InstanceCoverage {
+/**
+ * Does ANY layer in this checkout declare what produces its serialisations
+ * (`coverage.serialisations` on any of its directories, own or declared from
+ * within)?
+ *
+ * While none does, a directory that owes serialisations has nothing true it
+ * could declare: no generator writes `json`, `jsonld` and `schema.json` at a
+ * directory's own URL, and naming one that writes something else
+ * (`gen-subgraph-jsonld.ts` writes subgraph `index.jsonld` files) would be a
+ * false claim. So each such directory is recorded as AWAITING a producer
+ * rather than reported as a finding of its own, and adding a node-graph
+ * directory no longer reads as a new failure to the PR gate (smart-base#357,
+ * whose two new `collab` entries were the only "new" lines). A declaration
+ * that cannot be read counts as no producer, the answer that keeps the
+ * obligation listed rather than silently satisfied.
+ */
+export function serialisationsProducerDeclared(repoRoot: string): boolean {
+  for (const r of instanceRootsIn(repoRoot)) {
+    try {
+      const decl = readDeclaration(r);
+      if (!decl) continue;
+      if (instanceDirectories(r, decl).some((d) => typeof d.coverage?.serialisations === "string")) return true;
+    } catch {
+      // Unreadable: reported by auditInstance as undetermined, not here.
+    }
+  }
+  return false;
+}
+
+export function auditInstance(
+  root: string,
+  repoRoot: string = checkoutRootFor(root),
+  opts: { serialisationsProducer?: boolean } = {},
+): InstanceCoverage {
   const instance = root.split("/").pop() ?? root;
   let decl: CatHarnessDeclaration | undefined;
   try {
@@ -448,6 +491,8 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
   const findings: CoverageFinding[] = [];
   const exempted: InstanceCoverage["exempted"] = [];
   const notOwed: string[] = [];
+  const awaitingProducer: string[] = [];
+  const producer = opts.serialisationsProducer ?? serialisationsProducerDeclared(repoRoot);
   const dirs = decl.directories ?? [];
   // Who governs what, read from the skills; and how far a kind claim reaches —
   // this layer, every layer it depends on, and the PLATFORM layer
@@ -498,6 +543,10 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
         if (documentingPages({ instance, id: dir.id, graphTypologies: dir.graphTypologies }, pages, repoRoot, reach).length > 0) continue;
       }
       const declared = criterion === "skill" || criterion === "docs" ? undefined : dir.coverage?.[criterion];
+      if (declared === undefined && criterion === "serialisations" && !producer) {
+        awaitingProducer.push(dir.id);
+        continue;
+      }
       if (declared === undefined) {
         // An UNMET OBLIGATION outranks an unanswered question.
         //
@@ -610,6 +659,7 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
     findings,
     exempted,
     serialisationsNotOwed: notOwed,
+    serialisationsAwaitingProducer: awaitingProducer,
     readme,
     agentInstructions,
     ownDocs,
@@ -617,7 +667,9 @@ export function auditInstance(root: string, repoRoot: string = checkoutRootFor(r
 }
 
 export function auditAll(repoRoot: string): InstanceCoverage[] {
-  return instanceRootsIn(repoRoot).map((r) => auditInstance(r, repoRoot));
+  // Asked once for the checkout, not once per layer.
+  const serialisationsProducer = serialisationsProducerDeclared(repoRoot);
+  return instanceRootsIn(repoRoot).map((r) => auditInstance(r, repoRoot, { serialisationsProducer }));
 }
 
 export function formatReport(rs: InstanceCoverage[]): string {
@@ -665,6 +717,7 @@ export function formatReport(rs: InstanceCoverage[]): string {
   // one number just because one set happens to contain the other.
   const noOwnDocs = rs.filter((r) => r.ownDocs !== undefined).length;
   const notOwed = rs.reduce((n, r) => n + (r.serialisationsNotOwed?.length ?? 0), 0);
+  const awaiting = rs.reduce((n, r) => n + (r.serialisationsAwaitingProducer?.length ?? 0), 0);
   const undet = rs.filter((r) => r.verdict === "undetermined").length;
   const all = rs.flatMap((r) => r.findings);
   const major = all.filter((f) => f.severity === "major").length;
@@ -674,6 +727,16 @@ export function formatReport(rs: InstanceCoverage[]): string {
   );
   if (notOwed) {
     out.push(`${notOwed} director(ies) not owed serialisations (state, code or pages): no kind of theirs is a node graph.`);
+  }
+  if (awaiting) {
+    // One line, not one per directory, and no `✗`: the obligation is the
+    // same unmet one for every directory until a producer exists, and a line
+    // per directory made each new directory read as a new failure. `--json`
+    // lists them by layer.
+    out.push(
+      `${awaiting} director(ies) owe serialisations and declare none, and no layer declares a producer yet — ` +
+        "owed, not waived; each becomes a major finding once one does.",
+    );
   }
   if (noReadme) {
     out.push(
