@@ -114,7 +114,7 @@ export interface QueueItem {
 
 /** Where a narrative slot sits in its document, before anything is validated. */
 export interface SlotAt {
-  /** The path of the slot itself, ending in `"narrative"`. */
+  /** The path of the slot itself, ending in `"narrative"` (`"fac:narrative"` for a CSVW table). */
   at: NarrativePath;
   /** What the slot holds, unvalidated: a list, the empty slot, or anything else. */
   value: unknown;
@@ -185,6 +185,20 @@ export function slotsIn(doc: Record<string, unknown>): SlotAt[] {
       const r = rec as Record<string, unknown>;
       const subject = typeof r.block === "string" ? r.block.split("/").pop() : undefined;
       if ("narrative" in r) out.push({ at: ["summaries", i, "narrative"], value: r.narrative, subject });
+    });
+  }
+
+  // Tables in a CSVW record (`tabular.csvw.json`), including those a paged
+  // entry's pages were transcribed into: one narrative per table, under the
+  // CSVW extension key `fac:narrative`, which `readEntryTables` already
+  // renders. The subject is the table's label, else its CSV.
+  const tables = doc.tables;
+  if (Array.isArray(tables)) {
+    tables.forEach((rec, i) => {
+      if (typeof rec !== "object" || rec === null) return;
+      const r = rec as Record<string, unknown>;
+      const subject = typeof r["fac:label"] === "string" ? r["fac:label"] : typeof r.url === "string" ? r.url : undefined;
+      if ("fac:narrative" in r) out.push({ at: ["tables", i, "fac:narrative"], value: r["fac:narrative"], subject });
     });
   }
 

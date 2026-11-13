@@ -20,7 +20,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { TABULAR_RECORDS_SCHEMA_ID, TabularRecordsSchema, isTabularMimetype } from "../../schemas/library/tabular-records.ts";
-import { checkAll, checkEntry } from "../check-l1-complete.ts";
+import { checkAll, checkEntry, entryKind, type EntryKind } from "../check-l1-complete.ts";
+import { corpusDirectoriesForGraph } from "../../schemas/kg/harness-config.ts";
+import { libraryEntryDirs } from "../lib/library-entry-graphs.ts";
 import { planFor, sniffMimetype, tabularDelimiter } from "../ingest-document.ts";
 
 // The harness: the Python scripts it spawns stayed there; this test moved up in 70lx B2b.
@@ -280,11 +282,18 @@ describe("the real corpus", () => {
     expect(reports, "no `library` declared under ROOT — this test would be vacuous").toBeDefined();
     if (reports === undefined) return;
     expect(reports.length).toBeGreaterThan(0);
+    // A DATASET is an entry whose kind is `tabular`. A paged entry may carry
+    // tables transcribed from its pages (`tabular.csvw.json` beside its
+    // structure); that makes it a document with tables, not a
+    // dataset, so it is counted by its kind rather than by its record.
+    const kinds = new Map<string, EntryKind>();
+    for (const lib of corpusDirectoriesForGraph(ROOT, "library"))
+      for (const { slug, dir } of libraryEntryDirs(lib)) kinds.set(slug, entryKind((f) => existsSync(join(dir, f))));
     const tabular: string[] = [];
     for (const r of reports) {
       const q = r.requirements.find((x) => x.name === "tabular-records");
       expect(`${r.slug}: ${q?.state}`).toBe(`${r.slug}: met`);
-      if (!q?.detail.includes("not tabular")) tabular.push(r.slug);
+      if (kinds.get(r.slug) === "tabular") tabular.push(r.slug);
     }
     expect(tabular).toEqual(["codata-2022"]);
   });
