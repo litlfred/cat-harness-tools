@@ -28,7 +28,7 @@ function fold(gates: Record<string, string>, steps: string[] | null): Record<str
     `m.fold_skill_register(${JSON.stringify(root)}, "bun run cat", g)`,
     "print(json.dumps(g))",
   ].join("\n");
-  const r = spawnSync("python3", ["-I", "-c", code], { encoding: "utf-8" });
+  const r = spawnSync("python3", ["-I", "-B", "-c", code], { encoding: "utf-8" });
   if (r.status !== 0) throw new Error(r.stderr);
   return JSON.parse(r.stdout);
 }

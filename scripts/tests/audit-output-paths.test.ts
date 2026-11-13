@@ -147,14 +147,14 @@ describe("benchmark runner output paths and graph isolation (folio-assistant-wp4
   test("Python benchmark guard rejects graph paths and allows build/benchmarks/", () => {
     const pyGuard = join(SCRIPTS, "_benchmark_guard.py");
 
-    const okRun = spawnSync("python3", [pyGuard, "build/benchmarks/run.json"], { encoding: "utf-8" });
+    const okRun = spawnSync("python3", ["-B", pyGuard, "build/benchmarks/run.json"], { encoding: "utf-8" });
     expect(okRun.status).toBe(0);
 
-    const beansRun = spawnSync("python3", [pyGuard, "beans/run.json"], { encoding: "utf-8" });
+    const beansRun = spawnSync("python3", ["-B", pyGuard, "beans/run.json"], { encoding: "utf-8" });
     expect(beansRun.status).toBe(1);
     expect(beansRun.stderr).toContain("resolves inside declared graph directory 'beans'");
 
-    const qaRun = spawnSync("python3", [pyGuard, "test/results/run.json"], { encoding: "utf-8" });
+    const qaRun = spawnSync("python3", ["-B", pyGuard, "test/results/run.json"], { encoding: "utf-8" });
     expect(qaRun.status).toBe(1);
     expect(qaRun.stderr).toContain("resolves inside declared graph directory 'test/results'");
   });
