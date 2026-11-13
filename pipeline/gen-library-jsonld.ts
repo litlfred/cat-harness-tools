@@ -87,7 +87,7 @@ import { serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
 import type { DocumentImage, ImagesSidecar } from "../schemas/content/document-image.ts";
-import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
+import { buildTabularNodes, tableBlockId, tabularShapeOf } from "./tabular-nodes.ts";
 import { TABULAR_CSVW_FILENAME } from "../schemas/library/tabular-csvw.ts";
 import {
   RECORDING_FILENAME,
@@ -432,6 +432,27 @@ export function librarySubgraphStart(locatedAt: string): string {
   return findContentRepoRoot();
 }
 
+/**
+ * One table transcribed from a paged source's pages: an entry of the
+ * `tables` of a `tabular.csvw.json` that sits BESIDE `structure.json`
+ * (who-iris#224). Read raw, as `library-document.ts` reads it for the site:
+ * the `fac:` fields below are the transcriber's, and none is required.
+ */
+export interface TranscribedTable {
+  url: string;
+  tableSchema?: { columns?: { titles?: unknown }[] };
+  "fac:label"?: unknown;
+  "fac:caption"?: unknown;
+  "fac:pages"?: unknown;
+  "fac:narrative"?: unknown;
+}
+
+/** The pages a transcribed table spans, in order; `[]` when it does not say. */
+function tablePages(t: TranscribedTable): number[] {
+  const p = t["fac:pages"];
+  return Array.isArray(p) ? p.filter((n): n is number => Number.isInteger(n)).sort((a, b) => a - b) : [];
+}
+
 /** Everything one document contributes, as files to write. */
 export function buildDocumentNodes(
   docId: string,
@@ -444,6 +465,7 @@ export function buildDocumentNodes(
   instance?: string,
   subgraphStart: string = findContentRepoRoot(),
   sourceMaterialization?: unknown,
+  tables?: readonly TranscribedTable[],
 ): Array<{ path: string; content: string }> {
   // Without a resolved title (a test, a caller with no disk), resolve from the
   // structure alone: the Info dictionary or a text heading, never the page-1
@@ -505,6 +527,42 @@ export function buildDocumentNodes(
   // stays with the section that introduced it. Last is what the race happened
   // to land on and is not a reason.
   const figureOwned = new Set<string>();
+
+  // Tables transcribed from the pages (`tabular.csvw.json` beside the
+  // structure), placed like figures: in the FIRST section containing the
+  // table's first page. Until this, the paged rung never read that file, so
+  // a transcribed table had no block and its `fac:narrative` drafts (1464 in
+  // who-iris) reached neither the graph nor the library viewer, though the
+  // narrative queue offered them. The block carries the narrative as figure
+  // blocks carry theirs: a copy, reviewed in the file it was copied from.
+  const tableOwned = new Set<number>();
+  const tableBlock = (t: TranscribedTable, i: number, owner: string): string => {
+    const bid = tableBlockId(i);
+    const pages = tablePages(t);
+    const label = typeof t["fac:label"] === "string" && t["fac:label"] ? t["fac:label"] : bid;
+    const caption = typeof t["fac:caption"] === "string" && t["fac:caption"] ? t["fac:caption"] : undefined;
+    const headers = (t.tableSchema?.columns ?? []).map((c) => (typeof c.titles === "string" ? c.titles : ""));
+    out.push({
+      path: `blocks/${bid}.jsonld`,
+      content: node({
+        "@id": iri(`blocks/${bid}`),
+        "@type": typesForKind("table"),
+        kind: "table",
+        label,
+        title: caption,
+        // The CSV, relative to the block, as `file` is for a figure.
+        file: `../${t.url}`,
+        headers: headers.length ? headers : undefined,
+        pageStart: pages[0],
+        pageEnd: pages[pages.length - 1],
+        narrative: t["fac:narrative"] ?? undefined,
+        derivedFrom: owner,
+        sourceDocument: iri("manifest"),
+        provenance: "ingested",
+      }),
+    });
+    return iri(`blocks/${bid}`);
+  };
 
   for (const sec of sections) {
     const key = sectionKey(sec.id);
@@ -596,6 +654,16 @@ export function buildDocumentNodes(
       }
     }
 
+    // Tables whose first page falls in this section, by the same rule.
+    if (from !== undefined && to !== undefined) {
+      (tables ?? []).forEach((t, i) => {
+        const first = tablePages(t)[0];
+        if (first === undefined || first < from || first > to || tableOwned.has(i)) return;
+        tableOwned.add(i);
+        contained.push(tableBlock(t, i, iri(`sections/${key}`)));
+      });
+    }
+
     const sIri = iri(`sections/${key}`);
     sectionIris.push(sIri);
     out.push({
@@ -616,6 +684,14 @@ export function buildDocumentNodes(
     });
   }
 
+  // A table no section holds (no page, or a page outside every section) hangs
+  // off the document itself, after the sections, rather than being dropped:
+  // dropping it is the hiding this exists to end.
+  const unplaced: string[] = [];
+  (tables ?? []).forEach((t, i) => {
+    if (!tableOwned.has(i)) unplaced.push(tableBlock(t, i, iri("manifest")));
+  });
+
   const librarySubgraph = declaredSubgraphNode(subgraphStart, "library");
   out.push({
     path: "manifest.jsonld",
@@ -627,7 +703,7 @@ export function buildDocumentNodes(
       // corroborated extraction (bean `w6fu`, ruling of 2026-10-02 on #1838)
       // each have a slot. See `library-title.ts` for the order.
       title: resolvedTitle.title,
-      contains: sectionIris,
+      contains: [...sectionIris, ...unplaced],
       provenance: "ingested",
       ...(librarySubgraph ? memberOf(librarySubgraph.iri) : {}),
       ...licenceProperties(licence),
@@ -977,6 +1053,9 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
     const structure = read.raw as unknown as Structure;
     const candidates = readJson<Candidates>(join(dir, "candidates.json"));
     const images = readJson<ImagesSidecar>(join(dir, "images.json"));
+    // Tables transcribed from the pages, when the entry has them. `rung` is
+    // `paged`, so this file is not the entry's own record: it is beside it.
+    const transcribed = readJson<{ tables?: TranscribedTable[] }>(join(dir, TABULAR_CSVW_FILENAME));
     const licence = readLicence(dir);
     // A catalogue node names a record that will not read: the title cannot be
     // determined, and the slug over a record that exists is the R8 defect.
@@ -993,6 +1072,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       instance,
       subgraphStart,
       readJson<unknown>(join(dir, SOURCE_MATERIALIZATION_RECORD)),
+      Array.isArray(transcribed?.tables) ? transcribed.tables : undefined,
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
     if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance));
