@@ -38,8 +38,13 @@
 #      `index.lock.json` follows (`mountRemote`), and re-renders the agent
 #      surface when the lock changed.
 #   4. When a tracked file changed, push `repin/standing-<date>` and open ONE
-#      PR with auto-merge, or update the one already open (any
-#      `repin/standing-*` head), so runs never stack PRs.
+#      PR, or update the one already open (any `repin/standing-*` head), so
+#      runs never stack PRs. What happens to the PR then depends on what
+#      started the run (see "Who merges" below):
+#        - `workflow_dispatch` (the merge manager started it): auto-merge;
+#        - `schedule` or `repository_dispatch` (nobody decided): the
+#          `needs-repin` label, and NO auto-merge. An auto-merge already on
+#          the PR is turned off, since its content just changed under it.
 #
 # Why a token: pushes and PRs made with the default GITHUB_TOKEN do not
 # trigger the site's own `pull_request` workflows, so required checks never
@@ -47,17 +52,20 @@
 # token with contents + pull-requests write) for checks to run on the repin PR;
 # without it the PR is still opened, and the step summary says so.
 #
-# Who merges and re-pins (owner, 2026-11-13; cat-harness#1313,
-# merge-manager-watcher §"What this does not do yet"): ONLY the merge manager
-# runs a merge path. No session runs this workflow's merge step by hand, and
-# no session re-pins a site some other way to get round it. This workflow is
-# a scheduled job, not a session: what it does without the merge manager is
-# the per-site STANDING consent above (owner, 2026-10-16) — move a covered pin
-# and ask GitHub for auto-merge on green. Any other re-pin is the merge
-# manager's, on a session's `repin+merge:` message or a PR's `needs-repin`
-# label (`merge:watch --queue` lists them). A repin PR whose auto-merge cannot
-# be enabled, or that stays red, is the merge manager's to land or hand back,
-# with `merge:guard --merge`.
+# Who merges (owner, 2026-11-13; cat-harness#1313, merge-manager-watcher
+# §"What this does not do yet"): ONLY the merge manager runs a merge path.
+# The owner's card the same day, "Standing re-pin workflows: MM dispatches,
+# auto-merge OK", decides how that applies here:
+#   - a `workflow_dispatch` run is the merge manager's: it started the run,
+#     so the PR gets auto-merge;
+#   - a `schedule` or `repository_dispatch` run is nobody's decision: it
+#     opens or updates the PR and labels it `needs-repin`, and does NOT ask
+#     for auto-merge. `merge:watch --queue` lists it, and the merge manager
+#     decides — dispatch this workflow, or land it with `merge:guard --merge`.
+# No other session dispatches this workflow, runs its merge step by hand, or
+# re-pins a site some other way. In a reusable workflow `github.event_name`
+# is the CALLER's event, which is what this reads.
+# (scripts/tests/sdlc/standing-repin-merge.test.ts runs the step's script.)
 
 name: Standing repin
 
@@ -160,6 +168,8 @@ jobs:
           BASE: ${{ github.event.repository.default_branch }}
           METHOD: ${{ inputs.merge-method }}
           HAS_TOKEN: ${{ secrets.repin-token != '' }}
+          EVENT: ${{ github.event_name }}
+          REPIN_LABEL: needs-repin
         run: |
           set -euo pipefail
           if [ -z "$(git status --porcelain)" ]; then
@@ -190,8 +200,17 @@ jobs:
             gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/repin.md"
             number=$(gh pr view "$branch" --json number --jq .number)
           fi
-          gh pr merge "$number" --auto "--$METHOD" \
-            || echo "::warning::auto-merge could not be enabled on #$number (is it allowed in the repository settings?)"
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            # The merge manager started this run: its decision, auto-merge OK.
+            gh pr merge "$number" --auto "--$METHOD" \
+              || echo "::warning::auto-merge could not be enabled on #$number (is it allowed in the repository settings?)"
+          else
+            # Nobody decided ($EVENT): queue it for the merge manager.
+            gh pr edit "$number" --add-label "$REPIN_LABEL" \
+              || { echo "::error::could not label #$number \`$REPIN_LABEL\` (does the label exist here?): the merge manager would not see it"; exit 1; }
+            gh pr merge "$number" --disable-auto >/dev/null 2>&1 || true
+            echo "#$number labelled \`$REPIN_LABEL\` for the merge manager; no auto-merge on a $EVENT run." >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ "$HAS_TOKEN" != "true" ]; then
             echo "::warning::opened with GITHUB_TOKEN: the site's pull_request checks do not run on #$number, so auto-merge waits on them. Pass repin-token."
           fi
