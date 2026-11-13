@@ -25,6 +25,18 @@
 import "./kg/folio-graph-typology.js";
 
 /*
+ * NO PYTHON BYTECODE IN THE TREE — bean `cat-tools-sm8r` item 4.
+ *
+ * A script under test that spawns Python (the PDF and LaTeX importers, the
+ * layer-pr-checks gates) has it import in-tree modules, and Python then writes
+ * `__pycache__/` beside them: inside a mounted layer, which `mount-from-lock
+ * --check` then reports edited after one `bun test`. Every child inherits this;
+ * a spawn passing `-I` ignores it, and passes `-B` instead.
+ */
+// input-site: inert #0b652d78 — written, never read: it keeps a child's bytecode out of the tree
+process.env.PYTHONDONTWRITEBYTECODE = "1";
+
+/*
  * THE SUITE'S DEFAULT TIMEOUT — bean `61n5`.
  *
  * bun's default is 5 s, and this repository has a whole class of tests that

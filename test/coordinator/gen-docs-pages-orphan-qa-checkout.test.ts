@@ -22,7 +22,7 @@
  * a composed checkout, whose mounts are not git work trees, nothing put them
  * back. The paths are the same paths, rebased onto the copy.
  */
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -39,8 +39,17 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
   // The generator re-derives the committed witnesses under every layer's
   // `test/results/`, and re-renders every committed page: it runs over a
   // scratch copy, so the checkout is never written (bean `cat-tools-sm8r`).
+  // The copy is the fixture, made once with its own budget: copying a composed
+  // checkout takes seconds the test's own timeout was never meant to cover.
+  let scratch = "";
+  beforeAll(() => {
+    scratch = scratchCheckoutOf(REPO_ROOT);
+  }, 180_000);
+  afterAll(() => {
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
+  }, 180_000);
+
   test("published QA count matches the post-sweep tree, not the tree it started from, and consecutive runs are idempotent", () => {
-    const scratch = scratchCheckoutOf(REPO_ROOT);
     const INSTANCE_ROOT = join(scratch, relative(REPO_ROOT, ORIGIN_INSTANCE_ROOT));
     const QA_ASSET_DIR = join(INSTANCE_ROOT, "test", "results", "witnesses");
     const QA_INDEX_PATH = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "assets", "qa", "index.json");
@@ -96,7 +105,7 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
       expect(published2.files).toBe(published1.files);
       expect(published2).toEqual(published1);
     } finally {
-      rmSync(scratch, { recursive: true, force: true });
+      rmSync(orphanDir, { recursive: true, force: true });
     }
   }, 30000);
 });
