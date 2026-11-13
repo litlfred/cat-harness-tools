@@ -62,8 +62,13 @@ describe("the page a reader gets — over the REAL corpus", () => {
         ...[...text.matchAll(/<a id="([^"]+)"><\/a>/g)].map((m) => m[1]),
         ...[...text.matchAll(/^#{1,6} .*\{#([^}\s]+)\}\s*$/gm)].map((m) => m[1]),
       ]);
+      // One title link per row, in the table's first column. Prose links too
+      // (`linkProse` turns a code span naming a methodology into `#<name>`,
+      // owner 2026-11-10), so the count is of row links and every link of
+      // either kind must land on the page.
+      const rowLinks = [...text.matchAll(/^\| \*\*\[[^\]]*\]\(#([^)]+)\)/gm)].map((m) => m[1]);
       const links = [...text.matchAll(/\]\(#([^)]+)\)/g)].map((m) => m[1]);
-      expect(links.length).toBe(rows.length);
+      expect(rowLinks.length).toBe(rows.length);
       expect(links.filter((l) => !targets.has(l))).toEqual([]);
     }
   });

@@ -85,7 +85,7 @@ export interface GitHubApi {
   lockPinsAt?(repository: string, sha: string): Promise<Record<string, string> | undefined>;
   /**
    * The parsed `<instance>.json` of `repository` at `sha`, read from `at`
-   * (the instance's `upstreamRoot` in the site's lock, e.g. `smart-base/`)
+   * (the instance's `upstreamRoot` in the site's lock, e.g. `<instance>/`)
    * or from the root when `at` is empty; `undefined` when there is none.
    * Optional: an API without it adds no newly declared directory
    * ({@link extendExplicitDirectories}).
@@ -194,9 +194,9 @@ export async function cascadeOf(root: string, harnessRoot?: string): Promise<{ h
 /**
  * `{ instance → upstreamRoot }` from an `index.lock.json`'s `instances`: where
  * each instance's declaration sits in its repository. A layer whose
- * declaration is not at the root (smart-base keeps `smart-base/smart-base.json`)
+ * declaration is not at the root (one kept at `<instance>/<instance>.json`)
  * was read at the root by step 4a, found missing, and turned every re-pin that
- * moved it into could-not-determine (smart-trust, 2026-11-13). Pure.
+ * moved it into could-not-determine (2026-11-13). Pure.
  */
 export function upstreamRootsOf(lock: unknown): Record<string, string> {
   const out: Record<string, string> = {};
