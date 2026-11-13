@@ -18,6 +18,7 @@ import {
   joinTestsToScenarios,
   parseFeature,
   scanTree,
+  unescapeJsString,
 } from "../lib/test-gherkin";
 import { auditTestGherkin } from "../test-plan-audit";
 import { TEST_PLAN_SCHEMA_ID, TEST_PLAN_SCHEMA_ID_V1 } from "../../schemas/sdlc/test-plan";
@@ -408,5 +409,25 @@ describe("bindings beyond @test:, and Gherkin dialects", () => {
     // An unterminated or nested-looking comment never leaves a case readable.
     expect(withoutXmlComments('a<!-- <testcase id="x"/> --><!--<!-- -->b')).toBe("ab");
     expect(withoutXmlComments('a<!-- <testcase id="x"/>')).toBe("a");
+  });
+});
+
+describe("a JS title is named by its runtime string", () => {
+  test("escapes in a quoted or template title are read as the runner reads them; a looped id stays verbatim", () => {
+    const src = [
+      'describe("say \\"it\\" twice", () => {',
+      "  test('can\\'t fail', () => {});",
+      "  test(`a \\`tick\\``, () => {});",
+      '  test("regex \\\\bq\\\\b and \\u00e9 and \\x41", () => {});',
+      "  test(`case[${k}]`, () => {});",
+      "});",
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("t.test.ts", src))).toEqual([
+      "t.test.ts::say_\"it\"_twice::can't_fail",
+      "t.test.ts::say_\"it\"_twice::a_`tick`",
+      "t.test.ts::say_\"it\"_twice::regex_\\bq\\b_and_é_and_A",
+      "t.test.ts::say_\"it\"_twice::case[${k}]",
+    ]);
+    expect(unescapeJsString("a\\nb\\u{1F600}\\\nc\\q")).toBe("a\nb\u{1F600}cq");
   });
 });

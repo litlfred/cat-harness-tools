@@ -157,7 +157,7 @@ Feature: An actor performs a task in a process as a role, using that role's skil
     Then it is "editor"
     And the warning says partitionElementRef wins
 
-  @test:schemas/process/role-graph.test.ts::laneRoleRef_—_a_lane_names_its_Role_by_partitionElementRef_(owner,_2026-10-16)::variable=\"true\"_is_a_declaration,_not_a_legacy_binding
+  @test:schemas/process/role-graph.test.ts::laneRoleRef_—_a_lane_names_its_Role_by_partitionElementRef_(owner,_2026-10-16)::variable="true"_is_a_declaration,_not_a_legacy_binding
   Scenario: variable="true" declares a varying performer, not a binding
     Given a lane with a bootstrap.processes:role extension carrying variable "true"
     When its role ref is read

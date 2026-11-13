@@ -305,7 +305,7 @@ Feature: Subscribing to a substrate or content Knowledge Graph
     And the no-declaration row says the root carries no Knowledge Graph declaration
     # Rows: content-only nested -> content; harness-bearing nested -> substrate; harness-bearing at the root -> substrate; a declaration with no Subgraph -> not-a-substrate; no declaration at all -> not-a-substrate
 
-  @test:scripts/tests/kg/kg-subscribe.test.ts::content_Knowledge_Graphs_(owner,_2026-10-06):_recorded_as_their_own_kind::subscribe_records_`kind:_\"content\"`_on_the_entry_and_the_snapshot,_and_--check_is_clean
+  @test:scripts/tests/kg/kg-subscribe.test.ts::content_Knowledge_Graphs_(owner,_2026-10-06):_recorded_as_their_own_kind::subscribe_records_`kind:_"content"`_on_the_entry_and_the_snapshot,_and_--check_is_clean
   Scenario: Subscribing to content records kind "content" on the entry and snapshot
     Given a subscriber layer
     When it subscribes to the nested imm-kg content tree

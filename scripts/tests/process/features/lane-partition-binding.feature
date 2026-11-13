@@ -23,7 +23,7 @@ Feature: A lane binds its Role through partitionElementRef, with the legacy ref 
     Then the lane's role is "build-pipeline", bound by partitionElementRef
     And its binding warning names "reviewer"
 
-  @test:scripts/tests/process/lane-partition-binding.test.ts::loadProcessModel_reads_both_spellings::variable=\"true\"_is_a_declaration,_not_a_binding
+  @test:scripts/tests/process/lane-partition-binding.test.ts::loadProcessModel_reads_both_spellings::variable="true"_is_a_declaration,_not_a_binding
   Scenario: A role marked variable declares a varying performer and binds no role
     Given the diagram whose lane carries <bootstrap.processes:role variable="true">
     When it is loaded

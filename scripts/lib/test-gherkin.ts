@@ -473,6 +473,24 @@ const JS_BARE_MODS = new Set(["skip", "only", "todo", "failing", "concurrent", "
 /** Modifiers whose own argument list comes before the title call. */
 const JS_ARG_MODS = new Set(["each", "if", "skipIf", "runIf"]);
 
+/**
+ * A JS string literal's source text as the runtime string: what a runner
+ * prints as the title, and so what a tag is written against. `"a \"b\""`
+ * is the title `a "b"`, not `a \"b\"`. Covers the single-character escapes,
+ * `\xHH`, `\uHHHH`, `\u{…}` and a line continuation; any other escaped
+ * character stands for itself, as in JS.
+ */
+export function unescapeJsString(body: string): string {
+  const single: Record<string, string> = { n: "\n", t: "\t", r: "\r", b: "\b", f: "\f", v: "\v", "0": "\0" };
+  return body.replace(/\\(u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|\r\n|[\s\S])/g, (_, e: string, cp?: string, u?: string, x?: string) => {
+    if (cp) return String.fromCodePoint(parseInt(cp, 16));
+    if (u) return String.fromCharCode(parseInt(u, 16));
+    if (x) return String.fromCharCode(parseInt(x, 16));
+    if (e === "\n" || e === "\r\n" || e === "\r" || e === "\u2028" || e === "\u2029") return "";
+    return single[e] ?? e;
+  });
+}
+
 /** `id[${key}]`: a literal id, then one interpolation in brackets, nothing else computed. */
 const LOOPED_ID = /^[^`$\s\[\]]+\[\$\{[^{}`]*\}\]$/;
 
@@ -501,13 +519,15 @@ export const JS_ADAPTER: TestLanguageAdapter = {
      * One template is fixed: a literal id followed by a single `[${…}]`, the
      * looped-test convention `id[${key}]` (owner, 2026-11-06). It is named
      * verbatim, so its tag names `id[${key}]`, and the id stays unique in its
-     * file however many cases the loop runs.
+     * file however many cases the loop runs. Every other literal is named by
+     * its runtime string ({@link unescapeJsString}).
      */
     const firstArgString = (open: number): string | undefined => {
       for (let j = open + 1; j < code.length; j++) {
         if (strings.has(j)) {
           const body = strings.get(j)!;
-          return src[j] === "`" && body.includes("${") && !LOOPED_ID.test(body) ? undefined : body;
+          if (src[j] === "`" && body.includes("${")) return LOOPED_ID.test(body) ? body : undefined;
+          return unescapeJsString(body);
         }
         if (!/\s/.test(code[j])) return undefined;
       }

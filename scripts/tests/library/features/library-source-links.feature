@@ -154,7 +154,7 @@ Feature: Library pages link their sources
     When the view panel is built for an image source
     Then it holds a lazy-loaded img of that image
 
-  @test:scripts/tests/library/library-source-links.test.ts::an_unknown_page_count_is_not_zero_(owner,_2026-10-15:_\"(0_pages)\")::a_page-granularity_ingestion_with_no_source.pages_reads_null,_and_says_how_far_its_sections_reach
+  @test:scripts/tests/library/library-source-links.test.ts::an_unknown_page_count_is_not_zero_(owner,_2026-10-15:_"(0_pages)")::a_page-granularity_ingestion_with_no_source.pages_reads_null,_and_says_how_far_its_sections_reach
   Scenario: An unknown page count is null, with the pages its sections cover
     Given a page-granular structure of three sections with no source.pages
     When its document view is read

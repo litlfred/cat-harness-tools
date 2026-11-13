@@ -90,7 +90,7 @@ Feature: The shared navbar and the rail adapter
     Then it contains an img for "../assets/img/icons/cat-mark.svg"
     And it contains a "B" initial for bootstrap
 
-  @test:scripts/tests/ui/navbar.test.ts::the_exploding_menu::does_not_repeat_a_label_that_is_its_own_initial_(\"A_A\")
+  @test:scripts/tests/ui/navbar.test.ts::the_exploding_menu::does_not_repeat_a_label_that_is_its_own_initial_("A_A")
   Scenario: A label that is its own initial is not repeated beside the mark
     Given a navbar model whose root is labelled "A"
     When the navbar is rendered
@@ -762,37 +762,37 @@ Feature: The shared navbar and the rail adapter
     Then the visualiser label read off it is "WHO SMART Trust"
     And the injected rail contains "WHO SMART Trust"
 
-  @test:scripts/tests/ui/navbar.test.ts::a_page's_declared_section_label::is_absent_when_undeclared,_and_the_section_is_\"On_this_page\"_(the_theme_sidebar's_name,_2026-10-15)
+  @test:scripts/tests/ui/navbar.test.ts::a_page's_declared_section_label::is_absent_when_undeclared,_and_the_section_is_"On_this_page"_(the_theme_sidebar's_name,_2026-10-15)
   Scenario: With no declared label the section is "On this page"
     Given a page with a declared visualiser nav and no label meta
     Then no visualiser label is read
     And the injected rail contains "On this page"
 
-  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_\"what_is_26?_why_unlabeled?\"::every_fold_is_a_button_on_the_parent's_row_with_a_name_that_says_whose_and_how_many
+  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_"what_is_26?_why_unlabeled?"::every_fold_is_a_button_on_the_parent's_row_with_a_name_that_says_whose_and_how_many
   Scenario: Every fold is a button on its parent's row naming whose and how many
     Given a pages group with two folding rows, "Skill schema reference" with 2 pages and "Guides" with 1 holding the current page
     When the navbar is rendered
     Then there are two twisty buttons
     And the first is labelled "Show Skill schema reference's 2 pages", collapsed, and carries a tip
 
-  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_\"what_is_26?_why_unlabeled?\"::ids_are_unique_and_each_toggle_controls_its_own_list
+  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_"what_is_26?_why_unlabeled?"::ids_are_unique_and_each_toggle_controls_its_own_list
   Scenario: Fold ids are unique and each toggle controls its own list
     Given the same pages group rendered
     Then every aria-controls id is distinct
     And each id names a "fa-nav-kids" list
 
-  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_\"what_is_26?_why_unlabeled?\"::a_fold_holding_the_reader's_page_arrives_OPEN,_named_'Hide'
+  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_"what_is_26?_why_unlabeled?"::a_fold_holding_the_reader's_page_arrives_OPEN,_named_'Hide'
   Scenario: A fold holding the reader's page arrives open and named Hide
     Given the same pages group rendered
     Then the Guides twisty is expanded, controls "fa-nav-fold-2" and is labelled "Hide Guides's 1 page"
     And the "fa-nav-fold-2" list is not hidden
 
-  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_\"what_is_26?_why_unlabeled?\"::no_row_in_any_rail_is_a_bare_count
+  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_"what_is_26?_why_unlabeled?"::no_row_in_any_rail_is_a_bare_count
   Scenario: No row is a bare count
     Given the same pages group rendered
     Then no label reads only a number of pages or sub-sections
 
-  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_\"what_is_26?_why_unlabeled?\"::a_rail_rendered_INTO_a_page_carries_its_script:_the_fold_toggles_and_the_drag_edge
+  @test:scripts/tests/ui/navbar.test.ts::a_fold_opens_from_its_parent's_row_—_owner,_2026-10-15:_"what_is_26?_why_unlabeled?"::a_rail_rendered_INTO_a_page_carries_its_script:_the_fold_toggles_and_the_drag_edge
   Scenario: A navbar injected into a page carries its fold and drag script
     Given a plain page
     When a navbar with the folding pages group is injected
