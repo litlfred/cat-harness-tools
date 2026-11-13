@@ -93,7 +93,7 @@ describe("gen-instance-contexts over a fixture tree", () => {
     expect(problems.some((l) => l.includes("prefix `dcterms` is bound differently"))).toBe(true);
   });
 
-  test(`the path is instance-relative: ${INSTANCE_CONTEXT_PATH}`, () => {
+  test("the path is instance-relative: ns/context/v1.jsonld", () => {
     expect(by("top").path).toBe(`top/${INSTANCE_CONTEXT_PATH}`);
   });
 });
