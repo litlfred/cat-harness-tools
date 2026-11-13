@@ -101,32 +101,32 @@ Feature: Site parity guard for the root publish
     When the shortfall is computed with no rulings
     Then it names comparison-v1.0.0/
 
-  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_\"C\",_2026-10-15)::the_dropped_feature_is_reported_with_its_ruling,_not_a_shortfall
+  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_"C",_2026-10-15)::the_dropped_feature_is_reported_with_its_ruling,_not_a_shortfall
   Scenario: A page feature dropped by ruling is reported with that ruling, not as a shortfall
     Given the current root and an IG-route candidate with the rail, its own search box and the language block but no theme side bar
     When the shortfall and the drops are computed with the side-nav ruling
     Then the shortfall is empty
     And siteNav is reported as dropped as "the theme's side bar (#site-nav)" with the ruling
 
-  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_\"C\",_2026-10-15)::without_the_ruling_the_guard_still_refuses_the_same_build
+  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_"C",_2026-10-15)::without_the_ruling_the_guard_still_refuses_the_same_build
   Scenario: Without the side-nav ruling the IG-route build is refused for the side bar
     Given the current root and an IG-route candidate
     When the shortfall is computed with no rulings
     Then it names only the theme's side bar
 
-  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_\"C\",_2026-10-15)::search_stays_required:_the_side-bar_ruling_does_not_excuse_a_missing_search_box
+  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_"C",_2026-10-15)::search_stays_required:_the_side-bar_ruling_does_not_excuse_a_missing_search_box
   Scenario: The side-bar ruling does not excuse a missing search box
     Given an IG-route candidate without a search box
     When the shortfall is computed with the side-nav ruling
     Then it names only the search box
 
-  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_\"C\",_2026-10-15)::the_language_picker_is_required:_a_build_that_drops_fa-translation-meta_is_refused
+  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_"C",_2026-10-15)::the_language_picker_is_required:_a_build_that_drops_fa-translation-meta_is_refused
   Scenario: A build that drops the language picker's block is refused
     Given an IG-route candidate without fa-translation-meta
     When the shortfall is computed with the side-nav ruling
     Then it names only the language picker's block
 
-  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_\"C\",_2026-10-15)::a_feature_entry_excuses_no_directory,_and_a_directory_entry_no_feature
+  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_"C",_2026-10-15)::a_feature_entry_excuses_no_directory,_and_a_directory_entry_no_feature
   Scenario: A feature ruling excuses no directory, and a directory ruling no feature
     Given an IG-route candidate without openapi/
     When the shortfall is computed with the side-nav feature ruling
@@ -134,7 +134,7 @@ Feature: Site parity guard for the root publish
     And a feature ruling does not match the directory "openapi"
     And with a directory ruling for "site-nav" an IG-route candidate's shortfall still names #site-nav
 
-  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_\"C\",_2026-10-15)::an_entry_naming_both_a_directory_and_a_feature_excuses_neither
+  @test:scripts/tests/ui/site-parity.test.ts::page_features_dropped_by_the_owner's_ruling_(layout_"C",_2026-10-15)::an_entry_naming_both_a_directory_and_a_feature_excuses_neither
   Scenario: A ruling naming both a directory and a feature excuses neither
     Given an IG-route candidate without openapi/
     When the shortfall is computed with one ruling naming dir "openapi" and feature siteNav

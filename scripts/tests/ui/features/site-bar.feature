@@ -87,7 +87,7 @@ Feature: One rail and one top bar on every page
     Then no page gets a rail
     And the install page is unchanged
 
-  @test:scripts/tests/ui/site-bar.test.ts::every_railed_page_is_FINISHED:_one_rail,_the_current_first-paint_snippet_(2026-10-16)::a_page_that_only_MENTIONS_id=\"site-nav\"_is_railed,_its_side_bar_replaced
+  @test:scripts/tests/ui/site-bar.test.ts::every_railed_page_is_FINISHED:_one_rail,_the_current_first-paint_snippet_(2026-10-16)::a_page_that_only_MENTIONS_id="site-nav"_is_railed,_its_side_bar_replaced
   Scenario: A page that only mentions the side-bar id in prose is still railed
     Given a theme page whose prose quotes id="site-nav" in a code span
     When the rail pass runs
