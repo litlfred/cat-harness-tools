@@ -89,8 +89,25 @@ let docsSubgraph = declaredSubgraphNode(INSTANCE_ROOT, "docs");
  * moved or not.
  */
 function sourceDocumentIri(source: string): string {
-  const repoPath = relative(REPO_ROOT, resolve(CUR.root, source)).split("\\").join("/");
-  return sourceLinks(REPO_WEB, repoPath, "main")?.viewHref ?? source;
+  return sourceLinks(REPO_WEB, sourceRepoPath(REPO_ROOT, CUR.root, source), "main")?.viewHref ?? source;
+}
+
+/**
+ * The asset's path in THIS checkout, repository-relative. A source that names
+ * a sibling layer (`../cat-harness/processes/…`) is written for the index
+ * layout, where layers sit side by side; in a layer's own checkout that layer
+ * is MOUNTED under the root (`cat-harness/…`), so the sibling path would leave
+ * the repository and the link would read `…/blob/main/../cat-harness/…`. When
+ * the path leaves the repository and the mounted copy exists, use the mount;
+ * `sourceLinks` then names that layer's own repository.
+ */
+function sourceRepoPath(repoRoot: string, from: string, source: string): string {
+  let repoPath = relative(repoRoot, resolve(from, source)).split("\\").join("/");
+  if (repoPath.startsWith("../")) {
+    const mounted = repoPath.replace(/^(\.\.\/)+/, "");
+    if (existsSync(join(repoRoot, mounted))) repoPath = mounted;
+  }
+  return repoPath;
 }
 
 const check = process.argv.includes("--check");
