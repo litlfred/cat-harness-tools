@@ -8,7 +8,8 @@ import { mkdtempSync, mkdirSync, readFileSync, existsSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { localiseRail, navbarStringsFile, railLocale, railRootPath } from "../lib/navbar-locale.ts";
+import { localisePageBar, localiseRail, navbarStringsFile, railLocale, railRootPath } from "../lib/navbar-locale.ts";
+import { PAGE_BAR_CLASS } from "../lib/page-layout-classes.ts";
 import {
   NAV_STRINGS_GLOBAL,
   RAIL_CHROME_STRINGS,
@@ -136,5 +137,41 @@ describe("the swap is exact match or nothing", () => {
     expect(localiseRail(nav, map)).toBe(2);
     expect(attrEls[0]!.a).toEqual({ "aria-label": "افتح أو أغلق", "data-fa-tip": "افتح أو أغلق" });
     expect(attrEls[1]!.a).toEqual({ title: "Something else" });
+  });
+});
+
+describe("the page's top bar takes the same map", () => {
+  type N = { nodeType: number; nodeName?: string; textContent: string | null; childNodes?: N[] };
+  const t = (s: string): N => ({ nodeType: 3, textContent: s });
+  const el = (name: string, ...kids: N[]): N => ({ nodeType: 1, nodeName: name, textContent: null, childNodes: kids });
+  const map = { "SMART Verifiable IPS for Pilgrimage": "SMART IPS للزيارة الدينية", Home: "الرئيسية", Summary: "الملخص", Search: "بحث" };
+
+  it("swaps whole labels at any depth, never script text or a partial match", () => {
+    const home = el("A", t("SMART Verifiable IPS for Pilgrimage"));
+    const group = el("SUMMARY", t(" Home "));
+    const item = el("A", t("Summary"));
+    const partial = el("SPAN", t("Home page"));
+    const script = el("SCRIPT", t("Home"));
+    const bar = el("DIV", home, el("DETAILS", group, el("UL", el("LI", item))), partial, script);
+    const input = { a: { placeholder: "Search" } as Record<string, string> };
+    const doc = {
+      querySelectorAll(sel: string) {
+        if (sel === `.${PAGE_BAR_CLASS}`) {
+          return [Object.assign(bar, { querySelectorAll: () => [{ getAttribute: (k: string) => input.a[k] ?? null, setAttribute: (k: string, v: string) => (input.a[k] = v) }] })];
+        }
+        return [];
+      },
+    } as unknown as ParentNode;
+    expect(localisePageBar(doc, map)).toBe(4);
+    expect(home.childNodes![0]!.textContent).toBe("SMART IPS للزيارة الدينية");
+    expect(group.childNodes![0]!.textContent).toBe(" الرئيسية ");
+    expect(item.childNodes![0]!.textContent).toBe("الملخص");
+    expect(partial.childNodes![0]!.textContent).toBe("Home page");
+    expect(script.childNodes![0]!.textContent).toBe("Home");
+    expect(input.a.placeholder).toBe("بحث");
+  });
+
+  it("a page with no top bar is left alone", () => {
+    expect(localisePageBar({ querySelectorAll: () => [] } as unknown as ParentNode, map)).toBe(0);
   });
 });
