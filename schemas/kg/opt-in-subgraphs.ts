@@ -51,7 +51,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { findDeclarationFile, INDEX_CONFIG_FILENAME, instanceRootsIn } from "./instance-roots";
+import { fileStamp, findDeclarationFile, INDEX_CONFIG_FILENAME, instanceRootsIn } from "./instance-roots";
 
 /** The development override: a comma list of `+<instance>.<id>` / `-<instance>.<id>`. */
 export const SUBGRAPHS_ENV = "CAT_SUBGRAPHS";
@@ -186,14 +186,30 @@ export function declaredOptInRequires(checkoutRoot: string): Map<string, string[
     const file = findDeclarationFile(root);
     if (file === undefined) continue;
     try {
-      const raw = JSON.parse(readFileSync(join(root, file), "utf-8")) as { name?: unknown; directories?: unknown };
-      if (typeof raw.name !== "string") continue;
-      for (const [q, req] of requiresOfDirectories(raw.name, raw.directories)) out.set(q, req);
+      for (const [q, req] of requiresOf(join(root, file))) out.set(q, [...req]);
     } catch {
       // unreadable: check:declaration-filename's finding, not this one's
     }
   }
   return out;
+}
+
+/**
+ * One declaration's opt-in `requires`, computed once per version of the file
+ * (its size, mtime and inode). `resolveDirectories` asks for them on every
+ * call, and re-parsing every layer's declaration each time was 25 s of a
+ * 87 s `kg-audit` over the folio-assistant index (2026-11-13, core #753). A
+ * file that fails to read or parse is not cached and throws on every call.
+ */
+const requiresByFile = new Map<string, { stamp: string; requires: [string, string[]][] }>();
+function requiresOf(abs: string): [string, string[]][] {
+  const stamp = fileStamp(abs);
+  const hit = requiresByFile.get(abs);
+  if (hit !== undefined && hit.stamp === stamp) return hit.requires;
+  const raw = JSON.parse(readFileSync(abs, "utf-8")) as { name?: unknown; directories?: unknown };
+  const requires = typeof raw.name === "string" ? [...requiresOfDirectories(raw.name, raw.directories)] : [];
+  requiresByFile.set(abs, { stamp, requires });
+  return requires;
 }
 
 /**
