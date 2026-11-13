@@ -23,7 +23,8 @@
  * Exit codes: 0 written or up to date · 1 stale under `--check`.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 
 import { resolveLandingInstance } from "../schemas/kg/harness-config.js";
 import { instanceRootNamed } from "../schemas/kg/instance-roots.js";
@@ -133,6 +134,13 @@ if (check) {
   const landing = resolveLandingInstance(CHECKOUT);
   const why = landingMountedNotOwned(CHECKOUT, landing.kind === "instance" ? landing.name : undefined);
   if (why !== undefined) exitNotApplicable("landing:data:check", why);
+  // A layer that declares the file `builtAtPublish` (owner, 2026-11-13, "3y":
+  // generated at publish, not committed) has no committed copy to judge; the
+  // publish runs this writer (`derive:publish`).
+  const rel = relative(ROOT, OUT).split(sep).join("/");
+  if (isBuiltAtPublish(readDeclaration(ROOT)?.builtAtPublish ?? [], rel)) {
+    exitNotApplicable("landing:data:check", `${rel} is declared builtAtPublish: written at publish, never committed`);
+  }
 }
 const decl = readDeclaration(ROOT);
 

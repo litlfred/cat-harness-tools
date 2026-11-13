@@ -82,8 +82,8 @@ function head(args: readonly string[]): string {
 }
 
 describe("every step resolves to something runnable", () => {
-  for (const s of STEPS) {
-    test(`\`${s.write.join(" ")}\` exists`, () => {
+  describe.each(STEPS.map((s) => [s.write.join(" "), s.verify.join(" "), s] as const))("`%s`, verified by `%s`", (_write, _verify, s) => {
+    test("its write step exists", () => {
       const t = head(s.write);
       const ok = t in scripts() || existsSync(join(ROOT, t));
       expect(
@@ -94,12 +94,12 @@ describe("every step resolves to something runnable", () => {
       ).toBe(true);
     });
 
-    test(`\`${s.verify.join(" ")}\` exists`, () => {
+    test("its verify step exists", () => {
       const t = head(s.verify);
       const ok = t in scripts() || existsSync(join(ROOT, t));
       expect(ok, `verify target \`${t}\` is neither an npm script nor a file.`).toBe(true);
     });
-  }
+  });
 });
 
 /**

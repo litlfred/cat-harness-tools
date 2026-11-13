@@ -64,7 +64,7 @@ export const fillOfType = (type: string): string => LAYER_FILL[layerOf(type)];
 
 /** The neutral parts: everything that is not a box's layer colour. */
 export const THEME = {
-  font: 'Inter, "Segoe UI", system-ui, -apple-system, Helvetica, Arial, sans-serif',
+  font: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
   ink: "#14213d",
   body: "#2d3748",
   muted: "#6b778a",

@@ -90,33 +90,31 @@ describe("Liquid in docs/_includes", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  for (const f of files) {
-    it(`${relative(INSTANCE_ROOT, f)}: every tag is real or escaped`, () => {
-      const src = readFileSync(f, "utf-8");
-      const bad: string[] = [];
-      for (const t of liquidTags(src)) {
-        if (t.raw) continue;
-        const [name, ...rest] = t.body.split(/\s+/);
-        const expression = rest.join(" ").trim();
-        if (NEEDS_EXPRESSION.has(name) && expression.length === 0) {
-          bad.push(
-            `${f}:${t.line}  {% ${t.body} %} — \`${name}\` needs an expression. If this is ` +
-              `PROSE naming the tag, wrap it: {% raw %}…{% endraw %}. Liquid parses tags ` +
-              `inside HTML comments.`,
-          );
-          continue;
-        }
-        if (!NEEDS_EXPRESSION.has(name) && !NO_EXPRESSION.has(name)) {
-          bad.push(
-            `${f}:${t.line}  {% ${t.body} %} — \`${name}\` is not a Liquid tag this check ` +
-              `knows. Either it is a typo, or add it to NEEDS_EXPRESSION / NO_EXPRESSION in ` +
-              `${"scripts/tests/liquid-includes.test.ts"}.`,
-          );
-        }
+  it.each(files.map((f) => [relative(INSTANCE_ROOT, f), f] as const))("%s: every tag is real or escaped", (_rel, f) => {
+    const src = readFileSync(f, "utf-8");
+    const bad: string[] = [];
+    for (const t of liquidTags(src)) {
+      if (t.raw) continue;
+      const [name, ...rest] = t.body.split(/\s+/);
+      const expression = rest.join(" ").trim();
+      if (NEEDS_EXPRESSION.has(name) && expression.length === 0) {
+        bad.push(
+          `${f}:${t.line}  {% ${t.body} %} — \`${name}\` needs an expression. If this is ` +
+            `PROSE naming the tag, wrap it: {% raw %}…{% endraw %}. Liquid parses tags ` +
+            `inside HTML comments.`,
+        );
+        continue;
       }
-      expect(bad).toEqual([]);
-    });
-  }
+      if (!NEEDS_EXPRESSION.has(name) && !NO_EXPRESSION.has(name)) {
+        bad.push(
+          `${f}:${t.line}  {% ${t.body} %} — \`${name}\` is not a Liquid tag this check ` +
+            `knows. Either it is a typo, or add it to NEEDS_EXPRESSION / NO_EXPRESSION in ` +
+            `${"scripts/tests/liquid-includes.test.ts"}.`,
+        );
+      }
+    }
+    expect(bad).toEqual([]);
+  });
 
   it("catches the exact comment that broke the build", () => {
     // The regression, kept as a case rather than as a memory of one. Written

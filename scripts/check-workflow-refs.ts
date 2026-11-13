@@ -17,10 +17,11 @@
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
-import { join, relative } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { loadProcessModel, isActivity, processDiagrams } from "../src/workflow/process-model.js";
 import { knownSkills } from "./known-skills.js";
-import { repoRootFor } from "../schemas/kg/cat-harness.js";
+import { instanceRootsIn, repoRootFor, siblingScopeFor } from "../schemas/kg/cat-harness.js";
+import { judgeSkillRef, switchedOffSkillHomes } from "./lib/switched-off-skills.ts";
 import { beanCallFindings, noteTakers, type DiagramFacts } from "./check-bean-lifecycle-calls.ts";
 
 interface Dangling { file: string; node: string; ref: string }
@@ -73,6 +74,10 @@ function emptyInstances(): string[] {
 }
 
 const dangling: Dangling[] = [];
+/** Refs no visible layer holds, before {@link judgeSkillRef} splits them into dangling and not judged here. */
+const unresolved: Array<Dangling & { abs: string }> = [];
+/** Refs to a skill in an opt-in sub-graph the mounting root switched off (card Q-SKILL-TOOL-LINK B): judged where it is on. */
+const notJudged: Array<Dangling & { groups: string[]; reason: string }> = [];
 const coverage: Coverage[] = [];
 
 /**
@@ -156,7 +161,7 @@ for (const file of files) {
     const refs = node.skills ?? [];
     if (refs.length === 0) uncovered.push(node.id);
     for (const ref of refs) {
-      if (!skills.has(ref)) dangling.push({ file: relative(INSTANCE_ROOT, file), node: node.id, ref });
+      if (!skills.has(ref)) unresolved.push({ abs: file, file: relative(INSTANCE_ROOT, file), node: node.id, ref });
     }
   }
   coverage.push({
@@ -196,6 +201,20 @@ for (const file of files) {
 }
 }
 
+// The same split `check:tools` makes for a `satisfies` target, from the same
+// resolver, so the two cannot disagree about one skill name.
+if (unresolved.length > 0) {
+  const layers = [...new Set([resolve(INSTANCE_ROOT), ...instanceRootsIn(siblingScopeFor(INSTANCE_ROOT)).map((r) => resolve(r))])];
+  const layerOf = (abs: string): string | undefined =>
+    layers.filter((l) => abs === l || abs.startsWith(l + sep)).sort((a, b) => b.length - a.length)[0];
+  const off = switchedOffSkillHomes(layers);
+  for (const { abs, ...d } of unresolved) {
+    const why = judgeSkillRef(d.ref, layerOf(resolve(abs)), off);
+    if (why === undefined) dangling.push(d);
+    else notJudged.push({ ...d, ...why });
+  }
+}
+
 console.log(`Workflow skill refs  (${knownCount} skills known across ${INSTANCES.length} instances, ${fileCount} diagrams)\n`);
 
 // The vacuity report, ABOVE the findings rather than below them: a layer
@@ -219,6 +238,11 @@ for (const c of coverage) {
   const pct = c.total === 0 ? 100 : Math.round((c.covered / c.total) * 100);
   const mark = c.covered === c.total ? "✓" : pct === 0 ? "✗" : "·";
   console.log(`  ${mark} ${c.file.padEnd(38)} ${String(c.covered).padStart(2)}/${String(c.total).padEnd(2)}  ${pct}%`);
+}
+
+if (notJudged.length) {
+  console.log(`\n· ${notJudged.length} ref(s) not judged here — the skill is in an opt-in sub-graph the mounting root switched off (judged where it is switched on):`);
+  for (const d of notJudged) console.log(`  · ${d.file} · ${d.node} → "${d.ref}" (${d.groups.join(", ")})`);
 }
 
 if (dangling.length) {

@@ -60,17 +60,15 @@ describe("BLOCK_KINDS", () => {
 });
 
 describe("readBlockManifest recognises every kind", () => {
-  for (const kind of BLOCK_KINDS) {
-    test(kind, () => {
-      const p = join(DIR, `${kind}.ts`);
-      writeFileSync(
-        p,
-        `import { ${kind} } from "../../schema/builders";\n` +
-          `export default ${kind}({\n  label: "${kind}:x",\n  title: "T",\n});\n`,
-      );
-      expect(readBlockManifest(p)).toEqual({ kind, label: `${kind}:x` });
-    });
-  }
+  test.each([...BLOCK_KINDS])("%s", (kind) => {
+    const p = join(DIR, `${kind}.ts`);
+    writeFileSync(
+      p,
+      `import { ${kind} } from "../../schema/builders";\n` +
+        `export default ${kind}({\n  label: "${kind}:x",\n  title: "T",\n});\n`,
+    );
+    expect(readBlockManifest(p)).toEqual({ kind, label: `${kind}:x` });
+  });
 
   test("still rejects a chapter manifest", () => {
     const p = join(DIR, `ch.ts`);

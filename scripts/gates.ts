@@ -1564,10 +1564,11 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     script: "check:lock-consistency",
     kind: "report",
     reason:
-      "RED UNTIL THE PINS ARE ALIGNED (bean `cat-tools-sm8r`, cat-harness-tools#1571): it judges whether an index and the " +
-      "layers it mounts pin one commit of each shared lower layer, and on the composed checkout it exits 1 on the skews the " +
-      "bottom-up re-pin clears. Wiring it now would red every PR on pins this commit does not change; it becomes a gate in " +
-      "the index's CI once that re-pin lands, a folio-assistant workflow change for the owner",
+      "A REPORT, NOT A GATE (owner, 2026-11-13, \"3y 1y\": only the top-level lock decides): it lists where an index " +
+      "and the locks of the layers it mounts pin different commits of a shared lower layer. A composition mounts each " +
+      "layer once, at the index's pin, so a lower layer's own lock records only what it was last tested with; requiring " +
+      "them to match made every re-pin a serial bottom-up cascade. The stale committed files it once caught move to build " +
+      "time under option 3 of the same ruling. Run it to see what a lower layer was tested with",
   },
   {
     script: "jsonld:contexts:check",

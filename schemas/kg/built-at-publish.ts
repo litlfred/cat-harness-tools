@@ -8,13 +8,27 @@
  * ## The rule
  *
  * An artefact may be committed in a layer only if every input it is
- * computed from is pinned BY THAT LAYER'S OWN COMMIT: its own tree, plus the
- * layers it `needs` at the pins its own lock names. Two ways to fail it,
- * and {@link BuiltAtPublishSchema} names which one each entry fails:
+ * computed from is its OWN TREE. Three ways to fail it, and
+ * {@link BuiltAtPublishSchema} names which one each entry fails:
  *
  * - `checkout` — computed over every layer the checkout stacks on this one.
  *   Those are ABOVE it (they `need` it), so it cannot pin them, and the bytes
  *   are a function of the consuming index's lock, not of this commit.
+ * - `lower` — computed from a layer BELOW it (one it `needs`) or from the
+ *   tools that generate it. Only the top-level lock decides which commits of
+ *   those a composition mounts (owner, 2026-11-13, "3y 1y"); the layer's own
+ *   lock records only what it was last tested with. So the bytes are a function
+ *   of the consuming index's lock, as for `checkout`, and a committed copy goes
+ *   stale on every re-pin below. Until 2026-11-13 the rule allowed these, on the
+ *   premise that the layer's own lock pinned its lower layers.
+ *
+ *   EXCEPT what a reader of the repository on GitHub needs (owner,
+ *   2026-11-13: "i still want the agents.md and skills.md generated … and
+ *   readme.mds … those are needed in the github repo"): `README.md`,
+ *   `AGENTS.md` and the skill listings in them stay generated AND committed,
+ *   with their drift gates and post-merge regen, even where a section reads a
+ *   lower layer. Write those sections from the layer's own tree where possible
+ *   so a re-pin moves them as little as it can.
  * - `state` — computed from a graph kept on a branch (`beans`, `todos`, `qa`),
  *   which moves without a commit (`check:derived-from`'s storage clock,
  *   for artefacts that are not a declared directory).
@@ -40,7 +54,7 @@
 import { z } from "zod";
 
 /** Why an artefact cannot be current in a commit of the layer that serves it. */
-export const BuiltAtPublishCauseSchema = z.enum(["checkout", "state"]);
+export const BuiltAtPublishCauseSchema = z.enum(["checkout", "lower", "state"]);
 export type BuiltAtPublishCause = z.infer<typeof BuiltAtPublishCauseSchema>;
 
 /** A path relative to the layer root: a file, or a directory ending in `/`. No `..`, no leading `/`. */
@@ -96,8 +110,8 @@ export const BuiltAtPublishSchema = z
     if (e.because === "state" && e.from === undefined) {
       ctx.addIssue({ code: "custom", path: ["from"], message: "a `state` artefact names the branch-kept graph it is computed from" });
     }
-    if (e.because === "checkout" && e.from !== undefined) {
-      ctx.addIssue({ code: "custom", path: ["from"], message: "`from` names branch-kept graphs; a `checkout` artefact is computed over instances, not a branch" });
+    if (e.because !== "state" && e.from !== undefined) {
+      ctx.addIssue({ code: "custom", path: ["from"], message: `\`from\` names branch-kept graphs; a \`${e.because}\` artefact is computed over instances, not a branch` });
     }
   });
 export type BuiltAtPublish = z.infer<typeof BuiltAtPublishSchema>;

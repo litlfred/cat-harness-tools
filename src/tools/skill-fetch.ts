@@ -74,6 +74,7 @@ export const REFERENCE_PACKAGES: Record<string, { repo: string; ref: string; ski
 // as unreachable, and one removed here cannot pass.
 export { discoverLocalPackages, LOCAL_PACKAGES } from "../../scripts/skill-packages.js";
 import { LOCAL_PACKAGES } from "../../scripts/skill-packages.js";
+import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 
 
 /** A servable skill: its id, and what it says it is — when it says anything. */
@@ -233,6 +234,7 @@ export function registerSkillFetchTools(server: McpServer): void {
       // Check cache
       const cacheKey = `${package_name}/${skill}`;
       const cached = skillCache.get(cacheKey);
+      // input-site: inert #7ee99e9b — an in-process cache's age: an entry exists only after a fetch this process made, which is traced
       if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
         return {
           content: [{
@@ -245,6 +247,8 @@ export function registerSkillFetchTools(server: McpServer): void {
       // Fetch from GitHub raw
       const url = `https://raw.githubusercontent.com/${pkg.repo}/${pkg.ref}/${skillPath}`;
       try {
+        // input-site: traced #fddbba7a — a skill fetched from GitHub over the network: no fingerprint names it, so a run that reaches it records no hash
+        inputSiteReached("skill-fetch: GitHub raw");
         const resp = await fetch(url);
         if (!resp.ok) {
           return {
@@ -255,6 +259,7 @@ export function registerSkillFetchTools(server: McpServer): void {
           };
         }
         const content = await resp.text();
+        // input-site: inert #8a8df08a — stamps a cache entry; a write, never a check's input
         skillCache.set(cacheKey, { content, fetchedAt: Date.now() });
         return {
           content: [{
@@ -305,6 +310,7 @@ export function registerSkillFetchTools(server: McpServer): void {
         lines.push(`## ${pkgName} (${pkg.repo})\n`);
         for (const [skillId, path] of Object.entries(pkg.skills)) {
           const cached = skillCache.get(`${pkgName}/${skillId}`);
+          // input-site: inert #d299c1ba — labels a cached entry; an entry exists only after a fetch this process made, which is traced
           const status = cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS ? " (cached)" : "";
           lines.push(`- **${skillId}**${status} — \`${path}\``);
         }

@@ -13,9 +13,6 @@
   </script>
   <style>html{background:#0e0e12}html[data-theme="light"]{background:#fafafa}</style>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
   <style>
     :root { --ease: cubic-bezier(0.4,0,0.2,1); }
 
@@ -36,15 +33,15 @@
       --svg-f:none;
     }
     [data-font="paper"] {
-      --f-body:'Crimson Pro','Georgia',serif;
-      --f-head:'Inter','Helvetica Neue',sans-serif;
-      --f-mono:'JetBrains Mono','Consolas',monospace;
+      --f-body:Georgia, "Times New Roman", Times, serif;
+      --f-head:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      --f-mono:ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       --f-sz:19px; --f-lh:1.75;
     }
     [data-font="web"] {
-      --f-body:'Literata','Georgia',serif;
-      --f-head:'Inter','Helvetica Neue',sans-serif;
-      --f-mono:'JetBrains Mono','Consolas',monospace;
+      --f-body:Georgia, "Times New Roman", Times, serif;
+      --f-head:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      --f-mono:ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       --f-sz:17px; --f-lh:1.65;
     }
     html{scroll-behavior:auto;scroll-padding-top:50px}
@@ -245,7 +242,7 @@
       /* ── Base typography — Latin Modern / Computer Modern ── */
       html{font-size:11pt;scroll-padding-top:0}
       body{
-        font-family:'Latin Modern Roman','CMU Serif','Computer Modern','Crimson Pro','Times New Roman',serif!important;
+        font-family:Georgia, "Times New Roman", Times, serif!important;
         line-height:1.45;
         color:#000!important;
         background:#fff!important;
@@ -290,7 +287,7 @@
       .ch{break-before:page;margin-bottom:0}
       .ch:first-child{break-before:auto}
       .ch-t{
-        font-family:'Latin Modern Sans','CMU Sans Serif','Computer Modern Sans','Inter','Helvetica Neue',sans-serif!important;
+        font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif!important;
         font-size:17pt;
         font-weight:700;
         color:#000!important;
@@ -303,7 +300,7 @@
 
       /* ── Sections ───────────────────────────────────────── */
       .sec-t{
-        font-family:'Latin Modern Sans','CMU Sans Serif','Computer Modern Sans','Inter','Helvetica Neue',sans-serif!important;
+        font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif!important;
         font-size:13pt;
         font-weight:700;
         color:#000!important;
@@ -1533,7 +1530,7 @@
               onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})"><\/script>
             <style>
               :root{--fg:#222;--fg-b:#333;--fg-d:#888;--bg:#fff;--bg-r:#fafafa;--bg-s:#f5f5f5;--brd:#e0e0e0;--ac:#4f46e5;
-                --f-body:'Crimson Pro',Georgia,serif;--f-head:'Inter',system-ui,sans-serif;--f-mono:'JetBrains Mono',monospace}
+                --f-body:Georgia, "Times New Roman", Times, serif;--f-head:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;--f-mono:ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace}
               [data-theme="dark"]{--fg:#ddd;--fg-b:#ccc;--fg-d:#888;--bg:#1a1a1a;--bg-r:#222;--bg-s:#1e1e1e;--brd:#333;--ac:#818cf8}
               body{font-family:var(--f-body);color:var(--fg);background:var(--bg);max-width:800px;margin:2rem auto;padding:0 2rem;line-height:1.6}
               h1{font-family:var(--f-head);font-size:1.4rem;margin-bottom:.3rem}
@@ -2508,7 +2505,7 @@
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
         <style>
           :root{--fg:#222;--fg-b:#333;--fg-d:#888;--bg:#fff;--bg-r:#fafafa;--bg-s:#f5f5f5;--brd:#e0e0e0;--ac:#4f46e5;--grn:#22c55e;--red:#dc2626;--ora:#f59e0b;--yel:#eab308;
-            --f-body:'Crimson Pro',Georgia,serif;--f-head:'Inter',system-ui,sans-serif;--f-mono:'JetBrains Mono',monospace}
+            --f-body:Georgia, "Times New Roman", Times, serif;--f-head:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;--f-mono:ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace}
           [data-theme="dark"]{--fg:#ddd;--fg-b:#ccc;--fg-d:#888;--bg:#1a1a1a;--bg-r:#222;--bg-s:#1e1e1e;--brd:#333;--ac:#818cf8;--grn:#4ade80;--red:#f87171;--ora:#fbbf24;--yel:#facc15}
           body{font-family:var(--f-body);color:var(--fg);background:var(--bg);max-width:800px;margin:2rem auto;padding:0 2rem;line-height:1.6}
           h1{font-family:var(--f-head);font-size:1.4rem;margin-bottom:.5rem}

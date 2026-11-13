@@ -79,7 +79,9 @@ export function rootGateSet(root: string, opts: { instances?: readonly string[];
   const args = ["-I", script, resolve(root), "--list", ...(opts.instances ?? []).flatMap((i) => ["--instance", i])];
   // Never a shard: a `GATE_SHARD` left in the environment would narrow the set
   // `audit:coverage` and `qa:refresh` measure the root against (bean `lpcs`).
+  // input-site: inert #09a9e8c6 — drops GATE_SHARD and hands the rest of the environment whole to the child below; no value is read here
   const { GATE_SHARD: _shard, ...env } = process.env;
+  // input-site: spawned #fcd8f6f9 — run-gates.py --list under python3; the cone audits the child from its read set
   const r = spawnSync("python3", args, { encoding: "utf-8", maxBuffer: 1 << 24, env });
   if (r.error) throw new GateSetUndetermined(`python3 could not be run (${r.error.message})`);
   let parsed: RootGateSet;

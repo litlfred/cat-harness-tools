@@ -19,7 +19,7 @@
  */
 import { describe, expect, it } from "bun:test";
 
-import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -30,6 +30,7 @@ import {
   igSiteRoots,
   instanceRoute,
   mountable,
+  mountedKindRoutes,
   servedClashes,
   servedDirectories,
   WITHHELD_FILE,
@@ -294,6 +295,31 @@ describe("which kind answers at the instance's own route", () => {
     expect(withRoutes(found).candidates.map((c) => c.route).sort()).toEqual(["docs/wi", "wi"]);
   });
 
+  it("mountedKindRoutes answers the kind route the navbar's Docs row opens, and not the instance root", () => {
+    // who-iris, 2026-11-13: `docs/` (the CDN proposal among it) mounted at
+    // /docs/who-iris/ while the Folders row read "no viewer yet".
+    const repo = mkdtempSync(join(tmpdir(), "kind-route-"));
+    for (const d of ["site", "docs", "guides", "notes"]) {
+      mkdirSync(join(repo, d), { recursive: true });
+      writeFileSync(join(repo, d, "index.html"), "<html><body></body></html>");
+    }
+    writeFileSync(
+      join(repo, "wi.json"),
+      JSON.stringify({
+        name: "wi",
+        directories: [
+          { id: "wi-site", path: "site/", graphTypologies: ["docs"], instanceRoot: true },
+          { id: "wi-docs", path: "docs/", graphTypologies: ["docs"] },
+          // Two of one kind share no route, so neither is THE kind's page.
+          { id: "wi-guides", path: "guides/", graphTypologies: ["processes"] },
+          { id: "wi-notes", path: "notes/", graphTypologies: ["processes"] },
+        ],
+      }),
+    );
+    expect([...mountedKindRoutes(repo, "wi")]).toEqual([["docs", "/docs/wi/"]]);
+    expect(mountedKindRoutes(repo, "nobody").size).toBe(0);
+  });
+
   it("a directory of a kind a build Tool publishes (web-app) is never mounted, though it holds an index.html", () => {
     // smart-trust's onboarding game, 2026-11-12: its Vite index.html made the
     // mount pass copy the source and node_modules to /web-app/smart-trust/.
@@ -452,6 +478,19 @@ describe("a served directory's bytes publish at /<instance>/<path> — bean 680p
     expect(servedDirectories([entry("fhir-artifact-index/", true)])).toEqual([
       { name: "smart-trust", dir: "/repo/smart-trust/fhir-artifact-index/", route: "smart-trust/fhir-artifact-index" },
     ]);
+  });
+
+  it("a MOUNTED layer's twin under the layer output root is served over the pinned bytes — bean cat-tools-sm8r item 4", () => {
+    const repo = mkdtempSync(join(tmpdir(), "served-twin-"));
+    writeFileSync(join(repo, "index.lock.json"), JSON.stringify({ instances: [{ instance: "some-ig", path: "some-ig" }] }));
+    const pinned = join(repo, "some-ig", "fhir-artifact-index");
+    mkdirSync(pinned, { recursive: true });
+    const at = { name: "some-ig", abs: pinned, entry: { path: "fhir-artifact-index/", graphTypologies: ["fhir-artifact-index"], served: true } };
+    expect(servedDirectories([at], repo)[0]?.computed).toBeUndefined();
+    const twin = join(repo, "build", "layers", "some-ig", "fhir-artifact-index");
+    mkdirSync(twin, { recursive: true });
+    expect(servedDirectories([at], repo)).toEqual([{ name: "some-ig", dir: pinned, route: "some-ig/fhir-artifact-index", computed: twin }]);
+    rmSync(repo, { recursive: true, force: true });
   });
 });
 

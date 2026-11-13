@@ -50,6 +50,16 @@ const OWN_INSTANCE = resolve(HARNESS_ROOT);
 export type CorpusScope = "instance" | "checkout";
 
 /**
+ * Which opt-in sub-graphs a directory scan resolves with. Absent, each
+ * instance resolves with its root's own switches; `"all"` reads every group
+ * the checkout declares, switched on or not, for a check that judges a
+ * declaration rather than what one root is given.
+ */
+export interface SubgraphOpts {
+  enabledSubgraphs?: EnabledSubgraphs;
+}
+
+/**
  * The scope a platform tool asks over when it is pointed at `root`: the
  * CHECKOUT when `root` is the platform layer that ships these tools — the
  * corpus-wide run, which is what the mirrors made every such run — and the
@@ -63,6 +73,7 @@ export function corpusScopeFor(root: string): CorpusScope {
 }
 import { readRoleGraph, type RoleGraph } from "../schemas/process/role-graph.js";
 import { checkoutDirectories, orderedDependencies } from "../schemas/kg/harness-config.js";
+import type { EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { checkoutRoleGraph } from "../schemas/process/scenario-overlay.js";
 import { parseFrontMatter, scalar, type FrontMatter } from "../schemas/kg/front-matter.js";
@@ -151,8 +162,9 @@ function holdsMarkdown(abs: string): boolean {
 export function kgDirectories(
   root: string,
   scope: CorpusScope = corpusScopeFor(root),
-): Array<{ id: string; path: string; absPath: string; graphTypologies?: string[] }> {
-  return declaredKgDirectories(root, scope).filter((d) => existsSync(d.absPath));
+  opts: SubgraphOpts = {},
+): Array<{ id: string; path: string; absPath: string; graphTypologies?: string[]; optInSubgraph?: string }> {
+  return declaredKgDirectories(root, scope, opts).filter((d) => existsSync(d.absPath));
 }
 
 /**
@@ -165,9 +177,11 @@ export function kgDirectories(
 export function declaredKgDirectories(
   root: string,
   scope: CorpusScope = corpusScopeFor(root),
-): Array<{ id: string; path: string; absPath: string; graphTypologies?: string[] }> {
+  opts: SubgraphOpts = {},
+): Array<{ id: string; path: string; absPath: string; graphTypologies?: string[]; optInSubgraph?: string }> {
+  const en = opts.enabledSubgraphs === undefined ? {} : { enabledSubgraphs: opts.enabledSubgraphs };
   try {
-    return (scope === "checkout" ? checkoutDirectories(root, { stackedOn: root }) : resolveDirectories([{ name: "(local)", root, own: true }]))
+    return (scope === "checkout" ? checkoutDirectories(root, { stackedOn: root, ...en }) : resolveDirectories([{ name: "(local)", root, own: true }], undefined, en))
       // EXACTLY ONE knowledge-graph typology, not merely including one.
       //
       // `schemas/` declares `["schemas", "cat-harness"]` — a schema IS a
@@ -885,9 +899,9 @@ function holdsDiagrams(dir: string): boolean {
   return false;
 }
 
-export function workflowDirs(root: string, scope: CorpusScope = corpusScopeFor(root)): string[] {
+export function workflowDirs(root: string, scope: CorpusScope = corpusScopeFor(root), opts: SubgraphOpts = {}): string[] {
   const out: string[] = [];
-  for (const d of kgDirectories(root, scope)) {
+  for (const d of kgDirectories(root, scope, opts)) {
     // A `business-processes` directory DESCRIBES work and is never run (owner,
     // 2026-11-01, Q-SUBG-6 A). It is read by KIND, not by file extension: its
     // `.bpmn` files would otherwise reach the engine through `holdsDiagrams`
@@ -927,7 +941,7 @@ export function workflowDirs(root: string, scope: CorpusScope = corpusScopeFor(r
  * One call for the common case, so a caller that only wants the files does not
  * have to re-derive "and their `decisions/` subdirectory too".
  */
-export function workflowFiles(root: string, scope: CorpusScope = corpusScopeFor(root)): string[] {
+export function workflowFiles(root: string, scope: CorpusScope = corpusScopeFor(root), opts: SubgraphOpts = {}): string[] {
   const out: string[] = [];
   const walk = (dir: string): void => {
     if (!existsSync(dir)) return;
@@ -937,7 +951,7 @@ export function workflowFiles(root: string, scope: CorpusScope = corpusScopeFor(
       else if (e.name.endsWith(".bpmn") || e.name.endsWith(".dmn")) out.push(p);
     }
   };
-  for (const d of workflowDirs(root, scope)) walk(d);
+  for (const d of workflowDirs(root, scope, opts)) walk(d);
   // Belt and braces on top of `workflowDirs`'s own dedupe: a caller may pass
   // overlapping directories this function never chose, and the same file
   // reached twice is a duplicate `@id` downstream either way.

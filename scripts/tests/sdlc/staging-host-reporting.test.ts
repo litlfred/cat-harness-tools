@@ -17,13 +17,16 @@
  *
  * @module scripts/tests/staging-host-reporting.test
  */
-import { describe, expect, test } from "bun:test";
-import { readFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { afterAll, describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { createStagingPreview, type StagingDeployFacts } from "../../../schemas/sdlc/staging-preview.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { skillMdFile } from "../../known-skills.ts";
+import { publicationHost } from "../../../schemas/kg/cat-harness.ts";
+import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 
 const ROOT = resolve(HARNESS_ROOT);
 // Found where the declared skill directories hold it, not at a spelled path.
@@ -59,62 +62,39 @@ describe("turn-reporting staging host requirements (folio-assistant-1lfx)", () =
 });
 
 describe("staging review host resolution discipline", () => {
-  type StagingSurface =
-    | { host: "gh-pages"; url: string }
-    | { host: "local-server"; url: string }
-    | { host: "chat-only" }
-    | { host: "could-not-determine"; paths: string[] };
+  // The shipped resolver: the layer's DECLARED `publication.host`, read from its
+  // declaration. No URL is composed from a remote; an undeclared host is its
+  // own answer (`undefined`), never `github-pages`.
+  const made: string[] = [];
+  afterAll(() => { for (const d of made) rmSync(d, { recursive: true, force: true }); });
+  const layer = (declaration: Record<string, unknown>): string => {
+    const dir = mkdtempSync(join(tmpdir(), "staging-host-"));
+    made.push(dir);
+    writeDeclaration(dir, JSON.stringify({ name: "probe", ...declaration }));
+    return dir;
+  };
 
-  function determineStagingReviewSurface(config: {
-    pagesBaseUrl?: string;
-    localServerUrl?: string;
-    isChatOnly?: boolean;
-    changedFiles?: string[];
-  }): StagingSurface {
-    if (config.isChatOnly) {
-      return { host: "chat-only" };
-    }
-    if (config.localServerUrl) {
-      return { host: "local-server", url: config.localServerUrl };
-    }
-    if (config.pagesBaseUrl) {
-      return { host: "gh-pages", url: config.pagesBaseUrl };
-    }
-    return {
-      host: "could-not-determine",
-      paths: config.changedFiles ?? [],
-    };
-  }
-
-  test("resolves GitHub Pages when pagesBaseUrl is configured", () => {
-    const res = determineStagingReviewSurface({ pagesBaseUrl: "https://owner.github.io/repo" });
-    expect(res.host).toBe("gh-pages");
-    if (res.host === "gh-pages") {
-      expect(res.url).toBe("https://owner.github.io/repo");
-    }
+  test("resolves GitHub Pages when the declaration says github-pages", () => {
+    expect(publicationHost(layer({ publication: { host: "github-pages" } }))).toBe("github-pages");
   });
 
-  test("resolves local server when local server url is provided", () => {
-    const res = determineStagingReviewSurface({ localServerUrl: "http://127.0.0.1:4000" });
-    expect(res.host).toBe("local-server");
-    if (res.host === "local-server") {
-      expect(res.url).toBe("http://127.0.0.1:4000");
-    }
+  test("resolves local server when the declaration says local-server", () => {
+    expect(publicationHost(layer({ publication: { host: "local-server" } }))).toBe("local-server");
   });
 
-  test("resolves chat-only mode without guessing web URLs", () => {
-    const res = determineStagingReviewSurface({ isChatOnly: true });
-    expect(res.host).toBe("chat-only");
+  test("resolves `none` (publishes nowhere, e.g. chat-only review) without guessing a web host", () => {
+    const host = publicationHost(layer({ publication: { host: "none" } }));
+    expect(host).toBe("none");
+    expect(host).not.toBe("github-pages");
   });
 
-  test("third state: resolves 'could-not-determine' when unconfigured, retaining repo paths", () => {
-    const res = determineStagingReviewSurface({
-      changedFiles: ["docs/concepts/foo.md", "skills/bar.md"],
-    });
-    expect(res.host).toBe("could-not-determine");
-    if (res.host === "could-not-determine") {
-      expect(res.paths).toEqual(["docs/concepts/foo.md", "skills/bar.md"]);
-    }
+  test("third state: an undeclared or unknown host resolves to undefined, never github-pages", () => {
+    // A github.io remote in the declaration is not a host declaration: nothing is composed from it.
+    expect(publicationHost(layer({ repository: "https://github.com/owner/repo" }))).toBeUndefined();
+    expect(publicationHost(layer({ publication: { host: "owner.github.io" } }))).toBeUndefined();
+    const empty = mkdtempSync(join(tmpdir(), "staging-host-none-"));
+    made.push(empty);
+    expect(publicationHost(empty)).toBeUndefined();
   });
 
   test("does not compose github.io from repo remote when pagesBaseUrl is absent in deploy facts", () => {

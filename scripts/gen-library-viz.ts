@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Publish the L1 corpus as a projection, and a viewer over it.
+ * Publish the library as a projection, and a viewer over it.
  *
  * @module scripts/gen-library-viz
  * @graphNode none — a generator over the library graph, not a schema itself
@@ -45,7 +45,7 @@ import { readLibraryGraph, referencedCatalogueEntries, type LibraryGraph, type L
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
 import { DOCUMENT_VIEW_JS, entryFigureFiles, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
-import { LANGUAGE_TOGGLE_JS, entryLanguages, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
+import { LANGUAGE_TOGGLE_JS, entryLanguages, listingTitles, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
 import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
 import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
 import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
@@ -280,7 +280,7 @@ html[data-fa-scheme="light"] .lib-page {
 .lib-page th[aria-sort="descending"] button::after { content:" ▼"; }
 .lib-page td.num { text-align:right; font-variant-numeric:tabular-nums; }
 .lib-page tbody tr:hover { background:var(--panel); }
-.lib-page .slug { font-family:ui-monospace, Menlo, monospace; }
+.lib-page .slug { font-family:var(--fa-font-mono,Menlo,Consolas,monospace); }
 /* A row's secondary links -- source, README, a referenced entry's own -- are
    24 px targets (WCAG 2.5.8). As plain inline text they were 16 px tall and
    sat closer than 24 px to the title link beside them. */
@@ -333,7 +333,12 @@ html[data-fa-scheme="light"] .lib-page {
    count broken over two lines is harder to read than one scrolled to. */
 .lib-page #listing td.lib-first { white-space:normal; min-width:13rem; max-width:17rem; }
 .lib-page #listing td.t-title { white-space:normal; min-width:14rem; max-width:22rem; }
-.lib-page #listing td.t-title a.lib-title { display:inline-flex; align-items:center; min-height:24px; }
+/* A long title is capped at three lines (owner, 2026-11-13: "some titles are
+   really long. need cap + hover for complete"). The rest stays in the DOM, so
+   a screen reader reads all of it; the title attribute shows it on hover. */
+.lib-page #listing td.t-title a.lib-title, .lib-page #listing td.t-title .lib-title-locale {
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden; min-height:24px; }
+.lib-page #listing td.t-title .lib-title-locale { font-size:.85em; color:var(--muted); line-height:1.35; }
 .lib-page #listing td.t-source { white-space:normal; min-width:9rem; max-width:14rem; }
 .lib-page #listing td.t-source .slug { overflow-wrap:anywhere; }
 .lib-page #listing td.t-source .pill { white-space:nowrap; }
@@ -519,6 +524,27 @@ function uploadState(e){
     unknown: { label: "no source named", cls: "" }
   }[e.upload] || { label: e.upload, cls: "" };
 }
+/* THE PAGE'S LANGUAGE: ?lang=, else the locale segment of its path
+   (/en/.../library/), else the page's own lang, else English. */
+var LOCALE = (function(){
+  var l = "";
+  try { l = new URL(location.href).searchParams.get("lang") || ""; } catch (_e) {}
+  if (!l) { var m = /[/]([a-z]{2})(?:-[A-Za-z]{2})?[/]/.exec(location.pathname); l = m ? m[1] : ""; }
+  if (!l && document.documentElement) l = document.documentElement.getAttribute("lang") || "";
+  return (l || "en").toLowerCase().split("-")[0];
+})();
+/* A TITLE NOT IN THE PAGE'S LANGUAGE SHOWS THE READER'S UNDER IT -- owner,
+   2026-11-13: "when display title not in locale, then display locale if
+   present under original". Only an official edition's title (e.titles, from
+   the projection); nothing when there is none, and nothing is translated.
+   A long title is capped to three lines by CSS; the whole of it is in the
+   DOM for a screen reader and in a title attribute for a pointer. */
+function titleHtml(e, href){
+  var t = String(e.title == null ? "" : e.title);
+  var h = '<a class="lib-title" href="'+esc(href)+'" title="'+esc(t)+'"'+(e.lang ? ' lang="'+esc(e.lang)+'"' : "")+">"+esc(t)+"</a>";
+  var mine = e.lang && e.lang !== LOCALE && e.titles && typeof e.titles[LOCALE] === "string" ? e.titles[LOCALE] : "";
+  return mine ? h + '<span class="lib-title-locale" lang="'+esc(LOCALE)+'" title="'+esc(mine)+'">'+esc(mine)+"</span>" : h;
+}
 
 var COLS = [
   /* THE SLUG OPENS THE ENTRY'S VISUALISER -- e.view, generated per entry by
@@ -538,7 +564,7 @@ var COLS = [
          used to open the item's README on GitHub, which a referenced entry
          may not have (owner, 2026-10-02: a DAK IG's title went to a
          404). The README stays as a secondary link, only when one exists. */
-      var t = '<a class="lib-title" href="'+esc(entryHref(e))+'">'+esc(e.title)+"</a>";
+      var t = titleHtml(e, entryHref(e));
       var src = e.arxiv ? "https://arxiv.org/abs/"+encodeURIComponent(e.arxiv) : e.doi ? "https://doi.org/"+e.doi : "";
       return t + (src ? ' <a class="src" href="'+esc(src)+'">source</a>' : "") +
         (e.readme ? ' <a class="src" href="'+esc(e.readme)+'">README</a>' : "") + linksHtml(e);
@@ -570,6 +596,9 @@ var COLS = [
   { k:"upload",   t:"source",   n:false, c:"t-source", f:function(e){ var s=uploadState(e);
       var name = '<span class="slug" style="font-size:.72rem;color:var(--muted)">'+esc(e.sourceFile)+"</span>";
       if (e.sourceFile && e.viewable) name = '<a class="src lib-src" href="'+esc(entryHref(e))+'#lib-view" target="_blank" rel="noopener">'+esc(e.sourceFile)+"</a>";
+      /* Owner, 2026-11-13: every source file name is a link. One not viewable
+         here opens its entry page, which says where the file is held. */
+      else if (e.sourceFile) name = '<a class="src lib-src" href="'+esc(entryHref(e))+'">'+esc(e.sourceFile)+"</a>";
       return '<span class="pill '+s.cls+'">'+esc(s.label)+"</span>"+(e.sourceFile?"<br>"+name:""); } }
 ];
 
@@ -672,24 +701,6 @@ function renderDesk(){
   }).join("") || '<p class="empty">Nothing matches.</p>';
 }
 
-function renderQueue(){
-  var h = "<table><thead><tr><th>unit</th><th>queue</th><th>kind</th><th>size</th><th>state</th></tr></thead><tbody>";
-  h += G.uploads.filter(inScope).map(function(u){
-    /* An intake is ONE queued document however many files it declares, and
-       the row says so — otherwise a four-file capture reads as four things
-       waiting. The count comes from the intake's own declared file list. */
-    var kind = u.kind === "intake"
-      ? '<span class="pill info">intake · ' + u.declaredFiles + " file" + (u.declaredFiles === 1 ? "" : "s") + "</span>"
-      : esc(u.ext || "—");
-    var label = esc(u.file) + (u.kind === "intake" && u.title
-      ? '<br><span style="font-family:inherit;color:var(--muted);font-size:.78rem">' + esc(u.title) + "</span>" : "");
-    return '<tr><td class="slug" data-label="unit">' + label + '</td><td data-label="queue"><span class="pill">' + esc(u.instance) +
-      '</span></td><td data-label="kind">' + kind + '</td><td class="num" data-label="size">' + kb(u.bytes) + '</td><td data-label="state">' +
-      (u.ingestedBy ? '<span class="pill ok">ingested → ' + esc(u.ingestedBy) + "</span>"
-                    : '<span class="pill warn">uningested</span>') + "</td></tr>";
-  }).join("") || '<tr><td colspan="5"><p class="empty">No uploads queue for this subject.</p></td></tr>';
-  $("queue").innerHTML = h + "</tbody></table>";
-}
 
 function render(){ if (VIEW === "list") renderList(); else renderDesk(); }
 
@@ -775,6 +786,9 @@ function renderBlocks(id, data, err, entry){
     return;
   }
   var bs = (data && data.blocks) || [];
+  /* The Contents tree's leaves (library-document.ts) come from these. */
+  DOC_BLOCKS = bs;
+  if (DOC && DOC_ID === id && DOC_TAB === "contents") renderDocument(id, DOC, null);
   if (!bs.length) {
     el.innerHTML = '<h2>Blocks</h2><p class="empty">' + esc(id) +
       ' has no blocks. Nothing failed \u2014 the entry carries none.</p>';
@@ -820,7 +834,7 @@ function renderBlocks(id, data, err, entry){
          text lives in scripts/lib/library-withheld-view.ts so a test runs
          exactly what this page runs. */
       var body = blockBody(b, entry);
-      return '<tr><td class="num">' + esc(pages) + '</td><td>' + esc(b.kind) +
+      return '<tr id="' + esc(blockAnchor(b.id)) + '"><td class="num">' + esc(pages) + '</td><td>' + esc(b.kind) +
         '</td><td>' + esc((b.types || []).join(' + ')) + '</td><td class="bt">' + body +
         '</td><td>' + nar + '</td></tr>';
     }).join("") + '</tbody></table>';
@@ -873,6 +887,7 @@ function summaryPanel(s){
     (who ? '<p class="note">' + esc(who) + '</p>' : '') + '</div>';
 }
 function loadBlocks(id, entry){
+  DOC_BLOCKS = null;
   fetch(blocksHref(id), {cache: "no-store"})
     .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function(d){ renderBlocks(id, d, null, entry); })
@@ -937,7 +952,7 @@ fetch(DATA_HREF).then(function(r){
     renderList();
   });
   render();
-  renderQueue();
+  // The uploads queue has its own page (gen-uploads-viz.ts); the library page shows the corpus only (owner, 2026-11-13).
   honourAddress();
   window.addEventListener("hashchange", honourAddress);
 }).catch(function(e){
@@ -1291,7 +1306,7 @@ const ENTRY_PREFIXES = { [ENTRY_TYPE.split(":")[0]!]: termIri("SourceDocument").
  * config and the page's own path what to draw into it.
  */
 const VIEWER_HEAD = `<div class="lib-head">
-  <h1 id="lib-title">Library — the L1 corpus</h1>
+  <h1 id="lib-title">Library</h1>
   <p class="empty" id="status" style="padding:0">loading…</p>
   <div class="badges" id="badges"></div>
 </div>`;
@@ -1309,10 +1324,6 @@ const VIEWER_BODY = `<div class="toolbar">
   <section id="desktop" hidden></section>
   <section id="document" class="wrap" hidden aria-live="polite"></section>
   <section id="blocks" class="wrap" hidden aria-live="polite"></section>
-  <h2>Uploads — the queue feeding this</h2>
-  <p class="note">A source sitting here reads as <strong>absent</strong> to every consumer while the file is on disk.
-    Queues are counted per declaring instance and never merged.</p>
-  <section id="queue" class="wrap"></section>
 </div>`;
 
 /**
@@ -1404,7 +1415,7 @@ function libraryPageHtml(p: LibraryPage): string {
     },
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
 <div class="${LIBRARY_MOUNT}" data-fa-no-filter${decl?.attrs ?? ""}${attrs}>
-${decl ? `${decl.stub}\n` : ""}${p.entryTitle === undefined ? VIEWER_HEAD : VIEWER_HEAD.replace("Library — the L1 corpus", escHtml(p.entryTitle))}
+${decl ? `${decl.stub}\n` : ""}${p.entryTitle === undefined ? VIEWER_HEAD : VIEWER_HEAD.replace('<h1 id="lib-title">Library</h1>', `<h1 id="lib-title">${escHtml(p.entryTitle)}</h1>`)}
 ${p.record ? `${p.record}\n` : ""}${p.versions ? `${p.versions}\n` : ""}${p.summary ? `${p.summary}\n` : ""}${p.view ? `${p.view}\n` : ""}${p.entryTitle === undefined ? VIEWER_BODY : ENTRY_BODY}
 ${p.sources ?? ""}
 </div>
@@ -1435,7 +1446,7 @@ export function viewerHtml(
 ): string {
   return libraryPageHtml({
     sources: sourcesHtml(sources.links ?? [], sources.libraries ?? []),
-    title: scope ? `${scope} — library` : "Library — the L1 corpus",
+    title: scope ? `${scope} — library` : "Library",
     dataHref,
     config: { data: dataHref, scope, libRoot: libRoot ?? (scope ? "../" : "./") },
     noscript: `<p class="note">This page loads its entries from <a href="${escHtml(dataHref)}">the library projection</a>; it needs JavaScript to draw them.</p>`,
@@ -1891,6 +1902,15 @@ if (import.meta.main) {
     // held, published source whose kind has a viewer.
     const kind = viewableOf(repoRoot, e, g.uploads, checkoutRepo);
     if (kind) e.viewable = kind;
+  }
+  // Each entry's title language, and its held editions' titles (listingTitles).
+  for (const subject of new Set(g.entries.map((e) => e.instance))) {
+    const mine = g.entries.filter((e) => e.instance === subject);
+    const titled = listingTitles(mine, entryLanguages(
+      mine.map((e) => ({ id: e.id, ...(e.catalogue?.node ? { node: join(repoRoot, e.catalogue.node) } : {}) })),
+      new Set(mine.map((e) => e.id)),
+    ));
+    for (const e of mine) Object.assign(e, titled.get(e.id));
   }
 
   emit(join(dataDir, "index.json"), JSON.stringify(projection(g, scoped), null, 2) + "\n");

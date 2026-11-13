@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { inScope, scopeArg, siteScope } from "../lib/site-scope.ts";
 import { relinkOutOfScope, SCOPE_RULING, scopeDropped, siteScopeOf } from "../build-instance-site.ts";
 import { writerArgv, type VisualiserWriter } from "../visualiser-writers.ts";
+import { withoutLayers } from "../gen-tools-viz.ts";
 
 describe("site-scope — the --scope flag", () => {
   test("no flag is no scope: every instance is written", () => {
@@ -36,7 +37,7 @@ describe("site-scope — the --scope flag", () => {
   });
 });
 
-describe("siteScopeOf — an IG lands on a layer", () => {
+describe("siteScopeOf — a site writes its own pages", () => {
   const dir = mkdtempSync(join(tmpdir(), "site-scope-"));
   const cfg = (site: unknown): string => {
     writeFileSync(join(dir, "index.config.json"), JSON.stringify({ site }));
@@ -47,8 +48,13 @@ describe("siteScopeOf — an IG lands on a layer", () => {
     expect(siteScopeOf(cfg({ landing: "smart-base" }), "smart-immunizations")).toEqual(["smart-immunizations"]);
   });
 
-  test("a checkout that lands on itself, on the hub, or names no landing has no scope", () => {
-    expect(siteScopeOf(cfg({ landing: "smart-base" }), "smart-base")).toBeUndefined();
+  test("a folio that lands on itself: its own pages only, the other layers linked", () => {
+    // owner, 2026-11-13: "other harnesses should be referenced not included".
+    expect(siteScopeOf(cfg({ landing: "folio" }), "folio")).toEqual(["folio"]);
+    expect(siteScopeOf(cfg({ landing: "smart-base" }), "smart-base")).toEqual(["smart-base"]);
+  });
+
+  test("the hub, or a checkout that names no landing, has no scope", () => {
     expect(siteScopeOf(cfg({ landing: "hub" }), "x")).toBeUndefined();
     expect(siteScopeOf(cfg({}), "x")).toBeUndefined();
     rmSync(join(dir, "index.config.json"));
@@ -111,5 +117,36 @@ describe("scopeDropped — the parity guard lets a scoped site leave other layer
     const dropped = scopeDropped(current, candidate, ["ig"], ["ig", "who-iris", "core"], ["who-iris/catalogue/", "en/who-iris/catalogue/"]);
     expect(dropped.map((d) => d.dir).sort()).toEqual(["ar", "catalogue", "docs", "who-iris"]);
     expect(dropped.every((d) => d.ruling === SCOPE_RULING)).toBe(true);
+  });
+});
+
+describe("withoutLayers — the Tools viewer writes its scope's layer pages only", () => {
+  const pages = new Map([
+    ["en/cat-harness/tools/index.md", "all"],
+    ["en/cat-harness/tools/openapi.json", "api"],
+    ["en/cat-harness/tools/cat-harness/index.md", "ch"],
+    ["en/cat-harness/tools/cat-harness/gen-x/index.md", "ch tool"],
+    ["en/cat-harness/tools/cat-harness-tools/index.md", "cht"],
+    ["en/cat-harness/tools/smart-trust-tools/index.md", "own"],
+  ]);
+
+  test("an out-of-scope layer's pages are dropped; the index, the API and the scope's pages stay", () => {
+    const kept = withoutLayers(pages, ["en/cat-harness/tools/cat-harness", "en/cat-harness/tools/cat-harness-tools"]);
+    expect([...kept.keys()].sort()).toEqual([
+      "en/cat-harness/tools/index.md",
+      "en/cat-harness/tools/openapi.json",
+      "en/cat-harness/tools/smart-trust-tools/index.md",
+    ]);
+  });
+
+  test("a directory is matched whole, never as a name prefix", () => {
+    // `cat-harness` must not drop `cat-harness-tools`.
+    const kept = withoutLayers(pages, ["en/cat-harness/tools/cat-harness"]);
+    expect(kept.has("en/cat-harness/tools/cat-harness-tools/index.md")).toBe(true);
+    expect(kept.has("en/cat-harness/tools/cat-harness/index.md")).toBe(false);
+  });
+
+  test("no scope drops nothing", () => {
+    expect(withoutLayers(pages, []).size).toBe(pages.size);
   });
 });

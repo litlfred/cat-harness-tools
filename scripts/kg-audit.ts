@@ -85,6 +85,7 @@ import { auditFolioBlocks } from "./block-reference-resolver.js";
 // `Dirent` for the orphan-sidecar sweep (bean `3jj9`), which walks the
 // results tree with `withFileTypes` to tell a directory from a file.
 import { withPriorAdversarialReviews } from "./lib/kg-qa-carry.ts";
+import { judgeSkillRef, switchedOffSkillHomes } from "./lib/switched-off-skills.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
@@ -1567,9 +1568,18 @@ function auditRoles(
   const skillEdges = skillEdgeIndex([root, ...orderedDependencies(root).map((d) => d.rootPath)]);
   const anyActorDeclaresRoles = actors.some((a) => (a.roles ?? []).length > 0);
 
+  // A skill in an opt-in sub-graph the mounting root switched off is not
+  // judged here (card Q-SKILL-TOOL-LINK B): the same resolver `check:tools`
+  // and `check:workflow-refs` ask, over the same layers `skillEdges` reads.
+  let off: ReturnType<typeof switchedOffSkillHomes> | undefined;
+  const switchedOff = (s: string): boolean => {
+    off ??= switchedOffSkillHomes([root, ...orderedDependencies(root).map((d) => d.rootPath)]);
+    return judgeSkillRef(s, root, off) !== undefined;
+  };
+
   return graph.roles.filter((r) => subjects.has(r.id)).map((r) => {
     const badSkills = r.skills
-      .filter((s) => !resolvableSkills.has(s))
+      .filter((s) => !resolvableSkills.has(s) && !switchedOff(s))
       .map((s) => ({
         where: s,
         detail: `role "${r.id}" carries skill "${s}", which resolves to no skill in this instance or anything it \`needs\`.`,

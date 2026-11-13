@@ -333,11 +333,21 @@ describe("a skill's link", () => {
   });
 });
 
+// The real corpus, read once at module load so a test whose precondition this
+// checkout lacks is reported SKIPPED rather than passing having checked nothing.
+const REPO = resolve(dirname(HARNESS_ROOT));
+const CORPUS_ROWS = await processRows(REPO);
+const RENDERED = CORPUS_ROWS.filter((r) => r.svg !== undefined && r.loadError === undefined);
+/** The checkout has rendered process art on disk. */
+const HAS_RENDERED_ART = RENDERED.length > 0 && existsSync(join(REPO, RENDERED[0]!.svg!));
+const CORPUS_LINKS = skillLinksOf(REPO, instanceRoots(REPO));
+const corpusLinkable = (s: string): boolean => CORPUS_LINKS.has(s) || (CORPUS_LINKS.sources?.has(s) ?? false);
+/** Process_Discussion loads and its confirm-harness skill is linkable from this checkout. */
+const HAS_CONFIRM_HARNESS = CORPUS_ROWS.some((r) => r.id === "Process_Discussion" && r.loadError === undefined) && corpusLinkable("confirm-harness");
+
 describe("the real corpus", () => {
-  const REPO = resolve(dirname(HARNESS_ROOT));
-  test("a rendered diagram gets markers, and its page carries the panel", async () => {
-    const rows = (await processRows(REPO)).filter((r) => r.svg !== undefined && r.loadError === undefined);
-    if (rows.length === 0 || !existsSync(join(REPO, rows[0]!.svg!))) return; // no rendered art in this checkout
+  test.skipIf(!HAS_RENDERED_ART)("a rendered diagram gets markers, and its page carries the panel", () => {
+    const rows = RENDERED;
     const withMarkers = rows.filter((r) => (r.markers ?? []).length > 0);
     expect(withMarkers.length).toBeGreaterThan(0);
     const r = withMarkers[0]!;
@@ -355,23 +365,33 @@ describe("the real corpus", () => {
     expect(d.tasks[st.id]!.href).toBe(`${d.processHref}/node/${st.id}`);
   }, CORPUS_TIMEOUT);
 
-  test("every skill a panel names links somewhere — bootstrap's confirm-harness to its source (owner, 2026-11-08)", async () => {
-    const rows = (await processRows(REPO)).filter((r) => r.loadError === undefined);
+  test.skipIf(!HAS_CONFIRM_HARNESS)("every skill a panel names links somewhere — bootstrap's confirm-harness to its source (owner, 2026-11-08)", () => {
+    const rows = CORPUS_ROWS.filter((r) => r.loadError === undefined);
     const ctx = panelContext(REPO);
     // What this checkout can link: a page, or a source file the forge can
     // place. Standing alone (no index lock, no origin) the forge places
     // nothing, and a skill whose layer is not here has no file at all; the
     // QA page reports those, and this guards the rest.
-    const links = skillLinksOf(REPO, instanceRoots(REPO));
-    const linkable = (s: string): boolean => links.has(s) || (links.sources?.has(s) ?? false);
-    const discussion = rows.find((r) => r.id === "Process_Discussion");
-    if (discussion && linkable("confirm-harness")) {
-      const s = taskPanelData(discussion, rows, ctx).tasks["A_ListHarnesses"]!.skills.find((x) => x.name === "confirm-harness");
-      expect(s?.href).toMatch(/confirm-harness\.(html|md)$/);
-    }
+    const linkable = corpusLinkable;
+    const discussion = rows.find((r) => r.id === "Process_Discussion")!;
+    const s = taskPanelData(discussion, rows, ctx).tasks["A_ListHarnesses"]!.skills.find((x) => x.name === "confirm-harness");
+    expect(s?.href).toMatch(/confirm-harness\.(html|md)$/);
     const unlinked = rows.flatMap((r) =>
       unlinkedPanelRefs(taskPanelData(r, rows, ctx))
         .filter((x) => (x.kind === "skill" || x.kind === "role-skill") && linkable(x.name))
+        .map((x) => `${r.file}: ${x.kind} ${x.name} at ${x.task}`),
+    );
+    expect(unlinked).toEqual([]);
+  }, CORPUS_TIMEOUT);
+
+  test("every linkable skill a panel names has a link, whichever layers this checkout holds", () => {
+    // The sweep above, run unconditionally: it needs no particular process or
+    // skill to be present, so its guard is never lost to a skip.
+    const rows = CORPUS_ROWS.filter((r) => r.loadError === undefined);
+    const ctx = panelContext(REPO);
+    const unlinked = rows.flatMap((r) =>
+      unlinkedPanelRefs(taskPanelData(r, rows, ctx))
+        .filter((x) => (x.kind === "skill" || x.kind === "role-skill") && corpusLinkable(x.name))
         .map((x) => `${r.file}: ${x.kind} ${x.name} at ${x.task}`),
     );
     expect(unlinked).toEqual([]);

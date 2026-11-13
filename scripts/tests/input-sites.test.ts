@@ -23,9 +23,11 @@ import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/theme-by-ref.ts";
 
 import { blankSource, auditClosure, isChildSpawn, mainBlockLines, outsideTemplates, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
-import { pluginTableModules, validatorModules } from "../declared-imports.ts";
+import { pluginTableModules, toolRegistrarModules, validatorModules } from "../declared-imports.ts";
+import { discoverTools } from "../../tools/discover.ts";
+import { resolveModule } from "../tool-api.ts";
 import { checkFingerprint, entryFiles, FileDigests, TRACKED, type Fingerprint } from "../input-hash.ts";
-import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "../../schemas/sdlc/input-trace.ts";
+import { openTrace, qaRefLine, TRACE_ENV } from "../../schemas/sdlc/input-trace.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -321,15 +323,23 @@ describe("the runtime trace", () => {
   });
 
   test("without the variable set, the hook writes nothing anywhere", () => {
-    // input-site: inert #01b64b17 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
-    const prev = process.env[TRACE_ENV];
-    delete process.env[TRACE_ENV];
-    try {
-      inputSiteReached("nothing to see");
-      quietly(() => inputSiteReached("still nothing"));
-    } finally {
-      if (prev !== undefined) process.env[TRACE_ENV] = prev;
-    }
+    // The same calls in a child whose environment lacks the variable, run
+    // from the scratch root: the trace file the variable would have named
+    // stays absent, and the child leaves nothing beside its own source.
+    const t = openTrace(root);
+    const { [TRACE_ENV]: _unset, ...env } = t.env;
+    const code = 'inputSiteReached("nothing to see"); quietly(() => inputSiteReached("still nothing"));';
+    const file = join(root, "child.ts");
+    writeFileSync(file, `import { inputSiteReached, quietly } from ${JSON.stringify(join(TOOLS_ROOT, "schemas", "sdlc", "input-trace.ts"))};\n${code}\n`);
+    const r = Bun.spawnSync(["bun", file], { cwd: root, env, stdout: "pipe", stderr: "pipe" });
+    expect(r.exitCode).toBe(0);
+    expect(t.reached()).toBeUndefined();
+    const left = readdirSync(root, { recursive: true }).map(String).sort();
+    expect(left).toEqual(["build", "build/regen-cache", "build/regen-cache/traces", "child.ts"]);
+    // ...and the same child WITH the variable does write, so the silence above
+    // is the missing variable's and not a hook that writes nowhere at all.
+    inChild(t.env, code);
+    expect(t.reached()).toBe("nothing to see");
   });
 });
 
@@ -392,6 +402,24 @@ describe("annotations hold to the data that chooses their targets", () => {
     // The module moved into this layer with schemas/kg/ (8lcl); named from TOOLS_ROOT, not spelled.
     // declared-path-literal: the module whose `input-site` annotation is the subject of this assertion, the same file this test imports; no declaration answers where a module of this layer sits.
     expect(declaredBy(relTo(join(TOOLS_ROOT, "schemas/kg/harness-config.ts")), "plugin-tables")).toBe(true);
+  });
+
+  test("every Tool's in-process registrar is a module tool-api's `declared tool-registrars` names", () => {
+    const named = toolRegistrarModules(repo);
+    expect(named).toBeDefined();
+    const all = instanceRootsIn(repo);
+    for (const inst of all) {
+      for (const def of discoverTools(repo, undefined, inst).tools) {
+        const ip = def.invoke.inProcess;
+        if (!def.invoke.mcp || !ip) continue;
+        // The computation the site makes (tool-api.ts mcpToolList).
+        const abs = resolveModule(ip.module, inst, all);
+        if (abs === undefined) continue; // mcpToolList loads nothing for it
+        expect(named!.includes(relTo(resolve(abs))), `${def.id}: ${relTo(abs)} is not named by tool-registrars`).toBe(true);
+      }
+    }
+    // declared-path-literal: the module whose `input-site` annotation is the subject of this assertion, the same file this test imports; no declaration answers where a module of this layer sits.
+    expect(declaredBy(relTo(join(TOOLS_ROOT, "scripts/tool-api.ts")), "tool-registrars")).toBe(true);
   });
 
   test("every declared validator module, from any root a caller passes, is one `declared validator-refs` names", () => {

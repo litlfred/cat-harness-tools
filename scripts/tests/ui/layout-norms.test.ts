@@ -206,14 +206,17 @@ describe("the real corpus", () => {
     expect(r.fixed, "baseline lists a pair that no longer exists — run --update").toEqual([]);
   });
 
-  it("every pair found is real and named, and there is at least one", () => {
+  it("every pair found is named once", () => {
     // It said "the known pairs are the `skills/voices` ones" and listed a
-    // shape. `main` then added `methodologies/processes` nestings in
-    // `smart-base` and the `test/` ones above, so a shape assertion was a
-    // second copy of the baseline that drifted from it within hours. The
-    // baseline is the list; this pins only that the sweep found something to
-    // list, so an empty result cannot read as clean.
-    expect(r.found.length).toBeGreaterThan(0);
+    // shape, then "there is at least one". Both were copies of the corpus:
+    // the shape drifted from the baseline within hours, and "at least one"
+    // failed ON SUCCESS when smart-base's last nesting (`methodologies/
+    // processes`) moved to `collab/` (owner, 2026-11-13) — the shape the
+    // dangling guard in subgraphs-checkout.test.ts was rewritten away from.
+    // That the sweep COMPUTES is pinned by the fixtures above ("REPORTS and
+    // FAILS a nested declaration that is not baselined"), and that it read a
+    // corpus by `instances > 5`, so an empty result here is a clean corpus,
+    // not a vacuous one.
     expect(new Set(r.found).size).toBe(r.found.length);
   });
 

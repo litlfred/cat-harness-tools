@@ -26,6 +26,13 @@ describe("the shape", () => {
   test("a checkout entry names no branch", () => {
     expect(BuiltAtPublishSchema.safeParse(entry({ from: ["beans"] })).success).toBe(false);
   });
+  test("a lower entry (computed from a layer below, or from the tools) is valid and names no branch (owner, 2026-11-13)", () => {
+    expect(BuiltAtPublishSchema.safeParse(entry({ because: "lower" })).success).toBe(true);
+    expect(BuiltAtPublishSchema.safeParse(entry({ because: "lower", from: ["beans"] })).success).toBe(false);
+  });
+  test("an unknown cause is refused", () => {
+    expect(BuiltAtPublishSchema.safeParse(entry({ because: "pinned" })).success).toBe(false);
+  });
   test("a glob, an absolute path and a .. are refused", () => {
     for (const path of ["docs/*.json", "/docs/x/", "docs/../x"]) expect(BuiltAtPublishSchema.safeParse(entry({ path })).success).toBe(false);
   });

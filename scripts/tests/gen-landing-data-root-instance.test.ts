@@ -99,6 +99,41 @@ describe("gen-landing-data for a checkout-root landing", () => {
   });
 });
 
+describe("gen-landing-data --check when the board is built at publish (owner, 2026-11-13)", () => {
+  test("a layer that declares docs/_data/stickies.json builtAtPublish has nothing committed to judge: not applicable", () => {
+    const { parent, checkout } = fixture();
+    try {
+      const decl = JSON.parse(readFileSync(join(checkout, "folio.json"), "utf8"));
+      // declared-path-literal: a test vector — the board path a fixture declaration names as builtAtPublish, written as a declaration holds it.
+      decl.builtAtPublish = [{ path: "docs/_data/stickies.json", writer: ["landing:data"], because: "checkout", reason: "fixture" }];
+      writeFileSync(join(checkout, "folio.json"), json(decl));
+      const run = spawnSync("bun", ["run", SCRIPT, "--check"], {
+        cwd: checkout,
+        env: { ...process.env, CAT_HARNESS_ROOT: join(checkout, "cat-harness") },
+        encoding: "utf8",
+      });
+      expect(run.status).toBe(78);
+      expect(`${run.stdout}${run.stderr}`).toContain("builtAtPublish");
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
+  test("without the declaration, a missing board is still stale", () => {
+    const { parent, checkout } = fixture();
+    try {
+      const run = spawnSync("bun", ["run", SCRIPT, "--check"], {
+        cwd: checkout,
+        env: { ...process.env, CAT_HARNESS_ROOT: join(checkout, "cat-harness") },
+        encoding: "utf8",
+      });
+      expect(run.status).toBe(1);
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("contributingRoots for a checkout-root instance", () => {
   // The `.git` guard in `contributingRoots` stops a scan of a plain parent,
   // but not of a parent that is a checkout too — a Claude Code worktree, whose

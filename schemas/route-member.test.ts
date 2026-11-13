@@ -95,14 +95,16 @@ describe("a route-family member is one safe path segment", () => {
   });
 });
 
-describe("the keying enum carries exactly four values", () => {
-  test("route-family parses, and an undeclared fifth does not", () => {
+describe("storage on ONE branch is keyed in exactly four ways", () => {
+  test("route-family parses, and no fifth keying does", () => {
     const base = { branch: "gh-pages" };
     for (const keyedBy of ["commit", "tip", "route", "route-family"]) {
       expect(DirectoryStorageSchema.safeParse({ ...base, keyedBy }).success).toBe(true);
     }
     // The enum is the whole point: a fifth keying is a schema change somebody
-    // has to make, not a string a declaration can invent.
+    // has to make, not a string a declaration can invent. `family` IS a fifth
+    // value of the enum, but only for a `branchPrefix` (one branch per
+    // member, below); on a single `branch` it is refused like the rest.
     for (const keyedBy of ["routes", "family", "route_family", "dynamic", ""]) {
       expect(DirectoryStorageSchema.safeParse({ ...base, keyedBy }).success).toBe(false);
     }

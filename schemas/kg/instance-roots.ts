@@ -9,7 +9,7 @@
  * @module cat-harness/schemas/instance-roots
  * @graphNode none — constants and functions that locate a layer's declaration; no schema
  */
-import { existsSync, readdirSync, readFileSync, type Dirent } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, type Dirent } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { projectedRead } from "../sdlc/read-projections.ts";
 
@@ -105,10 +105,57 @@ export const CONFIG_SUFFIX = ".config.json";
  * reports a clean run over the layer it did not see. There is no correct
  * choice to make here, so the caller is told rather than guessed at.
  */
+/**
+ * A candidate file's parsed `{ name }`, read once per version of the file.
+ *
+ * Measured 2026-11-13 (folio-assistant-core main red, issue #753): in the
+ * full folio-assistant index, one `kg-audit --instance ./folio-assistant-core`
+ * took 2 min 55 s, and 126 s of it was this function re-reading and
+ * re-parsing the same layer declarations: `instanceRootsIn` and
+ * `declaredOptInRequires` call it on every layer for every directory resolved.
+ * Four `kg-audit` tests have a 30 s budget, so they timed out on core's main
+ * once the index grew, though every answer was right.
+ *
+ * Keyed by path and checked against the file's size, mtime and inode on every
+ * call, so an edit, a replacement or a new file is read again. A stat is not an
+ * open, and the projected read is reported only when the file is actually
+ * read, so a tracing run still pairs each report with its read. A file that
+ * fails to parse is not cached: it throws on every call, as before.
+ */
+const declarationNames = new Map<string, { stamp: string; raw: unknown }>();
+function declarationNameOf(abs: string): unknown {
+  const stamp = fileStamp(abs);
+  const hit = declarationNames.get(abs);
+  if (hit !== undefined && hit.stamp === stamp) return hit.raw;
+  // Only whether it parses and its `name` are used here. A caller that needs more reads the file again, and that open is not covered.
+  projectedRead(abs, "declaration-name");
+  const parsed = JSON.parse(readFileSync(abs, "utf-8")) as { name?: unknown } | null;
+  const raw = { name: parsed?.name };
+  declarationNames.set(abs, { stamp, raw });
+  return raw;
+}
+
+/** A directory's entries, listed again only when the directory's mtime moves (an entry added, removed or renamed). */
+const listings = new Map<string, { mtimeMs: number; entries: string[] }>();
+function listDir(dir: string): string[] {
+  const mtimeMs = statSync(dir).mtimeMs;
+  const hit = listings.get(dir);
+  if (hit !== undefined && hit.mtimeMs === mtimeMs) return hit.entries;
+  const entries = readdirSync(dir);
+  listings.set(dir, { mtimeMs, entries });
+  return entries;
+}
+
+/** A file's identity for the caches here: size, mtime and inode. */
+export function fileStamp(abs: string): string {
+  const st = statSync(abs);
+  return `${st.size}:${st.mtimeMs}:${st.ino}`;
+}
+
 export function findDeclarationFile(dir: string): string | undefined {
   let entries: string[];
   try {
-    entries = readdirSync(dir);
+    entries = listDir(resolve(dir));
   } catch {
     // Unreadable directory is "could not look", and a caller asking "is there
     // a declaration here" gets `undefined` either way. The distinction is not
@@ -127,9 +174,7 @@ export function findDeclarationFile(dir: string): string | undefined {
     if (stem.length === 0) continue;
     let raw: unknown;
     try {
-      // Only whether it parses and its `name` are used here. A caller that needs more reads the file again, and that open is not covered.
-      projectedRead(join(dir, entry), "declaration-name");
-      raw = JSON.parse(readFileSync(join(dir, entry), "utf-8"));
+      raw = declarationNameOf(join(dir, entry));
     } catch {
       // UNPARSEABLE IS NOT ABSENT. Skipping it here would make "this instance
       // declared something and it is broken" indistinguishable from "there is

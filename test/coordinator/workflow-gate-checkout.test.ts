@@ -10,12 +10,12 @@
  */
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "path";
-import { loadProcessModel } from "../../src/workflow/process-model.ts";
+import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.ts";
 import {
   loadRelaxations,
   validateRelaxations,
 } from "../../src/workflow/gate.ts";
-import { workflowFile } from "../../scripts/known-skills.ts";
+import { workflowFile, workflowFiles } from "../../scripts/known-skills.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -63,14 +63,16 @@ describe("the base is strict and the content-type processes are not", () => {
 
 describe("the relaxations this repo actually ships", () => {
   test("all of them are legal against the real processes", async () => {
+    // Every diagram the checkout holds, wherever its layer's declared graph
+    // puts it and whether or not this root switches its opt-in group on, as
+    // `check:workflow-policy` reads them: a relaxation is a declaration about
+    // a process, and core's `editing-hci-validation` moved into its opt-in
+    // `collab` (core#776). No `unseen`: a process found nowhere still fails.
     const models = await Promise.all(
-      ["editing-hci-validation", "draft-to-publication", "content-lifecycle",
-       "authoring-a-paper", "l2-dak-authoring", "l3-fhir-pipeline"].map((f) =>
-        loadProcessModel(processFile(f)),
-      ),
+      processDiagrams(workflowFiles(HARNESS, undefined, { enabledSubgraphs: "all" })).map((f) => loadProcessModel(f)),
     );
     const relaxations = loadRelaxations(INSTANCE_ROOT);
-    expect(() => validateRelaxations(relaxations, models)).not.toThrow();
+    expect(validateRelaxations(relaxations, models)).toEqual([]);
     // Every one is attributed and explained — the file is the record.
     for (const r of relaxations) {
       expect(r.package).toBeTruthy();

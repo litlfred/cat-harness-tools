@@ -115,7 +115,10 @@
         return el("li", {}, [el("a", { href: elHref(e.id) }, [e.name || "(unnamed)"]), el("span", { class: "am-type" }, [" " + typeLabel(e.type)]), (m.inViews[e.id] || []).length ? null : el("span", { class: "am-type" }, [" · in no view"])]);
       })));
     });
-    out.push(links([" · ", el("a", { href: "../" + m.file.split("/").map(encodeURIComponent).join("/") }, ["The Archi model file"])]));
+    // The model file sits in the DATA root beside `<m>/model.json`, not under
+    // the page: resolve from the model's data URL, so it holds wherever a
+    // site puts its pages (smart-ra serves pages under `en/dpi-h-ra/`).
+    out.push(links([" · ", el("a", { href: new URL("../" + m.file.split("/").map(encodeURIComponent).join("/"), new URL(cfg.model, location.href)).href }, ["The Archi model file"])]));
     return out;
   }
 

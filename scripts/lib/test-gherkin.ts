@@ -30,6 +30,17 @@
  * {@link BINDING_SCHEMES} and a {@link BindingResolver}. Feature files may be
  * written in any Gherkin dialect; the keywords are `gherkin-dialects.ts`.
  *
+ * ## Specifications, which are not tests of this tree
+ *
+ * Owner, 2026-11-13: a WHO DAK's (L2) `.feature` files are test
+ * SPECIFICATIONS for implementers, not tests of the repository's code. A
+ * repository says so BY DECLARATION — {@link SPECIFICATION_DECLARATIONS},
+ * never a path naming one repository. In a declared specification, a
+ * Scenario with no binding is counted as a specification rather than reported
+ * `scenario-names-no-test`; once it carries a binding (`@itb:` or `@test:`)
+ * it is checked like any other. Nothing else is relaxed: every test still
+ * needs a Scenario.
+ *
  * ## What the adapters are, and are not
  *
  * Each adapter is a lexical scanner, not a parser: it skips comments and
@@ -72,6 +83,12 @@ export interface TestLanguageAdapter {
   matches(file: string): boolean;
   /** The tests declared in `src`, named against `file`. */
   findTests(file: string, src: string): FoundTest[];
+  /**
+   * Does this file, by what it declares, hold tests its name does not show?
+   * Asked of a file no adapter `matches` (e.g. a suite with its own runner);
+   * `read` gives its text, so an adapter that rules a file out by name reads nothing.
+   */
+  claims?(file: string, read: () => string): boolean;
 }
 
 /** One Scenario (or Scenario Outline / Example) in a `.feature` file. */
@@ -94,6 +111,11 @@ export interface ParsedFeature {
   unknownLanguage?: string;
   /** Binding tags on a `Feature:` or `Rule:` line — inherited by every Scenario, so refused. */
   misplaced: { line: number; tag: string }[];
+  /**
+   * Set when a declaration ({@link SPECIFICATION_DECLARATIONS}) says this file
+   * specifies tests for implementers: the declaration that says so.
+   */
+  specification?: string;
 }
 
 /** Whitespace inside a segment becomes `_`: a Gherkin tag ends at whitespace. */
@@ -131,16 +153,40 @@ function templateEnd(src: string, i: number): { end: number; text: string } {
       const from = j;
       j += 2;
       let depth = 1;
+      // The last significant character of the expression, so a `/` can be
+      // told apart: a regex where an operand may start, division elsewhere.
+      // Without it, `${x.replace(/^a\//, "")}` read `\//` as a line comment
+      // and swallowed the closing backtick, so every test after it vanished.
+      let prev = "{";
       while (j < src.length && depth > 0) {
         const e = src[j];
         if (e === "`") {
           j = templateEnd(src, j).end;
+          prev = "`";
           continue;
+        }
+        if (e === "/" && src[j + 1] !== "/" && src[j + 1] !== "*" && /[(,=:[!&|?{};+\-*%~^]/.test(prev)) {
+          let k = j + 1;
+          let inClass = false;
+          while (k < src.length && src[k] !== "\n") {
+            if (src[k] === "\\") { k += 2; continue; }
+            if (src[k] === "[") inClass = true;
+            else if (src[k] === "]") inClass = false;
+            else if (src[k] === "/" && !inClass) break;
+            k++;
+          }
+          if (k < src.length && src[k] === "/") {
+            j = k + 1;
+            while (j < src.length && /[a-z]/.test(src[j])) j++;
+            prev = "/";
+            continue;
+          }
         }
         if (e === '"' || e === "'") {
           let k = j + 1;
           while (k < src.length && src[k] !== e && src[k] !== "\n") k += src[k] === "\\" ? 2 : 1;
           j = k + 1;
+          prev = e;
           continue;
         }
         if (e === "/" && src[j + 1] === "/") {
@@ -155,6 +201,7 @@ function templateEnd(src: string, i: number): { end: number; text: string } {
         }
         if (e === "{") depth++;
         else if (e === "}") depth--;
+        if (!/\s/.test(e)) prev = e;
         j++;
       }
       text += src.slice(from, j);
@@ -214,7 +261,7 @@ function regexLiteralEnd(src: string, i: number, masked: readonly string[]): num
  */
 export function maskSource(
   src: string,
-  opts: { rustChars?: boolean; templates?: boolean; rawStrings?: boolean; tripleQuotes?: boolean },
+  opts: { rustChars?: boolean; templates?: boolean; rawStrings?: boolean; tripleQuotes?: boolean; backtickNames?: boolean },
 ): { code: string; strings: Map<number, string> } {
   const out: string[] = [];
   const strings = new Map<number, string>();
@@ -258,6 +305,19 @@ export function maskSource(
         strings.set(i, src.slice(i + m[0].length, end < 0 ? src.length : end));
         out.push(blank(src.slice(i, stop)));
         i = stop;
+        continue;
+      }
+    }
+    if (opts.backtickNames && c === "`") {
+      // A Kotlin backtick identifier (`fun \`the vector's kid\`()`): a name,
+      // not a string, so it is kept as written. A quote inside it opens
+      // nothing; read as a char literal, `'s … DSC's` swallowed the rest of
+      // the name and the enclosing class's scope with it.
+      const end = src.indexOf("`", i + 1);
+      const nl = src.indexOf("\n", i + 1);
+      if (end > 0 && (nl < 0 || end < nl)) {
+        out.push(src.slice(i, end + 1));
+        i = end + 1;
         continue;
       }
     }
@@ -404,7 +464,8 @@ export const KOTLIN_ADAPTER: TestLanguageAdapter = {
   findTests(file, src) {
     // Backtick names (`fun \`decodes a QR\`()`) are identifiers, not strings:
     // read them from the raw source at the masked offset.
-    const { code } = maskSource(src, { tripleQuotes: true });
+    // `'` opens only a char literal ('a', '"', '\n'), as in Rust.
+    const { code } = maskSource(src, { tripleQuotes: true, rustChars: true, backtickNames: true });
     const scopeAt = braceScopes(code, (before) => {
       const m = /\b(?:class|object|interface)\s+([A-Za-z_]\w*)[^{]*$/.exec(before);
       // A `fun` after the header in the same chunk means this brace is the function's.
@@ -434,10 +495,42 @@ const JS_TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)__tests__\/.+\.[c
  * between them, and the test it hid read as no test at all.
  */
 const JS_HEAD = /(?<![\w.$])(describe|suite|context|test|it)(?=\s*[.(])/g;
+/**
+ * A suite with its own runner names it in a comment, `@test-runner run`:
+ * each `run("title", …)` call in that file is then a test, and the file is
+ * read whatever its name. The runner is the file's own function, so the file
+ * says so; the adapter names no runner of any one repository.
+ */
+const JS_RUNNER_DIRECTIVE = /@test-runner\s+([A-Za-z_$][\w$]*(?:\s*,\s*[A-Za-z_$][\w$]*)*)/g;
+const JS_SOURCE_FILE = /\.[cm]?[jt]sx?$/;
+
+/** The runner functions a file declares with `@test-runner`. */
+export function declaredTestRunners(src: string): string[] {
+  return [...src.matchAll(JS_RUNNER_DIRECTIVE)].flatMap((m) => m[1].split(",").map((x) => x.trim()));
+}
+
 /** Modifiers that take no arguments. */
 const JS_BARE_MODS = new Set(["skip", "only", "todo", "failing", "concurrent", "serial"]);
 /** Modifiers whose own argument list comes before the title call. */
 const JS_ARG_MODS = new Set(["each", "if", "skipIf", "runIf"]);
+
+/**
+ * A JS string literal's source text as the runtime string: what a runner
+ * prints as the title, and so what a tag is written against. `"a \"b\""`
+ * is the title `a "b"`, not `a \"b\"`. Covers the single-character escapes,
+ * `\xHH`, `\uHHHH`, `\u{…}` and a line continuation; any other escaped
+ * character stands for itself, as in JS.
+ */
+export function unescapeJsString(body: string): string {
+  const single: Record<string, string> = { n: "\n", t: "\t", r: "\r", b: "\b", f: "\f", v: "\v", "0": "\0" };
+  return body.replace(/\\(u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|\r\n|[\s\S])/g, (_, e: string, cp?: string, u?: string, x?: string) => {
+    if (cp) return String.fromCodePoint(parseInt(cp, 16));
+    if (u) return String.fromCharCode(parseInt(u, 16));
+    if (x) return String.fromCharCode(parseInt(x, 16));
+    if (e === "\n" || e === "\r\n" || e === "\r" || e === "\u2028" || e === "\u2029") return "";
+    return single[e] ?? e;
+  });
+}
 
 /** `id[${key}]`: a literal id, then one interpolation in brackets, nothing else computed. */
 const LOOPED_ID = /^[^`$\s\[\]]+\[\$\{[^{}`]*\}\]$/;
@@ -445,8 +538,13 @@ const LOOPED_ID = /^[^`$\s\[\]]+\[\$\{[^{}`]*\}\]$/;
 export const JS_ADAPTER: TestLanguageAdapter = {
   id: "js",
   matches: (f) => JS_TEST_FILE.test(f),
+  claims: (f, read) => JS_SOURCE_FILE.test(f) && declaredTestRunners(read()).length > 0,
   findTests(file, src) {
     const { code, strings } = maskSource(src, { templates: true });
+    const runners = declaredTestRunners(src).filter((r) => !/^(?:describe|suite|context|test|it)$/.test(r));
+    const heads = runners.length
+      ? new RegExp(`(?<![\\w.$])(describe|suite|context|test|it|${runners.map((r) => r.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")).join("|")})(?=\\s*[.(])`, "g")
+      : JS_HEAD;
     /** Offset of the `)` matching the `(` at `open`. */
     const closeOf = (open: number): number => {
       let depth = 0;
@@ -462,13 +560,15 @@ export const JS_ADAPTER: TestLanguageAdapter = {
      * One template is fixed: a literal id followed by a single `[${…}]`, the
      * looped-test convention `id[${key}]` (owner, 2026-11-06). It is named
      * verbatim, so its tag names `id[${key}]`, and the id stays unique in its
-     * file however many cases the loop runs.
+     * file however many cases the loop runs. Every other literal is named by
+     * its runtime string ({@link unescapeJsString}).
      */
     const firstArgString = (open: number): string | undefined => {
       for (let j = open + 1; j < code.length; j++) {
         if (strings.has(j)) {
           const body = strings.get(j)!;
-          return src[j] === "`" && body.includes("${") && !LOOPED_ID.test(body) ? undefined : body;
+          if (src[j] === "`" && body.includes("${")) return LOOPED_ID.test(body) ? body : undefined;
+          return unescapeJsString(body);
         }
         if (!/\s/.test(code[j])) return undefined;
       }
@@ -497,11 +597,11 @@ export const JS_ADAPTER: TestLanguageAdapter = {
         j = closeOf(argsOpen) + 1;
       }
     };
-    for (const m of code.matchAll(JS_HEAD)) {
+    for (const m of code.matchAll(heads)) {
       const open = callChain(m.index! + m[0].length);
       if (open === undefined) continue;
       const title = firstArgString(open);
-      if (m[1] === "test" || m[1] === "it") calls.push({ at: m.index!, title });
+      if (m[1] === "test" || m[1] === "it" || runners.includes(m[1])) calls.push({ at: m.index!, title });
       else scopes.push({ from: open, to: closeOf(open), title });
     }
     return calls.map((c) => {
@@ -759,6 +859,8 @@ export interface GherkinReport {
   tests: FoundTest[];
   scenarios: FoundScenario[];
   findings: GherkinFinding[];
+  /** Unbound Scenarios in declared specifications — counted, not findings. */
+  specifications: FoundScenario[];
 }
 
 /** Join tests to Scenarios and report every orphan, both ways. Pure. */
@@ -806,8 +908,12 @@ export function joinTestsToScenarios(
     }
   }
   const linkedBy = new Map<string, FoundScenario[]>();
+  const specFiles = new Set(features.filter((f) => f.specification).map((f) => f.file));
+  const specifications: FoundScenario[] = [];
   for (const s of scenarios) {
-    if (s.tests.length === 0 && s.bindings.length === 0 && !s.manual) {
+    if (s.tests.length === 0 && s.bindings.length === 0 && !s.manual && specFiles.has(s.file)) {
+      specifications.push(s);
+    } else if (s.tests.length === 0 && s.bindings.length === 0 && !s.manual) {
       findings.push({ kind: "scenario-names-no-test", file: s.file, line: s.line, detail: `Scenario "${s.title}" carries no binding tag (\`@test:\`, ${BINDING_SCHEMES.map((b) => `\`@${b}:\``).join(", ")}) and is not \`@manual\` — nothing executes it` });
     }
     for (const b of s.bindings) {
@@ -843,16 +949,18 @@ export function joinTestsToScenarios(
       });
     }
   }
-  return { tests: [...tests], scenarios, findings };
+  return { tests: [...tests], scenarios, findings, specifications };
 }
 
 // ── Reading a tree ──────────────────────────────────────────────────────────
 
+// input-site: inert #fca76dad — names the directories the walk skips; none of them is read
 const SKIP_DIRS = new Set([".git", "node_modules", "target", "build", "dist", "vendor", ".venv", "venv", "__pycache__", ".gradle"]);
 
 /** The files under `root` (repo-relative, `/`): git's list where there is one, else a walk. */
 export function listFiles(root: string): string[] {
   try {
+    // input-site: tree #6c771fee — the tracked and untracked-unignored files under the root: git's view of the working tree, which the cone replays
     const out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
       cwd: root,
       encoding: "utf-8",
@@ -876,12 +984,99 @@ export function listFiles(root: string): string[] {
   }
 }
 
+// ── Declared specifications ─────────────────────────────────────────────────
+
+/**
+ * A declaration a repository makes about itself that marks some of its
+ * `.feature` files as test specifications for implementers. `read` returns
+ * the files it covers (a subset of the `.feature` files given) and why, or
+ * `undefined` when the repository makes no such declaration.
+ */
+export interface SpecificationDeclaration {
+  name: string;
+  read(root: string, features: readonly string[]): { files: ReadonlySet<string>; because: string } | undefined;
+}
+
+/**
+ * A WHO SMART Digital Adaptation Kit: the root `dak.json` with
+ * `resourceType: "DAK"` (the DAK logical model). Its `testScenarios`
+ * component is the "set of test scenarios to validate an implementation of
+ * the DAK". When it lists `url` sources that are paths in the tree, only the
+ * `.feature` files under them are specifications; when it lists none, every
+ * `.feature` file in the DAK is.
+ */
+export const DAK_DECLARATION: SpecificationDeclaration = {
+  name: "dak",
+  read(root, features) {
+    const dak = readJson(join(root, "dak.json")) as { resourceType?: unknown; testScenarios?: unknown } | undefined;
+    if (!dak || dak.resourceType !== "DAK") return undefined;
+    const sources = testScenarioPaths(dak.testScenarios);
+    const files = features.filter((f) => sources.length === 0 || underAny(f, sources));
+    const because = sources.length === 0 ? "dak.json declares a DAK" : `dak.json declares a DAK whose testScenarios are ${sources.join(", ")}`;
+    return { files: new Set(files), because };
+  },
+};
+
+/**
+ * The same DAK, declared as a content type: `contentTypes.dak` in the root
+ * `index.config.json` (`resourceType: "DAK"`), which replaces `dak.json`. Its
+ * specifications are the `.feature` files the DAK publishes: those under its
+ * `testScenarios` paths, or, when it lists none, those inside the IG's
+ * declared `contentTypes.ig.include`. A repository's own tooling features lie
+ * outside what the IG publishes, so a harness layer that also declares
+ * itself a DAK keeps every one of them checked.
+ */
+export const DAK_CONTENT_TYPE_DECLARATION: SpecificationDeclaration = {
+  name: "dak-content-type",
+  read(root, features) {
+    const config = readJson(join(root, "index.config.json")) as { contentTypes?: { dak?: { resourceType?: unknown; testScenarios?: unknown }; ig?: { include?: unknown } } } | undefined;
+    const dak = config?.contentTypes?.dak;
+    if (!dak || dak.resourceType !== "DAK") return undefined;
+    const sources = testScenarioPaths(dak.testScenarios);
+    const include = Array.isArray(config?.contentTypes?.ig?.include)
+      ? (config!.contentTypes!.ig!.include as unknown[]).filter((u): u is string => typeof u === "string").map(normalisePath)
+      : [];
+    const scope = sources.length > 0 ? sources : include;
+    const files = features.filter((f) => underAny(f, scope));
+    const because =
+      sources.length > 0
+        ? `index.config.json contentTypes.dak declares a DAK whose testScenarios are ${sources.join(", ")}`
+        : "index.config.json contentTypes.dak declares a DAK, and contentTypes.ig.include is what it publishes";
+    return { files: new Set(files), because };
+  },
+};
+
+function readJson(path: string): unknown {
+  if (!existsSync(path)) return undefined;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8"));
+  } catch {
+    return undefined;
+  }
+}
+
+const normalisePath = (u: string): string => u.replace(/^\.\//, "").replace(/\/+$/, "");
+const underAny = (f: string, paths: readonly string[]): boolean => paths.some((u) => f === u || f.startsWith(u + "/"));
+
+/** The `url`s of a DAK's `testScenarios` that are paths in the tree (not absolute URLs). */
+function testScenarioPaths(testScenarios: unknown): string[] {
+  return (Array.isArray(testScenarios) ? testScenarios : [])
+    .map((t) => (t && typeof t === "object" && typeof (t as { url?: unknown }).url === "string" ? (t as { url: string }).url : undefined))
+    .filter((u): u is string => !!u && !/^[a-z][a-z0-9+.-]*:/i.test(u))
+    .map(normalisePath);
+}
+
+/** Every declaration the scan honours. A new one is an entry here, never a path in a caller. */
+export const SPECIFICATION_DECLARATIONS: readonly SpecificationDeclaration[] = [DAK_DECLARATION, DAK_CONTENT_TYPE_DECLARATION];
+
 export interface ScanOptions {
   /** Restrict to these repo-relative directories or files. Names stay relative to `root`. */
   under?: readonly string[];
   adapters?: readonly TestLanguageAdapter[];
   /** Resolvers for the non-`test` binding schemes. Default: `itb`, with no source held. */
   resolvers?: readonly BindingResolver[];
+  /** Declarations that mark `.feature` files as specifications. Default: {@link SPECIFICATION_DECLARATIONS}. */
+  declarations?: readonly SpecificationDeclaration[];
 }
 
 /** Scan `root`: every test the adapters find, every `.feature`, joined. */
@@ -900,7 +1095,20 @@ export function scanTree(root: string, opts: ScanOptions = {}): GherkinReport {
       continue;
     }
     const a = adapters.find((x) => x.matches(f));
-    if (a) tests.push(...a.findTests(f, readFileSync(join(root, f), "utf-8")));
+    if (a) {
+      tests.push(...a.findTests(f, readFileSync(join(root, f), "utf-8")));
+      continue;
+    }
+    let src: string | undefined;
+    const read = () => (src ??= readFileSync(join(root, f), "utf-8"));
+    const c = adapters.find((x) => x.claims?.(f, read));
+    if (c) tests.push(...c.findTests(f, read()));
+  }
+  const featureFiles = features.map((f) => f.file);
+  for (const d of opts.declarations ?? SPECIFICATION_DECLARATIONS) {
+    const spec = d.read(root, featureFiles);
+    if (!spec) continue;
+    for (const f of features) if (!f.specification && spec.files.has(f.file)) f.specification = spec.because;
   }
   return joinTestsToScenarios(tests, features, resolvers);
 }

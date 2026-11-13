@@ -60,8 +60,8 @@
  * reported a layer missing or refused; 2 when a branch or verdict could
  * not be determined, or a write failed.
  */
-import { appendFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { contentIsOffCheckout, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { standingCovers, standingGrantOf, type StandingCandidate, type StandingConsent } from "../schemas/kg/mount-trust.js";
@@ -84,11 +84,19 @@ export interface GitHubApi {
    */
   lockPinsAt?(repository: string, sha: string): Promise<Record<string, string> | undefined>;
   /**
-   * The parsed `<instance>.json` at the root of `repository` at `sha`;
-   * `undefined` when there is none. Optional: an API without it adds no
-   * newly declared directory ({@link extendExplicitDirectories}).
+   * How `head` relates to `base` in `repository`: GitHub's compare `status`
+   * (`ahead`, `behind`, `identical`, `diverged`). Optional: without it the
+   * cascade cannot tell a held pin is older, and moves it as before.
    */
-  declarationAt?(repository: string, sha: string, instance: string): Promise<unknown | undefined>;
+  compareCommits?(repository: string, base: string, head: string): Promise<string>;
+  /**
+   * The parsed `<instance>.json` of `repository` at `sha`, read from `at`
+   * (the instance's `upstreamRoot` in the site's lock, e.g. `<name>/`)
+   * or from the root when `at` is empty; `undefined` when there is none.
+   * Optional: an API without it adds no newly declared directory
+   * ({@link extendExplicitDirectories}).
+   */
+  declarationAt?(repository: string, sha: string, instance: string, at?: string): Promise<unknown | undefined>;
 }
 
 /** The raw shapes {@link verdictOf} reads: GitHub's combined status and check-runs responses, reduced to what matters. */
@@ -141,6 +149,9 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
       ]);
       return verdictOf(status, runs.check_runs);
     },
+    async compareCommits(repository, base, head) {
+      return (await get<{ status: string }>(`/repos/${repo(repository)}/compare/${base}...${head}`)).status;
+    },
     async lockPinsAt(repository, sha) {
       let file: { content?: string; encoding?: string };
       try {
@@ -152,10 +163,11 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
       if (!file.content || file.encoding !== "base64") return undefined;
       return lockPinsOf(JSON.parse(Buffer.from(file.content, "base64").toString("utf-8")));
     },
-    async declarationAt(repository, sha, instance) {
+    async declarationAt(repository, sha, instance, at) {
+      const path = [...(at ?? "").split("/").filter(Boolean), `${instance}.json`].map(encodeURIComponent).join("/");
       let file: { content?: string; encoding?: string };
       try {
-        file = await get(`/repos/${repo(repository)}/contents/${encodeURIComponent(`${instance}.json`)}?ref=${sha}`);
+        file = await get(`/repos/${repo(repository)}/contents/${path}?ref=${sha}`);
       } catch (e) {
         if (/HTTP 404/.test((e as Error).message)) return undefined;
         throw e;
@@ -186,6 +198,23 @@ export async function cascadeOf(root: string, harnessRoot?: string): Promise<{ h
   const needs = needsOfRoots(instanceRootsIn(root));
   const harness = [...needsOfRoots([harnessRoot]).keys()][0] ?? "";
   return { harness, below: harness ? belowHarness(harness, needs) : new Set<string>() };
+}
+
+/**
+ * `{ instance → upstreamRoot }` from an `index.lock.json`'s `instances`: where
+ * each instance's declaration sits in its repository. A layer whose
+ * declaration is not at the root (a layer that keeps `<name>/<name>.json`)
+ * was read at the root by step 4a, found missing, and turned every re-pin that
+ * moved it into could-not-determine (2026-11-13). Pure.
+ */
+export function upstreamRootsOf(lock: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  const instances = (lock as { instances?: unknown })?.instances;
+  for (const i of Array.isArray(instances) ? instances : []) {
+    const { instance, upstreamRoot } = i as { instance?: unknown; upstreamRoot?: unknown };
+    if (typeof instance === "string" && typeof upstreamRoot === "string") out[instance] = upstreamRoot;
+  }
+  return out;
 }
 
 /** `{ repository → ref }` from an `index.lock.json`'s `mounts`: the pins that layer is built and checked against. */
@@ -294,7 +323,12 @@ export function movesSince(before: unknown, mounts: readonly RemoteMount[]): Pla
  * through `api.declarationAt`; a declaration it cannot read is could-not-
  * determine (the move is withdrawn, never made with a list that may be short).
  */
-export async function extendExplicitDirectories(plan: RepinPlan, mounts: readonly RemoteMount[], api: GitHubApi): Promise<RepinPlan> {
+export async function extendExplicitDirectories(
+  plan: RepinPlan,
+  mounts: readonly RemoteMount[],
+  api: GitHubApi,
+  roots: Readonly<Record<string, string>> = {},
+): Promise<RepinPlan> {
   if (!api.declarationAt) return plan;
   const moves: PlannedMove[] = [];
   const unknown = [...plan.unknown];
@@ -307,13 +341,15 @@ export async function extendExplicitDirectories(plan: RepinPlan, mounts: readonl
     let before: unknown;
     let after: unknown;
     try {
-      [before, after] = await Promise.all([api.declarationAt(mv.repository, mv.from, mv.harness), api.declarationAt(mv.repository, mv.to, mv.harness)]);
+      const at = roots[mv.harness];
+      [before, after] = await Promise.all([api.declarationAt(mv.repository, mv.from, mv.harness, at), api.declarationAt(mv.repository, mv.to, mv.harness, at)]);
     } catch (e) {
       unknown.push({ harness: mv.harness, reason: `could not read \`${mv.harness}.json\` to compare the directories it declares: ${(e as Error).message}` });
       continue;
     }
     if (before === undefined || after === undefined) {
-      unknown.push({ harness: mv.harness, reason: `no \`${mv.harness}.json\` at the root of ${mv.repository}@${(before === undefined ? mv.from : mv.to).slice(0, 10)}, so whether it declares new directories cannot be told` });
+      const where = roots[mv.harness] ? `in \`${roots[mv.harness]}/\` of` : "at the root of";
+      unknown.push({ harness: mv.harness, reason: `no \`${mv.harness}.json\` ${where} ${mv.repository}@${(before === undefined ? mv.from : mv.to).slice(0, 10)}, so whether it declares new directories cannot be told` });
       continue;
     }
     const add = newlyDeclaredDirectoryIds(before, after).filter((id) => !listed.includes(id));
@@ -395,6 +431,23 @@ export async function alignToHeldPins(plan: RepinPlan, mounts: readonly RemoteMo
     if (ref === m.ref) {
       held.push({ harness: m.harness, reason: `${by} holds it at its current pin in its own lock; it moves when that layer re-pins it (cascade)` });
       continue;
+    }
+    // Never BACKWARDS. A layer's lock records what it was last tested with, so
+    // it can trail the site's own pin; aligning to it then undid fixes the
+    // site already had (folio-assistant train #3111 took bootstrap-tools from
+    // 0f88368 back to bbdaffb, the commit before a reference-direction fix).
+    if (api.compareCommits) {
+      let rel: string;
+      try {
+        rel = await api.compareCommits(m.repository, m.ref, ref);
+      } catch (e) {
+        held.push({ harness: m.harness, reason: `${by} holds it at ${ref.slice(0, 10)}, and whether that is older than its current pin could not be asked: ${(e as Error).message}` });
+        continue;
+      }
+      if (rel === "behind") {
+        held.push({ harness: m.harness, reason: `${by} holds it at ${ref.slice(0, 10)}, OLDER than its current pin ${m.ref.slice(0, 10)}; a re-pin never moves a pin backwards` });
+        continue;
+      }
     }
     const verdict = rule.require === "green" ? await api.commitVerdict(m.repository, ref) : undefined;
     const cover = standingCovers(m, { branch: rule.follows, sha: ref, ...(verdict ? { verdict } : {}) });
@@ -505,10 +558,11 @@ if (import.meta.main) {
     const depth = Number(valueOf("--depth") ?? 30);
     const api = githubApi();
     const mounts = readDeclaredMounts(root).mounts;
+    const lockFile = join(root, "index.lock.json");
+    const roots = existsSync(lockFile) ? upstreamRootsOf(JSON.parse(readFileSync(lockFile, "utf-8"))) : {};
     const extendFrom = valueOf("--extend-from");
     if (extendFrom !== undefined) {
-      const { readFileSync } = await import("node:fs");
-      const done = await extendExplicitDirectories({ moves: movesSince(JSON.parse(readFileSync(extendFrom, "utf-8")), mounts), held: [], unknown: [] }, mounts, api);
+      const done = await extendExplicitDirectories({ moves: movesSince(JSON.parse(readFileSync(extendFrom, "utf-8")), mounts), held: [], unknown: [] }, mounts, api, roots);
       const plan: RepinPlan = { ...done, moves: done.moves.filter((m) => m.addDirectories?.length) };
       const adding = plan.moves.map((m) => `- ${m.harness}: ${m.addDirectories!.map((id) => `\`${id}\``).join(", ")}`);
       const text = [
@@ -527,7 +581,7 @@ if (import.meta.main) {
       process.exit(exit);
     }
     const aligned = await alignToHeldPins(await planRepin(mounts, api, Number.isFinite(depth) && depth > 0 ? depth : 30), mounts, api, await cascadeOf(root));
-    const plan = await extendExplicitDirectories(aligned, mounts, api);
+    const plan = await extendExplicitDirectories(aligned, mounts, api, roots);
     const text = summaryOf(plan, dryRun);
     console.log(text);
     const summaryFile = valueOf("--summary-file");

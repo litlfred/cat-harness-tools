@@ -11,6 +11,7 @@
  * @module scripts/tests/image-roles.test
  */
 import { describe, expect, test } from "bun:test";
+import { resolve } from "node:path";
 
 import {
   PERMITTED_ORPHANS,
@@ -20,6 +21,7 @@ import {
   judge,
   mentionsIn,
   permitKey,
+  run,
   stalePermits,
   type Mention,
   type RoleFinding,
@@ -154,15 +156,30 @@ describe("the permit list is itself checked", () => {
   });
 
   test("the real list has no stale permit today", () => {
-    expect(stalePermits([])).toEqual([]);
+    // Against the REAL findings, the way the runner calls it. With no findings
+    // passed this would only hold while the real list is empty.
+    const { findings, examined } = run(resolve(import.meta.dir, "..", "..", ".."));
+    expect(examined).toBeGreaterThan(0);
+    expect(stalePermits(findings)).toEqual([]);
+    // ...and the same findings DO make a permit stale that names no finding,
+    // so the empty answer above is about the list and not the findings.
+    const bogus = new Map([["cat-harness/no-such-role", "fixture"]]);
+    expect(stalePermits(findings, bogus)).toEqual(["cat-harness/no-such-role"]);
   });
 
   test("every permit carries a REASON, not just a name", () => {
     // A suppression list whose entries say nothing is a dustbin. Each entry
     // names the decision it waits on, so the list reads as a queue.
-    for (const [k, why] of PERMITTED_ORPHANS) {
-      expect(why.length, `${k} has no reason`).toBeGreaterThan(80);
-      expect(why, `${k} names no date`).toMatch(/20\d\d-\d\d-\d\d/);
-    }
+    const unreasoned = (permits: ReadonlyMap<string, string>): string[] =>
+      [...permits].filter(([, why]) => why.length <= 80 || !/20\d\d-\d\d-\d\d/.test(why)).map(([k]) => k);
+    // A FIXTURE list first: the real one is empty today, and a rule applied
+    // only to it would check no entry at all.
+    const fixture = new Map([
+      ["cat-harness/kept", `waits on the theme decision recorded 2026-01-01; ${"the reason in full. ".repeat(4)}`],
+      ["cat-harness/short", "waiting since 2026-01-01"],
+      ["cat-harness/undated", `waits on the theme decision; ${"the reason in full, with no date. ".repeat(4)}`],
+    ]);
+    expect(unreasoned(fixture)).toEqual(["cat-harness/short", "cat-harness/undated"]);
+    expect(unreasoned(PERMITTED_ORPHANS)).toEqual([]);
   });
 });

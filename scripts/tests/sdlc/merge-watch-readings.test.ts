@@ -20,6 +20,8 @@ import {
   reliefCandidates,
   supersededBy,
   watchRepo,
+  paginate,
+  unreadSummary,
   type GitHub,
   type PinChange,
   type WorkflowRun,
@@ -182,7 +184,7 @@ describe("runner relief", () => {
     { number: 2, draft: false, labels: ["P3"], headSha: "p3", headBranch: "p3-branch" },
     { number: 3, draft: false, labels: [], headSha: "r3", headBranch: "ready-branch" },
   ];
-  test("draft, P3, closed-PR and never-started runs; never a main push run", () => {
+  test("draft, P3, closed-PR and never-started runs; never a main push or dynamic run, never the canceller", () => {
     const runs = [
       run({ id: 1, status: "in_progress", head_sha: "d1", head_branch: "draft-branch" }),
       run({ id: 2, status: "queued", head_sha: "p3", head_branch: "p3-branch" }),
@@ -192,12 +194,19 @@ describe("runner relief", () => {
       run({ id: 6, status: "in_progress", event: "push", head_sha: "m", head_branch: "main", run_started_at: minutesAgo(30) }),
       run({ id: 7, status: "queued", event: "push", head_sha: "m2", head_branch: "main", created_at: minutesAgo(120) }),
       run({ id: 8, status: "completed", head_sha: "d1", head_branch: "draft-branch" }),
+      // Live shapes (2026-11-07): GitHub sets run_started_at on a run that is still queued.
+      run({ id: 9, status: "queued", head_sha: "r3", head_branch: "ready-branch", created_at: minutesAgo(75), run_started_at: minutesAgo(75) }),
+      // CodeQL's "Push on main" is event `dynamic` on main: main's own run.
+      run({ id: 10, status: "queued", event: "dynamic", name: "Push on main", head_sha: "m3", head_branch: "main", created_at: minutesAgo(200) }),
+      // The canceller of a closed PR's runs, itself queued on that closed PR.
+      run({ id: 11, status: "queued", name: "Cancel the runs of a closed PR", path: ".github/workflows/cancel-on-close.yml", head_sha: "gone2", head_branch: "closed-2" }),
     ];
     expect(reliefCandidates(runs, prs, "main", NOW, 60).map((c) => [c.runId, c.reason])).toEqual([
       [1, "draft PR #1"],
       [2, "P3 PR #2"],
       [3, "closed PR (closed-branch)"],
       [4, "queued 90m, never started"],
+      [9, "queued 75m, never started"],
     ]);
   });
 });
@@ -312,5 +321,42 @@ describe("watchRepo over the stub", () => {
     expect(r.main.verdict).toBe("unknown: main push runs not read");
     expect(r.queue).toBeNull();
     expect(r.errors.length).toBeGreaterThan(0);
+  });
+});
+
+describe("pagination never follows GitHub's Link header", () => {
+  test("asks by page= on the given path, and stops at a short page", () => {
+    const asked: string[] = [];
+    const full = Array.from({ length: 2 }, (_, i) => ({ id: i }));
+    const pages = paginate((p) => {
+      asked.push(p);
+      return p.endsWith("page=3") ? [{ id: 9 }] : full;
+    }, "repos/o/r/pulls/1/commits?per_page=2");
+    expect(asked).toEqual([
+      "repos/o/r/pulls/1/commits?per_page=2&page=1",
+      "repos/o/r/pulls/1/commits?per_page=2&page=2",
+      "repos/o/r/pulls/1/commits?per_page=2&page=3",
+    ]);
+    expect(pages).toHaveLength(3);
+    expect(asked.every((p) => !p.startsWith("repositories/"))).toBe(true);
+  });
+  test("a wrapped page is measured by its array field", () => {
+    const asked: string[] = [];
+    paginate((p) => {
+      asked.push(p);
+      return { total_count: 1, check_runs: [{ id: 1 }] };
+    }, "repos/o/r/commits/s/check-runs?per_page=100");
+    expect(asked).toEqual(["repos/o/r/commits/s/check-runs?per_page=100&page=1"]);
+  });
+});
+
+describe("exit 2 says why", () => {
+  test("names each repository and what of it was not read", () => {
+    const report = watchRepo(stub({}), "o/x", undefined, NOW);
+    const [line] = unreadSummary([report]);
+    expect(line).toStartWith("o/x: ");
+    expect(line).toContain("runner queue");
+    expect(line).toContain("main verdict");
+    expect(unreadSummary([{ ...report, errors: [], queue: queueReading([], NOW), main: { sha: "m", verdict: "green" } }])).toEqual([]);
   });
 });

@@ -124,10 +124,25 @@ export function loadRelaxations(repoRoot: string): Relaxation[] {
  * otherwise sit in the file looking like policy while permitting nothing — and
  * nobody would find out until the day it was needed.
  */
-export function validateRelaxations(relaxations: Relaxation[], models: ProcessModel[]): void {
+export function validateRelaxations(
+  relaxations: Relaxation[],
+  models: ProcessModel[],
+  /**
+   * `unseen`: opt-in sub-graphs the checkout declares but does not hold on
+   * disk (switched off, so the mount left them out). A relaxation naming a
+   * process found nowhere is then UNDETERMINED, not wrong: the process may
+   * be in one of them. It is returned, not passed, so the caller says so.
+   */
+  opts: { unseen?: readonly string[] } = {},
+): Relaxation[] {
   const byId = new Map(models.map((m) => [m.id, m]));
+  const undetermined: Relaxation[] = [];
   for (const r of relaxations) {
     const model = byId.get(r.process);
+    if (!model && (opts.unseen?.length ?? 0) > 0) {
+      undetermined.push(r);
+      continue;
+    }
     if (!model) {
       throw new PolicyError(
         `skills/${r.package}/${POLICY_FILE} relaxes ${r.process}, which is not a process here. ` +
@@ -149,6 +164,27 @@ export function validateRelaxations(relaxations: Relaxation[], models: ProcessMo
       );
     }
   }
+  return undetermined;
+}
+
+/**
+ * The relaxations that are INACTIVE here: legal, but naming a process that
+ * only a switched-off opt-in group holds, so they relax nothing until a root
+ * switches that group on (owner, 2026-11-13: core's `workflow-policy.json`
+ * relaxes `Process_Editing`, which core#776 moves into its opt-in `collab`).
+ *
+ * Reported, never an error. Call it after {@link validateRelaxations}: it
+ * judges nothing, and a relaxation that was refused there never gets here.
+ * One `undetermined` there (its process is in no group on disk) is not also
+ * inactive: whether it is cannot be told here either.
+ */
+export function inactiveRelaxations(
+  relaxations: readonly Relaxation[],
+  /** The ids of the processes this root switches on. */
+  active: ReadonlySet<string>,
+  undetermined: readonly Relaxation[] = [],
+): Relaxation[] {
+  return relaxations.filter((r) => !undetermined.includes(r) && !active.has(r.process));
 }
 
 export interface GateVerdict {

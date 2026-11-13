@@ -104,7 +104,7 @@ export function catalogueNodesDir(source: string): string {
  * The manifest's `selection`: the nodes directory spelled from the SOURCE
  * LAYER's declaration (`<declared path>/<nodesDir>/`), never from the
  * checkout. Spelled `relative(REPO, …)` it read `catalogue/nodes/` where the
- * layer is the checkout root and `who-iris/catalogue/nodes/` where a consumer
+ * layer is the checkout root and `<mount>/catalogue/nodes/` where a consumer
  * mounts it, so the committed lookup was stale in every checkout but one.
  */
 export function nodesSelection(dir: { path: string }, nodesDir: string): string {

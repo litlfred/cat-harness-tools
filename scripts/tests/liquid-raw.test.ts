@@ -58,11 +58,9 @@ function render(src: string): string {
 const rubyLiquid = spawnSync("ruby", ["-e", 'require "liquid"'], { encoding: "utf-8" }).status === 0;
 
 describe("wrapRaw", () => {
-  for (const [name, text] of Object.entries(CASES)) {
-    it(`round-trips ${name}`, () => {
-      expect(render(wrapRaw(text).join(""))).toBe(text);
-    });
-  }
+  it.each(Object.entries(CASES))("round-trips %s", (_name, text) => {
+    expect(render(wrapRaw(text).join(""))).toBe(text);
+  });
 
   it("leaves text without a closing tag untouched", () => {
     expect(escapeForRaw(CASES["expression and tag syntax"])).toBe(CASES["expression and tag syntax"]);

@@ -16,7 +16,7 @@
  * | `assets` | `check:declared-assets` → `auditInstance` | the file exists |
  * | `visualisers[].renderedBy` | `check:visualiser-routes` → `checkVisualiserRoutes` | names a discovered Tool node |
  * | `needs` | `check:instance-graph` → `resolveInstanceGraph` | every dependency resolves, no cycle |
- * | `enableSubgraphs` | here → `enableSubgraphsProblems` | each id names an opt-in sub-graph of this layer or its `needs` closure |
+ * | `enableSubgraphs` (and each opt-in entry's `requires`) | here → `enableSubgraphsProblems`, `requiresProblems` | each id names an opt-in sub-graph of this layer or its `needs` closure; only an opt-in entry requires, never itself |
  * | `optInLinks` (the opt-in `directories`, as link targets) | `check:optin-links` → `checkOptInLinks` | no always-on page links into an opt-in sub-graph, which is absent wherever it is switched off |
 | `optInRefs` (the opt-in `directories`, as skill homes) | `check:optin-refs` → `checkOptInRefs` | no always-on Tool's `satisfies` or workflow's skill ref names a skill only an opt-in sub-graph holds |
  *
@@ -54,7 +54,7 @@ import { basename, relative, resolve } from "node:path";
 import { instanceDirectories, readDeclaration, nestedDirectories, type CatHarnessDeclaration } from "../schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { orderedDependencies, resolveInstanceGraph } from "../schemas/kg/harness-config.js";
-import { declaredEnableSubgraphs, enableSubgraphsProblems, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
+import { declaredEnableSubgraphs, enableSubgraphsProblems, requiresProblems, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
 import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import "../schemas/kg/folio-graph-typology.js";
 
@@ -202,9 +202,23 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
 
     // enableSubgraphs — each id names an opt-in sub-graph (`optIn: true`) of
     // this layer or one in its `needs` closure, top level or from within.
+    // An opt-in entry's `requires` is held to the same rule, and only an
+    // opt-in entry may carry one (owner, 2026-11-13).
     const enable = decl.enableSubgraphs ?? [];
-    examined.enableSubgraphs += enable.length;
-    if (enable.length > 0) {
+    // Top level AND from within: an opt-in group inside an opt-in level
+    // (an `L2/collab/` inside `L2/`) carries its `requires` in that level's
+    // graph.json, and `promoteFromWithin` keeps the raw field.
+    let all: ReturnType<typeof instanceDirectories>;
+    try {
+      all = instanceDirectories(inst, decl);
+    } catch {
+      all = (decl.directories ?? []) as ReturnType<typeof instanceDirectories>; // a nested file that will not read is check:harness-dirs' finding
+    }
+    const requiring = all.filter(
+      (d): d is typeof d & { requires: string[] } => Array.isArray((d as { requires?: unknown }).requires) && (d as { requires: unknown[] }).requires.length > 0,
+    ) as Array<{ id: string; optIn?: boolean; requires: string[] }>;
+    examined.enableSubgraphs += enable.length + requiring.reduce((n, d) => n + d.requires.length, 0);
+    if (enable.length > 0 || requiring.length > 0) {
       try {
         const closure: DeclaredOptIns[] = [{ name, directories: instanceDirectories(inst, decl) }];
         for (const dep of orderedDependencies(inst)) {
@@ -213,6 +227,9 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
         }
         for (const p of enableSubgraphsProblems(name, enable, closure)) {
           findings.push({ instance: name, field: "enableSubgraphs", subject: p.id, by: "check:declaration-resolution", detail: p.detail });
+        }
+        for (const p of requiresProblems(name, requiring, closure)) {
+          findings.push({ instance: name, field: "enableSubgraphs", subject: `${p.id}.requires`, by: "check:declaration-resolution", detail: p.detail });
         }
       } catch (e) {
         undetermined.push(`${name}: its enableSubgraphs could not be resolved — ${(e as Error).message.split("\n")[0]}`);

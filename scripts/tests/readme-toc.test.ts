@@ -159,20 +159,18 @@ describe("link styles", () => {
     pages: "https://example.github.io/repo/papers/p/one.pdf",
   } as const;
 
-  for (const [style, url] of Object.entries(styles)) {
-    test(`${style} renders ${url}`, () => {
-      const root = folio({ p: ["one"] });
-      publish(root, "gh-pages", ["papers/p/one.pdf"]);
-      const md = renderToc(
-        root,
-        config({
-          linkStyle: style as keyof typeof styles,
-          pagesBaseUrl: "https://example.github.io/repo",
-        }),
-      ).markdown;
-      expect(md).toContain(url);
-    });
-  }
+  test.each(Object.entries(styles))("%s renders %s", (style, url) => {
+    const root = folio({ p: ["one"] });
+    publish(root, "gh-pages", ["papers/p/one.pdf"]);
+    const md = renderToc(
+      root,
+      config({
+        linkStyle: style as keyof typeof styles,
+        pagesBaseUrl: "https://example.github.io/repo",
+      }),
+    ).markdown;
+    expect(md).toContain(url);
+  });
 
   test("pages and raw both warn that they need a public repository", () => {
     const root = folio({ p: ["one"] });

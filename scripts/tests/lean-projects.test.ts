@@ -89,92 +89,92 @@ describe.skipIf(!folio)("Lean project discovery", () => {
   });
 });
 
-for (const pkg of LEAN_PACKAGES) {
-  describe.skipIf(!folio)(`Paper package: ${pkg.name} (lib: ${pkg.lib})`, () => {
-    const pkgRoot = join(FOLIO_ROOT ?? INSTANCE_ROOT, pkg.lakeRoot);
-    const projDir = join(pkgRoot, pkg.lib);
-    const leanFiles = findLeanFiles(projDir);
+describe.skipIf(!folio).each(LEAN_PACKAGES.map((pkg) => [pkg.name, pkg.lib, pkg] as const))("Paper package: %s (lib: %s)", (_name, _lib, pkg) => {
+  const pkgRoot = join(FOLIO_ROOT ?? INSTANCE_ROOT, pkg.lakeRoot);
+  const projDir = join(pkgRoot, pkg.lib);
+  const leanFiles = findLeanFiles(projDir);
 
-    test("lakefile.toml exists", () => {
-      expect(existsSync(join(pkgRoot, "lakefile.toml"))).toBe(true);
+  test("lakefile.toml exists", () => {
+    expect(existsSync(join(pkgRoot, "lakefile.toml"))).toBe(true);
+  });
+
+  test("library directory exists", () => {
+    expect(existsSync(projDir)).toBe(true);
+  });
+
+  test("has .lean files", () => {
+    expect(leanFiles.length).toBeGreaterThan(0);
+  });
+
+  describe.each(leanFiles.map((file) => [relative(INSTANCE_ROOT, file), file] as const))("%s", (_rel, file) => {
+    test("is non-empty", () => {
+      const content = readFileSync(file, "utf-8");
+      expect(content.trim().length).toBeGreaterThan(0);
     });
 
-    test("library directory exists", () => {
-      expect(existsSync(projDir)).toBe(true);
-    });
-
-    test("has .lean files", () => {
-      expect(leanFiles.length).toBeGreaterThan(0);
-    });
-
-    for (const file of leanFiles) {
-      const rel = relative(INSTANCE_ROOT, file);
-
-      test(`${rel} is non-empty`, () => {
-        const content = readFileSync(file, "utf-8");
-        expect(content.trim().length).toBeGreaterThan(0);
-      });
-
-      test(`${rel} declares something or imports something`, () => {
-        // This used to assert `hasImport || isRoot`, on the theory that a
-        // module with no `import` was suspect. It is not: `Nat`, `ℕ`, `List`,
-        // `structure`, `inductive` and `class` are all core Lean, so a module
-        // can be entirely self-contained and correct. Checked against the
-        // five QOU modules it flagged — four compile clean and sorry-free
-        // with no imports at all. It caught the one genuinely broken file
-        // (`IsotopeRecord.lean`, accessors defined outside the structure's
-        // namespace so `r.A` could not resolve) only by coincidence: the
-        // defect was that it did not COMPILE, which no import check detects.
-        //
-        // What a cheap static test can honestly assert is that the file is
-        // not empty — it either declares something or pulls something in.
-        // Compilation is the Lean build's job, not this suite's.
-        const content = readFileSync(file, "utf-8");
-        const basename = file.split("/").pop()?.replace(".lean", "");
-        const hasImport = /^import\s/m.test(content);
-        const hasDecl =
-          /^(private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+)*(theorem|lemma|def|abbrev|structure|inductive|class|instance|axiom|example|opaque)\s/m.test(
-            content,
-          );
-        const isRoot = basename === pkg.lib;
-        expect(hasImport || hasDecl || isRoot).toBe(true);
-      });
-    }
-
-    // A REPORT, not a gate: a nonzero `sorry` count is the expected state of
-    // a paper in progress, so asserting zero would be wrong. It used to end
-    // in `expect(true).toBe(true)` and so could not fail for ANY reason —
-    // including the one that matters, `findLeanFiles` returning nothing and
-    // the audit reporting a clean "0 sorry" over an empty directory.
-    test("sorry audit (report)", () => {
-      let totalSorry = 0;
-      const sorryFiles: string[] = [];
-      for (const file of leanFiles) {
-        const content = readFileSync(file, "utf-8");
-        const count = (content.match(/\bsorry\b/g) || []).length;
-        if (count > 0) {
-          totalSorry += count;
-          sorryFiles.push(`${relative(INSTANCE_ROOT, file)}(${count})`);
-        }
-      }
-      if (totalSorry > 0) {
-        console.log(`    ℹ ${pkg.lib}: ${totalSorry} sorry in ${sorryFiles.length} files: ${sorryFiles.join(", ")}`);
-      }
-      // The one thing that can go wrong unnoticed: an audit of no files.
-      expect(leanFiles.length).toBeGreaterThan(0);
-    });
-
-    // Build artifacts not tracked
-    test("no .lake/ artifacts tracked in git", () => {
-      try {
-        const tracked = execSync(`git ls-files --cached ${pkg.lakeRoot}/.lake/`, {
-          cwd: INSTANCE_ROOT,
-          encoding: "utf-8",
-        }).trim();
-        expect(tracked).toBe("");
-      } catch {
-        // git not available — skip
-      }
+    test("declares something or imports something", () => {
+      // This used to assert `hasImport || isRoot`, on the theory that a
+      // module with no `import` was suspect. It is not: `Nat`, `ℕ`, `List`,
+      // `structure`, `inductive` and `class` are all core Lean, so a module
+      // can be entirely self-contained and correct. Checked against the
+      // five QOU modules it flagged — four compile clean and sorry-free
+      // with no imports at all. It caught the one genuinely broken file
+      // (`IsotopeRecord.lean`, accessors defined outside the structure's
+      // namespace so `r.A` could not resolve) only by coincidence: the
+      // defect was that it did not COMPILE, which no import check detects.
+      //
+      // What a cheap static test can honestly assert is that the file is
+      // not empty — it either declares something or pulls something in.
+      // Compilation is the Lean build's job, not this suite's.
+      const content = readFileSync(file, "utf-8");
+      const basename = file.split("/").pop()?.replace(".lean", "");
+      const hasImport = /^import\s/m.test(content);
+      const hasDecl =
+        /^(private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+)*(theorem|lemma|def|abbrev|structure|inductive|class|instance|axiom|example|opaque)\s/m.test(
+          content,
+        );
+      const isRoot = basename === pkg.lib;
+      expect(hasImport || hasDecl || isRoot).toBe(true);
     });
   });
-}
+
+  // A REPORT, not a gate: a nonzero `sorry` count is the expected state of
+  // a paper in progress, so asserting zero would be wrong. It used to end
+  // in `expect(true).toBe(true)` and so could not fail for ANY reason —
+  // including the one that matters, `findLeanFiles` returning nothing and
+  // the audit reporting a clean "0 sorry" over an empty directory.
+  test("sorry audit (report)", () => {
+    let totalSorry = 0;
+    const sorryFiles: string[] = [];
+    for (const file of leanFiles) {
+      const content = readFileSync(file, "utf-8");
+      const count = (content.match(/\bsorry\b/g) || []).length;
+      if (count > 0) {
+        totalSorry += count;
+        sorryFiles.push(`${relative(INSTANCE_ROOT, file)}(${count})`);
+      }
+    }
+    if (totalSorry > 0) {
+      console.log(`    ℹ ${pkg.lib}: ${totalSorry} sorry in ${sorryFiles.length} files: ${sorryFiles.join(", ")}`);
+    }
+    // The one thing that can go wrong unnoticed: an audit of no files.
+    expect(leanFiles.length).toBeGreaterThan(0);
+  });
+
+  // Build artifacts not tracked
+  test("no .lake/ artifacts tracked in git", () => {
+    // Only git being unavailable is tolerated; the expectation sits outside
+    // the catch, where a failed assertion is not swallowed with it.
+    let tracked: string;
+    try {
+      tracked = execSync(`git ls-files --cached ${pkg.lakeRoot}/.lake/`, {
+        cwd: INSTANCE_ROOT,
+        encoding: "utf-8",
+      }).trim();
+    } catch {
+      // git not available — skip
+      return;
+    }
+    expect(tracked).toBe("");
+  });
+});

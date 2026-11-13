@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -81,8 +81,7 @@ describe("readBlockManifest ignores builders and labels inside strings", () => {
   });
 
   // Cleanup is best-effort; the temp dir is small and per-run.
-  test("cleanup", () => {
+  afterAll(() => {
     rmSync(dir, { recursive: true, force: true });
-    expect(true).toBe(true);
   });
 });

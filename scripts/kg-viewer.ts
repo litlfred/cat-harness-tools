@@ -339,7 +339,7 @@ export function viewerHtml(
   ol li button[aria-current="true"] .kind { color: var(--on-accent-dim); }
   .detail { max-height: 88vh; overflow-y: auto; }
   .detail h3 { margin: 0 0 3px; font-size: 16px; }
-  .iri { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px;
+  .iri { font-family: var(--fa-font-mono,Menlo,Consolas,monospace); font-size: 11.5px;
          color: var(--dim); word-break: break-all; margin-bottom: 12px; }
   table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
   th, td { text-align: left; vertical-align: top; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); }

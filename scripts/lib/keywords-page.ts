@@ -20,7 +20,8 @@
  * nothing; {@link keywordsPageModel} reads the checkout.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, posix } from "node:path";
+import { join, posix, relative, sep } from "node:path";
+import { instanceDirectoriesForGraph, instanceRootsIn } from "../../schemas/kg/cat-harness.ts";
 import { tokenize } from "../../pipeline/lsi.ts";
 import type { KeywordVariant, KeywordsGraph, ScoredKeyword } from "../../schemas/library/library-keywords.ts";
 import type { LibraryLinks, LibraryResolver } from "./library-links.ts";
@@ -254,9 +255,8 @@ export function keywordsPage(model: KeywordsPageModel, generated: string, eviden
 export function glossaryLabels(repo: string): { labels: Set<string>; files: string[] } {
   const labels = new Set<string>();
   const files: string[] = [];
-  for (const inst of readdirSync(repo, { withFileTypes: true })) {
-    if (!inst.isDirectory() || inst.name.startsWith(".") || inst.name === "node_modules") continue;
-    const dir = join(repo, inst.name, "glossary");
+  // Every layer's declared `glossary` graphs, not a `glossary/` found by name.
+  for (const dir of instanceRootsIn(repo).flatMap((inst) => instanceDirectoriesForGraph(inst, "glossary"))) {
     if (!existsSync(dir)) continue;
     for (const f of readdirSync(dir).filter((n) => n.endsWith(".glossary.json")).sort()) {
       try {
@@ -264,7 +264,7 @@ export function glossaryLabels(repo: string): { labels: Set<string>; files: stri
         for (const t of g.terms ?? [])
           for (const l of [t.prefLabel, ...(Array.isArray(t.altLabel) ? t.altLabel : [t.altLabel])])
             if (typeof l === "string" && norm(l)) labels.add(norm(l));
-        files.push(posix.join(inst.name, "glossary", f));
+        files.push(relative(repo, join(dir, f)).split(sep).join(posix.sep));
       } catch {
         // A glossary that does not parse is the glossary check's to report.
       }

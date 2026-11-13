@@ -3431,6 +3431,8 @@ export class GraphTypologyRegistry {
   private kindRoot = new Map<string, number>();
   private validatorRoot = new Map<string, number>();
   private scannedRoots: string[] = [];
+  /** The layer roots each scanned checkout held when it was scanned, so a layer mounted since is noticed ({@link ensureCheckout}). */
+  private scannedLayers = new Map<string, string>();
   private loaded = false;
 
   /** Kinds a LATER checkout also declares and an earlier one already answered — reported, never silently merged. */
@@ -3517,17 +3519,28 @@ export class GraphTypologyRegistry {
   ensureCheckout(repoRoot: string): void {
     if (this.roots().length === 0 || this.include !== undefined) return;
     const abs = resolve(repoRoot);
-    if (this.scannedRoots.includes(abs)) return;
-    if (instanceRootsIn(abs).length === 0) return;
+    const layers = layersSignature(abs);
+    // A checkout scanned BEFORE its layers were mounted is scanned again once
+    // they are on disk. The standing re-pin reads a site's declaration, then
+    // mounts its layers in the same process, then reads it again for the
+    // health step: the first scan, before the IG harness layer was mounted,
+    // was cached, so the IG kind `ig-ast` stayed unknown and every IG's re-pin
+    // reported "declares unknown graph typology" (2026-11-13).
+    if (this.scannedRoots.includes(abs) && this.scannedLayers.get(abs) === layers) return;
+    if (layers === "") return;
     this.ensureDeclared();
-    this.loadCheckoutRoot(abs);
+    this.loadCheckoutRoot(abs, true);
   }
 
-  private loadCheckoutRoot(root: string): void {
+  private loadCheckoutRoot(root: string, rescan = false): void {
     const abs = resolve(root);
-    if (this.scannedRoots.includes(abs)) return;
-    const at = this.scannedRoots.length;
-    this.scannedRoots.push(abs);
+    const seen = this.scannedRoots.indexOf(abs);
+    if (seen >= 0 && !rescan) return;
+    // A rescan keeps the checkout's original precedence; a kind it loaded the
+    // first time is the same file now, and is skipped below.
+    const at = seen >= 0 ? seen : this.scannedRoots.length;
+    if (seen < 0) this.scannedRoots.push(abs);
+    this.scannedLayers.set(abs, layersSignature(abs));
     for (const { file, node } of declaredKindNodes(abs, this.include)) {
       const prior = this.declaredIn.get(node.kind);
       if (prior === file) continue;
@@ -3660,6 +3673,11 @@ export function declaredKindNodes(
     if (!parsed.success) throw new Error(`${file} is not a folio-graph-typology/v1 node: ${parsed.error.message}`);
     return { file, node: parsed.data };
   });
+}
+
+/** The layer roots a checkout holds now, as one comparable string; empty when it holds none. */
+function layersSignature(root: string): string {
+  return instanceRootsIn(root).slice().sort().join("\n");
 }
 
 /** Every `folio-validator/v1` node in every declared `validators/` graph (bean riit). */

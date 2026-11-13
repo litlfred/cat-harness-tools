@@ -56,3 +56,10 @@ Feature: ArchiMate views and elements get readable page slugs, and their pages l
     Given the same throwaway instance
     When its pages are generated for a site
     Then every relative href, src and data attribute (without "#" or ":") in each page and SVG, and each "node", "model" and "svg" of a non-root page's config, resolves to a written file or to a written folder's "index.html"
+
+  @test:archimate/scripts/slugs.test.ts::the_Archi_model_file_a_model_page_links::is_listed_for_the_site_build_at_its_data_path,_so_the_link_is_not_a_404
+  Scenario: The model's Archi file is listed for the site build at its data path
+    Given the throwaway instance
+    When its model files are listed
+    Then the only file is "1.0.0/model.archimate"
+    And its source is the instance's "archimate/1.0.0/model.archimate"

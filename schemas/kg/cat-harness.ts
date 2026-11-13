@@ -403,6 +403,8 @@ export interface ContentDirectory extends GraphNodeDirectory {
    * `dependents` did the day it landed. See {@link SubgraphCoverageSchema}.
    */
   coverage?: SubgraphCoverage;
+  /** A `translation-sources` directory's catalogues, when not under `<path>/<locale>/` (e.g. `input/*\/translations/{locale}.po`). See the schema field. */
+  catalogues?: string;
   /** Built into the layer's own IG site at `/<instance>/` (bean `mftp`); see `igSite` on the shape below. */
   igSite?: boolean;
 
@@ -456,6 +458,9 @@ export interface ContentDirectory extends GraphNodeDirectory {
 
   /** A named sub-graph that is OFF in every layer, its own included, unless that layer enables it. See the schema field and `opt-in-subgraphs.ts`. */
   optIn?: true;
+
+  /** Opt-in only: the other opt-in sub-graphs this one requires, qualified; switching it on switches them on. See the schema field and `opt-in-subgraphs.ts`. */
+  requires?: string[];
 
   /**
    * What this directory's content is COMPUTED FROM: the declared directory ids
@@ -664,7 +669,12 @@ export const ContentTypeTranslationSchema = z.object({
   formats: z.array(TranslatableFormatSchema),
   /** Whether RTL rendering is supported. */
   rtlSupported: z.boolean().default(false),
-  /** BPMN diagrams that need re-rendering for translation. */
+  /**
+   * BPMN diagrams that need re-rendering for translation: a path from the
+   * declaring layer (or one it `needs`), or, for a diagram another layer
+   * owns, its bare FILE NAME, found through the declared process graphs so
+   * the entry survives that layer regrouping its diagrams.
+   */
   bpmnDiagrams: z.array(z.string()).optional(),
   /** Additional notes about translation for this content type. */
   notes: z.string().optional(),
@@ -1912,6 +1922,22 @@ export type DirectoryStorage = z.infer<typeof DirectoryStorageSchema>;
 const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
   coverage: SubgraphCoverageSchema.optional(),
   /**
+   * For a `translation-sources` directory: where the layer's `.po` catalogues
+   * are when they are NOT under `<this directory>/<locale>/`. A path relative
+   * to the layer root, with `{locale}` standing for the locale and `*` for any
+   * one path segment's name, e.g. `input/*\/translations/{locale}.po`.
+   *
+   * The case it exists for is a FHIR IG built on smart-base: smart-base's
+   * injector reads exactly one catalogue per locale per source directory,
+   * `input/<area>/translations/<locale>.po`, so those files cannot move into
+   * the harness layout without breaking the published translations. The
+   * declared directory still holds what the harness keeps per layer (its
+   * `glossary-sense.json`, any `<locale>/glossary/` schemes); the catalogues
+   * this pattern matches are read beside it, and the locales they name count
+   * as the layer's locales.
+   */
+  catalogues: z.string().min(1).optional(),
+  /**
    * A named sub-graph that is OFF in every layer — including the one that
    * declares it — unless that layer enables it, by listing
    * `<instance>.<id>` in its own `enableSubgraphs` (cat-harness#991 step
@@ -1923,6 +1949,19 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    * See `schemas/kg/opt-in-subgraphs.ts`.
    */
   optIn: z.literal(true).optional(),
+  /**
+   * Opt-in entries only: the other opt-in sub-graphs this one cannot work
+   * without, each qualified `<instance>.<directory id>` — of this layer or its
+   * `needs` closure (owner, 2026-11-13: cat-harness's `sdlc` requires
+   * `cat-harness.work-plan`, whose skills and processes it uses). IMPLIED:
+   * wherever this sub-graph is switched on, everything it requires is
+   * switched on too, transitively, and a reference from inside it into one it
+   * requires is not dangling (`check:optin-refs`). A from-within entry
+   * (`L2/graph.json`'s `L2-collab`) may carry it too, read raw like its
+   * `optIn` (`requiresDeclared`).
+   * Checked by `check:declaration-resolution` (`requiresProblems`).
+   */
+  requires: z.array(z.string().min(1)).min(1).optional(),
   /** How this directory's tile looks. See {@link TileSchema}. */
   tile: TileSchema.optional(),
   /**
@@ -5424,6 +5463,15 @@ export interface ResolvedDirectory extends ContentDirectory {
    * Only entries of sub-graphs switched ON are ever resolved at all.
    */
   optInSubgraph?: string;
+  /**
+   * The CONVENTION of an inherited opt-in sub-graph the root has not switched
+   * on, for a kind every layer holds its own of ({@link isPerInstance}):
+   * the root's own directory at the entry's path, and nothing of the
+   * declarer's. Owner, 2026-11-13, card "library/" option A: core's corpus
+   * became opt-in (Q-SG-3 A), and a dependent of core still has a `library/`
+   * of its own. No other layer's directory is a member of it.
+   */
+  conventionOnly?: boolean;
 }
 
 /** What {@link resolveDirectories} is asked to resolve FOR. */
@@ -5505,8 +5553,8 @@ export function ownDirectoryById(root: string, id: string, fallback: string): st
  */
 export function defaultEnabledSubgraphs(root: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EnabledSubgraphs {
   const mounting = mountScopeFor(root);
-  if (mounting !== undefined) return enabledSubgraphsFrom(declaredEnableSubgraphs(mounting));
-  return enabledSubgraphsFrom(readDeclaration(root, registry)?.enableSubgraphs ?? declaredEnableSubgraphs(root));
+  if (mounting !== undefined) return closeOverRequires(enabledSubgraphsFrom(declaredEnableSubgraphs(mounting)), declaredOptInRequires(mounting));
+  return closeOverRequires(enabledSubgraphsFrom(readDeclaration(root, registry)?.enableSubgraphs ?? declaredEnableSubgraphs(root)), declaredOptInRequires(root));
 }
 
 export function resolveDirectories(
@@ -5558,6 +5606,17 @@ export function resolveDirectories(
     if (own !== undefined && optInLeftOutByMount(e)) return null;
     return q;
   };
+  /**
+   * What is left of a switched-off entry for the root: nothing, unless it is
+   * INHERITED and of a kind each layer holds its own of. Then the root keeps
+   * the convention (its own directory at that path), never the declarer's
+   * content, which is what being switched off withholds.
+   */
+  const conventionOf = (e: ResolvedDirectory): ResolvedDirectory | undefined => {
+    if (!rootLink || e.own === true || e.scope === "repository" || !isPerInstance(e, registry)) return undefined;
+    const { optInSubgraph: _q, optIn: _o, ...rest } = e as ResolvedDirectory & { optIn?: unknown };
+    return { ...rest, absPath: resolve(rootForScope(rootLink.root, e.scope), e.path), own: false, conventionOnly: true };
+  };
   if (rootLink) {
     for (const dir of DEFAULT_DIRECTORIES) {
       const absPath = resolve(rootLink.root, dir.path);
@@ -5595,8 +5654,11 @@ export function resolveDirectories(
   // promoted from within it or gets a member: invisible, with everything in it.
   for (const [id, d] of [...byId]) {
     const q = optInOf(d);
-    if (q === null) byId.delete(id);
-    else if (q !== undefined) byId.set(id, { ...d, optInSubgraph: q });
+    if (q === null) {
+      const c = conventionOf(d);
+      if (c) byId.set(id, c);
+      else byId.delete(id);
+    } else if (q !== undefined) byId.set(id, { ...d, optInSubgraph: q });
   }
 
   // Directories declared FROM WITHIN (bean `cmsl`, owner 2026-09-30, round 4):
@@ -5608,7 +5670,7 @@ export function resolveDirectories(
   // layer directories, and stay out of this list exactly as before.
   // An instance-level entry with the same id wins, so a declaration can move
   // inward without two answers existing at once.
-  for (const d of [...byId.values()]) promoteFromWithin(d, byId, registry, new Set(), rootLink, optInOf);
+  for (const d of [...byId.values()]) promoteFromWithin(d, byId, registry, new Set(), rootLink, optInOf, conventionOf);
 
   // MEMBERS (option A, owner 2026-09-30). A subgraph declared once is
   // inherited by every layer in the chain: each whose `<root>/<path>`
@@ -5635,7 +5697,7 @@ export function resolveDirectories(
   const work = [...out];
   while (work.length > 0) {
     const d = work.shift()!;
-    if (d.scope === "repository") continue;
+    if (d.scope === "repository" || d.conventionOnly) continue;
     for (const link of chain) {
       const abs = resolve(link.root, d.path);
       if (seen.has(abs) || !existsSync(abs)) continue;
@@ -5782,6 +5844,7 @@ function promoteFromWithin(
   seen: Set<string>,
   rootLink: { name: string; root?: string; own?: boolean } | undefined,
   optInOf: (e: ResolvedDirectory, parent?: string) => string | undefined | null = () => undefined,
+  conventionOf: (e: ResolvedDirectory) => ResolvedDirectory | undefined = () => undefined,
 ): void {
   if (seen.has(d.absPath)) return;
   seen.add(d.absPath);
@@ -5822,7 +5885,10 @@ function promoteFromWithin(
       // (`declaredBy: "(default)"`, e.g. `skills/voices`) is a convention, and
       // a from-within declaration is stronger than a convention.
       const existing = byId.get(nd.id);
-      if (existing !== undefined && existing.declaredBy !== "(default)") continue;
+      // A convention left by a switched-off sub-graph is overridden like a
+      // default: a later layer's declaration of the same id wins, as it does
+      // at the top level.
+      if (existing !== undefined && existing.declaredBy !== "(default)" && existing.conventionOnly !== true) continue;
       const sub = nd.path.replace(/^\.\//, "").replace(/\/+$/, "");
       // A DEFAULT parent (`skills/` that the layer never declared) is still
       // a directory in the root link's own tree — the defaults are seeded
@@ -5847,11 +5913,17 @@ function promoteFromWithin(
       } as ResolvedDirectory;
       // Within a switched-off opt-in sub-graph: not promoted, nor anything below it.
       const q = optInOf(entry, d.optInSubgraph);
-      if (q === null) continue;
+      if (q === null) {
+        // Switched off: nothing below it is promoted, but an inherited
+        // per-instance kind leaves the root its convention.
+        const c = conventionOf(entry);
+        if (c) byId.set(nd.id, c);
+        continue;
+      }
       if (q !== undefined) entry.optInSubgraph = q;
       else delete entry.optInSubgraph;
       byId.set(nd.id, entry);
-      promoteFromWithin(entry, byId, registry, seen, rootLink, optInOf);
+      promoteFromWithin(entry, byId, registry, seen, rootLink, optInOf, conventionOf);
     }
   }
 }
@@ -7752,7 +7824,7 @@ import "./folio-graph-typology.js";
 import { ThemeRefSchema, type ThemeRef } from "../ui/theme";
 import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
 import { projectedRead } from "../sdlc/read-projections";
-import { declaredEnableSubgraphs, enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
+import { closeOverRequires, declaredEnableSubgraphs, declaredOptInRequires, enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
 import { leftOutByMount, mountScopeFor } from "./remote-mount";
 // Layer DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this

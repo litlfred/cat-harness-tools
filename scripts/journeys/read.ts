@@ -49,6 +49,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { checkoutDirectories, checkoutRootFor } from "../../schemas/kg/harness-config.js";
 import { findDeclarationFile } from "../../schemas/kg/instance-roots.js";
 import { checkoutInstanceRoots } from "../viewer-declarations.ts";
+import { mountedInstances, readPathAt } from "../lib/layer-output.ts";
 import {
   BUILDING_BLOCKS_V01,
   BuildingBlocksSchema,
@@ -234,9 +235,12 @@ function jsonFilesUnder(dir: string, depth = 4): string[] {
 const upper = (id: string): string => id.replace(/^req:/, "").toUpperCase();
 
 /** An example's JSON from the index's local copy: only inside the layer, only JSON, only up to {@link EXAMPLE_JSON_MAX_BYTES}. */
-function exampleJson(root: string, local: string): string | undefined {
-  const p = resolve(root, local);
-  if (relative(root, p).startsWith("..") || !existsSync(p) || !statSync(p).isFile() || statSync(p).size > EXAMPLE_JSON_MAX_BYTES) return undefined;
+function exampleJson(root: string, local: string, overlay: (abs: string) => string = (abs) => abs): string | undefined {
+  const at = resolve(root, local);
+  if (relative(root, at).startsWith("..")) return undefined;
+  // A computed file of a mounted layer is read over its pinned bytes (bean `cat-tools-sm8r` item 4).
+  const p = overlay(at);
+  if ( !existsSync(p) || !statSync(p).isFile() || statSync(p).size > EXAMPLE_JSON_MAX_BYTES) return undefined;
   try {
     return JSON.stringify(JSON.parse(readFileSync(p, "utf8")), null, 2);
   } catch {
@@ -280,6 +284,8 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     dirs = [];
     corpus.undetermined = e instanceof Error ? e.message : String(e);
   }
+  const mounted = mountedInstances(checkout);
+  const overlay = (abs: string): string => readPathAt(checkout, abs, mounted);
   const seenFiles = new Set<string>();
   for (const d of dirs) {
     const instance = d.member ?? d.declaredBy;
@@ -290,8 +296,34 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     // An artifact index is BUILT AT PUBLISH: its directory, or its index.json,
     // is absent from a checkout. Recorded, so an example it would hold is
     // reported as could-not-determine rather than as missing.
-    if (kinds.includes("fhir-artifact-index") && !existsSync(join(d.absPath, "index.json"))) {
+    // Read through the layer output root (bean `cat-tools-sm8r` item 4): a
+    // mounted layer's index is written there, over the pinned bytes.
+    if (kinds.includes("fhir-artifact-index") && !existsSync(overlay(join(d.absPath, "index.json")))) {
       corpus.examplesUnbuilt.push(`${instance}/${rel(d.absPath)}`);
+    }
+    // Before the directory test: a mounted layer's index may sit only under
+    // the layer output root, with no pinned directory beside it.
+    if (kinds.includes("fhir-artifact-index")) {
+      const idx = readJson(overlay(join(d.absPath, "index.json"))) as { artifacts?: unknown[]; entries?: unknown[] } | undefined;
+      type Entry = { key?: string; title?: string; description?: string; code?: { text?: string }; published?: Record<string, { url?: string }>; profiles?: unknown; materialization?: { localPath?: unknown } };
+      for (const a of (idx?.artifacts ?? idx?.entries ?? []) as Entry[]) {
+        if (typeof a.key !== "string") continue;
+        const url = a.published?.html?.url ?? a.published?.json?.url;
+        const jsonUrl = a.published?.json?.url;
+        const profiles = Array.isArray(a.profiles) ? a.profiles.filter((x): x is string => typeof x === "string") : [];
+        const local = typeof a.materialization?.localPath === "string" ? a.materialization.localPath : undefined;
+        const json = local ? exampleJson(info.root, local, overlay) : undefined;
+        corpus.examples.set(a.key, {
+          key: a.key,
+          ...(a.title ? { title: a.title } : {}),
+          ...(typeof a.description === "string" && a.description ? { description: a.description } : {}),
+          ...(a.code?.text ? { code: a.code.text } : {}),
+          ...(url ? { url } : {}),
+          ...(jsonUrl ? { jsonUrl } : {}),
+          ...(profiles.length ? { profiles } : {}),
+          ...(json ? { json } : {}),
+        });
+      }
     }
     if (!existsSync(d.absPath) || !statSync(d.absPath).isDirectory()) continue;
     if ([SCENARIO_KIND, WORKSHOP_KIND, CODE_LIST_KIND, BUILDING_BLOCKS_KIND, DEVICE_SCREEN_KIND].some((k) => kinds.includes(k))) {
@@ -368,28 +400,6 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
         roles.set(x.id, { ...(typeof x.title === "string" ? { title: x.title } : {}), ...(other.length ? { otherNames: other } : {}) });
       }
       corpus.roles.set(instance, roles);
-    }
-    if (kinds.includes("fhir-artifact-index")) {
-      const idx = readJson(join(d.absPath, "index.json")) as { artifacts?: unknown[]; entries?: unknown[] } | undefined;
-      type Entry = { key?: string; title?: string; description?: string; code?: { text?: string }; published?: Record<string, { url?: string }>; profiles?: unknown; materialization?: { localPath?: unknown } };
-      for (const a of (idx?.artifacts ?? idx?.entries ?? []) as Entry[]) {
-        if (typeof a.key !== "string") continue;
-        const url = a.published?.html?.url ?? a.published?.json?.url;
-        const jsonUrl = a.published?.json?.url;
-        const profiles = Array.isArray(a.profiles) ? a.profiles.filter((x): x is string => typeof x === "string") : [];
-        const local = typeof a.materialization?.localPath === "string" ? a.materialization.localPath : undefined;
-        const json = local ? exampleJson(info.root, local) : undefined;
-        corpus.examples.set(a.key, {
-          key: a.key,
-          ...(a.title ? { title: a.title } : {}),
-          ...(typeof a.description === "string" && a.description ? { description: a.description } : {}),
-          ...(a.code?.text ? { code: a.code.text } : {}),
-          ...(url ? { url } : {}),
-          ...(jsonUrl ? { jsonUrl } : {}),
-          ...(profiles.length ? { profiles } : {}),
-          ...(json ? { json } : {}),
-        });
-      }
     }
     // Requirements: `req:` nodes kept in a `requirements/` folder of any declared directory.
     const reqDir = join(d.absPath, "requirements");

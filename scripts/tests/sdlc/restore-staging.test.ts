@@ -639,14 +639,21 @@ describe("a RETIRED preview is not restored", () => {
     // The third-state rule, applied to this function's own input. Answering
     // "could not read the records" as "there are none" restores every retired
     // preview — the defect, reintroduced by the guard against it.
-    const bare = remoteWith(withRetired);
+    // The branch exists and is read, but its retirement store is a FILE where a
+    // directory of records belongs: it is there (so not "no retirements"), and
+    // listing it fails (`git ls-tree <rev>:STAGING/_retired` is not a tree).
+    const { "STAGING/_retired/claude-gone.json": _record, ...rest } = withRetired;
+    const bare = remoteWith({ ...rest, "STAGING/_retired": "not a directory of records\n" });
     const repo = checkout();
     const built = site({ "index.html": "<p>new home</p>" });
 
-    // A rev that cannot be read at all stands in for an unreadable store: both
-    // reach `previewsAt` as a reason rather than as an empty set.
-    const broken = restoreStaging({ repo, remote: bare, site: built, branch: "no-such-branch", prefix: "STAGING" });
-    expect(broken.state).toBe("no-branch");
+    const broken = restoreStaging({ repo, remote: bare, site: built, ...BRANCH });
+    expect(broken.state).toBe("unknown");
     expect(broken.previews).toEqual([]);
+    expect(broken.state === "unknown" && broken.reason).toContain("STAGING/_retired");
+    expect(exitCodeFor(broken)).not.toBe(0);
+    // Neither preview is laid down — not even the live one — because the restore could not tell which are retired.
+    expect(existsSync(join(built, "STAGING", "claude-gone"))).toBe(false);
+    expect(existsSync(join(built, "STAGING", "claude-live"))).toBe(false);
   });
 });

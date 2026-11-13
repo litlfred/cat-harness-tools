@@ -106,22 +106,22 @@ describe("the themes viewer (bean folio-assistant-6gme)", () => {
   // this asks what the generator produces, not whether a file is current.
   const viz = buildViz(HARNESS_ROOT);
 
-  it("is drawn only where a `themes` visualiser is declared", () => {
-    // Undefined until cat-harness declares the visualiser; then it is at its route.
-    if (viz === undefined) return;
-    expect(viz.path.endsWith(join("themes", "index.md"))).toBe(true);
+  // Undefined until cat-harness declares the visualiser; then it is at its route.
+  // Reported as SKIPPED while it is undefined, never as a pass that checked nothing.
+  const none = viz === undefined;
+
+  it.skipIf(none)("is drawn only where a `themes` visualiser is declared", () => {
+    expect(viz!.path.endsWith(join("themes", "index.md"))).toBe(true);
   });
 
-  it("names the Tool that renders it, and opens with the platform's themes", () => {
-    if (viz === undefined) return;
-    expect(viz.md).toContain(`rendered-by: ${VIEWER_TOOL}`);
-    expect(viz.md).toContain("## The platform");
-    expect(viz.themes).toBeGreaterThanOrEqual(THEMES.length);
+  it.skipIf(none)("names the Tool that renders it, and opens with the platform's themes", () => {
+    expect(viz!.md).toContain(`rendered-by: ${VIEWER_TOOL}`);
+    expect(viz!.md).toContain("## The platform");
+    expect(viz!.themes).toBeGreaterThanOrEqual(THEMES.length);
   });
 
-  it("gives every instance it read a section, and names any it could not", () => {
-    if (viz === undefined) return;
-    expect((viz.md.match(/^## /gm) ?? []).length).toBeGreaterThanOrEqual(1 + viz.instances);
-    for (const m of viz.missing) expect(viz.md).toContain(m);
+  it.skipIf(none)("gives every instance it read a section, and names any it could not", () => {
+    expect((viz!.md.match(/^## /gm) ?? []).length).toBeGreaterThanOrEqual(1 + viz!.instances);
+    for (const m of viz!.missing) expect(viz!.md).toContain(m);
   });
 });

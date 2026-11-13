@@ -71,6 +71,7 @@ export function pagesBuildsFor(root: string, instances: readonly { name: string;
 export function buildPages(root: string, builds: readonly PagesBuild[]): string[] {
   const failed: string[] = [];
   for (const b of builds) {
+    // input-site: spawned #25652691 — a bun run cat <script> page build; the cone audits the child from its read set
     const r = spawnSync("bun", ["run", "cat", b.script], { cwd: root, stdio: ["ignore", "ignore", "inherit"] });
     if (r.status !== 0) failed.push(`${b.instance}: \`bun run cat ${b.script}\` exited ${r.status ?? r.signal}`);
   }

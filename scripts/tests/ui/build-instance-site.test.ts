@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps } from "../../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps, NODE_KIND_PAGES, recipeWritesNodeKindPages } from "../../build-instance-site.ts";
 import type { DeclaredArtefact } from "../../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -296,6 +296,37 @@ describe("gateSteps — every site build runs the library gate folio-assistant's
   });
 });
 
+describe("every site writes its node-kind pages (who-iris schemas page, owner 2026-11-13)", () => {
+  // who-iris's recipe named no site step, so the 34 node-kind links its schemas page draws were dead.
+  const src = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
+  const body = src.slice(src.indexOf("export async function buildInstanceSite("));
+  const folio = (scripts: Record<string, string>) => {
+    const dir = mkdtempSync(join(tmpdir(), "bis-nodekinds-"));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ scripts }));
+    return dir;
+  };
+
+  test("a recipe with no step that writes them gets them from the build", () => {
+    expect(recipeWritesNodeKindPages(folio({ "site:catalogue": "bun run scripts/x.ts" }), ["site:catalogue"])).toBe(false);
+    expect(recipeWritesNodeKindPages(mkdtempSync(join(tmpdir(), "bis-nopkg-")), [])).toBe(false);
+  });
+  test("a recipe whose own step runs the writer (a folio's site:node-kinds) does not run it twice", () => {
+    const root = folio({ "site:node-kinds": `bun run cat-harness-tools/scripts/${NODE_KIND_PAGES} --root . --out` });
+    expect(recipeWritesNodeKindPages(root, ["site:node-kinds"])).toBe(true);
+    expect(recipeWritesNodeKindPages(root, [])).toBe(false);
+  });
+  test("it runs on the built site after the site steps, as a folio, and before the rail and the link check", () => {
+    const at = (s: string) => {
+      const i = body.indexOf(s);
+      expect(i).toBeGreaterThan(-1);
+      return i;
+    };
+    const step = at("${NODE_KIND_PAGES} --root . --out ${s}");
+    expect(at("o.siteSteps ?? []) run(")).toBeLessThan(step);
+    for (const after of ["rail-standalone-pages.ts", "checkLinks(site,"]) expect(at(after)).toBeGreaterThan(step);
+  });
+});
+
 describe("publishedRoot — shell-safe quoting of git archive arguments (bean cat-tools-j4sh)", () => {
   test("an exclude of $(touch ...) is single-quoted for bash and does not execute", () => {
     const dir = mkdtempSync(join(tmpdir(), "bis-pubroot-"));
@@ -314,5 +345,27 @@ describe("publishedRoot — shell-safe quoting of git archive arguments (bean ca
     expect(existsSync(marker)).toBe(false);
     expect(tree).toBeDefined();
     expect(readFileSync(join(tree!, "index.html"), "utf-8")).toBe("<p>ok</p>");
+  });
+});
+
+describe("every site build writes its search scopes (who-iris search, owner 2026-11-13)", () => {
+  // Without `assets/js/search/manifest.json` the theme's loader falls back to the
+  // whole site index (33 MB on who-iris) and the search box never answers.
+  const src = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
+  const body = src.slice(src.indexOf("export async function buildInstanceSite("));
+
+  test("the split runs on the built site, scoped by the checkout it was built from", () => {
+    expect(body).toContain("splitSite(site, root)");
+  });
+
+  test("after the last step that writes pages, and before the site is judged", () => {
+    const at = (s: string) => {
+      const i = body.indexOf(s);
+      expect(i).toBeGreaterThan(-1);
+      return i;
+    };
+    const split = at("splitSite(site, root)");
+    for (const before of ["rail-standalone-pages.ts", "o.finalSteps ?? []) run(", "writeForwardingPages(site, root)"]) expect(at(before)).toBeLessThan(split);
+    for (const after of ['join(site, ".nojekyll")', "siteCoverageShortfall(", "parityShortfall("]) expect(at(after)).toBeGreaterThan(split);
   });
 });

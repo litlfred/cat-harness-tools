@@ -5,7 +5,9 @@
  * `cat-harness/docs/proposals/actor-facts-and-their-processes.md` §4 item 1.
  */
 import { describe, expect, test } from "bun:test";
-import { resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { evaluateActorFactConsumers, matchesToken } from "../actor-facts.js";
 import { KG_CRITERIA_BY_ID } from "../../schemas/sdlc/kg-qa.js";
 import { readActors, actorsDir, type LoadedActor } from "../../schemas/process/role-graph.js";
@@ -60,21 +62,31 @@ describe("consumer detection", () => {
       path: "/signer.json",
     };
 
-    const res = evaluateActorFactConsumers({
-      actors: [actor],
-      workflowFiles: [],
-      processes: [{ file: "virtual.bpmn" }],
-    });
-    // With no matching text, it fails
-    expect(res.result).toBe("fail");
+    // A process naming neither fact: both are unconsumed, so it fails.
+    const dir = mkdtempSync(join(tmpdir(), "actor-facts-"));
+    try {
+      const silent = join(dir, "silent.bpmn");
+      writeFileSync(silent, '<bpmn:definitions><bpmn:process id="P"><bpmn:task id="T" name="Do the work"/></bpmn:process></bpmn:definitions>');
+      const res = evaluateActorFactConsumers({ actors: [actor], workflowFiles: [], processes: [{ file: silent }] });
+      expect(res.result).toBe("fail");
+      expect(res.findings.map((f) => f.where)).toEqual(["role-management", "signing-api"]);
 
-    // With matching workflow files, it passes
-    const res2 = evaluateActorFactConsumers({
-      actors: [actor],
-      processes: [],
-      // Pass synthetic workflow content via process or virtual file simulation
-    });
-    expect(res2.result).toBe("fail");
+      // A process whose gateway consumes the capability and whose task
+      // consumes the permission: every declared fact is consumed, so it passes.
+      const consuming = join(dir, "consuming.bpmn");
+      writeFileSync(
+        consuming,
+        '<bpmn:definitions><bpmn:process id="P">' +
+          '<bpmn:exclusiveGateway id="G" name="signing-api reachable?"/>' +
+          '<bpmn:task id="T" name="Grant under role-management"/>' +
+          "</bpmn:process></bpmn:definitions>",
+      );
+      const res2 = evaluateActorFactConsumers({ actors: [actor], workflowFiles: [], processes: [{ file: consuming }] });
+      expect(res2.result).toBe("pass");
+      expect(res2.findings).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("reports unconsumed capability and permission as findings", () => {

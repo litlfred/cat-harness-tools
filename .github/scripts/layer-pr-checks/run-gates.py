@@ -232,6 +232,13 @@ RUNNER_STATE_SCRIPTS = {
 SWEEP_ONLY_SCRIPTS = {
     "check:navbar-consistency:strict": "the --strict sweep that fails on advisories; CI gates on `check:navbar-consistency:check`",
 }
+# QA reports, not merge gates (owner, 2026-11-13: "bpmn and svg dont need to
+# render to merge. that QA report"): a stale diagram drawing is reported by the
+# QA refresh and the publish, never a reason to refuse a merge. The committed
+# knowledge graph's JSON-LD is the opposite (compare-gates.py ALWAYS_GREEN).
+QA_REPORT_SCRIPTS = {
+    "render:bpmn:check": "a QA report, not a merge gate: the diagram SVGs (owner, 2026-11-13)",
+}
 # Gates that cannot determine anything in LAYER mode (`MODE=layer`), where the
 # caller is swapped into the index without its .git and the layers are mounted
 # at their own tips rather than at the index's lock (folio-assistant-core#287).
@@ -416,6 +423,8 @@ def skip_reason(root, script, env=None, own=None, declarer=None):
         return "runner-state", RUNNER_STATE_SCRIPTS[script]
     if script in SWEEP_ONLY_SCRIPTS:
         return "sweep-only", SWEEP_ONLY_SCRIPTS[script]
+    if script in QA_REPORT_SCRIPTS:
+        return "qa-report", QA_REPORT_SCRIPTS[script]
     if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
         return "layer-mode", LAYER_MODE_SCRIPTS[script]
     why = untracked_corpus_reason(root, declarer, script, own)
@@ -494,6 +503,17 @@ def script_runner(root):
     if "cat" in (pkg.get("scripts") or {}):
         return "bun run cat"
     return "bun cat-harness-tools/scripts/run-script.ts"
+
+
+def declares_script(root, path, script):
+    """Does the instance mounted at `path` declare `script` (`scripts` or
+    `checkoutScripts` of its package.json)? A manifest that cannot be read
+    answers yes: the runner then reports what `bun run cat` reports, rather
+    than this guessing at a skip."""
+    pkg = read_json(os.path.join(root, path, "package.json"))
+    if pkg is None:
+        return True
+    return script in {**(pkg.get("scripts") or {}), **(pkg.get("checkoutScripts") or {})}
 
 
 def declared_gates(root, name, path, runner, env=None, own=None):
@@ -1087,7 +1107,7 @@ def derive(root, given, tmp, env=None):
     Returns (own, harness, runner, gates, skipped): gate name -> command for
     the gates this runner runs, and gate name -> {command, skipped, kind} for
     the declared ones it does not. `kind` says why: `live-state`,
-    `needs-input`, `runner-state`, `sweep-only`, `layer-mode`, `untracked-corpus`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
+    `needs-input`, `runner-state`, `sweep-only`, `qa-report`, `layer-mode`, `untracked-corpus`, `prerequisite`, `not-at-pin` (an index or checkout gate whose script the mounted owner does not declare yet), or `input-absent` (a SUPPLIED_INPUTS gate
     on a side that holds no such input -- CI runs it where the input exists).
 
     `--list` prints this as JSON, and it is what `gates.ts` `loadGates` reads
@@ -1110,13 +1130,29 @@ def derive(root, given, tmp, env=None):
     gates.update({f"graph:{k}": v for k, v in CHECKOUT_GATES.items()})
     seen_scripts = set()
     runner = script_runner(root)
+    skipped = {}
     for script, owner in {**CHECKOUT_SCRIPTS, **index_scripts()}.items():
         command = f"{runner} {script}"
         if command in seen_scripts:
             continue
         seen_scripts.add(command)
+        if owner in known and not declares_script(root, known[owner], script):
+            # The list is this WORKFLOW's (`index-gates.json` beside this
+            # file, at the ref the caller's workflow pins); the scripts are
+            # the MOUNTED owner's, at the pin the index lock gives it. The two
+            # pins differ by design, so a gate added to the list after the
+            # index's pin named a script no mount declared, and `bun run cat`
+            # failed it as "no script" on every layer PR whose cone ran it
+            # (smart-base#357, jsonld:site:check: workflow 31e8a3e, index pin
+            # ed3c8eb, script added in be54df93). Nothing was judged, so it is
+            # listed as skipped, never counted, and runs once the pin has it.
+            skipped[f"{owner}:{script}"] = {
+                "command": command,
+                "skipped": f"{owner} at this side's pin does not declare `{script}`: the workflow's gate list is newer than the mounted {owner}",
+                "kind": "not-at-pin",
+            }
+            continue
         gates[f"{owner}:{script}"] = command
-    skipped = {}
     for n in harness:
         run_these, skip_these = declared_gates(root, n, known[n], runner, env, own)
         for gname, command in run_these.items():

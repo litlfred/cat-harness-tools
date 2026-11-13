@@ -367,6 +367,9 @@ describe("a journey page", () => {
     expect(p2).toMatch(/LOW-REQ-404<\/span> no <code>req:<\/code> node/);
     expect(p2).toContain("Health wallet");
     expect(p2).toContain("not in a catalogue");
+    // The example the artifact index lists resolves to its IG page, not a bare code.
+    const examples = /<ul class="jv-examples">([\s\S]*?)<\/ul>/.exec(p2)?.[1];
+    expect(examples).toBe('<li><a href="../../../../../Bundle-ana-ips.html" class="jv-code" data-jv-dak>Bundle/ana-ips</a></li>');
   });
   test("the workshop layer of another instance shows under the step it names", () => {
     expect(p2).toContain("Should the family be told?");
@@ -467,6 +470,12 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(overview).toContain("Appears in 2 of 2 steps");
     expect(overview).toContain('<a href="../walkthrough/P2/">P2</a>');
     expect(overview).toContain("Lead with people.");
+    // The ladder: one rung per code of the journey's trust ladder, in order,
+    // and the step whose record reaches a rung links from it.
+    const ladder = /<ol class="jp-rungs">([\s\S]*?)<\/ol>/.exec(overview)?.[1];
+    expect(ladder).toBeDefined();
+    expect([...ladder!.matchAll(/<b>([^<]+)<\/b>/g)].map((m) => m[1])).toEqual(["On paper", "Shared"]);
+    expect(ladder).toMatch(/<b>Shared<\/b>[\s\S]*<a href="\.\.\/walkthrough\/P2\/">P2<\/a><\/li>$/);
   });
   test("a step: prev and next for the keys, the last one going on to the discussion", () => {
     expect(p1).toContain('<link rel="prev" href="../../overview/"><link rel="next" href="../P2/">');
@@ -495,6 +504,16 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
   });
   test("the workshop page links to the presentation, and its discussion has an anchor", () => {
     expect(at(`${base}/index.html`)).toContain('href="overview/"');
+    // The fixture's workshop declares no closing discussion, so the anchor is
+    // asserted on the same workshop with one.
+    const w0 = corpus.workshops[0]!;
+    const ws = { ...w0.workshop, discussion: [{ id: "q1", theme: "Trust", question: "Where does trust begin?", steps: ["p2-treated#P2"] }] };
+    const out = renderJourneyPages({ ...corpus, workshops: [{ ...w0, workshop: ws }] }, LINKS, "top");
+    const page = String(out.find((f) => f.path === `${base}/index.html`)!.content);
+    expect(page).toContain('href="overview/"');
+    expect(page).toContain('<section id="discussion"><h2>Closing discussion</h2>');
+    expect(page.slice(page.indexOf('id="discussion"'))).toContain("Where does trust begin?");
+    expect(at(`${base}/index.html`)).not.toContain('id="discussion"');
   });
 });
 
@@ -684,7 +703,8 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(page).toContain('name="policy:q:P1:0"');
     expect(page).toContain('name="policy:q:P2:1"');
     // Readiness rows grouped and rated; decision rights with who holds them; the gap strip's own radios.
-    expect(page).toContain("<h4>Strategy &amp; investment</h4>");
+    // Each group keeps its heading; anchorHeadings (#1894) gives it an id like every view heading.
+    expect(page).toContain('<h4 id="strategy-investment">Strategy &amp; investment</h4>');
     expect(page).toContain('name="policy:rate:ready:twg" value="not-yet"');
     expect(page).toContain('name="policy:hold:rights:anchor"');
     expect(page).toContain('name="policy:viewer:status" value="no"');
@@ -770,11 +790,12 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(js).toContain('location.protocol === "file:"');
     expect(js).toContain("jp-json-open");
   });
-  test("the font is vendored and copied as bytes, with its licence", () => {
-    const woff = files.find((f) => f.path === "assets/fonts/PlusJakartaSans-Bold.woff2");
-    expect(woff?.content).toBeInstanceOf(Uint8Array);
-    expect(files.some((f) => f.path === "assets/fonts/OFL.txt")).toBe(true);
-    expect(at("assets/present.css")).toContain('src: url("fonts/PlusJakartaSans-Bold.woff2") format("woff2")');
+  test("no font is shipped: the slides use the system's own (owner, 2026-11-12)", () => {
+    expect(files.some((f) => f.path.startsWith("assets/fonts/"))).toBe(false);
+    const css = at("assets/present.css");
+    expect(css).not.toContain("@font-face");
+    expect(css).toContain("--sans: system-ui,");
+    expect(css).toContain("--mono: ui-monospace,");
   });
 });
 

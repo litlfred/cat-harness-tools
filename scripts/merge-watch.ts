@@ -82,7 +82,8 @@
  * `--queued-minutes <n>` (a queued run this old is a relief candidate) ·
  * `--exclude-layer <name>` (repeatable; replaces the default) · `--json`.
  *
- * Exit 0 printed · 2 usage error, or something could not be read.
+ * Exit 0 printed · 2 usage error, or something could not be read (a one-line
+ * summary on stderr names each repository and what of it was not read).
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -109,6 +110,8 @@ export interface WorkflowRun {
   created_at?: string;
   run_started_at?: string | null;
   pull_requests?: { number: number }[] | null;
+  /** The workflow file, e.g. `.github/workflows/cancel-on-close.yml`. */
+  path?: string;
 }
 
 export type Verdict =
@@ -124,7 +127,21 @@ const FAST_TIER = /fast tier only/i;
 /** `shard 2/4`, or a matrix name such as `bun test (head, 2/4)`. */
 const SHARD = /(?:shard |, )(\d+)\/(\d+)\b/i;
 
-/** The checks that count: every run except a cancelled one a later run of the same workflow job supersedes. */
+/**
+ * A job name GitHub never rendered: its `name:` expression is still the
+ * template (`bun test (head, ${{ matrix.shard }}/4)`, or a bare
+ * `needs.tier.outputs.full != 'true' && … || …`). A run cancelled before its
+ * matrix expanded leaves these behind, and no later job can carry the same
+ * name.
+ */
+export const UNRENDERED = /\$\{\{|(?:^|[\s(/])(?:needs|github|inputs|matrix|steps|env|vars)\.[\w-]+(?:\.[\w-]+)*\s*(?:==|!=|&&|\|\|)/;
+
+/**
+ * The checks that count: every run except a cancelled one a later run of the
+ * same workflow supersedes. A later run supersedes a cancelled job when it
+ * has a job of the same name, when it is still running (it blocks as pending
+ * instead), or when the cancelled job's name was never rendered.
+ */
 export function effectiveChecks(checks: readonly CheckRun[], runs: readonly WorkflowRun[]): CheckRun[] {
   const bySuite = new Map(runs.map((r) => [r.check_suite_id, r]));
   const place = (c: CheckRun): { group: string; order: number } => {
@@ -136,11 +153,16 @@ export function effectiveChecks(checks: readonly CheckRun[], runs: readonly Work
   return checks.filter((c) => {
     if (c.status !== "completed" || c.conclusion !== "cancelled") return true;
     const me = place(c);
-    return !checks.some((o) => {
+    const sameName = checks.some((o) => {
       if (o === c || o.name !== c.name) return false;
       const p = place(o);
       return p.group === me.group && p.order > me.order;
     });
+    if (sameName) return false;
+    const laterRuns = runs.filter((r) => `wf:${r.workflow_id}` === me.group && r.id > me.order);
+    if (laterRuns.some(busy)) return false;
+    if (UNRENDERED.test(c.name) && laterRuns.length > 0) return false;
+    return true;
   });
 }
 
@@ -458,10 +480,18 @@ export interface ReliefCandidate {
 
 const P3 = /^(?:priority[:/ ]\s*)?P3$/i;
 const PR_EVENTS = new Set(["pull_request", "pull_request_target", "pull_request_review", "pull_request_review_comment"]);
+/** Main's own runs: a push, and the `dynamic` runs GitHub starts for a push (CodeQL's "Push on main"). */
+const MAIN_EVENTS = new Set(["push", "dynamic"]);
+/** The workflow that cancels a closed PR's runs: cancelling it would undo the relief it brings. */
+const CANCELLER = /(^|\/)cancel-on-close\.ya?ml$/;
 
 /**
  * The busy runs the owner might cancel to free runners. Never a main push
- * run (started or not): those are main's verdict. Report only.
+ * run, started or not, nor the `dynamic` run a push starts: those are main's
+ * verdict. Never the canceller itself. Report only.
+ *
+ * "Never started" reads `status`, not `run_started_at`: GitHub sets
+ * `run_started_at` when a run is created, so a run still queued carries one.
  */
 export function reliefCandidates(
   runs: readonly WorkflowRun[],
@@ -472,14 +502,15 @@ export function reliefCandidates(
 ): ReliefCandidate[] {
   const out: ReliefCandidate[] = [];
   for (const r of runs.filter(busy)) {
-    if (r.event === "push" && r.head_branch === defaultBranch) continue;
+    if (MAIN_EVENTS.has(r.event ?? "") && r.head_branch === defaultBranch) continue;
+    if (r.path && CANCELLER.test(r.path)) continue;
     const linked = new Set((r.pull_requests ?? []).map((p) => p.number));
     const pr = openPrs.find((p) => linked.has(p.number) || p.headSha === r.head_sha || (r.head_branch && p.headBranch === r.head_branch));
     let reason: string | undefined;
     if (pr?.draft) reason = `draft PR #${pr.number}`;
     else if (pr && pr.labels.some((l) => P3.test(l))) reason = `P3 PR #${pr.number}`;
     else if (!pr && PR_EVENTS.has(r.event ?? "")) reason = `closed PR (${r.head_branch ?? r.head_sha?.slice(0, 7) ?? "?"})`;
-    else if (r.status !== "in_progress" && !r.run_started_at) {
+    else if (r.status !== "in_progress") {
       const age = minutesSince(r.created_at, now);
       if (age !== null && age >= queuedMinutes) reason = `queued ${age}m, never started`;
     }
@@ -506,9 +537,39 @@ function gh(args: readonly string[]): string {
   return r.stdout;
 }
 
+/** The items on one page: the array itself, or the first array-valued field (`check_runs`, `workflow_runs`). */
+export function pageItems(page: unknown): unknown[] {
+  if (Array.isArray(page)) return page;
+  if (page && typeof page === "object") {
+    for (const v of Object.values(page)) if (Array.isArray(v)) return v;
+  }
+  return [];
+}
+
+/** Hard stop, so a server that ignores `page` cannot loop forever. */
+export const MAX_PAGES = 50;
+
+/**
+ * Every page of `path`, asked for by `page=N` on the path we were given.
+ * `gh api --paginate` follows GitHub's `Link` header instead, whose next URL
+ * names the repository by id (`repositories/{id}/…`); the agent proxy refuses
+ * those (merge:watch's first live run, 2026-11-13). A page shorter than
+ * `per_page` is the last.
+ */
+export function paginate(get: (path: string) => unknown, path: string): unknown[] {
+  const perPage = Number(/[?&]per_page=(\d+)/.exec(path)?.[1] ?? 30);
+  const out: unknown[] = [];
+  for (let n = 1; n <= MAX_PAGES; n++) {
+    const page = get(`${path}${path.includes("?") ? "&" : "?"}page=${n}`);
+    out.push(page);
+    if (pageItems(page).length < perPage) break;
+  }
+  return out;
+}
+
 export const ghApi: GitHub = {
   json: <T>(path: string) => JSON.parse(gh([path])) as T,
-  pages: <T>(path: string) => JSON.parse(gh(["--paginate", "--slurp", path])) as T[],
+  pages: <T>(path: string) => paginate((p) => JSON.parse(gh([p])), path) as T[],
   text: (path: string) => gh([path]),
 };
 
@@ -770,6 +831,19 @@ export function formatReport(r: RepoReport): string {
   return lines.join("\n");
 }
 
+/** What could not be read, one entry per repository that has any; empty when everything was read. */
+export function unreadSummary(reports: readonly RepoReport[]): string[] {
+  return reports.flatMap((r) => {
+    const what = [
+      ...r.errors,
+      ...(r.queue === null ? ["runner queue"] : []),
+      ...(r.main.verdict.startsWith("unknown") ? ["main verdict"] : []),
+      ...r.prs.filter((p) => p.verdict.startsWith("unknown")).map((p) => `#${p.number} verdict`),
+    ];
+    return what.length > 0 ? [`${r.repo}: ${what.join(", ")}`] : [];
+  });
+}
+
 function main(argv: readonly string[]): number {
   let cli: Cli;
   try {
@@ -787,10 +861,9 @@ function main(argv: readonly string[]): number {
   const reports = cli.repos.map((repo) => watchRepo(ghApi, repo, cli.opts));
   if (cli.json) console.log(JSON.stringify(reports, null, 2));
   else console.log(reports.map(formatReport).join("\n\n"));
-  const unread = reports.some(
-    (r) => r.errors.length > 0 || r.queue === null || r.main.verdict.startsWith("unknown") || r.prs.some((p) => p.verdict.startsWith("unknown")),
-  );
-  return unread ? 2 : 0;
+  const unread = unreadSummary(reports);
+  if (unread.length > 0) console.error(`merge:watch: exit 2, something could not be read: ${unread.join("; ")}`);
+  return unread.length > 0 ? 2 : 0;
 }
 
 if (import.meta.main) process.exit(main(process.argv.slice(2)));

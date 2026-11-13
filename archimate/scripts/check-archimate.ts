@@ -8,6 +8,11 @@
  *
  * Usage:
  *   bun run cat-harness-tools/archimate/scripts/check-archimate.ts --instance <instance-dir>
+ *   bun run cat-harness-tools/archimate/scripts/check-archimate.ts [--repo <checkout-root>]
+ *
+ * Without `--instance` it sweeps the checkout: every layer that declares an
+ * `archimate` directory, or keeps the config at its root ({@link archimateInstances}).
+ * `--repo` defaults to the checkout this file sits in (`checkoutRootFor`).
  *
  * The `openapi` subgraph's `ingest-openapi.ts --check`, for models that are
  * authored in place rather than ingested: every configured model is present
@@ -19,7 +24,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { ArchimateConfigSchema, readArchimate, type ArchimateConfig, type ArchimateModel } from "../schemas/archimate.ts";
-import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, findDeclarationFile, instanceRootsIn } from "../../schemas/kg/cat-harness.ts";
 
 export const CONFIG_FILE = "cat-archimate.config.json";
 
@@ -181,15 +186,79 @@ export function checkCommitted(instanceRoot: string): string[] {
   return problems;
 }
 
-if (import.meta.main) {
-  const i = process.argv.indexOf("--instance");
-  const instance = i >= 0 ? process.argv[i + 1] : undefined;
-  if (!instance) {
-    console.error("usage: check-archimate.ts --instance <dir>");
-    process.exit(2);
+/**
+ * Whether a layer takes part in the archimate subgraph: it keeps the config at
+ * its root, or declares a directory of graph typology `archimate`. The
+ * DECLARATION decides, not the config's presence, so a layer that declares
+ * the directory and lost its config is swept, and {@link readConfig} fails it.
+ */
+export function declaresArchimate(instanceRoot: string): boolean {
+  if (existsSync(join(instanceRoot, CONFIG_FILE))) return true;
+  const found = findDeclarationFile(instanceRoot);
+  if (found === undefined) return false;
+  try {
+    const d = JSON.parse(readFileSync(join(instanceRoot, found), "utf8")) as { directories?: Array<{ graphTypologies?: string[] }> };
+    return (d.directories ?? []).some((e) => e.graphTypologies?.includes("archimate") === true);
+  } catch {
+    // UNPARSEABLE IS NOT ABSENT: `findDeclarationFile` returns a broken
+    // declaration so a caller can report it. Swept, its check fails and says
+    // why, rather than the sweep passing over a layer it could not read.
+    return true;
   }
-  const problems = checkCommitted(resolve(instance));
-  for (const p of problems) console.error(`✗ ${p}`);
-  if (problems.length) process.exit(1);
-  console.log(`✓ ${instance}: every ArchiMate model the config names is held, parses and resolves, and no other is held`);
+}
+
+/** Every layer in the checkout at `repo` that {@link declaresArchimate}, sorted. */
+export function archimateInstances(repo: string): string[] {
+  return instanceRootsIn(repo).filter(declaresArchimate).sort();
+}
+
+/** {@link checkCommitted} for one layer, a thrown config error reported as a problem rather than ending the sweep. */
+function checkOne(instanceRoot: string): string[] {
+  const found = findDeclarationFile(instanceRoot);
+  if (found !== undefined) {
+    try {
+      JSON.parse(readFileSync(join(instanceRoot, found), "utf8"));
+    } catch (e) {
+      return [`${found} does not parse, so its archimate directory cannot be read: ${e instanceof Error ? e.message : String(e)}`];
+    }
+  }
+  try {
+    return checkCommitted(instanceRoot);
+  } catch (e) {
+    return [e instanceof Error ? e.message : String(e)];
+  }
+}
+
+if (import.meta.main) {
+  const arg = (flag: string) => {
+    const i = process.argv.indexOf(flag);
+    return i >= 0 ? process.argv[i + 1] : undefined;
+  };
+  const instance = arg("--instance");
+  if (instance) {
+    const problems = checkCommitted(resolve(instance));
+    for (const p of problems) console.error(`✗ ${p}`);
+    if (problems.length) process.exit(1);
+    console.log(`✓ ${instance}: every ArchiMate model the config names is held, parses and resolves, and no other is held`);
+  } else {
+    const repo = resolve(arg("--repo") ?? checkoutRootFor(resolve(import.meta.dir, "..", "..")));
+    const roots = archimateInstances(repo);
+    // A sweep over nothing is not a pass: say so and fail, rather than print a tick.
+    if (roots.length === 0) {
+      console.error(`✗ ${repo}: no layer declares an archimate directory — nothing was checked`);
+      process.exit(1);
+    }
+    let failed = 0;
+    for (const root of roots) {
+      const name = relative(repo, root) || ".";
+      const problems = checkOne(root);
+      for (const p of problems) console.error(`✗ ${name}: ${p}`);
+      if (problems.length) failed++;
+      else console.log(`✓ ${name}: every ArchiMate model the config names is held, parses and resolves, and no other is held`);
+    }
+    if (failed) {
+      console.error(`${failed} of ${roots.length} layer(s) with an archimate directory failed`);
+      process.exit(1);
+    }
+  }
 }

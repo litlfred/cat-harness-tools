@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 
 import {
   auditInstance,
+  serialisationsProducerDeclared,
   auditAll,
   formatReport,
   CRITERIA,
@@ -121,27 +122,25 @@ describe("the falsifier the bean asks for", () => {
     cleanup();
   });
 
-  for (const missing of CRITERIA) {
-    it(`removing \`${missing}\` alone makes exactly that one appear`, () => {
-      const full: Record<string, string> = {
-        visualiser: "viz.html",
-        docs: "doc.md",
-        skill: "some-skill",
-        serialisations: "thing.jsonld",
-      };
-      delete full[missing];
-      const { root, cleanup } = instance(full, {
-        realTargets: ["viz.html", "doc.md", "thing.jsonld"],
-      });
-      const r = auditInstance(root);
-      expect(r.findings.map((f) => f.criterion)).toEqual([missing]);
-      // SERIALISATIONS are owed by every declared directory, so a missing one
-      // is an unmet obligation rather than an unanswered question. The other
-      // three are minor here because this fixture's kind owes none of them.
-      expect(r.findings[0]?.severity).toBe(missing === "serialisations" ? "major" : "minor");
-      cleanup();
+  it.each([...CRITERIA])("removing `%s` alone makes exactly that one appear", (missing) => {
+    const full: Record<string, string> = {
+      visualiser: "viz.html",
+      docs: "doc.md",
+      skill: "some-skill",
+      serialisations: "thing.jsonld",
+    };
+    delete full[missing];
+    const { root, cleanup } = instance(full, {
+      realTargets: ["viz.html", "doc.md", "thing.jsonld"],
     });
-  }
+    const r = auditInstance(root, undefined, { serialisationsProducer: true });
+    expect(r.findings.map((f) => f.criterion)).toEqual([missing]);
+    // SERIALISATIONS are owed by every declared directory, so a missing one
+    // is an unmet obligation rather than an unanswered question. The other
+    // three are minor here because this fixture's kind owes none of them.
+    expect(r.findings[0]?.severity).toBe(missing === "serialisations" ? "major" : "minor");
+    cleanup();
+  });
 });
 
 describe("declared-but-missing is a different problem from undeclared", () => {
@@ -245,7 +244,7 @@ describe("serialisations take no waiver — harnesses cannot override being in t
       } as unknown,
       { realTargets: ["viz.html", "doc.md"] },
     );
-    const r = auditInstance(root);
+    const r = auditInstance(root, undefined, { serialisationsProducer: true });
     expect(r.findings.map((f) => f.criterion)).toEqual(["serialisations"]);
     expect(r.findings[0]?.severity).toBe("major");
     // And it is not quietly filed as an exemption either.
@@ -257,7 +256,7 @@ describe("serialisations take no waiver — harnesses cannot override being in t
 describe("bootstrap's exemption is by layer, and is a second criterion not a hole", () => {
   it("bootstrap is never asked for a visualiser", () => {
     const { root, cleanup } = instance(undefined, { name: "bootstrap" });
-    const r = auditInstance(root);
+    const r = auditInstance(root, undefined, { serialisationsProducer: true });
     // `serialisations` is present even here, and that is the ruling rather
     // than an oversight: bootstrap is excused a visualiser precisely because
     // its json/jsonld "is its existence", so it cannot be excused that.
@@ -267,7 +266,7 @@ describe("bootstrap's exemption is by layer, and is a second criterion not a hol
 
   it("any other instance with the same shape IS asked", () => {
     const { root, cleanup } = instance(undefined, { name: "not-bootstrap" });
-    const r = auditInstance(root);
+    const r = auditInstance(root, undefined, { serialisationsProducer: true });
     expect(r.findings.map((f) => f.criterion).sort()).toEqual([
       "docs", "serialisations", "skill", "visualiser",
     ]);
@@ -859,10 +858,10 @@ describe("only a node-graph kind owes serialisations (owner, Q-SER-2 A, 2026-11-
     }
   });
 
-  function dirOf(kinds: string[]): ReturnType<typeof auditInstance> {
+  function dirOf(kinds: string[], serialisationsProducer = true): ReturnType<typeof auditInstance> {
     const { root, cleanup } = instance(undefined, { graphTypologies: kinds });
     try {
-      return auditInstance(root);
+      return auditInstance(root, undefined, { serialisationsProducer });
     } finally {
       cleanup();
     }
@@ -887,6 +886,43 @@ describe("only a node-graph kind owes serialisations (owner, Q-SER-2 A, 2026-11-
       expect(f?.severity).toBe("major");
       expect(f?.detail).toContain("every directory of a node-graph kind owes");
       expect(r.serialisationsNotOwed ?? []).toEqual([]);
+    }
+  });
+
+  // No layer declares a producer: the obligation is listed, not reported as a
+  // finding per directory (owner, card "collab gate" B, 2026-11-13).
+  it("the checker: with no producer anywhere, an owing directory AWAITS one — listed, not a finding, not waived", () => {
+    const r = dirOf(["cat-harness"], false);
+    expect(r.findings.map((f) => f.criterion)).not.toContain("serialisations");
+    expect(r.serialisationsAwaitingProducer).toEqual(["thing"]);
+    expect(r.exempted.map((e) => e.criterion)).not.toContain("serialisations");
+    expect(r.serialisationsNotOwed ?? []).toEqual([]);
+  });
+
+  it("the checker: a directory not owed is not awaiting a producer either", () => {
+    expect(dirOf(["code"], false).serialisationsAwaitingProducer).toEqual([]);
+  });
+
+  it("the report: awaiting directories are ONE line with no ✗, so a new directory adds no diagnostic", () => {
+    const one = formatReport([dirOf(["cat-harness"], false)]);
+    expect(one).toContain("1 director(ies) owe serialisations and declare none, and no layer declares a producer yet");
+    expect(one).not.toContain("/ serialisations");
+    expect(one.split("\n").filter((l) => l.trim().startsWith("✗") && l.includes("serialisations"))).toEqual([]);
+  });
+
+  it("the producer is read from the checkout: any directory declaring coverage.serialisations", () => {
+    const none = instance(undefined);
+    const some = instance({ serialisations: "scripts/gen.ts" }, { realTargets: ["inst/scripts/gen.ts"] });
+    try {
+      expect(serialisationsProducerDeclared(dirname(none.root))).toBe(false);
+      expect(serialisationsProducerDeclared(dirname(some.root))).toBe(true);
+      // Once a producer exists, an undeclared owing directory is a finding again.
+      expect(auditInstance(none.root, undefined, { serialisationsProducer: true }).findings.map((f) => f.criterion)).toContain(
+        "serialisations",
+      );
+    } finally {
+      none.cleanup();
+      some.cleanup();
     }
   });
 

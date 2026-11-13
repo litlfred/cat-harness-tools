@@ -18,6 +18,7 @@ import {
   joinTestsToScenarios,
   parseFeature,
   scanTree,
+  unescapeJsString,
 } from "../lib/test-gherkin";
 import { auditTestGherkin } from "../test-plan-audit";
 import { TEST_PLAN_SCHEMA_ID, TEST_PLAN_SCHEMA_ID_V1 } from "../../schemas/sdlc/test-plan";
@@ -73,6 +74,36 @@ describe("language adapters", () => {
     ]);
   });
 
+  test("kotlin: a quote inside a backtick name is part of the name, and the class scope survives it", () => {
+    const src = [
+      "class VectorsTest {",
+      "    @Test fun `the vector's kid is the DSC's`() { val c = '{' }",
+      "    @Test fun `the guide's DSC`() {}",
+      "    @Test fun plain() {}",
+      "}",
+    ].join("\n");
+    expect(names(KOTLIN_ADAPTER.findTests("app/VectorsTest.kt", src))).toEqual([
+      "app/VectorsTest.kt::VectorsTest::the_vector's_kid_is_the_DSC's",
+      "app/VectorsTest.kt::VectorsTest::the_guide's_DSC",
+      "app/VectorsTest.kt::VectorsTest::plain",
+    ]);
+  });
+
+  test("js: a file that declares @test-runner is read, and each call of its runner is a test", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-gherkin-runner-"));
+    const suite = [
+      "// @test-runner run",
+      "export function runSuite(h) {",
+      "  const run = (name, body) => body();",
+      '  run("decodes the vector", () => true);',
+      "  for (const k of keys) run(`cross[${k}]`, () => true);",
+      "}",
+    ].join("\n");
+    writeFileSync(join(root, "suite.ts"), suite);
+    writeFileSync(join(root, "helper.ts"), 'const run = (n) => n;\nrun("not a test");\n');
+    expect(names(scanTree(root).tests)).toEqual(["suite.ts::decodes_the_vector", "suite.ts::cross[${k}]"]);
+  });
+
   test("js: test() and it() are named through describe() titles, whitespace as _", () => {
     const src = [
       'import { describe, test } from "bun:test";',
@@ -111,6 +142,24 @@ describe("language adapters", () => {
     expect(names(JS_ADAPTER.findTests("r.test.ts", src))).toEqual([
       "r.test.ts::after_the_regexes::first",
       "r.test.ts::a_skipIf_scope::second",
+    ]);
+  });
+
+  test("js: a regex literal inside a template's ${} hides no test, even ending in an escaped slash", () => {
+    // `\//` closing the regex once read as a `//` comment, which swallowed the
+    // `}` and the closing backtick: every test after it vanished, unreported.
+    // A division inside ${} stays a division.
+    const src = [
+      "const urlFor = (r: string) => `file://${repos[r.replace(/^test\\//, \"\")]}`;",
+      "const half = (n: number) => `${n / 2} of ${n / 1}`;",
+      'describe("after the template", () => {',
+      '  test("first", () => {});',
+      '  test("second", () => {});',
+      "});",
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("r.test.ts", src))).toEqual([
+      "r.test.ts::after_the_template::first",
+      "r.test.ts::after_the_template::second",
     ]);
   });
 
@@ -378,5 +427,114 @@ describe("bindings beyond @test:, and Gherkin dialects", () => {
     // An unterminated or nested-looking comment never leaves a case readable.
     expect(withoutXmlComments('a<!-- <testcase id="x"/> --><!--<!-- -->b')).toBe("ab");
     expect(withoutXmlComments('a<!-- <testcase id="x"/>')).toBe("a");
+  });
+});
+
+describe("declared specifications", () => {
+  test("a DAK's unbound Scenarios are specifications, not findings; a bound one is still checked", () => {
+    const spec = [
+      "Feature: Immunization logic",
+      "  Scenario: dose is due",
+      "    Given a patient",
+      "  @itb:ts-immz/tc-due",
+      "  Scenario: bound to an external suite",
+    ].join("\n");
+    const write = (root: string, dak: unknown) => {
+      mkdirSync(join(root, "input", "testing"), { recursive: true });
+      mkdirSync(join(root, "tools"), { recursive: true });
+      writeFileSync(join(root, "input", "testing", "IMMZ.feature"), spec);
+      writeFileSync(join(root, "tools", "own.feature"), "Feature: own\n  Scenario: unbound\n");
+      writeFileSync(join(root, "tools", "own.test.ts"), 'test("untagged", () => {});\n');
+      if (dak !== undefined) writeFileSync(join(root, "dak.json"), JSON.stringify(dak));
+    };
+    const kinds = (r: { findings: { kind: string; file: string }[] }) => r.findings.map((f) => `${f.kind} ${f.file}`).sort();
+
+    const plain = mkdtempSync(join(tmpdir(), "nodak-"));
+    write(plain, undefined);
+    const p = scanTree(plain);
+    expect(p.specifications).toEqual([]);
+    expect(kinds(p)).toEqual([
+      "binding-unresolved input/testing/IMMZ.feature",
+      "scenario-names-no-test input/testing/IMMZ.feature",
+      "scenario-names-no-test tools/own.feature",
+      "test-without-scenario tools/own.test.ts",
+    ]);
+
+    const whole = mkdtempSync(join(tmpdir(), "dak-"));
+    write(whole, { resourceType: "DAK", id: "x" });
+    const w = scanTree(whole);
+    expect(w.specifications.map((s) => `${s.file} ${s.title}`).sort()).toEqual(["input/testing/IMMZ.feature dose is due", "tools/own.feature unbound"]);
+    expect(kinds(w)).toEqual(["binding-unresolved input/testing/IMMZ.feature", "test-without-scenario tools/own.test.ts"]);
+
+    const scoped = mkdtempSync(join(tmpdir(), "dakscoped-"));
+    write(scoped, { resourceType: "DAK", testScenarios: [{ url: "input/testing/" }, { url: "https://example.org/x" }] });
+    const sc = scanTree(scoped);
+    expect(sc.specifications.map((s) => s.file)).toEqual(["input/testing/IMMZ.feature"]);
+    expect(kinds(sc)).toEqual([
+      "binding-unresolved input/testing/IMMZ.feature",
+      "scenario-names-no-test tools/own.feature",
+      "test-without-scenario tools/own.test.ts",
+    ]);
+
+    const notDak = mkdtempSync(join(tmpdir(), "notdak-"));
+    write(notDak, { resourceType: "ImplementationGuide" });
+    expect(scanTree(notDak).specifications).toEqual([]);
+  });
+
+  test("a DAK declared in index.config.json specifies the features its IG publishes, not the repository's own", () => {
+    const write = (root: string, contentTypes: unknown) => {
+      mkdirSync(join(root, "input", "testing"), { recursive: true });
+      mkdirSync(join(root, "tools"), { recursive: true });
+      writeFileSync(join(root, "input", "testing", "IMMZ.feature"), "Feature: immz\n  Scenario: dose is due\n");
+      writeFileSync(join(root, "tools", "own.feature"), "Feature: own\n  Scenario: unbound\n");
+      writeFileSync(join(root, "index.config.json"), JSON.stringify({ contentTypes }));
+    };
+    const specs = (root: string) => scanTree(root).specifications.map((s) => s.file);
+    const kinds = (root: string) => scanTree(root).findings.map((f) => `${f.kind} ${f.file}`);
+    const dak = { resourceType: "DAK", id: "x" };
+
+    // The IG publishes input/testing/: its features are specifications; the repository's own stay checked.
+    const ig = mkdtempSync(join(tmpdir(), "dakct-"));
+    write(ig, { dak, ig: { include: ["sushi-config.yaml", "./input/testing/"] } });
+    expect(specs(ig)).toEqual(["input/testing/IMMZ.feature"]);
+    expect(kinds(ig)).toEqual(["scenario-names-no-test tools/own.feature"]);
+
+    // A DAK whose IG publishes no feature (a harness layer that is also a DAK) has no specifications.
+    const layer = mkdtempSync(join(tmpdir(), "dakctlayer-"));
+    write(layer, { dak, ig: { include: ["input/fsh/"] } });
+    expect(specs(layer)).toEqual([]);
+    expect(kinds(layer).sort()).toEqual(["scenario-names-no-test input/testing/IMMZ.feature", "scenario-names-no-test tools/own.feature"]);
+
+    // testScenarios paths, when listed, decide; with no IG section and none listed, nothing is a specification.
+    const scoped = mkdtempSync(join(tmpdir(), "dakctscoped-"));
+    write(scoped, { dak: { ...dak, testScenarios: [{ url: "tools/" }] }, ig: { include: ["input/"] } });
+    expect(specs(scoped)).toEqual(["tools/own.feature"]);
+    const bare = mkdtempSync(join(tmpdir(), "dakctbare-"));
+    write(bare, { dak });
+    expect(specs(bare)).toEqual([]);
+
+    const notDak = mkdtempSync(join(tmpdir(), "dakctnot-"));
+    write(notDak, { dak: { resourceType: "ImplementationGuide" }, ig: { include: ["input/"] } });
+    expect(specs(notDak)).toEqual([]);
+  });
+});
+
+describe("a JS title is named by its runtime string", () => {
+  test("escapes in a quoted or template title are read as the runner reads them; a looped id stays verbatim", () => {
+    const src = [
+      'describe("say \\"it\\" twice", () => {',
+      "  test('can\\'t fail', () => {});",
+      "  test(`a \\`tick\\``, () => {});",
+      '  test("regex \\\\bq\\\\b and \\u00e9 and \\x41", () => {});',
+      "  test(`case[${k}]`, () => {});",
+      "});",
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("t.test.ts", src))).toEqual([
+      "t.test.ts::say_\"it\"_twice::can't_fail",
+      "t.test.ts::say_\"it\"_twice::a_`tick`",
+      "t.test.ts::say_\"it\"_twice::regex_\\bq\\b_and_é_and_A",
+      "t.test.ts::say_\"it\"_twice::case[${k}]",
+    ]);
+    expect(unescapeJsString("a\\nb\\u{1F600}\\\nc\\q")).toBe("a\nb\u{1F600}cq");
   });
 });

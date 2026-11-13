@@ -19,6 +19,21 @@ Feature: Every test has a Gherkin
     Then each test is named <file>::<class>::<fun>, with the backtick name's spaces written as _
     And a function with no test annotation is not a test
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::kotlin:_a_quote_inside_a_backtick_name_is_part_of_the_name,_and_the_class_scope_survives_it
+  Scenario: A quote in a Kotlin backtick name stays in the name
+    Given a Kotlin class whose backtick-named @Test functions contain apostrophes, and a char literal holding a brace
+    When the Kotlin adapter reads it
+    Then each test is named <file>::<class>::<fun> with the apostrophes kept
+    And every test after them is still named through the class
+
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_file_that_declares_@test-runner_is_read,_and_each_call_of_its_runner_is_a_test
+  Scenario: A suite with its own runner declares it
+    Given a source file not named as a test file, whose comment declares "@test-runner run"
+    And another file that calls a function named run but declares nothing
+    When the tree is scanned
+    Then each run("title", …) call in the declaring file is a test, a looped id[${key}] title included
+    And the file that declares nothing holds no test
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_test()_and_it()_are_named_through_describe()_titles,_whitespace_as__
   Scenario: JavaScript tests are named through their describe titles
     Given a test file with test(), it.skip(), test.each()() and nested describe() calls
@@ -30,6 +45,14 @@ Feature: Every test has a Gherkin
   Scenario: A regex literal with a quote or backtick hides no test
     Given a test file whose first lines hold a regex literal with backticks and one with quotes
     And then a describe() scope and a describe.skipIf(cond)() scope, each holding a test
+    When the JS adapter reads it
+    Then both tests are found, each named through its scope
+
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_regex_literal_inside_a_template's_${}_hides_no_test,_even_ending_in_an_escaped_slash
+  Scenario: A regex literal inside a template's ${} hides no test
+    Given a test file whose first line holds a template whose ${…} holds a regex literal ending in an escaped slash
+    And a second line whose template divides inside ${…}
+    And then a describe() scope holding two tests
     When the JS adapter reads it
     Then both tests are found, each named through its scope
 
@@ -135,3 +158,36 @@ Feature: Every test has a Gherkin
     Then only the present case resolves; the absent and commented-out ones name no target
     When they are joined with no checkout held
     Then every @itb tag is unresolved, "source not held", and none passes
+
+  @test:scripts/tests/test-gherkin.test.ts::declared_specifications::a_DAK's_unbound_Scenarios_are_specifications,_not_findings;_a_bound_one_is_still_checked
+  Scenario: A DAK declares its feature files to be specifications for implementers
+    Given a tree with an unbound Scenario, an @itb-bound Scenario and an untagged test
+    When the tree declares no DAK
+    Then the unbound Scenarios name no test, the @itb tag is unresolved and the test has no Scenario
+    When its dak.json declares a DAK with no testScenarios sources
+    Then every unbound Scenario is a specification and not a finding
+    And the @itb tag is still unresolved and the untagged test still has no Scenario
+    When its dak.json lists a testScenarios url that is a path in the tree
+    Then only the unbound Scenarios under that path are specifications
+    When dak.json declares a resource that is not a DAK
+    Then nothing is a specification
+
+  @test:scripts/tests/test-gherkin.test.ts::declared_specifications::a_DAK_declared_in_index.config.json_specifies_the_features_its_IG_publishes,_not_the_repository's_own
+  Scenario: A DAK declared as a content type specifies only the features its IG publishes
+    Given a tree with an unbound Scenario under input/testing/ and another under tools/
+    When index.config.json declares contentTypes.dak a DAK and contentTypes.ig.include lists input/testing/
+    Then the Scenario under input/testing/ is a specification and the one under tools/ is still a finding
+    When the IG's include lists no path that holds a feature
+    Then nothing is a specification and both Scenarios are findings
+    When the DAK lists a testScenarios path
+    Then that path decides, not the IG's include
+    When neither testScenarios paths nor an IG include are declared, or contentTypes.dak is not a DAK
+    Then nothing is a specification
+
+  @test:scripts/tests/test-gherkin.test.ts::a_JS_title_is_named_by_its_runtime_string::escapes_in_a_quoted_or_template_title_are_read_as_the_runner_reads_them;_a_looped_id_stays_verbatim
+  Scenario: A JS test is named by the title its runner prints, not by the escapes in its source
+    Given a describe titled with escaped double quotes, holding tests titled with an escaped single quote, escaped backticks, an escaped backslash, a \u escape and a \x escape, and a looped test case[${k}]
+    When the JS adapter reads the file
+    Then each name carries the title's runtime characters, with no escaping backslash left
+    And the looped test keeps its ${k} verbatim
+    And a newline escape, a code-point escape and a line continuation unescape as JavaScript reads them

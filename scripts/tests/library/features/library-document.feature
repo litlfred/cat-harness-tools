@@ -83,3 +83,83 @@ Feature: The document view of a library entry
     Given a section with a heading and a Markdown table with a delimiter row, bold text and an escaped pipe
     When it is made plain and its whitespace collapsed
     Then the delimiter row is gone and each row reads as its cells joined by "; "
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::a_figure_with_its_WebP_on_disk_is_shown_with_every_language;_others_are_not
+  Scenario: Only a figure whose WebP is on disk is shown, with every language of its narrative
+    Given an entry listing a figure WebP that is on disk, a decorative PNG, and a figure WebP that is not on disk
+    When the entry's document view is read
+    Then its images are only "img-p002-1"
+    And that image's narratives are "A bar chart." in en and "Un graphique." in fr
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::a_table's_cells_come_from_its_CSV,_header_row_dropped,_quotes_and_newlines_kept
+  Scenario: A table's cells come from its CSV, header row dropped, quotes and newlines kept
+    Given an entry whose table-1.csv has a header row, a quoted cell with a comma and doubled quotes, and a cell with a newline
+    When the entry's document view is read
+    Then the table's rows are 'a, "quoted"' and "2", then "x" and "two" newline "lines"
+    And its first column is titled "A" in group "G"
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::a_withheld_entry_shows_neither
+  Scenario: A withheld entry shows neither figures nor tables
+    Given the same entry with figures and tables on disk
+    When its document view is read as withheld
+    Then it has no images and no tables
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::the_view_the_generator_writes,_with_figures_and_tables,_is_one_the_schema_accepts
+  Scenario: The view the generator writes, with figures and tables, passes the strict document schema
+    Given the same entry, read with repository links
+    When its document view is round-tripped through JSON and checked against the library document schema
+    Then it has one image and one table
+    And the schema reports no issues
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::the_site_copies_exactly_the_files_the_page_shows
+  Scenario: The site copies exactly the files the page shows
+    Given the same entry
+    When its figure files are listed
+    Then they are "images/img-p002-1.webp" and "tables/table-1.csv"
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::toc_present:_the_tree_is_the_outline,_as_before
+  Scenario: With a table of contents, the Contents tree is the PDF's outline
+    Given a document view with a three-entry outline and a section "Not in the outline" that no entry names
+    When its Contents tab is rendered
+    Then it says "Source: the PDF’s own outline. 3 entries." and offers "Expand all"
+    And the entry "1 One" links to section "s1"
+    And "Not in the outline" does not appear
+    And opening the first node shows "1.1 One A"
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::toc_absent:_the_tree_is_built_from_the_sections,_nested_by_level
+  Scenario: Without a table of contents, the Contents tree is built from the sections, nested by level
+    Given a document view with no outline and two level-1 sections "Page 1" and "Page 2"
+    When its Contents tab is rendered
+    Then it says "so its sections are listed. 2 sections." and not "No table of contents"
+    And both sections are linked by their ids
+    When a view with "Part A", level-2 "Chapter A1" and "Part B" is rendered
+    Then "Part A" and "Part B" are at the top
+    And opening the first node shows "Chapter A1"
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::blocks_appear_as_leaves_under_their_own_section,_by_contains_or_by_target
+  Scenario: Blocks appear as leaves under their own section, by the section's contains or by the block's target
+    Given section "Page 1" containing a prose block, section "Page 2" containing none, and a prose block targeting Page 2's file and a figure naming no section
+    When the Contents tree is rendered and both nodes are opened
+    Then Page 1 shows its prose block as a leaf titled by its first words, "Opening words of the first page…"
+    And Page 1 does not show Page 2's prose block
+    And Page 2 shows its prose block, placed by target
+    And the figure appears under neither section
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::children_are_built_only_when_a_node_is_first_opened
+  Scenario: A tree node's children are built only when it is first opened
+    Given two sections, the first containing a block
+    When the Contents tree is rendered
+    Then node 0 is a closed details element with an empty children list and no block rows
+    And opening node 0 builds its block rows
+    When a view with a single section is rendered
+    Then that node is open at once and its children are already built
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::the_generator_reads_each_section's_blocks_from_its_node,_and_the_viewer_anchors_each_block_row
+  Scenario: The generator reads each section's blocks from its node, and the viewer anchors each block row
+    # Gap: the viewer half is a source-text check of the viewer script, not a rendered page
+    Given an entry whose first section's node contains two blocks and a sub-section
+    When the entry's document view is read
+    Then the first section's blocks are "e/blocks/prose-sec-000" and "e/blocks/figure-1", without the sub-section
+    And the second section has no blocks field
+    And the view passes the library document schema
+    And the viewer script stores the loaded blocks and gives each block table row an anchor id

@@ -335,7 +335,7 @@ export function markInFrame(
 /** What the side-by-side panes hide in each framed page: the staging banner and the left rails. */
 export const FRAME_CHROME_CSS =
   "[data-fa-staging-banner]{display:none!important}:root{--fa-staging-offset:0px!important}html{padding-top:0!important}" +
-  "nav.fa-nav,.fa-nav,.side-bar{display:none!important}body{padding-left:0!important}.main{margin-left:0!important;max-width:none!important}";
+  "nav.fa-nav,.fa-nav,.side-bar{display:none!important}body{padding-inline-start:0!important}.main{margin-left:0!important;max-width:none!important}";
 
 export function renderSideBySide(
   doc: Document,

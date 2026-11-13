@@ -1194,6 +1194,7 @@ function settleSidecar(
  */
 export function notOwnLine(
   instanceRoot: string,
+  // input-site: env CAT_GATE_OWN_INSTANCES #949cc29c — handed to gateOwnInstances, which reads only this name
   env: Readonly<Record<string, string | undefined>> = process.env,
   repoRoot: string = REPO_ROOT ?? instanceRoot,
 ): string | undefined {

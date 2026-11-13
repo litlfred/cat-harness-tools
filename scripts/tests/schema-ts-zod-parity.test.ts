@@ -173,20 +173,18 @@ describe("schema parity: TS interfaces vs Zod schemas", () => {
     expect([...tsByKind.keys()].sort()).toEqual([...zodByKind.keys()].sort());
   });
 
-  for (const [kind, ifaceName] of [...tsByKind].sort()) {
-    test(`${kind}: field sets agree`, () => {
-      const ts = tsFields(ifaceName);
-      const zod = zodByKind.get(kind) ?? new Set<string>();
-      // `md` is a filesystem companion, not a manifest field; `$schema` and
-      // refinement-only keys never appear in the TS interface.
-      const ignore = new Set(["md"]);
-      const onlyTs = [...ts].filter((f) => !zod.has(f) && !ignore.has(f)).sort();
-      const onlyZod = [...zod].filter((f) => !ts.has(f) && !ignore.has(f)).sort();
-      // A field present in TS but absent from Zod is the dangerous direction:
-      // authors can write it, it type-checks, and Zod silently strips it.
-      expect({ onlyTs, onlyZod }).toEqual({ onlyTs: [], onlyZod: [] });
-    });
-  }
+  test.each([...tsByKind].sort())("%s: field sets agree", (kind, ifaceName) => {
+    const ts = tsFields(ifaceName);
+    const zod = zodByKind.get(kind) ?? new Set<string>();
+    // `md` is a filesystem companion, not a manifest field; `$schema` and
+    // refinement-only keys never appear in the TS interface.
+    const ignore = new Set(["md"]);
+    const onlyTs = [...ts].filter((f) => !zod.has(f) && !ignore.has(f)).sort();
+    const onlyZod = [...zod].filter((f) => !ts.has(f) && !ignore.has(f)).sort();
+    // A field present in TS but absent from Zod is the dangerous direction:
+    // authors can write it, it type-checks, and Zod silently strips it.
+    expect({ onlyTs, onlyZod }).toEqual({ onlyTs: [], onlyZod: [] });
+  });
 });
 
 describe("every block kind carries the editorial relation", () => {
@@ -244,13 +242,11 @@ describe("`authorNotes` survives validation, not just declaration", () => {
     ["diagram", DiagramSchema, { kind: "diagram" }],
     ["table", TableSchema, { kind: "table" }],
   ];
-  for (const [name, schema, base] of cases) {
-    test(`${name}: an authorNote round-trips`, () => {
-      const r = schema.safeParse({ ...base, authorNotes: [note] });
-      expect(r.success).toBe(true);
-      expect((r.data as { authorNotes?: unknown[] }).authorNotes).toEqual([note]);
-    });
-  }
+  test.each(cases)("%s: an authorNote round-trips", (_name, schema, base) => {
+    const r = schema.safeParse({ ...base, authorNotes: [note] });
+    expect(r.success).toBe(true);
+    expect((r.data as { authorNotes?: unknown[] }).authorNotes).toEqual([note]);
+  });
 
   test("granting the field did not weaken validation", () => {
     // An unknown `kind` must still be rejected -- otherwise the grant would

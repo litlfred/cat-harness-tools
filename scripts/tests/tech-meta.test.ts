@@ -138,17 +138,15 @@ describe("--refresh-meta does not reformat the file it refreshes", () => {
   // A refresh that picked one of them reformatted every entry the other rung
   // authored: adding three fields to `9789241548960-eng` produced a 4 349-line
   // diff, 4 324 of them whitespace. Measured 2026-09-19, bean `nso8`.
-  for (const indent of [1, 2]) {
-    test(`an indent-${indent} file stays indent-${indent}`, () => {
-      const { before, after } = refreshed(indent);
-      const width = (s: string) => {
-        const l = s.split("\n").find((x) => x.startsWith(" "));
-        return l ? l.length - l.trimStart().length : null;
-      };
-      expect(width(after)).toBe(width(before));
-      expect(width(after)).toBe(indent);
-    });
-  }
+  test.each([1, 2])("an indent-%d file keeps its indent", (indent) => {
+    const { before, after } = refreshed(indent);
+    const width = (s: string) => {
+      const l = s.split("\n").find((x) => x.startsWith(" "));
+      return l ? l.length - l.trimStart().length : null;
+    };
+    expect(width(after)).toBe(width(before));
+    expect(width(after)).toBe(indent);
+  });
 
   test("only the `source` block is added — every other line is byte-identical", () => {
     const { before, after } = refreshed(1);

@@ -55,17 +55,20 @@ describe("contentInstanceCode — this checkout", () => {
       "scripts/tests/iris-cdn.test.ts",
       "scripts/tests/iris-oxigraph.test.ts",
       // The untainted round-trip translation report over who-iris's own
-      // catalogues (bean `folio-assistant-ktt2`), and its test.
+      // catalogues (bean `folio-assistant-ktt2`), its test, and the pruner of
+      // rulings for strings removed from the catalogue (who-iris#261).
       "scripts/tests/translation-roundtrip-report.test.ts",
+      "scripts/translation-qa-prune.ts",
       "scripts/translation-roundtrip-report.ts",
       "themes/themes.test.ts",
       "themes/themes.ts",
-      // Its Tool node (2026-10-09): the `iris-pages` generator its catalogue
-      // visualiser is `renderedBy`. A declaration, but a `.ts` one, as every
-      // layer's `tools` graph is.
+      // Its Tool nodes (2026-10-09, who-iris#261): the `iris-pages` generator
+      // its catalogue visualiser is `renderedBy`, and `translation-qa-prune`.
+      // Declarations, but `.ts` ones, as every layer's `tools` graph is.
       "tools/index.ts",
-      // That Tool's own folder (bean `tdir`, tools/<id>/<id>.ts).
+      // Each Tool's own folder (bean `tdir`, tools/<id>/<id>.ts).
       "tools/iris-pages/iris-pages.ts",
+      "tools/translation-qa-prune/translation-qa-prune.ts",
     ]);
     expect(contentCodeFindings(v).map((f) => f.where)).toEqual(v.files);
     // The generic code left: none of the moved files may reappear here.

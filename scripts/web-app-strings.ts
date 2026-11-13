@@ -27,6 +27,7 @@ import type { WebApp } from "../schemas/ui/web-app.ts";
 
 /** Where a layer keeps an app's template and translations, relative to the layer root. */
 export function appPoPath(app: Pick<WebApp, "id">, locale: string, ext: "pot" | "po"): string {
+  // declared-path-literal: a path RELATIVE to the layer root, joined by callers that hold no declaration (a scratch layer in the tests); `translation-sources` is `translations/` in every layer that declares it.
   return join("translations", locale, "apps", `${app.id}.${ext}`);
 }
 

@@ -177,17 +177,15 @@ describe("idempotent — a second run writes nothing", () => {
     "<div>\n<!-- kg:subgraph:begin -->\n<p>Cats <em>and</em>\n dogs</p>\n<!-- kg:subgraph:end -->\n</div>",
     "<p><a>a</a> <a>b</a></p>",
   ];
-  for (const [i, f] of FIXTURES.entries()) {
-    test(`fixture ${i}`, () => {
-      const once = min(f);
-      expect(min(once)).toBe(once);
-      // And the second pass reports nothing to do.
-      const second = minifyHtml(once).counts;
-      expect(second.comments).toBe(0);
-      expect(second.dropped).toBe(0);
-      expect(second.squeezed).toBe(0);
-    });
-  }
+  test.each(FIXTURES.map((f, i) => [i, f] as const))("fixture %d", (_i, f) => {
+    const once = min(f);
+    expect(min(once)).toBe(once);
+    // And the second pass reports nothing to do.
+    const second = minifyHtml(once).counts;
+    expect(second.comments).toBe(0);
+    expect(second.dropped).toBe(0);
+    expect(second.squeezed).toBe(0);
+  });
 });
 
 describe("the runner's three states", () => {

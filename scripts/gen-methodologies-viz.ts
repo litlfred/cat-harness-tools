@@ -241,6 +241,21 @@ function cell(v: string): string {
 }
 
 /**
+ * A table cell's text with every backtick paired. An unpaired one opens a code
+ * span that runs into the next cell, the pipes between stop being cell
+ * boundaries, and kramdown prints the whole table as a paragraph (bean
+ * `7w1a`). Read left to right, the unpaired backtick is the last one; it is
+ * written as the character reference, which kramdown shows as a backtick and
+ * never reads as a span delimiter.
+ */
+export function pairTicks(v: string): string {
+  const n = (v.match(/`/g) ?? []).length;
+  if (n % 2 === 0) return v;
+  const i = v.lastIndexOf("`");
+  return `${v.slice(0, i)}&#96;${v.slice(i + 1)}`;
+}
+
+/**
  * A long prose field, trimmed for a table cell with the full text below it.
  *
  * Avoids arbitrary mid-word cuts and unclosed spans. Cuts at word boundaries,
@@ -287,7 +302,7 @@ export function evidenceLine(e: string, links?: LibraryResolver, fromPage = ""):
 /**
  * Code spans in a node's prose (`applies-when`, `origin`) that name something
  * the page can place become links (owner, 2026-11-10: the DIIG entry's
- * `grade`, `kepner-tregoe`, `madr` and `who-iris/library/9789240010567-eng/`
+ * `grade`, `kepner-tregoe`, `madr` and a library entry's directory
  * read as cross-references but were plain text).
  *
  * - a methodology on this site → its section on the list page, `#<name>`
@@ -504,7 +519,7 @@ export function page(
 
   for (const r of rows) {
     b.push(
-      `| **[${cell(r.title)}](#${r.name})**<br>\`${cell(r.name)}\` | ${prose(cell(r.appliesWhen))} | ` +
+      `| **[${pairTicks(cell(r.title))}](#${r.name})**<br>\`${cell(r.name)}\` | ${prose(pairTicks(cell(r.appliesWhen)))} | ` +
         `${BADGE[r.state]} | \`${cell(r.instance)}\` |`,
     );
   }

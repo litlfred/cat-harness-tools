@@ -74,7 +74,8 @@ import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declar
 import { generatedBanner } from "@litlfred/bootstrap-tools/scripts/generated-by.ts";
 import { frontMatter, nodeSummary } from "../scripts/front-matter.ts";
 import { isSkillMd, skillMdDirs } from "../scripts/known-skills.ts";
-import { groupOf, optInRootsOf } from "../schemas/kg/opt-in-roots.ts";
+import { groupOf, optInRootsOf, switchedOffGroups } from "../schemas/kg/opt-in-roots.ts";
+import { committedSkillIndex, type CommittedSkillPackage } from "../scripts/lib/switched-off-skills.ts";
 import { filesSection, processesSection, rolesSection } from "@litlfred/bootstrap-tools/scripts/readme-graph-sections.ts";
 
 // ── Section contract ────────────────────────────────────────────────────────
@@ -1027,7 +1028,62 @@ export function ownSkillIndex(root: string): { packages: { dir: string; rows: st
     total += rows.length;
     packages.push(optIn === undefined ? { dir, rows } : { dir, rows, optIn });
   }
-  return { packages, total, notes };
+  // A group the mounting root switched off and the mount LEFT OUT has no files
+  // here, so the list cannot be regenerated for it — and dropping it would
+  // call the layer's own index stale for a part only consent removed. Its
+  // sections are kept verbatim from the committed index, which the layer's
+  // own CI regenerates with every group on (card Q-OPTIN-DIRS A).
+  let leftOut: Set<string>;
+  try {
+    leftOut = new Set(switchedOffGroups(root).leftOut.map((g) => g.id));
+  } catch {
+    leftOut = new Set();
+  }
+  if (leftOut.size === 0) return { packages, total, notes };
+  const committed = committedSkillIndex(root);
+  const carried = committed.filter((p) => p.optIn !== undefined && leftOut.has(p.optIn));
+  if (carried.length === 0) return { packages, total, notes };
+  const merged = mergeCarriedPackages(packages, committed, (p) => p.optIn !== undefined && leftOut.has(p.optIn));
+  const kept = carried.reduce((n, p) => n + p.rows.length, 0);
+  notes.push(`${kept} skill(s) in ${carried.length} director(ies) of opt-in sub-graph(s) the mount left out (${[...new Set(carried.map((p) => p.optIn))].join(", ")}) kept from the committed index`);
+  return { packages: merged, total: total + kept, notes };
+}
+
+/**
+ * The regenerated packages with the committed ones `carry` selects put back
+ * where the committed index had them; a regenerated directory the committed
+ * index does not know stays after the one it followed.
+ */
+export function mergeCarriedPackages(
+  regen: readonly { dir: string; rows: string[]; optIn?: string }[],
+  committed: readonly CommittedSkillPackage[],
+  carry: (p: CommittedSkillPackage) => boolean,
+): { dir: string; rows: string[]; optIn?: string }[] {
+  const byDir = new Map(regen.map((p) => [p.dir, p]));
+  const known = new Set(committed.map((p) => p.dir));
+  const out: { dir: string; rows: string[]; optIn?: string }[] = [];
+  const used = new Set<string>();
+  let ri = 0;
+  for (const c of committed) {
+    if (carry(c)) {
+      if (!byDir.has(c.dir)) out.push(c.optIn === undefined ? { dir: c.dir, rows: [...c.rows] } : { dir: c.dir, rows: [...c.rows], optIn: c.optIn });
+      continue;
+    }
+    const r = byDir.get(c.dir);
+    if (r === undefined || used.has(r.dir)) continue;
+    for (; ri < regen.length && regen[ri] !== r; ri++) {
+      const q = regen[ri]!;
+      if (!known.has(q.dir) && !used.has(q.dir)) {
+        out.push(q);
+        used.add(q.dir);
+      }
+    }
+    out.push(r);
+    used.add(r.dir);
+    ri++;
+  }
+  for (const q of regen) if (!used.has(q.dir)) out.push(q);
+  return out;
 }
 
 const INDEX_FOOTER =

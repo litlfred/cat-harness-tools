@@ -94,6 +94,6 @@ describe("stageDeclared --plan", () => {
   test("--artifact is refused rather than ignored", async () => {
     const d = checkout({ site: { build: RECIPE } });
     gitRepo(d, "main");
-    expect(stageDeclared({ repo: d, artifact: "/tmp/x", log: () => {} }, { instance: "demo", recipe: RECIPE })).rejects.toThrow(/--artifact/);
+    await expect(stageDeclared({ repo: d, artifact: "/tmp/x", log: () => {} }, { instance: "demo", recipe: RECIPE })).rejects.toThrow(/--artifact/);
   });
 });

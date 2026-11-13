@@ -105,16 +105,23 @@
     if (!b || b.parentElement !== document.body) return;
     var bs = window.getComputedStyle(document.body);
     if (bs.maxWidth === "none" && parseFloat(bs.paddingTop) === 0 && parseFloat(bs.marginLeft) === 0) return;
-    b.style.marginLeft = ""; b.style.width = ""; b.style.maxWidth = ""; b.style.marginTop = "";
+    b.style.marginLeft = ""; b.style.marginRight = ""; b.style.width = ""; b.style.maxWidth = ""; b.style.marginTop = "";
     var nav = document.querySelector("nav.fa-nav");
+    var vw = root.clientWidth;
+    // On a right-to-left page the rail is on the RIGHT (`navbar.css` uses
+    // logical properties), so its edge is measured from that side and the bar
+    // is placed from it.
+    var rtl = bs.direction === "rtl";
     // At rest the rail is a strip, and the bar starts at its edge; opened over
     // the page it covers the bar's start, as it covers the content's.
-    var edge = nav ? Math.max(0, Math.min(nav.getBoundingClientRect().right, parseFloat(bs.paddingLeft) + parseFloat(bs.marginLeft) || 0)) : 0;
+    var edge = nav ? Math.max(0, rtl
+      ? Math.min(vw - nav.getBoundingClientRect().left, parseFloat(bs.paddingRight) + parseFloat(bs.marginRight) || 0)
+      : Math.min(nav.getBoundingClientRect().right, parseFloat(bs.paddingLeft) + parseFloat(bs.marginLeft) || 0)) : 0;
     var r = b.getBoundingClientRect();
-    var vw = root.clientWidth;
     b.style.maxWidth = "none";
     b.style.width = (vw - edge) + "px";
-    b.style.marginLeft = (edge - r.left) + "px";
+    if (rtl) b.style.marginRight = (r.right - (vw - edge)) + "px";
+    else b.style.marginLeft = (edge - r.left) + "px";
     b.style.marginTop = "-" + bs.paddingTop;
   }
   function queueBleed() {

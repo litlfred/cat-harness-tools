@@ -65,6 +65,9 @@ import { subscribedHarnesses, subscribedTile } from "./subscribed-harnesses.js";
 import { labelVisualisations, nameInstanceRoot } from "./lib/nav-label.js";
 import type { HarnessMark } from "./lib/harness-mark.js";
 import { publishedPagePath } from "./lib/jekyll-permalink.js";
+// A cycle (mount-instance-docs → lib/foreign-site-scope → here), safe because
+// both sides only call each other's hoisted functions, never at load time.
+import { mountedKindRoutes } from "./mount-instance-docs.ts";
 // The `folio` graph typology is registered by CORE. This module is a LIBRARY, so it
 // does NOT import that registration: a library's edge is inherited by every
 // module that imports it, and the harness may not depend on core. The
@@ -804,8 +807,17 @@ function tileFor(
     }
     return undefined;
   };
+  // THE MOUNT'S OWN ROUTE, last: a directory with no declared viewer that the
+  // mount pass publishes at its kind route (`docs/` → `/docs/who-iris/`) is a
+  // page the site serves, and the row opened nothing (who-iris, 2026-11-13).
+  // Read lazily, once: most layers resolve every kind above.
+  let mounted: Map<string, string> | undefined;
+  const mountedPageFor = (kind: string): string | undefined => {
+    mounted ??= mountedKindRoutes(repoRoot, decl.name);
+    return mounted.get(kind);
+  };
   for (const kind of kinds) {
-    const path = declared.get(kind) ?? sitePageFor(kind);
+    const path = declared.get(kind) ?? sitePageFor(kind) ?? mountedPageFor(kind);
     // READ-ONLY IS ORTHOGONAL TO WHETHER A VIEWER WAS FOUND, and keeping the
     // two independent here is the whole of the two-greys distinction: `path`
     // answers "is there anything to open", `readOnly` answers "may it be

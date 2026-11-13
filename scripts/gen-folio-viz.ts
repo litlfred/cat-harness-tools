@@ -50,6 +50,7 @@ import {
   siteDirFor,
 } from "../schemas/kg/cat-harness.js";
 import { makeEmit } from "./viewer-page.ts";
+import { mergeFolio } from "./folio-merge.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { declaredPageRoute, renderedByOf, withRenderedByFrontMatter } from "./viewer-declarations.js";
@@ -241,6 +242,8 @@ export function viewerHtml(dataHref: string, instance?: string): string {
 .fo-page .link-pill { display:inline-block; font-size:.8rem; line-height:1.25; padding:.1rem .4rem; border:1px solid var(--edge); background:var(--box); border-radius:2px; word-break:break-word; text-decoration:none; }
 .fo-page a.link-pill:hover { border-color:currentColor; text-decoration:underline; }
 .fo-page .empty { opacity:.9; }
+.fo-page .pill.ok { border-color:var(--edge); }
+.fo-page .pill.local { color:var(--warn); border-color:var(--warn-edge); background:var(--warn-bg); }
 </style>
 <div class="fo-page">
   <h1 id="fo-title">${escText(heading)}</h1>
@@ -250,10 +253,15 @@ export function viewerHtml(dataHref: string, instance?: string): string {
   <div id="badges"></div>
   <div id="dirs"></div>
   <div id="files"></div>
+  <div id="merged" aria-live="polite"></div>
   <div id="nodes"><p class="empty">loading…</p></div>
 </div>
 <script>
 var DATA_HREF = ${JSON.stringify(dataHref)};
+var INSTANCE = ${JSON.stringify(instance ?? "")};
+/* The reader's folio, the store docs-ui's glass reads and writes (R30 j2if). */
+var FOLIO_KEY = "fa-folio-assets";
+var mergeFolio = ${mergeFolio.toString()};
 // Bean "qgjh": a node's links are LINKS. An absolute http(s) href is used as
 // it is; a site-rooted one ("/concepts/agentic-harness.html") is resolved against this
 // site's root, found from where the page reads its data, so it works under the
@@ -269,8 +277,91 @@ function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s)
   .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
-fetch(DATA_HREF).then(function(r){ if(!r.ok) throw new Error(r.status + " " + r.statusText); return r.json(); })
-.then(function(G){
+/* BOTH SOURCES, LOADED DYNAMICALLY (owner, 2026-11-13). The published
+   projection and the reader's folio in this browser are read on every load
+   and merged by mergeFolio (scripts/folio-merge.ts): a union keyed by id,
+   the published copy wins for content, the local copy for the reader's own
+   state, and a local-only item is kept and marked unsynced. The projection
+   is fetched with no-store and a stamp, so a cached copy cannot hide what
+   was published since; it is fetched again when the tab comes back, and the
+   merge is redrawn whenever the reader's folio changes (this tab or another). */
+var published = null, publishedError = null, publishedText = null;
+function readLocalFolio() {
+  try {
+    var raw = localStorage.getItem(FOLIO_KEY);
+    var parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (_e) { return {}; }
+}
+function stamped(h) { return h + (h.indexOf("?") < 0 ? "?" : "&") + "_=" + Date.now(); }
+function renderMerged() {
+  var M = mergeFolio(published ? published.nodes : [], readLocalFolio(), INSTANCE);
+  var c = M.counts;
+  var STATUS = {
+    synced: '<span class="pill ok">published, in this browser</span>',
+    published: '<span class="pill ok">published</span>',
+    unsynced: '<span class="pill local">this browser only, unsynced</span>'
+  };
+  var head = '<h2 id="fo-merged-head">Folio: published and in this browser</h2>' +
+    '<p class="muted">' + (published
+      ? "<b>" + c.published + "</b> published"
+      : publishedError ? '<span class="pill warn">published copy could not be read</span>'
+      : "published copy loading\u2026") +
+    " \u00b7 <b>" + c.local + "</b> in this browser" +
+    " \u00b7 <b>" + c.unsynced + "</b> unsynced. Your own items stay in this browser; " +
+    "the site cannot see them.</p>";
+  if (M.rows.length === 0) {
+    $("merged").innerHTML = head + '<p class="empty">Nothing published and nothing in this browser\u2019s folio.</p>';
+    return;
+  }
+  $("merged").innerHTML = head +
+    '<table aria-label="Folio: published and in this browser" aria-labelledby="fo-merged-head">' +
+    "<caption>Folio: published and in this browser</caption>" +
+    "<thead><tr><th>item</th><th>source</th><th>on your glass</th><th>from</th></tr></thead><tbody>" +
+    M.rows.map(function(r){
+      /* A published link is site-rooted (linkHref resolves it); a local one is
+         the address docs-ui stored after its own safeHref, used as it is
+         when it is http(s), rooted or relative, and text otherwise. */
+      var h = r.hrefFrom === "published" ? linkHref(r.href)
+        : (/^https?:[/][/]|^[/.#]/.test(r.href) ? r.href : "");
+      var name = h ? '<a href="' + esc(h) + '">' + esc(r.title) + "</a>" : esc(r.title);
+      return '<tr data-fo-key="' + esc(r.key || r.id) + '" data-fo-status="' + r.status + '">' +
+        "<td>" + name + '<br><code class="muted">' + esc(r.id) + "</code></td>" +
+        "<td>" + STATUS[r.status] + "</td>" +
+        "<td>" + (r.shown === null ? '<span class="muted">not in your folio</span>'
+                  : r.shown ? "on the glass" : '<span class="muted">shelved</span>') + "</td>" +
+        '<td class="muted">' + esc(r.source || r.declaredIn || "") + "</td></tr>";
+    }).join("") + "</tbody></table>";
+}
+function loadPublished() {
+  return fetch(stamped(DATA_HREF), { cache: "no-store" })
+    .then(function(r){ if(!r.ok) throw new Error(r.status + " " + r.statusText); return r.text(); })
+    .then(function(t){
+      publishedError = null;
+      if (t === publishedText) return;
+      var G = JSON.parse(t);
+      publishedText = t;
+      published = G;
+      renderPublished(G);
+    })
+    .catch(function(e){
+      publishedError = e;
+      if (published) return;
+      /* COULD NOT LOAD IS NOT EMPTY, and the page says which. */
+      $("nodes").innerHTML = '<p class="empty">The projection at <code>' + esc(DATA_HREF) +
+        "</code> could not be read: " + esc(e.message) +
+        ". That is not an empty folio \u2014 it is a folio that could not be loaded.</p>";
+    })
+    .then(renderMerged);
+}
+renderMerged();
+loadPublished();
+window.addEventListener("storage", function(ev){ if (ev.key === null || ev.key === FOLIO_KEY) renderMerged(); });
+document.addEventListener("fa:folio-changed", renderMerged);
+document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "visible") loadPublished(); });
+window.addEventListener("pageshow", function(ev){ if (ev.persisted) loadPublished(); });
+
+function renderPublished(G){
   $("badges").innerHTML =
     '<span class="badge"><b>' + G.nodes.length + "</b> stick" + (G.nodes.length===1?"y":"ies") + "</span>" +
     '<span class="badge"><b>' + G.directories.length + "</b> declared director" +
@@ -333,13 +424,7 @@ fetch(DATA_HREF).then(function(r){ if(!r.ok) throw new Error(r.status + " " + r.
         '<td class="muted">' + n.chars.toLocaleString() + " chars</td>" +
       "</tr>";
     }).join("") + "</tbody></table>";
-})
-.catch(function(e){
-  /* COULD NOT LOAD IS NOT EMPTY, and the page says which. */
-  $("nodes").innerHTML = '<p class="empty">The projection at <code>' + esc(DATA_HREF) +
-    "</code> could not be read: " + esc(e.message) +
-    ". That is not an empty folio \\u2014 it is a folio that could not be loaded.</p>";
-});
+}
 </script>`,
   });
 }

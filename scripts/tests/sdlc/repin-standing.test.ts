@@ -26,6 +26,7 @@ import {
   newlyDeclaredDirectoryIds,
   planRepin,
   summaryOf,
+  upstreamRootsOf,
   verdictOf,
   type CommitVerdict,
   type GitHubApi,
@@ -338,6 +339,39 @@ describe("extendExplicitDirectories: a directory the new pin declares joins an e
     expect((await extendExplicitDirectories(moved(), [listed(["library"])], failing)).unknown[0]!.reason).toContain("HTTP 500");
   });
 
+  test("a declaration below the root is read where the site's lock says it sits (smart-base/, 2026-11-13)", async () => {
+    const asked: (string | undefined)[] = [];
+    const api: GitHubApi = {
+      ...stubApi({}),
+      async declarationAt(_r, sha, _i, at) {
+        asked.push(at);
+        return at === "smart-base" ? ({ [A]: OLD, [B]: NEW } as Record<string, unknown>)[sha] : undefined;
+      },
+    };
+    const plan = await extendExplicitDirectories(moved(), [listed(["library", "tools"])], api, { up: "smart-base" });
+    expect(asked).toEqual(["smart-base", "smart-base"]);
+    expect(plan.unknown).toEqual([]);
+    expect(plan.moves[0]!.addDirectories).toEqual(["scenarios"]);
+    // Missing even there: the reason names the directory it looked in.
+    const none = await extendExplicitDirectories(moved(), [listed(["library"])], { ...stubApi({}), async declarationAt() { return undefined; } }, { up: "smart-base" });
+    expect(none.unknown[0]!.reason).toContain("in `smart-base/` of o/up@");
+  });
+
+  test("upstreamRootsOf reads each instance's upstreamRoot from the lock, and nothing else", () => {
+    expect(
+      upstreamRootsOf({
+        instances: [
+          { instance: "smart-base", upstreamRoot: "smart-base" },
+          { instance: "cat-harness", upstreamRoot: "" },
+          { instance: "no-root" },
+          "junk",
+        ],
+      }),
+    ).toEqual({ "smart-base": "smart-base", "cat-harness": "" });
+    expect(upstreamRootsOf(undefined)).toEqual({});
+    expect(upstreamRootsOf({ instances: "x" })).toEqual({});
+  });
+
   test("applyRepin writes the added ids after the site's own, and touches no other entry", async () => {
     const root = site();
     const f = join(root, "index.config.json");
@@ -406,5 +440,39 @@ describe("cascadeOf: a site whose directories name kinds this job does not mount
     } finally {
       rmSync(base, { recursive: true, force: true });
     }
+  });
+});
+
+describe("alignToHeldPins never moves a pin backwards (folio-assistant train #3111)", () => {
+  const harness = (ref: string) => mount("top", ref, rule({ require: undefined }));
+  const lower = (ref: string) => mount("low", ref, rule({ require: undefined }));
+  const api = (rel: string | Error): GitHubApi => ({
+    ...stubApi({}),
+    async lockPinsAt() {
+      return { "o/low": B };
+    },
+    async compareCommits() {
+      if (rel instanceof Error) throw rel;
+      return rel;
+    },
+  });
+  const cap = { harness: "top", below: new Set(["low"]) };
+  const empty: RepinPlan = { moves: [], held: [], unknown: [] };
+
+  test("a held pin OLDER than the current one is held, not moved", async () => {
+    const plan = await alignToHeldPins(empty, [harness(A), lower(C)], api("behind"), cap);
+    expect(plan.moves).toEqual([]);
+    expect(plan.held[0]!.reason).toContain("never moves a pin backwards");
+  });
+
+  test("a NEWER held pin moves, as before", async () => {
+    const plan = await alignToHeldPins(empty, [harness(A), lower(C)], api("ahead"), cap);
+    expect(plan.moves.map((m) => [m.harness, m.from, m.to])).toEqual([["low", C, B]]);
+  });
+
+  test("when the order cannot be asked, it is held with the reason, never moved blind", async () => {
+    const plan = await alignToHeldPins(empty, [harness(A), lower(C)], api(new Error("HTTP 500")), cap);
+    expect(plan.moves).toEqual([]);
+    expect(plan.held[0]!.reason).toContain("HTTP 500");
   });
 });

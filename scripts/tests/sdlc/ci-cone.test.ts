@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decideRun, excluded, gitReplayable, keepRecords, loadRecords, parseTrace, pathState, preloadScripts, recordRun, inlineCodeOf, splitArgs, testGates, touchedOf, unquote } from "../../ci-cone.ts";
+import { decideRun, excluded, gitReplayable, keepRecords, loadRecords, parseTrace, pathState, preloadScripts, recordRun, recordsOnMain, inlineCodeOf, splitArgs, testGates, touchedOf, unquote } from "../../ci-cone.ts";
 import { BUILD_OUTPUT_DIRS, FileDigests, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
 import { NOT_INSTANCE_DIRS } from "../../../schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
@@ -518,11 +518,24 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     expect(decide("red:check").skip).toBe(false);
   });
 
-  test("not {tracked} in task-io: not a candidate, so it runs untraced and never skips", () => {
-    const r = recordRun({ root, scripts, script: "x:check", io: { outputs: [] }, baseline, sha: "s", stdio: "ignore", runner: ["bun", "run"] });
-    expect(r.code).toBe(0);
-    expect(r.note).toContain("not a candidate");
-    expect(decideRun({ root, scripts, script: "x:check", io: { outputs: [] }, baseline }).skip).toBe(false);
+  test("every check is a candidate, declared in task-io or not (owner, 2026-11-13: every gate)", () => {
+    // No input declaration at all, and none naming {tracked}: the traced read
+    // set alone decides, as for a test file.
+    for (const undeclared of [undefined, { outputs: [] }]) {
+      rmSync(join(root, "build"), { recursive: true, force: true });
+      const r = recordRun({ root, scripts, script: "x:check", io: undeclared, baseline, sha: "mainsha", stdio: "ignore", runner: ["bun", "run"] });
+      expect(r.code).toBe(0);
+      expect(r.note).toContain("recorded");
+      expect(decideRun({ root, scripts, script: "x:check", io: undeclared, baseline }).skip).toBe(true);
+    }
+  });
+
+  test("an undeclared check still runs when a path it read changed", () => {
+    recordRun({ root, scripts, script: "x:check", io: undefined, baseline, sha: "mainsha", stdio: "ignore", runner: ["bun", "run"] });
+    expect(decideRun({ root, scripts, script: "x:check", io: undefined, baseline }).skip).toBe(true);
+    // c.json is read only because a.json names it: a data-dependent read no declaration lists.
+    writeFileSync(join(root, "data", "c.json"), "changed\n");
+    expect(decideRun({ root, scripts, script: "x:check", io: undefined, baseline }).skip).toBe(false);
   });
 
   test("no record, or a record from another tracer version, means run", () => {
@@ -814,5 +827,21 @@ describe.skipIf(!HAS_STRACE)("a computed load the run did not open is no input; 
     process.env[VAR] = "one";
     write("plugins/p.ts", readFileSync(join(root, "plugins/p.ts"), "utf-8") + "// edited\n");
     expect(decide().skip).toBe(false);
+  });
+});
+
+describe("which runs record (recordsOnMain)", () => {
+  test("a push to main records", () => {
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "push", GITHUB_REF: "refs/heads/main" })).toBe(true);
+  });
+  test("a dispatch on main records too: a train's merge starts no push run (bean hd58)", () => {
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/main" })).toBe(true);
+  });
+  test("nothing else records: a dispatch on another branch, a PR, a merge group", () => {
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/repin-train/x" })).toBe(false);
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "pull_request", GITHUB_REF: "refs/pull/1/merge" })).toBe(false);
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "merge_group", GITHUB_REF: "refs/heads/gh-readonly-queue/main/x" })).toBe(false);
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "push", GITHUB_REF: "refs/heads/feature" })).toBe(false);
+    expect(recordsOnMain({})).toBe(false);
   });
 });

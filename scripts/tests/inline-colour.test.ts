@@ -147,12 +147,10 @@ describe("no colour is written into an inline style in the client", () => {
     expect(total).toBeGreaterThan(3);
   });
 
-  for (const file of clientScripts()) {
-    test(`${file.split("/").pop()}: none of them carries a colour or an opacity`, () => {
-      // Named with the line and the text, because "3 offenders" does not say
-      // which colour or where, and the fix is always a specific token.
-      expect(offenders(inlineStyleSites(readFileSync(file, "utf-8")))
-        .map((o) => `${o.line}: ${o.text.trim()}`)).toEqual([]);
-    });
-  }
+  test.each(clientScripts().map((file) => [file.split("/").pop(), file] as const))("%s: none of them carries a colour or an opacity", (_name, file) => {
+    // Named with the line and the text, because "3 offenders" does not say
+    // which colour or where, and the fix is always a specific token.
+    expect(offenders(inlineStyleSites(readFileSync(file, "utf-8")))
+      .map((o) => `${o.line}: ${o.text.trim()}`)).toEqual([]);
+  });
 });

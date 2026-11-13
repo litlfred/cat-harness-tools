@@ -4,9 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bibliography QA</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     /* ── Theme ──────────────────────────────────────────── */
     :root { --ease: cubic-bezier(0.4,0,0.2,1); }
@@ -29,7 +26,7 @@
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
       background: var(--bg); color: var(--fg);
-      font-family: 'Inter','Helvetica Neue',sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
       font-size: 14px; line-height: 1.5;
       min-height: 100vh; padding: 0;
     }
@@ -49,12 +46,12 @@
     }
     .top-bar .spacer { flex: 1; }
     .top-bar .meta {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .65rem; color: var(--fg-d);
     }
     .top-bar button {
       background: var(--bg-r); border: 1px solid var(--brd);
-      color: var(--fg-d); font-family: 'JetBrains Mono', monospace;
+      color: var(--fg-d); font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .6rem; padding: .2rem .6rem; border-radius: 3px;
       cursor: pointer; transition: all .15s;
     }
@@ -71,7 +68,7 @@
     }
     .card .num { font-size: 1.6rem; font-weight: 600; }
     .card .lbl {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .6rem; color: var(--fg-d); margin-top: .15rem;
     }
     .card.green .num { color: var(--grn); }
@@ -92,7 +89,7 @@
     }
     .controls input:focus { outline: none; border-color: var(--ac); }
     .filter-btn {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .6rem; padding: .25rem .6rem; border-radius: 3px;
       border: 1px solid var(--brd); background: var(--bg-r);
       color: var(--fg-d); cursor: pointer; transition: all .15s;
@@ -131,7 +128,7 @@
 
     .ref-info { min-width: 0; }
     .ref-id {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .7rem; color: var(--ac); font-weight: 500;
     }
     .ref-title {
@@ -142,7 +139,7 @@
       font-size: .75rem; color: var(--fg-d); margin-top: .1rem;
     }
     .ref-venue {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .6rem; color: var(--fg-d); margin-top: .1rem;
     }
 
@@ -151,7 +148,7 @@
       justify-content: flex-end; align-self: center;
     }
     .tag {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .55rem; padding: .15rem .4rem;
       border-radius: 3px; white-space: nowrap;
       border: 1px solid var(--brd); background: var(--bg-r);
@@ -197,7 +194,7 @@
     .tag-detail-text { color: var(--fg-d); font-size: .7rem; }
 
     .cite-list {
-      list-style: none; font-family: 'JetBrains Mono', monospace;
+      list-style: none; font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .65rem;
     }
     .cite-list li { padding: .15rem 0; color: var(--fg-d); }
@@ -207,7 +204,7 @@
       font-size: .75rem; align-items: baseline;
     }
     .meta-key {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
       font-size: .65rem; color: var(--fg-d); min-width: 60px;
     }
     .meta-val { color: var(--fg); word-break: break-all; }

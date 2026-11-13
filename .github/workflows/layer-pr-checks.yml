@@ -2543,16 +2543,15 @@ jobs:
           echo "::error::this PR re-pins index.lock.json but its layers cache ref is not published. Whoever re-pinned runs \`bun run cat layers:publish\` from their checkout (mount:remote does it after a re-pin); from a sandbox it lands on a claude/cat-layers/ branch that layers-move.yml moves."
           exit 1
 
-  # The lock's harness pins agree with the pinned harnesses' own locks (owner,
-  # 2026-11-11, after a content layer's main went red on pins skewed between
-  # new and old mains). A layer that pins harness X at A while another pinned
-  # harness Y, at its pin, pins X at B must have A contain B: Y was built and
-  # tested against X at B. And every pin is FRESH (owner, 2026-11-11, card
-  # "A: Agree check + freshness"): at its repository's main HEAD when the run
-  # looks, or a descendant of it, so a re-pin moves every layer together. Every
-  # pull request that changes `index.lock.json`, in either mode, on the fast
-  # tier; one that leaves the lock alone passes. `check-lock-coherence.ts`
-  # says why "contains" and not "equals", and why freshness too.
+  # Every pin of a pull request that changes `index.lock.json` is FRESH: at its
+  # repository's main HEAD, or a descendant of it (owner, 2026-11-11), as main
+  # was when the lock was last committed (owner, 2026-11-13, card "Lock gate":
+  # fresh at re-pin time; the script reads that date from fa/). Only the top-level lock decides (owner, 2026-11-13, "3y 1y"):
+  # a composition mounts each harness once, at this lock's pin, so whether the
+  # pinned harnesses' OWN locks agree with it is reported, not judged; that
+  # dropped the serial bottom-up re-pin cascade. One that leaves the lock alone
+  # passes. `check-lock-coherence.ts` says why. The job keeps its name, which
+  # rulesets require; the agreement it names is now reported only.
   lock-coherence:
     name: Lock pins agree with each other and are at main
     if: github.event_name == 'pull_request'
@@ -2566,7 +2565,7 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.4
-      - name: Do this lock's harness pins agree, and are they at main?
+      - name: Are this lock's harness pins at main?
         run: |
           set -euo pipefail
           [ -f fa/index.lock.json ] || { echo "no index.lock.json: nothing to check"; exit 0; }
@@ -2596,7 +2595,7 @@ jobs:
           set -e
           case "$code" in
             0) exit 0 ;;
-            1) echo "::error::this PR's index.lock.json pins a harness older than (or diverged from) what another pinned harness's own lock pins it at, or behind its repository's main. Re-pin every harness named above to its current main in one re-pin (\`bun run cat mount:remote\`), so every layer runs against what it was tested with." ;;
-            *) echo "::error::could not determine whether this lock's pins agree and are at main (exit $code): a fetch or an ancestry query failed, and that is never read as a pass. Re-run the job; if it persists, read the reasons above." ;;
+            1) echo "::error::this PR's index.lock.json pins a harness behind (or diverged from) its repository's main. Re-pin every harness named above to its current main in one re-pin (\`bun run cat mount:remote\`)." ;;
+            *) echo "::error::could not determine whether this lock's pins are at main (exit $code): a fetch or an ancestry query failed, and that is never read as a pass. Re-run the job; if it persists, read the reasons above." ;;
           esac
           exit 1

@@ -32,7 +32,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   checkoutRootFor,
@@ -47,6 +47,7 @@ import { instanceRootsIn } from "../kg/instance-roots.ts";
 
 import { harnessRoot } from "../harness-root.ts";
 import { subgraphHarnessPath } from "../../scripts/lib/harness-layout.ts";
+import { workflowFiles } from "../../scripts/known-skills.ts";
 // The two profile schemas live with the declaration that carries them
 // (`contentTranslations`, bean `0r7u`); re-exported so callers keep one import.
 export { ContentTypeTranslationSchema, TranslatableFormatSchema };
@@ -116,6 +117,26 @@ export function resolveTranslationPath(ct: DeclaredContentTypeTranslation, rel: 
   for (const root of chain) {
     const r = resolveImplementingPath(root, rel);
     if (r.state === "found") return join(r.root, rel);
+  }
+  // A bare diagram FILE NAME (`draft-to-publication.bpmn`) is found through the
+  // declared process graphs of the chain, wherever the owning layer placed it.
+  // A path into another layer is a fact about that layer's layout, and it
+  // changes when the layer regroups its diagrams (into an opt-in group, say),
+  // so a profile names a diagram it does not own by name. Every group on disk
+  // is read, switched on or not: the profile is a declaration, and a root
+  // leaving the group off does not make it wrong.
+  if (/^[^/]+\.(?:bpmn|dmn)$/.test(rel)) {
+    for (const root of chain) {
+      let files: string[];
+      try {
+        files = workflowFiles(root, "instance", { enabledSubgraphs: "all" });
+      } catch {
+        continue; // an unreadable declaration is check:harness-dirs' to report
+      }
+      const hits = files.filter((f) => basename(f) === rel);
+      if (hits.length === 1) return hits[0];
+      if (hits.length > 1) return undefined; // ambiguous: a finding, not a pick
+    }
   }
   return undefined;
 }

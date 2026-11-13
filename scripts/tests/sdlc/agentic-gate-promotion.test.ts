@@ -323,16 +323,26 @@ describe("Threshold evaluation against promotion criteria", () => {
   });
 
   test("fails promotion under CodeAgent literature baseline (48.6% unconfirmed rate)", () => {
-    // 50 PRs simulating literature finding: ~49% false positive rate
-    const records: WouldHaveBlockedRecord[] = Array.from({ length: 50 }, (_, i) => {
-      const isFp = i % 2 === 0; // 25 FP, 25 TP -> 50% FPR
-      return makeRecord(i + 1, [makeFinding(`f-${i}`, isFp ? "false_positive" : "true_positive")]);
-    });
+    // 50 PRs of 10 adjudicated findings each, 243 of the 500 false positives:
+    // FPR = 243/500 = 48.6%, the literature's rate, with window and coverage met
+    // so that the rate alone holds the gate at warn.
+    const records: WouldHaveBlockedRecord[] = Array.from({ length: 50 }, (_, i) =>
+      makeRecord(
+        i + 1,
+        Array.from({ length: 10 }, (_, j) => {
+          const k = i * 10 + j;
+          return makeFinding(`f-${k}`, k < 243 ? "false_positive" : "true_positive");
+        }),
+      ),
+    );
 
     const result = evaluateAgenticPromotion(records);
     expect(result.promoted).toBe(false);
     expect(result.decision).toBe("remain_warn_only");
-    expect(result.metrics.empiricalFpr).toBeCloseTo(0.5, 2);
+    expect(result.metrics.empiricalFpr).toBeCloseTo(0.486, 4);
+    expect(result.checks.prWindowMet).toBe(true);
+    expect(result.checks.reviewCoverageMet).toBe(true);
+    expect(result.checks.falsePositiveRateMet).toBe(false);
   });
 
   test("SUCCEEDS promotion when all criteria are met (window >= 50, coverage >= 80%, FPR <= 5%)", () => {
@@ -341,14 +351,13 @@ describe("Threshold evaluation against promotion criteria", () => {
     // Adjudicated = 100 -> coverage = 100/105 = 95.2% (>= 80%)
     // FPR = 2/100 = 2.0% (<= 5.0%)
     // Window = 50 (>= 50)
+    // PRs 0 and 1: one true positive and one false positive; the other 48:
+    // two true positives (2 + 96 = 98). PRs 0-4 each add one unknown.
     const records: WouldHaveBlockedRecord[] = Array.from({ length: 50 }, (_, i) => {
-      const findings: WouldHaveBlockedFinding[] = [
-        makeFinding(`tp-${i}-a`, "true_positive"),
-        makeFinding(`tp-${i}-b`, "true_positive"),
-      ];
-      if (i === 0 || i === 1) {
-        findings.push(makeFinding(`fp-${i}`, "false_positive"));
-      }
+      const findings: WouldHaveBlockedFinding[] =
+        i === 0 || i === 1
+          ? [makeFinding(`tp-${i}-a`, "true_positive"), makeFinding(`fp-${i}`, "false_positive")]
+          : [makeFinding(`tp-${i}-a`, "true_positive"), makeFinding(`tp-${i}-b`, "true_positive")];
       if (i < 5) {
         findings.push(makeFinding(`unk-${i}`, "unknown"));
       }
@@ -362,8 +371,8 @@ describe("Threshold evaluation against promotion criteria", () => {
     expect(result.checks.prWindowMet).toBe(true);
     expect(result.checks.reviewCoverageMet).toBe(true);
     expect(result.checks.falsePositiveRateMet).toBe(true);
-    expect(result.metrics.empiricalFpr).toBeCloseTo(2 / 102, 4);
-    expect(result.metrics.reviewCoverage).toBeCloseTo(102 / 107, 4);
+    expect(result.metrics.empiricalFpr).toBeCloseTo(2 / 100, 4);
+    expect(result.metrics.reviewCoverage).toBeCloseTo(100 / 105, 4);
     expect(result.reasons.some((r) => r.includes("All criteria met"))).toBe(true);
   });
 });

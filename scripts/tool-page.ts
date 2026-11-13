@@ -39,12 +39,14 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, posix, relative, resolve, sep } from "node:path";
+import { instanceDirectoriesForGraph } from "../schemas/kg/cat-harness.ts";
 import { z } from "zod";
 import { parse as parseYaml } from "yaml";
 
 import { TOOL_TYPES, toolTypeNameOf } from "../schemas/tools/tool-types.js";
 import type { ToolDefinition } from "../schemas/tools/tool.js";
 import type { McpToolEntry } from "./tool-api.ts";
+import { contractFile, contractIdentity, skillContracts, type SkillContract } from "./skill-contracts.ts";
 
 /** A skill as a Tool page shows it. */
 export interface SkillInfo {
@@ -169,6 +171,11 @@ export function toolPage(d: ToolPageData, generatedFm: string): string {
     "---",
     `title: ${JSON.stringify(`${t.id} — Tool`)}`,
     `description: ${JSON.stringify(t.title)}`,
+    // OUT OF THE SITE NAV, as every per-node page is (a skill's page in
+    // gen-processes-viz.ts, a methodology's): the Tools table's row links it.
+    // Without this every Tool was a top-level row of the rail's "Pages",
+    // ahead of the site's own pages (litlfred.github.io/who-iris, 2026-11-13).
+    "nav_exclude: true",
     generatedFm,
     "render_with_liquid: false",
     "---",
@@ -380,12 +387,15 @@ export function toolPage(d: ToolPageData, generatedFm: string): string {
 
   // ── WHAT IT IS MADE OF ───────────────────────────────────────────────────
   b.push("## What it is made of", "");
-  b.push(
-    "| role | file | |",
-    "|---|---|---|",
-    ...d.parts.map((p) => `| ${p.role} | ${link(code(p.file), p.href)} | ${p.exists ? "" : "not in this checkout"} |`),
-    "",
-  );
+  // No parts, no table: kramdown prints a header-only table as a paragraph.
+  if (d.parts.length === 0) b.push("Its definition names no file it is made of.", "");
+  else
+    b.push(
+      "| role | file | |",
+      "|---|---|---|",
+      ...d.parts.map((p) => `| ${p.role} | ${link(code(p.file), p.href)} | ${p.exists ? "" : "not in this checkout"} |`),
+      "",
+    );
   if (d.moduleImports.length) {
     b.push("Its module imports, one hop:", "", ...d.moduleImports.map((m) => `- ${link(code(m.file), m.href)}`), "");
   }
@@ -456,10 +466,39 @@ export function skillDocuments(dirs: readonly string[], repo: string): Map<strin
   return out;
 }
 
-/** A skill's declared I/O contracts, in any layer: `<layer>/schemas/skills/<skill>/<io>.schema.json`. */
+/** Each root's skills' declared contracts, read once per root. */
+const contractsByRoot = new Map<string, Map<string, SkillContract>>();
+
+/**
+ * A skill's declared I/O contracts, in any layer.
+ *
+ * First through the skill's own `input:`/`output:` refs (#1168 B3b), which
+ * find a contract wherever its layer keeps it — the root `schemas/skills/` or
+ * a subgraph's (bean `cat-tools-st4q`). A skill naming none falls back to
+ * `<schemas graph>/skills/<skill>/<io>.schema.json`, as before.
+ */
 export function skillIoContracts(skill: string, roots: readonly string[], repo: string): SkillInfo["io"] {
   for (const r of roots) {
-    const dir = join(r, "schemas", "skills", skill);
+    let byName = contractsByRoot.get(r);
+    if (byName === undefined) contractsByRoot.set(r, (byName = skillContracts(r)));
+    const c = byName.get(skill);
+    if (c === undefined) continue;
+    const out: SkillInfo["io"] = [];
+    for (const key of ["input", "output"] as const) {
+      const ref = c[key];
+      const f = ref === undefined ? undefined : contractFile(c.instanceRoot, ref);
+      if (f === undefined || !existsSync(f)) continue;
+      try {
+        out.push({ io: contractIdentity(ref!, skill, key).io, file: relative(repo, f).split(sep).join("/"), schema: JSON.parse(readFileSync(f, "utf-8")) });
+      } catch {
+        // An unreadable contract is `check:schemas`' finding; it is left out here.
+      }
+    }
+    if (out.length > 0) return out.sort((a, b) => a.io.localeCompare(b.io));
+  }
+  // Each layer's declared `schemas` graphs, not a `schemas/` found by name.
+  // declared-path-literal: `skills/<skill>/` is the I/O-contract folder INSIDE a schemas graph, that graph's own convention — not the `skills` graph.
+  for (const dir of roots.flatMap((r) => instanceDirectoriesForGraph(r, "schemas")).map((d) => join(d, "skills", skill))) {
     if (!existsSync(dir)) continue;
     const out: SkillInfo["io"] = [];
     for (const f of readdirSync(dir).filter((x) => x.endsWith(".schema.json")).sort()) {

@@ -257,6 +257,7 @@ describe("a mount that leaves out an opt-in sub-graph (cat-harness-tools#1754)",
     // `sdlc/` is NOT on disk: the mount left it out. Its command was committed upstream.
     const pointer = (name: string, rel: string) =>
       ["---", `description: "The ${name} skill."`, 'argument-hint: "[what to run it on]"', "generated: cat-harness-tools/scripts/gen-skill-commands.ts", "---", "", `# /${name}`, "", `Run the \`${name}\` skill. Read [\`${rel}\`](../../${rel}) and follow it.`, ""].join("\n");
+    // declared-path-literal: a test vector — the skill path a pointer command names, written as the command file holds it.
     writeFileSync(join(layer, ".claude", "commands", "watch.md"), pointer("watch", "sdlc/skills/sdlc-core/watch.md"));
     // A generated command pointing at a path the mount DID bring, with no skill there: a real orphan.
     writeFileSync(join(layer, ".claude", "commands", "gone.md"), pointer("gone", "skills/core/gone.md"));
@@ -297,6 +298,7 @@ describe("a mount that leaves out an opt-in sub-graph (cat-harness-tools#1754)",
     const { indexRoot, layer } = mountedWithExcept(["sdlc"]);
     const pkgs = { core: join(layer, "skills") };
     const r = reconcile(layer, pkgs);
+    // declared-path-literal: a test vector — the skill path a pointer command names, written as the command file holds it.
     expect(r.notMounted.map((n) => [n.name, n.skill])).toEqual([["watch", "sdlc/skills/sdlc-core/watch.md"]]);
     // The real orphan is still found: the rule is about where the skill lives, not a blanket pass.
     expect(r.findings.map((f) => [f.kind, f.name])).toContainEqual(["orphaned", "gone"]);
@@ -320,6 +322,12 @@ describe("a mount that leaves out an opt-in sub-graph (cat-harness-tools#1754)",
     const r = reconcile(root, pkgs);
     expect(r.notMounted).toEqual([]);
     expect(r.findings.map((f) => f.kind)).toEqual(["orphaned"]);
+    // ...and write() removes it: the unmounted checkout is not skipped.
+    const cmd = join(root, ".claude", "commands", "watch.md");
+    expect(existsSync(cmd)).toBe(true);
+    expect(write(root, pkgs)).toEqual([join(".claude", "commands", "watch.md")]);
+    expect(existsSync(cmd)).toBe(false);
+    expect(reconcile(root, pkgs).findings).toEqual([]);
   });
 });
 

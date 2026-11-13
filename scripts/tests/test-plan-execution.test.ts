@@ -291,7 +291,7 @@ describe("test-certification.dmn — three outcomes, and the third is reached ho
   test("a failure in a trusted run → refused", async () => {
     expect(await outcome({ failedCases: 1 })).toBe("refused");
   });
-  for (const [why, over] of [
+  test.each([
     ["running", { reportStatus: "running" }],
     ["aborted", { reportStatus: "aborted" }],
     ["data hash unknown", { dataHashKnown: false }],
@@ -299,11 +299,9 @@ describe("test-certification.dmn — three outcomes, and the third is reached ho
     ["checker disagrees", { checker: "disagree" }],
     ["checker could not run", { checker: "unknown" }],
     ["nothing passed", { passedCases: 0 }],
-  ] as const) {
-    test(`${why} → undetermined`, async () => {
-      expect(await outcome(over)).toBe("undetermined");
-    });
-  }
+  ] as const)("%s → undetermined", async (why, over) => {
+    expect(await outcome(over)).toBe("undetermined");
+  });
   test("could-not-determine outranks a failure: a failure in an untrusted run is not yet a refusal", async () => {
     expect(await outcome({ failedCases: 3, dataHashKnown: false })).toBe("undetermined");
     expect(await outcome({ failedCases: 3, checker: "disagree" })).toBe("undetermined");

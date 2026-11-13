@@ -126,19 +126,17 @@ describe("SC-008: a sign-off step cannot proceed on a decision nobody recorded",
     expect(signoffFacts("reqset:x", [human, { ...human, at: "2026-10-08", outcome: "amend" }]))
       .toEqual({ signoffRecorded: "yes", signoffOutcome: "amend" });
   });
-  for (const [file, step] of [["crdm-signoff.bpmn", "BA_Signoff"], ["crdm-close.bpmn", "BA_Confirm"]] as const) {
-    test(`${file}: ${step} calls the adjudication with the requirement-set codes, and only a recorded sign-off leaves`, async () => {
-      const model = await loadProcessModel(join(REPO, "cat-harness", "processes", "process", file));
-      const node = model.nodes.get(step)!;
-      expect(node.adjudication?.codes).toEqual(["approve", "amend", "reject", "defer", "cancel"]);
-      expect(node.adjudication?.list).toBe("adjudication-requirement-set");
-      const gw = model.nodes.get("GW_SignoffRecorded")!;
-      expect(gw.decisionRef).toContain("requirement-signoff-recorded.dmn");
-      // Every path out of the step goes through the record and the gate.
-      const record = model.nodes.get("A_RecordSignoff")!;
-      expect(record).toBeDefined();
-      const missing = [...model.flows.values()].find((f) => f.from === "GW_SignoffRecorded" && f.to === "A_RecordSignoff");
-      expect(missing).toBeDefined();
-    });
-  }
+  test.each([["crdm-signoff.bpmn", "BA_Signoff"], ["crdm-close.bpmn", "BA_Confirm"]] as const)("%s: %s calls the adjudication with the requirement-set codes, and only a recorded sign-off leaves", async (file, step) => {
+    const model = await loadProcessModel(join(REPO, "cat-harness", "processes", "process", file));
+    const node = model.nodes.get(step)!;
+    expect(node.adjudication?.codes).toEqual(["approve", "amend", "reject", "defer", "cancel"]);
+    expect(node.adjudication?.list).toBe("adjudication-requirement-set");
+    const gw = model.nodes.get("GW_SignoffRecorded")!;
+    expect(gw.decisionRef).toContain("requirement-signoff-recorded.dmn");
+    // Every path out of the step goes through the record and the gate.
+    const record = model.nodes.get("A_RecordSignoff")!;
+    expect(record).toBeDefined();
+    const missing = [...model.flows.values()].find((f) => f.from === "GW_SignoffRecorded" && f.to === "A_RecordSignoff");
+    expect(missing).toBeDefined();
+  });
 });

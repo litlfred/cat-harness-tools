@@ -19,7 +19,7 @@
  * @module scripts/check-tools
  * @covers tools, skills
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { tools, toolsOf } from "../tools/discover.js";
@@ -27,11 +27,9 @@ import { TOOL_TYPES, isInjectionSafe, toolTypeNameOf } from "../schemas/tools/to
 import { alternativesWithoutSelection, danglingRemedies, networkToolsWithoutRemedies } from "../schemas/tools/tool.js";
 import { toJsonSchema } from "../schemas/kg/to-json-schema.js";
 import { contractFile, skillContracts } from "./skill-contracts.js";
-import { corpusScopeFor, isSkillMd, knownSkills as knownSkillsIn, workflowFiles } from "./known-skills.js";
-import { defaultEnabledSubgraphs, instanceDirectoryForGraph, instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.js";
-import { optInRootsOf } from "../schemas/kg/opt-in-roots.js";
-import { isSubgraphEnabled } from "../schemas/kg/opt-in-subgraphs.js";
-import { leftOutByMount } from "../schemas/kg/remote-mount.js";
+import { corpusScopeFor, knownSkills as knownSkillsIn, workflowFiles } from "./known-skills.js";
+import { instanceDirectoryForGraph, instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.js";
+import { judgeSkillRef, switchedOffSkillHomes } from "./lib/switched-off-skills.ts";
 import { inlineToolDeclarations } from "../schemas/tools/tool-folders.js";
 import { resolveImplementingPath } from "../schemas/kg/harness-config.js";
 import type { ToolDefinition } from "../schemas/tools/tool.js";
@@ -208,7 +206,7 @@ export function unresolvedPaths(
  *
  *  - **36 non-skills admitted.** `skills/memory/` then held agent-memory nodes,
  *    every one a `.md` in a declared directory and none an instruction body.
- *    {@link isSkillMd} excludes them by their `$schema:` line; a directory
+ *    `isSkillMd` excludes them by their `$schema:` line; a directory
  *    scan cannot. So `satisfies: ["the-complement"]` would have RESOLVED —
  *    a Tool claiming to implement a memory entry, checked and passed.
  *  - **2 real skills missed.** `bootstrap/skills/` holds its skills DIRECTLY
@@ -477,75 +475,21 @@ export function inlineToolFindings(
 }
 
 /**
- * What the root that mounted each layer switched off, as far as a check can
- * see it (owner, 2026-11-12, card Q-SKILL-TOOL-LINK B: a Tool keeps its
- * `satisfies`, and a target in a switched-off group is not judged here).
- *
- * - `held`: skill name → the switched-off groups holding it, for a group
- *   still on disk (a mount that predates `except`, or a checkout's own).
- * - `leftOut`: layer root → its switched-off groups the mount LEFT OUT
- *   (`leftOutByMount`). Their skills cannot be listed: nothing is on disk.
+ * What the root that mounted each layer switched off (owner, 2026-11-12, card
+ * Q-SKILL-TOOL-LINK B). Shared with `check:workflow-refs` and `kg:audit`, so
+ * the three judge a skill name the same way: see `lib/switched-off-skills.ts`.
  */
-export function switchedOffSkillHomes(layers: readonly string[]): { held: Map<string, string[]>; leftOut: Map<string, string[]> } {
-  const held = new Map<string, string[]>();
-  const leftOut = new Map<string, string[]>();
-  const walk = (dir: string, group: string): void => {
-    let entries;
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      const p = join(dir, e.name);
-      if (e.isDirectory()) walk(p, group);
-      else if (e.name.endsWith(".md") && isSkillMd(p)) {
-        const name = e.name.slice(0, -3);
-        held.set(name, [...new Set([...(held.get(name) ?? []), group])]);
-      }
-    }
-  };
-  for (const layer of layers) {
-    let enabled;
-    try {
-      enabled = defaultEnabledSubgraphs(layer);
-    } catch {
-      continue; // an unreadable declaration is `check:harness-dirs`' finding
-    }
-    for (const g of optInRootsOf(layer)) {
-      if (isSubgraphEnabled(enabled, g.id)) continue;
-      if (existsSync(g.abs)) walk(g.abs, g.id);
-      else if (leftOutByMount(layer, g.abs)) leftOut.set(layer, [...(leftOut.get(layer) ?? []), g.id]);
-    }
-  }
-  return { held, leftOut };
-}
+export { switchedOffSkillHomes };
 
-/**
- * Whether a `satisfies` target no visible layer holds is a defect HERE.
- *
- * - Held in a group the mounting root switched off: not judged — absent by
- *   consent, judged where the group is switched on.
- * - The Tool's OWN layer has switched-off groups the mount left out: not
- *   judged — the skill may be in one, and nothing here can say. The layer
- *   that declares the Tool judges it in its own checkout, where those groups
- *   are on. A Tool of any OTHER layer gets no such pass: a consumer's own
- *   Tool naming a skill it has switched off is a real dangling edge.
- * - Otherwise: dangling. A target in a group the root switched ON and that
- *   is missing, and a name no layer declares, both land here.
- */
+/** Whether a `satisfies` target no visible layer holds is a defect HERE: `judgeSkillRef`, worded for a Tool. */
 export function judgeSatisfiesTarget(
   skill: string,
   toolLayer: string | undefined,
   off: { held: ReadonlyMap<string, readonly string[]>; leftOut: ReadonlyMap<string, readonly string[]> },
 ): { groups: string[]; reason: string } | undefined {
-  const held = off.held.get(skill);
-  if (held !== undefined) return { groups: [...held], reason: "held in an opt-in sub-graph the mounting root switched off" };
-  const unseen = toolLayer === undefined ? undefined : off.leftOut.get(toolLayer);
-  if (unseen !== undefined && unseen.length > 0) {
-    return { groups: [...unseen], reason: "not visible here: the Tool's own layer has opt-in sub-graphs the mount left out, and the skill may be in one; judged where they are switched on" };
-  }
-  return undefined;
+  const why = judgeSkillRef(skill, toolLayer, off);
+  if (why === undefined || off.held.has(skill)) return why;
+  return { ...why, reason: "not visible here: the Tool's own layer has opt-in sub-graphs the mount left out, and the skill may be in one; judged where they are switched on" };
 }
 
 export function checkTools(instance?: string): ToolCheck {

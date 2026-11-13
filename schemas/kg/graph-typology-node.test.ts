@@ -220,6 +220,28 @@ describe("several checkouts, in precedence order (kg-separation lesson 6)", () =
     const bare = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES);
     expect(() => readDeclaration(consumer, bare)).toThrow(/unknown graph typology "g7ls-contributed"/);
   });
+  test("a checkout read before a layer was mounted is read again once the layer is on disk (standing re-pin, ig-ast, 2026-11-13)", () => {
+    const closure = checkout({ "cat-harness": [] });
+    // The site, before its layers are mounted: its own declaration names a kind
+    // only a layer it mounts declares.
+    const site = checkout({ "smart-trust": [] });
+    const own = join(site, "smart-trust");
+    writeFileSync(
+      join(own, "smart-trust.json"),
+      JSON.stringify({ name: "smart-trust", needs: ["fhir-harness"], directories: [{ id: "smart-trust-ast", path: "ast/", graphTypologies: ["rescan-ig-ast"] }] }),
+    );
+    const r = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES, [closure]);
+    expect(() => readDeclaration(own, r)).toThrow(/unknown graph typology "rescan-ig-ast"/);
+    // The mount lays the layer down in the same process.
+    const mounted = join(site, "fhir-harness");
+    mkdirSync(join(mounted, "typologies"), { recursive: true });
+    writeFileSync(join(mounted, "fhir-harness.json"), JSON.stringify({ name: "fhir-harness", directories: [{ id: "fhir-typologies", path: "typologies/", graphTypologies: ["typologies"] }] }));
+    writeFileSync(join(mounted, "typologies", "rescan-ig-ast.json"), JSON.stringify(node("rescan-ig-ast")));
+    expect(readDeclaration(own, r)?.name).toBe("smart-trust");
+    expect(r.has("rescan-ig-ast")).toBe(true);
+    // Read again with nothing new mounted: the same kinds, no conflict from re-reading the same files.
+    expect(readDeclaration(own, r)?.name).toBe("smart-trust");
+  });
   test("a lazy roots thunk is not evaluated at construction time — importing the module touches no filesystem (cat-harness-tools#634)", () => {
     const inspected = checkout({ contributor: [node("l6-lazy")] });
     let calls = 0;

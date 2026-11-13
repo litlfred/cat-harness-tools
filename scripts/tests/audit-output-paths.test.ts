@@ -52,22 +52,41 @@ const BENCHMARK_RUNNERS = [
   "formula-benchmark.py",
 ];
 
+/**
+ * A quoted `beans/<name>.json` or `todos/<name>.json` string literal, in
+ * double or single quotes. Not backticks: those also quote paths in prose
+ * comments ("Was hardcoded to `todos/…`"), which name a retired default.
+ */
+const FORBIDDEN_BEANS = /["']beans\/[\w-]+\.json["']/;
+const FORBIDDEN_TODOS = /["']todos\/[\w-]+\.json["']/;
+
 describe("audit output paths", () => {
-  for (const file of WRITERS) {
+  test("the forbidden-path patterns match the literals they exist to catch", () => {
+    // `"\beans/…"` read `\b` as a word boundary and could never match a
+    // `beans/` literal: a pattern is only a check once it is seen to fire.
+    for (const q of ['"', "'"]) {
+      expect(`const out = ${q}beans/status-sections.json${q};`).toMatch(FORBIDDEN_BEANS);
+      expect(`const out = ${q}todos/status-sections.json${q};`).toMatch(FORBIDDEN_TODOS);
+    }
+    expect('const out = "build/status-sections.json";').not.toMatch(FORBIDDEN_BEANS);
+    expect('const out = "build/beans-status.json";').not.toMatch(FORBIDDEN_BEANS);
+  });
+
+  describe.each([...WRITERS])("%s", (file) => {
     const src = readFileSync(join(PIPELINE, file), "utf-8");
 
-    test(`${file} does not default into beans/ or todos/`, () => {
+    test("does not default into beans/ or todos/", () => {
       // String literals only — a path assembled at runtime would slip past
       // this, but all four spell theirs out, which is what made the drift
       // invisible and is also what makes it checkable.
-      expect(src).not.toMatch(/"\beans\/[\w-]+\.json"/);
-      expect(src).not.toMatch(/"todos\/[\w-]+\.json"/);
+      expect(src).not.toMatch(FORBIDDEN_BEANS);
+      expect(src).not.toMatch(FORBIDDEN_TODOS);
     });
 
-    test(`${file} defaults into build/`, () => {
+    test("defaults into build/", () => {
       expect(src).toMatch(/"build\/[\w-]+\.json"/);
     });
-  }
+  });
 
   test("qa-section-title-audit honours --out like its three siblings", () => {
     // It was the only one with a hardcoded path and no way to redirect it.
@@ -79,25 +98,25 @@ describe("audit output paths", () => {
 describe("benchmark runner output paths and graph isolation (folio-assistant-wp49)", () => {
   const declaredGraphDirs = getDeclaredGraphDirectories(SCRIPTS);
 
-  for (const runner of BENCHMARK_RUNNERS) {
+  describe.each([...BENCHMARK_RUNNERS])("%s", (runner) => {
     const src = readFileSync(join(SCRIPTS, runner), "utf-8");
 
-    test(`${runner} does not default into beans/ or todos/`, () => {
+    test("does not default into beans/ or todos/", () => {
       expect(src).not.toMatch(/default=["'][.]?[\/\\]?beans[\/\\]/);
       expect(src).not.toMatch(/default=["'][.]?[\/\\]?todos[\/\\]/);
     });
 
-    test(`${runner} does not default into any declared graph directory`, () => {
+    test("does not default into any declared graph directory", () => {
       for (const gDir of declaredGraphDirs) {
         const pattern = new RegExp(`default=["'][.]?[\\/\\\\]?${gDir.replace("/", "[\\/\\\\]")}[\\/\\\\]`);
         expect(src).not.toMatch(pattern);
       }
     });
 
-    test(`${runner} defaults its output into build/benchmarks/`, () => {
+    test("defaults its output into build/benchmarks/", () => {
       expect(src).toMatch(/default=["']build\/benchmarks\/[\w-]+\.json["']/);
     });
-  }
+  });
 
   test("isDeclaredGraphPath detects all declared graph paths", () => {
     expect(isDeclaredGraphPath("beans/test.json").isGraph).toBeTrue();

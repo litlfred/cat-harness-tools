@@ -107,7 +107,7 @@ describe("mcp projection", () => {
     }
   });
 
-  test("a Tool reachable over MCP is omitted, with a reason", () => {
+  test("a Tool with both shell and MCP arms projects on its shell arm, and nothing is omitted", () => {
     // Declared here: the corpus's only shell+mcp Tool, the umbrella `github`
     // node, was retired by cat-harness#390 (4dbr).
     const both = defineTool({
@@ -137,9 +137,20 @@ describe("mcp projection", () => {
   });
 
   test("a manual-only Tool is omitted, and says why", () => {
-    const { declarations, omissions } = project(tools(B).filter((x) => x.id === "beans-manual"));
+    const manualOnly = defineTool({
+      id: "by-hand", title: "x", description: "y",
+      install: { none: true }, invoke: { manual: true },
+      io: { inputs: [], outputs: [] }, satisfies: ["todo-manager"],
+    });
+    const { declarations, omissions } = project([manualOnly]);
+    expect(declarations).toEqual([]);
+    expect(omissions).toHaveLength(1);
+    expect(omissions[0]!.tool).toBe("by-hand");
+    expect(omissions[0]!.reason).toContain("manual-only");
     // beans-manual declares BOTH shell and manual, so it does project.
-    expect(declarations.length + omissions.length).toBe(1);
+    const beans = project(tools(B).filter((x) => x.id === "beans-manual"));
+    expect(beans.declarations).toHaveLength(1);
+    expect(beans.omissions).toEqual([]);
   });
 
   test("the real Tool set projects, and every declaration has a schema", () => {

@@ -90,6 +90,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { judge, readTree, renderingOrder, trackedIn, type PublishArtefact } from "./check-derived-from.ts";
 import { readInstances } from "./check-import-direction.ts";
 import { readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { BuiltAtPublishCauseSchema, type BuiltAtPublishCause } from "../schemas/kg/built-at-publish.ts";
 import { DEFAULT_LOCALE } from "../schemas/content/translation.ts";
 import { discoverTools } from "../tools/discover.ts";
 import { declaredVisualisers, siteOwnerDir, visualiserPageDir } from "./viewer-declarations.ts";
@@ -164,7 +165,7 @@ export interface DeclaredArtefact {
   /** Instance-relative, as declared. */
   path: string;
   writer: readonly string[];
-  because: "checkout" | "state";
+  because: BuiltAtPublishCause;
   /** The kinds of directory, in other layers, its writers read (`reads`): the declared read edge. */
   reads?: readonly string[];
   /** The kinds of the declared directory this entry fills (`directory`), so a reader of those kinds is ordered after it. */
@@ -223,7 +224,7 @@ export function enclosingKinds(
 }
 
 /** Every layer's `builtAtPublish`, layers lowest layer first ({@link writingOrder}), entries as declared. */
-export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state"): DeclaredArtefact[] {
+export function declaredPlan(repoRoot = REPO_ROOT, cause?: BuiltAtPublishCause): DeclaredArtefact[] {
   const order = writingOrder(repoRoot);
   const roots = new Map(readInstances(repoRoot).map((i) => [i.name, i.root] as const));
   const out: DeclaredArtefact[] = [];
@@ -232,7 +233,7 @@ export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state")
     if (root === undefined) continue;
     const decl = readDeclaration(root) as
       | {
-          builtAtPublish?: Array<{ path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string; index?: true }>;
+          builtAtPublish?: Array<{ path: string; writer: string[]; because: BuiltAtPublishCause; reads?: string[]; directory?: string; index?: true }>;
           directories?: Array<{ id?: string; path?: string; graphTypologies?: string[]; kinds?: string[] }>;
         }
       | undefined;
@@ -310,8 +311,8 @@ export function translatedLocales(repoRoot = REPO_ROOT): string[] {
  * that entry. Each route counts as an index when every declared entry of its
  * writer does, so a preview borrows it with the rest of that writer's output.
  */
-export function hostSiteArtefacts(repoRoot = REPO_ROOT, declared: readonly DeclaredArtefact[] = [], cause?: "checkout" | "state"): DeclaredArtefact[] {
-  if (cause === "state") return [];
+export function hostSiteArtefacts(repoRoot = REPO_ROOT, declared: readonly DeclaredArtefact[] = [], cause?: BuiltAtPublishCause): DeclaredArtefact[] {
+  if (cause !== undefined && cause !== "checkout") return []; // host-site pages are computed over the checkout
   const vis = declaredVisualisers(repoRoot).filter((v) => (v as { builtOnHostSite?: unknown }).builtOnHostSite !== undefined);
   if (vis.length === 0) return [];
   const site = siteOwnerDir(repoRoot);
@@ -457,6 +458,15 @@ export function built(a: Pick<DeclaredArtefact, "abs" | "path">): boolean {
   return statSync(a.abs).isDirectory() && walk(a.abs);
 }
 
+/**
+ * The artefacts only `writer` builds that are still not built: after a preview
+ * borrows main's copy of an index writer, an artefact declared since main's
+ * copy was made is absent, and the writer has to run to build it.
+ */
+export function unbuiltOnlyBy(declared: readonly Pick<DeclaredArtefact, "instance" | "abs" | "path" | "writer">[], writer: string): string[] {
+  return declared.filter((a) => a.writer.length > 0 && a.writer.every((w) => w === writer) && !built(a)).map((a) => `${a.instance}/${a.path}`);
+}
+
 /** Whether `strace` runs here (writer records need it). */
 export function straceWorks(): boolean {
   // input-site: inert #50824495 — probes for the tracer; its answer only turns recording on or off
@@ -556,9 +566,9 @@ if (import.meta.main) {
   console.log(`  ✓ ${plan.length} artefact(s) handled`);
 
   const at = process.argv.indexOf("--cause");
-  const cause = at === -1 ? undefined : (process.argv[at + 1] as "checkout" | "state");
-  if (cause !== undefined && cause !== "checkout" && cause !== "state") {
-    console.log(`::error::derive:publish: --cause is checkout or state, not ${String(cause)}`);
+  const cause = at === -1 ? undefined : (process.argv[at + 1] as BuiltAtPublishCause);
+  if (cause !== undefined && !BuiltAtPublishCauseSchema.options.includes(cause)) {
+    console.log(`::error::derive:publish: --cause is one of ${BuiltAtPublishCauseSchema.options.join(", ")}, not ${String(cause)}`);
     process.exit(2);
   }
   const declared = declaredPlan(REPO_ROOT, cause);
@@ -694,16 +704,25 @@ if (import.meta.main) {
     // Seconds per writer, so a slow one can be named from a published log (bean fwtz).
     const t0 = performance.now();
     const secs = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`;
+    // Set when a borrowed copy leaves a declared artefact unbuilt: putting back an older copy cannot build it either.
+    let mustRun = false;
     if (borrowOn && prevRecords !== undefined && isIndexWriter(w, declared)) {
       const from = entryShaOf(prevRecords, w);
-      if (hasEntry(outDir, w, from) && restoreOutputs(outDir, w, from, REPO_ROOT, keep)) {
+      const restored = hasEntry(outDir, w, from) && restoreOutputs(outDir, w, from, REPO_ROOT, keep);
+      const unbuilt = restored ? unbuiltOnlyBy(declared, w) : [];
+      mustRun = unbuilt.length > 0;
+      if (restored && unbuilt.length === 0) {
         reused.set(w, from);
         console.log(`  borrowed ${w}: a preview build does not reindex; put back main's copy from ${from.slice(0, 12)} [${secs()}]`);
         return { kind: "ran" };
       }
-      console.log(`  ${w} runs: an index, but main's recording holds no copy of it [decided in ${secs()}]`);
+      console.log(
+        restored
+          ? `  ${w} runs: main's copy from ${from.slice(0, 12)} builds nothing at ${unbuilt.join(", ")}, declared since [decided in ${secs()}]`
+          : `  ${w} runs: an index, but main's recording holds no copy of it [decided in ${secs()}]`,
+      );
     }
-    if (skipOn && prevRecords !== undefined) {
+    if (skipOn && prevRecords !== undefined && !mustRun) {
       // One file-digest memo for every decision: it is keyed on size and
       // mtime, so a file a predecessor rewrote is hashed again, and a fresh
       // memo per writer re-hashed every recorded read once per writer. Only

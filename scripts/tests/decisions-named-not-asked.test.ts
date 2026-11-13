@@ -45,32 +45,28 @@ bean body.`,
 };
 
 describe("it fires on the shape the owner had to name twice", () => {
-  for (const [name, text] of Object.entries(BAD)) {
-    test(name, () => {
-      const f = findNamedNotAsked(text);
-      expect(
-        f.length,
-        `This is a verbatim wrap-up that handed decisions over with no terms. ` +
-          `If the detector does not fire on it, it does not detect the defect it ` +
-          `was written for — which is the failure mode of the partition-names ` +
-          `guard on the same day (bean \`yx9p\`).`,
-      ).toBeGreaterThan(0);
-      expect(f[0]!.ids.length).toBeGreaterThanOrEqual(2);
-    });
-  }
+  test.each(Object.entries(BAD))("%s", (_name, text) => {
+    const f = findNamedNotAsked(text);
+    expect(
+      f.length,
+      `This is a verbatim wrap-up that handed decisions over with no terms. ` +
+        `If the detector does not fire on it, it does not detect the defect it ` +
+        `was written for — which is the failure mode of the partition-names ` +
+        `guard on the same day (bean \`yx9p\`).`,
+    ).toBeGreaterThan(0);
+    expect(f[0]!.ids.length).toBeGreaterThanOrEqual(2);
+  });
 });
 
 describe("it stays quiet on turns that did the right thing", () => {
-  for (const [name, text] of Object.entries(GOOD)) {
-    test(name, () => {
-      expect(
-        findNamedNotAsked(text),
-        `A reminder that fires on a correct turn gets ignored, and then it no ` +
-          `longer guards the incorrect ones. Noise is the failure mode here, not ` +
-          `a missed case.`,
-      ).toEqual([]);
-    });
-  }
+  test.each(Object.entries(GOOD))("%s", (_name, text) => {
+    expect(
+      findNamedNotAsked(text),
+      `A reminder that fires on a correct turn gets ignored, and then it no ` +
+        `longer guards the incorrect ones. Noise is the failure mode here, not ` +
+        `a missed case.`,
+    ).toEqual([]);
+  });
 });
 
 test("the anti-vacuity pair — the same function must do both", () => {

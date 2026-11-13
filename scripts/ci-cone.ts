@@ -6,9 +6,9 @@
  * @module scripts/ci-cone
  * @graphNode none — a CI helper behind `gate-shell.sh`, not a gate itself
  *
- * A check's inputs are declared or DERIVED, never inferred. Declared inputs
- * of `{tracked}` (the whole tree) move on every PR, so this adds the derived
- * read set, computed from the run itself and never stored as authored data:
+ * A check's inputs are DERIVED, never declared or inferred: its read set,
+ * computed from the run itself and never stored as authored data. Every
+ * check is a candidate, declared in `task-io` or not ({@link coneFingerprint}):
  *
  * 1. **Record (a push to main).** Every candidate check runs under
  *    `strace -f`. The files, directories and absent paths that run touched
@@ -84,7 +84,6 @@ import {
   fingerprint,
   qaBaselineIdentity,
   RECIPE_VERSION,
-  TRACKED,
   type BaselineResolver,
   type Fingerprint,
   type PairIO,
@@ -878,9 +877,18 @@ export function saveRecords(root: string, records: ConeRecords): void {
 /**
  * The fingerprint a cone record is keyed on: `f017`'s, over the script, the
  * audited environment, the tools and the baseline, but with NO tree input,
- * because the read set stands in for the tree. Only a check that `task-io`
- * declares `{tracked}` is a candidate. That declaration is the claim, read
- * for writes, that `f017` already relies on.
+ * because the read set stands in for the tree.
+ *
+ * EVERY check is a candidate, declared in `task-io` or not (owner, card,
+ * 2026-11-13: "every gate"; the 4rbc rule, derived and not declared). Its
+ * inputs are what its traced run read, as a test file's already are; a
+ * `task-io` input declaration, `{tracked}` or narrower, is not consulted,
+ * and its declared OUTPUTS, when it has any, are still hashed. Before, only a
+ * check declared `{tracked}` was a candidate, and on main's last 9 push runs
+ * (2026-11-13) about 50 gates a run were not traced for that reason alone.
+ * Nothing else is relaxed: a write inside the checkout, an unannotated or
+ * `traced` input site, more than {@link MAX_PATHS} paths, or a red run still
+ * records nothing, so the check runs.
  */
 export function coneFingerprint(
   root: string,
@@ -897,8 +905,7 @@ export function coneFingerprint(
     const pre = preloadScripts(root);
     return fingerprint(root, { ...scripts, ...pre }, [script, ...Object.keys(pre)], { inputs: [], outputs: [] }, digests, baseline, { treeReplayed: true });
   }
-  if (io?.inputs?.includes(TRACKED) !== true) return { undetermined: "not declared {tracked} in task-io, so not a candidate" };
-  return checkFingerprint(root, scripts, script, { inputs: [], outputs: io.outputs }, digests, baseline, { treeReplayed: true });
+  return checkFingerprint(root, scripts, script, { inputs: [], outputs: io?.outputs ?? [] }, digests, baseline, { treeReplayed: true });
 }
 
 // ── Test files as gates ──────────────────────────────────────────────────────
@@ -1523,6 +1530,20 @@ export function decideAll(o: {
   return { records: records?.sha ?? null, decisions };
 }
 
+/**
+ * Does this run RECORD what each gate read? A run of `main` does: a push, and
+ * equally a dispatch on `main`. A merge made with `GITHUB_TOKEN` (a merge or
+ * re-pin train) starts no push run, so the gates are dispatched on `main`
+ * instead (bean `hd58`); a push-only test left every such commit without a
+ * record, and a PR based on it warm-started from an older one. Measured over
+ * main's last 12 Code-quality gates runs on 2026-11-13: 3 were dispatches,
+ * every one with the cone off. A dispatch on any other branch never records:
+ * cached-step saves `main-only` entries from `main` alone.
+ */
+export function recordsOnMain(env: Readonly<Record<string, string | undefined>>): boolean {
+  return env.GITHUB_REF === "refs/heads/main" && (env.GITHUB_EVENT_NAME === "push" || env.GITHUB_EVENT_NAME === "workflow_dispatch");
+}
+
 function main(argv: readonly string[]): number {
   const [cmd, script] = argv;
   const root = process.cwd();
@@ -1556,9 +1577,8 @@ function main(argv: readonly string[]): number {
   if (cmd === "prepare") {
     // Which mode this job's gate steps run in, through $GITHUB_ENV.
     const out = env.GITHUB_ENV;
-    const push = env.GITHUB_EVENT_NAME === "push" && env.GITHUB_REF === "refs/heads/main";
     let mode = "";
-    if (push) {
+    if (recordsOnMain(env)) {
       if (straceWorks()) mode = "record";
       else console.log("ci-cone: strace does not run here, so this main run records nothing and no PR skips against it");
     } else if (env.GITHUB_EVENT_NAME === "pull_request") {

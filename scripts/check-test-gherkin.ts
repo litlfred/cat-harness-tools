@@ -20,6 +20,11 @@
  * "unresolved — source not held", never passed. Feature files may be in any
  * Gherkin dialect (`# language: <code>`).
  *
+ * A repository that DECLARES its `.feature` files to be test specifications
+ * for implementers — a WHO DAK's `dak.json` (owner, 2026-11-13) — has its
+ * unbound Scenarios counted as specifications, not reported; a bound one is
+ * checked as usual. See `SPECIFICATION_DECLARATIONS` in the library.
+ *
  * Usage:
  *   bun run cat check:test-gherkin
  *   bun run cat check:test-gherkin -- --root ../smart-trust-tools --under tools/hcert-rust
@@ -82,10 +87,14 @@ if (import.meta.main) {
   }
   const report = scanTree(dir, { under, resolvers: [itbResolver(itb && resolve(itb))] });
   if (json) {
-    console.log(JSON.stringify({ root: dir, tests: report.tests.length, scenarios: report.scenarios.length, findings: report.findings }, null, 2));
+    console.log(JSON.stringify({ root: dir, tests: report.tests.length, scenarios: report.scenarios.length, specifications: report.specifications.length, findings: report.findings }, null, 2));
   } else {
     const linked = report.tests.length - report.findings.filter((f) => f.kind === "test-without-scenario" || f.kind === "test-name-not-static").length;
     console.log(`check:test-gherkin: ${report.tests.length} test(s), ${report.scenarios.length} Scenario(s), ${linked} test(s) linked — under ${dir}`);
+    if (report.specifications.length > 0) {
+      const files = new Set(report.specifications.map((s) => s.file));
+      console.log(`${report.specifications.length} unbound Scenario(s) in ${files.size} declared specification file(s) — test specifications for implementers, not tests of this tree; an \`@itb:\` binding makes one checked.`);
+    }
     for (const kind of ORDER) {
       const fs = report.findings.filter((f) => f.kind === kind);
       if (fs.length === 0) continue;

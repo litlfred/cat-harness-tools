@@ -145,7 +145,7 @@ describe("the branch signal names the bean it is about", () => {
 });
 
 describe("a bulk ref is excluded from the signal and REPORTED", () => {
-  it(`a ref changing more than ${BULK_BEAN_CHANGES} bean files is bulk`, () => {
+  it("a ref changing more than 11 bean files is bulk", () => {
     const many = Array.from({ length: BULK_BEAN_CHANGES + 1 }, (_, i) => `folio-assistant-b${i}--f.md`);
     const { root, cleanup } = repo({ sweep: many });
     const changes = refsChangingBeans(root, "origin/main", "beans/defs");
@@ -215,12 +215,35 @@ describe("could not determine is never a clean run", () => {
   });
 });
 
+/** This layer's root: inside the checkout whether it is the repository root or a layer in one. */
+const THIS_REPO = resolve(import.meta.dir, "..", "..");
+
+/**
+ * Whether this checkout has what the probe reads — `origin` refs and a
+ * FETCH_HEAD — established with git directly rather than through the function
+ * under test, so a probe that cannot read them fails instead of skipping. A
+ * linked worktree that has never fetched has no FETCH_HEAD of its own.
+ */
+function hasFetchedRefs(root: string): boolean {
+  try {
+    return (
+      git(root, ["for-each-ref", "--count=1", "refs/remotes/origin"]).trim() !== "" &&
+      git(root, ["rev-parse", "--verify", "-q", "FETCH_HEAD"]).trim() !== ""
+    );
+  } catch {
+    return false;
+  }
+}
+
 describe("this repository", () => {
-  it("can establish how stale its own refs are", () => {
+  // Skipped, not passed, when the checkout has no origin refs or has never
+  // fetched: undetermined is not a clean run.
+  it.skipIf(!hasFetchedRefs(THIS_REPO))("can establish how stale its own refs are", () => {
     // Against the real repo rather than a fixture: the freshness probe reads
     // FETCH_HEAD, which a fixture clone has and a bare `git init` does not, so
     // only the real tree exercises the path the script actually takes.
-    const age = refAgeMinutes(resolve(import.meta.dir, "..", "..", ".."));
-    expect(age === undefined || age >= 0).toBe(true);
+    const age = refAgeMinutes(THIS_REPO);
+    expect(age).toBeNumber();
+    expect(age).toBeGreaterThanOrEqual(0);
   });
 });

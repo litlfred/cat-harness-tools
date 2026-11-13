@@ -52,10 +52,14 @@
  *     writes finished pages AFTER the site is built (gen-node-kind-pages says so of itself).
  *     As a source step its pages would pass through Jekyll, which drops every `_`-prefixed
  *     directory: a node at `docs/_data/node-kinds` lost its page that way. Then
- *     mount-instance-docs, pdf-viewer, suggest-editor, set-html-lang, publish-id-lookup,
+ *     gen-node-kind-pages, on every site, unless a site step already ran it (the schemas
+ *     page links every node kind's pages; owner, 2026-11-13). Then mount-instance-docs, pdf-viewer, suggest-editor, set-html-lang, publish-id-lookup,
  *     rail-standalone-pages; then each `--final-step` package script, the same way, for a step
  *     that must see every page of the finished site, the platform's own too (an IG's one bar on
- *     the identifier lookup page; owner, 2026-10-15); then `.nojekyll`
+ *     the identifier lookup page; owner, 2026-10-15); then the forwarding pages; then the search
+ *     scopes (`search-split.ts`: the manifest and one index per scope, so a reader never loads
+ *     the whole site's index); then `.nojekyll`; then the 404 page's English fallback
+ *     (`lib/locale-fallback-404.ts`)
  *  7. every relative or base-rooted href/src/action in every page resolves to a file
  *     under the site (read with an HTML parser, HTMLRewriter, not a regex)
  *  8. for the root, the guard (`site-parity.ts`): the build is measured against the root it
@@ -117,6 +121,9 @@ import { instanceRoots, writeMissingVisualisers } from "./visualiser-writers.ts"
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
 import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
+import { langTabs, UN_LOCALES } from "./lib/lang-tabs.ts";
+import { writeLocaleFallback404 } from "./lib/locale-fallback-404.ts";
+import { describeSplit, SCOPES_DIR, SOURCE_PATH as SEARCH_SOURCE, splitSite } from "./search-split.ts";
 import { PREVIEW_PREFIX, PREVIEW_PREFIXES, previewPath } from "./lib/preview-prefix.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
@@ -186,24 +193,25 @@ export interface BuildOptions {
   links?: "refuse" | "report";
   /** `report`: a declared visualiser page the site lacks ({@link siteCoverageShortfall}) is said, and does not stop the publish. */
   coverage?: "refuse" | "report";
+  /**
+   * After the platform's writers, write every layer's graph document and the
+   * root index, `index.jsonld` and `index.json` (`publish-root-index.ts`).
+   * Opt-in (`site.build.rootIndex: true`): it adds every layer's export to the
+   * site, and it refuses the publish rather than map fewer layers than the
+   * checkout declares (litlfred/who-iris, 2026-11-13).
+   */
+  rootIndex?: boolean;
   /** Root files the built site must hold before it is published (a step's promise, checked). */
   require?: string[];
   /** The visualiser-writer step, replaceable in a test; {@link writeMissingVisualisers} by default. */
   writeVisualisers?: (root: string, source: string, opts: { staging?: boolean; scope?: readonly string[] }) => unknown;
   /**
    * The instances whose visualiser pages this site writes and owes ({@link siteScopeOf}).
-   * Absent: every instance the checkout mounts, as a folio's own site carries them.
+   * Absent: every instance the checkout mounts (the hub's site, or a checkout naming no landing).
    */
   scope?: readonly string[];
 }
 
-/**
- * An IG repository's site scope (owner, 2026-11-08, Q-SZ-2 "B"): the IG's own
- * instance and the layer it lands on (`index.config.json` `site.landing`). Every
- * other layer's pages stay on that layer's own site and are linked, not copied.
- * Undefined when the checkout lands on itself or names no landing: a folio's
- * site still carries every instance it mounts.
- */
 /**
  * The host this checkout's site loads its shared assets from (`site.sharedAssets`
  * in `index.config.json`; Q-SZ-7 "A"), or undefined when it names none.
@@ -220,12 +228,19 @@ export function sharedAssetsOf(root: string): string | undefined {
 }
 
 /**
- * The instances whose pages a site writes: its own only, when it lands on
- * another layer. The landing layer lends the site its chrome and theme, not
- * its pages; those, and every other layer's, are linked on the platform's
- * site (owner, 2026-11-10: the base IG's pages should not be in an IG's
- * site, only cross referenced; this supersedes Q-SZ-2 "B", which kept the
- * landing layer's pages).
+ * The instances whose pages a site writes: its own only. An IG that lands on
+ * another layer borrows that layer's chrome and theme, not its pages (owner,
+ * 2026-11-10: the base IG's pages should not be in an IG's site, only cross
+ * referenced; this supersedes Q-SZ-2 "B", which kept the landing layer's
+ * pages). A folio that lands on itself is scoped the same way (owner,
+ * 2026-11-13: "other harnesses should be referenced not included"). It used
+ * to carry every instance it mounts, which put a mounted content layer's
+ * thousands of reference pages, its library files and the harness's pages
+ * in a folio's site and took it past Pages' 1 GB limit. Every other layer's
+ * pages are linked on the platform's site.
+ *
+ * Undefined (every instance) only for the hub, which exists to carry them
+ * all, and for a checkout that names no landing.
  */
 export function siteScopeOf(root: string, instance: string): string[] | undefined {
   const file = join(root, "index.config.json");
@@ -236,7 +251,7 @@ export function siteScopeOf(root: string, instance: string): string[] | undefine
   } catch {
     return undefined;
   }
-  if (typeof landing !== "string" || landing === "hub" || landing === instance) return undefined;
+  if (typeof landing !== "string" || landing === "hub") return undefined;
   return [instance];
 }
 
@@ -326,6 +341,33 @@ export function gateSteps(pre: readonly string[]): string[] {
   return [LIBRARY_GATE, ...pre.filter((p) => p !== LIBRARY_GATE)];
 }
 
+/**
+ * The writer of every node-kind page (`/<locale>/<declaring>/<kind>/…`).
+ * The schemas visualiser, which every site carries, links each node kind
+ * there, so every site owes those pages: who-iris, whose recipe named no
+ * site step, published 34 dead node-kind links on its schemas page (owner,
+ * 2026-11-13, node-kind audit). It runs on the built site, as a site step
+ * does, for every site.
+ */
+export const NODE_KIND_PAGES = "gen-node-kind-pages.ts";
+
+/**
+ * Whether one of the recipe's own steps already runs {@link NODE_KIND_PAGES}
+ * (a folio's `site:node-kinds`), so the build does not run it twice: the
+ * step's command in the checkout's package.json names the writer.
+ */
+export function recipeWritesNodeKindPages(root: string, steps: readonly string[]): boolean {
+  const file = join(root, "package.json");
+  if (!existsSync(file)) return false;
+  let scripts: Record<string, unknown> | undefined;
+  try {
+    scripts = (JSON.parse(readFileSync(file, "utf-8")) as { scripts?: Record<string, unknown> }).scripts;
+  } catch {
+    return false;
+  }
+  return steps.some((s) => typeof scripts?.[s] === "string" && (scripts[s] as string).includes(NODE_KIND_PAGES));
+}
+
 /** A package script name: what `--pre` and `--source-step` accept, and nothing that could carry a shell payload. */
 export const SCRIPT_NAME = /^[A-Za-z0-9][A-Za-z0-9:._-]*$/;
 
@@ -349,6 +391,8 @@ export interface SiteRecipe {
   links?: "refuse" | "report";
   /** A declared visualiser page missing from the built site refuses the publish (`refuse`, the default) or is only said (`report`). */
   coverage?: "refuse" | "report";
+  /** Publish every layer's graph document and the root index, `index.jsonld` ({@link BuildOptions.rootIndex}). */
+  rootIndex?: boolean;
 }
 
 export type SiteProfile = "folio" | "ig-repo-site";
@@ -417,6 +461,8 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
   if (links !== "refuse" && links !== "report") throw new Error(`${where}: site.build.links must be refuse or report`);
   const coverage = b.coverage ?? "refuse";
   if (coverage !== "refuse" && coverage !== "report") throw new Error(`${where}: site.build.coverage must be refuse or report`);
+  const rootIndex = b.rootIndex ?? false;
+  if (typeof rootIndex !== "boolean") throw new Error(`${where}: site.build.rootIndex must be true or false`);
   const keep = b.keep ?? [];
   if (!Array.isArray(keep) || !keep.every((x) => typeof x === "string" && KEEP_NAME.test(x))) throw new Error(`${where}: site.build.keep must be a list of root entry names`);
   return {
@@ -430,6 +476,7 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
       ...(profile !== "folio" ? { profile } : {}),
       ...(links !== "refuse" ? { links } : {}),
       ...(coverage !== "refuse" ? { coverage } : {}),
+      ...(rootIndex ? { rootIndex } : {}),
     },
     read,
   };
@@ -620,7 +667,16 @@ export async function checkLinks(
   const pages = htmlFiles(site);
   for (const page of pages) {
     const rel = relative(site, page).split(sep).join("/");
-    for (const url of await pageUrls(readFileSync(page, "utf-8"))) {
+    const html = readFileSync(page, "utf-8");
+    // The language tabs the chrome draws in the browser (`docs-ui.js`): not in
+    // the HTML, so read the way the chrome reads them (`lib/lang-tabs.ts`).
+    // Gated on every page, the content's too: the chrome draws the link.
+    for (const tab of await langTabs(html, `${base}${rel}`)) {
+      const t = targetOf(tab.href, rel, base);
+      if (t === undefined) continue;
+      if (t === "outside-base" || !served(site, t)) misses.push(`${rel}: ${tab.href} (language tab ${tab.locale}, by ${tab.from})`);
+    }
+    for (const url of await pageUrls(html)) {
       const own = selfAddress === undefined ? undefined : selfTargetOf(url, selfAddress);
       if (own !== undefined) {
         if (!served(site, own)) selfMisses.push(`${rel}: ${url}`);
@@ -1063,6 +1119,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     );
 
     for (const st of o.siteSteps ?? []) run(`site: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
+    // Every site, whatever its profile: the schemas page links each node kind's pages.
+    if (!recipeWritesNodeKindPages(root, [...(o.siteSteps ?? []), ...(o.finalSteps ?? [])])) {
+      run("node-kind pages", `bun run ${TOOLS}/${NODE_KIND_PAGES} --root . --out ${s}`, root);
+    }
     if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}${o.scope ? ` --scope ${shellQuote(scopeArg(o.scope))}` : ""}`, root);
     // A scoped site installs the viewer only when one of its pages embeds it (Q-SZ-6 "A").
     if (has.has("pdf") && o.scope && !pagesEmbedPdf(site)) console.log("pdf viewer: no page of this scoped site embeds a PDF; not installed");
@@ -1072,6 +1132,9 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
     run("rail on every page", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --theme-source ${shellQuote(docs)} --foreign-site --home-label ${shellQuote(title)} --instance ${shellQuote(o.instance)}${o.identity ? " --landing" : ""}`, root);
     for (const st of o.finalSteps ?? []) run(`final: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
+    // After every page writer, so the documents never shadow a page; before the
+    // guards below, which see the documents as part of the site.
+    if (o.rootIndex) run("graph documents and root index", `bun run ${TOOLS}/publish-root-index.ts --site ${s} --base-url ${shellQuote(`https://${gh.owner}.github.io${baseurl}`)}`, root);
     if (o.scope) {
       const pruned = pruneUnreferencedImages(site);
       console.log(`scope: ${pruned.files.length} image(s) no page shows left out (${(pruned.bytes / 1e6).toFixed(1)} MB)`);
@@ -1090,10 +1153,26 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // to the pages as published and never replace one.
     const fwd = writeForwardingPages(site, root);
     console.log(`forwarding: ${fwd.written.length} page(s) at old addresses${fwd.superseded.length ? `; ${fwd.superseded.length} left as published pages` : ""}`);
+    // The search scopes, after the last step that writes pages (owner, 2026-11-13: "search
+    // broke" a folio's catalogue). Without `assets/js/search/manifest.json` the theme's
+    // loader falls back to the WHOLE `search-data.json` — 33 MB and 20,571 entries on
+    // that site — and builds one lunr index from it in the browser, which never answers.
+    // This path, which stage-local uses for every folio and IG site, never ran the split.
+    // Scoped by the layers THIS checkout declares.
+    const split = splitSite(site, root);
+    if (split) {
+      console.log(`▶ search scopes`);
+      for (const line of describeSplit(split.manifest)) console.log(line);
+      console.log(`search: ${split.manifest.scopes.length} scope(s) from ${split.manifest.source.entries} entries (${(split.manifest.source.bytes / 1e6).toFixed(2)} MB) → ${SCOPES_DIR}/`);
+    } else console.log(`search: no ${SEARCH_SOURCE} in the site — nothing to split`);
   } finally {
     restoreHarnessData();
   }
   writeFileSync(join(site, ".nojekyll"), "");
+  // The 404 page and its English fallback (owner, 2026-11-13: "if page not
+  // there, should redirect to en/ version"). After every page writer, so a
+  // 404 page the content wrote keeps its own text and gains the fallback.
+  console.log(`404: ${writeLocaleFallback404(site, `${baseurl}/`, UN_LOCALES)} — a missing /<locale>/ page goes to its English page`);
 
   const lacking = missingRequired(site, o.require ?? []);
   if (lacking.length > 0) throw new Error(`the built site lacks ${lacking.join(", ")}, which a step was to write: the site is not published`);
@@ -1231,7 +1310,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   // Explicit step flags win. With none, the layer's own `site.build`.
-  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "finalSteps" | "keep" | "profile" | "links"> => {
+  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "finalSteps" | "keep" | "profile" | "links" | "rootIndex"> => {
     const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step"), finalSteps: many("--final-step") };
     if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length + flags.finalSteps.length > 0) return { ...flags, keep: many("--keep") };
     const { recipe: r, read } = recipeRead(root, instance);

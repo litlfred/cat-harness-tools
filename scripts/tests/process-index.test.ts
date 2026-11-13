@@ -197,13 +197,16 @@ describe("the committed subgraph JSON-LD", () => {
   //
   // Read from each layer's declaration rather than listed here: every
   // `processes` directory it declares, top level or from within a sub-graph,
-  // opt-in or not (the viewer walks them all). A list went stale when
-  // `kg-ops/processes/` and core's `dsa/processes/` became sub-graphs, and the
-  // count below came up three short with nothing naming why.
+  // opt-in ones included where this checkout switches them on. A list went
+  // stale when `kg-ops/processes/` and core's `dsa/processes/` became
+  // sub-graphs, and the count below came up three short with nothing naming
+  // why. Switched on, not merely on disk: `subgraph:jsonld` publishes no
+  // subgraph for a group the root leaves off, so the viewer has none to read
+  // (core's `collab/processes/`, core#776, until an index switches it on).
   const processDirs = (layer: string, root: string): string[] =>
     !existsSync(root)
       ? []
-      : resolveDirectories([{ name: layer, root, own: true }], undefined, { enabledSubgraphs: "all" })
+      : resolveDirectories([{ name: layer, root, own: true }])
           .filter((d) => d.own && (d.graphTypologies ?? []).includes("processes") && existsSync(d.absPath))
           .map((d) => relative(root, d.absPath).replace(/[\\/]+$/, ""))
           .filter((p) => p !== "" && !p.startsWith("..") && !/(^|\/)processes\/./.test(p))

@@ -49,6 +49,10 @@
  * Usage:
  *   bun run cat-harness-tools/scripts/search-split.ts --dir <built site>          # write
  *   bun run cat-harness-tools/scripts/search-split.ts --dir <built site> --check  # verify only
+ *   bun run cat-harness-tools/scripts/search-split.ts --dir <built site> --repo <checkout>  # scope by that checkout's layers
+ *
+ * `build-instance-site.ts` runs {@link splitSite} on every site it builds,
+ * with the checkout it built from as `repo`.
  *
  * @module scripts/search-split
  */
@@ -411,53 +415,101 @@ export function declaredInstanceNames(repo: string): Set<string> {
   return names;
 }
 
-if (import.meta.main) {
-  const args = process.argv.slice(2);
-  const at = args.indexOf("--dir");
-  if (at < 0 || !args[at + 1]) {
-    console.error("usage: search-split.ts --dir <built site> [--check]");
-    process.exit(2);
+/**
+ * The layer that holds the harness in the checkout at `repo`: the declared
+ * layer named `cat-harness`, else {@link HARNESS_ROOT}. Its declared locales
+ * are the site's target locales.
+ */
+export function harnessRootIn(repo: string): string {
+  for (const root of instanceRootsIn(repo)) {
+    try {
+      if (readDeclaration(root)?.name === "cat-harness") return root;
+    } catch {
+      // an unreadable declaration names nothing
+    }
   }
-  const dir = resolve(args[at + 1]!);
-  const check = args.includes("--check");
-  const source = join(dir, SOURCE_PATH);
-  if (!existsSync(source)) {
-    console.error(`search-split: ${SOURCE_PATH} is not in ${dir} — nothing to split`);
-    process.exit(1);
-  }
-  const instanceRoot = resolve(HARNESS_ROOT);
-  const repo = resolve(instanceRoot, "..");
+  return resolve(HARNESS_ROOT);
+}
+
+/** What {@link splitSite} did to one built site. */
+export interface SplitOutcome {
+  manifest: SearchManifest;
+  /** Every file the split owns, by site-relative path. */
+  files: Map<string, string>;
+  /** With `check`: how many of them are missing or differ on disk. */
+  stale: string[];
+}
+
+/**
+ * Split the built site at `site`, its layers and locales read from the
+ * checkout at `repo` — the checkout the site was BUILT from, so a folio or an
+ * IG checkout scopes by the layers it declares and mounts, not by wherever
+ * this file happens to sit. `undefined` when the site has no theme index to
+ * split. With `check`, nothing is written and the stale files are returned.
+ */
+export function splitSite(site: string, repo: string, opts: { check?: boolean; harnessRoot?: string } = {}): SplitOutcome | undefined {
+  const source = join(site, SOURCE_PATH);
+  if (!existsSync(source)) return undefined;
+  const harness = opts.harnessRoot ?? harnessRootIn(repo);
   const files = render(
     readFileSync(source, "utf-8"),
     declaredInstanceNames(repo),
-    new Set(targetLocales(instanceRoot)),
+    new Set(targetLocales(harness)),
     SECTION_BUDGET_BYTES,
-    publishedLookups(dir),
+    publishedLookups(site),
   );
-  let stale = 0;
+  const stale: string[] = [];
   for (const [rel, body] of files) {
-    const p = join(dir, rel);
-    if (check) {
-      if (!existsSync(p) || readFileSync(p, "utf-8") !== body) {
-        console.error(`  ✗ ${rel} is missing or stale`);
-        stale++;
-      }
+    const p = join(site, rel);
+    if (opts.check) {
+      if (!existsSync(p) || readFileSync(p, "utf-8") !== body) stale.push(rel);
       continue;
     }
     mkdirSync(join(p, ".."), { recursive: true });
     writeFileSync(p, body);
   }
   const manifest = JSON.parse(files.get(`${SCOPES_DIR}/manifest.json`)!) as SearchManifest;
+  return { manifest, files, stale };
+}
+
+/** The lines a run prints about the scopes it wrote. */
+export function describeSplit(manifest: SearchManifest): string[] {
+  const out: string[] = [];
   for (const s of manifest.scopes) {
     const idx = s.index ? `  + prebuilt index ${(s.index.bytes / 1e6).toFixed(2)} MB` : "";
-    console.log(`  ${s.kind.padEnd(8)} ${s.id.padEnd(24)} ${String(s.entries).padStart(6)} entries  ${(s.bytes / 1e6).toFixed(2)} MB${idx}`);
+    out.push(`  ${s.kind.padEnd(8)} ${s.id.padEnd(24)} ${String(s.entries).padStart(6)} entries  ${(s.bytes / 1e6).toFixed(2)} MB${idx}`);
   }
-  for (const r of manifest.remote ?? []) {
-    console.log(`  remote   ${r.id.padEnd(24)} ${String(r.entries).padStart(6)} entries  → ${r.href}`);
+  for (const r of manifest.remote ?? []) out.push(`  remote   ${r.id.padEnd(24)} ${String(r.entries).padStart(6)} entries  → ${r.href}`);
+  return out;
+}
+
+if (import.meta.main) {
+  const args = process.argv.slice(2);
+  const flag = (name: string): string | undefined => {
+    const at = args.indexOf(name);
+    return at >= 0 ? args[at + 1] : undefined;
+  };
+  const dirArg = flag("--dir");
+  if (!dirArg) {
+    console.error("usage: search-split.ts --dir <built site> [--repo <checkout>] [--check]");
+    process.exit(2);
   }
+  const dir = resolve(dirArg);
+  const check = args.includes("--check");
+  // The checkout whose layers scope the site: `--repo`, else the one holding the harness.
+  const repoArg = flag("--repo");
+  const repo = repoArg ? resolve(repoArg) : resolve(HARNESS_ROOT, "..");
+  const out = splitSite(dir, repo, { check, ...(repoArg ? {} : { harnessRoot: resolve(HARNESS_ROOT) }) });
+  if (!out) {
+    console.error(`search-split: ${SOURCE_PATH} is not in ${dir} — nothing to split`);
+    process.exit(1);
+  }
+  for (const rel of out.stale) console.error(`  ✗ ${rel} is missing or stale`);
+  for (const line of describeSplit(out.manifest)) console.log(line);
+  const m = out.manifest;
   console.log(
-    `${manifest.scopes.length} scope(s) from ${manifest.source.entries} entries (${(manifest.source.bytes / 1e6).toFixed(2)} MB)` +
-      (check ? (stale ? ` — ${stale} file(s) stale` : " — current") : ` → ${SCOPES_DIR}/`),
+    `${m.scopes.length} scope(s) from ${m.source.entries} entries (${(m.source.bytes / 1e6).toFixed(2)} MB)` +
+      (check ? (out.stale.length ? ` — ${out.stale.length} file(s) stale` : " — current") : ` → ${SCOPES_DIR}/`),
   );
-  process.exit(check && stale > 0 ? 1 : 0);
+  process.exit(check && out.stale.length > 0 ? 1 : 0);
 }

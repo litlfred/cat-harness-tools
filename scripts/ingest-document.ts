@@ -764,7 +764,7 @@ try:
 except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
-  // input-site: spawned #363b130f — python3 on a document this tool was handed; the cone audits the child from its read set
+  // input-site: spawned #8cb1d510 — python3 on a document this tool was handed; the cone audits the child from its read set
   const r = Bun.spawnSync(["python3", "-c", py, pdf, dirname(pyHelper("_text_quality.py")), langs.join(",")]);
   const raw = parseProbe(new TextDecoder().decode(r.stdout)) as Probe & {
     toc?: [string, number][];
@@ -1325,6 +1325,10 @@ export function ingestMode(argv: readonly string[]): "stage" | "promote" {
  * — a defect in THIS entry, fixable by re-running a rung — refuses.
  */
 export function mayPromote(requirements: readonly Requirement[], qaLater = false): boolean {
+  // An empty list is "nothing was examined", never "everything passed":
+  // `every` over `[]` is true, so the refusal is stated rather than left to
+  // `checkEntry` always returning something.
+  if (requirements.length === 0) return false;
   return requirements.every((r) => r.state !== "unmet" || (qaLater && QA_ONLY.has(r.name)));
 }
 

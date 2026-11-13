@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Do the harness pins of one `index.lock.json` agree with each other?
+ * Is this lock fresh, and do its harness pins agree with the pinned harnesses' own locks (reported; gating only with `--agreement`)?
  *
  * A layer's lock pins every harness it mounts: `mounts[]`, one
  * `{ harness, repository, ref }` each. Each pinned harness Y has its OWN
@@ -33,7 +33,33 @@
  * pin behind main, or diverged from it, fails, naming the harness, the
  * pinned SHA, main's SHA and the fix (re-pin to main). A re-pin therefore
  * moves every layer together, which is what turned that main green.
+ * "As the run finds it" is now "as the lock was written" (the next section,
+ * owner, 2026-11-13, card "Lock gate", "Fresh at re-pin time").
  * `--no-freshness` judges agreement alone.
+ *
+ * ## Fresh at re-pin time (owner, 2026-11-13, card "Lock gate")
+ *
+ * "At main as the run finds it" raced the layers' own merges: with mains
+ * moving every few minutes, a re-pin that was current when written went red
+ * before its CI finished, because main gained a merge made after the re-pin.
+ * The owner's ruling, option "Fresh at re-pin time": "Pass a pin that was
+ * main when the lock was written (every commit main gained since is newer
+ * than the re-pin commit). Kills the race, keeps 'all layers at main
+ * together'." So the rule judges against T, the committer date of the last
+ * commit that changed the lock (`git log -1 --format=%cI -- index.lock.json`
+ * in the repository that holds `--lock`; merging main into the pull request
+ * leaves T alone unless it touches the lock; an uncommitted lock is being
+ * written now, so T is now). A pin P is fresh when it is main or descends
+ * from it, or when P is behind main and every commit on main's first-parent
+ * chain after P (`P..main --first-parent`) has a committer date after T: P
+ * was main's tip when the lock was written. A pin behind main with a
+ * first-parent commit dated at or before T was already behind when written,
+ * and is stale; a diverged pin is stale. A T, or a main history, that
+ * cannot be read is could-not-determine. Committer dates come from different
+ * machines, so clock skew between them can move a commit to the wrong side
+ * of T by that skew; that is accepted, since the window it opens is minutes
+ * and the next re-pin closes it. `--at-run-time` keeps the strict rule
+ * above, every pin at main as the run finds it, for an audit.
  *
  * ## Three states, never two
  *
@@ -41,8 +67,26 @@
  * nothing to disagree with. A fetch that failed, or an ancestry git could not
  * evaluate, is `could-not-determine`, reported with its reason and never
  * read as agreement; a main that could not be read is never read as fresh.
- * Exit: 0 every pin agrees and is fresh · 1 a pair disagrees or a pin is
- * stale · 2 neither, but something could not be determined.
+ * Exit: 0 every pin is fresh · 1 a pin is stale · 2 neither, but something
+ * could not be determined. Agreement counts toward the exit only with
+ * `--agreement` (see "Only the top-level lock decides").
+ *
+ * ## Only the top-level lock decides (owner, 2026-11-13: "3y 1y")
+ *
+ * A composition mounts each harness ONCE, at the pin of the top-level index
+ * (the instance being built, or the hub). The locks inside the mounted
+ * layers are what each layer was last tested with on its own; they are not
+ * read by the mount. Requiring them to agree with the top-level pins made
+ * every re-pin a serial, bottom-up cascade, and concurrent merges kept
+ * making it stale again. So agreement is REPORTED, as a note on what a lower
+ * layer was last tested with, and does not fail the run. The one rule that
+ * gates is freshness: a pull request that changes the lock pins every harness
+ * at its main or ahead of it, so the top-level composition is current. This
+ * replaces the owner's 2026-11-11 card "A: Agree check + freshness" for the
+ * agreement half. The skew it guarded against (committed generated files
+ * computed from an older lower layer) goes away as option 3 of the same
+ * ruling moves those files from commits to build time.
+ * `--agreement` restores the old gate for a one-off audit.
  *
  * ## The network
  *
@@ -54,8 +98,10 @@
  * "no".
  *
  * Usage:
- *   bun run cat lock:coherence:check                        # ./index.lock.json: agreement and freshness
- *   bun run cat lock:coherence:check -- --no-freshness      # agreement alone
+ *   bun run cat lock:coherence:check                        # ./index.lock.json: freshness gates, agreement reported
+ *   bun run cat lock:coherence:check -- --agreement         # agreement gates too (an audit)
+ *   bun run cat lock:coherence:check -- --no-freshness      # agreement alone, reported
+ *   bun run cat lock:coherence:check -- --at-run-time       # every pin at main as the run finds it (an audit)
  *   bun run cat lock:coherence:check -- --lock <file>       # another lock file
  *   bun run cat lock:coherence:check -- --repo <owner>/<layer>@main
  *                                                           # a repository's lock at a ref, read with git
@@ -73,7 +119,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { relate as gitRelate, type Relation } from "./git-ancestry.ts";
 
@@ -126,28 +172,68 @@ export interface Stale {
   /** `behind`: the pin is an ancestor of main · `diverged`: neither contains the other. */
   relation: "behind" | "diverged";
   fix: string;
+  /** At re-pin time: the latest first-parent commit after the pin that main already had when the lock was written. */
+  hadAtT?: MainCommit;
 }
 
 /** Main's HEAD of a repository, or why it could not be read. */
 export type MainHead = { sha: string } | { reason: string };
+
+/** A commit on main's first-parent chain, with its committer date in epoch seconds. */
+export interface MainCommit {
+  sha: string;
+  at: number;
+}
+
+/** The first-parent commits on main after a pin (`pin..main --first-parent`), or why they could not be read. */
+export type MainSince = { commits: MainCommit[] } | { reason: string };
+
+/** When the lock was written: T, the committer date of the last commit that changed it, or why it could not be found. */
+export type WrittenAt = { at: number; sha: string } | { reason: string };
+
+/** A pin behind main that was main's tip when the lock was written. */
+export interface FreshAtRepin {
+  harness: string;
+  ref: string;
+  main: string;
+  /** The oldest first-parent commit main gained after the pin, dated after T. */
+  firstAfter: MainCommit;
+}
+
+/** Judge at re-pin time: T, and the first-parent commits main gained after a pin. */
+export interface RepinTime {
+  writtenAt: WrittenAt;
+  mainSince: (pin: Pin, main: string) => MainSince;
+}
 
 export interface FreshnessReport {
   checked: number;
   fresh: number;
   stale: Stale[];
   undetermined: Undetermined[];
+  /** Absent when judged at run time (`--at-run-time`). */
+  writtenAt?: WrittenAt;
+  /** Pins behind main now that were main when the lock was written; counted in `fresh`. */
+  freshAtRepin: FreshAtRepin[];
 }
+
+const iso = (at: number) => new Date(at * 1000).toISOString().replace(".000Z", "Z");
 
 /**
  * Judge every pin against its repository's main: at main, or descending from
- * it, is fresh. Pure, as {@link judgeLockCoherence}.
+ * it, is fresh. With `repin`, a pin behind main is fresh too when every
+ * first-parent commit main gained after it is dated after T (see "Fresh at
+ * re-pin time"); without it, the rule is at run time. Pure, as
+ * {@link judgeLockCoherence}.
  */
 export function judgeFreshness(
   root: readonly Pin[],
   mainOf: (pin: Pin) => MainHead,
   relate: (repository: string, a: string, b: string) => Relation,
+  repin?: RepinTime,
 ): FreshnessReport {
-  const out: FreshnessReport = { checked: 0, fresh: 0, stale: [], undetermined: [] };
+  const out: FreshnessReport = { checked: 0, fresh: 0, stale: [], undetermined: [], freshAtRepin: [] };
+  if (repin) out.writtenAt = repin.writtenAt;
   for (const p of root) {
     out.checked++;
     const m = mainOf(p);
@@ -164,6 +250,27 @@ export function judgeFreshness(
       out.undetermined.push({ harness: p.harness, via: p, lowerRef: m.sha, reason: `against main: ${r.reason}` });
       continue;
     }
+    let hadAtT: MainCommit | undefined;
+    if (repin && r.rel === "b-descends") {
+      const t = repin.writtenAt;
+      if ("reason" in t) {
+        out.undetermined.push({ harness: p.harness, via: p, lowerRef: m.sha, reason: `behind main, and when the lock was written is unknown: ${t.reason}` });
+        continue;
+      }
+      const since = repin.mainSince(p, m.sha);
+      if ("reason" in since || !since.commits.length) {
+        const why = "reason" in since ? since.reason : "no first-parent commit after the pin";
+        out.undetermined.push({ harness: p.harness, via: p, lowerRef: m.sha, reason: `main's history after the pin: ${why}` });
+        continue;
+      }
+      const before = since.commits.filter((c) => c.at <= t.at);
+      if (!before.length) {
+        out.fresh++;
+        out.freshAtRepin.push({ harness: p.harness, ref: p.ref, main: m.sha, firstAfter: since.commits.reduce((a, c) => (c.at < a.at ? c : a)) });
+        continue;
+      }
+      hadAtT = before.reduce((a, c) => (c.at > a.at ? c : a));
+    }
     out.stale.push({
       harness: p.harness,
       repository: p.repository,
@@ -171,6 +278,7 @@ export function judgeFreshness(
       main: m.sha,
       relation: r.rel === "b-descends" ? "behind" : "diverged",
       fix: `re-pin ${p.harness} to main (${m.sha}), with the other layers in the same re-pin`,
+      ...(hadAtT ? { hadAtT } : {}),
     });
   }
   return out;
@@ -178,14 +286,25 @@ export function judgeFreshness(
 
 export function formatFreshness(r: FreshnessReport, label: string): string {
   const verdict = r.stale.length ? "FAILED" : r.undetermined.length ? "COULD NOT DETERMINE" : "OK";
+  const t = r.writtenAt;
+  const when = !t ? "at run time" : "reason" in t ? "at re-pin time, T unknown" : `at re-pin time, T = ${iso(t.at)} (${t.sha.slice(0, 12)})`;
   const lines = [
-    `lock:freshness ${label}: ${verdict} — ${r.checked} pin(s), ${r.fresh} at or ahead of main, ` +
-      `${r.stale.length} stale, ${r.undetermined.length} undetermined`,
+    `lock:freshness ${label} (${when}): ${verdict} — ${r.checked} pin(s), ${r.fresh} fresh` +
+      (r.freshAtRepin.length ? ` (${r.freshAtRepin.length} behind main but main moved after the lock was written)` : "") +
+      `, ${r.stale.length} stale, ${r.undetermined.length} undetermined`,
   ];
+  for (const f of r.freshAtRepin) {
+    lines.push(
+      `  ✓ ${f.harness}: ${f.ref.slice(0, 12)} behind main ${f.main.slice(0, 12)}, but main moved after the lock was written ` +
+        `(${f.firstAfter.sha.slice(0, 12)} at ${iso(f.firstAfter.at)} > T): fresh at re-pin time`,
+    );
+  }
   for (const s of r.stale) {
     lines.push(
       `  ✗ ${s.harness}: pinned at ${s.ref}, main of ${s.repository} is ${s.main} ` +
-        `(${s.relation === "behind" ? "the pin is BEHIND main" : "the pin has diverged from main"}). Fix: ${s.fix}.`,
+        `(${s.relation === "behind" ? "the pin is BEHIND main" : "the pin has diverged from main"}` +
+        (s.hadAtT ? `; main already had ${s.hadAtT.sha.slice(0, 12)} at ${iso(s.hadAtT.at)} ≤ T, so the lock was written behind main` : "") +
+        `). Fix: ${s.fix}.`,
     );
   }
   for (const u of r.undetermined) lines.push(`  ? ${u.harness}@${u.via.ref.slice(0, 12)}: ${u.reason}`);
@@ -286,16 +405,24 @@ export function judgeLockCoherence(
   return report;
 }
 
-/** 0 agree · 1 a pair disagrees · 2 none disagrees but some could not be determined. */
-export function exitCodeOf(r: CoherenceReport, f?: FreshnessReport): 0 | 1 | 2 {
-  if (r.disagreements.length || f?.stale.length) return 1;
-  if (r.undetermined.length || f?.undetermined.length) return 2;
+/**
+ * 0 fresh · 1 a pin is stale · 2 none stale but some could not be determined.
+ * Agreement counts only with `{ agreement: true }`: then a disagreeing pair is
+ * 1 and an undetermined pair 2, as freshness (owner, 2026-11-13: only the
+ * top-level lock decides).
+ */
+export function exitCodeOf(r: CoherenceReport, f?: FreshnessReport, opts: { agreement?: boolean } = {}): 0 | 1 | 2 {
+  const agreement = opts.agreement === true;
+  if ((agreement && r.disagreements.length) || f?.stale.length) return 1;
+  if ((agreement && r.undetermined.length) || f?.undetermined.length) return 2;
   return 0;
 }
 
-export function formatReport(r: CoherenceReport, label: string): string {
+export function formatReport(r: CoherenceReport, label: string, gates = false): string {
   const lines: string[] = [];
-  const verdict = r.disagreements.length ? "FAILED" : r.undetermined.length ? "COULD NOT DETERMINE" : "OK";
+  const verdict = r.disagreements.length
+    ? gates ? "FAILED" : "DIFFERS (reported, not a failure: only the top-level lock decides)"
+    : r.undetermined.length ? "COULD NOT DETERMINE" : "OK";
   lines.push(
     `lock:coherence:check ${label}: ${verdict} — ${r.compared} pair(s) compared, ${r.agree} agree, ` +
       `${r.disagreements.length} disagree, ${r.undetermined.length} undetermined` +
@@ -394,6 +521,55 @@ export class LockReader {
     if (why) return { rel: "unknown", reason: why };
     return gitRelate(this.dirOf(repository), a, b);
   }
+
+  /** `pin..main --first-parent` with committer dates; commits only, which the `tree:0` fetch keeps. */
+  mainSince(repository: string, pin: string, main: string): MainSince {
+    const why = this.fetch(repository, [pin, main]);
+    if (why) return { reason: why };
+    return firstParentSince(this.dirOf(repository), pin, main);
+  }
+}
+
+/** The first-parent commits of `tip` not reachable from `base`, with committer dates. */
+export function firstParentSince(dir: string, base: string, tip: string): MainSince {
+  const r = git(dir, "log", "--first-parent", "--format=%H %ct", `${base}..${tip}`);
+  if (r.status !== 0) return { reason: `git log ${base.slice(0, 12)}..${tip.slice(0, 12)} failed: ${(r.stderr || "").trim().split("\n").pop()}` };
+  const commits: MainCommit[] = [];
+  for (const line of r.stdout.split("\n")) {
+    const [sha, at] = line.trim().split(" ");
+    if (sha && at) commits.push({ sha, at: Number(at) });
+  }
+  return { commits };
+}
+
+/**
+ * T: the committer date of the last commit that changed `file`, in the git
+ * repository that holds it (bare or not), at `rev`. A shallow checkout (CI's) is deepened
+ * once, commits and trees only, when the commit found is at its boundary,
+ * since there git reads the boundary as adding the file. An uncommitted
+ * change is being written now, so T is now.
+ */
+export function lockWrittenAt(file: string, rev = "HEAD", now: () => number = () => Math.floor(Date.now() / 1000)): WrittenAt {
+  const dir = dirname(file);
+  const name = basename(file);
+  const bare = git(dir, "rev-parse", "--is-bare-repository");
+  if (bare.status !== 0) return { reason: `${dir} is not in a git repository` };
+  if (bare.stdout.trim() !== "true") {
+    const st = git(dir, "status", "--porcelain", "--", name);
+    if (st.status === 0 && st.stdout.trim()) return { at: now(), sha: "uncommitted" };
+  }
+  for (let deepened = false; ; deepened = true) {
+    const r = git(dir, "log", "-1", "--format=%H %ct", rev, "--", name);
+    if (r.status !== 0) return { reason: `git log -- ${name} failed: ${(r.stderr || "").trim().split("\n").pop()}` };
+    const [sha, ct] = r.stdout.trim().split(" ");
+    if (!sha || !ct) return { reason: `no commit at ${rev.slice(0, 12)} changes ${name}` };
+    const shallow = git(dir, "rev-parse", "--git-path", "shallow");
+    const shallowFile = resolve(dir, shallow.stdout.trim());
+    const boundary = existsSync(shallowFile) && readFileSync(shallowFile, "utf-8").split("\n").includes(sha);
+    if (!boundary) return { at: Number(ct), sha };
+    if (deepened) return { reason: `the history is shallow at ${sha.slice(0, 12)} and could not be deepened` };
+    git(dir, "fetch", "-q", "--unshallow", "--filter=blob:none", "origin");
+  }
 }
 
 // ── CLI ────────────────────────────────────────────────────────────────────
@@ -405,7 +581,7 @@ function argOf(argv: readonly string[], flag: string): string | undefined {
 
 export function main(argv: readonly string[]): number {
   if (argv.includes("--help")) {
-    console.log("usage: lock:coherence:check [--lock <file> | --repo <owner/name>[@<ref>]] [--changed-from <base>] [--no-freshness] [--cache <dir>] [--json]");
+    console.log("usage: lock:coherence:check [--lock <file> | --repo <owner/name>[@<ref>]] [--changed-from <base>] [--agreement] [--no-freshness] [--at-run-time] [--cache <dir>] [--json]");
     return 0;
   }
   const cache = resolve(argOf(argv, "--cache") ?? join(process.env.RUNNER_TEMP || tmpdir(), "cat-lock-coherence"));
@@ -413,6 +589,7 @@ export function main(argv: readonly string[]): number {
   const repoArg = argOf(argv, "--repo");
   let root: Pin[];
   let label: string;
+  let writtenAt: () => WrittenAt;
 
   if (repoArg) {
     const [repository, ref = "main"] = repoArg.split("@") as [string, string?];
@@ -423,6 +600,8 @@ export function main(argv: readonly string[]): number {
     }
     root = l.pins;
     label = `${repository}@${ref}${/^[0-9a-f]{40}$/.test(ref) ? "" : ` (${(reader.resolve(repository, ref) ?? "?").slice(0, 12)})`}`;
+    const commit = reader.resolve(repository, ref) ?? ref;
+    writtenAt = () => lockWrittenAt(join(reader.dirOf(repository), "index.lock.json"), commit);
   } else {
     const file = resolve(argOf(argv, "--lock") ?? "index.lock.json");
     if (!existsSync(file)) {
@@ -445,6 +624,7 @@ export function main(argv: readonly string[]): number {
       return 2;
     }
     label = file;
+    writtenAt = () => lockWrittenAt(file);
   }
 
   const report = judgeLockCoherence(
@@ -452,19 +632,23 @@ export function main(argv: readonly string[]): number {
     (p) => reader.lockAt(p.repository, p.ref),
     (repo, a, b) => reader.relate(repo, a, b),
   );
+  const agreement = argv.includes("--agreement");
   const freshness = argv.includes("--no-freshness")
     ? undefined
     : judgeFreshness(
         root,
         (p) => reader.mainOf(p.repository),
         (repo, a, b) => reader.relate(repo, a, b),
+        argv.includes("--at-run-time")
+          ? undefined
+          : { writtenAt: writtenAt(), mainSince: (p, m) => reader.mainSince(p.repository, p.ref, m) },
       );
   if (argv.includes("--json")) console.log(JSON.stringify({ lock: label, ...report, freshness }, null, 2));
   else {
-    console.log(formatReport(report, label));
+    console.log(formatReport(report, label, agreement));
     if (freshness) console.log(formatFreshness(freshness, label));
   }
-  return exitCodeOf(report, freshness);
+  return exitCodeOf(report, freshness, { agreement });
 }
 
 if (import.meta.main) process.exit(main(process.argv.slice(2)));

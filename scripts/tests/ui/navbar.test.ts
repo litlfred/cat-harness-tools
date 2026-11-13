@@ -259,7 +259,24 @@ describe("at rest it is a strip, and opens three ways", () => {
   it("rests at exactly the glyph column and its gutters", () => {
     expect(NAV_COLLAPSED_PX).toBe(NAV_PAD_PX * 2 + NAV_GLYPH_PX);
     expect(css).toContain(`width:${NAV_COLLAPSED_PX}px`);
-    expect(css).toContain(`body{padding-left:${NAV_COLLAPSED_PX}px}`);
+    expect(css).toContain(`body{padding-inline-start:${NAV_COLLAPSED_PX}px}`);
+  });
+
+  it("mirrors on a right-to-left page: no physical left or right edge (owner, 2026-11-12)", () => {
+    // "in RTL, the LHS navbar needs to be RHS". Every edge is a logical
+    // property, so `dir="rtl"` moves the bar, the page's padding, the indents,
+    // the drag edge and the tooltips to the other side with no second set of
+    // numbers. The avatar crop (`left:`/`top:` inside its own frame) is a
+    // position within an image, not an edge of the page, and is inline.
+    expect(css).not.toMatch(/(?:^|[;{])(?:left|right|padding-left|padding-right|margin-left|margin-right)\s*:/);
+    expect(css).toContain(".fa-nav{position:fixed;top:0;inset-inline-start:0;");
+    // The two arrows are the only thing a mirror cannot infer.
+    expect(css).toContain('[dir="rtl"] .fa-nav-twisty[aria-expanded="false"]>span');
+    expect(css).toContain('[dir="rtl"] .fa-nav-head-toggle>span[aria-hidden]{transform:scaleX(-1)}');
+    // The drag edge widens toward the page on either side.
+    const src = wireNavResize.toString();
+    expect(src).toContain('direction === "rtl"');
+    expect(src).toContain("clientWidth - m.clientX");
   });
 
   it("is CLOSED, not gone", () => {
@@ -280,7 +297,7 @@ describe("at rest it is a strip, and opens three ways", () => {
     // Every open width reads `--fa-nav-w`: the bar, its column and the page's padding.
     expect(css).not.toMatch(new RegExp(`(?<!--fa-nav-w,)\\b${NAV_OPEN_PX}px`));
     expect(css).toContain(`.fa-nav-in{width:var(--fa-nav-w,${NAV_OPEN_PX}px)`);
-    expect(css).toContain(`padding-left:var(--fa-nav-w,${NAV_OPEN_PX}px)`);
+    expect(css).toContain(`padding-inline-start:var(--fa-nav-w,${NAV_OPEN_PX}px)`);
     // The drag edge's limits and key are stated once: the inlined function says the same.
     const src = wireNavResize.toString();
     expect(src).toContain(String(NAV_RESIZE_MIN_PX));
@@ -958,11 +975,9 @@ describe("the crop is ONE sum, and two renderers do it", () => {
     return { width: num("width"), height: num("height"), left: num("left"), top: num("top") };
   }
 
-  for (const r of regions) {
-    it(`agrees on ${JSON.stringify(r)}`, () => {
-      expect(railCrop(r)).toEqual(solveCrop(r));
-    });
-  }
+  it.each(regions.map((r) => [r] as const))("agrees on %p", (r) => {
+    expect(railCrop(r)).toEqual(solveCrop(r));
+  });
 
   it("the whole image is the identity crop, not a no-op that skips the branch", () => {
     // A renderer that treated w=h=1 as "no crop" would agree with the other by

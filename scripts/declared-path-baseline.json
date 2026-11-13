@@ -5,13 +5,12 @@
     "scripts/external-schemas.ts": 2,
     "scripts/gen-schema-docs.ts": 1,
     "scripts/generate-registry.ts": 1,
-    "scripts/kg-export.ts": 2,
+    "scripts/kg-export.ts": 1,
     "scripts/known-skills.ts": 1,
     "scripts/sync-docs-harness.ts": 1,
     "scripts/validate-skills.ts": 1
   },
   "resolves": [
-    "docs/source/guides-beans-and-todos/guides-beans-and-todos.json::sdlc/processes/bean-lifecycle.bpmn",
     "docs/source/process-crdm-methodology/process-crdm-methodology.json::processes/process/crdm-requirements.bpmn",
     "schemas/kg/detangle.ts::schemas/kg/detangle.ts",
     "schemas/kg/graph-typology-registry.ts::schemas/conduct/interaction.ts",

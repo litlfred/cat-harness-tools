@@ -47,11 +47,15 @@
     "scripts/tests/qa-reports-ci.test.ts",
     "scripts/tests/requirements-standards-assessment.test.ts",
     "scripts/tests/sdlc/red-gate-is-last.test.ts",
+    "scripts/tool-page.ts",
     "src/core/workflow-events.ts",
     "src/tools/skill-update.ts",
     "src/workflow/ci-health.ts",
     "test/coordinator/gate-shell-workflow.test.ts",
     "test/coordinator/gates-workflows.test.ts",
+    "test/layer-main-qa-guard.test.ts",
+    "test/layer-pr-checks-deferred-verdict.test.ts",
+    "test/layer-pr-checks-live-labels.test.ts",
     "test/layer-ready-reuse.test.ts",
     "test/release-gated-ci.test.ts"
   ]

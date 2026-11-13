@@ -326,6 +326,7 @@ export function databaseContentDigest(db: Database, def: SliceDef): string {
  * the published bytes carry no build history.
  */
 export function buildSlice(def: SliceDef, data: SliceData, outDir: string): SliceManifest {
+  // input-site: inert #4b5268b6 — a scratch dir for the build, removed in the finally below before this returns
   const scratchDir = mkdtempSync(join(tmpdir(), "slice-sqlite-"));
   const scratch = join(scratchDir, "build.sqlite3");
   try {
@@ -449,6 +450,7 @@ export function manifestText(m: SliceManifest): string {
 /** The problems `--check` reports for one slice; empty means green. */
 export function checkSlice(def: SliceDef, data: SliceData, opts: { publishedPayloadDir?: string } = {}): string[] {
   const problems: string[] = [];
+  // input-site: inert #fad5a4d5 — a temp dir for the two check builds, removed in the finally below before this returns
   const dir = mkdtempSync(join(tmpdir(), "slice-check-"));
   try {
     const a = buildSlice(def, data, join(dir, "a"));
@@ -934,6 +936,7 @@ export function kgData(doc: { "@id": string; "@context": unknown; "@graph": unkn
     });
     fts.push([str(n.name), str(n.title), str(n.summary), str(n.description)]);
     for (const term of edgeTerms) {
+      if (MIRRORED_EDGE_TERMS.has(term)) continue;
       for (const v of ([] as unknown[]).concat(n[term] ?? [])) {
         const dst = typeof v === "string" ? v : v && typeof v === "object" && typeof (v as { "@id"?: unknown })["@id"] === "string" ? (v as { "@id": string })["@id"] : null;
         if (dst === null) { odd++; continue; }
@@ -954,6 +957,19 @@ export function kgData(doc: { "@id": string; "@context": unknown; "@graph": unkn
     probe: known >= 0 ? { phrase: phraseIn(graph[known]!.title as string, 5)!, column: "iri", value: rel(graph[known]!["@id"]) } : undefined,
   };
 }
+
+/**
+ * The @id-typed terms the KG slice does NOT store as edges, because each is
+ * the exact mirror of a term it does store: a BPMN node's `outgoing` flows are
+ * the flows whose `from` is that node, and its `incoming` flows those whose
+ * `to` is (`kg-export` writes both sides of every sequence flow). Four edges
+ * for two facts made the flows' mirrors 14% of the slice (7,888 of 23,177
+ * edges, 877 KB of 6.24 MB), the share that took it over the budget as the
+ * process graphs grew. The reverse lookup is the slice's own `incoming` view
+ * (`SELECT src FROM incoming WHERE iri = :node AND rel = 'from'`). The
+ * published document keeps both sides, as it keeps the tombstones (bean `0exf`).
+ */
+export const MIRRORED_EDGE_TERMS: ReadonlySet<string> = new Set(["incoming", "outgoing"]);
 
 export const KG_SLICE: SliceDef = {
   slice: "kg",

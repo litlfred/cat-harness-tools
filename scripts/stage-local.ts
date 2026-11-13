@@ -813,13 +813,14 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   const log = o.log ?? ((s: string) => console.error(s));
   const repo = resolve(o.repo);
   const declared = o.publishers ?? publishersFor(repo, log);
-  const detected = detectPublisher(readWorkflows(repo), [FOLIO_PUBLISHER, ...declared], o.publisher);
   const branch = o.branch ?? git(repo, ["rev-parse", "--abbrev-ref", "HEAD"]);
   const sha = git(repo, ["rev-parse", "HEAD"]);
   // The CONFIGURED url, not `remote get-url`: an `insteadOf` rewrite (a mirror,
   // a proxy) changes where git talks to, not which repository this is.
   const ownerRepo = ownerRepoOf(git(repo, ["config", "--get", "remote.origin.url"]));
   if (!ownerRepo) throw new Error("origin is not a GitHub remote");
+  const [selfOwner, selfName] = ownerRepo.split("/") as [string, string];
+  const detected = detectPublisher(readWorkflows(repo), [FOLIO_PUBLISHER, ...declared], o.publisher, { owner: selfOwner, repo: selfName, ref: sha });
   const [owner, name] = ownerRepo.split("/") as [string, string];
   const pagesRoot = `https://${owner}.github.io/${name}`;
   const gh = `https://github.com/${ownerRepo}`;
@@ -1010,6 +1011,7 @@ export async function stageDeclared(
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
     ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
+    ...(d.recipe.rootIndex ? { rootIndex: true } : {}),
     ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => {
       previewData(repo, { instance: d.instance, branch, sha, base, owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log);
       writePreviewRecord(repo, site, { slug: branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, ""), sha, base, log });

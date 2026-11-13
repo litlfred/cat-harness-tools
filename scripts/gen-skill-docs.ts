@@ -483,6 +483,12 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   "folio-paper-adapter": "Paper adapter (folio-paper-adapter)",
   "authoring-math": "Mathematical authoring (authoring-math)",
   "authoring-who-smart-guidelines": "WHO SMART Guidelines (authoring-who-smart-guidelines)",
+  // The SMART Guidelines knowledge levels: each level's skill package sits in
+  // its own opt-in group, mounted only where enabled, so each needs a label.
+  "smart-l1": "SMART Guidelines L1: narrative guidance (smart-l1)",
+  "smart-l2": "SMART Guidelines L2: operational content (smart-l2)",
+  "smart-l3": "SMART Guidelines L3: machine-readable content (smart-l3)",
+  "smart-l4": "SMART Guidelines L4: executable components (smart-l4)",
   // Packages of a health-credential library layer mounted above this one
   // (owner, 2026-11-07). Headings say what the skills are about, never which
   // layer holds them: this layer may not name a higher one.

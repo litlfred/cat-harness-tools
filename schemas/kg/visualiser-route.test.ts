@@ -4,9 +4,17 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { aliasRoute, routeCollisions, routeOf, siteRootFrom, visualiserRoute, visualiserUrl } from "./visualiser-route.js";
+import { aliasRoute, routeCollisions, routeOf, siteRootFrom, subgraphSegment, visualiserRoute, visualiserUrl } from "./visualiser-route.js";
 
 describe("visualiserRoute", () => {
+  test("a sub-graph id with capitals routes lower-cased (smart-base's layer subgraphs)", () => {
+    expect(subgraphSegment("smart-base-L4-skills")).toBe("smart-base-l4-skills");
+    expect(visualiserRoute({ harness: "smart-base", visualiser: "skills", subgraph: "smart-base-L4-skills" })).toBe("smart-base/skills/smart-base-l4-skills/");
+    expect(visualiserRoute({ harness: "h", visualiser: "v", subgraph: "index/L2-bpmn" })).toBe("h/v/index/l2-bpmn/");
+    // Only case is forgiven: anything else that is not a segment is still refused.
+    expect(() => visualiserRoute({ harness: "h", visualiser: "v", subgraph: "L4 skills" })).toThrow(/not a URL segment/);
+  });
+
   test("the full KG, a sub-graph, and an asset of either", () => {
     expect(visualiserRoute({ harness: "cat-harness", visualiser: "library" })).toBe("cat-harness/library/");
     expect(visualiserRoute({ harness: "cat-harness", visualiser: "library", subgraph: "who-iris" })).toBe("cat-harness/library/who-iris/");
