@@ -1523,6 +1523,20 @@ export function decideAll(o: {
   return { records: records?.sha ?? null, decisions };
 }
 
+/**
+ * Does this run RECORD what each gate read? A run of `main` does: a push, and
+ * equally a dispatch on `main`. A merge made with `GITHUB_TOKEN` (a merge or
+ * re-pin train) starts no push run, so the gates are dispatched on `main`
+ * instead (bean `hd58`); a push-only test left every such commit without a
+ * record, and a PR based on it warm-started from an older one. Measured over
+ * main's last 12 Code-quality gates runs on 2026-11-13: 3 were dispatches,
+ * every one with the cone off. A dispatch on any other branch never records:
+ * cached-step saves `main-only` entries from `main` alone.
+ */
+export function recordsOnMain(env: Readonly<Record<string, string | undefined>>): boolean {
+  return env.GITHUB_REF === "refs/heads/main" && (env.GITHUB_EVENT_NAME === "push" || env.GITHUB_EVENT_NAME === "workflow_dispatch");
+}
+
 function main(argv: readonly string[]): number {
   const [cmd, script] = argv;
   const root = process.cwd();
@@ -1556,9 +1570,8 @@ function main(argv: readonly string[]): number {
   if (cmd === "prepare") {
     // Which mode this job's gate steps run in, through $GITHUB_ENV.
     const out = env.GITHUB_ENV;
-    const push = env.GITHUB_EVENT_NAME === "push" && env.GITHUB_REF === "refs/heads/main";
     let mode = "";
-    if (push) {
+    if (recordsOnMain(env)) {
       if (straceWorks()) mode = "record";
       else console.log("ci-cone: strace does not run here, so this main run records nothing and no PR skips against it");
     } else if (env.GITHUB_EVENT_NAME === "pull_request") {
