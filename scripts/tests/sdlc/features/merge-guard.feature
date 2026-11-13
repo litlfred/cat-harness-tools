@@ -602,3 +602,35 @@ Feature: Merge guard
     Given PR #1937 with red CI
     When it is evaluated as a non-release merge and as a release merge
     Then the number of refusals other than ci is the same
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::a_green_full-tier_judge_on_the_head_passes
+  Scenario: Under --full-tier a green full-tier judge on the head passes check 5
+    Given PR #1960 with a green "No new failures (tests and gates)" check run on its head
+    When check 5 is read with --full-tier
+    Then it passes, naming the judge
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::the_fast_tier_alone_is_not-ready,_and_says_how_to_run_the_full_tier
+  Scenario: Under --full-tier the fast tier alone is not ready
+    Given PR #1960 whose only check run is the green "Fast tier only" job
+    When check 5 is read with --full-tier
+    Then it refuses as not-ready
+    And its detail says the full tier has not run and that ready-to-merge or release runs it
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::a_red_judge_is_a_defect;_one_still_running_is_not-ready;_the_latest_run_of_a_judge_counts
+  Scenario: Under --full-tier a red judge is a defect, a running one not ready, and the latest run counts
+    Given PR #1960 with its full-tier judge red, then running, then red followed by a later green run
+    When check 5 is read with --full-tier each time
+    Then it is a defect, then not-ready, then a pass
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::check_runs_not_fetched_or_not_readable_are_unknown,_never_a_pass
+  Scenario: Under --full-tier unread check runs are unknown, never a pass
+    Given PR #1960 with no check runs fetched, and then check runs unreadable with "HTTP 403"
+    When check 5 is read with --full-tier
+    Then it is unknown both times, and names "HTTP 403"
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::--full-tier_gates_even_without_--release,_and_keeps_a_red_workflow_run's_refusal
+  Scenario: --full-tier gates without --release and keeps a workflow run's refusal
+    Given PR #1937 with a green full-tier judge
+    When check 5 is read with --full-tier and no --release
+    Then it has the same status as the release judgement, and is not advisory
+    And a passing workflow-run judgement with no full-tier judge refuses as not-ready

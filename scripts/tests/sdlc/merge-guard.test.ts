@@ -45,6 +45,8 @@ import {
   DEPLOY_ONLY_STEP,
   AGENT_BUILD_CONTEXT,
   agentBuildStatus,
+  fullTierCheck,
+  withFullTier,
   type CheckId,
   type GuardOptions,
   type GuardRun,
@@ -1055,5 +1057,66 @@ describe("check 5 gates a release only (owner, card Q-CIB-4 A, 2026-11-08)", () 
     expect(v.checks.filter((c) => c.id !== "ci" && c.status === "refuse").length).toBe(
       evaluateAny(red(), { release: true }).checks.filter((c) => c.id !== "ci" && c.status === "refuse").length,
     );
+  });
+});
+
+/**
+ * `--full-tier` (owner, 2026-11-13, card "A. merge-guard required status"):
+ * the status workflow's guard needs the full tier green on the head, not
+ * just green workflow runs, which the fast tier also gives.
+ */
+describe("check 5 under --full-tier — the full tier must be green on the head", () => {
+  const JUDGE = "No new failures (tests and gates)";
+  const FAST = "Fast tier only (advisory; the full checks gate a release)";
+  const cr = (name: string, status: string, conclusion: string | null, started_at = "2026-10-03T12:00:00Z") => ({ name, status, conclusion, started_at });
+  const ci = (s: GuardSnapshot) => evaluate(s, { fullTier: true }).checks.find((c) => c.id === "ci")!;
+
+  test("a green full-tier judge on the head passes", () => {
+    const s = real(1960);
+    expect(status(s, "ci").status).toBe("pass");
+    s.checkRuns = [cr(JUDGE, "completed", "success")];
+    const c = ci(s);
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain(`full tier green: ${JUDGE}`);
+  });
+
+  test("the fast tier alone is not-ready, and says how to run the full tier", () => {
+    const s = real(1960);
+    s.checkRuns = [cr(FAST, "completed", "success")];
+    const c = ci(s);
+    expect(c.status).toBe("refuse");
+    expect(c.kind).toBe("not-ready");
+    expect(c.detail).toContain("the full tier has not run on the head");
+    expect(c.detail).toContain("`ready-to-merge` or `release` runs it");
+  });
+
+  test("a red judge is a defect; one still running is not-ready; the latest run of a judge counts", () => {
+    const s = real(1960);
+    s.checkRuns = [cr(JUDGE, "completed", "failure")];
+    expect(ci(s)).toMatchObject({ status: "refuse", kind: "defect" });
+    s.checkRuns = [cr(JUDGE, "in_progress", null)];
+    expect(ci(s)).toMatchObject({ status: "refuse", kind: "not-ready" });
+    s.checkRuns = [cr(JUDGE, "completed", "failure", "2026-10-03T12:00:00Z"), cr(JUDGE, "completed", "success", "2026-10-03T13:00:00Z")];
+    expect(ci(s).status).toBe("pass");
+  });
+
+  test("check runs not fetched or not readable are unknown, never a pass", () => {
+    const s = real(1960);
+    expect(ci(s).status).toBe("unknown");
+    s.checkRuns = { unknown: "HTTP 403" };
+    const c = ci(s);
+    expect(c.status).toBe("unknown");
+    expect(c.detail).toContain("HTTP 403");
+  });
+
+  test("--full-tier gates even without --release, and keeps a red workflow run's refusal", () => {
+    const s = real(1937);
+    s.checkRuns = [cr(JUDGE, "completed", "success")];
+    const ruled = evaluateAny(s, { fullTier: true }).checks.find((c) => c.id === "ci")!;
+    const releaseCi = status(real(1937), "ci");
+    expect(ruled.status).toBe(releaseCi.status);
+    expect(ruled.detail).not.toContain("advisory");
+    expect(fullTierCheck(s).status).toBe("pass");
+    expect(withFullTier({ n: 5, id: "ci", status: "pass", detail: "runs green" }, { ...s, checkRuns: [] })).toMatchObject({ status: "refuse", kind: "not-ready" });
   });
 });
