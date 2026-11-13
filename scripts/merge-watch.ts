@@ -71,7 +71,25 @@
  * Pins are read from `index.lock.json` (or a legacy `*.mount-lock.json`) at
  * the PR's head and base.
  *
+ * ## The queue (`--queue`)
+ *
+ * Only the merge manager merges and re-pins (owner, 2026-11-13,
+ * cat-harness#1313). A session tells it a PR is finished by sending
+ * `ready:` or `repin+merge:`; an agent that cannot send messages labels its
+ * own PR instead, and `--queue` is how the merge manager reads those labels:
+ *
+ * | label | the PR's own agent says |
+ * |---|---|
+ * | `ready-to-merge` | it is green; merge it |
+ * | `needs-repin` | it is green except the re-pin; re-pin, then merge |
+ *
+ * `--queue` lists every open PR carrying either label across the repositories
+ * named, with the same verdict on its head as above, and flags `needs-repin`.
+ * It only reads. The merge path is `merge:guard --merge`, the merge manager's
+ * alone; this report never merges, re-pins or labels anything.
+ *
  * Usage:
+ *   bun run cat merge:watch -- --queue --repos litlfred/cat-harness,litlfred/cat-harness-tools --json
  *   bun run cat merge:watch -- --repo litlfred/cat-harness --repo litlfred/cat-harness-tools
  *   bun run cat merge:watch -- --repos litlfred/cat-harness,litlfred/folio-assistant --json
  *   bun run cat merge:watch -- --config merge-watch.json
@@ -80,7 +98,8 @@
  * <file>` (`{"repos": [...], "staleHours": 2, "queuedMinutes": 60,
  * "excludedLayers": ["smart-*"]}`; a trailing `*` matches a prefix) · `--stale-hours <n>` ·
  * `--queued-minutes <n>` (a queued run this old is a relief candidate) ·
- * `--exclude-layer <name>` (repeatable; replaces the default) · `--json`.
+ * `--exclude-layer <name>` (repeatable; replaces the default) · `--queue` (the
+ * labelled queue instead of the four readings) · `--json`.
  *
  * Exit 0 printed · 2 usage error, or something could not be read (a one-line
  * summary on stderr names each repository and what of it was not read).
@@ -620,7 +639,7 @@ function why(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function judgeHead(api: GitHub, repo: string, pr: PullDetail): Verdict {
+function judgeHead(api: GitHub, repo: string, pr: { draft: boolean; head: { sha: string } }): Verdict {
   const sha = pr.head.sha;
   const checks = flat<CheckRun>(api.pages(`repos/${repo}/commits/${sha}/check-runs?per_page=100`), "check_runs");
   const runs = flat<WorkflowRun>(api.pages(`repos/${repo}/actions/runs?head_sha=${sha}&per_page=100`), "workflow_runs");
@@ -761,11 +780,113 @@ export function watchRepo(api: GitHub, repo: string, opts: Options = DEFAULT_OPT
   return { repo, main, queue, prs, relief, errors };
 }
 
+// ── The labelled queue ──────────────────────────────────────────────────
+
+/** The label a finished, green PR's agent puts on it when it cannot send `ready:`. */
+export const READY_LABEL = "ready-to-merge";
+/** The label for "green except the re-pin": the merge manager re-pins, then merges. */
+export const REPIN_LABEL = "needs-repin";
+/** The labels that put a PR in the merge manager's queue. */
+export const QUEUE_LABELS: readonly string[] = [READY_LABEL, REPIN_LABEL];
+
+export interface QueueRow {
+  repo: string;
+  number: number;
+  title: string;
+  draft: boolean;
+  headSha: string;
+  /** The queue labels it carries, in {@link QUEUE_LABELS} order. */
+  labels: string[];
+  /** It carries {@link REPIN_LABEL}: re-pin before merging. */
+  needsRepin: boolean;
+  verdict: string;
+}
+
+export interface QueueReport {
+  repo: string;
+  prs: QueueRow[];
+  errors: string[];
+}
+
+interface PullListed {
+  number: number;
+  title?: string;
+  draft?: boolean;
+  labels?: { name: string }[];
+  head: { sha: string };
+}
+
+/** The queue labels among `labels`, in {@link QUEUE_LABELS} order; empty when it is not queued. */
+export function queueLabels(labels: readonly string[]): string[] {
+  return QUEUE_LABELS.filter((l) => labels.includes(l));
+}
+
+/**
+ * The open PRs of `repo` labelled {@link READY_LABEL} or {@link REPIN_LABEL},
+ * oldest number first, each with the verdict on its head. A head that could
+ * not be judged is `unknown`, never red.
+ */
+export function queueRepo(api: GitHub, repo: string): QueueReport {
+  let open: PullListed[];
+  try {
+    open = flat<PullListed>(api.pages(`repos/${repo}/pulls?state=open&per_page=100`));
+  } catch (err: unknown) {
+    return { repo, prs: [], errors: [`open PRs: ${why(err)}`] };
+  }
+  const prs: QueueRow[] = [];
+  for (const pr of [...open].sort((a, b) => a.number - b.number)) {
+    const labels = queueLabels((pr.labels ?? []).map((l) => l.name));
+    if (labels.length === 0) continue;
+    const draft = pr.draft ?? false;
+    let verdict: Verdict;
+    try {
+      verdict = judgeHead(api, repo, { draft, head: pr.head });
+    } catch (err: unknown) {
+      verdict = { kind: "unknown", why: why(err) };
+    }
+    prs.push({
+      repo,
+      number: pr.number,
+      title: pr.title ?? "",
+      draft,
+      headSha: pr.head.sha,
+      labels,
+      needsRepin: labels.includes(REPIN_LABEL),
+      verdict: formatVerdict(verdict),
+    });
+  }
+  return { repo, prs, errors: [] };
+}
+
+/** One line per queued PR: `repo#n  sha  verdict  [NEEDS-REPIN]  title`. */
+export function formatQueue(reports: readonly QueueReport[]): string {
+  const lines: string[] = [];
+  for (const r of reports) {
+    for (const p of r.prs) {
+      lines.push(
+        [`${p.repo}#${p.number}`, p.headSha.slice(0, 7), p.verdict, p.needsRepin ? "NEEDS-REPIN" : "-", p.draft ? "draft" : "-", p.title].join("\t"),
+      );
+    }
+    for (const e of r.errors) lines.push(`${r.repo}\terror\t${e}`);
+  }
+  return lines.length > 0 ? lines.join("\n") : `queue empty: no open PR labelled ${QUEUE_LABELS.join(" or ")}`;
+}
+
+/** What the queue could not read, one entry per repository that has any. */
+export function queueUnread(reports: readonly QueueReport[]): string[] {
+  return reports.flatMap((r) => {
+    const what = [...r.errors, ...r.prs.filter((p) => p.verdict.startsWith("unknown")).map((p) => `#${p.number} verdict`)];
+    return what.length > 0 ? [`${r.repo}: ${what.join(", ")}`] : [];
+  });
+}
+
 // ── CLI ─────────────────────────────────────────────────────────────────
 
 export interface Cli {
   repos: string[];
   json: boolean;
+  /** `--queue`: the labelled merge queue instead of the four readings. */
+  queue: boolean;
   opts: Options;
 }
 
@@ -796,12 +917,12 @@ export function parseArgs(argv: readonly string[], readFile: (p: string) => stri
     } else if (a === "--stale-hours") opts.staleHours = num(a, next());
     else if (a === "--queued-minutes") opts.queuedMinutes = num(a, next());
     else if (a === "--exclude-layer") (excluded ??= []).push(next());
-    else if (a === "--json") continue;
+    else if (a === "--json" || a === "--queue") continue;
     else throw new Error(`unknown flag ${a}`);
   }
   if (excluded) opts.excludedLayers = excluded;
   for (const r of repos) if (!/^[\w.-]+\/[\w.-]+$/.test(r)) throw new Error(`not owner/name: ${r}`);
-  return { repos: uniq(repos), json: argv.includes("--json"), opts };
+  return { repos: uniq(repos), json: argv.includes("--json"), queue: argv.includes("--queue"), opts };
 }
 
 function ago(iso: string | null): string {
@@ -850,13 +971,20 @@ function main(argv: readonly string[]): number {
     cli = parseArgs(argv);
   } catch (err: unknown) {
     console.error(why(err));
-    cli = { repos: [], json: false, opts: DEFAULT_OPTIONS };
+    cli = { repos: [], json: false, queue: false, opts: DEFAULT_OPTIONS };
   }
   if (cli.repos.length === 0) {
     console.error(
-      "usage: merge:watch (--repo <owner/name>… | --repos a,b | --config <file>) [--stale-hours n] [--queued-minutes n] [--exclude-layer name]… [--json]",
+      "usage: merge:watch (--repo <owner/name>… | --repos a,b | --config <file>) [--queue] [--stale-hours n] [--queued-minutes n] [--exclude-layer name]… [--json]",
     );
     return 2;
+  }
+  if (cli.queue) {
+    const queue = cli.repos.map((repo) => queueRepo(ghApi, repo));
+    console.log(cli.json ? JSON.stringify(queue, null, 2) : formatQueue(queue));
+    const unread = queueUnread(queue);
+    if (unread.length > 0) console.error(`merge:watch --queue: exit 2, something could not be read: ${unread.join("; ")}`);
+    return unread.length > 0 ? 2 : 0;
   }
   const reports = cli.repos.map((repo) => watchRepo(ghApi, repo, cli.opts));
   if (cli.json) console.log(JSON.stringify(reports, null, 2));
