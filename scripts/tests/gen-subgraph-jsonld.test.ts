@@ -288,7 +288,10 @@ describe("gen-subgraph-jsonld", () => {
     expect(plan.harnessRoots).toContain(core);
     const hyd = JSON.parse(files.get(join(outDir, "folio-assistant-core", "processes", SUBGRAPH_HYDRATED_FILE))!) as Record<string, unknown>;
     const members = hydratedMembers(hyd);
-    const lifecycle = [...plan.nodes.values()].find((n) => String(n.sourcePath ?? "").endsWith("content-lifecycle.bpmn"))!;
+    // `folio-review-publish.bpmn` stays in core's always-on `processes/`; the
+    // processes that run on the work plan moved to its opt-in `collab/`
+    // (owner, 2026-11-13).
+    const lifecycle = [...plan.nodes.values()].find((n) => String(n.sourcePath ?? "").endsWith("folio-review-publish.bpmn"))!;
     expect(members.has(lifecycle["@id"])).toBe(true);
     expect(lifecycle["@id"].startsWith(`${HOST_DOC}#`)).toBe(false);
     const root = read("", SUBGRAPH_INDEX_FILE);

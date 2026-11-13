@@ -398,7 +398,7 @@ describe("this checkout", () => {
       expect(corpus.has(s)).toBe(true);
     }
     const files = workflowFiles(PLATFORM, "checkout").map((f) => relative(REPO, f));
-    expect(files).toContain("smart-base/methodologies/processes/diig-investment-path.bpmn");
+    expect(files).toContain("smart-base/collab/processes/diig-investment-path.bpmn");
     expect(files).toContain("folio-assistant-core/processes/library/deep-document-research.bpmn");
   });
 
