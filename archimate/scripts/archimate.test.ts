@@ -315,6 +315,10 @@ describe("an instance", () => {
       writeFileSync(join(checkout, "plain", "plain.json"), JSON.stringify({ name: "plain", directories: [] }));
       expect(archimateInstances(checkout)).toEqual([tiny]);
       expect(checkCommitted(tiny)).toEqual([]);
+      // A declaration that does not parse is swept, so its failure is reported, not skipped.
+      mkdirSync(join(checkout, "broken"));
+      writeFileSync(join(checkout, "broken", "broken.json"), "{ not json");
+      expect(archimateInstances(checkout)).toEqual([join(checkout, "broken"), tiny]);
     } finally {
       rmSync(checkout, { recursive: true, force: true });
     }

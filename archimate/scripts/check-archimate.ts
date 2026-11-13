@@ -12,7 +12,7 @@
  *
  * Without `--instance` it sweeps the checkout: every layer that declares an
  * `archimate` directory, or keeps the config at its root ({@link archimateInstances}).
- * `--repo` defaults to the checkout this file sits in.
+ * `--repo` defaults to the checkout this file sits in (`checkoutRootFor`).
  *
  * The `openapi` subgraph's `ingest-openapi.ts --check`, for models that are
  * authored in place rather than ingested: every configured model is present
@@ -24,7 +24,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { ArchimateConfigSchema, readArchimate, type ArchimateConfig, type ArchimateModel } from "../schemas/archimate.ts";
-import { findDeclarationFile, instanceRootsIn, repoRootFor } from "../../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, findDeclarationFile, instanceRootsIn } from "../../schemas/kg/cat-harness.ts";
 
 export const CONFIG_FILE = "cat-archimate.config.json";
 
@@ -200,7 +200,10 @@ export function declaresArchimate(instanceRoot: string): boolean {
     const d = JSON.parse(readFileSync(join(instanceRoot, found), "utf8")) as { directories?: Array<{ graphTypologies?: string[] }> };
     return (d.directories ?? []).some((e) => e.graphTypologies?.includes("archimate") === true);
   } catch {
-    return false;
+    // UNPARSEABLE IS NOT ABSENT: `findDeclarationFile` returns a broken
+    // declaration so a caller can report it. Swept, its check fails and says
+    // why, rather than the sweep passing over a layer it could not read.
+    return true;
   }
 }
 
@@ -211,6 +214,14 @@ export function archimateInstances(repo: string): string[] {
 
 /** {@link checkCommitted} for one layer, a thrown config error reported as a problem rather than ending the sweep. */
 function checkOne(instanceRoot: string): string[] {
+  const found = findDeclarationFile(instanceRoot);
+  if (found !== undefined) {
+    try {
+      JSON.parse(readFileSync(join(instanceRoot, found), "utf8"));
+    } catch (e) {
+      return [`${found} does not parse, so its archimate directory cannot be read: ${e instanceof Error ? e.message : String(e)}`];
+    }
+  }
   try {
     return checkCommitted(instanceRoot);
   } catch (e) {
@@ -230,7 +241,7 @@ if (import.meta.main) {
     if (problems.length) process.exit(1);
     console.log(`✓ ${instance}: every ArchiMate model the config names is held, parses and resolves, and no other is held`);
   } else {
-    const repo = resolve(arg("--repo") ?? repoRootFor(resolve(import.meta.dir, "..", "..")));
+    const repo = resolve(arg("--repo") ?? checkoutRootFor(resolve(import.meta.dir, "..", "..")));
     const roots = archimateInstances(repo);
     // A sweep over nothing is not a pass: say so and fail, rather than print a tick.
     if (roots.length === 0) {
