@@ -229,7 +229,9 @@ export function leakedTablesIn(page: string, html: string): LeakedTable[] {
     const pieces = html
       .slice(0, m.index)
       .split(/\n|<br\s*\/?>/i)
-      .map((x) => x.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim())
+      // Plain text for a report, never HTML: drop the tags, then any angle
+      // bracket a nested or broken tag left behind.
+      .map((x) => x.replace(/<[^>]+>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim())
       .filter((x) => x.length > 0);
     found.push({ page, excerpt: (pieces[pieces.length - 1] ?? "").slice(0, 110) });
   }
