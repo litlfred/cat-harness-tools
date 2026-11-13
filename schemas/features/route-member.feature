@@ -43,14 +43,14 @@ Feature: Route-family member keys and the keying enum
     Then "v1.2.3" is accepted
     And "a..b" is refused
 
-  @test:schemas/route-member.test.ts::the_keying_enum_carries_exactly_four_values::route-family_parses,_and_an_undeclared_fifth_does_not
-  Scenario: Storage keyed by one of the four keyings parses and any other keying does not
-    # Gap: the describe says the enum has exactly four values, but another test in this file shows "family" is in the enum; this test only shows branch-keyed storage refuses it.
+  @test:schemas/route-member.test.ts::storage_on_ONE_branch_is_keyed_in_exactly_four_ways::route-family_parses,_and_no_fifth_keying_does
+  Scenario: Storage on one branch parses keyed one of four ways, and no other keying
     Given a directory storage on the branch "gh-pages"
     Then it parses keyed by "commit", "tip", "route" or "route-family"
     And it is refused keyed by "routes", "family", "route_family", "dynamic" or the empty string
+    # "family" is a keying of the enum, valid only with a branchPrefix; on a single branch it is refused
 
-  @test:schemas/route-member.test.ts::the_keying_enum_carries_exactly_four_values::the_branch_it_names_is_still_validated
+  @test:schemas/route-member.test.ts::storage_on_ONE_branch_is_keyed_in_exactly_four_ways::the_branch_it_names_is_still_validated
   Scenario: A route-family storage still refuses a malformed branch name
     Given directory storages keyed by "route-family"
     When the branch is "refs/heads/gh-pages", "-x", "a..b", "a//b", "gh-pages/", "x.lock" or "/abs"
