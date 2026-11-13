@@ -51,7 +51,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, posix, resolve } from "node:path";
 
-import { findDeclarationFile, INDEX_CONFIG_FILENAME, instanceRootsIn } from "./instance-roots";
+import { fileStamp, findDeclarationFile, INDEX_CONFIG_FILENAME, instanceRootsIn } from "./instance-roots";
 
 /** The development override: a comma list of `+<instance>.<id>` / `-<instance>.<id>`. */
 export const SUBGRAPHS_ENV = "CAT_SUBGRAPHS";
@@ -229,19 +229,49 @@ export function declaredOptInRequires(checkoutRoot: string): Map<string, string[
     const file = findDeclarationFile(root);
     if (file === undefined) continue;
     try {
-      const raw = JSON.parse(readFileSync(join(root, file), "utf-8")) as { name?: unknown; directories?: unknown };
-      if (typeof raw.name !== "string") continue;
-      const base = dirname(join(root, file));
-      const readText = (rel: string): string | undefined => {
-        const abs = join(base, rel);
-        return existsSync(abs) ? readFileSync(abs, "utf-8") : undefined;
-      };
-      for (const [q, req] of requiresDeclared(raw.name, raw.directories, readText)) out.set(q, req);
+      for (const [q, req] of requiresOf(join(root, file))) out.set(q, [...req]);
     } catch {
       // unreadable: check:declaration-filename's finding, not this one's
     }
   }
   return out;
+}
+
+/**
+ * One declaration's opt-in `requires`, computed once per version of the file
+ * (its size, mtime and inode). `resolveDirectories` asks for them on every
+ * call, and re-parsing every layer's declaration each time was 25 s of a
+ * 87 s `kg-audit` over the folio-assistant index (2026-11-13, core #753). A
+ * file that fails to read or parse is not cached and throws on every call.
+ */
+/**
+ * A declaration's requires, reused while every file the read touched (the
+ * declaration and each nested `graph.json` / `<dir>/<dir>.json` it looked
+ * for, present or absent) has the same size, mtime and inode. kg-audit asks
+ * this on every `resolveDirectories`, and re-parsing each layer every time
+ * was most of a run (cat-harness-tools#2010).
+ */
+const requiresByFile = new Map<string, { stamps: Map<string, string>; requires: [string, string[]][] }>();
+const stampOrAbsent = (abs: string): string => (existsSync(abs) ? fileStamp(abs) : "absent");
+function requiresOf(abs: string): [string, string[]][] {
+  const hit = requiresByFile.get(abs);
+  if (hit !== undefined && [...hit.stamps].every(([f, st]) => stampOrAbsent(f) === st)) return hit.requires;
+  const stamps = new Map<string, string>([[abs, fileStamp(abs)]]);
+  const raw = JSON.parse(readFileSync(abs, "utf-8")) as { name?: unknown; directories?: unknown };
+  if (typeof raw.name !== "string") {
+    requiresByFile.set(abs, { stamps, requires: [] });
+    return [];
+  }
+  const base = dirname(abs);
+  const readText = (rel: string): string | undefined => {
+    const f = join(base, rel);
+    const st = stampOrAbsent(f);
+    stamps.set(f, st);
+    return st === "absent" ? undefined : readFileSync(f, "utf-8");
+  };
+  const requires = [...requiresDeclared(raw.name, raw.directories, readText)];
+  requiresByFile.set(abs, { stamps, requires });
+  return requires;
 }
 
 /**

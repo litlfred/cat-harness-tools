@@ -58,8 +58,10 @@ export const WebAppBuildSchema = z
     /** Which installer reads the lockfile: `npm ci` or `bun install --frozen-lockfile`. */
     installer: z.enum(INSTALLERS).default("npm"),
     /** The `package.json` script that builds it. */
+    // input-site: inert #383ca95b — the default NAME of the app's own package.json build script, written into the node; nothing here reads a build output
     script: z.string().regex(/^[a-z0-9:_-]+$/).default("build"),
     /** Where the build writes, relative to the app's directory. */
+    // input-site: inert #86fd5190 — the default directory the app's own build writes to, written into the node; nothing here reads it
     outDir: InnerPath.default("dist"),
   })
   .strict();
@@ -72,6 +74,7 @@ export const WebAppKind = nodeKind(
     id: WebAppId,
     title: Text,
     description: Text,
+    // input-site: inert #6f3e26dd — the same two defaults, as the node's default build block; nothing here reads a build output
     build: WebAppBuildSchema.default({ installer: "npm", script: "build", outDir: "dist" }),
     /** The app draws its own frame. Only `none` is defined: an app inside the site's chrome is a page, not an app. */
     chrome: z.literal("none").default("none"),

@@ -966,14 +966,27 @@ export function judgeSidecarTree(args: {
   // A stored directory's working copy answers `unknown` for EVERY file; that
   // is one fact about the run, said once, not a line per sidecar.
   let storedUnknown: string | undefined;
+  // Resolved ONCE for the tree, as storedOn asks of a caller judging many
+  // paths. Per path, it walked every layer for each sidecar: 35 s of a 43 s
+  // `kg-audit` over the folio-assistant index (2026-11-13, core #753). Only the
+  // working-copy read uses it; if it cannot be resolved, each read resolves it
+  // as before and meets the same failure there.
+  let location: QaLocation | undefined;
+  if (args.against === undefined && args.fresh.length > 0) {
+    try {
+      location = resolveQaLocation(args.store?.repoRoot);
+    } catch {
+      location = undefined;
+    }
+  }
   for (const s of args.fresh) {
     let before: unknown[] | undefined;
     if (entry.state === "hit") {
-      let b = readBaseline(s.path, { against: args.against, store: args.store });
+      let b = readBaseline(s.path, { against: args.against, store: args.store, location });
       // A MOVED subject's baseline is at its old path (bean ).
       const was = b.state === "miss" ? movedFrom(s.path) : undefined;
       if (was !== undefined) {
-        const prev = readBaseline(was, { against: args.against, store: args.store });
+        const prev = readBaseline(was, { against: args.against, store: args.store, location });
         if (prev.state === "hit") b = prev;
       }
       if (b.state === "hit") {
