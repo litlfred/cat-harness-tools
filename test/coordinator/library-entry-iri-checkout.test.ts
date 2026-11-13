@@ -35,7 +35,11 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
   // renderings".
   test.skipIf(NOT_BUILT)("every entry's @id IS the address of its published JSON-LD, and that file is published", () => {
     const index = LibraryIndexSchema.parse(JSON.parse(readFileSync(INDEX, "utf-8")));
-    for (const e of index.entries) {
+    // A catalogued item held by reference has no manifest, so no asset of its
+    // own to address (`hasManifest: false`); every entry that has one is checked.
+    const withManifest = index.entries.filter((e) => e.hasManifest);
+    expect(withManifest.length).toBeGreaterThan(0);
+    for (const e of withManifest) {
       const m = JSON.parse(readFileSync(join(REPO, e.dir, "manifest.jsonld"), "utf-8")) as { "@id": string };
       expect(m["@id"], e.dir).toBe(libraryAssetIri(e.instance, e.id));
       const published = join(SITE, libraryAssetSitePath(e.instance, e.id));

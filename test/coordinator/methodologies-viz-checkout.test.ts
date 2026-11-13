@@ -62,8 +62,13 @@ describe("the page a reader gets — over the REAL corpus", () => {
         ...[...text.matchAll(/<a id="([^"]+)"><\/a>/g)].map((m) => m[1]),
         ...[...text.matchAll(/^#{1,6} .*\{#([^}\s]+)\}\s*$/gm)].map((m) => m[1]),
       ]);
+      // Each row's TITLE links to its own section: one per row, so a row whose
+      // link was dropped is caught. The prose cells also link the methodologies
+      // they name (2139a17c), so the page carries more `#` links than rows;
+      // those are counted as links that must resolve, not as rows.
+      const rowLinks = [...text.matchAll(/^\| \*\*\[[^\n]*?\]\(#([^)]+)\)\*\*/gm)].map((m) => m[1]);
+      expect(rowLinks.length).toBe(rows.length);
       const links = [...text.matchAll(/\]\(#([^)]+)\)/g)].map((m) => m[1]);
-      expect(links.length).toBe(rows.length);
       expect(links.filter((l) => !targets.has(l))).toEqual([]);
     }
   });
