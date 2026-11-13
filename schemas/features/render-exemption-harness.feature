@@ -15,9 +15,8 @@ Feature: The rendering exemption
 
   @test:schemas/render-exemption-harness.test.ts::this_repository's_actual_declaration::EXACTLY_one_instance_in_this_repository_claims_it
   Scenario: Exactly one layer in this repository claims the exemption
-    # Gap: the root list spells "folio-assist-core", which names no layer, so folio-assistant-core is never read; and only these four roots are checked, not every instance.
-    Given the declarations of bootstrap, cat-harness, folio-assist-core and the repository root
-    When those that claim a rendering exemption are counted
+    Given every instance discovered in the repository, bootstrap among them
+    When those whose declaration claims a rendering exemption are counted
     Then there is exactly 1
     And it is "bootstrap"
 
