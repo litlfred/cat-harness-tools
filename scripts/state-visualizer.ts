@@ -173,6 +173,7 @@ import {
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { subjectIri } from "./lib/subject-pages.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
@@ -1123,6 +1124,40 @@ export interface RegistryRow {
   text?: string;
   /** Why the file is not listed with its fields. */
   note?: string;
+  /** The node's IRI, where its layer's document mints one ({@link withSubjectIris}); its JSON-LD is the IRI plus `.jsonld`. */
+  iri?: string;
+}
+
+/**
+ * The files of a listed kind that are knowledge-graph SUBJECTS, by the
+ * directory under the declared one they sit in, and the subject kind
+ * `kg-export` mints their IRI as: `scenarios/actors/<f>.json` is an `actor`,
+ * `scenarios/capabilities/<f>.json` a `capability` (`collectRegistryNodes`,
+ * which reads only the files directly in each). Their rows link the IRI and
+ * its `.jsonld` (owner, 2026-11-13, node-kind audit: the 58 scenario rows on
+ * a downstream's site named `actors/admin.json` and linked nothing).
+ */
+export const SUBJECT_ROWS: Readonly<Record<string, readonly (readonly [dir: string, kind: string])[]>> = {
+  scenarios: [
+    ["actors", "actor"],
+    ["capabilities", "capability"],
+  ],
+};
+
+/** `rows` with each subject's IRI ({@link SUBJECT_ROWS}), minted by `iriOf` from the node's file, kind and id. */
+export function withSubjectIris(
+  rows: readonly RegistryRow[],
+  absPath: string,
+  kinds: readonly string[],
+  iriOf: (file: string, kind: string, id: string) => string | undefined = subjectIri,
+): RegistryRow[] {
+  const dirs = kinds.flatMap((k) => SUBJECT_ROWS[k] ?? []);
+  return rows.map((r) => {
+    const at = dirs.find(([d]) => r.file.startsWith(`${d}/`) && !r.file.slice(d.length + 1).includes("/"));
+    if (at === undefined || r.note !== undefined) return r;
+    const iri = iriOf(join(absPath, r.file), at[1], r.id);
+    return iri === undefined ? r : { ...r, iri };
+  });
 }
 
 /** Every `.json` node under a registry directory, in path order. Absent is an empty list; the page says unknown from the projection. */
@@ -1154,16 +1189,20 @@ export function registryRowsOf(absPath: string): RegistryRow[] {
 /** The node table of a registry page. */
 export function registryTable(rows: readonly RegistryRow[]): string {
   if (rows.length === 0) return "";
+  // A JSON-LD column only where some node has an IRI, so a registry with none keeps its shape.
+  const linked = rows.some((r) => r.iri !== undefined);
   const tr = rows
     .map(
       (r) =>
-        `<tr><td><code>${esc(r.id)}</code></td><td>${esc(r.note ?? r.text ?? "")}</td>` +
-        `<td>${r.schema ? `<code>${esc(r.schema)}</code>` : ""}</td><td><code>${esc(r.file)}</code></td></tr>`,
+        `<tr><td>${r.iri ? `<a href="${esc(r.iri)}"><code>${esc(r.id)}</code></a>` : `<code>${esc(r.id)}</code>`}</td><td>${esc(r.note ?? r.text ?? "")}</td>` +
+        `<td>${r.schema ? `<code>${esc(r.schema)}</code>` : ""}</td><td><code>${esc(r.file)}</code></td>` +
+        (linked ? `<td>${r.iri ? `<a href="${esc(r.iri)}.jsonld" type="application/ld+json">.jsonld</a>` : ""}</td>` : "") +
+        `</tr>`,
     )
     .join("");
   return (
     `<h2 class="sv-h2">Nodes — ${rows.length}</h2>` +
-    `<div style="overflow-x:auto"><table class="sv-table"><thead><tr><th>id</th><th>title or summary</th><th>$schema</th><th>file</th></tr></thead>` +
+    `<div style="overflow-x:auto"><table class="sv-table"><thead><tr><th>id</th><th>title or summary</th><th>$schema</th><th>file</th>${linked ? "<th>JSON-LD</th>" : ""}</tr></thead>` +
     `<tbody>${tr}</tbody></table></div>`
   );
 }
@@ -2531,7 +2570,7 @@ export function instanceSubjectPage(
       `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
       `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's ${esc(title)}</a></p>` +
       (loadsLive ? qaLivePanel(live!) : qaPanelsOf(ix, undefined, { qaFamilies })) +
-      (registry ? registryTable(registryRowsOf(s.absPath)) : "") +
+      (registry ? registryTable(withSubjectIris(registryRowsOf(s.absPath), s.absPath, vis.coversKinds ?? [])) : "") +
       `<h2 class="sv-h2">Instances holding ${esc(title)}</h2>` +
       `<ul class="sv-list">${others}</ul>`,
   });

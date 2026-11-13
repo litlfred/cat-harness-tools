@@ -177,6 +177,10 @@ export function toolPage(d: ToolPageData, generatedFm: string): string {
     // Without this every Tool was a top-level row of the rail's "Pages",
     // ahead of the site's own pages (owner, 2026-11-13).
     "nav_exclude: true",
+    // The page is a RENDERING of the Tool; its JSON-LD is the asset (kg-viewer
+    // §"The asset and its rendering are two resources"): head_custom.html
+    // writes it as `rel=alternate type=application/ld+json`.
+    ...(d.iri ? [`alternate_jsonld: ${JSON.stringify(d.iri)}`] : []),
     generatedFm,
     "render_with_liquid: false",
     "---",
