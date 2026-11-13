@@ -30,7 +30,7 @@
  * check that enforces that is plan step 1's second half.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { inputSiteReached } from "../../schemas/sdlc/input-trace.js";
 
@@ -98,38 +98,37 @@ export function readPathFor(root: string, layer: LayerRef, rel: string, mounted:
   return existsSync(computed) ? computed : join(resolve(root), layer.path, rel);
 }
 
-/** The mounted layer that holds `absPath` (the deepest mount that does), with its directory; undefined outside every mount. */
-function mountHolding(root: string, absPath: string, mounted: Map<string, string>): { layer: LayerRef; dir: string } | undefined {
+/**
+ * The output-root twin of an ABSOLUTE path inside the checkout: where a
+ * writer puts the computed file a reader would otherwise find at `abs`.
+ * `undefined` when `abs` is in no mounted layer (a local layer's computed
+ * files are its own path). For a reader that holds a resolved path (a
+ * declared directory's `absPath`) rather than a layer and a relative path.
+ * The longest mount path that holds `abs` wins, so a mount nested in another
+ * resolves to its own layer.
+ */
+export function outputTwinOf(root: string, abs: string, mounted: Map<string, string> = mountedInstances(root)): string | undefined {
   const r = resolve(root);
-  const p = resolve(absPath);
-  let best: { layer: LayerRef; dir: string } | undefined;
-  for (const [instance, path] of mounted) {
-    const dir = resolve(r, path);
-    if (dir === r || !(p === dir || p.startsWith(dir + sep))) continue;
-    if (!best || dir.length > best.dir.length) best = { layer: { instance, path }, dir };
+  const rel = relative(r, resolve(abs)).split(sep).join("/");
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return undefined;
+  let best: { instance: string; path: string } | undefined;
+  for (const [instance, p] of mounted) {
+    const path = p.replace(/^\.\/|\/+$/g, "");
+    if (path === "" || !(rel === path || rel.startsWith(`${path}/`))) continue;
+    if (best === undefined || path.length > best.path.length) best = { instance, path };
   }
-  return best;
+  if (best === undefined) return undefined;
+  return outputPathFor(r, best, rel.slice(best.path.length + 1), mounted);
 }
 
 /**
- * The output-root twin of an ABSOLUTE path inside a mounted layer, where a
- * writer puts what it computes for that path; undefined when the path is in
- * no mount (a local layer writes in place). For a reader that copies a whole
- * declared directory: copy the mount, then this over it.
+ * {@link readPathFor} for an ABSOLUTE path: the output-root twin when a
+ * writer put the file (or directory) there, else `abs` itself. Changes
+ * nothing while no writer writes under {@link LAYER_OUTPUT_ROOT}.
  */
-export function outputPathAt(root: string, absPath: string, mounted: Map<string, string> = mountedInstances(root)): string | undefined {
-  const m = mountHolding(root, absPath, mounted);
-  return m ? outputPathFor(root, m.layer, relative(m.dir, resolve(absPath)), mounted) : undefined;
-}
-
-/**
- * Where to read a file a reader names by its ABSOLUTE path in the checkout,
- * as a declared directory's `absPath` gives it: through {@link readPathFor}
- * when the path is inside a mounted layer (the deepest mount that holds it),
- * else the path itself. For readers that walk declared directories rather
- * than name a layer (bean `cat-tools-sm8r`, item 4, plan step 2).
- */
-export function readPathAt(root: string, absPath: string, mounted: Map<string, string> = mountedInstances(root)): string {
-  const m = mountHolding(root, absPath, mounted);
-  return m ? readPathFor(root, m.layer, relative(m.dir, resolve(absPath)), mounted) : resolve(absPath);
+export function readPathAt(root: string, abs: string, mounted: Map<string, string> = mountedInstances(root)): string {
+  const twin = outputTwinOf(root, abs, mounted);
+  if (twin === undefined) return abs;
+  inputSiteReached(`layer-output: ${relative(resolve(root), twin).split(sep).join("/")}`);
+  return existsSync(twin) ? twin : abs;
 }

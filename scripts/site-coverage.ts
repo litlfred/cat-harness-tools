@@ -38,8 +38,8 @@ import { processSubjects } from "./gen-processes-viz.ts";
 import { schemaSubjects } from "./gen-schema-viz.ts";
 import { readJourneyCorpus } from "./journeys/read.ts";
 import { declaredVisualisers, forwardingParts, pageParts, type DeclaredVisualiser } from "./viewer-declarations.ts";
-import { readPathAt } from "./lib/layer-output.ts";
 import { WEB_APP_FILE } from "../schemas/ui/web-app.ts";
+import { mountedInstances, readPathAt } from "./lib/layer-output.ts";
 
 /** One page the declarations say the site must carry. */
 export interface ExpectedPage {
@@ -139,8 +139,9 @@ export const SUBJECT_READERS: Readonly<Record<string, SubjectReader>> = {
  * writer can draw. Owner, 2026-10-30, smart-ra#103: "this is not an IG".
  */
 export function igIndexSubjects(root: string, dirs: readonly { instance: string; absPath: string }[]): string[] {
-  // Read through the layer-output overlay: a mounted IG layer's index is built into `build/layers/<instance>/`.
-  return [...new Set(dirs.filter((d) => existsSync(readPathAt(root, join(d.absPath, "index.json")))).map((d) => d.instance))].sort();
+  // A mounted layer's index is read through the layer output root (bean `cat-tools-sm8r` item 4).
+  const mounted = mountedInstances(root);
+  return [...new Set(dirs.filter((d) => existsSync(readPathAt(root, join(d.absPath, "index.json"), mounted))).map((d) => d.instance))].sort();
 }
 
 /**

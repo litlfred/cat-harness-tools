@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { LAYER_OUTPUT_ROOT, mountedInstances, outputPathAt, outputPathFor, readPathAt, readPathFor } from "../lib/layer-output.js";
+import { LAYER_OUTPUT_ROOT, mountedInstances, outputPathFor, outputTwinOf, readPathAt, readPathFor } from "../lib/layer-output.js";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -79,40 +79,25 @@ describe("readPathFor", () => {
   });
 });
 
-describe("readPathAt: a reader that names a file by its absolute path", () => {
-  const root = mkdtempSync(join(tmpdir(), "layer-output-at-"));
-  afterAll(() => rmSync(root, { recursive: true, force: true }));
-  writeFileSync(join(root, "index.lock.json"), JSON.stringify({ instances: [{ instance: "ig", path: "ig" }, { instance: "inner", path: "ig/inner" }] }));
-  mkdirSync(join(root, "ig", "inner", "dir"), { recursive: true });
-  mkdirSync(join(root, "own"), { recursive: true });
+describe("outputTwinOf / readPathAt — a reader holding an absolute path", () => {
+  test("a path in a mounted layer has a twin under the output root; a local or outside path has none", () => {
+    const root = checkout(LOCK);
+    expect(outputTwinOf(root, join(root, "upper-ig", "fhir-artifact-index"))).toBe(join(root, LAYER_OUTPUT_ROOT, "upper-ig", "fhir-artifact-index"));
+    expect(outputTwinOf(root, join(root, "upper-ig"))).toBe(join(root, LAYER_OUTPUT_ROOT, "upper-ig"));
+    expect(outputTwinOf(root, join(root, "upper-ig-other", "x"))).toBeUndefined();
+    expect(outputTwinOf(root, join(root, "own", "x"))).toBeUndefined();
+    expect(outputTwinOf(root, "/elsewhere/x")).toBeUndefined();
+  });
 
-  test("inside a mount with nothing computed: the path itself", () => {
-    expect(readPathAt(root, join(root, "ig", "dir", "index.json"))).toBe(join(root, "ig", "dir", "index.json"));
-  });
-  test("inside a mount with a computed file: the output root", () => {
-    mkdirSync(join(root, LAYER_OUTPUT_ROOT, "ig", "dir"), { recursive: true });
-    writeFileSync(join(root, LAYER_OUTPUT_ROOT, "ig", "dir", "index.json"), "{}");
-    expect(readPathAt(root, join(root, "ig", "dir", "index.json"))).toBe(join(root, LAYER_OUTPUT_ROOT, "ig", "dir", "index.json"));
-  });
-  test("the deepest mount that holds the path names the layer", () => {
-    mkdirSync(join(root, LAYER_OUTPUT_ROOT, "inner", "dir"), { recursive: true });
-    writeFileSync(join(root, LAYER_OUTPUT_ROOT, "inner", "dir", "x.json"), "{}");
-    expect(readPathAt(root, join(root, "ig", "inner", "dir", "x.json"))).toBe(join(root, LAYER_OUTPUT_ROOT, "inner", "dir", "x.json"));
-  });
-  test("outside every mount: the path itself", () => {
-    expect(readPathAt(root, join(root, "own", "index.json"))).toBe(join(root, "own", "index.json"));
-  });
-});
-
-describe("outputPathAt: the output-root twin of a path inside a mount", () => {
-  const root = mkdtempSync(join(tmpdir(), "layer-output-twin-"));
-  afterAll(() => rmSync(root, { recursive: true, force: true }));
-  writeFileSync(join(root, "index.lock.json"), JSON.stringify({ instances: [{ instance: "ig", path: "ig" }] }));
-
-  test("a served directory inside a mount has its twin under the output root", () => {
-    expect(outputPathAt(root, join(root, "ig", "served-dir"))).toBe(join(root, LAYER_OUTPUT_ROOT, "ig", "served-dir"));
-  });
-  test("a directory in no mount has none: a local layer writes in place", () => {
-    expect(outputPathAt(root, join(root, "own", "served-dir"))).toBeUndefined();
+  test("the twin when it exists, else the path itself — no writer at the output root changes nothing", () => {
+    const root = checkout(LOCK);
+    const abs = join(root, "upper-ig", "fhir-artifact-index", "index.json");
+    expect(readPathAt(root, abs)).toBe(abs);
+    const twin = join(root, LAYER_OUTPUT_ROOT, "upper-ig", "fhir-artifact-index");
+    mkdirSync(twin, { recursive: true });
+    writeFileSync(join(twin, "index.json"), "{}");
+    expect(readPathAt(root, abs)).toBe(join(twin, "index.json"));
+    expect(readPathAt(root, join(root, "upper-ig", "fhir-artifact-index"))).toBe(twin);
+    expect(readPathAt(root, join(root, "own", "a.json"))).toBe(join(root, "own", "a.json"));
   });
 });
