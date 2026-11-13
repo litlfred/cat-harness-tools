@@ -24,13 +24,11 @@ function compare(name: string, base: number | undefined, head: number): { status
 }
 
 describe("always-green gates", () => {
-  for (const g of ["cat-harness-tools:gen:jsonld:check", "check:kg-blocks"]) {
-    test(`${g}: red on both sides still fails the PR`, () => {
-      const r = compare(g, 1, 1);
-      expect(r.status).toBe(1);
-      expect(r.out).toContain("always-green");
-    });
-  }
+  test.each(["cat-harness-tools:gen:jsonld:check", "check:kg-blocks"])("%s: red on both sides still fails the PR", (g) => {
+    const r = compare(g, 1, 1);
+    expect(r.status).toBe(1);
+    expect(r.out).toContain("always-green");
+  });
   test("could not determine (2) on head fails too", () => {
     expect(compare("x:gen:jsonld:check", 1, 2).status).toBe(1);
   });

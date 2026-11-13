@@ -530,3 +530,12 @@ Feature: The ingest rung decision and the L1 completeness gate
     Given a text plan with the derived arms added
     Then there are 3 steps, the second running l1-blocks.ts on the staging entry and the third extract-candidates.py --aspects-only on it
     And a known title adds --title to the text step
+
+  @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::a_text_layer_in_the_wrong_script_for_the_document's_language_is_not_text
+  Scenario: A text layer in the wrong script for the document's language is not text
+    Given a probe whose letters are 5900 Latin and 12 Arabic
+    When it is judged for a document in "ar"
+    Then it is unreadable, with a reason naming "wrong script"
+    And with no language, with "fr", or with the mixed "ar" and "en", nothing is decided
+    And an "ar" probe that is mostly Arabic letters, and a "ru-RU" probe with 2000 Cyrillic letters, decide nothing
+    And a "zh" probe of 5900 Latin and 100 Han letters is unreadable, with a reason naming "han"

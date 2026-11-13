@@ -49,3 +49,18 @@ Feature: The workflow interpreter reads the shipped diagrams, and instances reco
     Given an instance saved with an absolute source inside the repository
     When it is loaded and saved again, and loaded back
     Then its source is "a/parent.bpmn"
+
+  @test:scripts/tests/process/workflow-interpreter.test.ts::every_shipped_diagram_is_interpretable::%s_parses,_and_every_flow_connects_two_known_nodes
+  Scenario: Each shipped workflow diagram parses, and every flow connects two known nodes
+    Given each process diagram found through the harness's workflow files, one row per diagram
+    When it is loaded as a process model
+    Then its id starts with "Process_" and it has at least one start node
+    And every flow's source and target are nodes of the model
+    And every activity sits in a lane
+
+  @test:scripts/tests/process/workflow-interpreter.test.ts::a_layer's_shared_global-tasks_file_is_read,_not_interpreted::%s_defines_global_tasks,_each_naming_a_skill
+  Scenario: Each shared global-tasks file defines global tasks, each naming a skill
+    Given each .bpmn workflow file of the harness that is a global-tasks file, one row per file
+    When its global tasks are loaded
+    Then there is at least one, and each names at least one skill
+    And loading it as a process model is refused as unsupported BPMN

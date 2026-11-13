@@ -1,37 +1,36 @@
-# Specifies gateExemptions on an index config (schemas/kg/index-config.ts),
-# in the shape an instance declaration uses (GateExemptionsSchema in
-# schemas/kg/cat-harness.ts).
-Feature: An index may declare its own gate exemptions
+# schemas/kg/index-config.ts and schemas/kg/cat-harness.ts let an index declare the gate exemptions
+# of its own workflows, in the layer declaration's shape, kept by every rewrite. Each Scenario names the test that executes it.
+Feature: An index's own gate exemptions
 
   @test:schemas/index-config-gate-exemptions.test.ts::an_index's_own_gate_exemptions::parse_in_the_shape_an_instance_declaration_uses
-  Scenario: Index gate exemptions parse in the declaration's shape
-    Given a step exemption of kind "ci-only" with a reason
-    When it is parsed inside an index config and on its own as gate exemptions
-    Then both parse
+  Scenario: Gate exemptions parse in the shape an instance declaration uses
+    Given a step exemption matching "bun run cat state:push -- --id health" of kind "ci-only" with a reason
+    When it is parsed as an index config's gateExemptions and on its own by GateExemptionsSchema
+    Then both parses succeed
 
   @test:schemas/index-config-gate-exemptions.test.ts::an_index's_own_gate_exemptions::are_refused_when_malformed_—_no_reason,_an_unknown_kind,_an_unknown_key
-  Scenario: Malformed index gate exemptions are refused
-    Given exemptions with a blank reason, with kind "slow", and with an extra key
-    When each is parsed inside an index config
-    Then each is refused
+  Scenario: Malformed gate exemptions are refused
+    Given gate exemptions with a blank reason, with the unknown kind "slow", and with an unknown key "extra"
+    When each is parsed as an index config's gateExemptions
+    Then each parse fails
 
   @test:schemas/index-config-gate-exemptions.test.ts::an_index's_own_gate_exemptions::survive_formatIndexConfig,_last,_and_are_absent_when_not_declared
-  Scenario: Gate exemptions survive formatting, last, and are absent when undeclared
-    Given an index config with a site landing and gate exemptions
-    When it is formatted and read back
-    Then the gate exemptions are unchanged
-    And gateExemptions is the last key
-    And a config without them formats with no gateExemptions key
+  Scenario: Gate exemptions survive formatting, come last, and are absent when not declared
+    Given an index config with a site landing and the step exemption
+    When it is parsed and formatted with formatIndexConfig
+    Then the formatted JSON carries the same gateExemptions
+    And gateExemptions is its last key
+    And an index config that declares none formats with no gateExemptions key
 
   @test:schemas/index-config-gate-exemptions.test.ts::a_file_a_gate's_allowlist_admits_(owner,_2026-10-16,_item_6b)::parses,_beside_steps_and_scripts
   Scenario: A file exemption parses alone and beside step exemptions
-    Given a file exemption naming a gate, a file and a reason
-    When it is parsed as gate exemptions, alone and together with step exemptions
-    Then both parse
     # Gap: the title says "beside steps and scripts", but no script exemption is included.
+    Given a file exemption for gate "check:structure-accessor" on "schemas/library-ref.ts" with a reason
+    When it is parsed by GateExemptionsSchema alone and together with the step exemptions
+    Then both parses succeed
 
   @test:schemas/index-config-gate-exemptions.test.ts::a_file_a_gate's_allowlist_admits_(owner,_2026-10-16,_item_6b)::is_refused_with_no_reason,_no_gate,_an_unknown_key,_or_a_path_outside_the_instance
   Scenario: A malformed file exemption is refused
-    Given file exemptions with a blank reason, an empty gate, an extra key, an absolute path and a path climbing out with ".."
-    When each is parsed as gate exemptions
-    Then each is refused
+    Given file exemptions with a blank reason, an empty gate, an unknown key, an absolute path "/abs/a.ts", and a climbing path "../up/a.ts"
+    When each is parsed by GateExemptionsSchema
+    Then each parse fails
