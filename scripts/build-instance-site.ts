@@ -186,6 +186,14 @@ export interface BuildOptions {
   links?: "refuse" | "report";
   /** `report`: a declared visualiser page the site lacks ({@link siteCoverageShortfall}) is said, and does not stop the publish. */
   coverage?: "refuse" | "report";
+  /**
+   * After the platform's writers, write every layer's graph document and the
+   * root index, `index.jsonld` and `index.json` (`publish-root-index.ts`).
+   * Opt-in (`site.build.rootIndex: true`): it adds every layer's export to the
+   * site, and it refuses the publish rather than map fewer layers than the
+   * checkout declares (litlfred/who-iris, 2026-11-13).
+   */
+  rootIndex?: boolean;
   /** Root files the built site must hold before it is published (a step's promise, checked). */
   require?: string[];
   /** The visualiser-writer step, replaceable in a test; {@link writeMissingVisualisers} by default. */
@@ -349,6 +357,8 @@ export interface SiteRecipe {
   links?: "refuse" | "report";
   /** A declared visualiser page missing from the built site refuses the publish (`refuse`, the default) or is only said (`report`). */
   coverage?: "refuse" | "report";
+  /** Publish every layer's graph document and the root index, `index.jsonld` ({@link BuildOptions.rootIndex}). */
+  rootIndex?: boolean;
 }
 
 export type SiteProfile = "folio" | "ig-repo-site";
@@ -417,6 +427,8 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
   if (links !== "refuse" && links !== "report") throw new Error(`${where}: site.build.links must be refuse or report`);
   const coverage = b.coverage ?? "refuse";
   if (coverage !== "refuse" && coverage !== "report") throw new Error(`${where}: site.build.coverage must be refuse or report`);
+  const rootIndex = b.rootIndex ?? false;
+  if (typeof rootIndex !== "boolean") throw new Error(`${where}: site.build.rootIndex must be true or false`);
   const keep = b.keep ?? [];
   if (!Array.isArray(keep) || !keep.every((x) => typeof x === "string" && KEEP_NAME.test(x))) throw new Error(`${where}: site.build.keep must be a list of root entry names`);
   return {
@@ -430,6 +442,7 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
       ...(profile !== "folio" ? { profile } : {}),
       ...(links !== "refuse" ? { links } : {}),
       ...(coverage !== "refuse" ? { coverage } : {}),
+      ...(rootIndex ? { rootIndex } : {}),
     },
     read,
   };
@@ -1072,6 +1085,9 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
     run("rail on every page", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --theme-source ${shellQuote(docs)} --foreign-site --home-label ${shellQuote(title)} --instance ${shellQuote(o.instance)}${o.identity ? " --landing" : ""}`, root);
     for (const st of o.finalSteps ?? []) run(`final: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
+    // After every page writer, so the documents never shadow a page; before the
+    // guards below, which see the documents as part of the site.
+    if (o.rootIndex) run("graph documents and root index", `bun run ${TOOLS}/publish-root-index.ts --site ${s} --base-url ${shellQuote(`https://${gh.owner}.github.io${baseurl}`)}`, root);
     if (o.scope) {
       const pruned = pruneUnreferencedImages(site);
       console.log(`scope: ${pruned.files.length} image(s) no page shows left out (${(pruned.bytes / 1e6).toFixed(1)} MB)`);
@@ -1231,7 +1247,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   // Explicit step flags win. With none, the layer's own `site.build`.
-  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "finalSteps" | "keep" | "profile" | "links"> => {
+  const stepsOrRecipe = (): Pick<BuildOptions, "home" | "pre" | "sourceSteps" | "siteSteps" | "finalSteps" | "keep" | "profile" | "links" | "rootIndex"> => {
     const flags = { home: one("--home"), pre: many("--pre"), sourceSteps: many("--source-step"), siteSteps: many("--site-step"), finalSteps: many("--final-step") };
     if (flags.home !== undefined || flags.pre.length + flags.sourceSteps.length + flags.siteSteps.length + flags.finalSteps.length > 0) return { ...flags, keep: many("--keep") };
     const { recipe: r, read } = recipeRead(root, instance);

@@ -307,12 +307,15 @@ const PackageScriptName = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:._-]*$/, "a p
  * - `siteSteps`: run as `bun run <name> <built site>`, after Jekyll: generators
  *   that write finished pages, which Jekyll would otherwise drop.
  * - `home`: the page that becomes the site's `index.md`.
+ * - `rootIndex`: publish every layer's graph document and the root index,
+ *   `index.jsonld` (`publish-root-index.ts`). Off unless declared.
  */
 export const HarnessSiteBuildSchema = z.object({
   home: z.string().optional(),
   pre: z.array(PackageScriptName).default([]),
   sourceSteps: z.array(PackageScriptName).default([]),
   siteSteps: z.array(PackageScriptName).default([]),
+  rootIndex: z.boolean().optional(),
 });
 
 export type HarnessSiteBuild = z.infer<typeof HarnessSiteBuildSchema>;
