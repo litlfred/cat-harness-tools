@@ -5440,6 +5440,15 @@ export interface ResolvedDirectory extends ContentDirectory {
    * Only entries of sub-graphs switched ON are ever resolved at all.
    */
   optInSubgraph?: string;
+  /**
+   * The CONVENTION of an inherited opt-in sub-graph the root has not switched
+   * on, for a kind every layer holds its own of ({@link isPerInstance}):
+   * the root's own directory at the entry's path, and nothing of the
+   * declarer's. Owner, 2026-11-13, card "library/" option A: core's corpus
+   * became opt-in (Q-SG-3 A), and a dependent of core still has a `library/`
+   * of its own. No other layer's directory is a member of it.
+   */
+  conventionOnly?: boolean;
 }
 
 /** What {@link resolveDirectories} is asked to resolve FOR. */
@@ -5574,6 +5583,17 @@ export function resolveDirectories(
     if (own !== undefined && optInLeftOutByMount(e)) return null;
     return q;
   };
+  /**
+   * What is left of a switched-off entry for the root: nothing, unless it is
+   * INHERITED and of a kind each layer holds its own of. Then the root keeps
+   * the convention (its own directory at that path), never the declarer's
+   * content, which is what being switched off withholds.
+   */
+  const conventionOf = (e: ResolvedDirectory): ResolvedDirectory | undefined => {
+    if (!rootLink || e.own === true || e.scope === "repository" || !isPerInstance(e, registry)) return undefined;
+    const { optInSubgraph: _q, optIn: _o, ...rest } = e as ResolvedDirectory & { optIn?: unknown };
+    return { ...rest, absPath: resolve(rootForScope(rootLink.root, e.scope), e.path), own: false, conventionOnly: true };
+  };
   if (rootLink) {
     for (const dir of DEFAULT_DIRECTORIES) {
       const absPath = resolve(rootLink.root, dir.path);
@@ -5611,8 +5631,11 @@ export function resolveDirectories(
   // promoted from within it or gets a member: invisible, with everything in it.
   for (const [id, d] of [...byId]) {
     const q = optInOf(d);
-    if (q === null) byId.delete(id);
-    else if (q !== undefined) byId.set(id, { ...d, optInSubgraph: q });
+    if (q === null) {
+      const c = conventionOf(d);
+      if (c) byId.set(id, c);
+      else byId.delete(id);
+    } else if (q !== undefined) byId.set(id, { ...d, optInSubgraph: q });
   }
 
   // Directories declared FROM WITHIN (bean `cmsl`, owner 2026-09-30, round 4):
@@ -5624,7 +5647,7 @@ export function resolveDirectories(
   // layer directories, and stay out of this list exactly as before.
   // An instance-level entry with the same id wins, so a declaration can move
   // inward without two answers existing at once.
-  for (const d of [...byId.values()]) promoteFromWithin(d, byId, registry, new Set(), rootLink, optInOf);
+  for (const d of [...byId.values()]) promoteFromWithin(d, byId, registry, new Set(), rootLink, optInOf, conventionOf);
 
   // MEMBERS (option A, owner 2026-09-30). A subgraph declared once is
   // inherited by every layer in the chain: each whose `<root>/<path>`
@@ -5651,7 +5674,7 @@ export function resolveDirectories(
   const work = [...out];
   while (work.length > 0) {
     const d = work.shift()!;
-    if (d.scope === "repository") continue;
+    if (d.scope === "repository" || d.conventionOnly) continue;
     for (const link of chain) {
       const abs = resolve(link.root, d.path);
       if (seen.has(abs) || !existsSync(abs)) continue;
@@ -5798,6 +5821,7 @@ function promoteFromWithin(
   seen: Set<string>,
   rootLink: { name: string; root?: string; own?: boolean } | undefined,
   optInOf: (e: ResolvedDirectory, parent?: string) => string | undefined | null = () => undefined,
+  conventionOf: (e: ResolvedDirectory) => ResolvedDirectory | undefined = () => undefined,
 ): void {
   if (seen.has(d.absPath)) return;
   seen.add(d.absPath);
@@ -5838,7 +5862,10 @@ function promoteFromWithin(
       // (`declaredBy: "(default)"`, e.g. `skills/voices`) is a convention, and
       // a from-within declaration is stronger than a convention.
       const existing = byId.get(nd.id);
-      if (existing !== undefined && existing.declaredBy !== "(default)") continue;
+      // A convention left by a switched-off sub-graph is overridden like a
+      // default: a later layer's declaration of the same id wins, as it does
+      // at the top level.
+      if (existing !== undefined && existing.declaredBy !== "(default)" && existing.conventionOnly !== true) continue;
       const sub = nd.path.replace(/^\.\//, "").replace(/\/+$/, "");
       // A DEFAULT parent (`skills/` that the layer never declared) is still
       // a directory in the root link's own tree — the defaults are seeded
@@ -5863,11 +5890,17 @@ function promoteFromWithin(
       } as ResolvedDirectory;
       // Within a switched-off opt-in sub-graph: not promoted, nor anything below it.
       const q = optInOf(entry, d.optInSubgraph);
-      if (q === null) continue;
+      if (q === null) {
+        // Switched off: nothing below it is promoted, but an inherited
+        // per-instance kind leaves the root its convention.
+        const c = conventionOf(entry);
+        if (c) byId.set(nd.id, c);
+        continue;
+      }
       if (q !== undefined) entry.optInSubgraph = q;
       else delete entry.optInSubgraph;
       byId.set(nd.id, entry);
-      promoteFromWithin(entry, byId, registry, seen, rootLink, optInOf);
+      promoteFromWithin(entry, byId, registry, seen, rootLink, optInOf, conventionOf);
     }
   }
 }
