@@ -113,6 +113,39 @@ describe("index-gates.json", () => {
     expect(derived["low:check:own"]).toBe("bun run cat check:own");
   });
 
+  test("an index gate whose script the MOUNTED cat-harness-tools does not declare yet is skipped as not-at-pin, never run as 'no script'", () => {
+    // The gate list is the workflow's, at the caller's workflow pin; the
+    // scripts are the mounted layer's, at the index lock's pin. A gate added
+    // after the index's pin named a script no mount declared, and every layer
+    // PR whose cone ran it failed on "no script" (jsonld:site:check, 2026-11-13).
+    const root = mkdtempSync(join(tmpdir(), "index-gates-pin-"));
+    mkdirSync(join(root, "low"));
+    writeFileSync(join(root, "low", "low.json"), JSON.stringify({ $schema: "cat-harness-declaration/v1", name: "low", needs: [] }));
+    writeFileSync(join(root, "low", "package.json"), JSON.stringify({ scripts: { "check:own": "true" } }));
+    mkdirSync(join(root, "cat-harness-tools"));
+    writeFileSync(
+      join(root, "cat-harness-tools", "cat-harness-tools.json"),
+      JSON.stringify({ $schema: "cat-harness-declaration/v1", name: "cat-harness-tools", needs: [] }),
+    );
+    const scripts = Object.values(gates);
+    const missing = scripts[scripts.length - 1]!;
+    const older = Object.fromEntries(scripts.filter((s) => s !== missing).map((s) => [s, "true"]));
+    writeFileSync(join(root, "cat-harness-tools", "package.json"), JSON.stringify({ checkoutScripts: older }));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { cat: "x" } }));
+    const [, , , derived, skipped] = py("run-gates.py", `m.derive(${JSON.stringify(root)}, ["low"], "/tmp", {})`) as [
+      unknown,
+      unknown,
+      unknown,
+      Record<string, string>,
+      Record<string, { command: string; skipped: string; kind: string }>,
+    ];
+    expect(derived[`cat-harness-tools:${missing}`]).toBeUndefined();
+    expect(skipped[`cat-harness-tools:${missing}`]).toEqual(
+      expect.objectContaining({ kind: "not-at-pin", command: `bun run cat ${missing}`, skipped: expect.stringContaining(missing) }),
+    );
+    for (const s of Object.keys(older)) expect(derived[`cat-harness-tools:${s}`]).toBe(`bun run cat ${s}`);
+  });
+
   test("run-gates.py own_instances reads both `instances` and the migrated `layers` + `harnesses` form of index.config.json (cat-harness#1138)", () => {
     const root = mkdtempSync(join(tmpdir(), "own-layers-"));
     mkdirSync(join(root, "ig"));
