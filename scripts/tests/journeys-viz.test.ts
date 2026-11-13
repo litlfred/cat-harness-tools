@@ -684,7 +684,8 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(page).toContain('name="policy:q:P1:0"');
     expect(page).toContain('name="policy:q:P2:1"');
     // Readiness rows grouped and rated; decision rights with who holds them; the gap strip's own radios.
-    expect(page).toContain("<h4>Strategy &amp; investment</h4>");
+    // Each group keeps its heading; anchorHeadings (#1894) gives it an id like every view heading.
+    expect(page).toContain('<h4 id="strategy-investment">Strategy &amp; investment</h4>');
     expect(page).toContain('name="policy:rate:ready:twg" value="not-yet"');
     expect(page).toContain('name="policy:hold:rights:anchor"');
     expect(page).toContain('name="policy:viewer:status" value="no"');
