@@ -157,7 +157,7 @@ Feature: An actor performs a task in a process as a role, using that role's skil
     Then it is "editor"
     And the warning says partitionElementRef wins
 
-  @test:schemas/process/role-graph.test.ts::laneRoleRef_—_a_lane_names_its_Role_by_partitionElementRef_(owner,_2026-10-16)::variable=\"true\"_is_a_declaration,_not_a_legacy_binding
+  @test:schemas/process/role-graph.test.ts::laneRoleRef_—_a_lane_names_its_Role_by_partitionElementRef_(owner,_2026-10-16)::variable="true"_is_a_declaration,_not_a_legacy_binding
   Scenario: variable="true" declares a varying performer, not a binding
     Given a lane with a bootstrap.processes:role extension carrying variable "true"
     When its role ref is read
@@ -394,3 +394,10 @@ Feature: An actor performs a task in a process as a role, using that role's skil
     When the holder is elected from A with creation time "not a date" and B
     Then it is B
     And when both creation times are unreadable, A is elected
+
+  @test:schemas/process/role-graph.test.ts::readRoleGraph_—_a_role_inherits_a_role_of_an_instance_it_needs::a_self-mounting_checkout:_the_needed_layer_is_mounted_INSIDE_the_layer's_own_root
+  Scenario: A self-mounting checkout finds the needed layer mounted inside its own root
+    Given instance "top" needing "base", with a role "checker" that inherits "reviewer"
+    And instance "base" mounted inside top's own root at "base/", declaring role "reviewer"
+    When top's role graph is read
+    Then it reads without error and its own roles are "checker"

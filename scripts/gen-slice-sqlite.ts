@@ -326,6 +326,7 @@ export function databaseContentDigest(db: Database, def: SliceDef): string {
  * the published bytes carry no build history.
  */
 export function buildSlice(def: SliceDef, data: SliceData, outDir: string): SliceManifest {
+  // input-site: inert #4b5268b6 — a scratch dir for the build, removed in the finally below before this returns
   const scratchDir = mkdtempSync(join(tmpdir(), "slice-sqlite-"));
   const scratch = join(scratchDir, "build.sqlite3");
   try {
@@ -449,6 +450,7 @@ export function manifestText(m: SliceManifest): string {
 /** The problems `--check` reports for one slice; empty means green. */
 export function checkSlice(def: SliceDef, data: SliceData, opts: { publishedPayloadDir?: string } = {}): string[] {
   const problems: string[] = [];
+  // input-site: inert #fad5a4d5 — a temp dir for the two check builds, removed in the finally below before this returns
   const dir = mkdtempSync(join(tmpdir(), "slice-check-"));
   try {
     const a = buildSlice(def, data, join(dir, "a"));

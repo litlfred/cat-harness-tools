@@ -185,7 +185,7 @@ describe("the pages to review (deep links, bean g4dv)", () => {
     expect(s).not.toContain(`${STAGING}gone.html`);
   });
 
-  test(`capped at ${MAX_REVIEW_ROWS} rows, with how many more and where`, () => {
+  test("capped at 20 rows, with how many more and where", () => {
     const files = Array.from({ length: MAX_REVIEW_ROWS + 5 }, (_, i) => ({ path: `p${String(i).padStart(2, "0")}.html`, change: "changed" as const, role: "content" as const }));
     const s = reviewSection(STAGING, MAIN, [impact(files)]);
     expect(s.split("\n").filter((l) => l.startsWith("- [")).length).toBe(MAX_REVIEW_ROWS);

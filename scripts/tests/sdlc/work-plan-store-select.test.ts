@@ -45,7 +45,7 @@ describe("the schema", () => {
 });
 
 describe("workPlanStoreFor", () => {
-  test(`${DEPLOYMENT_ENV} unset: the git branch, as every checkout today`, () => {
+  test("CAT_DEPLOYMENT unset: the git branch, as every checkout today", () => {
     const c = workPlanStoreFor("/nowhere", {});
     expect(c.tool).toBe("beans-git-branch");
     expect(c.deployment).toBeUndefined();

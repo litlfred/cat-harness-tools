@@ -84,8 +84,14 @@ export interface GitHubApi {
    */
   lockPinsAt?(repository: string, sha: string): Promise<Record<string, string> | undefined>;
   /**
+   * How `head` relates to `base` in `repository`: GitHub's compare `status`
+   * (`ahead`, `behind`, `identical`, `diverged`). Optional: without it the
+   * cascade cannot tell a held pin is older, and moves it as before.
+   */
+  compareCommits?(repository: string, base: string, head: string): Promise<string>;
+  /**
    * The parsed `<instance>.json` of `repository` at `sha`, read from `at`
-   * (the instance's `upstreamRoot` in the site's lock, e.g. `smart-base/`)
+   * (the instance's `upstreamRoot` in the site's lock, e.g. `<name>/`)
    * or from the root when `at` is empty; `undefined` when there is none.
    * Optional: an API without it adds no newly declared directory
    * ({@link extendExplicitDirectories}).
@@ -143,6 +149,9 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
       ]);
       return verdictOf(status, runs.check_runs);
     },
+    async compareCommits(repository, base, head) {
+      return (await get<{ status: string }>(`/repos/${repo(repository)}/compare/${base}...${head}`)).status;
+    },
     async lockPinsAt(repository, sha) {
       let file: { content?: string; encoding?: string };
       try {
@@ -194,9 +203,9 @@ export async function cascadeOf(root: string, harnessRoot?: string): Promise<{ h
 /**
  * `{ instance → upstreamRoot }` from an `index.lock.json`'s `instances`: where
  * each instance's declaration sits in its repository. A layer whose
- * declaration is not at the root (smart-base keeps `smart-base/smart-base.json`)
+ * declaration is not at the root (a layer that keeps `<name>/<name>.json`)
  * was read at the root by step 4a, found missing, and turned every re-pin that
- * moved it into could-not-determine (smart-trust, 2026-11-13). Pure.
+ * moved it into could-not-determine (2026-11-13). Pure.
  */
 export function upstreamRootsOf(lock: unknown): Record<string, string> {
   const out: Record<string, string> = {};
@@ -422,6 +431,23 @@ export async function alignToHeldPins(plan: RepinPlan, mounts: readonly RemoteMo
     if (ref === m.ref) {
       held.push({ harness: m.harness, reason: `${by} holds it at its current pin in its own lock; it moves when that layer re-pins it (cascade)` });
       continue;
+    }
+    // Never BACKWARDS. A layer's lock records what it was last tested with, so
+    // it can trail the site's own pin; aligning to it then undid fixes the
+    // site already had (folio-assistant train #3111 took bootstrap-tools from
+    // 0f88368 back to bbdaffb, the commit before a reference-direction fix).
+    if (api.compareCommits) {
+      let rel: string;
+      try {
+        rel = await api.compareCommits(m.repository, m.ref, ref);
+      } catch (e) {
+        held.push({ harness: m.harness, reason: `${by} holds it at ${ref.slice(0, 10)}, and whether that is older than its current pin could not be asked: ${(e as Error).message}` });
+        continue;
+      }
+      if (rel === "behind") {
+        held.push({ harness: m.harness, reason: `${by} holds it at ${ref.slice(0, 10)}, OLDER than its current pin ${m.ref.slice(0, 10)}; a re-pin never moves a pin backwards` });
+        continue;
+      }
     }
     const verdict = rule.require === "green" ? await api.commitVerdict(m.repository, ref) : undefined;
     const cover = standingCovers(m, { branch: rule.follows, sha: ref, ...(verdict ? { verdict } : {}) });

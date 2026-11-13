@@ -21,7 +21,7 @@
  * 5. Is a template whose source is GONE reported rather than deleted or
  *    silently dropped? `deletion-requires-confirmation`.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -115,6 +115,11 @@ describe("the ownership boundary with translate-bpmn", () => {
     // Without this the test above passes on an empty subdirectory. The other
     // module's templates must actually be there for the exclusion to mean
     // anything.
+    const translations = join(INSTANCE, "translations");
+    const onDisk = readdirSync(translations, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && existsSync(join(translations, d.name, "processes")))
+      .flatMap((d) => readdirSync(join(translations, d.name, "processes")).filter((f) => f.endsWith(".pot")));
+    expect(onDisk.length).toBeGreaterThan(0);
     const bpmn = PLAN().filter((p) => p.pot.includes(`${"processes"}/`));
     expect(bpmn).toHaveLength(0);
   });

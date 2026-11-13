@@ -115,7 +115,7 @@ describe("reader-facing text", () => {
     );
     expect(plainCell('not("red")')).toBe('<span class="fa-dmn-not">not</span> <span class="fa-dmn-chip fa-dmn-chip-input">red</span>');
     expect(plainCell(" - ")).toBe('<span class="fa-dmn-any">any</span>');
-    expect(plainCell('"go"', "output")).toBe(plainCell('"go"', "output"));
+    expect(plainCell('"go"', "output")).toMatch(/^<span class="fa-dmn-chip fa-dmn-chip-output fa-dmn-hue-\d+">go<\/span>$/);
   });
 });
 

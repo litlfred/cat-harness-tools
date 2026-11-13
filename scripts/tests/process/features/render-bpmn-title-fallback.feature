@@ -3,12 +3,14 @@
 # viewer. render-bpmn.ts runs on import, so its source is read.
 Feature: A step with no page of its own still has a title link
 
-  @test:scripts/tests/process/render-bpmn-title-fallback.test.ts::a_step_with_no_page_of_its_own_still_has_a_title_link::the_subject_page_wins,_else_the_process's_own_page
-  Scenario: A step's title links to its subject page, else to its process's page
+  @test:scripts/tests/process/render-bpmn-title-fallback.test.ts::a_step_with_no_page_of_its_own_still_has_a_title_link::the_subject_page_wins,_else_the_step's_entry_on_its_process's_page
+  Scenario: A step's title links to its subject page, else to the step's entry on its process's page
     # Gap: checked on the source text only; no drawing is rendered to see which link a step gets
     Given the source of scripts/render-bpmn.ts
     When it is read
-    Then the step's href is subjectHref(file, "process", `${s.process}/node/${s.id}`) falling back with ?? to SITE_UP + processTarget(basename(file, ".bpmn"), undefined)
+    Then the step's href is subjectHref(file, "process", `${s.process}/node/${s.id}`) falling back with ?? to SITE_UP + stepOnProcessPage(basename(file, ".bpmn"), s.id)
+    And the step's entry is the process page's target followed by "#step-<step>"
+    And the anchor of step "Task_Verify" is "step-Task_Verify"
 
   @test:scripts/tests/process/render-bpmn-title-fallback.test.ts::a_step_with_no_page_of_its_own_still_has_a_title_link::every_step_is_linked,_not_only_those_with_a_subject_page
   Scenario: Every step's title is recorded with its href, unconditionally
@@ -24,3 +26,4 @@ Feature: A step with no page of its own still has a title link
     When processTarget is computed for each
     Then with none it ends in "/p.html"
     And it differs from the target with the docs page
+

@@ -20,6 +20,8 @@ import {
   reliefCandidates,
   supersededBy,
   watchRepo,
+  paginate,
+  unreadSummary,
   type GitHub,
   type PinChange,
   type WorkflowRun,
@@ -319,5 +321,42 @@ describe("watchRepo over the stub", () => {
     expect(r.main.verdict).toBe("unknown: main push runs not read");
     expect(r.queue).toBeNull();
     expect(r.errors.length).toBeGreaterThan(0);
+  });
+});
+
+describe("pagination never follows GitHub's Link header", () => {
+  test("asks by page= on the given path, and stops at a short page", () => {
+    const asked: string[] = [];
+    const full = Array.from({ length: 2 }, (_, i) => ({ id: i }));
+    const pages = paginate((p) => {
+      asked.push(p);
+      return p.endsWith("page=3") ? [{ id: 9 }] : full;
+    }, "repos/o/r/pulls/1/commits?per_page=2");
+    expect(asked).toEqual([
+      "repos/o/r/pulls/1/commits?per_page=2&page=1",
+      "repos/o/r/pulls/1/commits?per_page=2&page=2",
+      "repos/o/r/pulls/1/commits?per_page=2&page=3",
+    ]);
+    expect(pages).toHaveLength(3);
+    expect(asked.every((p) => !p.startsWith("repositories/"))).toBe(true);
+  });
+  test("a wrapped page is measured by its array field", () => {
+    const asked: string[] = [];
+    paginate((p) => {
+      asked.push(p);
+      return { total_count: 1, check_runs: [{ id: 1 }] };
+    }, "repos/o/r/commits/s/check-runs?per_page=100");
+    expect(asked).toEqual(["repos/o/r/commits/s/check-runs?per_page=100&page=1"]);
+  });
+});
+
+describe("exit 2 says why", () => {
+  test("names each repository and what of it was not read", () => {
+    const report = watchRepo(stub({}), "o/x", undefined, NOW);
+    const [line] = unreadSummary([report]);
+    expect(line).toStartWith("o/x: ");
+    expect(line).toContain("runner queue");
+    expect(line).toContain("main verdict");
+    expect(unreadSummary([{ ...report, errors: [], queue: queueReading([], NOW), main: { sha: "m", verdict: "green" } }])).toEqual([]);
   });
 });

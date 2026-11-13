@@ -58,14 +58,12 @@ describe("bind address", () => {
 
   // Both servers' Bun.serve calls pass it, and /mcp goes through refuseMcp.
   // A source check: a route test would need a live port per case.
-  for (const file of ["src/server.ts", "adapters/mcp-server/server.ts"]) {
-    it(`${file} binds bindHostname() and guards /mcp`, () => {
-      const src = readFileSync(join(import.meta.dir, "../../..", file), "utf-8");
-      const serves = src.match(/Bun\.serve\(\{/g) ?? [];
-      expect(serves.length).toBe(2);
-      expect(src.match(/^\s+hostname,$/gm)?.length).toBe(2);
-      expect(src).toContain("refuseMcp(");
-      expect(src).not.toMatch(/return httpTransport\.handleRequest\(req\);/);
-    });
-  }
+  it.each(["src/server.ts", "adapters/mcp-server/server.ts"])("%s binds bindHostname() and guards /mcp", (file) => {
+    const src = readFileSync(join(import.meta.dir, "../../..", file), "utf-8");
+    const serves = src.match(/Bun\.serve\(\{/g) ?? [];
+    expect(serves.length).toBe(2);
+    expect(src.match(/^\s+hostname,$/gm)?.length).toBe(2);
+    expect(src).toContain("refuseMcp(");
+    expect(src).not.toMatch(/return httpTransport\.handleRequest\(req\);/);
+  });
 });

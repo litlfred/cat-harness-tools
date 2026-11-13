@@ -123,17 +123,15 @@ describe("embed", () => {
     expect(html).toContain(`href="${CDN}r@main/a b.pdf" download`);
   });
 
-  for (const [path, root] of [
+  test.each([
     ["/who-iris/item-x.html", "/"],
     ["/folio-assistant/who-iris/item-x.html", "/folio-assistant/"],
     ["/STAGING/my-branch/who-iris/item-x.html", "/STAGING/my-branch/"],
-  ] as const) {
-    test(`at ${path} the frame opens ${root}${VIEWER_PATH}, on page 3`, () => {
-      expect(frameSrcAt(path, html).src).toBe(
-        `${root}${VIEWER_PATH}?src=${encodeURIComponent(`${CDN}r@main/a b.pdf`)}&v=${VIEWER_REV}.0#page=3`,
-      );
-    });
-  }
+  ] as const)("at %s the frame opens the viewer under %s, on page 3", (path, root) => {
+    expect(frameSrcAt(path, html).src).toBe(
+      `${root}${VIEWER_PATH}?src=${encodeURIComponent(`${CDN}r@main/a b.pdf`)}&v=${VIEWER_REV}.0#page=3`,
+    );
+  });
 
   test("the frame's address changes with each deploy of the page around it, so a cache cannot serve last deploy's viewer", () => {
     // Owner, 2026-10-04: a hard reload still showed the pre-fix frame.

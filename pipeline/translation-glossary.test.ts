@@ -8,18 +8,20 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { glossaryConsistencyMarkdown } from "../scripts/kg-qa-report.ts";
 import { GlossarySenseStoreSchema, senseKey, type GlossarySenseVerdict } from "../schemas/kg/glossary-sense.ts";
 import {
+  cataloguePatternOf,
   checkLocale,
   glossaryResult,
   glossarySources,
   keptAsName,
   msgidSha256,
   ownTranslationRoots,
+  patternCatalogues,
   pendingQuestions,
   readSchemeScope,
   renders,
@@ -293,6 +295,56 @@ describe("checkLocale — the three rules, and scope", () => {
     const r = checkLocale(root, join(root, "translations"), "fr", [], glossarySources(root, "fr"));
     expect(r.findings).toEqual([]);
     expect(r.fixedTerms).toBe(1);
+  });
+});
+
+describe("a declared `catalogues` pattern (a smart-base IG's input/<area>/translations/<locale>.po)", () => {
+  /** A layer whose catalogues sit where smart-base's injector reads them, not under translations/<locale>/. */
+  function ig(dir: string): string {
+    const root = join(base, dir);
+    mkdirSync(join(root, "translations", "fr", "glossary"), { recursive: true });
+    writeFileSync(
+      join(root, "acme.json"),
+      JSON.stringify({
+        name: "acme",
+        directories: [
+          {
+            id: "translations",
+            path: "translations/",
+            graphTypologies: ["translation-sources"],
+            catalogues: "input/*/translations/{locale}.po",
+          },
+        ],
+      }),
+    );
+    writeFileSync(join(root, "translations", "fr", "glossary", "acme--terms.po"), HEADER + label("Health worker", "Agent de santé"));
+    w(`${dir}/input/pagecontent/translations/fr.po`, HEADER + plain("Every health worker signs in.", "Chaque soignant se connecte."));
+    w(`${dir}/input/images/translations/fr.po`, HEADER + plain("A health worker arrives.", "Un agent de santé arrive."));
+    w(`${dir}/input/images/translations/images.pot`, HEADER + plain("A health worker arrives.", ""));
+    w(`${dir}/input/images/translations/es.po`, HEADER + plain("Every health worker signs in.", "Cada trabajador sanitario entra."));
+    return root;
+  }
+  test("the pattern's files are the locale's catalogues, and its locales are the layer's", () => {
+    const root = ig("igpat");
+    expect(cataloguePatternOf(root)).toBe("input/*/translations/{locale}.po");
+    expect(patternCatalogues(root, "input/*/translations/{locale}.po").map((c) => `${relative(root, c.file)}=${c.locale}`)).toEqual([
+      "input/images/translations/es.po=es",
+      "input/images/translations/fr.po=fr",
+      "input/pagecontent/translations/fr.po=fr",
+    ]);
+    const r = checkLocale(root, join(root, "translations"), "fr", [], glossarySources(root, "fr"));
+    // pagecontent/fr.po renders "health worker" as «soignant», not the fixed «agent de santé».
+    expect(r.findings.map((f) => `${f.rule}:${f.term}:${f.catalogue}`)).toEqual([
+      "not-fixed-rendering:Health worker:input/pagecontent/translations/fr.po",
+    ]);
+  });
+  test("without the field, only translations/<locale>/ is read", () => {
+    const root = ig("igpat-none");
+    const decl = JSON.parse(readFileSync(join(root, "acme.json"), "utf-8"));
+    delete decl.directories[0].catalogues;
+    writeFileSync(join(root, "acme.json"), JSON.stringify(decl));
+    expect(cataloguePatternOf(root)).toBeUndefined();
+    expect(checkLocale(root, join(root, "translations"), "fr", [], glossarySources(root, "fr")).findings).toEqual([]);
   });
 });
 

@@ -82,7 +82,8 @@
  * `--queued-minutes <n>` (a queued run this old is a relief candidate) ·
  * `--exclude-layer <name>` (repeatable; replaces the default) · `--json`.
  *
- * Exit 0 printed · 2 usage error, or something could not be read.
+ * Exit 0 printed · 2 usage error, or something could not be read (a one-line
+ * summary on stderr names each repository and what of it was not read).
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -517,9 +518,39 @@ function gh(args: readonly string[]): string {
   return r.stdout;
 }
 
+/** The items on one page: the array itself, or the first array-valued field (`check_runs`, `workflow_runs`). */
+export function pageItems(page: unknown): unknown[] {
+  if (Array.isArray(page)) return page;
+  if (page && typeof page === "object") {
+    for (const v of Object.values(page)) if (Array.isArray(v)) return v;
+  }
+  return [];
+}
+
+/** Hard stop, so a server that ignores `page` cannot loop forever. */
+export const MAX_PAGES = 50;
+
+/**
+ * Every page of `path`, asked for by `page=N` on the path we were given.
+ * `gh api --paginate` follows GitHub's `Link` header instead, whose next URL
+ * names the repository by id (`repositories/{id}/…`); the agent proxy refuses
+ * those (merge:watch's first live run, 2026-11-13). A page shorter than
+ * `per_page` is the last.
+ */
+export function paginate(get: (path: string) => unknown, path: string): unknown[] {
+  const perPage = Number(/[?&]per_page=(\d+)/.exec(path)?.[1] ?? 30);
+  const out: unknown[] = [];
+  for (let n = 1; n <= MAX_PAGES; n++) {
+    const page = get(`${path}${path.includes("?") ? "&" : "?"}page=${n}`);
+    out.push(page);
+    if (pageItems(page).length < perPage) break;
+  }
+  return out;
+}
+
 export const ghApi: GitHub = {
   json: <T>(path: string) => JSON.parse(gh([path])) as T,
-  pages: <T>(path: string) => JSON.parse(gh(["--paginate", "--slurp", path])) as T[],
+  pages: <T>(path: string) => paginate((p) => JSON.parse(gh([p])), path) as T[],
   text: (path: string) => gh([path]),
 };
 
@@ -781,6 +812,19 @@ export function formatReport(r: RepoReport): string {
   return lines.join("\n");
 }
 
+/** What could not be read, one entry per repository that has any; empty when everything was read. */
+export function unreadSummary(reports: readonly RepoReport[]): string[] {
+  return reports.flatMap((r) => {
+    const what = [
+      ...r.errors,
+      ...(r.queue === null ? ["runner queue"] : []),
+      ...(r.main.verdict.startsWith("unknown") ? ["main verdict"] : []),
+      ...r.prs.filter((p) => p.verdict.startsWith("unknown")).map((p) => `#${p.number} verdict`),
+    ];
+    return what.length > 0 ? [`${r.repo}: ${what.join(", ")}`] : [];
+  });
+}
+
 function main(argv: readonly string[]): number {
   let cli: Cli;
   try {
@@ -798,10 +842,9 @@ function main(argv: readonly string[]): number {
   const reports = cli.repos.map((repo) => watchRepo(ghApi, repo, cli.opts));
   if (cli.json) console.log(JSON.stringify(reports, null, 2));
   else console.log(reports.map(formatReport).join("\n\n"));
-  const unread = reports.some(
-    (r) => r.errors.length > 0 || r.queue === null || r.main.verdict.startsWith("unknown") || r.prs.some((p) => p.verdict.startsWith("unknown")),
-  );
-  return unread ? 2 : 0;
+  const unread = unreadSummary(reports);
+  if (unread.length > 0) console.error(`merge:watch: exit 2, something could not be read: ${unread.join("; ")}`);
+  return unread.length > 0 ? 2 : 0;
 }
 
 if (import.meta.main) process.exit(main(process.argv.slice(2)));

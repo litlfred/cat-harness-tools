@@ -160,11 +160,12 @@ Feature: An Archi model is read, its views are drawn, and an instance's pages ar
     And every JSON-LD file's "@id" is its own IRI
     And the component's JSON-LD type is "archimate:ApplicationComponent", and the serving's source is the service's IRI
 
-  @test:archimate/scripts/archimate.test.ts::an_instance::a_page_copies_none_of_the_model's_documentation,_properties_or_notes:_its_config_points_at_the_normalised_model_relative_to_itself
-  Scenario: A page points at the normalised model relative to itself and copies no documentation, property or note
+  @test:archimate/scripts/archimate.test.ts::an_instance::a_page_copies_none_of_the_model's_documentation,_properties_or_notes:_it_declares_its_node_and_points_at_the_normalised_model_relative_to_itself
+  Scenario: A page declares its node, points at the normalised model relative to itself and copies no documentation, property or note
     Given the throwaway instance
     When its pages are generated
-    Then each page's config names "model.json" relative to the page's depth
+    Then each page's config names "model.json" relative to the page's depth, and the metamodel page names none
+    And each page declares its node with no problem found
     And no page contains the component's documentation "Holds the records.", its property key "owner" or value "WHO", or the note's text
 
   @test:archimate/scripts/archimate.test.ts::an_instance::declares_the_rail's_left-hand_section:_the_model's_views,_relative_to_each_page
@@ -205,3 +206,38 @@ Feature: An Archi model is read, its views are drawn, and an instance's pages ar
     Given the throwaway instance
     When its pages are generated requiring a served graph
     Then it throws naming "served: true"
+
+  @test:archimate/scripts/archimate.test.ts::an_instance::is_swept_from_the_checkout_when_it_declares_an_archimate_directory,_and_a_layer_that_does_not_is_left_out
+  Scenario: A layer declaring an archimate directory is swept from the checkout, and one that does not is left out
+    Given a checkout holding the throwaway instance "tiny" and a layer "plain" that declares no directories
+    When the checkout's ArchiMate instances are swept
+    Then only "tiny" is found, and it has no committed-check problem
+    And once a layer "broken" with a declaration that is not JSON is added, the sweep finds "broken" and "tiny"
+
+  @test:archimate/scripts/archimate.test.ts::an_instance::links_a_reused_element_back_to_the_node_it_copies,_and_an_own_element_to_the_copy_it_plays_(issue_#1949)
+  Scenario: A reused element links back to the node it copies, and an own element names the copy it plays
+    Given the throwaway instance whose service "Lookup" and serving carry an "overlay:base" property naming a node in "ra 0.3.0", with two added realisations
+    When its pages are generated
+    Then the service's and the serving's JSON-LD have "dcterms:source" naming the base IRI
+    And the service's page says "Reused from" a link to "ra 0.3.0"
+    And the component's JSON-LD has no "dcterms:source", but its page says it plays "Lookup" in ra 0.3.0
+    And the data object's page says it plays "Lookup" in ra 0.3.0 through the component
+    And an older "relationships/id-r9.jsonld" base IRI is read as the node IRI "relationship/id-r9", and "not an IRI" gives none
+    And the access relationship's page names no source
+
+  @test:archimate/scripts/archimate.test.ts::an_instance::bundles_the_IG_sites'_Contents_card_with_the_renderer,_and_draws_it_over_a_page's_sections_(issue_#1885)
+  Scenario: The IG sites' Contents card is bundled with the renderer and floated over a page's sections
+    Given the throwaway instance
+    When its pages are generated
+    Then "assets/archimate.js" sets "window.faContentsCard" before it calls it on a host
+    And "assets/archimate.css" holds the ".igi-contents" rule and floats it right in the page body
+
+  @test:archimate/scripts/archimate.test.ts::an_instance::serves_a_small_page_AT_each_node's_IRI_that_declares_the_node_and_links_its_page,_in_the_graph_and_in_a_site
+  Scenario: A small page at each node's IRI declares the node and links to its page, in the graph and in a site
+    Given the throwaway instance
+    When its pages are generated in the graph
+    Then the component's stub "1.0.0/element/id-a.html" declares its IRI with type ArchiMate ApplicationComponent, with no node problem
+    And it links its JSON-LD as an alternate and loads no script
+    And there are seven stubs: the model, its view, three elements and two relationships
+    When its pages are generated for a site
+    Then every stub is under "archimate/" and its canonical link reaches a written page at the declared route
