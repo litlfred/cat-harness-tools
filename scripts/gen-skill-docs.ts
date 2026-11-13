@@ -483,8 +483,8 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   "folio-paper-adapter": "Paper adapter (folio-paper-adapter)",
   "authoring-math": "Mathematical authoring (authoring-math)",
   "authoring-who-smart-guidelines": "WHO SMART Guidelines (authoring-who-smart-guidelines)",
-  // smart-base's opt-in knowledge levels (smart-base#360): each level's skills
-  // mount only where its group is enabled, so each needs its own label.
+  // The SMART Guidelines knowledge levels: each level's skill package sits in
+  // its own opt-in group, mounted only where enabled, so each needs a label.
   "smart-l1": "SMART Guidelines L1: narrative guidance (smart-l1)",
   "smart-l2": "SMART Guidelines L2: operational content (smart-l2)",
   "smart-l3": "SMART Guidelines L3: machine-readable content (smart-l3)",
