@@ -934,7 +934,7 @@ export function wireNavResize(doc: Document): void {
     h.className = "fa-nav-resize";
     h.setAttribute("role", "separator");
     h.setAttribute("aria-orientation", "vertical");
-    h.setAttribute("aria-label", "Drag to widen or narrow the navigation");
+    h.setAttribute("aria-label", "Drag to widen or narrow the navigation"); // NAV_RESIZE_LABEL: inlined as text, so a literal
     h.setAttribute("data-fa-tip", "Drag to widen or narrow the navigation");
     h.tabIndex = 0;
     const width = () => (nav as HTMLElement).getBoundingClientRect().width;
@@ -1113,7 +1113,7 @@ export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
   const name = m.headName ?? m.instance;
   const inner = mark(item, c) + `<span class="fa-nav-name fa-nav-label">${esc(name)}</span>`;
   if (m.headHref === undefined) {
-    return `<label class="fa-nav-head" for="fa-nav-open" title="Open or close navigation">` + inner + `</label>`;
+    return `<label class="fa-nav-head" for="fa-nav-open" title="${esc(NAV_TOGGLE_LABEL)}">` + inner + `</label>`;
   }
   // THE HEADER IS THE HOME LINK (owner, 2026-10-30), and the open/close label
   // stays beside it. At rest the label covers the whole header, so a tap on a
@@ -1125,7 +1125,7 @@ export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
     `<a class="fa-nav-head-link" href="${href(m.headHref, c)}" title="${esc(name)}: landing page">` +
     inner +
     `</a>` +
-    `<label class="fa-nav-head-toggle" for="fa-nav-open" aria-label="Open or close navigation" data-fa-tip="Open or close navigation">` +
+    `<label class="fa-nav-head-toggle" for="fa-nav-open" aria-label="${esc(NAV_TOGGLE_LABEL)}" data-fa-tip="${esc(NAV_TOGGLE_LABEL)}">` +
     `<span aria-hidden="true">\u2039</span></label>` +
     `</div>`
   );
@@ -1256,6 +1256,11 @@ export const NAVBAR_CSS = "assets/css/navbar.css";
  *
  * The home row is not a section: it is named after the site.
  */
+/** The open/close control's name and tooltip (translated by `navbar-strings.ts`). */
+export const NAV_TOGGLE_LABEL = "Open or close navigation";
+/** The drag edge's name and tooltip. `wireNavResize` is inlined as text, so it repeats it; a test holds them equal. */
+export const NAV_RESIZE_LABEL = "Drag to widen or narrow the navigation";
+
 export const RAIL_SECTION_LABELS = {
   pages: "Pages",
   onThisPage: "On this page",
