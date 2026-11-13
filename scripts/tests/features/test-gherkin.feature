@@ -163,3 +163,11 @@ Feature: Every test has a Gherkin
     Then only the unbound Scenarios under that path are specifications
     When dak.json declares a resource that is not a DAK
     Then nothing is a specification
+
+  @test:scripts/tests/test-gherkin.test.ts::a_JS_title_is_named_by_its_runtime_string::escapes_in_a_quoted_or_template_title_are_read_as_the_runner_reads_them;_a_looped_id_stays_verbatim
+  Scenario: A JS test is named by the title its runner prints, not by the escapes in its source
+    Given a describe titled with escaped double quotes, holding tests titled with an escaped single quote, escaped backticks, an escaped backslash, a \u escape and a \x escape, and a looped test case[${k}]
+    When the JS adapter reads the file
+    Then each name carries the title's runtime characters, with no escaping backslash left
+    And the looped test keeps its ${k} verbatim
+    And a newline escape, a code-point escape and a line continuation unescape as JavaScript reads them

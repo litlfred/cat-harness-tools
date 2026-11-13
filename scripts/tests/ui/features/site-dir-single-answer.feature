@@ -2,9 +2,8 @@
 # Each Scenario names the test that executes it.
 Feature: The site root is one answer, not a literal
 
-  @test:scripts/tests/ui/site-dir-single-answer.test.ts::the_site_root_is_one_answer,_not_a_literal::siteDir_composes_docs/<stub>_and_siteDirFor_reads_this_instance's
+  @test:scripts/tests/ui/site-dir-single-answer.test.ts::the_site_root_is_one_answer,_not_a_literal::siteDir_is_docs_under_the_layer_root_whatever_the_stub,_and_siteDirFor_reads_this_instance's
   Scenario: siteDir and siteDirFor give "docs" for every layer
-    # Gap: the title says docs/<stub>; the test asserts plain "docs" whatever the stub.
     Given an instance declaration with name "x" and stub "y", one with name "x" only, and this harness root
     When the site directory is asked of each
     Then every answer is "docs"

@@ -44,12 +44,10 @@ describe("merge:watch verdict per rule 1", () => {
     }
   });
 
-  for (const c of cases) {
-    test(c.name, () => {
-      const logs = new Map(Object.entries(c.logs ?? {}).map(([id, log]) => [Number(id), log]));
-      expect(formatVerdict(verdictOf(c.pr, c.checkRuns, c.workflowRuns, logs))).toBe(c.expected);
-    });
-  }
+  test.each(cases.map((c) => [c.name, c] as const))("%s", (_name, c) => {
+    const logs = new Map(Object.entries(c.logs ?? {}).map(([id, log]) => [Number(id), log]));
+    expect(formatVerdict(verdictOf(c.pr, c.checkRuns, c.workflowRuns, logs))).toBe(c.expected);
+  });
 
   test("no checks at all is pending, never green", () => {
     expect(formatVerdict(verdictOf({ draft: false }, [], []))).toBe("pending: no checks");

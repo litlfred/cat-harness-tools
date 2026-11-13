@@ -50,7 +50,7 @@ Feature: Site minification drops only what cannot render
     When it is minified
     Then it reads "<p><a>one</a> <a>two</a></p>"
 
-  @test:scripts/tests/ui/minify-site.test.ts::whitespace:_dropped_where_it_cannot_render,_one_space_where_it_can::…which_is_the_word_boundary_a_naive_`>\\s+<`_would_delete
+  @test:scripts/tests/ui/minify-site.test.ts::whitespace:_dropped_where_it_cannot_render,_one_space_where_it_can::…which_is_the_word_boundary_a_naive_`>\s+<`_would_delete
   Scenario: The word boundary between inline elements is not deleted
     Given two spans separated by a newline
     When it is minified

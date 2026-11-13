@@ -19,7 +19,7 @@
  */
 import { describe, expect, it } from "bun:test";
 
-import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -478,6 +478,19 @@ describe("a served directory's bytes publish at /<instance>/<path> — bean 680p
     expect(servedDirectories([entry("fhir-artifact-index/", true)])).toEqual([
       { name: "smart-trust", dir: "/repo/smart-trust/fhir-artifact-index/", route: "smart-trust/fhir-artifact-index" },
     ]);
+  });
+
+  it("a MOUNTED layer's twin under the layer output root is served over the pinned bytes — bean cat-tools-sm8r item 4", () => {
+    const repo = mkdtempSync(join(tmpdir(), "served-twin-"));
+    writeFileSync(join(repo, "index.lock.json"), JSON.stringify({ instances: [{ instance: "some-ig", path: "some-ig" }] }));
+    const pinned = join(repo, "some-ig", "fhir-artifact-index");
+    mkdirSync(pinned, { recursive: true });
+    const at = { name: "some-ig", abs: pinned, entry: { path: "fhir-artifact-index/", graphTypologies: ["fhir-artifact-index"], served: true } };
+    expect(servedDirectories([at], repo)[0]?.computed).toBeUndefined();
+    const twin = join(repo, "build", "layers", "some-ig", "fhir-artifact-index");
+    mkdirSync(twin, { recursive: true });
+    expect(servedDirectories([at], repo)).toEqual([{ name: "some-ig", dir: pinned, route: "some-ig/fhir-artifact-index", computed: twin }]);
+    rmSync(repo, { recursive: true, force: true });
   });
 });
 

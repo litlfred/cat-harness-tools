@@ -130,7 +130,7 @@ function stripComments(text: string): string {
 }
 
 describe("the site root is one answer, not a literal", () => {
-  test("siteDir composes docs/<stub> and siteDirFor reads this instance's", () => {
+  test("siteDir is docs under the layer root whatever the stub, and siteDirFor reads this instance's", () => {
     expect(siteDir({ name: "x", stub: "y" })).toBe("docs");
     // No longer varies with the stub: the layer root IS the stub directory,
     // so the site dir within it is the same string for every layer.

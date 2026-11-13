@@ -9,13 +9,13 @@ Feature: Instance publication, versions and dependencies
     When it is parsed
     Then the parse succeeds
 
-  @test:schemas/instance-versioning.test.ts::publication_is_a_STATE,_and_`published`_is_refused_(§3.1,_superseded_2026-09-23)::`publication.state:_\"draft\"`_is_legal_and_says_nothing_extra
+  @test:schemas/instance-versioning.test.ts::publication_is_a_STATE,_and_`published`_is_refused_(§3.1,_superseded_2026-09-23)::`publication.state:_"draft"`_is_legal_and_says_nothing_extra
   Scenario: A draft publication state is legal
     Given a minimal declaration with publication state "draft"
     When it is parsed
     Then the parse succeeds
 
-  @test:schemas/instance-versioning.test.ts::publication_is_a_STATE,_and_`published`_is_refused_(§3.1,_superseded_2026-09-23)::`publication.state:_\"published\"`_FAILS_TO_PARSE_—_the_process_does_not_exist
+  @test:schemas/instance-versioning.test.ts::publication_is_a_STATE,_and_`published`_is_refused_(§3.1,_superseded_2026-09-23)::`publication.state:_"published"`_FAILS_TO_PARSE_—_the_process_does_not_exist
   Scenario: A published publication state fails to parse
     Given a minimal declaration with publication state "published"
     When it is parsed
@@ -100,7 +100,7 @@ Feature: Instance publication, versions and dependencies
     And there are no findings
     And the formatted report says "EVERY INSTANCE IS DRAFT, and that is now a DECIDED state"
 
-  @test:schemas/instance-versioning.test.ts::check:publishable_—_the_rules_a_per-declaration_schema_cannot_see::`publication.state:_\"published\"`_FAILS_TO_PARSE_—_refused,_not_reported
+  @test:schemas/instance-versioning.test.ts::check:publishable_—_the_rules_a_per-declaration_schema_cannot_see::`publication.state:_"published"`_FAILS_TO_PARSE_—_refused,_not_reported
   Scenario: A declaration with publication state "published" is read as unknown by the gate
     Given a layer tree whose "alpha" declares publication state "published"
     When auditPublishable runs over it

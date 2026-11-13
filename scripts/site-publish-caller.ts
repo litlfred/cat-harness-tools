@@ -20,7 +20,7 @@
  * | calls it from more than one workflow | two publishes race for gh-pages |
  * | has a caller that differs from the template other than in comments and the pinned commit | e.g. a manual-only trigger, a `paths` filter, other inputs, an extra job |
  * | has a caller pinned to a branch or tag | `check:workflow-pins` moves it to the lock's commit |
- * | runs `stage-local.ts` in a workflow step of its own | a hand-rolled copy of the shared steps (the old IG template) |
+ * | runs `stage-local.ts` in a workflow step of its own (a call, not a mention in an `echo` or a comment) | a hand-rolled copy of the shared steps (the old IG template) |
  *
  * WHICH commit the caller is pinned to is `check:workflow-pins`' question,
  * not this one's: here any 40-hex commit is accepted.
@@ -100,6 +100,25 @@ function triggerSummary(have: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+/**
+ * Whether a step's `run:` script INVOKES `stage-local.ts` (or `cat stage:local`),
+ * as opposed to naming it in a message. Per line: shell comments, quoted
+ * strings and the arguments of `echo`/`printf` are dropped first, so
+ * `echo "::notice::... published by stage-local.ts."` is not a call
+ * (smart-base#374: ghbuild.yml was reported for its notice alone).
+ */
+export function invokesStageLocal(run: string): boolean {
+  return run.split("\n").some((line) => {
+    const bare = line
+      .replace(/"(?:\\.|[^"\\])*"|'[^']*'/g, " ")
+      .replace(/(^|\s)#.*$/, "$1");
+    return bare
+      .split(/&&|\|\||;|\|/)
+      .filter((cmd) => !/^\s*(?:echo|printf)\b/.test(cmd))
+      .some((cmd) => /stage-local\.ts|\bcat\s+stage:local\b/.test(cmd));
+  });
+}
+
 /** Judge one checkout's workflow texts (file name → text) against the canonical caller's text. */
 export function judge(workflows: Map<string, string>, template: string): Finding[] {
   const want = normalised(parseYaml(template));
@@ -115,7 +134,7 @@ export function judge(workflows: Map<string, string>, template: string): Finding
     }
     const jobs = (doc.jobs && typeof doc.jobs === "object" ? doc.jobs : {}) as Record<string, { uses?: unknown; steps?: { run?: unknown }[] }>;
     const refs = Object.values(jobs).map((j) => sharedRef(j?.uses)).filter((r): r is string => r !== undefined);
-    const handRolled = Object.values(jobs).some((j) => Array.isArray(j?.steps) && j.steps.some((s) => typeof s?.run === "string" && /stage-local\.ts/.test(s.run)));
+    const handRolled = Object.values(jobs).some((j) => Array.isArray(j?.steps) && j.steps.some((s) => typeof s?.run === "string" && invokesStageLocal(s.run)));
     if (handRolled) findings.push({ file, why: `runs stage-local.ts in a step of its own: a hand-rolled copy of ${SHARED}; call the shared workflow from ${CALLER_PATH} instead` });
     if (refs.length === 0) continue;
     callers.push(file);

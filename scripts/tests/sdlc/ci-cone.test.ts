@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decideRun, excluded, gitReplayable, keepRecords, loadRecords, parseTrace, pathState, preloadScripts, recordRun, inlineCodeOf, splitArgs, testGates, touchedOf, unquote } from "../../ci-cone.ts";
+import { decideRun, excluded, gitReplayable, keepRecords, loadRecords, parseTrace, pathState, preloadScripts, recordRun, recordsOnMain, inlineCodeOf, splitArgs, testGates, touchedOf, unquote } from "../../ci-cone.ts";
 import { BUILD_OUTPUT_DIRS, FileDigests, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
 import { NOT_INSTANCE_DIRS } from "../../../schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
@@ -814,5 +814,21 @@ describe.skipIf(!HAS_STRACE)("a computed load the run did not open is no input; 
     process.env[VAR] = "one";
     write("plugins/p.ts", readFileSync(join(root, "plugins/p.ts"), "utf-8") + "// edited\n");
     expect(decide().skip).toBe(false);
+  });
+});
+
+describe("which runs record (recordsOnMain)", () => {
+  test("a push to main records", () => {
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "push", GITHUB_REF: "refs/heads/main" })).toBe(true);
+  });
+  test("a dispatch on main records too: a train's merge starts no push run (bean hd58)", () => {
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/main" })).toBe(true);
+  });
+  test("nothing else records: a dispatch on another branch, a PR, a merge group", () => {
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/repin-train/x" })).toBe(false);
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "pull_request", GITHUB_REF: "refs/pull/1/merge" })).toBe(false);
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "merge_group", GITHUB_REF: "refs/heads/gh-readonly-queue/main/x" })).toBe(false);
+    expect(recordsOnMain({ GITHUB_EVENT_NAME: "push", GITHUB_REF: "refs/heads/feature" })).toBe(false);
+    expect(recordsOnMain({})).toBe(false);
   });
 });
