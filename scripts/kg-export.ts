@@ -55,7 +55,7 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { PROVENANCE_INLINE_STYLE, provenanceSectionFor } from "./provenance-footer.ts";
 import { tmpdir } from "node:os";
-import { basename, join, dirname, relative, resolve, sep } from "node:path";
+import { basename, join, dirname, normalize, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -84,7 +84,7 @@ import {
 } from "../schemas/kg/cat-harness.js";
 import { firstHeading, frontMatter } from "./front-matter.js";
 import { packageDirsIn } from "./skill-topics.js";
-import { isExternalContract, skillContracts } from "./skill-contracts.js";
+import { isExternalContract, layerContracts, skillContracts } from "./skill-contracts.js";
 import {
   isSkillMd,
   kgDirectories,
@@ -185,16 +185,13 @@ function skillMdDirs(root: string = ROOT, scope: CorpusScope = corpusScopeFor(ro
   return knownSkillDirs(root, scope).map((p) => p.join("/"));
 }
 
-/**
- * A directory per skill holding its **I/O contract** — `input.schema.json` and
- * `output.schema.json`.
- *
- * This is the other facet of a skill, not another kind of skill: a name may
- * have an instruction body, an I/O contract, or both. Keying the graph by name
- * rather than by file is what lets the two meet, and what makes "declared
- * somewhere, written nowhere" visible.
+/*
+ * A skill's **I/O contract** — `input.schema.json` and `output.schema.json` —
+ * is the other facet of a skill, not another kind of skill: a name may have an
+ * instruction body, an I/O contract, or both. Keying the graph by name rather
+ * than by file is what lets the two meet. The contract is found through the
+ * skill's own ref (`skillContracts`), wherever it sits (bean `cat-tools-st4q`).
  */
-const SKILL_IO_DIR = "schemas/skills";
 
 
 /**
@@ -1138,9 +1135,10 @@ function collectSkills(
   // serves; and since the context coerces these to `@id`, a relative value
   // would silently become a wrong absolute one rather than an obviously local
   // string.
-  // Minted by `skillIoIri`, the one function that owns a contract's IRI, so a
-  // local contract outside `schemas/skills/<skill>/<io>.schema.json` has no
-  // published address and is left unset rather than composed here.
+  // Minted by `skillIoIri`, the one function that owns a contract's IRI, for
+  // exactly the files `layerContracts` says the schema export writes; a ref
+  // it does not publish (a missing file, a collision) is left unset rather
+  // than composed here.
   //
   // Only for a contract THIS layer holds. A skill held higher up names a
   // contract under its own layer's `schemas/skills/` (placement PR1, bean
@@ -1171,14 +1169,20 @@ function collectSkills(
       }
       publishedByInstance.set(abs, ids);
     }
-    return ids.get(ref);
+    return ids.get(normalize(ref).split(sep).join("/"));
   };
+  // The host's published contracts, by source: `layerContracts` is the reader
+  // `harness-schema-export` publishes from, so a ref has an IRI here exactly
+  // when its file is written — at the root `schemas/skills/` or in a subgraph
+  // (bean `cat-tools-st4q`), and keyed by skill so a move keeps the address.
+  let ownPublished: Map<string, { skill: string; io: string }> | undefined;
   const contractIri = (instanceRoot: string, ref: string): string | undefined => {
     if (isExternalContract(ref)) return ref;
     if (resolve(instanceRoot) !== own) return publishedContract(instanceRoot, ref);
-    const m = new RegExp(`^${SKILL_IO_DIR}/([^/]+)/(input|output)\\.schema\\.json$`).exec(ref);
+    ownPublished ??= new Map(layerContracts(own).contracts.map((c) => [c.source, c]));
+    const hit = ownPublished.get(normalize(ref).split(sep).join("/"));
     // Under the host's own directory, where `harness-schema-export` writes it (#676).
-    return m ? skillIoIri(hostSchemaBase(base), m[1]!, m[2]!) : undefined;
+    return hit ? skillIoIri(hostSchemaBase(base), hit.skill, hit.io) : undefined;
   };
   for (const c of skillContracts(root, scope).values()) {
     const s = get(c.skill);

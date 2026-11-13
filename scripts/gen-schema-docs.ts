@@ -24,6 +24,7 @@ import { join, relative, resolve } from "path";
 import { readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { instanceDirectories, instanceDirectoryForGraph } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { layerContracts } from "./skill-contracts.ts";
 
 /**
  * THIS LAYER'S OWN `schemas` directory, or the convention.
@@ -296,7 +297,12 @@ function readSchema(path: string): JsonSchema | null {
   }
 }
 
-function renderSkillPage(skill: string, input: JsonSchema | null, output: JsonSchema | null): string {
+function renderSkillPage(
+  skill: string,
+  input: JsonSchema | null,
+  output: JsonSchema | null,
+  src: { input?: string; output?: string } = {},
+): string {
   const title = (input?.title || output?.title || skill).replace(/ (Input|Output)$/i, "");
   const lines: string[] = [];
   lines.push("---");
@@ -324,8 +330,8 @@ function renderSkillPage(skill: string, input: JsonSchema | null, output: JsonSc
     lines.push(renderProperties(input, 3));
     lines.push("");
     lines.push(
-      markdownEditLink({ repo: SCHEMA_DOCS_REPO }, { source: `${SKILLS_REPO_PREFIX}/${skill}/input.schema.json`, kind: "source", text: "Raw schema" }) +
-        ` · ${markdownEditLink({ repo: SCHEMA_DOCS_REPO }, { source: `${SKILLS_REPO_PREFIX}/${skill}/input.schema.json`, text: `${EDIT_GLYPH} Edit`, className: "fa-edit-source" })}`,
+      markdownEditLink({ repo: SCHEMA_DOCS_REPO }, { source: src.input ?? `${SKILLS_REPO_PREFIX}/${skill}/input.schema.json`, kind: "source", text: "Raw schema" }) +
+        ` · ${markdownEditLink({ repo: SCHEMA_DOCS_REPO }, { source: src.input ?? `${SKILLS_REPO_PREFIX}/${skill}/input.schema.json`, text: `${EDIT_GLYPH} Edit`, className: "fa-edit-source" })}`,
     );
     lines.push("");
   }
@@ -337,8 +343,8 @@ function renderSkillPage(skill: string, input: JsonSchema | null, output: JsonSc
     lines.push(renderProperties(output, 3));
     lines.push("");
     lines.push(
-      markdownEditLink({ repo: SCHEMA_DOCS_REPO }, { source: `${SKILLS_REPO_PREFIX}/${skill}/output.schema.json`, kind: "source", text: "Raw schema" }) +
-        ` · ${markdownEditLink({ repo: SCHEMA_DOCS_REPO }, { source: `${SKILLS_REPO_PREFIX}/${skill}/output.schema.json`, text: `${EDIT_GLYPH} Edit`, className: "fa-edit-source" })}`,
+      markdownEditLink({ repo: SCHEMA_DOCS_REPO }, { source: src.output ?? `${SKILLS_REPO_PREFIX}/${skill}/output.schema.json`, kind: "source", text: "Raw schema" }) +
+        ` · ${markdownEditLink({ repo: SCHEMA_DOCS_REPO }, { source: src.output ?? `${SKILLS_REPO_PREFIX}/${skill}/output.schema.json`, text: `${EDIT_GLYPH} Edit`, className: "fa-edit-source" })}`,
     );
     lines.push("");
   }
@@ -347,28 +353,48 @@ function renderSkillPage(skill: string, input: JsonSchema | null, output: JsonSc
 }
 
 function main(): void {
-  if (!existsSync(SKILLS_DIR)) {
-    console.error(`Schema directory not found: ${SKILLS_DIR}`);
+  // Every contract the layer publishes, wherever it sits — the root
+  // `schemas/skills/` or a subgraph's (bean `cat-tools-st4q`) — keyed by the
+  // skill it publishes under, plus any folder under the declared schemas
+  // graph's `skills/` that holds none of those.
+  const sources = new Map<string, { input?: string; output?: string }>();
+  for (const c of layerContracts(INSTANCE_ROOT).contracts) {
+    if (c.io !== "input" && c.io !== "output") continue;
+    const e = sources.get(c.skill) ?? {};
+    e[c.io] = c.source;
+    sources.set(c.skill, e);
+  }
+  if (existsSync(SKILLS_DIR)) {
+    for (const d of readdirSync(SKILLS_DIR)) {
+      if (sources.has(d) || !statSync(join(SKILLS_DIR, d)).isDirectory()) continue;
+      const rel = (io: string) => `${SKILLS_REPO_PREFIX}/${d}/${io}.schema.json`;
+      sources.set(d, {
+        ...(existsSync(join(SKILLS_DIR, d, "input.schema.json")) ? { input: rel("input") } : {}),
+        ...(existsSync(join(SKILLS_DIR, d, "output.schema.json")) ? { output: rel("output") } : {}),
+      });
+    }
+  }
+  if (sources.size === 0) {
+    console.error(`No skill contracts found under ${INSTANCE_ROOT}`);
     process.exit(1);
   }
 
   mkdirSync(OUT_DIR, { recursive: true });
 
-  const skills = readdirSync(SKILLS_DIR)
-    .filter((d) => statSync(join(SKILLS_DIR, d)).isDirectory())
-    .sort();
+  const skills = [...sources.keys()].sort();
 
   const indexRows: string[] = [];
   const produced: string[] = [];
 
   for (const skill of skills) {
-    const input = readSchema(join(SKILLS_DIR, skill, "input.schema.json"));
-    const output = readSchema(join(SKILLS_DIR, skill, "output.schema.json"));
+    const src = sources.get(skill)!;
+    const input = src.input ? readSchema(join(INSTANCE_ROOT, src.input)) : null;
+    const output = src.output ? readSchema(join(INSTANCE_ROOT, src.output)) : null;
     if (!input && !output) {
       console.warn(`  - ${skill}: no schemas, skipping`);
       continue;
     }
-    const page = renderSkillPage(skill, input, output);
+    const page = renderSkillPage(skill, input, output, src);
     emit(join(OUT_DIR, `${skill}.md`), page);
     produced.push(skill);
     const title = (input?.title || output?.title || skill).replace(/ (Input|Output)$/i, "");
