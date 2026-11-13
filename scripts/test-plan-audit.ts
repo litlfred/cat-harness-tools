@@ -29,7 +29,8 @@
  * @module scripts/test-plan-audit
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
+import { switchedOffGroups } from "../schemas/kg/opt-in-roots.js";
 import type { KgCriterionEntry, KgFinding } from "../schemas/sdlc/kg-qa.js";
 import { TestPlanSchema, TEST_PLAN_SCHEMA_ID, isTestPlanSchemaId, type TestPlan } from "../schemas/sdlc/test-plan.js";
 import { TestRunSchema, UNKNOWN_HASH, type SutRef } from "../schemas/sdlc/test-run.js";
@@ -97,6 +98,28 @@ export function dmnRefResolves(ref: string, bases: readonly string[]): boolean {
   return false;
 }
 
+/**
+ * Whether `ref`'s file lies in an opt-in sub-graph that the root which mounted
+ * a base switched off and the mount left out: absent by consent, so the ref is
+ * not judged here (card Q-SKILL-TOOL-LINK B), only where the group is on. A
+ * file in a group the root switched ON that is missing is still a finding.
+ */
+export function dmnRefSwitchedOff(ref: string, bases: readonly string[]): boolean {
+  const [file] = ref.split("#");
+  if (!file) return false;
+  for (const b of bases) {
+    const p = resolve(b, file);
+    let leftOut;
+    try {
+      leftOut = switchedOffGroups(b).leftOut;
+    } catch {
+      continue; // an unreadable declaration is `check:harness-dirs`' finding
+    }
+    if (leftOut.some((g) => p === g.abs || p.startsWith(g.abs + sep))) return true;
+  }
+  return false;
+}
+
 function readJson(path: string): { ok: true; value: unknown } | { ok: false; error: string } {
   try {
     return { ok: true, value: JSON.parse(readFileSync(path, "utf-8")) };
@@ -142,7 +165,7 @@ export function auditTestPlans(input: TestPlanAuditInput): Record<TestPlanCriter
       continue;
     }
     plans.set(plan.id, plan);
-    if (!dmnRefResolves(plan.exitCriteria.decision, bases)) {
+    if (!dmnRefResolves(plan.exitCriteria.decision, bases) && !dmnRefSwitchedOff(plan.exitCriteria.decision, bases)) {
       resolves.push({
         where: rel(f),
         detail: `exitCriteria \`${plan.exitCriteria.decision}\` does not resolve to a decision — the certifier would have no rule to apply.`,
@@ -307,7 +330,7 @@ export function auditTestPlanExitCriteria(input: TestPlanExitCriteriaAuditInput)
       continue;
     }
     const plan = parsed.data;
-    if (!dmnRefResolves(plan.exitCriteria.decision, bases)) {
+    if (!dmnRefResolves(plan.exitCriteria.decision, bases) && !dmnRefSwitchedOff(plan.exitCriteria.decision, bases)) {
       findings.push({
         where: rel(f),
         detail: `exitCriteria \`${plan.exitCriteria.decision}\` does not resolve to an existing .dmn file and decision.`,

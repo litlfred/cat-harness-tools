@@ -115,6 +115,7 @@ import { SweepMarkSchema } from "../schemas/sdlc/sweep-mark.ts";
 import { BoardSchema } from "../schemas/ui/board.ts";
 import { BOARD_POSITIONS_FILE, BoardPositionsSchema, positionsOn } from "../schemas/ui/board-positions.ts";
 import { parseTodoFile, readTodos, TODO_ROOT } from "./todos.ts";
+import { StoreAbsentError } from "./lib/bean-store-absent.ts";
 import {
   beanPositions,
   beansNamedBy,
@@ -793,7 +794,25 @@ function dashboardPage(g: StateGraph, graphs: StateGraph[]): string {
     });
   }
 
-  if (tag === TODO_INDEX_SCHEMA) return todoBoardPage(g, TODO_ROOT());
+  if (tag === TODO_INDEX_SCHEMA) {
+    // A published projection whose store this checkout does not hold — a
+    // mount that switched the todo store off, smart-ips-pilgrimage#66 — is a
+    // board this run cannot draw, not a failure of the run: the projection is
+    // linked, and the board is drawn where the store is.
+    const store = todoStoreHere();
+    if ("absent" in store) {
+      return page({
+        title: `${g.id} — state`,
+        body:
+          head +
+          `<p class="sv-sub">A projection is published at <a href="${src}">${esc(src)}</a>, and the ` +
+          `todo store it is built from is <strong>absent from this checkout</strong>: ${esc(store.absent)}. ` +
+          `The board is drawn where the store is.</p>` +
+          registry(graphs, g.id),
+      });
+    }
+    return todoBoardPage(g, store.root);
+  }
 
   return beansBoardPage(g, graphs, src);
 }
@@ -2737,6 +2756,21 @@ function readViewTodos(): TodoLike[] {
     return readTodos().map((t) => t as unknown as TodoLike);
   } catch {
     return [];
+  }
+}
+
+/**
+ * The todo store's root, or why it is absent from this checkout. Only a
+ * DETERMINED absence (`StoreAbsentError`, smart-ips-pilgrimage#13) is
+ * answered; any other failure to resolve it still throws.
+ */
+function todoStoreHere(): { root: string } | { absent: string } {
+  try {
+    return { root: TODO_ROOT() };
+  } catch (e) {
+    const cause = e instanceof StoreAbsentError ? e : (e as { cause?: unknown })?.cause;
+    if (cause instanceof StoreAbsentError) return { absent: cause.reason };
+    throw e;
   }
 }
 
