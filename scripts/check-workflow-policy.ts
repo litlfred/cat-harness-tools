@@ -18,7 +18,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
 import { workflowFiles, corpusScopeFor, declaredKgDirectories } from "./known-skills.js";
 import { loadProcessModel, processDiagrams } from "../src/workflow/process-model.js";
-import { loadRelaxations, validateRelaxations, PolicyError } from "../src/workflow/gate.js";
+import { inactiveRelaxations, loadRelaxations, validateRelaxations, PolicyError } from "../src/workflow/gate.js";
 
 const root = HARNESS_ROOT;
 const scope = corpusScopeFor(root);
@@ -29,9 +29,14 @@ const scope = corpusScopeFor(root);
 // relaxation of a process in a switched-off group read as "not a process
 // here". A process this script cannot see is one whose relaxations go
 // unchecked, so it reads every group that is on disk.
-const models = await Promise.all(
-  processDiagrams(workflowFiles(root, scope, { enabledSubgraphs: "all" })).map((f) => loadProcessModel(f)),
-);
+const diagrams = processDiagrams(workflowFiles(root, scope, { enabledSubgraphs: "all" }));
+const models = await Promise.all(diagrams.map((f) => loadProcessModel(f)));
+// The processes this root switches ON. A relaxation of a process only a
+// switched-off group holds is judged above like any other, and then reported
+// INACTIVE, not as an error (owner, 2026-11-13): it relaxes nothing here
+// until a root switches that group on.
+const switchedOn = new Set(processDiagrams(workflowFiles(root, scope)));
+const active = new Set(models.filter((_, i) => switchedOn.has(diagrams[i]!)).map((m) => m.id));
 // Opt-in groups declared but not on disk: the mount leaves a switched-off
 // group out, so a process in one cannot be read here at all.
 const unseen = declaredKgDirectories(root, scope, { enabledSubgraphs: "all" })
@@ -49,9 +54,11 @@ for (const m of models) {
 
 let relaxations;
 let undetermined: Awaited<ReturnType<typeof loadRelaxations>> = [];
+let inactive: Awaited<ReturnType<typeof loadRelaxations>> = [];
 try {
   relaxations = loadRelaxations(root);
   undetermined = validateRelaxations(relaxations, models, { unseen });
+  inactive = inactiveRelaxations(relaxations, active, undetermined);
 } catch (e) {
   console.error(`\n✗ ${e instanceof PolicyError ? e.message : String(e)}\n`);
   process.exit(1);
@@ -62,7 +69,7 @@ if (relaxations.length === 0) {
   console.log("  (none — every package takes the base processes as they stand)");
 }
 for (const r of relaxations) {
-  console.log(`  ${r.package} → ${r.process}/${r.activity}\n      ${r.reason}`);
+  console.log(`  ${r.package} → ${r.process}/${r.activity}${inactive.includes(r) ? "   (inactive here)" : ""}\n      ${r.reason}`);
   if (r.scope) console.log(`      scope: ${r.scope}`);
 }
 if (undetermined.length > 0) {
@@ -71,5 +78,12 @@ if (undetermined.length > 0) {
   for (const r of undetermined) console.log(`  ? ${r.package} → ${r.process}/${r.activity}`);
   console.log(`  Judged where those groups are mounted; not counted as legal here.`);
 }
+if (inactive.length > 0) {
+  console.log(`\nInactive: ${inactive.length} legal relaxation(s) name a process only a switched-off opt-in group holds; each relaxes nothing here until a root switches its group on:`);
+  for (const r of inactive) console.log(`  · ${r.package} → ${r.process}/${r.activity}`);
+}
 const legal = relaxations.length - undetermined.length;
-console.log(`\n✓ ${legal} relaxation(s) legal${undetermined.length ? `, ${undetermined.length} undetermined` : ", all legal"}.\n`);
+console.log(
+  `\n✓ ${legal} relaxation(s) legal${undetermined.length ? `, ${undetermined.length} undetermined` : ", all legal"}` +
+    `${inactive.length ? ` (${inactive.length} inactive here)` : ""}.\n`,
+);

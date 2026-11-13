@@ -167,6 +167,26 @@ export function validateRelaxations(
   return undetermined;
 }
 
+/**
+ * The relaxations that are INACTIVE here: legal, but naming a process that
+ * only a switched-off opt-in group holds, so they relax nothing until a root
+ * switches that group on (owner, 2026-11-13: core's `workflow-policy.json`
+ * relaxes `Process_Editing`, which core#776 moves into its opt-in `collab`).
+ *
+ * Reported, never an error. Call it after {@link validateRelaxations}: it
+ * judges nothing, and a relaxation that was refused there never gets here.
+ * One `undetermined` there (its process is in no group on disk) is not also
+ * inactive: whether it is cannot be told here either.
+ */
+export function inactiveRelaxations(
+  relaxations: readonly Relaxation[],
+  /** The ids of the processes this root switches on. */
+  active: ReadonlySet<string>,
+  undetermined: readonly Relaxation[] = [],
+): Relaxation[] {
+  return relaxations.filter((r) => !undetermined.includes(r) && !active.has(r.process));
+}
+
 export interface GateVerdict {
   allowed: boolean;
   /** Always populated — a refusal says why, and so does a permission. */
