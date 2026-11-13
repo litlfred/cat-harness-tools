@@ -54,6 +54,20 @@ describe("pruneUnreferencedImages", () => {
     rmSync(d, { recursive: true });
   });
 
+  test("a name with spaces, a comma or brackets is kept when a page names it, raw or encoded", () => {
+    const d = site({
+      "en/processes/a.html": `<img src="../../assets/img/workflows/Health Check and Counseling, Verbal Consent (brief).svg">`,
+      "en/processes/b.html": `<img src="../../assets/img/workflows/Clinical%20Encounter%20(brief).svg">`,
+      "assets/img/workflows/Health Check and Counseling, Verbal Consent (brief).svg": "1",
+      "assets/img/workflows/Clinical Encounter (brief).svg": "2",
+      "assets/img/workflows/Nobody Shows This (brief).svg": "333",
+    });
+    const r = pruneUnreferencedImages(d);
+    expect(r.files).toEqual(["assets/img/workflows/Nobody Shows This (brief).svg"]);
+    expect(r.bytes).toBe(3);
+    rmSync(d, { recursive: true });
+  });
+
   test("a site with no image folder prunes nothing", () => {
     const d = site({ "index.html": "x" });
     expect(pruneUnreferencedImages(d)).toEqual({ files: [], bytes: 0 });

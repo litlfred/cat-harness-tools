@@ -19,6 +19,18 @@ const TEXT = /\.(html?|css|js|mjs|json|jsonld|svg|xml|webmanifest|txt|md)$/i;
 /** An image file name, as a page, a stylesheet or a script names it. */
 const IMAGE_NAME = /[A-Za-z0-9_.%-]+\.(?:webp|png|jpe?g|gif|svg|avif|ico)/gi;
 
+/** A name {@link IMAGE_NAME} reads whole; any other is looked for as written. */
+const PLAIN_NAME = /^[a-z0-9_.%-]+$/;
+
+/**
+ * The ways a page writes a name that {@link IMAGE_NAME} cannot read whole, for
+ * example a BPMN diagram's `Health Check and Counseling, Verbal Consent (brief).svg`:
+ * as it is, and percent-encoded the two ways a URL can carry it.
+ */
+function spellings(name: string): string[] {
+  return [...new Set([name, encodeURIComponent(name), encodeURI(name), name.replace(/ /g, "%20")].map((s) => s.toLowerCase()))];
+}
+
 function walk(dir: string, skip: (rel: string) => boolean, root = dir, out: string[] = []): string[] {
   for (const n of readdirSync(dir)) {
     const p = join(dir, n);
@@ -53,9 +65,26 @@ export function pruneUnreferencedImages(site: string, dir = "assets/img"): { fil
     return { files: [], bytes: 0 };
   }
   const named = new Set<string>();
+  // Names with a space, a comma or a bracket: the pattern reads only their
+  // tail, so each is looked for whole, in every text file, until one names it.
+  const odd = new Map<string, string[]>();
+  for (const img of images) {
+    const name = img.slice(img.lastIndexOf(sep) + 1).toLowerCase();
+    if (!PLAIN_NAME.test(name)) odd.set(name, spellings(name));
+  }
   for (const f of walk(site, () => false)) {
     if (!TEXT.test(f)) continue;
-    for (const m of readFileSync(f, "utf-8").matchAll(IMAGE_NAME)) {
+    const text = readFileSync(f, "utf-8");
+    if (odd.size) {
+      const lower = text.toLowerCase();
+      for (const [name, ways] of odd) {
+        if (ways.some((w) => lower.includes(w))) {
+          named.add(name);
+          odd.delete(name);
+        }
+      }
+    }
+    for (const m of text.matchAll(IMAGE_NAME)) {
       const name = m[0].toLowerCase();
       named.add(name);
       try {
