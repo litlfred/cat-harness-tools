@@ -22,7 +22,7 @@ declare const self: { FaRailData?: Record<string, string>; FaNavStrings?: Record
  * the labels it translates. No file, or no entry, leaves the English as built
  * (`navbar-locale.ts`). After `draw`, which replaces the rail's contents.
  */
-function localise(nav: Element, root: string): void {
+function localise(nav: Element, siteRoot: string): void {
   const loc = railLocale(document.documentElement.getAttribute("lang"));
   if (!loc) return;
   const apply = (): void => {
@@ -33,7 +33,7 @@ function localise(nav: Element, root: string): void {
   // The script's address is built from page data, so both parts are held to
   // what they can legitimately be: `railLocale` admits a language tag only, and
   // the root a relative path of `.`/`..` segments (`railRootPath`).
-  const base = railRootPath(root);
+  const base = railRootPath(siteRoot);
   if (base === undefined) return;
   const s = document.createElement("script");
   s.src = `${base}/${navbarStringsFile(loc)}`;
@@ -66,7 +66,10 @@ function draw(): void {
   }
   nav.innerHTML = renderRailRegions(shared, page);
   nav.removeAttribute("data-fa-rail");
-  localise(nav, page.root);
+  // The SITE's root (`data-fa-to-root`), where the shared rail data and the
+  // strings files are: on a site composed onto the platform (an IG),
+  // `data-fa-root` is the platform's address, for the platform's links.
+  localise(nav, page.toRoot);
 }
 
 draw();
