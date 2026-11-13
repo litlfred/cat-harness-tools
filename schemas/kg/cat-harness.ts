@@ -669,7 +669,12 @@ export const ContentTypeTranslationSchema = z.object({
   formats: z.array(TranslatableFormatSchema),
   /** Whether RTL rendering is supported. */
   rtlSupported: z.boolean().default(false),
-  /** BPMN diagrams that need re-rendering for translation. */
+  /**
+   * BPMN diagrams that need re-rendering for translation: a path from the
+   * declaring layer (or one it `needs`), or, for a diagram another layer
+   * owns, its bare FILE NAME, found through the declared process graphs so
+   * the entry survives that layer regrouping its diagrams.
+   */
   bpmnDiagrams: z.array(z.string()).optional(),
   /** Additional notes about translation for this content type. */
   notes: z.string().optional(),
