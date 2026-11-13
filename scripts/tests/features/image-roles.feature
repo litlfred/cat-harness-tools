@@ -112,14 +112,14 @@ Feature: The image-role gate's judgements
 
   @test:scripts/tests/image-roles.test.ts::the_permit_list_is_itself_checked::the_real_list_has_no_stale_permit_today
   Scenario: The real permit list has no stale permit
-    # Gap: with no findings passed this only holds while the real list is empty
-    Given the real permit list and no findings
-    When stale permits are listed
+    Given the real permit list
+    And the real gate run over the checkout, which examines at least one role
+    When stale permits are listed against its findings
     Then there are none
+    And a fixture permit naming no finding is stale against the same findings
 
   @test:scripts/tests/image-roles.test.ts::the_permit_list_is_itself_checked::every_permit_carries_a_REASON,_not_just_a_name
   Scenario: Every real permit carries a dated reason
-    # Gap: the real list is empty today, so no entry is actually checked
-    Given the real permit list
-    Then every entry's reason is longer than 80 characters
-    And every reason names a date
+    Given a fixture permit list with one dated, full reason, one short reason and one undated reason
+    Then exactly the short and the undated entries lack a reason longer than 80 characters that names a date
+    And no entry of the real permit list lacks one

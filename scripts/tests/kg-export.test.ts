@@ -1728,11 +1728,13 @@ describe("a lane's role links into the document of the layer that declares it (c
     expect(roleHome(undefined, "OWN", "user", roots[0] ?? ".")).toBe("OWN");
   });
 
-  test("a role only another layer declares is minted in that layer's document", () => {
-    const pair = roots
-      .flatMap((own) => roots.filter((o) => o !== own).flatMap((o) => [...ids(o)].filter((id) => !ids(own).has(id)).map((id) => ({ own, id }))))
-      .at(0);
-    if (pair === undefined) return; // a checkout with one layer: nothing to cross
+  // A checkout with one layer has nothing to cross: reported as a skip, not a pass.
+  const pair = roots
+    .flatMap((own) => roots.filter((o) => o !== own).flatMap((o) => [...ids(o)].filter((id) => !ids(own).has(id)).map((id) => ({ own, id }))))
+    .at(0);
+
+  test.skipIf(pair === undefined)("a role only another layer declares is minted in that layer's document", () => {
+    if (pair === undefined) throw new Error("unreachable: skipped when no layer pair crosses");
     const home = roleHome(BASE, "OWN", pair.id, pair.own);
     expect(home).not.toBe("OWN");
     expect(roots.some((r) => ids(r).has(pair.id) && publishedIdentity(r, BASE).docIri === home)).toBe(true);

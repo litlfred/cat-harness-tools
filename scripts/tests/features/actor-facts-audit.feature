@@ -25,12 +25,12 @@ Feature: Actor facts have a consumer
     And there is one finding saying "no actor facts"
 
   @test:scripts/tests/actor-facts-audit.test.ts::consumer_detection::passes_when_all_declared_facts_are_consumed_in_processes/gateways/tasks
-  Scenario: An actor's facts with no matching process text are not consumed
-    # Gap: the title claims a passing case, but no input with matching text is given; both evaluations assert "fail"
+  Scenario: An actor's facts all consumed by a process's gateway and task pass
     Given an actor declaring capability "signing-api" and permission "role-management"
-    When the criterion is evaluated with no workflow files and one virtual process
-    Then the result is "fail"
-    And evaluated again with no processes, the result is still "fail"
+    When the criterion is evaluated against a process whose only task names neither
+    Then the result is "fail", with findings for "role-management" and "signing-api"
+    When it is evaluated against a process whose gateway names "signing-api" and whose task names "role-management"
+    Then the result is "pass" with no findings
 
   @test:scripts/tests/actor-facts-audit.test.ts::consumer_detection::reports_unconsumed_capability_and_permission_as_findings
   Scenario: Unconsumed capability and permission are each reported as a finding

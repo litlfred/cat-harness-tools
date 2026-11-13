@@ -322,6 +322,12 @@ describe("a mount that leaves out an opt-in sub-graph (cat-harness-tools#1754)",
     const r = reconcile(root, pkgs);
     expect(r.notMounted).toEqual([]);
     expect(r.findings.map((f) => f.kind)).toEqual(["orphaned"]);
+    // ...and write() removes it: the unmounted checkout is not skipped.
+    const cmd = join(root, ".claude", "commands", "watch.md");
+    expect(existsSync(cmd)).toBe(true);
+    expect(write(root, pkgs)).toEqual([join(".claude", "commands", "watch.md")]);
+    expect(existsSync(cmd)).toBe(false);
+    expect(reconcile(root, pkgs).findings).toEqual([]);
   });
 });
 

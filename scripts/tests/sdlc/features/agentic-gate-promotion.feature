@@ -118,18 +118,18 @@ Feature: Agentic gate promotion from warn to block
     And a reason says "Empirical false-positive rate not met"
 
   @test:scripts/tests/sdlc/agentic-gate-promotion.test.ts::Threshold_evaluation_against_promotion_criteria::fails_promotion_under_CodeAgent_literature_baseline_(48.6%_unconfirmed_rate)
-  Scenario: Promotion fails at a literature-like false-positive rate
-    # Gap: the fixture uses a 50% false-positive rate, not the 48.6% of the title
-    Given 50 records, alternating one false-positive and one true-positive finding
+  Scenario: Promotion fails at the literature's 48.6% false-positive rate
+    Given 50 records of 10 adjudicated findings each, 243 of the 500 false positives
     When promotion is evaluated with the default criteria
     Then the gate is not promoted and the decision is "remain_warn_only"
-    And the empirical false-positive rate is 0.5
+    And the empirical false-positive rate is 0.486
+    And the window and coverage checks pass while the false-positive rate check fails
 
   @test:scripts/tests/sdlc/agentic-gate-promotion.test.ts::Threshold_evaluation_against_promotion_criteria::SUCCEEDS_promotion_when_all_criteria_are_met_(window_>=_50,_coverage_>=_80%,_FPR_<=_5%)
   Scenario: Promotion succeeds when window, coverage and false-positive rate are all met
-    Given 50 records holding 100 true positives, 2 false positives and 5 unknown findings
+    Given 50 records holding 98 true positives, 2 false positives and 5 unknown findings
     When promotion is evaluated against the default criteria
     Then the gate is promoted and the decision is "promote_to_block"
     And all three checks pass
-    And the empirical false-positive rate is 2/102 and the review coverage 102/107
+    And the empirical false-positive rate is 2/100 and the review coverage 100/105
     And a reason says "All criteria met"

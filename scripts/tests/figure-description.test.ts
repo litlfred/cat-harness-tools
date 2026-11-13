@@ -12,6 +12,7 @@
  * `unread` companion were ever made optional "to keep it simple".
  */
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -141,10 +142,13 @@ describe("one description per (page, figure)", () => {
 });
 
 describe("corpus — the committed file, so this cannot pass on fixtures alone", () => {
-  test("cat-harness/library/figure-descriptions.json validates", async () => {
-    const path = join(REPO, "cat-harness/library", FIGURE_DESCRIPTIONS_FILE);
+  const path = join(REPO, "cat-harness/library", FIGURE_DESCRIPTIONS_FILE);
+  // No descriptions written yet is not a failure — but it is not a pass
+  // either: the run reports a skip.
+  const NO_DESCRIPTIONS = !existsSync(path);
+
+  test.skipIf(NO_DESCRIPTIONS)("cat-harness/library/figure-descriptions.json validates", async () => {
     const f = Bun.file(path);
-    if (!(await f.exists())) return; // no descriptions written yet is not a failure
     const parsed = FigureDescriptionsFileSchema.parse(await f.json());
     const all = Object.values(parsed.descriptions).flat();
     expect(all.length).toBeGreaterThan(0);

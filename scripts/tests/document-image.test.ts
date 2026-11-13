@@ -159,13 +159,11 @@ describe("the extractor's real output satisfies the schema", () => {
   // silently broke twice already today, once in an outline regex and once in
   // a probe fixture.
   const pdf = join(ROOT, "uploads", "milnorlink.pdf");
+  // Never a silent pass: without the PDF the extractor arm does not run, and
+  // the run reports a skip rather than a pass.
+  const NO_PDF = !existsSync(pdf);
 
-  test("milnorlink's sidecar parses, and is 19 scans + 1 figure", () => {
-    if (!existsSync(pdf)) {
-      // Never a silent pass: say the arm did not run.
-      console.log("  NOTE uploads/milnorlink.pdf absent — extractor arm did not run");
-      return;
-    }
+  test.skipIf(NO_PDF)("milnorlink's sidecar parses, and is 19 scans + 1 figure", () => {
     const r = Bun.spawnSync([
       "python3", join(TOOLS_ROOT, "scripts", "pdf-images.py"),
       "-o", join(ROOT, "library"), "--dry-run", "--json", pdf,
@@ -391,7 +389,7 @@ describe("generated blocks nothing points at", () => {
     expect(orphanedBlocks("d", list, read)).toEqual([]);
   });
 
-  test("no sections directory at all is the same refusal", () => {
+  test("no sections directory at all is a determined empty, not a refusal: its blocks are reported", () => {
     const { list, read } = fs({ "d/blocks": ["figure-a.jsonld"] }, {});
     // No sections means no references means everything looks orphaned. It is
     // reported, because an empty sections list is a DETERMINED empty — the

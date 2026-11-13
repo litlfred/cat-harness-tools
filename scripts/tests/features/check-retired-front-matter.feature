@@ -58,9 +58,11 @@ Feature: Retired front-matter keys stay retired
   @test:scripts/tests/check-retired-front-matter.test.ts::the_guards::a_missing_record_is_reported_even_when_no_file_carries_the_key
   Scenario: Missing records are reported even when no file carries a retired key
     Given a fixture layer whose only skill declares no retired key
+    And its own fsh-guts directory holds the record of every retirement but the first
     When it is swept
-    Then there are no findings
-    And every retired key is reported as having a missing record
+    Then the fsh-guts directory resolves inside the fixture
+    And there are no findings
+    And only the first retired key is reported as having a missing record
 
   @test:scripts/tests/check-retired-front-matter.test.ts::the_graph-typology_exemption::`roles:`_in_a_memory_entry_is_NOT_a_finding_—_different_kind,_real_reader
   Scenario: A roles key in a memory entry is exempt

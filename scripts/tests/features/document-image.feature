@@ -99,7 +99,7 @@ Feature: Document image roles, their basis and their blocks
 
   @test:scripts/tests/document-image.test.ts::the_extractor's_real_output_satisfies_the_schema::milnorlink's_sidecar_parses,_and_is_19_scans_+_1_figure
   Scenario: The extractor's sidecar for milnorlink parses and holds 19 page scans and 1 figure
-    # Gap: when uploads/milnorlink.pdf is absent the test returns early, asserting nothing
+    # Skipped: when uploads/milnorlink.pdf is absent
     Given the PDF uploads/milnorlink.pdf
     When scripts/pdf-images.py runs on it with --dry-run --json
     Then it exits 0 or 2
@@ -208,9 +208,8 @@ Feature: Document image roles, their basis and their blocks
     When the orphaned blocks of "d" are found
     Then none is reported
 
-  @test:scripts/tests/document-image.test.ts::generated_blocks_nothing_points_at::no_sections_directory_at_all_is_the_same_refusal
+  @test:scripts/tests/document-image.test.ts::generated_blocks_nothing_points_at::no_sections_directory_at_all_is_a_determined_empty,_not_a_refusal:_its_blocks_are_reported
   Scenario: With no sections directory, every block is reported
-    # Gap: the title calls this "the same refusal", but the test asserts the opposite: the block is reported
     Given blocks containing figure-a and no sections directory
     When the orphaned blocks of "d" are found
     Then "figure-a" is reported

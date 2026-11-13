@@ -5,8 +5,9 @@
  * has none of it.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join, relative } from "node:path";
 
 import { folioSubjects, readFolioGraph, projection, viewerHtml } from "../gen-folio-viz.ts";
 import { folioFileList } from "@litlfred/cat-harness/folio-render/file-list.ts";
@@ -182,10 +183,21 @@ describe("the committed projection is MACHINE-INDEPENDENT", () => {
     // The property that actually matters, and the one a single-machine test
     // can still check: relativised against the repo root, the answer does
     // not depend on where the repo happens to sit.
-    const a = readFolioGraph([ROOT, REPO], REPO)!;
-    const b = readFolioGraph([ROOT, REPO], REPO)!;
-    expect(a.nodes.map((n) => n.file)).toEqual(b.nodes.map((n) => n.file));
-    expect(a.nodes.every((n) => n.file.includes(`${basename(ROOT)}/folio/`))).toBe(true);
+    // The other base is the same checkout reached through a link from a
+    // scratch directory: another path to the identical tree.
+    const scratch = mkdtempSync(join(tmpdir(), "folio-viz-base-"));
+    try {
+      const alt = join(scratch, "elsewhere");
+      symlinkSync(REPO, alt, "dir");
+      const a = readFolioGraph([ROOT, REPO], REPO)!;
+      const b = readFolioGraph([join(alt, relative(REPO, ROOT)), alt], alt)!;
+      expect(a.nodes.length).toBeGreaterThan(0);
+      expect(b.nodes.map((n) => n.file)).toEqual(a.nodes.map((n) => n.file));
+      expect(b.directories.map((d) => d.dir)).toEqual(a.directories.map((d) => d.dir));
+      expect(a.nodes.every((n) => n.file.includes(`${basename(ROOT)}/folio/`))).toBe(true);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 });
 

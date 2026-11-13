@@ -4,7 +4,7 @@ Feature: Figure captions written "Fig N." are found
 
   @test:scripts/tests/figure-caption-forms.test.ts::caption_patterns_accept_`Fig_N.`::the_Python_arms_find_`Fig_1.`_and_still_refuse_non-captions
   Scenario: The Python caption patterns accept "Fig 1." and refuse non-captions
-    # Gap: the test passes without asserting when PyMuPDF is not installed
+    # Skipped: when PyMuPDF is not installed
     Given text lines "Fig 1. …", "Fig. 5. …", "Fig. 13 …", "Figure 2.13. …", "Fight the stock-outs", "Figs 3 and 4 show" and a "Fig 7." table-of-contents line with dot leaders
     When the Python caption candidates and labels are read
     Then the candidates are the first four lines only

@@ -24,7 +24,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { siteFileFor } from "../../schemas/kg/cat-harness.js";
-import { safeHref } from "../../schemas/ui/safe-url.js";
+import { ALLOWED_URL_SCHEMES, safeHref } from "../../schemas/ui/safe-url.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -92,7 +92,8 @@ describe("every href in the client goes through the check", () => {
     const declared = source.match(/var ALLOWED_URL_SCHEMES = \[(.*?)\]/s);
     expect(declared, "the client declares its allow-list").not.toBeNull();
     const clientSchemes = [...declared![1]!.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
-    expect(clientSchemes).toEqual(["http:", "https:", "mailto:", "tel:"]);
+    expect(ALLOWED_URL_SCHEMES.length).toBeGreaterThan(0);
+    expect(clientSchemes).toEqual([...ALLOWED_URL_SCHEMES]);
   });
 });
 

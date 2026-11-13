@@ -101,11 +101,14 @@ Feature: Slash commands generated from user_invocable skills
 
   @test:scripts/tests/gen-skill-commands.test.ts::a_mount_that_leaves_out_an_opt-in_sub-graph_(cat-harness-tools#1754)::an_unmounted_checkout_never_skips:_its_own_orphan_is_still_removed_by_write()
   Scenario: An unmounted checkout never skips its own orphaned command
-    # Gap: only the reconcile finding is checked; write() removing the command is not run
     Given an unmounted checkout with no skills and a generated command "watch" pointing at "/nowhere/sdlc/watch.md"
     When its commands are reconciled
     Then nothing is listed as not mounted
     And the only finding is "orphaned"
+    When its commands are written
+    Then the only file changed is ".claude/commands/watch.md"
+    And that command is gone
+    And reconciling again finds nothing
 
   @test:scripts/tests/gen-skill-commands.test.ts::over_this_repository::every_user_invocable_skill_has_a_command_and_every_command_has_a_declared_skill
   Scenario: This repository's skills and commands agree
