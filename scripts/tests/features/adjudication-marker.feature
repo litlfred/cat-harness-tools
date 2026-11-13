@@ -191,38 +191,38 @@ Feature: The adjudication marker on process diagrams
     When each is loaded
     Then each one's "Call_Refresh" accepts "remote", "local", "merge" and "defer"
 
-  @test:scripts/tests/adjudication-marker.test.ts::`defers=\"caller\"`_—_an_adjudication_whose_enum_the_caller_owns::the_deferral_is_DECLARED,_so_it_cannot_be_confused_with_a_lost_marker
+  @test:scripts/tests/adjudication-marker.test.ts::`defers="caller"`_—_an_adjudication_whose_enum_the_caller_owns::the_deferral_is_DECLARED,_so_it_cannot_be_confused_with_a_lost_marker
   Scenario: A deferred enum is declared, not read as a lost marker
     Given a parent calling a child whose judge declares defers "caller"
     When the diagram is loaded
     Then the child's judge is marked as deferring
     And it has no adjudication codes
 
-  @test:scripts/tests/adjudication-marker.test.ts::`defers=\"caller\"`_—_an_adjudication_whose_enum_the_caller_owns::it_still_carries_the_actor_restriction_—_a_`system`_actor_may_not
+  @test:scripts/tests/adjudication-marker.test.ts::`defers="caller"`_—_an_adjudication_whose_enum_the_caller_owns::it_still_carries_the_actor_restriction_—_a_`system`_actor_may_not
   Scenario: A deferring adjudication still refuses a system actor
     Given a task declaring defers "caller" and fulfilment kinds "person system"
     When the diagram is loaded
     Then loading fails with "Only `person` and `agent` may adjudicate"
 
-  @test:scripts/tests/adjudication-marker.test.ts::`defers=\"caller\"`_—_an_adjudication_whose_enum_the_caller_owns::REFUSES_a_deferral_with_no_fulfilment_at_all
+  @test:scripts/tests/adjudication-marker.test.ts::`defers="caller"`_—_an_adjudication_whose_enum_the_caller_owns::REFUSES_a_deferral_with_no_fulfilment_at_all
   Scenario: A deferring adjudication with no fulfilment is refused
     Given a task declaring defers "caller" and no fulfilment
     When the diagram is loaded
     Then loading fails saying there is no fulfilment element
 
-  @test:scripts/tests/adjudication-marker.test.ts::`defers=\"caller\"`_—_an_adjudication_whose_enum_the_caller_owns::REFUSES_any_value_but_`caller`_—_there_is_nowhere_else_an_enum_comes_from
+  @test:scripts/tests/adjudication-marker.test.ts::`defers="caller"`_—_an_adjudication_whose_enum_the_caller_owns::REFUSES_any_value_but_`caller`_—_there_is_nowhere_else_an_enum_comes_from
   Scenario: A deferral to anything but the caller is refused
     Given a task declaring defers "somewhere"
     When the diagram is loaded
     Then loading fails with "The only value is `caller`"
 
-  @test:scripts/tests/adjudication-marker.test.ts::`defers=\"caller\"`_—_an_adjudication_whose_enum_the_caller_owns::REFUSES_`accepts`_against_a_deferring_adjudicator,_and_says_to_use_`codes`
+  @test:scripts/tests/adjudication-marker.test.ts::`defers="caller"`_—_an_adjudication_whose_enum_the_caller_owns::REFUSES_`accepts`_against_a_deferring_adjudicator,_and_says_to_use_`codes`
   Scenario: Accepts against a deferring adjudicator is refused with advice to declare codes
     Given a call activity accepting "a b" into a child whose judge defers its enum
     When the diagram is loaded
     Then loading fails saying the judge defers its enum to the caller and to declare codes instead
 
-  @test:scripts/tests/adjudication-marker.test.ts::`defers=\"caller\"`_—_an_adjudication_whose_enum_the_caller_owns::a_caller_declaring_nothing_still_loads_—_the_four_real_ones_do
+  @test:scripts/tests/adjudication-marker.test.ts::`defers="caller"`_—_an_adjudication_whose_enum_the_caller_owns::a_caller_declaring_nothing_still_loads_—_the_four_real_ones_do
   Scenario: A caller of a deferring adjudicator declaring nothing still loads
     # Gap: only a fixture caller is checked, not the four real callers
     Given a call activity naming only a skill, into a child whose judge defers its enum

@@ -340,7 +340,7 @@ Feature: Library entries become graph nodes
     Then the published content context expands "license" to the bound IRI "http://purl.org/dc/terms/license"
     And it expands "licenceRecord" to the table's bound IRI
 
-  @test:scripts/tests/gen-library-jsonld.test.ts::the_instance_an_entry_belongs_to::a_relative_entry_path_names_the_instance,_not_\".\"
+  @test:scripts/tests/gen-library-jsonld.test.ts::the_instance_an_entry_belongs_to::a_relative_entry_path_names_the_instance,_not_"."
   Scenario: A relative entry path names the declaring instance
     Given an instance "inst" declaring "library/" and holding the entry "library/d"
     And the working directory is the instance root

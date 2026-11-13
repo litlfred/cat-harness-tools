@@ -3,7 +3,7 @@
 # Each Scenario names the test that executes it.
 Feature: Unknown bean attributes are refused
 
-  @test:scripts/tests/bean-attr-refused.test.ts::an_unknown_attribute_is_refused::`action=\"create\"`_—_the_exact_attribute_that_did_nothing_for_weeks
+  @test:scripts/tests/bean-attr-refused.test.ts::an_unknown_attribute_is_refused::`action="create"`_—_the_exact_attribute_that_did_nothing_for_weeks
   Scenario: A bean marker carrying action="create" is refused
     Given a one-task diagram whose task carries <cat-harness.processes:bean action="create"/>
     When the process model is loaded

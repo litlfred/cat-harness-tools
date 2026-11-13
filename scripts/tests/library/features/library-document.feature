@@ -116,3 +116,50 @@ Feature: The document view of a library entry
     Given the same entry
     When its figure files are listed
     Then they are "images/img-p002-1.webp" and "tables/table-1.csv"
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::toc_present:_the_tree_is_the_outline,_as_before
+  Scenario: With a table of contents, the Contents tree is the PDF's outline
+    Given a document view with a three-entry outline and a section "Not in the outline" that no entry names
+    When its Contents tab is rendered
+    Then it says "Source: the PDF’s own outline. 3 entries." and offers "Expand all"
+    And the entry "1 One" links to section "s1"
+    And "Not in the outline" does not appear
+    And opening the first node shows "1.1 One A"
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::toc_absent:_the_tree_is_built_from_the_sections,_nested_by_level
+  Scenario: Without a table of contents, the Contents tree is built from the sections, nested by level
+    Given a document view with no outline and two level-1 sections "Page 1" and "Page 2"
+    When its Contents tab is rendered
+    Then it says "so its sections are listed. 2 sections." and not "No table of contents"
+    And both sections are linked by their ids
+    When a view with "Part A", level-2 "Chapter A1" and "Part B" is rendered
+    Then "Part A" and "Part B" are at the top
+    And opening the first node shows "Chapter A1"
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::blocks_appear_as_leaves_under_their_own_section,_by_contains_or_by_target
+  Scenario: Blocks appear as leaves under their own section, by the section's contains or by the block's target
+    Given section "Page 1" containing a prose block, section "Page 2" containing none, and a prose block targeting Page 2's file and a figure naming no section
+    When the Contents tree is rendered and both nodes are opened
+    Then Page 1 shows its prose block as a leaf titled by its first words, "Opening words of the first page…"
+    And Page 1 does not show Page 2's prose block
+    And Page 2 shows its prose block, placed by target
+    And the figure appears under neither section
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::children_are_built_only_when_a_node_is_first_opened
+  Scenario: A tree node's children are built only when it is first opened
+    Given two sections, the first containing a block
+    When the Contents tree is rendered
+    Then node 0 is a closed details element with an empty children list and no block rows
+    And opening node 0 builds its block rows
+    When a view with a single section is rendered
+    Then that node is open at once and its children are already built
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::the_generator_reads_each_section's_blocks_from_its_node,_and_the_viewer_anchors_each_block_row
+  Scenario: The generator reads each section's blocks from its node, and the viewer anchors each block row
+    # Gap: the viewer half is a source-text check of the viewer script, not a rendered page
+    Given an entry whose first section's node contains two blocks and a sub-section
+    When the entry's document view is read
+    Then the first section's blocks are "e/blocks/prose-sec-000" and "e/blocks/figure-1", without the sub-section
+    And the second section has no blocks field
+    And the view passes the library document schema
+    And the viewer script stores the loaded blocks and gives each block table row an anchor id

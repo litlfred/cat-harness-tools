@@ -89,13 +89,6 @@ Feature: Merge watch readings, flags and runner relief
     Then another PR with the same pin, an older pin, or only another layer's pin does not supersede it
     And an ancestry that cannot be read never supersedes
 
-  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::runner_relief::draft,_P3,_closed-PR_and_never-started_runs;_never_a_main_push_run
-  Scenario: Runner relief offers draft, P3, closed-PR and never-started runs, never a main push run
-    Given open PRs: a draft, a P3-labelled one and a ready one, and runs on their branches, on a closed branch and on main
-    When relief candidates are listed with a 60-minute queue limit
-    Then they are run 1 "draft PR #1", run 2 "P3 PR #2", run 3 "closed PR (closed-branch)" and run 4 "queued 90m, never started"
-    And no main push run, recent queued run or completed run is offered
-
   @test:scripts/tests/sdlc/merge-watch-readings.test.ts::many_repositories::--repo,_--repos_and_--config_combine,_without_duplicates
   Scenario: --repo, --repos and --config combine without duplicates
     Given the arguments --repo o/a, --repos "o/b, o/a", --config c.json and --json, with c.json listing o/c and options
@@ -148,3 +141,33 @@ Feature: Merge watch readings, flags and runner relief
     Then the main verdict is "unknown: main push runs not read"
     And the queue is null
     And at least one error is reported
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::runner_relief::draft,_P3,_closed-PR_and_never-started_runs;_never_a_main_push_or_dynamic_run,_never_the_canceller
+  Scenario: Runner relief takes draft, P3, closed-PR and never-started runs, never main's runs or the canceller
+    Given a draft PR #1, a P3 PR #2 and a ready PR #3
+    And eleven runs, including main push runs, a "dynamic" run on main, a completed run and the canceller of a closed PR
+    When relief candidates are chosen with a 60-minute queue limit
+    Then they are run 1 "draft PR #1", run 2 "P3 PR #2", run 3 "closed PR (closed-branch)", run 4 "queued 90m, never started" and run 9 "queued 75m, never started"
+    And no other run is a candidate
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::pagination_never_follows_GitHub's_Link_header::asks_by_page=_on_the_given_path,_and_stops_at_a_short_page
+  Scenario: Pagination asks by page= on the given path and stops at a short page
+    Given a reader that returns two items per page, and one item for page 3
+    When "repos/o/r/pulls/1/commits?per_page=2" is paginated
+    Then pages 1, 2 and 3 of that path are asked for, in order
+    And three pages are returned
+    And no request goes to a "repositories/" path
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::pagination_never_follows_GitHub's_Link_header::a_wrapped_page_is_measured_by_its_array_field
+  Scenario: A wrapped page is measured by its array field
+    Given a reader whose page wraps one check run in an object with "total_count"
+    When "repos/o/r/commits/s/check-runs?per_page=100" is paginated
+    Then only page 1 is asked for
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::exit_2_says_why::names_each_repository_and_what_of_it_was_not_read
+  Scenario: The unread summary names each repository and what of it was not read
+    # Gap: only one repository is summarised, and the exit code itself is not checked
+    Given a watch of "o/x" over a stub that answers nothing
+    When the unread summary is made
+    Then its line starts with "o/x: " and mentions "runner queue" and "main verdict"
+    And a report with no errors, a queue reading and a green main verdict gives no line
