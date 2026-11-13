@@ -26,6 +26,7 @@ import {
   newlyDeclaredDirectoryIds,
   planRepin,
   summaryOf,
+  upstreamRootsOf,
   verdictOf,
   type CommitVerdict,
   type GitHubApi,
@@ -336,6 +337,39 @@ describe("extendExplicitDirectories: a directory the new pin declares joins an e
     expect(plan.unknown[0]!.reason).toContain("cannot be told");
     const failing: GitHubApi = { ...stubApi({}), async declarationAt() { throw new Error("HTTP 500"); } };
     expect((await extendExplicitDirectories(moved(), [listed(["library"])], failing)).unknown[0]!.reason).toContain("HTTP 500");
+  });
+
+  test("a declaration below the root is read where the site's lock says it sits (smart-base/, 2026-11-13)", async () => {
+    const asked: (string | undefined)[] = [];
+    const api: GitHubApi = {
+      ...stubApi({}),
+      async declarationAt(_r, sha, _i, at) {
+        asked.push(at);
+        return at === "smart-base" ? ({ [A]: OLD, [B]: NEW } as Record<string, unknown>)[sha] : undefined;
+      },
+    };
+    const plan = await extendExplicitDirectories(moved(), [listed(["library", "tools"])], api, { up: "smart-base" });
+    expect(asked).toEqual(["smart-base", "smart-base"]);
+    expect(plan.unknown).toEqual([]);
+    expect(plan.moves[0]!.addDirectories).toEqual(["scenarios"]);
+    // Missing even there: the reason names the directory it looked in.
+    const none = await extendExplicitDirectories(moved(), [listed(["library"])], { ...stubApi({}), async declarationAt() { return undefined; } }, { up: "smart-base" });
+    expect(none.unknown[0]!.reason).toContain("in `smart-base/` of o/up@");
+  });
+
+  test("upstreamRootsOf reads each instance's upstreamRoot from the lock, and nothing else", () => {
+    expect(
+      upstreamRootsOf({
+        instances: [
+          { instance: "smart-base", upstreamRoot: "smart-base" },
+          { instance: "cat-harness", upstreamRoot: "" },
+          { instance: "no-root" },
+          "junk",
+        ],
+      }),
+    ).toEqual({ "smart-base": "smart-base", "cat-harness": "" });
+    expect(upstreamRootsOf(undefined)).toEqual({});
+    expect(upstreamRootsOf({ instances: "x" })).toEqual({});
   });
 
   test("applyRepin writes the added ids after the site's own, and touches no other entry", async () => {
