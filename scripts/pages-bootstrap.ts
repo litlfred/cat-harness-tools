@@ -254,11 +254,14 @@ export function pagesSourceFor(root: string, workflows: string[] = findPublishWo
 }
 
 function git(root: string, args: string[], input?: string, env?: Record<string, string>) {
+  // input-site: traced #4e989e0a — git against the clone and its remote (ls-remote, push): no fingerprint names a remote, so a run that reaches it records no hash
+  inputSiteReached("pages-bootstrap: git");
   return spawnSync("git", ["-C", root, ...args], {
     encoding: "utf-8",
     input,
     timeout: 60_000,
     // Never sit at a credential prompt: an unanswerable question is `unknown`.
+    // input-site: inert #ab16c6f0 — the environment handed whole to the git child of the traced call above; no value is read here
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0", ...env },
   });
 }
@@ -334,6 +337,8 @@ async function probeOnce(url: string, timeoutMs: number): Promise<{ probe: Probe
     // GET rather than HEAD: GitHub Pages answers HEAD inconsistently while a
     // first deployment is in flight, and a wrong answer here is worse than the
     // few extra kilobytes.
+    // input-site: traced #3aa7bc06 — the published site, probed over the network: a run that reaches it records no hash
+    inputSiteReached("pages-bootstrap: probe the site");
     const res = await fetch(url, { signal: ctl.signal, redirect: "follow" });
     if (res.ok) return { probe: "ok", status: res.status };
     if (res.status === 404) return { probe: "not-found", status: res.status };
@@ -395,7 +400,9 @@ export async function pagesBootstrap(opts: BootstrapOptions = {}): Promise<Pages
     return base;
   }
 
+  // input-site: inert #a531bcd2 — a polling deadline; the loop it bounds probes the site through probeOnce, which is traced
   const deadline = Date.now() + (opts.waitSeconds ?? 0) * 1000;
+  // input-site: inert #23cfbd9b — when polling began, reported as seconds waited; the loop probes through probeOnce, which is traced
   const started = Date.now();
   const requestTimeoutMs = opts.requestTimeoutMs ?? 10_000;
 
@@ -404,11 +411,14 @@ export async function pagesBootstrap(opts: BootstrapOptions = {}): Promise<Pages
     base.probe = r.probe;
     base.status = r.status;
     base.probeError = r.error;
+    // input-site: inert #96b7aa5c — seconds waited, reported; reached only after probeOnce, which is traced
     base.waitedSeconds = Math.round((Date.now() - started) / 1000);
     opts.onTick?.(base.waitedSeconds, r.probe);
 
     if (r.probe === "ok") break;
+    // input-site: inert #6877128f — the polling deadline; reached only after probeOnce, which is traced
     if (Date.now() >= deadline) break;
+    // input-site: inert #bc7192ae — the pause between probes; reached only after probeOnce, which is traced
     await new Promise((res) => setTimeout(res, Math.min(10_000, Math.max(2_000, deadline - Date.now()))));
   }
 
