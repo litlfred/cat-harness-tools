@@ -1,6 +1,6 @@
 /**
  * `compare-gates.py`'s always-green gates (owner, 2026-11-13: "ALWAYS need
- * json(ld) up to date - gate … including SVGs"): red on head fails the PR even
+ * json(ld) up to date - gate gate"): red on head fails the PR even
  * when main is red too; not applicable (78) is still never counted.
  */
 import { describe, expect, test } from "bun:test";
@@ -24,7 +24,7 @@ function compare(name: string, base: number | undefined, head: number): { status
 }
 
 describe("always-green gates", () => {
-  for (const g of ["cat-harness-tools:gen:jsonld:check", "folio-assistant-core:render:bpmn:check", "check:kg-blocks"]) {
+  for (const g of ["cat-harness-tools:gen:jsonld:check", "check:kg-blocks"]) {
     test(`${g}: red on both sides still fails the PR`, () => {
       const r = compare(g, 1, 1);
       expect(r.status).toBe(1);
@@ -39,6 +39,9 @@ describe("always-green gates", () => {
   });
   test("green passes", () => {
     expect(compare("x:gen:jsonld:check", 1, 0).status).toBe(0);
+  });
+  test("the diagram SVGs are not always-green: a QA report (owner, 2026-11-13)", () => {
+    expect(compare("x:render:bpmn:check", 1, 1).status).toBe(0);
   });
   test("an ordinary gate red on both sides is still main's to fix", () => {
     const r = compare("x:bpmn:checklist:check", 1, 1);

@@ -232,6 +232,13 @@ RUNNER_STATE_SCRIPTS = {
 SWEEP_ONLY_SCRIPTS = {
     "check:navbar-consistency:strict": "the --strict sweep that fails on advisories; CI gates on `check:navbar-consistency:check`",
 }
+# QA reports, not merge gates (owner, 2026-11-13: "bpmn and svg dont need to
+# render to merge. that QA report"): a stale diagram drawing is reported by the
+# QA refresh and the publish, never a reason to refuse a merge. The committed
+# knowledge graph's JSON-LD is the opposite (compare-gates.py ALWAYS_GREEN).
+QA_REPORT_SCRIPTS = {
+    "render:bpmn:check": "a QA report, not a merge gate: the diagram SVGs (owner, 2026-11-13)",
+}
 # Gates that cannot determine anything in LAYER mode (`MODE=layer`), where the
 # caller is swapped into the index without its .git and the layers are mounted
 # at their own tips rather than at the index's lock (folio-assistant-core#287).
@@ -416,6 +423,8 @@ def skip_reason(root, script, env=None, own=None, declarer=None):
         return "runner-state", RUNNER_STATE_SCRIPTS[script]
     if script in SWEEP_ONLY_SCRIPTS:
         return "sweep-only", SWEEP_ONLY_SCRIPTS[script]
+    if script in QA_REPORT_SCRIPTS:
+        return "qa-report", QA_REPORT_SCRIPTS[script]
     if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
         return "layer-mode", LAYER_MODE_SCRIPTS[script]
     why = untracked_corpus_reason(root, declarer, script, own)
@@ -1087,7 +1096,7 @@ def derive(root, given, tmp, env=None):
     Returns (own, harness, runner, gates, skipped): gate name -> command for
     the gates this runner runs, and gate name -> {command, skipped, kind} for
     the declared ones it does not. `kind` says why: `live-state`,
-    `needs-input`, `runner-state`, `sweep-only`, `layer-mode`, `untracked-corpus`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
+    `needs-input`, `runner-state`, `sweep-only`, `qa-report`, `layer-mode`, `untracked-corpus`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
     on a side that holds no such input -- CI runs it where the input exists).
 
     `--list` prints this as JSON, and it is what `gates.ts` `loadGates` reads

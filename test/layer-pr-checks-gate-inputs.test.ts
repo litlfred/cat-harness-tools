@@ -113,6 +113,13 @@ describe("run-gates.py gate inputs", () => {
     expect(py("run-gates.py", `m.skip_reason(".", "check:navbar-consistency:check", {})`)).toEqual([null, null]);
   });
 
+  test("the diagram SVGs are a QA report, not a merge gate (owner, 2026-11-13); the KG's JSON-LD is gated", () => {
+    const [kind, why] = py("run-gates.py", `m.skip_reason(".", "render:bpmn:check", {})`) as [string, string];
+    expect(kind).toBe("qa-report");
+    expect(why).toContain("QA report");
+    expect(py("run-gates.py", `m.skip_reason(".", "gen:jsonld:check", {})`)).toEqual([null, null]);
+  });
+
   test("the lock and default-branch gates are skipped in layer mode only (folio-assistant-core#287)", () => {
     for (const s of ["mount:lock:check", "mount:remote:check", "check:draft-beans", "readmes:check", "readme-sections:check", "book:check", "check:standalone"]) {
       const [kind] = py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "layer"})`) as [string, string];

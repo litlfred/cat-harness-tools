@@ -92,8 +92,10 @@ describe("index-gates.json", () => {
   test("names the index checks the re-pin caught, each a script this layer declares, under its declared-gate name", () => {
     const pkg = JSON.parse(readFileSync(resolve(import.meta.dir, "..", "package.json"), "utf-8"));
     const declared = { ...pkg.scripts, ...pkg.checkoutScripts };
-    for (const s of ["check:reference-direction:check", "check:prov-qaqc", "libraries:check", "render:bpmn:check"])
+    for (const s of ["check:reference-direction:check", "check:prov-qaqc", "libraries:check", "gen:jsonld:check"])
       expect(Object.values(gates)).toContain(s);
+    // The diagram SVGs are a QA report, not a merge gate (owner, 2026-11-13).
+    expect(Object.values(gates)).not.toContain("render:bpmn:check");
     for (const [name, script] of Object.entries(gates)) {
       expect(declared).toHaveProperty([script]);
       expect(name).toBe(`cat-harness-tools:${script}`);

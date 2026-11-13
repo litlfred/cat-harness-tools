@@ -342,8 +342,9 @@ for (const file of sources) {
   // `docs/assets/img/workflows/`), never committed, so `--check` has no
   // committed bytes to compare it with: judging it read every diagram as stale
   // in any checkout that had not just run the writer, and kept this gate red on
-  // main. `--check` judges the committed beside-source copy only, which must be
-  // green on every PR (owner, 2026-11-13: "ALWAYS … including SVGs").
+  // main. `--check` judges the committed beside-source copy only, as a QA
+  // report, not a merge gate (owner, 2026-11-13: "bpmn and svg dont need to
+  // render to merge. that QA report").
   if (!check) await emit(join(OUT_DIR, `${basename(file, ".bpmn")}.svg`), linked);
 
   if (besideSource.has(file)) {
