@@ -309,6 +309,32 @@ describe("the queue shows exactly what is waiting on a person", () => {
     expect(written.confirmed_by).toEqual(HUMAN);
   });
 
+  test("a paged entry's transcribed table is offered, and a decision lands on the table", () => {
+    const root = repo({});
+    mkdirSync(join(root, "library", "paged"), { recursive: true });
+    writeFileSync(join(root, "library", "paged", "structure.json"), "{}\n");
+    const f = join(root, "library", "paged", "tabular.csvw.json");
+    writeFileSync(f, JSON.stringify({ tables: [{ url: "t1.csv", "fac:label": "Table 1", "fac:narrative": [draft] }] }, null, 2) + "\n");
+    const q = queue(root);
+    expect(q.map((i) => [i.slug, i.subject])).toEqual([["paged", "Table 1"]]);
+    expect(q.length).toBe(draftsOnDisk(join(root, "library")));
+    decide(q[0]!, "confirm", { by: HUMAN, root });
+    const [written] = JSON.parse(readFileSync(f, "utf-8")).tables[0]["fac:narrative"];
+    expect(written.state).toBe("confirmed");
+    expect(written.confirmed_by).toEqual(HUMAN);
+  });
+
+  test("a summary's SUPERSEDED history is not awaiting anyone — by the queue or by the walk", () => {
+    const root = repo({});
+    mkdirSync(join(root, "library", "s"), { recursive: true });
+    writeFileSync(
+      join(root, "library", "s", "summaries.json"),
+      JSON.stringify({ summaries: [{ block: "b/1", narrative: [draft], superseded: [{ ...draft, text: "an older draft" }] }] }, null, 2) + "\n",
+    );
+    expect(queue(root).length).toBe(1);
+    expect(draftsOnDisk(join(root, "library"))).toBe(1);
+  });
+
   test("a REJECTED draft is never re-offered", () => {
     // The reasons exist precisely so the same text does not come back around.
     const root = repo({ x: { ...draft, state: "rejected", rejected_by: HUMAN, rejection_reason: REJECTION_REASONS[1] } });
