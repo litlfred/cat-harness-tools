@@ -164,20 +164,16 @@ describe("merge-priority.dmn — readiness and CI, evaluated", () => {
     ["a marker signed by another session", { readyBy: "session_01Steward" }, "foreign-marker"],
     ["#1937: the head moved past the marker", { headSha: "ee4151d2ccc37a45ee58731ea7711bec0df0a4db" }, "stale-marker"],
   ];
-  for (const [what, over, readiness] of cases) {
-    test(`${what} is \`${readiness}\` and handed back by Rule_NotReady`, async () => {
-      expect(readinessOf(done(over))).toBe(readiness);
-      const p = await place(done(over));
-      expect([p.route, p.class, p.rule]).toEqual(["hand back", "hand-back", "Rule_NotReady"]);
-    });
-  }
+  test.each(cases.map(([what, over, readiness]) => [what, readiness, over] as const))("%s is `%s` and handed back by Rule_NotReady", async (_what, readiness, over) => {
+    expect(readinessOf(done(over))).toBe(readiness);
+    const p = await place(done(over));
+    expect([p.route, p.class, p.rule]).toEqual(["hand back", "hand-back", "Rule_NotReady"]);
+  });
 
-  for (const ci of ["red", "missing-required", "none", "unknown"] as const) {
-    test(`ownCi \`${ci}\` is handed back by Rule_HeadNotGreen, without throwing`, async () => {
-      const p = await place(done({ ownCi: ci }));
-      expect([p.route, p.class, p.rule]).toEqual(["hand back", "ci-not-green", "Rule_HeadNotGreen"]);
-    });
-  }
+  test.each(["red", "missing-required", "none", "unknown"] as const)("ownCi `%s` is handed back by Rule_HeadNotGreen, without throwing", async (ci) => {
+    const p = await place(done({ ownCi: ci }));
+    expect([p.route, p.class, p.rule]).toEqual(["hand back", "ci-not-green", "Rule_HeadNotGreen"]);
+  });
 
   test("every class the table can return is in PRIORITY_CLASSES", () => {
     const xml = readFileSync(PRIORITY_DMN, "utf8");

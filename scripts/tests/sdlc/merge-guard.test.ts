@@ -113,13 +113,11 @@ function signed(id: number, at: string, session: string, text: string) {
 const shift = (iso: string, ms: number) => new Date(Date.parse(iso) + ms).toISOString().replace(/\.000Z$/, "Z");
 
 describe("the three real cases are refused — exit 1, never 0", () => {
-  for (const n of [1937, 1957, 1960] as const) {
-    test(`#${n}`, () => {
-      const v = evaluate(real(n));
-      expect(v.verdict).toBe("refused");
-      expect(v.exitCode).toBe(1);
-    });
-  }
+  test.each([1937, 1957, 1960] as const)("#%d", (n) => {
+    const v = evaluate(real(n));
+    expect(v.verdict).toBe("refused");
+    expect(v.exitCode).toBe(1);
+  });
 });
 
 describe("check 1 — base", () => {
