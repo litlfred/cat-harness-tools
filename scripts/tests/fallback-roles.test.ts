@@ -272,7 +272,7 @@ const SAMPLE = [...BATCH.entries()].sort(([a], [b]) => a.localeCompare(b)).slice
 
 describe("the batch pass agrees with asking per skill — bounded regression check", () => {
   test(
-    `the same roles come back for ${String(SAMPLE.length)} sampled skills`,
+    "the same roles come back for up to 6 sampled skills",
     async () => {
       // Non-vacuity first, twice over: an empty batch, or a sample whose every entry
       // is empty, would satisfy the loop below and prove nothing (`6tkl`).

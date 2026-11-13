@@ -43,8 +43,8 @@ const subpath3 = (page: string, scope: string): boolean => {
 const subpath4 = (page: string, scope: string): boolean => page.startsWith(scope);
 
 /** The pages a scope covers: through its glob's matches, or as an exact path. */
-const covered = (files: string[], scopes: string[], test: (p: string, s: string) => boolean) =>
-  files.filter((f) => scopes.some((s) => test(f, s))).sort();
+const covered = (files: string[], scopes: string[], matches: (p: string, s: string) => boolean) =>
+  files.filter((f) => scopes.some((s) => matches(f, s))).sort();
 
 /** Bun's glob, the independent reference: files and directories, no dotfiles. */
 const bunGlob = (root: string, pattern: string): string[] =>

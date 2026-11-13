@@ -31,11 +31,9 @@ describe("the site root is derived, not baked", () => {
     ["/STAGING/claude-example/docs/who-iris/index.html", "/STAGING/claude-example/"],
   ];
 
-  for (const [path, want] of cases) {
-    test(`${path} -> ${want}`, () => {
-      expect(siteRootOf(path, WHO_IRIS)).toBe(want);
-    });
-  }
+  test.each(cases)("%s -> %s", (path, want) => {
+    expect(siteRootOf(path, WHO_IRIS)).toBe(want);
+  });
 
   test("a path outside the instance returns null rather than a guess", () => {
     // A real state. A client that guessed would request two assets that 404
