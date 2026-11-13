@@ -67,3 +67,16 @@ Feature: A built-at-publish path is declared once, ignored by git, and never tra
     And this instance is the top level of a git repository and declares at least one path
     When git ls-files is asked for the declared paths
     Then it succeeds and lists no file
+
+  @test:schemas/kg/built-at-publish.test.ts::the_shape::a_lower_entry_(computed_from_a_layer_below,_or_from_the_tools)_is_valid_and_names_no_branch_(owner,_2026-11-13)
+  Scenario: A lower entry parses, and one naming a branch is refused
+    Given an entry for "docs/x/" because "lower"
+    When it is checked against the entry schema
+    Then it passes
+    And the same entry with "from" naming "beans" fails
+
+  @test:schemas/kg/built-at-publish.test.ts::the_shape::an_unknown_cause_is_refused
+  Scenario: An entry with an unknown cause is refused
+    Given an entry for "docs/x/" because "pinned"
+    When it is checked against the entry schema
+    Then it fails

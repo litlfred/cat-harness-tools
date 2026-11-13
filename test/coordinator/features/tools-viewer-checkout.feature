@@ -73,3 +73,23 @@ Feature: The tools graph has its own docs page, every satisfies resolves, and th
     Then there is more than one subject
     And each page's path ends "/tools/<instance>/index.md" and is identical to its published page
     And no page exists for an instance whose tools graph is empty
+
+  @test:test/coordinator/tools-viewer-checkout.test.ts::the_generator_writes_where_the_declaration_says::draws_one_page_per_Tool,_carrying_its_IRI,_and_every_row_links_to_it
+  Scenario: One page is drawn per Tool, carrying its IRI, and every row of the layer page links to it
+    # Gap: the IRI itself is not checked, only that a JSON-LD script is present
+    # Skipped: where the per-Tool pages are not built in this checkout
+    Given the Tools pages drawn for every instance that declares Tools
+    When each Tool row's own page is looked up
+    Then every Tool has a page
+    And that page has a "Tool" row naming its id, a JSON-LD script, a "Skills it satisfies" section and a "How it is deployed and reached" section
+    And the layer's Tools page links the Tool's id to its page
+
+  @test:test/coordinator/tools-viewer-checkout.test.ts::the_generator_writes_where_the_declaration_says::publishes_an_OpenAPI_document,_an_MCP_tool_list_and_an_API_reference_per_layer,_linked_from_its_page
+  Scenario: Each layer publishes an OpenAPI document, an MCP tool list and an API reference, linked from its page
+    # Skipped: where the API documents are not built in this checkout
+    Given the Tools pages drawn for every instance that declares Tools
+    When each layer's "openapi.json", "mcp-tools.json" and "api/index.md" are read
+    Then the OpenAPI document is version "3.1.0" with exactly one path "/tools/<id>" per Tool
+    And the MCP tool list holds a "tools" array
+    And the API reference has an "## Operations" section
+    And the layer's Tools page links "[OpenAPI document](openapi.json)"

@@ -1,25 +1,25 @@
-# A Tool declared as data (`<id>/<id>.json`, bean y9r6) is discovered like a
-# `.ts` one: type references resolve to the same IRIs and `$comment` is
-# ignored. Each Scenario names the test that executes it.
-Feature: A Tool declared as JSON in its folder is read like a TypeScript one
+# schemas/tools/tool-folders.ts discovers a Tool declared as data in <id>/<id>.json the same way
+# as a .ts one: type references resolve to IRIs, defineTool validates it, $comment is ignored.
+# Each Scenario names the test that executes it.
+Feature: Tools declared as JSON folders
 
   @test:scripts/tests/tools/tool-folders-json.test.ts::toolsFromFolders_reads_<id>/<id>.json::type_references_resolve_against_the_base;_$comment_is_dropped
-  Scenario: A JSON Tool's type references resolve and its $comment is dropped
-    Given a folder alpha/alpha.json declaring Tool "alpha" with an input of $type "Flag" and a $comment
-    When the Tools are read from the folders against a base IRI
+  Scenario: A JSON Tool's type references resolve against the base and its $comment is dropped
+    Given a folder "alpha" holding alpha.json with an input typed "Flag" and a $comment
+    When toolsFromFolders reads the folder with base "https://example.org/h"
     Then the Tool's id is "alpha"
-    And its input's schema is the Flag type IRI under that base
-    And the Tool carries no "$comment"
+    And its first input's schema is the "Flag" Tool type IRI at that base
+    And the loaded Tool contains no "$comment"
 
   @test:scripts/tests/tools/tool-folders-json.test.ts::toolsFromFolders_reads_<id>/<id>.json::a_folder_holding_both_forms_is_refused
   Scenario: A folder holding both a .json and a .ts Tool is refused
-    Given a folder beta holding both beta.json and beta.ts
-    When the Tools are read from the folders
-    Then reading throws an error saying "twice"
+    Given a folder "beta" holding both beta.json and beta.ts
+    When toolsFromFolders reads it
+    Then it throws an error saying the Tool is declared "twice"
 
   @test:scripts/tests/tools/tool-folders-json.test.ts::toolsFromFolders_reads_<id>/<id>.json::an_unknown_type,_or_a_missing_$schema,_is_refused
   Scenario: An unknown type or a missing $schema is refused
-    Given a JSON Tool whose input has $type "NoSuchType"
-    When the Tools are read
-    Then reading throws "unknown Tool type"
-    And when the file has no $schema, reading throws naming "tool-definition/v1"
+    Given a gamma.json whose input is typed "NoSuchType"
+    When toolsFromFolders reads it
+    Then it throws "unknown Tool type"
+    And given a gamma.json with no $schema, it throws naming "tool-definition/v1"

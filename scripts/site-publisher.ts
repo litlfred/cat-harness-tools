@@ -143,9 +143,9 @@ export function detectPublisher(
       if (p) found.push({ kind: p.kind, caller, uses: u });
     }
     // The repository that DEFINES a publisher's reusable workflow builds with
-    // it too, though no workflow of its own calls it: smart-base keeps the IG
-    // build (fhirbuild.yml, ghbuild.yml) that every IG calls, so its own
-    // site-publish found no caller and failed on every push from 2026-11-11.
+    // it too, though no workflow of its own calls it: the layer that keeps the
+    // IG build (fhirbuild.yml, ghbuild.yml) every IG calls found no caller for
+    // its own site-publish, which failed on every push from 2026-11-11.
     // Its `uses` is its own file at the commit being built.
     const hosted = self ? kindOf.get(caller) : undefined;
     if (hosted && self && isReusableWorkflow(text)) {

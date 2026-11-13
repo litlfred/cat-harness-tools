@@ -27,11 +27,9 @@ describe("the example deployment descriptions", () => {
     expect(deploymentProblems(deployments, actors)).toEqual([]);
   });
 
-  for (const d of deployments) {
-    test(`${d.id}: no refused topology pair`, () => {
-      expect(topologyConflicts(d.topology, d.publicationHost)).toEqual([]);
-    });
-  }
+  test.each(deployments.map((d) => [d.id, d] as const))("%s: no refused topology pair", (_id, d) => {
+    expect(topologyConflicts(d.topology, d.publicationHost)).toEqual([]);
+  });
 
   test("today places one actor twice: cloud sessions and the owner's workstation", () => {
     const today = deployments.find((d) => d.id === "today")!;

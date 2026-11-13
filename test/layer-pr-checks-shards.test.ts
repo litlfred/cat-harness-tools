@@ -82,34 +82,30 @@ describe("run-gates.py GATE_SHARD", () => {
     expect(one.skipped).toEqual(whole.skipped);
   });
 
-  for (const n of [2, 3, 4, 7]) {
-    test(`${n} shards are disjoint, and their union is the unsharded set`, () => {
-      const seen: string[] = [];
-      for (let i = 1; i <= n; i++) {
-        const part = list(root, `${i}/${n}`);
-        expect(part.shard).toEqual({ shard: i, of: n, total: names.length });
-        const mine = Object.keys(part.gates);
-        for (const g of mine) expect(part.gates[g]).toBe(whole.gates[g]);
-        // Balanced to within one gate: a round-robin of the sorted names.
-        expect(Math.abs(mine.length - names.length / n)).toBeLessThan(1);
-        seen.push(...mine);
-      }
-      expect(new Set(seen).size).toBe(seen.length);
-      expect([...seen].sort()).toEqual([...names].sort());
-    });
-  }
+  test.each([2, 3, 4, 7])("%d shards are disjoint, and their union is the unsharded set", (n) => {
+    const seen: string[] = [];
+    for (let i = 1; i <= n; i++) {
+      const part = list(root, `${i}/${n}`);
+      expect(part.shard).toEqual({ shard: i, of: n, total: names.length });
+      const mine = Object.keys(part.gates);
+      for (const g of mine) expect(part.gates[g]).toBe(whole.gates[g]);
+      // Balanced to within one gate: a round-robin of the sorted names.
+      expect(Math.abs(mine.length - names.length / n)).toBeLessThan(1);
+      seen.push(...mine);
+    }
+    expect(new Set(seen).size).toBe(seen.length);
+    expect([...seen].sort()).toEqual([...names].sort());
+  });
 
   test("the slice is the same on every call (base and head split alike)", () => {
     expect(list(root, "2/3").gates).toEqual(list(root, "2/3").gates);
   });
 
-  for (const bad of ["0/4", "5/4", "1/0", "x", "1/2/3", "-1/4"]) {
-    test(`a malformed GATE_SHARD (${bad}) exits 2, never a guessed slice`, () => {
-      const r = spawnSync("python3", ["-I", RUN_GATES, root, "--list"], { encoding: "utf-8", env: env(bad) });
-      expect(r.status).toBe(2);
-      expect(r.stdout).toBe("");
-    });
-  }
+  test.each(["0/4", "5/4", "1/0", "x", "1/2/3", "-1/4"])("a malformed GATE_SHARD (%s) exits 2, never a guessed slice", (bad) => {
+    const r = spawnSync("python3", ["-I", RUN_GATES, root, "--list"], { encoding: "utf-8", env: env(bad) });
+    expect(r.status).toBe(2);
+    expect(r.stdout).toBe("");
+  });
 });
 
 describe("run-gates.py GATE_TIMINGS (cat-harness-tools#397)", () => {

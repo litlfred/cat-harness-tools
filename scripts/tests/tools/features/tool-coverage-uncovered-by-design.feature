@@ -1,14 +1,13 @@
-# `UNCOVERED_BY_DESIGN`: tier-A skills that are uncovered and should stay so.
-# The table is checked for form, and staleAnnotations is shown to discriminate
-# so a clean run over the corpus is not clean by vacuity. Each Scenario names
-# the test that executes it.
-Feature: The uncovered-by-design table is well formed and its stale entries are detected
+# scripts/tool-coverage.ts declares UNCOVERED_BY_DESIGN, the tier-A skills that stay
+# uncovered on purpose, and flags any annotation that has gone stale.
+# Each Scenario names the test that executes it.
+Feature: Skills uncovered by design and their stale annotations
 
   @test:scripts/tests/tools/tool-coverage-uncovered-by-design.test.ts::the_table_is_well_formed::every_entry_carries_a_non-trivial_reason
-  Scenario: Every entry's reason is long and cites a bean or code
+  Scenario: Every uncovered-by-design entry carries a substantial reason
     Given the uncovered-by-design table
     Then every reason is longer than 80 characters
-    And every reason mentions "bean" or contains a backtick
+    And every reason mentions a bean or contains a backtick
 
   @test:scripts/tests/tools/tool-coverage-uncovered-by-design.test.ts::the_table_is_well_formed::no_skill_is_annotated_twice
   Scenario: No skill appears twice in the table
@@ -27,25 +26,27 @@ Feature: The uncovered-by-design table is well formed and its stale entries are 
 
   @test:scripts/tests/tools/tool-coverage-uncovered-by-design.test.ts::staleAnnotations_discriminates::an_annotated_skill_that_is_uncovered_and_tier_A_is_not_stale
   Scenario: An annotated skill still uncovered in tier A is not stale
-    Given triage rows holding the table's first skill in tier A
-    When stale annotations are found
+    Given triage rows holding the first annotated skill in tier A
+    When the stale annotations are computed
     Then that skill is not among them
 
   @test:scripts/tests/tools/tool-coverage-uncovered-by-design.test.ts::staleAnnotations_discriminates::an_annotated_skill_absent_from_the_uncovered_set_is_stale_—_it_gained_a_Tool
-  Scenario: An annotated skill absent from the triage is stale
+  Scenario: An annotated skill missing from the triage is stale because it has a Tool
     Given no triage rows
-    When stale annotations are found
+    When the stale annotations are computed
     Then every table entry is stale
-    And the first says "Tool now"
+    And the first one's reason contains "Tool now"
 
   @test:scripts/tests/tools/tool-coverage-uncovered-by-design.test.ts::staleAnnotations_discriminates::an_annotated_skill_that_moved_off_tier_A_is_stale,_and_says_which_tier
-  Scenario: An annotated skill now in another tier is stale and names the tier
-    Given triage rows holding the table's first skill in tier C
-    When stale annotations are found
-    Then that skill is stale
-    And its reason says "tier C"
+  Scenario: An annotated skill moved off tier A is stale and names its tier
+    Given triage rows holding the first annotated skill in tier C
+    When the stale annotations are computed
+    Then that skill is among them
+    And its reason contains "tier C"
 
   @test:scripts/tests/tools/tool-coverage-uncovered-by-design.test.ts::uncoveredByDesign::returns_the_entry_for_an_annotated_skill_and_undefined_otherwise
-  Scenario: Looking up a skill returns its entry or nothing
-    Then looking up the table's first skill returns an entry with its state
+  Scenario: Looking up a skill returns its entry only when annotated
+    Given the uncovered-by-design table
+    When the first annotated skill is looked up
+    Then its state matches the table entry's state
     And looking up "a-skill-that-does-not-exist" returns nothing

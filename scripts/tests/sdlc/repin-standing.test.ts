@@ -442,3 +442,37 @@ describe("cascadeOf: a site whose directories name kinds this job does not mount
     }
   });
 });
+
+describe("alignToHeldPins never moves a pin backwards (folio-assistant train #3111)", () => {
+  const harness = (ref: string) => mount("top", ref, rule({ require: undefined }));
+  const lower = (ref: string) => mount("low", ref, rule({ require: undefined }));
+  const api = (rel: string | Error): GitHubApi => ({
+    ...stubApi({}),
+    async lockPinsAt() {
+      return { "o/low": B };
+    },
+    async compareCommits() {
+      if (rel instanceof Error) throw rel;
+      return rel;
+    },
+  });
+  const cap = { harness: "top", below: new Set(["low"]) };
+  const empty: RepinPlan = { moves: [], held: [], unknown: [] };
+
+  test("a held pin OLDER than the current one is held, not moved", async () => {
+    const plan = await alignToHeldPins(empty, [harness(A), lower(C)], api("behind"), cap);
+    expect(plan.moves).toEqual([]);
+    expect(plan.held[0]!.reason).toContain("never moves a pin backwards");
+  });
+
+  test("a NEWER held pin moves, as before", async () => {
+    const plan = await alignToHeldPins(empty, [harness(A), lower(C)], api("ahead"), cap);
+    expect(plan.moves.map((m) => [m.harness, m.from, m.to])).toEqual([["low", C, B]]);
+  });
+
+  test("when the order cannot be asked, it is held with the reason, never moved blind", async () => {
+    const plan = await alignToHeldPins(empty, [harness(A), lower(C)], api(new Error("HTTP 500")), cap);
+    expect(plan.moves).toEqual([]);
+    expect(plan.held[0]!.reason).toContain("HTTP 500");
+  });
+});

@@ -148,3 +148,13 @@ Feature: Graph typologies are declared as nodes and loaded from the checkouts on
     When the registry is asked whether it has "l6-lazy"
     Then it has, and the function has been called once
     And reading its roots returns that checkout without calling the function again
+
+  @test:schemas/kg/graph-typology-node.test.ts::several_checkouts,_in_precedence_order_(kg-separation_lesson_6)::a_checkout_read_before_a_layer_was_mounted_is_read_again_once_the_layer_is_on_disk_(standing_re-pin,_ig-ast,_2026-11-13)
+  Scenario: A checkout read before a layer was mounted is read again once the layer is on disk
+    Given a registry over a checkout that does not declare "rescan-ig-ast"
+    And a site checkout whose smart-trust declaration uses "rescan-ig-ast", which only its unmounted layer fhir-harness declares
+    When smart-trust's declaration is read with that registry
+    Then it throws 'unknown graph typology "rescan-ig-ast"'
+    When fhir-harness is laid down in the site with a typology node "rescan-ig-ast"
+    Then reading smart-trust's declaration gives the name "smart-trust" and the registry has "rescan-ig-ast"
+    And reading it once more, with nothing new mounted, still gives "smart-trust" without a conflict
