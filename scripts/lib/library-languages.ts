@@ -208,6 +208,34 @@ export function entryLanguages(
   return out;
 }
 
+/**
+ * Each entry's own language and its editions' titles by language, for the
+ * listing: owner, 2026-11-13, *"when display title not in locale, then
+ * display locale if present under original"*. Only an edition the library
+ * holds gives a title, so every title shown is WHO's own, never a guess.
+ * (`dc.title.alternative` is not read: its value `language` is the
+ * cataloguer's, not the title's, so it cannot say which title is which.)
+ */
+export function listingTitles(
+  entries: readonly { id: string; title: string }[],
+  langs: ReadonlyMap<string, EntryLanguages>,
+): Map<string, { lang: string; titles?: Record<string, string> }> {
+  const titleOf = new Map(entries.map((e) => [e.id, e.title]));
+  const out = new Map<string, { lang: string; titles?: Record<string, string> }>();
+  for (const e of entries) {
+    const l = langs.get(e.id);
+    if (!l?.lang) continue;
+    const titles: Record<string, string> = {};
+    for (const v of l.versions) {
+      const t = titleOf.get(v.id);
+      // A title that is only its slug names nothing.
+      if (v.id !== e.id && v.lang !== l.lang && t && t !== v.id && !(v.lang in titles)) titles[v.lang] = t;
+    }
+    out.set(e.id, { lang: l.lang, ...(Object.keys(titles).length ? { titles } : {}) });
+  }
+  return out;
+}
+
 function escHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
