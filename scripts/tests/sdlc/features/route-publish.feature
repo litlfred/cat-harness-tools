@@ -46,14 +46,16 @@ Feature: Publishing a route-keyed directory
     Then the state is "refused"
 
   @test:scripts/tests/sdlc/route-publish.test.ts::no_`expect`_is_ever_sent,_which_is_what_route_keying_means::a_sibling's_write_to_ANOTHER_path_survives,_and_to_the_SAME_path_is_overwritten
-  Scenario: A sibling's file pushed to the route is removed by the next wholesale publish
-    # Gap: the title says a sibling's write to another path survives; the test asserts it is removed, and no sibling write to the same path is made
+  Scenario: A sibling's write to another route survives, and to the same path is overwritten
     Given a route-keyed branch holding "a.md", a checkout with a changed "a.md"
-    And a sibling push that adds "sibling.md" to the branch behind the publisher's back
+    And a sibling push that adds "x.md" under another route "docs/uml/other" on the same branch
+    And a sibling push that rewrites the route's "a.md" behind the publisher's back
+    And a sibling push that adds "sibling.md" under the route behind the publisher's back
     When the route is published
     Then the state is "pushed"
-    And the branch holds the checkout's "a.md"
-    And "sibling.md" is no longer on the branch
+    And the other route's "x.md" is still on the branch, unchanged
+    And the branch holds the checkout's "a.md", not the sibling's
+    And "sibling.md" is no longer on the branch, since the route is replaced wholesale
 
   @test:scripts/tests/sdlc/route-publish.test.ts::the_checkout's_ignore_rules_are_honoured::a_gitignored_file_under_the_route_is_not_published
   Scenario: A gitignored file under the route is not published

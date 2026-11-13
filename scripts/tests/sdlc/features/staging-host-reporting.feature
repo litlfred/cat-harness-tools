@@ -32,35 +32,32 @@ Feature: Reporting the staging host
     Then it mentions "could not determine"
     And it mentions "repo-relative"
 
-  @test:scripts/tests/sdlc/staging-host-reporting.test.ts::staging_review_host_resolution_discipline::resolves_GitHub_Pages_when_pagesBaseUrl_is_configured
-  Scenario: A configured Pages base URL resolves to GitHub Pages
-    # Gap: the resolver is defined inside the test file, so no shipped code is exercised
-    Given a Pages base URL of "https://owner.github.io/repo"
-    When the staging review surface is determined
-    Then the host is "gh-pages" with that URL
+  @test:scripts/tests/sdlc/staging-host-reporting.test.ts::staging_review_host_resolution_discipline::resolves_GitHub_Pages_when_the_declaration_says_github-pages
+  Scenario: A declaration naming github-pages resolves to GitHub Pages
+    Given a layer whose declaration sets publication.host to "github-pages"
+    When its publication host is resolved
+    Then the host is "github-pages"
 
-  @test:scripts/tests/sdlc/staging-host-reporting.test.ts::staging_review_host_resolution_discipline::resolves_local_server_when_local_server_url_is_provided
-  Scenario: A local server URL resolves to the local server
-    # Gap: the resolver is defined inside the test file, so no shipped code is exercised
-    Given a local server URL of "http://127.0.0.1:4000"
-    When the staging review surface is determined
-    Then the host is "local-server" with that URL
+  @test:scripts/tests/sdlc/staging-host-reporting.test.ts::staging_review_host_resolution_discipline::resolves_local_server_when_the_declaration_says_local-server
+  Scenario: A declaration naming local-server resolves to the local server
+    Given a layer whose declaration sets publication.host to "local-server"
+    When its publication host is resolved
+    Then the host is "local-server"
 
-  @test:scripts/tests/sdlc/staging-host-reporting.test.ts::staging_review_host_resolution_discipline::resolves_chat-only_mode_without_guessing_web_URLs
-  Scenario: Chat-only mode resolves to chat-only without a URL
-    # Gap: the resolver is defined inside the test file, so no shipped code is exercised
-    Given the review is chat-only
-    When the staging review surface is determined
-    Then the host is "chat-only"
+  @test:scripts/tests/sdlc/staging-host-reporting.test.ts::staging_review_host_resolution_discipline::resolves_`none`_(publishes_nowhere,_e.g._chat-only_review)_without_guessing_a_web_host
+  Scenario: A declaration naming none resolves to none, not to a guessed web host
+    Given a layer whose declaration sets publication.host to "none"
+    When its publication host is resolved
+    Then the host is "none"
+    And it is not "github-pages"
 
-  @test:scripts/tests/sdlc/staging-host-reporting.test.ts::staging_review_host_resolution_discipline::third_state:_resolves_'could-not-determine'_when_unconfigured,_retaining_repo_paths
-  Scenario: With no host configured the surface is "could-not-determine" and keeps the changed paths
-    # Gap: the resolver is defined inside the test file, so no shipped code is exercised
-    Given no Pages URL, local server or chat-only flag
-    And changed files "docs/concepts/foo.md" and "skills/bar.md"
-    When the staging review surface is determined
-    Then the host is "could-not-determine"
-    And its paths are exactly those two changed files
+  @test:scripts/tests/sdlc/staging-host-reporting.test.ts::staging_review_host_resolution_discipline::third_state:_an_undeclared_or_unknown_host_resolves_to_undefined,_never_github-pages
+  Scenario: An undeclared or unknown host is the third state, never GitHub Pages
+    Given a layer whose declaration names a github.com repository but no publication host
+    And a layer whose declaration sets publication.host to "owner.github.io"
+    And a directory with no declaration at all
+    When each one's publication host is resolved
+    Then every answer is undefined
 
   @test:scripts/tests/sdlc/staging-host-reporting.test.ts::staging_review_host_resolution_discipline::does_not_compose_github.io_from_repo_remote_when_pagesBaseUrl_is_absent_in_deploy_facts
   Scenario: Deploy facts with no host build a staging preview with no moved-from address
