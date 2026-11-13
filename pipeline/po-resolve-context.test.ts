@@ -64,14 +64,12 @@ describe("poResolveContext", () => {
     ["absent", "chapter-01", "fr"],
     ["my-block", "chapter-01", "es"],
   ];
-  for (const [blockStem, chapterSlug, locale] of cases) {
-    it(`resolves ${blockStem}/${chapterSlug ?? "-"}/${locale} exactly as without a context`, () => {
-      const opts = { folioRoot: TMP, locale, blockStem, chapterSlug };
-      const without = resolvePoSources(opts);
-      const withCtx = resolvePoSources(opts, poResolveContext(TMP));
-      expect(withCtx).toEqual(without);
-    });
-  }
+  it.each(cases.map(([b, s, l]) => [b, s ?? "-", l, s] as const))("resolves %s/%s/%s exactly as without a context", (blockStem, _slug, locale, chapterSlug) => {
+    const opts = { folioRoot: TMP, locale, blockStem, chapterSlug };
+    const without = resolvePoSources(opts);
+    const withCtx = resolvePoSources(opts, poResolveContext(TMP));
+    expect(withCtx).toEqual(without);
+  });
 
   it("only the folio-level half is fixed — a .po added after the context was built is still found", () => {
     const before = poResolveContext(TMP);
