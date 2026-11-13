@@ -40,6 +40,7 @@ import {
   classifyMarkdownLine,
   classifyWorkflowLine,
   markdownUses,
+  paragraphsOf,
   workflowUses,
 } from "../check-declaration-filename.ts";
 
@@ -459,4 +460,49 @@ describe("the markdown corpus, on this repository", () => {
     },
     CORPUS_TIMEOUT,
   );
+});
+
+/**
+ * The paragraph a markdown line is judged with, built in LINEAR time.
+ *
+ * Extracted library sections run to 3,000-line blocks with no blank line.
+ * Walking out from every line to the nearest blank lines copied each block
+ * once per line, about 8.5 GB of strings over the composed index, and the
+ * corpus scan took 384 s on CI (core run 43469742934), timing out
+ * "this repository's own workflows carry no USE".
+ */
+describe("a line's paragraph is found in linear time", () => {
+  /** The walk this replaced, kept as the oracle. */
+  const walk = (lines: string[], i: number): string => {
+    let a = i;
+    let b = i;
+    while (a > 0 && lines[a - 1]!.trim() !== "") a--;
+    while (b < lines.length - 1 && lines[b + 1]!.trim() !== "") b++;
+    return lines.slice(a, b + 1).join("\n");
+  };
+
+  test("every non-blank line gets the paragraph the walk gave it", () => {
+    const lines = ["", "a", "b", "", "", "c", "  ", "d", "e", "f", "", "g"];
+    const at = paragraphsOf(lines);
+    for (const [i, line] of lines.entries()) {
+      if (line.trim() !== "") expect(at(i)).toBe(walk(lines, i));
+    }
+  });
+
+  test("a file with no blank line at all is one paragraph", () => {
+    const lines = ["x", "y", "z"];
+    expect(paragraphsOf(lines)(1)).toBe("x\ny\nz");
+  });
+
+  test("a 20,000-line block with the retired name on every line scans in well under a second", () => {
+    // Every line asks for its paragraph, the worst case for any per-line
+    // walk. Measured 2026-11-13: the walk takes 11 s here (737 ms at 5,000
+    // lines, under this bound, so a smaller block would not catch it); the
+    // linear version takes 3 ms.
+    const lines = Array.from({ length: 20000 }, (_, i) => `row ${i} names \`harness.json\` in prose`);
+    const t0 = performance.now();
+    const at = paragraphsOf(lines);
+    for (let i = 0; i < lines.length; i++) at(i);
+    expect(performance.now() - t0).toBeLessThan(1000);
+  });
 });

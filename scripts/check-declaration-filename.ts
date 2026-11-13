@@ -329,13 +329,42 @@ function namesACurrentDeclaration(text: string): boolean {
   return false;
 }
 
-/** The blank-line-delimited block containing `i`. */
-function paragraphAt(lines: string[], i: number): string {
-  let a = i;
-  let b = i;
-  while (a > 0 && lines[a - 1]!.trim() !== "") a--;
-  while (b < lines.length - 1 && lines[b + 1]!.trim() !== "") b++;
-  return lines.slice(a, b + 1).join("\n");
+/**
+ * The blank-line-delimited block containing each line, in LINEAR time.
+ *
+ * One pass records where each block starts and ends; a block's text is joined
+ * the first time a line in it asks, and reused after. Walking out from each
+ * line to the nearest blank lines instead (this function's shape until
+ * 2026-11-13) copies a block of B lines B times: about 8.5 GB of strings over
+ * the composed index, whose extracted library sections run to 3,000-line
+ * blocks with no blank line, and a 384 s scan on CI.
+ */
+export function paragraphsOf(lines: string[]): (i: number) => string {
+  const start = new Array<number>(lines.length);
+  const end = new Array<number>(lines.length);
+  let a = 0;
+  for (let i = 0; i <= lines.length; i++) {
+    if (i === lines.length || lines[i]!.trim() === "") {
+      for (let k = a; k < i; k++) end[k] = i - 1;
+      if (i < lines.length) {
+        start[i] = i; // a blank line names nothing, so is never classified
+        end[i] = i;
+      }
+      a = i + 1;
+    } else {
+      start[i] = a;
+    }
+  }
+  const joined = new Map<number, string>();
+  return (i) => {
+    const s = start[i]!;
+    let text = joined.get(s);
+    if (text === undefined) {
+      text = lines.slice(s, end[i]! + 1).join("\n");
+      joined.set(s, text);
+    }
+    return text;
+  };
 }
 
 /**
@@ -369,12 +398,13 @@ function scanMarkdown(root: string): MarkdownRef[] {
     for (const abs of listed.sort()) {
       const rel = relative(root, abs).split("\\").join("/");
       const lines = readFileSync(abs, "utf8").split("\n");
+      const paragraphAt = paragraphsOf(lines);
       for (const [i, line] of lines.entries()) {
         // Only a line naming the retired file is classified, so only that
         // line's paragraph is built: building one per line was quadratic in
         // a long block, 12 of the scan's 13.5 s (core main, 2026-11-13).
         if (!line.includes(RETIRED_DECLARATION)) continue;
-        const klass = classifyMarkdownLine(rel, line, records, paragraphAt(lines, i), generated);
+        const klass = classifyMarkdownLine(rel, line, records, paragraphAt(i), generated);
         if (klass) out.push({ file: rel, line: i + 1, text: line.trim(), klass });
       }
     }
@@ -391,12 +421,13 @@ function scanMarkdown(root: string): MarkdownRef[] {
       if (!e.name.endsWith(".md")) continue;
       const rel = relative(root, abs).split("\\").join("/");
       const lines = readFileSync(abs, "utf8").split("\n");
+      const paragraphAt = paragraphsOf(lines);
       for (const [i, line] of lines.entries()) {
         // Only a line naming the retired file is classified, so only that
         // line's paragraph is built: building one per line was quadratic in
         // a long block, 12 of the scan's 13.5 s (core main, 2026-11-13).
         if (!line.includes(RETIRED_DECLARATION)) continue;
-        const klass = classifyMarkdownLine(rel, line, records, paragraphAt(lines, i), generated);
+        const klass = classifyMarkdownLine(rel, line, records, paragraphAt(i), generated);
         if (klass) out.push({ file: rel, line: i + 1, text: line.trim(), klass });
       }
     }
