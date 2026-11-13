@@ -62,8 +62,12 @@ describe("the page a reader gets — over the REAL corpus", () => {
         ...[...text.matchAll(/<a id="([^"]+)"><\/a>/g)].map((m) => m[1]),
         ...[...text.matchAll(/^#{1,6} .*\{#([^}\s]+)\}\s*$/gm)].map((m) => m[1]),
       ]);
+      // One title link per row. A row's prose may link further methodologies
+      // by name (`linkProse`), so the count is of the title links only; every
+      // same-page link, title or prose, must still land on a target.
+      const rowLinks = [...text.matchAll(/^\| \*\*\[.*?\]\(#([^)]+)\)\*\*/gm)].map((m) => m[1]);
+      expect(rowLinks.length).toBe(rows.length);
       const links = [...text.matchAll(/\]\(#([^)]+)\)/g)].map((m) => m[1]);
-      expect(links.length).toBe(rows.length);
       expect(links.filter((l) => !targets.has(l))).toEqual([]);
     }
   });
