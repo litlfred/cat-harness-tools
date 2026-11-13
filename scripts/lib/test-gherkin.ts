@@ -72,6 +72,12 @@ export interface TestLanguageAdapter {
   matches(file: string): boolean;
   /** The tests declared in `src`, named against `file`. */
   findTests(file: string, src: string): FoundTest[];
+  /**
+   * Does this file, by what it declares, hold tests its name does not show?
+   * Asked of a file no adapter `matches` (e.g. a suite with its own runner);
+   * `read` gives its text, so an adapter that rules a file out by name reads nothing.
+   */
+  claims?(file: string, read: () => string): boolean;
 }
 
 /** One Scenario (or Scenario Outline / Example) in a `.feature` file. */
@@ -214,7 +220,7 @@ function regexLiteralEnd(src: string, i: number, masked: readonly string[]): num
  */
 export function maskSource(
   src: string,
-  opts: { rustChars?: boolean; templates?: boolean; rawStrings?: boolean; tripleQuotes?: boolean },
+  opts: { rustChars?: boolean; templates?: boolean; rawStrings?: boolean; tripleQuotes?: boolean; backtickNames?: boolean },
 ): { code: string; strings: Map<number, string> } {
   const out: string[] = [];
   const strings = new Map<number, string>();
@@ -258,6 +264,19 @@ export function maskSource(
         strings.set(i, src.slice(i + m[0].length, end < 0 ? src.length : end));
         out.push(blank(src.slice(i, stop)));
         i = stop;
+        continue;
+      }
+    }
+    if (opts.backtickNames && c === "`") {
+      // A Kotlin backtick identifier (`fun \`the vector's kid\`()`): a name,
+      // not a string, so it is kept as written. A quote inside it opens
+      // nothing; read as a char literal, `'s … DSC's` swallowed the rest of
+      // the name and the enclosing class's scope with it.
+      const end = src.indexOf("`", i + 1);
+      const nl = src.indexOf("\n", i + 1);
+      if (end > 0 && (nl < 0 || end < nl)) {
+        out.push(src.slice(i, end + 1));
+        i = end + 1;
         continue;
       }
     }
@@ -404,7 +423,8 @@ export const KOTLIN_ADAPTER: TestLanguageAdapter = {
   findTests(file, src) {
     // Backtick names (`fun \`decodes a QR\`()`) are identifiers, not strings:
     // read them from the raw source at the masked offset.
-    const { code } = maskSource(src, { tripleQuotes: true });
+    // `'` opens only a char literal ('a', '"', '\n'), as in Rust.
+    const { code } = maskSource(src, { tripleQuotes: true, rustChars: true, backtickNames: true });
     const scopeAt = braceScopes(code, (before) => {
       const m = /\b(?:class|object|interface)\s+([A-Za-z_]\w*)[^{]*$/.exec(before);
       // A `fun` after the header in the same chunk means this brace is the function's.
@@ -434,6 +454,20 @@ const JS_TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)__tests__\/.+\.[c
  * between them, and the test it hid read as no test at all.
  */
 const JS_HEAD = /(?<![\w.$])(describe|suite|context|test|it)(?=\s*[.(])/g;
+/**
+ * A suite with its own runner names it in a comment, `@test-runner run`:
+ * each `run("title", …)` call in that file is then a test, and the file is
+ * read whatever its name. The runner is the file's own function, so the file
+ * says so; the adapter names no runner of any one repository.
+ */
+const JS_RUNNER_DIRECTIVE = /@test-runner\s+([A-Za-z_$][\w$]*(?:\s*,\s*[A-Za-z_$][\w$]*)*)/g;
+const JS_SOURCE_FILE = /\.[cm]?[jt]sx?$/;
+
+/** The runner functions a file declares with `@test-runner`. */
+export function declaredTestRunners(src: string): string[] {
+  return [...src.matchAll(JS_RUNNER_DIRECTIVE)].flatMap((m) => m[1].split(",").map((x) => x.trim()));
+}
+
 /** Modifiers that take no arguments. */
 const JS_BARE_MODS = new Set(["skip", "only", "todo", "failing", "concurrent", "serial"]);
 /** Modifiers whose own argument list comes before the title call. */
@@ -445,8 +479,13 @@ const LOOPED_ID = /^[^`$\s\[\]]+\[\$\{[^{}`]*\}\]$/;
 export const JS_ADAPTER: TestLanguageAdapter = {
   id: "js",
   matches: (f) => JS_TEST_FILE.test(f),
+  claims: (f, read) => JS_SOURCE_FILE.test(f) && declaredTestRunners(read()).length > 0,
   findTests(file, src) {
     const { code, strings } = maskSource(src, { templates: true });
+    const runners = declaredTestRunners(src).filter((r) => !/^(?:describe|suite|context|test|it)$/.test(r));
+    const heads = runners.length
+      ? new RegExp(`(?<![\\w.$])(describe|suite|context|test|it|${runners.map((r) => r.replace(/\$/g, "\\$")).join("|")})(?=\\s*[.(])`, "g")
+      : JS_HEAD;
     /** Offset of the `)` matching the `(` at `open`. */
     const closeOf = (open: number): number => {
       let depth = 0;
@@ -497,11 +536,11 @@ export const JS_ADAPTER: TestLanguageAdapter = {
         j = closeOf(argsOpen) + 1;
       }
     };
-    for (const m of code.matchAll(JS_HEAD)) {
+    for (const m of code.matchAll(heads)) {
       const open = callChain(m.index! + m[0].length);
       if (open === undefined) continue;
       const title = firstArgString(open);
-      if (m[1] === "test" || m[1] === "it") calls.push({ at: m.index!, title });
+      if (m[1] === "test" || m[1] === "it" || runners.includes(m[1])) calls.push({ at: m.index!, title });
       else scopes.push({ from: open, to: closeOf(open), title });
     }
     return calls.map((c) => {
@@ -900,7 +939,14 @@ export function scanTree(root: string, opts: ScanOptions = {}): GherkinReport {
       continue;
     }
     const a = adapters.find((x) => x.matches(f));
-    if (a) tests.push(...a.findTests(f, readFileSync(join(root, f), "utf-8")));
+    if (a) {
+      tests.push(...a.findTests(f, readFileSync(join(root, f), "utf-8")));
+      continue;
+    }
+    let src: string | undefined;
+    const read = () => (src ??= readFileSync(join(root, f), "utf-8"));
+    const c = adapters.find((x) => x.claims?.(f, read));
+    if (c) tests.push(...c.findTests(f, read()));
   }
   return joinTestsToScenarios(tests, features, resolvers);
 }

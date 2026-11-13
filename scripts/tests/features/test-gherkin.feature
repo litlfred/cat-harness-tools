@@ -19,6 +19,21 @@ Feature: Every test has a Gherkin
     Then each test is named <file>::<class>::<fun>, with the backtick name's spaces written as _
     And a function with no test annotation is not a test
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::kotlin:_a_quote_inside_a_backtick_name_is_part_of_the_name,_and_the_class_scope_survives_it
+  Scenario: A quote in a Kotlin backtick name stays in the name
+    Given a Kotlin class whose backtick-named @Test functions contain apostrophes, and a char literal holding a brace
+    When the Kotlin adapter reads it
+    Then each test is named <file>::<class>::<fun> with the apostrophes kept
+    And every test after them is still named through the class
+
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_file_that_declares_@test-runner_is_read,_and_each_call_of_its_runner_is_a_test
+  Scenario: A suite with its own runner declares it
+    Given a source file not named as a test file, whose comment declares "@test-runner run"
+    And another file that calls a function named run but declares nothing
+    When the tree is scanned
+    Then each run("title", …) call in the declaring file is a test, a looped id[${key}] title included
+    And the file that declares nothing holds no test
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_test()_and_it()_are_named_through_describe()_titles,_whitespace_as__
   Scenario: JavaScript tests are named through their describe titles
     Given a test file with test(), it.skip(), test.each()() and nested describe() calls
