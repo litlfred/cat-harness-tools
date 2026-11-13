@@ -196,7 +196,7 @@ describe("sibling rows in a group share one indent (owner, 2026-10-01)", () => {
     const { navbarCss } = await import("../../lib/navbar.ts");
     const css = navbarCss();
     const pad = (selector: string): string | undefined =>
-      new RegExp(`${selector.replace(/[.]/g, "\\.")}\\{padding-inline-start:(\\d+)px`).exec(css)?.[1];
+      new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\{padding-inline-start:(\\d+)px`).exec(css)?.[1];
     const link = pad(".fa-nav-group .fa-nav-sub a");
     const dead = pad(".fa-nav-group .fa-nav-sub .fa-nav-dead");
     expect(link).toBeDefined();
