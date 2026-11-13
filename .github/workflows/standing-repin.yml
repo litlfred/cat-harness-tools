@@ -58,7 +58,7 @@
 # repository_dispatch and workflow_dispatch alike — and never merges it or
 # asks GitHub to. Measured before the ruling: repin PRs with auto-merge
 # merged themselves 3–4 seconds after opening, before any CI ran
-# (smart-base#381 and #361, smart-trust#214). `merge:watch --queue` lists the
+# (three repin PRs in two upper layers, measured by the merge manager). `merge:watch --queue` lists the
 # labelled PR; the merge manager judges it and lands it with
 # `merge:guard --merge`. No other session runs a merge path for it, and no
 # session re-pins a site some other way.
