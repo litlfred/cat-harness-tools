@@ -214,6 +214,26 @@ export function delimiterRowStarts(text: string): number[] {
 }
 
 /**
+ * Plain text for a report, never HTML: each `<…>` tag is dropped whole, and any
+ * angle bracket a nested or broken tag left behind goes too, so the result holds
+ * no `<` or `>` at all. One pass over the characters; the same output as
+ * removing `<[^>]+>` and then `[<>]`.
+ */
+export function plainText(x: string): string {
+  let out = "";
+  for (let i = 0; i < x.length; i += 1) {
+    const c = x[i]!;
+    if (c === "<") {
+      const close = x.indexOf(">", i + 1);
+      if (close > i + 1) i = close;
+      continue;
+    }
+    if (c !== ">") out += c;
+  }
+  return out;
+}
+
+/**
  * The text of the last non-empty line above `at`, as plain text: a line ends at
  * a newline or a `<br>`. Reads backwards in growing windows, so a page with many
  * leaked tables is not re-split from its first byte once per table.
@@ -224,9 +244,7 @@ function lineAbove(html: string, at: number): string {
     const pieces = html
       .slice(from, at)
       .split(/\n|<br\s*\/?>/i)
-      // Plain text for a report, never HTML: drop the tags, then any angle
-      // bracket a nested or broken tag left behind.
-      .map((x) => x.replace(/<[^>]+>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim());
+      .map((x) => plainText(x).replace(/\s+/g, " ").trim());
     // The first piece may be cut by the window, so it counts only at the start of the page.
     for (let i = pieces.length - 1; i >= (from === 0 ? 0 : 1); i -= 1) if (pieces[i]!.length > 0) return pieces[i]!;
     if (from === 0) return "";

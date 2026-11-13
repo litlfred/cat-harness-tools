@@ -185,3 +185,9 @@ Feature: A built page carries no escaped block markup or leaked markdown table
     Given 50,000 paragraphs holding a prose pipe and one leaked one-column table
     When leaked tables are found in it
     Then the one table is found within two seconds
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_report_excerpt_is_plain_text,_with_no_angle_bracket_left
+  Scenario: A report excerpt keeps the text and drops every tag and angle bracket
+    Given text holding tags, a nested tag and stray angle brackets
+    When it is reduced to plain text
+    Then the text survives and no "<" or ">" is left

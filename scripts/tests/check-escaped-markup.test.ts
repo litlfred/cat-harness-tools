@@ -38,6 +38,7 @@ import {
   escapedTagsIn,
   htmlPages,
   leakedTablesIn,
+  plainText,
 } from "../check-escaped-markup.js";
 
 /** The exact opening tag the broken build published, welded attributes and all. */
@@ -268,6 +269,11 @@ describe("a markdown table printed as text — bean `7w1a`", () => {
     expect(leakedTablesIn("p.html", page)).toEqual([{ page: "p.html", excerpt: "| h |" }]);
     // Generous: the lookbehind scan this replaced took seconds on a page this size.
     expect(performance.now() - t0).toBeLessThan(2000);
+  });
+
+  test("a report excerpt is plain text, with no angle bracket left", () => {
+    expect(plainText("<p>| a | <strong>b</strong> |</p>")).toBe("| a | b |");
+    expect(plainText("<<script>>alert</script> x < y > z <>")).toBe("alert x  z ");
   });
 
   test("the tree scan reports it", () => {
