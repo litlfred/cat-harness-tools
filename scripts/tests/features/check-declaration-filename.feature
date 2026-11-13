@@ -91,11 +91,10 @@ Feature: References to the retired harness.json declaration
 
   @test:scripts/tests/check-declaration-filename.test.ts::a_path_to_the_declaration_is_built_from_the_constant::examining_nothing_is_not_a_pass
   Scenario: An empty tree reads no files
-    # Gap: the runner's non-zero exit is not exercised; it scans its own checkout and takes no root
+    # Gap: only the zero file count is checked; the runner's non-zero exit is not exercised
     Given an empty directory
     When the declaration filename is checked
     Then the number of files read is 0
-    And the workflow scan is unknown, not empty
 
   @test:scripts/tests/check-declaration-filename.test.ts::a_workflow_line_is_classified,_not_merely_counted::a_step_that_READS_the_retired_declaration_fails
   Scenario: A workflow step reading the retired declaration is a use
@@ -239,19 +238,20 @@ Feature: References to the retired harness.json declaration
     And it holds more than zero entries
 
   @test:scripts/tests/check-declaration-filename.test.ts::a_line's_paragraph_is_found_in_linear_time::every_non-blank_line_gets_the_paragraph_the_walk_gave_it
-  Scenario: Every non-blank line gets the paragraph the line-by-line walk gave it
-    Given lines with blank, whitespace-only and non-blank lines in several paragraphs
-    When each non-blank line's paragraph is looked up
-    Then it is the paragraph the retired walk computes for that line
+  Scenario: Each non-blank line's paragraph matches the old walk
+    Given lines with single and repeated blank lines and a whitespace-only line
+    When the paragraphs of the lines are indexed
+    Then every non-blank line gets the same paragraph the line-by-line walk returns
 
   @test:scripts/tests/check-declaration-filename.test.ts::a_line's_paragraph_is_found_in_linear_time::a_file_with_no_blank_line_at_all_is_one_paragraph
-  Scenario: A file with no blank line is one paragraph
+  Scenario: A file without blank lines is one paragraph
     Given the lines "x", "y" and "z"
-    When the paragraph of the second line is looked up
-    Then it is all three lines
+    When the paragraph of the middle line is asked for
+    Then it is all three lines joined by newlines
 
   @test:scripts/tests/check-declaration-filename.test.ts::a_line's_paragraph_is_found_in_linear_time::a_20,000-line_block_with_the_retired_name_on_every_line_scans_in_well_under_a_second
-  Scenario: A 20,000-line block naming the retired file on every line scans in under a second
-    Given 20,000 consecutive non-blank lines, each naming the retired declaration
-    When every line's paragraph is looked up
-    Then it takes less than 1000 ms
+  Scenario: Paragraph lookup over 20,000 lines finishes within a second
+    # Gap: only the paragraph index is timed, not the full declaration-filename scan
+    Given a 20,000-line block naming "harness.json" on every line with no blank line
+    When the paragraph of every line is asked for
+    Then indexing and all lookups together take under 1000 ms

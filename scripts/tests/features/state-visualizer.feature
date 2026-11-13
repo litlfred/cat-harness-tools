@@ -1,10 +1,6 @@
 # The state dashboards: their route, and what each page can and cannot claim,
 # read from the pages the generator wrote. Each Scenario names the test that
 # executes it.
-#
-# Not tagged here: the three tests under the describe "per-instance memory
-# pages (the library page's last \"no viewer yet\" row)", whose title holds an
-# escaped quote that the pending checker change (#2065) renames.
 Feature: State graph dashboards
 
   @test:scripts/tests/state-visualizer.test.ts::the_route_is_the_policy,_not_this_generator's_choice::the_visualiser_is_AT_its_declared_route,_`<harness>/<visualiser>/`,_one_per_declared_visualiser
@@ -447,6 +443,27 @@ Feature: State graph dashboards
   @test:scripts/tests/state-visualizer.test.ts::drawsInstanceHub:_a_per-instance_visualiser_no_dashboard_draws_gets_its_own_route::not_when_a_dashboard_already_draws_the_route,_nor_with_no_instance_pages,_nor_for_a_state_kind
   Scenario: No hub where a dashboard draws, with no pages, or for a state kind
     Then code with a dashboard, code with no instance pages, and beans each draw no hub
+
+  @test:scripts/tests/state-visualizer.test.ts::per-instance_memory_pages_(the_library_page's_last_"no_viewer_yet"_row)::a_memory_directory's_lessons,_interaction_node_and_waivers_are_all_listed;_absent_is_null
+  Scenario: A memory directory's files are all listed, and an absent directory is null
+    # Gap: no waiver file is in the fixture; only lessons, an interaction node and an unparseable JSON file are listed
+    Given a memory directory holding a README, a lesson, an archived lesson, an interaction node and a file that does not parse as JSON
+    When its rows are read
+    Then the four non-README files are listed sorted, the archived lesson marked archived, the lesson's label and summary kept, and the bad file noted "does not parse as JSON"
+    And an absent directory reads as null
+    When the instance's memory page is rendered
+    Then it turns Liquid off, says "2 lessons (1 archived), 2 other nodes", links the lesson at the pinned blob URL, keeps the summary's braces, and carries the generated-by mark
+
+  @test:scripts/tests/state-visualizer.test.ts::per-instance_memory_pages_(the_library_page's_last_"no_viewer_yet"_row)::an_instance_whose_memory_is_not_in_the_build_says_unknown,_not_empty
+  Scenario: An instance whose memory is not in the build says unknown, not empty
+    Given an instance whose memory rows are null
+    When its memory page is rendered
+    Then it says "unknown", not empty
+
+  @test:scripts/tests/state-visualizer.test.ts::per-instance_memory_pages_(the_library_page's_last_"no_viewer_yet"_row)::memory_is_drawn_per_instance,_with_a_hub,_and_is_not_refused_as_unread
+  Scenario: Memory is drawn per instance, with a hub, and is not refused as unread
+    Then memory is a memory kind and draws an instance hub
+    And this repository's per-instance subjects for memory are drawn with nothing unread
 
   @test:scripts/tests/state-visualizer.test.ts::pipeline_plugins_and_editor_checkers_are_registries_(cat-harness-tools#386)::a_plugin_is_listed_by_its_slot_and_rationale
   Scenario: A pipeline plugin is listed by slot and rationale

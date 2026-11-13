@@ -84,7 +84,7 @@ Feature: The Bun-runtime guard
     Then it contains "runs what CI runs"
     And it does not contain "sfjo"
 
-  @test:scripts/tests/bun-runtime.test.ts::a_mismatch_with_a_UNIFORM_corpus::zero_stamped_elsewhere_does_not_produce_\"older_than_the_0_above\"
+  @test:scripts/tests/bun-runtime.test.ts::a_mismatch_with_a_UNIFORM_corpus::zero_stamped_elsewhere_does_not_produce_"older_than_the_0_above"
   Scenario: A mismatch with every sidecar on the running engine does not cite a zero count
     Given 86 sidecars all stamped "bun-1.3.11", a pin "1.3.14" and a running "1.3.11"
     When the session-start section is rendered

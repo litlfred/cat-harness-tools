@@ -117,6 +117,13 @@ Feature: Beans by process
   Scenario: Unplaced beans on the combined page say which store they are from
     Then the embedded data names folio-assistant-core as a store
 
+  @test:scripts/tests/processed-beans.test.ts::the_combined_page,_every_store_at_…/beans/beans-processed/_(owner,_2026-11-03)::each_store's_needs_go_to_the_page,_kept_to_the_stores_on_it,_for_"and_what_it_depends_on"
+  Scenario: Each store's needs go to the combined page, kept to the stores on it
+    Given a combined page of cat-harness needing bootstrap, and folio-assistant-core needing cat-harness and bootstrap
+    When the page is built
+    Then its embedded needs are cat-harness: none and folio-assistant-core: cat-harness, bootstrap being on no page
+    And the page carries the "and what it depends on" control
+
   @test:scripts/tests/processed-beans.test.ts::the_combined_page,_every_store_at_…/beans/beans-processed/_(owner,_2026-11-03)::no_live_refresh:_the_local_server_serves_one_store,_not_every_store
   Scenario: The combined page has no live refresh
     Then it holds no live-refresh control
