@@ -99,42 +99,42 @@ export function mergeFolio(
   local: Record<string, LocalFolioEntry> | null | undefined,
   instance?: string,
 ): FolioMerge {
-  var CONTENT = { title: 1, summary: 1, href: 1, links: 1, anchor: 1, theme: 1, declaredIn: 1, chars: 1, file: 1, id: 1 } as Record<string, number>;
-  var DESCRIBE = { kind: 1, nodeKind: 1, avatar: 1, source: 1, shown: 1, geom: 1 } as Record<string, number>;
-  var pub = Array.isArray(published) ? published.filter(function (n) { return n && typeof n.id === "string" && n.id; }) : [];
-  var loc = local && typeof local === "object" && !Array.isArray(local) ? local : {};
-  var str = function (v: unknown): string { return v == null ? "" : String(v); };
-  var bare = function (k: string): string { return k.replace(/^(pin|bookmark):/, ""); };
-  var byId: Record<string, string> = {};
-  for (var i = 0; i < pub.length; i++) {
+  let CONTENT = { title: 1, summary: 1, href: 1, links: 1, anchor: 1, theme: 1, declaredIn: 1, chars: 1, file: 1, id: 1 } as Record<string, number>;
+  let DESCRIBE = { kind: 1, nodeKind: 1, avatar: 1, source: 1, shown: 1, geom: 1 } as Record<string, number>;
+  let pub = Array.isArray(published) ? published.filter(function (n) { return n && typeof n.id === "string" && n.id; }) : [];
+  let loc = local && typeof local === "object" && !Array.isArray(local) ? local : {};
+  let str = function (v: unknown): string { return v == null ? "" : String(v); };
+  let bare = function (k: string): string { return k.replace(/^(pin|bookmark):/, ""); };
+  let byId: Record<string, string> = {};
+  for (let i = 0; i < pub.length; i++) {
     byId[pub[i]!.id] = pub[i]!.id;
     if (instance) byId[instance + "/" + pub[i]!.id] = pub[i]!.id;
   }
   // Which local key each published id took. The FIRST key in store order wins;
   // a second key naming the same id stays its own unsynced row rather than
   // being folded away (never drop a side).
-  var claimed: Record<string, string> = {};
-  var localKeys = Object.keys(loc);
-  for (var j = 0; j < localKeys.length; j++) {
-    var lk = localKeys[j]!;
-    var e = loc[lk];
+  let claimed: Record<string, string> = {};
+  let localKeys = Object.keys(loc);
+  for (let j = 0; j < localKeys.length; j++) {
+    let lk = localKeys[j]!;
+    let e = loc[lk];
     if (!e || typeof e !== "object") continue;
-    var pid = Object.prototype.hasOwnProperty.call(byId, lk) ? byId[lk]! :
+    let pid = Object.prototype.hasOwnProperty.call(byId, lk) ? byId[lk]! :
       Object.prototype.hasOwnProperty.call(byId, bare(lk)) ? byId[bare(lk)]! : "";
     if (pid && !Object.prototype.hasOwnProperty.call(claimed, pid)) claimed[pid] = lk;
   }
-  var layoutOf = function (en: LocalFolioEntry | null): Record<string, unknown> {
-    var out: Record<string, unknown> = {};
+  let layoutOf = function (en: LocalFolioEntry | null): Record<string, unknown> {
+    let out: Record<string, unknown> = {};
     if (!en) return out;
-    var ks = Object.keys(en);
-    for (var m = 0; m < ks.length; m++) if (!CONTENT[ks[m]!] && !DESCRIBE[ks[m]!]) out[ks[m]!] = en[ks[m]!];
+    let ks = Object.keys(en);
+    for (let m = 0; m < ks.length; m++) if (!CONTENT[ks[m]!] && !DESCRIBE[ks[m]!]) out[ks[m]!] = en[ks[m]!];
     return out;
   };
-  var row = function (id: string, key: string | null, n: PublishedFolioNode | null, en: LocalFolioEntry | null): FolioMergeRow {
-    var links = n && Array.isArray(n.links) ? n.links : [];
-    var title = n ? str(n.summary) || (en && str(en.title)) || n.id : str(en && en.title) || id;
-    var pubHref = links.length ? str(links[0]!.href) : "";
-    var locHref = en ? str(en.href) : "";
+  let row = function (id: string, key: string | null, n: PublishedFolioNode | null, en: LocalFolioEntry | null): FolioMergeRow {
+    let links = n && Array.isArray(n.links) ? n.links : [];
+    let title = n ? str(n.summary) || (en && str(en.title)) || n.id : str(en && en.title) || id;
+    let pubHref = links.length ? str(links[0]!.href) : "";
+    let locHref = en ? str(en.href) : "";
     return {
       id: id,
       key: key,
@@ -157,21 +157,21 @@ export function mergeFolio(
       layout: layoutOf(en),
     };
   };
-  var rows: FolioMergeRow[] = [];
-  var used: Record<string, number> = {};
-  for (var p = 0; p < pub.length; p++) {
-    var nd = pub[p]!;
-    var ck = Object.prototype.hasOwnProperty.call(claimed, nd.id) ? claimed[nd.id]! : null;
+  let rows: FolioMergeRow[] = [];
+  let used: Record<string, number> = {};
+  for (let p = 0; p < pub.length; p++) {
+    let nd = pub[p]!;
+    let ck = Object.prototype.hasOwnProperty.call(claimed, nd.id) ? claimed[nd.id]! : null;
     if (ck !== null) used[ck] = 1;
     rows.push(row(nd.id, ck, nd, ck !== null ? loc[ck]! : null));
   }
-  for (var q = 0; q < localKeys.length; q++) {
-    var k2 = localKeys[q]!;
+  for (let q = 0; q < localKeys.length; q++) {
+    let k2 = localKeys[q]!;
     if (used[k2] || !loc[k2] || typeof loc[k2] !== "object") continue;
     rows.push(row(k2, k2, null, loc[k2]!));
   }
-  var c = { published: pub.length, local: 0, synced: 0, unsynced: 0, publishedOnly: 0 };
-  for (var r = 0; r < rows.length; r++) {
+  let c = { published: pub.length, local: 0, synced: 0, unsynced: 0, publishedOnly: 0 };
+  for (let r = 0; r < rows.length; r++) {
     if (rows[r]!.status === "synced") { c.synced++; c.local++; }
     else if (rows[r]!.status === "unsynced") { c.unsynced++; c.local++; }
     else c.publishedOnly++;
