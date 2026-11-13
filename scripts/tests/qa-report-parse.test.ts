@@ -23,18 +23,16 @@ const SAMPLES: Record<string, string> = {
 };
 
 describe("parseQaReport agrees with loadQaReport on the same bytes", () => {
-  for (const [name, text] of Object.entries(SAMPLES)) {
-    test(name, () => {
-      const dir = mkdtempSync(join(tmpdir(), "qa-parse-"));
-      try {
-        const p = join(dir, `${name}.qa.json`);
-        writeFileSync(p, text);
-        expect(parseQaReport(text, "qa-reports:main/x")).toEqual(loadQaReport(p));
-      } finally {
-        rmSync(dir, { recursive: true, force: true });
-      }
-    });
-  }
+  test.each(Object.entries(SAMPLES))("%s", (name, text) => {
+    const dir = mkdtempSync(join(tmpdir(), "qa-parse-"));
+    try {
+      const p = join(dir, `${name}.qa.json`);
+      writeFileSync(p, text);
+      expect(parseQaReport(text, "qa-reports:main/x")).toEqual(loadQaReport(p));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
   test("the shape rules are applied, not just the parse", () => {
     expect(parseQaReport(SAMPLES.unmarked!, "l")?.$schema).toBe("block-qa/v1");

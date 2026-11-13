@@ -141,16 +141,14 @@ describe("retired SkillDefinition fields", () => {
     expect(dead, "a retirement record was named but never written").toEqual([]);
   });
 
-  for (const [field, record] of Object.entries(RETIRED)) {
-    test(`no SkillDefinition declares \`${field}\``, () => {
-      const declaring = files
-        .filter((f) => declaresField(f, field))
-        .map((f) => f.slice(ROOT.length + 1));
-      expect(
-        declaring,
-        `\`${field}\` is retired and read by nothing — see ${record}. ` +
-          "Reinstating it means writing the consumer FIRST, then updating this test.",
-      ).toEqual([]);
-    });
-  }
+  test.each(Object.entries(RETIRED))("no SkillDefinition declares `%s`", (field, record) => {
+    const declaring = files
+      .filter((f) => declaresField(f, field))
+      .map((f) => f.slice(ROOT.length + 1));
+    expect(
+      declaring,
+      `\`${field}\` is retired and read by nothing — see ${record}. ` +
+        "Reinstating it means writing the consumer FIRST, then updating this test.",
+    ).toEqual([]);
+  });
 });

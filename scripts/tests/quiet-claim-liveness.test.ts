@@ -145,7 +145,7 @@ describe("the branch signal names the bean it is about", () => {
 });
 
 describe("a bulk ref is excluded from the signal and REPORTED", () => {
-  it(`a ref changing more than ${BULK_BEAN_CHANGES} bean files is bulk`, () => {
+  it("a ref changing more than 11 bean files is bulk", () => {
     const many = Array.from({ length: BULK_BEAN_CHANGES + 1 }, (_, i) => `folio-assistant-b${i}--f.md`);
     const { root, cleanup } = repo({ sweep: many });
     const changes = refsChangingBeans(root, "origin/main", "beans/defs");

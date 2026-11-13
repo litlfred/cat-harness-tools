@@ -46,11 +46,9 @@ describe("the envelope (the kind's validator)", () => {
   it("accepts a conforming witness", () => {
     expect(Envelope.safeParse(CONFORMING).success).toBe(true);
   });
-  for (const [what, w] of Object.entries(CORPUS_SHAPES)) {
-    it(`accepts a witness with ${what}`, () => {
-      expect(Envelope.safeParse(w).success).toBe(true);
-    });
-  }
+  it.each(Object.entries(CORPUS_SHAPES))("accepts a witness with %s", (_what, w) => {
+    expect(Envelope.safeParse(w).success).toBe(true);
+  });
   // A present field of the wrong type is malformed: optional is not untyped.
   it("rejects a present field of the wrong type", () => {
     expect(Envelope.safeParse({ ...CONFORMING, scriptHash: 42 }).success).toBe(false);
@@ -65,11 +63,9 @@ describe("the producer contract", () => {
   });
   // The corpus shapes are exactly what the contract does NOT allow, except the
   // two that differ only in fields the contract leaves open.
-  for (const what of ["no engine", "an engine outside the contract's list", "no assertions", "auditOnly as a boolean", "a boolean computed value"]) {
-    it(`rejects a witness with ${what}`, () => {
-      expect(Contract.safeParse(CORPUS_SHAPES[what]).success).toBe(false);
-    });
-  }
+  it.each(["no engine", "an engine outside the contract's list", "no assertions", "auditOnly as a boolean", "a boolean computed value"])("rejects a witness with %s", (what) => {
+    expect(Contract.safeParse(CORPUS_SHAPES[what]).success).toBe(false);
+  });
 });
 
 describe("the graph typology", () => {
