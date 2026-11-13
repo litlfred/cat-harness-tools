@@ -30,7 +30,7 @@
  * check that enforces that is plan step 1's second half.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { inputSiteReached } from "../../schemas/sdlc/input-trace.js";
 
@@ -131,4 +131,68 @@ export function readPathAt(root: string, abs: string, mounted: Map<string, strin
   if (twin === undefined) return abs;
   inputSiteReached(`layer-output: ${relative(resolve(root), twin).split(sep).join("/")}`);
   return existsSync(twin) ? twin : abs;
+}
+
+/** Per-root cache of {@link mountedInstances}: a reader asks per file, and the lock does not change during a run. */
+const mountedCache = new Map<string, Map<string, string>>();
+
+/** {@link mountedInstances}, read once per root per process. */
+export function mountedInstancesCached(root: string): Map<string, string> {
+  const r = resolve(root);
+  let m = mountedCache.get(r);
+  if (m === undefined) {
+    m = mountedInstances(r);
+    mountedCache.set(r, m);
+  }
+  return m;
+}
+
+/** Forget every cached lock read: for a test that writes a lock between reads. */
+export function clearMountedCache(): void {
+  mountedCache.clear();
+}
+
+/**
+ * The checkout a reader with only an absolute path stands in: the nearest
+ * directory at or above `cwd` that holds a `.git` entry. Commands run from
+ * the checkout root (`bun run cat …`), and a mount carries no `.git` (its
+ * bytes are laid down from the lock), so this is the composed checkout, never
+ * a mount that happens to carry an `index.lock.json` of its own. `undefined`
+ * outside a checkout, where nothing is mounted.
+ */
+const checkouts = new Map<string, string | undefined>();
+export function checkoutRoot(cwd: string = process.cwd()): string | undefined {
+  if (checkouts.has(cwd)) return checkouts.get(cwd);
+  let found: string | undefined;
+  for (let d = resolve(cwd); ; d = dirname(d)) {
+    if (existsSync(join(d, ".git"))) {
+      found = d;
+      break;
+    }
+    if (dirname(d) === d) break;
+  }
+  checkouts.set(cwd, found);
+  return found;
+}
+
+/**
+ * {@link readPathAt} for a reader that holds only an absolute path: the
+ * output-root twin when a writer put the file there, else `abs`. `root` is
+ * the checkout; by default the one the working directory is in. Outside a
+ * checkout, or for a path in no mounted layer, it is `abs` unchanged, so a
+ * reader moved onto it reads exactly what it read before until a writer
+ * writes under {@link LAYER_OUTPUT_ROOT}.
+ */
+export function overlayPath(abs: string, root: string | undefined = checkoutRoot()): string {
+  if (root === undefined) return abs;
+  let mounted: Map<string, string>;
+  try {
+    mounted = mountedInstancesCached(root);
+  } catch {
+    // An unparseable lock: a READER falls back to the pinned bytes. Only a
+    // writer must refuse it (see mountedInstances).
+    return abs;
+  }
+  if (mounted.size === 0) return abs;
+  return readPathAt(root, abs, mounted);
 }

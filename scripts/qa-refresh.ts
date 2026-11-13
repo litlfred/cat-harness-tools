@@ -698,8 +698,10 @@ function main(argv: string[]): number {
   // sidecars are committed; this restores that, nothing more.
   for (const r of roots) mkdirSync(join(repoRoot, r), { recursive: true });
   const mounted = [...mountedInstanceRoots(repoRoot).values()].map((abs) => relative(repoRoot, abs));
+  // Only a file IN the mount was laid down from its pin; one under the layer
+  // output root (`MovedFile.at`) was computed here, and is judged like any other.
   const carried = carriedByMount(
-    movedInventory(repoRoot, roots).directories.flatMap((d) => d.files.map((f) => f.path)),
+    movedInventory(repoRoot, roots).directories.flatMap((d) => d.files.filter((f) => f.at === undefined).map((f) => f.path)),
     mounted,
   );
   // A writer may rewrite committed files beside its QA output (bean `72a8`);
