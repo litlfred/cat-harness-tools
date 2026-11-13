@@ -316,3 +316,25 @@ describe("publishedRoot — shell-safe quoting of git archive arguments (bean ca
     expect(readFileSync(join(tree!, "index.html"), "utf-8")).toBe("<p>ok</p>");
   });
 });
+
+describe("every site build writes its search scopes (who-iris search, owner 2026-11-13)", () => {
+  // Without `assets/js/search/manifest.json` the theme's loader falls back to the
+  // whole site index (33 MB on who-iris) and the search box never answers.
+  const src = readFileSync(join(import.meta.dir, "..", "..", "build-instance-site.ts"), "utf-8");
+  const body = src.slice(src.indexOf("export async function buildInstanceSite("));
+
+  test("the split runs on the built site, scoped by the checkout it was built from", () => {
+    expect(body).toContain("splitSite(site, root)");
+  });
+
+  test("after the last step that writes pages, and before the site is judged", () => {
+    const at = (s: string) => {
+      const i = body.indexOf(s);
+      expect(i).toBeGreaterThan(-1);
+      return i;
+    };
+    const split = at("splitSite(site, root)");
+    for (const before of ["rail-standalone-pages.ts", "o.finalSteps ?? []) run(", "writeForwardingPages(site, root)"]) expect(at(before)).toBeLessThan(split);
+    for (const after of ['join(site, ".nojekyll")', "siteCoverageShortfall(", "parityShortfall("]) expect(at(after)).toBeGreaterThan(split);
+  });
+});

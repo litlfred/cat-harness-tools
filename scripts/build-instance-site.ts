@@ -55,7 +55,9 @@
  *     mount-instance-docs, pdf-viewer, suggest-editor, set-html-lang, publish-id-lookup,
  *     rail-standalone-pages; then each `--final-step` package script, the same way, for a step
  *     that must see every page of the finished site, the platform's own too (an IG's one bar on
- *     the identifier lookup page; owner, 2026-10-15); then `.nojekyll`
+ *     the identifier lookup page; owner, 2026-10-15); then the forwarding pages; then the search
+ *     scopes (`search-split.ts`: the manifest and one index per scope, so a reader never loads
+ *     the whole site's index); then `.nojekyll`
  *  7. every relative or base-rooted href/src/action in every page resolves to a file
  *     under the site (read with an HTML parser, HTMLRewriter, not a regex)
  *  8. for the root, the guard (`site-parity.ts`): the build is measured against the root it
@@ -117,6 +119,7 @@ import { instanceRoots, writeMissingVisualisers } from "./visualiser-writers.ts"
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
 import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
+import { describeSplit, SCOPES_DIR, SOURCE_PATH as SEARCH_SOURCE, splitSite } from "./search-split.ts";
 import { PREVIEW_PREFIX, PREVIEW_PREFIXES, previewPath } from "./lib/preview-prefix.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
@@ -1090,6 +1093,18 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // to the pages as published and never replace one.
     const fwd = writeForwardingPages(site, root);
     console.log(`forwarding: ${fwd.written.length} page(s) at old addresses${fwd.superseded.length ? `; ${fwd.superseded.length} left as published pages` : ""}`);
+    // The search scopes, after the last step that writes pages (owner, 2026-11-13: "search
+    // broke" a folio's catalogue). Without `assets/js/search/manifest.json` the theme's
+    // loader falls back to the WHOLE `search-data.json` — 33 MB and 20,571 entries on
+    // that site — and builds one lunr index from it in the browser, which never answers.
+    // This path, which stage-local uses for every folio and IG site, never ran the split.
+    // Scoped by the layers THIS checkout declares.
+    const split = splitSite(site, root);
+    if (split) {
+      console.log(`▶ search scopes`);
+      for (const line of describeSplit(split.manifest)) console.log(line);
+      console.log(`search: ${split.manifest.scopes.length} scope(s) from ${split.manifest.source.entries} entries (${(split.manifest.source.bytes / 1e6).toFixed(2)} MB) → ${SCOPES_DIR}/`);
+    } else console.log(`search: no ${SEARCH_SOURCE} in the site — nothing to split`);
   } finally {
     restoreHarnessData();
   }

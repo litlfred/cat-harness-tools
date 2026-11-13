@@ -12,7 +12,7 @@
  * `7zz1`): standing alone, cat-harness has none of it.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -31,8 +31,10 @@ import {
   TOKENIZER_SEPARATOR,
   buildIndex,
   publishedLookups,
+  harnessRootIn,
   render,
   scopeOf,
+  splitSite,
   sectionOfPath,
   split,
   tokenCount,
@@ -312,5 +314,79 @@ describe("prebuilt indexes for scopes over the token budget — bean lrzn", () =
     expect(JSON.stringify(buildIndex(DOCS))).toBe(JSON.stringify(built.toJSON()));
     const loaded = theme.load(JSON.parse(JSON.stringify(buildIndex(DOCS))));
     for (const q of ["trust", "gate", "lists network", "smart"]) expect(loaded.search(q)).toEqual(built.search(q));
+  });
+});
+
+describe("splitSite — scoped by the checkout the site was built from (who-iris search, 2026-11-13)", () => {
+  // A folio checkout: its own layer at the root, the layers it mounts one level down.
+  const checkout = () => {
+    const repo = mkdtempSync(join(tmpdir(), "search-split-repo-"));
+    writeFileSync(join(repo, "who-iris.json"), JSON.stringify({ name: "who-iris" }));
+    for (const layer of ["cat-harness", "smart-base"]) {
+      mkdirSync(join(repo, layer), { recursive: true });
+      writeFileSync(join(repo, layer, `${layer}.json`), JSON.stringify({ name: layer }));
+    }
+    return repo;
+  };
+  const site = (index: Record<string, unknown>) => {
+    const dir = mkdtempSync(join(tmpdir(), "search-split-site-"));
+    mkdirSync(join(dir, "assets/js"), { recursive: true });
+    writeFileSync(join(dir, SOURCE_PATH), JSON.stringify(index));
+    return dir;
+  };
+  const idx = {
+    0: { relUrl: "/", title: "home" },
+    1: { relUrl: "/catalogue/", title: "catalogue" },
+    2: { relUrl: "/smart-base/p.html", title: "mounted layer" },
+    3: { relUrl: "/library/cat-harness/x.html", title: "kind route" },
+  };
+
+  test("writes the manifest and one file per scope, the mounted layers each a scope of their own", () => {
+    const repo = checkout();
+    const dir = site(idx);
+    try {
+      const out = splitSite(dir, repo, { harnessRoot: HARNESS_ROOT })!;
+      const m = JSON.parse(readFileSync(join(dir, SCOPES_DIR, "manifest.json"), "utf-8")) as SearchManifest;
+      expect(m).toEqual(out.manifest);
+      const got = new Map(m.scopes.map((s): [string, (string | number)[]] => [s.id, [s.kind, s.entries]]));
+      expect(got).toEqual(
+        new Map<string, (string | number)[]>([
+          [PLATFORM, ["platform", 2]],
+          ["cat-harness", ["instance", 1]],
+          ["smart-base", ["instance", 1]],
+        ]),
+      );
+      // The checkout's own layer is the site's root: never a scope of its own.
+      expect(m.scopes.some((s) => s.id === "who-iris")).toBe(false);
+      for (const s of m.scopes) expect(readFileSync(join(dir, s.path), "utf-8").length).toBe(s.bytes);
+      expect(splitSite(dir, repo, { harnessRoot: HARNESS_ROOT, check: true })!.stale).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a site with no theme index is nothing to split, and nothing is written", () => {
+    const repo = checkout();
+    const dir = mkdtempSync(join(tmpdir(), "search-split-none-"));
+    try {
+      expect(splitSite(dir, repo, { harnessRoot: HARNESS_ROOT })).toBeUndefined();
+      expect(existsSync(join(dir, SCOPES_DIR))).toBe(false);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("the harness is the checkout's declared cat-harness layer; with none, the resolved harness", () => {
+    const repo = checkout();
+    const bare = mkdtempSync(join(tmpdir(), "search-split-bare-"));
+    try {
+      expect(harnessRootIn(repo)).toBe(join(repo, "cat-harness"));
+      expect(harnessRootIn(bare)).toBe(resolve(HARNESS_ROOT));
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(bare, { recursive: true, force: true });
+    }
   });
 });
