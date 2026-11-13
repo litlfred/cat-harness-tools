@@ -170,6 +170,11 @@ export function toolPage(d: ToolPageData, generatedFm: string): string {
     "---",
     `title: ${JSON.stringify(`${t.id} — Tool`)}`,
     `description: ${JSON.stringify(t.title)}`,
+    // OUT OF THE SITE NAV, as every per-node page is (a skill's page in
+    // gen-processes-viz.ts, a methodology's): the Tools table's row links it.
+    // Without this every Tool was a top-level row of the rail's "Pages",
+    // ahead of the site's own pages (litlfred.github.io/who-iris, 2026-11-13).
+    "nav_exclude: true",
     generatedFm,
     "render_with_liquid: false",
     "---",
