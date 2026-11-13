@@ -78,26 +78,32 @@ describe("pr-tests.yml (this repository's own checks)", () => {
 describe("layer-pr-checks.yml (every layer)", () => {
   const doc = wf("layer-pr-checks.yml");
   const jobs = doc.jobs as Record<string, Job & { name?: string }>;
-  // The tier comes from the `tier` job, which reads the PR's live labels
-  // (owner, card Q-TIER-1 A; test/layer-pr-checks-live-labels.test.ts).
-  const FULL = "needs.tier.outputs.full == 'true'";
+  // The tier comes from prepare-head's tier step, which reads the PR's live
+  // labels (owner, card Q-TIER-1 A; test/layer-pr-checks-live-labels.test.ts).
+  const FULL = "needs.prepare-head.outputs.full == 'true'";
 
   test("a `labeled` run for another label judges nothing and never joins the PR's concurrency group", () => {
     expect(doc.concurrency.group).toContain(NOOP_GROUP);
     for (const j of ["prepare-head", "prepare-base", "compare"]) expect(jobs[j]!.if).toContain(ONLY_RELEASE_LABEL);
     // `run` needs prepare-head (a PR) or prepare-base (a push) to succeed; `ready-reuse` runs on ready_for_review only.
-    expect(jobs.run!.needs).toEqual(["tier", "prepare-head", "prepare-base"]);
-    expect(jobs["ready-reuse"]!.if).toContain("github.event.action == 'ready_for_review'");
+    expect(jobs.run!.needs).toEqual(["prepare-head", "prepare-base"]);
   });
 
   test("prepare-base does not run on the fast tier", () => {
     expect(jobs["prepare-base"]!.if).toContain(FULL);
-    expect(jobs["prepare-base"]!.needs).toContain("tier");
+    expect(jobs["prepare-base"]!.needs).toContain("prepare-head");
   });
 
   test("the verdict job is named for the tier it judged", () => {
     expect(jobs.compare!.name).toContain("Fast tier only (advisory; the full checks gate a release)");
     expect(jobs.compare!.name).toContain("No new failures (tests and gates)");
+    // The fast tier is judged by prepare-head's last step, and compare is
+    // skipped on it, so the fast tier never reports as "No new failures".
+    expect(jobs.compare!.if).toContain("needs.prepare-head.outputs.full != 'false'");
+    const steps = jobs["prepare-head"]!.steps!;
+    const fast = steps[steps.length - 1]!;
+    expect(fast.name).toBe("Fast tier only (advisory; the full checks gate a release)");
+    expect(fast.if).toContain("steps.tier.outputs.full == 'false'");
   });
 
   test("a push to main is batched per integration window, and the stamp is saved under the key it is looked up by", () => {
