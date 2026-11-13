@@ -192,18 +192,11 @@ export interface BuildOptions {
   writeVisualisers?: (root: string, source: string, opts: { staging?: boolean; scope?: readonly string[] }) => unknown;
   /**
    * The instances whose visualiser pages this site writes and owes ({@link siteScopeOf}).
-   * Absent: every instance the checkout mounts, as a folio's own site carries them.
+   * Absent: every instance the checkout mounts (the hub's site, or a checkout naming no landing).
    */
   scope?: readonly string[];
 }
 
-/**
- * An IG repository's site scope (owner, 2026-11-08, Q-SZ-2 "B"): the IG's own
- * instance and the layer it lands on (`index.config.json` `site.landing`). Every
- * other layer's pages stay on that layer's own site and are linked, not copied.
- * Undefined when the checkout lands on itself or names no landing: a folio's
- * site still carries every instance it mounts.
- */
 /**
  * The host this checkout's site loads its shared assets from (`site.sharedAssets`
  * in `index.config.json`; Q-SZ-7 "A"), or undefined when it names none.
@@ -220,12 +213,19 @@ export function sharedAssetsOf(root: string): string | undefined {
 }
 
 /**
- * The instances whose pages a site writes: its own only, when it lands on
- * another layer. The landing layer lends the site its chrome and theme, not
- * its pages; those, and every other layer's, are linked on the platform's
- * site (owner, 2026-11-10: the base IG's pages should not be in an IG's
- * site, only cross referenced; this supersedes Q-SZ-2 "B", which kept the
- * landing layer's pages).
+ * The instances whose pages a site writes: its own only. An IG that lands on
+ * another layer borrows that layer's chrome and theme, not its pages (owner,
+ * 2026-11-10: the base IG's pages should not be in an IG's site, only cross
+ * referenced; this supersedes Q-SZ-2 "B", which kept the landing layer's
+ * pages). A folio that lands on itself is scoped the same way (owner,
+ * 2026-11-13: "other harnesses should be referenced not included"). It used
+ * to carry every instance it mounts, which put a mounted content layer's
+ * thousands of reference pages, its library files and the harness's pages
+ * in a folio's site and took it past Pages' 1 GB limit. Every other layer's
+ * pages are linked on the platform's site.
+ *
+ * Undefined (every instance) only for the hub, which exists to carry them
+ * all, and for a checkout that names no landing.
  */
 export function siteScopeOf(root: string, instance: string): string[] | undefined {
   const file = join(root, "index.config.json");
@@ -236,7 +236,7 @@ export function siteScopeOf(root: string, instance: string): string[] | undefine
   } catch {
     return undefined;
   }
-  if (typeof landing !== "string" || landing === "hub" || landing === instance) return undefined;
+  if (typeof landing !== "string" || landing === "hub") return undefined;
   return [instance];
 }
 
