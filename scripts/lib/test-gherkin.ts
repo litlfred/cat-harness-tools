@@ -913,7 +913,7 @@ export interface SpecificationDeclaration {
 
 /**
  * A WHO SMART Digital Adaptation Kit: the root `dak.json` with
- * `resourceType: "DAK"` (smart-base's DAK logical model). Its `testScenarios`
+ * `resourceType: "DAK"` (the DAK logical model). Its `testScenarios`
  * component is the "set of test scenarios to validate an implementation of
  * the DAK". When it lists `url` sources that are paths in the tree, only the
  * `.feature` files under them are specifications; when it lists none, every
