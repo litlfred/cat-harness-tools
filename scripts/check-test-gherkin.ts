@@ -25,6 +25,8 @@
  *   bun run cat check:test-gherkin -- --root ../smart-trust-tools --under tools/hcert-rust
  *   bun run cat check:test-gherkin -- --itb ../who-itb     # resolve @itb: tags
  *   bun run cat check:test-gherkin -- --json
+ *   bun run cat check:test-gherkin -- --js-test-call tools/conformance-ts/suite.ts=run
+ *                                   # a suite whose tests are calls of its own runner
  *
  * Exit: 0 every test and Scenario linked, 1 an orphan either way, 2 could not check.
  *
@@ -64,14 +66,23 @@ if (import.meta.main) {
   const under: string[] = [];
   let json = false;
   let itb: string | undefined;
+  const jsTestCalls: { file: string; call: string }[] = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--root") root = args[++i];
     else if (a === "--under") under.push(args[++i]);
     else if (a === "--json") json = true;
     else if (a === "--itb") itb = args[++i];
+    else if (a === "--js-test-call") {
+      const m = /^(.+)=([A-Za-z_$][\w$]*)$/.exec(args[++i] ?? "");
+      if (!m) {
+        console.error("check:test-gherkin: --js-test-call takes <file>=<call>, e.g. tools/conformance-ts/suite.ts=run");
+        process.exit(2);
+      }
+      jsTestCalls.push({ file: m[1].replace(/^\.\//, ""), call: m[2] });
+    }
     else {
-      console.error(`check:test-gherkin: unknown argument \`${a}\`. Usage: [--root DIR] [--under DIR]… [--itb DIR] [--json]`);
+      console.error(`check:test-gherkin: unknown argument \`${a}\`. Usage: [--root DIR] [--under DIR]… [--itb DIR] [--js-test-call FILE=CALL]… [--json]`);
       process.exit(2);
     }
   }
@@ -80,7 +91,7 @@ if (import.meta.main) {
     console.error(`check:test-gherkin: ${dir} is not a directory — could not check.`);
     process.exit(2);
   }
-  const report = scanTree(dir, { under, resolvers: [itbResolver(itb && resolve(itb))] });
+  const report = scanTree(dir, { under, resolvers: [itbResolver(itb && resolve(itb))], jsTestCalls });
   if (json) {
     console.log(JSON.stringify({ root: dir, tests: report.tests.length, scenarios: report.scenarios.length, findings: report.findings }, null, 2));
   } else {

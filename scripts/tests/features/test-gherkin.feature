@@ -63,6 +63,29 @@ Feature: Every test has a Gherkin
     Then the four tests and the scoped test are found by their titles
     And the value is not taken for a test
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::kotlin:_a_quote_inside_a_backtick_name_opens_no_string,_so_no_later_test_is_lost
+  Scenario: A quote inside a Kotlin backtick name hides no test
+    Given a Kotlin class whose tests are named `the vector's kid is the DSC's`, `a "quoted" { name` and later
+    When the Kotlin adapter reads it
+    Then all three tests are found through the class, each name as written
+
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_suite's_own_runner_call_is_a_test_call,_in_the_files_that_declare_it
+  Scenario: A suite's own runner call is a test call where it is declared
+    Given a plain .ts module whose tests are run("…") calls, one inside a describe, one with a computed title, and a rerun("…") call
+    When a JS adapter declared for that file with the call run reads it
+    Then the run calls are found through their describe titles, and the computed one is reported as computed
+    And rerun is not taken for a test
+    And the default JS adapter neither reads the file nor knows the call
+    And a call name that is not a JS identifier is refused
+
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::a_scan_reads_a_declared_runner_file_with_its_call,_and_leaves_undeclared_ones_alone
+  Scenario: A scan reads a declared runner file, and only that one
+    Given a tree with two plain .ts modules of run("…") calls and a Scenario naming the test in the first
+    When the tree is scanned without a declaration
+    Then no test is found
+    When it is scanned declaring the first file with the call run
+    Then its test is found and linked, and there are no findings
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_test_with_a_computed_title_is_found_and_reported,_never_dropped
   Scenario: A test whose title is computed is reported, not dropped
     Given a test file with tests titled by a loop variable and by a template with an interpolation

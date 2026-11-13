@@ -214,7 +214,7 @@ function regexLiteralEnd(src: string, i: number, masked: readonly string[]): num
  */
 export function maskSource(
   src: string,
-  opts: { rustChars?: boolean; templates?: boolean; rawStrings?: boolean; tripleQuotes?: boolean },
+  opts: { rustChars?: boolean; templates?: boolean; rawStrings?: boolean; tripleQuotes?: boolean; backtickNames?: boolean },
 ): { code: string; strings: Map<number, string> } {
   const out: string[] = [];
   const strings = new Map<number, string>();
@@ -277,6 +277,19 @@ export function maskSource(
       if (end > 0) {
         out.push(blank(src.slice(i, end)));
         i = end;
+        continue;
+      }
+    }
+    if (c === "`" && opts.backtickNames) {
+      // A Kotlin backtick identifier (`fun \`the DSC's kid\`()`): one line,
+      // no escapes. Its text is a name, not code, so a quote or brace in it
+      // opens nothing. The backticks are kept and the text blanked, so the
+      // adapter matches the identifier here and reads its name from the source.
+      const end = src.indexOf("`", i + 1);
+      const nl = src.indexOf("\n", i + 1);
+      if (end > 0 && (nl < 0 || end < nl)) {
+        out.push("`" + blank(src.slice(i + 1, end)) + "`");
+        i = end + 1;
         continue;
       }
     }
@@ -404,7 +417,7 @@ export const KOTLIN_ADAPTER: TestLanguageAdapter = {
   findTests(file, src) {
     // Backtick names (`fun \`decodes a QR\`()`) are identifiers, not strings:
     // read them from the raw source at the masked offset.
-    const { code } = maskSource(src, { tripleQuotes: true });
+    const { code } = maskSource(src, { tripleQuotes: true, backtickNames: true });
     const scopeAt = braceScopes(code, (before) => {
       const m = /\b(?:class|object|interface)\s+([A-Za-z_]\w*)[^{]*$/.exec(before);
       // A `fun` after the header in the same chunk means this brace is the function's.
@@ -416,7 +429,8 @@ export const KOTLIN_ADAPTER: TestLanguageAdapter = {
       const fn = /^(?:\s*\([^)]*\))?(?:\s*@[\w.]+(?:\([^)]*\))?)*\s*(?:(?:public|internal|private|override|suspend|open)\s+)*fun\s+(`[^`\n]+`|[A-Za-z_]\w*)/.exec(rest);
       if (!fn) continue;
       const at = m.index! + m[0].length + fn.index + fn[0].length - fn[1].length;
-      const name = fn[1].startsWith("`") ? fn[1].slice(1, -1) : fn[1];
+      // The masked identifier is blank inside its backticks: read it from the source.
+      const name = fn[1].startsWith("`") ? src.slice(at + 1, at + fn[1].length - 1) : fn[1];
       tests.push({ name: qualifiedTestName(file, scopeAt(at), name), file, line: lineAt(src, at), language: "kotlin" });
     }
     return tests;
@@ -434,6 +448,8 @@ const JS_TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)__tests__\/.+\.[c
  * between them, and the test it hid read as no test at all.
  */
 const JS_HEAD = /(?<![\w.$])(describe|suite|context|test|it)(?=\s*[.(])/g;
+/** The scope calls: everything else a head matches is a test call. */
+const JS_SCOPE_CALLS = new Set(["describe", "suite", "context"]);
 /** Modifiers that take no arguments. */
 const JS_BARE_MODS = new Set(["skip", "only", "todo", "failing", "concurrent", "serial"]);
 /** Modifiers whose own argument list comes before the title call. */
@@ -442,10 +458,26 @@ const JS_ARG_MODS = new Set(["each", "if", "skipIf", "runIf"]);
 /** `id[${key}]`: a literal id, then one interpolation in brackets, nothing else computed. */
 const LOOPED_ID = /^[^`$\s\[\]]+\[\$\{[^{}`]*\}\]$/;
 
-export const JS_ADAPTER: TestLanguageAdapter = {
-  id: "js",
-  matches: (f) => JS_TEST_FILE.test(f),
-  findTests(file, src) {
+/**
+ * A JS adapter whose test calls are `test`, `it` and `extraCalls`, reading the
+ * files `matches` accepts. A suite with its own runner (`run("STT-… title",
+ * …)` in a plain `.ts` module) declares the call and the files, and its tests
+ * are found and named exactly as `test()` ones are.
+ */
+export function jsAdapter(matches: (f: string) => boolean, extraCalls: readonly string[] = []): TestLanguageAdapter {
+  for (const c of extraCalls) {
+    if (!/^[A-Za-z_$][\w$]*$/.test(c)) throw new Error(`jsAdapter: \`${c}\` is not a JS identifier`);
+  }
+  const head = extraCalls.length === 0
+    ? JS_HEAD
+    : new RegExp(`(?<![\\w.$])(describe|suite|context|test|it|${extraCalls.map((c) => c.replace(/\$/g, "\\$")).join("|")})(?=\\s*[.(])`, "g");
+  return { id: "js", matches, findTests: (file, src) => jsFindTests(file, src, head) };
+}
+
+export const JS_ADAPTER: TestLanguageAdapter = jsAdapter((f) => JS_TEST_FILE.test(f));
+
+function jsFindTests(file: string, src: string, head: RegExp): FoundTest[] {
+  {
     const { code, strings } = maskSource(src, { templates: true });
     /** Offset of the `)` matching the `(` at `open`. */
     const closeOf = (open: number): number => {
@@ -497,11 +529,11 @@ export const JS_ADAPTER: TestLanguageAdapter = {
         j = closeOf(argsOpen) + 1;
       }
     };
-    for (const m of code.matchAll(JS_HEAD)) {
+    for (const m of code.matchAll(head)) {
       const open = callChain(m.index! + m[0].length);
       if (open === undefined) continue;
       const title = firstArgString(open);
-      if (m[1] === "test" || m[1] === "it") calls.push({ at: m.index!, title });
+      if (!JS_SCOPE_CALLS.has(m[1])) calls.push({ at: m.index!, title });
       else scopes.push({ from: open, to: closeOf(open), title });
     }
     return calls.map((c) => {
@@ -519,8 +551,8 @@ export const JS_ADAPTER: TestLanguageAdapter = {
       );
       return { name, file, line, language: "js", ...(dynamic ? { dynamic: true as const } : {}) };
     });
-  },
-};
+  }
+}
 
 // ── Python (pytest, unittest) ───────────────────────────────────────────────
 
@@ -882,11 +914,23 @@ export interface ScanOptions {
   adapters?: readonly TestLanguageAdapter[];
   /** Resolvers for the non-`test` binding schemes. Default: `itb`, with no source held. */
   resolvers?: readonly BindingResolver[];
+  /**
+   * JS/TS files whose tests are calls of a suite's own runner, each with the
+   * call's name: `{ file: "tools/conformance-ts/suite.ts", call: "run" }`.
+   * Such a file is read by a JS adapter that knows the call, before the
+   * default adapters, so it need not be named `*.test.ts`.
+   */
+  jsTestCalls?: readonly { file: string; call: string }[];
 }
 
 /** Scan `root`: every test the adapters find, every `.feature`, joined. */
 export function scanTree(root: string, opts: ScanOptions = {}): GherkinReport {
-  const adapters = opts.adapters ?? TEST_LANGUAGE_ADAPTERS;
+  const declared = new Map<string, string[]>();
+  for (const { file, call } of opts.jsTestCalls ?? []) declared.set(file, [...(declared.get(file) ?? []), call]);
+  const adapters = [
+    ...[...declared].map(([file, calls]) => jsAdapter((f) => f === file, calls)),
+    ...(opts.adapters ?? TEST_LANGUAGE_ADAPTERS),
+  ];
   const resolvers = opts.resolvers ?? [itbResolver(undefined)];
   const schemes = [...new Set([...BINDING_SCHEMES, ...resolvers.map((r) => r.scheme)])];
   // A directory or a single file, repo-relative.

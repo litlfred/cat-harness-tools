@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 import {
   JS_ADAPTER,
+  jsAdapter,
   itbResolver,
   withoutXmlComments,
   KOTLIN_ADAPTER,
@@ -160,6 +161,60 @@ describe("language adapters", () => {
       "c.test.ts::plain_skip-if",
       "c.test.ts::scope::inner",
     ]);
+  });
+
+  test("kotlin: a quote inside a backtick name opens no string, so no later test is lost", () => {
+    const src = [
+      "class VectorTest {",
+      "    @Test fun `the vector's kid is the DSC's`() {}",
+      "    @Test fun `a \"quoted\" { name`() { val s = \"}\" }",
+      "    @Test fun later() {}",
+      "}",
+    ].join("\n");
+    expect(names(KOTLIN_ADAPTER.findTests("app/VectorTest.kt", src))).toEqual([
+      "app/VectorTest.kt::VectorTest::the_vector's_kid_is_the_DSC's",
+      'app/VectorTest.kt::VectorTest::a_"quoted"_{_name',
+      "app/VectorTest.kt::VectorTest::later",
+    ]);
+  });
+
+  test("js: a suite's own runner call is a test call, in the files that declare it", () => {
+    const src = [
+      "export function runSuite(h: H): void {",
+      "  const run = (name: string, body: () => boolean) => { results.push([name, body()]); };",
+      '  run("STT-ZIP-001 ZLIB round-trips", () => true);',
+      '  describe("errors", () => { run("STT-B45-002 strict decoding", () => true); });',
+      "  run(`STT-TST-004 vector ${id}`, () => true);",
+      '  rerun("not a test", () => true);',
+      "}",
+    ].join("\n");
+    const adapter = jsAdapter((f) => f === "tools/suite.ts", ["run"]);
+    expect(adapter.matches("tools/suite.ts")).toBe(true);
+    expect(adapter.matches("tools/other.ts")).toBe(false);
+    expect(adapter.findTests("tools/suite.ts", src).map((t) => [t.name, t.dynamic ?? false])).toEqual([
+      ["tools/suite.ts::STT-ZIP-001_ZLIB_round-trips", false],
+      ["tools/suite.ts::errors::STT-B45-002_strict_decoding", false],
+      ["tools/suite.ts::<computed_at_line_5>", true],
+    ]);
+    // The default adapter does not read the file, and does not know the call.
+    expect(JS_ADAPTER.matches("tools/suite.ts")).toBe(false);
+    expect(JS_ADAPTER.findTests("tools/suite.ts", src)).toEqual([]);
+    expect(() => jsAdapter(() => true, ["not-an-identifier"])).toThrow();
+  });
+
+  test("a scan reads a declared runner file with its call, and leaves undeclared ones alone", () => {
+    const root = mkdtempSync(join(tmpdir(), "gherkin-jscall-"));
+    mkdirSync(join(root, "tools"), { recursive: true });
+    writeFileSync(join(root, "tools/suite.ts"), 'run("reads a plan", () => true);\n');
+    writeFileSync(join(root, "tools/cross.ts"), 'run("not declared", () => true);\n');
+    writeFileSync(
+      join(root, "suite.feature"),
+      ["Feature: suite", "  @test:tools/suite.ts::reads_a_plan", "  Scenario: reads a plan", "    Then it passes", ""].join("\n"),
+    );
+    expect(scanTree(root).tests.map((t) => t.name)).toEqual([]);
+    const r = scanTree(root, { jsTestCalls: [{ file: "tools/suite.ts", call: "run" }] });
+    expect(r.tests.map((t) => t.name)).toEqual(["tools/suite.ts::reads_a_plan"]);
+    expect(r.findings).toEqual([]);
   });
 
   test("js: a test with a computed title is found and reported, never dropped", () => {
