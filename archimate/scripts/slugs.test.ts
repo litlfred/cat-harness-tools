@@ -5,7 +5,7 @@ import { join, posix } from "node:path";
 import type { ArchimateModel } from "../schemas/archimate.ts";
 import { SLUG_MAX, planSlugs, slugify } from "../schemas/slugs.ts";
 import { pageNodeOf, pageNodeProblems } from "../../scripts/thin-page.ts";
-import { pageDataOf, pagesFor, sitePathOf } from "./gen-archimate-pages.ts";
+import { modelFilesFor, pageDataOf, pagesFor, sitePathOf } from "./gen-archimate-pages.ts";
 
 /** A model of named elements and views, nothing drawn: all {@link planSlugs} reads. */
 function model(elements: Array<[string, string, string?]>, views: Array<[string, string, string?]> = []): ArchimateModel {
@@ -142,6 +142,19 @@ describe("pages at slugs", () => {
           expect({ from: at(f), r, ok: written.has(target) || written.has(posix.join(target, "index.html")) }).toEqual({ from: at(f), r, ok: true });
         }
       }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the Archi model file a model page links", () => {
+  it("is listed for the site build at its data path, so the link is not a 404", () => {
+    const root = instance();
+    try {
+      const files = modelFilesFor(root);
+      expect(files.map((f) => f.file)).toEqual(["1.0.0/model.archimate"]);
+      expect(files[0]!.source).toBe(join(root, "archimate", "1.0.0", "model.archimate"));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

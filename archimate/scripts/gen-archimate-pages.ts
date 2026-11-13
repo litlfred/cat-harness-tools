@@ -84,7 +84,7 @@
  * `archimate:target`, as there. Names, descriptions and membership are
  * `schema:` and `dcterms:`. Nothing is minted in this project's namespaces.
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, relative, resolve } from "node:path";
 import { DOCS_SITE_BASE } from "../../schemas/kg/jsonld.ts";
 import { KG_RENDER_ASSET, contentsCardScript, contentsCardStyle, escHtml, kgRenderScript, nodeAttrs, nodeStubPageHtml, pageNodeOf, thinPageHtml, type PageNode } from "../../scripts/thin-page.ts";
@@ -884,6 +884,13 @@ function orphans(root: string, wanted: Set<string>): string[] {
   return out;
 }
 
+/** Each configured model's Archi file: where it is in the checkout, and its path under the data root. */
+export function modelFilesFor(root: string): Array<{ file: string; source: string }> {
+  const config = readConfig(root);
+  const dir = archimateDir(root, config);
+  return config.models.map((m) => ({ file: m.file, source: join(dir, m.file) })).filter((m) => existsSync(m.source));
+}
+
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 ? process.argv[i + 1] : undefined;
@@ -918,6 +925,14 @@ if (import.meta.main) {
       const p = join(resolve(out), sitePathOf({ graphPath, pageRoot }, f));
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, f.content);
+    }
+    // Each model's Archi file, at the data path its page links and its node's
+    // `schema:contentUrl` names (`<data root>/<file>`). A committed tree has it
+    // there already; a site build must copy it, or the link is a 404.
+    for (const m of modelFilesFor(root)) {
+      const p = join(target, m.file);
+      mkdirSync(dirname(p), { recursive: true });
+      copyFileSync(m.source, p);
     }
   } else {
     const wanted = new Set(files.map((f) => join(target, f.path)));
