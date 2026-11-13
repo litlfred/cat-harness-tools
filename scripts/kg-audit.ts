@@ -398,6 +398,15 @@ const KG_ATT_TREE = join(ATT_HOME.root, "kg-qa");
 /** The declared directory whose absence makes every read `unknown` (never a re-baseline). */
 const ATT_STORE = ATT_HOME.storeRoot;
 /**
+ * The attestation store is COMMITTED content (ruling D2 (a)). In a layer this
+ * checkout MOUNTS it is the pinned bytes, and nothing here may rewrite it
+ * (bean `cat-tools-sm8r`, item 4): a write that would change it is reported,
+ * and the layer's own repository makes it.
+ */
+const ATT_IN_MOUNT = writePathAt(ATT_STORE) !== ATT_STORE;
+/** Attestation files a write run would have rewritten in a mounted layer: reported, never written. */
+const attLeftInMount: string[] = [];
+/**
  * Is the derived kg-qa tree STORED on `qa-reports` (bean `oqe3`)? Then its
  * working copy is a measurement of the last run, not a record: a stale or
  * orphaned sidecar there is advisory in judge mode. Unstored, it is still the
@@ -3130,14 +3139,15 @@ if (!check) {
     // conditions `relocateSidecars` already checked — and only onto a vacant path.
     const from = attestationPathFor(join(root, m.from), KG_QA_TREE, ATT_HOME.root, "kg-qa", KG_QA_SIDECAR_SUFFIX);
     const to = attestationPathFor(join(root, m.to), KG_QA_TREE, ATT_HOME.root, "kg-qa", KG_QA_SIDECAR_SUFFIX);
-    if (existsSync(from) && !existsSync(to)) {
+    // A mounted layer's committed store is never moved (see ATT_IN_MOUNT).
+    if (!ATT_IN_MOUNT && existsSync(from) && !existsSync(to)) {
       mkdirSync(dirname(to), { recursive: true });
       renameSync(from, to);
       console.log(`  → moved ${relative(root, from)}\n      to ${relative(root, to)}  (its attestations)`);
     }
   }
 }
-if (initAttestations && !check && !existsSync(ATT_STORE)) {
+if (initAttestations && !check && !ATT_IN_MOUNT && !existsSync(ATT_STORE)) {
   mkdirSync(ATT_STORE, { recursive: true });
   console.log(`  → started the attestation store at ${relative(root, ATT_STORE)} — declare it as an \`attestations\` directory`);
 }
@@ -3251,10 +3261,20 @@ for (const r of reports) {
     // a finding in judge mode (bean `oqe3`), unlike a derived sidecar.
     const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
     if (current !== text) staleAttestations.push(relative(root, p));
+  } else if (ATT_IN_MOUNT) {
+    const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
+    if (current !== text) attLeftInMount.push(relative(root, p));
   } else {
     mkdirSync(join(p, ".."), { recursive: true });
     writeFileSync(p, text);
   }
+}
+if (attLeftInMount.length > 0) {
+  console.log(
+    `\n  · ${attLeftInMount.length} committed attestation file(s) of a MOUNTED layer would change; left as pinned ` +
+      "(a mount is read-only). Run `bun run cat kg:audit:all` in that layer's own repository to rewrite them:",
+  );
+  for (const a of attLeftInMount) console.log(`    ${a}`);
 }
 if (attMoved > 0) {
   console.log(
