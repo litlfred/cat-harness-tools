@@ -135,3 +135,16 @@ Feature: Every test has a Gherkin
     Then only the present case resolves; the absent and commented-out ones name no target
     When they are joined with no checkout held
     Then every @itb tag is unresolved, "source not held", and none passes
+
+  @test:scripts/tests/test-gherkin.test.ts::declared_specifications::a_DAK's_unbound_Scenarios_are_specifications,_not_findings;_a_bound_one_is_still_checked
+  Scenario: A DAK declares its feature files to be specifications for implementers
+    Given a tree with an unbound Scenario, an @itb-bound Scenario and an untagged test
+    When the tree declares no DAK
+    Then the unbound Scenarios name no test, the @itb tag is unresolved and the test has no Scenario
+    When its dak.json declares a DAK with no testScenarios sources
+    Then every unbound Scenario is a specification and not a finding
+    And the @itb tag is still unresolved and the untagged test still has no Scenario
+    When its dak.json lists a testScenarios url that is a path in the tree
+    Then only the unbound Scenarios under that path are specifications
+    When dak.json declares a resource that is not a DAK
+    Then nothing is a specification
