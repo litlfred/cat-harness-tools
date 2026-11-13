@@ -993,6 +993,15 @@ export const FULL_TIER_JUDGE = /no new failures/i;
  * in it — the skipped judge of a run whose tier was decided in the same job,
  * whose template text names both tiers). Neither is a full-tier verdict.
  */
+/**
+ * A test shard: `bun test (head, 2/4)` (`pr-tests.yml`) or `head — tests and
+ * gates, shard 2/3` (`layer-pr-checks.yml`); merge-watch's `SHARD`. The fast
+ * tier skips every shard, and `pr-tests.yml`'s judge still concludes `success`
+ * on it (measured on #2103, 2026-11-13), so the judge alone does not say the
+ * full tier ran: a shard that RAN does.
+ */
+export const SHARD = /(?:shard |, )(\d+)\/(\d+)\b/i;
+
 function judgedNothing(c: GhCheckRun): boolean {
   return c.conclusion === "skipped" || c.name.includes("${{");
 }
@@ -1000,7 +1009,9 @@ function judgedNothing(c: GhCheckRun): boolean {
 /**
  * `--full-tier`: did the full tier run on the head and pass? The latest run of
  * each full-tier judge (by name) must have concluded `success`; a skipped or
- * unrendered one judged nothing and is not counted. None at all is
+ * unrendered one judged nothing and is not counted; and at least one test
+ * shard ({@link SHARD}) must have run, since a fast-tier judge can be green
+ * too. None at all is
  * not-ready (only the fast tier ran: label the PR `ready-to-merge` or
  * `release`, which runs the full tier); one in progress is not-ready; one red
  * is a defect.
@@ -1022,7 +1033,11 @@ export function fullTierCheck(s: GuardSnapshot): CheckResult {
   if (red.length) return R(5, "ci", "refuse", `full-tier judge red: ${red.map((j) => `${j.name} (${j.conclusion})`).join(", ")}`, "defect");
   const going = judges.filter((j) => j.status !== "completed");
   if (going.length) return R(5, "ci", "refuse", `full-tier judge not finished: ${going.map((j) => j.name).join(", ")}`);
-  return R(5, "ci", "pass", `full tier green: ${judges.map((j) => j.name).join(", ")}`);
+  const ran = s.checkRuns.filter((c) => SHARD.test(c.name) && !judgedNothing(c) && c.status === "completed" && c.conclusion !== "cancelled");
+  if (ran.length === 0) {
+    return R(5, "ci", "refuse", `the full tier has not run on the head: ${judges.map((j) => j.name).join(", ")} is green, but no test shard ran (the fast tier). \`ready-to-merge\` or \`release\` runs it`);
+  }
+  return R(5, "ci", "pass", `full tier green: ${judges.map((j) => j.name).join(", ")}, after ${ran.length} test shard(s) ran`);
 }
 
 /** Check 5 under `--full-tier`: the workflow-run judgement gates, AND the full tier must be green. */

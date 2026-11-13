@@ -605,9 +605,9 @@ Feature: Merge guard
 
   @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::a_green_full-tier_judge_on_the_head_passes
   Scenario: Under --full-tier a green full-tier judge on the head passes check 5
-    Given PR #1960 with a green "No new failures (tests and gates)" check run on its head
+    Given PR #1960 with a green "No new failures (tests and gates)" check run and a test shard that ran on its head
     When check 5 is read with --full-tier
-    Then it passes, naming the judge
+    Then it passes, naming the judge and the shard count
 
   @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::the_fast_tier_alone_is_not-ready,_and_says_how_to_run_the_full_tier
   Scenario: Under --full-tier the fast tier alone is not ready
@@ -641,4 +641,12 @@ Feature: Merge guard
     When check 5 is read with --full-tier
     Then it refuses as not-ready, saying the full tier has not run
     When a green "No new failures (tests and gates)" run is added beside the unrendered one
+    Then it passes
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::a_green_judge_with_every_test_shard_skipped_is_the_fast_tier_(#2103's_real_head):_not-ready
+  Scenario: Under --full-tier a green judge with every test shard skipped is the fast tier
+    Given PR #1960 with #2103's real fast-tier check runs: "Tests (no new failures)" green and every "bun test" shard skipped and unrendered
+    When check 5 is read with --full-tier
+    Then it refuses as not-ready, saying no test shard ran
+    When a "bun test (head, 2/4)" shard that ran is added
     Then it passes

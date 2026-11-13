@@ -1070,14 +1070,15 @@ describe("check 5 under --full-tier — the full tier must be green on the head"
   const FAST = "Fast tier only (advisory; the full checks gate a release)";
   const cr = (name: string, status: string, conclusion: string | null, started_at = "2026-10-03T12:00:00Z") => ({ name, status, conclusion, started_at });
   const ci = (s: GuardSnapshot) => evaluate(s, { fullTier: true }).checks.find((c) => c.id === "ci")!;
+  const SHARD_RAN = "head — tests and gates, shard 1/3";
 
   test("a green full-tier judge on the head passes", () => {
     const s = real(1960);
     expect(status(s, "ci").status).toBe("pass");
-    s.checkRuns = [cr(JUDGE, "completed", "success")];
+    s.checkRuns = [cr(JUDGE, "completed", "success"), cr(SHARD_RAN, "completed", "success")];
     const c = ci(s);
     expect(c.status).toBe("pass");
-    expect(c.detail).toContain(`full tier green: ${JUDGE}`);
+    expect(c.detail).toContain(`full tier green: ${JUDGE}, after 1 test shard(s) ran`);
   });
 
   test("the fast tier alone is not-ready, and says how to run the full tier", () => {
@@ -1096,7 +1097,7 @@ describe("check 5 under --full-tier — the full tier must be green on the head"
     expect(ci(s)).toMatchObject({ status: "refuse", kind: "defect" });
     s.checkRuns = [cr(JUDGE, "in_progress", null)];
     expect(ci(s)).toMatchObject({ status: "refuse", kind: "not-ready" });
-    s.checkRuns = [cr(JUDGE, "completed", "failure", "2026-10-03T12:00:00Z"), cr(JUDGE, "completed", "success", "2026-10-03T13:00:00Z")];
+    s.checkRuns = [cr(JUDGE, "completed", "failure", "2026-10-03T12:00:00Z"), cr(JUDGE, "completed", "success", "2026-10-03T13:00:00Z"), cr(SHARD_RAN, "completed", "success")];
     expect(ci(s).status).toBe("pass");
   });
 
@@ -1107,7 +1108,23 @@ describe("check 5 under --full-tier — the full tier must be green on the head"
     const c = ci(s);
     expect(c).toMatchObject({ status: "refuse", kind: "not-ready" });
     expect(c.detail).toContain("the full tier has not run on the head");
-    s.checkRuns = [cr(unrendered, "completed", "skipped"), cr(JUDGE, "completed", "success")];
+    s.checkRuns = [cr(unrendered, "completed", "skipped"), cr(JUDGE, "completed", "success"), cr(SHARD_RAN, "completed", "success")];
+    expect(ci(s).status).toBe("pass");
+  });
+
+  test("a green judge with every test shard skipped is the fast tier (#2103's real head): not-ready", () => {
+    const s = real(1960);
+    // ad8dff8 on #2103, 2026-11-13: pr-tests.yml's fast tier.
+    s.checkRuns = [
+      cr("Tests (no new failures)", "completed", "success"),
+      cr("bun test (head, ${{ matrix.shard }}/4)", "completed", "skipped"),
+      cr("bun test (base, ${{ matrix.shard }}/4)", "completed", "skipped"),
+      cr("Typecheck", "completed", "success"),
+    ];
+    const c = ci(s);
+    expect(c).toMatchObject({ status: "refuse", kind: "not-ready" });
+    expect(c.detail).toContain("no test shard ran (the fast tier)");
+    s.checkRuns.push(cr("bun test (head, 2/4)", "completed", "success"));
     expect(ci(s).status).toBe("pass");
   });
 
@@ -1122,7 +1139,7 @@ describe("check 5 under --full-tier — the full tier must be green on the head"
 
   test("--full-tier gates even without --release, and keeps a red workflow run's refusal", () => {
     const s = real(1937);
-    s.checkRuns = [cr(JUDGE, "completed", "success")];
+    s.checkRuns = [cr(JUDGE, "completed", "success"), cr(SHARD_RAN, "completed", "success")];
     const ruled = evaluateAny(s, { fullTier: true }).checks.find((c) => c.id === "ci")!;
     const releaseCi = status(real(1937), "ci");
     expect(ruled.status).toBe(releaseCi.status);
