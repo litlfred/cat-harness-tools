@@ -887,11 +887,13 @@ export function joinTestsToScenarios(
 
 // ── Reading a tree ──────────────────────────────────────────────────────────
 
+// input-site: inert #fca76dad — names the build and dependency directories a walk skips; never reads them
 const SKIP_DIRS = new Set([".git", "node_modules", "target", "build", "dist", "vendor", ".venv", "venv", "__pycache__", ".gradle"]);
 
 /** The files under `root` (repo-relative, `/`): git's list where there is one, else a walk. */
 export function listFiles(root: string): string[] {
   try {
+    // input-site: tree #6c771fee — ls-files: the tracked and untracked files of the working tree
     const out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
       cwd: root,
       encoding: "utf-8",
