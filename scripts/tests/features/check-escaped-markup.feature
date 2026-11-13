@@ -106,7 +106,7 @@ Feature: A built page carries no escaped block markup or leaked markdown table
 
   @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::accepts_the_other_spellings_a_converter_may_emit
   Scenario: Other delimiter row spellings are recognised
-    Given leaked tables whose delimiter rows are "|---|---|", "| :---: | --- |" and "|&mdash;|&mdash;|"
+    Given leaked tables whose delimiter rows are "|---|---|", "| :---: | --- |", "|&mdash;|&mdash;|" and "---|---"
     When leaked tables are found in each
     Then each yields one finding
 

@@ -14,11 +14,11 @@
 import { describe, expect, test, afterEach } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import { DECLARATION_SUFFIX } from "../../schemas/kg/cat-harness.ts";
 
-import { ownKgRoots } from "../known-skills.ts";
+import { kgRoots, ownKgRoots } from "../known-skills.ts";
 
 const made: string[] = [];
 afterEach(() => {
@@ -32,7 +32,7 @@ afterEach(() => {
  * the arrangement that lets a declared path point at a sibling layer and
  * escape — the case the filter exists for.
  */
-function repo(dirs: string[], opts: { sibling?: string[] } = {}): { repoRoot: string; inst: string } {
+function repo(dirs: string[], opts: { sibling?: string[]; self?: boolean } = {}): { repoRoot: string; inst: string } {
   const repoRoot = mkdtempSync(join(tmpdir(), "own-kg-roots-"));
   made.push(repoRoot);
   const inst = join(repoRoot, "inst");
@@ -49,6 +49,8 @@ function repo(dirs: string[], opts: { sibling?: string[] } = {}): { repoRoot: st
       name: "inst",
       directories: [
         ...dirs.map((d) => ({ id: d.replace(/\//g, "-"), path: `${d}/`, graphTypologies: ["cat-harness"] })),
+        // The layer root itself, declared as a graph directory.
+        ...(opts.self ? [{ id: "self", path: "./", graphTypologies: ["cat-harness"] }] : []),
         ...(opts.sibling ?? []).map((d) => ({
           id: `sib-${d.replace(/\//g, "-")}`,
           path: `${d}/`,
@@ -128,7 +130,11 @@ describe("another instance's roots are excluded — not this audit's to write", 
     // `relative(here, here)` is "", which does not start with ".." — so a
     // layer declaring `./` would otherwise walk everything, its own results
     // tree included.
-    const { inst } = repo(["skills"]);
+    const { inst } = repo(["skills"], { self: true });
+    // The precondition, made visible: the declaration DOES resolve to the layer
+    // root itself, so it is the filter, not the resolver, that keeps it out.
+    expect(kgRoots(inst).map((r) => resolve(r))).toContain(resolve(inst));
     expect(seen(inst)).not.toContain("");
+    expect(seen(inst)).toEqual(["skills"]);
   });
 });

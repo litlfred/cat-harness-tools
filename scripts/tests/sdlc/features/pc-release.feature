@@ -55,18 +55,23 @@ Feature: Public comment releases are frozen and kept
 
   @test:scripts/tests/sdlc/pc-release.test.ts::no_publish_path_removes_a_release::the_main_publish_never_writes_or_deletes_PC/
   Scenario: The main publish never writes or deletes PC/
-    # Gap: no publish is run; only the reserved prefixes and the own-path test are checked
-    Given the main-site publish's reserved prefixes
-    When they are read
-    Then they contain the PC prefix
-    And "PC/v0.9/index.html" is not one of the main publish's own paths
+    Given version v0.9 frozen on a publish branch
+    And a main site published there with "index.html" and "gone.html"
+    When the main site is published again without "gone.html"
+    Then the publish removes the two files its manifest named and "gone.html" is gone
+    And the frozen release is byte-identical and verifying it finds nothing changed, missing or added
+    And a site that writes into PC/ is refused as writing into reserved paths
+    And a manifest that names a file under PC/ is refused as not the main site's to delete
+    And the release still verifies unchanged
 
   @test:scripts/tests/sdlc/pc-release.test.ts::no_publish_path_removes_a_release::a_full-replace_deploy_carries_PC/
   Scenario: A full-replace deploy carries PC/
-    # Gap: no deploy is run; only the carried prefixes list is checked
-    Given the prefixes restore-staging carries across a full replace
-    When they are read
-    Then they contain the PC prefix
+    Given a gh-pages branch holding "PC/v0.9/index.html" and an old home page
+    And a freshly built site with a new home page and no PC/
+    When restore-staging runs against the branch before the deploy
+    Then it reports PC as carried
+    And the built site now holds the frozen "PC/v0.9/index.html" unchanged
+    And the built site's own home page is not overwritten
 
   @test:scripts/tests/sdlc/pc-release.test.ts::bannerInto::puts_the_banner_after_<body>_once
   Scenario: The release banner goes after <body> once

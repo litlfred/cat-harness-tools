@@ -5,7 +5,7 @@
  * the unsafe neighbour is refused, because a resolver proven only on the
  * cases it handles is proven against its author's optimism.
  */
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -559,7 +559,7 @@ describe("take-base when one side deleted the file", () => {
     expect(readFileSync(join(d, "gen.html"), "utf-8")).toBe("resolved earlier\n");
   });
 
-  test("cleanup", () => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
+  afterAll(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
 });
 
 describe("modify/delete on DECLARED paths: generated resolves, authored refuses (#1854)", () => {
@@ -878,7 +878,7 @@ describe("a conflicted path the branch's .gitignore matches (#1801)", () => {
     expect(execFileSync("git", ["ls-files", "--", "results/untracked.json"], { cwd: dir, encoding: "utf-8" })).toBe("");
   });
 
-  test("cleanup", () => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
+  afterAll(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
 });
 
 describe("a resolution that fails is reported as a refusal, not an unexplained exit", () => {

@@ -43,8 +43,9 @@ Feature: A layer's own knowledge-graph roots
     Then each root, mirrored under "test/results/kg-qa", stays inside that tree
 
   @test:scripts/tests/own-kg-roots.test.ts::another_instance's_roots_are_excluded_—_not_this_audit's_to_write::the_instance_root_itself_is_not_a_root_of_its_own_graph
-  Scenario: The layer root itself is not one of its roots
-    # Gap: the layer does not declare "./", so a declared layer-root case is not exercised
-    Given a layer declaring "skills"
+  Scenario: The layer root itself is not a root of its own graph, even when declared
+    Given a layer declaring "skills/" and its own root "./" as cat-harness graphs
+    And the declared roots include the layer root itself
     When its own knowledge-graph roots are listed
-    Then none of them is the layer root itself
+    Then the layer root is not among them
+    And they are exactly "skills"

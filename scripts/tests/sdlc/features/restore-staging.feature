@@ -224,8 +224,8 @@ Feature: Restoring staging previews across a full-replace deploy
 
   @test:scripts/tests/sdlc/restore-staging.test.ts::a_RETIRED_preview_is_not_restored::an_UNREADABLE_retirement_store_is_`unknown`,_never_`no_retirements`
   Scenario: An unreadable retirement store does not restore the retired previews
-    # Gap: the title says "unknown"; the test reads a missing branch "no-branch" as the stand-in and asserts only that state and no previews
-    Given the branch with a retired "claude-gone", but the restore pointed at a branch that does not exist
+    Given the branch with previews "claude-live" and "claude-gone", whose "STAGING/_retired" is a file rather than a directory of records
     When the previews are restored
-    Then the state is "no-branch"
-    And there are no previews
+    Then the state is "unknown", with a reason naming "STAGING/_retired"
+    And there are no previews and the exit code is not 0
+    And neither "STAGING/claude-gone" nor "STAGING/claude-live" is written into the site

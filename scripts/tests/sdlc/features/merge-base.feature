@@ -251,12 +251,6 @@ Feature: Merge-conflict patterns and the base-side resolver
     When the base side is taken
     Then "gen.html" still holds the earlier resolution
 
-  @test:scripts/tests/sdlc/merge-base.test.ts::take-base_when_one_side_deleted_the_file::cleanup
-  Scenario: The modify/delete fixtures are cleaned up
-    # Gap: housekeeping only; nothing is asserted
-    When the test ends
-    Then each temporary repository made for the modify/delete cases is removed
-
   @test:scripts/tests/sdlc/merge-base.test.ts::modify/delete_on_DECLARED_paths:_generated_resolves,_authored_refuses_(#1854)::the_generated_page_takes_main's_deletion;_the_bean_is_refused
   Scenario: On declared paths a generated page takes main's deletion and the bean is refused
     Given a merge where main deleted an auto-docs page and a bean the branch edited
@@ -382,12 +376,6 @@ Feature: Merge-conflict patterns and the base-side resolver
     Then it holds main's content
     And nothing is left unmerged
     And "results/untracked.json" is not tracked
-
-  @test:scripts/tests/sdlc/merge-base.test.ts::a_conflicted_path_the_branch's_.gitignore_matches_(#1801)::cleanup
-  Scenario: The ignored-path fixtures are cleaned up
-    # Gap: housekeeping only; nothing is asserted
-    When the test ends
-    Then each temporary repository made for the ignored-path cases is removed
 
   @test:scripts/tests/sdlc/merge-base.test.ts::a_resolution_that_fails_is_reported_as_a_refusal,_not_an_unexplained_exit::the_line_has_the_refusal_shape_merge-main.yml_and_merge-main-comment_read
   Scenario: A resolution that fails is reported in the refusal line shape

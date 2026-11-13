@@ -220,7 +220,7 @@ Feature: The task panel on process pages
 
   @test:scripts/tests/ui/task-panel.test.ts::the_real_corpus::a_rendered_diagram_gets_markers,_and_its_page_carries_the_panel
   Scenario: A rendered diagram in the real corpus gets markers and its page carries the panel
-    # Skipped: passes without checking when the checkout has no rendered process art
+    # Skipped: when the checkout has no rendered process art (reported as skipped, not passed)
     Given the real corpus's process rows with rendered diagrams
     Then at least one row has markers
     And each of its markers lies within 0 to 100% left and top
@@ -235,8 +235,15 @@ Feature: The task panel on process pages
     And its first step links to the process IRI's node/<step id>
 
   @test:scripts/tests/ui/task-panel.test.ts::the_real_corpus::every_skill_a_panel_names_links_somewhere_—_bootstrap's_confirm-harness_to_its_source_(owner,_2026-11-08)
-  Scenario: Every linkable skill a real-corpus panel names has a link
+  Scenario: Bootstrap's confirm-harness links to its source, and every linkable skill a real-corpus panel names has a link
+    # Skipped: when Process_Discussion is absent or confirm-harness is not linkable from this checkout (reported as skipped, not passed)
     Given the real corpus's process rows and the skills this checkout can link
-    When Process_Discussion is present and confirm-harness is linkable
+    And Process_Discussion is present and confirm-harness is linkable
     Then its A_ListHarnesses task links confirm-harness to an .html or .md file
     And no panel names a linkable skill or role skill without a link
+
+  @test:scripts/tests/ui/task-panel.test.ts::the_real_corpus::every_linkable_skill_a_panel_names_has_a_link,_whichever_layers_this_checkout_holds
+  Scenario: Every linkable skill a real-corpus panel names has a link, whatever layers are present
+    Given the real corpus's process rows and the skills this checkout can link
+    When every panel's data is built
+    Then no panel names a linkable skill or role skill without a link

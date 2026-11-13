@@ -48,11 +48,11 @@ interface Fixture {
   /** Write a file into the CHECKOUT at a route-relative name. */
   local: (name: string, text: string) => void;
   removeLocal: (name: string) => void;
-  /** The remote's blob at the tip, as text; undefined when the path is absent. */
-  remote: (name: string) => string | undefined;
+  /** The remote's blob at the tip, as text; undefined when the path is absent. `under` defaults to the route. */
+  remote: (name: string, under?: string) => string | undefined;
   tip: () => string;
-  /** Put a file on the BRANCH behind the publisher's back. */
-  pushToBranch: (name: string, text: string) => void;
+  /** Put a file on the BRANCH behind the publisher's back. `under` defaults to the route. */
+  pushToBranch: (name: string, text: string, under?: string) => void;
 }
 
 /**
@@ -115,8 +115,8 @@ function fixture(
   // when the fixture means it to be empty.
   mkdirSync(join(root, ROUTE), { recursive: true });
 
-  const remote = (name: string): string | undefined => {
-    const r = spawnSync("git", ["--git-dir", bare, "cat-file", "blob", `refs/heads/${BRANCH}:${ROUTE}/${name}`], { encoding: "utf-8" });
+  const remote = (name: string, under: string = ROUTE): string | undefined => {
+    const r = spawnSync("git", ["--git-dir", bare, "cat-file", "blob", `refs/heads/${BRANCH}:${under}/${name}`], { encoding: "utf-8" });
     return r.status === 0 ? r.stdout : undefined;
   };
   return {
@@ -129,7 +129,7 @@ function fixture(
     removeLocal: (name) => unlinkSync(join(root, ROUTE, name)),
     remote,
     tip: () => git(bare, "rev-parse", `refs/heads/${BRANCH}`).trim(),
-    pushToBranch: (name, text) => {
+    pushToBranch: (name, text, under = ROUTE) => {
       // input-site: inert #8140d8da — a unique scratch name or throwaway token; no assertion depends on its value
       const w = join(base, `w-${Math.random().toString(36).slice(2)}`);
       mkdirSync(w);
@@ -137,8 +137,8 @@ function fixture(
       git(w, "remote", "add", "origin", url);
       git(w, "fetch", "-q", "origin", BRANCH);
       git(w, "checkout", "-q", "-B", "x", "FETCH_HEAD");
-      mkdirSync(dirname(join(w, ROUTE, name)), { recursive: true });
-      writeFileSync(join(w, ROUTE, name), text);
+      mkdirSync(dirname(join(w, under, name)), { recursive: true });
+      writeFileSync(join(w, under, name), text);
       git(w, "add", "-A");
       git(w, "commit", "-q", "-m", "sibling");
       git(w, "push", "-q", url, `HEAD:refs/heads/${BRANCH}`);
@@ -219,13 +219,21 @@ describe("no `expect` is ever sent, which is what route keying means", () => {
     // second half a `conflict`; here the generator is the one writer and a lost
     // write costs a rerun, so last-write-wins is correct rather than tolerated.
     const f = fixture("route", { "a.md": "A\n" }, { "a.md": "A2\n" });
+    // ANOTHER path: a sibling route on the same branch, which this publish does not own.
+    const OTHER = "docs/uml/other";
+    f.pushToBranch("x.md", "the other route's\n", OTHER);
+    // The SAME path: a sibling's write to the route's own a.md.
+    f.pushToBranch("a.md", "a sibling's a.md\n");
+    // And a path under the route the checkout does not hold. The publisher never
+    // saw sibling.md in its read... but it DOES see it as a tip path absent from
+    // the checkout, so wholesale replacement removes it. That is the contract,
+    // and it is worth asserting rather than assuming: anything under a published
+    // route is the generator's to own.
     f.pushToBranch("sibling.md", "from elsewhere\n");
-    // The publisher never saw sibling.md in its read... but it DOES see it as a
-    // tip path absent from the checkout, so wholesale replacement removes it.
-    // That is the contract, and it is worth asserting rather than assuming:
-    // anything under a published route is the generator's to own.
+    expect(f.remote("a.md")).toBe("a sibling's a.md\n");
     const r = publishRoute(ID, "publish", f.opts);
     expect(r.state).toBe("pushed");
+    expect(f.remote("x.md", OTHER)).toBe("the other route's\n");
     expect(f.remote("a.md")).toBe("A2\n");
     expect(f.remote("sibling.md")).toBeUndefined();
   });
