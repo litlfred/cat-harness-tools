@@ -36,7 +36,7 @@ describe("site-scope — the --scope flag", () => {
   });
 });
 
-describe("siteScopeOf — an IG lands on a layer", () => {
+describe("siteScopeOf — a site writes its own pages", () => {
   const dir = mkdtempSync(join(tmpdir(), "site-scope-"));
   const cfg = (site: unknown): string => {
     writeFileSync(join(dir, "index.config.json"), JSON.stringify({ site }));
@@ -47,8 +47,13 @@ describe("siteScopeOf — an IG lands on a layer", () => {
     expect(siteScopeOf(cfg({ landing: "smart-base" }), "smart-immunizations")).toEqual(["smart-immunizations"]);
   });
 
-  test("a checkout that lands on itself, on the hub, or names no landing has no scope", () => {
-    expect(siteScopeOf(cfg({ landing: "smart-base" }), "smart-base")).toBeUndefined();
+  test("a folio that lands on itself: its own pages only, the other layers linked", () => {
+    // owner, 2026-11-13: "other harnesses should be referenced not included".
+    expect(siteScopeOf(cfg({ landing: "dpi-h-ra" }), "dpi-h-ra")).toEqual(["dpi-h-ra"]);
+    expect(siteScopeOf(cfg({ landing: "smart-base" }), "smart-base")).toEqual(["smart-base"]);
+  });
+
+  test("the hub, or a checkout that names no landing, has no scope", () => {
     expect(siteScopeOf(cfg({ landing: "hub" }), "x")).toBeUndefined();
     expect(siteScopeOf(cfg({}), "x")).toBeUndefined();
     rmSync(join(dir, "index.config.json"));
