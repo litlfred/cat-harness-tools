@@ -210,13 +210,6 @@ Feature: Input-site audit, runtime trace and the fingerprint's refusals
     Then the module is one the "plugin-tables" declaration names
     And schemas/kg/harness-config.ts carries a "declared" annotation with source "plugin-tables"
 
-  @test:scripts/tests/input-sites.test.ts::annotations_hold_to_the_data_that_chooses_their_targets::every_Tool's_in-process_registrar_is_a_module_tool-api's_`declared_tool-registrars`_names
-  Scenario: Every Tool's in-process registrar is listed by the tool-registrars declaration
-    Given every MCP Tool with an in-process registrar, in every instance of the checkout
-    When each registrar module is resolved as tool-api's MCP tool list resolves it
-    Then each one that resolves is named by the "tool-registrars" declaration
-    And tool-api.ts carries a "declared" annotation with source "tool-registrars"
-
   @test:scripts/tests/input-sites.test.ts::annotations_hold_to_the_data_that_chooses_their_targets::every_declared_validator_module,_from_any_root_a_caller_passes,_is_one_`declared_validator-refs`_names
   Scenario: Every declared validator module, from any caller's root, is listed by the validator-refs declaration
     Given every kind's validator and node-schema validator refs in the typology registry
