@@ -47,6 +47,7 @@ import { isGlobalTasksFile } from "../src/workflow/process-model.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { BESIDE_SOURCE_OUT_ENV, besideSourceTarget } from "./lib/beside-source-out.ts";
 import { subjectHref } from "./lib/subject-pages.ts";
+import { definersFrom, nearestDefiner, processDefiners } from "./lib/process-definers.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 /**
@@ -148,21 +149,20 @@ if (commentFindings.length > 0) {
 const renderer = await openRenderer(VIEWER);
 
 /**
- * Map every `bpmn:process` id to the file that defines it, so a call activity's
- * `calledElement` can be resolved to a diagram rather than to a bare id.
+ * Every `bpmn:process` id and ALL the files that define it, so a call
+ * activity's `calledElement` can be resolved to a diagram rather than to a
+ * bare id. Two layers of a composed checkout may define the same id; a link
+ * then resolves to the definer nearest the referring diagram by path
+ * (`lib/process-definers.ts`), never to whichever file was read last.
  */
-const processHome = new Map<string, string>();
-const processFile = new Map<string, string>();
-/** The same, as absolute paths — what the beside-the-source links compare. */
-const processPath = new Map<string, string>();
-for (const file of sources) {
-  const xml = await readFile(file, "utf8");
-  for (const m of xml.matchAll(/<bpmn:process\s+id="([^"]+)"/g)) {
-    processHome.set(m[1], basename(file, ".bpmn"));
-    processFile.set(m[1], relative(ROOT, file));
-    processPath.set(m[1], file);
-  }
-}
+const definers = processDefiners(
+  await Promise.all(
+    sources.map(async (file): Promise<[string, string[]]> => [
+      file,
+      [...(await readFile(file, "utf8")).matchAll(/<bpmn:process\s+id="([^"]+)"/g)].map((m) => m[1]!),
+    ]),
+  ),
+);
 
 /**
  * Page sections presenting each diagram, keyed relative to this layer —
@@ -202,22 +202,24 @@ export function stepOnProcessPage(home: string, step: string): string {
  * (`process-presentations.ts`). The process names no page; the page names
  * the process (data-modelling step 8, bean `xl55`).
  */
-function subprocessLinks(xml: string): Map<string, string> {
+function subprocessLinks(file: string, xml: string): Map<string, string> {
   const out = new Map<string, string>();
   for (const m of xml.matchAll(/<bpmn:callActivity\b([^>]*)>/g)) {
     const id = /\sid="([^"]+)"/.exec(m[1])?.[1];
     const called = /\scalledElement="([^"]+)"/.exec(m[1])?.[1];
     if (!id || !called) continue;
-    const home = processHome.get(called);
-    if (!home) continue;
+    const calledPath = nearestDefiner(definers, called, file);
+    if (!calledPath) continue;
+    const home = basename(calledPath, ".bpmn");
+    const calledFile = relative(ROOT, calledPath);
     // The called process's own page, its subject IRI (owner, 2026-10-23: "the
     // info button/icons in the bpmn rendering should point to those new
     // IRIs", #603) — where its layer's graph publishes one; else its page
     // section or diagram page, as before.
     out.set(
       id,
-      subjectHref(resolve(ROOT, processFile.get(called)!), "process", called) ??
-        SITE_UP + processTarget(home, presentations.get(processFile.get(called)!)),
+      subjectHref(resolve(ROOT, calledFile), "process", called) ??
+        SITE_UP + processTarget(home, presentations.get(calledFile)),
     );
   }
   return out;
@@ -325,7 +327,7 @@ for (const file of sources) {
     const href = subjectHref(file, "process", `${s.process}/node/${s.id}`) ?? SITE_UP + stepOnProcessPage(basename(file, ".bpmn"), s.id);
     titles.set(s.id, { href, name: s.name });
   }
-  const expands = new Map([...subprocessLinks(xml)].map(([id, href]) => [id, { href, name: stepName.get(id) ?? id }]));
+  const expands = new Map([...subprocessLinks(file, xml)].map(([id, href]) => [id, { href, name: stepName.get(id) ?? id }]));
   const linked = linkSteps(responsive, titles, expands);
   const nTitles = countLinks(linked, TITLE_LINK_CLASS);
   const nExpands = countLinks(linked, EXPAND_LINK_CLASS);
@@ -354,7 +356,7 @@ for (const file of sources) {
     // writes into bootstrap (bean `xsqm`, owner 2026-09-30): this copy wrote the
     // SVG without the note, so each writer called the other's output stale and
     // `render:bpmn:check` went red on main. One writer, one set of bytes.
-    const own = await besideSourceSvg(renderer, file, processPath);
+    const own = await besideSourceSvg(renderer, file, definersFrom(definers, file));
     if ("error" in own) {
       console.error(`✗ ${file}: ${own.error}`);
       process.exitCode = 1;
