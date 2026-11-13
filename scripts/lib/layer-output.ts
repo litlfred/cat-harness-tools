@@ -98,6 +98,30 @@ export function readPathFor(root: string, layer: LayerRef, rel: string, mounted:
   return existsSync(computed) ? computed : join(resolve(root), layer.path, rel);
 }
 
+/** The mounted layer that holds `absPath` (the deepest mount that does), with its directory; undefined outside every mount. */
+function mountHolding(root: string, absPath: string, mounted: Map<string, string>): { layer: LayerRef; dir: string } | undefined {
+  const r = resolve(root);
+  const p = resolve(absPath);
+  let best: { layer: LayerRef; dir: string } | undefined;
+  for (const [instance, path] of mounted) {
+    const dir = resolve(r, path);
+    if (dir === r || !(p === dir || p.startsWith(dir + sep))) continue;
+    if (!best || dir.length > best.dir.length) best = { layer: { instance, path }, dir };
+  }
+  return best;
+}
+
+/**
+ * The output-root twin of an ABSOLUTE path inside a mounted layer, where a
+ * writer puts what it computes for that path; undefined when the path is in
+ * no mount (a local layer writes in place). For a reader that copies a whole
+ * declared directory: copy the mount, then this over it.
+ */
+export function outputPathAt(root: string, absPath: string, mounted: Map<string, string> = mountedInstances(root)): string | undefined {
+  const m = mountHolding(root, absPath, mounted);
+  return m ? outputPathFor(root, m.layer, relative(m.dir, resolve(absPath)), mounted) : undefined;
+}
+
 /**
  * Where to read a file a reader names by its ABSOLUTE path in the checkout,
  * as a declared directory's `absPath` gives it: through {@link readPathFor}
@@ -106,17 +130,6 @@ export function readPathFor(root: string, layer: LayerRef, rel: string, mounted:
  * than name a layer (bean `cat-tools-sm8r`, item 4, plan step 2).
  */
 export function readPathAt(root: string, absPath: string, mounted: Map<string, string> = mountedInstances(root)): string {
-  const r = resolve(root);
-  const p = resolve(absPath);
-  let best: LayerRef | undefined;
-  let bestDir = "";
-  for (const [instance, path] of mounted) {
-    const dir = resolve(r, path);
-    if (dir === r || !(p === dir || p.startsWith(dir + sep))) continue;
-    if (dir.length > bestDir.length) {
-      best = { instance, path };
-      bestDir = dir;
-    }
-  }
-  return best ? readPathFor(r, best, relative(bestDir, p), mounted) : p;
+  const m = mountHolding(root, absPath, mounted);
+  return m ? readPathFor(root, m.layer, relative(m.dir, resolve(absPath)), mounted) : resolve(absPath);
 }

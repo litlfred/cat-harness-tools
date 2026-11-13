@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { LAYER_OUTPUT_ROOT, mountedInstances, outputPathFor, readPathAt, readPathFor } from "../lib/layer-output.js";
+import { LAYER_OUTPUT_ROOT, mountedInstances, outputPathAt, outputPathFor, readPathAt, readPathFor } from "../lib/layer-output.js";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -101,5 +101,18 @@ describe("readPathAt: a reader that names a file by its absolute path", () => {
   });
   test("outside every mount: the path itself", () => {
     expect(readPathAt(root, join(root, "own", "index.json"))).toBe(join(root, "own", "index.json"));
+  });
+});
+
+describe("outputPathAt: the output-root twin of a path inside a mount", () => {
+  const root = mkdtempSync(join(tmpdir(), "layer-output-twin-"));
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(join(root, "index.lock.json"), JSON.stringify({ instances: [{ instance: "ig", path: "ig" }] }));
+
+  test("a served directory inside a mount has its twin under the output root", () => {
+    expect(outputPathAt(root, join(root, "ig", "served-dir"))).toBe(join(root, LAYER_OUTPUT_ROOT, "ig", "served-dir"));
+  });
+  test("a directory in no mount has none: a local layer writes in place", () => {
+    expect(outputPathAt(root, join(root, "own", "served-dir"))).toBeUndefined();
   });
 });

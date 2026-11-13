@@ -87,6 +87,7 @@ import { isPublished } from "../schemas/kg/url-space.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { instanceSitePath } from "./instance-exports.ts";
 import { inScope, siteScope } from "./lib/site-scope.ts";
+import { outputPathAt } from "./lib/layer-output.ts";
 
 /**
  * A layer's route — `<instance>` or `<instance>/<path>`, no slash at
@@ -2502,19 +2503,26 @@ async function main(): Promise<number> {
   const servedDone: { route: string; files: number }[] = [];
   for (const sv of servedDirectories()) {
     const dest = join(siteAbs, sv.route);
-    if (!existsSync(sv.dir)) {
+    // A mounted layer's computed files are built into its output root, not
+    // the mount (bean `cat-tools-sm8r`, item 4): the site serves the mount's
+    // pinned bytes with the computed files laid over them.
+    const built = outputPathAt(REPO, sv.dir);
+    const layers = [sv.dir, ...(built !== undefined && existsSync(built) ? [built] : [])].filter((d) => existsSync(d));
+    if (!layers.length) {
       servedProblems.push(`/${sv.route}/ is declared served, but ${sv.dir.slice(REPO.length + 1)} does not exist`);
       continue;
     }
-    const withheld = withheldPaths(sv.dir);
-    const src = realpathSync(sv.dir);
-    const filter = withheldFilter(src, withheld);
-    const clashes = servedClashes(src, dest, filter);
+    const copies = layers.map((d) => {
+      const src = realpathSync(d);
+      const filter = withheldFilter(src, withheldPaths(d));
+      return { src, filter };
+    });
+    const clashes = copies.flatMap((c) => servedClashes(c.src, dest, c.filter));
     if (clashes.length) {
       servedProblems.push(`/${sv.route}/ is declared served, but the site already publishes ${clashes.length} of its file(s): ${clashes.slice(0, 5).join(", ")}${clashes.length > 5 ? ", …" : ""}`);
       continue;
     }
-    cpSync(src, dest, { recursive: true, filter });
+    for (const c of copies) cpSync(c.src, dest, { recursive: true, filter: c.filter });
     servedDone.push({ route: sv.route, files: countFiles(dest) });
   }
 
