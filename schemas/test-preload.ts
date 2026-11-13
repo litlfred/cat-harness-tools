@@ -47,18 +47,25 @@ process.env.PYTHONDONTWRITEBYTECODE = "1";
  * names its own is left exactly as it is.
  */
 type BunSpawnOptions = { env?: Record<string, string | undefined> } | undefined;
-const currentEnvByDefault = <F extends (...args: never[]) => unknown>(spawn: F): F =>
-  ((cmdOrOptions: unknown, options?: BunSpawnOptions) => {
+type AnySpawn = (...args: unknown[]) => unknown;
+function currentEnvByDefault(spawn: AnySpawn): AnySpawn {
+  return (cmdOrOptions: unknown, options?: unknown) => {
     // input-site: inert #09c28de2 — hands this process's environment on to a child, unread here
     const env = { ...process.env };
-    if (Array.isArray(cmdOrOptions)) return (spawn as (...a: unknown[]) => unknown)(cmdOrOptions, options?.env === undefined ? { ...options, env } : options);
+    if (Array.isArray(cmdOrOptions)) {
+      const o = options as BunSpawnOptions;
+      // input-site: inert #e0cf2153 — passes a test's own spawn through, with the current environment when it named none
+      return spawn(cmdOrOptions, o?.env === undefined ? { ...o, env } : o);
+    }
     const o = cmdOrOptions as BunSpawnOptions;
-    return (spawn as (...a: unknown[]) => unknown)(o?.env === undefined ? { ...o, env } : o);
-  }) as unknown as F;
-// input-site: inert #670a5704 — wraps the spawn, runs nothing itself
-Bun.spawn = currentEnvByDefault(Bun.spawn);
-// input-site: inert #a3023216 — wraps the spawn, runs nothing itself
-Bun.spawnSync = currentEnvByDefault(Bun.spawnSync);
+    // input-site: inert #3e6e99b8 — passes a test's own spawn through, with the current environment when it named none
+    return spawn(o?.env === undefined ? { ...o, env } : o);
+  };
+}
+// input-site: inert #17f38363 — wraps the spawn, runs nothing itself
+Bun.spawn = currentEnvByDefault(Bun.spawn as unknown as AnySpawn) as unknown as typeof Bun.spawn;
+// input-site: inert #c272410e — wraps the spawn, runs nothing itself
+Bun.spawnSync = currentEnvByDefault(Bun.spawnSync as unknown as AnySpawn) as unknown as typeof Bun.spawnSync;
 
 /*
  * THE SUITE'S DEFAULT TIMEOUT — bean `61n5`.
