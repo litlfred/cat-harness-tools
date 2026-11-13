@@ -484,7 +484,7 @@ export const JS_ADAPTER: TestLanguageAdapter = {
     const { code, strings } = maskSource(src, { templates: true });
     const runners = declaredTestRunners(src).filter((r) => !/^(?:describe|suite|context|test|it)$/.test(r));
     const heads = runners.length
-      ? new RegExp(`(?<![\\w.$])(describe|suite|context|test|it|${runners.map((r) => r.replace(/\$/g, "\\$")).join("|")})(?=\\s*[.(])`, "g")
+      ? new RegExp(`(?<![\\w.$])(describe|suite|context|test|it|${runners.map((r) => r.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")).join("|")})(?=\\s*[.(])`, "g")
       : JS_HEAD;
     /** Offset of the `)` matching the `(` at `open`. */
     const closeOf = (open: number): number => {
