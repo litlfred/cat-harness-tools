@@ -172,6 +172,18 @@ Feature: Every test has a Gherkin
     When dak.json declares a resource that is not a DAK
     Then nothing is a specification
 
+  @test:scripts/tests/test-gherkin.test.ts::declared_specifications::a_DAK_declared_in_index.config.json_specifies_the_features_its_IG_publishes,_not_the_repository's_own
+  Scenario: A DAK declared as a content type specifies only the features its IG publishes
+    Given a tree with an unbound Scenario under input/testing/ and another under tools/
+    When index.config.json declares contentTypes.dak a DAK and contentTypes.ig.include lists input/testing/
+    Then the Scenario under input/testing/ is a specification and the one under tools/ is still a finding
+    When the IG's include lists no path that holds a feature
+    Then nothing is a specification and both Scenarios are findings
+    When the DAK lists a testScenarios path
+    Then that path decides, not the IG's include
+    When neither testScenarios paths nor an IG include are declared, or contentTypes.dak is not a DAK
+    Then nothing is a specification
+
   @test:scripts/tests/test-gherkin.test.ts::a_JS_title_is_named_by_its_runtime_string::escapes_in_a_quoted_or_template_title_are_read_as_the_runner_reads_them;_a_looped_id_stays_verbatim
   Scenario: A JS test is named by the title its runner prints, not by the escapes in its source
     Given a describe titled with escaped double quotes, holding tests titled with an escaped single quote, escaped backticks, an escaped backslash, a \u escape and a \x escape, and a looped test case[${k}]
