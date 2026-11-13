@@ -53,10 +53,10 @@ const BENCHMARK_RUNNERS = [
 ];
 
 describe("audit output paths", () => {
-  for (const file of WRITERS) {
+  describe.each([...WRITERS])("%s", (file) => {
     const src = readFileSync(join(PIPELINE, file), "utf-8");
 
-    test(`${file} does not default into beans/ or todos/`, () => {
+    test("does not default into beans/ or todos/", () => {
       // String literals only — a path assembled at runtime would slip past
       // this, but all four spell theirs out, which is what made the drift
       // invisible and is also what makes it checkable.
@@ -64,10 +64,10 @@ describe("audit output paths", () => {
       expect(src).not.toMatch(/"todos\/[\w-]+\.json"/);
     });
 
-    test(`${file} defaults into build/`, () => {
+    test("defaults into build/", () => {
       expect(src).toMatch(/"build\/[\w-]+\.json"/);
     });
-  }
+  });
 
   test("qa-section-title-audit honours --out like its three siblings", () => {
     // It was the only one with a hardcoded path and no way to redirect it.
@@ -79,25 +79,25 @@ describe("audit output paths", () => {
 describe("benchmark runner output paths and graph isolation (folio-assistant-wp49)", () => {
   const declaredGraphDirs = getDeclaredGraphDirectories(SCRIPTS);
 
-  for (const runner of BENCHMARK_RUNNERS) {
+  describe.each([...BENCHMARK_RUNNERS])("%s", (runner) => {
     const src = readFileSync(join(SCRIPTS, runner), "utf-8");
 
-    test(`${runner} does not default into beans/ or todos/`, () => {
+    test("does not default into beans/ or todos/", () => {
       expect(src).not.toMatch(/default=["'][.]?[\/\\]?beans[\/\\]/);
       expect(src).not.toMatch(/default=["'][.]?[\/\\]?todos[\/\\]/);
     });
 
-    test(`${runner} does not default into any declared graph directory`, () => {
+    test("does not default into any declared graph directory", () => {
       for (const gDir of declaredGraphDirs) {
         const pattern = new RegExp(`default=["'][.]?[\\/\\\\]?${gDir.replace("/", "[\\/\\\\]")}[\\/\\\\]`);
         expect(src).not.toMatch(pattern);
       }
     });
 
-    test(`${runner} defaults its output into build/benchmarks/`, () => {
+    test("defaults its output into build/benchmarks/", () => {
       expect(src).toMatch(/default=["']build\/benchmarks\/[\w-]+\.json["']/);
     });
-  }
+  });
 
   test("isDeclaredGraphPath detects all declared graph paths", () => {
     expect(isDeclaredGraphPath("beans/test.json").isGraph).toBeTrue();
