@@ -5,7 +5,7 @@ import { join, posix } from "node:path";
 import { deflateRawSync } from "node:zlib";
 import { ARCHIMATE_MODEL_TAG, ArchimateConfigSchema, ArchimateModelSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "../schemas/archimate.ts";
 import { renderViewSvg, wrap } from "./render-view.ts";
-import { checkCommitted } from "./check-archimate.ts";
+import { archimateInstances, checkCommitted } from "./check-archimate.ts";
 import { pageNodeOf, pageNodeProblems } from "../../scripts/thin-page.ts";
 import { baseIriOf, pageDataOf, figureTargets, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
 import { renderedByOf } from "../../scripts/viewer-declarations.ts";
@@ -300,6 +300,23 @@ describe("an instance", () => {
       expect(figureTargets(root)).toHaveLength(1);
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("is swept from the checkout when it declares an archimate directory, and a layer that does not is left out", () => {
+    const checkout = mkdtempSync(join(tmpdir(), "archimate-checkout-"));
+    try {
+      const tiny = join(checkout, "tiny");
+      mkdirSync(join(tiny, "archimate", "1.0.0"), { recursive: true });
+      writeFileSync(join(tiny, "tiny.json"), JSON.stringify(declaration));
+      writeFileSync(join(tiny, "archimate", "1.0.0", "model.archimate"), XML);
+      writeFileSync(join(tiny, "archimate", "cat-archimate.config.json"), JSON.stringify(config));
+      mkdirSync(join(checkout, "plain"));
+      writeFileSync(join(checkout, "plain", "plain.json"), JSON.stringify({ name: "plain", directories: [] }));
+      expect(archimateInstances(checkout)).toEqual([tiny]);
+      expect(checkCommitted(tiny)).toEqual([]);
+    } finally {
+      rmSync(checkout, { recursive: true, force: true });
     }
   });
 
