@@ -159,30 +159,18 @@ Feature: Every test has a Gherkin
     When they are joined with no checkout held
     Then every @itb tag is unresolved, "source not held", and none passes
 
-  @test:scripts/tests/test-gherkin.test.ts::declared_specifications::a_DAK's_unbound_Scenarios_are_specifications,_not_findings;_a_bound_one_is_still_checked
-  Scenario: A DAK declares its feature files to be specifications for implementers
-    Given a tree with an unbound Scenario, an @itb-bound Scenario and an untagged test
-    When the tree declares no DAK
-    Then the unbound Scenarios name no test, the @itb tag is unresolved and the test has no Scenario
-    When its dak.json declares a DAK with no testScenarios sources
-    Then every unbound Scenario is a specification and not a finding
-    And the @itb tag is still unresolved and the untagged test still has no Scenario
-    When its dak.json lists a testScenarios url that is a path in the tree
-    Then only the unbound Scenarios under that path are specifications
-    When dak.json declares a resource that is not a DAK
+  @test:scripts/tests/test-gherkin.test.ts::declared_specifications::testSpecifications_on_any_contentTypes_section_marks_its_features_as_specifications;_a_bound_one_is_still_checked
+  Scenario: A content-type section declares which feature files are specifications for implementers
+    Given a tree with an unbound Scenario and an @itb-bound Scenario under input/testing/, an unbound Scenario under tools/, and an untagged test
+    When index.config.json declares no testSpecifications
+    Then every unbound Scenario names no test, the @itb tag is unresolved and the test has no Scenario
+    When a contentTypes section of any type declares testSpecifications input/testing/
+    Then the unbound Scenario under input/testing/ is a specification and not a finding
+    And the one under tools/ is still a finding, the @itb tag is still unresolved and the test still has no Scenario
+    When a section carries other DAK or IG fields but no testSpecifications
     Then nothing is a specification
-
-  @test:scripts/tests/test-gherkin.test.ts::declared_specifications::a_DAK_declared_in_index.config.json_specifies_the_features_its_IG_publishes,_not_the_repository's_own
-  Scenario: A DAK declared as a content type specifies only the features its IG publishes
-    Given a tree with an unbound Scenario under input/testing/ and another under tools/
-    When index.config.json declares contentTypes.dak a DAK and contentTypes.ig.include lists input/testing/
-    Then the Scenario under input/testing/ is a specification and the one under tools/ is still a finding
-    When the IG's include lists no path that holds a feature
-    Then nothing is a specification and both Scenarios are findings
-    When the DAK lists a testScenarios path
-    Then that path decides, not the IG's include
-    When neither testScenarios paths nor an IG include are declared, or contentTypes.dak is not a DAK
-    Then nothing is a specification
+    When testSpecifications is not a list of repository-relative paths
+    Then the scan is refused rather than reading the declaration as empty
 
   @test:scripts/tests/test-gherkin.test.ts::a_JS_title_is_named_by_its_runtime_string::escapes_in_a_quoted_or_template_title_are_read_as_the_runner_reads_them;_a_looped_id_stays_verbatim
   Scenario: A JS test is named by the title its runner prints, not by the escapes in its source
