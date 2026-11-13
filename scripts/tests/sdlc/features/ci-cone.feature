@@ -453,9 +453,8 @@ Feature: The CI cone skips a check only when everything its green run read is un
 
   @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::nothing_else_records:_a_dispatch_on_another_branch,_a_PR,_a_merge_group
   Scenario: No other run records
-    Given a workflow dispatch on "refs/heads/repin-train/x"
-    Or a pull request on "refs/pull/1/merge"
-    Or a merge group on "refs/heads/gh-readonly-queue/main/x"
-    Or a push to "refs/heads/feature"
-    Or an empty environment
-    Then the run does not record
+    Then a workflow dispatch on "refs/heads/repin-train/x" does not record
+    And a pull request on "refs/pull/1/merge" does not record
+    And a merge group on "refs/heads/gh-readonly-queue/main/x" does not record
+    And a push to "refs/heads/feature" does not record
+    And an empty environment does not record

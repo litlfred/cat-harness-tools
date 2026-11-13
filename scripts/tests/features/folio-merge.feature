@@ -62,10 +62,14 @@ Feature: Folio page merge of published and local items
 
   @test:scripts/tests/folio-merge.test.ts::mergeFolio_—_a_union_keyed_by_id::a_missing_or_malformed_side_is_empty,_not_an_error
   Scenario: A missing or malformed side counts as empty
-    When both sides are null, then there are no rows
-    And when the local side is an array, then the local count is 0
-    And when the published side is undefined, then both local entries are unsynced
-    And when the only published node has an empty id and the only local entry is null, then there are no rows
+    When both sides are null
+    Then there are no rows
+    When the local side is an array
+    Then the local count is 0
+    When the published side is undefined
+    Then both local entries are unsynced
+    When the only published node has an empty id and the only local entry is null
+    Then there are no rows
 
   @test:scripts/tests/folio-merge.test.ts::mergeFolio_—_a_union_keyed_by_id::it_is_self-contained,_so_the_page_can_carry_it_by_toString
   Scenario: The merge function survives being carried as source text

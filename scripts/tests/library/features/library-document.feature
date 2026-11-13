@@ -156,10 +156,10 @@ Feature: The document view of a library entry
 
   @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::the_generator_reads_each_section's_blocks_from_its_node,_and_the_viewer_anchors_each_block_row
   Scenario: The generator reads each section's blocks from its node, and the viewer anchors each block row
+    # Gap: the viewer half is a source-text check of the viewer script, not a rendered page
     Given an entry whose first section's node contains two blocks and a sub-section
     When the entry's document view is read
     Then the first section's blocks are "e/blocks/prose-sec-000" and "e/blocks/figure-1", without the sub-section
     And the second section has no blocks field
     And the view passes the library document schema
     And the viewer script stores the loaded blocks and gives each block table row an anchor id
-    # Gap: the viewer half is a source-text check of the viewer script, not a rendered page
