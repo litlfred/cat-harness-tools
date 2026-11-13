@@ -213,7 +213,6 @@ describe("`narrativesIn` reads both shapes and says where each one sits", () => 
   test("a CSVW record yields one per transcribed TABLE, named by its label", () => {
     // Transcribed tables in a paged entry: `tables[i]["fac:narrative"]` in `tabular.csvw.json`.
     const got = narrativesIn({
-      narrative: { text: null, state: "not-authored" },
       tables: [
         { url: "tables/table-1.csv", "fac:label": "Table 1", "fac:narrative": [draft] },
         { url: "tables/table-2.csv" },
