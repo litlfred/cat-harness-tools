@@ -51,9 +51,8 @@ Feature: MCP projection of Tools and its injection defence
     When each parses "; rm -rf /", "$(whoami)", a backticked "id" and "a b"
     Then every parse fails
 
-  @test:scripts/tests/tools/mcp-project.test.ts::mcp_projection::a_Tool_reachable_over_MCP_is_omitted,_with_a_reason
+  @test:scripts/tests/tools/mcp-project.test.ts::mcp_projection::a_Tool_with_both_shell_and_MCP_arms_projects_on_its_shell_arm,_and_nothing_is_omitted
   Scenario: A Tool with both shell and MCP arms projects on its shell arm
-    # Gap: the title says such a Tool is omitted with a reason; the test asserts it is projected and nothing is omitted
     Given a Tool "shell-and-mcp" invoked by shell and by MCP tool "some_mcp_tool"
     When the Tools are projected
     Then the declarations include "shell_and_mcp"
@@ -68,11 +67,13 @@ Feature: MCP projection of Tools and its injection defence
     And the Tool has an unmet requirement without network
 
   @test:scripts/tests/tools/mcp-project.test.ts::mcp_projection::a_manual-only_Tool_is_omitted,_and_says_why
-  Scenario: The beans-manual Tool is either declared or omitted
-    # Gap: only checks that declarations plus omissions total 1; neither the omission nor its reason is checked
-    Given the real Tool "beans-manual"
+  Scenario: A manual-only Tool is omitted, and its omission says why
+    Given a Tool "by-hand" whose only invoke arm is manual
     When it is projected
-    Then it yields exactly one declaration or omission
+    Then there are no declarations
+    And there is exactly one omission, for "by-hand"
+    And its reason contains "manual-only"
+    And the real Tool "beans-manual", which declares both shell and manual, projects to exactly one declaration with no omission
 
   @test:scripts/tests/tools/mcp-project.test.ts::mcp_projection::the_real_Tool_set_projects,_and_every_declaration_has_a_schema
   Scenario: The real Tool set projects to well-formed declarations

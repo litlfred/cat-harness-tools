@@ -267,7 +267,7 @@ describe("weight and format are REPORTED, not refused", () => {
   test("png is accepted, with webp named as preferred", () => {
     const r = ingestThemeArt({ ...OK_INPUT, candidates: candidates() });
     expect(r.ok).toBe(true);
-    expect(r.warnings.every((w) => w.kind !== "heavy" || true)).toBe(true);
+    expect(r.warnings.some((w) => w.kind === "heavy")).toBe(false);
     expect(r.warnings.some((w) => w.kind === "not-preferred-format")).toBe(true);
   });
 
