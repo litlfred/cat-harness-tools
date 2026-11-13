@@ -57,3 +57,46 @@ Feature: The layer output resolver
     When its read path is resolved it is the file itself
     And once the twin is written, the file and its directory each resolve to the twin
     And a local instance's file resolves to itself
+
+  @test:scripts/tests/layer-output.test.ts::overlayPath_(step_5:_the_QA_readers)::the_checkout_is_the_nearest_directory_holding_.git,_not_a_mount_carrying_its_own_lock
+  Scenario: The checkout is the nearest directory holding .git, not a mount carrying its own lock
+    Given a checkout holding .git and a mounted lower directory carrying its own index.lock.json
+    When the checkout root is resolved from inside the mounted lower directory
+    Then it is the outer checkout holding .git
+
+  @test:scripts/tests/layer-output.test.ts::overlayPath_(step_5:_the_QA_readers)::outside_a_checkout_the_path_is_unchanged
+  Scenario: Outside a checkout the path is unchanged
+    Given a path with no checkout root
+    When its overlay path is resolved
+    Then the path is returned unchanged
+
+  @test:scripts/tests/layer-output.test.ts::overlayPath_(step_5:_the_QA_readers)::reads_the_computed_twin_over_the_pinned_bytes,_and_the_mount_when_there_is_none
+  Scenario: overlayPath reads the computed twin over the pinned bytes, and the mount when there is none
+    Given a pinned QA result file in a mounted lower layer
+    When its overlay path is resolved before and after its computed twin is written
+    Then it resolves to the pinned path first and to the computed twin once written
+
+  @test:scripts/tests/layer-output.test.ts::overlayPath_(step_5:_the_QA_readers)::an_unparseable_lock:_a_reader_falls_back_to_the_pinned_path
+  Scenario: With an unparseable lock a reader falls back to the pinned path
+    Given a checkout whose index.lock.json is not valid JSON
+    When overlayPath resolves a path inside a mounted directory
+    Then it falls back to the pinned path
+
+  @test:scripts/tests/layer-output.test.ts::the_QA_inventory_and_publish_see_the_overlay_(step_5)::movedInventory_is_the_union,_keyed_by_the_layer's_own_path,_the_output_root_winning
+  Scenario: movedInventory is the union keyed by the layer's own path with the output root winning
+    Given a mounted layer with pinned QA results and computed QA results under the output root
+    When movedInventory is computed for the layer's results directory
+    Then it returns the union keyed by the layer's own path with the output root winning on collisions
+
+  @test:scripts/tests/layer-output.test.ts::the_QA_inventory_and_publish_see_the_overlay_(step_5)::overlayEntries_names_each_computed_file_at_its_logical_path
+  Scenario: overlayEntries names each computed file at its logical path
+    Given a mounted layer with computed QA results under the output root
+    When overlayEntries is computed for the layer's results directory
+    Then each computed file is listed with its logical path and its output-root path
+
+  @test:scripts/tests/layer-output.test.ts::the_QA_inventory_and_publish_see_the_overlay_(step_5)::with_nothing_mounted,_both_are_what_they_were
+  Scenario: With nothing mounted both movedInventory and overlayEntries are what they were
+    Given a checkout with no mounted layers and a local results directory
+    When movedInventory and overlayEntries are computed
+    Then movedInventory lists the local files and overlayEntries is empty
+
