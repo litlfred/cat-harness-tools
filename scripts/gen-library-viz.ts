@@ -786,6 +786,9 @@ function renderBlocks(id, data, err, entry){
     return;
   }
   var bs = (data && data.blocks) || [];
+  /* The Contents tree's leaves (library-document.ts) come from these. */
+  DOC_BLOCKS = bs;
+  if (DOC && DOC_ID === id && DOC_TAB === "contents") renderDocument(id, DOC, null);
   if (!bs.length) {
     el.innerHTML = '<h2>Blocks</h2><p class="empty">' + esc(id) +
       ' has no blocks. Nothing failed \u2014 the entry carries none.</p>';
@@ -831,7 +834,7 @@ function renderBlocks(id, data, err, entry){
          text lives in scripts/lib/library-withheld-view.ts so a test runs
          exactly what this page runs. */
       var body = blockBody(b, entry);
-      return '<tr><td class="num">' + esc(pages) + '</td><td>' + esc(b.kind) +
+      return '<tr id="' + esc(blockAnchor(b.id)) + '"><td class="num">' + esc(pages) + '</td><td>' + esc(b.kind) +
         '</td><td>' + esc((b.types || []).join(' + ')) + '</td><td class="bt">' + body +
         '</td><td>' + nar + '</td></tr>';
     }).join("") + '</tbody></table>';
@@ -884,6 +887,7 @@ function summaryPanel(s){
     (who ? '<p class="note">' + esc(who) + '</p>' : '') + '</div>';
 }
 function loadBlocks(id, entry){
+  DOC_BLOCKS = null;
   fetch(blocksHref(id), {cache: "no-store"})
     .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function(d){ renderBlocks(id, d, null, entry); })

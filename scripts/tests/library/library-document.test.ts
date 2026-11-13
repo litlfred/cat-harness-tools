@@ -11,7 +11,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { entryFigureFiles, extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
+import { DOCUMENT_VIEW_JS, entryFigureFiles, extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
+import { VIEWER_JS } from "../../gen-library-viz.ts";
 import { LibraryDocumentSchema } from "../../../schemas/ui/site-indexes.ts";
 
 function entry(structure: object, extra: Record<string, string> = {}): string {
@@ -250,5 +251,106 @@ describe("kept figures and transcribed tables (who-iris#224)", () => {
 
   test("the site copies exactly the files the page shows", () => {
     expect(entryFigureFiles(withFiles())).toEqual(["images/img-p002-1.webp", "tables/table-1.csv"]);
+  });
+});
+
+/**
+ * The Contents tab as a tree of sections with their blocks as leaves (owner,
+ * 2026-11-13: "a hierarchy tree expandable browser of sections ... that shows
+ * blocks within"). Runs the SAME browser code the page embeds.
+ */
+describe("the Contents tree", () => {
+  interface Tree {
+    docContents(d: unknown): string;
+    docTreeKids(k: number): string;
+    setBlocks(b: unknown[] | null): void;
+  }
+  const esc = (s: unknown): string =>
+    String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+  // input-site: inert #b429a5e6 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
+  const T = new Function("esc", "$", "DATA_HREF", "window", "document", "location",
+    `${DOCUMENT_VIEW_JS}\nreturn { docContents, docTreeKids, setBlocks: function(b){ DOC_BLOCKS = b; } };`,
+  )(esc, () => null, "data/index.json", { addEventListener() {} }, {}, { hash: "" }) as Tree;
+
+  const sec = (id: string, title: string, level: number, page: number, blocks?: string[]) => ({
+    id, number: null, title, level, pageStart: page, pageEnd: page, labelStart: null, labelEnd: null,
+    words: 1, summary: null, keywords: [], extract: null, extractCut: false, ...(blocks ? { blocks } : {}),
+  });
+  const view = (over: object) => ({ id: "r", variant: "pdf", toc: [], sections: [], checks: {}, withheld: false, ...over });
+  const pages = view({ sections: [sec("page-001", "Page 1", 1, 1, ["e/blocks/prose-page-001"]), sec("page-002", "Page 2", 1, 2)] });
+  const blocks = [
+    { id: "e/blocks/prose-page-001", kind: "prose", title: "Page 1", target: "../sections/page-001.md", content: "Opening words of the first page" },
+    { id: "e/blocks/prose-page-002", kind: "prose", title: "Page 2", target: "../sections/page-002.md", content: "Second page text" },
+    { id: "e/blocks/figure-p002-1", kind: "figure", title: "A chart", target: "images/p002.webp", content: null },
+  ];
+
+  test("toc present: the tree is the outline, as before", () => {
+    T.setBlocks([]);
+    const d = view({
+      tocSource: "outline",
+      toc: [
+        { level: 1, title: "One", number: "1", page: 1, pageLabel: null, confidence: null, evidence: null, source: "outline", section: "s1" },
+        { level: 2, title: "One A", number: "1.1", page: 1, pageLabel: null, confidence: null, evidence: null, source: "outline", section: null },
+        { level: 1, title: "Two", number: "2", page: 2, pageLabel: null, confidence: null, evidence: null, source: "outline", section: null },
+      ],
+      sections: [sec("s1", "One", 1, 1), sec("s9", "Not in the outline", 1, 2)],
+    });
+    const h = T.docContents(d);
+    expect(h).toContain("Source: the PDF’s own outline. 3 entries.");
+    expect(h).toContain('data-toc="open">Expand all');
+    expect(h).toContain('<a href="#sec-s1" data-sec="s1">1 One</a>');
+    expect(h).not.toContain("Not in the outline");
+    expect(T.docTreeKids(0)).toContain("1.1 One A");
+  });
+
+  test("toc absent: the tree is built from the sections, nested by level", () => {
+    T.setBlocks([]);
+    const h = T.docContents(pages);
+    expect(h).toContain("so its sections are listed. 2 sections.");
+    expect(h).not.toContain("No table of contents");
+    expect(h).toContain('data-sec="page-001">Page 1</a>');
+    expect(h).toContain('data-sec="page-002">Page 2</a>');
+    const nested = view({ sections: [sec("a", "Part A", 1, 1), sec("a1", "Chapter A1", 2, 1), sec("b", "Part B", 1, 2)] });
+    const top = T.docContents(nested);
+    expect(top).toContain("Part A");
+    expect(top).toContain("Part B");
+    expect(T.docTreeKids(0)).toContain("Chapter A1");
+  });
+
+  test("blocks appear as leaves under their own section, by contains or by target", () => {
+    T.setBlocks(blocks);
+    T.docContents(pages);
+    const one = T.docTreeKids(0), two = T.docTreeKids(1);
+    // Page 1 by its section's `contains`; the leaf's title repeats the section's, so its first words show.
+    expect(one).toContain('<a href="#blk-prose-page-001" data-blk="blk-prose-page-001">Opening words of the first page…</a>');
+    expect(one).not.toContain("prose-page-002");
+    // Page 2 lists nothing; its prose block is placed by target. The figure names no section and is not guessed in.
+    expect(two).toContain('data-blk="blk-prose-page-002"');
+    expect(two + one).not.toContain("figure-p002-1");
+  });
+
+  test("children are built only when a node is first opened", () => {
+    T.setBlocks(blocks);
+    const h = T.docContents(pages);
+    expect(h).toContain('<details data-node="0"><summary>');
+    expect(h).toContain('<ul data-kids="0"></ul>');
+    expect(h).not.toContain("data-blk");
+    expect(T.docTreeKids(0)).toContain("data-blk");
+    // A node alone at its level opens at once, so its children are built now.
+    const single = T.docContents(view({ sections: [sec("page-001", "Page 1", 1, 1, ["e/blocks/prose-page-001"])] }));
+    expect(single).toContain('<details data-node="0" open>');
+    expect(single).toContain('data-built="1"><li class="leaf blk">');
+  });
+
+  test("the generator reads each section's blocks from its node, and the viewer anchors each block row", () => {
+    const dir = entry({ ...base, toc: [] }, {
+      "sections/sec-000-1-introduction.jsonld": JSON.stringify({ contains: ["e/blocks/prose-sec-000", "e/sections/sub", "e/blocks/figure-1"] }),
+    });
+    const d = readEntryDocument(dir, "r")!;
+    expect(d.sections[0].blocks).toEqual(["e/blocks/prose-sec-000", "e/blocks/figure-1"]);
+    expect(d.sections[1].blocks).toBeUndefined();
+    expect(LibraryDocumentSchema.safeParse(d).success).toBe(true);
+    expect(VIEWER_JS).toContain("DOC_BLOCKS = bs;");
+    expect(VIEWER_JS).toContain(`'<tr id="' + esc(blockAnchor(b.id)) + '">`);
   });
 });

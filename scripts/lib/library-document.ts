@@ -86,6 +86,12 @@ export interface DocSection {
    * Supplied by the caller ({@link EntryLinks}); absent when none maps.
    */
   edit?: { path: string; label: string };
+  /**
+   * The blocks this section holds, by `@id`, as its `sections/<id>.jsonld`
+   * `contains` lists them. The Contents tree draws them as leaves under the
+   * section. Absent when the section's node lists none.
+   */
+  blocks?: string[];
 }
 
 /**
@@ -389,6 +395,13 @@ export function plainHeading(t: string): string {
     .trim();
 }
 
+/** The block `@id`s a section's own node `contains` (a sub-section it names is not a block). */
+function sectionBlocks(dir: string, id: string): { blocks?: string[] } {
+  const c = readJson<{ contains?: unknown }>(join(dir, "sections", `${id}.jsonld`))?.contains;
+  const blocks = (Array.isArray(c) ? c : []).filter((x): x is string => typeof x === "string" && x !== "" && !x.includes("/sections/"));
+  return blocks.length ? { blocks } : {};
+}
+
 export function readEntryDocument(
   dir: string,
   id: string,
@@ -453,6 +466,7 @@ export function readEntryDocument(
       keywords: kw(kj?.sections?.[x.id]),
       extract,
       extractCut: cut,
+      ...sectionBlocks(dir, x.id),
     };
   });
 
@@ -557,58 +571,107 @@ function confPill(c, ev){
 function notRecorded(what){
   return '<p class="empty">' + esc(what) + ' not recorded for this entry — it was ingested before this field existed. Re-ingest to add it.</p>';
 }
-function docContents(d){
-  if (!d.toc.length && d.variant && d.variant !== "pdf") {
-    /* A text or notebook source has no separate outline: its headings ARE its
-       sections, so they are its contents. */
-    if (!d.sections.length) return '<p class="empty">No sections: the source has no headings.</p>';
-    return '<p class="note">Contents: the source\u2019s own headings.</p><ul class="toc">' + d.sections.map(function(s){
-      return '<li style="margin-left:' + (Math.max(0, (s.level || 1) - 1)) + 'em"><a href="#sec-' + esc(s.id) + '" data-sec="' + esc(s.id) + '">' +
-        (s.number ? esc(s.number) + ' ' : '') + esc(s.title) + '</a></li>';
-    }).join("") + '</ul>';
-  }
-  if (!d.toc.length) return '<p class="empty">No table of contents: the PDF carries no outline and none could be inferred.</p>';
-  var how = d.tocSource === "outline" ? "the PDF\u2019s own outline"
-    : "inferred (" + esc(d.tocMethod || "unknown") + "); each entry\u2019s confidence and the evidence behind it are shown";
-  /* A TREE OF <details>, collapsed to the top level so the document's shape
-     is visible at a glance (owner, 2026-10-06: "TOC collapsible and start
-     collapsed - hard to see overview"). Native <details>: keyboard and
-     screen-reader behaviour with no script. */
-  var bySec = {};
-  d.sections.forEach(function(s){ bySec[s.id] = s; });
-  function line(e){
-    var t = (e.number ? esc(e.number) + ' ' : '') + esc(e.title);
-    var link = e.section ? '<a href="#sec-' + esc(e.section) + '" data-sec="' + esc(e.section) + '">' + t + '</a>' : t;
-    var s = e.section && bySec[e.section];
-    return link + ' <span class="note">' + pageText(e.page, e.pageLabel) + '</span> ' + confPill(e.confidence, e.evidence) +
-      (s && s.edit && d.links ? ' ' + editHost(s) : '');
-  }
-  /* Build a node list first, so a level can see how many siblings it has.
-     A node that is the ONLY one at its level starts open: an outline whose
-     single root is the book's title would otherwise collapse to one line
-     (9789241548960-eng). The tree opens down to the first level that
-     branches — the chapters — and no further. */
-  var i = 0;
-  function nodes(level){
+/* THE CONTENTS TREE. Owner, 2026-11-13: "a hierarchy tree expandable
+   browser of sections on library items ... that shows blocks within". From
+   the outline when there is one, else from the sections, nested by level; a
+   section's blocks are its leaves. A node's children are built when it is
+   first opened, so a document of a thousand sections stays fast. */
+var DOC_BLOCKS = null, DOC_TREE = [];
+/* Section id -> its blocks: the ids its own node contains, then any block
+   whose target is that section's file. A block placed by neither is left to
+   the Blocks panel rather than guessed into a section. */
+function docBlocksBySection(d){
+  var out = {}, byId = {}, placed = {};
+  (DOC_BLOCKS || []).forEach(function(b){ byId[b.id] = b; });
+  d.sections.forEach(function(s){
+    (s.blocks || []).forEach(function(id){
+      if (placed[id]) return;
+      placed[id] = 1; (out[s.id] = out[s.id] || []).push(byId[id] || { id: id });
+    });
+  });
+  var known = {};
+  d.sections.forEach(function(s){ known[s.id] = 1; });
+  (DOC_BLOCKS || []).forEach(function(b){
+    var m = !placed[b.id] && /(?:^|\/)sections\/([^\/]+)\.md$/.exec(b.target || "");
+    if (m && known[m[1]]) { placed[b.id] = 1; (out[m[1]] = out[m[1]] || []).push(b); }
+  });
+  return out;
+}
+function blockAnchor(id){ return "blk-" + String(id).split("/").pop(); }
+function blockLeaf(b, secTitle){
+  var words = String(b.content || (b.summary && b.summary.text) || "").replace(/\s+/g, " ").trim().split(" ").slice(0, 10).join(" ");
+  var t = b.title && b.title !== secTitle ? b.title : words ? words + "…" : b.title || String(b.id).split("/").pop();
+  return '<li class="leaf blk"><span class="pill">' + esc(b.kind || "block") + '</span> <a href="#' + esc(blockAnchor(b.id)) +
+    '" data-blk="' + esc(blockAnchor(b.id)) + '">' + esc(t) + '</a></li>';
+}
+/* Nest a flat list by its levels: node = { item, kids: [node index] }. */
+function docNest(items){
+  var nodes = [], i = 0;
+  function level(lv){
     var out = [];
-    while (i < d.toc.length && d.toc[i].level >= level) {
-      var e = d.toc[i++];
-      out.push({ e: e, kids: (i < d.toc.length && d.toc[i].level > e.level) ? nodes(e.level + 1) : [] });
+    while (i < items.length && (items[i].level || 1) >= lv) {
+      var n = nodes.push({ item: items[i++], kids: [] }) - 1;
+      if (i < items.length && (items[i].level || 1) > (nodes[n].item.level || 1)) nodes[n].kids = level((nodes[n].item.level || 1) + 1);
+      out.push(n);
     }
     return out;
   }
-  function render(ns){
-    var only = ns.length === 1;
-    return ns.map(function(n){
-      return n.kids.length
-        ? '<li><details' + (only ? ' open' : '') + '><summary>' + line(n.e) + '</summary><ul>' + render(n.kids) + '</ul></details></li>'
-        : '<li class="leaf">' + line(n.e) + '</li>';
-    }).join("");
+  /* From the shallowest level, so an item above the first one's is not dropped. */
+  var top = items.length ? level(Math.min.apply(null, items.map(function(x){ return x.level || 1; }))) : [];
+  return { nodes: nodes, top: top };
+}
+/* The <li> of each node in ns. A node that is the ONLY one at its level
+   starts open (an outline whose single root is the book's title would
+   otherwise collapse to one line, 9789241548960-eng), so its children are
+   built now; every other node's are built on its first toggle. */
+function docTreeItems(ns){
+  var only = ns.length === 1;
+  return ns.map(function(k){
+    var n = DOC_TREE[k];
+    if (!n.kids.length && !n.blocks.length) return '<li class="leaf">' + n.line + '</li>';
+    return '<li><details data-node="' + k + '"' + (only ? ' open' : '') + '><summary>' + n.line + '</summary><ul data-kids="' + k + '"' +
+      (only ? ' data-built="1">' + docTreeKids(k) : '>') + '</ul></details></li>';
+  }).join("");
+}
+function docTreeKids(k){
+  var n = DOC_TREE[k];
+  return docTreeItems(n.kids) + n.blocks.map(function(b){ return blockLeaf(b, n.title); }).join("");
+}
+function docTreeBuild(details){
+  var ul = details.querySelector("ul[data-kids]");
+  if (!ul || ul.getAttribute("data-built")) return;
+  ul.setAttribute("data-built", "1");
+  ul.innerHTML = docTreeKids(Number(ul.getAttribute("data-kids")));
+}
+function docContents(d){
+  var bySec = {};
+  d.sections.forEach(function(s){ bySec[s.id] = s; });
+  var blocksOf = docBlocksBySection(d);
+  var useToc = d.toc.length > 0, items = useToc ? d.toc : d.sections;
+  if (!items.length) return d.variant && d.variant !== "pdf"
+    ? '<p class="empty">No sections: the source has no headings.</p>'
+    : '<p class="empty">No table of contents: the PDF carries no outline and none could be inferred.</p>';
+  function line(e){
+    var sid = useToc ? e.section : e.id, s = sid && bySec[sid];
+    var t = (e.number ? esc(e.number) + ' ' : '') + esc(e.title);
+    var link = sid ? '<a href="#sec-' + esc(sid) + '" data-sec="' + esc(sid) + '">' + t + '</a>' : t;
+    var where = useToc ? ' <span class="note">' + pageText(e.page, e.pageLabel) + '</span> ' + confPill(e.confidence, e.evidence)
+      : e.pageStart != null ? ' <span class="note">' + pageText(e.pageStart, e.labelStart) + '</span>' : '';
+    return link + where + (s && s.edit && d.links ? ' ' + editHost(s) : '');
   }
-  var tree = render(nodes(d.toc[0].level));
-  return '<p class="note">Source: ' + how + '. ' + d.toc.length + ' entries.</p>' +
+  var t = docNest(items);
+  DOC_TREE = t.nodes.map(function(n){
+    var sid = useToc ? n.item.section : n.item.id;
+    return { line: line(n.item), title: n.item.title, kids: n.kids, blocks: (sid && blocksOf[sid]) || [] };
+  });
+  var how = !useToc
+    ? (d.variant && d.variant !== "pdf" ? "Contents: the source’s own headings."
+      : "No outline: the PDF carries none and none could be inferred, so its sections are listed.") + ' ' + d.sections.length + ' sections.'
+    : 'Source: ' + (d.tocSource === "outline" ? "the PDF’s own outline"
+      : "inferred (" + esc(d.tocMethod || "unknown") + "); each entry’s confidence and the evidence behind it are shown") + '. ' + d.toc.length + ' entries.';
+  return '<p class="note">' + how + (DOC_BLOCKS ? '' : ' Blocks are listed once the block graph has loaded.') + '</p>' +
     '<p><button type="button" data-toc="open">Expand all</button> <button type="button" data-toc="close">Collapse all</button></p>' +
-    '<ul class="toc">' + tree + '</ul>';
+    '<ul class="toc">' + docTreeItems(t.top) + '</ul>';
 }
 function docPages(d){
   if (!d.pageLabels) return notRecorded("Page labels");
@@ -782,10 +845,32 @@ function renderDocument(id, d, err){
   });
   Array.prototype.forEach.call(el.querySelectorAll("[data-toc]"), function(b){
     b.addEventListener("click", function(){
-      var open = b.getAttribute("data-toc") === "open";
-      Array.prototype.forEach.call(el.querySelectorAll("ul.toc details"), function(x){ x.open = open; });
+      if (b.getAttribute("data-toc") !== "open") {
+        Array.prototype.forEach.call(el.querySelectorAll("ul.toc details"), function(x){ x.open = false; });
+        return;
+      }
+      /* Opening builds children, which may be nodes of their own: repeat
+         until every node is open. */
+      for (var ds; (ds = el.querySelectorAll("ul.toc details:not([open])")).length;)
+        Array.prototype.forEach.call(ds, function(x){ docTreeBuild(x); x.open = true; });
     });
   });
+  /* toggle does not bubble, so it is caught on the way down; once per panel. */
+  if (!el.getAttribute("data-tree")) {
+    el.setAttribute("data-tree", "1");
+    el.addEventListener("toggle", function(ev){
+      var t = ev.target;
+      if (t && t.matches && t.matches("ul.toc details[data-node]") && t.open) docTreeBuild(t);
+    }, true);
+    /* A block leaf scrolls to its row in the Blocks panel; the address is
+       left alone, since a changed hash re-reads the whole entry. */
+    el.addEventListener("click", function(ev){
+      var a = ev.target && ev.target.closest && ev.target.closest("a[data-blk]");
+      if (!a) return;
+      ev.preventDefault();
+      var r = document.getElementById(a.getAttribute("data-blk")); if (r) r.scrollIntoView({ block: "center" });
+    });
+  }
   /* Hrefs now, not on first hover: a keyboard reader tabs to these links. */
   if (d.links && window.faEditLinks) window.faEditLinks.fill(el);
   /* A section link from any tab opens the Sections tab at that section. Only
