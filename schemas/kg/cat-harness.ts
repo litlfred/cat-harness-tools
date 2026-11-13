@@ -403,6 +403,8 @@ export interface ContentDirectory extends GraphNodeDirectory {
    * `dependents` did the day it landed. See {@link SubgraphCoverageSchema}.
    */
   coverage?: SubgraphCoverage;
+  /** A `translation-sources` directory's catalogues, when not under `<path>/<locale>/` (e.g. `input/*\/translations/{locale}.po`). See the schema field. */
+  catalogues?: string;
   /** Built into the layer's own IG site at `/<instance>/` (bean `mftp`); see `igSite` on the shape below. */
   igSite?: boolean;
 
@@ -1914,6 +1916,22 @@ export type DirectoryStorage = z.infer<typeof DirectoryStorageSchema>;
 
 const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
   coverage: SubgraphCoverageSchema.optional(),
+  /**
+   * For a `translation-sources` directory: where the layer's `.po` catalogues
+   * are when they are NOT under `<this directory>/<locale>/`. A path relative
+   * to the layer root, with `{locale}` standing for the locale and `*` for any
+   * one path segment's name, e.g. `input/*\/translations/{locale}.po`.
+   *
+   * The case it exists for is a FHIR IG built on smart-base: smart-base's
+   * injector reads exactly one catalogue per locale per source directory,
+   * `input/<area>/translations/<locale>.po`, so those files cannot move into
+   * the harness layout without breaking the published translations. The
+   * declared directory still holds what the harness keeps per layer (its
+   * `glossary-sense.json`, any `<locale>/glossary/` schemes); the catalogues
+   * this pattern matches are read beside it, and the locales they name count
+   * as the layer's locales.
+   */
+  catalogues: z.string().min(1).optional(),
   /**
    * A named sub-graph that is OFF in every layer — including the one that
    * declares it — unless that layer enables it, by listing

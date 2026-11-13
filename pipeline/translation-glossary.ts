@@ -116,7 +116,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { directoryForGraph, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { directoryForGraph, readDeclaration, resolveDirectories } from "../schemas/kg/cat-harness.ts";
 import {
   GLOSSARY_SENSE_FILE,
   GLOSSARY_SENSE_SCHEMA,
@@ -729,6 +729,54 @@ function catalogues(dir: string): string[] {
     .flatMap((e) => (e.isDirectory() ? catalogues(join(dir, e.name)) : e.name.endsWith(".po") ? [join(dir, e.name)] : []));
 }
 
+/**
+ * The `catalogues` pattern the layer's `translation-sources` directory declares,
+ * or undefined (the catalogues are then only under `<translations>/<locale>/`).
+ */
+export function cataloguePatternOf(root: string): string | undefined {
+  try {
+    const dirs = resolveDirectories([{ name: "(local)", root, own: true }]).filter((d) =>
+      d.graphTypologies.includes("translation-sources"),
+    );
+    return dirs.length === 1 ? dirs[0]?.catalogues : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** One path segment of a `catalogues` pattern as a whole-name regex; `{locale}` is captured. */
+const segmentRe = (seg: string): RegExp =>
+  new RegExp(
+    `^${seg
+      .split(/(\{locale\}|\*)/)
+      .map((p) => (p === "{locale}" ? "(?<locale>[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]+)*)" : p === "*" ? "[^/]*" : p.replace(/[.+?^${}()|[\]\\]/g, "\\$&")))
+      .join("")}$`,
+  );
+
+/**
+ * The files under `root` that the `catalogues` pattern matches, each with the
+ * locale it names. With `locale` given, `{locale}` must be that locale.
+ */
+export function patternCatalogues(root: string, pattern: string, locale?: string): Array<{ file: string; locale: string }> {
+  const segs = pattern.replace(/^\.?\//, "").split("/").filter(Boolean);
+  const out: Array<{ file: string; locale: string }> = [];
+  const walk = (dir: string, i: number, found: string | undefined): void => {
+    if (!existsSync(dir)) return;
+    const re = segmentRe(locale === undefined ? segs[i]! : segs[i]!.replaceAll("{locale}", locale));
+    const last = i === segs.length - 1;
+    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const m = re.exec(e.name);
+      if (!m) continue;
+      const loc = m.groups?.locale ?? found;
+      if (last) {
+        if (e.isFile() && e.name.endsWith(".po")) out.push({ file: join(dir, e.name), locale: locale ?? loc ?? "" });
+      } else if (e.isDirectory()) walk(join(dir, e.name), i + 1, loc);
+    }
+  };
+  if (segs.length > 0) walk(root, 0, undefined);
+  return out.filter((c) => c.locale !== "");
+}
+
 /** Check one locale of the layer at `root`, whose catalogues are in `translations`. */
 export function checkLocale(
   root: string,
@@ -761,7 +809,11 @@ export function checkLocale(
   // A label that binds here in one area is not also a sense check from another.
   const binding = new Set(terms.filter((t) => t.inScope).map((t) => t.term.toLowerCase()));
   const exact = new Map<string, Map<string, string[]>>();
-  const files = catalogues(join(translations, locale));
+  const pattern = cataloguePatternOf(root);
+  const files = [
+    ...catalogues(join(translations, locale)),
+    ...(pattern === undefined ? [] : patternCatalogues(root, pattern, locale).map((c) => c.file)),
+  ];
   for (const po of files) {
     const rel = relative(root, po);
     for (const e of parsePoEntries(readFileSync(po, "utf-8"))) {
@@ -982,7 +1034,13 @@ function mainFor(root: string, argv: readonly string[]): number {
     console.error(`translation-glossary: ${root} declares no \`translation-sources\` directory — nothing can be determined (exit 2)`);
     return 2;
   }
-  const have = readdirSync(translations, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  const pattern = cataloguePatternOf(root);
+  const have = [
+    ...new Set([
+      ...readdirSync(translations, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name),
+      ...(pattern === undefined ? [] : patternCatalogues(root, pattern).map((c) => c.locale)),
+    ]),
+  ].sort();
   const asked = args(argv, "locale").flatMap((l) => l.split(",")).filter(Boolean);
   const unknown = asked.filter((l) => !have.includes(l));
   if (unknown.length > 0) {
