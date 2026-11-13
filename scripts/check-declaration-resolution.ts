@@ -203,8 +203,19 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     // An opt-in entry's `requires` is held to the same rule, and only an
     // opt-in entry may carry one (owner, 2026-11-13).
     const enable = decl.enableSubgraphs ?? [];
-    const requiring = (decl.directories ?? []).filter((d) => (d.requires?.length ?? 0) > 0);
-    examined.enableSubgraphs += enable.length + requiring.reduce((n, d) => n + d.requires!.length, 0);
+    // Top level AND from within: an opt-in group inside an opt-in level
+    // (an `L2/collab/` inside `L2/`) carries its `requires` in that level's
+    // graph.json, and `promoteFromWithin` keeps the raw field.
+    let all: ReturnType<typeof instanceDirectories>;
+    try {
+      all = instanceDirectories(inst, decl);
+    } catch {
+      all = (decl.directories ?? []) as ReturnType<typeof instanceDirectories>; // a nested file that will not read is check:harness-dirs' finding
+    }
+    const requiring = all.filter(
+      (d): d is typeof d & { requires: string[] } => Array.isArray((d as { requires?: unknown }).requires) && (d as { requires: unknown[] }).requires.length > 0,
+    ) as Array<{ id: string; optIn?: boolean; requires: string[] }>;
+    examined.enableSubgraphs += enable.length + requiring.reduce((n, d) => n + d.requires.length, 0);
     if (enable.length > 0 || requiring.length > 0) {
       try {
         const closure: DeclaredOptIns[] = [{ name, directories: instanceDirectories(inst, decl) }];
