@@ -43,6 +43,7 @@ import { dirname, join } from "node:path";
 // `src/` may import `scripts/` (so does `src/tools/beans-prime.ts`); the
 // reverse is what the layering forbids.
 import { graphReadPath } from "../../scripts/graph-read.ts";
+import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 
 import { z } from "zod";
 
@@ -181,6 +182,12 @@ export function unseen<T extends CommentLike>(comments: T[], state: SeenState | 
   });
 }
 
+const now = (): string => {
+  // input-site: traced #6203122b — stamps the seen-comments mark being written
+  inputSiteReached("seen-comments: clock");
+  return new Date().toISOString();
+};
+
 /** The mark to store after reading `comments`. Never moves backwards. */
 export function advance(
   issue: string,
@@ -196,7 +203,7 @@ export function advance(
     issue,
     lastCommentId: maxId,
     ...(newest ? { lastUpdatedAt: newest } : {}),
-    checkedAt: new Date().toISOString(),
+    checkedAt: now(),
     ...(note ? { note } : {}),
   };
 }
