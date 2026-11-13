@@ -153,16 +153,40 @@ function templateEnd(src: string, i: number): { end: number; text: string } {
       const from = j;
       j += 2;
       let depth = 1;
+      // The last significant character of the expression, so a `/` can be
+      // told apart: a regex where an operand may start, division elsewhere.
+      // Without it, `${x.replace(/^a\//, "")}` read `\//` as a line comment
+      // and swallowed the closing backtick, so every test after it vanished.
+      let prev = "{";
       while (j < src.length && depth > 0) {
         const e = src[j];
         if (e === "`") {
           j = templateEnd(src, j).end;
+          prev = "`";
           continue;
+        }
+        if (e === "/" && src[j + 1] !== "/" && src[j + 1] !== "*" && /[(,=:[!&|?{};+\-*%~^]/.test(prev)) {
+          let k = j + 1;
+          let inClass = false;
+          while (k < src.length && src[k] !== "\n") {
+            if (src[k] === "\\") { k += 2; continue; }
+            if (src[k] === "[") inClass = true;
+            else if (src[k] === "]") inClass = false;
+            else if (src[k] === "/" && !inClass) break;
+            k++;
+          }
+          if (k < src.length && src[k] === "/") {
+            j = k + 1;
+            while (j < src.length && /[a-z]/.test(src[j])) j++;
+            prev = "/";
+            continue;
+          }
         }
         if (e === '"' || e === "'") {
           let k = j + 1;
           while (k < src.length && src[k] !== e && src[k] !== "\n") k += src[k] === "\\" ? 2 : 1;
           j = k + 1;
+          prev = e;
           continue;
         }
         if (e === "/" && src[j + 1] === "/") {
@@ -177,6 +201,7 @@ function templateEnd(src: string, i: number): { end: number; text: string } {
         }
         if (e === "{") depth++;
         else if (e === "}") depth--;
+        if (!/\s/.test(e)) prev = e;
         j++;
       }
       text += src.slice(from, j);

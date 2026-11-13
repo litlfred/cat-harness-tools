@@ -48,6 +48,14 @@ Feature: Every test has a Gherkin
     When the JS adapter reads it
     Then both tests are found, each named through its scope
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_regex_literal_inside_a_template's_${}_hides_no_test,_even_ending_in_an_escaped_slash
+  Scenario: A regex literal inside a template's ${} hides no test
+    Given a test file whose first line holds a template whose ${…} holds a regex literal ending in an escaped slash
+    And a second line whose template divides inside ${…}
+    And then a describe() scope holding two tests
+    When the JS adapter reads it
+    Then both tests are found, each named through its scope
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_template_nested_in_a_template's_${}_does_not_close_it;_id[${key}]_is_a_fixed_name
   Scenario: A template nested in a template's ${} does not close it
     Given a test file whose first line nests a template literal inside another's ${…}
