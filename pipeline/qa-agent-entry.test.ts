@@ -57,8 +57,8 @@ function run(t: Repo, result: string, evidence?: string) {
 }
 
 describe("qa-agent-entry evidence guard", () => {
-  for (const result of ["fail", "warn"]) {
-    it(`${result} without --evidence is refused, and writes nothing`, () => {
+  describe.each(["fail", "warn"])("a %s verdict", (result) => {
+    it("without --evidence is refused, and writes nothing", () => {
       const t = repo();
       try {
         const r = run(t, result);
@@ -70,7 +70,7 @@ describe("qa-agent-entry evidence guard", () => {
       }
     }, SPAWN_BUDGET_MS);
 
-    it(`${result} with whitespace-only --evidence is refused`, () => {
+    it("with whitespace-only --evidence is refused", () => {
       const t = repo();
       try {
         const r = run(t, result, "   ");
@@ -81,7 +81,7 @@ describe("qa-agent-entry evidence guard", () => {
       }
     }, SPAWN_BUDGET_MS);
 
-    it(`${result} with evidence is accepted and recorded`, () => {
+    it("with evidence is accepted and recorded", () => {
       const t = repo();
       try {
         const r = run(t, result, "blk.md:1 claims 'exact' on a float64 agreement");
@@ -91,23 +91,21 @@ describe("qa-agent-entry evidence guard", () => {
         t.cleanup();
       }
     }, SPAWN_BUDGET_MS);
-  }
+  });
 
   // The other half of the rule: a verdict that found nothing has nothing to
   // evidence, so pass and n/a keep working bare.
-  for (const result of ["pass", "n/a"]) {
-    it(`${result} without --evidence still succeeds`, () => {
-      const t = repo();
-      try {
-        const r = run(t, result);
-        expect(r.code).toBe(0);
-        expect(r.entry.result).toBe(result);
-        expect(r.entry.evidence).toBeUndefined();
-      } finally {
-        t.cleanup();
-      }
-    }, SPAWN_BUDGET_MS);
-  }
+  it.each(["pass", "n/a"])("%s without --evidence still succeeds", (result) => {
+    const t = repo();
+    try {
+      const r = run(t, result);
+      expect(r.code).toBe(0);
+      expect(r.entry.result).toBe(result);
+      expect(r.entry.evidence).toBeUndefined();
+    } finally {
+      t.cleanup();
+    }
+  }, SPAWN_BUDGET_MS);
 });
 
 describe("qa-agent-entry field_hash", () => {

@@ -163,9 +163,7 @@ describe("pdfInfoTitleJunk — measured on this corpus", () => {
     ["WHO_PUB_TPS_93.1", ["WHO_PUB_TPS_93.1.pdf"], undefined],
     ["9789240010567-eng", [], "9789240010567-eng"],
   ];
-  for (const [t, files, slug] of junk) {
-    test(`refuses ${JSON.stringify(t)}`, () => expect(pdfInfoTitleJunk(t, files, slug)).not.toBeNull());
-  }
+  test.each(junk)("refuses %p", (t, files, slug) => expect(pdfInfoTitleJunk(t, files, slug)).not.toBeNull());
 
   const usable = [
     "Link Groups",
@@ -175,7 +173,5 @@ describe("pdfInfoTitleJunk — measured on this corpus", () => {
     "WHO SMART guidelines: optimising country-level use of guideline recommendations in the digital age",
     "MerLean: An Agentic Framework for Autoformalization in Quantum Computation",
   ];
-  for (const t of usable) {
-    test(`accepts ${JSON.stringify(t)}`, () => expect(pdfInfoTitleJunk(t, ["x.pdf"], "x")).toBeNull());
-  }
+  test.each(usable)("accepts %p", (t) => expect(pdfInfoTitleJunk(t, ["x.pdf"], "x")).toBeNull());
 });
