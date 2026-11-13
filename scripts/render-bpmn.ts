@@ -7,7 +7,8 @@
  *
  * Usage:  bun run cat-harness-tools/scripts/render-bpmn.ts [--check]
  *
- * `--check` renders to memory and fails if a committed SVG is stale.
+ * `--check` renders to memory and fails if a committed beside-source SVG is
+ * stale; the site copy is built at publish and is not judged.
  *
  * Never hand-edit `docs/assets/img/workflows/*.svg` — regenerate instead.
  *
@@ -337,7 +338,13 @@ for (const file of sources) {
     continue;
   }
 
-  await emit(join(OUT_DIR, `${basename(file, ".bpmn")}.svg`), linked);
+  // The site copy is built at publish (cat-harness.json `builtAtPublish`
+  // `docs/assets/img/workflows/`), never committed, so `--check` has no
+  // committed bytes to compare it with: judging it read every diagram as stale
+  // in any checkout that had not just run the writer, and kept this gate red on
+  // main. `--check` judges the committed beside-source copy only, which must be
+  // green on every PR (owner, 2026-11-13: "ALWAYS … including SVGs").
+  if (!check) await emit(join(OUT_DIR, `${basename(file, ".bpmn")}.svg`), linked);
 
   if (besideSource.has(file)) {
     // bootstrap-tools' OWN writer, not a copy of it. The two used to be

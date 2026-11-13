@@ -19,6 +19,13 @@ read as NEW FAILURE). A gate run-gates.py skipped
 base it reads as not run. Writes a Markdown summary to
 $GITHUB_STEP_SUMMARY when set.
 
+ALWAYS GREEN (owner, 2026-11-13: "the json(ld) that is the actual KG need to
+be a part of the merge to main commits. ALWAYS need json(ld) up to date -
+gate … including SVGs"): a gate whose script is in ALWAYS_GREEN fails the PR whenever it is
+red or undetermined on head, even when main is red too. The knowledge
+graph's JSON-LD is committed, and a merge to main never lands it stale.
+Not applicable (78) is still never counted.
+
 A gate the CI cone skipped (`unchanged: <sha>` beside `skipped`,
 cat-harness-tools#398, bean `4rbc`) was not run because every input that its
 green traced run on main `<sha>` read is unchanged. It is listed as
@@ -50,6 +57,20 @@ import os
 UNDETERMINED = {2: "could not determine", 78: "not applicable here"}
 import sys
 from collections import Counter
+
+# Scripts (the part of a gate name after `<instance>:`) that must be green on
+# every PR, whatever main exited: the committed knowledge graph (owner,
+# 2026-11-13). `gen:jsonld:check` regenerates every layer's block, library
+# and site JSON-LD and its context; a folio's publish `pre` gates name the
+# same writers per instance.
+# `render:bpmn:check` keeps the committed beside-source diagram SVGs current
+# ("including SVGs", same day).
+ALWAYS_GREEN = {"gen:jsonld:check", "check:kg-blocks", "check:library-kg", "jsonld:site:check", "render:bpmn:check"}
+
+
+def always_green(name):
+    """Is `name` (`<instance>:<script>`, or a bare script) an always-green gate?"""
+    return name in ALWAYS_GREEN or any(name.endswith(":" + s) for s in ALWAYS_GREEN)
 
 
 def new_diagnostics(base_entry, head_entry):
@@ -117,6 +138,13 @@ def main():
                 if b is None
                 else f"not applicable here; not counted (main exited {b})"
             )
+        elif always_green(name):
+            verdict = (
+                "RED — always-green: the knowledge graph's JSON-LD and the diagram SVGs must be current in every merge to main"
+                + ("" if b != 0 else " (main passed)")
+                + (f"; main exited {b}" if b not in (None, 0) else "")
+            )
+            new.append(name)
         elif b is None and h in UNDETERMINED:
             verdict = f"{UNDETERMINED[h]}; main did not run it, so not counted"
         elif h == 2 and b in (0, 1):
