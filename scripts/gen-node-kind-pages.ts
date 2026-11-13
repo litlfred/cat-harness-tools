@@ -265,7 +265,7 @@ export const kindDir = (locale: string, k: Pick<NodeKindEntry, "id" | "declaredB
  * Whether a kind gets pages: every kind a layer declares, versioned or not.
  * Until 2026-11-13 a kind declared without a version (cat-harness's
  * `work-plan` under `bean`, `qa-script`) got none, while the schemas page,
- * which links every declared kind, linked it: 7 dead links on who-iris's
+ * which links every declared kind, linked it: 7 dead links on one layer's
  * schemas page (owner, 2026-11-13: every node kind gets pages, no waivers).
  * Its dashboard lists the nodes of its subclasses; its title is its id.
  */
