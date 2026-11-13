@@ -117,6 +117,20 @@ describe("ig-pages: an IG's artefact pages are owed only where its index is buil
     expect(igIndexSubjects(at, [dirs[0]!])).toEqual([]);
     rmSync(at, { recursive: true, force: true });
   });
+
+  test("a MOUNTED layer's index written to the layer output root makes it a subject (bean `cat-tools-sm8r` item 4)", () => {
+    const at = mkdtempSync(join(tmpdir(), "site-coverage-ig-out-"));
+    writeFileSync(join(at, "index.lock.json"), JSON.stringify({ instances: [{ instance: "some-ig", path: "some-ig" }] }));
+    const pinned = join(at, "some-ig", "fhir-artifact-index");
+    mkdirSync(pinned, { recursive: true });
+    const dirs = [{ instance: "some-ig", absPath: pinned }];
+    expect(igIndexSubjects(at, dirs)).toEqual([]);
+    const out = join(at, "build", "layers", "some-ig", "fhir-artifact-index");
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, "index.json"), "{}");
+    expect(igIndexSubjects(at, dirs)).toEqual(["some-ig"]);
+    rmSync(at, { recursive: true, force: true });
+  });
 });
 
 describe("web-app-build: a layer that carries an app owes the apps page on its own scoped site (smart-trust onboarding game)", () => {

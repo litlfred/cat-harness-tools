@@ -61,6 +61,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync,
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "path";
 
 import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js";
+import { mountedInstances, readPathAt } from "./lib/layer-output.ts";
 import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, siteFileFor, visualisationsOf } from "../schemas/kg/cat-harness.js";
 import { declinesNavbar, type NavItem } from "./lib/harness-rail.js";
 import { injectRailOnce } from "./lib/rail-once.js";
@@ -1894,6 +1895,13 @@ export interface Served {
   dir: string;
   /** `<instance>/<path>`, no leading or trailing slash. */
   route: string;
+  /**
+   * The directory's twin under the layer output root, when the layer is
+   * mounted and a writer put files there (bean `cat-tools-sm8r` item 4): its
+   * files are published OVER `dir`'s, so a computed index, `package.tgz` or
+   * sidecar replaces the pinned one and the pinned rest still publishes.
+   */
+  computed?: string;
 }
 
 /**
@@ -1902,10 +1910,14 @@ export interface Served {
  * the data with a path that does not depend on where the site is hosted
  * (`visualizer-loading` §"How to fetch").
  */
-export function servedDirectories(entries: { name: string; entry: DeclaredEntry & { path: string }; abs: string }[] = declaredEntries()): Served[] {
-  return entries
-    .filter((x) => x.entry.served === true)
-    .map((x) => ({ name: x.name, dir: x.abs, route: instanceRoute(x.name, x.entry.path.replace(/^\/+|\/+$/g, "")) }));
+export function servedDirectories(entries: { name: string; entry: DeclaredEntry & { path: string }; abs: string }[] = declaredEntries(), repo = REPO): Served[] {
+  const served = entries.filter((x) => x.entry.served === true);
+  const mounted = served.length ? mountedInstances(repo) : new Map<string, string>();
+  return served.map((x) => {
+    const read = readPathAt(repo, x.abs, mounted);
+    const computed = read === x.abs ? undefined : read;
+    return { name: x.name, dir: x.abs, route: instanceRoute(x.name, x.entry.path.replace(/^\/+|\/+$/g, "")), ...(computed === undefined ? {} : { computed }) };
+  });
 }
 
 /** The directory's own declared viewer, repo-relative, or `undefined` (#1168 B7a-2b). */
@@ -2502,19 +2514,26 @@ async function main(): Promise<number> {
   const servedDone: { route: string; files: number }[] = [];
   for (const sv of servedDirectories()) {
     const dest = join(siteAbs, sv.route);
-    if (!existsSync(sv.dir)) {
+    // The pinned directory, then its twin under the layer output root laid
+    // over it (bean `cat-tools-sm8r` item 4): either may be absent, not both.
+    const sources = [sv.dir, ...(sv.computed === undefined ? [] : [sv.computed])].filter((d) => existsSync(d));
+    if (sources.length === 0) {
       servedProblems.push(`/${sv.route}/ is declared served, but ${sv.dir.slice(REPO.length + 1)} does not exist`);
       continue;
     }
-    const withheld = withheldPaths(sv.dir);
-    const src = realpathSync(sv.dir);
-    const filter = withheldFilter(src, withheld);
-    const clashes = servedClashes(src, dest, filter);
+    // Every clash is judged against the site BEFORE either copy, so the
+    // overlay's own overwrite of a pinned file is not reported as one.
+    const copies = sources.map((dir) => {
+      const src = realpathSync(dir);
+      const filter = withheldFilter(src, withheldPaths(dir));
+      return { src, filter, clashes: servedClashes(src, dest, filter) };
+    });
+    const clashes = [...new Set(copies.flatMap((c) => c.clashes))].sort();
     if (clashes.length) {
       servedProblems.push(`/${sv.route}/ is declared served, but the site already publishes ${clashes.length} of its file(s): ${clashes.slice(0, 5).join(", ")}${clashes.length > 5 ? ", …" : ""}`);
       continue;
     }
-    cpSync(src, dest, { recursive: true, filter });
+    for (const c of copies) cpSync(c.src, dest, { recursive: true, filter: c.filter });
     servedDone.push({ route: sv.route, files: countFiles(dest) });
   }
 
