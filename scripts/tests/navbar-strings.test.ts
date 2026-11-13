@@ -8,7 +8,7 @@ import { mkdtempSync, mkdirSync, readFileSync, existsSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { localiseRail, navbarStringsFile, railLocale } from "../lib/navbar-locale.ts";
+import { localiseRail, navbarStringsFile, railLocale, railRootPath } from "../lib/navbar-locale.ts";
 import {
   NAV_STRINGS_GLOBAL,
   RAIL_CHROME_STRINGS,
@@ -89,6 +89,15 @@ describe("which pages ask for a file", () => {
     expect(railLocale("en-GB")).toBeUndefined();
     expect(railLocale("")).toBeUndefined();
     expect(railLocale(null)).toBeUndefined();
+  });
+
+  it("builds the file's address only from a language tag and a relative root", () => {
+    expect(railLocale("pt-br")).toBe("pt-br");
+    expect(railLocale('ar"><script>')).toBeUndefined();
+    expect(railLocale("../../x")).toBeUndefined();
+    for (const ok of [".", "..", "../..", "../../", ""]) expect(railRootPath(ok)).toBeDefined();
+    expect(railRootPath("../..")).toBe("../..");
+    for (const bad of ["https://evil.example", "//evil.example", "/abs", "../x", "javascript:alert(1)"]) expect(railRootPath(bad)).toBeUndefined();
   });
 });
 

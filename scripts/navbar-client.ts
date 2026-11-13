@@ -12,7 +12,7 @@
  */
 import { RAIL_PAGE_ID, renderRailRegions, type RailPage } from "./lib/harness-rail.ts";
 import { wireNavFolds, wireNavResize } from "./lib/navbar.ts";
-import { localiseRail, navbarStringsFile, railLocale } from "./lib/navbar-locale.ts";
+import { localiseRail, navbarStringsFile, railLocale, railRootPath } from "./lib/navbar-locale.ts";
 
 declare const self: { FaRailData?: Record<string, string>; FaNavStrings?: Record<string, Record<string, string>> };
 
@@ -30,8 +30,13 @@ function localise(nav: Element, root: string): void {
     if (map) localiseRail(nav, map);
   };
   if (self.FaNavStrings?.[loc]) return apply();
+  // The script's address is built from page data, so both parts are held to
+  // what they can legitimately be: `railLocale` admits a language tag only, and
+  // the root a relative path of `.`/`..` segments (`railRootPath`).
+  const base = railRootPath(root);
+  if (base === undefined) return;
   const s = document.createElement("script");
-  s.src = `${root}/${navbarStringsFile(loc)}`;
+  s.src = `${base}/${navbarStringsFile(loc)}`;
   s.onload = apply;
   document.head.appendChild(s);
 }

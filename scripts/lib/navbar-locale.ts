@@ -23,7 +23,18 @@ export function navbarStringsFile(locale: string): string {
 export function railLocale(lang: string | null | undefined): string | undefined {
   const l = (lang ?? "").trim().toLowerCase();
   if (!l || l === "en" || l.startsWith("en-")) return undefined;
-  return l;
+  // A BCP 47 tag's shape and nothing else: it becomes part of a script's address.
+  return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/.test(l) ? l : undefined;
+}
+
+/**
+ * The rail's `data-fa-root` as a script base, or `undefined`: only a relative
+ * path of `.`/`..` segments (`.`, `..`, `../..`), which is all the rail writes.
+ * Anything else (a scheme, a host, an absolute path) loads nothing.
+ */
+export function railRootPath(root: string | null | undefined): string | undefined {
+  const r = (root ?? "").trim().replace(/\/+$/, "") || ".";
+  return /^\.\.?(?:\/\.\.)*$/.test(r) ? r : undefined;
 }
 
 /**
