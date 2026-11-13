@@ -4,6 +4,7 @@
  *
  * @module scripts/jsonld-site-check
  * @graphNode none — a gate over the composition, through `kg-export --judge`
+ * @covers computed — it renders every layer's whole graph, whichever kinds that layer declares
  *
  * Owner, 2026-11-13: "merge to main fails if json(ld) dont render to
  * gh-pages". The site publishes each layer's graph as `<base>/<stub>.jsonld`

@@ -35,7 +35,15 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
   // renderings".
   test.skipIf(NOT_BUILT)("every entry's @id IS the address of its published JSON-LD, and that file is published", () => {
     const index = LibraryIndexSchema.parse(JSON.parse(readFileSync(INDEX, "utf-8")));
-    for (const e of index.entries) {
+    // An item catalogued BY REFERENCE (`referencedCatalogueEntries`) holds no
+    // bytes here: no `<library>/<slug>/`, no manifest, no asset JSON-LD; it is
+    // a page only. Every HELD entry must still carry its asset.
+    const held = index.entries.filter((e) => e.provenance !== "catalogued");
+    expect(held.length).toBeGreaterThan(0);
+    for (const e of index.entries.filter((x) => x.provenance === "catalogued")) {
+      expect(existsSync(join(REPO, e.dir)), e.dir).toBe(false);
+    }
+    for (const e of held) {
       const m = JSON.parse(readFileSync(join(REPO, e.dir, "manifest.jsonld"), "utf-8")) as { "@id": string };
       expect(m["@id"], e.dir).toBe(libraryAssetIri(e.instance, e.id));
       const published = join(SITE, libraryAssetSitePath(e.instance, e.id));

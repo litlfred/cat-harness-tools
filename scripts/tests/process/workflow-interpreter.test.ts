@@ -34,22 +34,20 @@ describe("every shipped diagram is interpretable", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  for (const f of files) {
-    test(`${f} parses, and every flow connects two known nodes`, async () => {
-      const model = await loadProcessModel(join(HARNESS, f));
-      expect(model.id).toMatch(/^Process_/);
-      expect(model.startNodes.length).toBeGreaterThan(0);
-      for (const flow of model.flows.values()) {
-        expect(model.nodes.has(flow.from)).toBe(true);
-        expect(model.nodes.has(flow.to)).toBe(true);
-      }
-      // Every activity sits in a lane, i.e. some role owns it. An activity in
-      // no lane is a step nobody is accountable for.
-      for (const n of model.nodes.values()) {
-        if (n.kind === "activity") expect(n.lane).toBeDefined();
-      }
-    });
-  }
+  test.each(files)("%s parses, and every flow connects two known nodes", async (f) => {
+    const model = await loadProcessModel(join(HARNESS, f));
+    expect(model.id).toMatch(/^Process_/);
+    expect(model.startNodes.length).toBeGreaterThan(0);
+    for (const flow of model.flows.values()) {
+      expect(model.nodes.has(flow.from)).toBe(true);
+      expect(model.nodes.has(flow.to)).toBe(true);
+    }
+    // Every activity sits in a lane, i.e. some role owns it. An activity in
+    // no lane is a step nobody is accountable for.
+    for (const n of model.nodes.values()) {
+      if (n.kind === "activity") expect(n.lane).toBeDefined();
+    }
+  });
 });
 
 describe("a layer's shared global-tasks file is read, not interpreted", () => {
@@ -59,14 +57,12 @@ describe("a layer's shared global-tasks file is read, not interpreted", () => {
     .filter((f) => f.endsWith(".bpmn") && isGlobalTasksFile(readFileSync(f, "utf-8")))
     .map((p) => relative(HARNESS, p));
 
-  for (const f of shared) {
-    test(`${f} defines global tasks, each naming a skill`, async () => {
-      const defs = await loadGlobalTasks(join(HARNESS, f));
-      expect(defs.length).toBeGreaterThan(0);
-      for (const d of defs) expect(d.skills.length, d.id).toBeGreaterThan(0);
-      await expect(loadProcessModel(join(HARNESS, f))).rejects.toBeInstanceOf(UnsupportedBpmn);
-    });
-  }
+  test.each(shared)("%s defines global tasks, each naming a skill", async (f) => {
+    const defs = await loadGlobalTasks(join(HARNESS, f));
+    expect(defs.length).toBeGreaterThan(0);
+    for (const d of defs) expect(d.skills.length, d.id).toBeGreaterThan(0);
+    await expect(loadProcessModel(join(HARNESS, f))).rejects.toBeInstanceOf(UnsupportedBpmn);
+  });
 });
 
 describe("unsupported BPMN is refused, not skipped", () => {

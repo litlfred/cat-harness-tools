@@ -53,7 +53,7 @@ function repo(): string {
 
 const at = (host: string) => new URL(`http://${host}${BEANS_PROCESSED_PATH}`);
 
-describe(BEANS_PROCESSED_PATH, () => {
+describe("/api/work-plan/beans-processed", () => {
   test("another path is not this route's", () => {
     expect(handleWorkPlanGet(new URL("http://localhost/api/other"), repo(), {})).toBeNull();
   });

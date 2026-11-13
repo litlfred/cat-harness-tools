@@ -18,6 +18,7 @@ import {
   joinTestsToScenarios,
   parseFeature,
   scanTree,
+  unescapeJsString,
 } from "../lib/test-gherkin";
 import { auditTestGherkin } from "../test-plan-audit";
 import { TEST_PLAN_SCHEMA_ID, TEST_PLAN_SCHEMA_ID_V1 } from "../../schemas/sdlc/test-plan";
@@ -71,6 +72,36 @@ describe("language adapters", () => {
       "app/QrTest.kt::QrTest::reads_a_QR_code",
       "app/QrTest.kt::QrTest::Errors::rejects",
     ]);
+  });
+
+  test("kotlin: a quote inside a backtick name is part of the name, and the class scope survives it", () => {
+    const src = [
+      "class VectorsTest {",
+      "    @Test fun `the vector's kid is the DSC's`() { val c = '{' }",
+      "    @Test fun `the guide's DSC`() {}",
+      "    @Test fun plain() {}",
+      "}",
+    ].join("\n");
+    expect(names(KOTLIN_ADAPTER.findTests("app/VectorsTest.kt", src))).toEqual([
+      "app/VectorsTest.kt::VectorsTest::the_vector's_kid_is_the_DSC's",
+      "app/VectorsTest.kt::VectorsTest::the_guide's_DSC",
+      "app/VectorsTest.kt::VectorsTest::plain",
+    ]);
+  });
+
+  test("js: a file that declares @test-runner is read, and each call of its runner is a test", () => {
+    const root = mkdtempSync(join(tmpdir(), "test-gherkin-runner-"));
+    const suite = [
+      "// @test-runner run",
+      "export function runSuite(h) {",
+      "  const run = (name, body) => body();",
+      '  run("decodes the vector", () => true);',
+      "  for (const k of keys) run(`cross[${k}]`, () => true);",
+      "}",
+    ].join("\n");
+    writeFileSync(join(root, "suite.ts"), suite);
+    writeFileSync(join(root, "helper.ts"), 'const run = (n) => n;\nrun("not a test");\n');
+    expect(names(scanTree(root).tests)).toEqual(["suite.ts::decodes_the_vector", "suite.ts::cross[${k}]"]);
   });
 
   test("js: test() and it() are named through describe() titles, whitespace as _", () => {
@@ -378,5 +409,25 @@ describe("bindings beyond @test:, and Gherkin dialects", () => {
     // An unterminated or nested-looking comment never leaves a case readable.
     expect(withoutXmlComments('a<!-- <testcase id="x"/> --><!--<!-- -->b')).toBe("ab");
     expect(withoutXmlComments('a<!-- <testcase id="x"/>')).toBe("a");
+  });
+});
+
+describe("a JS title is named by its runtime string", () => {
+  test("escapes in a quoted or template title are read as the runner reads them; a looped id stays verbatim", () => {
+    const src = [
+      'describe("say \\"it\\" twice", () => {',
+      "  test('can\\'t fail', () => {});",
+      "  test(`a \\`tick\\``, () => {});",
+      '  test("regex \\\\bq\\\\b and \\u00e9 and \\x41", () => {});',
+      "  test(`case[${k}]`, () => {});",
+      "});",
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("t.test.ts", src))).toEqual([
+      "t.test.ts::say_\"it\"_twice::can't_fail",
+      "t.test.ts::say_\"it\"_twice::a_`tick`",
+      "t.test.ts::say_\"it\"_twice::regex_\\bq\\b_and_é_and_A",
+      "t.test.ts::say_\"it\"_twice::case[${k}]",
+    ]);
+    expect(unescapeJsString("a\\nb\\u{1F600}\\\nc\\q")).toBe("a\nb\u{1F600}cq");
   });
 });

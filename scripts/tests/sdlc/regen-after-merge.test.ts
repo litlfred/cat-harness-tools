@@ -493,17 +493,15 @@ describe("the default asks the WHOLE gate set — bean `i1q7`, item 3", () => {
 // goes red on it.
 describe("regen can repair what trains 2 and 3 could not — bean wczm", () => {
   const pairs = repairableGates(loadGates(REPO, {}), SCRIPTS);
-  for (const [check, writer] of [
+  test.each([
     ["check:l1-complete:check", "l1-complete:write"],
     // The second pair, `smart-base:smart-kg-l1:check` / `:all`, left with
     // smart-base at the SMART separation cutover (bean `hupw`): the gate now
     // belongs to litlfred/smart-base, which owns the content it checked.
-  ] as const) {
-    test(`${check} is a gate regen asks, and ${writer} is its writer`, () => {
-      expect(pairs.find((p) => p.check === check)).toEqual({ check, writer });
-      expect(SCRIPTS[writer]).toBeDefined();
-    });
-  }
+  ] as const)("%s is a gate regen asks, and %s is its writer", (check, writer) => {
+    expect(pairs.find((p) => p.check === check)).toEqual({ check, writer });
+    expect(SCRIPTS[writer]).toBeDefined();
+  });
 });
 
 describe("a NEW outcome cannot quietly become clean — bean `g5kt` x `i1q7`", () => {
@@ -530,13 +528,11 @@ describe("a NEW outcome cannot quietly become clean — bean `g5kt` x `i1q7`", (
     "no-browser": false,
   };
 
-  for (const [outcome, clean] of Object.entries(CLEAN) as [Outcome, boolean][]) {
-    test(`${outcome} ${clean ? "exits 0" : "does NOT exit 0"}`, () => {
-      const v = exitCodeFor({ results: [{ check: "x:check", writer: "x", outcome }], settled: true });
-      if (clean) expect(v.code).toBe(0);
-      else expect(v.code).not.toBe(0);
-    });
-  }
+  test.each((Object.entries(CLEAN) as [Outcome, boolean][]).map(([o, c]) => [o, c ? "exits 0" : "does NOT exit 0", c] as const))("%s %s", (outcome, _label, clean) => {
+    const v = exitCodeFor({ results: [{ check: "x:check", writer: "x", outcome }], settled: true });
+    if (clean) expect(v.code).toBe(0);
+    else expect(v.code).not.toBe(0);
+  });
 
   test("a run holding only clean outcomes is clean", () => {
     const results: Result[] = [

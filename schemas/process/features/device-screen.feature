@@ -45,3 +45,28 @@ Feature: A device screen is typed data with no free markup
   Scenario: The block union holds exactly the block types of the table
     Then the number of options in the screen block union equals the number of block types
     And the options' type literals, in order, are exactly the block types of the table
+
+  @test:schemas/process/device-screen.test.ts::device-screen:_a_screen_is_typed_data::states:_replace_blocks_by_id,_hide_them,_or_show_a_block_only_in_one_state
+  Scenario: States replace blocks by id, hide them, or show a block only in one state
+    Given the screen labelled "Valid card" with its blocks replaced by a statusBadge "verdict", an alert "locked" shown only in state "tampered", actions "go" and a personCard
+    And a "tampered" state that replaces "verdict" with a failed badge "Signature mismatch" and "go" with a qr of example "Bundle/bad"
+    When the screen is parsed and its states and blocks read
+    Then its states are "default" labelled "Valid card" and "tampered" labelled "Tampered card", each with its own try text
+    And the default blocks are statusBadge, actions and personCard
+    And the tampered blocks are statusBadge, alert, qr and personCard, the badge reading "Signature mismatch"
+    And the screen's examples are "Bundle/bad"
+    And a state hiding "go" leaves statusBadge, alert and personCard
+    And a screen with no states lists no states
+
+  @test:schemas/process/device-screen.test.ts::device-screen:_a_screen_is_typed_data::a_state_is_checked:_unique,_changes_something,_replaces_and_hides_only_blocks_that_exist
+  Scenario: A state is checked: unique, changes something, and replaces and hides only existing blocks
+    Given the screen with its blocks replaced by one note of id "a"
+    When states are declared that break one rule each
+    Then a state named "default" is refused as the screen's own name
+    And a state id given twice is refused as appearing twice
+    And a state that hides and replaces nothing is refused as changing nothing
+    And hiding block "z", or replacing block "z", is refused as there being no such block
+    And a replacement block without an id is refused as needing the id
+    And a block shown only in state "nope" is refused as there being no such state
+    And a stateLabel on a screen with no states is refused
+    And a state replacing block "a" is accepted

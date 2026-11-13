@@ -162,16 +162,12 @@ describe("a version is universal but GATE-enforced; an id is held (§3.2, owner 
 });
 
 describe("versions are exact — ranges cannot be expressed in FHIR `dependsOn` (§2 rule 2)", () => {
-  for (const ok of ["1.0.0", "0.0.1", "10.20.30", "1.2.3-rc.1", "1.2.3+build.5", "current", "dev"]) {
-    test(`accepts ${ok}`, () => {
-      expect(ExactVersionSchema.safeParse(ok).success).toBe(true);
-    });
-  }
-  for (const bad of ["^1.2.3", "~1.2.3", ">=1.0.0", "1.2.*", "1.x", "1.2", "1.0.0 || 2.0.0", "latest", ""]) {
-    test(`refuses ${JSON.stringify(bad)}`, () => {
-      expect(ExactVersionSchema.safeParse(bad).success).toBe(false);
-    });
-  }
+  test.each(["1.0.0", "0.0.1", "10.20.30", "1.2.3-rc.1", "1.2.3+build.5", "current", "dev"])("accepts %s", (ok) => {
+    expect(ExactVersionSchema.safeParse(ok).success).toBe(true);
+  });
+  test.each(["^1.2.3", "~1.2.3", ">=1.0.0", "1.2.*", "1.x", "1.2", "1.0.0 || 2.0.0", "latest", ""])("refuses %p", (bad) => {
+    expect(ExactVersionSchema.safeParse(bad).success).toBe(false);
+  });
 });
 
 /**

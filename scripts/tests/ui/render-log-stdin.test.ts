@@ -67,19 +67,17 @@ describe("the prose flags are REFUSED, not ignored", () => {
   // The whole value of the refusal: a caller left behind by the migration must be
   // told. Ignoring the flag would write an entry saying something was published
   // and not WHAT, which is the ambiguity this log exists to prevent.
-  for (const flag of ["--summary", "--reason", "--detail"]) {
-    test(`${flag} in argv exits 2 and names itself`, () => {
-      const dir = tmp();
-      try {
-        const r = run(["--dir", dir, ...BASE, flag, "some prose"], '{"summary":"s"}');
-        expect(r.code).toBe(2);
-        expect(r.stderr).toContain(flag);
-        expect(r.stderr).toContain("no longer travel in argv");
-      } finally {
-        rmSync(dir, { recursive: true, force: true });
-      }
-    });
-  }
+  test.each(["--summary", "--reason", "--detail"])("%s in argv exits 2 and names itself", (flag) => {
+    const dir = tmp();
+    try {
+      const r = run(["--dir", dir, ...BASE, flag, "some prose"], '{"summary":"s"}');
+      expect(r.code).toBe(2);
+      expect(r.stderr).toContain(flag);
+      expect(r.stderr).toContain("no longer travel in argv");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
   test("all three are named together rather than one at a time", () => {
     // A caller with three stale flags should learn that in one run, not three.
@@ -115,21 +113,19 @@ describe("stdin that is not usable prose is exit 2, never a silent write", () =>
     ["a missing summary", '{"reason":"r"}', /`summary` is required/i],
     ["an empty summary", '{"summary":"   "}', /`summary` is required/i],
   ];
-  for (const [name, body, expected] of cases) {
-    test(name, () => {
-      const dir = tmp();
-      try {
-        const r = run(["--dir", dir, ...BASE], body);
-        expect(r.code).toBe(2);
-        expect(r.stderr).toMatch(expected);
-        // The third-state rule: could-not-read is never a clean write.
-        expect(r.stderr).toContain("Nothing was written");
-        expect(readdirSync(dir)).toEqual([]);
-      } finally {
-        rmSync(dir, { recursive: true, force: true });
-      }
-    });
-  }
+  test.each(cases)("%s is refused, and nothing is written", (_name, body, expected) => {
+    const dir = tmp();
+    try {
+      const r = run(["--dir", dir, ...BASE], body);
+      expect(r.code).toBe(2);
+      expect(r.stderr).toMatch(expected);
+      // The third-state rule: could-not-read is never a clean write.
+      expect(r.stderr).toContain("Nothing was written");
+      expect(readdirSync(dir)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("prose survives stdin verbatim", () => {

@@ -125,3 +125,10 @@ Feature: The local gate set is derived from the real workflows and accounts for 
     When those whose script declares itself a writer are taken
     Then each is among the writer steps
     And none is among the gates
+
+  @test:test/coordinator/gates-workflows.test.ts::the_gates_come_from_the_workflow,_not_from_a_list::the_shared_Chromium_installer_counts_as_installing_a_browser
+  Scenario: The shared Chromium installer counts as installing a browser
+    Given a job with a single run step
+    Then "npx playwright install --with-deps chromium" counts as installing a browser
+    And running the shared "playwright-chromium/install.sh" script counts as installing a browser
+    And "bun run cat gates" does not

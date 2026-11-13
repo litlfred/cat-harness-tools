@@ -127,7 +127,7 @@ describe("the committed tree carries no orphan", () => {
     expect(HANDLER).toBeTruthy();
   });
 
-  for (const kind of ["schemas", "library"]) {
+  describe.each(["schemas", "library"])("%s", (kind) => {
     // Standing alone the viewer's subject pages are not built: its generator
     // writes them at publish and they are gitignored (bean w1gy F18). An
     // undeclared route guards nothing, so the assertion below still names it.
@@ -135,7 +135,7 @@ describe("the committed tree carries no orphan", () => {
     const unbuilt =
       route !== undefined &&
       siteNotBuilt(`the ${kind} viewer's subject pages its generator writes at publish (gitignored)`, join(SITE, route));
-    it.skipIf(unbuilt)(`${kind} subject pages all declare themselves`, () => {
+    it.skipIf(unbuilt)("subject pages all declare themselves", () => {
       const route = declaredPageRoute(INSTANCE, VIEWER_OF[kind]!);
       expect(route, `${kind}: no declared viewer route`).toBeDefined();
       const dir = join(SITE, route!);
@@ -151,5 +151,5 @@ describe("the committed tree carries no orphan", () => {
         else expect(html).toContain(`var SCOPE = "${s}";`);
       }
     });
-  }
+  });
 });

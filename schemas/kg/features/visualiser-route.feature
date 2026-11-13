@@ -66,3 +66,11 @@ Feature: A visualiser's route is <locale>/<harness>/<visualiser>[/<sub-graph>[/<
     Given claims of "h/v/" by a and "h/vv/" by b
     When the collisions are computed
     Then there are none
+
+  @test:schemas/kg/visualiser-route.test.ts::visualiserRoute::a_sub-graph_id_with_capitals_routes_lower-cased_(smart-base's_layer_subgraphs)
+  Scenario: A sub-graph id with capitals routes lower-cased, and any other bad segment is still refused
+    When the sub-graph "smart-base-L4-skills" is made a segment
+    Then it is "smart-base-l4-skills"
+    And the smart-base skills route for it is "smart-base/skills/smart-base-l4-skills/"
+    And the sub-graph "index/L2-bpmn" routes as "h/v/index/l2-bpmn/"
+    And the sub-graph "L4 skills" throws "not a URL segment"

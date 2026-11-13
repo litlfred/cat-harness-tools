@@ -247,25 +247,23 @@ describe("what a translated page must also say", () => {
     },
   ];
 
-  for (const c of cases) {
-    it(`reports ${c.name}`, () => {
-      const { root, dispose } = instance({
-        [`${SITE_DIR}/index.md`]: SOURCE_PAGE,
-        [`${SITE_DIR}/fr/index.md`]: c.page,
-      });
-      try {
-        const { index, findings } = buildTranslationIndex(root);
-        const errors = findings.filter((f) => f.severity === "error");
-        expect(errors.map((f) => f.where)).toEqual([`${SITE_DIR}/fr/index.md`]);
-        expect(errors[0].message).toContain(c.expect);
-        // A page that fails a rule is never half-indexed: a nav item pointing
-        // at a page whose declaration is wrong is worse than no nav item.
-        expect(index.pages[""]?.translations.fr).toBeUndefined();
-      } finally {
-        dispose();
-      }
+  it.each(cases.map((c) => [c.name, c] as const))("reports %s", (_name, c) => {
+    const { root, dispose } = instance({
+      [`${SITE_DIR}/index.md`]: SOURCE_PAGE,
+      [`${SITE_DIR}/fr/index.md`]: c.page,
     });
-  }
+    try {
+      const { index, findings } = buildTranslationIndex(root);
+      const errors = findings.filter((f) => f.severity === "error");
+      expect(errors.map((f) => f.where)).toEqual([`${SITE_DIR}/fr/index.md`]);
+      expect(errors[0].message).toContain(c.expect);
+      // A page that fails a rule is never half-indexed: a nav item pointing
+      // at a page whose declaration is wrong is worse than no nav item.
+      expect(index.pages[""]?.translations.fr).toBeUndefined();
+    } finally {
+      dispose();
+    }
+  });
 
   it("reports a translation whose source is itself a translation", () => {
     const { root, dispose } = instance({
@@ -407,9 +405,7 @@ describe("URL normalisation matches navKey in docs-ui.js", () => {
     ["/x.html?lang=fr", "x"],
     ["/x.html#anchor", "x"],
   ];
-  for (const [url, key] of cases) {
-    it(`${url} -> "${key}"`, () => expect(pageKey(url)).toBe(key));
-  }
+  it.each(cases)('%s -> "%s"', (url, key) => expect(pageKey(url)).toBe(key));
 
   it("a declared `permalink` wins over the composed path", () => {
     // `docs/index.md` declares `permalink: /`. Composing `/index.html` for it
