@@ -110,6 +110,49 @@ Feature: Lock coherence and freshness
     When coherence and freshness are judged by default
     Then the exit code is 1
 
+  @test:scripts/tests/lock-coherence.test.ts::fresh_at_re-pin_time_(owner,_2026-11-13,_card_"Lock_gate")::a_pin_behind_main_is_fresh_when_every_commit_main_gained_after_it_is_newer_than_T
+  Scenario: A pin behind main is fresh at re-pin time when everything main gained since is newer than T
+    Given harness pinned at "a", main at "b", and the lock written at T
+    And main's only commit after the pin is dated after T
+    When freshness is judged at re-pin time
+    Then the pin is fresh at re-pin time, naming its ref and main
+    And the exit code is 0
+    And the report says main moved after the lock was written, and the pin was fresh at re-pin time
+
+  @test:scripts/tests/lock-coherence.test.ts::fresh_at_re-pin_time_(owner,_2026-11-13,_card_"Lock_gate")::a_pin_behind_main_is_stale_when_main_already_had_a_commit_dated_at_or_before_T
+  Scenario: A pin behind main is stale when main already had a commit dated at or before T
+    Given harness pinned at "a", main at "b", and the lock written at T
+    And main's commit after the pin is dated exactly T
+    When freshness is judged at re-pin time
+    Then the pin is stale, behind, naming the commit main already had at T
+    And the exit code is 1
+    And the report says the lock was written behind main
+
+  @test:scripts/tests/lock-coherence.test.ts::fresh_at_re-pin_time_(owner,_2026-11-13,_card_"Lock_gate")::a_diverged_pin_is_stale_whatever_the_dates
+  Scenario: A diverged pin is stale at re-pin time whatever the dates
+    Given a pin on a side branch that main does not contain
+    And main's commits after it are all dated after T
+    When freshness is judged at re-pin time
+    Then the pin is stale, diverged, and the exit code is 1
+
+  @test:scripts/tests/lock-coherence.test.ts::fresh_at_re-pin_time_(owner,_2026-11-13,_card_"Lock_gate")::a_T_that_cannot_be_found_is_undetermined_(exit_2),_never_fresh
+  Scenario: A T that cannot be found is undetermined, never fresh
+    Given a pin behind main and no time the lock was written ("not a git repository")
+    When freshness is judged at re-pin time
+    Then no pin is fresh, one is undetermined, and the exit code is 2
+
+  @test:scripts/tests/lock-coherence.test.ts::fresh_at_re-pin_time_(owner,_2026-11-13,_card_"Lock_gate")::main's_history_after_the_pin_that_cannot_be_read_is_undetermined_(exit_2)
+  Scenario: Main's history after the pin that cannot be read is undetermined
+    Given a pin behind main, the lock written at T, and main's history unreadable ("offline")
+    When freshness is judged at re-pin time
+    Then one pin is undetermined and the exit code is 2
+
+  @test:scripts/tests/lock-coherence.test.ts::fresh_at_re-pin_time_(owner,_2026-11-13,_card_"Lock_gate")::at_run_time_(--at-run-time)_the_same_pin_is_stale:_the_old_rule
+  Scenario: At run time the same pin behind main is stale, as under the old rule
+    Given a pin behind main
+    When freshness is judged at run time, with no re-pin time
+    Then the pin is stale, no write time is recorded, and the exit code is 1
+
   @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::matched:_tools_pinned_where_core's_lock_pins_it_passes
   Scenario: Over real repositories, tools pinned where core's lock pins it passes
     Given local tools and core repositories, core's lock pinning tools at t2
@@ -132,6 +175,24 @@ Feature: Lock coherence and freshness
     Given a reader whose repository URL does not exist
     When freshness is judged
     Then one pin is undetermined and the exit code is 2
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::at_re-pin_time:_T_from_the_lock's_own_repository,_against_main's_dated_first-parent_chain
+  Scenario: Over real repositories, T is read from the lock's own repository and judged against main's dated chain
+    Given a repository with commits p1 at 10:00, p2 at 10:10 and p3 at 10:20 on main
+    And a layer whose lock pinning p2 is committed at 10:15, followed by an unrelated commit at 10:30
+    Then T is 10:15, at the commit that wrote the lock
+    When freshness is judged at re-pin time
+    Then p2 is fresh at re-pin time, main p3 being the first commit after it, at 10:20
+    And p1 is stale, behind, since main already had p2 at T
+    And at run time p2 is stale
+    When the lock is rewritten and not committed
+    Then T is now, at "uncommitted"
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::T_of_a_lock_outside_any_git_repository_is_unknown
+  Scenario: The write time of a lock outside any git repository is unknown
+    Given a lock in a directory that is not in a git repository
+    When the time it was written is read
+    Then it is unknown, because the lock is not in a git repository
 
   @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_pin_that_cannot_be_fetched_is_undetermined
   Scenario: Over real repositories, a pin that cannot be fetched is undetermined
