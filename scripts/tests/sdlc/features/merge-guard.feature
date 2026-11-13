@@ -634,3 +634,11 @@ Feature: Merge guard
     When check 5 is read with --full-tier and no --release
     Then it has the same status as the release judgement, and is not advisory
     And a passing workflow-run judgement with no full-tier judge refuses as not-ready
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::a_skipped_judge,_or_one_whose_name_was_never_rendered,_judged_nothing:_not-ready,_never_a_defect
+  Scenario: Under --full-tier a skipped or unrendered judge judged nothing
+    Given PR #1960 whose only "No new failures" check runs are a skipped one and a skipped one whose name is still a template
+    When check 5 is read with --full-tier
+    Then it refuses as not-ready, saying the full tier has not run
+    When a green "No new failures (tests and gates)" run is added beside the unrendered one
+    Then it passes

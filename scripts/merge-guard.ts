@@ -988,8 +988,19 @@ const ADVISORY_RULING = 'owner, card Q-CIB-4 A, 2026-11-08: "CI not gate on non-
 export const FULL_TIER_JUDGE = /no new failures/i;
 
 /**
+ * A check run that judged nothing: `skipped` (the fast tier skips the full
+ * tier's judge), or a job whose name GitHub never rendered (`${{ … }}` still
+ * in it — the skipped judge of a run whose tier was decided in the same job,
+ * whose template text names both tiers). Neither is a full-tier verdict.
+ */
+function judgedNothing(c: GhCheckRun): boolean {
+  return c.conclusion === "skipped" || c.name.includes("${{");
+}
+
+/**
  * `--full-tier`: did the full tier run on the head and pass? The latest run of
- * each full-tier judge (by name) must have concluded `success`. None at all is
+ * each full-tier judge (by name) must have concluded `success`; a skipped or
+ * unrendered one judged nothing and is not counted. None at all is
  * not-ready (only the fast tier ran: label the PR `ready-to-merge` or
  * `release`, which runs the full tier); one in progress is not-ready; one red
  * is a defect.
@@ -998,7 +1009,7 @@ export function fullTierCheck(s: GuardSnapshot): CheckResult {
   if (s.checkRuns === undefined) return R(5, "ci", "unknown", "the head's check runs were not fetched, so the full tier cannot be judged");
   if (!Array.isArray(s.checkRuns)) return R(5, "ci", "unknown", `could not read the head's check runs: ${s.checkRuns.unknown}`);
   const latest = new Map<string, GhCheckRun>();
-  for (const c of s.checkRuns.filter((x) => FULL_TIER_JUDGE.test(x.name))) {
+  for (const c of s.checkRuns.filter((x) => FULL_TIER_JUDGE.test(x.name) && !judgedNothing(x))) {
     const had = latest.get(c.name);
     const order = (x: GhCheckRun) => Date.parse(x.started_at ?? "") || x.id || 0;
     if (!had || order(c) >= order(had)) latest.set(c.name, c);

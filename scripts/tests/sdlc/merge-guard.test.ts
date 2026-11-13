@@ -1100,6 +1100,17 @@ describe("check 5 under --full-tier — the full tier must be green on the head"
     expect(ci(s).status).toBe("pass");
   });
 
+  test("a skipped judge, or one whose name was never rendered, judged nothing: not-ready, never a defect", () => {
+    const s = real(1960);
+    const unrendered = "${{ needs.prepare-head.outputs.full != 'true' && 'Fast tier only (advisory; the full checks gate a release)' || 'No new failures (tests and gates)' }}";
+    s.checkRuns = [cr(unrendered, "completed", "skipped"), cr(JUDGE, "completed", "skipped")];
+    const c = ci(s);
+    expect(c).toMatchObject({ status: "refuse", kind: "not-ready" });
+    expect(c.detail).toContain("the full tier has not run on the head");
+    s.checkRuns = [cr(unrendered, "completed", "skipped"), cr(JUDGE, "completed", "success")];
+    expect(ci(s).status).toBe("pass");
+  });
+
   test("check runs not fetched or not readable are unknown, never a pass", () => {
     const s = real(1960);
     expect(ci(s).status).toBe("unknown");
