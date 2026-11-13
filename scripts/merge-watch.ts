@@ -125,7 +125,21 @@ const FAST_TIER = /fast tier only/i;
 /** `shard 2/4`, or a matrix name such as `bun test (head, 2/4)`. */
 const SHARD = /(?:shard |, )(\d+)\/(\d+)\b/i;
 
-/** The checks that count: every run except a cancelled one a later run of the same workflow job supersedes. */
+/**
+ * A job name GitHub never rendered: its `name:` expression is still the
+ * template (`bun test (head, ${{ matrix.shard }}/4)`, or a bare
+ * `needs.tier.outputs.full != 'true' && … || …`). A run cancelled before its
+ * matrix expanded leaves these behind, and no later job can carry the same
+ * name.
+ */
+export const UNRENDERED = /\$\{\{|(?:^|[\s(/])(?:needs|github|inputs|matrix|steps|env|vars)\.[\w-]+(?:\.[\w-]+)*\s*(?:==|!=|&&|\|\|)/;
+
+/**
+ * The checks that count: every run except a cancelled one a later run of the
+ * same workflow supersedes. A later run supersedes a cancelled job when it
+ * has a job of the same name, when it is still running (it blocks as pending
+ * instead), or when the cancelled job's name was never rendered.
+ */
 export function effectiveChecks(checks: readonly CheckRun[], runs: readonly WorkflowRun[]): CheckRun[] {
   const bySuite = new Map(runs.map((r) => [r.check_suite_id, r]));
   const place = (c: CheckRun): { group: string; order: number } => {
@@ -137,11 +151,16 @@ export function effectiveChecks(checks: readonly CheckRun[], runs: readonly Work
   return checks.filter((c) => {
     if (c.status !== "completed" || c.conclusion !== "cancelled") return true;
     const me = place(c);
-    return !checks.some((o) => {
+    const sameName = checks.some((o) => {
       if (o === c || o.name !== c.name) return false;
       const p = place(o);
       return p.group === me.group && p.order > me.order;
     });
+    if (sameName) return false;
+    const laterRuns = runs.filter((r) => `wf:${r.workflow_id}` === me.group && r.id > me.order);
+    if (laterRuns.some(busy)) return false;
+    if (UNRENDERED.test(c.name) && laterRuns.length > 0) return false;
+    return true;
   });
 }
 
