@@ -267,6 +267,26 @@ describe("the gate fires on a workbook with no record", () => {
   test("a PDF entry is MET and SAYS SO — a determined zero", () => {
     expect(tabState(entryFor("application/pdf"))?.detail).toBe("not tabular (application/pdf)");
   });
+
+  test("a PDF with tables transcribed from its pages is MET, and still NOT a dataset", () => {
+    // who-iris#224: a paged entry's printed tables as CSVW under `tables/`.
+    // The entry is a PDF that holds tables; counting it as tabular would put
+    // every such report beside CODATA in the corpus test below.
+    const dir = entryFor("application/pdf");
+    writeFileSync(
+      join(dir, "tabular.csvw.json"),
+      JSON.stringify({
+        $schema: "folio-tabular-csvw/v1",
+        doc_id: "doc",
+        tables: [],
+        source: { file: "doc.pdf", note: "tables transcribed from the PDF pages" },
+        narrative: { text: null, state: "not-authored" },
+      }),
+    );
+    const r = tabState(dir);
+    expect(r?.state).toBe("met");
+    expect(r?.detail).toBe("not tabular (application/pdf); 0 table(s) transcribed from its pages as CSVW");
+  });
 });
 
 describe("the real corpus", () => {

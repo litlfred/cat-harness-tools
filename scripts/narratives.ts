@@ -199,6 +199,19 @@ export function slotsIn(doc: Record<string, unknown>): SlotAt[] {
       if ("narrative" in r) out.push({ at: ["errata", i, "narrative"], value: r.narrative, subject });
     });
   }
+
+  // Transcribed tables (`tabular.csvw.json`, who-iris#224): one narrative per
+  // table at `tables[i]["fac:narrative"]`, beside the file's own top-level
+  // `narrative`. The subject is the table's label, else its CSV.
+  const tables = doc.tables;
+  if (Array.isArray(tables)) {
+    tables.forEach((rec, i) => {
+      if (typeof rec !== "object" || rec === null) return;
+      const r = rec as Record<string, unknown>;
+      const subject = typeof r["fac:label"] === "string" ? r["fac:label"] : typeof r.url === "string" ? r.url : undefined;
+      if ("fac:narrative" in r) out.push({ at: ["tables", i, "fac:narrative"], value: r["fac:narrative"], subject });
+    });
+  }
   return out;
 }
 

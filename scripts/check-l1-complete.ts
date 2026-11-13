@@ -997,11 +997,21 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
               }
             : !r.data.source
               ? { name: "tabular-records", state: "unmet", detail: `${TABULAR_CSVW_FILENAME} carries no source block — re-run the tabular rung` }
-              : {
-                  name: "tabular-records",
-                  state: "met",
-                  detail: `${r.data.tables.length} table(s) as CSVW, narrative ${r.data.narrative ? slotStates(r.data.narrative) : "absent"}`,
-                },
+              : entryKind(has) === "paged"
+                // A PDF whose printed tables were transcribed into `tables/`
+                // (who-iris#224) is a PAGED source that holds tables, not a
+                // dataset: `structure.json` comes first in KIND_SIDECAR, and
+                // its own sniffed mimetype says what it is.
+                ? {
+                    name: "tabular-records",
+                    state: "met",
+                    detail: `not tabular (${typeof mime === "string" && mime ? mime : "no sniffed mimetype"}); ${r.data.tables.length} table(s) transcribed from its pages as CSVW`,
+                  }
+                : {
+                    name: "tabular-records",
+                    state: "met",
+                    detail: `${r.data.tables.length} table(s) as CSVW, narrative ${r.data.narrative ? slotStates(r.data.narrative) : "absent"}`,
+                  },
         );
       }
     } else if (!has("tabular.jsonld")) {
