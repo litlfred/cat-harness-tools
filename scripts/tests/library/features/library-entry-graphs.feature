@@ -35,8 +35,9 @@ Feature: A library entry's declared sub-graphs
     When the graph files of entry e2 are listed
     Then the list is empty
 
-  @test:scripts/tests/library/library-entry-graphs.test.ts::entryGraphSitePath::beside_the_entry's_manifest,_keeping_the_path_inside_the_entry
-  Scenario: A graph file's site path keeps its path inside the entry
+  @test:scripts/tests/library/library-entry-graphs.test.ts::entryGraphSitePath::under_the_entry_IRI,_keeping_the_path_inside_the_entry
+  Scenario: A graph file's site path sits under the entry IRI, keeping its path inside the entry
     Given instance "some-instance", entry "an-entry" and the file l1-extraction/recommendations.l1.json
     When its site path is computed
-    Then it is assets/library/jsonld/some-instance/an-entry/l1-extraction/recommendations.l1.json
+    Then it is assets/library/jsonld/some-instance/source/an-entry/l1-extraction/recommendations.l1.json
+

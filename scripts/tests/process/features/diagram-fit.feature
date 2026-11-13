@@ -193,3 +193,16 @@ Feature: A BPMN diagram's layout is checked for fit and tangles, and the fixable
     Given a pooled event whose label crosses the pool's right edge
     When the fit is checked
     Then label-on-lane-line includes "E/Pool"
+
+  @test:scripts/tests/process/diagram-fit.test.ts::a_flow_in_and_a_flow_out_never_share_a_point_(owner,_2026-11-08)::an_outgoing_flow_that_leaves_where_another_arrives_is_reported
+  Scenario: An outgoing flow that leaves where another flow arrives is reported
+    Given tasks A, B and C left to right, with F1 from A to B, F2 from B to C, and a loop-back F3 from C entering B at the point F2 leaves it
+    When the diagram is checked for shared ports
+    Then the one shared port is F3 with F2 on B
+    And the "edge-shared-port" finding is "F3+F2/B"
+
+  @test:scripts/tests/process/diagram-fit.test.ts::a_flow_in_and_a_flow_out_never_share_a_point_(owner,_2026-11-08)::the_same_loop_entering_another_side_is_clean,_and_two_arrivals_on_one_point_are_a_join
+  Scenario: A loop entering another side is clean, and two arrivals on one point are a join
+    Given the same tasks, with the loop-back F3 entering B from below, and F4 from A arriving at C on the same point as F2
+    When the diagram is checked for shared ports
+    Then no shared port is reported

@@ -159,3 +159,30 @@ Feature: Library pages link their sources
     Given a page-granular structure of three sections with no source.pages
     When its document view is read
     Then its pages is null and it covers 3 pages
+
+  @test:scripts/tests/library/library-source-links.test.ts::an_entry_page_links_its_catalogue_record_at_the_top::the_Dublin_Core_record_on_the_repository_host,_and_the_Handle_at_its_resolver
+  Scenario: The Dublin Core record links on the repository host, and the Handle at its resolver
+    Given a repository "o/host" holding the record "catalogue/records/e1.dc.json"
+    When the catalogue record links are made for that record and Handle "10665/332098"
+    Then they are the record's GitHub blob URL on main, then "https://hdl.handle.net/10665/332098"
+    And the first link's label mentions "Dublin Core"
+
+  @test:scripts/tests/library/library-source-links.test.ts::an_entry_page_links_its_catalogue_record_at_the_top::the_Dublin_Core_link_is_the_published_XML_when_there_is_one,_and_the_KG_node_is_linked
+  Scenario: The Dublin Core link is the published XML when there is one, and the KG node is linked
+    Given the same repository, also holding the node "catalogue/nodes/item-e1.json"
+    When the catalogue record links are made with a published XML href
+    Then they are the XML href, the node's GitHub blob URL, then the Handle resolver URL
+    And the first link is labelled "Dublin Core XML — e1.dc.xml"
+
+  @test:scripts/tests/library/library-source-links.test.ts::an_entry_page_links_its_catalogue_record_at_the_top::nothing_recorded,_nothing_linked;_a_malformed_Handle_is_not_linked
+  Scenario: Nothing recorded links nothing, and a malformed Handle is not linked
+    When the catalogue record links are made with no catalogue, or with the Handle "javascript:x"
+    Then there are no links
+    And the record HTML of no links is empty
+
+  @test:scripts/tests/library/library-source-links.test.ts::an_entry_page_links_its_catalogue_record_at_the_top::the_record_line_sits_under_the_head,_above_the_view_panel_and_the_listing
+  Scenario: The record line sits under the head, above the view panel and the listing
+    Given a not-held entry page with a catalogue record link
+    When the entry page HTML is written
+    Then the "lib-record" element comes after "lib-title" and before "lib-view" and "listing"
+    And an entry page with no record has no "lib-record" element
