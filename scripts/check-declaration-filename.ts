@@ -370,6 +370,10 @@ function scanMarkdown(root: string): MarkdownRef[] {
       const rel = relative(root, abs).split("\\").join("/");
       const lines = readFileSync(abs, "utf8").split("\n");
       for (const [i, line] of lines.entries()) {
+        // Only a line naming the retired file is classified, so only that
+        // line's paragraph is built: building one per line was quadratic in
+        // a long block, 12 of the scan's 13.5 s (core main, 2026-11-13).
+        if (!line.includes(RETIRED_DECLARATION)) continue;
         const klass = classifyMarkdownLine(rel, line, records, paragraphAt(lines, i), generated);
         if (klass) out.push({ file: rel, line: i + 1, text: line.trim(), klass });
       }
@@ -388,6 +392,10 @@ function scanMarkdown(root: string): MarkdownRef[] {
       const rel = relative(root, abs).split("\\").join("/");
       const lines = readFileSync(abs, "utf8").split("\n");
       for (const [i, line] of lines.entries()) {
+        // Only a line naming the retired file is classified, so only that
+        // line's paragraph is built: building one per line was quadratic in
+        // a long block, 12 of the scan's 13.5 s (core main, 2026-11-13).
+        if (!line.includes(RETIRED_DECLARATION)) continue;
         const klass = classifyMarkdownLine(rel, line, records, paragraphAt(lines, i), generated);
         if (klass) out.push({ file: rel, line: i + 1, text: line.trim(), klass });
       }
