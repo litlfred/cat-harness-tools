@@ -621,6 +621,42 @@ export const LibraryDocumentViewSchema = z
         pageLabelConflicts: AlignmentList.optional(),
       })
       .strict(),
+    /**
+     * The entry's KEPT figures (role `figure`, a WebP on disk), each with every
+     * language's description. Absent when it keeps none.
+     */
+    images: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            file: z.string().min(1),
+            page: z.number().int().nullable(),
+            /** The captions a vector render shows. */
+            shows: StringList.optional(),
+            narratives: z.record(z.string(), z.string()),
+            state: z.string(),
+          })
+          .strict(),
+      )
+      .optional(),
+    /** The entry's transcribed tables (`tabular.csvw.json`), cells inline. Absent when it has none. */
+    tables: z
+      .array(
+        z
+          .object({
+            label: z.string(),
+            caption: z.string(),
+            pages: z.array(z.number().int()),
+            columns: z.array(z.object({ titles: z.string(), group: z.string().optional() }).strict()),
+            rows: z.array(StringList),
+            notes: z.string().optional(),
+            narratives: z.record(z.string(), z.string()),
+            csv: z.string().min(1),
+          })
+          .strict(),
+      )
+      .optional(),
     withheld: z.boolean(),
     /** Where [source] and [feedback] point: the repository and the entry's directory (bean zcak). */
     links: z.object({ repo: z.string().min(1), branch: z.string().min(1), dir: z.string().min(1) }).strict().optional(),

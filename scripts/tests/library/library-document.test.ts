@@ -12,6 +12,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { entryFigureFiles, extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
+import { LibraryDocumentSchema } from "../../../schemas/ui/site-indexes.ts";
 
 function entry(structure: object, extra: Record<string, string> = {}): string {
   const dir = mkdtempSync(join(tmpdir(), "libdoc-"));
@@ -233,6 +234,18 @@ describe("kept figures and transcribed tables (who-iris#224)", () => {
     const v = readEntryDocument(withFiles(), "r", { withheld: true })!;
     expect(v.images).toBeUndefined();
     expect(v.tables).toBeUndefined();
+  });
+
+  // The page's schema is strict, and `check:kind-validators` holds every
+  // written `entries/<id>.doc.json` to it: a key the generator adds and the
+  // schema does not name fails every entry that has one downstream. `images`
+  // and `tables` shipped that way (cat-harness-tools 428a2100).
+  test("the view the generator writes, with figures and tables, is one the schema accepts", () => {
+    const v = readEntryDocument(withFiles(), "r", { links: { repo: "o/r", branch: "main", dir: "library/r" } })!;
+    expect(v.images?.length).toBe(1);
+    expect(v.tables?.length).toBe(1);
+    const r = LibraryDocumentSchema.safeParse(JSON.parse(JSON.stringify(v)));
+    expect(r.success ? [] : r.error.issues).toEqual([]);
   });
 
   test("the site copies exactly the files the page shows", () => {
