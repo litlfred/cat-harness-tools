@@ -5,6 +5,7 @@ Feature: Voice-overlay criteria derived from the voices
 
   @test:scripts/tests/content/voice-criteria.test.ts::overlaySeverityOf_is_declared,_never_derived_from_the_rules::it_reads_the_voice's_own_field
   Scenario: A voice's overlay severity is the one it declares
+    # Gap: no assertion that any shipped voice declares an overlaySeverity, so the loop may check nothing
     Given the voices shipped in the harness instance
     When overlaySeverityOf is read for each voice that declares an "overlaySeverity"
     Then it equals that declared value
@@ -24,6 +25,7 @@ Feature: Voice-overlay criteria derived from the voices
 
   @test:scripts/tests/content/voice-criteria.test.ts::the_criterion_id_is_composed_in_one_place::`overlayCriterionId`_is_what_the_derivation_uses
   Scenario: Every derived block criterion uses the id overlayCriterionId composes
+    # Gap: no assertion that any shipped voice judges blocks, so the loop may check nothing
     Given the shipped voices that judge blocks
     When the voice-overlay criteria are derived
     Then the criterion for each such voice has the id overlayCriterionId gives for that voice

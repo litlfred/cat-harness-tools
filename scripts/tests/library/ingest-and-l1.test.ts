@@ -980,12 +980,11 @@ describe("refuse to promote — the gate between the arms and the library", () =
   });
 
   test("an EMPTY requirement list does not promote by vacuous truth", () => {
-    // `every` over `[]` is true, so this would promote an entry nothing
-    // examined. The CLI never passes an empty list — `checkEntry` on an empty
-    // directory yields unmet requirements, asserted below — but the pairing is
-    // the thing that makes it safe, and it is recorded here rather than
-    // assumed.
-    expect(mayPromote([])).toBe(true);
+    // `every` over `[]` is true, so a bare `every` would promote an entry
+    // nothing examined. `mayPromote` refuses it itself, and — belt and braces —
+    // `checkEntry` on an empty directory still yields requirements.
+    expect(mayPromote([])).toBe(false);
+    expect(mayPromote([], true)).toBe(false);
     const empty = mkdtempSync(join(tmpdir(), "stage-vac-"));
     made.push(empty);
     expect(checkEntry(empty).requirements.length).toBeGreaterThan(0);

@@ -14,6 +14,7 @@ Feature: The harness reads bootstrap's terms and kinds as bootstrap states them
 
   @test:schemas/bootstrap-reading.test.ts::the_harness_reads_bootstrap's_terms_and_kinds_as_bootstrap_states_them::the_harness's_registry_reads_bootstrap's_sentence;_the_class_it_types_a_directory_with_is_its_own
   Scenario: The registry reads each bootstrap kind's summary as bootstrap's sentence
+    # Gap: the title's claim that the class typing a directory is the harness's own is not checked.
     Given bootstrap's graph typologies, of which there is at least one
     When each kind is looked up in the harness's base graph-typology registry
     Then it is defined there with bootstrap's sentence as its summary

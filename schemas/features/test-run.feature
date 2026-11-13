@@ -27,6 +27,7 @@ Feature: Test run records with data and process hashes
 
   @test:schemas/test-run.test.ts::criterion_1_—_both_hashes,_neither_derivable_from_the_other::the_real_runner's_two_bases_are_in_fact_disjoint
   Scenario: The real crdm-detect runner's two bases are disjoint and readable
+    # Gap: disjointness is implied only by the build not throwing; it is not asserted directly.
     Given the shipped crdm-detect eval's corpus as data and its script and skill file as process
     When a test run is built over the real checkout
     Then it does not throw for overlap

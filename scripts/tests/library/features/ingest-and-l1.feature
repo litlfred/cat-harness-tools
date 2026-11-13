@@ -360,9 +360,9 @@ Feature: The ingest rung decision and the L1 completeness gate
     And --qa-later is read from the arguments only when given
 
   @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::an_EMPTY_requirement_list_does_not_promote_by_vacuous_truth
-  Scenario: An empty requirement list may promote, but an empty entry never yields one
-    # Gap: the title says an empty list does NOT promote; the body asserts that mayPromote([]) is true, and relies on checkEntry never returning an empty list.
-    Then an empty requirement list may promote
+  Scenario: An empty requirement list never promotes, with or without --qa-later
+    Then an empty requirement list may not promote
+    And it may not promote with --qa-later either
     And the L1 check of an empty directory yields at least one requirement
 
   @test:scripts/tests/library/ingest-and-l1.test.ts::refuse_to_promote_—_the_gate_between_the_arms_and_the_library::an_unmet_entry_has_unmet_requirements_to_refuse_ON

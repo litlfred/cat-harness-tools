@@ -43,10 +43,9 @@ Feature: Landing stickies composed from layer contributions
 
   @test:schemas/landing-sticky.test.ts::bootstrap_has_its_OWN_cat,_not_cat-harness's::bootstrap_declares_a_theme,_and_it_is_not_the_one_cat-harness_uses
   Scenario: Bootstrap declares a theme that cat-harness does not use
-    # Gap: the themes are compared as objects by identity, not by themeId
     Given bootstrap's and cat-harness's sticky contributions
     Then bootstrap declares at least one sticky
-    And no bootstrap theme is among the cat-harness themes
+    And no bootstrap themeId is among the cat-harness themeIds
 
   @test:schemas/landing-sticky.test.ts::bootstrap_has_its_OWN_cat,_not_cat-harness's::its_theme_resolves_to_its_OWN_art,_not_the_default_cloud's
   Scenario: Bootstrap's theme resolves to its own three-crop art
@@ -357,9 +356,8 @@ Feature: Landing stickies composed from layer contributions
 
   @test:schemas/landing-sticky.test.ts::the_cat's_introduction_keeps_the_owner's_own_words::bootstrap_does_NOT_share_it,_which_is_what_makes_the_theme_the_harness's_own
   Scenario: Bootstrap does not use the grumpy-cyborg-agents theme
-    # Gap: the theme object, not its themeId, is compared with the string, so the check cannot fail
-    Given bootstrap's contributed themes
-    Then none equals "grumpy-cyborg-agents"
+    Given bootstrap's contributed theme ids
+    Then none is "grumpy-cyborg-agents"
 
   @test:schemas/landing-sticky.test.ts::the_cat's_introduction_keeps_the_owner's_own_words::its_source_link_is_absolute_and_does_not_point_at_this_site
   Scenario: The cat-harness card's external source link is not the site's own URL

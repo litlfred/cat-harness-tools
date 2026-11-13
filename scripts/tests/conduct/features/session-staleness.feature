@@ -73,12 +73,14 @@ Feature: Sessions waiting on a person
 
   @test:scripts/tests/conduct/session-staleness.test.ts::a_row_this_cannot_date_is_skipped,_never_treated_as_fresh::a_missing_timestamp_is_skipped
   Scenario: A row with no timestamp is skipped
+    # Gap: zero findings is also what a row read as fresh would give; the body cannot tell "skipped" from "treated as fresh"
     Given a session requiring action with no updated time
     When stale sessions are found
     Then there are no findings
 
   @test:scripts/tests/conduct/session-staleness.test.ts::a_row_this_cannot_date_is_skipped,_never_treated_as_fresh::an_unparseable_timestamp_is_skipped_rather_than_read_as_now
   Scenario: An unparseable timestamp is skipped rather than read as now
+    # Gap: zero findings is also what reading the timestamp as now would give; the body cannot tell "skipped" from "read as now"
     Given a session requiring action updated at "not a date"
     When stale sessions are found
     Then there are no findings

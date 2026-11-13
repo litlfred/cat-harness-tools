@@ -218,6 +218,15 @@ export interface LibraryEntry {
    */
   viewable?: "pdf" | "image";
   /**
+   * The language of {@link title} (ISO 639-1) and the titles of the entry's
+   * OFFICIAL language editions in the library, keyed by language — attached
+   * by the caller (`gen-library-viz`, from `entryLanguages`). The listing
+   * shows the reader's language under a title in another one (owner,
+   * 2026-11-13). Never translated here: absent when no edition is held.
+   */
+  lang?: string;
+  titles?: Record<string, string>;
+  /**
    * Where else a reader can go for this entry — read from a `referenced`
    * entry's own `links` (`schemas/library/referenced-source.ts`). Owner, 2026-10-02:
    * a DAK IG is in a DAK base layer's library as an EXTERNAL reference,

@@ -31,6 +31,7 @@ Feature: Sibling scope and `needs` resolution for harness instances
 
   @test:schemas/overlay-resolution.test.ts::siblingScopeFor_—_which_directory_a_sibling_is_looked_up_in::the_two_agree_for_every_nested_instance_—_this_does_not_replace_`repoRootFor`
   Scenario: Sibling scope agrees with the repo root for a nested instance
+    # Gap: the title claims agreement for every nested instance; one leaf is checked.
     Given a temporary tree with an "alpha" instance
     When the sibling scope and the repo root of "alpha" are found
     Then they are the same directory

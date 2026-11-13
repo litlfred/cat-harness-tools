@@ -131,6 +131,7 @@ Feature: Theme-art intake
     Given three good PNG layouts
     When the art is ingested
     Then the intake is accepted
+    And no "heavy" warning is given
     And a "not-preferred-format" warning is given
 
   @test:schemas/library/theme-art-intake.test.ts::weight_and_format_are_REPORTED,_not_refused::the_heavy_budget_sits_clear_of_both_measured_cases

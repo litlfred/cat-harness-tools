@@ -194,9 +194,9 @@ describe("bootstrap has its OWN cat, not cat-harness's", () => {
   // cat-harness's cat", and that is what these check.
   test("bootstrap declares a theme, and it is not the one cat-harness uses", () => {
     expect(BOOT.length).toBeGreaterThan(0);
-    const catThemes = new Set(CAT.map((c) => c.contribution.theme));
+    const catThemes = new Set(CAT.map((c) => c.contribution.theme.themeId));
     for (const b of BOOT) {
-      expect(catThemes.has(b.contribution.theme)).toBe(false);
+      expect(catThemes.has(b.contribution.theme.themeId)).toBe(false);
     }
   });
 
@@ -711,7 +711,7 @@ describe("the cat's introduction keeps the owner's own words", () => {
   });
 
   test("bootstrap does NOT share it, which is what makes the theme the harness's own", () => {
-    const boot = new Set(BOOT.map((c) => c.contribution.theme));
+    const boot = new Set(BOOT.map((c) => c.contribution.theme.themeId));
     for (const t of boot) expect(t).not.toBe("grumpy-cyborg-agents");
   });
 

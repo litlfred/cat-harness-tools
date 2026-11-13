@@ -64,6 +64,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 import { localSiteDir } from "./lib/local-site-dir.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { inScope, scopeArg, siteScope } from "./lib/site-scope.ts";
 import { deriveAlternatives, type ToolDefinition } from "../schemas/tools/tool.js";
 import { toolIri } from "../schemas/tools/tool-folders.js";
 import { termIri } from "../schemas/kg/namespaces.js";
@@ -1046,8 +1047,23 @@ export async function allPages(
   return { pages, rows, subjects, empty };
 }
 
+/**
+ * The pages a scoped site build writes: `pages` without those under an
+ * out-of-scope layer's own Tools page directory. That layer's Tools pages are
+ * linked on the platform's site, not copied (owner, 2026-11-13: "other
+ * harnesses should be referenced not included"); the combined index and the
+ * API documents stay, since they are this site's own view of every Tool.
+ * `outOfScopeDirs` are those directories, site-relative, with `/` separators.
+ */
+export function withoutLayers(pages: ReadonlyMap<string, string>, outOfScopeDirs: readonly string[]): Map<string, string> {
+  if (outOfScopeDirs.length === 0) return new Map(pages);
+  return new Map([...pages].filter(([rel]) => !outOfScopeDirs.some((d) => rel === d || rel.startsWith(`${d}/`))));
+}
+
 if (import.meta.main) {
   const check = process.argv.includes("--check");
+  // A scoped site (`--scope`): the layers whose own Tools pages are written.
+  const scope = siteScope();
   // Every declared `tools` graph, not cat-harness's alone (bean 1nu0). A
   // discovery failure is reported, never folded into "no tools".
   const found = discoverTools(REPO);
@@ -1068,14 +1084,21 @@ if (import.meta.main) {
     process.exit(1);
   }
   const known = skillIds(REPO);
-  const { pages, rows, subjects, empty } = await allPages(rows0, PAGE, known, REPO);
+  const drawnAll = await allPages(rows0, PAGE, known, REPO);
+  const { rows, subjects: allSubjects, empty } = drawnAll;
+  const subjects = allSubjects.filter((x) => inScope(scope, x.name));
+  const pages = withoutLayers(
+    drawnAll.pages,
+    allSubjects.filter((x) => !inScope(scope, x.name)).map((x) => dirname(pageRelPath(REPO, x.name)!).split(sep).join("/")),
+  );
+  if (scope !== undefined) console.log(`  scope ${scopeArg(scope)}: ${subjects.length} of ${allSubjects.length} layer page(s); the others are linked on their own site`);
   const localDocs = localSiteDir(resolve(HARNESS_ROOT));
   const site = siteTarget(localDocs ?? baseDocsDir(REPO));
 
   // ORPHANS: a sub-graph page this viewer drew for a layer that no
   // longer declares Tools. Only a page that says it is ours is touched.
   const viewDir = join(site, PAGE, "..");
-  const drawn = new Set(subjects.map((x) => x.name));
+  const drawn = new Set(allSubjects.map((x) => x.name));
   const orphans = existsSync(viewDir)
     ? readdirSync(viewDir, { withFileTypes: true })
         .filter((e) => e.isDirectory() && !drawn.has(e.name) && !pages.has(posixJoin(dirname(PAGE), e.name, "index.md")))

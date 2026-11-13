@@ -22,6 +22,13 @@ Feature: Library entry language versions
     When its language versions are read
     Then it has no versions
 
+  @test:scripts/tests/library/library-languages.test.ts::library_entry_language_versions::the_listing_gets_each_entry's_language_and_its_held_editions'_titles,_and_none_it_does_not_hold
+  Scenario: The listing gets each entry's language and its held editions' titles
+    Given a catalogue where English item 10665-1 links French item 10665-2 as a language version, both entries of the library
+    When the listing titles are read
+    Then 10665-2 is "fr" with the English title "The strategy", and 10665-1 is "en" with the French title "La stratégie"
+    And with only 10665-2 in the library it is "fr" with no other titles
+
   @test:scripts/tests/library/library-languages.test.ts::library_entry_language_versions::the_HTML_escapes_and_names_each_version;_no_summary_without_an_abstract
   Scenario: The versions HTML links and names each version; no summary without an abstract
     Given an English source version 10665-1 and a French version 10665-2

@@ -74,15 +74,13 @@ describe("it reproduces what the hardcoded table asserted", () => {
     { path: "bootstrap/skills", here: 9, nested: 0, was: 2 },
   ];
 
-  for (const c of CASES) {
-    test(`${c.path} — ${c.here} here / ${c.nested} nested -> ${c.was}`, () => {
-      const corpus = [
-        ...at(c.path, ...Array.from({ length: c.here }, (_, i) => `h${i}.md`)),
-        ...at(c.path, ...Array.from({ length: c.nested }, (_, i) => `sub/n${i}.md`)),
-      ];
-      expect(groupDepthFor(c.path, corpus)).toBe(c.was);
-    });
-  }
+  test.each(CASES.map((c) => [c.path, c.here, c.nested, c.was, c] as const))("%s — %d here / %d nested -> %d", (_p, _h, _n, _w, c) => {
+    const corpus = [
+      ...at(c.path, ...Array.from({ length: c.here }, (_, i) => `h${i}.md`)),
+      ...at(c.path, ...Array.from({ length: c.nested }, (_, i) => `sub/n${i}.md`)),
+    ];
+    expect(groupDepthFor(c.path, corpus)).toBe(c.was);
+  });
 
   test("the two `skills` directories DISAGREE, so no kind-based rule passes", () => {
     const harness = at("cat-harness/skills", "kg-qa.manifest.json", "p/a.md", "p/b.md");

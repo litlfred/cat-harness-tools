@@ -24,6 +24,7 @@ Feature: An index's own gate exemptions
 
   @test:schemas/index-config-gate-exemptions.test.ts::a_file_a_gate's_allowlist_admits_(owner,_2026-10-16,_item_6b)::parses,_beside_steps_and_scripts
   Scenario: A file exemption parses alone and beside step exemptions
+    # Gap: the title says "beside steps and scripts", but no script exemption is included.
     Given a file exemption for gate "check:structure-accessor" on "schemas/library-ref.ts" with a reason
     When it is parsed by GateExemptionsSchema alone and together with the step exemptions
     Then both parses succeed

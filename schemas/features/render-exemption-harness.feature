@@ -15,13 +15,14 @@ Feature: The rendering exemption
 
   @test:schemas/render-exemption-harness.test.ts::this_repository's_actual_declaration::EXACTLY_one_instance_in_this_repository_claims_it
   Scenario: Exactly one layer in this repository claims the exemption
-    Given the declarations of bootstrap, cat-harness, folio-assist-core and the repository root
-    When those that claim a rendering exemption are counted
+    Given every instance discovered in the repository, bootstrap among them
+    When those whose declaration claims a rendering exemption are counted
     Then there is exactly 1
     And it is "bootstrap"
 
   @test:schemas/render-exemption-harness.test.ts::this_repository's_actual_declaration::what_it_OWES_exists_on_disk_—_the_two_render_skills_it_names
   Scenario: The render skills the exemption owes exist on disk
+    # Gap: the title says two skills; the test requires only at least one.
     Given the "owes" text of bootstrap's exemption
     When the "bootstrap-graph-*.md" paths it names are collected
     Then there is at least one

@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { entryLanguages, languageOfFile, slugOfLocal, summaryHtml, versionsHtml } from "../../lib/library-languages.ts";
+import { entryLanguages, languageOfFile, listingTitles, slugOfLocal, summaryHtml, versionsHtml } from "../../lib/library-languages.ts";
 import { upstreamPdfOf } from "../../lib/library-upstream-pdf.ts";
 
 function layer() {
@@ -60,6 +60,19 @@ describe("library entry language versions", () => {
     const nodes = layer();
     const got = entryLanguages([{ id: "10665-1", node: join(nodes, "item-10665-1.json") }], new Set(["10665-1"]));
     expect(got.get("10665-1")!.versions).toEqual([]);
+  });
+
+  test("the listing gets each entry's language and its held editions' titles, and none it does not hold", () => {
+    const nodes = layer();
+    const entries = [
+      { id: "10665-1", title: "The strategy", node: join(nodes, "item-10665-1.json") },
+      { id: "10665-2", title: "La stratégie", node: join(nodes, "item-10665-2.json") },
+    ];
+    const got = listingTitles(entries, entryLanguages(entries, new Set(entries.map((e) => e.id))));
+    expect(got.get("10665-2")).toEqual({ lang: "fr", titles: { en: "The strategy" } });
+    expect(got.get("10665-1")).toEqual({ lang: "en", titles: { fr: "La stratégie" } });
+    const alone = listingTitles([entries[1]!], entryLanguages([entries[1]!], new Set(["10665-2"])));
+    expect(alone.get("10665-2")).toEqual({ lang: "fr" });
   });
 
   test("the HTML escapes and names each version; no summary without an abstract", () => {

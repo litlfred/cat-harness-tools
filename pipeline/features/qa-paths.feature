@@ -5,7 +5,6 @@ Feature: Block QA verdict paths
 
   @test:pipeline/qa-paths.test.ts::where_a_verdict_is_READ_from::prefers_the_results_tree_when_BOTH_exist_—_the_case_nothing_else_covers
   Scenario: The results-tree verdict is preferred when both exist
-    # Gap: the content check (the file holds "results") is not awaited, so only the path is reliably asserted
     Given a block with both a legacy sibling verdict and a results-tree verdict
     When the existing verdict path is looked up
     Then it is the results-tree path

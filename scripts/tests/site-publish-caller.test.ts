@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { TEMPLATE, differences, judge, sharedRef } from "../site-publish-caller.ts";
+import { TEMPLATE, differences, invokesStageLocal, judge, sharedRef } from "../site-publish-caller.ts";
 
 const template = readFileSync(TEMPLATE, "utf8");
 const SHA = "b".repeat(40);
@@ -61,6 +61,22 @@ describe("site-publish-caller", () => {
     const rolled = "on: workflow_dispatch\njobs:\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: bun run cat-harness-tools/scripts/stage-local.ts --repo .\n";
     const why = judge(new Map([["site-publish.yml", rolled]]), template).map((f) => f.why);
     expect(why).toEqual([expect.stringContaining("is missing"), expect.stringContaining("hand-rolled")]);
+  });
+
+  test("a step that only NAMES stage-local.ts in a message or comment is not hand-rolled", () => {
+    const named = "on: workflow_dispatch\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          # the root is published by stage-local.ts\n          echo \"::notice::the root is published by stage-local.ts.\"\n";
+    const why = judge(new Map([["site-publish.yml", pinned], ["ghbuild.yml", named]]), template).map((f) => f.why);
+    expect(why.join(" ")).not.toContain("hand-rolled");
+  });
+
+  test("invokesStageLocal tells a call from a mention", () => {
+    expect(invokesStageLocal("bun run cat-harness-tools/scripts/stage-local.ts --repo .")).toBe(true);
+    expect(invokesStageLocal("set -o pipefail\nbun run cat stage:local --repo . | tee log")).toBe(true);
+    expect(invokesStageLocal("cd x && bun cat-harness-tools/scripts/stage-local.ts")).toBe(true);
+    expect(invokesStageLocal('echo "published by stage-local.ts"')).toBe(false);
+    expect(invokesStageLocal("printf '%s\\n' 'run stage-local.ts'")).toBe(false);
+    expect(invokesStageLocal("# stage-local.ts publishes the root\ntrue")).toBe(false);
+    expect(invokesStageLocal('echo "::notice::x" && echo "stage-local.ts"')).toBe(false);
   });
 
   test("two callers race for gh-pages", () => {

@@ -77,6 +77,7 @@ Feature: Note anchors, moves and duplicates
 
   @test:schemas/note-anchor.test.ts::a_drop_never_implicitly_duplicates::duplicating_REQUIRES_a_new_id,_so_it_cannot_happen_by_accident
   Scenario: Duplicating a note takes the new id the caller gives
+    # Gap: that duplicating cannot happen without a new id is a matter of the function's signature; the test does not exercise any path that omits one.
     Given a note with id "t1"
     When it is duplicated with id "t2" onto the block "sec:b"
     Then the copy's id is "t2"
