@@ -41,12 +41,10 @@ const JUDGE_GATES = [
 ] as const;
 
 describe("bean oqe3: judge gates name their baseline", () => {
-  for (const gate of JUDGE_GATES) {
-    test(`${gate} passes --against main`, () => {
-      const cmd = SCRIPTS[gate];
-      expect(cmd, `${gate} is not a script in cat-harness-tools/package.json`).toBeString();
-      expect(cmd!.split(/\s+/).join(" ")).toMatch(/(?:--check|\bcheck\b)/);
-      expect(cmd!.split(/\s+/).join(" ")).toContain("--against main");
-    });
-  }
+  test.each([...JUDGE_GATES])("%s passes --against main", (gate) => {
+    const cmd = SCRIPTS[gate];
+    expect(cmd, `${gate} is not a script in cat-harness-tools/package.json`).toBeString();
+    expect(cmd!.split(/\s+/).join(" ")).toMatch(/(?:--check|\bcheck\b)/);
+    expect(cmd!.split(/\s+/).join(" ")).toContain("--against main");
+  });
 });
