@@ -122,27 +122,25 @@ describe("the falsifier the bean asks for", () => {
     cleanup();
   });
 
-  for (const missing of CRITERIA) {
-    it(`removing \`${missing}\` alone makes exactly that one appear`, () => {
-      const full: Record<string, string> = {
-        visualiser: "viz.html",
-        docs: "doc.md",
-        skill: "some-skill",
-        serialisations: "thing.jsonld",
-      };
-      delete full[missing];
-      const { root, cleanup } = instance(full, {
-        realTargets: ["viz.html", "doc.md", "thing.jsonld"],
-      });
-      const r = auditInstance(root, undefined, { serialisationsProducer: true });
-      expect(r.findings.map((f) => f.criterion)).toEqual([missing]);
-      // SERIALISATIONS are owed by every declared directory, so a missing one
-      // is an unmet obligation rather than an unanswered question. The other
-      // three are minor here because this fixture's kind owes none of them.
-      expect(r.findings[0]?.severity).toBe(missing === "serialisations" ? "major" : "minor");
-      cleanup();
+  it.each([...CRITERIA])("removing `%s` alone makes exactly that one appear", (missing) => {
+    const full: Record<string, string> = {
+      visualiser: "viz.html",
+      docs: "doc.md",
+      skill: "some-skill",
+      serialisations: "thing.jsonld",
+    };
+    delete full[missing];
+    const { root, cleanup } = instance(full, {
+      realTargets: ["viz.html", "doc.md", "thing.jsonld"],
     });
-  }
+    const r = auditInstance(root, undefined, { serialisationsProducer: true });
+    expect(r.findings.map((f) => f.criterion)).toEqual([missing]);
+    // SERIALISATIONS are owed by every declared directory, so a missing one
+    // is an unmet obligation rather than an unanswered question. The other
+    // three are minor here because this fixture's kind owes none of them.
+    expect(r.findings[0]?.severity).toBe(missing === "serialisations" ? "major" : "minor");
+    cleanup();
+  });
 });
 
 describe("declared-but-missing is a different problem from undeclared", () => {
