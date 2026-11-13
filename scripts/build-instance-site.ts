@@ -1094,11 +1094,11 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     const fwd = writeForwardingPages(site, root);
     console.log(`forwarding: ${fwd.written.length} page(s) at old addresses${fwd.superseded.length ? `; ${fwd.superseded.length} left as published pages` : ""}`);
     // The search scopes, after the last step that writes pages (owner, 2026-11-13: "search
-    // broke" who-iris's catalogue). Without `assets/js/search/manifest.json` the theme's
+    // broke" a folio's catalogue). Without `assets/js/search/manifest.json` the theme's
     // loader falls back to the WHOLE `search-data.json` — 33 MB and 20,571 entries on
-    // who-iris — and builds one lunr index from it in the browser, which never answers.
-    // folio-assistant's own publish ran the split; this path, which stage-local uses for
-    // every folio and IG site, did not. Scoped by the layers THIS checkout declares.
+    // that site — and builds one lunr index from it in the browser, which never answers.
+    // This path, which stage-local uses for every folio and IG site, never ran the split.
+    // Scoped by the layers THIS checkout declares.
     const split = splitSite(site, root);
     if (split) {
       console.log(`▶ search scopes`);
