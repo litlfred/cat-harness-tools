@@ -1110,23 +1110,23 @@ describe("`graphTypologies` was `graphs` until 2026-09-21, and the old key still
   // kind of rename.
   const base = { id: "voices", path: "voices/" } as const;
 
-  for (const [name, schema] of [
+  describe.each([
     ["GraphNodeDirectorySchema", GraphNodeDirectorySchema],
     ["ContentDirectorySchema", ContentDirectorySchema],
-  ] as const) {
-    it(`${name} reads a legacy \`graphs\` key as \`graphTypologies\``, () => {
+  ] as const)("%s", (_name, schema) => {
+    it("reads a legacy `graphs` key as `graphTypologies`", () => {
       const r = schema.safeParse({ ...base, graphs: ["voices"] });
       expect(r.success).toBe(true);
       if (r.success) expect((r.data as { graphTypologies: string[] }).graphTypologies).toEqual(["voices"]);
     });
 
-    it(`${name} takes the canonical key unchanged`, () => {
+    it("takes the canonical key unchanged", () => {
       const r = schema.safeParse({ ...base, graphTypologies: ["voices"] });
       expect(r.success).toBe(true);
       if (r.success) expect((r.data as { graphTypologies: string[] }).graphTypologies).toEqual(["voices"]);
     });
 
-    it(`${name} lets \`graphTypologies\` WIN when a declaration carries both`, () => {
+    it("lets `graphTypologies` WIN when a declaration carries both", () => {
       // Deliberately not a merge. Two spellings that disagree is the one case
       // where guessing which is current would be worse than either answer, so
       // the canonical key is taken and the legacy one ignored.
@@ -1134,7 +1134,7 @@ describe("`graphTypologies` was `graphs` until 2026-09-21, and the old key still
       expect(r.success).toBe(true);
       if (r.success) expect((r.data as { graphTypologies: string[] }).graphTypologies).toEqual(["voices"]);
     });
-  }
+  });
 
   it("still refuses an entry carrying NEITHER key", () => {
     // The alias must not turn a missing field into an empty one: a directory
