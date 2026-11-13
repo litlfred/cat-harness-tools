@@ -41,6 +41,7 @@ import { kindHeading } from "../schemas/content/translation.ts";
 import { mergePoSources, poResolveContext, resolvePoSources } from "./po-resolve";
 import { injectMarkdown, parsePo, translateBlockFields, translateManifestText } from "./po-inject";
 import { dmnRefusalNote, placeDmnTable, renderDmnFile, type BlockRef, type BlockRefs } from "./render-dmn-table";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 // ── Block headers ────────────────────────────────────────────────
 
@@ -563,6 +564,8 @@ export async function buildDocumentMarkdown(
   const manifestPath = isAbsolute(paperPath) ? paperPath : resolve(process.cwd(), paperPath);
   const docDir = dirname(manifestPath);
 
+  // input-site: traced #72b22832 — a document folio's manifest, loaded by path, as block-module and json-manifest load theirs: a run that reaches it records no hash
+  inputSiteReached("render-markdown: document manifest");
   const paperMod = await import(manifestPath);
   const paper: Paper = paperMod.default;
 
@@ -624,6 +627,8 @@ export async function buildDocumentMarkdown(
 
     let chapter: Chapter;
     try {
+      // input-site: traced #b082593c — a chapter's manifest, loaded by path: a run that reaches it records no hash
+      inputSiteReached("render-markdown: chapter manifest");
       chapter = (await import(chPath)).default as Chapter;
     } catch (e) {
       issues.push({
@@ -672,6 +677,8 @@ export async function buildDocumentMarkdown(
           continue;
         }
         try {
+          // input-site: traced #f24abebe — a content block's manifest, loaded by path: a run that reaches it records no hash
+          inputSiteReached("render-markdown: block manifest");
           const block = (await import(tsPath)).default as Block;
           const mdContent = existsSync(mdPath) ? readFileSync(mdPath, "utf-8") : "";
           if (!mdContent.trim() && !hasDmnCompanion(block, chDir, rootName)) {
