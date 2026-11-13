@@ -46,6 +46,18 @@
 # run and auto-merge waits forever. Pass `repin-token` (an App or fine-grained
 # token with contents + pull-requests write) for checks to run on the repin PR;
 # without it the PR is still opened, and the step summary says so.
+#
+# Who merges and re-pins (owner, 2026-11-13; cat-harness#1313,
+# merge-manager-watcher §"What this does not do yet"): ONLY the merge manager
+# runs a merge path. No session runs this workflow's merge step by hand, and
+# no session re-pins a site some other way to get round it. This workflow is
+# a scheduled job, not a session: what it does without the merge manager is
+# the per-site STANDING consent above (owner, 2026-10-16) — move a covered pin
+# and ask GitHub for auto-merge on green. Any other re-pin is the merge
+# manager's, on a session's `repin+merge:` message or a PR's `needs-repin`
+# label (`merge:watch --queue` lists them). A repin PR whose auto-merge cannot
+# be enabled, or that stays red, is the merge manager's to land or hand back,
+# with `merge:guard --merge`.
 
 name: Standing repin
 

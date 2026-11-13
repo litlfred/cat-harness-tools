@@ -19,10 +19,30 @@
  *
  * `--session` is the MERGING session (an id `session_…` or its URL). It is
  * required with `--merge`, because check 2 asks whether that session is the
- * one that marked the PR ready. `--no-merge-manager` lifts that separation
- * when no Merge Manager is active and the PR's own session merges; everything
- * else is still checked. `--status` also posts the verdict as the
- * `merge-guard` commit status on the head, which is what the workflow does.
+ * one that marked the PR ready. `--merge-manager-own-pr` is for one case
+ * only: the merge manager landing a PR it opened itself, so the PR's own
+ * session IS the merging one and check 2 cannot separate them. It lifts that
+ * separation and nothing else, and refuses when `--session` is not the PR's
+ * own session. (`--no-merge-manager` is its old name, still accepted; it no
+ * longer means "no merge manager is active, so any session merges".)
+ * `--status` also posts the verdict as the `merge-guard` commit status on the
+ * head, which is what the workflow does.
+ *
+ * ## Only the merge manager runs a merge path
+ *
+ * Owner, 2026-11-13 (cat-harness#1313, merge-manager-watcher §"What this does
+ * not do yet"): only the merge manager merges and re-pins. `--merge` is its
+ * tool; no other session runs it, on its own PR or anyone else's. A session
+ * says its PR is finished in one of two ways, both of which check 3 reads:
+ *
+ * - it sends the merge manager `ready: <sha>` (or `repin+merge: …`), and
+ *   posts or has the merge manager relay the `ready: <sha>` marker on the PR;
+ * - an agent that cannot send messages labels its own PR instead:
+ *   `ready-to-merge` when it is green, `needs-repin` when it is green except
+ *   the re-pin. `merge:watch --queue` lists both labels as the queue.
+ *
+ * Evaluating without `--merge` (and `--status`, which the workflow posts on
+ * every PR) is read-only, and anyone may run it.
  *
  * ## The eight checks
  *
@@ -32,10 +52,16 @@
  *    branch of a merged PR.
  * 2. `ready-for-review` — not a draft; and the latest `ready_for_review` event
  *    is attributable to the PR's OWN session, never the merging one — unless
- *    `--no-merge-manager`, when the own session IS the merging one.
- * 3. `ready-marker` — a `ready: <sha>` comment whose session footer is the
- *    PR's own session, and `<sha>` is the head or every commit after it is a
- *    merge-main bot merge.
+ *    `--merge-manager-own-pr`, when the own session IS the merging one.
+ * 3. `ready-marker` — the PR's own session said it is ready, at the head, in
+ *    one of three ways (every commit after the point named may be a
+ *    merge-main bot merge):
+ *    - a `ready: <sha>` comment whose session footer is the PR's own session;
+ *    - a `ready: <sha>` comment the merge manager posted FOR that session,
+ *      saying `relayed for <session>` ({@link relayedFor}), whoever signs it;
+ *    - the `ready-to-merge` label, added (the timeline's `labeled` event)
+ *      after the last push to the head ({@link labelReady}) — the path for an
+ *      agent that cannot send messages.
  * 4. `labels` — `ready-to-merge` present, `needs-merge-human` absent.
  * 5. `ci` — every `pull_request` run on the head is `success` or `skipped`,
  *    and every workflow owed for that event ran. One substitution: on
@@ -206,11 +232,13 @@ export interface GhTimelineEvent {
   event: string;
   created_at?: string;
   actor?: GhUser | null;
+  /** On `labeled` / `unlabeled` events: the label. */
+  label?: { name: string } | null;
 }
 export interface GhCommit {
   sha: string;
   author: GhUser | null;
-  commit: { author: { name: string; date?: string } | null; message?: string };
+  commit: { author: { name: string; date?: string } | null; committer?: { date?: string } | null; message?: string };
   parents: { sha: string }[];
 }
 export interface GhPull {
@@ -292,13 +320,18 @@ export interface GuardOptions {
   /** The login the merge would be made under, for check 2's actor half. */
   mergingActor?: string;
   /**
-   * No Merge Manager is active, so the PR's OWN session merges it (owner
-   * ruling 2026-10-06). Check 2 then drops its separation half — "the merging
-   * session did not mark it ready" — because there is no second session to
-   * separate from. Every other check, and check 2's own-session attribution,
-   * still applies. CLI: `--no-merge-manager`.
+   * The merge manager is landing a PR it opened itself, so the PR's OWN
+   * session is the merging one. Check 2 then drops its separation half — "the
+   * merging session did not mark it ready" — because there is no second
+   * session to separate from, and instead refuses unless {@link mergingSession}
+   * (when given) IS the PR's own session. Every other check still applies.
+   *
+   * Only the merge manager merges (owner, 2026-11-13, cat-harness#1313), so
+   * this is not "no merge manager is active, any session may merge" — the
+   * meaning of its old name, `--no-merge-manager` (owner ruling 2026-10-06,
+   * superseded). CLI: `--merge-manager-own-pr`, or the old name.
    */
-  noMergeManager?: boolean;
+  mergeManagerOwnPr?: boolean;
   /**
    * This merge is a RELEASE (owner, card Q-CIB-4 A, 2026-11-08): check 5
    * gates it. Without it, and without the {@link RELEASE_LABEL} label on the
@@ -390,9 +423,26 @@ const READY_RE = /^[ \t]*\**[ \t]*ready:\**[ \t]*`?([0-9a-f]{7,40})\b/im;
 
 export interface ReadyMarker {
   sha: string;
+  /** The session that SIGNED the comment. */
   session: string | undefined;
+  /** For a marker the merge manager relays: the session it speaks for ({@link relayedFor}). */
+  relayedFor?: string;
   at: string;
   url?: string;
+}
+
+/**
+ * `relayed for <session>` (an id or a URL containing one), on a line that is
+ * not quoted, outside code. The merge manager writes it on a `ready: <sha>`
+ * it posts for a session that told it the PR is ready, so the marker counts as
+ * that session's own (check 3) and is not the merge manager marking the PR
+ * ready (check 2).
+ */
+const RELAY_RE = /^(?![ \t]*>).*\brelayed for\b[^\n]*?(session_[A-Za-z0-9]+)/im;
+
+/** The session a comment relays a `ready:` for, or `undefined`. */
+export function relayedFor(body: string | null | undefined): string | undefined {
+  return withoutCode(body ?? "").match(RELAY_RE)?.[1];
 }
 
 /** Every `ready:` comment, oldest first. */
@@ -400,9 +450,22 @@ export function readyMarkers(comments: readonly GhComment[]): ReadyMarker[] {
   const out: ReadyMarker[] = [];
   for (const c of byTime(comments)) {
     const m = withoutCode(c.body ?? "").match(READY_RE);
-    if (m) out.push({ sha: m[1]!.toLowerCase(), session: signingSession(c.body), at: c.created_at, url: c.html_url });
+    if (!m) continue;
+    const relay = relayedFor(c.body);
+    out.push({
+      sha: m[1]!.toLowerCase(),
+      session: signingSession(c.body),
+      ...(relay ? { relayedFor: relay } : {}),
+      at: c.created_at,
+      url: c.html_url,
+    });
   }
   return out;
+}
+
+/** Does this marker speak for `own`: signed by it, or relayed for it? */
+function speaksFor(m: ReadyMarker, own: string): boolean {
+  return m.relayedFor === undefined ? m.session === own : m.relayedFor === own;
 }
 
 /**
@@ -587,7 +650,7 @@ function checkReadyForReview(s: GuardSnapshot, o: GuardOptions): CheckResult {
   const own = signingSession(s.pr.body);
   const window = o.readyWindowMs ?? READY_WINDOW_MS;
 
-  const separate = !o.noMergeManager;
+  const separate = !o.mergeManagerOwnPr;
   if (separate && o.mergingActor && actor === o.mergingActor && actor !== s.pr.user?.login) {
     return R(2, "ready-for-review", "refuse", `marked ready at ${last.created_at} by \`${actor}\`, the merging actor`, "defect");
   }
@@ -596,7 +659,9 @@ function checkReadyForReview(s: GuardSnapshot, o: GuardOptions): CheckResult {
       c,
       session: signingSession(c.body),
       dt: Math.abs(Date.parse(c.created_at) - at),
-      isAck: isStewardAckComment(c.body),
+      // A relayed marker reports the PR's own session's word; it is not the
+      // relaying merge manager marking the PR ready.
+      isAck: isStewardAckComment(c.body) || relayedFor(c.body) !== undefined,
       claims: claimsReadyFlip(c.body),
     }))
     .filter((x): x is typeof x & { session: string } => Boolean(x.session) && x.dt <= window)
@@ -640,16 +705,93 @@ function checkReadyForReview(s: GuardSnapshot, o: GuardOptions): CheckResult {
       kind,
     );
   }
-  const lifted = o.noMergeManager ? "; no Merge Manager is active, so the merging session is not separated from it (--no-merge-manager)" : "";
+  if (o.mergeManagerOwnPr && o.mergingSession && o.mergingSession !== own) {
+    return R(
+      2,
+      "ready-for-review",
+      "refuse",
+      `--merge-manager-own-pr is for the merge manager landing its OWN PR, but the merging session \`${o.mergingSession}\` is not this PR's own session \`${own}\``,
+      "defect",
+    );
+  }
+  const lifted = o.mergeManagerOwnPr
+    ? "; the merge manager is landing its own PR, so the merging session is not separated from it (--merge-manager-own-pr)"
+    : "";
   return R(2, "ready-for-review", "pass", `marked ready at ${last.created_at} by the PR's own session \`${own}\`${lifted}`);
 }
 
 function latestOwnMarker(s: GuardSnapshot): ReadyMarker | undefined {
   const own = signingSession(s.pr.body);
-  return own ? readyMarkers(s.comments).filter((m) => m.session === own).at(-1) : undefined;
+  return own ? readyMarkers(s.comments).filter((m) => speaksFor(m, own)).at(-1) : undefined;
 }
 
+/** When the head was pushed, as far as the record shows: the latest of the dates below. */
+function pushedAt(s: GuardSnapshot, c: GhCommit): number | undefined {
+  const dates = [c.commit.committer?.date, c.commit.author?.date];
+  // A workflow run starts when the commit reaches GitHub, so the earliest run
+  // on the sha bounds the push from below even when the commit's own date is old.
+  if (s.runs.state === "has-run") {
+    const onSha = (s.runs.runs as GuardRun[]).filter((r) => r.head_sha && c.sha.toLowerCase().startsWith(r.head_sha.toLowerCase()));
+    const first = onSha.map((r) => Date.parse(r.created_at ?? "")).filter(Number.isFinite).sort((a, b) => a - b)[0];
+    if (first !== undefined) dates.push(new Date(first).toISOString());
+  }
+  for (const e of s.timeline) if (e.event === "head_ref_force_pushed") dates.push(e.created_at);
+  const ms = dates.map((d) => Date.parse(d ?? "")).filter(Number.isFinite);
+  return ms.length ? Math.max(...ms) : undefined;
+}
+
+export type LabelReady = { ok: true; at: string; detail: string } | { ok: false; why: string };
+
+/**
+ * Check 3's label path, for an agent that cannot send messages (owner,
+ * 2026-11-13): the PR carries {@link READY_LABEL}, and the timeline's latest
+ * `labeled` event for it is later than the last push of any commit that is
+ * not a merge-main bot merge.
+ *
+ * "The last push" is read from what the record keeps, since GitHub records no
+ * push event for a plain push: the commit's committer and author dates, the
+ * earliest workflow run on that sha, and every `head_ref_force_pushed`. A
+ * commit made before the label but pushed after it, on a head with no run
+ * yet, is the case it can miss; check 5's runs on the head are then still
+ * pending, and the next push re-dates the head.
+ */
+export function labelReady(s: GuardSnapshot): LabelReady {
+  if (!s.pr.labels.some((l) => l.name === READY_LABEL)) return { ok: false, why: `\`${READY_LABEL}\` is absent` };
+  const added = byTime(s.timeline.filter((e) => e.event === "labeled" && e.label?.name === READY_LABEL)).at(-1);
+  if (!added?.created_at) return { ok: false, why: `the timeline shows no \`labeled ${READY_LABEL}\` event` };
+  if (s.commits.length >= COMMITS_API_CAP) return { ok: false, why: `the PR has ${COMMITS_API_CAP}+ commits, more than the API returns` };
+  const named = botPushedShas(s.comments);
+  const lastOwn = s.commits.filter((c) => !isBotMerge(c, named)).at(-1) ?? s.commits.at(-1);
+  if (!lastOwn) return { ok: false, why: "the PR has no commits" };
+  const pushed = pushedAt(s, lastOwn);
+  if (pushed === undefined) return { ok: false, why: `no date for the push of \`${short(lastOwn.sha)}\`` };
+  const pushedIso = new Date(pushed).toISOString();
+  if (Date.parse(added.created_at) <= pushed) {
+    return { ok: false, why: `\`${READY_LABEL}\` was added at ${added.created_at}, not after the last push (\`${short(lastOwn.sha)}\`, ${pushedIso})` };
+  }
+  const after = s.commits.length - 1 - s.commits.indexOf(lastOwn);
+  return {
+    ok: true,
+    at: added.created_at,
+    detail: `\`${READY_LABEL}\` added at ${added.created_at}, after the last push (\`${short(lastOwn.sha)}\`, ${pushedIso})${after ? `; the ${after} commit(s) after it are merge-main bot merges` : ""}`,
+  };
+}
+
+/**
+ * Check 3 by its marker and, where that does not pass, by the label: a pass
+ * on either passes. A refusal keeps the marker's detail and kind, with why the
+ * label did not stand in.
+ */
 function checkReadyMarker(s: GuardSnapshot): CheckResult {
+  const byMarker = checkReadyMarkerComment(s);
+  if (byMarker.status === "pass") return byMarker;
+  const label = labelReady(s);
+  if (label.ok) return R(3, "ready-marker", "pass", label.detail);
+  const hasLabel = s.pr.labels.some((l) => l.name === READY_LABEL);
+  return hasLabel ? { ...byMarker, detail: `${byMarker.detail}; nor does the label stand in: ${label.why}` } : byMarker;
+}
+
+function checkReadyMarkerComment(s: GuardSnapshot): CheckResult {
   const own = signingSession(s.pr.body);
   if (!own) {
     return R(3, "ready-marker", "refuse", "the PR body links no session, so no `ready:` comment can be attributed to the PR's own session");
@@ -658,12 +800,15 @@ function checkReadyMarker(s: GuardSnapshot): CheckResult {
   const marker = latestOwnMarker(s);
   if (!marker) {
     if (all.length === 0) return R(3, "ready-marker", "refuse", "no `ready: <sha>` comment");
-    const seen = all.map((m) => `\`${short(m.sha)}\` signed ${m.session ? `\`${m.session}\`` : "by no session"}`).join(", ");
-    const kind: RefusalKind = all.some((m) => m.session && m.session !== own) ? "defect" : "not-ready";
+    const seen = all
+      .map((m) => `\`${short(m.sha)}\` signed ${m.session ? `\`${m.session}\`` : "by no session"}${m.relayedFor ? ` relayed for \`${m.relayedFor}\`` : ""}`)
+      .join(", ");
+    const kind: RefusalKind = all.some((m) => (m.relayedFor ?? m.session) && (m.relayedFor ?? m.session) !== own) ? "defect" : "not-ready";
     return R(3, "ready-marker", "refuse", `no \`ready:\` comment is signed by the PR's own session \`${own}\` (found: ${seen})`, kind);
   }
   const head = s.pr.head.sha.toLowerCase();
-  if (head.startsWith(marker.sha)) return R(3, "ready-marker", "pass", `\`ready: ${short(marker.sha)}\` names the head`);
+  const via = marker.relayedFor ? `, relayed for \`${own}\` by ${marker.session ? `\`${marker.session}\`` : "an unsigned comment"}` : "";
+  if (head.startsWith(marker.sha)) return R(3, "ready-marker", "pass", `\`ready: ${short(marker.sha)}\` names the head${via}`);
   const i = s.commits.findIndex((c) => c.sha.toLowerCase().startsWith(marker.sha));
   if (i < 0) {
     if (s.commits.length >= COMMITS_API_CAP) {
@@ -685,7 +830,7 @@ function checkReadyMarker(s: GuardSnapshot): CheckResult {
       `the head \`${short(head)}\` is newer than \`ready: ${short(marker.sha)}\`, and ${foreign.length} commit(s) after it are not merge-main bot merges: ${list}`,
     );
   }
-  return R(3, "ready-marker", "pass", `\`ready: ${short(marker.sha)}\`; the ${after.length} commit(s) after it are merge-main bot merges`);
+  return R(3, "ready-marker", "pass", `\`ready: ${short(marker.sha)}\`${via}; the ${after.length} commit(s) after it are merge-main bot merges`);
 }
 
 function checkLabels(s: GuardSnapshot): CheckResult {
@@ -892,8 +1037,11 @@ function checkChecklist(s: GuardSnapshot): CheckResult {
 function checkOpenQuestion(s: GuardSnapshot): CheckResult {
   const marker = latestOwnMarker(s);
   const markerComment = marker && s.comments.find((c) => c.created_at === marker.at);
-  if (!marker || !markerComment) return R(7, "open-question", "skip", "no ready marker to measure from (check 3)");
-  const qs = openQuestions(s.comments, marker.at, s.pr.base.repo?.owner?.login ?? "litlfred");
+  // With no marker, the `ready-to-merge` label that stood in for it (check 3) is the point to measure from.
+  const label = labelReady(s);
+  const since = marker && markerComment ? marker.at : label.ok ? label.at : undefined;
+  if (since === undefined) return R(7, "open-question", "skip", "no ready marker to measure from (check 3)");
+  const qs = openQuestions(s.comments, since, s.pr.base.repo?.owner?.login ?? "litlfred");
   return qs.length
     ? R(
         7,
@@ -1212,7 +1360,9 @@ export function render(v: GuardVerdict): string {
   return lines.join("\n");
 }
 
-const USAGE = "usage: bun run cat merge:guard <pr> [--merge --session <id> [--no-merge-manager]] [--release] [--actor <login>] [--repo owner/repo] [--status] [--json]";
+const USAGE =
+  "usage: bun run cat merge:guard <pr> [--merge --session <id> [--merge-manager-own-pr]] [--release] [--actor <login>] [--repo owner/repo] [--status] [--json]\n" +
+  "  --merge is the merge manager's alone (owner, 2026-11-13): no other session runs it.";
 
 async function main(argv: string[]): Promise<number> {
   const args = [...argv];
@@ -1232,7 +1382,10 @@ async function main(argv: string[]): Promise<number> {
   const doMerge = flag("--merge");
   const asJson = flag("--json");
   const doStatus = flag("--status");
-  const noMergeManager = flag("--no-merge-manager");
+  // `--no-merge-manager` is the old name; both are taken out of `args`.
+  const oldName = flag("--no-merge-manager");
+  const mergeManagerOwnPr = flag("--merge-manager-own-pr") || oldName;
+  if (oldName) console.error("--no-merge-manager is now --merge-manager-own-pr: the merge manager landing its own PR. No other session merges.");
   const release = flag("--release");
   const sessionArg = opt("--session");
   const actor = opt("--actor");
@@ -1256,7 +1409,7 @@ async function main(argv: string[]): Promise<number> {
     console.error(`merge-guard #${n}: COULD NOT DETERMINE — ${e instanceof Error ? e.message : String(e)}`);
     return 2;
   }
-  const v = evaluate(snapshot, { mergingSession, mergingActor: actor, noMergeManager, release });
+  const v = evaluate(snapshot, { mergingSession, mergingActor: actor, mergeManagerOwnPr, release });
   console.log(asJson ? JSON.stringify(v, null, 2) : render(v));
   if (doStatus) {
     try {
