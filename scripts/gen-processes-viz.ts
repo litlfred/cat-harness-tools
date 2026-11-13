@@ -863,6 +863,18 @@ export interface PageScope {
 }
 
 /**
+ * A pipe table, or `none` when it would have no rows.
+ *
+ * Kramdown drops a table with no body and prints its header and delimiter as
+ * a paragraph — the delimiter's `---` typeset as em dashes — so a header-only
+ * table is never emitted.
+ */
+export function tableOrNone(header: readonly string[], rows: readonly string[], none: string): string[] {
+  if (rows.length === 0) return [none];
+  return [`| ${header.join(" | ")} |`, `|${header.map(() => "---").join("|")}|`, ...rows];
+}
+
+/**
  * `scope.instance` draws one layer's sub-graph page, one directory below
  * the index, so every link on it is one segment deeper.
  */
@@ -915,9 +927,13 @@ export function page(
   L.push("");
   L.push(`**${rows.length}** diagram(s), **${ok.length}** parsed, **${broken.length}** that would not load.`);
   L.push("");
-  L.push("| where | diagrams |");
-  L.push("|---|---|");
-  for (const [g, n] of [...byGroup].sort((a, b) => b[1] - a[1])) L.push(`| \`${esc(g)}/\` | ${n} |`);
+  L.push(
+    ...tableOrNone(
+      ["where", "diagrams"],
+      [...byGroup].sort((a, b) => b[1] - a[1]).map(([g, n]) => `| \`${esc(g)}/\` | ${n} |`),
+      "_No diagrams._",
+    ),
+  );
   L.push("");
 
   if (scope.subjects !== undefined && scope.subjects.length > 0) {
@@ -945,12 +961,16 @@ export function page(
       "subprocess. Links and counts only: where an instance IS lives in its file under `beans/workflows/`.",
   );
   L.push("");
-  L.push("| process | steps | undocumented steps | running instances |");
-  L.push("|---|---|---|---|");
-  for (const r of ok) {
-    const undoc = r.steps.filter((st) => !st.documentation).length;
-    L.push(`| [${esc(r.name)}](${base}${r.stem}.html) | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id, root)} |`);
-  }
+  L.push(
+    ...tableOrNone(
+      ["process", "steps", "undocumented steps", "running instances"],
+      ok.map((r) => {
+        const undoc = r.steps.filter((st) => !st.documentation).length;
+        return `| [${esc(r.name)}](${base}${r.stem}.html) | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id, root)} |`;
+      }),
+      "_No process parsed._",
+    ),
+  );
   L.push("");
   if (instances.unread.length > 0) {
     L.push(`Instances of ${instances.unread.map((x) => `\`${x}\``).join(", ")} could not be read in this build, so "none recorded" above does not cover them.`);
@@ -966,8 +986,6 @@ export function page(
   L.push("");
   L.push(`**${join.size}** distinct skill(s) are named by an activity.`);
   L.push("");
-  L.push("| skill | run by |");
-  L.push("|---|---|");
   // A diagram in "run by" links to its own page — the one the first table
   // links — found by FILE, the key `skillToProcesses` joins on. A file with no
   // loaded row publishes no page, so it stays code.
@@ -980,7 +998,13 @@ export function page(
     const stem = pageOf.get(f);
     return stem === undefined ? `\`${esc(basename(f))}\`` : `[\`${esc(basename(f))}\`](${base}${stem}.html)`;
   };
-  for (const [s, fs] of join) L.push(`| ${skillCell(s)} | ${fs.map(runBy).join(", ")} |`);
+  L.push(
+    ...tableOrNone(
+      ["skill", "run by"],
+      [...join].map(([s, fs]) => `| ${skillCell(s)} | ${fs.map(runBy).join(", ")} |`),
+      "_No activity names a skill._",
+    ),
+  );
   L.push("");
   L.push(`Names an ⓘ task panel shows without a link are listed on [Task panel links: QA](${base}${PANEL_LINKS_QA.replace(/\.md$/, ".html")}).`);
   L.push("");
@@ -996,20 +1020,28 @@ export function page(
   L.push("");
   L.push(`**${lanes.size}** distinct lane name(s).`);
   L.push("");
-  L.push("| lane | in |");
-  L.push("|---|---|");
-  for (const [l, fs] of [...lanes].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "en"))) {
-    L.push(`| ${esc(l)} | ${fs.length} |`);
-  }
+  L.push(
+    ...tableOrNone(
+      ["lane", "in"],
+      [...lanes]
+        .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "en"))
+        .map(([l, fs]) => `| ${esc(l)} | ${fs.length} |`),
+      "_No lanes._",
+    ),
+  );
   L.push("");
 
   L.push("## Which steps touch the work plan?");
   L.push("");
   L.push("`<cat-harness.processes:bean op>` — the audit trail for who reserves and resolves work.");
   L.push("");
-  L.push("| op | diagrams |");
-  L.push("|---|---|");
-  for (const [o, fs] of [...ops].sort((a, b) => b[1].length - a[1].length)) L.push(`| \`${esc(o)}\` | ${fs.length} |`);
+  L.push(
+    ...tableOrNone(
+      ["op", "diagrams"],
+      [...ops].sort((a, b) => b[1].length - a[1].length).map(([o, fs]) => `| \`${esc(o)}\` | ${fs.length} |`),
+      "_No step names a bean op._",
+    ),
+  );
   L.push("");
 
   L.push("## Strict, advisory — and nobody said");
@@ -1085,11 +1117,13 @@ export function page(
         "a pipeline or an agent performs the step, and only the last of those has a skill to run.",
     );
     L.push("");
-    L.push("| lane | steps |");
-    L.push("|---|---|");
-    for (const [l, n] of [...byLane].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "en"))) {
-      L.push(`| ${esc(l)} | ${n} |`);
-    }
+    L.push(
+      ...tableOrNone(
+        ["lane", "steps"],
+        [...byLane].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "en")).map(([l, n]) => `| ${esc(l)} | ${n} |`),
+        "_None outside call activities._",
+      ),
+    );
     L.push("");
     L.push(
       "**No verdict is offered on which of these is a gap**, and that is the honest state rather " +
@@ -1311,8 +1345,7 @@ export function processPage(
       : `**${undoc}** of ${row.steps.length} step(s) carry no documentation — \`activity-documented\` lists them.`,
   );
   L.push("");
-  L.push("| step | lane | skill / sub-process | what it does |");
-  L.push("|---|---|---|---|");
+  const stepRows: string[] = [];
   for (const st of row.steps) {
     const target = st.calledElement
       ? `calls ${byId.get(st.calledElement) ? proc(byId.get(st.calledElement)!) : `\`${st.calledElement}\``}`
@@ -1328,8 +1361,9 @@ export function processPage(
         ? `${st.documentation ? "<br><br>" : ""}${cell(st.narrative.text)}`
         : `${st.documentation ? "<br>" : ""}_narrative \`${esc(st.narrative.href)}\` not found_`
       : "";
-    L.push(`| <a id="${stepAnchor(st.id)}"></a>**${esc(st.name)}**<br>\`${st.id}\` | ${cell(st.lane)} | ${how} | ${st.documentation || !st.narrative ? cell(st.documentation) : ""}${narr} |`);
+    stepRows.push(`| <a id="${stepAnchor(st.id)}"></a>**${esc(st.name)}**<br>\`${st.id}\` | ${cell(st.lane)} | ${how} | ${st.documentation || !st.narrative ? cell(st.documentation) : ""}${narr} |`);
   }
+  L.push(...tableOrNone(["step", "lane", "skill / sub-process", "what it does"], stepRows, "_No steps._"));
   L.push("");
 
   // Only when there is one: a linear process has no decision to show, and an

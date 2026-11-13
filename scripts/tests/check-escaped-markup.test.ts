@@ -196,7 +196,7 @@ describe("a markdown table printed as text — bean `7w1a`", () => {
   });
 
   test("accepts the other spellings a converter may emit", () => {
-    for (const row of ["|---|---|", "| :---: | --- |", "|&mdash;|&mdash;|"]) {
+    for (const row of ["|---|---|", "| :---: | --- |", "|&mdash;|&mdash;|", "---|---"]) {
       expect(leakedTablesIn("p.html", `<p>| a | b |\n${row}\n| 1 | 2 |</p>`).length).toBe(1);
     }
   });
@@ -211,8 +211,49 @@ describe("a markdown table printed as text — bean `7w1a`", () => {
     expect(leakedTablesIn("p.html", shown)).toEqual([]);
   });
 
-  test("a single dash rule or a prose pipe is not a delimiter row", () => {
-    expect(leakedTablesIn("p.html", "<p>a | b</p>\n<p>|—|</p>\n<hr />")).toEqual([]);
+  test("a prose pipe, a dash rule or a lone dash is not a delimiter row", () => {
+    expect(leakedTablesIn("p.html", "<p>a | b</p>\n<p>—</p>\n<p>a — b | c</p>\n<hr />")).toEqual([]);
+  });
+
+  test("a HEADER-ONLY table — no body row, so the delimiter closes the paragraph on its line", () => {
+    // What kramdown 2.5 printed for the 31 generated pages: a header and a
+    // delimiter with nothing under them, the row ending in `</p>`. The first,
+    // `$`-anchored pattern could not see it.
+    const leaked = "<h2>What it is made of</h2>\n<p>| role | file | |\n|—|—|—|</p>";
+    expect(leakedTablesIn("tools/x/index.html", leaked)).toEqual([
+      { page: "tools/x/index.html", excerpt: "| role | file | |" },
+    ]);
+  });
+
+  test("a table straight under a heading — read as one paragraph with mixed dash runs", () => {
+    // The second shape: no blank line before the table, so it joins the block
+    // above; a longer delimiter typesets as a MIXED run (`——-`, `—–`).
+    for (const row of ["|——-|——-|——-|", "| —– | :—-: |", "|&mdash;&ndash;|&#8212;-|"]) {
+      const leaked = `<h5 id="x">Content Review Skills</h5>\n<p>| Skill | Description |\n${row}\n| a | b |</p>`;
+      expect(leakedTablesIn("skills.html", leaked).length).toBe(1);
+    }
+  });
+
+  test("a row that opens straight after a tag, or shares a line with its header", () => {
+    expect(leakedTablesIn("p.html", "<p>|—|—|</p>").length).toBe(1);
+    expect(leakedTablesIn("p.html", "<p>| a | b |<br />|—|—|</p>")).toEqual([{ page: "p.html", excerpt: "| a | b |" }]);
+  });
+
+  test("one cell is enough — a one-column table leaks as `|—|`", () => {
+    expect(leakedTablesIn("p.html", "<p>| only |\n|—|</p>").length).toBe(1);
+  });
+
+  test("a delimiter inside <script>, <style> or <textarea> is data, not a leak", () => {
+    for (const tag of ["script", "style", "textarea"]) {
+      expect(leakedTablesIn("p.html", `<${tag}>\n| a | b |\n|---|---|\n</${tag}>`)).toEqual([]);
+    }
+  });
+
+  test("a RENDERED table is still not a finding, whatever its cells hold", () => {
+    const ok =
+      "<table><thead><tr><th>role</th><th>file</th></tr></thead>" +
+      "<tbody><tr><td>—</td><td>-</td></tr><tr><td>a</td><td><code>|---|</code></td></tr></tbody></table>";
+    expect(leakedTablesIn("p.html", ok)).toEqual([]);
   });
 
   test("the tree scan reports it", () => {
