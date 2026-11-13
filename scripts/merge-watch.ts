@@ -110,6 +110,8 @@ export interface WorkflowRun {
   created_at?: string;
   run_started_at?: string | null;
   pull_requests?: { number: number }[] | null;
+  /** The workflow file, e.g. `.github/workflows/cancel-on-close.yml`. */
+  path?: string;
 }
 
 export type Verdict =
@@ -478,10 +480,18 @@ export interface ReliefCandidate {
 
 const P3 = /^(?:priority[:/ ]\s*)?P3$/i;
 const PR_EVENTS = new Set(["pull_request", "pull_request_target", "pull_request_review", "pull_request_review_comment"]);
+/** Main's own runs: a push, and the `dynamic` runs GitHub starts for a push (CodeQL's "Push on main"). */
+const MAIN_EVENTS = new Set(["push", "dynamic"]);
+/** The workflow that cancels a closed PR's runs: cancelling it would undo the relief it brings. */
+const CANCELLER = /(^|\/)cancel-on-close\.ya?ml$/;
 
 /**
  * The busy runs the owner might cancel to free runners. Never a main push
- * run (started or not): those are main's verdict. Report only.
+ * run, started or not, nor the `dynamic` run a push starts: those are main's
+ * verdict. Never the canceller itself. Report only.
+ *
+ * "Never started" reads `status`, not `run_started_at`: GitHub sets
+ * `run_started_at` when a run is created, so a run still queued carries one.
  */
 export function reliefCandidates(
   runs: readonly WorkflowRun[],
@@ -492,14 +502,15 @@ export function reliefCandidates(
 ): ReliefCandidate[] {
   const out: ReliefCandidate[] = [];
   for (const r of runs.filter(busy)) {
-    if (r.event === "push" && r.head_branch === defaultBranch) continue;
+    if (MAIN_EVENTS.has(r.event ?? "") && r.head_branch === defaultBranch) continue;
+    if (r.path && CANCELLER.test(r.path)) continue;
     const linked = new Set((r.pull_requests ?? []).map((p) => p.number));
     const pr = openPrs.find((p) => linked.has(p.number) || p.headSha === r.head_sha || (r.head_branch && p.headBranch === r.head_branch));
     let reason: string | undefined;
     if (pr?.draft) reason = `draft PR #${pr.number}`;
     else if (pr && pr.labels.some((l) => P3.test(l))) reason = `P3 PR #${pr.number}`;
     else if (!pr && PR_EVENTS.has(r.event ?? "")) reason = `closed PR (${r.head_branch ?? r.head_sha?.slice(0, 7) ?? "?"})`;
-    else if (r.status !== "in_progress" && !r.run_started_at) {
+    else if (r.status !== "in_progress") {
       const age = minutesSince(r.created_at, now);
       if (age !== null && age >= queuedMinutes) reason = `queued ${age}m, never started`;
     }

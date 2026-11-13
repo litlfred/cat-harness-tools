@@ -184,7 +184,7 @@ describe("runner relief", () => {
     { number: 2, draft: false, labels: ["P3"], headSha: "p3", headBranch: "p3-branch" },
     { number: 3, draft: false, labels: [], headSha: "r3", headBranch: "ready-branch" },
   ];
-  test("draft, P3, closed-PR and never-started runs; never a main push run", () => {
+  test("draft, P3, closed-PR and never-started runs; never a main push or dynamic run, never the canceller", () => {
     const runs = [
       run({ id: 1, status: "in_progress", head_sha: "d1", head_branch: "draft-branch" }),
       run({ id: 2, status: "queued", head_sha: "p3", head_branch: "p3-branch" }),
@@ -194,12 +194,19 @@ describe("runner relief", () => {
       run({ id: 6, status: "in_progress", event: "push", head_sha: "m", head_branch: "main", run_started_at: minutesAgo(30) }),
       run({ id: 7, status: "queued", event: "push", head_sha: "m2", head_branch: "main", created_at: minutesAgo(120) }),
       run({ id: 8, status: "completed", head_sha: "d1", head_branch: "draft-branch" }),
+      // Live shapes (2026-11-07): GitHub sets run_started_at on a run that is still queued.
+      run({ id: 9, status: "queued", head_sha: "r3", head_branch: "ready-branch", created_at: minutesAgo(75), run_started_at: minutesAgo(75) }),
+      // CodeQL's "Push on main" is event `dynamic` on main: main's own run.
+      run({ id: 10, status: "queued", event: "dynamic", name: "Push on main", head_sha: "m3", head_branch: "main", created_at: minutesAgo(200) }),
+      // The canceller of a closed PR's runs, itself queued on that closed PR.
+      run({ id: 11, status: "queued", name: "Cancel the runs of a closed PR", path: ".github/workflows/cancel-on-close.yml", head_sha: "gone2", head_branch: "closed-2" }),
     ];
     expect(reliefCandidates(runs, prs, "main", NOW, 60).map((c) => [c.runId, c.reason])).toEqual([
       [1, "draft PR #1"],
       [2, "P3 PR #2"],
       [3, "closed PR (closed-branch)"],
       [4, "queued 90m, never started"],
+      [9, "queued 75m, never started"],
     ]);
   });
 });
