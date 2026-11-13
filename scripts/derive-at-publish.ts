@@ -458,6 +458,15 @@ export function built(a: Pick<DeclaredArtefact, "abs" | "path">): boolean {
   return statSync(a.abs).isDirectory() && walk(a.abs);
 }
 
+/**
+ * The artefacts only `writer` builds that are still not built: after a preview
+ * borrows main's copy of an index writer, an artefact declared since main's
+ * copy was made is absent, and the writer has to run to build it.
+ */
+export function unbuiltOnlyBy(declared: readonly Pick<DeclaredArtefact, "instance" | "abs" | "path" | "writer">[], writer: string): string[] {
+  return declared.filter((a) => a.writer.length > 0 && a.writer.every((w) => w === writer) && !built(a)).map((a) => `${a.instance}/${a.path}`);
+}
+
 /** Whether `strace` runs here (writer records need it). */
 export function straceWorks(): boolean {
   // input-site: inert #50824495 — probes for the tracer; its answer only turns recording on or off
@@ -695,16 +704,25 @@ if (import.meta.main) {
     // Seconds per writer, so a slow one can be named from a published log (bean fwtz).
     const t0 = performance.now();
     const secs = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`;
+    // Set when a borrowed copy leaves a declared artefact unbuilt: putting back an older copy cannot build it either.
+    let mustRun = false;
     if (borrowOn && prevRecords !== undefined && isIndexWriter(w, declared)) {
       const from = entryShaOf(prevRecords, w);
-      if (hasEntry(outDir, w, from) && restoreOutputs(outDir, w, from, REPO_ROOT, keep)) {
+      const restored = hasEntry(outDir, w, from) && restoreOutputs(outDir, w, from, REPO_ROOT, keep);
+      const unbuilt = restored ? unbuiltOnlyBy(declared, w) : [];
+      mustRun = unbuilt.length > 0;
+      if (restored && unbuilt.length === 0) {
         reused.set(w, from);
         console.log(`  borrowed ${w}: a preview build does not reindex; put back main's copy from ${from.slice(0, 12)} [${secs()}]`);
         return { kind: "ran" };
       }
-      console.log(`  ${w} runs: an index, but main's recording holds no copy of it [decided in ${secs()}]`);
+      console.log(
+        restored
+          ? `  ${w} runs: main's copy from ${from.slice(0, 12)} builds nothing at ${unbuilt.join(", ")}, declared since [decided in ${secs()}]`
+          : `  ${w} runs: an index, but main's recording holds no copy of it [decided in ${secs()}]`,
+      );
     }
-    if (skipOn && prevRecords !== undefined) {
+    if (skipOn && prevRecords !== undefined && !mustRun) {
       // One file-digest memo for every decision: it is keyed on size and
       // mtime, so a file a predecessor rewrote is hashed again, and a fresh
       // memo per writer re-hashed every recorded read once per writer. Only
