@@ -49,7 +49,7 @@ describe("siteScopeOf — a site writes its own pages", () => {
 
   test("a folio that lands on itself: its own pages only, the other layers linked", () => {
     // owner, 2026-11-13: "other harnesses should be referenced not included".
-    expect(siteScopeOf(cfg({ landing: "dpi-h-ra" }), "dpi-h-ra")).toEqual(["dpi-h-ra"]);
+    expect(siteScopeOf(cfg({ landing: "folio" }), "folio")).toEqual(["folio"]);
     expect(siteScopeOf(cfg({ landing: "smart-base" }), "smart-base")).toEqual(["smart-base"]);
   });
 

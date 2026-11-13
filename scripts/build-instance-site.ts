@@ -219,10 +219,10 @@ export function sharedAssetsOf(root: string): string | undefined {
  * referenced; this supersedes Q-SZ-2 "B", which kept the landing layer's
  * pages). A folio that lands on itself is scoped the same way (owner,
  * 2026-11-13: "other harnesses should be referenced not included"). It used
- * to carry every instance it mounts, which put who-iris' 7,129 reference
- * pages, its library files and cat-harness' pages in smart-ra's site and
- * took it past Pages' 1 GB limit. Every other layer's pages are linked on
- * the platform's site.
+ * to carry every instance it mounts, which put a mounted content layer's
+ * thousands of reference pages, its library files and the harness's pages
+ * in a folio's site and took it past Pages' 1 GB limit. Every other layer's
+ * pages are linked on the platform's site.
  *
  * Undefined (every instance) only for the hub, which exists to carry them
  * all, and for a checkout that names no landing.
