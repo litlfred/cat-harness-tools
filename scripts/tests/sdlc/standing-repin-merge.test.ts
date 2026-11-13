@@ -1,7 +1,8 @@
 /**
  * The standing repin's PR step, run for real against stub `gh` and `git`:
- * who may ask for auto-merge (owner, 2026-11-13, card "Standing re-pin
- * workflows: MM dispatches, auto-merge OK").
+ * it never merges and never asks for auto-merge, on any trigger; it labels
+ * the PR `needs-repin` for the merge manager (owner, 2026-11-13, card
+ * "C. No auto-merge").
  *
  * The step's own `run:` script is read out of
  * `.github/workflows/standing-repin.yml` and executed with bash, with `gh`
@@ -60,7 +61,6 @@ function runStep(event: string, existing?: number, labelFails = false): { code: 
     RUNNER_TEMP: dir,
     GITHUB_STEP_SUMMARY: summary,
     BASE: "main",
-    METHOD: "squash",
     HAS_TOKEN: "true",
     GH_TOKEN: "x",
     EVENT: event,
@@ -79,30 +79,25 @@ function runStep(event: string, existing?: number, labelFails = false): { code: 
 
 const ghCalls = (calls: readonly string[]) => calls.filter((c) => c.startsWith("gh pr merge") || c.startsWith("gh pr edit"));
 
-describe("standing repin: only the merge manager's dispatch asks for auto-merge", () => {
-  test("the step reads the caller's event and labels with needs-repin", () => {
+describe("standing repin never merges: it labels needs-repin on every trigger", () => {
+  test("the step labels with needs-repin and has no merge method", () => {
     const s = step();
-    expect(s.env?.EVENT).toBe("${{ github.event_name }}");
     expect(s.env?.REPIN_LABEL).toBe("needs-repin");
+    expect(s.env?.METHOD).toBeUndefined();
+    expect(s.run).not.toMatch(/--auto\b/);
   });
 
-  test("workflow_dispatch (the merge manager started it): auto-merge, no label", () => {
-    const r = runStep("workflow_dispatch");
-    expect(r.code).toBe(0);
-    expect(r.calls.some((c) => c.startsWith("gh pr create --base main --head repin/standing-"))).toBe(true);
-    expect(ghCalls(r.calls)).toEqual(["gh pr merge 42 --auto --squash"]);
-  });
-
-  test.each(["schedule", "repository_dispatch"])("%s: the PR is labelled needs-repin, and auto-merge is never asked for", (event) => {
+  test.each(["workflow_dispatch", "schedule", "repository_dispatch"])("%s: the new PR is labelled needs-repin, and auto-merge is never asked for", (event) => {
     const r = runStep(event);
     expect(r.code).toBe(0);
+    expect(r.calls.some((c) => c.startsWith("gh pr create --base main --head repin/standing-"))).toBe(true);
     expect(ghCalls(r.calls)).toEqual(["gh pr edit 42 --add-label needs-repin", "gh pr merge 42 --disable-auto"]);
-    expect(r.calls.some((c) => c.includes("--auto"))).toBe(false);
-    expect(r.summary).toContain(`labelled \`needs-repin\` for the merge manager; no auto-merge on a ${event} run`);
+    expect(r.calls.some((c) => /--auto\b/.test(c))).toBe(false);
+    expect(r.summary).toContain(`labelled \`needs-repin\` for the merge manager (${event} run); this workflow never merges it`);
   });
 
-  test("a scheduled run updating the open repin PR labels that PR and turns its auto-merge off", () => {
-    const r = runStep("schedule", 7);
+  test("a run updating the open repin PR labels that PR and turns its auto-merge off", () => {
+    const r = runStep("workflow_dispatch", 7);
     expect(r.code).toBe(0);
     expect(r.calls.some((c) => c.startsWith("gh pr create"))).toBe(false);
     expect(ghCalls(r.calls)).toEqual([
@@ -115,6 +110,6 @@ describe("standing repin: only the merge manager's dispatch asks for auto-merge"
   test("a label that cannot be added fails the run, so the merge manager is not left unaware", () => {
     const r = runStep("schedule", undefined, true);
     expect(r.code).not.toBe(0);
-    expect(r.calls.some((c) => c.includes("--auto"))).toBe(false);
+    expect(r.calls.some((c) => /--auto\b/.test(c))).toBe(false);
   });
 });
