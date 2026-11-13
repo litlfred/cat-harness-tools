@@ -49,6 +49,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { checkoutDirectories, checkoutRootFor } from "../../schemas/kg/harness-config.js";
 import { findDeclarationFile } from "../../schemas/kg/instance-roots.js";
 import { checkoutInstanceRoots } from "../viewer-declarations.ts";
+import { readPathAt } from "../lib/layer-output.ts";
 import {
   BUILDING_BLOCKS_V01,
   BuildingBlocksSchema,
@@ -290,7 +291,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     // An artifact index is BUILT AT PUBLISH: its directory, or its index.json,
     // is absent from a checkout. Recorded, so an example it would hold is
     // reported as could-not-determine rather than as missing.
-    if (kinds.includes("fhir-artifact-index") && !existsSync(join(d.absPath, "index.json"))) {
+    if (kinds.includes("fhir-artifact-index") && !existsSync(readPathAt(checkout, join(d.absPath, "index.json")))) {
       corpus.examplesUnbuilt.push(`${instance}/${rel(d.absPath)}`);
     }
     if (!existsSync(d.absPath) || !statSync(d.absPath).isDirectory()) continue;
@@ -370,7 +371,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
       corpus.roles.set(instance, roles);
     }
     if (kinds.includes("fhir-artifact-index")) {
-      const idx = readJson(join(d.absPath, "index.json")) as { artifacts?: unknown[]; entries?: unknown[] } | undefined;
+      const idx = readJson(readPathAt(checkout, join(d.absPath, "index.json"))) as { artifacts?: unknown[]; entries?: unknown[] } | undefined;
       type Entry = { key?: string; title?: string; description?: string; code?: { text?: string }; published?: Record<string, { url?: string }>; profiles?: unknown; materialization?: { localPath?: unknown } };
       for (const a of (idx?.artifacts ?? idx?.entries ?? []) as Entry[]) {
         if (typeof a.key !== "string") continue;

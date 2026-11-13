@@ -30,7 +30,7 @@
  * check that enforces that is plan step 1's second half.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { inputSiteReached } from "../../schemas/sdlc/input-trace.js";
 
@@ -96,4 +96,27 @@ export function readPathFor(root: string, layer: LayerRef, rel: string, mounted:
   // check that reads one cannot be skipped on its fingerprint.
   if (mounted.has(layer.instance)) inputSiteReached(`layer-output: ${layer.instance}/${rel}`);
   return existsSync(computed) ? computed : join(resolve(root), layer.path, rel);
+}
+
+/**
+ * Where to read a file a reader names by its ABSOLUTE path in the checkout,
+ * as a declared directory's `absPath` gives it: through {@link readPathFor}
+ * when the path is inside a mounted layer (the deepest mount that holds it),
+ * else the path itself. For readers that walk declared directories rather
+ * than name a layer (bean `cat-tools-sm8r`, item 4, plan step 2).
+ */
+export function readPathAt(root: string, absPath: string, mounted: Map<string, string> = mountedInstances(root)): string {
+  const r = resolve(root);
+  const p = resolve(absPath);
+  let best: LayerRef | undefined;
+  let bestDir = "";
+  for (const [instance, path] of mounted) {
+    const dir = resolve(r, path);
+    if (dir === r || !(p === dir || p.startsWith(dir + sep))) continue;
+    if (dir.length > bestDir.length) {
+      best = { instance, path };
+      bestDir = dir;
+    }
+  }
+  return best ? readPathFor(r, best, relative(bestDir, p), mounted) : p;
 }

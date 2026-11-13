@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { LAYER_OUTPUT_ROOT, mountedInstances, outputPathFor, readPathFor } from "../lib/layer-output.js";
+import { LAYER_OUTPUT_ROOT, mountedInstances, outputPathFor, readPathAt, readPathFor } from "../lib/layer-output.js";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -76,5 +76,30 @@ describe("readPathFor", () => {
   test("with nothing computed, the reader falls back to the mount", () => {
     const root = checkout(LOCK);
     expect(readPathFor(root, { instance: "lower", path: "lower" }, "a.json")).toBe(join(root, "lower", "a.json"));
+  });
+});
+
+describe("readPathAt: a reader that names a file by its absolute path", () => {
+  const root = mkdtempSync(join(tmpdir(), "layer-output-at-"));
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(join(root, "index.lock.json"), JSON.stringify({ instances: [{ instance: "ig", path: "ig" }, { instance: "inner", path: "ig/inner" }] }));
+  mkdirSync(join(root, "ig", "inner", "dir"), { recursive: true });
+  mkdirSync(join(root, "own"), { recursive: true });
+
+  test("inside a mount with nothing computed: the path itself", () => {
+    expect(readPathAt(root, join(root, "ig", "dir", "index.json"))).toBe(join(root, "ig", "dir", "index.json"));
+  });
+  test("inside a mount with a computed file: the output root", () => {
+    mkdirSync(join(root, LAYER_OUTPUT_ROOT, "ig", "dir"), { recursive: true });
+    writeFileSync(join(root, LAYER_OUTPUT_ROOT, "ig", "dir", "index.json"), "{}");
+    expect(readPathAt(root, join(root, "ig", "dir", "index.json"))).toBe(join(root, LAYER_OUTPUT_ROOT, "ig", "dir", "index.json"));
+  });
+  test("the deepest mount that holds the path names the layer", () => {
+    mkdirSync(join(root, LAYER_OUTPUT_ROOT, "inner", "dir"), { recursive: true });
+    writeFileSync(join(root, LAYER_OUTPUT_ROOT, "inner", "dir", "x.json"), "{}");
+    expect(readPathAt(root, join(root, "ig", "inner", "dir", "x.json"))).toBe(join(root, LAYER_OUTPUT_ROOT, "inner", "dir", "x.json"));
+  });
+  test("outside every mount: the path itself", () => {
+    expect(readPathAt(root, join(root, "own", "index.json"))).toBe(join(root, "own", "index.json"));
   });
 });
