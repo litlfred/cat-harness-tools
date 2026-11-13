@@ -398,7 +398,14 @@ describe("this checkout", () => {
       expect(corpus.has(s)).toBe(true);
     }
     const files = workflowFiles(PLATFORM, "checkout").map((f) => relative(REPO, f));
-    expect(files).toContain("smart-base/collab/processes/diig-investment-path.bpmn");
+    // DIIG's diagram moves to smart-base's opt-in `collab/` (owner, 2026-11-13).
+    // Either place proves the corpus reaches the dependent's diagrams, and
+    // accepting both lets this land before or after that move.
+    expect(
+      files.some((f) =>
+        ["smart-base/collab/processes/diig-investment-path.bpmn", "smart-base/methodologies/processes/diig-investment-path.bpmn"].includes(f),
+      ),
+    ).toBe(true);
     expect(files).toContain("folio-assistant-core/processes/library/deep-document-research.bpmn");
   });
 
