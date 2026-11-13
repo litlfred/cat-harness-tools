@@ -34,6 +34,7 @@ Feature: Developer mode tool parity, topology and capability refusal
 
   @test:scripts/tests/tools/developer-mode-parity.test.ts::Developer_Mode_Topology::all_10_proposal_axes_are_expressible_and_validated
   Scenario: The topology axes list their values and refuse unknown ones
+    # Gap: the title says "all 10" axes; the body lists eight enums exactly, checks one publication host by containment, and tests invalid-value rejection for only compute, toolSurface and modelCardinality
     Given the topology axis value lists
     Then compute, tool surface, model cardinality, data stores, visibility, forge, network reach and model provenance each list their exact values
     And the publication hosts include "local-server"

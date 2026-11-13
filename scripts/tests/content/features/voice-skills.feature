@@ -64,6 +64,7 @@ Feature: The voice-skills check
 
   @test:scripts/tests/content/voice-skills.test.ts::the_structural_half_—_what_Zod_cannot_check::every_shipped_voice's_declared_instruction_body_resolves
   Scenario: Every shipped voice-skill declares an instruction body that exists
+    # Gap: no assertion that any shipped voice is folio-voice-skill/v1, so the loop may check nothing
     Given each shipped voice whose voice.json schema is "folio-voice-skill/v1"
     Then it declares an instructions file
     And that file exists in the voice's directory

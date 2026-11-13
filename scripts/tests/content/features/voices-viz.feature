@@ -51,6 +51,7 @@ Feature: Voices graph reader and viewer page
 
   @test:scripts/tests/content/voices-viz.test.ts::the_page_agrees_with_the_QA_sidecars_about_severity::`overlaySeverity`_and_`criterion`_match_what_the_criteria_derivation_produces
   Scenario: Each voice's overlay severity and criterion match the criteria derivation
+    # Gap: the describe says "agrees with the QA sidecars"; the body compares the graph with the criteria derivation functions, not with any sidecar
     Given the voices graph of the harness and the shipped voices of the criteria derivation
     When each graph voice is matched to its shipped voice by id
     Then every graph voice has a shipped voice

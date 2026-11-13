@@ -78,6 +78,7 @@ Feature: Voice-scoped criteria are opt-in, and an unreadable config runs them
 
   @test:scripts/tests/content/voice-gate.test.ts::readActiveVoices::an_instance_with_NO_config_of_its_own_is_`undefined`,_not_`[]`
   Scenario: An instance with no config of its own has undetermined voices
+    # Gap: the body is the same as "no config at all is undefined" (a fresh empty temporary directory); no real instance layer without a config is read
     Given a fresh temporary directory that declares nothing
     Then readActiveVoices returns undefined
 
