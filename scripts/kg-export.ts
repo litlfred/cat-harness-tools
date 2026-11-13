@@ -2482,9 +2482,9 @@ const declaredRoleIds = (root: string, scope: CorpusScope = corpusScopeFor(root)
 
 /**
  * The document a role's IRI is minted in: the one whose layer DECLARES it,
- * as {@link skillHome} does for skills. A lane of a folio-assistant-core
+ * as {@link skillHome} does for skills. A lane of a content layer's
  * process binding cat-harness's `user` linked
- * `<site>/folio-assistant-core/role/user`, a page no export writes, because
+ * `<site>/<that layer>/role/user`, a page no export writes, because
  * the IRI was minted in the process's own document (461 dead links on the
  * folio-assistant site, cat-harness-tools#1894). This document wins when it
  * declares the role; a role nobody declares keeps this document's IRI, so it
