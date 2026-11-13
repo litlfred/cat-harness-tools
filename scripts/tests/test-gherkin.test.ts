@@ -480,6 +480,43 @@ describe("declared specifications", () => {
     write(notDak, { resourceType: "ImplementationGuide" });
     expect(scanTree(notDak).specifications).toEqual([]);
   });
+
+  test("a DAK declared in index.config.json specifies the features its IG publishes, not the repository's own", () => {
+    const write = (root: string, contentTypes: unknown) => {
+      mkdirSync(join(root, "input", "testing"), { recursive: true });
+      mkdirSync(join(root, "tools"), { recursive: true });
+      writeFileSync(join(root, "input", "testing", "IMMZ.feature"), "Feature: immz\n  Scenario: dose is due\n");
+      writeFileSync(join(root, "tools", "own.feature"), "Feature: own\n  Scenario: unbound\n");
+      writeFileSync(join(root, "index.config.json"), JSON.stringify({ contentTypes }));
+    };
+    const specs = (root: string) => scanTree(root).specifications.map((s) => s.file);
+    const kinds = (root: string) => scanTree(root).findings.map((f) => `${f.kind} ${f.file}`);
+    const dak = { resourceType: "DAK", id: "x" };
+
+    // The IG publishes input/testing/: its features are specifications; the repository's own stay checked.
+    const ig = mkdtempSync(join(tmpdir(), "dakct-"));
+    write(ig, { dak, ig: { include: ["sushi-config.yaml", "./input/testing/"] } });
+    expect(specs(ig)).toEqual(["input/testing/IMMZ.feature"]);
+    expect(kinds(ig)).toEqual(["scenario-names-no-test tools/own.feature"]);
+
+    // A DAK whose IG publishes no feature (a harness layer that is also a DAK) has no specifications.
+    const layer = mkdtempSync(join(tmpdir(), "dakctlayer-"));
+    write(layer, { dak, ig: { include: ["input/fsh/"] } });
+    expect(specs(layer)).toEqual([]);
+    expect(kinds(layer).sort()).toEqual(["scenario-names-no-test input/testing/IMMZ.feature", "scenario-names-no-test tools/own.feature"]);
+
+    // testScenarios paths, when listed, decide; with no IG section and none listed, nothing is a specification.
+    const scoped = mkdtempSync(join(tmpdir(), "dakctscoped-"));
+    write(scoped, { dak: { ...dak, testScenarios: [{ url: "tools/" }] }, ig: { include: ["input/"] } });
+    expect(specs(scoped)).toEqual(["tools/own.feature"]);
+    const bare = mkdtempSync(join(tmpdir(), "dakctbare-"));
+    write(bare, { dak });
+    expect(specs(bare)).toEqual([]);
+
+    const notDak = mkdtempSync(join(tmpdir(), "dakctnot-"));
+    write(notDak, { dak: { resourceType: "ImplementationGuide" }, ig: { include: ["input/"] } });
+    expect(specs(notDak)).toEqual([]);
+  });
 });
 
 describe("a JS title is named by its runtime string", () => {

@@ -1008,27 +1008,66 @@ export interface SpecificationDeclaration {
 export const DAK_DECLARATION: SpecificationDeclaration = {
   name: "dak",
   read(root, features) {
-    const path = join(root, "dak.json");
-    if (!existsSync(path)) return undefined;
-    let dak: { resourceType?: unknown; testScenarios?: unknown };
-    try {
-      dak = JSON.parse(readFileSync(path, "utf-8"));
-    } catch {
-      return undefined;
-    }
-    if (dak.resourceType !== "DAK") return undefined;
-    const sources = (Array.isArray(dak.testScenarios) ? dak.testScenarios : [])
-      .map((t) => (t && typeof t === "object" && typeof (t as { url?: unknown }).url === "string" ? (t as { url: string }).url : undefined))
-      .filter((u): u is string => !!u && !/^[a-z][a-z0-9+.-]*:/i.test(u))
-      .map((u) => u.replace(/^\.\//, "").replace(/\/+$/, ""));
-    const files = features.filter((f) => sources.length === 0 || sources.some((u) => f === u || f.startsWith(u + "/")));
+    const dak = readJson(join(root, "dak.json")) as { resourceType?: unknown; testScenarios?: unknown } | undefined;
+    if (!dak || dak.resourceType !== "DAK") return undefined;
+    const sources = testScenarioPaths(dak.testScenarios);
+    const files = features.filter((f) => sources.length === 0 || underAny(f, sources));
     const because = sources.length === 0 ? "dak.json declares a DAK" : `dak.json declares a DAK whose testScenarios are ${sources.join(", ")}`;
     return { files: new Set(files), because };
   },
 };
 
+/**
+ * The same DAK, declared as a content type: `contentTypes.dak` in the root
+ * `index.config.json` (`resourceType: "DAK"`), which replaces `dak.json`. Its
+ * specifications are the `.feature` files the DAK publishes: those under its
+ * `testScenarios` paths, or, when it lists none, those inside the IG's
+ * declared `contentTypes.ig.include`. A repository's own tooling features lie
+ * outside what the IG publishes, so a harness layer that also declares
+ * itself a DAK keeps every one of them checked.
+ */
+export const DAK_CONTENT_TYPE_DECLARATION: SpecificationDeclaration = {
+  name: "dak-content-type",
+  read(root, features) {
+    const config = readJson(join(root, "index.config.json")) as { contentTypes?: { dak?: { resourceType?: unknown; testScenarios?: unknown }; ig?: { include?: unknown } } } | undefined;
+    const dak = config?.contentTypes?.dak;
+    if (!dak || dak.resourceType !== "DAK") return undefined;
+    const sources = testScenarioPaths(dak.testScenarios);
+    const include = Array.isArray(config?.contentTypes?.ig?.include)
+      ? (config!.contentTypes!.ig!.include as unknown[]).filter((u): u is string => typeof u === "string").map(normalisePath)
+      : [];
+    const scope = sources.length > 0 ? sources : include;
+    const files = features.filter((f) => underAny(f, scope));
+    const because =
+      sources.length > 0
+        ? `index.config.json contentTypes.dak declares a DAK whose testScenarios are ${sources.join(", ")}`
+        : "index.config.json contentTypes.dak declares a DAK, and contentTypes.ig.include is what it publishes";
+    return { files: new Set(files), because };
+  },
+};
+
+function readJson(path: string): unknown {
+  if (!existsSync(path)) return undefined;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8"));
+  } catch {
+    return undefined;
+  }
+}
+
+const normalisePath = (u: string): string => u.replace(/^\.\//, "").replace(/\/+$/, "");
+const underAny = (f: string, paths: readonly string[]): boolean => paths.some((u) => f === u || f.startsWith(u + "/"));
+
+/** The `url`s of a DAK's `testScenarios` that are paths in the tree (not absolute URLs). */
+function testScenarioPaths(testScenarios: unknown): string[] {
+  return (Array.isArray(testScenarios) ? testScenarios : [])
+    .map((t) => (t && typeof t === "object" && typeof (t as { url?: unknown }).url === "string" ? (t as { url: string }).url : undefined))
+    .filter((u): u is string => !!u && !/^[a-z][a-z0-9+.-]*:/i.test(u))
+    .map(normalisePath);
+}
+
 /** Every declaration the scan honours. A new one is an entry here, never a path in a caller. */
-export const SPECIFICATION_DECLARATIONS: readonly SpecificationDeclaration[] = [DAK_DECLARATION];
+export const SPECIFICATION_DECLARATIONS: readonly SpecificationDeclaration[] = [DAK_DECLARATION, DAK_CONTENT_TYPE_DECLARATION];
 
 export interface ScanOptions {
   /** Restrict to these repo-relative directories or files. Names stay relative to `root`. */
