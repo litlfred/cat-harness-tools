@@ -1,10 +1,7 @@
 # Tables in the LaTeX render: every tabular is wrapped in an adjustbox that
 # only shrinks, over-wide prose columns wrap at a computed width, and long
 # math and identifiers get break points. Each Scenario names the test that
-# executes it. Two tests have a backslash escape in their titles and are not
-# tagged until the checker's naming change (#2065) lands: "over-wide prose
-# table wraps its long column at a computed p{<frac>\linewidth}" and
-# "splitLongMath breaks top-level operators, not inside \frac / groups".
+# executes it.
 Feature: LaTeX tables fit the line width
 
   @test:scripts/tests/render-latex-tables.test.ts::table_rendering_wraps_tabular_in_adjustbox::GFM_markdown_table_(renderTable_path)
@@ -34,6 +31,13 @@ Feature: LaTeX tables fit the line width
     When a three-cell table aligned left, centre and right is rendered
     Then its tabular spec is "l c r" with no p{}
 
+  @test:scripts/tests/render-latex-tables.test.ts::smart_column_sizing_for_over-wide_tables::over-wide_prose_table_wraps_its_long_column_at_a_computed_p{<frac>\linewidth}
+  Scenario: An over-wide prose table wraps its long column at a computed fraction of the line width
+    Given a three-column table whose description column holds sentences well over forty-five characters
+    When it is rendered to LaTeX
+    Then a column is ragged-right p{0.<digits>\linewidth}
+    And the adjustbox safety net is kept, and the LaTeX validates with no errors
+
   @test:scripts/tests/render-latex-tables.test.ts::smart_column_sizing_for_over-wide_tables::over-wide_DENSE_table_(nothing_wraps)_stays_plain_for_adjustbox_to_scale
   Scenario: An over-wide dense table stays plain for the adjustbox to scale
     When an eight-column table of short cells is rendered
@@ -55,6 +59,12 @@ Feature: LaTeX tables fit the line width
     Given eight columns of fairly long text
     When the column spec is chosen
     Then it is "l l l l l l l l" with no p{}
+
+  @test:scripts/tests/render-latex-tables.test.ts::breaking_non-breaking_blobs_(long_math_+_identifiers)::splitLongMath_breaks_top-level_operators,_not_inside_\frac_/_groups
+  Scenario: splitLongMath breaks top-level operators, not those inside \frac groups
+    Given long math joining four \frac terms with top-level +, - and =
+    When splitLongMath splits it
+    Then \frac{a+b}{c+d} is untouched, a top-level + is followed by \allowbreak{}, and there are at least three break points
 
   @test:scripts/tests/render-latex-tables.test.ts::breaking_non-breaking_blobs_(long_math_+_identifiers)::short_math_is_returned_unchanged
   Scenario: Short math is unchanged

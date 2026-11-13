@@ -1,13 +1,31 @@
 # A lane may declare that its performer varies, and the audit reads it
 # (bean ug4r). Each Scenario names the test that executes it.
-#
-# The four tests under the describe whose title holds an escaped quote
-# (a lane declaring <folio:role variable=\"true\"/>) carry no Scenario yet:
-# a pending checker change (#2065) renames tags with escaped quotes.
 Feature: Variable performer lanes
 
   Background:
     Given a role graph declaring role "logger"
+
+  @test:scripts/tests/variable-performer.test.ts::a_lane_declaring_<folio:role_variable="true"/>::the_real_diagram_carries_the_declaration_and_it_parses
+  Scenario: The real log-message diagram's Actor lane declares a varying performer and binds no role
+    When bootstrap's log-message.bpmn is loaded
+    Then its Lane_Actor lane exists, reads as performer-varies, and has no role ref
+
+  @test:scripts/tests/variable-performer.test.ts::a_lane_declaring_<folio:role_variable="true"/>::a_lane_that_binds_a_role_is_NOT_read_as_varying
+  Scenario: A lane that binds a role is not read as varying
+    When bootstrap's log-message.bpmn is loaded
+    Then its Lane_Logger lane exists and does not read as performer-varies
+
+  @test:scripts/tests/variable-performer.test.ts::a_lane_declaring_<folio:role_variable="true"/>::only_the_exact_string_"true"_counts
+  Scenario: Only the exact value "true" declares a varying performer
+    Given log-message.bpmn with the Actor lane's role variable changed from "true" to "yes", the edit having taken effect
+    When the diagram is loaded
+    Then Lane_Actor does not read as performer-varies
+
+  @test:scripts/tests/variable-performer.test.ts::a_lane_declaring_<folio:role_variable="true"/>::a_lane_with_neither_ref_nor_the_flag_stays_unflagged
+  Scenario: A lane with neither a role ref nor the flag stays unflagged
+    Given log-message.bpmn with the Actor lane's extension elements removed, the edit having taken effect
+    When the diagram is loaded
+    Then Lane_Actor does not read as performer-varies and has no role ref
 
   @test:scripts/tests/variable-performer.test.ts::laneBinding_—_the_five_answers_the_audit_judges::a_lane_whose_ref_names_a_declared_role_is_BOUND
   Scenario: A lane naming a declared role is bound
