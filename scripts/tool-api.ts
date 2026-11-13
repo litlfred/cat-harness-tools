@@ -70,6 +70,7 @@ export function resolveModule(module: string, declaringRoot: string, roots: read
 
 /** What a registrar registers: each `server.tool(…)` or `server.registerTool(…)` call, recorded. */
 export async function captureRegistrar(moduleAbs: string, register?: string): Promise<{ name: string; description: string; inputSchema: Record<string, unknown> }[]> {
+  // input-site: declared tool-registrars #029f9904 — the registrar module a Tool's inProcess arm names, resolved as resolveModule does
   const mod = (await import(moduleAbs)) as Record<string, unknown>;
   const fns = Object.entries(mod).filter(([k, v]) => typeof v === "function" && k.startsWith("register") && (register === undefined || k === register));
   const out: { name: string; description: string; inputSchema: Record<string, unknown> }[] = [];
