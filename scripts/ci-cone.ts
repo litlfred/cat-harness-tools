@@ -6,9 +6,9 @@
  * @module scripts/ci-cone
  * @graphNode none — a CI helper behind `gate-shell.sh`, not a gate itself
  *
- * A check's inputs are declared or DERIVED, never inferred. Declared inputs
- * of `{tracked}` (the whole tree) move on every PR, so this adds the derived
- * read set, computed from the run itself and never stored as authored data:
+ * A check's inputs are DERIVED, never declared or inferred: its read set,
+ * computed from the run itself and never stored as authored data. Every
+ * check is a candidate, declared in `task-io` or not ({@link coneFingerprint}):
  *
  * 1. **Record (a push to main).** Every candidate check runs under
  *    `strace -f`. The files, directories and absent paths that run touched
@@ -84,7 +84,6 @@ import {
   fingerprint,
   qaBaselineIdentity,
   RECIPE_VERSION,
-  TRACKED,
   type BaselineResolver,
   type Fingerprint,
   type PairIO,
@@ -878,9 +877,18 @@ export function saveRecords(root: string, records: ConeRecords): void {
 /**
  * The fingerprint a cone record is keyed on: `f017`'s, over the script, the
  * audited environment, the tools and the baseline, but with NO tree input,
- * because the read set stands in for the tree. Only a check that `task-io`
- * declares `{tracked}` is a candidate. That declaration is the claim, read
- * for writes, that `f017` already relies on.
+ * because the read set stands in for the tree.
+ *
+ * EVERY check is a candidate, declared in `task-io` or not (owner, card,
+ * 2026-11-13: "every gate"; the 4rbc rule, derived and not declared). Its
+ * inputs are what its traced run read, as a test file's already are; a
+ * `task-io` input declaration, `{tracked}` or narrower, is not consulted,
+ * and its declared OUTPUTS, when it has any, are still hashed. Before, only a
+ * check declared `{tracked}` was a candidate, and on main's last 9 push runs
+ * (2026-11-13) about 50 gates a run were not traced for that reason alone.
+ * Nothing else is relaxed: a write inside the checkout, an unannotated or
+ * `traced` input site, more than {@link MAX_PATHS} paths, or a red run still
+ * records nothing, so the check runs.
  */
 export function coneFingerprint(
   root: string,
@@ -897,8 +905,7 @@ export function coneFingerprint(
     const pre = preloadScripts(root);
     return fingerprint(root, { ...scripts, ...pre }, [script, ...Object.keys(pre)], { inputs: [], outputs: [] }, digests, baseline, { treeReplayed: true });
   }
-  if (io?.inputs?.includes(TRACKED) !== true) return { undetermined: "not declared {tracked} in task-io, so not a candidate" };
-  return checkFingerprint(root, scripts, script, { inputs: [], outputs: io.outputs }, digests, baseline, { treeReplayed: true });
+  return checkFingerprint(root, scripts, script, { inputs: [], outputs: io?.outputs ?? [] }, digests, baseline, { treeReplayed: true });
 }
 
 // ── Test files as gates ──────────────────────────────────────────────────────
