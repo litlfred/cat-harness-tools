@@ -196,3 +196,36 @@ export function overlayPath(abs: string, root: string | undefined = checkoutRoot
   if (mounted.size === 0) return abs;
   return readPathAt(root, abs, mounted);
 }
+
+/**
+ * Where a WRITER writes the computed file a reader finds at `abs`: its
+ * output-root twin when `abs` is in a mounted layer, else `abs`. The write
+ * half of {@link overlayPath} (plan step 5: the QA writers). Unlike a
+ * reader, a writer refuses an unparseable lock (see {@link mountedInstances}):
+ * reading it as "nothing mounted" would write into the mounts.
+ */
+export function writePathAt(abs: string, root: string | undefined = checkoutRoot()): string {
+  if (root === undefined) return abs;
+  const mounted = mountedInstancesCached(root);
+  if (mounted.size === 0) return abs;
+  return outputTwinOf(root, abs, mounted) ?? abs;
+}
+
+/**
+ * The directories a reader LISTS for the directory it knows as `abs`: the
+ * output-root twin first, then `abs` itself, each only if it exists. A
+ * directory reader walks both and lets the first hold a relative path win,
+ * which is the union {@link readPathAt} gives file by file.
+ */
+export function overlayDirs(abs: string, root: string | undefined = checkoutRoot()): string[] {
+  let twin: string | undefined;
+  if (root !== undefined) {
+    try {
+      const mounted = mountedInstancesCached(root);
+      twin = mounted.size ? outputTwinOf(root, abs, mounted) : undefined;
+    } catch {
+      twin = undefined;
+    }
+  }
+  return [twin, abs].filter((d): d is string => d !== undefined && existsSync(d));
+}

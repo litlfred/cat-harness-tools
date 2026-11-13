@@ -84,6 +84,7 @@ import { claimsEntry, judgePair, rootScripts } from "./pair-claims.js";
 import { auditFolioBlocks } from "./block-reference-resolver.js";
 // `Dirent` for the orphan-sidecar sweep (bean `3jj9`), which walks the
 // results tree with `withFileTypes` to tell a directory from a file.
+import { writePathAt } from "./lib/layer-output.ts";
 import { withPriorAdversarialReviews } from "./lib/kg-qa-carry.ts";
 import { judgeSkillRef, switchedOffSkillHomes } from "./lib/switched-off-skills.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
@@ -374,7 +375,16 @@ const INSTANCE_RUN = root !== AUDITOR_ROOT;
  * sweeps through these two paths and composes no other.
  */
 const QA_HOME = kgQaHomeFor(root, INSTANCE_RUN ? AUDITOR_ROOT : undefined);
-const KG_QA_TREE = join(QA_HOME.root, "kg-qa");
+/** The layer's `kg-qa/` tree as the layer lays it out: what its declarations and the stored-directory test name. */
+const KG_QA_LOGICAL = join(QA_HOME.root, "kg-qa");
+/**
+ * Where this run writes and reads the tree: the logical one for a local
+ * layer, its layer output root (`build/layers/<instance>/…`) for a mounted
+ * one, so the audit never writes into a mount (bean `cat-tools-sm8r`, item
+ * 4). Every sidecar, relocation and orphan sweep below is computed from it,
+ * so they move together.
+ */
+const KG_QA_TREE = writePathAt(KG_QA_LOGICAL);
 
 /**
  * Where this run's JUDGEMENTS live — pair attestations and voice reviews —
@@ -393,7 +403,7 @@ const ATT_STORE = ATT_HOME.storeRoot;
  * orphaned sidecar there is advisory in judge mode. Unstored, it is still the
  * committed record and both are findings, as they were.
  */
-const derivedStored = qaStorageOf(KG_QA_TREE) !== undefined;
+const derivedStored = qaStorageOf(KG_QA_LOGICAL) !== undefined;
 
 
 /**
@@ -3028,8 +3038,9 @@ const manifest: KgQaManifest = {
     engine_version: ENGINE_VERSION,
   },
 };
-const manifestPath =
-  QA_HOME.by === "hosted" ? join(QA_HOME.root, "kg-qa.manifest.json") : join(root, KG_QA_MANIFEST_PATH);
+const manifestPath = writePathAt(
+  QA_HOME.by === "hosted" ? join(QA_HOME.root, "kg-qa.manifest.json") : join(root, KG_QA_MANIFEST_PATH),
+);
 const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
 if (check) {
   const current = existsSync(manifestPath) ? readFileSync(manifestPath, "utf-8") : undefined;

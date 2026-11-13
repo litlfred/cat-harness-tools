@@ -16,9 +16,11 @@ import {
   mountedInstances,
   outputPathFor,
   outputTwinOf,
+  overlayDirs,
   overlayPath,
   readPathAt,
   readPathFor,
+  writePathAt,
 } from "../lib/layer-output.js";
 import { movedInventory } from "../qa-verify-moved.js";
 import { overlayEntries } from "../qa-store.js";
@@ -187,5 +189,41 @@ describe("the QA inventory and publish see the overlay (step 5)", () => {
     writeFileSync(join(root, "own", "test", "results", "a.json"), "x");
     expect(movedInventory(root, ["own/test/results"]).directories[0]!.files).toEqual([{ path: "own/test/results/a.json", bytes: 1 }]);
     expect(overlayEntries(root, ["own/test/results"])).toEqual([]);
+  });
+});
+
+describe("writePathAt and overlayDirs (step 5: the QA writers)", () => {
+  test("a mounted layer's path is written under build/layers/<instance>/", () => {
+    clearMountedCache();
+    const root = checkout(LOCK);
+    expect(writePathAt(join(root, "lower", "test", "results", "a.json"), root)).toBe(
+      join(root, LAYER_OUTPUT_ROOT, "lower", "test", "results", "a.json"),
+    );
+  });
+
+  test("a local layer's path, and one outside the checkout, are written where they are", () => {
+    clearMountedCache();
+    const root = checkout(LOCK);
+    expect(writePathAt(join(root, "own", "test", "results", "a.json"), root)).toBe(join(root, "own", "test", "results", "a.json"));
+    expect(writePathAt("/elsewhere/x.json", root)).toBe("/elsewhere/x.json");
+    expect(writePathAt("/elsewhere/x.json", undefined)).toBe("/elsewhere/x.json");
+  });
+
+  test("a writer refuses an unparseable lock rather than writing into the mounts", () => {
+    clearMountedCache();
+    const root = checkout("{ not json");
+    expect(() => writePathAt(join(root, "lower", "x.json"), root)).toThrow(/cannot be determined/);
+  });
+
+  test("overlayDirs lists the output root first, then the layer's own directory, each only if it exists", () => {
+    clearMountedCache();
+    const root = checkout(LOCK);
+    const own = join(root, "lower", "test", "results");
+    const twin = join(root, LAYER_OUTPUT_ROOT, "lower", "test", "results");
+    expect(overlayDirs(own, root)).toEqual([]);
+    mkdirSync(own, { recursive: true });
+    expect(overlayDirs(own, root)).toEqual([own]);
+    mkdirSync(twin, { recursive: true });
+    expect(overlayDirs(own, root)).toEqual([twin, own]);
   });
 });

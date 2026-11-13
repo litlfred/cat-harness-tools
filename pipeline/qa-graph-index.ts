@@ -77,7 +77,8 @@
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { overlayDirs } from "../scripts/lib/layer-output.ts";
 
 /** The published tag. */
 export const QA_GRAPH_INDEX_SCHEMA = "folio-qa-graph/v1";
@@ -232,6 +233,22 @@ export function isQaGraphUnknown(ix: QaGraphProjection): ix is QaGraphUnknown {
   return (ix as QaGraphUnknown).availability === "unknown";
 }
 
+/**
+ * The JSON files of the graph under `dir` through the layer output overlay
+ * (bean `cat-tools-sm8r`, item 4): the output root's file where both hold one
+ * relative path, else the layer's own. Each path is where the bytes are.
+ */
+function overlayJsonFiles(dir: string, extensions?: readonly string[]): string[] {
+  const byRel = new Map<string, string>();
+  for (const d of overlayDirs(dir)) {
+    for (const p of jsonFilesIn(d, extensions)) {
+      const rel = relative(d, p);
+      if (!byRel.has(rel)) byRel.set(rel, p);
+    }
+  }
+  return [...byRel.keys()].sort().map((r) => byRel.get(r)!);
+}
+
 /** Read the `qa` graph under `dir` and project it. */
 export function readQaGraph(dir: string, opts?: { exclude?: ReadonlySet<string>; extensions?: readonly string[] }): QaGraphIndex {
   const acc = new Map<string, { files: number; field: "totals" | "counts" | null; buckets: Record<string, number> }>();
@@ -239,7 +256,7 @@ export function readQaGraph(dir: string, opts?: { exclude?: ReadonlySet<string>;
   let unreadable = 0;
   let files = 0;
 
-  for (const p of jsonFilesIn(dir, opts?.extensions)) {
+  for (const p of overlayJsonFiles(dir, opts?.extensions)) {
     if (opts?.exclude?.has(p)) continue;
     files += 1;
     let doc: unknown;
