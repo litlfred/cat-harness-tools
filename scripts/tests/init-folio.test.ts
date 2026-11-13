@@ -749,12 +749,12 @@ describe("a contentless instance (mer2)", () => {
 
   // Done-when 3: assert what was PRODUCED — a declaration that loads and
   // graphs that resolve — rather than inferring success from no throw.
-  for (const [label, run] of [
+  describe.each([
     ["instance", (d: string) => initInstance(instanceOpts(d))],
     ["document folio", (d: string) => initFolio(opts(d))],
     ["paper folio", (d: string) => initFolio(opts(d, { contentType: "paper" }))],
-  ] as const) {
-    test.skipIf(label === "paper folio" && NO_PAPER_PROFILE)(`probe — the ${label}'s declaration loads and every declared directory exists`, () => {
+  ] as const)("%s", (label, run) => {
+    test.skipIf(label === "paper folio" && NO_PAPER_PROFILE)("probe — its declaration loads and every declared directory exists", () => {
       const d = tmp();
       run(d);
       const decl = readDeclaration(d);
@@ -766,7 +766,7 @@ describe("a contentless instance (mer2)", () => {
         expect(existsSync(join(d, dir.path))).toBe(true);
       }
     });
-  }
+  });
 
   test.skipIf(NO_PAPER_PROFILE)("a folio's probe sees the content type it asked for, not a fallback", () => {
     const d = tmp();
