@@ -90,6 +90,15 @@ Feature: Adversarial review checklists, backfill and coverage
     When the skill is corrected to "beans update <id> --status in-progress" and reviewed again
     Then the review result is "pass" with no findings
 
+  @test:scripts/tests/adversarial-checklist.test.ts::Adversarial_Backfill_&_Risk-Ranking_(scripts/adversarial-backfill.ts)::never_passes_a_node_whose_file_does_not_exist,_nor_counts_it_as_reviewed
+  Scenario: A node whose file does not exist is never reviewed and never passes
+    Given a scratch root with no file at "scripts/ghost.ts"
+    When tool node "ghost" at "scripts/ghost.ts" is reviewed adversarially
+    Then the review result is "unknown", not "pass"
+    And no file is counted as reviewed
+    And "scripts/ghost.ts" is recorded as skipped because the file does not exist
+    And the review has no findings and is a valid AdversarialReview
+
   @test:scripts/tests/adversarial-checklist.test.ts::Adversarial_Backfill_&_Risk-Ranking_(scripts/adversarial-backfill.ts)::executes_backfill_batch_writing_to_sidecars_and_NEVER_creates_beans
   Scenario: A backfill batch writes its sidecars and never creates beans
     Given the ranked candidate nodes of this checkout with their sidecars redirected to a scratch tree

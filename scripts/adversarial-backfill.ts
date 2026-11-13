@@ -381,15 +381,15 @@ export function reviewNodeAdversarially(
   const checklist = getChecklistForKind(node.kind);
   const findings: AdversarialFinding[] = [];
 
-  // Read node content if on disk
+  // Read node content if on disk. An absent file is not reviewed: it is
+  // recorded as skipped and the review is `unknown` (incomplete coverage),
+  // never a silent `pass` over an empty text.
   const absPath = join(implementingRootFor(repoRoot, node.path), node.path);  // bean 70lx
-  let text = "";
-  if (existsSync(absPath)) {
-    text = readFileSync(absPath, "utf-8");
-  }
+  const present = existsSync(absPath);
+  const text = present ? readFileSync(absPath, "utf-8") : "";
 
-  // Adversarially test against checklist items
-  for (const item of checklist) {
+  // Adversarially test against checklist items (only a file that was read)
+  for (const item of present ? checklist : []) {
     if (item.id === "tool-description-fidelity") {
       // Check if description exists and matches
       if (text && !text.includes("Usage:") && !text.includes("description") && !text.includes("defineTool")) {
@@ -447,10 +447,14 @@ export function reviewNodeAdversarially(
     at: new Date().toISOString(),
     coverage: {
       files_total: 1,
-      files_reviewed: 1,
-      skipped: [],
+      files_reviewed: present ? 1 : 0,
+      skipped: present ? [] : [{ path: node.path, why: "file does not exist" }],
     },
-    result: findings.some((f) => f.weight === "blocking" && f.status === "open") ? "fail" : "pass",
+    result: !present
+      ? "unknown"
+      : findings.some((f) => f.weight === "blocking" && f.status === "open")
+        ? "fail"
+        : "pass",
     flags: findings.filter((f) => f.weight === "blocking"),
     findings,
   };
