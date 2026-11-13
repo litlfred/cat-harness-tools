@@ -57,7 +57,8 @@
  *     that must see every page of the finished site, the platform's own too (an IG's one bar on
  *     the identifier lookup page; owner, 2026-10-15); then the forwarding pages; then the search
  *     scopes (`search-split.ts`: the manifest and one index per scope, so a reader never loads
- *     the whole site's index); then `.nojekyll`
+ *     the whole site's index); then `.nojekyll`; then the 404 page's English fallback
+ *     (`lib/locale-fallback-404.ts`)
  *  7. every relative or base-rooted href/src/action in every page resolves to a file
  *     under the site (read with an HTML parser, HTMLRewriter, not a regex)
  *  8. for the root, the guard (`site-parity.ts`): the build is measured against the root it
@@ -119,6 +120,8 @@ import { instanceRoots, writeMissingVisualisers } from "./visualiser-writers.ts"
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
 import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
+import { langTabs, UN_LOCALES } from "./lib/lang-tabs.ts";
+import { writeLocaleFallback404 } from "./lib/locale-fallback-404.ts";
 import { describeSplit, SCOPES_DIR, SOURCE_PATH as SEARCH_SOURCE, splitSite } from "./search-split.ts";
 import { PREVIEW_PREFIX, PREVIEW_PREFIXES, previewPath } from "./lib/preview-prefix.ts";
 
@@ -636,7 +639,16 @@ export async function checkLinks(
   const pages = htmlFiles(site);
   for (const page of pages) {
     const rel = relative(site, page).split(sep).join("/");
-    for (const url of await pageUrls(readFileSync(page, "utf-8"))) {
+    const html = readFileSync(page, "utf-8");
+    // The language tabs the chrome draws in the browser (`docs-ui.js`): not in
+    // the HTML, so read the way the chrome reads them (`lib/lang-tabs.ts`).
+    // Gated on every page, the content's too: the chrome draws the link.
+    for (const tab of await langTabs(html, `${base}${rel}`)) {
+      const t = targetOf(tab.href, rel, base);
+      if (t === undefined) continue;
+      if (t === "outside-base" || !served(site, t)) misses.push(`${rel}: ${tab.href} (language tab ${tab.locale}, by ${tab.from})`);
+    }
+    for (const url of await pageUrls(html)) {
       const own = selfAddress === undefined ? undefined : selfTargetOf(url, selfAddress);
       if (own !== undefined) {
         if (!served(site, own)) selfMisses.push(`${rel}: ${url}`);
@@ -1125,6 +1137,10 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     restoreHarnessData();
   }
   writeFileSync(join(site, ".nojekyll"), "");
+  // The 404 page and its English fallback (owner, 2026-11-13: "if page not
+  // there, should redirect to en/ version"). After every page writer, so a
+  // 404 page the content wrote keeps its own text and gains the fallback.
+  console.log(`404: ${writeLocaleFallback404(site, `${baseurl}/`, UN_LOCALES)} — a missing /<locale>/ page goes to its English page`);
 
   const lacking = missingRequired(site, o.require ?? []);
   if (lacking.length > 0) throw new Error(`the built site lacks ${lacking.join(", ")}, which a step was to write: the site is not published`);

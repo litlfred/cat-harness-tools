@@ -30,7 +30,7 @@
  * check that enforces that is plan step 1's second half.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { inputSiteReached } from "../../schemas/sdlc/input-trace.js";
 
@@ -96,4 +96,39 @@ export function readPathFor(root: string, layer: LayerRef, rel: string, mounted:
   // check that reads one cannot be skipped on its fingerprint.
   if (mounted.has(layer.instance)) inputSiteReached(`layer-output: ${layer.instance}/${rel}`);
   return existsSync(computed) ? computed : join(resolve(root), layer.path, rel);
+}
+
+/**
+ * The output-root twin of an ABSOLUTE path inside the checkout: where a
+ * writer puts the computed file a reader would otherwise find at `abs`.
+ * `undefined` when `abs` is in no mounted layer (a local layer's computed
+ * files are its own path). For a reader that holds a resolved path (a
+ * declared directory's `absPath`) rather than a layer and a relative path.
+ * The longest mount path that holds `abs` wins, so a mount nested in another
+ * resolves to its own layer.
+ */
+export function outputTwinOf(root: string, abs: string, mounted: Map<string, string> = mountedInstances(root)): string | undefined {
+  const r = resolve(root);
+  const rel = relative(r, resolve(abs)).split(sep).join("/");
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return undefined;
+  let best: { instance: string; path: string } | undefined;
+  for (const [instance, p] of mounted) {
+    const path = p.replace(/^\.\/|\/+$/g, "");
+    if (path === "" || !(rel === path || rel.startsWith(`${path}/`))) continue;
+    if (best === undefined || path.length > best.path.length) best = { instance, path };
+  }
+  if (best === undefined) return undefined;
+  return outputPathFor(r, best, rel.slice(best.path.length + 1), mounted);
+}
+
+/**
+ * {@link readPathFor} for an ABSOLUTE path: the output-root twin when a
+ * writer put the file (or directory) there, else `abs` itself. Changes
+ * nothing while no writer writes under {@link LAYER_OUTPUT_ROOT}.
+ */
+export function readPathAt(root: string, abs: string, mounted: Map<string, string> = mountedInstances(root)): string {
+  const twin = outputTwinOf(root, abs, mounted);
+  if (twin === undefined) return abs;
+  inputSiteReached(`layer-output: ${relative(resolve(root), twin).split(sep).join("/")}`);
+  return existsSync(twin) ? twin : abs;
 }

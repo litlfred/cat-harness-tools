@@ -18,6 +18,7 @@ Feature: The skill overlay reads declarations and keeps every layer's skills
 
   @test:schemas/skill-overlay.test.ts::the_overlay_is_read_from_declarations,_not_from_a_literal::resolveDirectories_keeps_both_as_MEMBERS,_but_not_in_overlay_order_—_why_it_is_not_used
   Scenario: resolveDirectories keeps both graphs as members but not in overlay order
+    # Gap: the root does not depend on dep in this fixture, so the overlay result compared against is root's skills alone, not the reversed pair.
     Given a root layer and a dependency layer, each declaring a graph at "skills"
     When resolveDirectories is run over both links and filtered to kg-only directories
     Then the members are the root's "skills" then the dependency's
@@ -76,6 +77,7 @@ Feature: The skill overlay reads declarations and keeps every layer's skills
 
   @test:schemas/skill-overlay.test.ts::the_two_resolvers_agree_about_what_a_declaration_means::an_instance_that_declares_NOTHING_keeps_its_conventional_directories
   Scenario: A layer whose declaration omits the conventional directories still keeps them
+    # Gap: the title says the instance declares nothing, but the fixture declares its graph directory; what is shown is that conventional directories survive alongside one declared entry.
     Given a declared layer with "beans" and "uploads" directories on disk that it does not declare
     When its own directories are resolved
     Then their ids include "beans" and "uploads"

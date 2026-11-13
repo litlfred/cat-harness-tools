@@ -58,6 +58,7 @@ Feature: Skill voice reviews
 
   @test:scripts/tests/content/skill-voice-review.test.ts::whether_a_skill's_review_is_current::verdicts_must_cover_each_rule_once,_and_explain_every_non-pass
   Scenario: Verdicts must cover each rule once and explain every fail
+    # Gap: the title says "each rule once"; no case gives a rule two verdicts
     Given voice "v" with rules "r1" and "r2"
     Then verdicts passing "r1" and failing "r2" with a note have no problems
     And verdicts for "r1" alone report "r2: no verdict"

@@ -138,7 +138,7 @@ describe("a row's TITLE opens the entry's own page (owner, 2026-10-02)", () => {
   const title = COLS.find((c) => c.k === "title")!;
   test("a referenced entry with no README: the title links its path IRI", () => {
     const html = title.f({ instance: "smart-base", id: "smart-trust", title: "WHO SMART Trust", links: [] });
-    expect(html).toContain('href="/folio-assistant/cat-harness/library/smart-base/smart-trust/">WHO SMART Trust</a>');
+    expect(html).toContain('href="/folio-assistant/cat-harness/library/smart-base/smart-trust/" title="WHO SMART Trust">WHO SMART Trust</a>');
     expect(html).not.toContain("github.com");
   });
   test("the SLUG links the entry's `view`, composed against the site root", () => {
@@ -148,7 +148,7 @@ describe("a row's TITLE opens the entry's own page (owner, 2026-10-02)", () => {
   });
   test("an entry WITH a README keeps it, as a secondary link only", () => {
     const html = title.f({ instance: "smart-base", id: "x", title: "X", readme: "https://github.com/o/r/blob/main/x/README.md" });
-    expect(html).toMatch(/^<a class="lib-title" href="\/folio-assistant\/cat-harness\/library\/smart-base\/x\/">X<\/a>/);
+    expect(html).toMatch(/^<a class="lib-title" href="\/folio-assistant\/cat-harness\/library\/smart-base\/x\/" title="X">X<\/a>/);
     expect(html).toContain('<a class="src" href="https://github.com/o/r/blob/main/x/README.md">README</a>');
   });
 });

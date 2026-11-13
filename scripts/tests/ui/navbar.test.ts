@@ -975,11 +975,9 @@ describe("the crop is ONE sum, and two renderers do it", () => {
     return { width: num("width"), height: num("height"), left: num("left"), top: num("top") };
   }
 
-  for (const r of regions) {
-    it(`agrees on ${JSON.stringify(r)}`, () => {
-      expect(railCrop(r)).toEqual(solveCrop(r));
-    });
-  }
+  it.each(regions.map((r) => [r] as const))("agrees on %p", (r) => {
+    expect(railCrop(r)).toEqual(solveCrop(r));
+  });
 
   it("the whole image is the identity crop, not a no-op that skips the branch", () => {
     // A renderer that treated w=h=1 as "no crop" would agree with the other by

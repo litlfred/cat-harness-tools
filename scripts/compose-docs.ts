@@ -61,6 +61,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { declaredDocsSources } from "./lib/docs-sources.ts";
 import { dirname } from "node:path";
 import { expandGlobScopesInFile, type ExpandedScope } from "./lib/default-scope-globs.ts";
+import { instanceRepositories } from "../schemas/kg/instance-repositories.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
@@ -1124,6 +1125,98 @@ export function expandComposedScopes(out: string): ExpandedScope[] {
   return expandGlobScopesInFile(configPath, out);
 }
 
+/** One page's source, in the shape the IG pages' `ig-source-lines` already use. */
+export interface PageSource {
+  /** `https://github.com/<owner>/<repo>/blob/main/<path>`: the page's Markdown. */
+  readonly blob: string;
+  /** `owner/name`, the repository a 📣 opens its issue in. */
+  readonly repo: string;
+  /** Each heading written IN this file: its text and 1-based source line. */
+  readonly lines: ReadonlyArray<{ readonly t: string; readonly l: number }>;
+}
+
+/**
+ * The ATX headings a Markdown page writes itself, with their source lines.
+ *
+ * Front matter and fenced code are skipped, and a kramdown `{#id}` and closing
+ * `#`s are dropped. A heading a Liquid include draws is NOT here, which is the
+ * point: the browser offers ✎ only for a section whose text this file holds
+ * (owner, 2026-11-13: "own-text sections only").
+ */
+export function markdownHeadings(md: string): Array<{ t: string; l: number }> {
+  const out: Array<{ t: string; l: number }> = [];
+  const lines = md.split("\n");
+  let i = 0;
+  if (lines[0]?.trim() === "---") {
+    for (i = 1; i < lines.length && lines[i]!.trim() !== "---"; i++);
+    i++;
+  }
+  let fence: string | null = null;
+  for (; i < lines.length; i++) {
+    const s = lines[i]!;
+    const f = /^\s{0,3}(`{3,}|~{3,})/.exec(s);
+    if (f) {
+      if (fence === null) fence = f[1]![0]!;
+      else if (f[1]![0] === fence) fence = null;
+      continue;
+    }
+    if (fence !== null) continue;
+    const m = /^\s{0,3}#{1,6}\s+(.*?)\s*$/.exec(s);
+    if (!m) continue;
+    const t = m[1]!
+      .replace(/\s*\{[#:][^}]*\}\s*$/, "")
+      .replace(/\s+#+\s*$/, "")
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .trim();
+    if (t && !t.includes("{{") && !t.includes("{%")) out.push({ t, l: i + 1 });
+  }
+  return out;
+}
+
+/**
+ * THE PAGE SOURCES, a stage the CLI runs after `compose()` (owner,
+ * 2026-11-13: ✎ edit and ✍ suggest on plain pages). Writes
+ * `_data/page_sources.json`, keyed by `page.path`, so `head_custom.html` can
+ * hand each page its source to `edit-links.js`.
+ *
+ * A data file rather than front matter: front matter would change every
+ * page's bytes, and `compose()` is held byte-identical for an empty overlay.
+ * A page whose layer declares no `repository` is LEFT OUT, never guessed, and
+ * keeps its 📣 alone.
+ */
+export function writePageSources(out: string, r: ComposeReport, repo = REPO): Record<string, PageSource> {
+  const repos = instanceRepositories(repo).entries.map((e) => ({ ...e, root: resolve(e.root) + sep }));
+  const where = (abs: string): { repo: string; path: string } | undefined => {
+    const owner = repos.filter((e) => abs.startsWith(e.root)).sort((a, b) => b.root.length - a.root.length)[0];
+    if (!owner) return undefined;
+    const rel = relative(owner.root, abs).split(sep).join("/");
+    return owner.livesAt
+      ? { repo: owner.livesAt.repository, path: `${owner.livesAt.path}/${rel}` }
+      : { repo: owner.repository, path: rel };
+  };
+  const layerDir = new Map(r.layers.map((l) => [l.id, l.dir]));
+  const composedDir = new Map(r.composed.map((c) => [c.under, c.dir]));
+  const pages: Record<string, PageSource> = {};
+  for (const [rel, by] of Object.entries(r.suppliedBy).sort(([a], [b]) => a.localeCompare(b))) {
+    const page = rel.split(sep).join("/");
+    if (!page.endsWith(".md") || isChrome(page)) continue;
+    const head = page.split("/")[0]!;
+    const c = r.composed.find((x) => x.under === head && x.instance === by);
+    const src = c ? join(composedDir.get(head)!, page.slice(head.length + 1)) : layerDir.has(by) ? join(layerDir.get(by)!, rel) : undefined;
+    if (!src || !existsSync(src)) continue;
+    const w = where(resolve(src));
+    if (!w) continue;
+    pages[page] = {
+      blob: `https://github.com/${w.repo}/blob/main/${w.path}`,
+      repo: w.repo,
+      lines: markdownHeadings(readFileSync(src, "utf-8")),
+    };
+  }
+  mkdirSync(join(out, "_data"), { recursive: true });
+  writeFileSync(join(out, "_data", "page_sources.json"), JSON.stringify(pages) + "\n");
+  return pages;
+}
+
 /** Every file beneath a directory with its bytes — for the identity check. */
 export function treeDigest(dir: string): Map<string, string> {
   const m = new Map<string, string>();
@@ -1194,6 +1287,9 @@ if (import.meta.main) {
   // Not on a shell: its pages are composed into it by later steps, so its
   // tree is not finished here, and a glob expanded now would miss them.
   const scopes = shell ? [] : expandComposedScopes(resolve(out));
+  // Each page's own source, for the ✎ / ✍ on its sections. Not on a shell, for
+  // the same reason: its pages are composed in later.
+  const sources = shell ? {} : writePageSources(resolve(out), r);
   if (shell) console.log("  --shell: the chrome only — Jekyll machinery and assets, no page, no composed instance");
   for (const l of r.leftOut ?? []) {
     console.log(`  --platform-only: left out ${l.id} (repository) — ${relative(REPO, l.dir)}; the site's own steps compose it`);
@@ -1249,6 +1345,7 @@ if (import.meta.main) {
   // Each glob scope with what it became, so a reader can see a folder's pages
   // were covered rather than trust a count.
   for (const x of scopes) console.log(`  SCOPE    ${x.glob} -> ${x.paths.length} exact path(s): ${x.paths.join(", ")}`);
+  if (!shell) console.log(`  page sources: ${Object.keys(sources).length} page(s) know their repository and file (_data/page_sources.json)`);
   console.log(`  ${r.aliases.written.length} alias redirect(s) written`);
   console.log(
     `  ${r.forwards.written.length} forwarding page(s) written at old visualiser addresses` +

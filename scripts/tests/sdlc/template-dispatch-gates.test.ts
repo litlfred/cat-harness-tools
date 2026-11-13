@@ -34,15 +34,12 @@ describe("dispatch-only workflow templates never gate on push", () => {
     expect(workflows.length).toBeGreaterThan(0);
   });
 
-  for (const { rel, text } of workflows) {
-    if (triggersOnPush(text)) continue;
-    test(`${rel} has no job or step that waits for a push`, () => {
-      const dead = text
-        .split("\n")
-        .map((line, i) => ({ line, n: i + 1 }))
-        .filter(({ line }) => /^\s*if:.*github\.event_name\s*==\s*'push'/.test(line))
-        .map(({ n, line }) => `${n}: ${line.trim()}`);
-      expect(dead, `a condition that can never be true in a dispatch-only workflow`).toEqual([]);
-    });
-  }
+  test.each(workflows.filter((w) => !triggersOnPush(w.text)).map((w) => [w.rel, w.text] as const))("%s has no job or step that waits for a push", (_rel, text) => {
+    const dead = text
+      .split("\n")
+      .map((line, i) => ({ line, n: i + 1 }))
+      .filter(({ line }) => /^\s*if:.*github\.event_name\s*==\s*'push'/.test(line))
+      .map(({ n, line }) => `${n}: ${line.trim()}`);
+    expect(dead, `a condition that can never be true in a dispatch-only workflow`).toEqual([]);
+  });
 });

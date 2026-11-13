@@ -75,7 +75,7 @@ Feature: Layer discovery with git worktrees present
     When checkoutRootFor is asked for the submodule
     Then it throws "cannot determine the checkout"
 
-  @test:schemas/instance-roots-worktrees.test.ts::checkoutRootFor_—_repository-level_reads_stay_inside_the_checkout_(g43f)::rootForScope:_a_`scope:_\"repository\"`_path_on_the_root_instance_resolves_inside_it
+  @test:schemas/instance-roots-worktrees.test.ts::checkoutRootFor_—_repository-level_reads_stay_inside_the_checkout_(g43f)::rootForScope:_a_`scope:_"repository"`_path_on_the_root_instance_resolves_inside_it
   Scenario: A repository-scoped path on a root instance resolves inside it
     Then rootForScope of agent-a with scope "repository" is agent-a
     And rootForScope of agent-a's "core" with scope "repository" is agent-a

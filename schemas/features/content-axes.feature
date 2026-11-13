@@ -5,6 +5,7 @@ Feature: The four content axes stay four
 
   @test:schemas/content-axes.test.ts::the_four_axes_are_four,_and_none_is_a_synonym_for_another::no_value_appears_on_two_axes,_except_the_ONE_that_is_meant_to
   Scenario: Only "document" appears on two content axes
+    # Gap: the test's comment names `paper` as the deliberate overlap, but the assertion pins "document"; the reason is not checked.
     Given the adapter, profile, visualiser and interactivity vocabularies
     When the number of axes each value appears on is counted
     Then exactly one value appears on more than one axis

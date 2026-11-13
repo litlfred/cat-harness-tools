@@ -191,14 +191,14 @@ Feature: Harness tiles are ordered by declaration and linked by presence
     Then the "who" tile links "/who/"
     And its only linked visualisation is "/host/schemas/who/"
 
-  @test:scripts/tests/kg/harness-tiles.test.ts::an_icon_is_PUBLISHED,_never_declared_—_owner:_\"broken_image_on_LHS_navbar\"::the_site_directory's_prefix_is_STRIPPED,_because_the_mount_does_not_carry_it
+  @test:scripts/tests/kg/harness-tiles.test.ts::an_icon_is_PUBLISHED,_never_declared_—_owner:_"broken_image_on_LHS_navbar"::the_site_directory's_prefix_is_STRIPPED,_because_the_mount_does_not_carry_it
   Scenario: An icon's site directory prefix is stripped
     Given a temporary repository whose "host" declares an icon image under its own site directory at "assets/img/mark.svg"
     When the tiles are built
     Then the host icon src is "/assets/img/mark.svg"
     And it does not contain the site directory prefix
 
-  @test:scripts/tests/kg/harness-tiles.test.ts::an_icon_is_PUBLISHED,_never_declared_—_owner:_\"broken_image_on_LHS_navbar\"::an_instance_mounted_beneath_the_site_root_carries_its_SITE_DIR's_mount
+  @test:scripts/tests/kg/harness-tiles.test.ts::an_icon_is_PUBLISHED,_never_declared_—_owner:_"broken_image_on_LHS_navbar"::an_instance_mounted_beneath_the_site_root_carries_its_SITE_DIR's_mount
   Scenario: An instance mounted beneath the site root carries its site directory's mount
     Given a temporary repository whose site owner "host" declares library, schemas and beans visualisers
     And "sibling" declares an icon under its own site directory and a "docs" directory at that site directory
@@ -206,7 +206,7 @@ Feature: Harness tiles are ordered by declaration and linked by presence
     When the tiles are built
     Then the "sibling" icon src is "/docs/sibling/assets/img/mark.svg"
 
-  @test:scripts/tests/kg/harness-tiles.test.ts::an_icon_is_PUBLISHED,_never_declared_—_owner:_\"broken_image_on_LHS_navbar\"::no_mount_means_NO_icon_and_a_finding_—_`pb04`_one_layer_down
+  @test:scripts/tests/kg/harness-tiles.test.ts::an_icon_is_PUBLISHED,_never_declared_—_owner:_"broken_image_on_LHS_navbar"::no_mount_means_NO_icon_and_a_finding_—_`pb04`_one_layer_down
   Scenario: No mount means no icon and a finding
     Given a temporary repository whose site owner "host" declares library, schemas and beans visualisers
     And "sibling" declares an icon under a site directory it does not have
@@ -214,7 +214,7 @@ Feature: Harness tiles are ordered by declaration and linked by presence
     Then the "sibling" icon is null
     And it has a finding containing "Showing no mark rather than a broken image"
 
-  @test:scripts/tests/kg/harness-tiles.test.ts::an_icon_is_PUBLISHED,_never_declared_—_owner:_\"broken_image_on_LHS_navbar\"::a_path_outside_the_site_directory_is_refused_rather_than_rewritten
+  @test:scripts/tests/kg/harness-tiles.test.ts::an_icon_is_PUBLISHED,_never_declared_—_owner:_"broken_image_on_LHS_navbar"::a_path_outside_the_site_directory_is_refused_rather_than_rewritten
   Scenario: An icon path outside the site directory is refused
     Given a temporary repository whose "host" declares an icon image at "elsewhere/mark.svg"
     When the tiles are built

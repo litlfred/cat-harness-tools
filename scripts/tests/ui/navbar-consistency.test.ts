@@ -229,18 +229,16 @@ describe("one artefact, one glyph, across both registries", () => {
 });
 
 describe("could-not-determine is never green", () => {
-  for (const name of ["TILE_GLYPHS", "ROW_GLYPHS"]) {
-    test(`a renamed ${name} REFUSES (exit 2), it does not pass`, () => {
-      withEdit(name === "ROW_GLYPHS" ? ROW_CLIENT : CLIENT, (s) => s.replace(`var ${name} = {`, `var ${name}_MOVED = {`), () => {
-        const { status, out } = run("--check");
-        expect(status).toBe(2);
-        expect(out).toContain("could not locate");
-        // The distinction that matters: not merely non-zero, but a DIFFERENT
-        // non-zero from a finding, so a reader can tell "blind" from "failed".
-        expect(status).not.toBe(1);
-      });
+  test.each(["TILE_GLYPHS", "ROW_GLYPHS"])("a renamed %s REFUSES (exit 2), it does not pass", (name) => {
+    withEdit(name === "ROW_GLYPHS" ? ROW_CLIENT : CLIENT, (s) => s.replace(`var ${name} = {`, `var ${name}_MOVED = {`), () => {
+      const { status, out } = run("--check");
+      expect(status).toBe(2);
+      expect(out).toContain("could not locate");
+      // The distinction that matters: not merely non-zero, but a DIFFERENT
+      // non-zero from a finding, so a reader can tell "blind" from "failed".
+      expect(status).not.toBe(1);
     });
-  }
+  });
 });
 
 describe("the themes set is iterated, not hardcoded", () => {
