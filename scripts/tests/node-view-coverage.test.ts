@@ -123,9 +123,9 @@ describe("reading a folder page", () => {
   test("the folder's data files: its visualiser's assets, not the site's", () => {
     expect(dataFileRefs(html, page, "https://s/", "schemas")).toEqual(["https://s/assets/schemas/index.json"]);
   });
-  test("data links read against the site root, and another layer's rows are skipped", () => {
+  test("data links: each reading of a relative one, and another layer's rows are skipped", () => {
     const d = { nodeKinds: [{ page: "en/h/bean/" }, { instance: "other", page: "en/h/x/" }, { instance: "l", href: "https://e/x" }], roots: ["a/b"] };
-    expect(dataLinks(d, "https://s/", "l").sort()).toEqual(["https://e/x", "https://s/en/h/bean/"]);
+    expect(dataLinks(d, ["https://s/", page], "l")).toEqual([["https://s/en/h/bean/", "https://s/en/h/schemas/l/en/h/bean/"], ["https://e/x"]]);
   });
 });
 
@@ -175,10 +175,22 @@ describe("one row", () => {
     expect(r.rawRepoLinks).toBe(0);
     const by = Object.fromEntries(r.nodes.map((n) => [n.id, n]));
     expect(by.a!.verdict).toBe("ok");
-    expect(by.b!.missing).toEqual(["iri-extension", "jsonld", "page", "listed"]);
+    expect(by.b!.missing).toEqual(["page", "listed", "iri-extension", "jsonld"]);
     // A page the data links, at the wrong address: a page, not the canonical one.
     expect(by.c!.page).toBe("other/c.html");
-    expect(by.c!.missing).toEqual(["iri", "jsonld", "canonical-page"]);
+    expect(by.c!.missing).toEqual(["canonical-page", "iri", "jsonld"]);
+  });
+
+  test("a node the export does not mint takes its IRI from its page's rel=alternate", async () => {
+    mkdirSync(join(site, folder, "d"), { recursive: true });
+    writeFileSync(join(site, folder, "d/index.html"), `<link rel="alternate" type="application/ld+json" href="../../../../../ld/d.jsonld">`);
+    mkdirSync(join(site, "ld"), { recursive: true });
+    writeFileSync(join(site, "ld/d.jsonld"), "{}");
+    const r = await coverRow(base({ nodes: [{ id: "d" }], iriUnknown: "the export did not build" }));
+    expect(r.nodes[0]!.iri).toBe("https://s/ld/d");
+    expect(r.withIri).toBe(1);
+    expect(r.withJsonld).toBe(1);
+    expect(r.nodes[0]!.missing).toEqual(["listed"]);
   });
 
   test("no folder page: every node misses its row", async () => {

@@ -327,18 +327,24 @@ export function inlineData(html: string): unknown[] {
 const LINK_KEYS = /^(page|href|url|link|pageUrl|pagePath|route|view)$/i;
 
 /**
- * The links in a folder's data. Strings under a link-named key, read against
- * the SITE root (`SITE_HREF + r.page`), and absolute URLs anywhere. An object
- * that names another layer (`instance`/`layer`) is that layer's row, not this one's.
+ * The links in a folder's data, each as its ALTERNATIVE readings. Strings under
+ * a link-named key are relative, and a data file does not say to what: the
+ * schema graph's `page` is read against the site root (`SITE_HREF + r.page`),
+ * the Tools graph's against its folder page. So a relative string is read
+ * against each of `bases` in turn, and the caller keeps the first that
+ * resolves. An absolute URL anywhere is one reading. An object that names
+ * another layer (`instance`/`layer`) is that layer's row, not this one's.
  */
-export function dataLinks(data: unknown, siteUrl: string, layer: string): string[] {
-  const out = new Set<string>();
+export function dataLinks(data: unknown, bases: readonly string[], layer: string): string[][] {
+  const out = new Map<string, string[]>();
   const walk = (v: unknown, key: string): void => {
     if (typeof v === "string") {
-      if (/^https?:\/\//.test(v)) out.add(v.split("#")[0]!);
-      else if (LINK_KEYS.test(key) && /^[\w.~%/-]+$/.test(v) && (v.endsWith("/") || v.endsWith(".html"))) {
+      if (/^https?:\/\//.test(v)) {
+        const u = v.split("#")[0]!;
+        out.set(u, [u]);
+      } else if (LINK_KEYS.test(key) && /^[\w.~%/-]+$/.test(v) && (v.endsWith("/") || v.endsWith(".html"))) {
         try {
-          out.add(new URL(v.replace(/^\/+/, ""), siteUrl).href);
+          out.set(v, [...new Set(bases.map((b) => new URL(v.replace(/^\/+/, ""), b).href))]);
         } catch {
           // not a path
         }
@@ -357,7 +363,7 @@ export function dataLinks(data: unknown, siteUrl: string, layer: string): string
     }
   };
   walk(data, "");
-  return [...out];
+  return [...out.values()];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -452,6 +458,22 @@ export function httpFetcher(concurrency = 16, impl: typeof fetch = fetch): Fetch
 
 const ok = (s: number): boolean => s >= 200 && s < 300;
 
+/** The `<link rel="alternate" type="application/ld+json">` a page names, absolute. */
+export function alternateJsonld(html: string, pageUrl: string): string | undefined {
+  for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
+    const t = m[0];
+    if (!/\brel="alternate"/i.test(t) || !/type="application\/ld\+json"/i.test(t)) continue;
+    const href = /\bhref="([^"]+)"/.exec(t)?.[1];
+    if (!href) continue;
+    try {
+      return new URL(href.replace(/&amp;/g, "&"), pageUrl).href;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ONE ROW
 // ─────────────────────────────────────────────────────────────────────────────
@@ -529,7 +551,21 @@ export async function coverRow(r: RowInput): Promise<CoverageRow> {
           reasons.push(`data file ${siteRel(d, r.siteUrl)} does not parse`);
         }
       }
-      for (const d of datas) for (const l of dataLinks(d, r.siteUrl, r.layer)) set.add(l);
+      for (const d of datas) {
+        for (const alts of dataLinks(d, [r.siteUrl, u], r.layer)) {
+          // The first reading that resolves; with none, the first is the dead one.
+          let pick = alts[0]!;
+          if (alts.length > 1) {
+            for (const a of alts) {
+              if (ok(await f.status(a))) {
+                pick = a;
+                break;
+              }
+            }
+          }
+          set.add(pick);
+        }
+      }
       set.delete(u);
       links = [...set];
       break;
@@ -556,36 +592,14 @@ export async function coverRow(r: RowInput): Promise<CoverageRow> {
     });
   }
 
-  const probeable = folderFound === true || r.folderUrls.length > 0;
   const rows: NodeRow[] = await Promise.all(
     nodes.map(async (n, i): Promise<NodeRow> => {
       const missing: NodeLack[] = [];
       const unknown: string[] = [];
       const within = i < r.probeLimit;
-      // 1. IRI
-      if (r.iriUnknown) unknown.push(`IRI: ${r.iriUnknown}`);
-      else if (!n.iri) missing.push("iri");
-      else if (iriHasExtension(n.iri)) missing.push("iri-extension");
-      // 2. JSON-LD (and the JSON twin)
-      if (n.iri && !r.iriUnknown) {
-        const lf = r.iriFetcher ?? f;
-        if (!lf || !within) unknown.push(!within ? "jsonld: over --probe-limit" : "jsonld: nothing to fetch with");
-        else {
-          const doc = iriHasExtension(n.iri) ? n.iri : `${n.iri}.jsonld`;
-          const s = await lf.status(doc);
-          if (s === 0) unknown.push(`jsonld: could not ask ${doc}`);
-          else if (!ok(s)) missing.push("jsonld");
-          if (n.json && !iriHasExtension(n.iri)) {
-            const sj = await lf.status(`${n.iri}.json`);
-            if (sj === 0) unknown.push("json: could not ask");
-            else if (!ok(sj)) missing.push("json");
-          }
-        }
-      } else if (r.iriUnknown === undefined && !n.iri) {
-        missing.push("jsonld");
-      }
-      // 3. page, 4. listed
+      // 3. page, 4. listed — first, because a page names its asset's JSON-LD (rule 3).
       let page: string | undefined;
+      let pageUrl: string | undefined;
       const canon = folderUrl ?? r.folderUrls[0];
       const canonUrl = canon ? nodePageUrl(canon, n.id) : undefined;
       const tail = n.id.split("/").pop()!;
@@ -597,33 +611,67 @@ export async function coverRow(r: RowInput): Promise<CoverageRow> {
         missing.push("page", "listed");
       } else if (!f) {
         unknown.push("page and row: no site read");
-      } else if (folderFound === false && !probeable) {
-        missing.push("page", "listed");
       } else {
         const s = within ? await f.status(canonUrl) : -1;
         if (s === -1) unknown.push("page: over --probe-limit");
         else if (s === 0) unknown.push("page: could not ask");
-        else if (ok(s)) page = siteRel(canonUrl, r.siteUrl);
+        else if (ok(s)) pageUrl = canonUrl;
         else {
           // A page elsewhere that the folder links counts as a page, at the wrong address.
           for (const l of named.filter((x) => x.startsWith(r.siteUrl) && x !== canonUrl)) {
             if (ok(await f.status(l))) {
-              page = siteRel(l, r.siteUrl);
+              pageUrl = l;
               break;
             }
           }
-          if (page) missing.push("canonical-page");
+          if (pageUrl) missing.push("canonical-page");
           else missing.push("page");
         }
         if (folderFound === true && !listed) missing.push("listed");
         else if (folderFound === "unknown") unknown.push("row: folder page could not be read");
         else if (folderFound === false) missing.push("listed");
       }
+      if (pageUrl) page = siteRel(pageUrl, r.siteUrl);
+
+      // 1. IRI: the export's `@id`, or else the JSON-LD the page names
+      // (`rel=alternate type=application/ld+json`) — the library mints its
+      // IRIs outside the export (`library-iri.ts`), and its pages say so.
+      let iri = n.iri;
+      let iriFromPage = false;
+      if (iri === undefined && pageUrl && f) {
+        const alt = alternateJsonld((await f.text(pageUrl)) ?? "", pageUrl);
+        if (alt) {
+          iri = alt.replace(/\.jsonld$/, "");
+          iriFromPage = true;
+        }
+      }
+      const iriUnknown = iri === undefined ? r.iriUnknown : undefined;
+      if (iriUnknown) unknown.push(`IRI: ${iriUnknown}`);
+      else if (!iri) missing.push("iri");
+      else if (!iriFromPage && iriHasExtension(iri)) missing.push("iri-extension");
+      // 2. JSON-LD (and the JSON twin)
+      if (iri) {
+        const lf = iriFromPage ? f : r.iriFetcher ?? f;
+        if (!lf || !within) unknown.push(!within ? "jsonld: over --probe-limit" : "jsonld: nothing to fetch with");
+        else {
+          const doc = iriHasExtension(iri) ? iri : `${iri}.jsonld`;
+          const s = await lf.status(doc);
+          if (s === 0) unknown.push(`jsonld: could not ask ${doc}`);
+          else if (!ok(s)) missing.push("jsonld");
+          if (n.json && !iriHasExtension(iri)) {
+            const sj = await lf.status(`${iri}.json`);
+            if (sj === 0) unknown.push("json: could not ask");
+            else if (!ok(sj)) missing.push("json");
+          }
+        }
+      } else if (!iriUnknown) {
+        missing.push("jsonld");
+      }
       const verdict: NodeRow["verdict"] = missing.length > 0 ? "missing" : unknown.length > 0 ? "unknown" : "ok";
       return {
         id: n.id,
         ...(n.path ? { path: n.path } : {}),
-        ...(n.iri ? { iri: n.iri } : {}),
+        ...(iri ? { iri } : {}),
         ...(page ? { page } : {}),
         verdict,
         ...(missing.length ? { missing: [...new Set(missing)] } : {}),
@@ -644,7 +692,7 @@ export async function coverRow(r: RowInput): Promise<CoverageRow> {
     ...(folderUrl ?? r.folderUrls[0] ? { folderPage: siteRel((folderUrl ?? r.folderUrls[0])!, r.siteUrl) } : {}),
     folderPageFound: folderFound,
     declared: nodes.length,
-    withIri: r.iriUnknown ? "unknown" : rows.filter((n) => n.iri !== undefined).length,
+    withIri: count((n) => n.iri !== undefined, (n) => why(n, "IRI:")),
     withJsonld: count((n) => n.iri !== undefined && !lacks(n, "jsonld") && !why(n, "jsonld"), (n) => why(n, "jsonld") || why(n, "IRI")),
     ...(anyJson ? { withJson: count((n) => n.iri !== undefined && !lacks(n, "json") && !why(n, "json:") && !lacks(n, "jsonld"), (n) => why(n, "json")) } : {}),
     withPage: count((n) => n.page !== undefined, (n) => why(n, "page")),
