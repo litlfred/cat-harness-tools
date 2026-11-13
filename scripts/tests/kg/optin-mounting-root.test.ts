@@ -18,6 +18,9 @@ import { join } from "node:path";
 import { defaultEnabledSubgraphs, resolveDirectories } from "../../../schemas/kg/cat-harness.js";
 import { WHOLE_INSTANCE_ID } from "../../../schemas/kg/remote-mount.js";
 import { judgeSatisfiesTarget, switchedOffSkillHomes } from "../../check-tools.ts";
+import { judgeSkillRef, parseSkillIndex } from "../../lib/switched-off-skills.ts";
+import { mergeCarriedPackages } from "../../../pipeline/readme-sections.ts";
+import { dmnRefSwitchedOff } from "../../test-plan-audit.ts";
 import { knownSkills, workflowFiles } from "../../known-skills.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 
@@ -167,5 +170,70 @@ describe("check:tools: a `satisfies` target in a group the mounting root switche
     const off = switchedOffSkillHomes([up]);
     expect(off.leftOut.size).toBe(0);
     expect(judgeSatisfiesTarget("no-such-skill", up, off)).toBeUndefined();
+  });
+});
+
+describe("a left-out group's skills are named by the layer's committed index (smart-ips-pilgrimage#66)", () => {
+  // `readme:sync` lists every skill of every opt-in group in SKILLS.md, under
+  // a heading marked `(opt-in \`<layer>.<group>\`)`, and the layer's own CI
+  // keeps it current with every group on. A mount that leaves the group out
+  // still carries that file, so the names are known, not guessed.
+  const section = (dir: string, group: string, names: readonly string[]): string =>
+    [`**\`${dir}/\`** (${names.length}) (opt-in \`${group}\`)`, "", "| Skill | What it is for |", "|---|---|", ...names.map((n) => `| \`${n}\` | for ${n} |`), ""].join("\n");
+  const index = (up: string, ...sections: string[]): void => writeFileSync(join(up, "SKILLS.md"), ["_n skills_", "", ...sections].join("\n"));
+
+  test("a name the index lists in a left-out group is held there, whichever layer refers to it", () => {
+    const up = consumer([]);
+    index(up, section("ops", "up.ops", ["ops-skill"]), section("extra", "up.extra", ["extra-skill"]));
+    const off = switchedOffSkillHomes([up]);
+    expect(off.leftOut.size).toBe(0);
+    expect(judgeSkillRef("ops-skill", "/elsewhere", off)?.groups).toEqual(["up.ops"]);
+    expect(judgeSkillRef("no-such-skill", "/elsewhere", off)).toBeUndefined();
+  });
+
+  test("a left-out group the index does not list keeps the narrower pass: the layer's own refs only", () => {
+    const up = consumer([]);
+    index(up, section("ops", "up.ops", ["ops-skill"]));
+    const off = switchedOffSkillHomes([up]);
+    expect(off.leftOut.get(up)).toEqual(["up.extra"]);
+    expect(judgeSkillRef("extra-skill", "/elsewhere", off)).toBeUndefined();
+    expect(judgeSkillRef("extra-skill", up, off)?.groups).toEqual(["up.extra"]);
+  });
+
+  test("a group the mounting root switched ON that is missing is not excused by the index", () => {
+    const up = consumer(["extra"]);
+    rmSync(join(up, "extra"), { recursive: true, force: true });
+    index(up, section("extra", "up.extra", ["extra-skill"]));
+    const off = switchedOffSkillHomes([up]);
+    expect(off.held.has("extra-skill")).toBe(false);
+    expect(judgeSkillRef("extra-skill", "/elsewhere", off)).toBeUndefined();
+  });
+
+  test("a section whose rows disagree with its count is not a record", () => {
+    const text = ["**`ops/`** (2) (opt-in `up.ops`)", "", "| Skill | What it is for |", "|---|---|", "| `a` | x |", ""].join("\n");
+    expect(parseSkillIndex(text)).toEqual([]);
+    expect(parseSkillIndex(section("ops", "up.ops", ["a", "b"]))).toEqual([{ dir: "ops", rows: ["| `a` | for a |", "| `b` | for b |"], optIn: "up.ops" }]);
+  });
+
+  test("readme:sync keeps a left-out group's sections where the committed index had them", () => {
+    const regen = [{ dir: "skills/a", rows: ["| a |"] }, { dir: "skills/new", rows: ["| n |"] }, { dir: "skills/z", rows: ["| z |"] }];
+    const committed = [
+      { dir: "skills/a", rows: ["| a |"] },
+      { dir: "ops", rows: ["| o |"], optIn: "up.ops" },
+      { dir: "skills/z", rows: ["| z-old |"] },
+    ];
+    const merged = mergeCarriedPackages(regen, committed, (p) => p.optIn === "up.ops");
+    expect(merged.map((p) => p.dir)).toEqual(["skills/a", "ops", "skills/new", "skills/z"]);
+    // Only the carried group is taken from the committed index; the rest is regenerated.
+    expect(merged.find((p) => p.dir === "skills/z")?.rows).toEqual(["| z |"]);
+  });
+
+  test("a test plan's exit DMN in a left-out group is not judged; one in a switched-on group is", () => {
+    const off = consumer([]);
+    expect(dmnRefSwitchedOff("ops/decisions/exit.dmn#Decision_Exit", [off])).toBe(true);
+    expect(dmnRefSwitchedOff("skills/exit.dmn#Decision_Exit", [off])).toBe(false);
+    const on = consumer(["ops"]);
+    rmSync(join(on, "ops"), { recursive: true, force: true });
+    expect(dmnRefSwitchedOff("ops/decisions/exit.dmn#Decision_Exit", [on])).toBe(false);
   });
 });
