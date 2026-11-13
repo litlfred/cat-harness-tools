@@ -152,7 +152,7 @@ describe("the link classifier", () => {
 });
 
 describe("size classes", () => {
-  test(`${MIN_GROUP_SIZE} or more is a candidate; fewer is small; one is a singleton; no-fit is its own class`, () => {
+  test("5 or more is a candidate; fewer is small; one is a singleton; no-fit is its own class", () => {
     expect(sizeClassOf("e", MIN_GROUP_SIZE)).toBe("candidate");
     expect(sizeClassOf("e", MIN_GROUP_SIZE - 1)).toBe("small");
     expect(sizeClassOf("e", 2)).toBe("small");

@@ -193,15 +193,15 @@ describe("what is published", () => {
     expect(graph["hasPart"]).toEqual(INDEX.items.map((i) => todoIri(i.id)));
   });
 
-  for (const item of INDEX.items) {
-    test(`${item.id}: its JSON-LD, its .json and its page exist`, () => {
+  describe.each(INDEX.items.map((item) => [item.id, item] as const))("%s", (_id, item) => {
+    test("its JSON-LD, its .json and its page exist", () => {
       expect(existsSync(join(SITE, todoSitePath(item.id)))).toBe(true);
       expect(existsSync(join(SITE, todoSitePath(item.id).replace(/\.jsonld$/, ".json")))).toBe(true);
       expect(isTodoPage(readFileSync(join(SITE, todoPageSitePath(item.id), "index.html"), "utf8"))).toBe(true);
     });
     if (item.target) {
       const { page, node } = item.target;
-      test(`${item.id}: its target IRI names a file the site publishes`, () => {
+      test("its target IRI names a file the site publishes", () => {
         // The checkout's answer, as the generator asks it: a page of a source
         // above the base is published under its layer, and its JSON-LD is
         // in that layer's docs directory until compose lays it there.
@@ -219,7 +219,7 @@ describe("what is published", () => {
         expect(published.target?.["@id"]).toBe(iri);
       });
     }
-  }
+  });
 
   test("the site context is one a content record accepts", () => {
     expect(ContentContextSchema.safeParse([...SITE_DOCUMENT_CONTEXT]).success).toBe(true);

@@ -26,10 +26,8 @@ describe("translation-block-qa --check flags", () => {
     expect(judged.map(([name]) => name).sort()).toEqual(["translation:block-qa:check", "translation:page-qa:check"]);
   });
 
-  for (const [name, cmd] of judged) {
-    test(`${name} passes no flag the judge refuses`, () => {
-      const argv = cmd.slice(cmd.indexOf("translation-block-qa.ts") + "translation-block-qa.ts".length).trim().split(/\s+/);
-      expect(unknownFlags(argv, JUDGE_FLAGS)).toEqual([]);
-    });
-  }
+  test.each(judged)("%s passes no flag the judge refuses", (_name, cmd) => {
+    const argv = cmd.slice(cmd.indexOf("translation-block-qa.ts") + "translation-block-qa.ts".length).trim().split(/\s+/);
+    expect(unknownFlags(argv, JUDGE_FLAGS)).toEqual([]);
+  });
 });

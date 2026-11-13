@@ -81,11 +81,9 @@ describe("\\lean{} tags → Lean declarations", () => {
     expect(uniqueDecls.length).toBeGreaterThan(0);
   });
 
-  for (const decl of uniqueDecls) {
-    test(`${decl} exists in Lean source`, () => {
-      expect(declExistsInLean(decl)).toBe(true);
-    });
-  }
+  test.each(uniqueDecls)("%s exists in Lean source", (decl) => {
+    expect(declExistsInLean(decl)).toBe(true);
+  });
 });
 
 // ── Test: coverage completeness ─────────────────────────────────
