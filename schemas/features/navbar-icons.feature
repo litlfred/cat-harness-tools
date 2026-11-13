@@ -37,12 +37,14 @@ Feature: Navbar icons resolve through three declaration states
 
   @test:schemas/navbar-icons.test.ts::three_states,_and_the_middle_one_is_the_point::a_floor_already_visited_is_not_consulted_twice
   Scenario: A floor already visited in the walk is not consulted again
+    # Gap: the outcome would be the same if the floor were consulted twice, since it declares nothing; not consulting it twice is not observable here.
     Given a leaf that needs the floor, and the floor declares nothing
     When the leaf's navbar icons are resolved with that floor
     Then the result is undefined
 
   @test:schemas/navbar-icons.test.ts::the_walk_is_breadth-first,_and_it_terminates::a_nearer_layer_beats_a_deeper_one
   Scenario: A nearer layer's declaration beats a deeper one
+    # Gap: near and far are at the same depth, so the test shows need order, not that a nearer layer beats a deeper one.
     Given a leaf that needs "near" declaring "todos" and "far" declaring "beans"
     When the leaf's navbar icons are resolved
     Then the result is "todos"

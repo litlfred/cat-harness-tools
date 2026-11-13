@@ -45,6 +45,7 @@ Feature: Route-family member keys and the keying enum
 
   @test:schemas/route-member.test.ts::the_keying_enum_carries_exactly_four_values::route-family_parses,_and_an_undeclared_fifth_does_not
   Scenario: Storage keyed by one of the four keyings parses and any other keying does not
+    # Gap: the describe says the enum has exactly four values, but another test in this file shows "family" is in the enum; this test only shows branch-keyed storage refuses it.
     Given a directory storage on the branch "gh-pages"
     Then it parses keyed by "commit", "tip", "route" or "route-family"
     And it is refused keyed by "routes", "family", "route_family", "dynamic" or the empty string
