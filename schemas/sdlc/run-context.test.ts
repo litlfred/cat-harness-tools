@@ -17,7 +17,25 @@ import { KG_QA_MANIFEST_SCHEMA, KgQaManifestSchema } from "./kg-qa";
 import { HEALTH_REPORT_SCHEMA, HealthReportSchema } from "./health-report";
 import { addressBook, provJsonldDocument } from "../kg/prov-jsonld";
 import type { ProvActivity } from "../content/prov";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { instanceDirectoryForGraph, instanceRootsIn } from "../kg/cat-harness";
+
+/** The `<name>@<version>` of the one release of `name` the checkout's `tool-release` graphs catalogue. */
+function cataloguedRelease(repo: string, name: string): string {
+  const refs = new Set<string>();
+  for (const root of instanceRootsIn(repo)) {
+    const dir = instanceDirectoryForGraph(root, "tool-release");
+    if (!dir) continue;
+    for (const f of readdirSync(dir)) {
+      if (!f.startsWith(`${name}-`) || !f.endsWith(".json")) continue;
+      const n = JSON.parse(readFileSync(join(dir, f), "utf-8")) as { name?: unknown; version?: unknown };
+      if (n.name === name && typeof n.version === "string") refs.add(`${name}@${n.version}`);
+    }
+  }
+  expect([...refs]).toHaveLength(1);
+  return [...refs][0]!;
+}
 
 const SHA = "a".repeat(64);
 const COMMIT = "1".repeat(40);
@@ -256,8 +274,13 @@ describe("the reference a report carries (C1: by sha256)", () => {
   test("addressBook resolves tool-release refs (`<name>@<version>`) as `prov:Entity` IRIs for `prov:used` (Step 3)", () => {
     const repo = resolve(import.meta.dir, "..", "..", "..");
     const book = addressBook(repo);
-    const plantuml = book.resolve("entity", "plantuml@1.2026.9");
-    expect(plantuml).toEqual({ iri: "https://litlfred.github.io/cat-harness/v0/tool-releases/plantuml-1.2026.9" });
+    // The PlantUML pin moves with cat-harness's catalogue, so read the version
+    // it catalogues rather than hard-coding one that a re-pin retires.
+    const plantumlRef = cataloguedRelease(repo, "plantuml");
+    const plantuml = book.resolve("entity", plantumlRef);
+    expect(plantuml).toEqual({
+      iri: `https://litlfred.github.io/cat-harness/v0/tool-releases/${plantumlRef.replace("@", "-")}`,
+    });
     const jre17 = book.resolve("entity", "temurin-jre@17.0.12+7");
     expect(jre17).toEqual({ iri: "https://litlfred.github.io/cat-harness/v0/tool-releases/temurin-jre-17.0.12_7-linux-x64" });
     const act: ProvActivity = {
@@ -270,7 +293,7 @@ describe("the reference a report carries (C1: by sha256)", () => {
         "prov:hadPlan": "code-change-review#Task_ClaimBean",
       },
       "cat-harness:underPolicy": "https://litlfred.github.io/folio-assistant/policies/folio-defaults",
-      "prov:used": ["plantuml@1.2026.9", "temurin-jre@21.0.4+7"],
+      "prov:used": [plantumlRef, "temurin-jre@21.0.4+7"],
     } as ProvActivity;
     const { unaddressed } = provJsonldDocument("t--x", [act], book);
     expect(unaddressed).toEqual([]);
