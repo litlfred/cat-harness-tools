@@ -412,6 +412,58 @@ describe("bindings beyond @test:, and Gherkin dialects", () => {
   });
 });
 
+describe("declared specifications", () => {
+  test("a DAK's unbound Scenarios are specifications, not findings; a bound one is still checked", () => {
+    const spec = [
+      "Feature: Immunization logic",
+      "  Scenario: dose is due",
+      "    Given a patient",
+      "  @itb:ts-immz/tc-due",
+      "  Scenario: bound to an external suite",
+    ].join("\n");
+    const write = (root: string, dak: unknown) => {
+      mkdirSync(join(root, "input", "testing"), { recursive: true });
+      mkdirSync(join(root, "tools"), { recursive: true });
+      writeFileSync(join(root, "input", "testing", "IMMZ.feature"), spec);
+      writeFileSync(join(root, "tools", "own.feature"), "Feature: own\n  Scenario: unbound\n");
+      writeFileSync(join(root, "tools", "own.test.ts"), 'test("untagged", () => {});\n');
+      if (dak !== undefined) writeFileSync(join(root, "dak.json"), JSON.stringify(dak));
+    };
+    const kinds = (r: { findings: { kind: string; file: string }[] }) => r.findings.map((f) => `${f.kind} ${f.file}`).sort();
+
+    const plain = mkdtempSync(join(tmpdir(), "nodak-"));
+    write(plain, undefined);
+    const p = scanTree(plain);
+    expect(p.specifications).toEqual([]);
+    expect(kinds(p)).toEqual([
+      "binding-unresolved input/testing/IMMZ.feature",
+      "scenario-names-no-test input/testing/IMMZ.feature",
+      "scenario-names-no-test tools/own.feature",
+      "test-without-scenario tools/own.test.ts",
+    ]);
+
+    const whole = mkdtempSync(join(tmpdir(), "dak-"));
+    write(whole, { resourceType: "DAK", id: "x" });
+    const w = scanTree(whole);
+    expect(w.specifications.map((s) => `${s.file} ${s.title}`).sort()).toEqual(["input/testing/IMMZ.feature dose is due", "tools/own.feature unbound"]);
+    expect(kinds(w)).toEqual(["binding-unresolved input/testing/IMMZ.feature", "test-without-scenario tools/own.test.ts"]);
+
+    const scoped = mkdtempSync(join(tmpdir(), "dakscoped-"));
+    write(scoped, { resourceType: "DAK", testScenarios: [{ url: "input/testing/" }, { url: "https://example.org/x" }] });
+    const sc = scanTree(scoped);
+    expect(sc.specifications.map((s) => s.file)).toEqual(["input/testing/IMMZ.feature"]);
+    expect(kinds(sc)).toEqual([
+      "binding-unresolved input/testing/IMMZ.feature",
+      "scenario-names-no-test tools/own.feature",
+      "test-without-scenario tools/own.test.ts",
+    ]);
+
+    const notDak = mkdtempSync(join(tmpdir(), "notdak-"));
+    write(notDak, { resourceType: "ImplementationGuide" });
+    expect(scanTree(notDak).specifications).toEqual([]);
+  });
+});
+
 describe("a JS title is named by its runtime string", () => {
   test("escapes in a quoted or template title are read as the runner reads them; a looped id stays verbatim", () => {
     const src = [

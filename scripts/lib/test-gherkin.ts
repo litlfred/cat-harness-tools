@@ -30,6 +30,17 @@
  * {@link BINDING_SCHEMES} and a {@link BindingResolver}. Feature files may be
  * written in any Gherkin dialect; the keywords are `gherkin-dialects.ts`.
  *
+ * ## Specifications, which are not tests of this tree
+ *
+ * Owner, 2026-11-13: a WHO DAK's (L2) `.feature` files are test
+ * SPECIFICATIONS for implementers, not tests of the repository's code. A
+ * repository says so BY DECLARATION — {@link SPECIFICATION_DECLARATIONS},
+ * never a path naming one repository. In a declared specification, a
+ * Scenario with no binding is counted as a specification rather than reported
+ * `scenario-names-no-test`; once it carries a binding (`@itb:` or `@test:`)
+ * it is checked like any other. Nothing else is relaxed: every test still
+ * needs a Scenario.
+ *
  * ## What the adapters are, and are not
  *
  * Each adapter is a lexical scanner, not a parser: it skips comments and
@@ -100,6 +111,11 @@ export interface ParsedFeature {
   unknownLanguage?: string;
   /** Binding tags on a `Feature:` or `Rule:` line — inherited by every Scenario, so refused. */
   misplaced: { line: number; tag: string }[];
+  /**
+   * Set when a declaration ({@link SPECIFICATION_DECLARATIONS}) says this file
+   * specifies tests for implementers: the declaration that says so.
+   */
+  specification?: string;
 }
 
 /** Whitespace inside a segment becomes `_`: a Gherkin tag ends at whitespace. */
@@ -818,6 +834,8 @@ export interface GherkinReport {
   tests: FoundTest[];
   scenarios: FoundScenario[];
   findings: GherkinFinding[];
+  /** Unbound Scenarios in declared specifications — counted, not findings. */
+  specifications: FoundScenario[];
 }
 
 /** Join tests to Scenarios and report every orphan, both ways. Pure. */
@@ -865,8 +883,12 @@ export function joinTestsToScenarios(
     }
   }
   const linkedBy = new Map<string, FoundScenario[]>();
+  const specFiles = new Set(features.filter((f) => f.specification).map((f) => f.file));
+  const specifications: FoundScenario[] = [];
   for (const s of scenarios) {
-    if (s.tests.length === 0 && s.bindings.length === 0 && !s.manual) {
+    if (s.tests.length === 0 && s.bindings.length === 0 && !s.manual && specFiles.has(s.file)) {
+      specifications.push(s);
+    } else if (s.tests.length === 0 && s.bindings.length === 0 && !s.manual) {
       findings.push({ kind: "scenario-names-no-test", file: s.file, line: s.line, detail: `Scenario "${s.title}" carries no binding tag (\`@test:\`, ${BINDING_SCHEMES.map((b) => `\`@${b}:\``).join(", ")}) and is not \`@manual\` — nothing executes it` });
     }
     for (const b of s.bindings) {
@@ -902,7 +924,7 @@ export function joinTestsToScenarios(
       });
     }
   }
-  return { tests: [...tests], scenarios, findings };
+  return { tests: [...tests], scenarios, findings, specifications };
 }
 
 // ── Reading a tree ──────────────────────────────────────────────────────────
@@ -937,12 +959,60 @@ export function listFiles(root: string): string[] {
   }
 }
 
+// ── Declared specifications ─────────────────────────────────────────────────
+
+/**
+ * A declaration a repository makes about itself that marks some of its
+ * `.feature` files as test specifications for implementers. `read` returns
+ * the files it covers (a subset of the `.feature` files given) and why, or
+ * `undefined` when the repository makes no such declaration.
+ */
+export interface SpecificationDeclaration {
+  name: string;
+  read(root: string, features: readonly string[]): { files: ReadonlySet<string>; because: string } | undefined;
+}
+
+/**
+ * A WHO SMART Digital Adaptation Kit: the root `dak.json` with
+ * `resourceType: "DAK"` (the DAK logical model). Its `testScenarios`
+ * component is the "set of test scenarios to validate an implementation of
+ * the DAK". When it lists `url` sources that are paths in the tree, only the
+ * `.feature` files under them are specifications; when it lists none, every
+ * `.feature` file in the DAK is.
+ */
+export const DAK_DECLARATION: SpecificationDeclaration = {
+  name: "dak",
+  read(root, features) {
+    const path = join(root, "dak.json");
+    if (!existsSync(path)) return undefined;
+    let dak: { resourceType?: unknown; testScenarios?: unknown };
+    try {
+      dak = JSON.parse(readFileSync(path, "utf-8"));
+    } catch {
+      return undefined;
+    }
+    if (dak.resourceType !== "DAK") return undefined;
+    const sources = (Array.isArray(dak.testScenarios) ? dak.testScenarios : [])
+      .map((t) => (t && typeof t === "object" && typeof (t as { url?: unknown }).url === "string" ? (t as { url: string }).url : undefined))
+      .filter((u): u is string => !!u && !/^[a-z][a-z0-9+.-]*:/i.test(u))
+      .map((u) => u.replace(/^\.\//, "").replace(/\/+$/, ""));
+    const files = features.filter((f) => sources.length === 0 || sources.some((u) => f === u || f.startsWith(u + "/")));
+    const because = sources.length === 0 ? "dak.json declares a DAK" : `dak.json declares a DAK whose testScenarios are ${sources.join(", ")}`;
+    return { files: new Set(files), because };
+  },
+};
+
+/** Every declaration the scan honours. A new one is an entry here, never a path in a caller. */
+export const SPECIFICATION_DECLARATIONS: readonly SpecificationDeclaration[] = [DAK_DECLARATION];
+
 export interface ScanOptions {
   /** Restrict to these repo-relative directories or files. Names stay relative to `root`. */
   under?: readonly string[];
   adapters?: readonly TestLanguageAdapter[];
   /** Resolvers for the non-`test` binding schemes. Default: `itb`, with no source held. */
   resolvers?: readonly BindingResolver[];
+  /** Declarations that mark `.feature` files as specifications. Default: {@link SPECIFICATION_DECLARATIONS}. */
+  declarations?: readonly SpecificationDeclaration[];
 }
 
 /** Scan `root`: every test the adapters find, every `.feature`, joined. */
@@ -969,6 +1039,12 @@ export function scanTree(root: string, opts: ScanOptions = {}): GherkinReport {
     const read = () => (src ??= readFileSync(join(root, f), "utf-8"));
     const c = adapters.find((x) => x.claims?.(f, read));
     if (c) tests.push(...c.findTests(f, read()));
+  }
+  const featureFiles = features.map((f) => f.file);
+  for (const d of opts.declarations ?? SPECIFICATION_DECLARATIONS) {
+    const spec = d.read(root, featureFiles);
+    if (!spec) continue;
+    for (const f of features) if (!f.specification && spec.files.has(f.file)) f.specification = spec.because;
   }
   return joinTestsToScenarios(tests, features, resolvers);
 }
