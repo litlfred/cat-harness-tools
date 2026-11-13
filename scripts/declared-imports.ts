@@ -32,6 +32,10 @@
  *   ref of every `qa-checkers` and `pipeline-plugins` node, resolved against
  *   the root of the layer that declares it, as `harness-config.ts`'s
  *   `tableEntry` does.
+ * - `tool-registrars`: the module every Tool with an `mcp` arm names in its
+ *   `inProcess` arm, resolved as `tool-api.ts` `resolveModule` does: in the
+ *   declaring layer, else in any layer of the checkout. `mcpToolList` imports
+ *   it to read the names its registrar serves.
  *
  * A source that cannot be read — a declaration that does not parse, a kind
  * declared twice — returns `undefined`, and the fingerprint is undetermined.
@@ -44,9 +48,10 @@ import { orderedDependencies } from "../schemas/kg/harness-config.ts";
 import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
 import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
 import { moduleRootOf, parseValidatorRef } from "../schemas/kg/kind-validator.ts";
+import { discoverTools } from "../tools/discover.ts";
 
 /** The declaration sources a `declared` verdict may name. */
-export const DECLARATION_SOURCES = ["validator-refs", "plugin-tables"] as const;
+export const DECLARATION_SOURCES = ["validator-refs", "plugin-tables", "tool-registrars"] as const;
 export type DeclarationSource = (typeof DECLARATION_SOURCES)[number];
 
 /** The graphs whose nodes name a plugin table (`harness-config.ts`, `registerDeclaredContributions`). */
@@ -128,6 +133,34 @@ export function pluginTableModules(root: string): string[] {
   return [...out].sort();
 }
 
+/**
+ * `tool-registrars`: the modules the checkout's Tools name as their in-process
+ * registrar, repo-relative, sorted. `undefined` when a declared `tools` graph
+ * does not load, since a partial list would leave a registrar unhashed.
+ */
+export function toolRegistrarModules(root: string): string[] | undefined {
+  const abs = resolve(root);
+  const roots = instanceRootsIn(abs);
+  const out = new Set<string>();
+  for (const inst of roots) {
+    const d = discoverTools(abs, undefined, inst);
+    if (d.failures.length > 0) return undefined;
+    for (const def of d.tools) {
+      const ip = def.invoke.inProcess;
+      if (!def.invoke.mcp || !ip) continue;
+      // `tool-api.ts` resolveModule: the declaring layer first, then every layer.
+      for (const r of [inst, ...roots]) {
+        const target = join(r, ip.module);
+        if (existsSync(target)) {
+          out.add(relative(abs, resolve(target)));
+          break;
+        }
+      }
+    }
+  }
+  return [...out].sort();
+}
+
 /** Per-run memo of each source's answer for one checkout; clear it after writers ran. */
 export class DeclaredImports {
   private memo = new Map<string, readonly string[] | undefined>();
@@ -137,7 +170,14 @@ export class DeclaredImports {
     if (this.memo.has(source)) return this.memo.get(source);
     let files: readonly string[] | undefined;
     try {
-      files = source === "validator-refs" ? validatorModules(this.root) : source === "plugin-tables" ? pluginTableModules(this.root) : undefined;
+      files =
+        source === "validator-refs"
+          ? validatorModules(this.root)
+          : source === "plugin-tables"
+            ? pluginTableModules(this.root)
+            : source === "tool-registrars"
+              ? toolRegistrarModules(this.root)
+              : undefined;
     } catch {
       files = undefined; // a declaration that cannot be read: undetermined, so the check runs
     }
