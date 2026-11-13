@@ -1,10 +1,12 @@
 /**
  * `validateRelaxations` with opt-in sub-graphs: a relaxation is judged against
  * every process on disk, and a process found nowhere is UNDETERMINED (not
- * wrong) only while a declared opt-in group is missing from disk.
+ * wrong) only while a declared opt-in group is missing from disk. A legal
+ * relaxation of a process only a switched-off group holds is INACTIVE:
+ * reported, not an error (owner, 2026-11-13).
  */
 import { describe, expect, test } from "bun:test";
-import { PolicyError, validateRelaxations, type Relaxation } from "../src/workflow/gate.ts";
+import { inactiveRelaxations, PolicyError, validateRelaxations, type Relaxation } from "../src/workflow/gate.ts";
 import type { ProcessModel } from "../src/workflow/process-model.ts";
 
 const model = (id: string, nodes: Record<string, boolean>): ProcessModel =>
@@ -34,5 +36,21 @@ describe("relaxations of processes in opt-in groups", () => {
 
   test("every group mounted: a process that exists nowhere fails", () => {
     expect(() => validateRelaxations([relax("Process_Gone", "Task_SmeReview")], [editing], { unseen: [] })).toThrow(/not a process here/);
+  });
+
+  test("group switched off but on disk: legal, and INACTIVE rather than an error", () => {
+    const r = relax("Process_Editing", "Task_SmeReview");
+    expect(validateRelaxations([r], [editing], { unseen: [] })).toEqual([]);
+    expect(inactiveRelaxations([r], new Set())).toEqual([r]);
+  });
+
+  test("group switched on: active", () => {
+    const r = relax("Process_Editing", "Task_SmeReview");
+    expect(inactiveRelaxations([r], new Set(["Process_Editing"]))).toEqual([]);
+  });
+
+  test("undetermined is not also inactive", () => {
+    const r = relax("Process_Editing", "Task_SmeReview");
+    expect(inactiveRelaxations([r], new Set(), [r])).toEqual([]);
   });
 });
