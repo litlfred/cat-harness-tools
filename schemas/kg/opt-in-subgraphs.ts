@@ -49,7 +49,7 @@
  * ignored, and so is a `requires` id ({@link requiresProblems}).
  */
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, posix, resolve } from "node:path";
 
 import { findDeclarationFile, INDEX_CONFIG_FILENAME, instanceRootsIn } from "./instance-roots";
 
@@ -153,6 +153,49 @@ export function requiresOfDirectories(name: string, directories: unknown): Map<s
   return out;
 }
 
+/**
+ * The `requires` of EVERY opt-in entry a layer declares: the top-level ones
+ * ({@link requiresOfDirectories}) and those declared FROM WITHIN a directory,
+ * in its `graph.json` or `<dir>/<dir>.json`, at any depth, the two
+ * conventional names `declaredKinds` also reads. Keyed `<name>.<own id>`, the
+ * id `enableSubgraphs` spells for a from-within entry.
+ *
+ * Read STRUCTURALLY through `readText`, a path relative to the directory the
+ * declaration sits in, so a checkout (the disk) and the mount planner (a
+ * remote tree, before anything is mounted) ask the same question. An opt-in
+ * group inside an opt-in level (an `L2/collab/` inside `L2/`, owner, 2026-11-13)
+ * was invisible to the top-level read, so what it requires was never implied.
+ */
+export function requiresDeclared(
+  name: string,
+  directories: unknown,
+  readText: (relPath: string) => string | undefined,
+  depth = 4,
+): Map<string, string[]> {
+  const out = requiresOfDirectories(name, directories);
+  const walk = (dirs: unknown, base: string, left: number): void => {
+    if (left <= 0 || !Array.isArray(dirs)) return;
+    for (const d of dirs as Array<{ path?: unknown }>) {
+      if (typeof d?.path !== "string") continue;
+      const dir = posix.join(base, d.path.replace(/\/+$/, ""));
+      for (const file of new Set(["graph.json", `${basename(dir)}.json`])) {
+        const text = readText(posix.join(dir, file));
+        if (text === undefined) continue;
+        let nested: { directories?: unknown };
+        try {
+          nested = JSON.parse(text) as { directories?: unknown };
+        } catch {
+          continue; // a nested file that will not parse is check:harness-dirs' finding
+        }
+        for (const [q, req] of requiresOfDirectories(name, nested.directories)) out.set(q, req);
+        walk(nested.directories, dir, left - 1);
+      }
+    }
+  };
+  walk(directories, "", depth);
+  return out;
+}
+
 /** Whether `dir` or a directory above it holds a `.git`. */
 function inGitCheckout(dir: string): boolean {
   for (let d = resolve(dir); ; d = dirname(d)) {
@@ -188,7 +231,12 @@ export function declaredOptInRequires(checkoutRoot: string): Map<string, string[
     try {
       const raw = JSON.parse(readFileSync(join(root, file), "utf-8")) as { name?: unknown; directories?: unknown };
       if (typeof raw.name !== "string") continue;
-      for (const [q, req] of requiresOfDirectories(raw.name, raw.directories)) out.set(q, req);
+      const base = dirname(join(root, file));
+      const readText = (rel: string): string | undefined => {
+        const abs = join(base, rel);
+        return existsSync(abs) ? readFileSync(abs, "utf-8") : undefined;
+      };
+      for (const [q, req] of requiresDeclared(raw.name, raw.directories, readText)) out.set(q, req);
     } catch {
       // unreadable: check:declaration-filename's finding, not this one's
     }

@@ -23,6 +23,7 @@ import {
   enabledSubgraphsFrom,
   enableSubgraphsProblems,
   requiredBy,
+  requiresDeclared,
   requiresProblems,
   parseSubgraphsEnv,
   SUBGRAPHS_ENV,
@@ -259,6 +260,58 @@ describe("one sub-graph requires another (owner, 2026-11-13: implied)", () => {
     const { parent } = checkout({}, { directories: [...A_DECL.directories, { id: "y", path: "y/", graphTypologies: ["cat-harness"], optIn: true, requires: ["a.api"] }] });
     const r = checkDeclarationResolution(join(parent, "a"));
     expect(r.findings.filter((f) => f.subject === "y.requires")).toEqual([
+      expect.objectContaining({ instance: "a", field: "enableSubgraphs", detail: expect.stringContaining("a.api") }),
+    ]);
+  });
+});
+
+describe("an opt-in group declared FROM WITHIN may require too (owner, 2026-11-13: L2/L3 own collab)", () => {
+  // `x/graph.json` declares `x-collab`, opt-in inside the opt-in `x`, which
+  // requires `a.x` (its level) and `a.y` (a top-level opt-in).
+  const withY = {
+    directories: [...A_DECL.directories, { id: "y", path: "y/", graphTypologies: ["cat-harness"], optIn: true }],
+  };
+  const X_GRAPH = {
+    directories: [
+      { id: "x-skills", path: "skills/", subgraph: true, graphTypologies: ["skills"] },
+      { id: "x-tools", path: "tools/", subgraph: true, graphTypologies: ["tools"] },
+      { id: "x-collab", path: "collab/", subgraph: true, graphTypologies: ["cat-harness"], optIn: true, requires: ["a.x", "a.y"] },
+    ],
+  };
+
+  test("requiresDeclared reads the top level and every from-within file, keyed by the entry's own id", () => {
+    const files: Record<string, string> = {
+      "x/graph.json": JSON.stringify(X_GRAPH),
+      // Deeper: a group inside `x/collab/`, by the `<dir>/<dir>.json` name.
+      "x/collab/collab.json": JSON.stringify({ directories: [{ id: "x-collab-deep", path: "deep/", optIn: true, requires: ["a.x-collab"] }] }),
+      "api/graph.json": "{ not json",
+    };
+    const req = requiresDeclared("a", withY.directories.map((d) => (d.id === "y" ? { ...d, requires: ["a.x"] } : d)), (rel) => files[rel]);
+    expect(Object.fromEntries(req)).toEqual({
+      "a.y": ["a.x"],
+      "a.x-collab": ["a.x", "a.y"],
+      "a.x-collab-deep": ["a.x-collab"],
+    });
+  });
+
+  test("a folio enabling `a.x-collab` gets its level `a.x` and `a.y` too", () => {
+    const { a, b } = checkout({ enableSubgraphs: ["a.x-collab"] }, withY);
+    write(a, { "x/graph.json": X_GRAPH });
+    expect([...enabledSubgraphs(b)].sort()).toEqual(["a.x", "a.x-collab", "a.y"]);
+  });
+
+  test("check:declaration-resolution holds a from-within `requires` to the same rule", () => {
+    const { a, parent } = checkout({}, withY);
+    write(a, {
+      "x/graph.json": {
+        directories: [
+          ...X_GRAPH.directories.slice(0, 2),
+          { id: "x-collab", path: "collab/", subgraph: true, graphTypologies: ["cat-harness"], optIn: true, requires: ["a.api"] },
+        ],
+      },
+    });
+    const r = checkDeclarationResolution(join(parent, "a"));
+    expect(r.findings.filter((f) => f.subject === "x-collab.requires")).toEqual([
       expect.objectContaining({ instance: "a", field: "enableSubgraphs", detail: expect.stringContaining("a.api") }),
     ]);
   });
