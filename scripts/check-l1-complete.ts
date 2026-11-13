@@ -999,7 +999,7 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
               ? { name: "tabular-records", state: "unmet", detail: `${TABULAR_CSVW_FILENAME} carries no source block — re-run the tabular rung` }
               : entryKind(has) === "paged"
                 // A PDF whose printed tables were transcribed into `tables/`
-                // (who-iris#224) is a PAGED source that holds tables, not a
+                // (transcribed tables in a paged entry) is a PAGED source that holds tables, not a
                 // dataset: `structure.json` comes first in KIND_SIDECAR, and
                 // its own sniffed mimetype says what it is.
                 ? {

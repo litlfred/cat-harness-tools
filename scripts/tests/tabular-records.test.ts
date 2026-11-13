@@ -269,7 +269,7 @@ describe("the gate fires on a workbook with no record", () => {
   });
 
   test("a PDF with tables transcribed from its pages is MET, and still NOT a dataset", () => {
-    // who-iris#224: a paged entry's printed tables as CSVW under `tables/`.
+    // Transcribed tables in a paged entry: its printed tables as CSVW under `tables/`.
     // The entry is a PDF that holds tables; counting it as tabular would put
     // every such report beside CODATA in the corpus test below.
     const dir = entryFor("application/pdf");

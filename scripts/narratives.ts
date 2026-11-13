@@ -200,7 +200,7 @@ export function slotsIn(doc: Record<string, unknown>): SlotAt[] {
     });
   }
 
-  // Transcribed tables (`tabular.csvw.json`, who-iris#224): one narrative per
+  // Transcribed tables in a paged entry (`tabular.csvw.json`): one narrative per
   // table at `tables[i]["fac:narrative"]`, beside the file's own top-level
   // `narrative`. The subject is the table's label, else its CSV.
   const tables = doc.tables;
