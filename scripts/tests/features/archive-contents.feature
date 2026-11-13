@@ -94,3 +94,39 @@ Feature: Archive contents listing and its gate
     When its contents.jsonld is read and the directory's keys are checked
     Then its "@context" is the published content context URL
     And one document is checked with no undeclared keys
+
+  @test:scripts/tests/archive-contents.test.ts::one_schema,_whatever_the_container::the_mimetype_is_sniffed_from_the_ENTRY's_own_bytes,_not_its_name
+  Scenario: Each entry's mimetype is sniffed from its own bytes
+    Given the zip fixture with "a.txt" and a nested "b.pdf"
+    When archive-contents.py lists it
+    Then the "b.pdf" entry is sniffed as "application/pdf" from "magic-bytes"
+    And the "a.txt" entry has a null sniffed mimetype with source "unrecognised"
+
+  @test:scripts/tests/archive-contents.test.ts::one_schema,_whatever_the_container::a_directory_is_listed_with_no_size_and_no_digest
+  Scenario: Directory entries carry no size and no digest
+    Given the zip fixture
+    When archive-contents.py lists it
+    Then at least one entry is a directory
+    And no directory entry has bytes or a sha256
+
+  @test:scripts/tests/archive-contents.test.ts::one_schema,_whatever_the_container::the_counts_agree_with_the_entries_—_the_schema_refuses_it_otherwise
+  Scenario: The entry counts agree with the entries and the schema enforces it
+    Given the zip fixture's listing
+    Then n_entries equals the number of entries
+    And n_files equals the number of file entries
+    And the same listing with n_entries raised by one fails the archive-contents schema
+
+  @test:scripts/tests/archive-contents.test.ts::one_schema,_whatever_the_container::a_non-archive_is_REFUSED,_never_listed_as_empty
+  Scenario: A non-archive is refused, not listed as empty
+    Given a text file named "plain.zip" that is not a zip
+    When archive-contents.py is run on it
+    Then it exits non-zero
+    And stderr says "not an archive"
+
+  @test:scripts/tests/archive-contents.test.ts::routing_happens_on_CONTENT,_with_no_PDF_backend_needed::a_zip_takes_the_archive_rung
+  Scenario: A zip takes the archive rung
+    Given the zip fixture
+    When an ingest plan is made for it
+    Then the rung is "archive"
+    And the first step runs a path ending in "/archive-contents.py"
+    And the reason mentions "application/zip"

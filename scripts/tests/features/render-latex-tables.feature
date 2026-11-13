@@ -80,3 +80,12 @@ Feature: LaTeX tables fit the line width
   Scenario: Dropped-space seams are reported
     When the seams of a text with "$V$discharged", "$n$th" and a spaced "$A$" on line 3 are found
     Then there is one seam, mentioning "discharged", on line 3
+
+
+  @test:scripts/tests/render-latex-tables.test.ts::smart_column_sizing_for_over-wide_tables::over-wide_prose_table_wraps_its_long_column_at_a_computed_p{<frac>\linewidth}
+  Scenario: TODO-SCENARIO over-wide prose table wraps its long column at a computed p{<frac>\linewidth}
+    # TODO-STEPS scripts/tests/render-latex-tables.test.ts:106
+
+  @test:scripts/tests/render-latex-tables.test.ts::breaking_non-breaking_blobs_(long_math_+_identifiers)::splitLongMath_breaks_top-level_operators,_not_inside_\frac_/_groups
+  Scenario: TODO-SCENARIO splitLongMath breaks top-level operators, not inside \frac / groups
+    # TODO-STEPS scripts/tests/render-latex-tables.test.ts:155

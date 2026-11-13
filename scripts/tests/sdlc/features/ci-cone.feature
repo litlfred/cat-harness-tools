@@ -276,14 +276,6 @@ Feature: The CI cone skips a check only when everything its green run read is un
     And the note mentions "re-run untraced, which exited 1"
     And the check runs
 
-  @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::not_{tracked}_in_task-io:_not_a_candidate,_so_it_runs_untraced_and_never_skips
-  Scenario: A check without the tracked input in its task-io is not a candidate, runs untraced and never skips
-    # Skipped: where strace cannot run
-    Given task-io for "x:check" with no inputs
-    When it is recorded
-    Then it exits 0 and the note mentions "not a candidate"
-    And the check runs
-
   @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::no_record,_or_a_record_from_another_tracer_version,_means_run
   Scenario: No record, or a record from another tracer version, makes the check run
     # Skipped: where strace cannot run
@@ -432,3 +424,24 @@ Feature: The CI cone skips a check only when everything its green run read is un
     Then the test runs
     When it is "one" again and the plugin is edited
     Then the test runs
+
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::every_check_is_a_candidate,_declared_in_task-io_or_not_(owner,_2026-11-13:_every_gate)
+  Scenario: TODO-SCENARIO every check is a candidate, declared in task-io or not (owner, 2026-11-13: every gate)
+    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:521
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::the_falsifiers,_under_a_real_strace_(skipped_where_strace_cannot_run)::an_undeclared_check_still_runs_when_a_path_it_read_changed
+  Scenario: TODO-SCENARIO an undeclared check still runs when a path it read changed
+    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:533
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::a_push_to_main_records
+  Scenario: TODO-SCENARIO a push to main records
+    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:834
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::a_dispatch_on_main_records_too:_a_train's_merge_starts_no_push_run_(bean_hd58)
+  Scenario: TODO-SCENARIO a dispatch on main records too: a train's merge starts no push run (bean hd58)
+    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:837
+
+  @test:scripts/tests/sdlc/ci-cone.test.ts::which_runs_record_(recordsOnMain)::nothing_else_records:_a_dispatch_on_another_branch,_a_PR,_a_merge_group
+  Scenario: TODO-SCENARIO nothing else records: a dispatch on another branch, a PR, a merge group
+    # TODO-STEPS scripts/tests/sdlc/ci-cone.test.ts:840

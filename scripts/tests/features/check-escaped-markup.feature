@@ -122,14 +122,37 @@ Feature: A built page carries no escaped block markup or leaked markdown table
     When leaked tables are found in it
     Then there are none
 
-  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_single_dash_rule_or_a_prose_pipe_is_not_a_delimiter_row
-  Scenario: A single dash rule or a prose pipe is not a delimiter row
-    Given a paragraph "a | b", a paragraph "|—|" and a horizontal rule
-    When leaked tables are found in them
-    Then there are none
-
   @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::the_tree_scan_reports_it
   Scenario: The tree scan reports a leaked table
     Given a tree whose index.html is the shipped methodologies table
     When the tree is checked
     Then one leaked table is reported
+
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_prose_pipe,_a_dash_rule_or_a_lone_dash_is_not_a_delimiter_row
+  Scenario: TODO-SCENARIO a prose pipe, a dash rule or a lone dash is not a delimiter row
+    # TODO-STEPS scripts/tests/check-escaped-markup.test.ts:214
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_HEADER-ONLY_table_—_no_body_row,_so_the_delimiter_closes_the_paragraph_on_its_line
+  Scenario: TODO-SCENARIO a HEADER-ONLY table — no body row, so the delimiter closes the paragraph on its line
+    # TODO-STEPS scripts/tests/check-escaped-markup.test.ts:218
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_table_straight_under_a_heading_—_read_as_one_paragraph_with_mixed_dash_runs
+  Scenario: TODO-SCENARIO a table straight under a heading — read as one paragraph with mixed dash runs
+    # TODO-STEPS scripts/tests/check-escaped-markup.test.ts:228
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_row_that_opens_straight_after_a_tag,_or_shares_a_line_with_its_header
+  Scenario: TODO-SCENARIO a row that opens straight after a tag, or shares a line with its header
+    # TODO-STEPS scripts/tests/check-escaped-markup.test.ts:237
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::one_cell_is_enough_—_a_one-column_table_leaks_as_`|—|`
+  Scenario: TODO-SCENARIO one cell is enough — a one-column table leaks as `|—|`
+    # TODO-STEPS scripts/tests/check-escaped-markup.test.ts:242
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_delimiter_inside_<script>,_<style>_or_<textarea>_is_data,_not_a_leak
+  Scenario: TODO-SCENARIO a delimiter inside <script>, <style> or <textarea> is data, not a leak
+    # TODO-STEPS scripts/tests/check-escaped-markup.test.ts:246
+
+  @test:scripts/tests/check-escaped-markup.test.ts::a_markdown_table_printed_as_text_—_bean_`7w1a`::a_RENDERED_table_is_still_not_a_finding,_whatever_its_cells_hold
+  Scenario: TODO-SCENARIO a RENDERED table is still not a finding, whatever its cells hold
+    # TODO-STEPS scripts/tests/check-escaped-markup.test.ts:252

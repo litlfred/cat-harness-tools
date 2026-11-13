@@ -89,13 +89,6 @@ Feature: Merge watch readings, flags and runner relief
     Then another PR with the same pin, an older pin, or only another layer's pin does not supersede it
     And an ancestry that cannot be read never supersedes
 
-  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::runner_relief::draft,_P3,_closed-PR_and_never-started_runs;_never_a_main_push_run
-  Scenario: Runner relief offers draft, P3, closed-PR and never-started runs, never a main push run
-    Given open PRs: a draft, a P3-labelled one and a ready one, and runs on their branches, on a closed branch and on main
-    When relief candidates are listed with a 60-minute queue limit
-    Then they are run 1 "draft PR #1", run 2 "P3 PR #2", run 3 "closed PR (closed-branch)" and run 4 "queued 90m, never started"
-    And no main push run, recent queued run or completed run is offered
-
   @test:scripts/tests/sdlc/merge-watch-readings.test.ts::many_repositories::--repo,_--repos_and_--config_combine,_without_duplicates
   Scenario: --repo, --repos and --config combine without duplicates
     Given the arguments --repo o/a, --repos "o/b, o/a", --config c.json and --json, with c.json listing o/c and options
@@ -148,3 +141,20 @@ Feature: Merge watch readings, flags and runner relief
     Then the main verdict is "unknown: main push runs not read"
     And the queue is null
     And at least one error is reported
+
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::runner_relief::draft,_P3,_closed-PR_and_never-started_runs;_never_a_main_push_or_dynamic_run,_never_the_canceller
+  Scenario: TODO-SCENARIO draft, P3, closed-PR and never-started runs; never a main push or dynamic run, never the canceller
+    # TODO-STEPS scripts/tests/sdlc/merge-watch-readings.test.ts:187
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::pagination_never_follows_GitHub's_Link_header::asks_by_page=_on_the_given_path,_and_stops_at_a_short_page
+  Scenario: TODO-SCENARIO asks by page= on the given path, and stops at a short page
+    # TODO-STEPS scripts/tests/sdlc/merge-watch-readings.test.ts:328
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::pagination_never_follows_GitHub's_Link_header::a_wrapped_page_is_measured_by_its_array_field
+  Scenario: TODO-SCENARIO a wrapped page is measured by its array field
+    # TODO-STEPS scripts/tests/sdlc/merge-watch-readings.test.ts:343
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::exit_2_says_why::names_each_repository_and_what_of_it_was_not_read
+  Scenario: TODO-SCENARIO names each repository and what of it was not read
+    # TODO-STEPS scripts/tests/sdlc/merge-watch-readings.test.ts:354

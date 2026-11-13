@@ -239,3 +239,16 @@ Feature: Building an instance site
     Given the source of buildInstanceSite
     Then "splitSite(site, root)" appears after the rail standalone pages, the final steps and the forwarding pages
     And it appears before the .nojekyll write, the coverage shortfall and the parity shortfall
+
+
+  @test:scripts/tests/ui/build-instance-site.test.ts::every_site_writes_its_node-kind_pages_(who-iris_schemas_page,_owner_2026-11-13)::a_recipe_with_no_step_that_writes_them_gets_them_from_the_build
+  Scenario: TODO-SCENARIO a recipe with no step that writes them gets them from the build
+    # TODO-STEPS scripts/tests/ui/build-instance-site.test.ts:309
+
+  @test:scripts/tests/ui/build-instance-site.test.ts::every_site_writes_its_node-kind_pages_(who-iris_schemas_page,_owner_2026-11-13)::a_recipe_whose_own_step_runs_the_writer_(a_folio's_site:node-kinds)_does_not_run_it_twice
+  Scenario: TODO-SCENARIO a recipe whose own step runs the writer (a folio's site:node-kinds) does not run it twice
+    # TODO-STEPS scripts/tests/ui/build-instance-site.test.ts:313
+
+  @test:scripts/tests/ui/build-instance-site.test.ts::every_site_writes_its_node-kind_pages_(who-iris_schemas_page,_owner_2026-11-13)::it_runs_on_the_built_site_after_the_site_steps,_as_a_folio,_and_before_the_rail_and_the_link_check
+  Scenario: TODO-SCENARIO it runs on the built site after the site steps, as a folio, and before the rail and the link check
+    # TODO-STEPS scripts/tests/ui/build-instance-site.test.ts:318

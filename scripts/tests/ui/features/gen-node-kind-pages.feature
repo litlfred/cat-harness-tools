@@ -177,3 +177,8 @@ Feature: Generic node kind pages
   @test:scripts/tests/ui/gen-node-kind-pages.test.ts::pages_under_a_route_built_at_publish::with_no_declaration_nothing_is_skipped_(a_folio's_site)
   Scenario: With no declaration no page is skipped as built at publish
     Then "en/cat-harness/node-kind-index" is not built at publish when there is no declaration
+
+
+  @test:scripts/tests/ui/gen-node-kind-pages.test.ts::plannedPages::a_declared_kind_with_no_version_gets_its_pages_too:_the_schemas_page_links_it_(who-iris,_2026-11-13)
+  Scenario: TODO-SCENARIO a declared kind with no version gets its pages too: the schemas page links it (who-iris, 2026-11-13)
+    # TODO-STEPS scripts/tests/ui/gen-node-kind-pages.test.ts:138

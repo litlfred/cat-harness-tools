@@ -32,3 +32,16 @@ Feature: Relaxations of processes in opt-in groups
     Given process "Process_Editing" on disk and no unseen groups
     When a relaxation of "Process_Gone" is validated
     Then it throws an error mentioning "not a process here"
+
+
+  @test:test/workflow-policy-opt-in.test.ts::relaxations_of_processes_in_opt-in_groups::group_switched_off_but_on_disk:_legal,_and_INACTIVE_rather_than_an_error
+  Scenario: TODO-SCENARIO group switched off but on disk: legal, and INACTIVE rather than an error
+    # TODO-STEPS test/workflow-policy-opt-in.test.ts:41
+
+  @test:test/workflow-policy-opt-in.test.ts::relaxations_of_processes_in_opt-in_groups::group_switched_on:_active
+  Scenario: TODO-SCENARIO group switched on: active
+    # TODO-STEPS test/workflow-policy-opt-in.test.ts:47
+
+  @test:test/workflow-policy-opt-in.test.ts::relaxations_of_processes_in_opt-in_groups::undetermined_is_not_also_inactive
+  Scenario: TODO-SCENARIO undetermined is not also inactive
+    # TODO-STEPS test/workflow-policy-opt-in.test.ts:52

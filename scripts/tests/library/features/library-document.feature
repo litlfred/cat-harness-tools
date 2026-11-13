@@ -116,3 +116,24 @@ Feature: The document view of a library entry
     Given the same entry
     When its figure files are listed
     Then they are "images/img-p002-1.webp" and "tables/table-1.csv"
+
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::toc_present:_the_tree_is_the_outline,_as_before
+  Scenario: TODO-SCENARIO toc present: the tree is the outline, as before
+    # TODO-STEPS scripts/tests/library/library-document.test.ts:287
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::toc_absent:_the_tree_is_built_from_the_sections,_nested_by_level
+  Scenario: TODO-SCENARIO toc absent: the tree is built from the sections, nested by level
+    # TODO-STEPS scripts/tests/library/library-document.test.ts:306
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::blocks_appear_as_leaves_under_their_own_section,_by_contains_or_by_target
+  Scenario: TODO-SCENARIO blocks appear as leaves under their own section, by contains or by target
+    # TODO-STEPS scripts/tests/library/library-document.test.ts:320
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::children_are_built_only_when_a_node_is_first_opened
+  Scenario: TODO-SCENARIO children are built only when a node is first opened
+    # TODO-STEPS scripts/tests/library/library-document.test.ts:332
+
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::the_generator_reads_each_section's_blocks_from_its_node,_and_the_viewer_anchors_each_block_row
+  Scenario: TODO-SCENARIO the generator reads each section's blocks from its node, and the viewer anchors each block row
+    # TODO-STEPS scripts/tests/library/library-document.test.ts:345

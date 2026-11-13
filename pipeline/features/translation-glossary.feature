@@ -155,3 +155,12 @@ Feature: Translation glossary consistency
     Then it contains "### Glossary consistency", "#### fr" and "#### ar"
     And it contains the table row "| `inconsistent` | Actor |"
     And it contains "No findings."
+
+
+  @test:pipeline/translation-glossary.test.ts::a_declared_`catalogues`_pattern_(a_smart-base_IG's_input/<area>/translations/<locale>.po)::the_pattern's_files_are_the_locale's_catalogues,_and_its_locales_are_the_layer's
+  Scenario: TODO-SCENARIO the pattern's files are the locale's catalogues, and its locales are the layer's
+    # TODO-STEPS pipeline/translation-glossary.test.ts:327
+
+  @test:pipeline/translation-glossary.test.ts::a_declared_`catalogues`_pattern_(a_smart-base_IG's_input/<area>/translations/<locale>.po)::without_the_field,_only_translations/<locale>/_is_read
+  Scenario: TODO-SCENARIO without the field, only translations/<locale>/ is read
+    # TODO-STEPS pipeline/translation-glossary.test.ts:341

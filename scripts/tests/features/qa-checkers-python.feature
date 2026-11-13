@@ -456,3 +456,8 @@ Feature: The Python script-quality checkers
     Given a Python file "x = 1"
     When assertions_are_falsifiable checks it
     Then the result is "n/a"
+
+
+  @test:scripts/tests/qa-checkers-python.test.ts::checkDoesNotDefaultToFloat_—_trailing-comma_sentinel_(Black)::multiline_float(\n_"inf",\n)_is_exempt
+  Scenario: TODO-SCENARIO multiline float(\n "inf",\n) is exempt
+    # TODO-STEPS scripts/tests/qa-checkers-python.test.ts:215

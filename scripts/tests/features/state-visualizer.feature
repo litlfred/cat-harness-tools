@@ -517,3 +517,16 @@ Feature: State graph dashboards
     Given cat-harness and a layer "top" declaring a hosted per-instance editor-checkers page, an unhosted one, another Tool's and a hosted dashboard
     Then the visualisers hosted on cat-harness are top/editor-checkers only
     And none are hosted on top
+
+
+  @test:scripts/tests/state-visualizer.test.ts::per-instance_memory_pages_(the_library_page's_last_"no_viewer_yet"_row)::a_memory_directory's_lessons,_interaction_node_and_waivers_are_all_listed;_absent_is_null
+  Scenario: TODO-SCENARIO a memory directory's lessons, interaction node and waivers are all listed; absent is null
+    # TODO-STEPS scripts/tests/state-visualizer.test.ts:1308
+
+  @test:scripts/tests/state-visualizer.test.ts::per-instance_memory_pages_(the_library_page's_last_"no_viewer_yet"_row)::an_instance_whose_memory_is_not_in_the_build_says_unknown,_not_empty
+  Scenario: TODO-SCENARIO an instance whose memory is not in the build says unknown, not empty
+    # TODO-STEPS scripts/tests/state-visualizer.test.ts:1341
+
+  @test:scripts/tests/state-visualizer.test.ts::per-instance_memory_pages_(the_library_page's_last_"no_viewer_yet"_row)::memory_is_drawn_per_instance,_with_a_hub,_and_is_not_refused_as_unread
+  Scenario: TODO-SCENARIO memory is drawn per instance, with a hub, and is not refused as unread
+    # TODO-STEPS scripts/tests/state-visualizer.test.ts:1347

@@ -36,3 +36,8 @@ Feature: Migrating narratives to language-tagged lists
     Given a file written on one line
     When it is migrated
     Then it is refused naming the round-trip, and the text is unchanged
+
+
+  @test:scripts/tests/narratives-migrate-lang.test.ts::narratives:migrate-lang_(e1lo_3d)::a_file_written_with_\u_escapes_keeps_them
+  Scenario: TODO-SCENARIO a file written with \u escapes keeps them
+    # TODO-STEPS scripts/tests/narratives-migrate-lang.test.ts:37

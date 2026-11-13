@@ -17,16 +17,17 @@ function build(order: string[]) {
 }
 
 describe("nearestDefiner", () => {
-  for (const order of [[core, ig, coreCaller, igCaller], [ig, core, igCaller, coreCaller]]) {
-    test(`each referrer resolves to its own layer's definer (read order ${order.map((f) => f.split("/")[2]).join(",")})`, () => {
-      const d = build(order);
-      expect(d.get("Process_Publication")).toEqual([core, ig].sort());
-      expect(nearestDefiner(d, "Process_Publication", coreCaller)).toBe(core);
-      expect(nearestDefiner(d, "Process_Publication", igCaller)).toBe(ig);
-      expect(definersFrom(d, coreCaller).get("Process_Publication")).toBe(core);
-      expect(definersFrom(d, igCaller).get("Process_Publication")).toBe(ig);
-    });
-  }
+  test.each([
+    ["layer-a,layer-b,layer-a,layer-b", [core, ig, coreCaller, igCaller]],
+    ["layer-b,layer-a,layer-b,layer-a", [ig, core, igCaller, coreCaller]],
+  ] as const)("each referrer resolves to its own layer's definer (read order %s)", (_label, order) => {
+    const d = build([...order]);
+    expect(d.get("Process_Publication")).toEqual([core, ig].sort());
+    expect(nearestDefiner(d, "Process_Publication", coreCaller)).toBe(core);
+    expect(nearestDefiner(d, "Process_Publication", igCaller)).toBe(ig);
+    expect(definersFrom(d, coreCaller).get("Process_Publication")).toBe(core);
+    expect(definersFrom(d, igCaller).get("Process_Publication")).toBe(ig);
+  });
 
   test("a definer refers to itself", () => {
     const d = build([core, ig]);
