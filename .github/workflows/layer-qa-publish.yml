@@ -35,6 +35,10 @@
 #      the instance's own declared `qa` home (`kgQaHomeFor` "own").
 #   4. Run the caller's own QA `writers`, if it lists any (derived reports
 #      only the layer knows how to compute), into the same home.
+#   4b. Report node-view coverage against the layer's published site
+#      (`node-views:report --instance ./<instance> --base <site>`), into
+#      `<home>/node-views/`, so the layer's QA page shows it (owner,
+#      2026-11-13, card A). A QA report, never a gate: it cannot fail this job.
 #   5. Publish that home with `qa:publish` to the CALLER's repository
 #      (`QA_STORE_REMOTE`), under `main/<sha>` for a push to main and
 #      `pr/<n>/<head sha>` for a pull request — the keys a reader asks for at
@@ -71,6 +75,16 @@ on:
         required: false
         type: string
         default: ""
+      site-base:
+        description: "The layer's published site, probed by the node-view coverage report. Empty means GitHub Pages for the calling repository (https://<owner>.github.io/<repo>/)."
+        required: false
+        type: string
+        default: ""
+      node-views:
+        description: "Report node-view coverage (a QA report, never a gate) into the published results."
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -207,6 +221,23 @@ jobs:
             bash -c "$cmd"
             echo "::endgroup::"
           done <<< "$WRITERS"
+      - name: Report node-view coverage (a QA report, not a gate)
+        if: steps.key.outputs.skip != 'true' && steps.home.outputs.skip != 'true' && inputs.node-views
+        continue-on-error: true
+        working-directory: fa
+        env:
+          BASE: ${{ inputs.site-base != '' && inputs.site-base || format('https://{0}.github.io/{1}/', github.repository_owner, github.event.repository.name) }}
+        run: |
+          set -uo pipefail
+          # Per folder and kind: which of this layer's nodes have an IRI, a
+          # .jsonld, a page and a row on the published site. It writes
+          # <home>/node-views/<instance>.node-views.qa.json and always exits
+          # 0; `continue-on-error` keeps a crash from costing the publish.
+          if [ ! -f cat-harness-tools/scripts/node-view-coverage.ts ]; then
+            echo "::notice::the pinned cat-harness-tools has no node-view-coverage.ts yet: no node-view report"
+            exit 0
+          fi
+          bun run cat-harness-tools/scripts/node-view-coverage.ts --instance "./$INSTANCE" --base "$BASE" 2>&1 | tail -n 40
       - name: Publish to this repository's qa-reports branch
         if: steps.key.outputs.skip != 'true' && steps.home.outputs.skip != 'true'
         working-directory: fa

@@ -130,6 +130,28 @@ describe("the page script", () => {
     expect(out.indexOf("\nb\n")).toBeLessThan(out.indexOf("\na\n"));
     expect(out).not.toContain("ANOTHER commit");
   });
+  test("draws the node-view coverage reports as their own table, unknown kept as a word", async () => {
+    const out = await runScript([
+      [`main/${MOUNT.ref}/manifest.json`, { written_at: "x" }],
+      ["api.github.com", { tree: [{ type: "blob", path: "kg-qa/tools/a.kg-qa.json" }, { type: "blob", path: "node-views/fhir-harness.node-views.qa.json" }] }],
+      ["a.kg-qa.json", RECORD("a", 0)],
+      [
+        "node-views.qa.json",
+        {
+          $schema: "node-view-coverage/v1",
+          rows: [
+            { directory: "fh-tools", path: "tools/", kind: "tools", viewer: { state: "declared", id: "cat-harness/tools" }, declared: 3, withIri: 3, withJsonld: 2, withPage: 1, listed: 1, deadLinks: ["x/"], rawRepoLinks: 0 },
+            { directory: "qa", path: "test/results/", kind: "qa", viewer: { state: "none" }, declared: "unknown", withIri: "unknown", withJsonld: "unknown", withPage: "unknown", listed: "unknown", deadLinks: [], rawRepoLinks: "unknown" },
+          ],
+        },
+      ],
+    ]);
+    expect(out).toContain("Node-view coverage");
+    expect(out).not.toContain("other file(s)");
+    expect(out).toContain("fh-tools (tools/)");
+    expect(out).toContain("cat-harness/tools");
+    expect(out).toContain("qa (test/results/)\nqa\nnone\nunknown");
+  });
   test("clicking a row shows its checks, failures first, with their findings", async () => {
     const out = await runScript(
       [

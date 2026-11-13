@@ -200,6 +200,8 @@ describe("per-family node schemas (bean rdkm)", () => {
       // whose files live in another kind's directory is a validator aimed at
       // nothing. The list grew because the KIND did.
       "kg-qa-manifest/v1", "kg-qa/v1",
+      // The node-view coverage report, owner 2026-11-13 (card A).
+      "node-view-coverage/v1",
       "qa-results/v1",
       "qa-script/v1", "qa-witness/v1", "translation-qa/v1", "viewer-nav-qa/v1",
     ]);

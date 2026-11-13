@@ -15,7 +15,10 @@
  * 2. on a 404, `index.json`'s newest `main` entry, labelled as ANOTHER commit's
  *    results (`fetched-fallback` in `qa-site-assets.ts` terms);
  * 3. the entry's file list from the GitHub trees API (one call per page view),
- *    then each `kg-qa/v1` record from raw, rendered as one table.
+ *    then each `kg-qa/v1` record from raw, rendered as one table;
+ * 4. each `node-view-coverage/v1` report (`node-views/*.node-views.qa.json`,
+ *    owner 2026-11-13, card A) from raw, as a second table: per folder and
+ *    kind, how many nodes have an IRI, a `.jsonld`, a page and a row.
  *
  * Every miss is said: no branch, no entry or an unreachable GitHub reads
  * "unknown, not zero", never an empty table.
@@ -157,8 +160,11 @@ export const QA_LIVE_JS = String.raw`(function () {
           var files = (t.tree || []).filter(function (x) {
             return x.type === "blob" && /\.kg-qa\.json$/.test(x.path);
           });
+          var views = (t.tree || []).filter(function (x) {
+            return x.type === "blob" && /\.node-views\.qa\.json$/.test(x.path);
+          });
           var others = (t.tree || []).filter(function (x) {
-            return x.type === "blob" && !/\.kg-qa\.json$/.test(x.path);
+            return x.type === "blob" && !/\.kg-qa\.json$/.test(x.path) && !/\.node-views\.qa\.json$/.test(x.path);
           }).length;
           return Promise.all(
             files.map(function (f) {
@@ -168,6 +174,15 @@ export const QA_LIVE_JS = String.raw`(function () {
             }),
           ).then(function (docs) {
             render(box, { repo: repo, ref: ref, branch: branch, root: root }, hit, docs, files, others, t.truncated === true);
+            return Promise.all(
+              views.map(function (f) {
+                return getJson(raw + hit.key + "/" + root + "/" + f.path.split("/").map(encodeURIComponent).join("/")).catch(function () {
+                  return null;
+                });
+              }),
+            ).then(function (vdocs) {
+              renderViews(box, vdocs, views.length);
+            });
           });
         });
       })
@@ -282,6 +297,51 @@ export const QA_LIVE_JS = String.raw`(function () {
           toggle();
         }
       });
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+  }
+
+  /** The node-view coverage reports: one row per folder and kind; "unknown" stays a word, never 0. */
+  function renderViews(box, vdocs, n) {
+    if (n === 0) return;
+    box.appendChild(el("h3", "Node-view coverage", "sv-h3"));
+    var rows = [];
+    var unreadable = 0;
+    for (var i = 0; i < vdocs.length; i++) {
+      var d = vdocs[i];
+      if (!d || d.$schema !== "node-view-coverage/v1" || !Array.isArray(d.rows)) {
+        unreadable++;
+        continue;
+      }
+      for (var j = 0; j < d.rows.length; j++) rows.push(d.rows[j]);
+    }
+    box.appendChild(
+      el(
+        "p",
+        "Per folder and kind: the nodes the directory holds, and how many have an IRI, a .jsonld, a page and a row on the folder page. A QA report, not a gate." +
+          (unreadable ? " " + unreadable + " report(s) could not be read." : ""),
+        "sv-sub",
+      ),
+    );
+    if (rows.length === 0) return;
+    var table = el("table", null, "sv-qa-live-table sv-node-views");
+    var hr = el("tr");
+    ["folder", "kind", "viewer", "nodes", "IRI", ".jsonld", "page", "listed", "dead links", "raw repo links"].forEach(function (h) {
+      hr.appendChild(el("th", h));
+    });
+    var thead = el("thead");
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = el("tbody");
+    rows.forEach(function (r) {
+      var tr = el("tr");
+      var viewer = r.viewer && r.viewer.state === "declared" ? r.viewer.id : r.viewer ? r.viewer.state : "";
+      [r.directory + " (" + r.path + ")", r.kind, viewer, r.declared, r.withIri, r.withJsonld, r.withPage, r.listed, (r.deadLinks || []).length, r.rawRepoLinks].forEach(function (v) {
+        tr.appendChild(el("td", v));
+      });
+      if (r.reason) tr.title = r.reason;
+      tbody.appendChild(tr);
     });
     table.appendChild(tbody);
     box.appendChild(table);

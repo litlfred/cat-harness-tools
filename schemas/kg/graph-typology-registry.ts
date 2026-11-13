@@ -1562,6 +1562,10 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // EXPLICITLY removed -- and a count cannot tell a deliberate removal
       // from a generator nobody wired.
       "viewer-nav-qa/v1": {},
+      // The node-view coverage report (owner, 2026-11-13, card A): per layer
+      // × folder × kind, which nodes have an IRI, a `.jsonld`, a page and a
+      // folder-page row. A report, not a gate (`node-views:report`).
+      "node-view-coverage/v1": {},
     },
     // No `validator`, and that is a finding rather than an omission: the
     // module above exports TypeScript interfaces only. The largest generated
