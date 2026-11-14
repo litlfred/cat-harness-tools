@@ -45,7 +45,8 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs
 import { join, relative, resolve, sep } from "node:path";
 
 import { isBuiltAtPublish, type BuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
-import { defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, defaultGraphTypologies, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { outputTwinOf, readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { nodeKindIndex, type NodeKindEntry, type NodeKindIndex } from "../schemas/kg/node-kind-index.ts";
 import { kindDirectories, nodesOfKind, type KindNode } from "../schemas/kg/node-kind-nodes.ts";
 import { isNodeKind } from "../schemas/kg/node-kind.ts";
@@ -591,16 +592,28 @@ export async function buildNodeKindPages(o: BuildOptions): Promise<{ pages: stri
   // Only pages carrying the mark are candidates, so a hand-written page that
   // happens to sit under a locale is never touched.
   if (o.prune) {
+    // A page this generator computed for a MOUNTED layer is at the layer's
+    // output root (bean `cat-tools-sm8r`, item 4, step 4), so both copies are
+    // scanned: the pinned mount's and the output root's, keyed by the site path.
+    const checkout = checkoutRootFor(o.instanceRoot);
+    const siteTwin = outputTwinOf(checkout, o.site);
     for (const locale of LOCALES) {
-      for (const file of ownPages(join(o.site, locale))) {
+      const pinned = ownPages(join(o.site, locale));
+      const computed = siteTwin !== undefined ? ownPages(join(siteTwin, locale)).map((f) => join(o.site, relative(siteTwin, f))) : [];
+      for (const file of [...new Set([...pinned, ...computed])]) {
         if (written.has(file)) continue;
         if (o.check && pageBuiltAtPublish(relative(o.site, join(file, "..")), o.builtAtPublish)) continue;
         if (o.check) {
           console.error(`  ✗ ${relative(o.siteRepo, file)} is an orphan — its node or kind is gone`);
           stale++;
         } else {
-          rmSync(file);
-          console.log(`  ✗ pruned ${relative(o.siteRepo, file)}`);
+          // Pruned where this run writes; a run never edits a pinned mount.
+          const at = writePathAt(checkout, file);
+          if (existsSync(at)) {
+            rmSync(at);
+            console.log(`  ✗ pruned ${relative(o.siteRepo, at)}`);
+          }
+          if (at !== file && existsSync(file)) console.log(`  ! ${relative(o.siteRepo, file)} is an orphan in the pinned mount — left until the layer is re-pinned`);
         }
       }
     }
@@ -609,9 +622,10 @@ export async function buildNodeKindPages(o: BuildOptions): Promise<{ pages: stri
 }
 
 /** The planned pages that do not resolve: no `index.html`, or one this generator did not write. */
-export function unresolvedPages(site: string, pages: readonly string[]): string[] {
+export function unresolvedPages(site: string, pages: readonly string[], checkout: string = checkoutRootFor(HARNESS_ROOT)): string[] {
   return pages.filter((rel) => {
-    const file = join(site, rel, "index.html");
+    // The page this checkout computed at a mounted layer's output root, else the pinned one.
+    const file = readPathAt(checkout, join(site, rel, "index.html"));
     return !existsSync(file) || !readFileSync(file, "utf-8").includes(PAGE_MARK);
   });
 }

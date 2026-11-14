@@ -133,6 +133,18 @@ export function readPathAt(root: string, abs: string, mounted: Map<string, strin
   return existsSync(twin) ? twin : abs;
 }
 
+/**
+ * Where a writer WRITES the computed file it would otherwise put at the
+ * absolute path `abs`: its output-root twin when `abs` lies in a mounted
+ * layer, else `abs` itself. The write-side partner of {@link readPathAt}:
+ * a writer writes here and reads its own earlier output (a `--check`)
+ * through `readPathAt`, so a fresh mounted checkout still judges the pinned
+ * copy and a checkout that has run the writer judges what it wrote.
+ */
+export function writePathAt(root: string, abs: string, mounted: Map<string, string> = mountedInstances(root)): string {
+  return outputTwinOf(root, abs, mounted) ?? abs;
+}
+
 /** Per-root cache of {@link mountedInstances}: a reader asks per file, and the lock does not change during a run. */
 const mountedCache = new Map<string, Map<string, string>>();
 
