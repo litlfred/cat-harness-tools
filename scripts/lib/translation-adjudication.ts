@@ -183,7 +183,9 @@ export function payloadProblems(p: unknown): string[] {
 
 // ── The issue ────────────────────────────────────────────────────────────
 
-const FENCE_OPEN = "```json translation-adjudication";
+/** The info string of the issue body's fenced JSON block. */
+export const ADJUDICATION_FENCE_INFO = "json translation-adjudication" as const;
+const FENCE_OPEN = "```" + ADJUDICATION_FENCE_INFO;
 
 /** The issue's title. */
 export function issueTitle(p: AdjudicationPayload): string {

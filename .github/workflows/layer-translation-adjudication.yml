@@ -15,12 +15,14 @@
 #   permissions: { contents: write, pull-requests: write, issues: write }
 #   jobs:
 #     adjudicate:
-#       uses: litlfred/cat-harness-tools/.github/workflows/layer-translation-adjudication.yml@main
+#       uses: litlfred/cat-harness-tools/.github/workflows/layer-translation-adjudication.yml@<lock sha> # index.lock.json
 #
 # What it does:
 #   1. Runs only for an issue labelled `translation-adjudication` or titled
 #      `[translation review] …`, and only once per issue.
-#   2. Mounts the platform's layers from the caller's `index.lock.json`.
+#   2. Mounts the platform's layers from the folio-assistant index's lock (as
+#      `layer-qa-publish.yml` does, so a layer with no `index.lock.json` of
+#      its own works too), and takes the script at the caller's lock pin of cat-harness-tools.
 #   3. Runs `scripts/translation-adjudicate.ts` on the event file. The issue
 #      body is untrusted: it is never put in a shell variable or an
 #      expression, only parsed as JSON by the script. The adjudicator is the
@@ -44,6 +46,16 @@ on:
         required: false
         type: string
         default: "."
+      index-ref:
+        description: "The folio-assistant ref whose lock mounts the platform's layers."
+        required: false
+        type: string
+        default: "main"
+      tools-ref:
+        description: "'lock' (the caller's index.lock.json pin of cat-harness-tools, or the index's mount when it has none), or a 40-hex commit."
+        required: false
+        type: string
+        default: "lock"
 
 permissions:
   contents: write
@@ -79,12 +91,54 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out the folio-assistant index
         if: steps.once.outputs.skip != 'true'
-
-      - uses: litlfred/cat-harness-tools/.github/actions/mount-layers@1257da8bbbb8e661391d08b014b16464de19613f # last change to .github/actions/mount-layers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: litlfred/folio-assistant
+          ref: ${{ inputs.index-ref }}
+          path: fa
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: steps.once.outputs.skip != 'true'
-
+        with:
+          bun-version: 1.4.4
+      - name: Mount every layer from the index's lock, and install
+        if: steps.once.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          bash fa/.github/mount-from-lock.sh --root fa
+          (cd fa && bun install)
+      - name: Check out the caller
+        if: steps.once.outputs.skip != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: src
+      - name: Take the adjudication script at the caller's pin
+        # The script follows a lock, never a branch (`workflow-pins`): with
+        # `tools-ref: lock` (the default) it is the cat-harness-tools commit
+        # the CALLER's index.lock.json mounts, or, for a layer with no lock of
+        # its own, the index's mount. Any other value must be a commit.
+        # Placed inside the index so its imports resolve through the index's
+        # node_modules.
+        if: steps.once.outputs.skip != 'true'
+        env:
+          TOOLS_REF: ${{ inputs.tools-ref }}
+        run: |
+          set -euo pipefail
+          T=fa/.adjudication-tools
+          ref="$TOOLS_REF"
+          if [ "$ref" = lock ]; then
+            if [ -f src/index.lock.json ]; then
+              ref=$(python3 -c "import json;print(next(m['ref'] for m in json.load(open('src/index.lock.json'))['mounts'] if m['harness']=='cat-harness-tools'))")
+            else
+              cp -R fa/cat-harness-tools "$T"
+              exit 0
+            fi
+          fi
+          [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::tools-ref must be 'lock' or a 40-hex commit, not '$ref'"; exit 1; }
+          git init -q "$T"
+          git -C "$T" fetch -q --depth 1 https://github.com/litlfred/cat-harness-tools.git "$ref"
+          git -C "$T" checkout -q FETCH_HEAD
       - name: Plan and write the records
         id: plan
         if: steps.once.outputs.skip != 'true'
@@ -92,8 +146,8 @@ jobs:
           LAYER: ${{ inputs.path-in-repo }}
         run: |
           set +e
-          CAT_HARNESS_ROOT="$PWD/cat-harness" bun run "$FA_TOOLS/scripts/translation-adjudicate.ts" \
-            --root "$LAYER" --event "$GITHUB_EVENT_PATH" --summary "$RUNNER_TEMP/summary.md"
+          CAT_HARNESS_ROOT="$PWD/fa/cat-harness" bun run fa/.adjudication-tools/scripts/translation-adjudicate.ts \
+            --root "src/$LAYER" --event "$GITHUB_EVENT_PATH" --summary "$RUNNER_TEMP/summary.md"
           code=$?
           set -e
           echo "code=$code" >> "$GITHUB_OUTPUT"
@@ -109,6 +163,7 @@ jobs:
           LAYER: ${{ inputs.path-in-repo }}
         run: |
           set -euo pipefail
+          cd src
           branch="translation-adjudication/issue-$N"
           git switch -c "$branch"
           git add -- "$LAYER"

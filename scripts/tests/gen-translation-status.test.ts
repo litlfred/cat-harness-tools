@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { countCatalogue, languageName, localeOfficiality, localeStatuses, officialityLabel, otherInstances, share, statusPage } from "../gen-translation-status.ts";
+import { countCatalogue, languageName, localeOfficiality, localeStatuses, officialityLabel, otherInstances, reviewLayers, reviewProjection, share, statusPage } from "../gen-translation-status.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 
 /** A minimal catalogue header — every real `.po` opens with one. */
@@ -390,5 +390,23 @@ describe("officiality per locale, from BOTH records (bean cat-tools-bbnd)", () =
     expect(html).toContain('data-fa-tr-locale="fr"');
     expect(html).toContain('data-fa-tr-officiality="unofficial"');
     expect(html).toContain("not signed off");
+  });
+});
+
+describe("the review projection", () => {
+  test("names the review page, the issue contract, and every catalogue's sources and state", () => {
+    const root = mkdtempSync(join(tmpdir(), "tr-review-"));
+    const layer = join(root, "lay");
+    mkdirSync(join(layer, "translations", "fr"), { recursive: true });
+    writeFileSync(join(layer, "lay.json"), JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "lay", repository: "acme/lay", directories: [{ id: "lay-tr", path: "translations/", graphTypologies: ["translation-sources"] }] }));
+    writeFileSync(join(layer, "translations", "fr", "page.po"), '#: docs/page.md:1\nmsgid "Hi"\nmsgstr "Salut"\n');
+    const layers = reviewLayers(root, layer);
+    const p = JSON.parse(reviewProjection(layers, "en/h/translation-status/index.md"));
+    expect(p.$schema).toBe("folio-translation-review/v1");
+    expect(p.reviewPage).toBe("en/h/translation-status/review.html");
+    expect(p.issue).toMatchObject({ schema: "translation-adjudication/v1", label: "translation-adjudication", fence: "json translation-adjudication" });
+    const lay = p.layers.find((l: { name: string }) => l.name === "lay");
+    expect(lay).toMatchObject({ repository: "acme/lay", translations: "translations", locales: ["fr"] });
+    expect(lay.rows[0]).toMatchObject({ catalogue: "page", sources: ["docs/page.md"], cells: { fr: { state: "machine", translated: 1 } } });
   });
 });

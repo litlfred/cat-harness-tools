@@ -51,6 +51,7 @@ import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { officialityFindings, readLocale } from "./check-translation-officiality.ts";
 import { poHeader } from "./kg-viewer-strings.ts";
 import { reviewBody, reviewLayer, type ReviewLayer } from "./lib/translation-review-page.ts";
+import { ADJUDICATION_FENCE_INFO, ADJUDICATION_LABEL, ADJUDICATION_SCHEMA, ADJUDICATION_TITLE_PREFIX, MAX_ISSUE_URL } from "./lib/translation-adjudication.ts";
 import { criteriaAttestationsHome } from "../schemas/sdlc/qa-attestations.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
@@ -697,6 +698,35 @@ export function reviewLayers(repoRoot: string, ownRoot: string): ReviewLayer[] {
   return out;
 }
 
+/** The tag of {@link reviewProjection}. */
+export const TRANSLATION_REVIEW_SCHEMA = "folio-translation-review/v1";
+
+/**
+ * The review matrix as a projection: every layer's catalogues, each with the
+ * source files its strings come from and its state per locale. A page's
+ * block knows its source file (`data-src`), so the chrome can find the
+ * catalogues that translate it, show their state, and file the same
+ * `translation-adjudication/v1` issue the review page files.
+ */
+export function reviewProjection(layers: ReviewLayer[], statusPage: string): string {
+  return `${JSON.stringify(
+    {
+      $schema: TRANSLATION_REVIEW_SCHEMA,
+      reviewPage: statusPage.replace(/index\.(html|md)$/, "review.html"),
+      issue: {
+        schema: ADJUDICATION_SCHEMA,
+        label: ADJUDICATION_LABEL,
+        titlePrefix: ADJUDICATION_TITLE_PREFIX,
+        fence: ADJUDICATION_FENCE_INFO,
+        maxUrl: MAX_ISSUE_URL,
+      },
+      layers,
+    },
+    null,
+    1,
+  )}\n`;
+}
+
 /** The review page, themed like the status page and written beside it as `review.html`. */
 export function reviewPage(layers: ReviewLayer[]): string {
   return themedPage({
@@ -806,6 +836,9 @@ function main(): void {
   // directory, so it is built at publish with it and needs no route.
   const reviewPath = join(pageDir, "review.html");
   const layers = reviewLayers(REPO_ROOT, ROOT);
+  // The review matrix as data, for the site chrome's per-block controls
+  // (a block's translation status, and the same issue the review page files).
+  const reviewJsonPath = join(assetDir, "review.json");
 
   // NO RAIL since 2026-10-07: the page is themed, so the theme's sidebar is its
   // navigation. The page says which directory it draws (#1168 B7a-2), in its
@@ -843,6 +876,7 @@ function main(): void {
     [assetPath, json],
     [pagePath, page],
     [reviewPath, () => withRenderedByFrontMatter(reviewPage(layers), VIEWER_TOOL)],
+    [reviewJsonPath, () => reviewProjection(layers, sitePath.rel)],
   ] as const) {
     if (check && builtHere(p)) {
       built += 1;
