@@ -50,6 +50,7 @@ import {
 import { writeInstanceConfig } from "../test/support/instance-fixture.js";
 import { notApplicableAlone } from "../test/support/checkout.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 
@@ -511,7 +512,7 @@ describe("this repository's own corpus", () => {
       // The URL is where Jekyll PUBLISHES the page, which since bean `kc7k` is
       // not always its source path; ask the permalink rule which file serves it.
       const source = sourceForPermalink(join(INSTANCE_ROOT, SITE_DIR), page.sourceUrl);
-      expect(source !== undefined && existsSync(join(INSTANCE_ROOT, SITE_DIR, source)), `no source page for key "${key}"`).toBe(true);
+      expect(source !== undefined && existsSync(overlayPath(join(INSTANCE_ROOT, SITE_DIR, source))), `no source page for key "${key}"`).toBe(true);
     }
   });
 });
