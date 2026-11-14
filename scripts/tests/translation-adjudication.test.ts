@@ -30,11 +30,11 @@ msgid ""
 msgstr ""
 "Language: fr\\n"
 
-#: docs/index.md:3
+#: docs/no-such-page.md:3
 msgid "Hello"
 msgstr "Bonjour"
 
-#: docs/index.md:9 docs/other.md:2
+#: docs/no-such-page.md:9 docs/no-such-page2.md:2
 #, python-format
 msgid ""
 "A long "
@@ -43,7 +43,7 @@ msgstr ""
 "Une longue "
 "chaîne"
 
-#: docs/index.md:12
+#: docs/no-such-page.md:12
 msgctxt "menu"
 msgid "File"
 msgstr "Fichier"
@@ -94,7 +94,7 @@ describe("the PO reader", () => {
     expect(es[1]!.msgstr).toBe("Une longue chaîne");
     expect(es[2]!.msgctxt).toBe("menu");
     expect(es[3]!.msgidPlural).toBe("Many");
-    expect(sourceFilesOf(PO)).toEqual(["docs/index.md", "docs/other.md"]);
+    expect(sourceFilesOf(PO)).toEqual(["docs/no-such-page.md", "docs/no-such-page2.md"]);
   });
 });
 
@@ -111,7 +111,7 @@ describe("applying a suggestion", () => {
   });
   test("adds a flags line after the comments when there is none", () => {
     const t = (applySuggestion(PO, { msgid: "Hello", current: "Bonjour", suggested: "Salut" }) as { text: string }).text;
-    expect(t).toContain('#: docs/index.md:3\n#, fuzzy\nmsgid "Hello"\nmsgstr "Salut"');
+    expect(t).toContain('#: docs/no-such-page.md:3\n#, fuzzy\nmsgid "Hello"\nmsgstr "Salut"');
   });
   test("matches on context", () => {
     expect("refused" in applySuggestion(PO, { msgid: "File", current: "Fichier", suggested: "Dossier" })).toBe(true);
@@ -169,7 +169,7 @@ describe("planning the record", () => {
     expect(r.writes.has("translations/fr/docs/index.po")).toBe(false);
     const node = JSON.parse(r.writes.get("translations/fr/docs/index.json")!);
     expect(node.status).toMatchObject({ locale: "fr", official: true, signedOffBy: "reviewer", signedOffAt: "2026-11-14T10:00:00Z" });
-    expect(node.sourceFile).toBe("docs/index.md");
+    expect(node.sourceFile).toBe("docs/no-such-page.md");
     expect(node.potFile).toBe("translations/fr/docs/index.pot");
     const a = JSON.parse(r.writes.get(att("translations/fr/docs/index", "fr"))!);
     expect(a.criteria["human-adjudication"]).toEqual([
@@ -180,7 +180,7 @@ describe("planning the record", () => {
     const root = layer();
     mkdirSync(join(root, "test/attestations/translation-qa/translations/fr/docs"), { recursive: true });
     writeFileSync(join(root, att("translations/fr/docs/index", "fr")), JSON.stringify({ $schema: "qa-attestations/v1", family: "translation-qa", subject: { kind: "block", id: "s", path: "s" }, locale: "fr", criteria: { "human-adjudication": [{ reviewer: { kind: "human", id: "github:earlier" } }] } }));
-    writeFileSync(join(root, "translations/fr/docs/index.json"), JSON.stringify({ label: "trans:fr/docs/index", locale: "fr", sourceFile: "docs/index.md", poFile: "x", status: { locale: "fr", official: true, signedOffBy: "earlier", signedOffAt: "2026-01-01T00:00:00Z" } }));
+    writeFileSync(join(root, "translations/fr/docs/index.json"), JSON.stringify({ label: "trans:fr/docs/index", locale: "fr", sourceFile: "docs/no-such-page.md", poFile: "x", status: { locale: "fr", official: true, signedOffBy: "earlier", signedOffAt: "2026-01-01T00:00:00Z" } }));
     const r = plan(root, payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: poHash(PO), note: "tone", suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Salut" }, { msgid: "Gone", current: "", suggested: "x" }] }]));
     expect(r.applied).toEqual(["fr/docs/index: 1 suggestion(s) applied, marked fuzzy and flagged for review"]);
     expect(r.refused).toEqual([expect.stringContaining("no entry")]);
@@ -222,9 +222,9 @@ describe("the review page's cells", () => {
     const root = layer();
     const l = reviewLayer({ name: "layer", repository: "acme/layer", layerRoot: root, translationsDir: join(root, "translations"), attestationFor: () => join(root, "none"), poHeader: () => undefined, count });
     expect(l.rows.map((r) => r.catalogue)).toEqual(["docs/index"]);
-    expect(l.rows[0]!.sources).toEqual(["docs/index.md", "docs/other.md"]);
+    expect(l.rows[0]!.sources).toEqual(["docs/no-such-page.md", "docs/no-such-page2.md"]);
     const html = reviewBody([l], "./");
-    expect(html).toContain('href="https://github.com/acme/layer/blob/main/docs/index.md"');
+    expect(html).toContain('href="https://github.com/acme/layer/blob/main/docs/no-such-page.md"');
     expect(html).toContain(`data-hash="${poHash(PO)}"`);
     // The page's fence is the one the workflow parses.
     expect(html).toContain("\\x60\\x60\\x60json translation-adjudication");
