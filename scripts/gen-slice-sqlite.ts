@@ -487,7 +487,7 @@ export function checkSlice(def: SliceDef, data: SliceData, opts: { publishedPayl
     } else {
       const pdir = opts.publishedPayloadDir ?? join(INSTANCE_ROOT, payloadOutDir(INSTANCE_ROOT));
       for (const [ref, link] of data.payloads.links) {
-        if (!existsSync(join(pdir, link.sha256))) problems.push(`${ref}: points at payload ${link.sha256}, which the published tree does not hold`);
+        if (!existsSync(overlayPath(join(pdir, link.sha256)))) problems.push(`${ref}: points at payload ${link.sha256}, which the published tree does not hold`);
       }
     }
   } finally {

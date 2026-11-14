@@ -34,6 +34,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { overlayPath } from "./lib/layer-output.ts";
 import { join, resolve } from "node:path";
 
 import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
@@ -92,7 +93,9 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
   // harness's canonical site, whose IRIs it carries) names the file it
   // framed instead (`publish-root-index.ts`).
   const subgraphIndex = opts.subgraphIndex ?? join(site, "subgraph", SUBGRAPH_INDEX_FILE);
-  const repoIndex = existsSync(subgraphIndex) ? (JSON.parse(readFileSync(subgraphIndex, "utf-8")) as Doc) : undefined;
+  // Read over the layer overlay: a mounted layer's subgraph tree is at its output root (bean `cat-tools-sm8r`, item 4).
+  const indexAt = overlayPath(subgraphIndex);
+  const repoIndex = existsSync(indexAt) ? (JSON.parse(readFileSync(indexAt, "utf-8")) as Doc) : undefined;
   if (!repoIndex) problems.push(`${subgraphIndex} is missing — the subgraph roots cannot be named`);
   const roots = list(repoIndex?.hasSubgraph).map(String);
   const seeAlso = list(repoIndex?.seeAlso).map(String);
