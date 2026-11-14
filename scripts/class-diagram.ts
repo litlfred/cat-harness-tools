@@ -26,7 +26,7 @@
  * - every box a link to its class, every type a link to its definition;
  * - "could not determine" a dashed box with the reason, never an empty box.
  */
-import { cardinalityOf, type SchemaDecl, type SchemaEdge } from "./schema-graph.ts";
+import { cardinalityOf, classModelOfDocuments, type SchemaDecl, type SchemaEdge } from "./schema-graph.ts";
 import { sourceOfKind, typeLink } from "./type-links.ts";
 
 /** A class to draw. `href` links the name; `links` maps a field type to its definition. */
@@ -294,4 +294,50 @@ export function diagramOfDecls(
     });
   }
   return { classes, edges: out, ...(opts.label ? { label: opts.label } : {}) };
+}
+
+/** The stylesheet as a tag, emitted once by a page that draws diagrams. */
+export const CLASS_DIAGRAM_STYLE = `<style>${CLASS_DIAGRAM_CSS.replace(/\s*\n\s*/g, " ").trim()}</style>`;
+
+/** One contract document: a skill's input or output, a Tool's MCP input. */
+export interface ContractDoc {
+  /** `input`, `output`, or an MCP tool's name. */
+  io: string;
+  /** Repo-relative path, or a stable pseudo-path for a schema that is not a file. */
+  file: string;
+  schema: Record<string, unknown>;
+  /** Where the contract's root class links: its page, or its file. */
+  href?: string;
+}
+
+/**
+ * The class diagram of what a skill or Tool takes and gives: the owner as a
+ * `«skill»` / `«tool»` box with one edge per contract to that contract's root
+ * class, and every class of every contract below it — read by the same JSON
+ * Schema reader the schemas viewer uses and drawn by the same renderer.
+ *
+ * Returns one line of HTML (a `<div>` holding the SVG), safe in Markdown as a
+ * raw block. Pair it with {@link CLASS_DIAGRAM_STYLE} once per page.
+ */
+export function contractDiagramHtml(
+  owner: { name: string; source: "skill" | "tool"; href?: string },
+  docs: readonly ContractDoc[],
+): string {
+  if (docs.length === 0) return "";
+  const m = classModelOfDocuments(docs.map((d) => ({ text: JSON.stringify(d.schema), module: d.file })));
+  const model = diagramOfDecls(m.decls, m.edges, { label: `${owner.name}: ${docs.map((d) => d.io).join(", ")}` });
+  const ownerId = `owner:${owner.name}`;
+  const fields: DiagramClass["fields"] = [];
+  const edges: DiagramEdge[] = [];
+  for (const d of docs) {
+    const root = m.decls.find((x) => x.module === d.file);
+    if (!root) continue;
+    const box = model.classes.find((c) => c.id === root.id);
+    if (box && d.href) box.href = d.href;
+    fields.push({ name: d.io, type: root.name, card: "1..1", ...(d.href ? { href: d.href } : {}) });
+    edges.push({ from: ownerId, to: root.id, kind: "field", via: d.io, card: "1..1" });
+  }
+  model.classes.unshift({ id: ownerId, name: owner.name, source: owner.source, fields, sel: true, ...(owner.href ? { href: owner.href } : {}) });
+  model.edges.unshift(...edges);
+  return `<div class="cd-wrap">${renderClassDiagram(model)}</div>`;
 }

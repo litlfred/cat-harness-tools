@@ -224,3 +224,49 @@ describe("one renderer, one look", () => {
     expect(svg).toContain("not valid JSON");
   });
 });
+
+describe("skill and Tool pages draw their contracts", async () => {
+  const { contractDiagramHtml } = await import("../class-diagram.ts");
+  const { toolPage } = await import("../tool-page.ts");
+  const { defineTool } = await import("../../schemas/tools/tool.ts");
+  const input = { title: "Demo input", type: "object", required: ["candidates"], properties: { candidates: { type: "array", minItems: 1, items: { type: "string" } } } };
+  const output = { title: "Demo output", type: "object", properties: { report: { type: "string" }, entries: { type: "array", items: { type: "object", properties: { ok: { type: "boolean" } } } } } };
+
+  it("draws the skill as a «skill» box pointing at each contract's root class", () => {
+    const html = contractDiagramHtml({ name: "demo-skill", source: "skill", href: "../skills/demo-skill.html" }, [
+      { io: "input", file: "s/demo/input.schema.json", schema: input, href: "https://forge.test/input.schema.json" },
+      { io: "output", file: "s/demo/output.schema.json", schema: output },
+    ]);
+    expect(html.startsWith('<div class="cd-wrap"><svg')).toBe(true);
+    expect(html).toContain("«skill»");
+    expect(html).toContain(">input [1..1]</text>");
+    expect(html).toContain(">output [1..1]</text>");
+    expect(html).toContain('href="../skills/demo-skill.html"');
+    expect(html).toContain('href="https://forge.test/input.schema.json"');
+    expect(html).toContain("DemoOutput.entries");
+    expect(html).not.toContain("\n");
+  });
+
+  it("puts a skill's contract diagram and an MCP tool's input diagram on the Tool page", () => {
+    const def = defineTool({
+      id: "demo-tool", title: "Demo", description: "A demo Tool.", install: { none: true },
+      invoke: { shell: "bun run cat demo" }, io: { inputs: [], outputs: [] }, satisfies: ["demo-skill"],
+    });
+    const md = toolPage({
+      def, instance: "demo", typeIri: "https://x.test/Tool",
+      skills: new Map([["demo-skill", { file: "skills/demo-skill.md", io: [
+        { io: "input", file: "s/demo/input.schema.json", schema: input },
+        { io: "output", file: "s/demo/output.schema.json", schema: output },
+      ] }]]),
+      skillHref: () => "../skills/demo-skill.html", toolHref: () => undefined, siblings: new Map(), alternatives: [],
+      processes: [], processesRead: true, parts: [], moduleImports: [], mcpServers: [], workflows: [],
+      mcpTools: [{ name: "demo_run", description: "", inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } }, _meta: { tool: "demo-tool", source: "declared" } }],
+      api: { reference: "../api/#demo", openapi: "../openapi.json", mcp: "../mcp-tools.json" },
+    }, "generated: true");
+    expect(md).toContain("<style>.cd {");
+    expect((md.match(/<div class="cd-wrap"><svg/g) ?? []).length).toBe(2);
+    expect(md).toContain("«tool»");
+    expect(md).toContain(">demo_run [1..1]</text>");
+    expect(md).toContain('href="../mcp-tools.json"');
+  });
+});

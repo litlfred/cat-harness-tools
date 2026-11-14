@@ -93,3 +93,17 @@ Feature: One class model drawn the same way from Zod, JSON Schema and FHIR logic
     Given a schema file that is not valid JSON
     When it is drawn
     Then the box is dashed and shows the reason
+
+  @test:scripts/tests/class-model.test.ts::skill_and_Tool_pages_draw_their_contracts::draws_the_skill_as_a_«skill»_box_pointing_at_each_contract's_root_class
+  Scenario: A skill's contracts are one diagram with the skill pointing at each root class
+    Given a skill with an input and an output JSON Schema contract
+    When its contract diagram is drawn
+    Then a «skill» box links to the skill's page and points at each contract's root class through "input" and "output"
+    And nested contract classes are drawn, and the diagram is one line of HTML
+
+  @test:scripts/tests/class-model.test.ts::skill_and_Tool_pages_draw_their_contracts::puts_a_skill's_contract_diagram_and_an_MCP_tool's_input_diagram_on_the_Tool_page
+  Scenario: A Tool page draws its skills' contracts and its MCP input
+    Given a Tool that satisfies a skill with contracts and serves an MCP tool
+    When its page is written
+    Then it carries the diagram stylesheet once and two diagrams
+    And the MCP diagram's «tool» box links to the layer's MCP tool list
