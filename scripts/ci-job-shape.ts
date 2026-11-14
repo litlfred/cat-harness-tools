@@ -9,7 +9,7 @@
  * @covers none — a CI-health report: it reads workflow runs, no declared graph
  *
  * Owner, 2026-11-13 ("updates skills and processes to see when need to do
- * so"), after folio-assistant-core run 43493373385 took 22m58s for about 2.5
+ * so"), after a content-core run (43493373385) took 22m58s for about 2.5
  * minutes of work: five serial jobs each waited 1-9 minutes for a runner and
  * ran for 3 seconds to 2 minutes. The light ones were folded into one job
  * (cat-harness-tools#2119). This report says when another workflow needs the
@@ -34,7 +34,7 @@
  * Skipped jobs take no runner and are left out. A job that never started
  * (cancelled while queued) is left out too.
  *
- *   bun run cat ci:job-shape -- --repo litlfred/folio-assistant-core [--runs 20] [--workflow pr-checks.yml] [--event pull_request] [--json]
+ *   bun run cat ci:job-shape -- --repo <owner>/<repo> [--runs 20] [--workflow pr-checks.yml] [--event pull_request] [--json]
  *
  * Exit 0: read, nothing flagged; 1: something flagged; 2: something could
  * not be read (never read as a pass). `--json` prints the reports, for the CI
