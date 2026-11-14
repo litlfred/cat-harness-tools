@@ -1170,9 +1170,10 @@ export const SUBJECT_ROWS: Readonly<Record<string, readonly SubjectRows[]>> = {
     {
       kind: "attestation",
       id: (r) => (r.file.endsWith(ATTESTATIONS_SUFFIX) ? r.file.slice(0, -ATTESTATIONS_SUFFIX.length) : undefined),
-      // `qa-attestations` is cat-harness's kind (its `validators/` node), and
-      // its pages sit beside this visualiser's, under the same harness.
-      page: (r, instance, layerPath) => `../../${QaAttestationsKind.id}/${instance}/${posix.join(layerPath, r.file.replace(/\.json$/, ""))}/`,
+      // `qa-attestations` is cat-harness-tools' kind (its `validators/` node,
+      // beside the code that defines it), so its pages are under
+      // `<locale>/cat-harness-tools/`, a sibling of this visualiser's harness.
+      page: (r, instance, layerPath) => `../../../cat-harness-tools/${QaAttestationsKind.id}/${instance}/${posix.join(layerPath, r.file.replace(/\.json$/, ""))}/`,
     },
   ],
 };

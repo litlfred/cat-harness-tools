@@ -73,9 +73,9 @@ describe("the attestations page lists each attestation", () => {
       layerPath: "test/attestations",
     });
     expect(linked[0]!.iri).toBe("https://e.org/fa/cat-harness/attestation/kg-qa/skills/foo");
-    expect(linked[0]!.page).toBe("../../qa-attestations/cat-harness/test/attestations/kg-qa/skills/foo.attestations/");
+    expect(linked[0]!.page).toBe("../../../cat-harness-tools/qa-attestations/cat-harness/test/attestations/kg-qa/skills/foo.attestations/");
     const html = registryTable(linked);
-    expect(html).toContain('<a href="../../qa-attestations/cat-harness/test/attestations/kg-qa/skills/foo.attestations/"><code>kg-qa/skills/foo</code></a>');
+    expect(html).toContain('<a href="../../../cat-harness-tools/qa-attestations/cat-harness/test/attestations/kg-qa/skills/foo.attestations/"><code>kg-qa/skills/foo</code></a>');
     expect(html).toContain('<a href="https://e.org/fa/cat-harness/attestation/kg-qa/skills/foo">IRI</a>');
     expect(html).toContain('href="https://e.org/fa/cat-harness/attestation/kg-qa/skills/foo.jsonld"');
   });
