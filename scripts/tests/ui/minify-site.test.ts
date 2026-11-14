@@ -332,6 +332,19 @@ describe("shared scripts and stylesheets", () => {
     expect(again.filesChanged).toBe(0);
   });
 
+  test("a print handler survives: minifying changes what a script is, not what it does on print", () => {
+    // Owner, 2026-11-14: "Make sure printing loads all of the content before it
+    // renders the PDF on the browser". This pass defers nothing; what it must
+    // not do is lose a `beforeprint` handler (docs-ui.js opens closed
+    // disclosures there) or the strictness it runs under.
+    const src = `(function () {\n  "use strict";\n  // open everything for the printer\n  window.addEventListener("beforeprint", function () {\n    document.details.open = true;\n  });\n})();\n`;
+    const handlers: Record<string, () => void> = {};
+    const doc = { details: { open: false } };
+    new Function("window", "document", js(src))({ addEventListener: (t: string, f: () => void) => { handlers[t] = f; } }, doc);
+    handlers.beforeprint!();
+    expect(doc.details.open).toBe(true);
+  });
+
   test("an unreadable site directory is exit 2", async () => {
     expect((await runMinifyAssets({ site: join(tmpdir(), "minify-assets-does-not-exist") })).exitCode).toBe(2);
   });
