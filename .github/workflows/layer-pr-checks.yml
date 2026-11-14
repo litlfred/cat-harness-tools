@@ -2739,6 +2739,8 @@ jobs:
           path: ${{ runner.temp }}/preview
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true'
+        with:
+          bun-version: 1.4.4
       - name: The change's cone, judged against main (preview tier)
         id: preview-judge
         if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true'
