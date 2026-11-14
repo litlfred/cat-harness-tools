@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { overlayPath } from "../scripts/lib/layer-output.ts";
+import { siteFileAt } from "./support/site-fs.ts";
 
 /**
  * A block's translation, in its feedback panel (owner, 2026-11-14: "add to
@@ -26,7 +26,7 @@ import { overlayPath } from "../scripts/lib/layer-output.ts";
  */
 
 const ROOT = join(HARNESS_ROOT);
-const asset = (p: string) => readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, p))), "utf8");
+const asset = (p: string) => readFileSync(overlayPath(join(ROOT, siteFileAt(ROOT, p))), "utf8");
 const CSS = asset("assets/css/docs-ui.css");
 const EDIT_LINKS = asset("assets/js/edit-links.js");
 const REVIEW_JS = asset("assets/js/translation-review.js");
