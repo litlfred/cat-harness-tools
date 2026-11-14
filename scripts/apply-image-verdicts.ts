@@ -164,7 +164,7 @@ export function draftsOf(v: Verdict, who: unknown, when: string) {
  * `image-verdicts.json` holds the English verdict and, for most documents,
  * no `translations`: the other five languages were drafted into the
  * sidecars afterwards. Rebuilding a sidecar from the verdicts alone dropped
- * them on every re-ingest and on every bare run of this script (who-iris
+ * them on every re-ingest and on every bare run of this script (the content
  * re-ingest pilot, 2026-11-14: 15 images on two entries, and 10 other
  * entries by a bare run).
  */
