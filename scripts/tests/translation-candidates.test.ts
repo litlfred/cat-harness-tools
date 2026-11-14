@@ -265,7 +265,7 @@ describe("sources", () => {
     expect(await s.translate(["hello"], "en", "zh")).toEqual(["hola"]);
     expect(seen).toEqual({
       argv: ["runner", "--x"],
-      req: { source: "en", target: "zh", model: "Helsinki-NLP/opus-mt-en-zh", targetToken: ">>cmn_Hans<<", texts: ["hello"] },
+      req: { model: "Helsinki-NLP/opus-mt-en-zh", texts: [">>cmn_Hans<< hello"] },
     });
     expect(s.source("zh")).toEqual({ kind: "open-mt", id: "Helsinki-NLP/opus-mt-en-zh" });
   });

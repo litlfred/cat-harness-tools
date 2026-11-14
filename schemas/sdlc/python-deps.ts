@@ -158,19 +158,19 @@ export const PYTHON_DEPS: readonly PythonDep[] = [
   {
     distribution: "transformers",
     tier: "extended",
-    why: "`opus-mt-runner.py` only: runs the Helsinki-NLP OPUS-MT Marian models (CC-BY 4.0) locally for `translation-candidates.ts --engine opus-mt`, the open machine-translation candidate source with no freemium API quota (owner, 2026-11-14). Imported inside `translate()`, so the runner's request check works without it. The wheel is 13.3 MB (transformers 5.23.0, PyPI, 2026-11-14), but it needs `torch` below, and each OPUS-MT model is a further download on first use. Extended because nothing in CI translates; the TypeScript side is tested with a fake engine.",
+    why: "`translation/opus_mt_runner.py` only: runs the Helsinki-NLP OPUS-MT Marian models (CC-BY 4.0) locally for `translate-pot.ts --engine opus-mt` and `translation-candidates.ts --engine opus-mt`, open machine translation with no freemium API quota (owner, 2026-11-14). Imported inside `main()`, so an empty request needs no model. The wheel is 13.3 MB (transformers 5.23.0, PyPI, 2026-11-14), but it needs `torch` below, and each OPUS-MT model is a further download on first use. Extended because nothing in CI translates; the TypeScript side is tested with a fake engine.",
   },
   {
     distribution: "torch",
     tier: "extended",
     transitive: true,
-    why: "The tensor backend `transformers` needs to run a Marian model in `opus-mt-runner.py` (`return_tensors=\"pt\"`). Never imported by name; declared because `transformers` does not install it. The heaviest entry here: the manylinux x86_64 wheel alone is 539.2 MB (torch 2.15.0, cp312, PyPI, 2026-11-14), before any CUDA libraries it pulls.",
+    why: "The tensor backend `transformers` needs to run a Marian model in `translation/opus_mt_runner.py` (`return_tensors=\"pt\"`). Never imported by name; declared because `transformers` does not install it. The heaviest entry here: the manylinux x86_64 wheel alone is 539.2 MB (torch 2.15.0, cp312, PyPI, 2026-11-14), before any CUDA libraries it pulls.",
   },
   {
     distribution: "sentencepiece",
     tier: "extended",
     transitive: true,
-    why: "`MarianTokenizer` in `opus-mt-runner.py` loads the OPUS-MT `.spm` vocabularies with it, and `transformers` does not install it. Never imported by name. 1.7 MB (sentencepiece 0.2.3, cp312 manylinux wheel, PyPI, 2026-11-14).",
+    why: "`MarianTokenizer` in `translation/opus_mt_runner.py` loads the OPUS-MT `.spm` vocabularies with it, and `transformers` does not install it. Never imported by name. 1.7 MB (sentencepiece 0.2.3, cp312 manylinux wheel, PyPI, 2026-11-14).",
   },
 ];
 

@@ -23,7 +23,8 @@
  *
  * Engines (`--engine`, comma-separated, tried in that order for the fill):
  *   - `opus-mt`: Helsinki-NLP Marian models (CC-BY 4.0) on this machine,
- *     through `opus-mt-runner.py` beside this script, or `--runner "<cmd>"`.
+ *     through `translation/opus_mt_runner.py` (shared with `translate-pot.ts`),
+ *     or `--runner "<cmd>"`.
  *   - `libretranslate`: a LibreTranslate you host (`--url`, default
  *     `http://localhost:5000`). The hosted libretranslate.com is refused.
  *
@@ -52,8 +53,8 @@ import { sourceFor, type CandidateSourceAdapter, type CommandRunner } from "./li
 
 const SOURCE_LOCALE = "en";
 
-/** `opus-mt-runner.py`, beside this script: the default OPUS-MT runner. */
-const BUNDLED_RUNNER = fileURLToPath(new URL("./opus-mt-runner.py", import.meta.url));
+/** `translation/opus_mt_runner.py`, shared with `translate-pot.ts`: the default OPUS-MT runner, run isolated (`python3 -I`). */
+const BUNDLED_RUNNER = fileURLToPath(new URL("./translation/opus_mt_runner.py", import.meta.url));
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -185,7 +186,7 @@ async function main(): Promise<number> {
   try {
     sources = ids.map((id) =>
       sourceFor(id, {
-        runner: arg("--runner")?.split(/\s+/).filter(Boolean) ?? ["python3", BUNDLED_RUNNER],
+        runner: arg("--runner")?.split(/\s+/).filter(Boolean) ?? ["python3", "-I", BUNDLED_RUNNER],
         run: runCommand,
         url: arg("--url") ?? "http://localhost:5000",
       }),
