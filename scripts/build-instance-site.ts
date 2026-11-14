@@ -100,7 +100,7 @@ import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { editedMountsIn, relayAdvice } from "./remote-mount.ts";
 import { BESIDE_SOURCE_OUT_ENV } from "./lib/beside-source-out.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
-import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
+import { describeFeatures, droppedByRuling, type DroppedByRuling, PARITY_REPORT, parityReport, siteFeatures, writeParityReport } from "./site-parity.ts";
 
 /**
  * The rail pass ("rail on every page") replaces the theme's side bar on every
@@ -176,8 +176,11 @@ export interface BuildOptions {
   keep?: string[];
   /**
    * The root publish's guard ({@link parityShortfall}): the built site is measured against
-   * the root it replaces — read from `parityAgainst`, else from `remote`'s publish branch —
-   * and a shortfall refuses the publish (`refuse`, the default) or is only said (`report`).
+   * the root it replaces — read from `parityAgainst`, else from `remote`'s publish branch.
+   * A shortfall is REPORTED (`report`, the default): said in the log and written to
+   * {@link PARITY_REPORT} for the site's QA page, and the site is still published
+   * (owner, 2026-11-14: "It shouldn't fail if there is an issue it should be a QA
+   * report"). `refuse` keeps the old gate for a caller that asks for it.
    */
   parity?: "refuse" | "report" | "off";
   parityAgainst?: string;
@@ -189,9 +192,9 @@ export interface BuildOptions {
   parityDropped?: DroppedByRuling[];
   /** The platform steps around the declared ones ({@link PROFILE_STEPS}); `folio` when absent. */
   profile?: SiteProfile;
-  /** `report`: unresolved links are said, and do not stop the publish. */
+  /** `report` (the default): unresolved links are said, and do not stop the publish; `refuse` stops it. */
   links?: "refuse" | "report";
-  /** `report`: a declared visualiser page the site lacks ({@link siteCoverageShortfall}) is said, and does not stop the publish. */
+  /** `report` (the default): a declared visualiser page the site lacks ({@link siteCoverageShortfall}) is said, and does not stop the publish; `refuse` stops it. */
   coverage?: "refuse" | "report";
   /**
    * After the platform's writers, write every layer's graph document and the
@@ -258,6 +261,38 @@ export function siteScopeOf(root: string, instance: string): string[] | undefine
 /** The `require`d root files a built site does not hold. */
 export function missingRequired(site: string, required: readonly string[]): string[] {
   return required.filter((f) => !existsSync(join(site, f)));
+}
+
+/**
+ * WHAT STILL REFUSES A PUBLISH: graph data, a `.json` or `.jsonld` file.
+ *
+ * Owner, 2026-11-14, after who-iris's root publish was refused for a missing
+ * icon row: *"It shouldn't fail if there is an issue it should be a QA
+ * report"*, then *"only refuse should be related to json(ld) publishing"*, and
+ * *"if there is a required sub-graph then that json(ld) should also be
+ * required to publish, but not all of its stuff."* So a declared layer's or
+ * sub-graph's graph document missing refuses (`publish-root-index.ts` already
+ * refuses a short map), while its pages, links, scripts and stylesheets are
+ * findings: said in the log, written to {@link BUILD_QA_REPORT}, and published.
+ * A build that cannot run at all (a bad recipe, a failed step, a failed push)
+ * still stops, since there is no site to report on.
+ */
+export const isGraphData = (path: string): boolean => /\.json(ld)?$/i.test(path);
+
+/** Where a build leaves the findings it published with, beside the link report, for the QA page. */
+export const BUILD_QA_REPORT = "assets/site-qa/build.json";
+
+/** One finding a build published with instead of refusing. */
+export interface BuildFinding {
+  check: "required" | "coverage" | "inline-scripts" | "chrome";
+  detail: string;
+}
+
+/** Write {@link BUILD_QA_REPORT}: every finding, in the order found. Deterministic. */
+export function writeBuildQa(site: string, findings: readonly BuildFinding[]): void {
+  const file = join(site, BUILD_QA_REPORT);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify({ $schema: "site-build-qa/v1", findings }, null, 1) + "\n");
 }
 
 /**
@@ -387,9 +422,9 @@ export interface SiteRecipe {
    * `templates/ig-repo-site/folio-site.yml` runs — the shell, its navbar, Jekyll, the rail.
    */
   profile?: SiteProfile;
-  /** An unresolved link refuses the publish (`refuse`, the default) or is only said (`report`). */
+  /** An unresolved link is only said (`report`, the default; owner 2026-11-14) or refuses the publish (`refuse`). */
   links?: "refuse" | "report";
-  /** A declared visualiser page missing from the built site refuses the publish (`refuse`, the default) or is only said (`report`). */
+  /** A declared visualiser page missing from the built site is only said (`report`, the default; owner 2026-11-14) or refuses the publish (`refuse`). */
   coverage?: "refuse" | "report";
   /** Publish every layer's graph document and the root index, `index.jsonld` ({@link BuildOptions.rootIndex}). */
   rootIndex?: boolean;
@@ -457,9 +492,9 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
   if (home !== undefined && typeof home !== "string") throw new Error(`${where}: site.build.home must be a path`);
   const profile = b.profile ?? "folio";
   if (profile !== "folio" && profile !== "ig-repo-site") throw new Error(`${where}: site.build.profile must be folio or ig-repo-site`);
-  const links = b.links ?? "refuse";
+  const links = b.links ?? "report";
   if (links !== "refuse" && links !== "report") throw new Error(`${where}: site.build.links must be refuse or report`);
-  const coverage = b.coverage ?? "refuse";
+  const coverage = b.coverage ?? "report";
   if (coverage !== "refuse" && coverage !== "report") throw new Error(`${where}: site.build.coverage must be refuse or report`);
   const rootIndex = b.rootIndex ?? false;
   if (typeof rootIndex !== "boolean") throw new Error(`${where}: site.build.rootIndex must be true or false`);
@@ -474,8 +509,8 @@ export function recipeRead(root: string, instance: string): { recipe?: SiteRecip
       ...(list("finalSteps").length ? { finalSteps: list("finalSteps") } : {}),
       ...(keep.length ? { keep: keep as string[] } : {}),
       ...(profile !== "folio" ? { profile } : {}),
-      ...(links !== "refuse" ? { links } : {}),
-      ...(coverage !== "refuse" ? { coverage } : {}),
+      ...(links !== "report" ? { links } : {}),
+      ...(coverage !== "report" ? { coverage } : {}),
       ...(rootIndex ? { rootIndex } : {}),
     },
     read,
@@ -784,33 +819,47 @@ export function chromeArtefacts(root: string, plan: readonly DeclaredArtefact[] 
 
 /**
  * Run the chrome's publish-time writers ({@link chromeArtefacts}) as
- * `derive:publish` runs them, and judge them the same way: a writer that fails
- * refuses the build; one that says it does not apply to this root (exit 78,
- * `lib/not-applicable.ts`) is reported and its artefacts excused; any other
- * artefact that came out missing or empty refuses the build, since the chrome
- * links it.
+ * `derive:publish` runs them. One that says it does not apply to this root
+ * (exit 78, `lib/not-applicable.ts`) is reported and its artefacts excused.
+ * A writer that fails, or an artefact that came out missing or empty, refuses
+ * the build only when that artefact is graph data ({@link isGraphData}); a
+ * stylesheet or script is a FINDING, returned for the QA report (owner,
+ * 2026-11-14: "only refuse should be related to json(ld) publishing").
  */
 export function buildChrome(
   root: string,
   artefacts: readonly DeclaredArtefact[] = chromeArtefacts(root),
   runOne: (writer: string) => WriterOutcome = (w) => runWriter(writerCommand(root, w), root),
-): { ran: string[]; skipped: Map<string, string> } {
+): { ran: string[]; skipped: Map<string, string>; findings: BuildFinding[] } {
   const ran: string[] = [];
   const skipped = new Map<string, string>();
+  const failed = new Map<string, string>();
+  const findings: BuildFinding[] = [];
   for (const w of writersOf(artefacts)) {
     console.log(`▶ chrome artefact writer: ${w}`);
     const o = runOne(w);
-    if (o.kind === "failed") throw new Error(`chrome artefact writer ${w} failed (exit ${o.exit ?? "on a signal"})`);
-    if (o.kind === "skipped") {
+    if (o.kind === "failed") {
+      const what = `chrome artefact writer ${w} failed (exit ${o.exit ?? "on a signal"})`;
+      if (artefacts.some((a) => a.writer.includes(w) && isGraphData(a.path))) throw new Error(`${what}: it writes graph data`);
+      failed.set(w, what);
+      console.error(`  ✗ ${what} (reported, not gated)`);
+      findings.push({ check: "chrome", detail: what });
+    } else if (o.kind === "skipped") {
       skipped.set(w, o.why);
       console.log(`  skipped ${w} — it does not apply to this root: ${o.why}`);
     } else ran.push(w);
   }
-  const empty = artefacts.filter((a) => !a.writer.some((w) => skipped.has(w)) && !built(a));
-  if (empty.length > 0) {
-    throw new Error(`the site chrome's publish-time artefact(s) ${empty.map((a) => `${a.instance}/${a.path}`).join(", ")} came out missing or empty after ${writersOf(empty).join(", ")}`);
+  const empty = artefacts.filter((a) => !a.writer.some((w) => skipped.has(w) || failed.has(w)) && !built(a));
+  const words = (xs: readonly DeclaredArtefact[]) => `${xs.map((a) => `${a.instance}/${a.path}`).join(", ")} came out missing or empty after ${writersOf(xs).join(", ")}`;
+  const graph = empty.filter((a) => isGraphData(a.path));
+  if (graph.length > 0) throw new Error(`the site chrome's graph data ${words(graph)}`);
+  const rest = empty.filter((a) => !isGraphData(a.path));
+  if (rest.length > 0) {
+    const what = `the site chrome's publish-time artefact(s) ${words(rest)}`;
+    console.error(`  ✗ ${what} (reported, not gated)`);
+    findings.push({ check: "chrome", detail: what });
   }
-  return { ran, skipped };
+  return { ran, skipped, findings };
 }
 
 function run(label: string, cmd: string, cwd: string, env: Record<string, string> = {}): void {
@@ -1079,13 +1128,15 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const restoreHarnessData = pinGeneratedData(root, mounted);
   const s = shellQuote(site);
   const writeVisualisers = o.writeVisualisers ?? writeMissingVisualisers;
+  /** What this build publishes with instead of refusing ({@link isGraphData}), for {@link BUILD_QA_REPORT}. */
+  const findings: BuildFinding[] = [];
   try {
     const has = PROFILE_STEPS[o.profile ?? "folio"];
     if (has.has("sync")) run("sync docs harness", `bun run ${TOOLS}/sync-docs-harness.ts`, root);
     if (has.has("landing")) run("landing data", `bun run ${TOOLS}/gen-landing-data.ts`, root);
     const scope = `--instance ${shellQuote(o.instance)} --title ${shellQuote(title)} --link-root ${shellQuote(o.linkRoot)}`;
     // Before the chrome is composed: what it links that only a publish-time writer builds.
-    buildChrome(root);
+    findings.push(...buildChrome(root).findings);
     run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${shellQuote(docs)} ${shellFlags(o.profile)} ${scope}`, root);
     run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${shellQuote(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
     if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
@@ -1094,7 +1145,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // written by the writer its Tool declares, into the site source — the pages a recipe
     // step already wrote are not written twice ({@link writeMissingVisualisers}). A writer
     // that fails or cannot be pointed at a site is said here, and its pages are judged
-    // below by the coverage guard, which refuses or reports as the recipe says.
+    // below by the coverage guard, which reports (or refuses, when the recipe says `refuse`).
     writeVisualisers(root, docs, { staging: Boolean(staging), ...(o.scope ? { scope: o.scope } : {}) });
 
     // The Gemfile is the mounted harness's, in its site CHROME (semantic subgraphs, slice 1).
@@ -1175,7 +1226,12 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   console.log(`404: ${writeLocaleFallback404(site, `${baseurl}/`, UN_LOCALES)} — a missing /<locale>/ page goes to its English page`);
 
   const lacking = missingRequired(site, o.require ?? []);
-  if (lacking.length > 0) throw new Error(`the built site lacks ${lacking.join(", ")}, which a step was to write: the site is not published`);
+  const lackingGraph = lacking.filter(isGraphData);
+  if (lackingGraph.length > 0) throw new Error(`the built site lacks the graph data ${lackingGraph.join(", ")}, which a step was to write: the site is not published`);
+  for (const f of lacking.filter((x) => !isGraphData(x))) {
+    console.error(`  ✗ required: ${f} (reported, not gated)`);
+    findings.push({ check: "required", detail: `the built site lacks ${f}, which a step was to write` });
+  }
 
   // Every page the declarations say this site serves — the root's and every
   // layer it needs (owner, 2026-10-15: smart-ra was published without
@@ -1184,15 +1240,19 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   // was never published.
   const uncovered = siteCoverageShortfall(root, site, { staging: Boolean(staging), ownInstance: o.instance, ...(o.scope ? { scope: o.scope } : {}) });
   if (uncovered.length > 0) {
-    for (const m of uncovered) console.error(`  ✗ coverage: ${m.route} (${m.harness} declares \`${m.visualiser}\`${m.instance ? `; ${m.instance} has entries` : ""})`);
-    if (o.coverage !== "report") throw new Error(`the built site lacks ${uncovered.length} declared visualiser page(s): the site is not published`);
-    console.error(`  (coverage: report — the recipe says so; published without ${uncovered.length} declared page(s))`);
+    for (const m of uncovered) {
+      const what = `${m.route} (${m.harness} declares \`${m.visualiser}\`${m.instance ? `; ${m.instance} has entries` : ""})`;
+      console.error(`  ✗ coverage: ${what}`);
+      findings.push({ check: "coverage", detail: what });
+    }
+    if (o.coverage === "refuse") throw new Error(`the built site lacks ${uncovered.length} declared visualiser page(s): the site is not published`);
+    console.error(`  (coverage: reported, not gated — published without ${uncovered.length} declared page(s))`);
   } else console.log("coverage: ✓ every declared visualiser page is in the site");
 
   // The root's guard: the built site carries everything the root it replaces carries.
   const keep = [...new Set([...PREVIEW_PREFIXES, PC_PREFIX, "_render-log", ...(o.keep ?? [])])];
   let publishedTree: string | undefined;
-  if (!staging && (o.parity ?? "refuse") !== "off") {
+  if (!staging && (o.parity ?? "report") !== "off") {
     const against = (publishedTree = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined));
     if (against === undefined) console.log("parity: no published root to compare with — nothing to lose");
     else {
@@ -1203,10 +1263,14 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
       console.log(`parity: ${describeFeatures("current root", cur)}`);
       console.log(`parity: ${describeFeatures("this build  ", cand)}`);
       for (const d of droppedByRuling(cur, cand, dropped)) console.log(`parity: ${d.words} is dropped by ruling, not a shortfall — ${d.ruling}`);
-      const short = parityShortfall(cur, cand, dropped);
+      const refuse = Boolean(o.publish) && o.parity === "refuse";
+      const report = parityReport(cur, cand, dropped, refuse);
+      const short = report.shortfall;
+      writeParityReport(site, report);
       for (const m of short) console.error(`  ✗ ${m}`);
-      if (short.length && o.publish && o.parity !== "report") throw new Error(`this build lacks ${short.length} thing(s) the published root carries: the root is not replaced`);
-      if (!short.length) console.log("parity: ✓ this build carries everything the published root does");
+      if (short.length && refuse) throw new Error(`this build lacks ${short.length} thing(s) the published root carries: the root is not replaced`);
+      if (short.length) console.error(`  (parity: reported, not gated — published with ${short.length} shortfall(s); the QA page reads ${PARITY_REPORT})`);
+      else console.log("parity: ✓ this build carries everything the published root does");
     }
   }
 
@@ -1235,8 +1299,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   }
   if (links.misses.length > 0) {
     for (const m of links.misses.slice(0, 50)) console.error(`  ✗ ${m}`);
-    if (o.links !== "report") throw new Error(`${links.misses.length} unresolved link(s): the site is not published`);
-    console.error(`  (links: report — the recipe says so; published with ${links.misses.length} unresolved link(s))`);
+    if (o.links === "refuse") throw new Error(`${links.misses.length} unresolved link(s): the site is not published`);
+    console.error(`  (links: reported, not gated — published with ${links.misses.length} unresolved link(s); the QA page reads ${LINK_REPORT})`);
   }
 
   // Every inline script still parses, and no theme markup pass reached into
@@ -1249,7 +1313,8 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   for (const p of upstreamScripts.slice(0, 20)) console.log(`  · ${p.page}:${p.line} ${p.reason} (a page the content supplies: reported, not gated)`);
   if (ownScripts.length > 0) {
     for (const p of ownScripts.slice(0, 50)) console.error(`  ✗ ${p.page}:${p.line} ${p.reason}`);
-    throw new Error(`${ownScripts.length} inline script(s) do not survive the build: the site is not published`);
+    for (const p of ownScripts) findings.push({ check: "inline-scripts", detail: `${p.page}:${p.line} ${p.reason}` });
+    console.error(`  (inline scripts: reported, not gated — published with ${ownScripts.length} unsound)`);
   }
 
   // Accessibility and QA (owner, 2026-11-02): every heading has a named
@@ -1259,6 +1324,9 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const anchorPages = new Set(anchors.problems.map((p) => p.page)).size;
   console.log(`anchors: ${anchors.pages} html pages, ${anchorPages} to fix (reported, not gated)`);
   for (const p of anchors.problems.slice(0, 20)) console.log(`  · ${p.page}: ${p.reason}`);
+
+  writeBuildQa(site, findings);
+  console.log(`qa: ${findings.length} finding(s) published with, in ${BUILD_QA_REPORT}`);
 
   o.beforePublish?.(site);
 

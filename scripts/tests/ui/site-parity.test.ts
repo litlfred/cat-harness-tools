@@ -10,12 +10,12 @@
  */
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { publishedRoot, recipeFromConfig, siteStepEnv } from "../../build-instance-site.ts";
-import { droppedByRuling, matchesDropped, parityShortfall, siteFeatures } from "../../site-parity.ts";
+import { droppedByRuling, matchesDropped, PARITY_REPORT, parityReport, parityShortfall, siteFeatures, writeParityReport } from "../../site-parity.ts";
 import { THEME_SIDEBAR_RULING } from "../../build-instance-site.ts";
 
 const tmp = (p: string) => mkdtempSync(join(tmpdir(), p));
@@ -96,6 +96,36 @@ describe("parityShortfall — what the candidate would lose", () => {
   });
 });
 
+describe("a shortfall is a QA finding, not a refusal (owner, 2026-11-14)", () => {
+  // who-iris's root publish was refused because its index.html lacked the icon row.
+  // Owner: "It shouldn't fail if there is an issue it should be a QA report."
+  const current = siteFeatures(folioSiteRoot(), ["branches"]);
+  const noRowOnIndex = { ...current, index: (current.index ?? []).filter((k) => k !== "navbarRow") };
+
+  test("an index.html without the icon row is published with the shortfall reported", () => {
+    const r = parityReport(current, noRowOnIndex);
+    expect(r.outcome).toBe("published-with-shortfall");
+    expect(r.shortfall).toEqual(["the harness icon row (#fa-navbar-row): on the current root's index.html, not on the candidate's"]);
+  });
+
+  test("the guard still finds the missing icon row; only a caller that asks for refuse is refused", () => {
+    expect(parityReport(current, noRowOnIndex, [], true).outcome).toBe("refused");
+    expect(parityReport(current, current, [], true).outcome).toBe("carries-everything");
+  });
+
+  test("the report is written beside the link report, for the QA page", () => {
+    const site = tmp("parity-qa-");
+    writeParityReport(site, parityReport(current, noRowOnIndex));
+    expect(PARITY_REPORT).toBe("assets/site-qa/parity.json");
+    const back = JSON.parse(readFileSync(join(site, PARITY_REPORT), "utf-8"));
+    expect(back.$schema).toBe("site-parity-report/v1");
+    expect(back.outcome).toBe("published-with-shortfall");
+    expect(back.shortfall).toHaveLength(1);
+    expect(back.current.stamp).toEqual({ present: true });
+    rmSync(site, { recursive: true, force: true });
+  });
+});
+
 describe("the recipe an IG declares (site.build)", () => {
   const checkout = (build: unknown) => {
     const d = tmp("recipe-");
@@ -104,9 +134,11 @@ describe("the recipe an IG declares (site.build)", () => {
   };
 
   test("keep, profile and links are read and checked", () => {
-    expect(recipeFromConfig(checkout({ pre: ["site:ast"], keep: ["branches"], profile: "ig-repo-site", links: "report" }), "r")).toEqual({
-      pre: ["site:ast"], sourceSteps: [], siteSteps: [], keep: ["branches"], profile: "ig-repo-site", links: "report",
+    // `report` is the default (owner, 2026-11-14), so only `refuse` is carried.
+    expect(recipeFromConfig(checkout({ pre: ["site:ast"], keep: ["branches"], profile: "ig-repo-site", links: "refuse" }), "r")).toEqual({
+      pre: ["site:ast"], sourceSteps: [], siteSteps: [], keep: ["branches"], profile: "ig-repo-site", links: "refuse",
     });
+    expect(recipeFromConfig(checkout({ links: "report", coverage: "report" }), "r")).toEqual({ pre: [], sourceSteps: [], siteSteps: [] });
     expect(() => recipeFromConfig(checkout({ keep: ["../x"] }), "r")).toThrow(/keep/);
     expect(() => recipeFromConfig(checkout({ keep: ["."] }), "r")).toThrow(/keep/);
     expect(() => recipeFromConfig(checkout({ profile: "ig" }), "r")).toThrow(/profile/);
