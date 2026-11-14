@@ -2175,6 +2175,10 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq strace && strace -V | head -1
       - *install
       - *chromium
+      - name: Mark the mounts before the tests and gates
+        # Bean `cat-tools-sm8r`, item 4, step 7: every file now, so the step
+        # after the gates can name each one a test or gate wrote inside a mount.
+        run: python3 ci/.github/scripts/layer-pr-checks/snapshot.py mark fa "$RUNNER_TEMP/before-tests.txt"
       - name: bun test
         working-directory: fa
         # Judged by the compare job, not by this exit code.
@@ -2281,19 +2285,21 @@ jobs:
         # 7": "A. Measure, then red"). A mounted layer is its pinned commit:
         # what a writer computes for it goes to its layer output root,
         # `build/layers/<instance>/` (`scripts/lib/layer-output.ts`), never into
-        # the mount. `mount-from-lock --check` compares every mount with its
-        # pin (paths a layer declares `builtAtPublish` are not hashed, so
-        # `derive:publish`'s writes are not counted), and this shard's answer
-        # is recorded as a gate of its own beside the others in gates.json.
-        # The compare job judges it like any gate: red when this PR's side
-        # edits a mount and main's side does not.
+        # the mount. The mounts were marked after the prepared tree was applied
+        # and before the tests, so `derive:publish` (the prepare job's) is not
+        # counted: this names what THIS shard's tests and gates wrote, changed
+        # or removed under any mounted instance's path in the root's lock. The
+        # answer is a gate of its own in this shard's gates.json, and the
+        # compare job judges it like any gate: red when the PR's side writes
+        # inside a mount and main's side does not.
         env:
           NAME: "mounts:untouched (shard ${{ matrix.shard }}/${{ inputs.gate-shards }})"
         run: |
           set -uo pipefail
           log="$RUNNER_TEMP/mounts-untouched.log"
+          mapfile -t mounts < <(python3 -c 'import json,sys; print("\n".join(i["path"] for i in json.load(open(sys.argv[1])).get("instances", []) if i.get("path")))' fa/index.lock.json)
           code=0
-          bun ci/scripts/mount-from-lock.ts --root fa --check > "$log" 2>&1 || code=$?
+          python3 ci/.github/scripts/layer-pr-checks/snapshot.py diff fa "$RUNNER_TEMP/before-tests.txt" "${mounts[@]}" > "$log" 2>&1 || code=$?
           tail -40 "$log"
           python3 - "$RUNNER_TEMP/gates.json" "$NAME" "$code" "$log" <<'PY'
           import json, sys
@@ -2303,7 +2309,7 @@ jobs:
           except (OSError, ValueError):
               gates = {}
           tail = open(log, errors="replace").read().strip()[-1500:]
-          gates[name] = {"command": "bun ci/scripts/mount-from-lock.ts --root fa --check", "exit": code, "tail": tail}
+          gates[name] = {"command": "snapshot.py diff fa <before the tests> <every mount in index.lock.json>", "exit": code, "tail": tail}
           json.dump(gates, open(path, "w"), indent=1)
           PY
       # The artefact's own name, inside it: when the compare job's download

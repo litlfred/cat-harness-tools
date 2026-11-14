@@ -19,6 +19,10 @@ few seconds), then applies this snapshot, so it holds the same tree.
   snapshot.py apply <root> <out>           in a shard: remove the deleted
                                            paths and the directories they
                                            leave empty, then unpack the tar
+  snapshot.py diff <root> <list> <dir>...  the files under any <dir> written,
+                                           changed or removed since <list>;
+                                           exits 1 when there are any (bean
+                                           `cat-tools-sm8r`, item 4, step 7)
 
 `node_modules` and `.git` are left out: a shard installs for itself, and the
 mounts carry no `.git`. The one exception is the root's `.git/branch-mounts`:
@@ -99,6 +103,25 @@ def apply(root, out):
     print(f"snapshot applied: {len(deleted)} removed, {n} unpacked")
 
 
+def diff(root, listing, dirs):
+    before = {}
+    with open(listing) as f:
+        for line in f:
+            ino, size, mtime, p = line.rstrip("\n").split(" ", 3)
+            before[p] = f"{ino} {size} {mtime}"
+    prefixes = [d.strip("/") + "/" for d in dirs if d.strip("/")]
+    inside = lambda p: any(p.startswith(x) for x in prefixes)
+    now = [p for p in walk(root) if inside(p)]
+    changed = [p for p in now if before.get(p) != stamp(root, p)]
+    deleted = sorted(p for p in set(before) - set(now) if inside(p))
+    for p in changed:
+        print(f"written  {p}")
+    for p in deleted:
+        print(f"removed  {p}")
+    print(f"{len(changed)} file(s) written or changed, {len(deleted)} removed inside {len(prefixes)} mount(s)")
+    return 1 if changed or deleted else 0
+
+
 def main():
     a = sys.argv[1:]
     if len(a) == 3 and a[0] == "mark":
@@ -107,6 +130,8 @@ def main():
         save(a[1], a[2], a[3])
     elif len(a) == 3 and a[0] == "apply":
         apply(a[1], a[2])
+    elif len(a) >= 3 and a[0] == "diff":
+        sys.exit(diff(a[1], a[2], a[3:]))
     else:
         print(__doc__, file=sys.stderr)
         sys.exit(2)
