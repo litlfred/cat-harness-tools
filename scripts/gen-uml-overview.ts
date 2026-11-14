@@ -65,7 +65,7 @@ import { BASE_GRAPH_TYPOLOGIES, resolveGraphTypology } from "../schemas/kg/graph
 import { readUmlPalette } from "./uml-palette.js";
 import { bothViews, gridLinks, renderSvgs, safeId, sha256, svgStamp, views, type RenderJob } from "./plantuml-render.js";
 import { detangleResultsDir, sidecarFor } from "../schemas/kg/detangle-sidecar.js";
-import { readQaManifest, readQaTree } from "./qa-store.ts";
+import { QaUsageError, readQaManifest, readQaTree } from "./qa-store.ts";
 import { requireCurrentWorkingCopy } from "./qa-working-copy.ts";
 import { JUDGEMENT_EXIT } from "./qa-results.ts";
 import { overlayDirs } from "./lib/layer-output.ts";
@@ -327,6 +327,11 @@ const QA_REF = (() => {
  * - **miss** with no such entry or root, **corrupt**, **unknown**: not
  *   determined. Drawing "no node here" for these would be the `dh4f` defect,
  *   a miss read as clean.
+ * - **unreachable**: a checkout with no store to ask (no `origin`, no
+ *   `QA_STORE_REMOTE`, as a layer standing alone has; bean `cat-tools-sm8r`).
+ *   Not determined either. It threw, and a test drawing the real corpus
+ *   standing alone passed only while another test's leftover `test/results/`
+ *   kept this branch from being reached.
  */
 function tagsForSection(path: string, kind: string): Set<string> | null {
   const abs = join(REPO, path);
@@ -337,6 +342,17 @@ function tagsForSection(path: string, kind: string): Set<string> | null {
   const dirs = overlayDirs(abs);
   if (dirs.length > 0) return new Set(dirs.flatMap((d) => [...tagsUnder(d)]));
   const where = `${path}/ is not in the checkout, and qa-reports at ${QA_REF}`;
+  try {
+    return storedTags(path, where);
+  } catch (e) {
+    if (!(e instanceof QaUsageError)) throw e;
+    UNDETERMINED.push(`${where}: unreachable — ${e.message}`);
+    return null;
+  }
+}
+
+/** {@link tagsForSection} for a `qa` directory not in the checkout: as stored in `qa-reports` at {@link QA_REF}. */
+function storedTags(path: string, where: string): Set<string> | null {
   const m = readQaManifest(QA_REF);
   if (m.state !== "hit") {
     UNDETERMINED.push(`${where}: ${m.state} — ${m.reason}`);

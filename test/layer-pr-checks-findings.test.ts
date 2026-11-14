@@ -24,7 +24,7 @@ function findings(text: string): string[] {
     "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
     "print(json.dumps(m.findings(sys.stdin.read())))",
   ].join("\n");
-  const r = spawnSync("python3", ["-I", "-c", code], { input: text, encoding: "utf-8" });
+  const r = spawnSync("python3", ["-I", "-B", "-c", code], { input: text, encoding: "utf-8" });
   if (r.status !== 0) throw new Error(r.stderr);
   return JSON.parse(r.stdout);
 }
@@ -37,7 +37,7 @@ function compare(base: string, head: string): number {
   const side = (text: string) => ({ "libraries:check": { command: "x", exit: 1, tail: "", diagnostics: findings(text) } });
   writeFileSync(join(dir, "base.json"), JSON.stringify(side(base)));
   writeFileSync(join(dir, "head.json"), JSON.stringify(side(head)));
-  const r = spawnSync("python3", ["-I", join(DIR, "compare-gates.py"), join(dir, "base.json"), join(dir, "head.json")], {
+  const r = spawnSync("python3", ["-I", "-B", join(DIR, "compare-gates.py"), join(dir, "base.json"), join(dir, "head.json")], {
     encoding: "utf-8",
     // input-site: env PATH #34b0985f — PATH handed to a child process, which decides which binaries it runs
     env: { PATH: process.env.PATH ?? "" },
@@ -73,7 +73,7 @@ function compareProduced(base: { producer?: string; diagnostics: string[] }, hea
   const side = (s: { producer?: string; diagnostics: string[] }) => ({ "cat-harness-tools:check:subgraph-coverage": { command: "x", exit: 1, tail: "", ...s } });
   writeFileSync(join(dir, "base.json"), JSON.stringify(side(base)));
   writeFileSync(join(dir, "head.json"), JSON.stringify(side(head)));
-  const r = spawnSync("python3", ["-I", join(DIR, "compare-gates.py"), join(dir, "base.json"), join(dir, "head.json")], {
+  const r = spawnSync("python3", ["-I", "-B", join(DIR, "compare-gates.py"), join(dir, "base.json"), join(dir, "head.json")], {
     encoding: "utf-8",
     // input-site: env PATH #34b0985f — PATH handed to a child process, which decides which binaries it runs
     env: { PATH: process.env.PATH ?? "" },
@@ -112,7 +112,7 @@ describe("gate_diagnostics.producer", () => {
       "import gate_diagnostics as g",
       `print(json.dumps([g.producer(${JSON.stringify(root)}, "cat-harness-tools:check:foreign-paths"), g.producer(${JSON.stringify(root)}, "site:check:x")]))`,
     ].join("\n");
-    const r = spawnSync("python3", ["-I", "-c", code], { encoding: "utf-8" });
+    const r = spawnSync("python3", ["-I", "-B", "-c", code], { encoding: "utf-8" });
     expect(r.status).toBe(0);
     expect(JSON.parse(r.stdout)).toEqual(["d30c2f5f", null]);
   });

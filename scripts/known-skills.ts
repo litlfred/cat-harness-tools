@@ -932,7 +932,29 @@ export function workflowDirs(root: string, scope: CorpusScope = corpusScopeFor(r
   // Deduping HERE rather than in each caller: the ambiguity is created by this
   // function's own two branches, and a caller cannot see that the path it was
   // handed twice is the same directory found two ways.
-  return [...new Set(out)];
+  //
+  // NESTED, too, not only identical. A declared directory with no `processes/`
+  // is pushed whole when `holdsDiagrams` finds a diagram at ANY depth, so an
+  // opt-in level (`L2/`) claims the processes of a sub-graph declared inside it
+  // (`L2/collab/processes/`), which is also pushed in its own right. Every
+  // caller walks recursively, so each of those diagrams reached the KG export
+  // twice: 207 nodes sharing their IRIs, and `slice:sqlite` failed on
+  // `UNIQUE constraint failed: nodes.iri` (folio-assistant main after #3119).
+  return outermostDirs(out);
+}
+
+/**
+ * The given directories without duplicates and without any that lies inside
+ * another of them: a recursive walk of the outer one already reaches it.
+ * Order is kept, by first appearance.
+ */
+export function outermostDirs(dirs: readonly string[]): string[] {
+  const uniq = [...new Set(dirs.map((d) => resolve(d)))];
+  const inside = (d: string, outer: string): boolean => {
+    const rel = relative(outer, d);
+    return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+  };
+  return uniq.filter((d) => !uniq.some((o) => o !== d && inside(d, o)));
 }
 
 /**

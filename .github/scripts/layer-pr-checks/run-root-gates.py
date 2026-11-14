@@ -52,6 +52,10 @@ from concurrent.futures import ThreadPoolExecutor
 # Beside this file, found by its path: the tests and `python3 -I` put no
 # script directory on sys.path.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# No __pycache__/ beside the module: this directory is often a MOUNTED layer,
+# whose bytes a mount digest pins, and a caller passing `-I` cannot be asked
+# for PYTHONDONTWRITEBYTECODE (bean cat-tools-sm8r item 4).
+sys.dont_write_bytecode = True
 from gate_diagnostics import diagnostics, producer  # noqa: E402
 
 TIMEOUT_S = 1200

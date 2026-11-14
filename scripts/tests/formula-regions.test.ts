@@ -25,7 +25,7 @@ const DETECTIONS_FIXTURE = join(FIXTURE_DIR, "detections.json");
 const TRUTH_FIXTURE = join(FIXTURE_DIR, "truth.json");
 
 function run(cwd: string, ...args: string[]): { code: number; out: string; err: string } {
-  const r = spawnSync("python3", [SCRIPT, ...args], { cwd, encoding: "utf-8" });
+  const r = spawnSync("python3", ["-B", SCRIPT, ...args], { cwd, encoding: "utf-8" });
   return { code: r.status ?? 1, out: r.stdout ?? "", err: r.stderr ?? "" };
 }
 
