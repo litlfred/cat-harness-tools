@@ -32,7 +32,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFile
 import { dirname, join } from "node:path";
 
 import { withInlineCode } from "../schemas/content/inline-code.js";
-import { checkoutRoot, overlayDirs, writePathAt } from "./lib/layer-output.ts";
+import { checkoutRoot, overlayDirs, readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { escapeHtml, todoListingFileFor } from "./todo-listing.js";
 
@@ -250,13 +250,18 @@ export function writeProvenanceListing(opts: {
   // Where the site's layer is MOUNTED (bean `cat-tools-sm8r`, item 4), the
   // slice is computed output and goes to the layer's output root; the pinned
   // mount is never written. In the layer's own checkout both are the site.
+  // A caller's own `emit` gets the resolved path too: a check compares the
+  // copy a reader would see (output root, else the site), a write goes to the
+  // output root.
   const root = checkoutRoot();
   const writeAt = (abs: string): string => (root === undefined ? abs : writePathAt(root, abs));
-  const emit =
+  const at = (abs: string): string => (root === undefined ? abs : opts.check ? readPathAt(root, abs) : writePathAt(root, abs));
+  const sink =
     opts.emit ??
     ((path: string, content: string) => {
-      if (!opts.check) writeFileSync(writeAt(path), content);
+      if (!opts.check) writeFileSync(path, content);
     });
+  const emit = (path: string, content: string): void => sink(at(path), content);
   const fragDir = join(opts.siteDir, "_includes", "generated", "provenance", opts.producer);
   const fragOut = writeAt(fragDir);
   const indexFile = join(opts.siteDir, "_data", "provenance", `${opts.producer}.json`);
