@@ -717,7 +717,7 @@ describe("refuse to promote — the gate between the arms and the library", () =
     // uploads/ -> library/ in two commands.
     const base = { rung: "pdf-pages" as const, why: "", steps: [["python3", "pdf-pages.py"]] };
     const armed = withDerivedArms(base, "/tmp/x.pdf", "/stage", "/stage/slug", "/lib");
-    expect(armed.steps).toHaveLength(10);
+    expect(armed.steps).toHaveLength(12);
     // The LaTeX overlay straight after the rung, so every arm that reads
     // `sections/` reads the overlaid text. It takes the ENTRY and the
     // destination LIBRARY, where a fetched `source/` lives.
@@ -751,12 +751,24 @@ describe("refuse to promote — the gate between the arms and the library", () =
     expect(armed.steps[5]).toEqual(["bun", "run", expect.stringContaining("l1-blocks.ts"), "-o", "/stage/slug"]);
     // Footnotes (owner, 2026-11-11): after the blocks, which each note names; the ENTRY and the PDF.
     expect(armed.steps[6]).toEqual(["python3", expect.stringContaining("pdf-footnotes.py"), "/stage/slug", "/tmp/x.pdf"]);
+    // The table arm (owner, 2026-11-14): the ENTRY, the DESTINATION library
+    // (a transcription there is kept, never overwritten) and the PDF.
+    expect(armed.steps[7]).toEqual([
+      "bun",
+      "run",
+      expect.stringContaining("pdf-tables-csvw.ts"),
+      "--staging",
+      "/stage/slug",
+      "--library",
+      "/lib",
+      "/tmp/x.pdf",
+    ]);
     // The Stage B aspects (requirements, 2026-11-01) read `sections/`, so they take the ENTRY.
-    expect(armed.steps[7]).toEqual(["python3", expect.stringContaining("extract-candidates.py"), "--aspects-only", "/stage/slug"]);
+    expect(armed.steps[8]).toEqual(["python3", expect.stringContaining("extract-candidates.py"), "--aspects-only", "/stage/slug"]);
     // The verdict arm — bean `8suc`. It takes the ENTRY directory and the
     // DESTINATION LIBRARY, because the judgement lives in the library and a
     // staging directory does not say which one that is.
-    expect(armed.steps[8]).toEqual([
+    expect(armed.steps[9]).toEqual([
       "bun",
       "run",
       expect.stringContaining("apply-image-verdicts.ts"),
@@ -766,7 +778,20 @@ describe("refuse to promote — the gate between the arms and the library", () =
       "/lib",
     ]);
     // The cover arm (owner, 2026-10-16): page 1, into the entry, so `avatarOf` takes it before a figure.
-    expect(armed.steps[9]).toEqual(["python3", expect.stringContaining("pdf-cover.py"), "/tmp/x.pdf", "-o", "/stage/slug/cover.png", "--width", "300"]);
+    expect(armed.steps[10]).toEqual(["python3", expect.stringContaining("pdf-cover.py"), "/tmp/x.pdf", "-o", "/stage/slug/cover.png", "--width", "300"]);
+    // The extraction record, last: it reads what every arm above wrote, and
+    // names the rung that wrote `structure.json`.
+    expect(armed.steps[11]).toEqual([
+      "bun",
+      "run",
+      expect.stringContaining("entry-extraction.ts"),
+      "--staging",
+      "/stage/slug",
+      "--library",
+      "/lib",
+      "--structure-tool",
+      "pdf-pages.py",
+    ]);
 
     // NOT for the other kinds, and this is stated rather than assumed.
     // `check-l1-complete`'s `PAGED_ONLY` list exists because not every

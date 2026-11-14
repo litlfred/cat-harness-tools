@@ -66,6 +66,12 @@ on:
 
 permissions:
   contents: write
+  # The preview's cone run (`preview-qa-<sha>`, an artifact of the PR's
+  # `preview` checks run; scripts/preview-qa.ts) is downloaded with the job
+  # token. A reusable workflow gets only what its caller grants, so this lands
+  # only after every caller does (the canonical caller grants it since #2151);
+  # a caller that does not would fail to start.
+  actions: read
 
 concurrency:
   group: site-publish-${{ github.repository }}
@@ -275,7 +281,7 @@ jobs:
           if get -o "$RUNNER_TEMP/preview-qa.zip" "$api/artifacts/$id/zip" && unzip -o -q "$RUNNER_TEMP/preview-qa.zip" -d build/preview-qa; then
             echo "the cone run of $SHA (artifact $id) goes on top of the preview's QA pages"
           else
-            echo "::warning::the cone run of $SHA (artifact $id) could not be downloaded (the caller may need to grant actions: read): the preview's QA pages say no run is recorded"
+            echo "::warning::the cone run of $SHA (artifact $id) could not be downloaded: the preview's QA pages say no run is recorded"
           fi
       - name: Build and publish with stage-local
         # The job log is not readable from an agent's container, so a

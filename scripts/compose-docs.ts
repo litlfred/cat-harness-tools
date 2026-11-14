@@ -147,15 +147,13 @@ export function chromeLayers(repo = REPO): DocsLayer[] {
   const { layers, pending } = docsLayers(repo);
   // The site directory's output-root twin is the site too, not chrome.
   const siteTwin = site === undefined ? undefined : outputTwinOf(repo, site);
-  const all = [...layers, ...pending];
-  // A chrome layer's own output-root twin (`build/layers/<instance>/…`, left
-  // by an earlier build in the same checkout) is that layer again, not a
-  // second one: it surfaced as a duplicate in CI once a test wrote it.
-  const twins = new Set(all.flatMap((l) => {
-    const t = outputTwinOf(repo, l.dir);
-    return t !== undefined && resolve(t) !== resolve(l.dir) ? [resolve(t)] : [];
-  }));
-  return all.filter((l) => !l.repositoryScoped && resolve(l.dir) !== site && (siteTwin === undefined || resolve(l.dir) !== resolve(siteTwin)) && !twins.has(resolve(l.dir)));
+  const chrome = [...layers, ...pending].filter((l) => !l.repositoryScoped && resolve(l.dir) !== site && (siteTwin === undefined || resolve(l.dir) !== resolve(siteTwin)));
+  // A chrome layer's output-root twin is that same layer, laid over it, not a
+  // second chrome layer: once a writer has written there (`themes:css`), the
+  // listing would otherwise name it twice. A twin whose base is absent stays,
+  // since it carries the layer.
+  const twins = new Set(chrome.flatMap((l) => outputTwinOf(repo, l.dir) ?? []).map((d) => resolve(d)));
+  return chrome.filter((l) => !twins.has(resolve(l.dir)));
 }
 
 /**

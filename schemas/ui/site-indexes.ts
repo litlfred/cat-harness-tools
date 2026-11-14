@@ -212,7 +212,7 @@ export const TranslationStatusSchema = z
 // by `scripts/tests/schema-graph-kinds.test.ts` rather than by memory.
 export const DECL_KINDS = [
   "zod-object", "zod-union", "zod-enum", "zod-array", "zod-record", "zod-scalar",
-  "interface", "type-alias", "json-schema", "undetermined",
+  "interface", "type-alias", "json-schema", "fhir-logical", "undetermined",
 ] as const;
 
 export const SchemaGraphIndexSchema = z
@@ -248,6 +248,12 @@ export const SchemaGraphIndexSchema = z
                 type: z.string(),
                 optional: z.boolean(),
                 array: z.boolean(),
+                // `min..max`, from `cardinalityOf` (bean `cat-tools-4xq6`).
+                card: z.string().optional(),
+                // The UML type the diagram shows, when not the written one.
+                utype: z.string().optional(),
+                // Type name -> its definition's URL (`scripts/type-links.ts`).
+                links: z.record(z.string(), z.string()).optional(),
                 doc: z.string().optional(),
               })
               .strict(),
@@ -257,6 +263,9 @@ export const SchemaGraphIndexSchema = z
           refs: StringList,
           unresolved: StringList,
           external: StringList,
+          // The source label drawn upper right of the box (bean `cat-tools-4xq6`).
+          source: z.enum(["zod", "typescript", "json-schema", "fhir", "skill"]).optional(),
+          canonical: z.string().optional(),
           exported: z.boolean(),
         })
         .strict(),
@@ -273,6 +282,8 @@ export const SchemaGraphIndexSchema = z
         })
         .strict(),
     ),
+    // Sources asked for and not read, e.g. an artefact index built at publish.
+    unread: StringList.optional(),
     // `NodeKindRow` in `scripts/gen-schema-viz.ts` (issue #2278): every node
     // kind, `$schema` family and whole-typology validator, joined to the
     // declaration that defines it. The generator has written it since #2278;
@@ -376,7 +387,10 @@ export const LibraryIndexEntrySchema = z
     documentClass: z.string(),
     sections: Count,
     blocks: Count,
+    /** Raster images placed (`images.json`), every role. */
     images: Count,
+    /** Kept figures, raster and vector (role `figure`). Optional so an index built before it still reads. */
+    figures: Count.optional(),
     ocrPages: Count,
     hasOcr: z.boolean(),
     hasManifest: z.boolean(),
