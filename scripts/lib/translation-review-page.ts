@@ -42,6 +42,8 @@ import {
   ADJUDICATION_LABEL,
   ADJUDICATION_SCHEMA,
   ADJUDICATION_TITLE_PREFIX,
+  CANDIDATES_SCHEMA,
+  CANDIDATES_SUFFIX,
   MAX_ISSUE_URL,
   poHash,
   sourceFilesOf,
@@ -296,6 +298,8 @@ export function clientConfig(layers: ReviewLayer[]): string {
     label: ADJUDICATION_LABEL,
     prefix: ADJUDICATION_TITLE_PREFIX,
     maxUrl: MAX_ISSUE_URL,
+    candidatesSchema: CANDIDATES_SCHEMA,
+    candidatesSuffix: CANDIDATES_SUFFIX,
     layers: layers.map((l) => ({ name: l.name, repository: l.repository ?? null, translations: l.translations })),
   }).replace(/</g, "\\u003c");
 }
@@ -370,23 +374,50 @@ const SCRIPT = String.raw`
       if (!r.ok) throw new Error("HTTP " + r.status);
       text = await r.text();
     } catch (err) { body.textContent = "Could not load " + path + ": " + err.message; return; }
+    var cands = {};
+    try {
+      var rc = await fetch("https://raw.githubusercontent.com/" + layer.repository + "/main/" + path.replace(/\.po$/, cfg.candidatesSuffix));
+      if (rc.ok) {
+        var cf = await rc.json();
+        if (cf && cf.$schema === cfg.candidatesSchema && Array.isArray(cf.entries)) cf.entries.forEach(function (e) {
+          if (e && typeof e.msgid === "string" && Array.isArray(e.candidates)) cands[(e.msgctxt || "") + "\u0004" + e.msgid] = e.candidates.filter(function (c) { return c && typeof c.text === "string" && c.source && typeof c.source.id === "string"; });
+        });
+      }
+    } catch (err) { /* no candidates: the reviewer types their own */ }
     var hash = await sha16(text);
     var warn = hash !== btn.dataset.hash ? '<p class="tr-warn">This catalogue has changed since the page was built; your suggestions are made against the newest version.</p>' : "";
     var entries = parsePo(text);
     var rows = entries.map(function (e, i) {
-      return '<tr><td><div class="tr-msgid"></div></td><td><div class="tr-msgstr"></div></td><td><textarea data-i="' + i + '" rows="2" aria-label="suggested translation"></textarea></td></tr>';
+      return '<tr><td><div class="tr-msgid"></div></td><td><div class="tr-msgstr"></div></td><td><div class="tr-cands" data-i="' + i + '"></div><textarea data-i="' + i + '" rows="2" aria-label="suggested translation"></textarea></td></tr>';
     }).join("");
-    body.innerHTML = warn + '<p>Type a better translation next to each string you find wrong. Leave the others empty.</p>' +
+    body.innerHTML = warn + '<p>For each string you find wrong, pick one of the candidate translations (each names its source: an agent model, an open machine-translation model, a web service) or type your own. Leave the others empty.</p>' +
       '<div class="tr-wrap"><table class="tr-sugg"><thead><tr><th>source</th><th>current</th><th>your suggestion</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<label>Note (optional) <input type="text" id="tr-note"></label>';
     body.querySelectorAll(".tr-msgid").forEach(function (d, i) { d.textContent = entries[i].msgid + (entries[i].msgctxt ? " [" + entries[i].msgctxt + "]" : ""); });
     body.querySelectorAll(".tr-msgstr").forEach(function (d, i) { d.textContent = entries[i].msgstr || "(empty)"; });
+    // Candidates from other sources (agent models, open MT, web services): a
+    // choice fills the suggestion and records its source; editing the text
+    // makes it the reviewer's own.
+    body.querySelectorAll(".tr-cands").forEach(function (box) {
+      var i = +box.dataset.i, e = entries[i], list = cands[(e.msgctxt || "") + "\u0004" + e.msgid] || [];
+      var ta = body.querySelector('textarea[data-i="' + i + '"]');
+      list.forEach(function (c, j) {
+        if (c.text === e.msgstr) return;
+        var lab = document.createElement("label"); lab.className = "tr-cand";
+        var r = document.createElement("input"); r.type = "radio"; r.name = "tr-cand-" + i;
+        r.onchange = function () { ta.value = c.text; ta.dataset.srcText = c.text; ta.dataset.src = JSON.stringify({ kind: c.source.kind, id: c.source.id }); };
+        var t = document.createElement("span"); t.textContent = c.text;
+        var w = document.createElement("span"); w.className = "tr-dim"; w.textContent = " — " + c.source.kind + " " + c.source.id;
+        lab.append(r, t, w); box.appendChild(lab);
+      });
+    });
     document.getElementById("tr-dialog-save").onclick = function () {
       var sugg = [];
       body.querySelectorAll("textarea").forEach(function (ta) {
         var v = ta.value.trim(); if (!v) return;
         var e = entries[+ta.dataset.i];
         var s = { msgid: e.msgid, current: e.msgstr || "", suggested: v };
+        if (ta.dataset.src && ta.dataset.srcText === v) s.source = JSON.parse(ta.dataset.src);
         if (e.msgctxt !== undefined) s.msgctxt = e.msgctxt;
         sugg.push(s);
       });
@@ -417,7 +448,7 @@ const SCRIPT = String.raw`
       L.push("### Mistranslations, with suggestions", "");
       mis.forEach(function (i) {
         L.push("- \x60" + i.locale + "\x60 " + code(i.catalogue) + (i.note ? " — " + i.note : ""));
-        i.suggestions.forEach(function (s) { L.push("  - " + code(s.msgid) + ": " + code(s.current) + " → " + code(s.suggested)); });
+        i.suggestions.forEach(function (s) { L.push("  - " + code(s.msgid) + ": " + code(s.current) + " → " + code(s.suggested) + (s.source ? " (candidate from " + s.source.kind + " " + code(s.source.id) + ")" : "")); });
       });
       L.push("");
     }
@@ -477,6 +508,8 @@ export function reviewBody(layers: ReviewLayer[], statusHref: string): string {
 .tr-page .tr-issue textarea { width: 100%; }
 .tr-page dialog { max-width: min(60rem, 95vw); width: 95vw; }
 .tr-page .tr-sugg textarea { width: 100%; min-width: 12rem; font-size: 1rem; }
+.tr-page .tr-cand { display: flex; gap: 0.4rem; align-items: center; min-height: 44px; cursor: pointer; }
+.tr-page .tr-cand input { width: 1.4rem; height: 1.4rem; flex: none; }
 </style>
 <div class="tr-page">
 <h1 id="tr-title">translations — review</h1>

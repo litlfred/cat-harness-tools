@@ -12,6 +12,7 @@ import { join } from "node:path";
 import {
   ADJUDICATION_SCHEMA,
   applySuggestion,
+  candidatesProblems,
   issueBody,
   newIssueUrl,
   parseIssueBody,
@@ -234,4 +235,24 @@ describe("the review page's cells", () => {
 
 test("the fixture is read from disk as written", () => {
   expect(readFileSync(join(layer(), "translations/fr/docs/index.po"), "utf-8")).toBe(PO);
+});
+
+describe("candidate translations", () => {
+  test("a candidates file names a source for every candidate", () => {
+    const ok = { $schema: "translation-candidates/v1", locale: "fr", catalogue: "docs/index", entries: [{ msgid: "Hello", candidates: [{ text: "Salut", source: { kind: "open-mt", id: "opus-mt-en-fr" } }, { text: "Bonjour", source: { kind: "agent", id: "claude-opus-5-5", at: "2026-11-14T10:00:00Z" } }] }] };
+    expect(candidatesProblems(ok)).toEqual([]);
+    const bad = { ...ok, entries: [{ msgid: "Hello", candidates: [{ text: "Salut", source: { kind: "oracle", id: "" } }] }] };
+    expect(candidatesProblems(bad)).toEqual([expect.stringContaining("kind must be one of")]);
+  });
+  test("a picked candidate's source travels in the issue and into the audited record", () => {
+    const root = layer();
+    const p = payload([{ catalogue: "docs/index", locale: "fr", verdict: "mistranslation", poHash: poHash(PO), suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Salut", source: { kind: "web-service", id: "deepl" } }] }]);
+    expect(payloadProblems(p)).toEqual([]);
+    expect(issueBody(p)).toContain("candidate from web-service `deepl`");
+    const r = plan(root, p);
+    const list = JSON.parse(r.writes.get(att("translations/fr/docs/index", "fr"))!).criteria["human-adjudication"];
+    expect(list[0].suggestions[0].source).toEqual({ kind: "web-service", id: "deepl" });
+    const badSource = payload([{ ...p.items[0]!, suggestions: [{ msgid: "Hello", current: "Bonjour", suggested: "Salut", source: { kind: "x", id: "y" } as never }] }]);
+    expect(payloadProblems(badSource)).toEqual([expect.stringContaining("source kind")]);
+  });
 });
