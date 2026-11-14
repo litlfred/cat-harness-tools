@@ -50,6 +50,8 @@ import { SKILL_PAGES_DIR } from "./lib/skill-pages.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { officialityFindings, readLocale } from "./check-translation-officiality.ts";
 import { poHeader } from "./kg-viewer-strings.ts";
+import { reviewBody, reviewLayer, type ReviewLayer } from "./lib/translation-review-page.ts";
+import { criteriaAttestationsHome } from "../schemas/sdlc/qa-attestations.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "translation-status-viewer";
@@ -629,6 +631,7 @@ and needs review; adding it to <em>translated</em> would flatter exactly the ent
 <div class="ts-onward">
 <h2 id="onward-links">Onward links</h2>
 <ul>
+  <li><strong>Review:</strong> <a href="review.html">review the machine translations</a> — every catalogue × locale, who reviewed it, and a form to accept a translation or suggest a better one as a GitHub issue.</li>
   <li><strong>Skill:</strong> ${skill} — gettext extraction, PO injection, round-trip QA, and sign-off workflows.</li>
   <li><strong>Sources:</strong> <a href="https://github.com/litlfred/folio-assistant/tree/main/${esc(doc.scope)}"><code>${esc(doc.scope)}</code> on GitHub</a> — catalogues (<code>.po</code>) and extractable templates (<code>.pot</code>).</li>
 </ul>
@@ -651,6 +654,59 @@ export function statusLine(l: LocaleStatus): string {
 }
 
 /** `--instance <dir>`: measure that layer's catalogues and print them. Writes nothing. */
+/**
+ * The review page's matrix for this layer and every other layer in the
+ * checkout that declares a `translation-sources` directory (found the way
+ * {@link otherInstances} finds them). Each carries its declared
+ * `repository`, which is where a review of it is filed.
+ */
+export function reviewLayers(repoRoot: string, ownRoot: string): ReviewLayer[] {
+  const roots = [ownRoot];
+  for (const e of readdirSync(repoRoot, { withFileTypes: true })) {
+    if (!e.isDirectory() || e.name.startsWith(".") || e.name === "node_modules") continue;
+    const dir = join(repoRoot, e.name);
+    if (resolve(dir) !== resolve(ownRoot)) roots.push(dir);
+  }
+  const out: ReviewLayer[] = [];
+  const seen = new Set<string>();
+  for (const root of roots) {
+    let tdir: string | undefined;
+    let decl: ReturnType<typeof readDeclaration>;
+    try {
+      tdir = translationsDirOf(root);
+      decl = readDeclaration(root);
+    } catch {
+      continue;
+    }
+    const name = decl?.name ?? root;
+    if (tdir === undefined || !existsSync(tdir) || seen.has(name)) continue;
+    seen.add(name);
+    const home = criteriaAttestationsHome(root).root;
+    out.push(
+      reviewLayer({
+        name,
+        ...(decl?.repository ? { repository: decl.repository } : {}),
+        layerRoot: root,
+        translationsDir: tdir,
+        attestationFor: (cat, locale) => join(home, "translation-qa", `${cat}.${locale}.attestations.json`),
+        poHeader,
+        count: countCatalogue,
+      }),
+    );
+  }
+  return out;
+}
+
+/** The review page, themed like the status page and written beside it as `review.html`. */
+export function reviewPage(layers: ReviewLayer[]): string {
+  return themedPage({
+    title: "translations — review",
+    generator: "cat-harness-tools/scripts/gen-translation-status.ts",
+    command: "bun run translation:status",
+    body: reviewBody(layers, "./"),
+  });
+}
+
 function reportInstance(root: string): number {
   const translationsDir = translationsDirOf(root);
   if (translationsDir === undefined || !existsSync(translationsDir)) {
@@ -746,6 +802,10 @@ function main(): void {
   const pageDir = join(site, dirname(sitePath.rel));
   const assetPath = join(assetDir, "index.json");
   const pagePath = join(pageDir, "index.html");
+  // The review page, beside the status page: inside the same declared
+  // directory, so it is built at publish with it and needs no route.
+  const reviewPath = join(pageDir, "review.html");
+  const layers = reviewLayers(REPO_ROOT, ROOT);
 
   // NO RAIL since 2026-10-07: the page is themed, so the theme's sidebar is its
   // navigation. The page says which directory it draws (#1168 B7a-2), in its
@@ -782,6 +842,7 @@ function main(): void {
   for (const [p, render] of [
     [assetPath, json],
     [pagePath, page],
+    [reviewPath, () => withRenderedByFrontMatter(reviewPage(layers), VIEWER_TOOL)],
   ] as const) {
     if (check && builtHere(p)) {
       built += 1;

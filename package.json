@@ -661,6 +661,7 @@
     "translation:pot:check": "bun run cat-harness-tools/pipeline/pot-for-pages.ts --check",
     "translation:index": "bun run cat-harness-tools/pipeline/translation-index.ts",
     "translation:index:check": "bun run cat-harness-tools/pipeline/translation-index.ts --check",
+    "translation:adjudicate": "bun run cat-harness-tools/scripts/translation-adjudicate.ts",
     "translation:status": "bun run cat-harness-tools/scripts/gen-translation-status.ts",
     "translation:status:check": "bun run cat-harness-tools/scripts/gen-translation-status.ts --check",
     "uml:overview": "bun run cat-harness-tools/scripts/gen-uml-overview.ts",

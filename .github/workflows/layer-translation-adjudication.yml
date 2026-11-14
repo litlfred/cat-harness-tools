@@ -1,0 +1,135 @@
+# Turn a translation-review issue into the recorded adjudication, as a PR —
+# ONE reusable workflow every layer with translations calls.
+#
+# The translation review page (`review.html` beside the translation status
+# page, `scripts/gen-translation-status.ts`) opens a GitHub issue prefilled
+# with a `translation-adjudication/v1` record: catalogues a person found
+# acceptable, and mistranslations with suggested text. The person who files
+# the issue is the adjudicator.
+#
+# A caller is a few lines, in the repository holding the catalogues:
+#
+#   name: Translation adjudication
+#   on:
+#     issues: { types: [opened, labeled] }
+#   permissions: { contents: write, pull-requests: write, issues: write }
+#   jobs:
+#     adjudicate:
+#       uses: litlfred/cat-harness-tools/.github/workflows/layer-translation-adjudication.yml@main
+#
+# What it does:
+#   1. Runs only for an issue labelled `translation-adjudication` or titled
+#      `[translation review] …`, and only once per issue.
+#   2. Mounts the platform's layers from the caller's `index.lock.json`.
+#   3. Runs `scripts/translation-adjudicate.ts` on the event file. The issue
+#      body is untrusted: it is never put in a shell variable or an
+#      expression, only parsed as JSON by the script. The adjudicator is the
+#      event's `issue.user.login`; an author who is not an owner, member or
+#      collaborator gets a comment and nothing is recorded.
+#   4. Commits the records on `translation-adjudication/issue-<n>`, authored by
+#      the issue's author (GitHub's noreply address), opens a ready PR that
+#      names the issue, and comments the summary on the issue.
+#
+# It never merges. A PR opened with GITHUB_TOKEN does not start other
+# workflows, so the layer's PR checks start when a maintainer pushes to or
+# re-opens it — the PR body says so.
+
+name: Layer translation adjudication
+
+on:
+  workflow_call:
+    inputs:
+      path-in-repo:
+        description: "Where the layer sits in the calling repository; '.' for the repository root."
+        required: false
+        type: string
+        default: "."
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: translation-adjudication-${{ github.repository }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  adjudicate:
+    name: Record the translation adjudication
+    if: >-
+      github.event_name == 'issues' &&
+      (contains(github.event.issue.labels.*.name, 'translation-adjudication') ||
+       startsWith(github.event.issue.title, '[translation review]'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Skip an issue already recorded
+        id: once
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          N: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/heads/translation-adjudication/issue-$N" >/dev/null 2>&1; then
+            echo "::notice::issue #$N already has a branch; nothing to do"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.once.outputs.skip != 'true'
+
+      - uses: litlfred/cat-harness-tools/.github/actions/mount-layers@1257da8bbbb8e661391d08b014b16464de19613f # last change to .github/actions/mount-layers
+        if: steps.once.outputs.skip != 'true'
+
+      - name: Plan and write the records
+        id: plan
+        if: steps.once.outputs.skip != 'true'
+        env:
+          LAYER: ${{ inputs.path-in-repo }}
+        run: |
+          set +e
+          CAT_HARNESS_ROOT="$PWD/cat-harness" bun run "$FA_TOOLS/scripts/translation-adjudicate.ts" \
+            --root "$LAYER" --event "$GITHUB_EVENT_PATH" --summary "$RUNNER_TEMP/summary.md"
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = 2 ]; then exit 1; fi
+
+      - name: Open the pull request
+        if: steps.once.outputs.skip != 'true' && steps.plan.outputs.code == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number }}
+          LOGIN: ${{ github.event.issue.user.login }}
+          UID_: ${{ github.event.issue.user.id }}
+          LAYER: ${{ inputs.path-in-repo }}
+        run: |
+          set -euo pipefail
+          branch="translation-adjudication/issue-$N"
+          git switch -c "$branch"
+          git add -- "$LAYER"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q --author="$LOGIN <$UID_+$LOGIN@users.noreply.github.com>" \
+            -m "Record translation adjudication from #$N" -m "Adjudicated by @$LOGIN in #$N; recorded by layer-translation-adjudication."
+          git push -u origin "$branch"
+          {
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo "Records the review filed in #$N. The author of that issue is the reviewer; this PR only writes down what they decided."
+            echo
+            echo "A PR opened by the workflow token does not start the layer's checks: push to this branch or close and re-open the PR to run them."
+          } > "$RUNNER_TEMP/body.md"
+          url=$(gh pr create --head "$branch" --title "Translation adjudication from #$N" --body-file "$RUNNER_TEMP/body.md")
+          { cat "$RUNNER_TEMP/summary.md"; echo; echo "Pull request: $url"; } > "$RUNNER_TEMP/comment.md"
+          gh issue comment "$N" --body-file "$RUNNER_TEMP/comment.md"
+
+      - name: Say why nothing was recorded
+        if: steps.once.outputs.skip != 'true' && steps.plan.outputs.code == '3'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number }}
+        run: gh issue comment "$N" --body-file "$RUNNER_TEMP/summary.md"
