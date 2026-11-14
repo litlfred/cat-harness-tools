@@ -20,7 +20,17 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { keepComment, minifyHtml, runMinifySite, tokenize } from "../../minify-site.ts";
+import {
+  isOwnAsset,
+  keepComment,
+  minifyCss,
+  minifyHtml,
+  minifyJs,
+  runMinifyAssets,
+  runMinifySite,
+  strictness,
+  tokenize,
+} from "../../minify-site.ts";
 
 const min = (s: string) => minifyHtml(s).html;
 
@@ -227,5 +237,102 @@ describe("the runner's three states", () => {
     const again = runMinifySite({ site: d });
     expect(again.filesChanged).toBe(0);
     expect(again.bytesBefore).toBe(again.bytesAfter);
+  });
+});
+
+describe("shared scripts and stylesheets", () => {
+  const js = (s: string) => {
+    const r = minifyJs(s);
+    if (!("text" in r)) throw new Error(`skipped: ${r.skip}`);
+    return r.text;
+  };
+  const IIFE = `/*\n * The chrome's shape: one commented IIFE.\n */\n(function () {\n  "use strict";\n  // a comment\n  var x = 1;\n  window.faX = function () { return this === undefined; };\n})();\n`;
+
+  test("comments and whitespace go, and the script still runs the same", () => {
+    const out = js(IIFE);
+    expect(out.length).toBeLessThan(IIFE.length);
+    expect(out).not.toContain("a comment");
+    const w: Record<string, unknown> = {};
+    new Function("window", out)(w);
+    const bare = w.faX as () => boolean;
+    expect(bare()).toBe(true); // still strict: a bare call has `this` undefined
+  });
+
+  test("a directive opening the whole-script IIFE comes back at the top", () => {
+    expect(strictness(IIFE)).toBe("whole");
+    expect(js(IIFE)).toStartWith('"use strict";\n(function(){');
+  });
+
+  test("a directive anywhere else leaves the file as it was, never silently sloppy", () => {
+    const nested = "var a = 1;\nfunction f() {\n  \"use strict\";\n  return this;\n}\n";
+    expect(strictness(nested)).toBe("other");
+    expect("skip" in minifyJs(nested)).toBe(true);
+  });
+
+  test("top-level names are kept: a classic script's globals are other scripts' API", () => {
+    const out = js("function faShared(a) { return a + 1; }\nvar faCount = 2;\n");
+    expect(out).toContain("function faShared(");
+    expect(out).toContain("faCount=2");
+  });
+
+  test("a licence comment travels with the copy", () => {
+    const out = js("/** @license MIT, Example Co. */\nvar a = 1; // gone\n");
+    expect(out).toContain("@license MIT, Example Co.");
+    expect(out).not.toContain("gone");
+  });
+
+  test("a script that does not parse is reported and left alone", () => {
+    expect("skip" in minifyJs("---\nlayout: null\n---\nvar a = 1;")).toBe(true);
+  });
+
+  test("minifying twice is minifying once", () => {
+    const once = js(IIFE);
+    expect(js(once)).toBe(once);
+  });
+
+  test("CSS is minified, url() and @import untouched in meaning", async () => {
+    const src = '/* prose */\n@import url("other.css");\n.a {\n  background: url("../img/x.webp") no-repeat;\n  color: red;\n}\n@media print {\n  .b { display: none }\n}\n';
+    const r = await minifyCss(src);
+    if (!("text" in r)) throw new Error(r.skip);
+    expect(r.text.length).toBeLessThan(src.length);
+    expect(r.text).not.toContain("prose");
+    expect(r.text).toContain("url(../img/x.webp)");
+    expect(r.text).toContain('@import "other.css"');
+    expect(r.text).toContain("@media print");
+    const again = await minifyCss(r.text);
+    expect("text" in again && again.text).toBe(r.text);
+  });
+
+  test("vendored, already-minified and non-asset files are not ours to rewrite", () => {
+    expect(isOwnAsset("assets/js/docs-ui.js")).toBe(true);
+    expect(isOwnAsset("assets/css/docs-ui.css")).toBe(true);
+    expect(isOwnAsset("assets/js/vendor/qrcode.js")).toBe(false);
+    expect(isOwnAsset("assets/js/vendor/wasm-graphviz/index.js")).toBe(false);
+    expect(isOwnAsset("assets/katex.min.css")).toBe(false);
+    expect(isOwnAsset("assets/data.json")).toBe(false);
+  });
+
+  test("the runner writes once, reports bytes, and a re-run changes nothing", async () => {
+    const d = mkdtempSync(join(tmpdir(), "minify-assets-"));
+    mkdirSync(join(d, "assets", "js", "vendor"), { recursive: true });
+    mkdirSync(join(d, "assets", "css"), { recursive: true });
+    writeFileSync(join(d, "assets", "js", "a.js"), IIFE);
+    writeFileSync(join(d, "assets", "js", "vendor", "v.js"), "// vendored\nvar v = 1;\n");
+    writeFileSync(join(d, "assets", "css", "a.css"), "/* x */\n.a {\n  color: red;\n}\n");
+    const check = await runMinifyAssets({ site: d, check: true });
+    expect(check.filesChanged).toBe(2);
+    expect(readFileSync(join(d, "assets", "js", "a.js"), "utf-8")).toBe(IIFE);
+    const first = await runMinifyAssets({ site: d });
+    expect(first.exitCode).toBe(0);
+    expect(first.filesSeen).toBe(2);
+    expect(first.bytesAfter).toBeLessThan(first.bytesBefore);
+    expect(first.gzipAfter).toBeLessThanOrEqual(first.gzipBefore);
+    expect(readFileSync(join(d, "assets", "js", "vendor", "v.js"), "utf-8")).toContain("// vendored");
+    const again = await runMinifyAssets({ site: d });
+    expect(again.filesChanged).toBe(0);
+  });
+
+  test("an unreadable site directory is exit 2", async () => {
+    expect((await runMinifyAssets({ site: join(tmpdir(), "minify-assets-does-not-exist") })).exitCode).toBe(2);
   });
 });
