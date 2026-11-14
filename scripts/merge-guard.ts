@@ -1150,8 +1150,16 @@ export const FULL_TIER_JUDGE = /no new failures/i;
  */
 export const SHARD = /(?:shard |, )(\d+)\/(\d+)\b/i;
 
+/**
+ * A job name that is still template text. GitHub shows some with the `${{ }}`
+ * and some without it, as `needs.<job>.outputs.full == 'false' && '…' || '…'`
+ * (dth-hrh#133, 2026-11-14: a run cancelled before its tier was decided). The
+ * run that followed it was green, and this cancelled one kept check 5 red.
+ */
+const UNRENDERED = /\$\{\{|\bneeds\.[\w-]+\.outputs\./;
+
 function judgedNothing(c: GhCheckRun): boolean {
-  return c.conclusion === "skipped" || c.name.includes("${{");
+  return c.conclusion === "skipped" || UNRENDERED.test(c.name);
 }
 
 /**
