@@ -49,7 +49,8 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteArg, siteTarget } from "./lib/site-target.ts";
 import { baseDocsDir } from "./compose-docs.js";
 import { KEYWORDS_GRAPH_DIR, KeywordsGraphSchema, type KeywordsGraph } from "../schemas/library/library-keywords.ts";
-import { declaredGraphs, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, declaredGraphs, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { checkMethodologyEvidence, frontMatterOf, methodologyNodes } from "./check-methodology-evidence.ts";
 import {
@@ -407,18 +408,26 @@ if (import.meta.main) {
     [OUT, render()],
     [KEYWORDS_OUT, renderKeywords()],
   ];
+  // Where cat-harness is MOUNTED (bean `cat-tools-sm8r`, item 4), the pages
+  // are computed output for the layer's output root (`build/layers/<instance>/…`,
+  // `lib/layer-output.ts`), never the pinned mount; a check compares the copy a
+  // reader would see. In cat-harness's own checkout, and under `--site`, both
+  // are `out` itself.
+  const checkout = checkoutRootFor(HARNESS_ROOT);
   for (const [out, page] of pages) {
     if (check) {
-      const cur = existsSync(out) ? readFileSync(out, "utf8") : "";
+      const at = readPathAt(checkout, out);
+      const cur = existsSync(at) ? readFileSync(at, "utf8") : "";
       if (cur !== page) {
         console.error(relative(REPO, out) + " is stale — run `bun run cat lsi:viz` and commit it.");
         process.exit(1);
       }
       console.log("lsi viewer: " + relative(REPO, out) + " is current");
     } else {
-      mkdirSync(dirname(out), { recursive: true });
-      writeFileSync(out, page);
-      console.log("lsi viewer → " + relative(REPO, out));
+      const to = writePathAt(checkout, out);
+      mkdirSync(dirname(to), { recursive: true });
+      writeFileSync(to, page);
+      console.log("lsi viewer → " + relative(REPO, to));
     }
   }
 }

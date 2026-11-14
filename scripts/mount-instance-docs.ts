@@ -77,7 +77,7 @@ import { layoutSubscribedInstances, subscribedTrees } from "./subscribed-trees.t
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
 import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
+import { declaredNavsIn, jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
 import { THEME_SEARCH_SCRIPTS, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "./lib/site-bar.ts";
 import { beforeHeadEnd, hasRail, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
@@ -317,6 +317,23 @@ export function railDataWriter(siteAbs: string): (file: string, body: string) =>
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, body);
   };
+}
+
+/**
+ * Where a built layer's `_data/harness.json` is READ: its output-root twin
+ * when `sync-docs-harness.ts` wrote it there, else the copy inside the layer.
+ *
+ * Since bean `cat-tools-sm8r` item 4 step 4 (1b4d19fa), a checkout that MOUNTS
+ * the layer gets the file at the layer's output root (`lib/layer-output.ts`),
+ * not inside the pinned mount. Every reader here still read the mount, found
+ * nothing, and took "the file cannot say": the rail pass wrote no
+ * `#fa-navbar-row`, so a railed page that the theme does not lay out (a
+ * folio's own generated home page) lost its icon row, and the root publish's
+ * parity check named it (2026-11-14). `gen-navbar-include.ts` already reads
+ * through {@link readPathAt}; these readers now do the same.
+ */
+export function harnessDataPath(prefix: string, repo: string = REPO): string {
+  return readPathAt(repo, join(repo, prefix, "_data", "harness.json"), mountedInstances(repo));
 }
 
 /**
@@ -604,7 +621,7 @@ export function publishedGraphs(built: string, instanceName: string, toRoot: str
   const out = new Map<string, GraphFallback>();
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return out;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = harnessDataPath(prefix);
   if (!existsSync(data)) return out;
   let d: { harnesses?: { name?: string; visualisations?: { kind?: string; path?: string; note?: string; label?: string; sameAs?: string }[] }[] };
   try {
@@ -642,7 +659,7 @@ export function instantiatedHarnesses(built: string, toRoot: string): NavItem[] 
   // disagree with the declaration the moment the directory moves.
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = harnessDataPath(prefix);
   if (!existsSync(data)) return undefined;
   let d: { harnesses?: { name?: string; label?: string; title?: string; href?: string | null; instantiated?: boolean; tone?: number; mark?: HarnessMark | null }[] };
   try {
@@ -679,7 +696,7 @@ export function instantiatedHarnesses(built: string, toRoot: string): NavItem[] 
 export function navbarRowData(built: string): unknown {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = harnessDataPath(prefix);
   if (!existsSync(data)) return undefined;
   try {
     const d = JSON.parse(readFileSync(data, "utf-8")) as { navbar?: unknown };
@@ -698,7 +715,7 @@ export function navbarRowData(built: string): unknown {
 export function railScopesOf(built: string): { name: string; href: string }[] {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return [];
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = harnessDataPath(prefix);
   if (!existsSync(data)) return [];
   try {
     const d = JSON.parse(readFileSync(data, "utf-8")) as { railScopes?: { name?: unknown; href?: unknown }[] };
@@ -911,7 +928,7 @@ export function pinPlatformChrome(siteAbs: string, harnessRoot: string = HARNESS
 export function railNames(built: string, instance: string): { harness?: string; site?: string } {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return {};
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = harnessDataPath(prefix);
   if (!existsSync(data)) return {};
   let d: { title?: string; harnesses?: { name?: string; label?: string; title?: string }[] };
   try {
@@ -940,7 +957,7 @@ export function instanceMark(
 ): Pick<NavItem, "avatar" | "glyphPath" | "tone"> | undefined {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = harnessDataPath(prefix);
   if (!existsSync(data)) return undefined;
   let d: { name?: string; icon?: HarnessMark | null; harnesses?: { name?: string; tone?: number; mark?: HarnessMark | null }[] };
   try {
@@ -990,6 +1007,8 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
   const byInstance = new Map<string, T[]>();
   // The same Pages and top bar as every other page of the site (owner, 2026-10-15).
   const pageTree = opts.themeSource && existsSync(opts.themeSource) ? jekyllNavPages(opts.themeSource) : undefined;
+  // A page that declares its own navigation gives its Pages subtree (read before any page is railed).
+  const declared = pageTree ? declaredNavsIn(siteAbs, pageTree) : undefined;
   const themeSearch = THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s))) ? THEME_SEARCH_SCRIPTS : undefined;
   for (const m of mounts) byInstance.set(m.name, [...(byInstance.get(m.name) ?? []), m]);
 
@@ -1086,7 +1105,7 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       // other themed page (`railStandalonePages`), or the page shows both.
       const before = pageTree !== undefined && hasThemeSidebar(read) ? stripThemeSidebar(read) : read;
       const mark = instanceMark(built, m.name, toRoot);
-      const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before) }).items : undefined;
+      const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before), ...(declared ? { declared } : {}) }).items : undefined;
       const rel = file.slice(siteAbs.length + 1);
       const railed = injectRailOnce(before, {
         ...(pages && pages.length ? { pages, here: `/${rel.replace(/(^|\/)index\.html$/, "$1")}` } : {}),
@@ -1288,7 +1307,7 @@ export function instanceHarnesses(
 ): NavItem[] | undefined {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = harnessDataPath(prefix);
   if (!existsSync(data)) return undefined;
   let d: { harnesses?: { name?: string; label?: string; title?: string; href?: string | null; tone?: number; mark?: HarnessMark | null; needs?: string[] }[] };
   try {
@@ -1431,6 +1450,10 @@ export function railStandalonePages(
   // replaced by the rail, whose Pages section is the same tree, built here
   // once (`lib/jekyll-pages-nav.ts`) and given to every page of the site.
   const pageTree = opts.themeSource ? jekyllNavPages(opts.themeSource) : undefined;
+  // A page that declares its own navigation (an IG's menu, `data-fa-visualiser-nav`)
+  // gives its Pages subtree: same entries, order and nesting. Read here, before
+  // the walk rails any page and moves its declaration into the shared data.
+  const declared = pageTree ? declaredNavsIn(siteAbs, pageTree) : undefined;
   // The theme's search, where the site publishes it: the top bar of a page
   // the theme did not lay out searches the same index (`lib/site-bar.ts`).
   const themeSearch = THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s))) ? THEME_SEARCH_SCRIPTS : undefined;
@@ -1466,7 +1489,7 @@ export function railStandalonePages(
     if (pageTrees.has(key)) return pageTrees.get(key);
     const treeKey = `${toRoot}\0${locale}\0`;
     let tree = pageTrees.get(treeKey);
-    if (tree === undefined) pageTrees.set(treeKey, (tree = pagesNav(pageTree, { prefix: toRoot, locale }).items));
+    if (tree === undefined) pageTrees.set(treeKey, (tree = pagesNav(pageTree, { prefix: toRoot, locale, ...(declared ? { declared } : {}) }).items));
     const pages = scopeHref !== undefined ? pagesUnder(tree, `${toRoot}${scopeHref}`) : tree;
     pageTrees.set(key, pages);
     return pages;
