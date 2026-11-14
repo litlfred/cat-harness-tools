@@ -809,10 +809,11 @@ const contributionsByRoot = new Map<string, ContributionRegistry | null>();
  *
  * Rooted at the layer that OWNS the library entry, not at the checkout. From
  * the checkout root the registry held every mounted layer's kinds, so the same
- * committed node was typed by whatever happened to be mounted: who-iris's NHWA
- * indicators were `smart-base:Indicator` in the folio-assistant index (where
- * smart-base, a layer ABOVE who-iris, is mounted) and `cat-harness:Block` in
- * who-iris's own checkout, and no committed file passed both checks
+ * committed node was typed by whatever happened to be mounted: a library
+ * layer's indicators were a DAK layer's `Indicator` in the folio-assistant
+ * index (where that DAK layer, ABOVE the library's, is mounted) and
+ * `cat-harness:Block` in the library layer's own checkout, and no committed
+ * file passed both checks
  * (folio-assistant#3124). `loadContributionsSync` walks the root's own
  * declared dependencies, so a layer is typed only by kinds it can see in any
  * checkout. A root whose contributions cannot be loaded types only the core
