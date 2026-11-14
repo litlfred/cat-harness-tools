@@ -328,7 +328,7 @@ if (import.meta.main) {
     // its build writes `dist/` (and an install `node_modules/`), and nothing
     // a check runs may write inside a mount (bean `cat-tools-sm8r`, item 4;
     // the `mounts:untouched` gate named `block-qa-schema/dist/` on its first
-    // run, fhir-harness#434). A layer's own checkout builds in place.
+    // run in a layer's pull request). A layer's own checkout builds in place.
     const abs = workdirFor(join(ROOT, pkg.dir));
     const label = `${pkg.name} [${pkg.ecosystem}]`;
 
