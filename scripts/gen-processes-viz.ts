@@ -82,7 +82,7 @@ import {
   type UnlinkedRef,
 } from "./lib/task-panel.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
-import { subjectHref } from "./lib/subject-pages.ts";
+import { subjectHref, subjectIri } from "./lib/subject-pages.ts";
 import { methodologyNodes } from "./check-methodology-evidence.js";
 import { instanceOf, pageRelPath as methodologiesPageRel } from "./gen-methodologies-viz.js";
 import { declaredRoute } from "./viewer-declarations.js";
@@ -866,6 +866,18 @@ export interface PageScope {
   readonly instance?: string;
   /** On the full index: one row per sub-graph page, to browse by layer. */
   readonly subjects?: readonly { name: string; count: number; href: string }[];
+  /** A process's IRI ({@link processIri} unless given). */
+  readonly iriOf?: (r: ProcessRow) => string | undefined;
+}
+
+/**
+ * A process's IRI, `<doc dir>/process/<id>`, as its layer's document mints it
+ * (`kg-export`; `subjectIri`), and served with its `.jsonld` wherever that
+ * layer is published. Its row and its page link it (owner, 2026-11-13,
+ * node-kind audit: "link existing IRIs").
+ */
+export function processIri(r: Pick<ProcessRow, "file" | "id">, repo: string = REPO): string | undefined {
+  return subjectIri(join(repo, r.file), "process", r.id);
 }
 
 /**
@@ -972,7 +984,9 @@ export function page(
       ["process", "steps", "undocumented steps", "running instances"],
       ok.map((r) => {
         const undoc = r.steps.filter((st) => !st.documentation).length;
-        return `| [${esc(r.name)}](${base}${r.stem}.html) | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id, root)} |`;
+        const iri = (scope.iriOf ?? processIri)(r);
+        const node = iri === undefined ? "" : ` · [IRI](${iri}) · [JSON-LD](${iri}.jsonld)`;
+        return `| [${esc(r.name)}](${base}${r.stem}.html)${node} | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id, root)} |`;
       }),
       "_No process parsed._",
     ),
@@ -1201,7 +1215,9 @@ export function processPage(
   presentedOn: readonly Presentation[] = [],
   instances: InstancesRead = NO_INSTANCES,
   unlinked: (ref: string) => void = () => {},
+  iriOf: (r: ProcessRow) => string | undefined = processIri,
 ): string {
+  const iri = iriOf(row);
   const byId = new Map(rows.map((r) => [r.id, r]));
   // Process ids and skill names in authored prose become links (owner, 2026-10-31).
   const prose = (t: string): string => {
@@ -1249,6 +1265,10 @@ export function processPage(
   L.push("---");
   L.push(`title: '${row.name.replace(/'/g, "''")}'`);
   L.push("nav_exclude: true");
+  // The page renders the process; its JSON-LD is the asset (kg-viewer §"The
+  // asset and its rendering are two resources"): head_custom.html writes it
+  // as `rel=alternate type=application/ld+json`.
+  if (iri !== undefined) L.push(`alternate_jsonld: ${JSON.stringify(`${iri}.jsonld`)}`);
   L.push(GENERATED_FM);
   L.push("---");
   L.push("");

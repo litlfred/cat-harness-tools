@@ -119,3 +119,59 @@ export function subjectHref(source: string, kind: string, id: string): string | 
   const doc = servingDocIri(inst);
   return doc === undefined ? undefined : makeIri(doc, kind, id);
 }
+
+const publishedDocIris = new Map<string, string | undefined>();
+
+/**
+ * The IRI of subject `<kind>/<id>` declared by the file at `source`
+ * (absolute), as its layer's document mints it, whichever checkout is being
+ * built. {@link subjectHref} answers only where THIS build writes the
+ * subject's page. This answers wherever the layer's own publication serves
+ * it: the platform's site serves every layer it indexes
+ * (`folio-assistant/<layer>/actor/<id>` and `.jsonld`, 200, measured
+ * 2026-11-13). So a downstream's viewer row can name the node by its IRI and
+ * link its JSON-LD (owner, 2026-11-13, node-kind audit: "link existing IRIs").
+ * `undefined` for a layer whose document is not on the platform's site (one
+ * minting against a `canonicalUrl` elsewhere, which serves nothing yet), and
+ * for a file in no layer.
+ */
+export function subjectIri(source: string, kind: string, id: string): string | undefined {
+  const inst = findInstanceRoot(resolve(source));
+  if (inst === undefined) return undefined;
+  const key = resolve(inst);
+  if (!publishedDocIris.has(key)) {
+    let doc: string | undefined;
+    try {
+      // Served where the platform's site serves it: a layer whose own
+      // `canonicalUrl` is elsewhere (`http://smart.who.int/base`) serves
+      // nothing there yet, so it has no IRI to link.
+      const host = hostSiteBase();
+      const minted = publishedIdentity(key).docIri;
+      doc = host !== undefined && minted.startsWith(`${host}/`) ? minted : undefined;
+    } catch {
+      doc = undefined;
+    }
+    publishedDocIris.set(key, doc);
+  }
+  const doc = publishedDocIris.get(key);
+  return doc === undefined ? undefined : makeIri(doc, kind, id);
+}
+
+/**
+ * Whether this run's checkout publishes the platform's own site, where its
+ * docs pages are ({@link publishesHostSite} for the harness). A downstream's
+ * site holds none of them, so a link to one names the platform's site.
+ */
+export function buildsHostSite(): boolean {
+  return hostSiteHere();
+}
+
+/** The platform's site, where its docs pages are published: the harness's document base. */
+export function hostSiteBase(): string | undefined {
+  try {
+    const base = publishedIdentity(resolve(HARNESS_ROOT)).base;
+    return /^https?:\/\//.test(base) ? base.replace(/\/+$/, "") : undefined;
+  } catch {
+    return undefined;
+  }
+}

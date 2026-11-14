@@ -53,6 +53,7 @@ import { makeEmit } from "./viewer-page.ts";
 import { mergeFolio } from "./folio-merge.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
+import { buildsHostSite, hostSiteBase } from "./lib/subject-pages.ts";
 import { declaredPageRoute, renderedByOf, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { checkoutDirectories } from "../schemas/kg/harness-config.js";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
@@ -174,7 +175,7 @@ export function readFolioDirs(dirList: readonly string[], repo: string): FolioGr
                 label: String(l.label ?? ""),
                 // Authored as the page's source location; published elsewhere
                 // for the docs-folder pages (bean `kc7k`).
-                href: publishedHref(join(ROOT, siteDirFor(ROOT)), String(l.href ?? "")),
+                href: platformDocHref(join(ROOT, siteDirFor(ROOT)), String(l.href ?? "")),
               }))
             : [],
           chars: String(raw.comment ?? raw.text ?? "").length,
@@ -186,6 +187,28 @@ export function readFolioDirs(dirList: readonly string[], repo: string): FolioGr
     g.directories.push({ dir: rel(dir), present, nodes: n, files: present ? folioFileList(dir) : [] });
   }
   return g;
+}
+
+/**
+ * A sticky's link to a page of the platform's own docs, where this build
+ * publishes it. The href is authored site-rooted (`/concepts/…`) and the page
+ * is published only on the platform's site, so on a downstream's site
+ * (a WHO library folio) it resolved against that site and 404'd: 5 of 5 sticky links on
+ * `/folio/` (owner, 2026-11-13, node-kind audit). Where this build is not
+ * the platform's site, a link to one of its docs pages names the platform's
+ * site absolutely; on the platform's site it stays site-rooted, so a preview
+ * keeps its links. Any other href is {@link publishedHref}'s.
+ */
+export function platformDocHref(
+  siteDir: string,
+  href: string,
+  host: { here: boolean; base: string | undefined } = { here: buildsHostSite(), base: hostSiteBase() },
+): string {
+  const published = publishedHref(siteDir, href);
+  if (host.here || host.base === undefined || !published.startsWith("/") || published.startsWith("//")) return published;
+  const path = /^([^#?]*)/.exec(href)![1]!.replace(/^\/+/, "");
+  const stem = path === "" || path.endsWith("/") ? `${path}index` : path.replace(/\.html$/i, "");
+  return existsSync(join(siteDir, `${stem}.md`)) || existsSync(join(siteDir, `${stem}.html`)) ? `${host.base}${published}` : published;
 }
 
 export function projection(g: FolioGraph): unknown {
