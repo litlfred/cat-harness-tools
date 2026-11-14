@@ -171,6 +171,7 @@ import {
   withViewers,
 } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { overlayPath, writePathOf } from "./lib/layer-output.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { siteTarget } from "./lib/site-target.ts";
 import { subjectIri } from "./lib/subject-pages.ts";
@@ -376,7 +377,9 @@ function esc(s: string): string {
  * believes the notice either avoids the feature or rebuilds it.
  */
 function projectionFor(id: string): string | null {
-  const p = join(SITE, "assets", id, "index.json");
+  // Over the overlay: in a mounted layer gen-docs-pages writes the projection
+  // to the output root, not beside the pinned site.
+  const p = overlayPath(join(SITE, "assets", id, "index.json"));
   return existsSync(p) ? p : null;
 }
 
@@ -563,17 +566,21 @@ function emit(path: string, content: string): void {
   const rel = relative(ROOT, path);
   if (check && builtAtPublishHere(path)) return;
   if (check) {
-    if (!existsSync(path)) {
+    // Over the overlay: in a mounted layer the page is at the output root.
+    const at = overlayPath(path);
+    if (!existsSync(at)) {
       console.error(`  ✗ ${rel} is missing`);
       stale++;
-    } else if (readFileSync(path, "utf-8") !== content) {
+    } else if (readFileSync(at, "utf-8") !== content) {
       console.error(`  ✗ ${rel} is stale`);
       stale++;
     }
     return;
   }
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
+  // A mounted layer is read-only: its pages go to the output root's twin.
+  const to = writePathOf(path);
+  mkdirSync(dirname(to), { recursive: true });
+  writeFileSync(to, content);
   wrote++;
   console.log(`  ✓ ${rel}`);
 }
@@ -1883,8 +1890,9 @@ export async function writeDynamicState(
   // input-site: traced #574cb84e — the wall clock stamped into the dynamic state document, unless the caller gives one: a run that reads it records no hash
   inputSiteReached("state-visualizer: dynamic state's time");
   const doc = dynamicStateDocument(harness, inputs, opts.now ?? new Date(), unread, docIri);
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, JSON.stringify(doc, null, 2) + "\n");
+  const to = writePathOf(out);
+  mkdirSync(dirname(to), { recursive: true });
+  writeFileSync(to, JSON.stringify(doc, null, 2) + "\n");
   return { doc, unread, out };
 }
 
@@ -3409,8 +3417,13 @@ if (check) {
   }
   console.log(`state visualiser: ${graphs.length} dashboard(s) up to date, no orphans`);
 } else {
-  for (const o of orphans) unlinkSync(join(SITE, o));
-  for (const o of subjectOrphans) rmSync(join(SITE, o), { recursive: true });
+  // In a mounted layer only the output root's copy is this run's to remove;
+  // the pinned bytes are the layer's own and are never written.
+  for (const o of orphans) {
+    const at = writePathOf(join(SITE, o));
+    if (existsSync(at)) unlinkSync(at);
+  }
+  for (const o of subjectOrphans) rmSync(writePathOf(join(SITE, o)), { recursive: true, force: true });
   // The workflow pages read `<site>/<harness>/state.jsonld` when they load.
   // The platform's own render pipeline exports it as stage 3 (`kg-dynamic`),
   // but a folio's site build runs this writer and no stage 3, so its pages

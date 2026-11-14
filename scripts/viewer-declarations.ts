@@ -707,13 +707,14 @@ export function viewersOf(
             ? [at(d.id)]
             : [at(`${owner}-${d.id}`), ...(harnessIds.has(d.id) ? [] : [at(d.id)])]
           : [];
-    // A sub-graph page counts when it is on disk OR when the declaring harness
+    // A sub-graph page counts when it is on disk (over the layer overlay: a
+    // mounted layer's pages are at its output root, bean `cat-tools-sm8r`) OR when the declaring harness
     // builds it at publish (`writer` or `builtAtPublish`): a page that is
     // deliberately not committed is not missing, and its writer is named on the
     // tile instead.
     const subRef = subs
       .map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!))
-      .find((r) => existsSync(join(repoRoot, r)) || v.writer !== undefined || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
+      .find((r) => existsSync(overlayPath(join(repoRoot, r))) || v.writer !== undefined || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
     // Covered BY KIND, a visualiser that draws per-sub-graph views covers a
     // directory only where it drew that directory's view: the full KG page of
     // a viewer that never reached this layer is not its viewer.
@@ -752,7 +753,7 @@ export function viewersOf(
     };
     const writer =
       v.writer?.map((w) => renderedPath(repoRoot, writerAt(w))) ??
-      (existsSync(join(repoRoot, ref)) ? undefined : (builtAtPublishWriter(repoRoot, v.harnessRoot, ref) ?? heldPageWriter(repoRoot, v)));
+      (existsSync(overlayPath(join(repoRoot, ref))) ? undefined : (builtAtPublishWriter(repoRoot, v.harnessRoot, ref) ?? heldPageWriter(repoRoot, v)));
     // The directory's tile is the DEFAULT dress; what the visualiser declares
     // about itself wins, since a directory drawn twice needs two names.
     out.push({ ...d.tile, ...tile, ...(writer ? { writer } : {}), ref, title: v.title ?? d.tile?.title ?? d.id });

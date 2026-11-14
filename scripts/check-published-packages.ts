@@ -25,11 +25,13 @@
  * @covers cat-harness
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
+import { writePathOf } from "./lib/layer-output.ts";
 
 function findIndexLockRoot(): string {
   if (existsSync(join(process.cwd(), "index.lock.json"))) return process.cwd();
@@ -307,10 +309,27 @@ if (import.meta.main) {
   );
   for (const f of foreign) console.log(`  · ${f.name} (${f.dir}): not applicable here — ${f.why}`);
 
+  const scratch: string[] = [];
+  const workdirFor = (abs: string): string => {
+    if (writePathOf(abs) === abs) return abs;
+    const tmp = mkdtempSync(join(tmpdir(), "published-package-"));
+    scratch.push(tmp);
+    cpSync(abs, tmp, { recursive: true, filter: (src) => !/(^|[\\/])(dist|node_modules)$/.test(src) });
+    if (existsSync(join(abs, "node_modules"))) symlinkSync(join(abs, "node_modules"), join(tmp, "node_modules"));
+    return tmp;
+  };
+  process.on("exit", () => {
+    for (const d of scratch) rmSync(d, { recursive: true, force: true });
+  });
   const failed: string[] = [];
   const skipped: string[] = [];
   for (const pkg of pkgs) {
-    const abs = join(ROOT, pkg.dir);
+    // A package in a MOUNTED layer is built and tested in a scratch copy:
+    // its build writes `dist/` (and an install `node_modules/`), and nothing
+    // a check runs may write inside a mount (bean `cat-tools-sm8r`, item 4;
+    // the `mounts:untouched` gate named `block-qa-schema/dist/` on its first
+    // run, fhir-harness#434). A layer's own checkout builds in place.
+    const abs = workdirFor(join(ROOT, pkg.dir));
     const label = `${pkg.name} [${pkg.ecosystem}]`;
 
     if (pkg.ecosystem === "npm") {
