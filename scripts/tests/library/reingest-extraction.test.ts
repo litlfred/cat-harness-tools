@@ -74,7 +74,7 @@ describe("vector figures become figure blocks", () => {
   };
 
   test("a kept vector figure gets a block beside the raster ones, with its narrative", () => {
-    const out = buildDocumentNodes("d", structure as never, undefined, () => true, images as never, undefined, undefined, undefined, undefined, undefined, undefined, vector);
+    const out = buildDocumentNodes("d", structure as never, undefined, () => true, images as never, undefined, undefined, undefined, undefined, undefined, undefined, undefined, vector);
     const block = out.find((f) => f.path === "blocks/figure-vfig-p004.jsonld");
     expect(block).toBeDefined();
     const n = JSON.parse(block!.content) as Record<string, unknown>;
@@ -88,7 +88,7 @@ describe("vector figures become figure blocks", () => {
   });
 
   test("an uninspected or unrendered vector render is not a figure block", () => {
-    const out = buildDocumentNodes("d", structure as never, undefined, () => true, undefined, undefined, undefined, undefined, undefined, undefined, undefined, vector);
+    const out = buildDocumentNodes("d", structure as never, undefined, () => true, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, vector);
     expect(out.some((f) => f.path === "blocks/figure-vfig-p005.jsonld")).toBe(false);
     expect(out.some((f) => f.path === "blocks/figure-vfig-p006.jsonld")).toBe(false);
     expect(placedFigures(images as never, vector).map((f) => f.id)).toEqual(["img-p002-1", "vfig-p004"]);

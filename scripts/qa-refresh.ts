@@ -78,7 +78,7 @@ import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 import { rootProfile, type RootProfile } from "./lib/root-gate-set.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";
-import { writePathAt } from "./lib/layer-output.ts";
+import { writePathOf } from "./lib/layer-output.ts";
 
 export { REFRESH_SCHEMA, refreshReportComplete };
 export const REFRESH_EXIT = { complete: 0, incomplete: 1, unknown: 2 } as const;
@@ -700,7 +700,7 @@ function main(argv: string[]): number {
   // A mounted layer's directory is created under its layer output root, never
   // inside the mount (bean `cat-tools-sm8r`, item 4): the writers write there,
   // and every reader finds it through the overlay.
-  for (const r of roots) mkdirSync(writePathAt(join(repoRoot, r), repoRoot), { recursive: true });
+  for (const r of roots) mkdirSync(writePathOf(join(repoRoot, r), repoRoot), { recursive: true });
   const mounted = [...mountedInstanceRoots(repoRoot).values()].map((abs) => relative(repoRoot, abs));
   // Only a file IN the mount was laid down from its pin; one under the layer
   // output root (`MovedFile.at`) was computed here, and is judged like any other.
