@@ -239,6 +239,7 @@ export const QA_WRITERS: readonly QaWriter[] = [
       ["check:source-licence", "source-licence"],
       ["check:layout-norms", "layout-norms"],
       ["check:rendered-labels", "rendered-labels"],
+      ["check:nav-names", "nav-names"],
       ["check:lane-documentation", "lane-documentation"],
       ["check:methodology-evidence", "methodology-evidence"],
       ["check:avatar-coverage", "avatar-coverage"],
