@@ -20,7 +20,8 @@
  * `gen-iris-pages` catch a real orphan rather than a hypothetical one.
  */
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "../../../test/support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
