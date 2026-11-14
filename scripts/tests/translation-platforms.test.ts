@@ -267,7 +267,7 @@ describe("pull: a platform's strings become candidates, never verdicts", () => {
     expect(poPathParts("translations", "translations/fr/docs/index.po")).toEqual({ locale: "fr", catalogue: "docs/index" });
     expect(poPathParts("translations", "docs/fr/index.po")).toBeUndefined();
     expect(poPathParts("translations", "translations/fr/../../x.po")).toBeUndefined();
-    expect(poPathParts("translations", "translations/fr/index.pot")).toBeUndefined();
+    expect(poPathParts("translations", "translations/fr/not-a-catalogue.pot")).toBeUndefined();
     expect(poPathParts("translations", "translations/NOTALOCALE/x.po")).toBeUndefined();
   });
 });

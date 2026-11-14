@@ -24,7 +24,7 @@ A platform is a **source of candidates, never an adjudicator** (owner,
   an adjudication (`translation-adjudication/v1`).
 
 The Python scripts beside this file (`pull_*_translations.py`, copied from
-smart-base) write platform output straight into `msgstr`. They break this rule,
+upstream, see `README.md`) write platform output straight into `msgstr`. They break this rule,
 so do not use them to import into a layer. Use the import below instead.
 
 ## How it fits together
@@ -153,12 +153,12 @@ Counts are unique source strings in each layer's declared `translations/`, for 5
 | Layer | Catalogues | Strings | Words |
 |---|---|---|---|
 | cat-harness | 113 | 4,610 | ~99k |
-| smart-trust | 56 | 3,516 | ~50k |
-| who-iris | 6 | 276 | ~2.5k |
+| a content layer above it | 56 | 3,516 | ~50k |
+| a library layer | 6 | 276 | ~2.5k |
 
-who-iris is expected to grow to about 400k library items, so 400k strings or more. The free plans compare like this; check each provider's current terms before relying on them:
+The library layer is expected to grow to about 400k library items, so 400k strings or more. The free plans compare like this; check each provider's current terms before relying on them:
 
-| Plan | Limit | Fits who-iris? |
+| Plan | Limit | Fits the library layer? |
 |---|---|---|
 | Hosted Weblate Libre | 160,000 hosted strings | No |
 | Crowdin open-source plan | No hosted-word limit, according to Crowdin staff (the general free plan's 60k words count source words × languages) | Yes, if Crowdin approves the application |
