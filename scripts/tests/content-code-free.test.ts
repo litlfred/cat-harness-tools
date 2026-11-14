@@ -52,8 +52,8 @@ describe("check:content-code-free", () => {
 
   test("the folio file-list renderer and the Jekyll plugins are kept by rule", () => {
     // declared-path-literal: test inputs to the path classifier, not reads
-    for (const f of ["folio-render/file-list.ts", "folio-render/file-list.test.ts", "site-chrome/_plugins/fa-root-relative.rb", "docs/_plugins/liquid-undefined-warn.rb"]) expect(isCode(f)).toBe(false);
-    for (const f of ["_plugins/x.ts", "site-chrome/_plugins/sub/x.ts", "render/file-list.ts"]) expect(isCode(f)).toBe(true);
+    for (const f of ["folio-render/file-list.ts", "folio-render/file-list.test.ts", "site-chrome/tests/foo.test.ts", "site-chrome/_plugins/fa-root-relative.rb", "docs/_plugins/liquid-undefined-warn.rb"]) expect(isCode(f)).toBe(false);
+    for (const f of ["_plugins/x.ts", "site-chrome/_plugins/sub/x.ts", "site-chrome/tests/sub/x.ts", "render/file-list.ts"]) expect(isCode(f)).toBe(true);
   });
 
   test("an unlisted file is added; a listed file that is gone is only reported", () => {

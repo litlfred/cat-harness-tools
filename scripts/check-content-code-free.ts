@@ -25,8 +25,10 @@
  * - browser assets: a `.js`/`.mjs` under `site-chrome/assets/`,
  *   `site-chrome/_includes/` or `docs/assets/` is a file the site ships to
  *   the browser, next to the include that loads it;
- * - two build helpers: the folio file-list renderer (`folio-render/`) and the
- *   Jekyll plugins (`_plugins/*.rb`), part of the same chrome layout;
+ * - build helpers and site-chrome tests: the folio file-list renderer
+ *   (`folio-render/`), the Jekyll plugins (`_plugins/*.rb`), and the
+ *   site-chrome unit tests (`site-chrome/tests/*.test.ts`) that verify
+ *   `site-chrome/` browser assets in-place;
  * - anything under a path the harness declares `builtAtPublish`: written by a
  *   writer at publish, never tracked. In a mounted checkout there is no git
  *   index to say so, so the corpus is a walk, and a publish-built page's
@@ -62,10 +64,10 @@ export const isBrowserAsset = (rel: string): boolean =>
  */
 export const BUILT_PAGE_ASSET = /^docs\/[a-z]{2}(?:-[A-Za-z]+)?\/(?:[^/]+\/)*assets\/[^/]+\.m?js$/;
 
-/** The folio file-list renderer and the Jekyll plugins, kept by owner card (2026-10-30, option A). */
+/** The folio file-list renderer, the site-chrome tests, and the Jekyll plugins, kept by owner card (2026-10-30, option A). */
 // declared-path-literal: a classifier over repo-relative paths, as BROWSER_ASSET_DIRS above
 export const isBuildHelper = (rel: string): boolean =>
-  rel.startsWith("folio-render/") || /(^|\/)_plugins\/[^/]+\.rb$/.test(rel);
+  rel.startsWith("folio-render/") || /^site-chrome\/tests\/[^/]+\.test\.ts$/.test(rel) || /(^|\/)_plugins\/[^/]+\.rb$/.test(rel);
 
 export const isCode = (rel: string): boolean =>
   CODE_EXTENSIONS.some((e) => rel.endsWith(e)) && !isBrowserAsset(rel) && !isBuildHelper(rel);
