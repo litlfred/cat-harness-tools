@@ -20,6 +20,7 @@ import { join } from "node:path";
 import { ROOT } from "../todos.js";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
+import { overlayPath } from "../lib/layer-output.ts";
 
 describe("the published process hierarchy", () => {
   beforeAll(() => {
@@ -29,10 +30,10 @@ describe("the published process hierarchy", () => {
   // Standing alone the index is not built: `docs:pages` writes it at publish,
   // and it is gitignored (bean w1gy F18).
   const NOT_BUILT = (): boolean =>
-    siteNotBuilt("the published todo index `docs:pages` writes at publish (gitignored)", INDEX);
+    siteNotBuilt("the published todo index `docs:pages` writes at publish (gitignored)", overlayPath(INDEX));
   const index = () =>
     JSON.parse(
-      readFileSync(INDEX, "utf8"),
+      readFileSync(overlayPath(INDEX), "utf8"),
     ) as { processes: Record<string, string[]>; items: Array<{ tags: { processes: string[] } }> };
 
   test.skipIf(NOT_BUILT())("real call edges are present — a silent regex failure would flatten the board", () => {

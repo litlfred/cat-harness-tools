@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 import { ensureThemesCss } from "../support/themes-css.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * THREE THINGS ABOUT WHAT SITS ON THE FOLIO GLASS — owner, 2026-09-24.
@@ -26,12 +27,12 @@ import { ensureThemesCss } from "../support/themes-css.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
 // The sticky themes' tokens — the scrim and the ink a themed card reads.
 // Loaded because the real page loads it (`head_custom.html`), and a themed
 // card measured without it would be measured against fallbacks it never uses.
 const THEMES = readFileSync(ensureThemesCss(ROOT), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 
 const COVER = "/library/who-iris/book-cover.png";
 const PNG = Buffer.from(
@@ -40,7 +41,7 @@ const PNG = Buffer.from(
 );
 /** The REAL backdrop art of the `library` theme, served at its published path. */
 const ART_PATH = "/assets/img/harness/landing-library-card.webp";
-const ART = readFileSync(join(ROOT, SITE, ART_PATH.slice(1)));
+const ART = readFileSync(overlayPath(join(ROOT, SITE, ART_PATH.slice(1))));
 const ART_LAPTOP = "/assets/img/harness/landing-library-laptop.webp";
 const ART_MOBILE = "/assets/img/harness/landing-library-mobile.webp";
 

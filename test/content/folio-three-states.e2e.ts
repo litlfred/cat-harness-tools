@@ -6,6 +6,7 @@ import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { layoutStandIn, parseThemed } from "../support/themed-page.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 import { declaredPagePath } from "../support/site-pages.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * R30's THREE STATES, bean `j2if`. Owner, 2026-09-21:
@@ -67,13 +68,13 @@ function asLayoutServesIt(file: string): string {
 function libraryViewerAsset(pathname: string): { contentType: string; body: string } | undefined {
   for (const [file, contentType] of [["viewer.js", "text/javascript"], ["viewer.css", "text/css"]] as const) {
     if (pathname.endsWith(`assets/library/${file}`)) {
-      return { contentType, body: readFileSync(join(SITE_ABS, "assets", "library", file), "utf8") };
+      return { contentType, body: readFileSync(overlayPath(join(SITE_ABS, "assets", "library", file)), "utf8") };
     }
   }
   return undefined;
 }
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 
 /**
  * A library page: two rows that declare themselves, and nothing else.
@@ -476,7 +477,7 @@ const PROJECTION = join(SITE_ABS, "assets", "library", "index.json");
     const page = readFileSync(VIEW, "utf8");
     expect(page.startsWith("---\nlayout: default\n")).toBe(true);
     expect(page).not.toContain("data-fa-folio-mount");
-    expect(readFileSync(join(ROOT, siteFileFor(ROOT, "_includes/head_custom.html")), "utf8")).toMatch(
+    expect(readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "_includes/head_custom.html"))), "utf8")).toMatch(
       /<script src="\{\{ '\/assets\/js\/docs-ui\.js' \| relative_url \}\}[^"]*" defer><\/script>/,
     );
   });
@@ -590,7 +591,7 @@ test.describe("an asset's address is its own path IRI", () => {
 
   test("arriving at a LEGACY anchor SELECTS the row, at its path IRI", async ({ page }) => {
     // The page is a shell (#1881); the selection logic is the shared script.
-    const js = readFileSync(join(SITE_ABS, "assets", "library", "viewer.js"), "utf8");
+    const js = readFileSync(overlayPath(join(SITE_ABS, "assets", "library", "viewer.js")), "utf8");
     expect(js).toContain("honourAddress");
     const data = JSON.parse(readFileSync(DATA2, "utf8")) as { entries: Array<{ instance: string; id: string }> };
     const mine = data.entries.find((e) => e.instance === "who-iris");
