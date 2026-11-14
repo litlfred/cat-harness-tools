@@ -1635,6 +1635,12 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "derived family's tree. Kept on main where deleting derived results cannot reach them; each " +
       "entry pins the hash it attested, so a stale one is detectable.",
     schema: "schemas/sdlc/qa-attestations.ts",
+    // Every family's file is one `qa-attestations/v1` node (`QaAttestationsKind`,
+    // named by cat-harness's `validators/qa-attestations.json`), so each has
+    // an IRI, a JSON-LD document and a page (owner, 2026-11-13, node-kind audit).
+    nodeSchemas: {
+      "qa-attestations/v1": {},
+    },
     // declared-path-literal: this table IS the declaration, as on `health`.
   },
   // Source code. Registered 2026-09-22 (bean `ylj7`) after a measurement the

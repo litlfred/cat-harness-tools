@@ -30,7 +30,7 @@ describe("scenario rows link their actor's and capability's IRI", () => {
   const iriOf = (file: string, kind: string, id: string) => (file.startsWith("/s/") ? `${IRI}/${kind}/${id}` : undefined);
 
   test("only files directly in actors/ and capabilities/ are subjects, as kg-export reads them", () => {
-    expect(SUBJECT_ROWS.scenarios).toEqual([["actors", "actor"], ["capabilities", "capability"]]);
+    expect(SUBJECT_ROWS.scenarios).toEqual([{ dir: "actors", kind: "actor" }, { dir: "capabilities", kind: "capability" }]);
     const out = withSubjectIris(rows, "/s", ["scenarios"], iriOf);
     expect(out.map((r) => r.iri)).toEqual([`${IRI}/actor/admin`, `${IRI}/capability/merge`, undefined, undefined, undefined]);
   });
