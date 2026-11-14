@@ -119,3 +119,17 @@ describe("a sticky's link to a platform docs page (who-iris /folio/, 2026-11-13)
     expect(platformDocHref(site, "https://github.com/x", { here: false, base: host })).toBe("https://github.com/x");
   });
 });
+
+describe("subjectIri — the IRI a layer's document mints, wherever it is built", () => {
+  test("a platform layer's subject is named on the platform's site, own canonicalUrl or not (cat-harness declares one there)", async () => {
+    const { subjectIri, hostSiteBase } = await import("../../lib/subject-pages.ts");
+    const { HARNESS_ROOT } = await import("../../lib/roots.ts");
+    const host = hostSiteBase();
+    expect(host).toMatch(/^https?:\/\//);
+    expect(subjectIri(join(HARNESS_ROOT, "scenarios", "actors", "admin.json"), "actor", "admin")).toBe(`${host}/cat-harness/actor/admin`);
+  });
+  test("a file in no layer has none", async () => {
+    const { subjectIri } = await import("../../lib/subject-pages.ts");
+    expect(subjectIri(join(tmpdir(), "nowhere", "x.json"), "actor", "x")).toBeUndefined();
+  });
+});

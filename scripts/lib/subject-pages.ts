@@ -131,8 +131,9 @@ const publishedDocIris = new Map<string, string | undefined>();
  * (`folio-assistant/<layer>/actor/<id>` and `.jsonld`, 200, measured
  * 2026-11-13). So a downstream's viewer row can name the node by its IRI and
  * link its JSON-LD (owner, 2026-11-13, node-kind audit: "link existing IRIs").
- * `undefined` for a layer minting against its own `canonicalUrl`, which
- * serves nothing yet, and for a file in no layer.
+ * `undefined` for a layer whose document is not on the platform's site (one
+ * minting against a `canonicalUrl` elsewhere, which serves nothing yet), and
+ * for a file in no layer.
  */
 export function subjectIri(source: string, kind: string, id: string): string | undefined {
   const inst = findInstanceRoot(resolve(source));
@@ -141,7 +142,12 @@ export function subjectIri(source: string, kind: string, id: string): string | u
   if (!publishedDocIris.has(key)) {
     let doc: string | undefined;
     try {
-      doc = declaresOwnCanonical(readDeclaration(key)) ? undefined : publishedIdentity(key).docIri;
+      // Served where the platform's site serves it: a layer whose own
+      // `canonicalUrl` is elsewhere (`http://smart.who.int/base`) serves
+      // nothing there yet, so it has no IRI to link.
+      const host = hostSiteBase();
+      const minted = publishedIdentity(key).docIri;
+      doc = host !== undefined && minted.startsWith(`${host}/`) ? minted : undefined;
     } catch {
       doc = undefined;
     }
