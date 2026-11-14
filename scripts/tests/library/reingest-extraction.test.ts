@@ -22,7 +22,7 @@ import {
 } from "../../entry-extraction.ts";
 import { ExtractionStepSchema } from "../../../schemas/library/entry-extraction.ts";
 import { advisoryLine, checkEntry, sidecarDocument } from "../../check-l1-complete.ts";
-import { csvwFromPdfTables, captionLabel, isGrid, runTableArm, toCsv } from "../../pdf-tables-csvw.ts";
+import { csvwFromPdfTables, captionLabel, isGrid, isProseCut, runTableArm, toCsv, wordSplitShare } from "../../pdf-tables-csvw.ts";
 import { TabularCsvwSchema } from "../../../schemas/library/tabular-csvw.ts";
 import { readEntryTables } from "../../lib/library-document.ts";
 import { OPTIONAL_PIPELINE_PLUGIN_KINDS, PIPELINE_PLUGIN_KINDS } from "../../../pipeline/pipeline-plugins.ts";
@@ -214,6 +214,28 @@ describe("the table arm writes CSVW drafts, guarded", () => {
     // A paragraph read as a one-column grid, or a header with no body, is no table.
     expect(isGrid({ id: "t", pages: [1], rows: [["a paragraph"], ["more"]] })).toBe(false);
     expect(isGrid({ id: "t", pages: [1], rows: [["A", "B"]] })).toBe(false);
+  });
+
+  test("prose cut into columns is no table, and is counted apart", () => {
+    // Page 26 of 9789240116191-eng as pdfplumber's text strategy cut it, and a real grid (Annex 2's roles).
+    const prose = [
+      ["ollowi", "n", "g key elements", "t", "o contin", "uously and"],
+      ["securely", "m", "anage the", "p", "roduct m", "aster data"],
+      ["and ensure", "t", "hat it is", "u", "pdated and", "a"],
+    ];
+    const grid = [
+      ["ROLE CATEGORY", "ROLES", "DEPLOYMENT", "OPERATION"],
+      ["Technical", "Solution architect", "Yes", "No"],
+      ["Leadership", "Project manager", "Yes", "Yes"],
+    ];
+    expect(wordSplitShare(prose).share).toBeGreaterThanOrEqual(0.5);
+    expect(wordSplitShare(grid)).toEqual({ share: 0, pairs: 9 });
+    expect(isProseCut({ id: "p", pages: [26], rows: prose })).toBe(true);
+    expect(isProseCut({ id: "g", pages: [57], rows: grid })).toBe(false);
+    // Too few boundaries to judge: kept.
+    expect(isProseCut({ id: "s", pages: [1], rows: [["Pr", "oduct co"], ["12", "de"]] })).toBe(false);
+    const { record } = csvwFromPdfTables("d", { status: "ok", tables: [{ id: "p", pages: [26], rows: prose }, { id: "g", pages: [57], rows: grid }] }, {}, "2026-11-14", undefined);
+    expect((record.tables as unknown[]).length).toBe(1);
   });
 
   test("a failure is recorded as not extracted and the arm does not throw", () => {

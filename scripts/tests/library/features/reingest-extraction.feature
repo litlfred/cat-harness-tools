@@ -63,6 +63,11 @@ Feature: Re-ingestion extraction coverage
     When the arm writes it
     Then tabular.csvw.json validates and readEntryTables reads its label, columns, rows and pages
 
+  @test:scripts/tests/library/reingest-extraction.test.ts::the_table_arm_writes_CSVW_drafts,_guarded::prose_cut_into_columns_is_no_table,_and_is_counted_apart
+  Scenario: Prose a column split cut through is not drafted as a table
+    When a candidate's cell boundaries cut a word at a quarter or more of at least five boundaries
+    Then it is not drafted, and the record's note counts it apart from the other dropped candidates
+
   @test:scripts/tests/library/reingest-extraction.test.ts::the_table_arm_writes_CSVW_drafts,_guarded::a_failure_is_recorded_as_not_extracted_and_the_arm_does_not_throw
   Scenario: A table step that fails records not extracted
     Given a PDF the table step cannot read
