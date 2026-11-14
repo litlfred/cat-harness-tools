@@ -467,6 +467,8 @@ export function buildDocumentNodes(
   subgraphStart: string = findContentRepoRoot(),
   sourceMaterialization?: unknown,
   tables?: readonly TranscribedTable[],
+  /** The owning layer's root, whose dependency closure types the blocks ({@link owningLayerRoot}). */
+  typingRoot?: string,
 ): Array<{ path: string; content: string }> {
   // Without a resolved title (a test, a caller with no disk), resolve from the
   // structure alone: the Info dictionary or a text heading, never the page-1
@@ -603,7 +605,7 @@ export function buildDocumentNodes(
           // A dependency's kind (a higher layer's `functional-requirement`
           // or `indicator`) is typed through the contribution registry; without
           // it such a node had no `@type` at all.
-          "@type": candidateTypes(c.kind, subgraphStart),
+          "@type": candidateTypes(c.kind, typingRoot ?? subgraphStart),
           kind: c.kind,
           title: c.name ?? undefined,
           pageStart: sec.page_start ?? undefined,
@@ -791,6 +793,18 @@ function contributedKinds(subgraphStart?: string): ContributionRegistry | undefi
     }
   }
   return contributionsByRoot.get(root) ?? undefined;
+}
+
+/**
+ * The layer a library entry belongs to, for typing its blocks: the nearest
+ * directory above it that carries a layer declaration. An entry with none
+ * above it (a bare content repository) is typed from the checkout, as before.
+ */
+export function owningLayerRoot(locatedAt: string): string {
+  for (let at = dirname(resolve(locatedAt)); at !== dirname(at); at = dirname(at)) {
+    if (readDeclaration(at) !== undefined) return at;
+  }
+  return contributionsRoot();
 }
 
 /**
@@ -1089,6 +1103,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       subgraphStart,
       readJson<unknown>(join(dir, SOURCE_MATERIALIZATION_RECORD)),
       Array.isArray(transcribed?.tables) ? transcribed.tables : undefined,
+      owningLayerRoot(locatedAt),
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
     if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance, subgraphStart));

@@ -34,3 +34,10 @@ Feature: Locks agree on shared layers
     When the lock skews are read
     Then the undetermined list contains "upper-layer: cannot fetch o/upper-layer@s1"
     And there are 2 undetermined entries and no skews
+
+  @test:scripts/tests/check-lock-consistency.test.ts::skews_are_a_report_by_default_(exit_0),_and_exit_1_only_when_--gate_is_asked
+  Scenario: Skews are reported with exit 0 by default and exit 1 only with --gate
+    Given an index lock pinning bootstrap at "c90ef456"
+    And cat-harness's own lock pinning bootstrap at "a83ae82d"
+    When the exit code is computed for the reading
+    Then it is 0 by default and 1 with --gate
