@@ -64,7 +64,7 @@
 # matched, and the gates were split by count, not by time. Now:
 #   prepare-head  starts at once, on a PR. Its first steps are the light
 #       checks that were jobs of their own (owner, 2026-11-13, "A. Collapse
-#       into one job"; folio-assistant-core run 43493373385 spent 20 of its 23
+#       into one job"; content-core run 43493373385 spent 20 of its 23
 #       minutes queueing five serial jobs for runners): "Lock pins agree with
 #       each other and are at main", "Which tier (the PR's live labels)" and
 #       "Already judged? (marked ready for review)". Its last step is the
@@ -1197,7 +1197,7 @@ jobs:
       # Bean fwtz (owner 2026-10-31: "cache the page build", keyed on input
       # content, so changed inputs rebuild). The writer cache above keys on
       # statically derived inputs and reused 0 of 41 writers on
-      # https://github.com/litlfred/folio-assistant-core/pull/444. Writer records
+      # the content core's PR #444. Writer records
       # are traced instead: a push to
       # main records what each writer read and wrote; a PR skips a writer whose
       # every recorded read is unchanged and puts back what it wrote.
@@ -1883,7 +1883,7 @@ jobs:
   # Main's writer records (bean fwtz), on their own machine beside the base
   # side: tracing every derive:publish writer under strace took the base
   # side's preparation from ~10 to 56 minutes (run
-  # https://github.com/litlfred/folio-assistant-core/actions/runs/41251751682). PRs read only the records this job saves, so nothing waits
+  # 41251751682, on the content core). PRs read only the records this job saves, so nothing waits
   # on it but the run's own end.
   record-writers:
     name: Record main's page-build scripts (bean fwtz)
@@ -2218,7 +2218,7 @@ jobs:
     # The fast tier is judged by prepare-head's last step, "Fast tier only
     # (advisory; the full checks gate a release)" (owner, 2026-11-13, "A.
     # Collapse into one job"): a job of its own here waited 4m22s for a runner
-    # to read two outputs (folio-assistant-core run 43493373385). This job is
+    # to read two outputs (content-core run 43493373385). This job is
     # then skipped, so it never reports the fast tier as "No new failures".
     # It runs when the tier is unknown (prepare-head failed before deciding it),
     # and reports that prepare-head failed.
@@ -2668,7 +2668,7 @@ jobs:
   # The required check "Lock pins agree with each other and are at main"
   # (rulesets require the name). Its verdict is prepare-head's step of the
   # same name (owner, 2026-11-13, "A. Collapse into one job": a job of its own
-  # waited 9m29s for a runner to run for 9s, folio-assistant-core run
+  # waited 9m29s for a runner to run for 9s, content-core run
   # 43493373385). This job is SKIPPED when that step passed, which rulesets
   # and merge-guard read as a pass, so a passing PR spends no runner on it.
   # It runs when the step failed, and fails under the required name; and when
