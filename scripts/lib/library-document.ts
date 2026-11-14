@@ -152,8 +152,103 @@ export interface DocumentView {
   /** The entry's transcribed tables (`tabular.csvw.json`), cells inline. Absent when it has none. */
   tables?: DocTable[];
   withheld: boolean;
+  /** What was extracted, kind by kind ({@link entryCoverage}). */
+  coverage?: DocCoverage[];
   /** Present when the caller gave {@link EntryLinks}: the page draws the links. */
   links?: { repo: string; branch: string; dir: string };
+}
+
+/**
+ * WHAT WAS EXTRACTED, kind by kind — owner, 2026-11-14: "why no biblio,
+ * glossary, etc here" on a one-page notice that has none. A blank said
+ * nothing: "none in the text", "not extracted yet" and "never looked" all
+ * read the same. Each kind now says one of:
+ *
+ * - `found` (with a count), `partial` (fewer kept than the text captions),
+ * - `none` — only where something DID look: the extractor's own output, or
+ *   the headings and text, which are held and were read here;
+ * - `not-extracted` — the step has not run for this entry.
+ *
+ * An `extraction.json` the ingest writes ({ kinds: { <kind>: { state, count,
+ * note } } }) is the authority for any kind it names; the rest is derived.
+ */
+export interface DocCoverage {
+  kind: "contents" | "sections" | "figures" | "tables" | "references" | "glossary" | "footnotes" | "summaries";
+  state: "found" | "partial" | "none" | "not-extracted";
+  count?: number;
+  note?: string;
+}
+
+const PAGE_TITLE = /^page\s+\d+$/i;
+const HEADING_OF: Record<"references" | "glossary", RegExp> = {
+  references: /^(?:\d+(?:\.\d+)*\.?\s+)?(?:references|bibliography|works cited|literature cited|sources|further reading|r[ée]f[ée]rences|bibliographie|referencias|bibliograf[ií]a)\s*:?$/i,
+  glossary: /^(?:\d+(?:\.\d+)*\.?\s+)?(?:glossary|abbreviations(?: and acronyms)?|acronyms(?: and abbreviations)?|definitions|glossaire|abr[ée]viations|sigles(?: et abr[ée]viations)?|glosario|abreviaturas|siglas)\s*:?$/i,
+};
+
+/** Where a References or Glossary heading is: a section's title, else a short line of the held text. */
+function headingAt(dir: string, sections: DocSection[], re: RegExp): DocSection | null {
+  const byTitle = sections.find((x) => re.test(x.title.trim()));
+  if (byTitle) return byTitle;
+  for (const x of sections) {
+    const p = join(dir, "sections", `${x.id}.md`);
+    if (!existsSync(p)) continue;
+    const body = readFileSync(p, "utf8").replace(/^---[\s\S]*?\n---\n/, "");
+    if (body.split("\n").some((l) => l.trim().length < 60 && re.test(l.replace(/^#+\s*/, "").trim()))) return x;
+  }
+  return null;
+}
+
+/** {@link DocCoverage} for one entry. */
+export function entryCoverage(dir: string, v: DocumentView, captions: { kind: string }[] | undefined): DocCoverage[] {
+  const out: DocCoverage[] = [];
+  const pageSplit = v.sections.length > 0 && v.sections.every((x) => PAGE_TITLE.test(x.title.trim()));
+  const depth = new Set(v.sections.map((x) => x.level)).size;
+  out.push(v.toc.length
+    ? { kind: "contents", state: "found", count: v.toc.length, ...(v.tocSource ? { note: v.tocSource } : {}) }
+    : pageSplit
+      ? { kind: "contents", state: "not-extracted", note: "split one section per page; no contents was trusted" }
+      : { kind: "contents", state: "none", note: "no outline in the PDF and none inferred" });
+  out.push({ kind: "sections", state: pageSplit ? "partial" : "found", count: v.sections.length,
+    note: pageSplit ? "one per page, not by heading" : depth > 1 ? `${depth} levels` : "one level" });
+  const capFig = (captions ?? []).filter((c) => /fig/i.test(c.kind)).length;
+  const capTab = (captions ?? []).filter((c) => /tab/i.test(c.kind)).length;
+  const figs = v.images?.length ?? 0;
+  const looked = existsSync(join(dir, "images.json")) || existsSync(join(dir, "vector-figures.json"));
+  out.push(figs
+    ? { kind: "figures", state: capFig > figs ? "partial" : "found", count: figs, ...(capFig > figs ? { note: `${capFig} captioned in the text` } : {}) }
+    : looked
+      ? capFig ? { kind: "figures", state: "partial", count: 0, note: `${capFig} captioned in the text, none kept` } : { kind: "figures", state: "none" }
+      : { kind: "figures", state: "not-extracted" });
+  const tabs = v.tables?.length ?? 0;
+  out.push(tabs
+    ? { kind: "tables", state: capTab > tabs ? "partial" : "found", count: tabs, ...(capTab > tabs ? { note: `${capTab} captioned in the text` } : {}) }
+    : existsSync(join(dir, "tabular.csvw.json"))
+      ? { kind: "tables", state: "none" }
+      : { kind: "tables", state: "not-extracted", ...(capTab ? { note: `${capTab} captioned in the text` } : {}) });
+  for (const kind of ["references", "glossary"] as const) {
+    const at = headingAt(dir, v.sections, HEADING_OF[kind]);
+    const where = at ? (at.pageStart != null ? `p${at.pageStart}` : `“${at.title}”`) : "";
+    out.push(at
+      ? { kind, state: "not-extracted", note: `a ${kind === "references" ? "references" : "glossary"} section is in the text (${where}); its entries are not extracted` }
+      : { kind, state: "none", note: "no such heading in the text" });
+  }
+  const fn = readJson<{ footnotes?: unknown[] }>(join(dir, "footnotes.json"));
+  out.push(fn ? (fn.footnotes?.length ? { kind: "footnotes", state: "found", count: fn.footnotes.length } : { kind: "footnotes", state: "none" })
+    : { kind: "footnotes", state: "not-extracted" });
+  const summed = v.sections.filter((x) => x.summary).length;
+  out.push({ kind: "summaries", state: summed === v.sections.length && summed ? "found" : summed ? "partial" : "not-extracted",
+    count: summed, note: `${summed} of ${v.sections.length} sections` });
+  // The ingest's own record wins for every kind it names.
+  const rec = readJson<{ kinds?: Record<string, { state?: string; count?: number; note?: string }> }>(join(dir, "extraction.json"));
+  for (const c of out) {
+    const r = rec?.kinds?.[c.kind];
+    if (r && (r.state === "found" || r.state === "partial" || r.state === "none" || r.state === "not-extracted")) {
+      c.state = r.state;
+      if (typeof r.count === "number") c.count = r.count; else delete c.count;
+      if (r.note) c.note = r.note; else delete c.note;
+    }
+  }
+  return out;
 }
 
 /** One kept figure: where it is, and what it shows in each language (`lang` → text). */
@@ -535,6 +630,7 @@ export function readEntryDocument(
     const tables = readEntryTables(dir);
     if (tables.length) view.tables = tables;
   }
+  view.coverage = entryCoverage(dir, view, s.figures);
   if (d.toc_alignment) view.checks.tocAlignment = d.toc_alignment;
   if (Array.isArray(d.figure_sequence_gaps)) view.checks.figureSequenceGaps = d.figure_sequence_gaps;
   if (d.page_label_conflicts) view.checks.pageLabelConflicts = d.page_label_conflicts;
@@ -772,10 +868,6 @@ function figPopout(i){
     '<p class="note">Agent draft, not yet reviewed. <a href="' + esc(href) + '" target="_blank" rel="noopener">Open the image on its own</a></p></div>';
   if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
 }
-document.addEventListener("click", function(ev){
-  var b = ev.target && ev.target.closest && ev.target.closest("button.fig-thumb[data-fig]");
-  if (b) figPopout(+b.getAttribute("data-fig"));
-});
 function docTable(t){
   var groups = t.columns.some(function(c){ return c.group; });
   var head = "";
@@ -872,6 +964,22 @@ function docChecks(d){
   return '<p class="note">Findings about the DOCUMENT, reported and never corrected \u2014 drafts drift.</p>' +
     '<table><thead><tr><th>check</th><th>count</th><th>items</th></tr></thead><tbody>' + rows.join("") + '</tbody></table>';
 }
+/* WHAT WAS EXTRACTED -- one line of pills, kind by kind (owner,
+   2026-11-14: "why no biblio, glossary, etc here"). Words, never colour
+   alone: "none in the text" is a finding, "not extracted" is a gap. */
+var COVER_NAMES = { contents: "Contents", sections: "Sections", figures: "Figures", tables: "Tables",
+  references: "References", glossary: "Glossary", footnotes: "Footnotes", summaries: "Summaries" };
+function docCoverage(d){
+  if (!d.coverage || !d.coverage.length) return "";
+  return '<p class="doc-cover"><span class="note">What was extracted:</span> ' + d.coverage.map(function(c){
+    var word = c.state === "found" ? (c.count != null ? String(c.count) : "found")
+      : c.state === "partial" ? (c.count != null ? c.count + ", partial" : "partial")
+      : c.state === "none" ? "none in the text" : "not extracted";
+    var cls = c.state === "found" ? "ok" : c.state === "none" ? "" : "warn";
+    return '<span class="pill ' + cls + '"' + (c.note ? ' title="' + esc(c.note) + '"' : '') + '>' +
+      esc(COVER_NAMES[c.kind] || c.kind) + ': ' + esc(word) + '</span>';
+  }).join(" ") + '</p>';
+}
 var DOC_TABS = [["contents","Contents",docContents],["pages","Pages",docPages],["figures","Figures & tables",docFigures],["sections","Sections",docSections],["checks","Checks",docChecks]];
 function renderDocument(id, d, err){
   var el = $("document");
@@ -891,6 +999,7 @@ function renderDocument(id, d, err){
     : d.pagesCovered ? 'page count not recorded; sections reach page ' + d.pagesCovered
     : 'page count not recorded';
   el.innerHTML = '<h2>Document — ' + esc(d.title || id) + ' <span class="note">(' + size + ')</span>' + whole + '</h2>' +
+    docCoverage(d) +
     '<div class="seg" role="tablist" aria-label="Document view">' + DOC_TABS.map(function(t){
       return '<button type="button" role="tab" aria-selected="' + (t[0] === tab[0]) + '" data-tab="' + t[0] + '">' + esc(t[1]) + '</button>';
     }).join("") + '</div>' + (d.keywords && d.keywords.length ? '<div class="dockw"><span class="note">Keywords (LSI):</span> ' + chips(d.keywords) + '</div>' : '') +
@@ -920,6 +1029,9 @@ function renderDocument(id, d, err){
     /* A block leaf scrolls to its row in the Blocks panel; the address is
        left alone, since a changed hash re-reads the whole entry. */
     el.addEventListener("click", function(ev){
+      /* A figure's thumbnail opens its popout. */
+      var fb = ev.target && ev.target.closest && ev.target.closest("button.fig-thumb[data-fig]");
+      if (fb) { figPopout(+fb.getAttribute("data-fig")); return; }
       var a = ev.target && ev.target.closest && ev.target.closest("a[data-blk]");
       if (!a) return;
       ev.preventDefault();

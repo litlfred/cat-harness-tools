@@ -364,3 +364,44 @@ describe("the Contents tree", () => {
     expect(VIEWER_JS).toContain(`'<tr id="' + esc(blockAnchor(b.id)) + '">`);
   });
 });
+
+// Owner, 2026-11-14: "why no biblio, glossary, etc here" -- a blank said
+// nothing. Each kind now says found, none in the text, or not extracted.
+describe("what was extracted (coverage)", () => {
+  const cov = (dir: string) => Object.fromEntries((readEntryDocument(dir, "r")!.coverage ?? []).map((c) => [c.kind, c]));
+
+  test("a References heading is found but its entries are not extracted; no glossary heading is 'none'", () => {
+    const dir = entry({ ...base, sections: [...base.sections,
+      { id: "sec-002-references", number: null, title: "References", level: 1, page_start: 4, page_end: 4, n_chars: 10, n_words: 2 }] });
+    const c = cov(dir);
+    expect(c.references).toMatchObject({ state: "not-extracted" });
+    expect(c.references.note).toContain("p4");
+    expect(c.glossary).toMatchObject({ state: "none" });
+    expect(c.contents).toMatchObject({ state: "found", count: 2 });
+    // One table is captioned in the text and none transcribed.
+    expect(c.tables).toMatchObject({ state: "not-extracted", note: "1 captioned in the text" });
+    expect(c.footnotes).toMatchObject({ state: "not-extracted" });
+  });
+
+  test("a page-split entry says its contents were not extracted and its sections are pages", () => {
+    const dir = entry({ ...base, toc: [], figures: [], sections: [
+      { id: "page-001", number: null, title: "Page 1", level: 1, page_start: 1, page_end: 1, n_chars: 20, n_words: 5 },
+      { id: "page-002", number: null, title: "Page 2", level: 1, page_start: 2, page_end: 2, n_chars: 20, n_words: 5 }] });
+    writeFileSync(join(dir, "sections", "page-002.md"), "---\nx: 1\n---\nSome text\nGlossary\nterm: meaning\n");
+    const c = cov(dir);
+    expect(c.contents.state).toBe("not-extracted");
+    expect(c.sections).toMatchObject({ state: "partial", count: 2 });
+    // A heading line inside a page's text is found too.
+    expect(c.glossary.state).toBe("not-extracted");
+  });
+
+  test("the ingest's extraction.json wins for the kinds it names", () => {
+    const dir = entry(base, { "extraction.json": JSON.stringify({ kinds: { references: { state: "found", count: 12 } } }) });
+    expect(cov(dir).references).toEqual({ kind: "references", state: "found", count: 12 });
+  });
+
+  test("the view with coverage is one the schema accepts", () => {
+    const r = LibraryDocumentSchema.safeParse(JSON.parse(JSON.stringify(readEntryDocument(entry(base), "r"))));
+    expect(r.success ? [] : r.error.issues).toEqual([]);
+  });
+});
