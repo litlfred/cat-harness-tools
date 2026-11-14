@@ -93,6 +93,10 @@ export function mergeCandidates(po: string, sidecar: CandidatesFile, input: Cand
       rejected.push({ ...ctx, msgid: c.msgid, reason: "no such entry in the catalogue" });
       continue;
     }
+    if (poByKey.get(key)!.msgidPlural !== undefined) {
+      rejected.push({ ...ctx, msgid: c.msgid, reason: "plural entry: one candidate cannot supply its forms" });
+      continue;
+    }
     let text = c.text;
     if (o.check !== false) {
       const r = checkedCandidate(c.msgid, c.text);
