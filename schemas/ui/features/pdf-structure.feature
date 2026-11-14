@@ -30,7 +30,7 @@ Feature: A PDF's structure.json conforms to pdf-structure/v1
 
   @test:schemas/ui/pdf-structure.test.ts::pdf-structure/v1::the_diagnostics_pdf-structure.py_writes_are_accepted:_furniture_lines_stripped,_outline_reordered
   Scenario: The diagnostics pdf-structure.py writes are accepted
-    Given the minimal structure with diagnostics including furniture_lines_stripped 12 and outline_reordered true
+    Given the minimal structure with diagnostics including furniture_lines_stripped 12, outline_reordered true and grade_marks_written 14
     When it is parsed
     Then it parses with no issues
     And the same diagnostics with outline_reordered false are refused

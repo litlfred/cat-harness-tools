@@ -2407,6 +2407,10 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "folio-document-errata/v1": {},
       "folio-run-context/v1": {},
       "folio-tabular-csvw/v1": {},
+      // Which extractor read the entry and what each extraction step wrote
+      // (`extraction.json`, schemas/library/entry-extraction.ts), written by
+      // every re-derive since the reingest record (issue #2186).
+      "folio-library-extraction/v1": {},
       // A recorded meeting or talk, and one transcript per language
       // (bean `folio-assistant-1r0p`, `schemas/library/recording.ts`).
       "folio-recording/v1": {},
