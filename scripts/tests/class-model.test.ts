@@ -10,7 +10,7 @@ import { describe, expect, it } from "bun:test";
 import { cardinalityOf, classModelOfDocuments, readJsonDocument, readJsonSchemaModule, type SchemaField } from "../schema-graph.ts";
 import { isFhirLogicalModel, readFhirLogicalModel } from "../fhir-logical-model.ts";
 import { diagramOfDecls, renderClassDiagram } from "../class-diagram.ts";
-import { typeLink } from "../type-links.ts";
+import { typeLink, umlType } from "../type-links.ts";
 
 const field = (f: Partial<SchemaField>): SchemaField => ({ name: "f", type: "string", optional: false, array: false, names: [], ...f });
 
@@ -180,6 +180,17 @@ describe("type links", () => {
     expect(typeLink("json-schema", "date-time")).toBe("https://www.w3.org/TR/xmlschema-2/#dateTime");
     expect(typeLink("zod", "z.string().min(1)")).toBe("https://zod.dev/api#strings");
     expect(typeLink("zod", "MyThing")).toBeUndefined();
+  });
+});
+
+describe("UML types", () => {
+  it("shows a Zod field's type as UML does, the same words as JSON Schema and FHIR", () => {
+    expect(umlType("zod", "z.string().optional()")).toBe("string");
+    expect(umlType("zod", "z.array(z.string().min(1)).optional()")).toBe("string[]");
+    expect(umlType("zod", "z.array(SkillNameSchema).default([])")).toBe("SkillNameSchema[]");
+    expect(umlType("zod", "z.array(z.enum(KINDS)).min(1)")).toBe("enum[]");
+    expect(umlType("zod", 'z.string().regex(/^\\d{4}$/, "a year")')).toBe("string");
+    expect(umlType("json-schema", "string[]")).toBe("string[]");
   });
 });
 

@@ -72,6 +72,12 @@ Feature: One class model drawn the same way from Zod, JSON Schema and FHIR logic
     Then a FHIR primitive links to the HL7 datatypes page, a FHIR complex type to its canonical
     And a JSON Schema type to the JSON Schema reference, a date-time format to XML Schema, a Zod scalar to the Zod API
 
+  @test:scripts/tests/class-model.test.ts::UML_types::shows_a_Zod_field's_type_as_UML_does,_the_same_words_as_JSON_Schema_and_FHIR
+  Scenario: A Zod field's diagram type is its UML type
+    Given Zod field expressions with optionality, bounds, defaults and regexes
+    Then the diagram shows "string", "string[]", "SkillNameSchema[]" and "enum[]"
+    And a JSON Schema type is shown as written
+
   @test:scripts/tests/class-model.test.ts::one_renderer,_one_look::draws_the_same_shape_from_Zod_and_JSON_Schema_identically,_but_for_the_source_label
   Scenario: The same shape from two sources draws identically
     Given a Person with contact points written in Zod and in JSON Schema

@@ -323,7 +323,7 @@ export function sourceDescriptorRows(
 }
 
 /** The projection, trimmed for the page. */
-function projection(
+export function projection(
   g: SchemaGraph,
   /** Subject-page counts, `directory id -> [count, unit]`. Empty is normal. */
   scoped: Readonly<Record<string, readonly [number, string]>>,
@@ -380,7 +380,8 @@ function projection(
         // Where the field's type is defined, when it is not a declaration of
         // this graph (that one links by its edge): `type-links.ts`.
         const links: Record<string, string> = {};
-        for (const t of f.type.split(" | ")) {
+        const utype = umlType(sourceOfKind(d.kind), f.type);
+        for (const t of utype.split(" | ")) {
           const name = t.trim().replace(/\[\]$/, "").replace(/^z\./, "").replace(/\(.*$/, "");
           const href = typeLink(sourceOfKind(d.kind), name, f.typeLinks);
           if (href && name) links[name] = href;
@@ -391,6 +392,8 @@ function projection(
           optional: f.optional,
           array: f.array,
           card: cardinalityOf(f),
+          // The type the diagram shows, when it differs from the written one.
+          ...(utype !== f.type ? { utype } : {}),
           ...(Object.keys(links).length ? { links } : {}),
           ...(f.doc ? { doc: f.doc.slice(0, DOC_MAX) } : {}),
         };
@@ -510,7 +513,7 @@ import { siteTarget } from "./lib/site-target.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { CLASS_DIAGRAM_CSS, CLASS_DIAGRAM_JS } from "./class-diagram.ts";
 import { cardinalityOf } from "./schema-graph.ts";
-import { sourceOfKind, typeLink } from "./type-links.ts";
+import { sourceOfKind, typeLink, umlType } from "./type-links.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "schemas-viewer";
@@ -774,7 +777,7 @@ function umlClass(t, sel) {
     fields: (t.fields || []).map(function (f) {
       var links = f.links || {}, first = Object.keys(links)[0];
       return {
-        name: f.name, type: f.type.replace(/^z\\./, ""), card: f.card,
+        name: f.name, type: f.utype || f.type, card: f.card,
         href: targets[f.name] ? "#" + encodeURIComponent(targets[f.name]) : (first ? links[first] : "")
       };
     })
@@ -806,7 +809,8 @@ function uml(d) {
     classes.push({ id: id, name: nm, source: d.source || "zod", ext: true, fields: [] });
     edges.push({ from: d.id, to: id, kind: "extends" });
   });
-  return '<div class="cd-wrap">' + classDiagram({ classes: classes, edges: edges, label: "Neighbourhood of " + d.name }) + "</div>" +
+  return '<div class="cd-wrap">' + classDiagram({ classes: classes, edges: edges, label: "Neighbourhood of " + d.name,
+    maxWidth: Math.max(320, (($("detail") && $("detail").clientWidth) || 900) - 56) }) + "</div>" +
     (n > 8 ? '<p class="sub">' + (n - 8) + " further referenced type(s) not drawn; they are listed under References.</p>" : "");
 }
 
@@ -1156,7 +1160,7 @@ function diagram() {
   /* Boxes first, to know their sizes before placing anything. */
   var boxes = m.decls.map(function (d) {
     var fields = (d.fields || []).map(function (f) {
-      return f.name + " : " + f.type.replace(/^z\./, "").slice(0, 24) + (f.card ? " [" + f.card + "]" : "");
+      return f.name + " : " + (f.utype || f.type).slice(0, 24) + (f.card ? " [" + f.card + "]" : "");
     });
     var rows = fields.slice(0, 6);
     if (fields.length > rows.length) rows = rows.concat(["… " + (fields.length - rows.length) + " more"]);

@@ -27,7 +27,7 @@
  * - "could not determine" a dashed box with the reason, never an empty box.
  */
 import { cardinalityOf, classModelOfDocuments, type SchemaDecl, type SchemaEdge } from "./schema-graph.ts";
-import { sourceOfKind, typeLink } from "./type-links.ts";
+import { sourceOfKind, typeLink, umlType } from "./type-links.ts";
 
 /** A class to draw. `href` links the name; `links` maps a field type to its definition. */
 export interface DiagramClass {
@@ -64,6 +64,8 @@ export interface DiagramModel {
   label?: string;
   /** Most rows a box shows before "… n more". Default 10. */
   maxRows?: number;
+  /** Width budget in px: a wider layer wraps into bands. Default 1100. */
+  maxWidth?: number;
 }
 
 /**
@@ -116,20 +118,52 @@ function classDiagram(model) {
     });
     if (!moved) break;
   }
-  var rows = {}, keys = [];
-  cls.forEach(function (c, i) { if (!rows[layer[i]]) { rows[layer[i]] = []; keys.push(layer[i]); } rows[layer[i]].push(c); });
-  keys.sort(function (x, y) { return x - y; });
+  var byLayer = {}, lkeys = [];
+  cls.forEach(function (c, i) { if (!byLayer[layer[i]]) { byLayer[layer[i]] = []; lkeys.push(layer[i]); } byLayer[layer[i]].push(c); });
+  lkeys.sort(function (x, y) { return x - y; });
+  /* A layer wider than the budget wraps into bands, so the picture stays
+     legible at 1:1 instead of centring its subject off to one side. */
+  var BUDGET = Math.max(model.maxWidth || 1100, 320), rows = {}, keys = [], band = 0;
+  lkeys.forEach(function (k) {
+    var cur = [], w = 0;
+    byLayer[k].forEach(function (c) {
+      if (cur.length && w + GX + c.__w > BUDGET) { rows[band] = cur; keys.push(band++); cur = []; w = 0; }
+      w += (cur.length ? GX : 0) + c.__w; cur.push(c);
+    });
+    rows[band] = cur; keys.push(band++);
+  });
   var W = 0;
   keys.forEach(function (k) {
     var w = -GX; rows[k].forEach(function (c) { w += c.__w + GX; }); rows[k].__w = w; W = Math.max(W, w);
   });
-  var y = 8;
+  var y = 8, bandTop = {}, bandBot = {};
   keys.forEach(function (k) {
     var x = (W - rows[k].__w) / 2, hmax = 0;
-    rows[k].forEach(function (c) { c.__x = x; c.__y = y; x += c.__w + GX; hmax = Math.max(hmax, c.__h); });
+    rows[k].forEach(function (c) { c.__x = x; c.__y = y; c.__band = k; x += c.__w + GX; hmax = Math.max(hmax, c.__h); });
+    bandTop[k] = y; bandBot[k] = y + hmax;
     y += hmax + GY;
   });
-  var H = y - GY + 14, parts = [], right = W;
+  /* A vertical lane that crosses no box of bands a..b (exclusive): the gaps
+     between boxes, or the margins, which are always free. Nearest to x wins. */
+  function lane(a, b, x) {
+    var cands = [-GX / 2, W + GX / 2];
+    for (var k = a + 1; k < b; k++) rows[k].forEach(function (c, i) {
+      cands.push(c.__x - GX / 2);
+      if (i === rows[k].length - 1) cands.push(c.__x + c.__w + GX / 2);
+    });
+    var best = null;
+    cands.forEach(function (cx) {
+      for (var k = a + 1; k < b; k++) {
+        for (var i = 0; i < rows[k].length; i++) {
+          var c = rows[k][i];
+          if (cx > c.__x - 4 && cx < c.__x + c.__w + 4) return;
+        }
+      }
+      if (best === null || Math.abs(cx - x) < Math.abs(best - x)) best = cx;
+    });
+    return best === null ? x : best;
+  }
+  var H = y - GY + 14, parts = [], right = W, left = 0;
   /* Edges leaving one box start at separate points along its bottom, so a
      composition's diamond is never shared with a plain reference. */
   var outs = {}, seenOut = {};
@@ -156,7 +190,9 @@ function classDiagram(model) {
       seenOut[top.id] = (seenOut[top.id] || 0) + 1;
       x1 = top.__x + top.__w * seenOut[top.id] / (outs[top.id] + 1);
     }
-    var midY = y1 + (y2 - y1) / 2 + ((fanout[key] % 2) ? 0 : 8);
+    /* Turn in the gap just above the target's band, so a route to a lower
+       band runs along a gap rather than across the boxes between. */
+    var midY = y2 - GY / 2 + ((fanout[key] % 2) ? 0 : 8);
     if (y2 <= y1) { /* same row or upward: route around the right side */
       var rx = Math.max(top.__x + top.__w, bot.__x + bot.__w) + 18;
       var d0 = "M" + (top.__x + top.__w) + " " + (top.__y + 14) + " H" + rx + " V" + (bot.__y + 14) + " H" + (bot.__x + bot.__w);
@@ -165,6 +201,15 @@ function classDiagram(model) {
       return;
     }
     var d = up ? "M" + x2 + " " + y2 + " V" + midY + " H" + x1 + " V" + y1 : "M" + x1 + " " + y1 + " V" + midY + " H" + x2 + " V" + y2;
+    if (!up && bot.__band > top.__band + 1) {
+      /* Bands lie between: leave through the first gap, run down a free lane,
+         turn in the gap above the target. */
+      var g1 = bandTop[top.__band + 1] - GY / 2 + ((fanout[key] % 3) * 4);
+      var lx0 = lane(top.__band, bot.__band, (x1 + x2) / 2) + ((fanout[key] % 3) - 1) * 4;
+      d = "M" + x1 + " " + y1 + " V" + g1 + " H" + lx0 + " V" + midY + " H" + x2 + " V" + y2;
+      right = Math.max(right, lx0 + 4);
+      left = Math.min(left, lx0 - 4);
+    }
     parts.push('<path class="cd-e' + (e.kind === "id-ref" ? " cd-id" : "") + '" d="' + d + '" marker-end="url(#cd-' + (up ? "gen" : "tip") + ')"' +
       (e.comp ? ' marker-start="url(#cd-dia)"' : "") + "/>");
     if (t && !up) {
@@ -195,8 +240,8 @@ function classDiagram(model) {
     parts.push(g + "</g>");
     delete c.__rows;
   });
-  var VW = Math.ceil(right + 8);
-  return '<svg class="cd" viewBox="-2 0 ' + (VW + 4) + " " + H + '" width="' + (VW + 4) + '" height="' + H + '" role="img" aria-label="' +
+  var VX = Math.floor(Math.min(left, 0)) - 2, VW = Math.ceil(right + 8) - VX;
+  return '<svg class="cd" viewBox="' + VX + " 0 " + VW + " " + H + '" width="' + VW + '" height="' + H + '" role="img" aria-label="' +
     esc(model.label || "Class diagram") + '"><defs>' +
     '<marker id="cd-gen" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M1 1 L13 7 L1 13 z" class="cd-genhead"/></marker>' +
     '<marker id="cd-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" class="cd-tiphead"/></marker>' +
@@ -267,9 +312,10 @@ export function diagramOfDecls(
       name: d.name,
       source,
       fields: d.fields.map((f) => {
-        const target = byName.get(f.type.replace(/\[\]$/, ""));
-        const link = target ? opts.hrefOf?.(target) : typeLink(source, f.type, f.typeLinks);
-        return { name: f.name, type: f.type.replace(/^z\./, ""), card: cardinalityOf(f), ...(link ? { href: link } : {}) };
+        const type = umlType(source, f.type);
+        const target = byName.get(type.replace(/\[\]$/, ""));
+        const link = target ? opts.hrefOf?.(target) : typeLink(source, type, f.typeLinks);
+        return { name: f.name, type, card: cardinalityOf(f), ...(link ? { href: link } : {}) };
       }),
       ...(d.values.length ? { values: d.values } : {}),
       ...(opts.focus?.includes(d.id) ? { sel: true } : {}),

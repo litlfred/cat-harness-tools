@@ -106,3 +106,35 @@ export function sourceOfKind(kind: string): ClassSource {
   if (kind === "interface" || kind === "type-alias") return "typescript";
   return "zod";
 }
+
+/** Zod modifiers that change a value's constraints, not its type: dropped from the UML type. */
+const ZOD_MODIFIER =
+  /\.(optional|nullable|nullish|default|min|max|int|positive|negative|nonnegative|nonpositive|nonempty|regex|describe|refine|superRefine|transform|length|url|email|uuid|datetime|date|time|trim|toLowerCase|toUpperCase|catch|brand|readonly|strict|strip|passthrough|finite|safe|gte|lte|gt|lt|multipleOf|startsWith|endsWith|includes|pipe|meta)\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)$/;
+
+/**
+ * The type a class diagram shows for a field, as UML writes it: `string`,
+ * `Foo[]`, `enum` — the same words whichever source a field came from.
+ *
+ * A JSON Schema or FHIR type is already that. A Zod field's type is the
+ * expression as written (`z.array(z.string().min(1)).optional()`), which the
+ * field table keeps; the diagram shows what it IS (`string[]`), since its
+ * optionality and bounds are the cardinality beside it. An expression this
+ * does not recognise is shown as written rather than guessed at.
+ */
+export function umlType(source: ClassSource, type: string): string {
+  if (source !== "zod" && source !== "typescript") return type;
+  let t = type.trim().replace(/\bz\./g, "");
+  for (let i = 0; i < 24 && ZOD_MODIFIER.test(t); i++) t = t.replace(ZOD_MODIFIER, "").trim();
+  let m: RegExpExecArray | null;
+  if ((m = /^array\(([\s\S]*)\)$/.exec(t))) return `${umlType(source, m[1]!)}[]`;
+  if ((m = /^(string|number|boolean|bigint|date|unknown|any|null|undefined|never|void|symbol)\(\)$/.exec(t))) return m[1]!;
+  if (/^(enum|nativeEnum)\(/.test(t)) return "enum";
+  if ((m = /^literal\(([\s\S]*)\)$/.exec(t))) return m[1]!;
+  if (/^record\(/.test(t)) return "record";
+  if (/^(object|strictObject|looseObject)\(/.test(t)) return "object";
+  if (/^(union|discriminatedUnion)\(/.test(t)) return "union";
+  if (/^lazy\(/.test(t)) return "lazy";
+  if (/^tuple\(/.test(t)) return "tuple";
+  if ((m = /^([A-Za-z_$][\w$]*)$/.exec(t))) return m[1]!;
+  return t;
+}

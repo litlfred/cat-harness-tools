@@ -250,6 +250,8 @@ export const SchemaGraphIndexSchema = z
                 array: z.boolean(),
                 // `min..max`, from `cardinalityOf` (bean `cat-tools-4xq6`).
                 card: z.string().optional(),
+                // The UML type the diagram shows, when not the written one.
+                utype: z.string().optional(),
                 // Type name -> its definition's URL (`scripts/type-links.ts`).
                 links: z.record(z.string(), z.string()).optional(),
                 doc: z.string().optional(),
