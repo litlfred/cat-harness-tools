@@ -60,7 +60,7 @@ import { toJsonSchema } from "../schemas/kg/to-json-schema.js";
 
 import { compareRoute } from "./route-authority.ts";
 import { isDirectoryReadme } from "../schemas/kg/kg-node.ts";
-import { instanceDirectoryForGraph, instanceRootsIn, instanceDirectories, readDeclaration, siteDir, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, instanceDirectoryForGraph, instanceRootsIn, instanceDirectories, readDeclaration, siteDir, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { BASE_GRAPH_TYPOLOGIES, resolveGraphTypology } from "../schemas/kg/graph-typology-registry.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { bothViews, gridLinks, renderSvgs, safeId, sha256, svgStamp, views, type RenderJob } from "./plantuml-render.js";
@@ -68,7 +68,7 @@ import { detangleResultsDir, sidecarFor } from "../schemas/kg/detangle-sidecar.j
 import { QaUsageError, readQaManifest, readQaTree } from "./qa-store.ts";
 import { requireCurrentWorkingCopy } from "./qa-working-copy.ts";
 import { JUDGEMENT_EXIT } from "./qa-results.ts";
-import { overlayDirs } from "./lib/layer-output.ts";
+import { overlayDirs, readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { spawnSync } from "node:child_process";
 import { glossaryLinksMd, schemasViewPuml } from "./gen-object-model-uml.js";
 import { resolveKindValidator, resolveNodeSchemas, type NodeSchemaResolution } from "../schemas/kg/kind-validator.js";
@@ -78,6 +78,14 @@ const HARNESS = resolve(HARNESS_ROOT);
 /** Colours for the `.puml`, read from `uml.css` so both renderings agree. */
 const PALETTE = readUmlPalette(HARNESS);
 const REPO = repoRootFor(HARNESS);
+/**
+ * The checkout holding the harness. Where it MOUNTS cat-harness, every file
+ * this generator computes (the `.puml` model, the pages, the SVGs) is written
+ * at the layer's output root (`build/layers/cat-harness/…`,
+ * `lib/layer-output.ts`) and read back through the overlay, so a run leaves
+ * the pinned mount as its lock pins it (bean `cat-tools-sm8r`, item 4).
+ */
+const CHECKOUT = checkoutRootFor(HARNESS);
 // declared-path-literal: the conventional fallback when no declaration names the directory
 const UML_ROOT = join(instanceDirectoryForGraph(HARNESS, "uml") ?? join(HARNESS, "uml"), "overview");
 const OWN = readDeclaration(HARNESS);
@@ -1048,6 +1056,26 @@ function jobsFor(pumls: [string, string][]): RenderJob[] {
   return pumls.flatMap(([p, text]) => bothViews(p, text, svgFor(p)));
 }
 
+/**
+ * Every file under `dir` as this checkout sees it: the pinned files and those
+ * a run computed at the output root, each named by its path under `dir`.
+ */
+export function walkOverlay(dir: string, root: string): string[] {
+  const out = new Set<string>();
+  for (const d of overlayDirs(dir, root)) for (const f of walk(d)) out.add(join(dir, relative(d, f)));
+  return [...out];
+}
+
+/**
+ * The render jobs whose SVG, as the overlay reads it, is stale, each aimed
+ * at where this checkout writes it: the output root for a mounted harness.
+ */
+export function jobsToRender(jobs: readonly RenderJob[], root: string): RenderJob[] {
+  return jobs
+    .filter((j) => svgStamp(readPathAt(root, j.svg)) !== sha256(j.text))
+    .map((j) => ({ ...j, svg: writePathAt(root, j.svg) }));
+}
+
 function walk(dir: string): string[] {
   if (!existsSync(dir)) return [];
   const out: string[] = [];
@@ -1080,7 +1108,7 @@ async function main(): Promise<void> {
   pumls.push([OBJECT_MODEL_PUML, readFileSync(OBJECT_MODEL_PUML, "utf8")]);
   const jobs = jobsFor(pumls);
   const svgs = new Set(jobs.map((j) => j.svg));
-  const existing = [...walk(UML_ROOT), ...walk(DOCS_ROOT), ...walk(SVG_ROOT)];
+  const existing = [...walkOverlay(UML_ROOT, CHECKOUT), ...walkOverlay(DOCS_ROOT, CHECKOUT), ...walkOverlay(SVG_ROOT, CHECKOUT)];
   const orphans = umlOrphans(existing, files, svgs);
 
   if (check) {
@@ -1111,9 +1139,12 @@ async function main(): Promise<void> {
     // on-disk comparison: neither is a published route, so neither is route-keyed.
     const stale = [...files]
       .filter(([p]) => !p.startsWith(`${DOCS_ROOT}/`))
-      .filter(([p, text]) => !existsSync(p) || readFileSync(p, "utf8") !== text)
+      .filter(([p, text]) => {
+        const at = readPathAt(CHECKOUT, p);
+        return !existsSync(at) || readFileSync(at, "utf8") !== text;
+      })
       .map(([p]) => p);
-    for (const j of jobs) if (svgStamp(j.svg) !== sha256(j.text)) stale.push(j.svg);
+    for (const j of jobs) if (svgStamp(readPathAt(CHECKOUT, j.svg)) !== sha256(j.text)) stale.push(j.svg);
     const stalePages = verdict.stale.map((r) => join(REPO, r));
     if (stale.length || stalePages.length || orphans.length || (verdict.drift?.length ?? 0) > 0) {
       for (const p of [...stalePages, ...stale]) console.error(`stale: ${relative(REPO, p)}`);
@@ -1123,13 +1154,22 @@ async function main(): Promise<void> {
     }
     console.log(`UML overview is current — ${files.size} file(s), pages read from the ${verdict.authority}`);
   } else {
-    for (const p of orphans) rmSync(p);
+    // Removed, and written, where this run writes: an orphan left in a pinned
+    // mount stays until the layer is re-pinned, since a run never edits a mount.
+    let pinnedOrphans = 0;
+    for (const p of orphans) {
+      const at = writePathAt(CHECKOUT, p);
+      if (existsSync(at)) rmSync(at);
+      if (at !== p && existsSync(p)) pinnedOrphans++;
+    }
+    if (pinnedOrphans) console.log(`${pinnedOrphans} orphan(s) in the pinned mount left until the layer is re-pinned`);
     for (const [p, text] of files) {
-      mkdirSync(dirname(p), { recursive: true });
-      writeFileSync(p, text);
+      const at = writePathAt(CHECKOUT, p);
+      mkdirSync(dirname(at), { recursive: true });
+      writeFileSync(at, text);
     }
     console.log(`wrote ${files.size} file(s) under ${relative(REPO, UML_ROOT)} and ${relative(REPO, DOCS_ROOT)}${orphans.length ? `; removed ${orphans.length} orphan(s)` : ""}`);
-    const r = await renderSvgs(jobs, { repo: REPO, generator: GENERATOR });
+    const r = await renderSvgs(jobsToRender(jobs, CHECKOUT), { repo: REPO, generator: GENERATOR });
     if (r.skipped) {
       // Not a pass: the pages would show stale pictures, and --check says so.
       console.error(`SVGs NOT rendered (${r.skipped}); set PLANTUML_JAR or install java, then re-run`);
