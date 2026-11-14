@@ -15,7 +15,9 @@
  * @module scripts/tests/docs-route
  */
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "../../test/support/site-fs.ts";
+import { existsSync } from "node:fs";
+import { overlayPath } from "../lib/layer-output.ts";
 import { join, resolve } from "node:path";
 
 import { parse as parseYaml } from "yaml";
@@ -33,7 +35,7 @@ import {
 } from "../lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { siteNotBuilt } from "../../test/support/checkout.ts";
-import { existingPageDir, pageParts, visualiserPageDir } from "../viewer-declarations.ts";
+import { existingPageDir, forwardingParts, pageParts, visualiserPageDir } from "../viewer-declarations.ts";
 import { dirname, relative, sep } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -53,7 +55,12 @@ const LOCALES = ["ar", "es", "fr", "ru", "zh"];
  */
 const visualiserPage = (visualiser: string, harness = "cat-harness"): string => {
   const parts = { harness, visualiser };
-  const dir = existingPageDir(SITE, parts) ?? visualiserPageDir(SITE, pageParts(parts));
+  // A page written at publish is in the layer-output overlay, not the mount
+  // (bean cat-tools-sm8r), so each address is asked of both.
+  const built = [visualiserPageDir(SITE, pageParts(parts)), visualiserPageDir(SITE, forwardingParts(parts))].find((d) =>
+    ["index.md", "index.html"].some((f) => existsSync(overlayPath(join(d, f)))),
+  );
+  const dir = existingPageDir(SITE, parts) ?? built ?? visualiserPageDir(SITE, pageParts(parts));
   return `${relative(SITE, dir).split(sep).join("/")}/index.md`;
 };
 
