@@ -114,3 +114,34 @@ describe("lesson 6 — kinds come from the checkout under inspection", () => {
     expect(report.instances).toEqual(["consumer", "contributor"]);
   });
 });
+
+// A mounted layer's id into its own declaration may name a group declared from
+// within one of its opt-in directories; a root that leaves that directory off
+// has no copy of it (smart-base.L2-collab, inside L2/graph.json, on
+// smart-immunizations#145). That id is left to the layer's own root and said
+// so; with the directory on disk it is judged as before.
+describe("a mounted layer's enableSubgraphs into an unmounted opt-in directory", () => {
+  const layer = (name: string, extra: object) => ({ $schema: "cat-harness-declaration/1.0.0", name, version: "0.1.0", needs: [], ...extra });
+  const lyr = layer("lyr", {
+    directories: [{ id: "lyr-L2", path: "L2/", optIn: true, graphTypologies: ["cat-harness"] }],
+    enableSubgraphs: ["lyr.lyr-L2", "lyr.L2-collab"],
+  });
+
+  test("the directory is not mounted: not judged here, and named", () => {
+    const root = fixture({ "app.json": decl({ name: "app" }), "lyr/lyr.json": lyr });
+    const r = checkDeclarationResolution(root);
+    expect(r.findings.filter((f) => f.field === "enableSubgraphs")).toEqual([]);
+    expect(r.notJudgedHere).toEqual([expect.stringContaining("lyr enableSubgraphs lyr.L2-collab")]);
+  });
+
+  test("the directory is on disk without the group: still a finding", () => {
+    const root = fixture({
+      "app.json": decl({ name: "app" }),
+      "lyr/lyr.json": lyr,
+      "lyr/L2/graph.json": { name: "L2", directories: [] },
+    });
+    const r = checkDeclarationResolution(root);
+    expect(r.findings.filter((f) => f.field === "enableSubgraphs").map((f) => f.subject)).toEqual(["lyr.L2-collab"]);
+    expect(r.notJudgedHere ?? []).toEqual([]);
+  });
+});
