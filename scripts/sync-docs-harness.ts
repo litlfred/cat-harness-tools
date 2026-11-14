@@ -43,6 +43,7 @@ import { siteDirectories, withViewers } from "./viewer-declarations.js";
 import { harnessTitle, normaliseDestination } from "./lib/nav-label.js";
 import { checkoutDirectories, resolveLandingInstance } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -56,6 +57,15 @@ const ROOT = resolve(HARNESS_ROOT);
  */
 const REPO_ROOT = process.env.REPO_ROOT ?? resolve(ROOT, "..");
 const OUT = join(ROOT, siteDirFor(ROOT), "_data/harness.json");
+/**
+ * Where the file is read and written (bean `cat-tools-sm8r`, item 4, step 4):
+ * in a checkout that MOUNTS cat-harness, at the layer's output root
+ * (`build/layers/cat-harness/…`, `lib/layer-output.ts`) rather than inside the
+ * pinned mount; a read falls back to the pinned copy. In cat-harness's own
+ * checkout both are `OUT`.
+ */
+const OUT_READ = readPathAt(REPO_ROOT, OUT);
+const OUT_WRITE = writePathAt(REPO_ROOT, OUT);
 const check = process.argv.includes("--check");
 
 /** `docs/assets/x.svg` → `/assets/x.svg`; anything else is passed through. */
@@ -226,9 +236,9 @@ for (const [layout, img] of imagesForRole(decl.images, "landing")) {
  */
 const detected = detectRepoUrl(ROOT);
 let repoUrl = detected;
-if (!repoUrl && existsSync(OUT)) {
+if (!repoUrl && existsSync(OUT_READ)) {
   try {
-    const prev = JSON.parse(readFileSync(OUT, "utf-8")) as { links?: { id: string; url?: string }[] };
+    const prev = JSON.parse(readFileSync(OUT_READ, "utf-8")) as { links?: { id: string; url?: string }[] };
     repoUrl = prev.links?.find((l) => l.id === "source")?.url;
     if (repoUrl) {
       console.warn(
@@ -705,7 +715,7 @@ const payload = {
   config,
 };
 const next = `${JSON.stringify(payload, null, 2)}\n`;
-const current = existsSync(OUT) ? readFileSync(OUT, "utf-8") : "";
+const current = existsSync(OUT_READ) ? readFileSync(OUT_READ, "utf-8") : "";
 
 /**
  * The file with every tile's live COUNT removed: what a commit determines.
@@ -746,6 +756,6 @@ if (check) {
   process.exit(1);
 }
 
-mkdirSync(dirname(OUT), { recursive: true });
-writeFileSync(OUT, next);
-console.log(`Wrote ${relative(ROOT, OUT)} — title "${payload.title}"`);
+mkdirSync(dirname(OUT_WRITE), { recursive: true });
+writeFileSync(OUT_WRITE, next);
+console.log(`Wrote ${relative(REPO_ROOT, OUT_WRITE)} — title "${payload.title}"`);
