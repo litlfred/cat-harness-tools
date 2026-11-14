@@ -147,7 +147,15 @@ export function chromeLayers(repo = REPO): DocsLayer[] {
   const { layers, pending } = docsLayers(repo);
   // The site directory's output-root twin is the site too, not chrome.
   const siteTwin = site === undefined ? undefined : outputTwinOf(repo, site);
-  return [...layers, ...pending].filter((l) => !l.repositoryScoped && resolve(l.dir) !== site && (siteTwin === undefined || resolve(l.dir) !== resolve(siteTwin)));
+  const all = [...layers, ...pending];
+  // A chrome layer's own output-root twin (`build/layers/<instance>/…`, left
+  // by an earlier build in the same checkout) is that layer again, not a
+  // second one: it surfaced as a duplicate in CI once a test wrote it.
+  const twins = new Set(all.flatMap((l) => {
+    const t = outputTwinOf(repo, l.dir);
+    return t !== undefined && resolve(t) !== resolve(l.dir) ? [resolve(t)] : [];
+  }));
+  return all.filter((l) => !l.repositoryScoped && resolve(l.dir) !== site && (siteTwin === undefined || resolve(l.dir) !== resolve(siteTwin)) && !twins.has(resolve(l.dir)));
 }
 
 /**
