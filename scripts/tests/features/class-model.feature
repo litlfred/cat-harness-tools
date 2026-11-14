@@ -94,6 +94,12 @@ Feature: One class model drawn the same way from Zod, JSON Schema and FHIR logic
     When a class is drawn with a link for each class
     Then the box links to its class and a built-in type links to its definition
 
+  @test:scripts/tests/class-model.test.ts::one_renderer,_one_look::gives_every_diagram_its_own_marker_ids,_so_a_page_with_several_repeats_none
+  Scenario: Several diagrams on one page repeat no id
+    Given three diagrams drawn for one page, two of them of the same classes
+    Then no SVG id appears twice, and each marker reference points at a marker of its own diagram
+    And a caller-given prefix names the markers
+
   @test:scripts/tests/class-model.test.ts::one_renderer,_one_look::draws_an_undetermined_declaration_dashed_with_its_reason,_never_as_an_empty_box
   Scenario: An undetermined declaration is drawn dashed with its reason
     Given a schema file that is not valid JSON

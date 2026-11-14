@@ -204,7 +204,8 @@ describe("one renderer, one look", () => {
     properties: { name: { type: "string" }, telecom: { type: "array", items: { $ref: "#/$defs/ContactPoint" } } },
     $defs: { ContactPoint: { type: "object", required: ["value"], properties: { value: { type: "string" } } } },
   }) }]);
-  const strip = (svg: string): string => svg.replace(/«[^»]+»/g, "«»").replace(/href="[^"]*"/g, "").replace(/data-id="[^"]*"/g, "");
+  const strip = (svg: string): string =>
+    svg.replace(/«[^»]+»/g, "«»").replace(/href="[^"]*"/g, "").replace(/data-id="[^"]*"/g, "").replace(/\bcd[a-z0-9]+(?:-\d+)?-(gen|tip|dia)\b/g, "M-$1");
 
   it("draws the same shape from Zod and JSON Schema identically, but for the source label", () => {
     const a = renderClassDiagram(diagramOfDecls(zod.decls, zod.edges, { label: "Person" }));
@@ -226,6 +227,22 @@ describe("one renderer, one look", () => {
     const svg = renderClassDiagram(diagramOfDecls(json.decls, json.edges, { hrefOf: (d) => `#${d.name}` }));
     expect(svg).toContain('href="#Person"');
     expect(svg).toContain('href="https://json-schema.org/understanding-json-schema/reference/string"');
+  });
+
+  it("gives every diagram its own marker ids, so a page with several repeats none", () => {
+    const one = renderClassDiagram(diagramOfDecls(json.decls, json.edges, { label: "Person" }));
+    const two = renderClassDiagram(diagramOfDecls(zod.decls, zod.edges, { label: "Person" }));
+    const again = renderClassDiagram(diagramOfDecls(json.decls, json.edges, { label: "Person" }));
+    const ids = (svg: string): string[] => [...svg.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]!);
+    const page = [one, two, again].flatMap(ids);
+    expect(page.length).toBe(9);
+    expect(new Set(page).size).toBe(page.length);
+    // Every marker reference points at a marker of its own diagram.
+    for (const svg of [one, two, again]) {
+      for (const m of svg.matchAll(/url\(#([^)]+)\)/g)) expect(ids(svg)).toContain(m[1]!);
+    }
+    // A caller may name the prefix.
+    expect(renderClassDiagram({ ...diagramOfDecls(json.decls, json.edges), idPrefix: "fig7" })).toContain('<marker id="fig7-tip"');
   });
 
   it("draws an undetermined declaration dashed with its reason, never as an empty box", () => {
