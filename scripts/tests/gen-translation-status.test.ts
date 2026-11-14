@@ -404,7 +404,7 @@ describe("the review projection", () => {
     const p = JSON.parse(reviewProjection(layers, "en/h/translation-status/index.md"));
     expect(p.$schema).toBe("folio-translation-review/v1");
     expect(p.reviewPage).toBe("en/h/translation-status/review.html");
-    expect(p.issue).toMatchObject({ schema: "translation-adjudication/v1", label: "translation-adjudication", fence: "json translation-adjudication" });
+    expect(p.issue).toMatchObject({ schema: "translation-adjudication/v1", label: "translation-adjudication", fence: "json translation-adjudication", candidatesSchema: "translation-candidates/v1", candidatesSuffix: ".candidates.json" });
     const lay = p.layers.find((l: { name: string }) => l.name === "lay");
     expect(lay).toMatchObject({ repository: "acme/lay", translations: "translations", locales: ["fr"] });
     expect(lay.rows[0]).toMatchObject({ catalogue: "page", sources: ["docs/page.md"], cells: { fr: { state: "machine", translated: 1 } } });
