@@ -22,7 +22,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredPagePath } from "./support/site-pages.ts";
-import { overlayPath } from "../scripts/lib/layer-output.ts";
+import { overlayPath, writePathOf } from "../scripts/lib/layer-output.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -43,7 +43,9 @@ const IDS = GRAPH["@graph"].map((t) => t.identifier);
 const NODES = [...new Set(GRAPH["@graph"].map((t) => t.target?.label).filter(Boolean))] as string[];
 
 const engine = new Liquid({
-  root: join(SITE, "_includes"),
+  // The output root first: includes generated at publish (`generated/todo-listing.html`)
+  // are written there, not in the mount (bean cat-tools-sm8r).
+  root: [...new Set([writePathOf(join(SITE, "_includes")), join(SITE, "_includes")])],
   extname: ".html",
   jekyllInclude: true,
   dynamicPartials: false,
