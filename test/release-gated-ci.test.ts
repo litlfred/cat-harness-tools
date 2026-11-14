@@ -16,12 +16,16 @@ const wf = (name: string) => parse(readFileSync(join(ROOT, ".github/workflows", 
 const RELEASE = "contains(github.event.pull_request.labels.*.name, 'release')";
 
 type Step = { id?: string; name?: string; if?: string; with?: Record<string, string> };
-type Job = { if?: string; needs?: string[]; outputs?: Record<string, string>; steps?: Step[] };
+type Job = { if?: string; needs?: string[]; outputs?: Record<string, string>; steps?: Step[]; strategy?: { matrix?: Record<string, string> } };
 
 // Adding the `release` label starts the full tier; any other label is a no-op
 // (owner, 2026-11-11, card B: every PR passes the full tier before merge).
 const ONLY_RELEASE_LABEL = "(github.event.action != 'labeled' || github.event.label.name == 'release')";
 const NOOP_GROUP = "(github.event.action == 'labeled' && github.event.label.name != 'release') && format('noop-label-{0}', github.run_id)";
+// layer-pr-checks.yml also starts on the `preview` label: its preview tier
+// (owner, 2026-11-14, card "Preview QA" A; `scripts/preview-qa.ts`).
+const RELEASE_OR_PREVIEW_LABEL = "(github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview')";
+const NOOP_GROUP_LAYER = "(github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id)";
 
 describe("pr-tests.yml (this repository's own checks)", () => {
   const doc = wf("pr-tests.yml");
@@ -83,8 +87,8 @@ describe("layer-pr-checks.yml (every layer)", () => {
   const FULL = "needs.prepare-head.outputs.full == 'true'";
 
   test("a `labeled` run for another label judges nothing and never joins the PR's concurrency group", () => {
-    expect(doc.concurrency.group).toContain(NOOP_GROUP);
-    for (const j of ["prepare-head", "prepare-base", "compare"]) expect(jobs[j]!.if).toContain(ONLY_RELEASE_LABEL);
+    expect(doc.concurrency.group).toContain(NOOP_GROUP_LAYER);
+    for (const j of ["prepare-head", "prepare-base", "compare"]) expect(jobs[j]!.if).toContain(RELEASE_OR_PREVIEW_LABEL);
     // `run` needs prepare-head (a PR) or prepare-base (a push) to succeed; `ready-reuse` runs on ready_for_review only.
     expect(jobs.run!.needs).toEqual(["prepare-head", "prepare-base"]);
   });
@@ -97,6 +101,7 @@ describe("layer-pr-checks.yml (every layer)", () => {
   test("the verdict job is named for the tier it judged", () => {
     expect(jobs.compare!.name).toContain("Fast tier only (advisory; the full checks gate a release)");
     expect(jobs.compare!.name).toContain("No new failures (tests and gates)");
+    expect(jobs.compare!.name).toContain("This change (preview; advisory)");
     // The fast tier is judged by prepare-head's last step, and compare is
     // skipped on it, so the fast tier never reports as "No new failures".
     expect(jobs.compare!.if).toContain("needs.prepare-head.outputs.full != 'false'");
@@ -104,6 +109,21 @@ describe("layer-pr-checks.yml (every layer)", () => {
     const fast = steps[steps.length - 1]!;
     expect(fast.name).toBe("Fast tier only (advisory; the full checks gate a release)");
     expect(fast.if).toContain("steps.tier.outputs.full == 'false'");
+  });
+
+  test("the preview tier runs the head side only, its tests cut to the change's cone, and never computes main's side", () => {
+    const PREVIEW = "needs.prepare-head.outputs.preview == 'true'";
+    expect(jobs.run!.strategy!.matrix!.side).toContain(PREVIEW);
+    const test = jobs.run!.steps!.find((s) => s.name === "bun test") as Step & { env?: Record<string, string> };
+    expect(test.env!.PREVIEW_TESTS).toContain("needs.prepare-head.outputs.preview-tests");
+    const skip = jobs["prepare-base"]!.steps!.find((s) => s.id === "skip-prep") as Step & { env?: Record<string, string>; run?: string };
+    expect(skip.env!.PREVIEW).toContain(PREVIEW);
+    expect(skip.run).toContain('elif [ "$PREVIEW" = "true" ]; then');
+    // compare judges the cone with preview-qa.ts and never runs the release verdict on it.
+    const steps = jobs.compare!.steps! as Array<Step & { run?: string; with?: Record<string, string> }>;
+    for (const n of ["Tests", "Gates", "Verdict"]) expect(steps.find((s) => s.name === n)!.if).toContain("needs.prepare-head.outputs.preview != 'true'");
+    expect(steps.find((s) => s.id === "preview-judge")!.run).toContain("preview-qa.ts judge");
+    expect(steps.find((s) => s.name === "Hand the report to the preview build")!.with!.name).toBe("preview-qa-${{ github.event.pull_request.head.sha }}");
   });
 
   test("a push to main is batched per integration window, and the stamp is saved under the key it is looked up by", () => {

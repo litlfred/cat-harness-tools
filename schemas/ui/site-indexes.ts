@@ -376,7 +376,10 @@ export const LibraryIndexEntrySchema = z
     documentClass: z.string(),
     sections: Count,
     blocks: Count,
+    /** Raster images placed (`images.json`), every role. */
     images: Count,
+    /** Kept figures, raster and vector (role `figure`). Optional so an index built before it still reads. */
+    figures: Count.optional(),
     ocrPages: Count,
     hasOcr: z.boolean(),
     hasManifest: z.boolean(),

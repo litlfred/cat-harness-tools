@@ -114,6 +114,8 @@ export const THEME_SIDEBAR_RULING: DroppedByRuling = {
   ruling: 'owner, 2026-10-15, "Replace sidebar after build": the rail pass replaces the theme\'s side bar on every page (one rail everywhere)',
 };
 import { expectedPages, siteCoverageShortfall } from "./site-coverage.ts";
+import { placeSiteQaPanel, siteQaRoutes } from "./site-qa-panel.ts";
+import { declaredVisualisers } from "./viewer-declarations.ts";
 import { pagesEmbedPdf, pruneUnreferencedImages } from "./lib/site-prune.ts";
 import { servedOverHttp, shareAssets } from "./lib/shared-assets.ts";
 import { scopeArg } from "./lib/site-scope.ts";
@@ -1327,6 +1329,12 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
 
   writeBuildQa(site, findings);
   console.log(`qa: ${findings.length} finding(s) published with, in ${BUILD_QA_REPORT}`);
+  // The reports on the site's QA pages: the QA visualiser's own page and its page
+  // for this site's layer, read in the browser (`site-qa-panel.ts`).
+  const qaVisualisers = new Set(declaredVisualisers(root).filter((v) => (v.coversKinds ?? []).includes("qa")).map((v) => v.id));
+  const qaRoutes = siteQaRoutes(expectedPages(root, { staging: Boolean(staging), ...(o.scope ? { scope: o.scope } : {}) }), qaVisualisers, o.instance);
+  const placed = placeSiteQaPanel(site, qaRoutes);
+  console.log(`qa: the build's reports are shown on ${placed.length ? placed.join(", ") : "no QA page (this site holds none)"}`);
 
   o.beforePublish?.(site);
 
