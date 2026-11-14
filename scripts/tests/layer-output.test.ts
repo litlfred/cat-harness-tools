@@ -226,4 +226,16 @@ describe("writePathAt and overlayDirs (step 5: the QA writers)", () => {
     mkdirSync(twin, { recursive: true });
     expect(overlayDirs(own, root)).toEqual([twin, own]);
   });
+
+  test("a file written via writePathAt is read back via overlayPath over the pinned copy", () => {
+    clearMountedCache();
+    const root = checkout(LOCK);
+    const pinned = join(root, "lower", "test", "results", "r.json");
+    mkdirSync(join(root, "lower", "test", "results"), { recursive: true });
+    writeFileSync(pinned, "pinned");
+    const dest = writePathAt(pinned, root);
+    mkdirSync(join(root, LAYER_OUTPUT_ROOT, "lower", "test", "results"), { recursive: true });
+    writeFileSync(dest, "computed");
+    expect(overlayPath(pinned, root)).toBe(dest);
+  });
 });
