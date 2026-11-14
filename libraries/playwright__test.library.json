@@ -20,6 +20,7 @@
     "test/bar-controls.e2e.ts",
     "test/beans-count-agrees.e2e.ts",
     "test/beans-page-search.e2e.ts",
+    "test/block-translation-review.e2e.ts",
     "test/conduct/glass-interactions.e2e.ts",
     "test/content/a11y.e2e.ts",
     "test/content/anchor-offset.e2e.ts",

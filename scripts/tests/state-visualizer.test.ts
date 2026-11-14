@@ -62,6 +62,7 @@ import {
   visualiserPageRef,
 } from "../viewer-declarations.ts";
 import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
+import { overlayPath } from "../lib/layer-output.ts";
 
 const ROOT = HARNESS_ROOT;
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -156,14 +157,14 @@ describe("each page reads the projection that already exists", () => {
   test.skipIf(
     siteNotBuilt(
       "the beans and todos projections `gen-docs-pages.ts` writes at publish (gitignored)",
-      join(SITE, "assets", "beans", "index.json"),
-      join(SITE, "assets", "todos", "index.json"),
+      overlayPath(join(SITE, "assets", "beans", "index.json")),
+      overlayPath(join(SITE, "assets", "todos", "index.json")),
     ),
   )("and that projection is really there", () => {
     // The generator publishes no data of its own — `gen-docs-pages.ts` does.
     // A second copy would be two answers to what the work plan holds.
-    expect(existsSync(join(SITE, "assets", "beans", "index.json"))).toBe(true);
-    expect(existsSync(join(SITE, "assets", "todos", "index.json"))).toBe(true);
+    expect(existsSync(overlayPath(join(SITE, "assets", "beans", "index.json")))).toBe(true);
+    expect(existsSync(overlayPath(join(SITE, "assets", "todos", "index.json")))).toBe(true);
   });
 
   test.skipIf(dashboardsNotBuilt("beans", "todos"))("a graph page names only its own graph", () => {
