@@ -39,19 +39,20 @@
  *
  * ## Pull: platform output → candidates
  *
- * {@link importPlatformPo} compares a platform's version of a `.po` (from its
- * PR, or an export) with the version on the base branch, and returns the
- * base text — untouched except for empty `msgstr`s filled fuzzy — plus the
- * candidates to append. Whatever the platform did to a translated string,
- * the `.po` keeps the base's text; the platform's text is a candidate.
+ * {@link platformDiff} compares a platform's version of a `.po` (from its
+ * PR, or an export) with the version on the base branch: the `.po` goes back
+ * to the base's text, and every string the platform changed becomes a
+ * candidate input for the shared writer (`scripts/lib/translation-candidates.ts`,
+ * `addCandidates`), which appends to the sidecar and fills an empty `msgstr`
+ * fuzzy exactly as for any other source. {@link annotatePlatformStates} then
+ * records the platform's own state on its candidates.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
+import { emptySidecar, mergeCandidates, type CandidateInput } from "../translation-candidates.ts";
 import {
-  applySuggestion,
-  CANDIDATES_SCHEMA,
   CANDIDATES_SUFFIX,
   candidatesProblems,
   poEntries,
@@ -429,6 +430,8 @@ export interface ImportResult {
   skipped: string[];
   /** msgids whose empty msgstr took the first candidate, fuzzy. */
   filled: string[];
+  /** Candidates newly recorded (an identical one already there is not). */
+  added: number;
 }
 
 /** Blank every msgstr of a `.po` (plural forms included), keeping comments, flags and header. */
@@ -453,67 +456,103 @@ export function blankTranslations(text: string): string {
 }
 
 /**
- * Turn a platform's `.po` into candidates. Pure: reads nothing, writes
- * nothing. The `.po` returned is the base's (or, for a catalogue the
- * platform created, the platform's with every translation blanked), with
- * only empty, non-plural msgstrs filled — fuzzy — from each string's first
- * candidate.
+ * The subject of the commit the import makes on a platform's branch
+ * (`layer-translation-platform-import.yml` writes the same words). A `.po`
+ * whose latest commit has it holds the import's own output, not the
+ * platform's, so a later run leaves it alone until the platform syncs again.
  */
-export function importPlatformPo(input: ImportInput): ImportResult {
+export const rewriteSubject = (p: Platform) => `Rewrite ${p} translations as candidates`;
+
+export interface PlatformDiff {
+  /**
+   * The `.po` to restore before candidates are added: the base branch's, or,
+   * for a catalogue the platform created, the platform's with every
+   * translation blanked. The platform's text never stays in a `msgstr`.
+   */
+  base: string;
+  /** The platform's strings, for the shared writer (`addCandidates` / `mergeCandidates`). */
+  inputs: CandidateInput[];
+  /** The platform's state per string, keyed by {@link stateKey}, with the text it describes. */
+  states: Map<string, { text: string; state: PlatformState }>;
+  /** One line per string NOT offered, with the reason. */
+  skipped: string[];
+}
+
+const show = (s: string) => JSON.stringify(s.length > 60 ? `${s.slice(0, 57)}…` : s);
+
+/**
+ * What a platform's `.po` offers beyond the base: one candidate input per
+ * translated string whose text differs from the base's. Pure. Writing —
+ * the sidecar, an empty `msgstr` filled fuzzy, the node — is the shared
+ * writer's (`scripts/lib/translation-candidates.ts`), as for every source.
+ */
+export function platformDiff(input: Omit<ImportInput, "locale" | "catalogue" | "candidates">): PlatformDiff {
   const source: PlatformCandidate["source"] = {
     kind: "web-service",
     id: input.platform,
     ...(input.version ? { version: input.version } : {}),
     at: input.at,
   };
-  const file: CandidatesFile = input.candidates
-    ? structuredClone(input.candidates)
-    : { $schema: CANDIDATES_SCHEMA, locale: input.locale, catalogue: input.catalogue, entries: [] };
-  let po = input.base ?? blankTranslations(input.incoming);
-  const baseEntries = new Map(poEntries(po).map((e) => [keyOf(e), e]));
-  const imported: string[] = [];
+  const base = input.base ?? blankTranslations(input.incoming);
+  const baseEntries = new Map(poEntries(base).map((e) => [keyOf(e), e]));
+  const inputs: CandidateInput[] = [];
+  const states: PlatformDiff["states"] = new Map();
   const skipped: string[] = [];
-  const filled: string[] = [];
-  const show = (s: string) => JSON.stringify(s.length > 60 ? `${s.slice(0, 57)}…` : s);
-
   for (const inc of poEntries(input.incoming)) {
     if (inc.msgstr === "") continue;
     const k = keyOf(inc);
-    const base = baseEntries.get(k);
-    if (!base) { skipped.push(`${show(inc.msgid)}: not in the base catalogue (a template change is not the platform's to make)`); continue; }
+    const b = baseEntries.get(k);
+    if (!b) { skipped.push(`${show(inc.msgid)}: not in the base catalogue (a template change is not the platform's to make)`); continue; }
     if (inc.msgidPlural !== undefined) { skipped.push(`${show(inc.msgid)}: plural entry; plural forms are suggested by hand`); continue; }
-    if (inc.msgstr === base.msgstr) continue; // nothing new from the platform
+    if (inc.msgstr === b.msgstr) continue; // nothing new from the platform
     const state: PlatformState = inc.fuzzy
       ? "fuzzy"
       : input.hints?.get(k) ?? (input.exportMode === "approved" ? "approved" : "translated");
-    let entry = file.entries.find((e) => keyOf(e) === k);
-    if (!entry) {
-      entry = { ...(inc.msgctxt !== undefined ? { msgctxt: inc.msgctxt } : {}), msgid: inc.msgid, candidates: [] };
-      file.entries.push(entry);
-    }
-    const dup = entry.candidates.find((c) => c.text === inc.msgstr && c.source.kind === "web-service" && c.source.id === input.platform);
-    if (dup) {
-      // Same text again: refresh the platform's state, keep the first `at`.
-      (dup as Partial<PlatformCandidate>).metadata = { platformState: state };
-      skipped.push(`${show(inc.msgid)}: already a candidate from ${input.platform}`);
-    } else {
-      const cand: PlatformCandidate = { text: inc.msgstr, source, metadata: { platformState: state } };
-      entry.candidates.push(cand);
-      imported.push(`${show(inc.msgid)} (${state} on ${input.platform})`);
-    }
-    if (base.msgstr === "" && entry.candidates.length > 0) {
-      const first = entry.candidates[0]!.text;
-      const r = applySuggestion(po, { msgid: inc.msgid, ...(inc.msgctxt !== undefined ? { msgctxt: inc.msgctxt } : {}), current: "", suggested: first });
-      if ("text" in r) {
-        po = r.text;
-        filled.push(inc.msgid);
-        baseEntries.set(k, { ...base, msgstr: first });
-      }
-    }
+    inputs.push({ ...(inc.msgctxt !== undefined ? { msgctxt: inc.msgctxt } : {}), msgid: inc.msgid, text: inc.msgstr, source });
+    states.set(k, { text: inc.msgstr, state });
   }
-  const problems = candidatesProblems(file);
+  return { base, inputs, states, skipped };
+}
+
+/**
+ * Record the platform's own state on its candidates, as
+ * `metadata.platformState`: metadata, never a verdict. A candidate already
+ * there from an earlier import has its state refreshed. Returns a copy.
+ */
+export function annotatePlatformStates(file: CandidatesFile, platform: Platform, states: PlatformDiff["states"]): CandidatesFile {
+  const out = structuredClone(file);
+  for (const e of out.entries) {
+    const st = states.get(keyOf(e));
+    if (!st) continue;
+    const mine = e.candidates.filter((c) => c.source.kind === "web-service" && c.source.id === platform);
+    // The writer may normalise the text (placeholders); fall back to this platform's newest candidate.
+    const c = mine.find((x) => x.text === st.text) ?? mine[mine.length - 1];
+    if (c) (c as Partial<PlatformCandidate>).metadata = { platformState: st.state };
+  }
+  return out;
+}
+
+/**
+ * The whole import, in memory: {@link platformDiff}, the shared writer's
+ * {@link mergeCandidates}, then {@link annotatePlatformStates}. Pure. The CLI
+ * does the same on disk with `addCandidates`.
+ */
+export function importPlatformPo(input: ImportInput): ImportResult {
+  const d = platformDiff(input);
+  const sidecar = input.candidates ?? emptySidecar(input.locale, input.catalogue);
+  const m = mergeCandidates(d.base, sidecar, d.inputs);
+  const candidates = annotatePlatformStates(m.sidecar, input.platform, d.states);
+  const problems = candidatesProblems(candidates);
   if (problems.length > 0) throw new Error(`candidates file would not validate: ${problems.join("; ")}`);
-  return { po, candidates: file, imported, skipped, filled };
+  const rejectedKeys = new Set(m.rejected.map((r) => keyOf(r)));
+  return {
+    po: m.po,
+    candidates,
+    imported: d.inputs.filter((i) => !rejectedKeys.has(keyOf(i))).map((i) => `${show(i.msgid)} (${d.states.get(keyOf(i))!.state} on ${input.platform})`),
+    skipped: [...d.skipped, ...m.rejected.map((r) => `${show(r.msgid)}: ${r.reason}`)],
+    filled: m.filled.map((f) => f.msgid),
+    added: m.added,
+  };
 }
 
 /** The sidecar's path for a catalogue. */

@@ -23,6 +23,7 @@ import {
   platformFiles,
   poPathParts,
   resourceSlug,
+  rewriteSubject,
   stateKey,
   transifexConfig,
   transifexYml,
@@ -226,7 +227,7 @@ describe("pull: a platform's strings become candidates, never verdicts", () => {
   test("importing the same strings twice adds no duplicate candidate", () => {
     const once = run();
     const twice = run({ base: once.po, candidates: once.candidates });
-    expect(twice.imported).toEqual([]);
+    expect(twice.added).toBe(0);
     expect(twice.candidates.entries.find((x) => x.msgid === "Hello")!.candidates).toHaveLength(1);
     expect(twice.po).toBe(once.po);
   });
@@ -296,14 +297,34 @@ describe("the CLI on a platform's branch (a local git repository)", () => {
     expect(candidatesProblems(side)).toEqual([]);
     expect(side.entries.find((e: { msgid: string }) => e.msgid === "Hello").candidates[0].text).toBe("Salut");
     const pt = readFileSync(join(root, "translations", "pt-BR", "docs", "index.po"), "utf-8");
-    expect(find(pt, "Hello")).toMatchObject({ msgstr: "Salut", fuzzy: true });
-    expect(readFileSync(summary, "utf-8")).toContain("never an adjudicator");
+    // A catalogue the platform created, whose node the writer refuses (the
+    // node schema's label does not take a region-tagged locale): the
+    // platform's text is still not kept, and the summary says why.
+    expect(find(pt, "Hello").msgstr).toBe("");
+    const said = readFileSync(summary, "utf-8");
+    expect(said).toContain("never an adjudicator");
+    expect(said).toMatch(/pt-BR\/docs\/index\.po`: restored to the base; candidates NOT recorded/);
+    const meta = side.entries.find((e: { msgid: string }) => e.msgid === "World").candidates[0];
+    expect(meta).toMatchObject({ text: "Monde", source: { kind: "web-service", id: "crowdin" }, metadata: { platformState: "fuzzy" } });
 
     // Nothing new on a second run.
     git(root, "add", ".");
-    git(root, "commit", "-q", "-m", "rewritten");
+    git(root, "commit", "-q", "-m", rewriteSubject("crowdin"));
     const again = spawnSync("bun", ["run", cli, "import", "--platform", "crowdin", "--base", "main", "--root", root, "--repo-root", root], { encoding: "utf-8" });
     expect(again.status).toBe(3);
+    expect(execFileSync("git", ["-C", root, "status", "--porcelain"], { encoding: "utf-8" })).toBe("");
+
+    // The platform syncs again (its own text back over ours): re-imported, no duplicate, state kept.
+    writeFileSync(join(root, "translations", "fr", "docs", "index.po"), INCOMING);
+    git(root, "commit", "-q", "-am", "crowdin sync");
+    expect(spawnSync("bun", ["run", cli, "import", "--platform", "crowdin", "--base", "main", "--root", root, "--repo-root", root]).status).toBe(0);
+    const fr2 = readFileSync(join(root, "translations", "fr", "docs", "index.po"), "utf-8");
+    expect(find(fr2, "Hello").msgstr).toBe("Bonjour");
+    expect(find(fr2, "File")).toMatchObject({ msgstr: "Fichier", fuzzy: true });
+    const side2 = JSON.parse(readFileSync(join(root, "translations", "fr", "docs", "index.candidates.json"), "utf-8"));
+    const file2 = side2.entries.find((e: { msgid: string }) => e.msgid === "File").candidates;
+    expect(file2).toHaveLength(1);
+    expect(file2[0].metadata.platformState).toBe("translated");
 
     // export --check: absent is fine, written is current, a new template is drift.
     const check = () => spawnSync("bun", ["run", cli, "export", "--platform", "crowdin", "--root", root, "--repo-root", root, "--check"], { encoding: "utf-8" }).status;

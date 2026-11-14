@@ -25,6 +25,7 @@
  * 3 import found nothing to rewrite · 2 could not determine.
  */
 import { execFileSync } from "node:child_process";
+
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
@@ -32,17 +33,20 @@ import {
   catalogueLayout,
   declaredTranslationsDir,
   candidatesPath,
+  annotatePlatformStates,
   flagStateHints,
-  importPlatformPo,
+  platformDiff,
   isPlatform,
   platformFiles,
   poPathParts,
   readCandidates,
+  rewriteSubject,
   weblateStateHints,
   PLATFORMS,
   type Platform,
   type StateHints,
 } from "./lib/translation-sources/platforms.ts";
+import { addCandidates } from "./lib/translation-candidates.ts";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -162,6 +166,9 @@ async function runImport(): Promise<number> {
   for (const path of changed) {
     const parts = poPathParts(dir, path);
     if (!parts) continue;
+    // Our own rewrite is the newest change: nothing new from the platform since.
+    const last = execFileSync("git", ["-C", dirs.repoRoot, "log", "-1", "--format=%s", "--", path], { encoding: "utf-8" }).trim();
+    if (last === rewriteSubject(platform)) continue;
     let baseText: string | undefined;
     try {
       baseText = execFileSync("git", ["-C", dirs.repoRoot, "show", `${base}:${path}`], { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] });
@@ -169,26 +176,27 @@ async function runImport(): Promise<number> {
       baseText = undefined; // the platform created this catalogue
     }
     const incoming = readFileSync(join(dirs.repoRoot, path), "utf-8");
+    const d = platformDiff({ platform, base: baseText, incoming, ...(hints ? { hints } : {}), exportMode, at });
+    if (d.inputs.length === 0 && d.base === incoming) continue;
+    const dry = flag("--dry-run");
     const cpath = candidatesPath(dirs.translationsDir, parts.locale, parts.catalogue);
-    const r = importPlatformPo({
-      platform,
-      locale: parts.locale,
-      catalogue: parts.catalogue,
-      base: baseText,
-      incoming,
-      ...(existsSync(cpath) ? { candidates: readCandidates(cpath)! } : {}),
-      ...(hints ? { hints } : {}),
-      exportMode,
-      at,
-    });
-    if (r.imported.length === 0 && r.po === incoming) continue;
-    rewrote += 1;
-    lines.push(`- \`${path}\`: ${r.imported.length} candidate(s) from ${platform}${r.filled.length ? `, ${r.filled.length} empty string(s) filled fuzzy` : ""}${r.skipped.length ? `, ${r.skipped.length} skipped` : ""}`);
-    for (const s of r.skipped) lines.push(`  - skipped ${s}`);
-    if (!flag("--dry-run")) {
-      writeFileSync(join(dirs.repoRoot, path), r.po);
-      if (r.candidates.entries.length > 0) writeFileSync(cpath, `${JSON.stringify(r.candidates, null, 2)}\n`);
+    const sidecarBefore = existsSync(cpath) ? readFileSync(cpath, "utf-8") : undefined;
+    // The platform's text never stays in a msgstr: put the base back first.
+    if (!dry) writeFileSync(join(dirs.repoRoot, path), d.base);
+    const r = addCandidates(d.inputs, { root: dirs.repoRoot, translations: dir, locale: parts.locale, catalogue: parts.catalogue, dryRun: dry, now: () => new Date(at) });
+    if (!dry && !r.refused && existsSync(cpath)) {
+      const annotated = annotatePlatformStates(readCandidates(cpath)!, platform, d.states);
+      writeFileSync(cpath, `${JSON.stringify(annotated, null, 2)}\n`);
     }
+    // A re-run over strings already imported changes nothing; say so rather than claim a rewrite.
+    const unchanged = dry
+      ? r.added === 0 && d.base === incoming
+      : readFileSync(join(dirs.repoRoot, path), "utf-8") === incoming && (existsSync(cpath) ? readFileSync(cpath, "utf-8") : undefined) === sidecarBefore;
+    if (unchanged) continue;
+    rewrote += 1;
+    const skipped = [...d.skipped, ...r.rejected.map((x) => `${JSON.stringify(x.msgid.slice(0, 60))}: ${x.reason}`)];
+    lines.push(`- \`${path}\`: ${r.refused ? `restored to the base; candidates NOT recorded (${r.refused})` : `${r.added} candidate(s) from ${platform}${r.filled.length ? `, ${r.filled.length} empty string(s) filled fuzzy` : ""}${r.noFill ? ` (${r.noFill})` : ""}`}${skipped.length ? `, ${skipped.length} skipped` : ""}`);
+    for (const s of skipped) lines.push(`  - skipped ${s}`);
   }
   const summary = rewrote === 0
     ? `Nothing from ${platform} to rewrite: no translated string in this branch differs from \`${base}\`.`
