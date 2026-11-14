@@ -81,7 +81,7 @@ import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { TreeStore } from "./branch-store.js";
 import { inputSiteReached, qaRefLine, quietly } from "../schemas/sdlc/input-trace.ts";
-import { mountedInstancesCached, outputTwinOf } from "./lib/layer-output.ts";
+import { mountedInstancesCached, outputTwinOf, overlayDirs, writePathAt } from "./lib/layer-output.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -283,7 +283,8 @@ export function resolveQaLocation(repoRoot: string = gitTopLevel()): QaLocation 
           id: d.id,
           path: relative(repoRoot, d.absPath).split("\\").join("/").replace(/\/+$/, ""),
           absPath: d.absPath,
-          present: existsSync(d.absPath) && statSync(d.absPath).isDirectory(),
+          // In the checkout, or under its layer output root when its layer is mounted (bean `cat-tools-sm8r`, item 4).
+          present: overlayDirs(d.absPath).some((p) => statSync(p).isDirectory()),
           ...(storage ? { storage } : {}),
         });
       }
@@ -835,7 +836,9 @@ export function fetchQa(args: { ref: string; into?: string; prefix?: string }, o
   const { repoRoot } = openStore(opts);
   const into = resolve(args.into ?? repoRoot);
   for (const [p, text] of t.files) {
-    const dest = join(into, p);
+    // Never into a mount: a mounted layer's results are materialised under its
+    // layer output root (bean `cat-tools-sm8r`, item 4), where every reader looks.
+    const dest = writePathAt(join(into, p));
     mkdirSync(dirname(dest), { recursive: true });
     writeFileSync(dest, text);
   }
@@ -843,13 +846,15 @@ export function fetchQa(args: { ref: string; into?: string; prefix?: string }, o
   const extra: string[] = [];
   if (m.state === "hit") {
     for (const root of m.manifest.roots) {
-      const abs = join(into, root);
-      if (!existsSync(abs)) continue;
-      for (const f of readdirSync(abs, { recursive: true, withFileTypes: true })) {
-        if (!f.isFile()) continue;
-        const parent = (f as { parentPath?: string; path?: string }).parentPath ?? (f as { path?: string }).path ?? abs;
-        const rel = relative(into, join(parent, f.name)).split("\\").join("/");
-        if (!t.files.has(rel) && (!args.prefix || rel.startsWith(args.prefix))) extra.push(rel);
+      const logical = join(into, root);
+      // The union of the root and its layer output root, each file named by its logical path.
+      for (const abs of overlayDirs(logical)) {
+        for (const f of readdirSync(abs, { recursive: true, withFileTypes: true })) {
+          if (!f.isFile()) continue;
+          const parent = (f as { parentPath?: string; path?: string }).parentPath ?? (f as { path?: string }).path ?? abs;
+          const rel = relative(into, join(logical, relative(abs, join(parent, f.name)))).split("\\").join("/");
+          if (!t.files.has(rel) && (!args.prefix || rel.startsWith(args.prefix)) && !extra.includes(rel)) extra.push(rel);
+        }
       }
     }
   }
@@ -903,6 +908,30 @@ export function overlayEntries(repoRoot: string, roots: readonly string[]): { pa
 }
 
 /**
+ * Stage `roots` into the private index `env` names: the files the checkout
+ * holds at each root (`git add -f`), then each mounted layer's computed
+ * results from its layer output root (`build/layers/<instance>/`, bean
+ * `cat-tools-sm8r` item 4) at the layer's own path, over whatever the mount
+ * pins there. So an entry is keyed exactly as before the move, wherever the
+ * writers wrote. Returns whether anything was staged.
+ */
+function stageRoots(store: Store, env: Record<string, string>, repoRoot: string, roots: readonly string[]): boolean {
+  const inTree = roots.filter((r) => existsSync(join(repoRoot, r)));
+  if (inTree.length) store.must([`--work-tree=${repoRoot}`, "add", "-f", "--", ...inTree], { env, cwd: repoRoot });
+  const overlay = overlayEntries(repoRoot, roots);
+  if (overlay.length) {
+    const ids = store
+      .must(["hash-object", "-w", "--stdin-paths"], { input: overlay.map((o) => o.at).join("\n") + "\n", cwd: repoRoot })
+      .trim()
+      .split("\n");
+    if (ids.length !== overlay.length) throw new Error(`git hash-object returned ${ids.length} ids for ${overlay.length} overlay paths`);
+    const info = overlay.map((o, i) => `100644 ${ids[i]}\t${o.path}`).join("\n") + "\n";
+    store.must(["update-index", "--add", "--index-info"], { env, input: info });
+  }
+  return inTree.length > 0 || overlay.length > 0;
+}
+
+/**
  * Build the entry tree for `roots` through a private index (spike finding 3).
  * Never touches the checkout's index or object store.
  */
@@ -919,21 +948,7 @@ function buildEntry(
     const env = { GIT_INDEX_FILE: join(tmp, "index") };
     // -f: once `test/results/` is .gitignored (when `storage` is set) the
     // working copy is ignored by design, and it is still what gets published.
-    store.must([`--work-tree=${repoRoot}`, "add", "-f", "--", ...roots], { env, cwd: repoRoot });
-    // A mounted layer's computed results are under its output root
-    // (`build/layers/<instance>/`, bean `cat-tools-sm8r` item 4). They are
-    // published at the layer's own path, over whatever the mount pins there,
-    // so the entry is keyed exactly as before the move.
-    const overlay = overlayEntries(repoRoot, roots);
-    if (overlay.length) {
-      const ids = store
-        .must(["hash-object", "-w", "--stdin-paths"], { input: overlay.map((o) => o.at).join("\n") + "\n", cwd: repoRoot })
-        .trim()
-        .split("\n");
-      if (ids.length !== overlay.length) throw new Error(`git hash-object returned ${ids.length} ids for ${overlay.length} overlay paths`);
-      const info = overlay.map((o, i) => `100644 ${ids[i]}\t${o.path}`).join("\n") + "\n";
-      store.must(["update-index", "--add", "--index-info"], { env, input: info });
-    }
+    stageRoots(store, env, repoRoot, roots);
     const payload = store.must(["write-tree"], { env }).trim();
     const listing = store.must(["ls-tree", "-r", "-l", "-z", payload]);
     let files = 0;
@@ -1324,7 +1339,8 @@ export function addQa(
   const { store, repoRoot } = openStore(opts);
   const roots = args.roots.map((r) => toRepoPath(r, repoRoot));
   if (roots.some((r) => r === "")) throw new QaUsageError("refusing to add the whole checkout; name the directories to add");
-  const present = roots.filter((r) => existsSync(join(repoRoot, r)));
+  // A root is present in the checkout or under its layer output root (bean `cat-tools-sm8r`, item 4).
+  const present = roots.filter((r) => overlayDirs(join(repoRoot, r)).length > 0);
   // input-site: store #0a597796 — configures or performs a qa-reports store read; every by-ref read is reported by snapshot(), every other git call by TreeStore.git()
   const writtenAt = args.writtenAt ?? new Date().toISOString();
 
@@ -1336,7 +1352,7 @@ export function addQa(
   try {
     if (present.length) {
       const env = { GIT_INDEX_FILE: join(tmp, "index") };
-      store.must([`--work-tree=${repoRoot}`, "add", "-f", "--", ...present], { env, cwd: repoRoot });
+      stageRoots(store, env, repoRoot, present);
       addTree = store.must(["write-tree"], { env }).trim();
       for (const l of store.must(["ls-tree", "-r", "-l", "-z", addTree]).split("\0").filter(Boolean)) {
         const tab = l.indexOf("\t");
