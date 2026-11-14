@@ -105,7 +105,6 @@ import { Database } from "bun:sqlite";
 import { mintsFragments, subjectBase, subjectPathOf } from "./lib/subject-iri.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { overlayDirs, overlayPath } from "./lib/layer-output.ts";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
@@ -115,6 +114,7 @@ import { PAYLOAD_MEDIA_TYPES, PAYLOAD_PATH, type PayloadLink } from "../schemas/
 import { TodoIndexSchema } from "../schemas/sdlc/todo-index.ts";
 import { declaredBlockEdges, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { auditPayloadTree, payloadOutDir, planPayloads, renderPayloadFiles, type PayloadEntry, type PayloadPlan } from "./gen-subgraph-jsonld.ts";
+import { overlayDirs, overlayPath, readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { nodeKind } from "../schemas/kg/node-kind.ts";
 import { z } from "zod";
@@ -726,7 +726,7 @@ export const TODOS_SLICE: SliceDef = {
   async load(root) {
     // Read through the layer overlay: `docs:pages` writes a mounted layer's
     // todo index at its output root (bean `cat-tools-sm8r`, item 4).
-    const p = overlayPath(join(INSTANCE_ROOT, TODO_INDEX));
+    const p = readPathAt(root, join(INSTANCE_ROOT, TODO_INDEX));
     if (!existsSync(p)) return null;
     // The todo reader is imported lazily: it resolves its graph at import.
     const { readTodoFiles } = await import("./todos.ts");
@@ -869,18 +869,18 @@ export const LIBRARY_SLICE: SliceDef = {
     like: "b.title",
     body: "library-entry",
   },
-  async load() {
+  async load(root) {
     // Read through the layer output overlay: `library:viz` writes a mounted
     // layer's projection at the output root (`makeEmit` → `writePathAt`), so
     // the path under the mount is only the name. Read there, an index checkout
-    // found no source and the slice failed (folio-assistant#3124).
+    // found no source and the slice failed.
     const dir = join(INSTANCE_ROOT, LIBRARY_DIR);
-    const index = overlayPath(join(dir, "index.json"));
+    const index = overlayPath(join(dir, "index.json"), root);
     if (!existsSync(index)) return null;
     const entries = new Map<string, Buffer>();
     const edir = join(dir, "entries");
     // The output twin first, then the mount: the first to hold an entry wins.
-    for (const d of overlayDirs(edir)) {
+    for (const d of overlayDirs(edir, root)) {
       for (const f of readdirSync(d).sort()) {
         if (f.endsWith(".json") && !entries.has(f.slice(0, -5))) entries.set(f.slice(0, -5), readFileSync(join(d, f)));
       }
@@ -1140,7 +1140,7 @@ function argValues(args: string[], name: string): string[] {
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  const outDir = resolve(argValues(args, "--out")[0] ?? SLICES_DIR);
+  const outDir = resolve(argValues(args, "--out")[0] ?? writePathAt(REPO_ROOT, SLICES_DIR));
   const payloadOut = argValues(args, "--payload-out")[0];
   const wanted = argValues(args, "--slice");
   const unknown = wanted.filter((w) => !SLICES.some((s) => s.slice === w));
