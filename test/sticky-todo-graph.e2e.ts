@@ -22,13 +22,14 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredPagePath } from "./support/site-pages.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const TODOS = readFileSync(join(SITE, "assets/todos/index.json"), "utf8");
-const GRAPH_TEXT = readFileSync(join(SITE, "todos.jsonld"), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const TODOS = readFileSync(overlayPath(join(SITE, "assets/todos/index.json")), "utf8");
+const GRAPH_TEXT = readFileSync(overlayPath(join(SITE, "todos.jsonld")), "utf8");
 
 interface GraphTodo {
   identifier: string;
@@ -50,8 +51,8 @@ const engine = new Liquid({
 engine.registerFilter("relative_url", (s: unknown) => String(s ?? ""));
 engine.registerFilter("markdownify", (s: unknown) => String(s ?? ""));
 const data = {
-  harness: JSON.parse(readFileSync(join(SITE, "_data/harness.json"), "utf8")),
-  stickies: JSON.parse(readFileSync(join(SITE, "_data/stickies.json"), "utf8")),
+  harness: JSON.parse(readFileSync(overlayPath(join(SITE, "_data/harness.json")), "utf8")),
+  stickies: JSON.parse(readFileSync(overlayPath(join(SITE, "_data/stickies.json")), "utf8")),
 };
 
 async function body(): Promise<string> {
