@@ -82,7 +82,9 @@ describe("navbar rendering of themed blank mark", () => {
     expect(bottomHtml).toContain('<span class="fa-nav-glyph fa-nav-tone fa-nav-blank" style="--fa-nav-hue:215" aria-hidden="true"></span>');
     // Ensure no SVG glyph path or initial letter text was rendered inside the blank mark.
     // Scoped to the harness ROW: the group's own summary draws a mark (GROUP_GLYPHS).
-    const row = bottomHtml.slice(bottomHtml.indexOf('<a href="../unadorned-instance/"'));
+    // Up to the row's end: the Harnesses icon after the panel draws an SVG of its own.
+    const from = bottomHtml.indexOf('<a href="../unadorned-instance/"');
+    const row = bottomHtml.slice(from, bottomHtml.indexOf("</a>", from));
     expect(row).not.toContain('<svg viewBox="0 0 24 24"');
   });
 

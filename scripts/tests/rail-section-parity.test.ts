@@ -6,6 +6,7 @@ import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { injectRail, railModel } from "../lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS, navbarRegionsHtml } from "../lib/navbar.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { harnessesControl } from "../check-viewer-nav.ts";
 
 /**
  * ONE VOCABULARY FOR THE RAIL'S SECTIONS, on both paths that draw one —
@@ -53,14 +54,20 @@ describe("the rail's sections are named alike on both paths (bean 9rq1)", () => 
     }
   });
 
-  test("Path B — the fa-nav rail — draws On this page, Folders and Harnesses, in that order", () => {
+  test("Path B — the fa-nav rail — draws On this page and Folders, in that order, and Harnesses as an icon's panel", () => {
+    // Harnesses is no longer a disclosure (owner, 2026-11-13: "remove the
+    // harnesses navbar, instead add an icon to the controls to show the
+    // harnesses"): it is the panel the Harnesses icon opens, under the same name.
     const html = injectRail(PAGE, OPTS)!;
-    expect(summaries(html)).toEqual([RAIL_SECTION_LABELS.onThisPage, RAIL_SECTION_LABELS.folders, RAIL_SECTION_LABELS.harnesses]);
+    expect(summaries(html)).toEqual([RAIL_SECTION_LABELS.onThisPage, RAIL_SECTION_LABELS.folders]);
+    expect(harnessesControl(html)).toBe(true);
+    expect(html).toContain(`<div class="fa-nav-pop-title"><span class="fa-nav-label">${RAIL_SECTION_LABELS.harnesses}</span></div>`);
   });
 
   test("Path B from shared data (navbar.js's code) draws the same names as the server", () => {
     const m = railModel({ ...OPTS, documentIndex: { label: RAIL_SECTION_LABELS.onThisPage, items: [{ href: "#a", label: "A" }, { href: "#b", label: "B" }], collapsible: true } });
-    expect(summaries(navbarRegionsHtml(m))).toEqual([RAIL_SECTION_LABELS.onThisPage, RAIL_SECTION_LABELS.folders, RAIL_SECTION_LABELS.harnesses]);
+    expect(summaries(navbarRegionsHtml(m))).toEqual([RAIL_SECTION_LABELS.onThisPage, RAIL_SECTION_LABELS.folders]);
+    expect(harnessesControl(navbarRegionsHtml(m))).toBe(true);
   });
 
   test("no section on either path keeps a retired name", () => {
@@ -81,6 +88,6 @@ describe("the rail's sections are named alike on both paths (bean 9rq1)", () => 
    */
   test("Pages: Path B draws it when the site has a page tree, in Path A's order", () => {
     const html = injectRail(PAGE, { ...OPTS, pages: [{ href: "../guide/", label: "Guide" }] })!;
-    expect(summaries(html)).toEqual([RAIL_SECTION_LABELS.onThisPage, RAIL_SECTION_LABELS.pages, RAIL_SECTION_LABELS.folders, RAIL_SECTION_LABELS.harnesses]);
+    expect(summaries(html)).toEqual([RAIL_SECTION_LABELS.onThisPage, RAIL_SECTION_LABELS.pages, RAIL_SECTION_LABELS.folders]);
   });
 });

@@ -134,9 +134,23 @@ export function layoutFlags(html: string, marked: ReadonlySet<string> = new Set(
   if (untippedControls(nav).length > 0 || (needsTips(nav) && !paintsTips(css, ".fa-nav"))) {
     flags.push("rail-tips");
   }
-  const harnesses = summaries.some((m) => m[2] === RAIL_SECTION_LABELS.harnesses);
-  if (!harnesses || hidesSummaryAtRest(css)) flags.push("harnesses-at-rest");
+  if (!harnessesControl(nav)) flags.push("harnesses-at-rest");
   return flags;
+}
+
+/**
+ * Is there a Harnesses CONTROL at rest — an icon button that opens the panel
+ * holding the harness list? Owner, 2026-11-13: *"remove the harnesses navbar,
+ * instead add an icon to the controls to show the harnesses."* The disclosure
+ * this flag used to look for is gone; the button is what is visible at rest
+ * (an icon, tipped like every icon-only control), and its `aria-controls`
+ * must name a panel the rail really holds. Exported for the test.
+ */
+export function harnessesControl(nav: string): boolean {
+  const label = RAIL_SECTION_LABELS.harnesses;
+  const b = [...nav.matchAll(/<button\b([^>]*\bdata-fa-nav-pop\b[^>]*)>/g)].find((m) => attr(m[1]!, "aria-label") === label);
+  const id = b ? attr(b[1]!, "aria-controls") : undefined;
+  return id !== undefined && new RegExp(`<div class="fa-nav-pop" id="${id}"`).test(nav);
 }
 
 /* ── THE TWO FLAGS FROM bean `ob3m` FINDING 1 ─────────────────────────────
@@ -223,23 +237,6 @@ export function paintsTips(css: string, scope: string): boolean {
 }
 
 /**
- * Does a rule hide the disclosure's SUMMARY with no state attached — that is,
- * at rest? A selector conditioned on hover, focus, the pinned box or `[open]`
- * is a statement about another state; a pseudo-element (`::marker`, the
- * WebKit marker) is not the summary.
- */
-export function hidesSummaryAtRest(css: string): boolean {
-  const hides = /(?:^|;)\s*(?:opacity:\s*0(?![.\d])|display:\s*none|visibility:\s*hidden|max-height:\s*0(?![.\d]))/;
-  return cssRules(css).some(
-    (r) =>
-      hides.test(r.body) &&
-      r.sel
-        .split(",")
-        .some((s) => /fa-nav-group\s*>\s*summary(?![\w-])/.test(s) && !/::|:hover|:focus|:checked|\[open\]|:has\(/.test(s)),
-  );
-}
-
-/**
  * The same two questions of the DOCS SITE's strip, which `docs-ui.js` builds
  * at load and so has no markup a page walk can read. Asked of the two files
  * that make it instead:
@@ -247,11 +244,10 @@ export function hidesSummaryAtRest(css: string): boolean {
  * - `rail-tips` — every control `navbar-row.js` creates, and the light/dark
  *   switch `mountNavIconRow` adds, carries `data-fa-tip`, and `docs-ui.css`
  *   paints it on hover and on focus;
- * - `harnesses-at-rest` — the bottom disclosure's summary is declared
- *   visible at rest. The rest state there is a FLAG (`--fa-nav-text`) the
- *   generic lists scale everything by, so "hidden" is not a literal `0` this
- *   could grep for; what is checked is the override that undoes it. The
- *   rendered proof is `rail-tips.e2e.ts`, which measures it in a browser.
+ * - `harnesses-at-rest` — `navbar-row.js` moves the rail's own controls
+ *   (`data-fa-nav-control`, the Harnesses icon) into the row it mounts at the
+ *   foot of the rail (owner, 2026-11-13). Until then this asked that the
+ *   bottom disclosure's summary be visible at rest; the disclosure is gone.
  */
 export function stripFlags(js: string, css: string, rowJs: string): ViewerNavFlag[] {
   const flags: ViewerNavFlag[] = [];
@@ -273,13 +269,9 @@ export function stripFlags(js: string, css: string, rowJs: string): ViewerNavFla
   if (at < 0 || built.length === 0 || untipped.length > 0 || !paintsTip || !paintsTips(css, ".side-bar")) {
     flags.push("rail-tips");
   }
-  const shown = cssRules(css).some(
-    (r) =>
-      r.sel.split(",").some((s) => /\.fa-nav-bottom\s*>\s*\.fa-nav-group\s*>\s*summary\s*$/.test(s.trim())) &&
-      /opacity:\s*1\b/.test(r.body) &&
-      /max-height:\s*none/.test(r.body),
-  );
-  if (!shown) flags.push("harnesses-at-rest");
+  // The Harnesses icon is the rail's own (`harnessesBottomHtml`); the row
+  // must carry it along, or it is left behind in the bottom region alone.
+  if (!/data-fa-nav-control/.test(rowJs)) flags.push("harnesses-at-rest");
   return flags;
 }
 

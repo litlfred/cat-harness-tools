@@ -42,7 +42,7 @@ body:has(.fa-page-bar) .fa-glass-band:not([data-fa-band-tools]){display:none!imp
 .fa-page-foot{box-sizing:border-box;margin:0;padding:1rem 1.5rem;border-top:1px solid var(--fa-pl-line);color:var(--fa-pl-muted);font-size:var(--fa-text-sm,0.875rem)}
 .fa-page-foot a{color:var(--fa-pl-link)}
 /* Not stuck, on a narrow screen the bar's title would sit under the Folio tab (top middle): the bar leaves the tab its row, as a viewer reserves it. */
-@media (max-width:49.99rem){body:has(.fa-glass-handle) .fa-page-bar{padding-top:2.25rem}}
+@media (max-width:49.99rem){body:has(.fa-glass-handle):not(:has(.fa-nav-icons .fa-nav-folio)) .fa-page-bar{padding-top:2.25rem}}
 @media (max-width:40rem){.fa-page-bar{padding:.5rem .75rem}.fa-page-main{padding:.75rem .75rem 2rem}.fa-page-main h1{font-size:var(--fa-text-lg,1.25rem)}.fa-page-foot{padding:1rem .75rem}}
 /* THE SITE BAR (lib/site-bar.ts; owner, 2026-10-15: "Top bar, like IG sites"): every page's top bar on a site the rail is drawn on — the site's name
    home, the site's search, the language picker's slot. On a just-the-docs page it is the theme's own #main-header, kept for its search script; the
