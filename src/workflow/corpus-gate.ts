@@ -165,25 +165,39 @@ export async function checkCorpusGate(
   repoRoot: string,
   opts: CorpusGateOptions,
 ): Promise<GateFinding[]> {
-  const bpmn = workflowFiles(opts.platformRoot).find(
-    (f) => basename(f, ".bpmn") === EDITING_PROCESS_STEM,
-  );
-  if (!bpmn) {
-    throw new Error(
-      `No ${EDITING_PROCESS_STEM}.bpmn in any knowledge-graph directory ` +
-        `declared by ${opts.platformRoot}. Point --platform at the folio-assistant checkout.`,
+  // The editing process is loaded the first time a changed file turns out to
+  // be a block, not before. A change with no block in it (a re-pin, a
+  // workflow edit) is not a corpus write, so it is not this gate's business
+  // whether the editing process is reachable from here: the diagram lives in
+  // an opt-in group of the layer that owns it, and a root that does not
+  // enable that group does not have it on disk. A block with no process to
+  // check it against is still refused, by the throw below.
+  let editing: { model: ProcessModel; relaxations: Relaxation[] } | undefined;
+  const loadEditing = async (): Promise<{ model: ProcessModel; relaxations: Relaxation[] }> => {
+    if (editing) return editing;
+    const bpmn = workflowFiles(opts.platformRoot).find(
+      (f) => basename(f, ".bpmn") === EDITING_PROCESS_STEM,
     );
-  }
-  const model: ProcessModel = await loadProcessModel(bpmn);
-  let relaxations: Relaxation[] = [];
-  try {
-    relaxations = loadRelaxations(opts.platformRoot);
-    validateRelaxations(relaxations, [model]);
-  } catch (e) {
-    // A malformed policy must not silently become "no relaxations", which would
-    // refuse work a package had legitimately declared.
-    throw new Error(`Workflow policy is not loadable, so the gate cannot run: ${String(e)}`);
-  }
+    if (!bpmn) {
+      throw new Error(
+        `This change writes a content block, and there is no ${EDITING_PROCESS_STEM}.bpmn in any ` +
+          `knowledge-graph directory declared by ${opts.platformRoot} to check it against. ` +
+          `Enable the opt-in sub-graph that holds it in this root's enableSubgraphs, or point --platform at a checkout that has it.`,
+      );
+    }
+    const model: ProcessModel = await loadProcessModel(bpmn);
+    let relaxations: Relaxation[] = [];
+    try {
+      relaxations = loadRelaxations(opts.platformRoot);
+      validateRelaxations(relaxations, [model]);
+    } catch (e) {
+      // A malformed policy must not silently become "no relaxations", which would
+      // refuse work a package had legitimately declared.
+      throw new Error(`Workflow policy is not loadable, so the gate cannot run: ${String(e)}`);
+    }
+    editing = { model, relaxations };
+    return editing;
+  };
 
   const seen = new Map<string, GateFinding>();
   const changeSets = changedChangeSetInstances(repoRoot, opts.files);
@@ -207,6 +221,7 @@ export async function checkCorpusGate(
     if (!label) continue; // not a block: not this gate's business
     if (seen.has(ts)) continue;
 
+    const { model, relaxations } = await loadEditing();
     const id = instanceId(model.id, label);
     // The repository's own store first: it is where the editing workflow for
     // its own blocks is recorded. The platform's store is a fallback, and in a
