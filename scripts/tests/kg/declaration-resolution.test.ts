@@ -117,8 +117,8 @@ describe("lesson 6 — kinds come from the checkout under inspection", () => {
 
 // A mounted layer's id into its own declaration may name a group declared from
 // within one of its opt-in directories; a root that leaves that directory off
-// has no copy of it (smart-base.L2-collab, inside L2/graph.json, on
-// smart-immunizations#145). That id is left to the layer's own root and said
+// has no copy of it (`<layer>.L2-collab`, inside L2/graph.json, read from
+// an IG root that enables none of the layer's levels). That id is left to the layer's own root and said
 // so; with the directory on disk it is judged as before.
 describe("a mounted layer's enableSubgraphs into an unmounted opt-in directory", () => {
   const layer = (name: string, extra: object) => ({ $schema: "cat-harness-declaration/1.0.0", name, version: "0.1.0", needs: [], ...extra });

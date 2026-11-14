@@ -233,7 +233,7 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
           if (dd !== undefined) closure.push({ name: dd.name, directories: instanceDirectories(dep.rootPath, dd) });
         }
         // A layer's id into its OWN declaration can name a group declared from
-        // within one of its opt-in directories (`smart-base.L2-collab`, inside
+        // within one of its opt-in directories (`<layer>.L2-collab`, inside
         // `L2/graph.json`). A root that does not enable that directory does not
         // have it mounted, so the group's declaration is not on disk here, and
         // "declares no directory" would be a claim about bytes this root never
