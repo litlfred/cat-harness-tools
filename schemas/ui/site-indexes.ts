@@ -212,7 +212,7 @@ export const TranslationStatusSchema = z
 // by `scripts/tests/schema-graph-kinds.test.ts` rather than by memory.
 export const DECL_KINDS = [
   "zod-object", "zod-union", "zod-enum", "zod-array", "zod-record", "zod-scalar",
-  "interface", "type-alias", "json-schema", "fhir-logical", "undetermined",
+  "interface", "type-alias", "json-schema", "fhir-logical", "fhir-profile", "undetermined",
 ] as const;
 
 export const SchemaGraphIndexSchema = z
@@ -252,6 +252,8 @@ export const SchemaGraphIndexSchema = z
                 card: z.string().optional(),
                 // The UML type the diagram shows, when not the written one.
                 utype: z.string().optional(),
+                // What a profile says of the field: MS, = fixed, ~ pattern, prohibited.
+                constraint: z.string().optional(),
                 // Type name -> its definition's URL (`scripts/type-links.ts`).
                 links: z.record(z.string(), z.string()).optional(),
                 doc: z.string().optional(),
@@ -264,7 +266,7 @@ export const SchemaGraphIndexSchema = z
           unresolved: StringList,
           external: StringList,
           // The source label drawn upper right of the box (bean `cat-tools-4xq6`).
-          source: z.enum(["zod", "typescript", "json-schema", "fhir", "skill"]).optional(),
+          source: z.enum(["zod", "typescript", "json-schema", "fhir", "fhir:profile", "skill"]).optional(),
           canonical: z.string().optional(),
           exported: z.boolean(),
         })

@@ -52,7 +52,7 @@ import { checkoutRootFor, findInstanceRoot } from "../schemas/kg/cat-harness.js"
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, rootInstanceName } from "../schemas/kg/harness-config.js";
 import { withConcernGroupDirs } from "./concern-groups.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { isFhirLogicalModel, readFhirLogicalModel } from "./fhir-logical-model.ts";
+import { isFhirStructureDefinition, readFhirLogicalModel } from "./fhir-logical-model.ts";
 
 /**
  * Which layers' `schemas` directories a reading covers.
@@ -122,6 +122,7 @@ export type DeclKind =
   | "type-alias"
   | "json-schema"
   | "fhir-logical"
+  | "fhir-profile"
   | "undetermined";
 
 /** One field of an object-like declaration. */
@@ -177,6 +178,12 @@ export interface SchemaField {
    * core. A type that IS a declaration links by its edge instead.
    */
   typeLinks?: Record<string, string>;
+  /**
+   * What a profile says about the field beyond its type and cardinality —
+   * `MS` (mustSupport), `= value` (fixed), `~ value` (pattern), `prohibited`
+   * — drawn after the cardinality as `{…}` (bean `cat-tools-t6fz`).
+   */
+  constraint?: string;
 }
 
 /** One declaration — a Zod schema, an interface, a type alias, a JSON Schema or a FHIR logical model. */
@@ -1208,7 +1215,7 @@ export function readJsonDocument(text: string, moduleRel: string): ClassModelRea
   // Cheap sniff before a parse: most JSON in a schemas directory is not FHIR.
   if (!text.includes("StructureDefinition")) return undefined;
   try {
-    if (!isFhirLogicalModel(JSON.parse(text))) return undefined;
+    if (!isFhirStructureDefinition(JSON.parse(text))) return undefined;
   } catch {
     return undefined;
   }
@@ -1385,7 +1392,6 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
         const abs = join(layerRoot, local);
         if (!existsSync(abs)) continue;
         const text = readFileSync(abs, "utf-8");
-        if (!text.includes('"logical"')) continue;
         const moduleRel = rel(abs);
         if (modules.some((m) => m.module === moduleRel)) continue;
         let doc: unknown;
@@ -1394,7 +1400,9 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
         } catch {
           continue;
         }
-        if (!isFhirLogicalModel(doc)) continue;
+        // A class, or a profile over one — an extension definition included,
+        // which is a profile of Extension (bean `cat-tools-t6fz`).
+        if (!isFhirStructureDefinition(doc)) continue;
         const read = readFhirLogicalModel(text, moduleRel);
         modules.push({
           module: moduleRel,

@@ -11,10 +11,10 @@ import { describe, expect, test } from "bun:test";
 import { TRANSLATION_LABEL, TranslationNodeSchema, localeIsRtl } from "./translation.ts";
 
 const node = (locale: string, over: Record<string, unknown> = {}) => ({
-  label: `trans:${locale}/docs/index`,
+  label: `trans:${locale}/start/a`,
   locale,
-  sourceFile: "docs/index.md",
-  poFile: `translations/${locale}/docs/index.po`,
+  sourceFile: "start/a.md",
+  poFile: `translations/${locale}/start/a.po`,
   status: { locale, official: false, generatedBy: "agent" },
   ...over,
 });
@@ -34,14 +34,14 @@ describe("a translation node's locale is a BCP 47 tag", () => {
   }
 
   test("refuses a label without the trans: prefix or the slash", () => {
-    expect(TranslationNodeSchema.safeParse(node("fr", { label: "fr/docs/index" })).success).toBe(false);
+    expect(TranslationNodeSchema.safeParse(node("fr", { label: "fr/start/a" })).success).toBe(false);
     expect(TranslationNodeSchema.safeParse(node("pt-BR", { label: "trans:pt-BR" })).success).toBe(false);
   });
 });
 
 describe("the locale is the same in the label, the node and its status", () => {
   test("a label naming another locale is refused, on the label", () => {
-    const r = TranslationNodeSchema.safeParse(node("pt-BR", { label: "trans:pt/docs/index" }));
+    const r = TranslationNodeSchema.safeParse(node("pt-BR", { label: "trans:pt/start/a" }));
     expect(r.success).toBe(false);
     expect(r.error?.issues.map((i) => i.path.join("."))).toEqual(["label"]);
   });
