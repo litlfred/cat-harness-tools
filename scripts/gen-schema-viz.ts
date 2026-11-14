@@ -323,7 +323,7 @@ export function sourceDescriptorRows(
 }
 
 /** The projection, trimmed for the page. */
-function projection(
+export function projection(
   g: SchemaGraph,
   /** Subject-page counts, `directory id -> [count, unit]`. Empty is normal. */
   scoped: Readonly<Record<string, readonly [number, string]>>,
@@ -376,18 +376,36 @@ function projection(
       kind: d.kind,
       ...(d.note ? { note: d.note } : {}),
       ...(d.doc ? { doc: d.doc.slice(0, DOC_MAX) } : {}),
-      fields: d.fields.map((f) => ({
-        name: f.name,
-        type: f.type,
-        optional: f.optional,
-        array: f.array,
-        ...(f.doc ? { doc: f.doc.slice(0, DOC_MAX) } : {}),
-      })),
+      fields: d.fields.map((f) => {
+        // Where the field's type is defined, when it is not a declaration of
+        // this graph (that one links by its edge): `type-links.ts`.
+        const links: Record<string, string> = {};
+        const utype = umlType(sourceOfKind(d.kind), f.type);
+        for (const t of utype.split(" | ")) {
+          const name = t.trim().replace(/\[\]$/, "").replace(/^z\./, "").replace(/\(.*$/, "");
+          const href = typeLink(sourceOfKind(d.kind), name, f.typeLinks);
+          if (href && name) links[name] = href;
+        }
+        return {
+          name: f.name,
+          type: f.type,
+          optional: f.optional,
+          array: f.array,
+          card: cardinalityOf(f),
+          // The type the diagram shows, when it differs from the written one.
+          ...(utype !== f.type ? { utype } : {}),
+          ...(Object.keys(links).length ? { links } : {}),
+          ...(f.doc ? { doc: f.doc.slice(0, DOC_MAX) } : {}),
+        };
+      }),
       extendsNames: d.extendsNames,
       values: d.values,
       refs: d.refs,
       unresolved: d.unresolved,
       external: d.external,
+      // The source label the box carries, upper right (bean `cat-tools-4xq6`).
+      source: d.kind === "undetermined" ? sourceOfKind(d.module.endsWith(".json") ? "json-schema" : "zod-object") : sourceOfKind(d.kind),
+      ...(d.canonical ? { canonical: d.canonical } : {}),
       // `line` is NOT carried, and the reader keeps it — the difference is
       // the whole of this comment.
       //
@@ -413,6 +431,7 @@ function projection(
       exported: d.exported,
     })),
     edges: g.edges,
+    ...(g.unread.length ? { unread: g.unread } : {}),
     nodeKinds,
     sources,
   };
@@ -492,6 +511,9 @@ import { declaredPageRoute, declaredRoute, withRenderedBy, tileDirectories } fro
 import { subjectNav, subjectNavCss, themedPage } from "./lib/themed-page.ts";
 import { siteTarget } from "./lib/site-target.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
+import { CLASS_DIAGRAM_CSS, CLASS_DIAGRAM_JS } from "./class-diagram.ts";
+import { cardinalityOf } from "./schema-graph.ts";
+import { sourceOfKind, typeLink, umlType } from "./type-links.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "schemas-viewer";
@@ -583,10 +605,14 @@ export function viewerHtml(dataHref: string, scope = "", subjects: readonly stri
 .sc-page .opt { color: var(--muted); }
 .sc-page a { color: var(--accent); }
 .sc-page svg { max-width: 100%; height: auto; display: block; margin: 8px 0 16px; }
-.sc-page .uml-box { fill: var(--box); stroke: var(--line); }
-.sc-page .uml-box.sel { stroke: var(--accent); stroke-width: 2; }
-.sc-page .uml-t { fill: var(--fg); font: 600 12px ui-monospace, Menlo, monospace; }
-.sc-page .uml-f { fill: var(--muted); font: 11px ui-monospace, Menlo, monospace; }
+/* Boxes take the uml.css colours, light in both schemes, as every UML figure
+   does (bean cat-tools-4xq6): one look for every source and every page. */
+.sc-page .uml-box { fill: var(--fa-uml-schema, #e9edf3); stroke: var(--fa-uml-edge, #1b2432); }
+.sc-page .uml-box.sel { stroke: #2f5d9e; stroke-width: 2.2; }
+.sc-page .uml-t { fill: var(--fa-uml-edge, #1b2432); font: 600 12px ui-monospace, Menlo, monospace; }
+.sc-page .uml-f { fill: var(--fa-uml-edge, #1b2432); font: 11px ui-monospace, Menlo, monospace; }
+.sc-page .uml-st { fill: #4a5568; font: 10px ui-monospace, Menlo, monospace; }
+${CLASS_DIAGRAM_CSS.replace(/^([^{}\n]+)\{/gm, (_m: string, sel: string) => sel.split(",").map((x) => `.sc-page ${x.trim()}`).join(", ") + " {")}
 .sc-page .uml-e { stroke: var(--muted); fill: none; }
 .sc-page .uml-head { fill: var(--box); stroke: var(--muted); }
 .sc-page .uml-tip { fill: none; stroke: var(--muted); stroke-width: 1.4; }
@@ -704,6 +730,9 @@ ${subjectNavCss("sc-page")}
 </div>
 <script>
 "use strict";
+/* The one class-diagram renderer (scripts/class-diagram.ts), the same text
+   the skill and Tool pages run at build time. */
+${CLASS_DIAGRAM_JS}
 var G = null, SEL = null;
 var DATA_HREF = "${dataHref}";
 /* The SUBJECT this page is scoped to, or "" for the handler's whole view.
@@ -732,103 +761,57 @@ function withCode(s) {
 }
 function byId(id) { return G.declIndex[id]; }
 
-/* A one-type UML neighbourhood: generalisations above, references below.
-   Built as SVG text so the page keeps its no-dependency rule. */
-function uml(d) {
-  var CH = 7.0, PAD = 10, LH = 15, HEAD = 22;
-  var maxChars = (typeof window !== "undefined" && window.innerWidth < 640) ? 42 : 76;
-  var maxTypeChars = (typeof window !== "undefined" && window.innerWidth < 640) ? 28 : 64;
-  function box(x, y, title, fields, sel) {
-    // Truncation is STATED, not silent. A box showing 8 of 24 fields with no
-    // mark reads as a type with 8 fields, which is a wrong diagram rather than
-    // an abbreviated one.
-    var rows = fields.slice(0, 8);
-    if (fields.length > rows.length) rows = rows.concat(["… " + (fields.length - rows.length) + " more"]);
-    var w = Math.max(title.length, 8);
-    rows.forEach(function (r) { w = Math.max(w, r.length); });
-    w = Math.min(w, maxChars) * CH + PAD * 2;
-    var h = HEAD + (rows.length ? rows.length * LH + 6 : 0);
-    var g = '<g><rect class="uml-box' + (sel ? " sel" : "") + '" x="' + x + '" y="' + y +
-      '" width="' + w + '" height="' + h + '" rx="4"/>' +
-      '<text class="uml-t" x="' + (x + PAD) + '" y="' + (y + 15) + '">' + esc(title.slice(0, maxChars)) + "</text>";
-    if (rows.length) {
-      g += '<line class="uml-e" x1="' + x + '" y1="' + (y + HEAD) + '" x2="' + (x + w) + '" y2="' + (y + HEAD) + '"/>';
-      rows.forEach(function (r, i) {
-        g += '<text class="uml-f" x="' + (x + PAD) + '" y="' + (y + HEAD + 14 + i * LH) + '">' + esc(r.slice(0, maxChars)) + "</text>";
-      });
-    }
-    return { svg: g + "</g>", w: w, h: h };
-  }
-  var parents = (d.extendsNames || []).map(function (n) {
-    var e = (G.edges || []).filter(function (x) { return x.from === d.id && x.kind === "extends"; })
-      .map(function (x) { return byId(x.to); }).filter(Boolean)
-      .find(function (t) { return t.name === n; });
-    return e || { id: null, name: n, fields: [] };
-  });
-  var refs = [];
+/* A one-type UML neighbourhood: generalisations above, references below,
+   drawn by classDiagram -- the renderer every page shares, so a type looks the
+   same here, on a skill's page and on a Tool's page, whichever source it was
+   read from. Every box links to its declaration; every type to its definition. */
+function umlClass(t, sel) {
+  var targets = {};
   (G.edges || []).forEach(function (x) {
-    if (x.from !== d.id || x.kind !== "field") return;
+    if (x.from === t.id && x.via && byId(x.to)) targets[x.via] = x.to;
+  });
+  return {
+    id: t.id, name: t.name, source: t.source || "zod", sel: sel,
+    und: t.kind === "undetermined", note: t.kind === "undetermined" ? "could not determine: " + (t.note || "") : "",
+    href: "#" + encodeURIComponent(t.id), values: t.values || [],
+    fields: (t.fields || []).map(function (f) {
+      var links = f.links || {}, first = Object.keys(links)[0];
+      return {
+        name: f.name, type: f.utype || f.type, card: f.card,
+        href: targets[f.name] ? "#" + encodeURIComponent(targets[f.name]) : (first ? links[first] : "")
+      };
+    })
+  };
+}
+function uml(d) {
+  var classes = [umlClass(d, true)], edges = [], seen = {}, n = 0;
+  seen[d.id] = true;
+  (G.edges || []).forEach(function (x) {
+    if (x.from !== d.id) return;
     var t = byId(x.to);
-    if (t && !refs.some(function (r) { return r.t.id === t.id; })) refs.push({ t: t, via: x.via, arr: x.array, opt: x.optional });
+    if (!t) return;
+    if (!seen[t.id]) {
+      /* Truncation is STATED: the caption below counts what was not drawn. */
+      if (x.kind !== "extends" && n >= 8) { n++; return; }
+      if (x.kind !== "extends") n++;
+      seen[t.id] = true;
+      classes.push(umlClass(t, false));
+    }
+    var f = (d.fields || []).filter(function (ff) { return ff.name === x.via; })[0];
+    edges.push({ from: d.id, to: t.id, kind: x.kind, via: x.via, card: f && x.kind !== "extends" ? f.card : "",
+      comp: t.name.indexOf(d.name + ".") === 0 });
   });
-  refs = refs.slice(0, 6);
-  var selFields = (d.fields || []).map(function (f) {
-    return f.name + (f.optional ? "?" : "") + ": " + f.type.replace(/^z\\./, "").slice(0, maxTypeChars);
+  /* A base that resolved to nothing here is still a generalisation: drawn as
+     an outside box, never dropped. */
+  (d.extendsNames || []).forEach(function (nm) {
+    if (classes.some(function (c) { return c.name === nm; })) return;
+    var id = "ext:" + nm;
+    classes.push({ id: id, name: nm, source: d.source || "zod", ext: true, fields: [] });
+    edges.push({ from: d.id, to: id, kind: "extends" });
   });
-
-  var W = 0, parts = [], y = 0;
-  var px = 0, prow = [];
-  parents.forEach(function (p) {
-    var b = box(px, y, p.name, [], false);
-    prow.push({ b: b, x: px, cx: px + b.w / 2, bottom: y + b.h });
-    px += b.w + 24;
-  });
-  var prowW = px - 24;
-  if (prow.length) { W = Math.max(W, prowW); y += 46; }
-  var sel = box(0, y, d.name, selFields, true);
-  var selTop = y, selBottom = y + sel.h, selCx = sel.w / 2;
-  W = Math.max(W, sel.w);
-  y += sel.h + 46;
-  var rx = 0, rrow = [];
-  refs.forEach(function (r) {
-    var b = box(rx, y, r.t.name, [], false);
-    rrow.push({ b: b, x: rx, cx: rx + b.w / 2, top: y, via: r.via + (r.arr ? "[]" : "") + (r.opt ? "?" : "") });
-    rx += b.w + 24;
-  });
-  if (rrow.length) { W = Math.max(W, rx - 24); y += 40; } else { y -= 46; }
-
-  // Shift the parent row so it sits over the selected box rather than at the
-  // left margin: a generalisation that elbows sideways for no reason reads as
-  // pointing somewhere else.
-  var pShift = prow.length ? Math.max(0, Math.round(sel.w / 2 - prowW / 2)) : 0;
-  if (pShift > 0) W = Math.max(W, prowW + pShift);
-  prow.forEach(function (p) {
-    p.cx += pShift;
-    p.b.svg = p.b.svg.replace(/x="(\d+(?:\.\d+)?)"/, function (m0, v) {
-      return 'x="' + (parseFloat(v) + pShift) + '"';
-    });
-    parts.push(p.b.svg);
-    parts.push('<path class="uml-e" d="M' + p.cx + ' ' + p.bottom + ' L' + p.cx + ' ' + (selTop - 10) +
-      ' L' + selCx + ' ' + (selTop - 10) + ' L' + selCx + ' ' + selTop + '" marker-end="url(#gen)"/>');
-  });
-  parts.push(sel.svg);
-  rrow.forEach(function (r) {
-    parts.push(r.b.svg);
-    parts.push('<path class="uml-e" d="M' + selCx + ' ' + selBottom + ' L' + selCx + ' ' + (r.top - 14) +
-      ' L' + r.cx + ' ' + (r.top - 14) + ' L' + r.cx + ' ' + r.top + '" marker-end="url(#ref)"/>');
-    parts.push('<text class="uml-l" x="' + (r.cx + 4) + '" y="' + (r.top - 18) + '">' + esc(r.via) + "</text>");
-  });
-  var H = y + 8;
-  return '<svg viewBox="0 0 ' + (W + 4) + " " + H + '" width="' + (W + 4) + '" role="img" aria-label="Neighbourhood of ' +
-    esc(d.name) + '"><defs>' +
-    /* UML notation, kept: a HOLLOW triangle is generalisation, an open arrow
-       is an association. Drawing both the same way would say the two edge
-       kinds are one relation, which is the thing the reader works to keep
-       apart. */
-    '<marker id="gen" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="9" markerHeight="9" orient="auto-start-reverse">' +
-    '<path d="M1 1 L11 6 L1 11 z" class="uml-head"/></marker>' +
-    '<marker id="ref" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">' +
-    '<path d="M1 1 L9 5 L1 9" class="uml-tip"/></marker></defs>' + parts.join("") + "</svg>";
+  return '<div class="cd-wrap">' + classDiagram({ classes: classes, edges: edges, label: "Neighbourhood of " + d.name,
+    maxWidth: Math.max(320, (($("detail") && $("detail").clientWidth) || 900) - 56) }) + "</div>" +
+    (n > 8 ? '<p class="sub">' + (n - 8) + " further referenced type(s) not drawn; they are listed under References.</p>" : "");
 }
 
 function detail(d) {
@@ -1172,12 +1155,12 @@ function diagram() {
   }
 
   var L = diaLayout(m);
-  var CH = 7.0, PAD = 10, LH = 15, HEAD = 22, GAPX = 46, GAPY = 96;
+  var CH = 7.0, PAD = 10, LH = 15, HEAD = 34, GAPX = 46, GAPY = 96;
 
   /* Boxes first, to know their sizes before placing anything. */
   var boxes = m.decls.map(function (d) {
     var fields = (d.fields || []).map(function (f) {
-      return f.name + (f.optional ? "?" : "") + ": " + f.type.replace(/^z\./, "").slice(0, 24);
+      return f.name + " : " + (f.utype || f.type).slice(0, 24) + (f.card ? " [" + f.card + "]" : "");
     });
     var rows = fields.slice(0, 6);
     if (fields.length > rows.length) rows = rows.concat(["… " + (fields.length - rows.length) + " more"]);
@@ -1318,7 +1301,9 @@ function diagram() {
       ". Click to open its definition.</title>" +
       '<rect class="uml-box' + (SEL === d.id ? " sel" : "") + '" x="' + bx.x.toFixed(1) + '" y="' + bx.y.toFixed(1) +
       '" width="' + bx.w.toFixed(1) + '" height="' + bx.h.toFixed(1) + '" rx="4"/>' +
-      '<text class="uml-t" x="' + (bx.x + PAD).toFixed(1) + '" y="' + (bx.y + 15).toFixed(1) + '">' +
+      '<text class="uml-st" x="' + (bx.x + bx.w - 6).toFixed(1) + '" y="' + (bx.y + 12).toFixed(1) + '" text-anchor="end">\u00ab' +
+      esc(d.source || "zod") + "\u00bb</text>" +
+      '<text class="uml-t" x="' + (bx.x + PAD).toFixed(1) + '" y="' + (bx.y + 27).toFixed(1) + '">' +
       esc(d.name.slice(0, 34)) + "</text>";
     if (bx.rows.length) {
       g += '<line class="uml-e" x1="' + bx.x.toFixed(1) + '" y1="' + (bx.y + HEAD).toFixed(1) +

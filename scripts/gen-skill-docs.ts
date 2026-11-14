@@ -28,7 +28,8 @@ import { join, resolve, basename, dirname, relative, isAbsolute, sep } from "pat
 
 import { isSkillMd, kgDirectories, corpusScopeFor } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
-import { processRows, type ProcessRow } from "./gen-processes-viz.js";
+import { instanceRoots, processRows, type ProcessRow } from "./gen-processes-viz.js";
+import { forgeHrefFor, skillContractSectionMd } from "./tool-page.ts";
 import { checkoutRootFor, readDeclaration, siteDirFor, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { stripInlineCode } from "../schemas/content/inline-code.ts";
@@ -1104,6 +1105,9 @@ function processesSection(name: string, rows: readonly ProcessRow[]): string[] {
 async function main(): Promise<void> {
   if (!CHECK_ONLY) mkdirSync(TARGETS().dir, { recursive: true });
   const procRows = await processRows();
+  /** Every layer of the checkout, for finding a skill's contracts wherever its layer keeps them. */
+  const contractRoots = instanceRoots(REPO_ROOT);
+  const contractHref = forgeHrefFor(REPO_ROOT);
 
   const indexRows: Record<string, string[]> = {};
   // One page per skill id in a flat output dir; if a skill appears in more than
@@ -1272,6 +1276,8 @@ async function main(): Promise<void> {
       // (math, code, templates) is emitted verbatim, not parsed by Jekyll —
       // including a skill that writes the closing raw tag itself (bean kjbb).
       page.push(...wrapRaw(body.trimEnd()));
+      // The skill's I/O contracts as a class diagram (bean `cat-tools-4xq6`).
+      page.push(...skillContractSectionMd(name, contractRoots, REPO_ROOT, contractHref));
       page.push(...processesSection(name, procRows));
       page.push("");
       emit(join(OUT_DIR, `${published}.md`), page.join("\n"));
