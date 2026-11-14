@@ -1,6 +1,7 @@
 # scripts/translate-pot.ts fills the EMPTY msgstr entries of a layer's gettext catalogues with a
 # self-hosted open MT engine, flags each `#, fuzzy`, refuses strings whose placeholders do not
-# round-trip, and never overwrites a filled msgstr. Each Scenario names the test that executes it.
+# round-trip, and never overwrites a filled msgstr. Singular strings go through the one candidates
+# writer (translation-candidates/v1); plural entries are filled directly. Each Scenario names the test that executes it.
 Feature: Machine translation of empty catalogue entries
 
   @test:scripts/tests/translate-pot.test.ts::the_catalogue_model_is_lossless::parse_then_serialize_is_the_identity,_comments_and_obsolete_entries_included
@@ -128,3 +129,33 @@ Feature: Machine translation of empty catalogue entries
     Given the case in the CLI over a translations tree
     When the catalogue is filled
     Then --dry-run writes nothing
+
+  @test:scripts/tests/translate-pot.test.ts::singular_and_plural_passes::entries:_singular_fills_only_singular_entries,_plural_only_plural_ones
+  Scenario: Entries: singular fills only singular entries, plural only plural ones
+    Given the case in singular and plural passes
+    When the catalogue is filled
+    Then entries: singular fills only singular entries, plural only plural ones
+
+  @test:scripts/tests/translate-pot.test.ts::singular_and_plural_passes::newSingulars_lists_the_singular_entries_a_fill_gave_text,_and_no_others
+  Scenario: NewSingulars lists the singular entries a fill gave text, and no others
+    Given the case in singular and plural passes
+    When the catalogue is filled
+    Then newSingulars lists the singular entries a fill gave text, and no others
+
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::singular_strings_become_candidates_through_the_one_writer,_for_the_review_page
+  Scenario: Singular strings become candidates through the one writer, for the review page
+    Given the case in the CLI over a translations tree
+    When the catalogue is filled
+    Then singular strings become candidates through the one writer, for the review page
+
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::plural_entries_are_still_filled_with_the_target's_plural_count,_outside_the_candidates_file
+  Scenario: Plural entries are still filled with the target's plural count, outside the candidates file
+    Given the case in the CLI over a translations tree
+    When the catalogue is filled
+    Then plural entries are still filled with the target's plural count, outside the candidates file
+
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::a_catalogue_that_says_DO_NOT_MACHINE-FILL_gets_candidates,_but_its_.po_is_not_changed
+  Scenario: A catalogue that says DO NOT MACHINE-FILL gets candidates, but its .po is not changed
+    Given the case in the CLI over a translations tree
+    When the catalogue is filled
+    Then a catalogue that says DO NOT MACHINE-FILL gets candidates, but its .po is not changed
