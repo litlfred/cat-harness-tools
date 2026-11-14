@@ -33,6 +33,23 @@
  * - the address is Jekyll's (`jekyll-permalink.ts`): front-matter
  *   `permalink`, else the `_config.yml` default, else the source path.
  *
+ * ## A page that declares its own navigation
+ *
+ * Front matter cannot say everything a page set's own menu says: a menu
+ * entry that is not a Jekyll page (a generated page with no front matter, a
+ * PDF, a link to another site), a group that is a label rather than a page,
+ * and an order the author chose. A page that DECLARES its navigation
+ * (`data-fa-visualiser-nav`, `navbar.ts`) has said all of that already, and
+ * the rail draws the declaration as that page's own section. So, given the
+ * declarations ({@link declaredNavsIn}), a Pages row whose page declares one
+ * takes its children FROM the declaration: the same entries, in the same
+ * order and nesting, under the same labels, with no re-sorting and no
+ * folding. A front-matter child of that row the declaration does not reach
+ * (neither it nor any page below it is listed there) is kept after the
+ * declared entries, so no page vanishes; a front-matter page that only
+ * stood in for a declared group (all its pages listed under the group) is
+ * not drawn twice.
+ *
  * A page whose `parent` names no listed page is kept at the top level and
  * REPORTED (`orphans`), never dropped: a page that vanishes from the
  * navigation reads as a page that does not exist.
@@ -45,7 +62,7 @@ import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 import { pagePermalink, permalinkDefaultsIn, scopeApplies } from "./jekyll-permalink.ts";
-import type { NavItem } from "./navbar.ts";
+import { VISUALISER_NAV_ATTR, type NavItem, type VisualiserNavEntry } from "./navbar.ts";
 
 /** One page as the theme's navigation sees it. */
 export interface JekyllNavPage {
@@ -228,10 +245,12 @@ function byLocaleTitle(collator: Intl.Collator): (a: JekyllNavPage, b: JekyllNav
 
 function shiftDepth(item: NavItem, delta: number): NavItem {
   const nextDepth = (item.depth ?? 0) + delta;
+  const children = item.children?.map((c) => shiftDepth(c, delta));
+  if (children && DECLARED_ROWS.has(item.children!)) DECLARED_ROWS.add(children);
   return {
     ...item,
     ...(nextDepth > 0 ? { depth: nextDepth } : {}),
-    ...(item.children ? { children: item.children.map((c) => shiftDepth(c, delta)) } : {}),
+    ...(children ? { children } : {}),
   };
 }
 
@@ -241,14 +260,108 @@ export function childPages(n: number): string {
 }
 
 /**
+ * A page's declared navigation with every on-site href made site-absolute
+ * (`/concepts.html`), as {@link pagesNav} takes it. An off-site href
+ * (`https://…`) is kept as it is.
+ */
+export type DeclaredPageNav = readonly VisualiserNavEntry[];
+
+/** The comparable form of a site-absolute URL: no query or fragment, `index.html` as its directory. */
+function pageKey(url: string): string {
+  return url.replace(/[?#].*$/, "").replace(/(^|\/)index\.html$/, "$1");
+}
+
+const OFF_SITE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
+
+/**
+ * A declaration's entries read off a built page at `toRoot` (`.`, `..`), with
+ * each on-site href made site-absolute. `undefined` when an href is neither
+ * off-site nor under `toRoot` — an in-page anchor (`#x`) — because entries
+ * that are places on one page are that page's contents, not pages.
+ */
+export function siteAbsoluteDeclaration(entries: readonly VisualiserNavEntry[], toRoot: string): DeclaredPageNav | undefined {
+  const at = `${toRoot}/`;
+  const abs = (href: string | undefined): string | undefined | false => {
+    if (href === undefined || href === "") return undefined;
+    if (OFF_SITE.test(href)) return href;
+    if (href.startsWith(at)) return `/${href.slice(at.length)}`;
+    return false;
+  };
+  const out: VisualiserNavEntry[] = [];
+  for (const e of entries) {
+    if (typeof e?.label !== "string" || !e.label) continue;
+    const href = abs(typeof e.href === "string" ? e.href : undefined);
+    if (href === false) return undefined;
+    const items: Array<{ label: string; href?: string }> = [];
+    for (const k of Array.isArray(e.items) ? e.items : []) {
+      if (typeof k?.label !== "string" || !k.label) continue;
+      const kh = abs(typeof k.href === "string" ? k.href : undefined);
+      if (kh === false) return undefined;
+      items.push({ label: k.label, ...(kh ? { href: kh } : {}) });
+    }
+    out.push({ label: e.label, ...(href ? { href } : {}), ...(items.length ? { items } : {}) });
+  }
+  return out.length ? out : undefined;
+}
+
+/**
+ * The declared navigation of every listed page that has pages under it,
+ * read off the BUILT site at `siteDir` before the rail is put in (the rail
+ * moves a declaration into shared data). Keyed by the page's URL as
+ * {@link JekyllNavPage.url} gives it. A page with no children is not read:
+ * its declaration has no Pages rows to stand for.
+ */
+export function declaredNavsIn(siteDir: string, pages: readonly JekyllNavPage[]): Map<string, DeclaredPageNav> {
+  const out = new Map<string, DeclaredPageNav>();
+  const parents = new Set(pages.map((p) => p.parent).filter((t): t is string => t !== undefined));
+  for (const p of pages) {
+    if (!parents.has(p.title) || out.has(p.url)) continue;
+    const rel = p.url.replace(/^\/+/, "").replace(/[?#].*$/, "");
+    const file = rel === "" || rel.endsWith("/") ? `${rel}index.html` : rel;
+    if (!/\.html$/i.test(file)) continue;
+    const abs = join(siteDir, file);
+    if (!existsSync(abs)) continue;
+    const entries = visualiserNavEntriesOf(readFileSync(abs, "utf-8"));
+    if (!entries) continue;
+    const depth = file.split("/").length - 1;
+    const declared = siteAbsoluteDeclaration(entries, depth === 0 ? "." : new Array(depth).fill("..").join("/"));
+    if (declared) out.set(p.url, declared);
+  }
+  return out;
+}
+
+/**
+ * The entries of a page's declared navigation (`visualiserNavDeclaration`,
+ * `navbar.ts`), as written, or `undefined` when it declares none or declares
+ * it badly. `visualiserNavOf` reads the same element into the page's own
+ * section; it is not reused here because it returns rail rows, not entries,
+ * and changing it changes the browser bundle (`navbar.js`) it is part of.
+ */
+export function visualiserNavEntriesOf(html: string): VisualiserNavEntry[] | undefined {
+  const m = new RegExp(`<script\\b[^>]*\\b${VISUALISER_NAV_ATTR}\\b[^>]*>([\\s\\S]*?)</script>`, "i").exec(html);
+  if (!m) return undefined;
+  try {
+    const raw = JSON.parse(m[1]!) as unknown;
+    return Array.isArray(raw) ? (raw as VisualiserNavEntry[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Children arrays drawn from a declaration: never re-sorted or folded. */
+const DECLARED_ROWS = new WeakSet<readonly NavItem[]>();
+
+/**
  * The page tree as rail rows. `prefix` is put before every site-absolute URL
  * (`..` for a page one level down; `""` for Liquid, whose `relative_url` adds
  * the base). `here` — the current page's URL — is drawn as "you are here".
  * `locale` orders each level alphabetically in the reader's locale (bean `xka5`).
+ * `declared` gives, by page URL, the navigation a page declares
+ * ({@link declaredNavsIn}); that page's children are drawn from it.
  */
 export function pagesNav(
   pages: readonly JekyllNavPage[],
-  o: { prefix?: string; here?: string; locale?: string } = {},
+  o: { prefix?: string; here?: string; locale?: string; declared?: ReadonlyMap<string, DeclaredPageNav> } = {},
 ): { items: NavItem[]; orphans: string[] } {
   const prefix = o.prefix ?? "";
   const collator = makeCollator(o.locale);
@@ -263,9 +376,49 @@ export function pagesNav(
           : p.parent === parent.title && (p.grandParent === undefined || p.grandParent === grand?.title) && p !== parent,
       )
       .sort(cmp);
+  const hrefOf = (url: string): { href: string } | { current: true } =>
+    !OFF_SITE.test(url) && o.here !== undefined && pageKey(o.here) === pageKey(url)
+      ? { current: true }
+      : { href: OFF_SITE.test(url) ? url : `${prefix}${url}` };
+  /** Every page at or below `p` in the front-matter tree. */
+  const below = (p: JekyllNavPage, grand: JekyllNavPage | undefined, seen = new Set<JekyllNavPage>()): JekyllNavPage[] => {
+    if (seen.has(p)) return [];
+    seen.add(p);
+    return [p, ...kidsOf(p, grand).flatMap((k) => below(k, p, seen))];
+  };
+  const declaredKids = (p: JekyllNavPage, grand: JekyllNavPage | undefined, depth: number, entries: DeclaredPageNav): NavItem[] => {
+    const covered = new Set<string>();
+    for (const e of entries) {
+      if (e.href && !OFF_SITE.test(e.href)) covered.add(pageKey(e.href));
+      for (const k of e.items ?? []) if (k.href && !OFF_SITE.test(k.href)) covered.add(pageKey(k.href));
+    }
+    const leaf = (label: string, href: string | undefined, d: number): NavItem => ({
+      label,
+      depth: d,
+      ...(href ? hrefOf(href) : {}),
+    });
+    const out: NavItem[] = entries.map((e) => {
+      const kids = (e.items ?? []).map((k) => leaf(k.label, k.href, depth + 2));
+      if (kids.length) DECLARED_ROWS.add(kids);
+      return { ...leaf(e.label, e.href, depth + 1), ...(kids.length ? { children: kids, fold: childPages(kids.length) } : {}) };
+    });
+    // A front-matter child the declaration does not reach stays, after it.
+    for (const k of kidsOf(p, grand)) {
+      if (below(k, p).some((b) => covered.has(pageKey(b.url)))) continue;
+      out.push(row(k, p, depth + 1, p));
+    }
+    DECLARED_ROWS.add(out);
+    return out;
+  };
   const row = (p: JekyllNavPage, grand: JekyllNavPage | undefined, depth: number, parent?: JekyllNavPage): NavItem => {
-    // just-the-docs nests three levels; deeper is not navigation.
-    const kids = depth < 2 ? kidsOf(p, grand).map((k) => row(k, p, depth + 1, p)) : [];
+    const declared = o.declared?.get(p.url);
+    // just-the-docs nests three levels; deeper is not navigation. A declared
+    // section is the page set's own, drawn as it declares it.
+    const kids = declared
+      ? declaredKids(p, grand, depth, declared)
+      : depth < 2
+        ? kidsOf(p, grand).map((k) => row(k, p, depth + 1, p))
+        : [];
     const here = o.here !== undefined && o.here === p.url;
     return {
       label: parent === undefined ? p.title : labelUnder(p.title, parent.title),
@@ -292,7 +445,11 @@ export function pagesNav(
     const built = row(p, undefined, 0);
     if (isHarnessDocsRoot(p.url, h) && group.root === undefined) {
       group.root = p;
-      if (built.children) group.children.push(...built.children);
+      if (built.children && DECLARED_ROWS.has(built.children) && group.children.length === 0) {
+        group.children = [...built.children];
+        DECLARED_ROWS.add(group.children);
+      }
+      else if (built.children) group.children.push(...built.children);
     } else {
       group.children.push(shiftDepth(built, 1));
     }
@@ -304,7 +461,7 @@ export function pagesNav(
     const label = group.root?.title ?? h;
     const here = group.root !== undefined && o.here !== undefined && o.here === group.root.url;
     const href = group.root !== undefined && !here ? `${prefix}${group.root.url}` : undefined;
-    const children = [...group.children].sort((a, b) => collator.compare(a.label, b.label));
+    const children = DECLARED_ROWS.has(group.children) ? group.children : [...group.children].sort((a, b) => collator.compare(a.label, b.label));
     topItems.push({
       item: {
         label,
@@ -362,8 +519,9 @@ export function labelUnder(title: string, parentTitle: string): string {
  * when the current page is inside it (`navbar.ts`).
  */
 export function foldTitlePrefixes(items: readonly NavItem[]): NavItem[] {
+  // A declared section is drawn as declared (`pagesNav`, `declared`).
   const recur = (item: NavItem): NavItem =>
-    item.children ? { ...item, children: foldTitlePrefixes(item.children) } : item;
+    item.children && !DECLARED_ROWS.has(item.children) ? { ...item, children: foldTitlePrefixes(item.children) } : item;
   const families = new Map<string, number>();
   for (const item of items) {
     const p = titlePrefix(item.label);
