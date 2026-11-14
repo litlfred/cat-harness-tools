@@ -34,6 +34,7 @@
  * a given file map equals the direct on-disk comparison, file for file.
  */
 import { existsSync, readFileSync } from "node:fs";
+import { overlayPath } from "./lib/layer-output.ts";
 import { join } from "node:path";
 
 import { BranchStore, resolveTipLocation, type TipLocation } from "./branch-store.ts";
@@ -85,7 +86,9 @@ export function compareRoute(id: string, files: ReadonlyMap<string, string>, rep
   if (a.reason !== undefined) return { state: "unknown", authority: a.authority, stale: [], reason: a.reason };
 
   const onDisk = (p: string): string | undefined => {
-    const abs = join(repoRoot, p);
+    // Through the layer output overlay: a mounted layer's computed pages are
+    // at its output root (bean `cat-tools-sm8r`, item 4), else the pinned copy.
+    const abs = overlayPath(join(repoRoot, p), repoRoot);
     return existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
   };
 

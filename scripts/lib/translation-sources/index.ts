@@ -25,7 +25,7 @@ export const SOURCE_IDS = ["opus-mt", "libretranslate"] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];
 
 export interface SourceOptions {
-  /** OPUS-MT runner command; default `python3 <scripts>/opus-mt-runner.py`. */
+  /** OPUS-MT runner command; default `python3 -I <scripts>/translation/opus_mt_runner.py`. */
   runner: string[];
   run: CommandRunner;
   /** LibreTranslate base URL. */

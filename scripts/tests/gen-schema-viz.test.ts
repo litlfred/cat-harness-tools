@@ -46,13 +46,15 @@ describe("schemas visualiser wireframe fixes (folio-assistant-nnpk)", () => {
     expect(html).toContain("#detail table td:first-child code { white-space: nowrap; }");
   });
 
-  it("Finding 5: UML box adjusts field type truncation width for desktop viewports", () => {
-    // uml function defines responsive/desktop truncation limits
-    expect(html).toContain("maxChars = (typeof window !== \"undefined\" && window.innerWidth < 640) ? 42 : 76;");
-    expect(html).toContain("maxTypeChars = (typeof window !== \"undefined\" && window.innerWidth < 640) ? 28 : 64;");
-    // box width and text slicing use maxChars and maxTypeChars
-    expect(html).toContain("Math.min(w, maxChars) * CH + PAD * 2");
-    expect(html).toContain("f.type.replace(/^z\\./, \"\").slice(0, maxTypeChars)");
+  it("Finding 5: UML box truncation is stated, through the one shared renderer", () => {
+    // The selected type is drawn by classDiagram (scripts/class-diagram.ts),
+    // inlined here and run at build time for skill and Tool pages (bean cat-tools-4xq6).
+    expect(html).toContain("function classDiagram(model)");
+    expect(html).toContain("return classDiagram({ classes: classes, edges: edges, label:".replace("return ", ""));
+    // A box shows at most MAXR rows and says how many it left out.
+    expect(html).toContain('"\\u2026 " + more + " more"');
+    // A clipped name or type ends in an ellipsis rather than being cut silently.
+    expect(html).toContain('s.slice(0, n - 1) + "\\u2026"');
   });
 });
 
