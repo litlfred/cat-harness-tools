@@ -189,6 +189,33 @@
 #
 # A PR labelled `release` runs the full tier, as every ready PR did before.
 #
+# THE PREVIEW TIER (owner, 2026-11-14, card "Preview QA", A: "if a
+# staging/preview branch is being built, then if a CI test is in the
+# dependency cone of a change then it should be run and the QA report page(s)
+# should show that on top"). A PR labelled `preview` (and not `release`) runs
+# only the change's DEPENDENCY CONE, judged against main's STORED answer, and
+# the preview build shows it on top of every QA page (`scripts/preview-qa.ts`):
+#   - tests: the files `affected-tests.ts` selects, the ones whose import
+#     closure holds a changed path (prepare-head's "The change's cone"). A
+#     change to what every test runs under (lockfile, manifest, tsconfig,
+#     preload) runs NO test, and the page says so and names the `release`
+#     tier (owner, card "Select all": say so, run gates only);
+#   - gates: the CI cone, as on the full tier (`GATE_CONE=skip`): a gate whose
+#     recorded read set is unchanged since main's record is skipped as
+#     unchanged, so every gate that runs is in the cone;
+#   - main's side is NEVER computed: prepare-base only restores the answer a
+#     run on main stored for the PR's base. Without one, a red check is
+#     `unknown`, never `new`. Only head shards run.
+#   - `compare` reports as "This change (preview; advisory)", judges nothing
+#     red, and uploads `preview-qa-<head sha>` (the report), which the site
+#     publish of the PR's branch puts on top of its QA pages
+#     (`folio-site-publish.yml`, `stage-local.ts`).
+# Runner cost: the head shards, with the tests cut to the cone and the gates
+# to the CI cone; a PR with no stored main answer saves the whole base side.
+# The label is the opt-in, so the release-gated rule stands: an unlabelled PR
+# still runs the fast tier only. `preview` starts the tier when added, like
+# `release`, once the caller's own `if` and concurrency group let it through.
+#
 # ADDING THE `release` LABEL STARTS THE FULL TIER, once the caller lists
 # `labeled` in its `pull_request` types (owner, 2026-11-11, card B: every PR
 # passes the full tier before merge). Without it the label starts nothing,
@@ -206,11 +233,11 @@
 #     pull_request:
 #       types: [opened, synchronize, reopened, ready_for_review, labeled]
 #   concurrency:
-#     group: harness-pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release') && format('noop-label-{0}', github.run_id) || github.ref }}
+#     group: harness-pr-checks-${{ (github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id) || github.ref }}
 #     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 #   jobs:
 #     checks:
-#       if: github.event.action != 'labeled' || github.event.label.name == 'release'
+#       if: github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview'
 #
 # An all-skipped run judges nothing; merge-guard's check 5 lets it never
 # displace an earlier run of the same workflow on the head.
@@ -375,7 +402,7 @@ permissions:
 # A `labeled` run for any label but `release` is a no-op, in a group of its
 # own: in the PR's group it would cancel the PR's real run.
 concurrency:
-  group: layer-pr-checks-${{ github.repository }}-${{ (github.event.action == 'labeled' && github.event.label.name != 'release') && format('noop-label-{0}', github.run_id) || github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.ref, github.event_name == 'push' && github.sha || 'run') }}
+  group: layer-pr-checks-${{ github.repository }}-${{ (github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview') && format('noop-label-{0}', github.run_id) || github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.ref, github.event_name == 'push' && github.sha || 'run') }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The instance, once: the input when given, else (layer mode) the calling
@@ -397,7 +424,7 @@ jobs:
     # A push to main has no PR side: it records main's side (the CI cone),
     # and is always the full tier.
     # Nor on a no-op `labeled` event (any label but `release`).
-    if: ${{ github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && github.event_name != 'push' }}
+    if: ${{ github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview') && github.event_name != 'push' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -414,6 +441,12 @@ jobs:
       typecheck: ${{ steps.tsc.outcome }}
       # Formerly the outputs of the `tier` and `ready-reuse` jobs.
       full: ${{ steps.tier.outputs.full }}
+      # The preview tier (the header): `full` is true for it too, so the
+      # machinery runs; this says to cut it to the change's cone.
+      preview: ${{ steps.tier.outputs.preview }}
+      # The selected test files, as `bun test` is given them from the root,
+      # space-separated; empty for none. And why, when it is none.
+      preview-tests: ${{ steps.preview-cone.outputs.tests }}
       reuse: ${{ steps.decide.outputs.reuse }}
       run-url: ${{ steps.decide.outputs.run_url }}
       # The verdict of the lock step, for the `lock-coherence` job.
@@ -437,8 +470,10 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           PAYLOAD_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'release') || contains(github.event.pull_request.labels.*.name, 'ready-to-merge') }}
+          PAYLOAD_PREVIEW: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
         run: |
           set -uo pipefail
+          echo "preview=false" >> "$GITHUB_OUTPUT"
           if [ "$EVENT" != pull_request ]; then echo "full=true" >> "$GITHUB_OUTPUT"; echo "FULL=true" >> "$GITHUB_ENV"; echo "### Which tier (the PR's live labels): full (not a PR)" >> "$GITHUB_STEP_SUMMARY"; echo "not a PR: the full tier"; exit 0; fi
           api="${GITHUB_API_URL:-https://api.github.com}/repos/$REPO/issues/$PR/labels?per_page=100"
           body="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$api" 2>/dev/null)" \
@@ -452,15 +487,23 @@ jobs:
           if [ "$names" = UNREAD ]; then
             echo "::warning::the PR's labels could not be read from the API; the event payload decides the tier (release or ready-to-merge: $PAYLOAD_FULL)"
             full="$PAYLOAD_FULL"
+            preview="${PAYLOAD_PREVIEW:-false}"
           else
-            full=false
-            for l in $names; do case "$l" in release|ready-to-merge) full=true ;; esac; done
-            echo "live labels: ${names:-none} -> $([ "$full" = true ] && echo 'full tier' || echo 'fast tier')"
+            full=false; preview=false
+            for l in $names; do case "$l" in release|ready-to-merge) full=true ;; preview) preview=true ;; esac; done
           fi
+          # `release` wins: a PR with both runs the full tier.
+          [ "$full" = true ] && preview=false
+          tier="$([ "$full" = true ] && echo full || { [ "$preview" = true ] && echo preview || echo fast; })"
+          [ "$names" != UNREAD ] && echo "live labels: ${names:-none} -> $tier tier"
+          # The preview tier runs the full tier's machinery, cut to the cone.
+          [ "$preview" = true ] && full=true
           echo "full=$full" >> "$GITHUB_OUTPUT"
+          echo "preview=$preview" >> "$GITHUB_OUTPUT"
           # The steps shared with prepare-base and the shards read `env.FULL`.
           echo "FULL=$full" >> "$GITHUB_ENV"
-          echo "### Which tier (the PR's live labels): $([ "$full" = true ] && echo full || echo fast)" >> "$GITHUB_STEP_SUMMARY"
+          echo "PREVIEW=$preview" >> "$GITHUB_ENV"
+          echo "### Which tier (the PR's live labels): $tier" >> "$GITHUB_STEP_SUMMARY"
       # ---- Lock pins agree with each other and are at main ----
       # Every pin of a pull request that changes `index.lock.json` is FRESH: at its
       # repository's main HEAD, or a descendant of it (owner, 2026-11-11), as main
@@ -1066,6 +1109,46 @@ jobs:
         if: steps.skip-prep.outputs.hit != 'true'
         working-directory: fa
         run: bun install
+      # The preview tier's test cone (the header; `scripts/preview-qa.ts`).
+      # The selection is `affected-tests.ts`, which needs the index's packages,
+      # so it runs from the mounted cat-harness-tools; `preview-qa.ts` is taken
+      # from the judging scripts' pin and set beside it for this step only,
+      # since the mount's pin can predate it. The caller is `src`, at the PR's
+      # merge commit: its first parent is the main it merges into.
+      - name: The change's cone (preview tier)
+        id: preview-cone
+        if: env.PREVIEW == 'true' && steps.skip-prep.outputs.hit != 'true'
+        env:
+          TOOLS_REF: ${{ steps.tools-lock.outputs.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PATH_IN_REPO: ${{ inputs.path-in-repo }}
+          PREFIX: ${{ inputs.mode == 'layer' && env.INSTANCE || '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/preview"
+          tmp="fa/cat-harness-tools/scripts/.preview-qa-ci.ts"
+          if ! git -C ci show "HEAD:scripts/preview-qa.ts" > "$tmp" 2>/dev/null; then
+            rm -f "$tmp"
+            echo "::warning::scripts/preview-qa.ts is not at the judging scripts' pin ($TOOLS_REF): the preview tier runs no test"
+            echo "tests=" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          root="src${PATH_IN_REPO:+/$PATH_IN_REPO}"
+          ok=true
+          bun "$tmp" select --root "$root" --base 'HEAD^1' --head HEAD --as "$HEAD_SHA" --base-label main --out "$RUNNER_TEMP/preview/selection.json" || ok=false
+          tests=""
+          [ "$ok" = true ] && tests="$(bun "$tmp" tests --selection "$RUNNER_TEMP/preview/selection.json" --prefix "$PREFIX" | tr '\n' ' ' | sed 's/ *$//')"
+          rm -f "$tmp"
+          if [ "$ok" != true ]; then echo "::warning::the change's cone could not be selected: the preview tier runs no test"; fi
+          echo "tests=$tests" >> "$GITHUB_OUTPUT"
+          echo "selected=$ok" >> "$GITHUB_OUTPUT"
+          { echo "### The change's cone (preview tier)"; echo; echo "Tests: ${tests:-none}"; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the cone's selection for compare (preview tier)
+        if: steps.preview-cone.outputs.selected == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: preview-selection
+          path: ${{ runner.temp }}/preview/selection.json
+          retention-days: 1
       - &chromium
         name: Install Chromium, for the checks that draw through a browser
         # Not on the fast tier (a non-release PR): only derive:publish and the
@@ -1550,7 +1633,7 @@ jobs:
     # 2026-11-13, "A. Collapse into one job"). A push has no prepare-head and
     # is always the full tier.
     needs: [prepare-head]
-    if: ${{ !cancelled() && needs.prepare-head.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && (github.event_name == 'push' || needs.prepare-head.outputs.full == 'true') }}
+    if: ${{ !cancelled() && needs.prepare-head.outputs.reuse != 'true' && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview') && (github.event_name == 'push' || needs.prepare-head.outputs.full == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -1833,6 +1916,7 @@ jobs:
           QUICK: ${{ steps.quick.outputs.quick == 'true' }}
           BASE_HIT: ${{ steps.base-hit.outputs.hit == 'true' }}
           CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
+          PREVIEW: ${{ github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true' }}
         run: |
           hit=false
           # Why nothing runs, for main's verdict on a push (owner, Q-MQA-2 A):
@@ -1845,6 +1929,11 @@ jobs:
             echo "main's integration run already started in this window: this push runs nothing, and the next window's first push judges it" | tee -a "$GITHUB_STEP_SUMMARY"
           elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
           elif [ "$BASE_HIT" = "true" ]; then hit=true
+          elif [ "$PREVIEW" = "true" ]; then
+            # The preview tier never computes main's side (the header): the
+            # cone is judged against main's stored answer, or as unknown.
+            hit=true
+            echo "preview tier: no answer for this PR's base is stored, and main's side is not computed; red checks in the cone read as unknown" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
           echo "hit=$hit" >> "$GITHUB_OUTPUT"
           echo "deferred=$deferred" >> "$GITHUB_OUTPUT"
@@ -1981,7 +2070,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        side: ${{ fromJSON(github.event_name == 'push' && '["base"]' || (needs.prepare-base.outputs.cached == 'true' && '["head"]' || '["base","head"]')) }}
+        side: ${{ fromJSON(github.event_name == 'push' && '["base"]' || ((needs.prepare-base.outputs.cached == 'true' || needs.prepare-head.outputs.preview == 'true') && '["head"]' || '["base","head"]')) }}
         shard: ${{ fromJSON(needs.prepare-base.outputs.shards) }}
     env:
       SIDE: ${{ matrix.side }}
@@ -2102,7 +2191,20 @@ jobs:
           # layer keeps about this one fails on its PR, not at re-pin.
           READERS: ${{ inputs.mode == 'layer' && inputs.test-path == '' && inputs.reader-tests || 0 }}
           BUN_OPTIONS: ${{ inputs.gate-shards > 1 && format('--shard={0}/{1}', matrix.shard, inputs.gate-shards) || '' }}
+          # The preview tier (the header): only the tests in the change's cone.
+          PREVIEW: ${{ github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true' }}
+          PREVIEW_TESTS: ${{ needs.prepare-head.outputs.preview-tests }}
         run: |
+          if [ "$PREVIEW" = "true" ]; then
+            READERS=0
+            TEST_PATH="$PREVIEW_TESTS"
+            if [ -z "$TEST_PATH" ]; then
+              echo "preview tier: no test in the change's cone (or every test is, and none runs: see the cone step)"
+              echo '<?xml version="1.0"?><testsuites tests="0" failures="0"></testsuites>' > "$RUNNER_TEMP/junit.xml"
+              exit 0
+            fi
+            echo "preview tier: the tests in the change's cone: $TEST_PATH"
+          fi
           if [ "${READERS:-0}" -gt 0 ] 2>/dev/null; then
             readers="$(python3 ../ci/.github/scripts/layer-pr-checks/reader-tests.py . "$INSTANCE" "$READERS" | tr '\n' ' ')"
             [ -n "$readers" ] && { echo "with the tests of other instances that name $INSTANCE: $readers"; TEST_PATH="$TEST_PATH $readers"; }
@@ -2222,11 +2324,11 @@ jobs:
     # then skipped, so it never reports the fast tier as "No new failures".
     # It runs when the tier is unknown (prepare-head failed before deciding it),
     # and reports that prepare-head failed.
-    name: ${{ needs.prepare-head.outputs.full == 'false' && 'Fast tier only (advisory; the full checks gate a release)' || 'No new failures (tests and gates)' }}
+    name: ${{ needs.prepare-head.outputs.full == 'false' && 'Fast tier only (advisory; the full checks gate a release)' || (needs.prepare-head.outputs.preview == 'true' && 'This change (preview; advisory)' || 'No new failures (tests and gates)') }}
     needs: [prepare-head, prepare-base, run]
     # A no-op `labeled` run (any label but `release`) judged nothing, so it
     # reports no verdict.
-    if: ${{ !cancelled() && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release') && needs.prepare-head.outputs.full != 'false' }}
+    if: ${{ !cancelled() && github.event.action != 'closed' && (github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview') && needs.prepare-head.outputs.full != 'false' }}
     runs-on: ubuntu-24.04
     outputs:
       main-verdict: ${{ steps.main-verdict.outputs.verdict }}
@@ -2380,6 +2482,7 @@ jobs:
           OWN_SHA: ${{ needs.prepare-base.outputs.own-sha }}
           PIN_AT: ${{ needs.prepare-base.outputs.layers-at }}
           INDEX: ${{ needs.prepare-base.outputs.index }}
+          PREVIEW: ${{ github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true' }}
         run: |
           set -euo pipefail
           sides="base head"
@@ -2389,10 +2492,12 @@ jobs:
             cp -r "$RUNNER_TEMP/base-results" merged/base
             sides="head"
           fi
+          # The preview tier ran the head side only; main's is the stored answer or none.
+          [ "$PREVIEW" = "true" ] && sides="head"
           for side in $sides; do
             python3 .github/scripts/layer-pr-checks/merge-shards.py results "$side" "$N" "merged/$side"
           done
-          if [ "$CACHED" != "true" ]; then
+          if [ "$CACHED" != "true" ] && [ "$PREVIEW" != "true" ]; then
             mkdir -p "$RUNNER_TEMP/base-results"
             cp merged/base/junit.xml merged/base/gates.json "$RUNNER_TEMP/base-results/"
             # Which main this answer is, for a PR that is judged against it
@@ -2414,7 +2519,7 @@ jobs:
             cp merged/head/gates.json "$RUNNER_TEMP/timings/gates.json"
           fi
       - name: Keep main's answer for the next run (bean cis2)
-        if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true'
+        if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true' && needs.prepare-head.outputs.preview != 'true'
         continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
@@ -2562,20 +2667,80 @@ jobs:
           echo "main's verdict: ${VERDICT:-none}${DEFERRED:+ (deferred: $DEFERRED)}"
       - name: Tests
         id: tests
-        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push'
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview != 'true'
         continue-on-error: true
         run: python3 .github/scripts/layer-pr-checks/compare-test-failures.py merged/base/junit.xml merged/head/junit.xml
       - name: Gates
         id: gates
-        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push'
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview != 'true'
         continue-on-error: true
         run: python3 .github/scripts/layer-pr-checks/compare-gates.py merged/base/gates.json merged/head/gates.json
       # The typecheck runs in the head side's prepare job; it is judged here.
       - name: Verdict
-        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && (steps.tests.outcome != 'success' || steps.gates.outcome != 'success' || needs.prepare-head.outputs.typecheck == 'failure')
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview != 'true' && (steps.tests.outcome != 'success' || steps.gates.outcome != 'success' || needs.prepare-head.outputs.typecheck == 'failure')
         run: |
           echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }}, typecheck: ${{ needs.prepare-head.outputs.typecheck }} — see the step summary"
           exit 1
+      # The preview tier (the header): the change's cone, judged against
+      # main's stored answer (`scripts/preview-qa.ts`), at the judging
+      # scripts' pin. Advisory: a red check in the cone is reported, on the
+      # preview's QA pages and here, and never fails this job; the typecheck
+      # does, as on the fast tier.
+      - name: The preview report's script
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ env.HARNESS_OWNER }}/cat-harness-tools
+          ref: ${{ needs.prepare-head.outputs.tools }}
+          path: pq
+          sparse-checkout: scripts
+      - name: The cone's selection
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: preview-selection
+          path: ${{ runner.temp }}/preview
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true'
+      - name: The change's cone, judged against main (preview tier)
+        id: preview-judge
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true'
+        env:
+          CACHED: ${{ needs.prepare-base.outputs.cached == 'true' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PREFIX: ${{ inputs.mode == 'layer' && env.INSTANCE || '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/preview"
+          main=()
+          [ "$CACHED" = "true" ] && main=(--main-dir merged/base)
+          if [ ! -f pq/scripts/preview-qa.ts ]; then
+            echo "::warning::scripts/preview-qa.ts is not at the judging scripts' pin: no preview report"
+            exit 0
+          fi
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          bun pq/scripts/preview-qa.ts judge --selection "$RUNNER_TEMP/preview/selection.json" --head-sha "$HEAD_SHA" \
+            --head-dir merged/head "${main[@]}" --prefix "$PREFIX" --run "$run_url" \
+            --out "$RUNNER_TEMP/preview/preview-qa.json" --md "$RUNNER_TEMP/preview/summary.md"
+          cat "$RUNNER_TEMP/preview/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "made=true" >> "$GITHUB_OUTPUT"
+      # Named by the PR's head commit, which the site publish of the PR's
+      # branch looks up (folio-site-publish.yml) to put on top of its QA pages.
+      - name: Hand the report to the preview build
+        if: steps.preview-judge.outputs.made == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: preview-qa-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/preview/preview-qa.json
+          retention-days: 14
+      - name: Preview verdict (advisory)
+        if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push' && needs.prepare-head.outputs.preview == 'true'
+        env:
+          TYPECHECK: ${{ needs.prepare-head.outputs.typecheck }}
+        run: |
+          echo "preview tier: advisory; the release tier and merge-guard judge the merge" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$TYPECHECK" != "failure" ] || { echo "::error::typecheck failed"; exit 1; }
       # The quick lane is judged here: its tests and the typecheck. A PR side
       # that could not be prepared is red, never a pass.
       - name: Quick-lane verdict
