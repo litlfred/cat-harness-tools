@@ -92,7 +92,7 @@ function run(opts: { observer: boolean }) {
       return { documentElement: svg };
     }
   }
-  const js = WV_SCRIPT.replace(/^<script>/, "").replace(/<\/script>$/, "");
+  const js = WV_SCRIPT.replace(/^<script[^>]*>/i, "").replace(/<\/script\s*>\s*$/i, "");
   new Function("window", "document", "fetch", "DOMParser", "CSS", "IntersectionObserver", js)(
     win,
     doc,
