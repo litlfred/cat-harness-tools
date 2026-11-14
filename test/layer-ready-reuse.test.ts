@@ -76,7 +76,7 @@ async function py(cmd: "key" | "decide", extra: Record<string, string> = {}): Pr
   const sum = join(d, `sum-${Math.random()}`);
   writeFileSync(out, "");
   writeFileSync(sum, "");
-  const p = Bun.spawn(["python3", "-I", SCRIPT, cmd], {
+  const p = Bun.spawn(["python3", "-I", "-B", SCRIPT, cmd], {
     env: {
       PATH: process.env.PATH ?? "",
       GITHUB_OUTPUT: out,
