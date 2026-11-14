@@ -19,7 +19,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "../test/support/site-fs.ts";
 import { basename, join } from "node:path";
 
 import { viewerHtml as schemaViewer, viewerPlacement } from "../scripts/gen-schema-viz.ts";
