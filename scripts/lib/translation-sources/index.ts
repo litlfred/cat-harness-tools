@@ -30,12 +30,14 @@ export interface SourceOptions {
   run: CommandRunner;
   /** LibreTranslate base URL. */
   url: string;
+  /** The model to ask for instead of the adapter's default. */
+  model?: string;
   fetchImpl?: typeof fetch;
 }
 
 /** The adapter for a command-line name, or why there is none. */
 export function sourceFor(id: string, o: SourceOptions): CandidateSourceAdapter {
-  if (id === "opus-mt") return opusMtSource(o.runner, o.run);
-  if (id === "libretranslate") return libreTranslateSource(o.url, o.fetchImpl ?? fetch);
+  if (id === "opus-mt") return opusMtSource(o.runner, o.run, o.model);
+  if (id === "libretranslate") return libreTranslateSource(o.url, o.fetchImpl ?? fetch, o.model);
   throw new Error(`no candidate source "${id}"; known: ${SOURCE_IDS.join(", ")}`);
 }
