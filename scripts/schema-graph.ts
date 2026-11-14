@@ -48,10 +48,11 @@ import { basename, join, posix, relative } from "node:path";
 
 import ts from "typescript";
 
-import { checkoutRootFor } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, findInstanceRoot } from "../schemas/kg/cat-harness.js";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, rootInstanceName } from "../schemas/kg/harness-config.js";
 import { withConcernGroupDirs } from "./concern-groups.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { isFhirLogicalModel, readFhirLogicalModel } from "./fhir-logical-model.ts";
 
 /**
  * Which layers' `schemas` directories a reading covers.
@@ -120,6 +121,7 @@ export type DeclKind =
   | "interface"
   | "type-alias"
   | "json-schema"
+  | "fhir-logical"
   | "undetermined";
 
 /** One field of an object-like declaration. */
@@ -158,9 +160,26 @@ export interface SchemaField {
    * said rather than what a heuristic guessed.
    */
   ref?: string;
+  /**
+   * The least number of values, when the source states it: JSON Schema
+   * `minItems` (with `required`), a FHIR element's `min`. Unset, it is read
+   * from {@link SchemaField.optional} and {@link SchemaField.array} by
+   * {@link cardinalityOf}.
+   */
+  min?: number;
+  /** The most, when the source states it: `maxItems`, a FHIR `max`; `"*"` is unbounded. */
+  max?: number | "*";
+  /** The source states no cardinality and none can be read: drawn `?..?`, never guessed. */
+  cardinalityUnknown?: true;
+  /**
+   * Type name → where its definition is (a canonical URL), for a type that is
+   * not a declaration of this graph — a FHIR datatype while no layer holds FHIR
+   * core. A type that IS a declaration links by its edge instead.
+   */
+  typeLinks?: Record<string, string>;
 }
 
-/** One declaration — a Zod schema, an interface or a type alias. */
+/** One declaration — a Zod schema, an interface, a type alias, a JSON Schema or a FHIR logical model. */
 export interface SchemaDecl {
   /** `<module>#<name>`, unique across the graph. */
   id: string;
@@ -170,6 +189,11 @@ export interface SchemaDecl {
   kind: DeclKind;
   /** For `undetermined`: the head of what was seen. Never omitted silently. */
   note?: string;
+  /**
+   * The IRI the source names itself by — a JSON Schema `$id`, a FHIR `url` —
+   * so a reference by canonical resolves to it.
+   */
+  canonical?: string;
   /** First prose line of the declaration's doc comment. */
   doc?: string;
   /**
@@ -282,7 +306,16 @@ export interface SchemaGraph {
    * broken assertion.
    */
   refProblems: string[];
+  /**
+   * Sources the reading was asked to cover and could not open — a declared
+   * FHIR artefact index that is built at publish and absent here. Listed so a
+   * viewer says "not read", never shows the IG as having no logical models.
+   */
+  unread: string[];
 }
+
+/** The graph typology an IG's artefact index is declared under (the FHIR layer's kind). */
+const FHIR_ARTIFACT_INDEX = "fhir-artifact-index";
 
 const TAG = /@graphNode\s+(\S+)(?:\s*[—-]\s*(.*))?/;
 
@@ -814,21 +847,46 @@ function readModule(
 // be readable with nothing installed, so its shapes are JSON Schema. A reader
 // that took `.ts` only reported bootstrap as having no schemas at all, which
 // is a wrong answer rather than a partial one. Each file is read as one
-// declaration for the root schema and one per `definitions` / `$defs` entry.
+// declaration for the root schema and one per `definitions` / `$defs` entry,
+// plus one per inline object property (`Root.part`), so a nested shape is a
+// class of its own rather than a field typed `object` (bean `cat-tools-4xq6`).
 
 const JSON_SCHEMA_SUFFIX = ".schema.json";
 
-/** One `$ref` found in a JSON Schema file, before it is resolved. */
-interface JsonSchemaRef {
+/**
+ * One reference a JSON-document reader found, before it is resolved.
+ *
+ * Shared by every reader over JSON documents — JSON Schema here, FHIR logical
+ * models in `fhir-logical-model.ts` — so one resolver turns them all into
+ * edges and the viewer cannot tell which reader drew a box.
+ */
+export interface ClassModelRef {
   from: string;
-  /** The `$ref` as written. */
+  /** The reference as written: a `$ref`, or a canonical URL. */
   ref: string;
   /** The module the ref was written in, which a relative ref resolves against. */
   module: string;
   via: string;
-  kind: "field" | "extends" | "id-ref";
+  kind: SchemaEdge["kind"];
   optional: boolean;
   array: boolean;
+  /**
+   * `canonical`: resolve only by a declaration's {@link SchemaDecl.canonical}
+   * (a FHIR type or profile URL). Otherwise canonical first, then by path.
+   */
+  by?: "canonical";
+  /** A miss is expected (FHIR core not held here): no edge, and not reported as unresolved. */
+  quietMiss?: true;
+}
+
+/** What a reader over one JSON document returns. */
+export interface ClassModelRead {
+  decls: SchemaDecl[];
+  /** Cross-declaration references, resolved once every file is read. */
+  refs: ClassModelRef[];
+  /** Edges inside the document, already resolved (a nested class to its parent). */
+  edges: SchemaEdge[];
+  summary?: string;
 }
 
 type Json = Record<string, unknown>;
@@ -875,11 +933,43 @@ function refsUnder(v: unknown, out: string[] = []): string[] {
 const firstLine = (v: unknown): string | undefined =>
   typeof v === "string" ? v.split("\n").map((l) => l.trim()).find(Boolean) : undefined;
 
-/** Read one `*.schema.json` file: its declarations and its unresolved `$ref`s. */
-export function readJsonSchemaModule(
-  text: string,
-  moduleRel: string,
-): { decls: SchemaDecl[]; refs: JsonSchemaRef[]; summary?: string } {
+/** True for a JSON Schema `type` that is, or includes, `t`. */
+const typeIs = (s: Json, t: string): boolean => s.type === t || (Array.isArray(s.type) && s.type.includes(t));
+
+/** An inline object with its own properties: drawn as a nested class. */
+const isInlineObject = (v: unknown): v is Json => isObj(v) && typeof v.$ref !== "string" && isObj(v.properties);
+
+/** Keywords that say what a schema IS. One with none of them cannot be drawn honestly. */
+const SHAPE_KEYWORDS = [
+  "type", "properties", "enum", "const", "$ref", "allOf", "oneOf", "anyOf", "items",
+  "additionalProperties", "patternProperties", "not", "if",
+] as const;
+
+/**
+ * A field's cardinality, `min..max`, as the class diagram writes it.
+ *
+ * Readers that know it (JSON Schema `minItems`/`maxItems`, FHIR `min`/`max`)
+ * set {@link SchemaField.min} / {@link SchemaField.max}. Otherwise it is read
+ * from optionality and list-ness: a list is `0..*` unless its written type says
+ * `.nonempty()` or `.min(n)`. A reader that could not determine it says
+ * `cardinalityUnknown`, and the answer is `?..?`, never a guess.
+ */
+export function cardinalityOf(f: SchemaField): string {
+  if (f.cardinalityUnknown) return "?..?";
+  let min = f.min;
+  if (min === undefined) {
+    if (f.optional) min = 0;
+    else if (f.array) {
+      const m = /\.min\((\d+)\)/.exec(f.type);
+      min = /\.nonempty\(\)/.test(f.type) ? 1 : m ? Number(m[1]) : 0;
+    } else min = 1;
+  }
+  const max = f.max ?? (f.array ? "*" : 1);
+  return `${min}..${max}`;
+}
+
+/** Read one `*.schema.json` file: its declarations, its local edges and its unresolved `$ref`s. */
+export function readJsonSchemaModule(text: string, moduleRel: string): ClassModelRead {
   let doc: unknown;
   try {
     doc = JSON.parse(text);
@@ -893,40 +983,80 @@ export function readJsonSchemaModule(
         fields: [], extendsNames: [], values: [], refs: [], unresolved: [], external: [], line: 1, exported: true,
       }],
       refs: [],
+      edges: [],
     };
   }
-  if (!isObj(doc)) return { decls: [], refs: [] };
+  if (!isObj(doc)) return { decls: [], refs: [], edges: [] };
   const decls: SchemaDecl[] = [];
-  const refs: JsonSchemaRef[] = [];
+  const refs: ClassModelRef[] = [];
+  const edges: SchemaEdge[] = [];
   const taken = new Set<string>();
 
-  const one = (name: string, schema: Json): void => {
+  const one = (name: string, schema: Json, isRoot = false): string => {
     let unique = name;
     for (let i = 2; taken.has(unique); i++) unique = `${name}${i}`;
     taken.add(unique);
     const id = `${moduleRel}#${unique}`;
-    const required = new Set(Array.isArray(schema.required) ? (schema.required as string[]) : []);
-    const props = isObj(schema.properties) ? schema.properties : {};
-    const fields: SchemaField[] = Object.entries(props).map(([fname, p]) => {
-      const array = isObj(p) && p.type === "array";
-      for (const r of refsUnder(p)) {
-        refs.push({ from: id, ref: r, module: moduleRel, via: fname, kind: "field", optional: !required.has(fname), array });
-      }
-      return {
-        name: fname,
-        type: jsonTypeOf(p),
-        optional: !required.has(fname),
-        array,
-        names: refsUnder(p).map(refName),
-        ...(isObj(p) && firstLine(p.description) ? { doc: firstLine(p.description) } : {}),
-      };
-    });
+    const fields: SchemaField[] = [];
     const extendsNames: string[] = [];
+
+    const addProperties = (s: Json): void => {
+      const required = new Set(Array.isArray(s.required) ? (s.required as string[]) : []);
+      const props = isObj(s.properties) ? s.properties : {};
+      for (const [fname, p] of Object.entries(props)) {
+        const optional = !required.has(fname);
+        const array = isObj(p) && typeIs(p, "array");
+        const item = array && isObj(p) ? p.items : p;
+        const field: SchemaField = {
+          name: fname,
+          type: jsonTypeOf(p),
+          optional,
+          array,
+          names: [],
+          ...(isObj(p) && firstLine(p.description) ? { doc: firstLine(p.description) } : {}),
+        };
+        if (array && isObj(p)) {
+          field.min = optional ? 0 : typeof p.minItems === "number" ? p.minItems : 0;
+          field.max = typeof p.maxItems === "number" ? p.maxItems : "*";
+        }
+        if (isInlineObject(item)) {
+          // A nested shape is a class of its own, joined by composition.
+          const child = one(`${unique}.${fname}`, item);
+          const childName = child.slice(child.indexOf("#") + 1);
+          field.type = array ? `${childName}[]` : childName;
+          edges.push({ from: id, to: child, via: fname, kind: "field", optional, array });
+        } else {
+          for (const r of refsUnder(p)) {
+            refs.push({ from: id, ref: r, module: moduleRel, via: fname, kind: "field", optional, array });
+          }
+          field.names = refsUnder(p).map(refName);
+        }
+        fields.push(field);
+      }
+    };
+    addProperties(schema);
     if (Array.isArray(schema.allOf)) {
       for (const part of schema.allOf) {
-        if (isObj(part) && typeof part.$ref === "string") {
+        if (!isObj(part)) continue;
+        if (typeof part.$ref === "string") {
           extendsNames.push(refName(part.$ref));
           refs.push({ from: id, ref: part.$ref, module: moduleRel, via: "", kind: "extends", optional: false, array: false });
+        }
+        // An inline part's properties are this class's own fields.
+        if (isObj(part.properties)) addProperties(part);
+      }
+    }
+    // A schema that is only a `$ref` is an alias of its target: generalisation.
+    if (typeof schema.$ref === "string" && !isObj(schema.properties)) {
+      extendsNames.push(refName(schema.$ref));
+      refs.push({ from: id, ref: schema.$ref, module: moduleRel, via: "", kind: "extends", optional: false, array: false });
+    }
+    // A union of references: one member edge per alternative, as a Zod union draws.
+    for (const k of ["oneOf", "anyOf"] as const) {
+      if (!Array.isArray(schema[k])) continue;
+      for (const alt of schema[k] as unknown[]) {
+        if (isObj(alt) && typeof alt.$ref === "string") {
+          refs.push({ from: id, ref: alt.$ref, module: moduleRel, via: "", kind: "member", optional: false, array: false });
         }
       }
     }
@@ -938,11 +1068,13 @@ export function readJsonSchemaModule(
         if (typeof n === "string") refs.push({ from: id, ref: `#/$defs/${n}`, module: moduleRel, via: "uses", kind: "id-ref", optional: false, array: false });
       }
     }
-    decls.push({
+    const hasDefs = isObj(schema.$defs) || isObj(schema.definitions);
+    const shaped = SHAPE_KEYWORDS.some((k) => schema[k] !== undefined);
+    const base = {
       id,
       name: unique,
       module: moduleRel,
-      kind: "json-schema",
+      ...(isRoot && typeof schema.$id === "string" ? { canonical: schema.$id } : {}),
       ...(firstLine(schema.description) ? { doc: firstLine(schema.description) } : {}),
       fields,
       extendsNames,
@@ -952,47 +1084,81 @@ export function readJsonSchemaModule(
       external: [],
       line: 1,
       exported: true,
-    });
+    };
+    // A schema with no shape keyword says nothing a box could show. A root
+    // that only holds `$defs` is a container, which is a statement; anything
+    // else is UNDETERMINED with the keys it did have — never an empty class.
+    decls.push(
+      shaped || (isRoot && hasDefs)
+        ? { ...base, kind: "json-schema" }
+        : {
+            ...base,
+            kind: "undetermined",
+            note: `could not determine: no ${SHAPE_KEYWORDS.slice(0, 4).join("/")}… keyword (keys: ${Object.keys(schema).slice(0, 6).join(", ") || "none"})`,
+          },
+    );
+    return id;
   };
 
   const rootName = typeof doc.title === "string" && identifierOf(doc.title) ? identifierOf(doc.title) : identifierOf(basename(moduleRel, JSON_SCHEMA_SUFFIX));
-  one(rootName, doc);
+  one(rootName, doc, true);
   for (const key of ["definitions", "$defs"] as const) {
     const defs = doc[key];
     if (isObj(defs)) for (const [n, d] of Object.entries(defs)) if (isObj(d)) one(n, d);
   }
-  return { decls, refs, ...(firstLine(doc.description) ? { summary: firstLine(doc.description) } : {}) };
+  // The root first: a ref to the file with no fragment names it.
+  decls.sort((a, b) => (a.id === `${moduleRel}#${rootName}` ? -1 : b.id === `${moduleRel}#${rootName}` ? 1 : 0));
+  return { decls, refs, edges, ...(firstLine(doc.description) ? { summary: firstLine(doc.description) } : {}) };
 }
 
 /**
- * Resolve JSON Schema `$ref`s to declarations. A ref resolves within its own
- * file (`#/definitions/X`) or to a sibling file in the same directory, named
+ * Resolve the references JSON-document readers found into edges.
+ *
+ * In order: a declaration whose {@link SchemaDecl.canonical} is the ref (a JSON
+ * Schema `$id`, a FHIR `url`) — then, for a `$ref`, within its own file
+ * (`#/definitions/X`) or a sibling file in the same directory, named
  * relatively or by an IRI whose last segment is that file. Anything else — the
- * JSON Schema meta-schema, an outside standard — is external and not an edge.
+ * JSON Schema meta-schema, an outside standard — is external and not an edge,
+ * except a canonical a reader asked to resolve (`by: "canonical"`), whose miss
+ * is recorded as unresolved: the model names a model this graph does not hold.
  */
-function resolveJsonSchemaRefs(
-  refs: readonly JsonSchemaRef[],
+export function resolveClassModelRefs(
+  refs: readonly ClassModelRef[],
   byId: ReadonlyMap<string, SchemaDecl>,
 ): { edges: SchemaEdge[]; unresolved: Map<string, string[]> } {
   const edges: SchemaEdge[] = [];
   const unresolved = new Map<string, string[]>();
+  const miss = (from: string, ref: string): void => {
+    unresolved.set(from, [...(unresolved.get(from) ?? []), ref]);
+  };
   const rootOfModule = new Map<string, string>();
-  for (const d of byId.values()) if (d.kind === "json-schema" && !rootOfModule.has(d.module)) rootOfModule.set(d.module, d.id);
+  const byCanonical = new Map<string, SchemaDecl>();
+  for (const d of byId.values()) {
+    if (d.kind !== "undetermined" && !rootOfModule.has(d.module)) rootOfModule.set(d.module, d.id);
+    if (d.canonical) byCanonical.set(d.canonical, d);
+  }
   const seen = new Set<string>();
   for (const r of refs) {
     const [file, frag = ""] = r.ref.split("#");
-    const dir = r.module.slice(0, r.module.lastIndexOf("/"));
-    const module = file === "" ? r.module : `${dir}/${file!.split("/").pop()}`;
-    if (!rootOfModule.has(module)) {
-      // Outside this graph, or a sibling that is not here.
-      if (file !== "" && !/^https?:/.test(file!)) {
-        unresolved.set(r.from, [...(unresolved.get(r.from) ?? []), r.ref]);
-      }
+    let to: string | undefined;
+    const canon = byCanonical.get(file!) ?? byCanonical.get(r.ref);
+    if (canon) {
+      to = frag === "" || frag === "/" || byCanonical.has(r.ref) ? canon.id : `${canon.module}#${refName(frag)}`;
+    } else if (r.by === "canonical") {
+      if (!r.quietMiss) miss(r.from, r.ref);
       continue;
+    } else {
+      const dir = r.module.slice(0, r.module.lastIndexOf("/"));
+      const module = file === "" ? r.module : `${dir}/${file!.split("/").pop()}`;
+      if (!rootOfModule.has(module)) {
+        // Outside this graph, or a sibling that is not here.
+        if (file !== "" && !/^https?:/.test(file!)) miss(r.from, r.ref);
+        continue;
+      }
+      to = frag === "" || frag === "/" ? rootOfModule.get(module)! : `${module}#${refName(frag)}`;
     }
-    const to = frag === "" || frag === "/" ? rootOfModule.get(module)! : `${module}#${refName(frag)}`;
     if (!byId.has(to)) {
-      unresolved.set(r.from, [...(unresolved.get(r.from) ?? []), r.ref]);
+      miss(r.from, r.ref);
       continue;
     }
     if (to === r.from) continue; // a self-reference is a property of the box
@@ -1002,6 +1168,51 @@ function resolveJsonSchemaRefs(
     edges.push({ from: r.from, to, via: r.via, kind: r.kind, optional: r.optional, array: r.array });
   }
   return { edges, unresolved };
+}
+
+/**
+ * The class model of a few JSON documents on their own — a skill's input and
+ * output contracts, a Tool's MCP input schema — read and resolved by the same
+ * readers and resolver as the whole graph, so a skill page draws the boxes the
+ * schemas viewer draws.
+ */
+export function classModelOfDocuments(docs: readonly { text: string; module: string }[]): { decls: SchemaDecl[]; edges: SchemaEdge[] } {
+  const decls: SchemaDecl[] = [];
+  const refs: ClassModelRef[] = [];
+  const edges: SchemaEdge[] = [];
+  for (const d of docs) {
+    const read = readJsonDocument(d.text, d.module);
+    if (!read) continue;
+    decls.push(...read.decls);
+    refs.push(...read.refs);
+    edges.push(...read.edges);
+  }
+  const byId = new Map(decls.map((d) => [d.id, d]));
+  const resolved = resolveClassModelRefs(refs, byId);
+  for (const d of decls) {
+    d.refs = [...new Set([...edges, ...resolved.edges].filter((e) => e.from === d.id).map((e) => e.to))].sort();
+    d.unresolved = [...new Set([...d.unresolved, ...(resolved.unresolved.get(d.id) ?? [])])].sort();
+  }
+  return { decls, edges: [...edges, ...resolved.edges] };
+}
+
+/**
+ * The reader for one JSON file, chosen by what the file HOLDS, never by a
+ * folio's name: a FHIR logical model by `resourceType`/`kind`, a JSON Schema
+ * by its `.schema.json` name. `undefined` when no reader models it — a source
+ * descriptor, a concern-group file — which is not a schema and is not shown.
+ */
+export function readJsonDocument(text: string, moduleRel: string): ClassModelRead | undefined {
+  if (moduleRel.endsWith(JSON_SCHEMA_SUFFIX)) return readJsonSchemaModule(text, moduleRel);
+  if (!moduleRel.endsWith(".json")) return undefined;
+  // Cheap sniff before a parse: most JSON in a schemas directory is not FHIR.
+  if (!text.includes("StructureDefinition")) return undefined;
+  try {
+    if (!isFhirLogicalModel(JSON.parse(text))) return undefined;
+  } catch {
+    return undefined;
+  }
+  return readFhirLogicalModel(text, moduleRel);
 }
 
 /**
@@ -1036,8 +1247,10 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
   const exportsByModule = new Map<string, Map<string, string>>();
   /** Module key → what it re-exports, for the regroup's old-path shims. */
   const reExportsByModule = new Map<string, ReExport[]>();
-  /** `$ref`s read from JSON Schema files, resolved after every file is read. */
-  const jsonRefs: JsonSchemaRef[] = [];
+  /** References read from JSON documents, resolved after every file is read. */
+  const jsonRefs: ClassModelRef[] = [];
+  /** Edges a JSON reader resolved inside its own document. */
+  const jsonLocalEdges: SchemaEdge[] = [];
   const bindingsByModule = new Map<string, Map<string, string | null>>();
   /**
    * Module path → the declared schema directory it was read from, for `@ref`'s
@@ -1069,14 +1282,17 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
     for (const dir of withConcernGroupDirs([declaredDir], "schemas")) {
       const dirRel = rel(dir);
       for (const f of readdirSync(dir).sort()) {
-        if (f.endsWith(JSON_SCHEMA_SUFFIX)) {
+        if (f.endsWith(".json")) {
           const moduleRel = `${dirRel}/${f}`;
-          const read = readJsonSchemaModule(readFileSync(join(dir, f), "utf-8"), moduleRel);
+          // The reader is chosen by what the file holds (bean `cat-tools-4xq6`):
+          // a JSON Schema, a FHIR logical model, or nothing this graph draws.
+          const read = readJsonDocument(readFileSync(join(dir, f), "utf-8"), moduleRel);
+          if (read === undefined) continue;
           dirOfModule.set(moduleRel, declaredRel);
           modules.push({
             module: moduleRel,
             instance,
-            name: basename(f, JSON_SCHEMA_SUFFIX),
+            name: basename(basename(f, JSON_SCHEMA_SUFFIX), ".json"),
             // A JSON Schema file IS a schema node: it carries `$id`, and the
             // `@graphNode` tag is a TypeScript docblock convention it cannot hold.
             graphNode: "schema",
@@ -1086,6 +1302,7 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
           });
           decls.push(...read.decls);
           jsonRefs.push(...read.refs);
+          jsonLocalEdges.push(...read.edges);
           continue;
         }
         if (!f.endsWith(".ts")) continue;
@@ -1132,12 +1349,77 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
     }
   }
 
+  // FHIR logical models held by an IG's artefact index (bean `cat-tools-4xq6`).
+  // Only for the checkout scope — the viewer's — since the corpus readers
+  // (kg-audit, the glossary) judge `schemas` modules and an IG's artefacts are
+  // not that. The index lists every artefact by `key`; a logical model is a
+  // `StructureDefinition/<id>` whose materialised JSON says `kind: logical`.
+  const unread: string[] = [];
+  if (opts.scope === "checkout") {
+    let indexDirs: string[] = [];
+    try {
+      indexDirs = checkoutDirectoriesForGraph(FHIR_ARTIFACT_INDEX, root);
+    } catch {
+      indexDirs = [];
+    }
+    for (const dir of [...indexDirs].sort()) {
+      const indexFile = join(dir, "index.json");
+      if (!existsSync(indexFile)) {
+        unread.push(`${rel(dir)}: index.json absent (built at publish)`);
+        continue;
+      }
+      let idx: { artifacts?: unknown[]; entries?: unknown[] };
+      try {
+        idx = JSON.parse(readFileSync(indexFile, "utf-8"));
+      } catch (e) {
+        unread.push(`${rel(dir)}: index.json unreadable — ${(e as Error).message.slice(0, 80)}`);
+        continue;
+      }
+      const layerRoot = findInstanceRoot(dir) ?? dir;
+      const instance = rel(layerRoot).split("/")[0] || rootName || basename(layerRoot);
+      type Entry = { key?: unknown; materialization?: { localPath?: unknown } };
+      for (const a of (idx.artifacts ?? idx.entries ?? []) as Entry[]) {
+        if (typeof a.key !== "string" || !a.key.startsWith("StructureDefinition/")) continue;
+        const local = a.materialization?.localPath;
+        if (typeof local !== "string") continue;
+        const abs = join(layerRoot, local);
+        if (!existsSync(abs)) continue;
+        const text = readFileSync(abs, "utf-8");
+        if (!text.includes('"logical"')) continue;
+        const moduleRel = rel(abs);
+        if (modules.some((m) => m.module === moduleRel)) continue;
+        let doc: unknown;
+        try {
+          doc = JSON.parse(text);
+        } catch {
+          continue;
+        }
+        if (!isFhirLogicalModel(doc)) continue;
+        const read = readFhirLogicalModel(text, moduleRel);
+        modules.push({
+          module: moduleRel,
+          instance,
+          name: basename(local, ".json"),
+          graphNode: "schema",
+          ...(read.summary ? { summary: read.summary } : {}),
+          isTest: false,
+          decls: read.decls.map((d) => d.id),
+        });
+        decls.push(...read.decls);
+        jsonRefs.push(...read.refs);
+        jsonLocalEdges.push(...read.edges);
+      }
+    }
+  }
+
   // Resolution, second pass — every module's exports are known by now, so a
   // forward reference resolves the same as a backward one. Doing it inline
   // above would make an edge's existence depend on directory order, which is
   // filesystem state rather than a property of the graph.
   const byId = new Map(decls.map((d) => [d.id, d]));
   const edges: SchemaEdge[] = [];
+  /** Modules a JSON reader read: their edges are the resolver's, not the AST walk's. */
+  const jsonModules = new Set(modules.filter((m) => /\.json$/.test(m.module)).map((m) => m.module));
 
   /**
    * A bound name → the declaration it names, `"external"`, or `null`.
@@ -1233,13 +1515,14 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
     edges.push({ from: d.id, to: hit.id, via: f.name, kind: "id-ref", optional: f.optional, array: f.array });
   };
 
-  const jsonEdges = resolveJsonSchemaRefs(jsonRefs, byId);
-  edges.push(...jsonEdges.edges);
+  const jsonEdges = resolveClassModelRefs(jsonRefs, byId);
+  const fromJson = [...jsonLocalEdges, ...jsonEdges.edges];
+  edges.push(...fromJson);
 
   for (const d of decls) {
-    if (d.kind === "json-schema") {
-      d.refs = [...new Set(jsonEdges.edges.filter((e) => e.from === d.id).map((e) => e.to))].sort();
-      d.unresolved = [...new Set(jsonEdges.unresolved.get(d.id) ?? [])].sort();
+    if (jsonModules.has(d.module)) {
+      d.refs = [...new Set(fromJson.filter((e) => e.from === d.id).map((e) => e.to))].sort();
+      d.unresolved = [...new Set([...d.unresolved, ...(jsonEdges.unresolved.get(d.id) ?? [])])].sort();
       continue;
     }
     const refs = new Set<string>();
@@ -1292,7 +1575,7 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
 
   refProblems.sort();
 
-  return { roots: dirs.map(rel), modules, decls, edges, refProblems };
+  return { roots: dirs.map(rel), modules, decls, edges, refProblems, unread };
 }
 
 if (import.meta.main) {
