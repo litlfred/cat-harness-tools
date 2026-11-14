@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { injectRail } from "../scripts/lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * The harness icon row on a RAILED page — bean `wckf` (#2147), under `9rq1`.
@@ -23,10 +24,10 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
 // The row's own stylesheet FIRST, as `head_custom.html` links it (beans `lhvt`, `9rq1`).
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
 // `navbar-row.js` FIRST — it draws the row, and `docs-ui.js` calls it — as `head_custom.html` loads them.
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const LIVE = (JSON.parse(readFileSync(join(ROOT, SITE, "_data/harness.json"), "utf8")) as { navbar: { icons: string[] } | null }).navbar;
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const LIVE = (JSON.parse(readFileSync(overlayPath(join(ROOT, SITE, "_data/harness.json")), "utf8")) as { navbar: { icons: string[] } | null }).navbar;
 if (!LIVE) throw new Error("docs/_data/harness.json has navbar:null — run `bun run cat docs:harness`.");
 
 const SHELL =
@@ -46,11 +47,11 @@ function railed(row: unknown): string {
   return html;
 }
 
-const ROW_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8");
-const ROW_CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css")), "utf8");
-const DOCS_UI_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const QR_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
-const QR_UTF8_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode_UTF8.js")), "utf8");
+const ROW_JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js"))), "utf8");
+const ROW_CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css"))), "utf8");
+const DOCS_UI_JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const QR_JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js"))), "utf8");
+const QR_UTF8_JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode_UTF8.js"))), "utf8");
 
 /**
  * Serve `html` at a who-iris replica's address, and the site's real assets at

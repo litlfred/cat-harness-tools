@@ -26,6 +26,11 @@ test("a second test file gets the suite default too", () => {
   const r = spawnSync("bun", ["test", "--preload", join(import.meta.dir, "test-preload.ts"), "./one.test.ts", "./two.test.ts"], {
     cwd: dir,
     encoding: "utf-8",
+    // CI shards the suite through `BUN_OPTIONS` (`--shard=k/4`, which Bun
+    // prepends to every invocation), and a child inherits it: this run of two
+    // files would then be sharded too and run a quarter of them. The child is
+    // its own suite, so it runs unsharded.
+    env: { ...process.env, BUN_OPTIONS: (process.env.BUN_OPTIONS ?? "").replace(/--shard(=|\s+)\S+/g, "").trim() },
   });
   const out = `${r.stdout}${r.stderr}`;
   expect(out, out).not.toContain("timed out");

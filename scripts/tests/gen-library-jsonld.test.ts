@@ -32,6 +32,7 @@ import {
   licenceProperties,
   LICENCE_FILENAME,
   libraryInstanceOf,
+  libraryEntriesIn,
   unknownArgument,
 } from "../../pipeline/gen-library-jsonld";
 import { CONTENT_CONTEXT } from "../../schemas/kg/jsonld.ts";
@@ -769,6 +770,100 @@ describe("a candidate's @type (cat-harness-tools#1356)", () => {
     // A core kind keeps its own pair.
     expect(candidateTypes("theorem").length).toBeGreaterThan(0);
     expect(candidateTypes("theorem")).not.toContain("cat-harness:Block");
+  });
+
+  test("an entry in a mounted layer resolves contributed kinds and prefixes from that layer's dependencies, not a sibling's", () => {
+    const root = mkdtempSync(join(tmpdir(), "layer-contribs-"));
+    try {
+      mkdirSync(join(root, "dak", "block-kinds"), { recursive: true });
+      writeDeclaration(join(root, "dak"), {
+        name: "dak",
+        version: "0.1.0",
+        iriBase: "https://example.org/dak/",
+        directories: [{ id: "dak-block-kinds", path: "block-kinds/", graphTypologies: ["block-kinds"] }],
+      });
+      writeFileSync(
+        join(root, "dak", "block-kinds", "indicator.json"),
+        JSON.stringify({
+          $schema: "folio-block-kind/v1",
+          kind: "indicator",
+          adapter: "dak",
+          builder: "indicator",
+          labelPrefix: "ind",
+          folioType: "dak:Indicator",
+        }),
+      );
+
+      for (const [name, needs] of [
+        ["ig", ["dak"]],
+        ["iris", []],
+      ] as const) {
+        const entryDir = join(root, name, "library", "d");
+        mkdirSync(join(entryDir, "sections"), { recursive: true });
+        writeDeclaration(join(root, name), {
+          name,
+          version: "0.1.0",
+          iriBase: `https://example.org/${name}/`,
+          ...(needs.length ? { needs: [...needs] } : {}),
+          directories: [{ id: "library", path: "library/", graphTypologies: ["library"] }],
+        });
+        writeFileSync(
+          join(entryDir, "structure.json"),
+          asPdfStructureFile({
+            doc_id: "d",
+            sections: [{ id: "sec-000-1-intro", number: "1", title: "Intro", level: 1, page_start: 1, page_end: 2, n_chars: 10, n_words: 2 }],
+            metadata: { title: "Guide" },
+          }),
+        );
+        writeFileSync(join(entryDir, "sections", "sec-000-1-intro.md"), "Intro.\n");
+        writeFileSync(
+          join(entryDir, "candidates.json"),
+          JSON.stringify({
+            candidates: [{ kind: "indicator", statement: "Active workers.", section_file: "sections/sec-000-1-intro.md" }],
+          }),
+        );
+      }
+
+      const igBuilt = buildEntryNodes("d", join(root, "ig", "library", "d"));
+      expect(igBuilt.state).toBe("built");
+      if (igBuilt.state !== "built") return;
+      const igBlock = JSON.parse(igBuilt.files.find((f) => f.path === "blocks/indicator-sec-000-01.jsonld")!.content);
+      expect(igBlock["@type"]).toEqual(["dak:Indicator"]);
+      expect(igBlock["@context"][1].dak).toBe("https://example.org/dak/v0/ns/");
+
+      const irisBuilt = buildEntryNodes("d", join(root, "iris", "library", "d"));
+      expect(irisBuilt.state).toBe("built");
+      if (irisBuilt.state !== "built") return;
+      const irisBlock = JSON.parse(irisBuilt.files.find((f) => f.path === "blocks/indicator-sec-000-01.jsonld")!.content);
+      expect(irisBlock["@type"]).toEqual(["cat-harness:Block"]);
+      expect(irisBlock["@context"][1].dak).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("non-entry directories inside a library are skipped", () => {
+  test("libraryEntriesIn drops dotfiles and directories declared for another graph typology", () => {
+    const root = mkdtempSync(join(tmpdir(), "lib-entries-"));
+    try {
+      const lib = join(root, "inst", "library");
+      mkdirSync(join(lib, "doc-1"), { recursive: true });
+      mkdirSync(join(lib, "processes"), { recursive: true });
+      mkdirSync(join(lib, "skills"), { recursive: true });
+      mkdirSync(join(lib, ".hidden"), { recursive: true });
+      writeDeclaration(join(root, "inst"), {
+        name: "inst",
+        directories: [
+          { id: "library", path: "library/", graphTypologies: ["library"] },
+          { id: "lib-processes", path: "library/processes/", graphTypologies: ["processes"] },
+          { id: "lib-skills", path: "library/skills/", graphTypologies: ["skills"] },
+        ],
+      });
+      expect(libraryEntriesIn(lib).map((e) => e.slug)).toEqual(["doc-1"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

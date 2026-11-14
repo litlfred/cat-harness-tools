@@ -27,10 +27,11 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredPagePath, firstPaintBlock, SCHEME_INK } from "./support/site-pages.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
-const read = (rel: string) => readFileSync(join(SITE, rel), "utf8");
+const read = (rel: string) => readFileSync(overlayPath(join(SITE, rel)), "utf8");
 
 const PAGE = readFileSync(declaredPagePath(ROOT, "beans"), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
 const CSS = read("assets/css/work-plan.css");

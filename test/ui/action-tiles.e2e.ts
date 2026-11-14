@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * The header's four buttons became one launcher over a grid of action tiles.
@@ -37,9 +38,9 @@ import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 // what Playwright runs the spec with.
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const QR = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js"))), "utf8");
 
 /**
  * The link block `head_custom.html` fills from `docs/_data/harness.json`.
@@ -54,7 +55,7 @@ const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js
  * `/folio-assistant/` baseurl is what the template does; `url` entries are
  * off-site and printed as-is.
  */
-const HARNESS_DATA = JSON.parse(readFileSync(join(ROOT, SITE, "_data/harness.json"), "utf8")) as {
+const HARNESS_DATA = JSON.parse(readFileSync(overlayPath(join(ROOT, SITE, "_data/harness.json")), "utf8")) as {
   links: { id: string; path?: string; url?: string }[];
   tiles?: { id: string; title: string; href?: string; icon?: string; hidden?: boolean }[];
 };

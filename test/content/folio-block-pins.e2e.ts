@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { resolveChromium } from "../../scripts/playwright-chromium";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * PIN ANY BLOCK, OF ANY GRAPH KIND, TO THE FOLIO — litlfred/cat-harness#982.
@@ -34,9 +35,9 @@ test.use({
 });
 
 const ROOT = join(HARNESS_ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const EDIT_LINKS_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/edit-links.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const EDIT_LINKS_JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/edit-links.js"))), "utf8");
 
 const BOOKMARK_AT = "http://replica.test/dth-hrh/registry.html#par-3-2-1";
 const TERM = "https://iri.example/glossary/health-worker";

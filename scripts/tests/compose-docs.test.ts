@@ -42,6 +42,7 @@ import {
   isChrome,
   isWithheld,
   mergeConfig,
+  OUTPUT_LAYER_SUFFIX,
   redirectStub,
   treeDigest,
   withheldFromCanonical,
@@ -149,7 +150,11 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     // PARSE to the merge, while every other file stays byte-identical.
     const { layers } = docsLayers(REPO);
     const instanceLayers = layers.filter((l) => !l.repositoryScoped);
-    expect(instanceLayers.map((l) => l.id)).toEqual(["site-chrome", "docs"]);
+    // A mounted cat-harness's computed files are an `@output` layer laid over
+    // its own (bean `cat-tools-sm8r`, item 4): part of the base, not a layer
+    // of their own, so the declared layers are named without them.
+    const isTwin = (id: string): boolean => id.endsWith(OUTPUT_LAYER_SUFFIX);
+    expect(instanceLayers.map((l) => l.id).filter((id) => !isTwin(id))).toEqual(["site-chrome", "docs"]);
 
     const dest = join(mkdtempSync(join(tmpdir(), "composereal-")), "site");
     const report = compose(dest, REPO);
@@ -160,6 +165,9 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     // The only shadows are the chrome's empty stand-ins for the includes the
     // harness's pages generate: anything else would be a page silently lost.
     for (const o of report.overrides) {
+      // A layer's own output-root twin replacing a pinned copy is the overlay
+      // doing its job, not a page lost.
+      if (o.by === `${o.baseLayer}${OUTPUT_LAYER_SUFFIX}`) continue;
       expect(o.baseLayer).toBe("site-chrome");
       expect(o.path.startsWith("_includes/generated/")).toBe(true);
     }

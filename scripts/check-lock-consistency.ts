@@ -52,9 +52,10 @@
  * could-not-determine (exit 2), never a pass; a layer with no lock pins
  * nothing and is not a finding.
  *
- *   bun run cat check:lock-consistency [--root <index>]
+ *   bun run cat check:lock-consistency [--root <index>] [--gate | --strict]
  *
- * Exit 0 aligned, 1 a skew, 2 could not determine.
+ * Exit 0 aligned (or skews reported without `--gate` / `--strict`), 1 a skew
+ * with `--gate` / `--strict`, 2 could not determine.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -123,22 +124,45 @@ export function lockSkews(root: string, fetch: LockFetcher = fetchLockFromGit): 
   return { skews, undetermined, compared };
 }
 
+/**
+ * Exit code for a lock-consistency reading: `2` when any layer lock is
+ * unreadable, `1` when skews exist and `--gate` / `--strict` is active, and
+ * `0` otherwise (owner, 2026-11-13, "3y 1y": only the top-level lock decides;
+ * agreement skews are reported, not a gate).
+ */
+export function exitCodeOf(
+  reading: { skews: readonly Skew[]; undetermined: readonly string[] },
+  opts: { gate?: boolean } = {},
+): 0 | 1 | 2 {
+  if (reading.undetermined.length > 0) return 2;
+  if (opts.gate && reading.skews.length > 0) return 1;
+  return 0;
+}
+
 if (import.meta.main) {
-  const i = process.argv.indexOf("--root");
-  const root = resolve(i >= 0 ? process.argv[i + 1]! : process.cwd());
+  const argv = process.argv.slice(2);
+  const i = argv.indexOf("--root");
+  const root = resolve(i >= 0 ? argv[i + 1]! : process.cwd());
+  const gate = argv.includes("--gate") || argv.includes("--strict");
   if (!existsSync(join(root, "index.lock.json"))) {
     console.log(`check:lock-consistency: ${root} has no index.lock.json — nothing is mounted, so nothing can be skewed`);
     process.exit(0);
   }
   const { skews, undetermined, compared } = lockSkews(root);
   for (const s of skews) {
-    console.log(`✗ ${s.instance}: the index pins ${s.index.slice(0, 12)}, ${s.layer}'s own lock pins ${s.layerPins.slice(0, 12)} — re-pin bottom-up so every lock names one commit`);
+    const mark = gate ? "✗" : "·";
+    console.log(`${mark} ${s.instance}: the index pins ${s.index.slice(0, 12)}, ${s.layer}'s own lock pins ${s.layerPins.slice(0, 12)} — what ${s.layer} was last tested with`);
   }
   for (const u of undetermined) console.log(`? ${u}`);
-  if (skews.length > 0) process.exit(1);
-  if (undetermined.length > 0) {
+  const code = exitCodeOf({ skews, undetermined }, { gate });
+  if (code === 2) {
     console.log(`check:lock-consistency: could not determine (${undetermined.length} layer lock(s) unreadable) — not a pass`);
     process.exit(2);
   }
-  console.log(`check:lock-consistency: ${compared} shared pin(s) compared, all aligned`);
+  if (code === 1) process.exit(1);
+  console.log(
+    skews.length > 0
+      ? `check:lock-consistency: ${compared} shared pin(s) compared, ${skews.length} skew(s) reported (not a gate; only the top-level lock decides)`
+      : `check:lock-consistency: ${compared} shared pin(s) compared, all aligned`,
+  );
 }
