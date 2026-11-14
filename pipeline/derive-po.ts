@@ -296,7 +296,7 @@ export function formatDerivedPo(
   tr: Array<PotEntry | undefined>,
   sourcePath: string,
 ): string {
-  const name = LOCALE_NAMES[locale] ?? locale;
+  const name = LOCALE_NAMES[locale] ?? LOCALE_NAMES[locale.split("-")[0]!] ?? locale;
   const out: string[] = [
     `# ${name} translation of folio-assistant ${page} (${sourcePath})`,
     "# Copyright (C) 2026 folio-assistant contributors",

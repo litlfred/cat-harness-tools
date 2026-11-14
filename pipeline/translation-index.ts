@@ -85,7 +85,7 @@ import { explicitInstanceRoot, HARNESS_ROOT } from "../scripts/lib/roots.ts";
 /** Re-exported so a caller that already reads pages through this module needs no second import. */
 export { permalinkDefaultsIn };
 
-import { LOCALE_RTL, UN_LOCALES } from "../schemas/content/translation.ts";
+import { localeIsRtl, UN_LOCALES } from "../schemas/content/translation.ts";
 import { isTranslatable } from "../schemas/library/translation-tools.ts";
 import { ownDirectoryById, siteDirFor } from "../schemas/kg/cat-harness.ts";
 
@@ -650,7 +650,7 @@ export function buildTranslationIndex(instanceRoot: string, siteDir?: string): B
       url: t.url,
       title: t.title,
       status: typeof t.fm.translation_status === "string" ? t.fm.translation_status : "",
-      dir: LOCALE_RTL[t.lang] ? "rtl" : "ltr",
+      dir: localeIsRtl(t.lang) ? "rtl" : "ltr",
     };
   }
 

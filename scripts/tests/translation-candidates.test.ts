@@ -414,4 +414,26 @@ describe("collectCandidates over a layer", () => {
     expect(r.filled).toHaveLength(1);
     expect(JSON.parse(read(root, "es/start/a.json")).status.generatedBy).toBe("web-service");
   });
+
+  test("addCandidates takes a region-tagged locale (pt-BR) and creates its node", () => {
+    const root = layer();
+    mkdirSync(join(root, "translations", "pt-BR", "start"), { recursive: true });
+    const empty = PO.replace(/msgstr "[^"]+"/g, 'msgstr ""');
+    writeFileSync(join(root, "translations", "pt-BR", "start", "a.pot"), empty);
+    writeFileSync(join(root, "translations", "pt-BR", "start", "a.po"), empty);
+    const r = addCandidates([{ msgid: "Open {name} now", text: "Abrir {name} agora", source: { kind: "web-service", id: "crowdin", at: "2026-11-14T00:00:00Z" } }], {
+      root,
+      translations: "translations",
+      locale: "pt-BR",
+      catalogue: "start/a",
+      now,
+    });
+    expect(r.refused).toBeUndefined();
+    expect(r.added).toBe(1);
+    expect(r.filled).toHaveLength(1);
+    expect(r.nodeCreated).toBe(true);
+    const node = JSON.parse(read(root, "pt-BR/start/a.json"));
+    expect(node).toMatchObject({ label: "trans:pt-BR/start/a", locale: "pt-BR", status: { locale: "pt-BR", official: false, generatedBy: "web-service" } });
+    expect(read(root, "pt-BR/start/a.po")).toContain('msgstr "Abrir {name} agora"');
+  });
 });

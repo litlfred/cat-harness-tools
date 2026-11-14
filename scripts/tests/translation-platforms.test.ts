@@ -297,13 +297,18 @@ describe("the CLI on a platform's branch (a local git repository)", () => {
     expect(candidatesProblems(side)).toEqual([]);
     expect(side.entries.find((e: { msgid: string }) => e.msgid === "Hello").candidates[0].text).toBe("Salut");
     const pt = readFileSync(join(root, "translations", "pt-BR", "docs", "index.po"), "utf-8");
-    // A catalogue the platform created, whose node the writer refuses (the
-    // node schema's label does not take a region-tagged locale): the
-    // platform's text is still not kept, and the summary says why.
-    expect(find(pt, "Hello").msgstr).toBe("");
+    // A catalogue the platform created in a region-tagged locale: its strings
+    // are candidates like any other, the empty ones filled fuzzy, and its new
+    // node is labelled `trans:pt-BR/…` (the owner, 2026-11-14: BCP 47 tags).
+    expect(find(pt, "Hello")).toMatchObject({ msgstr: "Salut", fuzzy: true });
+    const ptSide = JSON.parse(readFileSync(join(root, "translations", "pt-BR", "docs", "index.candidates.json"), "utf-8"));
+    expect(candidatesProblems(ptSide)).toEqual([]);
+    const ptNode = JSON.parse(readFileSync(join(root, "translations", "pt-BR", "docs", "index.json"), "utf-8"));
+    expect(ptNode).toMatchObject({ label: "trans:pt-BR/docs/index", locale: "pt-BR", status: { locale: "pt-BR", official: false } });
     const said = readFileSync(summary, "utf-8");
     expect(said).toContain("never an adjudicator");
-    expect(said).toMatch(/pt-BR\/docs\/index\.po`: restored to the base; candidates NOT recorded/);
+    expect(said).not.toContain("candidates NOT recorded");
+    expect(said).toMatch(/pt-BR\/docs\/index\.po`: \d+ candidate\(s\) from crowdin/);
     const meta = side.entries.find((e: { msgid: string }) => e.msgid === "World").candidates[0];
     expect(meta).toMatchObject({ text: "Monde", source: { kind: "web-service", id: "crowdin" }, metadata: { platformState: "fuzzy" } });
 
