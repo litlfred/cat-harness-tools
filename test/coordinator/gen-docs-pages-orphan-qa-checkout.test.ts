@@ -28,6 +28,7 @@ import { join, relative } from "node:path";
 
 import { readQaGraph } from "../../pipeline/qa-graph-index.ts";
 import { directoryForGraph, siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { readPathAt, writePathAt } from "../../scripts/lib/layer-output.ts";
 import { runDocsPagesIn, scratchCheckoutOf } from "../support/checkout.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing it reads changed. */
@@ -53,7 +54,11 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
     const INSTANCE_ROOT = join(scratch, relative(REPO_ROOT, ORIGIN_INSTANCE_ROOT));
     const QA_ASSET_DIR = join(INSTANCE_ROOT, "test", "results", "witnesses");
     const QA_INDEX_PATH = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "assets", "qa", "index.json");
-    const orphanDir = join(QA_ASSET_DIR, "test-orphan-0kbt");
+    // A mounted layer's witnesses are written, and swept, at its output root
+    // (bean `cat-tools-sm8r`, item 4): plant the orphan where the generator
+    // writes, and read what it published the way a reader does.
+    const orphanDir = writePathAt(scratch, join(QA_ASSET_DIR, "test-orphan-0kbt"));
+    const publishedIndex = (): string => readPathAt(scratch, QA_INDEX_PATH);
     const orphanPath = join(orphanDir, "orphan.kg.json");
 
     try {
@@ -82,10 +87,19 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
       // Step 4: Assert published count matches the tree the run leaves behind, not what it started from
       const qaDir = directoryForGraph(INSTANCE_ROOT, "qa");
       expect(qaDir).toBeDefined();
-      const treeCount = readQaGraph(qaDir!).files;
+      // Counted over the scratch copy's overlay, as the generator counts it:
+      // the overlay is resolved from the checkout the reader runs in.
+      const cwd = process.cwd();
+      process.chdir(scratch);
+      let treeCount: number;
+      try {
+        treeCount = readQaGraph(qaDir!).files;
+      } finally {
+        process.chdir(cwd);
+      }
 
-      expect(existsSync(QA_INDEX_PATH)).toBe(true);
-      const published1 = JSON.parse(readFileSync(QA_INDEX_PATH, "utf-8")) as {
+      expect(existsSync(publishedIndex())).toBe(true);
+      const published1 = JSON.parse(readFileSync(publishedIndex(), "utf-8")) as {
         files: number;
         families: Array<{ schema: string; files: number; buckets?: Record<string, number> }>;
       };
@@ -101,7 +115,7 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
       const r2 = runDocsPagesIn(scratch, REPO_ROOT);
       expect(r2.status).toBe(0);
 
-      const published2 = JSON.parse(readFileSync(QA_INDEX_PATH, "utf-8")) as typeof published1;
+      const published2 = JSON.parse(readFileSync(publishedIndex(), "utf-8")) as typeof published1;
       expect(published2.files).toBe(published1.files);
       expect(published2).toEqual(published1);
     } finally {
