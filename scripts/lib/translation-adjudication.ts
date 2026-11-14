@@ -77,11 +77,93 @@ export const MAX_ISSUE_URL = 7500;
 export type Verdict = "acceptable" | "mistranslation";
 
 /** One string's suggested fix. `current` is what the reviewer saw, so a changed catalogue is caught. */
+/**
+ * Where a candidate translation came from. A reviewer may pick one of several
+ * candidates for a string (an agent model, an open machine-translation model,
+ * a web service, a person); the source of the one they picked is recorded
+ * with their verdict.
+ */
+export const CANDIDATE_SOURCE_KINDS = ["agent", "open-mt", "web-service", "human"] as const;
+export type CandidateSourceKind = (typeof CANDIDATE_SOURCE_KINDS)[number];
+
+export interface CandidateSource {
+  kind: CandidateSourceKind;
+  /** The model or service: `claude-opus-5-5`, `opus-mt-en-fr`, `deepl`, a GitHub login. */
+  id: string;
+  version?: string;
+  /** ISO 8601, when the candidate was produced. */
+  at?: string;
+}
+
+/**
+ * The candidates sidecar, `translations/<locale>/<catalogue>.candidates.json`:
+ * alternative translations per string, from any number of sources, for a
+ * reviewer to choose among. The `.po` keeps one `msgstr`; this file keeps the
+ * rest. Writers append; a candidate is never a verdict.
+ *
+ * **Candidates are never a barrier to having a translation** (owner,
+ * 2026-11-14). A writer that adds candidates for a string whose `msgstr` is
+ * empty also puts the first candidate in the `.po` as its `msgstr`, marked
+ * `#, fuzzy`: the page then shows that translation, the status page counts it
+ * as needing review, and it stays the default until a person adjudicates the
+ * catalogue — accepting it, or choosing another candidate or their own text.
+ */
+export const CANDIDATES_SCHEMA = "translation-candidates/v1" as const;
+export const CANDIDATES_SUFFIX = ".candidates.json" as const;
+
+export interface CandidatesFile {
+  $schema: typeof CANDIDATES_SCHEMA;
+  locale: string;
+  /** Path inside the locale directory, without extension. */
+  catalogue: string;
+  entries: Array<{
+    msgctxt?: string;
+    msgid: string;
+    candidates: Array<{ text: string; source: CandidateSource }>;
+  }>;
+}
+
+/** Problems with a candidates file; empty means it is a {@link CandidatesFile}. */
+export function candidatesProblems(c: unknown): string[] {
+  const o = c as Record<string, unknown> | null;
+  if (o === null || typeof o !== "object" || Array.isArray(o)) return ["not an object"];
+  const out: string[] = [];
+  if (o.$schema !== CANDIDATES_SCHEMA) out.push(`$schema must be "${CANDIDATES_SCHEMA}"`);
+  if (typeof o.locale !== "string" || !LOCALE_RE.test(o.locale)) out.push("locale is not a locale tag");
+  if (!safeCatalogue(o.catalogue)) out.push("catalogue is not a safe relative path");
+  if (!Array.isArray(o.entries)) return [...out, "entries must be a list"];
+  o.entries.forEach((e0, i) => {
+    const e = e0 as Record<string, unknown> | null;
+    if (e === null || typeof e !== "object" || typeof e.msgid !== "string") return void out.push(`entries[${i}].msgid is required`);
+    if (!Array.isArray(e.candidates)) return void out.push(`entries[${i}].candidates must be a list`);
+    e.candidates.forEach((c1, j) => {
+      const cc = c1 as Record<string, unknown> | null;
+      if (cc === null || typeof cc.text !== "string") out.push(`entries[${i}].candidates[${j}].text is required`);
+      const p = sourceProblem(cc?.source);
+      if (p) out.push(`entries[${i}].candidates[${j}].source ${p}`);
+    });
+  });
+  return out;
+}
+
+/** `undefined` when `v` is a {@link CandidateSource}, else what is wrong. */
+export function sourceProblem(v: unknown): string | undefined {
+  const s = v as Record<string, unknown> | null;
+  if (s === null || typeof s !== "object" || Array.isArray(s)) return "must be an object";
+  if (!(CANDIDATE_SOURCE_KINDS as readonly unknown[]).includes(s.kind)) return `kind must be one of ${CANDIDATE_SOURCE_KINDS.join(", ")}`;
+  if (typeof s.id !== "string" || s.id.length === 0 || s.id.length > 200) return "id must name the model or service";
+  if (s.version !== undefined && (typeof s.version !== "string" || s.version.length > 200)) return "version must be text";
+  if (s.at !== undefined && (typeof s.at !== "string" || s.at.length > 40)) return "at must be a timestamp";
+  return undefined;
+}
+
 export interface Suggestion {
   msgctxt?: string;
   msgid: string;
   current: string;
   suggested: string;
+  /** The candidate's source when the reviewer picked one rather than typing their own. */
+  source?: CandidateSource;
   note?: string;
 }
 
@@ -174,6 +256,10 @@ export function payloadProblems(p: unknown): string[] {
           if (!str(s.current)) out.push(`${sat}.current is required (the text you saw)`);
           if (!str(s.suggested) || s.suggested.trim().length === 0) out.push(`${sat}.suggested is required`);
           if (s.note !== undefined && !str(s.note, 2000)) out.push(`${sat}.note is too long`);
+          if (s.source !== undefined) {
+            const sp = sourceProblem(s.source);
+            if (sp) out.push(`${sat}.source ${sp}`);
+          }
         });
       }
     }
@@ -225,7 +311,7 @@ export function issueBody(p: AdjudicationPayload): string {
     for (const i of mis) {
       lines.push(`- \`${i.locale}\` ${code(i.catalogue)}${i.note ? ` — ${i.note}` : ""}`);
       for (const s of i.suggestions ?? []) {
-        lines.push(`  - ${code(s.msgid)}${s.msgctxt ? ` (context ${code(s.msgctxt)})` : ""}: ${code(s.current)} → ${code(s.suggested)}${s.note ? ` — ${s.note}` : ""}`);
+        lines.push(`  - ${code(s.msgid)}${s.msgctxt ? ` (context ${code(s.msgctxt)})` : ""}: ${code(s.current)} → ${code(s.suggested)}${s.source ? ` (candidate from ${s.source.kind} ${code(s.source.id)})` : ""}${s.note ? ` — ${s.note}` : ""}`);
       }
     }
     lines.push("");
