@@ -124,3 +124,9 @@ Feature: The layer output resolver
     Given a mounted layer's results directory and its output-root twin
     When the directories a reader lists are resolved as each comes to exist
     Then only existing ones are listed, the output root first
+
+  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_file_written_via_writePathAt_is_read_back_via_overlayPath_over_the_pinned_copy
+  Scenario: A file written via writePathAt is read back via overlayPath over the pinned copy
+    Given a mounted layer with a pinned result file and a twin written via writePathAt
+    When overlayPath resolves the pinned result path
+    Then it returns the output-root twin written via writePathAt
