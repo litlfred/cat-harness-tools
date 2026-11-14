@@ -274,3 +274,78 @@ describe("writePathAt and overlayDirs (step 5: the QA writers)", () => {
     expect(overlayPath(pinned, root)).toBe(dest);
   });
 });
+
+describe("checkNavNames — reads a mounted layer's docs surfaces from its output-root twin", () => {
+  test("reads _data/harness.json, navbar-footer.html, railed html pages, and rail data from build/layers/<instance>/", async () => {
+    const { checkNavNames } = await import("../check-nav-names.ts");
+    const root = checkout({
+      instances: [{ instance: "cat-harness", path: "cat-harness", sha: "c".repeat(40) }],
+    });
+    writeFileSync(
+      join(root, "index.config.json"),
+      JSON.stringify({
+        instances: {
+          "cat-harness": { path: "cat-harness", declaration: "cat-harness.json" },
+        },
+      }),
+    );
+    mkdirSync(join(root, "cat-harness", "docs"), { recursive: true });
+    writeFileSync(
+      join(root, "cat-harness", "cat-harness.json"),
+      JSON.stringify({
+        instance: "cat-harness",
+        title: "C@T Harness",
+        version: "0.1.0",
+        graphs: {
+          docs: { path: "docs", publish: true },
+          skills: { path: "skills", publish: true },
+        },
+      }),
+    );
+
+    const outDocs = join(root, LAYER_OUTPUT_ROOT, "cat-harness", "docs");
+    mkdirSync(join(outDocs, "_data"), { recursive: true });
+    mkdirSync(join(outDocs, "_includes", "generated"), { recursive: true });
+    mkdirSync(join(outDocs, "assets", "rail-data"), { recursive: true });
+    mkdirSync(join(outDocs, "skills"), { recursive: true });
+
+    writeFileSync(
+      join(outDocs, "_data", "harness.json"),
+      JSON.stringify({
+        graphs: {
+          docs: { title: "Docs", nav_label: "Docs", icon: "📖" },
+          skills: { title: "Skills", nav_label: "Skills", icon: "🧭" },
+        },
+      }),
+    );
+    writeFileSync(
+      join(outDocs, "_data", "stickies.json"),
+      JSON.stringify({ items: [{ scope: "skills", label: "Skills", icon: "🧭" }] }),
+    );
+    writeFileSync(
+      join(outDocs, "_includes", "generated", "navbar-footer.html"),
+      `<button data-rail-toggle="skills"><span class="rail-toggle-icon">🧭</span><span class="rail-toggle-label">Skills</span></button>`,
+    );
+    writeFileSync(
+      join(outDocs, "skills", "index.html"),
+      `---
+title: Skills
+rail_scope: skills
+rail_title: Skills
+rail_icon: "🧭"
+---
+<p>Skills</p>
+`,
+    );
+    writeFileSync(
+      join(outDocs, "assets", "rail-data", "skills.js"),
+      `window.CAT_RAIL_DATA["skills"] = {"title":"Skills","icon":"🧭"};\n`,
+    );
+
+    const res = checkNavNames(root, join(root, "cat-harness", "docs"));
+    expect(res.undetermined).toBeUndefined();
+    expect(res.conflicts).toEqual([]);
+    expect(res.templates).toEqual([]);
+  });
+});
+

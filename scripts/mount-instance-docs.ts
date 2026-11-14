@@ -604,7 +604,7 @@ export function publishedGraphs(built: string, instanceName: string, toRoot: str
   const out = new Map<string, GraphFallback>();
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return out;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = readPathAt(REPO, join(REPO, prefix, "_data", "harness.json"));
   if (!existsSync(data)) return out;
   let d: { harnesses?: { name?: string; visualisations?: { kind?: string; path?: string; note?: string; label?: string; sameAs?: string }[] }[] };
   try {
@@ -642,7 +642,7 @@ export function instantiatedHarnesses(built: string, toRoot: string): NavItem[] 
   // disagree with the declaration the moment the directory moves.
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = readPathAt(REPO, join(REPO, prefix, "_data", "harness.json"));
   if (!existsSync(data)) return undefined;
   let d: { harnesses?: { name?: string; label?: string; title?: string; href?: string | null; instantiated?: boolean; tone?: number; mark?: HarnessMark | null }[] };
   try {
@@ -679,7 +679,7 @@ export function instantiatedHarnesses(built: string, toRoot: string): NavItem[] 
 export function navbarRowData(built: string): unknown {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = readPathAt(REPO, join(REPO, prefix, "_data", "harness.json"));
   if (!existsSync(data)) return undefined;
   try {
     const d = JSON.parse(readFileSync(data, "utf-8")) as { navbar?: unknown };
@@ -698,7 +698,7 @@ export function navbarRowData(built: string): unknown {
 export function railScopesOf(built: string): { name: string; href: string }[] {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return [];
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = readPathAt(REPO, join(REPO, prefix, "_data", "harness.json"));
   if (!existsSync(data)) return [];
   try {
     const d = JSON.parse(readFileSync(data, "utf-8")) as { railScopes?: { name?: unknown; href?: unknown }[] };
@@ -878,7 +878,7 @@ export function generatedChromeBytes(rel: string): Buffer | undefined {
 export function pinPlatformChrome(siteAbs: string, harnessRoot: string = HARNESS_ROOT): { copied: string[]; same: string[]; differing: string[] } {
   const out = { copied: [] as string[], same: [] as string[], differing: [] as string[] };
   for (const rel of [...PINNED_CHROME_FILES, ...PINNED_DATA_FILES]) {
-    const from = join(harnessRoot, siteFileFor(harnessRoot, rel));
+    const from = readPathAt(REPO, join(harnessRoot, siteFileFor(harnessRoot, rel)));
     // `avatars.css` and `themes.css` are generated, not committed
     // (`avatars:css`, `themes:css`): a mount that has not run the writer is
     // given its bytes from the same renderer.
@@ -911,7 +911,7 @@ export function pinPlatformChrome(siteAbs: string, harnessRoot: string = HARNESS
 export function railNames(built: string, instance: string): { harness?: string; site?: string } {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return {};
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = readPathAt(REPO, join(REPO, prefix, "_data", "harness.json"));
   if (!existsSync(data)) return {};
   let d: { title?: string; harnesses?: { name?: string; label?: string; title?: string }[] };
   try {
@@ -940,7 +940,7 @@ export function instanceMark(
 ): Pick<NavItem, "avatar" | "glyphPath" | "tone"> | undefined {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = readPathAt(REPO, join(REPO, prefix, "_data", "harness.json"));
   if (!existsSync(data)) return undefined;
   let d: { name?: string; icon?: HarnessMark | null; harnesses?: { name?: string; tone?: number; mark?: HarnessMark | null }[] };
   try {
@@ -1288,7 +1288,7 @@ export function instanceHarnesses(
 ): NavItem[] | undefined {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
-  const data = join(REPO, prefix, "_data", "harness.json");
+  const data = readPathAt(REPO, join(REPO, prefix, "_data", "harness.json"));
   if (!existsSync(data)) return undefined;
   let d: { harnesses?: { name?: string; label?: string; title?: string; href?: string | null; tone?: number; mark?: HarnessMark | null; needs?: string[] }[] };
   try {

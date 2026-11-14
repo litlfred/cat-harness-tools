@@ -147,3 +147,10 @@ Feature: The layer output resolver
     Given a mounted layer with a pinned result file and a twin written via writePathAt
     When overlayPath resolves the pinned result path
     Then it returns the output-root twin written via writePathAt
+
+  @test:scripts/tests/layer-output.test.ts::checkNavNames_—_reads_a_mounted_layer's_docs_surfaces_from_its_output-root_twin::reads__data/harness.json,_navbar-footer.html,_railed_html_pages,_and_rail_data_from_build/layers/<instance>/
+  Scenario: checkNavNames reads a mounted layer's docs surfaces from its output-root twin
+    Given a checkout where cat-harness is mounted and its generated docs surfaces live under build/layers/cat-harness/docs/
+    When checkNavNames inspects the checkout
+    Then it reads the output-root docs surfaces and passes with no failures
+

@@ -114,6 +114,7 @@ import { PAYLOAD_MEDIA_TYPES, PAYLOAD_PATH, type PayloadLink } from "../schemas/
 import { TodoIndexSchema } from "../schemas/sdlc/todo-index.ts";
 import { declaredBlockEdges, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { auditPayloadTree, payloadOutDir, planPayloads, renderPayloadFiles, type PayloadEntry, type PayloadPlan } from "./gen-subgraph-jsonld.ts";
+import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { nodeKind } from "../schemas/kg/node-kind.ts";
 import { z } from "zod";
@@ -484,7 +485,7 @@ export function checkSlice(def: SliceDef, data: SliceData, opts: { publishedPayl
       writePayloads(data.payloads, payloadDir);
       problems.push(...auditPayloadTree(payloadDir, data.payloads.links));
     } else {
-      const pdir = opts.publishedPayloadDir ?? join(INSTANCE_ROOT, payloadOutDir(INSTANCE_ROOT));
+      const pdir = opts.publishedPayloadDir ?? readPathAt(REPO_ROOT, join(INSTANCE_ROOT, payloadOutDir(INSTANCE_ROOT)));
       for (const [ref, link] of data.payloads.links) {
         if (!existsSync(join(pdir, link.sha256))) problems.push(`${ref}: points at payload ${link.sha256}, which the published tree does not hold`);
       }
@@ -723,7 +724,7 @@ export const TODOS_SLICE: SliceDef = {
     body: "markdown",
   },
   async load(root) {
-    const p = join(INSTANCE_ROOT, TODO_INDEX);
+    const p = readPathAt(root, join(INSTANCE_ROOT, TODO_INDEX));
     if (!existsSync(p)) return null;
     // The todo reader is imported lazily: it resolves its graph at import.
     const { readTodoFiles } = await import("./todos.ts");
@@ -866,15 +867,16 @@ export const LIBRARY_SLICE: SliceDef = {
     like: "b.title",
     body: "library-entry",
   },
-  async load() {
+  async load(root) {
     const dir = join(INSTANCE_ROOT, LIBRARY_DIR);
-    if (!existsSync(join(dir, "index.json"))) return null;
+    const indexPath = readPathAt(root, join(dir, "index.json"));
+    if (!existsSync(indexPath)) return null;
     const entries = new Map<string, Buffer>();
-    const edir = join(dir, "entries");
+    const edir = readPathAt(root, join(dir, "entries"));
     if (existsSync(edir)) {
       for (const f of readdirSync(edir).sort()) if (f.endsWith(".json")) entries.set(f.slice(0, -5), readFileSync(join(edir, f)));
     }
-    return libraryData(JSON.parse(readFileSync(join(dir, "index.json"), "utf-8")), entries);
+    return libraryData(JSON.parse(readFileSync(indexPath, "utf-8")), entries);
   },
 };
 
@@ -1129,7 +1131,7 @@ function argValues(args: string[], name: string): string[] {
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  const outDir = resolve(argValues(args, "--out")[0] ?? SLICES_DIR);
+  const outDir = resolve(argValues(args, "--out")[0] ?? writePathAt(REPO_ROOT, SLICES_DIR));
   const payloadOut = argValues(args, "--payload-out")[0];
   const wanted = argValues(args, "--slice");
   const unknown = wanted.filter((w) => !SLICES.some((s) => s.slice === w));

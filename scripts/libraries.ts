@@ -98,6 +98,7 @@ import {
 import { parseOutsideSoftwareRef } from "../schemas/library/outside-software.ts";
 import { loadSpdxLicenseList } from "../schemas/library/spdx-license-expression.ts";
 
+import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { reaches } from "./lib/needs-reach.ts";
 
 /** The graph typology a `libraries/` directory is declared with. */
@@ -912,10 +913,18 @@ export function writeLayer(layer: LibraryLayer, derived: DerivedLayer): { writte
 export function main(argv: readonly string[], repoRoot = resolve(import.meta.dir, "..", "..")): number {
   const check = argv.includes("--check");
   const only = argv.includes("--instance") ? argv[argv.indexOf("--instance") + 1] : undefined;
+  const ownScope = check && !only ? gateOwnInstances() : undefined;
   const own = libraryLayers(repoRoot);
   const held = heldLayers(repoRoot, own);
   let layers = [...own, ...held];
   if (only) layers = layers.filter((l) => l.name === only || resolve(l.root) === resolve(only));
+  if (ownScope) {
+    layers = layers.filter((l) => ownScope.has((l.heldBy ?? l).name));
+    if (layers.length === 0) {
+      console.log(nothingOwnLine("libraries:check", "software-library directory", ownScope));
+      return 0;
+    }
+  }
   if (layers.length === 0) {
     console.error(
       only
@@ -940,7 +949,7 @@ export function main(argv: readonly string[], repoRoot = resolve(import.meta.dir
   // A held directory for a layer the checkout does not hold: could not
   // determine whether it is current, never a pass, and never deleted here.
   const holder = own.find((l) => l.name === HOLDER);
-  if (holder && !only) {
+  if (holder && !only && (!ownScope || ownScope.has(holder.name))) {
     for (const d of strayHeldDirs(holder, held)) {
       findings.push(`${HOLDER}/${relative(holder.root, join(holder.dir, HELD_DIR, d)).split(sep).join("/")}: no layer named \`${d}\` below the kind is in this checkout — could not determine whether its nodes are current`);
     }
