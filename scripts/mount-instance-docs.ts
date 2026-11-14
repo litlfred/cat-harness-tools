@@ -77,7 +77,7 @@ import { layoutSubscribedInstances, subscribedTrees } from "./subscribed-trees.t
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
 import { renderMarkdownPage } from "./publish-instance-files.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
+import { declaredNavsIn, jekyllNavPages, pagesNav } from "./lib/jekyll-pages-nav.ts";
 import { THEME_SEARCH_SCRIPTS, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "./lib/site-bar.ts";
 import { beforeHeadEnd, hasRail, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
@@ -990,6 +990,8 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
   const byInstance = new Map<string, T[]>();
   // The same Pages and top bar as every other page of the site (owner, 2026-10-15).
   const pageTree = opts.themeSource && existsSync(opts.themeSource) ? jekyllNavPages(opts.themeSource) : undefined;
+  // A page that declares its own navigation gives its Pages subtree (read before any page is railed).
+  const declared = pageTree ? declaredNavsIn(siteAbs, pageTree) : undefined;
   const themeSearch = THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s))) ? THEME_SEARCH_SCRIPTS : undefined;
   for (const m of mounts) byInstance.set(m.name, [...(byInstance.get(m.name) ?? []), m]);
 
@@ -1086,7 +1088,7 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       // other themed page (`railStandalonePages`), or the page shows both.
       const before = pageTree !== undefined && hasThemeSidebar(read) ? stripThemeSidebar(read) : read;
       const mark = instanceMark(built, m.name, toRoot);
-      const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before) }).items : undefined;
+      const pages = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before), ...(declared ? { declared } : {}) }).items : undefined;
       const rel = file.slice(siteAbs.length + 1);
       const railed = injectRailOnce(before, {
         ...(pages && pages.length ? { pages, here: `/${rel.replace(/(^|\/)index\.html$/, "$1")}` } : {}),
@@ -1431,6 +1433,10 @@ export function railStandalonePages(
   // replaced by the rail, whose Pages section is the same tree, built here
   // once (`lib/jekyll-pages-nav.ts`) and given to every page of the site.
   const pageTree = opts.themeSource ? jekyllNavPages(opts.themeSource) : undefined;
+  // A page that declares its own navigation (an IG's menu, `data-fa-visualiser-nav`)
+  // gives its Pages subtree: same entries, order and nesting. Read here, before
+  // the walk rails any page and moves its declaration into the shared data.
+  const declared = pageTree ? declaredNavsIn(siteAbs, pageTree) : undefined;
   // The theme's search, where the site publishes it: the top bar of a page
   // the theme did not lay out searches the same index (`lib/site-bar.ts`).
   const themeSearch = THEME_SEARCH_SCRIPTS.every((s) => existsSync(join(siteAbs, s))) ? THEME_SEARCH_SCRIPTS : undefined;
@@ -1466,7 +1472,7 @@ export function railStandalonePages(
     if (pageTrees.has(key)) return pageTrees.get(key);
     const treeKey = `${toRoot}\0${locale}\0`;
     let tree = pageTrees.get(treeKey);
-    if (tree === undefined) pageTrees.set(treeKey, (tree = pagesNav(pageTree, { prefix: toRoot, locale }).items));
+    if (tree === undefined) pageTrees.set(treeKey, (tree = pagesNav(pageTree, { prefix: toRoot, locale, ...(declared ? { declared } : {}) }).items));
     const pages = scopeHref !== undefined ? pagesUnder(tree, `${toRoot}${scopeHref}`) : tree;
     pageTrees.set(key, pages);
     return pages;
