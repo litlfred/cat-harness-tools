@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteFileFor } from "../schemas/kg/cat-harness.ts";
+import { siteFileAt } from "./support/site-fs.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { overlayPath } from "../scripts/lib/layer-output.ts";
 
@@ -30,7 +30,8 @@ import { overlayPath } from "../scripts/lib/layer-output.ts";
  */
 const ROOT = join(HARNESS_ROOT);
 /** A site path (no leading slash) → the file the composed site serves for it. */
-const siteFile = (rel: string) => join(ROOT, siteFileFor(ROOT, rel));
+// Through the layer output overlay: the page and its assets are written at publish (bean cat-tools-sm8r).
+const siteFile = (rel: string) => overlayPath(join(ROOT, siteFileAt(ROOT, rel)));
 const ORIGIN = "https://site.example.test";
 const PAGE = "uml/overview/bootstrap";
 
@@ -66,7 +67,7 @@ async function open(page: Page, errors: string[], requests: string[]): Promise<v
   await page.goto(`${ORIGIN}/${PAGE}.html`);
 }
 
-const dotText = () => readFileSync(overlayPath(siteFile("assets/img/uml/overview/bootstrap.dot")), "utf8");
+const dotText = () => readFileSync(siteFile("assets/img/uml/overview/bootstrap.dot"), "utf8");
 
 test.describe("UML overview, Interactive view", () => {
   test("is lazy: Graphviz is fetched only when the view is picked, then lays the DOT out", async ({ page }) => {

@@ -28,6 +28,7 @@ import { join, resolve, sep } from "node:path";
 import type { Page } from "@playwright/test";
 
 import { themedBody } from "../../scripts/lib/themed-page.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * The theme's ground and body ink in each scheme — the ground as
@@ -137,6 +138,7 @@ ${themedBody(page)}
  */
 export async function serveThemedAt(p: Page, repoRoot: string, urlPath: string, scheme: Scheme = "dark"): Promise<void> {
   const file = join(repoRoot, urlPath.replace(/^\//, "").replace(/\/$/, "/index.html"));
-  const body = themedShell(readFileSync(file, "utf8"), scheme);
+  // A page the build wrote at the layer output root is read there (bean cat-tools-sm8r).
+  const body = themedShell(readFileSync(overlayPath(file), "utf8"), scheme);
   await p.route((url) => url.pathname === urlPath, (route) => route.fulfill({ contentType: "text/html", body }));
 }
