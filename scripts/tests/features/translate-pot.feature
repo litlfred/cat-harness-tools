@@ -1,161 +1,91 @@
-# scripts/translate-pot.ts fills the EMPTY msgstr entries of a layer's gettext catalogues with a
-# self-hosted open MT engine, flags each `#, fuzzy`, refuses strings whose placeholders do not
-# round-trip, and never overwrites a filled msgstr. Singular strings go through the one candidates
-# writer (translation-candidates/v1); plural entries are filled directly. Each Scenario names the test that executes it.
-Feature: Machine translation of empty catalogue entries
+# scripts/translate-pot.ts is the older name and flags of scripts/translation-candidates.ts: every
+# machine string, singular or plural, goes through the one candidates writer (translation-candidates/v1),
+# fills an EMPTY msgstr fuzzy, is refused when its placeholders do not round-trip, and never overwrites
+# a filled msgstr. Plural entries get every form, by the catalogue's plural count. Each Scenario names
+# the test that executes it.
+Feature: Machine translation of empty catalogue entries, under the older command
 
-  @test:scripts/tests/translate-pot.test.ts::the_catalogue_model_is_lossless::parse_then_serialize_is_the_identity,_comments_and_obsolete_entries_included
-  Scenario: Parse then serialize is the identity, comments and obsolete entries included
-    Given the case in the catalogue model is lossless
-    When the catalogue is filled
-    Then parse then serialize is the identity, comments and obsolete entries included
+  @test:scripts/tests/translate-pot.test.ts::the_older_flags_map_onto_translation-candidates::--locale_repeats_into_one_list,_a_.po_is_started_unless_--no-create,_and_the_rest_pass_through
+  Scenario: --locale repeats into one list, a .po is started unless --no-create, and the rest pass through
+    Given the case in the older flags map onto translation-candidates
+    When translate-pot runs
+    Then --locale repeats into one list, a .po is started unless --no-create, and the rest pass through
 
-  @test:scripts/tests/translate-pot.test.ts::the_placeholder_guard::recognises_brace,_printf,_python,_liquid,_HTML,_entity,_code,_link_and_math_tokens
-  Scenario: Recognises brace, printf, python, liquid, HTML, entity, code, link and math tokens
-    Given the case in the placeholder guard
-    When the catalogue is filled
-    Then recognises brace, printf, python, liquid, HTML, entity, code, link and math tokens
-
-  @test:scripts/tests/translate-pot.test.ts::the_placeholder_guard::a_translation_that_keeps_every_token_round-trips,_in_any_order
-  Scenario: A translation that keeps every token round-trips, in any order
-    Given the case in the placeholder guard
-    When the catalogue is filled
-    Then a translation that keeps every token round-trips, in any order
-
-  @test:scripts/tests/translate-pot.test.ts::the_placeholder_guard::a_dropped,_added_or_altered_token_does_not_round-trip
-  Scenario: A dropped, added or altered token does not round-trip
-    Given the case in the placeholder guard
-    When the catalogue is filled
-    Then a dropped, added or altered token does not round-trip
-
-  @test:scripts/tests/translate-pot.test.ts::the_placeholder_guard::mask_and_unmask_are_inverse,_even_when_the_engine_spaces_out_a_sentinel
-  Scenario: Mask and unmask are inverse, even when the engine spaces out a sentinel
-    Given the case in the placeholder guard
-    When the catalogue is filled
-    Then mask and unmask are inverse, even when the engine spaces out a sentinel
-
-  @test:scripts/tests/translate-pot.test.ts::the_placeholder_guard::an_entry_whose_placeholders_do_not_survive_is_refused,_left_empty_and_NOT_flagged_fuzzy
-  Scenario: An entry whose placeholders do not survive is refused, left empty and NOT flagged fuzzy
-    Given the case in the placeholder guard
-    When the catalogue is filled
-    Then an entry whose placeholders do not survive is refused, left empty and NOT flagged fuzzy
-
-  @test:scripts/tests/translate-pot.test.ts::the_placeholder_guard::a_string_with_nothing_but_tokens_is_refused_rather_than_copied
-  Scenario: A string with nothing but tokens is refused rather than copied
-    Given the case in the placeholder guard
-    When the catalogue is filled
-    Then a string with nothing but tokens is refused rather than copied
-
-  @test:scripts/tests/translate-pot.test.ts::never_overwrite::a_non-empty_msgstr_is_untouched,_fuzzy_or_not;_only_the_empty_one_is_filled
-  Scenario: A non-empty msgstr is untouched, fuzzy or not; only the empty one is filled
-    Given the case in never overwrite
-    When the catalogue is filled
-    Then a non-empty msgstr is untouched, fuzzy or not; only the empty one is filled
-
-  @test:scripts/tests/translate-pot.test.ts::never_overwrite::a_plural_with_any_form_filled_is_not_touched
-  Scenario: A plural with any form filled is not touched
-    Given the case in never overwrite
-    When the catalogue is filled
-    Then a plural with any form filled is not touched
-
-  @test:scripts/tests/translate-pot.test.ts::never_overwrite::the_header_entry_is_never_filled
-  Scenario: The header entry is never filled
-    Given the case in never overwrite
-    When the catalogue is filled
-    Then the header entry is never filled
-
-  @test:scripts/tests/translate-pot.test.ts::never_overwrite::a_second_run_over_its_own_output_changes_nothing
-  Scenario: A second run over its own output changes nothing
-    Given the case in never overwrite
-    When the catalogue is filled
-    Then a second run over its own output changes nothing
-
-  @test:scripts/tests/translate-pot.test.ts::what_is_kept_intact::msgctxt,_comments_and_an_existing_flag_line_survive;_fuzzy_joins_the_flags
-  Scenario: Msgctxt, comments and an existing flag line survive; fuzzy joins the flags
-    Given the case in what is kept intact
-    When the catalogue is filled
-    Then msgctxt, comments and an existing flag line survive; fuzzy joins the flags
-
-  @test:scripts/tests/translate-pot.test.ts::what_is_kept_intact::leading_and_trailing_whitespace,_and_line_structure,_come_back_verbatim
-  Scenario: Leading and trailing whitespace, and line structure, come back verbatim
-    Given the case in what is kept intact
-    When the catalogue is filled
-    Then leading and trailing whitespace, and line structure, come back verbatim
-
-  @test:scripts/tests/translate-pot.test.ts::what_is_kept_intact::plural_forms_follow_the_target's_nplurals:_three_for_ru
-  Scenario: Plural forms follow the target's nplurals: three for ru
-    Given the case in what is kept intact
-    When the catalogue is filled
-    Then plural forms follow the target's nplurals: three for ru
-
-  @test:scripts/tests/translate-pot.test.ts::what_is_kept_intact::markup_and_math_reach_the_engine_masked,_and_identical_strings_are_sent_once
-  Scenario: Markup and math reach the engine masked, and identical strings are sent once
-    Given the case in what is kept intact
-    When the catalogue is filled
-    Then markup and math reach the engine masked, and identical strings are sent once
-
-  @test:scripts/tests/translate-pot.test.ts::engines_and_the_node::the_hosted_libretranslate.com_API_is_refused
-  Scenario: The hosted libretranslate.com API is refused
-    Given the case in engines and the node
-    When the catalogue is filled
-    Then the hosted libretranslate.com API is refused
-
-  @test:scripts/tests/translate-pot.test.ts::engines_and_the_node::the_node_records_machine_generation_and_never_claims_official
-  Scenario: The node records machine generation and never claims official
-    Given the case in engines and the node
-    When the catalogue is filled
-    Then the node records machine generation and never claims official
-
-  @test:scripts/tests/translate-pot.test.ts::engines_and_the_node::a_.po_made_from_a_.pot_carries_the_locale
-  Scenario: A .po made from a .pot carries the locale
-    Given the case in engines and the node
-    When the catalogue is filled
-    Then a .po made from a .pot carries the locale
+  @test:scripts/tests/translate-pot.test.ts::the_older_flags_map_onto_translation-candidates::an_unknown_flag,_a_missing_value_or_a_non-English_source_is_refused
+  Scenario: An unknown flag, a missing value or a non-English source is refused
+    Given the case in the older flags map onto translation-candidates
+    When translate-pot runs
+    Then an unknown flag, a missing value or a non-English source is refused
 
   @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::fills_the_empty_entry,_keeps_the_filled_one,_and_writes_the_node
   Scenario: Fills the empty entry, keeps the filled one, and writes the node
     Given the case in the CLI over a translations tree
-    When the catalogue is filled
+    When translate-pot runs
     Then fills the empty entry, keeps the filled one, and writes the node
 
-  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::a_catalogue_signed_off_as_official_is_skipped
-  Scenario: A catalogue signed off as official is skipped
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::singular_strings_become_candidates_for_the_review_page;_a_second_run_changes_nothing
+  Scenario: Singular strings become candidates for the review page; a second run changes nothing
     Given the case in the CLI over a translations tree
-    When the catalogue is filled
-    Then a catalogue signed off as official is skipped
+    When translate-pot runs
+    Then singular strings become candidates for the review page; a second run changes nothing
 
-  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::--dry-run_writes_nothing
-  Scenario: --dry-run writes nothing
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::plural_entries_are_machine-filled,_fuzzy,_with_the_target's_plural_count,_and_are_candidates_too
+  Scenario: Plural entries are machine-filled, fuzzy, with the target's plural count, and are candidates too
     Given the case in the CLI over a translations tree
-    When the catalogue is filled
-    Then --dry-run writes nothing
+    When translate-pot runs
+    Then plural entries are machine-filled, fuzzy, with the target's plural count, and are candidates too
 
-  @test:scripts/tests/translate-pot.test.ts::singular_and_plural_passes::entries:_singular_fills_only_singular_entries,_plural_only_plural_ones
-  Scenario: Entries: singular fills only singular entries, plural only plural ones
-    Given the case in singular and plural passes
-    When the catalogue is filled
-    Then entries: singular fills only singular entries, plural only plural ones
-
-  @test:scripts/tests/translate-pot.test.ts::singular_and_plural_passes::newSingulars_lists_the_singular_entries_a_fill_gave_text,_and_no_others
-  Scenario: NewSingulars lists the singular entries a fill gave text, and no others
-    Given the case in singular and plural passes
-    When the catalogue is filled
-    Then newSingulars lists the singular entries a fill gave text, and no others
-
-  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::singular_strings_become_candidates_through_the_one_writer,_for_the_review_page
-  Scenario: Singular strings become candidates through the one writer, for the review page
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::a_language_with_one_form_(zh)_takes_its_only_form_from_the_plural
+  Scenario: A language with one form (zh) takes its only form from the plural
     Given the case in the CLI over a translations tree
-    When the catalogue is filled
-    Then singular strings become candidates through the one writer, for the review page
+    When translate-pot runs
+    Then a language with one form (zh) takes its only form from the plural
 
-  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::plural_entries_are_still_filled_with_the_target's_plural_count,_outside_the_candidates_file
-  Scenario: Plural entries are still filled with the target's plural count, outside the candidates file
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::leading_and_trailing_whitespace,_and_line_structure,_come_back_verbatim;_math_and_markup_reach_the_engine_masked
+  Scenario: Leading and trailing whitespace, and line structure, come back verbatim; math and markup reach the engine masked
     Given the case in the CLI over a translations tree
-    When the catalogue is filled
-    Then plural entries are still filled with the target's plural count, outside the candidates file
+    When translate-pot runs
+    Then leading and trailing whitespace, and line structure, come back verbatim; math and markup reach the engine masked
+
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::a_string_with_nothing_but_placeholders_is_not_sent,_and_is_reported
+  Scenario: A string with nothing but placeholders is not sent, and is reported
+    Given the case in the CLI over a translations tree
+    When translate-pot runs
+    Then a string with nothing but placeholders is not sent, and is reported
+
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::an_entry_whose_placeholders_do_not_survive_is_left_empty_and_not_flagged_fuzzy
+  Scenario: An entry whose placeholders do not survive is left empty and not flagged fuzzy
+    Given the case in the CLI over a translations tree
+    When translate-pot runs
+    Then an entry whose placeholders do not survive is left empty and not flagged fuzzy
+
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::a_catalogue_signed_off_as_official_gets_candidates,_but_its_.po_and_node_are_not_changed
+  Scenario: A catalogue signed off as official gets candidates, but its .po and node are not changed
+    Given the case in the CLI over a translations tree
+    When translate-pot runs
+    Then a catalogue signed off as official gets candidates, but its .po and node are not changed
 
   @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::a_catalogue_that_says_DO_NOT_MACHINE-FILL_gets_candidates,_but_its_.po_is_not_changed
   Scenario: A catalogue that says DO NOT MACHINE-FILL gets candidates, but its .po is not changed
     Given the case in the CLI over a translations tree
-    When the catalogue is filled
+    When translate-pot runs
     Then a catalogue that says DO NOT MACHINE-FILL gets candidates, but its .po is not changed
+
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::a_template_with_no_.po_is_started,_unless_--no-create
+  Scenario: A template with no .po is started, unless --no-create
+    Given the case in the CLI over a translations tree
+    When translate-pot runs
+    Then a template with no .po is started, unless --no-create
+
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::--dry-run_writes_nothing
+  Scenario: --dry-run writes nothing
+    Given the case in the CLI over a translations tree
+    When translate-pot runs
+    Then --dry-run writes nothing
+
+  @test:scripts/tests/translate-pot.test.ts::the_CLI_over_a_translations_tree::no_catalogue_at_all_is_reported,_not_passed
+  Scenario: No catalogue at all is reported, not passed
+    Given the case in the CLI over a translations tree
+    When translate-pot runs
+    Then no catalogue at all is reported, not passed
+
