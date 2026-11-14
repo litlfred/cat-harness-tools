@@ -59,7 +59,7 @@ describe("checkDeclarationResolution over a checkout", () => {
       needs: "check:instance-graph",
     });
     expect(r.findings.find((f) => f.field === "directories")!.subject).toContain("gone");
-    expect(r.examined).toEqual({ declaration: 1, directories: 2, assets: 1, visualisers: 1, needs: 1, enableSubgraphs: 0, optInLinks: 0 });
+    expect(r.examined).toEqual({ declaration: 1, directories: 2, assets: 1, visualisers: 1, needs: 1, enableSubgraphs: 0, optInLinks: 0, optInRefs: 0 });
     // A certain finding is never hidden behind "no Tool loaded".
     expect(exitCodeOf(r)).toBe(1);
   });
@@ -81,6 +81,26 @@ describe("checkDeclarationResolution over a checkout", () => {
       expect.objectContaining({ instance: "demo", subject: "present/page.md", by: "check:optin-links", detail: expect.stringContaining("demo.extra") }),
     ]);
     expect(r.examined.optInLinks).toBe(2);
+    expect(exitCodeOf(r)).toBe(1);
+  });
+
+  test("an always-on workflow naming a skill only an opt-in sub-graph holds is a finding of check:optin-refs", () => {
+    const root = fixture({
+      "demo.json": decl({
+        enableSubgraphs: ["demo.extra"],
+        directories: [
+          { id: "processes", path: "processes/", graphTypologies: ["processes"] },
+          { id: "extra", path: "extra/", optIn: true, graphTypologies: ["cat-harness"] },
+        ],
+      }),
+      "extra/only.md": "# only\n",
+      "processes/main.bpmn": '<definitions><process id="p"><task id="t"><extensionElements><bootstrap.processes:skill ref="only"/></extensionElements></task></process></definitions>\n',
+    });
+    const r = checkDeclarationResolution(root);
+    expect(r.findings.filter((f) => f.field === "optInRefs")).toEqual([
+      expect.objectContaining({ instance: "demo", subject: "processes/main.bpmn", by: "check:optin-refs", detail: expect.stringContaining("demo.extra") }),
+    ]);
+    expect(r.examined.optInRefs).toBeGreaterThanOrEqual(1);
     expect(exitCodeOf(r)).toBe(1);
   });
 
