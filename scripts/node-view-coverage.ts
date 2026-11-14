@@ -46,7 +46,7 @@
  * `--locale <l>` (default `en`) · `--summary <file>` (write the Markdown table).
  *
  * @module scripts/node-view-coverage
- * @covers library, tools, processes, skills, schemas, scenarios, attestations, qa, health, code, docs, themes, voices, glossary, references, translation-sources, software-library — one row per layer × declared directory × kind, one verdict per node
+ * @covers none — it measures a built site's views of every declared directory (one row per layer × directory × kind), not any one graph's content
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
