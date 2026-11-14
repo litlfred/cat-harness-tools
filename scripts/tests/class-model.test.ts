@@ -281,3 +281,29 @@ describe("skill and Tool pages draw their contracts", async () => {
     expect(md).toContain('href="../mcp-tools.json"');
   });
 });
+
+describe("class model QA report", async () => {
+  const { classModelQa } = await import("../class-model-qa.ts");
+  const docs = classModelOfDocuments([
+    { text: "{", module: "s/bad.schema.json" },
+    { text: persona, module: "ig/StructureDefinition-GenericPersona.json" },
+    { text: requirement, module: "ig/StructureDefinition-FunctionalRequirement.json" },
+  ]);
+  const report = classModelQa({ roots: [], modules: [], decls: docs.decls, edges: docs.edges, refProblems: [], unread: ["ig/fhir-artifact-index: index.json absent (built at publish)"] });
+
+  it("records undetermined declarations, unresolved references and unknown cardinalities as kg-qa/v1 findings", () => {
+    expect(report.$schema).toBe("kg-qa/v1");
+    expect(report.subject).toEqual({ kind: "graph", id: "schema-class-model", path: null });
+    expect(report.criteria["class-model-determined"]!.result).toBe("fail");
+    expect(report.criteria["class-model-determined"]!.findings[0]!.detail).toContain("«json-schema» bad");
+    // FunctionalRequirement's base is not in this reading: a real miss, named.
+    expect(report.criteria["class-model-references-resolve"]!.findings.map((f) => f.where)).toContain("ig/StructureDefinition-FunctionalRequirement.json#FunctionalRequirement");
+    expect(report.criteria["class-model-cardinality-known"]!.findings.map((f) => f.where)).toEqual(["ig/StructureDefinition-GenericPersona.json#GenericPersona.note"]);
+  });
+
+  it("reports an unread source as unknown, never a pass, and counts what each reader drew", () => {
+    expect(report.criteria["class-model-sources-read"]!.result).toBe("unknown");
+    expect(report.criteria["class-model-sources-drawn"]!.findings.map((f) => f.where)).toEqual(["fhir", "json-schema"]);
+    expect(report.totals).toEqual({ pass: 1, fail: 3, "n/a": 0, unknown: 1 });
+  });
+});

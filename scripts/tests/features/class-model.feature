@@ -113,3 +113,17 @@ Feature: One class model drawn the same way from Zod, JSON Schema and FHIR logic
     When its page is written
     Then it carries the diagram stylesheet once and two diagrams
     And the MCP diagram's «tool» box links to the layer's MCP tool list
+
+  @test:scripts/tests/class-model.test.ts::class_model_QA_report::records_undetermined_declarations,_unresolved_references_and_unknown_cardinalities_as_kg-qa/v1_findings
+  Scenario: The class model QA report records what the readers could not determine
+    Given an unparseable JSON Schema and two FHIR logical models, one naming a base the reading does not hold
+    When the class model QA report is made
+    Then it is a kg-qa/v1 report on the graph "schema-class-model"
+    And the undetermined schema, the unresolved base and the field with no cardinality are findings
+
+  @test:scripts/tests/class-model.test.ts::class_model_QA_report::reports_an_unread_source_as_unknown,_never_a_pass,_and_counts_what_each_reader_drew
+  Scenario: An unread source is unknown, and each reader's output is counted
+    Given an artefact index that is built at publish and absent
+    When the class model QA report is made
+    Then "class-model-sources-read" is unknown
+    And "class-model-sources-drawn" lists the fhir and json-schema readers
