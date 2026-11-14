@@ -144,7 +144,7 @@ export function wordSplitShare(rows: readonly (readonly (string | null)[])[]): {
 
 /**
  * Prose cut into columns, not a table: a word is cut at a quarter or more of
- * at least five cell boundaries. Measured on the who-iris re-ingest pilot
+ * at least five cell boundaries. Measured on a content layer's re-ingest pilot
  * (2026-11-14, two WHO handbooks, 109 candidates): every grid a reader would
  * call a table scored 0.12 or less, every page of prose read as one 0.42 or
  * more, so the line sits in an empty stretch and moving it within it changes
