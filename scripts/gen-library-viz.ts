@@ -167,6 +167,15 @@ export const VIEWER_CSS = `/* The block content panel — bean lrmo. Tokens only
 .lib-page #document .doc-figure img { display: block; width: 120px; height: 90px; object-fit: contain; border-radius: 4px; }
 .lib-page #document .doc-figure figcaption { flex: 1 1 auto; min-width: 0; font-size: .9em; display: flex; gap: 8px; align-items: baseline; }
 .lib-page #document .fig-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.lib-page .fig-print-desc { display: none; }
+.lib-page .doc-print { margin-inline-start: 8px; font-size: .8rem; cursor: pointer; }
+@media print {
+  .lib-page .fig-print-desc { display: block; margin: 4px 0 0; font-size: .85em; }
+  .lib-page #document .doc-figure { display: block; break-inside: avoid; }
+  .lib-page #document .doc-figure img { width: auto; height: auto; max-width: 100%; max-height: 60vh; }
+  .lib-page #document .fig-thumb { cursor: default; }
+  .lib-page .doc-print, .lib-page .fig-pop { display: none; }
+}
 .lib-page .fig-pop { max-width: min(92vw, 1100px); max-height: 92vh; padding: 0; border: 1px solid var(--border, #8884); border-radius: 8px; background: var(--bg, #fff); color: inherit; }
 .lib-page .fig-pop::backdrop { background: rgba(0,0,0,.6); }
 .lib-page .fig-pop-box { position: relative; padding: 12px 16px; }

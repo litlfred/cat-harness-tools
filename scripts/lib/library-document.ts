@@ -967,6 +967,53 @@ function docChecks(d){
 /* WHAT WAS EXTRACTED -- one line of pills, kind by kind (owner,
    2026-11-14: "why no biblio, glossary, etc here"). Words, never colour
    alone: "none in the text" is a finding, "not extracted" is a gap. */
+/* PRINTING LOADS EVERYTHING FIRST -- owner, 2026-11-14: "Make sure printing
+   loads all of the content before it renders the PDF on the browser". What
+   this panel defers for the screen -- lazy thumbnails, figure descriptions
+   kept for the popout, the contents tree built on toggle, summaries behind a
+   disclosure -- is all made present before a print:
+   - the "Print / PDF" button prepares, WAITS for every image, then prints;
+   - the browser's own print (Ctrl+P) gets the same preparation on
+     beforeprint; the images are switched to eager there too, and afterprint
+     closes again what the preparation opened. */
+var PRINT_OPENED = [];
+function docPrintPrep(){
+  var root = document.querySelector(".lib-page") || document;
+  /* The contents tree and every disclosure in the panels, built and open. */
+  for (var ds; (ds = root.querySelectorAll("ul.toc details:not([open])")).length;)
+    Array.prototype.forEach.call(ds, function(x){ docTreeBuild(x); x.open = true; PRINT_OPENED.push(x); });
+  Array.prototype.forEach.call(root.querySelectorAll("#document details:not([open]), #blocks details:not([open])"), function(x){ x.open = true; PRINT_OPENED.push(x); });
+  /* Each figure's description, said in print as the popout says it on screen. */
+  if (DOC_GALLERY) Array.prototype.forEach.call(root.querySelectorAll(".doc-figure button.fig-thumb[data-fig]"), function(b){
+    var fig = b.closest(".doc-figure");
+    if (!fig || fig.querySelector(".fig-print-desc")) return;
+    var im = DOC_GALLERY.images[+b.getAttribute("data-fig")];
+    var p = document.createElement("p");
+    p.className = "fig-print-desc";
+    p.textContent = im ? pickNarrative(im.narratives) : "";
+    fig.appendChild(p);
+  });
+  /* Every image fetched now, not when it would have scrolled into view. */
+  var imgs = Array.prototype.slice.call(root.querySelectorAll("img"));
+  imgs.forEach(function(i){ if (i.loading === "lazy" || i.getAttribute("loading") === "lazy") i.loading = "eager"; });
+  return Promise.all(imgs.map(function(i){
+    if (i.complete && i.naturalWidth) return null;
+    return new Promise(function(ok){
+      var done = function(){ ok(null); };
+      i.addEventListener("load", done, { once: true });
+      i.addEventListener("error", done, { once: true });
+      setTimeout(done, 15000);
+    });
+  }));
+}
+function docPrintDone(){
+  PRINT_OPENED.forEach(function(x){ x.open = false; });
+  PRINT_OPENED = [];
+}
+if (typeof window !== "undefined" && window.addEventListener) {
+  window.addEventListener("beforeprint", function(){ docPrintPrep(); });
+  window.addEventListener("afterprint", docPrintDone);
+}
 var COVER_NAMES = { contents: "Contents", sections: "Sections", figures: "Figures", tables: "Tables",
   references: "References", glossary: "Glossary", footnotes: "Footnotes", summaries: "Summaries" };
 function docCoverage(d){
@@ -998,7 +1045,8 @@ function renderDocument(id, d, err){
     : d.pages ? d.pages + ' pages'
     : d.pagesCovered ? 'page count not recorded; sections reach page ' + d.pagesCovered
     : 'page count not recorded';
-  el.innerHTML = '<h2>Document — ' + esc(d.title || id) + ' <span class="note">(' + size + ')</span>' + whole + '</h2>' +
+  el.innerHTML = '<h2>Document — ' + esc(d.title || id) + ' <span class="note">(' + size + ')</span>' + whole +
+    ' <button type="button" class="doc-print" title="Load every figure and section, then print or save as PDF">Print / PDF</button></h2>' +
     docCoverage(d) +
     '<div class="seg" role="tablist" aria-label="Document view">' + DOC_TABS.map(function(t){
       return '<button type="button" role="tab" aria-selected="' + (t[0] === tab[0]) + '" data-tab="' + t[0] + '">' + esc(t[1]) + '</button>';
@@ -1029,6 +1077,11 @@ function renderDocument(id, d, err){
     /* A block leaf scrolls to its row in the Blocks panel; the address is
        left alone, since a changed hash re-reads the whole entry. */
     el.addEventListener("click", function(ev){
+      /* Print: prepare, wait for every image, then print. */
+      if (ev.target && ev.target.closest && ev.target.closest("button.doc-print")) {
+        docPrintPrep().then(function(){ window.print(); });
+        return;
+      }
       /* A figure's thumbnail opens its popout. */
       var fb = ev.target && ev.target.closest && ev.target.closest("button.fig-thumb[data-fig]");
       if (fb) { figPopout(+fb.getAttribute("data-fig")); return; }
