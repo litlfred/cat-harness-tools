@@ -39,7 +39,7 @@ function report(verdict: string, head: string, failures = ""): { status: number;
     ].join("\n"),
   );
   chmodSync(join(dir, "gh"), 0o755);
-  const r = spawnSync("python3", ["-I", REPORT], {
+  const r = spawnSync("python3", ["-I", "-B", REPORT], {
     encoding: "utf-8",
     env: {
       // input-site: env PATH #34b0985f — PATH handed to a child process, which decides which binaries it runs

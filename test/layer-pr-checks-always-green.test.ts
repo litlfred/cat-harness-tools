@@ -16,7 +16,7 @@ function compare(name: string, base: number | undefined, head: number): { status
   const side = (exit: number) => ({ [name]: { command: "x", exit, tail: "tail" } });
   writeFileSync(join(dir, "base.json"), JSON.stringify(base === undefined ? {} : side(base)));
   writeFileSync(join(dir, "head.json"), JSON.stringify(side(head)));
-  const r = spawnSync("python3", ["-I", join(DIR, "compare-gates.py"), join(dir, "base.json"), join(dir, "head.json")], {
+  const r = spawnSync("python3", ["-I", "-B", join(DIR, "compare-gates.py"), join(dir, "base.json"), join(dir, "head.json")], {
     encoding: "utf-8",
     env: { ...process.env, GITHUB_STEP_SUMMARY: "" },
   });

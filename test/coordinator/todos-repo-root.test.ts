@@ -15,7 +15,6 @@
  * standing alone too.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -27,7 +26,7 @@ import { ROOT, TODO_ROOT, readTodos, todoDirs } from "../../scripts/todos.js";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { workflowFiles } from "../../scripts/known-skills.js";
 import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.js";
-import { qaResultDirsIn, restoringTracked } from "../support/checkout.ts";
+import { buildDocsProjections } from "../support/checkout.ts";
 
 /**
  * The checkout's diagrams as the real parser reads them — each one's process id
@@ -147,16 +146,11 @@ describe("the published process hierarchy", () => {
   // A generator that cannot run here (a standalone layer has no checkout to
   // publish) is not a failure of its own: the tests below then fail on the
   // missing index under their own names, as they always did.
-  // The generator also re-derives the committed witnesses under every
-  // layer's `test/results/`; they are put back as they were, so the run
-  // leaves no tracked file changed (bean w1gy F24).
+  // The generator also re-renders every layer's committed pages and
+  // witnesses, so it runs over a scratch copy of the checkout and only the
+  // projections it builds at publish are copied back (bean `cat-tools-sm8r`).
   beforeAll(() => {
-    if (!existsSync(INDEX)) {
-      const repo = repoRootFor(ROOT);
-      restoringTracked(qaResultDirsIn(repo), () =>
-        spawnSync("bun", ["cat-harness-tools/scripts/gen-docs-pages.ts"], { cwd: repo, encoding: "utf-8" }),
-      );
-    }
+    if (!existsSync(INDEX)) buildDocsProjections(repoRootFor(ROOT));
   }, 180_000);
   const index = () =>
     JSON.parse(
