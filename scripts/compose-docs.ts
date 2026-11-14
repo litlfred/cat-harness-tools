@@ -62,6 +62,7 @@ import { declaredDocsSources } from "./lib/docs-sources.ts";
 import { dirname } from "node:path";
 import { expandGlobScopesInFile, type ExpandedScope } from "./lib/default-scope-globs.ts";
 import { instanceRepositories } from "../schemas/kg/instance-repositories.ts";
+import { mountedInstances, outputTwinOf } from "./lib/layer-output.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
@@ -144,7 +145,9 @@ export function chromeLayers(repo = REPO): DocsLayer[] {
   const harness = join(repo, "cat-harness");
   const site = existsSync(harness) ? resolve(harness, siteDirFor(harness)) : undefined;
   const { layers, pending } = docsLayers(repo);
-  return [...layers, ...pending].filter((l) => !l.repositoryScoped && resolve(l.dir) !== site);
+  // The site directory's output-root twin is the site too, not chrome.
+  const siteTwin = site === undefined ? undefined : outputTwinOf(repo, site);
+  return [...layers, ...pending].filter((l) => !l.repositoryScoped && resolve(l.dir) !== site && (siteTwin === undefined || resolve(l.dir) !== resolve(siteTwin)));
 }
 
 /**
@@ -209,14 +212,38 @@ export function docsLayers(repo = REPO): { layers: DocsLayer[]; missing: DocsLay
   }
   // Base (instance-scoped) before overlay (repository-scoped): later wins.
   found.sort((a, b) => Number(a.repositoryScoped) - Number(b.repositoryScoped));
+  const withOutput = withOutputTwins(repo, found);
   const atPublish = new Set([...builtAtPublishIn(repo), ...builtAtPublishIn(join(repo, "cat-harness"))]);
-  const absent = found.filter((l) => !existsSync(l.dir));
+  // A layer whose pinned directory is absent is still present when a writer
+  // put its computed files at the output root: its twin carries it.
+  const carried = new Set(withOutput.filter((l) => l.twinOf !== undefined && existsSync(l.dir)).map((l) => l.twinOf));
+  const absent = found.filter((l) => !existsSync(l.dir) && !carried.has(l.id));
   const pending = absent.filter((l) => atPublish.has(resolve(l.dir) + sep));
   return {
-    layers: found.filter((l) => existsSync(l.dir)),
+    layers: withOutput.filter((l) => existsSync(l.dir)).map(({ id, dir, repositoryScoped }) => ({ id, dir, repositoryScoped })),
     missing: absent.filter((l) => !pending.includes(l)),
     pending,
   };
+}
+
+/** The id an output-root twin layer is reported under: its base layer's id and this suffix. */
+export const OUTPUT_LAYER_SUFFIX = "@output";
+
+/**
+ * Each layer of a MOUNTED instance followed by its output-root twin
+ * (`build/layers/<instance>/<same path>`, `scripts/lib/layer-output.ts`; bean
+ * `cat-tools-sm8r` item 4, step 4). A writer that computes pages for a
+ * mounted layer puts them there rather than inside the pinned mount, and the
+ * twin is laid directly over its base, so a computed page shadows the pinned
+ * copy and the overlay after it still wins. A layer of the checkout's own
+ * (not mounted) has no twin, and nothing changes while no writer writes one.
+ */
+export function withOutputTwins(repo: string, layers: readonly DocsLayer[]): (DocsLayer & { twinOf?: string })[] {
+  const mounted = mountedInstances(repo);
+  return layers.flatMap((l) => {
+    const twin = l.repositoryScoped ? undefined : outputTwinOf(repo, l.dir, mounted);
+    return twin === undefined ? [l] : [l, { id: `${l.id}${OUTPUT_LAYER_SUFFIX}`, dir: twin, repositoryScoped: false, twinOf: l.id }];
+  });
 }
 
 /** One layer directory composed into the Jekyll source under its own name. */

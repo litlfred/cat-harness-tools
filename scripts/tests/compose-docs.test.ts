@@ -826,3 +826,57 @@ describe("a composed instance's docs SOURCE is never composed (owner, 2026-10-23
     }
   });
 });
+
+describe("a MOUNTED base layer's computed pages at the output root (bean cat-tools-sm8r, item 4, step 4)", () => {
+  /** The fixture, with the checkout's lock mounting cat-harness, and `files` written at its output-root twin. */
+  function mounted(base: Record<string, string>, overlay: Record<string, string>, computed: Record<string, string>): string {
+    const root = fixture(base, overlay);
+    writeFileSync(join(root, "index.lock.json"), JSON.stringify({ instances: [{ instance: INSTANCE, path: INSTANCE, sha: "a".repeat(40) }] }));
+    const twin = join(root, "build", "layers", INSTANCE, "docs");
+    for (const [rel, body] of Object.entries(computed)) {
+      mkdirSync(join(twin, rel, ".."), { recursive: true });
+      writeFileSync(join(twin, rel), body);
+    }
+    return root;
+  }
+
+  test("the twin is laid directly over its base, before the repository overlay", () => {
+    const root = mounted({ "a.md": "base" }, {}, { "gen.md": "computed" });
+    expect(docsLayers(root).layers.map((l) => l.id)).toEqual(["docs", "docs@output", "root-docs"]);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("no twin layer while nothing was written there: the composed tree is unchanged", () => {
+    const root = mounted({ "a.md": "base" }, {}, {});
+    expect(docsLayers(root).layers.map((l) => l.id)).toEqual(["docs", "root-docs"]);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a computed page shadows the pinned copy and says so; the overlay still wins over both", () => {
+    const root = mounted({ "p.md": "PINNED", "q.md": "PINNED Q" }, { "q.md": "OVERLAY Q" }, { "p.md": "COMPUTED", "q.md": "COMPUTED Q", "new.md": "NEW" });
+    const r = compose(out(root), root);
+    expect(readFileSync(join(out(root), "p.md"), "utf-8")).toBe("COMPUTED");
+    expect(readFileSync(join(out(root), "q.md"), "utf-8")).toBe("OVERLAY Q");
+    expect(readFileSync(join(out(root), "new.md"), "utf-8")).toBe("NEW");
+    expect(r.overrides).toContainEqual({ path: "p.md", baseLayer: "docs", by: "docs@output" });
+    expect(r.suppliedBy["new.md"]).toBe("docs@output");
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a base layer absent from the mount but present at the output root is carried, not missing", () => {
+    const root = mounted({}, {}, { "gen.md": "computed" });
+    rmSync(layerDir(root, "docs"), { recursive: true, force: true });
+    const { layers, missing } = docsLayers(root);
+    expect(layers.map((l) => l.id)).toEqual(["docs@output", "root-docs"]);
+    expect(missing).toEqual([]);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a checkout that does not mount the layer has no twin, even with files at that path", () => {
+    const root = fixture({ "a.md": "base" }, {});
+    mkdirSync(join(root, "build", "layers", INSTANCE, "docs"), { recursive: true });
+    writeFileSync(join(root, "build", "layers", INSTANCE, "docs", "gen.md"), "stray");
+    expect(docsLayers(root).layers.map((l) => l.id)).toEqual(["docs", "root-docs"]);
+    rmSync(root, { recursive: true, force: true });
+  });
+});

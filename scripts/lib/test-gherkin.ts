@@ -32,10 +32,12 @@
  *
  * ## Specifications, which are not tests of this tree
  *
- * Owner, 2026-11-13: a WHO DAK's (L2) `.feature` files are test
- * SPECIFICATIONS for implementers, not tests of the repository's code. A
- * repository says so BY DECLARATION — {@link SPECIFICATION_DECLARATIONS},
- * never a path naming one repository. In a declared specification, a
+ * Owner, 2026-11-13: some `.feature` files are test SPECIFICATIONS for
+ * implementers (a DAK's L2 scenarios, for one), not tests of the repository's
+ * code. A repository says so BY DECLARATION, in its harness configuration —
+ * {@link SPECIFICATION_DECLARATIONS}: `testSpecifications` on a
+ * `contentTypes` section of `index.config.json` — never by a path or a type
+ * the checker names. In a declared specification, a
  * Scenario with no binding is counted as a specification rather than reported
  * `scenario-names-no-test`; once it carries a binding (`@itb:` or `@test:`)
  * it is checked like any other. Nothing else is relaxed: every test still
@@ -997,38 +999,55 @@ export interface SpecificationDeclaration {
   read(root: string, features: readonly string[]): { files: ReadonlySet<string>; because: string } | undefined;
 }
 
+/** The key a `contentTypes` section uses to declare its implementer specifications. */
+export const TEST_SPECIFICATIONS_KEY = "testSpecifications";
+
 /**
- * A WHO SMART Digital Adaptation Kit: the root `dak.json` with
- * `resourceType: "DAK"` (the DAK logical model). Its `testScenarios`
- * component is the "set of test scenarios to validate an implementation of
- * the DAK". When it lists `url` sources that are paths in the tree, only the
- * `.feature` files under them are specifications; when it lists none, every
- * `.feature` file in the DAK is.
+ * `testSpecifications` on any section of `contentTypes` in the root
+ * `index.config.json`: repository-relative paths (a directory ends in `/`)
+ * whose `.feature` files are specifications for implementers.
+ *
+ * The section a repository puts it on is the content type whose
+ * specifications they are, and this reader names none: it is the same for an
+ * IG, a DAK or any type registered later. The key is the platform's, as
+ * `include` is the IG type's; everything else in a section stays the business
+ * of the layer that registered the type. A section with no such key declares
+ * nothing, and a key that is not a list of paths is refused, never ignored:
+ * a declaration that silently reads as empty would keep every Scenario
+ * reported while its author believes otherwise.
  */
-export const DAK_DECLARATION: SpecificationDeclaration = {
-  name: "dak",
+export const CONTENT_TYPE_SPECIFICATIONS: SpecificationDeclaration = {
+  name: "content-type",
   read(root, features) {
-    const path = join(root, "dak.json");
+    const path = join(root, "index.config.json");
     if (!existsSync(path)) return undefined;
-    let dak: { resourceType?: unknown; testScenarios?: unknown };
+    let config: { contentTypes?: unknown };
     try {
-      dak = JSON.parse(readFileSync(path, "utf-8"));
+      config = JSON.parse(readFileSync(path, "utf-8"));
     } catch {
-      return undefined;
+      return undefined; // a config that does not parse is the index's own check's finding
     }
-    if (dak.resourceType !== "DAK") return undefined;
-    const sources = (Array.isArray(dak.testScenarios) ? dak.testScenarios : [])
-      .map((t) => (t && typeof t === "object" && typeof (t as { url?: unknown }).url === "string" ? (t as { url: string }).url : undefined))
-      .filter((u): u is string => !!u && !/^[a-z][a-z0-9+.-]*:/i.test(u))
-      .map((u) => u.replace(/^\.\//, "").replace(/\/+$/, ""));
-    const files = features.filter((f) => sources.length === 0 || sources.some((u) => f === u || f.startsWith(u + "/")));
-    const because = sources.length === 0 ? "dak.json declares a DAK" : `dak.json declares a DAK whose testScenarios are ${sources.join(", ")}`;
-    return { files: new Set(files), because };
+    const sections = config?.contentTypes;
+    if (!sections || typeof sections !== "object") return undefined;
+    const by: string[] = [];
+    const paths: string[] = [];
+    for (const [type, section] of Object.entries(sections as Record<string, unknown>)) {
+      if (!section || typeof section !== "object" || !(TEST_SPECIFICATIONS_KEY in section)) continue;
+      const declared = (section as Record<string, unknown>)[TEST_SPECIFICATIONS_KEY];
+      if (!Array.isArray(declared) || !declared.every((d) => typeof d === "string" && d.length > 0 && !/^[a-z][a-z0-9+.-]*:/i.test(d) && !d.startsWith("/"))) {
+        throw new Error(`index.config.json contentTypes.${type}.${TEST_SPECIFICATIONS_KEY} must be a list of repository-relative paths`);
+      }
+      by.push(`contentTypes.${type}`);
+      paths.push(...(declared as string[]).map((d) => d.replace(/^\.\//, "").replace(/\/+$/, "")));
+    }
+    if (by.length === 0) return undefined;
+    const files = features.filter((f) => paths.some((u) => f === u || f.startsWith(u + "/")));
+    return { files: new Set(files), because: `index.config.json ${by.join(", ")} declares ${TEST_SPECIFICATIONS_KEY} ${paths.join(", ")}` };
   },
 };
 
 /** Every declaration the scan honours. A new one is an entry here, never a path in a caller. */
-export const SPECIFICATION_DECLARATIONS: readonly SpecificationDeclaration[] = [DAK_DECLARATION];
+export const SPECIFICATION_DECLARATIONS: readonly SpecificationDeclaration[] = [CONTENT_TYPE_SPECIFICATIONS];
 
 export interface ScanOptions {
   /** Restrict to these repo-relative directories or files. Names stay relative to `root`. */

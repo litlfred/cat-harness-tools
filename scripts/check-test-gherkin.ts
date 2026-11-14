@@ -21,7 +21,8 @@
  * Gherkin dialect (`# language: <code>`).
  *
  * A repository that DECLARES its `.feature` files to be test specifications
- * for implementers — a WHO DAK's `dak.json` (owner, 2026-11-13) — has its
+ * for implementers — `testSpecifications` on a `contentTypes` section of its
+ * `index.config.json` (owner, 2026-11-13) — has its
  * unbound Scenarios counted as specifications, not reported; a bound one is
  * checked as usual. See `SPECIFICATION_DECLARATIONS` in the library.
  *

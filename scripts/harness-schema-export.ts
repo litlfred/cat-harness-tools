@@ -47,7 +47,7 @@ import { hostSchemaBase, hostSchemaPath, legacyHostSchemaPath, movedSchema } fro
 /*
  * Where a layer keeps its skills' I/O contracts: wherever its skills' refs
  * point (`input:`/`output:` front matter, #1168 B3b), relative to its layer
- * root — the root `schemas/skills/` or a subgraph's own, such as smart-base's
+ * root — the root `schemas/skills/` or a subgraph's own, such as a
  * `L2/schemas/skills/` (bean `cat-tools-st4q`). `layerContracts` in
  * `skill-contracts.ts` is the one reader.
  *
