@@ -130,7 +130,7 @@ Feature: Building an instance site
 
   @test:scripts/tests/ui/build-instance-site.test.ts::build-instance-site_—_a_checkout_that_only_mounts_layers_(an_IG_repository)::only_graph_data_refuses:_a_missing_.json_or_.jsonld_is_graph_data,_a_page_or_stylesheet_is_not
   Scenario: Only graph data refuses a publish
-    Then "folio-build.json", "index.jsonld", "who-iris/who-iris.jsonld" and "INDEX.JSONLD" are graph data
+    Then "folio-build.json", "index.jsonld", "layer/layer.jsonld" and "INDEX.JSONLD" are graph data
     And "index.html", "assets/css/avatars.css", "assets/js/x.js", "a.jsonl" and "json/index.html" are not
 
   @test:scripts/tests/ui/build-instance-site.test.ts::build-instance-site_—_a_checkout_that_only_mounts_layers_(an_IG_repository)::what_the_build_published_with_is_written_beside_the_link_report,_for_the_QA_page

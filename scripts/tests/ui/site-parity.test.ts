@@ -97,7 +97,7 @@ describe("parityShortfall — what the candidate would lose", () => {
 });
 
 describe("a shortfall is a QA finding, not a refusal (owner, 2026-11-14)", () => {
-  // who-iris's root publish was refused because its index.html lacked the icon row.
+  // A folio's root publish was refused because its index.html lacked the icon row.
   // Owner: "It shouldn't fail if there is an issue it should be a QA report."
   const current = siteFeatures(folioSiteRoot(), ["branches"]);
   const noRowOnIndex = { ...current, index: (current.index ?? []).filter((k) => k !== "navbarRow") };

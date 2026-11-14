@@ -266,7 +266,7 @@ export function missingRequired(site: string, required: readonly string[]): stri
 /**
  * WHAT STILL REFUSES A PUBLISH: graph data, a `.json` or `.jsonld` file.
  *
- * Owner, 2026-11-14, after who-iris's root publish was refused for a missing
+ * Owner, 2026-11-14, after a folio's root publish was refused for a missing
  * icon row: *"It shouldn't fail if there is an issue it should be a QA
  * report"*, then *"only refuse should be related to json(ld) publishing"*, and
  * *"if there is a required sub-graph then that json(ld) should also be

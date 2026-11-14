@@ -151,7 +151,7 @@ describe("build-instance-site — a checkout that only mounts layers (an IG repo
 
   // Owner, 2026-11-14: "only refuse should be related to json(ld) publishing".
   test("only graph data refuses: a missing .json or .jsonld is graph data, a page or stylesheet is not", () => {
-    for (const f of ["folio-build.json", "index.jsonld", "who-iris/who-iris.jsonld", "INDEX.JSONLD"]) expect(isGraphData(f)).toBe(true);
+    for (const f of ["folio-build.json", "index.jsonld", "layer/layer.jsonld", "INDEX.JSONLD"]) expect(isGraphData(f)).toBe(true);
     for (const f of ["index.html", "assets/css/avatars.css", "assets/js/x.js", "a.jsonl", "json/index.html"]) expect(isGraphData(f)).toBe(false);
   });
 

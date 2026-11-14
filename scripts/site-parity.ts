@@ -199,7 +199,7 @@ export interface ParityReport {
 /**
  * The parity result for QA. Pure.
  *
- * Owner, 2026-11-14, after who-iris's root publish was refused for an icon row
+ * Owner, 2026-11-14, after a folio's root publish was refused for an icon row
  * missing from its `index.html`: *"It shouldn't fail if there is an issue it
  * should be a QA report."* A shortfall is a finding about the build. It is
  * reported and the site is still published.
