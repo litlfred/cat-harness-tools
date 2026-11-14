@@ -57,6 +57,7 @@ import { VoiceProfileSchema } from "../schemas/content/voices.js";
 import { instanceDirectoryForGraph, readDeclaration, siteDir } from "../schemas/kg/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { overlayDirs, overlayPath } from "./lib/layer-output.ts";
 import { contentLayerInstance } from "../schemas/kg/graph-typology-registry.js";
 import { PAGE_LOCALE, declaredPageRoute, declaredRoute } from "./viewer-declarations.ts";
 
@@ -102,7 +103,9 @@ const GLOSSARY_FALLBACK = CONTENT ? `${CONTENT.name}/glossary` : "glossary";
 const GLOSSARY_ROUTE = (CONTENT && declaredPageRoute(CORE_ROOT, "glossary-page")) ?? `${PAGE_LOCALE}/${GLOSSARY_FALLBACK}`;
 const GLOSSARY_LEGACY_ROUTE = (CONTENT && declaredRoute(CORE_ROOT, "glossary-page")) ?? GLOSSARY_FALLBACK;
 const glossaryPageAt = (route: string): string => join(HARNESS, siteDir(OWN), ...route.split("/"), "index.md");
-const GLOSSARY_PAGE = [GLOSSARY_ROUTE, GLOSSARY_LEGACY_ROUTE].map(glossaryPageAt).find((p) => existsSync(p)) ?? glossaryPageAt(GLOSSARY_ROUTE);
+// Through the layer output overlay: in a checkout that mounts the harness, the
+// glossary pages are computed at its output root (bean `cat-tools-sm8r`, item 4).
+const GLOSSARY_PAGE = [GLOSSARY_ROUTE, GLOSSARY_LEGACY_ROUTE].map(glossaryPageAt).find((p) => existsSync(overlayPath(p))) ?? glossaryPageAt(GLOSSARY_ROUTE);
 /** The glossary page whose `<dt id>` anchors every class must reach — written at publish, so a test can ask whether it is there. */
 export const glossaryPage = (): string => GLOSSARY_PAGE;
 /**
@@ -351,13 +354,14 @@ function assertEdges(classes: ClassDef[], edges: Edge[]): string[] {
  * pass on an entry its link does not reach.
  */
 function glossaryAnchors(): Set<string> | null {
-  if (!existsSync(GLOSSARY_PAGE)) return null;
+  if (!existsSync(overlayPath(GLOSSARY_PAGE))) return null;
   const instanceDir = join(dirname(GLOSSARY_PAGE), "instance");
-  const pages = existsSync(instanceDir)
-    ? readdirSync(instanceDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory() && existsSync(join(instanceDir, e.name, "index.md")))
-        .map((e) => [e.name, readFileSync(join(instanceDir, e.name, "index.md"), "utf8")] as const)
-    : [];
+  // The output root's pages first, then the pinned ones: the first to hold an instance wins.
+  const names = new Set<string>();
+  for (const d of overlayDirs(instanceDir)) {
+    for (const e of readdirSync(d, { withFileTypes: true })) if (e.isDirectory() && existsSync(join(d, e.name, "index.md"))) names.add(e.name);
+  }
+  const pages = [...names].map((n) => [n, readFileSync(overlayPath(join(instanceDir, n, "index.md")), "utf8")] as const);
   return new Set(
     pages.flatMap(([instance, page]) =>
       [...page.matchAll(/<dt id="([^"]+)"/g)].map((m) => m[1]!).filter((id) => id.split("--", 1)[0] === instance),
