@@ -36,6 +36,7 @@ import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 import {
   instanceDirectoriesForGraph,
+  optInDirectoriesForGraph,
   instanceDirectoryForGraph,
   instanceRootsIn,
 } from "../../schemas/kg/cat-harness.js";
@@ -179,7 +180,13 @@ describe("an instance that declares a kind twice is auditable, not a crash", () 
   test("the singular refuses exactly when the plural finds several", () => {
     const disagreements: string[] = [];
     for (const inst of instanceRootsIn(REPO)) {
-      const all = instanceDirectoriesForGraph(inst, "schemas");
+      // The singular leaves out what sits inside a switched-on opt-in
+      // sub-graph (an ADDITIONAL graph of the kind, `optInDirectoriesForGraph`),
+      // and the plural keeps it, since a caller scanning every contract
+      // directory needs it. The invariant is over the set both ask about:
+      // smart-base's opt-in levels (`L1/` … `L4/`) each hold a `schemas/`.
+      const optIn = new Set(optInDirectoriesForGraph(inst, "schemas"));
+      const all = instanceDirectoriesForGraph(inst, "schemas").filter((d) => !optIn.has(d));
       let threw = false;
       try {
         instanceDirectoryForGraph(inst, "schemas");
