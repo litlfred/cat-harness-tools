@@ -133,6 +133,14 @@ describe("writePathAt — a writer holding an absolute path", () => {
     writeFileSync(at, "computed");
     expect(readPathAt(root, abs)).toBe(at);
   });
+
+  test("the root is always the first argument, and a given mounted map is used without reading the lock", () => {
+    const root = checkout();
+    const mounted = new Map([["lower", "lower"]]);
+    expect(writePathAt(root, join(root, "lower", "docs", "page.html"), mounted)).toBe(join(root, LAYER_OUTPUT_ROOT, "lower", "docs", "page.html"));
+    expect(writePathAt(root, join(root, "lower", "docs", "page.html"))).toBe(join(root, "lower", "docs", "page.html"));
+    expect(writePathAt(root, "/elsewhere/x", mounted)).toBe("/elsewhere/x");
+  });
 });
 
 describe("derive-at-publish built() — an artefact of a mounted layer built at its output root", () => {
