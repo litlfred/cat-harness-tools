@@ -43,7 +43,7 @@ import { siteDirectories, withViewers } from "./viewer-declarations.js";
 import { harnessTitle, normaliseDestination } from "./lib/nav-label.js";
 import { checkoutDirectories, resolveLandingInstance } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { readPathAt, writePathAt } from "./lib/layer-output.ts";
+import { overlayDirs, overlayPath, readPathAt, writePathAt } from "./lib/layer-output.ts";
 
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -278,10 +278,16 @@ if (!repoUrl && existsSync(OUT_READ)) {
  */
 function scanTileCounts(assetsDir: string): Map<string, TileCount> {
   const out = new Map<string, TileCount>();
-  if (!existsSync(assetsDir)) return out;
-  for (const d of readdirSync(assetsDir, { withFileTypes: true })) {
-    if (!d.isDirectory()) continue;
-    const file = join(assetsDir, d.name, "index.json");
+  // Over the layer overlay (bean `cat-tools-sm8r`, item 4): a mounted layer's
+  // projections (`assets/beans/`, `assets/todos/`, …) are written at its
+  // output root, so the directories are the union of that copy and the
+  // layer's own, each name once, and each index is read where a reader sees it.
+  const dirs = overlayDirs(assetsDir);
+  if (dirs.length === 0) return out;
+  const names = new Set<string>();
+  for (const at of dirs) for (const d of readdirSync(at, { withFileTypes: true })) if (d.isDirectory()) names.add(d.name);
+  for (const name of [...names].sort()) {
+    const file = overlayPath(join(assetsDir, name, "index.json"));
     if (!existsSync(file)) continue;
     let parsed: unknown;
     try {
