@@ -53,8 +53,9 @@ Feature: Site parity guard for the root publish
   @test:scripts/tests/ui/site-parity.test.ts::the_recipe_an_IG_declares_(site.build)::keep,_profile_and_links_are_read_and_checked
   Scenario: An IG's site.build keep, profile and links are read and checked
     Given a checkout whose r.config.json declares site.build
-    When the recipe is read with pre "site:ast", keep "branches", profile "ig-repo-site" and links "report"
+    When the recipe is read with pre "site:ast", keep "branches", profile "ig-repo-site" and links "refuse"
     Then those values come back with empty source and site steps
+    And links "report" and coverage "report", the defaults, are not carried
     And a keep of "../x" or "." is refused naming keep
     And a profile of "ig" is refused naming profile
     And links "ignore" is refused naming links
@@ -149,3 +150,24 @@ Feature: Site parity guard for the root publish
     Then without rulings the shortfall has 1 line
     And with the theme side-bar ruling the shortfall is empty
     And a railed candidate without a search box still falls short only for the search box under that ruling
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_shortfall_is_a_QA_finding,_not_a_refusal_(owner,_2026-11-14)::an_index.html_without_the_icon_row_is_published_with_the_shortfall_reported
+  Scenario: A root index.html without the icon row is published, the shortfall reported
+    Given the current root's measures
+    And a candidate whose index.html lacks the harness icon row
+    When the parity report is made
+    Then its outcome is "published-with-shortfall"
+    And its only shortfall names the harness icon row on index.html
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_shortfall_is_a_QA_finding,_not_a_refusal_(owner,_2026-11-14)::the_guard_still_finds_the_missing_icon_row;_only_a_caller_that_asks_for_refuse_is_refused
+  Scenario: The missing icon row is still found, and refused only when the caller asks
+    Given the same candidate
+    When the parity report is made with refuse
+    Then its outcome is "refused"
+    And a candidate that loses nothing is "carries-everything" even with refuse
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_shortfall_is_a_QA_finding,_not_a_refusal_(owner,_2026-11-14)::the_report_is_written_beside_the_link_report,_for_the_QA_page
+  Scenario: The parity report is written for the QA page
+    Given a built site
+    When the parity report is written into it
+    Then "assets/site-qa/parity.json" holds a "site-parity-report/v1" with the outcome and one shortfall
