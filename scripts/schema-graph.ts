@@ -324,7 +324,7 @@ export interface SchemaGraph {
 /** The graph typology an IG's artefact index is declared under (the FHIR layer's kind). */
 const FHIR_ARTIFACT_INDEX = "fhir-artifact-index";
 
-/** The graph typology FHIR core's StructureDefinitions are declared under (fhir-harness#431). */
+/** The graph typology FHIR core's StructureDefinitions are declared under (by whichever layer holds it; never named here). */
 const FHIR_CORE_DEFINITIONS = "fhir-core-definitions";
 
 const TAG = /@graphNode\s+(\S+)(?:\s*[—-]\s*(.*))?/;
@@ -1229,7 +1229,7 @@ export function readJsonDocument(text: string, moduleRel: string): ClassModelRea
 
 /**
  * Load the FHIR core definitions `refs` reference, from declared
- * `fhir-core-definitions` directories (fhir-harness#431; bean `cat-tools-t6fz`).
+ * `fhir-core-definitions` directories (bean `cat-tools-t6fz`).
  *
  * Only what is referenced, one level deep, from the release the referencing
  * model states (`fhirVersion` → `r4` / `r4b` / `r5`). A release that is unread,
@@ -1512,7 +1512,7 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
   }
 
   // FHIR core types, from a layer's declared `fhir-core-definitions` graph
-  // (fhir-harness#431; bean `cat-tools-t6fz`). Only the core definitions a
+  // (bean `cat-tools-t6fz`). Only the core definitions a
   // reading REFERENCES are loaded, one level deep, from the release its model
   // states (`fhirVersion`): the bodies are the full package files, 12 MB, and a
   // reference to `Patient` needs Patient, not the whole specification. A

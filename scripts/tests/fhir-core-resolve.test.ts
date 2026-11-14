@@ -1,6 +1,6 @@
 /**
  * FHIR core types resolved from a declared `fhir-core-definitions` graph
- * (fhir-harness#431; bean `cat-tools-t6fz`): loaded by reference, from the
+ * (bean `cat-tools-t6fz`): loaded by reference, from the
  * release the model states, and never guessed.
  *
  * @module scripts/tests/fhir-core-resolve.test
@@ -58,7 +58,7 @@ function read(fhirVersion: string | undefined) {
   return r;
 }
 
-describe("FHIR core types from fhir-harness", () => {
+describe("FHIR core types from a declared fhir-core graph", () => {
   it("maps a fhirVersion to its release, and says nothing for an unknown one", () => {
     expect(fhirCoreRelease("4.0.1")).toBe("r4");
     expect(fhirCoreRelease("4.3.0")).toBe("r4b");
