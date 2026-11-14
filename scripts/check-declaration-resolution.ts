@@ -48,12 +48,13 @@
  *   bun run cat-harness-tools/scripts/check-declaration-resolution.ts [--root <checkout>] [--json]
  */
 import { spawnSync } from "node:child_process";
-import { basename, relative, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, join, relative, resolve } from "node:path";
 
 import { instanceDirectories, readDeclaration, nestedDirectories, type CatHarnessDeclaration } from "../schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { orderedDependencies, resolveInstanceGraph } from "../schemas/kg/harness-config.js";
-import { declaredEnableSubgraphs, enableSubgraphsProblems, requiresProblems, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
+import { declaredEnableSubgraphs, enableSubgraphsProblems, requiresProblems, splitQualifiedSubgraphId, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
 import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import "../schemas/kg/folio-graph-typology.js";
 
@@ -85,6 +86,13 @@ export interface ResolutionReport {
   findings: ResolutionFinding[];
   /** Reasons this run could not decide something. Non-empty means exit 2. */
   undetermined: string[];
+  /**
+   * References this root cannot see and another root judges, each with the
+   * reason: a mounted layer's `enableSubgraphs` id into its OWN declaration,
+   * when that layer's opt-in directories are not laid down here. Printed,
+   * never counted.
+   */
+  notJudgedHere?: string[];
 }
 
 type Visualiser = { id: string; renderedBy?: string; covers?: string[]; coversKinds?: string[] };
@@ -121,6 +129,7 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
   const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0, enableSubgraphs: 0, optInLinks: 0 };
   const findings: ResolutionFinding[] = [];
   const undetermined: string[] = [];
+  const notJudgedHere: string[] = [];
   const names = new Map<string, string>();
 
   if (roots.length === 0) {
@@ -223,7 +232,30 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
           const dd = readDeclaration(dep.rootPath);
           if (dd !== undefined) closure.push({ name: dd.name, directories: instanceDirectories(dep.rootPath, dd) });
         }
+        // A layer's id into its OWN declaration can name a group declared from
+        // within one of its opt-in directories (`<layer>.L2-collab`, inside
+        // `L2/graph.json`). A root that does not enable that directory does not
+        // have it mounted, so the group's declaration is not on disk here, and
+        // "declares no directory" would be a claim about bytes this root never
+        // received. The layer's own root has every directory on disk and judges
+        // it there; this root says which ids it left to that root.
+        const optInDirs = (decl.directories ?? []) as Array<{ id?: string; path?: string; optIn?: boolean }>;
+        const unmounted =
+          resolve(inst) === root
+            ? []
+            : optInDirs
+                .filter((d) => d.optIn === true && typeof d.path === "string" && !existsSync(join(inst, d.path)))
+                .map((d) => d.id ?? d.path);
         for (const p of enableSubgraphsProblems(name, enable, closure)) {
+          const own = splitQualifiedSubgraphId(p.id)?.instance === name;
+          if (own && unmounted.length > 0 && p.detail.startsWith(`\`${name}\` declares no directory`)) {
+            notJudgedHere.push(
+              `${name} enableSubgraphs ${p.id}: ${name}'s opt-in director${unmounted.length === 1 ? "y" : "ies"} ` +
+                `${unmounted.map((u) => `\`${u}\``).join(", ")} ${unmounted.length === 1 ? "is" : "are"} not mounted in this root, ` +
+                `so a group declared from within ${unmounted.length === 1 ? "it" : "them"} cannot be seen here; ${name}'s own root judges it`,
+            );
+            continue;
+          }
           findings.push({ instance: name, field: "enableSubgraphs", subject: p.id, by: "check:declaration-resolution", detail: p.detail });
         }
         for (const p of requiresProblems(name, requiring, closure)) {
@@ -302,7 +334,7 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     seen.add(k);
     return true;
   });
-  return { root, instances: [...names.values()].sort(), examined, findings: unique, undetermined };
+  return { root, instances: [...names.values()].sort(), examined, findings: unique, undetermined, notJudgedHere };
 }
 
 /** A certain finding is never hidden behind an undetermined one: 1 before 2. */
@@ -316,6 +348,7 @@ export function formatResolution(r: ResolutionReport): string {
   const lines: string[] = [];
   for (const f of r.findings) lines.push(`  ✗ ${f.instance} ${f.field} ${f.subject} [${f.by}]: ${f.detail}`);
   for (const u of r.undetermined) lines.push(`  ? ${u}`);
+  for (const n of r.notJudgedHere ?? []) lines.push(`  · not judged here: ${n}`);
   const counts = RESOLVED_FIELDS.map((k) => `${r.examined[k]} ${k}`).join(", ");
   const verdict = exitCodeOf(r) === 0 ? "✓ every reference resolves" : exitCodeOf(r) === 1 ? `✗ ${r.findings.length} unresolved` : "? COULD NOT DETERMINE — not a pass";
   lines.push(`${verdict}: ${counts} across ${r.instances.length} instance(s) (${r.instances.join(", ")}) in ${r.root}`);
