@@ -56,7 +56,7 @@ const data = {
 };
 
 async function body(): Promise<string> {
-  const src = readFileSync(declaredPagePath(ROOT, "todos"), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
+  const src = readFileSync(overlayPath(declaredPagePath(ROOT, "todos")), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
   return engine.parseAndRender(src, { site: { data } });
 }
 
