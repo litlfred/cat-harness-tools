@@ -62,6 +62,8 @@ export interface DiagramModel {
   edges: DiagramEdge[];
   /** Accessible name of the figure. */
   label?: string;
+  /** Prefix of this diagram's SVG marker ids; default a hash of what it draws. */
+  idPrefix?: string;
   /** Most rows a box shows before "… n more". Default 10. */
   maxRows?: number;
   /** Width budget in px: a wider layer wraps into bands. Default 1100. */
@@ -79,6 +81,19 @@ function classDiagram(model) {
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   var CH = 6.7, PAD = 10, LH = 15, HEAD = 34, GX = 34, GY = 74, MAXC = 64, MAXR = model.maxRows || 10;
+  /* MARKER IDS ARE PER DIAGRAM. An SVG <marker> is found by document id, so
+     fixed ids repeat on every page that draws two diagrams (check:duplicate-ids
+     on the Tool pages, fa#3124). The prefix is the caller's, or a hash of what
+     the diagram draws, so it is the same on every build; the same diagram drawn
+     twice on one page gets a counter. */
+  var MK = model.idPrefix || (function () {
+    var src = (model.label || "") + "|" + (model.classes || []).map(function (c) { return c.id; }).join("|"), h = 5381;
+    for (var i = 0; i < src.length; i++) h = ((h * 33) ^ src.charCodeAt(i)) >>> 0;
+    return "cd" + h.toString(36);
+  })();
+  var seenMk = classDiagram.__seen || (classDiagram.__seen = {});
+  seenMk[MK] = (seenMk[MK] || 0) + 1;
+  if (seenMk[MK] > 1) MK += "-" + seenMk[MK];
   var cls = model.classes || [], edges = model.edges || [], byId = {}, idx = {};
   cls.forEach(function (c, i) { byId[c.id] = c; idx[c.id] = i; });
   function rowsOf(c) {
@@ -178,7 +193,7 @@ function classDiagram(model) {
     var t = (e.via || "") + (e.card ? " [" + e.card + "]" : "");
     if (a === b) {
       var sx = a.__x + a.__w, sy = a.__y + 20;
-      parts.push('<path class="cd-e" d="M' + sx + " " + sy + " h22 v28 h-22\" marker-end=\"url(#cd-tip)\"/>");
+      parts.push('<path class="cd-e" d="M' + sx + " " + sy + " h22 v28 h-22\" marker-end=\"url(#" + MK + "-tip)\"/>");
       if (t) parts.push('<text class="cd-l" x="' + (sx + 26) + '" y="' + (sy + 18) + '">' + esc(t) + "</text>");
       right = Math.max(right, sx + 30 + t.length * 6.4);
       return;
@@ -196,7 +211,7 @@ function classDiagram(model) {
     if (y2 <= y1) { /* same row or upward: route around the right side */
       var rx = Math.max(top.__x + top.__w, bot.__x + bot.__w) + 18;
       var d0 = "M" + (top.__x + top.__w) + " " + (top.__y + 14) + " H" + rx + " V" + (bot.__y + 14) + " H" + (bot.__x + bot.__w);
-      parts.push('<path class="cd-e' + (e.kind === "id-ref" ? " cd-id" : "") + '" d="' + d0 + '" marker-end="url(#cd-' + (up ? "gen" : "tip") + ')"/>');
+      parts.push('<path class="cd-e' + (e.kind === "id-ref" ? " cd-id" : "") + '" d="' + d0 + '" marker-end="url(#' + MK + "-" + (up ? "gen" : "tip") + ')"/>');
       right = Math.max(right, rx + 4);
       return;
     }
@@ -210,8 +225,8 @@ function classDiagram(model) {
       right = Math.max(right, lx0 + 4);
       left = Math.min(left, lx0 - 4);
     }
-    parts.push('<path class="cd-e' + (e.kind === "id-ref" ? " cd-id" : "") + '" d="' + d + '" marker-end="url(#cd-' + (up ? "gen" : "tip") + ')"' +
-      (e.comp ? ' marker-start="url(#cd-dia)"' : "") + "/>");
+    parts.push('<path class="cd-e' + (e.kind === "id-ref" ? " cd-id" : "") + '" d="' + d + '" marker-end="url(#' + MK + "-" + (up ? "gen" : "tip") + ')"' +
+      (e.comp ? ' marker-start="url(#' + MK + '-dia)"' : "") + "/>");
     if (t && !up) {
       var tw = t.length * 6.4 + 8, lx = x2 + 6, ly = y2 - 12;
       parts.push('<rect class="cd-lb" x="' + (lx - 3) + '" y="' + (ly - 10) + '" width="' + tw + '" height="14" rx="2"/>');
@@ -243,9 +258,9 @@ function classDiagram(model) {
   var VX = Math.floor(Math.min(left, 0)) - 2, VW = Math.ceil(right + 8) - VX;
   return '<svg class="cd" viewBox="' + VX + " 0 " + VW + " " + H + '" width="' + VW + '" height="' + H + '" role="img" aria-label="' +
     esc(model.label || "Class diagram") + '"><defs>' +
-    '<marker id="cd-gen" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M1 1 L13 7 L1 13 z" class="cd-genhead"/></marker>' +
-    '<marker id="cd-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" class="cd-tiphead"/></marker>' +
-    '<marker id="cd-dia" viewBox="0 0 16 10" refX="1" refY="5" markerWidth="14" markerHeight="9" orient="auto"><path d="M1 5 L8 1 L15 5 L8 9 z" class="cd-diahead"/></marker></defs>' +
+    '<marker id="' + MK + '-gen" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M1 1 L13 7 L1 13 z" class="cd-genhead"/></marker>' +
+    '<marker id="' + MK + '-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" class="cd-tiphead"/></marker>' +
+    '<marker id="' + MK + '-dia" viewBox="0 0 16 10" refX="1" refY="5" markerWidth="14" markerHeight="9" orient="auto"><path d="M1 5 L8 1 L15 5 L8 9 z" class="cd-diahead"/></marker></defs>' +
     parts.join("") + "</svg>";
 }
 `;
