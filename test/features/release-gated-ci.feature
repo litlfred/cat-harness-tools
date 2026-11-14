@@ -73,3 +73,10 @@ Feature: Release-gated CI workflows
     Then the workflow_call input "integration-minutes" defaults to 60
     And in "prepare-base" the "Save the stamp" step uses the same key as the "integ-lookup" step
     And the "skip-prep" step's BATCHED variable is true when "integ-lookup" had a cache hit
+
+  @test:test/release-gated-ci.test.ts::layer-pr-checks.yml_(every_layer)::the_preview_tier_runs_the_head_side_only,_its_tests_cut_to_the_change's_cone,_and_never_computes_main's_side
+  Scenario: The preview tier runs the change's cone on the head side and reports it for the preview
+    Given a PR labelled "preview" and not "release"
+    When layer-pr-checks runs
+    Then only head shards run, bun test is given the cone's tests, and main's side is not computed
+    And compare judges the cone with preview-qa.ts instead of the release verdict, and uploads "preview-qa-<head sha>"

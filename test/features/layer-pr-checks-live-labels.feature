@@ -65,3 +65,21 @@ Feature: The PR's live labels decide the check tier
     # Gap: only checks that prepare-head's if contains the release-label clause; the runtime skip is not checked
     Given the prepare-head job of layer-pr-checks.yml
     Then its if condition contains "github.event.label.name == 'release'"
+
+  @test:test/layer-pr-checks-live-labels.test.ts::tier:_the_PR's_live_labels_decide,_not_the_payload::preview_live,_without_release_->_the_preview_tier:_the_full_machinery,_cut_to_the_change's_cone
+  Scenario: A live preview label without release is the preview tier
+    Given the PR's live labels are "docs" and "preview"
+    When the tier step runs
+    Then the tier is preview, and the full tier's machinery is on to run the change's cone
+
+  @test:test/layer-pr-checks-live-labels.test.ts::tier:_the_PR's_live_labels_decide,_not_the_payload::release_and_preview_->_the_full_tier,_never_the_preview_tier
+  Scenario: Release wins over preview
+    Given the PR's live labels are "preview" and "release"
+    When the tier step runs
+    Then the tier is full and not preview
+
+  @test:test/layer-pr-checks-live-labels.test.ts::tier:_the_PR's_live_labels_decide,_not_the_payload::no_read_at_all:_the_payload's_preview_label_decides_too;_unset,_it_is_not_the_preview_tier
+  Scenario: Unreadable labels: the payload's preview label decides
+    Given the labels cannot be read from the API
+    When the payload carries "preview", or carries nothing, or the event is a push
+    Then the tier is preview only in the first case

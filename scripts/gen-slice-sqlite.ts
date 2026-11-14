@@ -114,7 +114,7 @@ import { PAYLOAD_MEDIA_TYPES, PAYLOAD_PATH, type PayloadLink } from "../schemas/
 import { TodoIndexSchema } from "../schemas/sdlc/todo-index.ts";
 import { declaredBlockEdges, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { auditPayloadTree, payloadOutDir, planPayloads, renderPayloadFiles, type PayloadEntry, type PayloadPlan } from "./gen-subgraph-jsonld.ts";
-import { readPathAt, writePathAt } from "./lib/layer-output.ts";
+import { overlayDirs, overlayPath, readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { nodeKind } from "../schemas/kg/node-kind.ts";
 import { z } from "zod";
@@ -868,15 +868,22 @@ export const LIBRARY_SLICE: SliceDef = {
     body: "library-entry",
   },
   async load(root) {
+    // Read through the layer output overlay: `library:viz` writes a mounted
+    // layer's projection at the output root (`makeEmit` → `writePathAt`), so
+    // the path under the mount is only the name. Read there, an index checkout
+    // found no source and the slice failed.
     const dir = join(INSTANCE_ROOT, LIBRARY_DIR);
-    const indexPath = readPathAt(root, join(dir, "index.json"));
-    if (!existsSync(indexPath)) return null;
+    const index = overlayPath(join(dir, "index.json"), root);
+    if (!existsSync(index)) return null;
     const entries = new Map<string, Buffer>();
-    const edir = readPathAt(root, join(dir, "entries"));
-    if (existsSync(edir)) {
-      for (const f of readdirSync(edir).sort()) if (f.endsWith(".json")) entries.set(f.slice(0, -5), readFileSync(join(edir, f)));
+    const edir = join(dir, "entries");
+    // The output twin first, then the mount: the first to hold an entry wins.
+    for (const d of overlayDirs(edir, root)) {
+      for (const f of readdirSync(d).sort()) {
+        if (f.endsWith(".json") && !entries.has(f.slice(0, -5))) entries.set(f.slice(0, -5), readFileSync(join(d, f)));
+      }
     }
-    return libraryData(JSON.parse(readFileSync(indexPath, "utf-8")), entries);
+    return libraryData(JSON.parse(readFileSync(index, "utf-8")), entries);
   },
 };
 
