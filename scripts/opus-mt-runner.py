@@ -4,8 +4,8 @@ opus-mt-runner — the local OPUS-MT runner `translate-pot.ts --engine opus-mt`
 calls. Helsinki-NLP Marian models (CC-BY 4.0), run on this machine; nothing is
 sent to a translation service.
 
-    bun run cat-harness-tools/scripts/translate-pot.ts --root <layer> \
-      --engine opus-mt --runner "python3 cat-harness-tools/scripts/opus-mt-runner.py"
+    bun run cat translation:machine-fill --instance <layer> \
+      --engine opus-mt        (this runner is the default for --engine opus-mt)
 
 Reads ONE JSON request on stdin and writes ONE JSON response on stdout:
 

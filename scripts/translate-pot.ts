@@ -6,10 +6,12 @@
  * @module scripts/translate-pot
  * @covers translation-sources
  *
- *   bun run cat-harness-tools/scripts/translate-pot.ts --root <layer root> \
+ *   bun run cat translation:machine-fill --instance <layer root> \
  *     --engine libretranslate --url http://localhost:5000
- *   bun run cat-harness-tools/scripts/translate-pot.ts --root <layer root> \
- *     --engine opus-mt --runner "python3 /path/to/opus_mt_runner.py"
+ *   bun run cat translation:machine-fill --instance <layer root> --engine opus-mt
+ *
+ * `--engine opus-mt` runs `opus-mt-runner.py` beside this script unless
+ * `--runner "<command>"` names another local runner.
  *
  * Options: `--locale es,fr` (default: every locale directory) · `--only
  * <catalogue>` (e.g. `start/contributing`) · `--batch <n>` strings per engine
@@ -37,6 +39,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { instanceDirectories } from "../schemas/kg/cat-harness.js";
 import { TranslationNodeSchema } from "../schemas/content/translation.ts";
@@ -59,6 +62,9 @@ import {
 } from "./lib/machine-translation.ts";
 
 const SOURCE_LOCALE = "en";
+
+/** `opus-mt-runner.py`, beside this script: the default `--runner`. */
+const BUNDLED_RUNNER = fileURLToPath(new URL("./opus-mt-runner.py", import.meta.url));
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -239,7 +245,8 @@ export async function translateLayer(o: RunOptions): Promise<{ reports: Catalogu
 }
 
 async function main(): Promise<number> {
-  const root = resolve(arg("--root") ?? ".");
+  // `--instance` is what the other translation commands call it; `--root` is kept.
+  const root = resolve(arg("--instance") ?? arg("--root") ?? ".");
   const tdir = instanceDirectories(root).find((d) => (d.graphTypologies ?? []).includes("translation-sources"));
   if (!tdir) {
     console.error(`translate-pot: ${root} declares no translation-sources directory. This is NOT a pass.`);
@@ -252,12 +259,10 @@ async function main(): Promise<number> {
     if (engineName === "libretranslate") {
       engine = libreTranslateEngine(arg("--url") ?? "http://localhost:5000", fetch, model);
     } else if (engineName === "opus-mt") {
-      const runner = arg("--runner");
-      if (!runner) {
-        console.error("translate-pot: --engine opus-mt needs --runner \"<command>\" (a local OPUS-MT runner).");
-        return 2;
-      }
-      engine = opusMtEngine(runner.split(/\s+/).filter(Boolean), runCommand, model);
+      // The bundled runner unless another is named. The Tool node exposes no
+      // `--runner`: a command line is not a command-line word.
+      const runner = arg("--runner")?.split(/\s+/).filter(Boolean) ?? ["python3", BUNDLED_RUNNER];
+      engine = opusMtEngine(runner, runCommand, model);
     } else {
       console.error("translate-pot: --engine must be opus-mt or libretranslate.");
       return 2;

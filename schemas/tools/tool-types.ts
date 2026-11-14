@@ -644,6 +644,15 @@ export const TranslationLevelSchema = z
   .describe("What a translation sign-off covers.");
 
 /**
+ * The open, self-hosted machine-translation engine `translate-pot.ts` runs:
+ * OPUS-MT (Helsinki-NLP Marian models, through a local runner) or a
+ * self-hosted LibreTranslate. No hosted freemium API is a member.
+ */
+export const MtEngineSchema = z
+  .enum(["opus-mt", "libretranslate"])
+  .describe("An open, self-hosted machine-translation engine: opus-mt (local Marian runner) or libretranslate (self-hosted URL).");
+
+/**
  * A plain non-negative count — how many of something, or how many to show.
  *
  * ## Why this exists, and why it did not until 2026-09-20
@@ -802,6 +811,7 @@ export const TOOL_TYPES = {
   LinkStyle: LinkStyleSchema,
   ReadmeSection: ReadmeSectionSchema,
   TranslationLevel: TranslationLevelSchema,
+  MtEngine: MtEngineSchema,
   WireframeUse: WireframeUseSchema,
   SurfaceRef: SurfaceRefSchema,
   Count: CountSchema,
@@ -996,6 +1006,7 @@ export const INJECTION_SAFE: ReadonlySet<ToolTypeName> = new Set<ToolTypeName>([
   "LinkStyle",
   "ReadmeSection",
   "TranslationLevel",
+  "MtEngine",
   "WireframeUse",
   // A pattern type: kebab-case segments joined by `/`. See the schema.
   "SurfaceRef",
