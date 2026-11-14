@@ -6,6 +6,7 @@ import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { publishedPagePath } from "../scripts/lib/jekyll-permalink.ts";
 import { serveThemed } from "./support/themed-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * Every todo has its own page, and the page renders it from its JSON-LD —
@@ -31,7 +32,7 @@ const SITE_BASE = "https://litlfred.github.io/folio-assistant/";
 const ROOT = HARNESS_ROOT;  // the site is the harness's (bean 70lx)
 const SITE_DIR = join(ROOT, siteDirFor(ROOT));
 const index = JSON.parse(
-  readFileSync(join(SITE_DIR, "assets", "todos", "index.json"), "utf8"),
+  readFileSync(overlayPath(join(SITE_DIR, "assets", "todos", "index.json")), "utf8"),
 ) as { items: Array<{ id: string; summary: string; target?: { page: string; node: string } }> };
 
 function listen(page: import("@playwright/test").Page): string[] {

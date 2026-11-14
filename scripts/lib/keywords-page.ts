@@ -233,7 +233,7 @@ export function keywordsPage(model: KeywordsPageModel, generated: string, eviden
   L.push("## Each entry, side by side");
   L.push("");
   for (const e of model.entries) {
-    L.push(`<details><summary>${cell(e.entry)} <small>${cell(e.instance)}</small></summary>`);
+    L.push(`<details markdown="1"><summary>${cell(e.entry)} <small>${cell(e.instance)}</small></summary>`);
     L.push("");
     L.push(`${entryLink(e)}${e.author.length ? ` · author keywords: ${e.author.map(cell).join(", ")}` : ""}`);
     L.push("");

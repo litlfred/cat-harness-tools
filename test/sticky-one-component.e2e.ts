@@ -20,12 +20,13 @@ import { join } from "node:path";
 import { siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { fshGutsHtml } from "../scripts/lib/navbar.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 const ROOT = join(HARNESS_ROOT);
 // The row's own stylesheet FIRST, as `head_custom.html` links it (beans `lhvt`, `9rq1`).
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
 // `navbar-row.js` FIRST — it draws the row, and `docs-ui.js` calls it — as `head_custom.html` loads them.
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 
 const cell = (id: string, title: string) => `
   <div class="fa-sticky-cell" data-fa-home-slot="${id}">

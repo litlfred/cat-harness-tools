@@ -47,6 +47,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { instanceRootsIn, siteDirFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath, readPathAt, writePathAt } from "../../scripts/lib/layer-output.ts";
 import { builtAtPublishOf } from "../../scripts/mount-from-lock.ts";
 
 /** The cat-harness layer root — the directory this file's `test/` sits in. */
@@ -179,7 +180,7 @@ export function ensureDocsPages(instanceRoot: string = INSTANCE): void {
   if (STANDALONE) return;
   const root = resolve(instanceRoot);
   const index = join(root, siteDirFor(root), "assets", "todos", "index.json");
-  if (existsSync(index)) return;
+  if (existsSync(overlayPath(index))) return;
   buildDocsProjections(checkoutHolding(root));
 }
 
@@ -273,9 +274,13 @@ export function copyBuiltAtPublish(scratch: string, repo: string): void {
   for (const root of instanceRootsIn(repo)) {
     const rel = relative(repo, root);
     for (const path of builtAtPublishOf(root)) {
-      const src = join(scratch, rel, path);
+      // A mounted layer's projections are written at its output root, in the
+      // scratch copy and here alike (bean `cat-tools-sm8r`, item 4).
+      const src = readPathAt(scratch, join(scratch, rel, path));
       if (!existsSync(src)) continue;
-      cpSync(src, join(root, path), { recursive: true, force: true });
+      const dest = writePathAt(repo, join(root, path));
+      mkdirSync(dirname(dest), { recursive: true });
+      cpSync(src, dest, { recursive: true, force: true });
     }
   }
 }

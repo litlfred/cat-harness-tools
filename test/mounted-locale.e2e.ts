@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { repoRootFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { TRANSLATION_META_ID, translationMetaBlock, withTranslationMeta } from "../scripts/lib/translation-meta.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * A MOUNTED page wears the docs pages' locale globe — issue #2219.
@@ -37,8 +38,8 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 const ROOT = join(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
 
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 const PAGE_FILE = join(REPO, "who-iris", "site", "index.html");
 const PAGE = existsSync(PAGE_FILE) ? readFileSync(PAGE_FILE, "utf8") : "";
 
