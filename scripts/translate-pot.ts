@@ -42,7 +42,8 @@
  *   bun run cat translate-pot --engine opus-mt [--locale fr]... [--instance <dir>]
  *   bun run cat translate-pot --engine libretranslate --url http://localhost:5000
  *   … --dry-run      report what would be filled, write nothing
- *   … --dir <path>   the translations directory (default <instance>/translations)
+ *   … --dir <path>   the translations directory (default: the layer's declared
+ *                    `translation-sources` directory, via `translationsHomeFor`)
  *   … --no-create    do not create a .po from a .pot that has none
  *
  * Exit codes: 0 done (refusals are reported, not failures), 1 engine or I/O
@@ -530,10 +531,22 @@ function engineFor(a: Args): Engine {
   throw new Error("--engine must be opus-mt or libretranslate");
 }
 
+/**
+ * The layer's translations directory, from its own `translation-sources`
+ * declaration (or its host's), never a path written here. Imported lazily so
+ * the pure functions above load without the declaration reader.
+ */
+async function declaredHome(instance: string): Promise<{ root: string; scope: readonly string[] }> {
+  const { translationsHomeFor } = await import("../schemas/kg/cat-harness.js");
+  const { HARNESS_ROOT } = await import("./lib/roots.ts");
+  return translationsHomeFor(instance, HARNESS_ROOT);
+}
+
 export async function main(argv: string[], engineOverride?: Engine): Promise<number> {
   const a = parseArgs(argv);
   const engine = engineOverride ?? engineFor(a);
-  const tdir = a.dir ?? join(a.instance, "translations");
+  const home = a.dir !== undefined ? { root: a.dir, scope: [] as readonly string[] } : await declaredHome(a.instance);
+  const tdir = home.root;
   if (!existsSync(tdir)) {
     console.error(`no translations directory at ${tdir}`);
     return 2;
@@ -544,7 +557,7 @@ export async function main(argv: string[], engineOverride?: Engine): Promise<num
   let catalogues = 0;
 
   for (const locale of locales) {
-    const ldir = join(tdir, locale);
+    const ldir = join(tdir, locale, ...home.scope);
     if (!existsSync(ldir)) continue;
     for (const pot of walk(ldir).filter((p) => p.endsWith(".pot")).sort()) {
       catalogues++;

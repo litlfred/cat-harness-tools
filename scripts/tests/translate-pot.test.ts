@@ -190,7 +190,7 @@ describe("the CLI over a translations tree", () => {
 
   test("fills the empty entry, keeps the filled one, and writes the node", async () => {
     const { root, dir } = tree();
-    expect(await main(["--instance", root], upper)).toBe(0);
+    expect(await main(["--instance", root, "--dir", join(root, "translations")], upper)).toBe(0);
     const po = readFileSync(join(dir, "terms.po"), "utf8");
     expect(po).toContain(`msgid "Proof"\nmsgstr "Demostración"`);
     expect(po).toContain(`#, fuzzy\nmsgid "Lemma"\nmsgstr "LEMMA"`);
@@ -206,7 +206,7 @@ describe("the CLI over a translations tree", () => {
     const { root, dir } = tree();
     const before = readFileSync(join(dir, "terms.po"), "utf8").replace("Language: es", "X-Folio-Official: yes\\n\"\n\"Language: es");
     writeFileSync(join(dir, "terms.po"), before);
-    expect(await main(["--instance", root], upper)).toBe(0);
+    expect(await main(["--instance", root, "--dir", join(root, "translations")], upper)).toBe(0);
     expect(readFileSync(join(dir, "terms.po"), "utf8")).toBe(before);
     expect(existsSync(join(dir, "terms.json"))).toBe(false);
   });
@@ -214,7 +214,7 @@ describe("the CLI over a translations tree", () => {
   test("--dry-run writes nothing", async () => {
     const { root, dir } = tree();
     const before = readFileSync(join(dir, "terms.po"), "utf8");
-    expect(await main(["--instance", root, "--dry-run"], upper)).toBe(0);
+    expect(await main(["--instance", root, "--dir", join(root, "translations"), "--dry-run"], upper)).toBe(0);
     expect(readFileSync(join(dir, "terms.po"), "utf8")).toBe(before);
   });
 });
