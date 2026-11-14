@@ -602,7 +602,7 @@ export function buildDocumentNodes(
           // A dependency's kind (a higher layer's `functional-requirement`
           // or `indicator`) is typed through the contribution registry; without
           // it such a node had no `@type` at all.
-          "@type": candidateTypes(c.kind),
+          "@type": candidateTypes(c.kind, subgraphStart),
           kind: c.kind,
           title: c.name ?? undefined,
           pageStart: sec.page_start ?? undefined,
@@ -756,37 +756,52 @@ function libraryPrefixes(): Map<string, string> {
   return contentPrefixes;
 }
 
-let contributions: ContributionRegistry | null | undefined;
+const contributions = new Map<string, ContributionRegistry | null>();
 
 /**
- * The block kinds the content repository's dependencies contribute — the DAK
- * layer's `functional-requirement`, `non-functional-requirement`, `indicator`
- * and the rest. Loaded once, as `gen-block-jsonld` loads them. A checkout
- * whose contributions cannot be loaded types only the core kinds, which is
- * what it did before.
+ * The block kinds a layer's dependencies contribute — the DAK layer's
+ * `functional-requirement`, `non-functional-requirement`, `indicator` and the
+ * rest — read from `start`, the layer whose library holds the entry
+ * ({@link librarySubgraphStart}). Loaded once per layer, as
+ * `gen-block-jsonld` loads them. A checkout whose contributions cannot be
+ * loaded types only the core kinds, which is what it did before.
+ *
+ * FROM THE HOLDING LAYER, NOT THE INDEX. Read from the index root, the
+ * registry held every MOUNTED layer's kinds, so one entry's `@type` depended
+ * on which index generated it: a layer that does not need the DAK layer had
+ * its `indicator` candidates typed by it in an index that happened to mount
+ * it, and as the generic block in its own checkout. Both checks gate the same
+ * committed nodes, so one of them was always stale (121 indicator blocks,
+ * measured 2026-11-14). From the holding layer an entry reads the same in
+ * every index as in its own checkout, the rule `libraryPrefixes` and the
+ * `library` subgraph already follow.
  */
-function contributedKinds(): ContributionRegistry | undefined {
-  if (contributions === undefined) {
+function contributedKinds(start: string = findContentRepoRoot()): ContributionRegistry | undefined {
+  // The content repo root keeps `contributionsRoot`'s answer: run from the
+  // platform checkout itself, that is the folder above it.
+  const root = resolve(start) === resolve(findContentRepoRoot()) ? contributionsRoot() : resolve(start);
+  if (!contributions.has(root)) {
     try {
-      contributions = loadContributionsSync<FolioContribution, ContributionRegistry>(
-        contributionsRoot(),
-        new ContributionRegistry(),
+      contributions.set(
+        root,
+        loadContributionsSync<FolioContribution, ContributionRegistry>(root, new ContributionRegistry()),
       );
     } catch {
-      contributions = null;
+      contributions.set(root, null);
     }
   }
-  return contributions ?? undefined;
+  return contributions.get(root) ?? undefined;
 }
 
 /**
- * A candidate's `@type`: its kind's, through the contribution registry, or the
- * generic library block class when no mounted layer types the kind. An
- * L1 library may hold another layer's `indicator` without mounting that
- * layer; its node is then still a typed block, never one with no type.
+ * A candidate's `@type`: its kind's, through the contribution registry of the
+ * layer holding the entry (`start`), or the generic library block class when
+ * no layer that one needs types the kind. An L1 library may hold another
+ * layer's `indicator` without needing that layer; its node is then still a
+ * typed block, never one with no type.
  */
-export function candidateTypes(kind: string): string[] {
-  const types = typesForKind(kind, contributedKinds());
+export function candidateTypes(kind: string, start?: string): string[] {
+  const types = typesForKind(kind, contributedKinds(start));
   return types.length ? types : [termCurie("Block")];
 }
 

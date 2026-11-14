@@ -38,7 +38,7 @@ import { CONTENT_CONTEXT } from "../../schemas/kg/jsonld.ts";
 import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import { STANDARD_PREFIXES, contextBindings, vocabMapping } from "../../schemas/content/vocab-mapping.ts";
 import { manifestLicence } from "../../schemas/library/source-licence.ts";
-import { writeDeclaration } from "../../test/support/instance-fixture.js";
+import { writeDeclaration, writeInstanceConfig } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { clearGroupCache } from "../concern-groups.ts";
 
@@ -769,6 +769,48 @@ describe("a candidate's @type (cat-harness-tools#1356)", () => {
     // A core kind keeps its own pair.
     expect(candidateTypes("theorem").length).toBeGreaterThan(0);
     expect(candidateTypes("theorem")).not.toContain("cat-harness:Block");
+  });
+});
+
+describe("a candidate's @type comes from the layer holding the entry, not the index", () => {
+  // Measured 2026-11-14: read from the index root, the registry held every
+  // MOUNTED layer's kinds, so a layer that does not need the DAK layer had its
+  // indicator candidates typed by it in an index that mounted it, and as the
+  // generic block in its own checkout. One of the two gen:jsonld:check runs
+  // over the same committed nodes was always red.
+  const TMP = mkdtempSync(join(tmpdir(), "candidate-types-"));
+  const dep = join(TMP, "dep-dak");
+  const uses = join(TMP, "uses-dak");
+  const plain = join(TMP, "plain");
+  beforeAll(() => {
+    for (const d of ["block-kinds", "content-adapters"]) mkdirSync(join(dep, d), { recursive: true });
+    writeFileSync(
+      join(dep, "block-kinds", "widget-indicator.json"),
+      JSON.stringify({ $schema: "folio-block-kind/v1", kind: "widget-indicator", adapter: "dak-test", labelPrefix: "wind", folioType: "dep-dak:WidgetIndicator" }),
+    );
+    writeFileSync(
+      join(dep, "content-adapters", "dak-test.json"),
+      JSON.stringify({ $schema: "folio-content-adapter/v1", adapter: "dak-test", typed: false, companionRoles: ["md"], vocabulary: "adapters/dak-test/index.ts" }),
+    );
+    writeDeclaration(dep, {
+      name: "dep-dak",
+      directories: [
+        { id: "kinds", path: "block-kinds/", graphTypologies: ["block-kinds"] },
+        { id: "adapters", path: "content-adapters/", graphTypologies: ["content-adapters"] },
+      ],
+    });
+    mkdirSync(uses, { recursive: true });
+    writeInstanceConfig(uses, JSON.stringify({ contentType: "document", dependencies: { folioAssistant: [{ name: "dep-dak", path: dep }] } }));
+    mkdirSync(plain, { recursive: true });
+    writeInstanceConfig(plain, JSON.stringify({ contentType: "document" }));
+  });
+  afterAll(() => rmSync(TMP, { recursive: true, force: true }));
+
+  test("a layer that needs the contributor types the kind through it", () => {
+    expect(candidateTypes("widget-indicator", uses)).toEqual(["dep-dak:WidgetIndicator"]);
+  });
+  test("a layer that does not is the generic block, whatever else is mounted", () => {
+    expect(candidateTypes("widget-indicator", plain)).toEqual(["cat-harness:Block"]);
   });
 });
 
