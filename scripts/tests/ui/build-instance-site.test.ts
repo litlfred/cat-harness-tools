@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps, NODE_KIND_PAGES, recipeWritesNodeKindPages } from "../../build-instance-site.ts";
+import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, selfAddressOf, selfTargetOf, writeLinkReport, LINK_REPORT, missingRequired, isGraphData, writeBuildQa, BUILD_QA_REPORT, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps, NODE_KIND_PAGES, recipeWritesNodeKindPages } from "../../build-instance-site.ts";
 import type { DeclaredArtefact } from "../../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -149,6 +149,19 @@ describe("build-instance-site — a checkout that only mounts layers (an IG repo
     expect(missingRequired(site, ["folio-build.json"])).toEqual([]);
   });
 
+  // Owner, 2026-11-14: "only refuse should be related to json(ld) publishing".
+  test("only graph data refuses: a missing .json or .jsonld is graph data, a page or stylesheet is not", () => {
+    for (const f of ["folio-build.json", "index.jsonld", "layer/layer.jsonld", "INDEX.JSONLD"]) expect(isGraphData(f)).toBe(true);
+    for (const f of ["index.html", "assets/css/avatars.css", "assets/js/x.js", "a.jsonl", "json/index.html"]) expect(isGraphData(f)).toBe(false);
+  });
+
+  test("what the build published with is written beside the link report, for the QA page", () => {
+    const site = mkdtempSync(join(tmpdir(), "bis-qa-"));
+    writeBuildQa(site, [{ check: "coverage", detail: "/x/ (h declares `v`)" }]);
+    expect(BUILD_QA_REPORT).toBe("assets/site-qa/build.json");
+    expect(JSON.parse(readFileSync(join(site, BUILD_QA_REPORT), "utf-8"))).toEqual({ $schema: "site-build-qa/v1", findings: [{ check: "coverage", detail: "/x/ (h declares `v`)" }] });
+  });
+
   test("a dead link on a content page is reported apart; one on any other page still refuses", async () => {
     const site = mkdtempSync(join(tmpdir(), "bis-links-"));
     mkdirSync(join(site, "sub"));
@@ -267,13 +280,23 @@ describe("the chrome's publish-time writers run before the chrome is composed (s
     expect(r.ran).toEqual(["avatars:css"]);
   });
 
-  test("a writer that fails refuses the build", () => {
-    expect(() => buildChrome(tmp, [css], () => ({ kind: "failed", exit: 1 }))).toThrow(/avatars:css failed/);
+  // Owner, 2026-11-14: "only refuse should be related to json(ld) publishing".
+  test("a stylesheet writer that fails is a QA finding, and the build goes on", () => {
+    const r = buildChrome(tmp, [css], () => ({ kind: "failed", exit: 1 }));
+    expect(r.findings).toEqual([{ check: "chrome", detail: "chrome artefact writer avatars:css failed (exit 1)" }]);
   });
 
-  test("a writer that ran and built nothing refuses the build: the chrome links it", () => {
+  test("a script writer that ran and built nothing is a QA finding, and the build goes on", () => {
     const gone = entry("assets/js/never.js", "never:js");
-    expect(() => buildChrome(tmp, [gone], () => ({ kind: "ran" }))).toThrow(/missing or empty/);
+    const r = buildChrome(tmp, [gone], () => ({ kind: "ran" }));
+    expect(r.findings).toHaveLength(1);
+    expect(r.findings[0]!.detail).toMatch(/never\.js came out missing or empty after never:js/);
+  });
+
+  test("graph data still refuses: a JSON(-LD) writer that fails, or a JSON(-LD) that came out missing", () => {
+    const graph = entry("assets/graph/index.jsonld", "graph:jsonld");
+    expect(() => buildChrome(tmp, [graph], () => ({ kind: "failed", exit: 1 }))).toThrow(/graph:jsonld failed .*graph data/);
+    expect(() => buildChrome(tmp, [graph], () => ({ kind: "ran" }))).toThrow(/graph data .*index\.jsonld came out missing or empty/);
   });
 
   test("a writer that does not apply to this root (exit 78) is reported, and its artefacts excused", () => {
@@ -366,6 +389,6 @@ describe("every site build writes its search scopes (who-iris search, owner 2026
     };
     const split = at("splitSite(site, root)");
     for (const before of ["rail-standalone-pages.ts", "o.finalSteps ?? []) run(", "writeForwardingPages(site, root)"]) expect(at(before)).toBeLessThan(split);
-    for (const after of ['join(site, ".nojekyll")', "siteCoverageShortfall(", "parityShortfall("]) expect(at(after)).toBeGreaterThan(split);
+    for (const after of ['join(site, ".nojekyll")', "siteCoverageShortfall(", "parityReport("]) expect(at(after)).toBeGreaterThan(split);
   });
 });

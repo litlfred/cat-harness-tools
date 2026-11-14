@@ -993,10 +993,11 @@ export async function stageDeclared(
   log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
   if (d.recipe.finalSteps?.length) log(`final       ${d.recipe.finalSteps.join(", ")} (after the platform's own writers)`);
   log(`profile     ${d.recipe.profile ?? "folio"}${d.recipe.profile === "ig-repo-site" ? " (the platform steps folio-site.yml runs: the shell, its navbar, Jekyll, the rail)" : ""}`);
-  if (d.recipe.links === "report") log("links       report: unresolved links are said, not refused (the recipe says so)");
+  log(`links       ${d.recipe.links === "refuse" ? "refuse: an unresolved link refuses the publish (the recipe says so)" : "report: unresolved links are said, not refused"}`);
+  log("refuses     only on graph data (.json/.jsonld) and a build that cannot run; pages, links, scripts and stylesheets are QA findings (assets/site-qa/)");
   if (target === "main") {
     log(`keeps       branches/, STAGING/, _render-log/${(d.recipe.keep ?? []).map((k) => `, ${k}/`).join("")}`);
-    log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
+    log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall is reported to QA (assets/site-qa/parity.json), not refused`);
   }
   relayEditedMounts(repo, o, log);
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
