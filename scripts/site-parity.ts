@@ -38,8 +38,8 @@
  * site whose folio rail stands in for the theme's side menu drops
  * `#site-nav`, while the search box and the rail stay required.
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 /** The page features compared, each with the test that finds it in a page's HTML. */
 export const PAGE_FEATURES = {
@@ -177,6 +177,50 @@ export function parityShortfall(current: SiteFeatures, candidate: SiteFeatures, 
   if (missing.length) out.push(`directories the current root serves and the candidate does not: ${missing.map((d) => `${d}/`).join(", ")}`);
   if (current.stamp && !candidate.stamp) out.push("the build stamp folio-build.json: the current root has it, the candidate does not");
   return out;
+}
+
+/**
+ * Where a root publish leaves its parity result on the site, beside the link
+ * report (`assets/site-qa/links.json`), for the site's QA page to read.
+ */
+export const PARITY_REPORT = "assets/site-qa/parity.json";
+
+/** The parity result as the QA page reads it. */
+export interface ParityReport {
+  $schema: "site-parity-report/v1";
+  /** `refused` only when the caller asked for the old gate (`parity: "refuse"`). */
+  outcome: "carries-everything" | "published-with-shortfall" | "refused";
+  shortfall: string[];
+  droppedByRuling: { what: string; ruling: string }[];
+  current: SiteFeatures;
+  candidate: SiteFeatures;
+}
+
+/**
+ * The parity result for QA. Pure.
+ *
+ * Owner, 2026-11-14, after a folio's root publish was refused for an icon row
+ * missing from its `index.html`: *"It shouldn't fail if there is an issue it
+ * should be a QA report."* A shortfall is a finding about the build. It is
+ * reported and the site is still published.
+ */
+export function parityReport(current: SiteFeatures, candidate: SiteFeatures, dropped: readonly DroppedByRuling[] = [], refused = false): ParityReport {
+  const shortfall = parityShortfall(current, candidate, dropped);
+  return {
+    $schema: "site-parity-report/v1",
+    outcome: shortfall.length === 0 ? "carries-everything" : refused ? "refused" : "published-with-shortfall",
+    shortfall,
+    droppedByRuling: droppedByRuling(current, candidate, dropped).map((d) => ({ what: d.words, ruling: d.ruling })),
+    current: { ...current, stamp: current.stamp ? { present: true } : undefined },
+    candidate: { ...candidate, stamp: candidate.stamp ? { present: true } : undefined },
+  };
+}
+
+/** Write {@link PARITY_REPORT} into `site`. Deterministic. */
+export function writeParityReport(site: string, report: ParityReport): void {
+  const file = join(site, PARITY_REPORT);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify(report, null, 1) + "\n");
 }
 
 /** One line per measure, for a log or a report. */
