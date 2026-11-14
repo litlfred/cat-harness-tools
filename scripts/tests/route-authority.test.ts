@@ -14,7 +14,8 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "../../test/support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 

@@ -10,7 +10,7 @@
  * changed.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "../support/site-fs.ts";
 import { join, resolve } from "node:path";
 
 import { entryView, instanceRootRoutes } from "../../scripts/gen-library-viz.ts";

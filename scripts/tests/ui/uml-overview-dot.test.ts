@@ -10,7 +10,9 @@
  * `graph-rendering` rules 1 and 7 forbid.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "../../../test/support/site-fs.ts";
+import { overlayPath } from "../../lib/layer-output.ts";
 import { join, relative, resolve } from "node:path";
 
 import { Graphviz } from "@hpcc-js/wasm-graphviz";
@@ -31,7 +33,7 @@ function walk(dir: string, ext: string): string[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((e) => {
     const p = join(dir, e);
-    return statSync(p).isDirectory() ? walk(p, ext) : p.endsWith(ext) ? [p] : [];
+    return statSync(overlayPath(p)).isDirectory() ? walk(p, ext) : p.endsWith(ext) ? [p] : [];
   });
 }
 
