@@ -47,8 +47,8 @@ function localise(nav: Element, siteRoot: string): void {
 
 /**
  * THE OPEN FOLDER IN THE PAGE'S TOP BAR TOO (owner, 2026-11-13): the bar's
- * site name reads "WHO IRIS: Library" on a page in the Library folder, as the
- * rail's header reads "WHO IRIS" over "Library". Read from the header the
+ * site name reads "<site>: Library" on a page in the Library folder, as the
+ * rail's header reads the site's name over "Library". Read from the header the
  * rail just drew, so the two cannot disagree; no folder, no suffix.
  */
 function folderInPageBar(nav: Element): void {

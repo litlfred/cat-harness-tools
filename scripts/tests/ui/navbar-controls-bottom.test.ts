@@ -4,7 +4,7 @@
  *
  * - *"put these controls at the bottom of the navbar ... remove the harnesses
  *   navbar, instead add an icon to the controls to show the harnesses."*
- * - the open FOLDER under the layer's name: "WHO IRIS" over "Library".
+ * - the open FOLDER under the layer's name: the site's name over "Library".
  *
  * The browser half (the row moved to the foot, the icon adopted into it, the
  * panel opening) is `test/rail-icon-row.e2e.ts`.
@@ -15,13 +15,13 @@ import { railModel, railSharedJson, renderRailRegions } from "../../lib/harness-
 import { NAV_CONTROL_ATTR, folderOfPage, navbarCss, navbarRegionsHtml, wireNavFolds } from "../../lib/navbar.ts";
 
 const LINKS = [
-  { href: "../../../en/cat-harness/library/who-iris/", label: "Library", description: "L1 source content" },
-  { href: "../../../en/cat-harness/schemas/who-iris/", label: "Schemas" },
+  { href: "../../../en/cat-harness/library/folio-x/", label: "Library", description: "L1 source content" },
+  { href: "../../../en/cat-harness/schemas/folio-x/", label: "Schemas" },
   { href: "../../../en/cat-harness/themes/", label: "Themes" },
-  { href: "../../../who-iris/catalogue/", label: "Catalogue" },
+  { href: "../../../folio-x/catalogue/", label: "Catalogue" },
 ];
 const OPTS = {
-  instance: "who-iris",
+  instance: "folio-x",
   toRoot: "../../..",
   links: LINKS,
   harnesses: [{ href: "../../../cat-harness/", label: "C@T Harness" }],
@@ -99,17 +99,17 @@ describe("the Harnesses icon replaces the Harnesses disclosure", () => {
 
 describe("the header's second line is the page's folder", () => {
   it("matches a folder's own page, a page beneath it, and its all-layers page", () => {
-    const at = (here: string) => folderOfPage(LINKS, [`../../..${here}`], "who-iris")?.label;
-    expect(at("/en/cat-harness/library/who-iris/")).toBe("Library");
-    expect(at("/en/cat-harness/library/who-iris/some-doc/")).toBe("Library");
-    // `schemas/who-iris/` routes `schemas/`: the all-layers schema page is in it.
+    const at = (here: string) => folderOfPage(LINKS, [`../../..${here}`], "folio-x")?.label;
+    expect(at("/en/cat-harness/library/folio-x/")).toBe("Library");
+    expect(at("/en/cat-harness/library/folio-x/some-doc/")).toBe("Library");
+    // `schemas/folio-x/` routes `schemas/`: the all-layers schema page is in it.
     expect(at("/en/cat-harness/schemas/")).toBe("Schemas");
     expect(at("/en/cat-harness/themes/x/")).toBe("Themes");
-    expect(at("/who-iris/catalogue/")).toBe("Catalogue");
+    expect(at("/folio-x/catalogue/")).toBe("Catalogue");
   });
 
   it("names no folder for the home page or a page in none", () => {
-    const at = (here: string) => folderOfPage(LINKS, [`../../..${here}`], "who-iris");
+    const at = (here: string) => folderOfPage(LINKS, [`../../..${here}`], "folio-x");
     expect(at("/")).toBeUndefined();
     expect(at("/en/")).toBeUndefined();
     expect(at("/en/cat-harness/tools/x/")).toBeUndefined();
@@ -117,18 +117,18 @@ describe("the header's second line is the page's folder", () => {
 
   it("a locale root or the site root is never a folder's route", () => {
     const wide = [{ href: "../en/", label: "English" }, { href: "../", label: "Home" }];
-    expect(folderOfPage(wide, ["../en/cat-harness/library/"], "who-iris")).toBeUndefined();
+    expect(folderOfPage(wide, ["../en/cat-harness/library/"], "folio-x")).toBeUndefined();
   });
 
   it("is drawn under the name from shared data, and the bare name elsewhere", () => {
     const shared = railSharedJson(OPTS, "../../..");
     const page = (here: string) => renderRailRegions(shared, { data: "x", toRoot: "../../..", root: "../../..", here });
-    const lib = page("/en/cat-harness/library/who-iris/");
-    expect(lib).toContain('<span class="fa-nav-titles"><span class="fa-nav-name fa-nav-label">who-iris</span><span class="fa-nav-folder fa-nav-label">Library</span></span>');
+    const lib = page("/en/cat-harness/library/folio-x/");
+    expect(lib).toContain('<span class="fa-nav-titles"><span class="fa-nav-name fa-nav-label">folio-x</span><span class="fa-nav-folder fa-nav-label">Library</span></span>');
     expect(page("/en/cat-harness/schemas/")).toContain('<span class="fa-nav-folder fa-nav-label">Schemas</span>');
     const home = page("/");
     expect(home).not.toContain("fa-nav-folder");
-    expect(home).toContain('<span class="fa-nav-name fa-nav-label">who-iris</span>');
+    expect(home).toContain('<span class="fa-nav-name fa-nav-label">folio-x</span>');
   });
 });
 

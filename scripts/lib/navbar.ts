@@ -346,7 +346,7 @@ export interface NavbarModel {
   /**
    * The FOLDER the page is in, shown under the layer's name in the header.
    * Owner, 2026-11-13: on a page opened from "Library" in Folders the header
-   * reads "WHO IRIS" with "Library" beneath it. Derived from the Folders list
+   * reads the site's name with "Library" beneath it. Derived from the Folders list
    * by the page's address ({@link folderOfPage}); absent on a page in no
    * folder, and then the header is the name alone.
    */
@@ -1289,9 +1289,9 @@ export const NAV_CONTROL_ATTR = "data-fa-nav-control";
 /**
  * The folder the page at `path` is in: the Folders row whose ROUTE holds the
  * page, longest first. A folder's route is its href, less a final
- * layer segment (see below) — `library/who-iris/` routes `library/`, so the
+ * layer segment (see below) — `library/<layer>/` routes `library/`, so the
  * all-layers page `schemas/` is in the Schemas folder as well as
- * `schemas/who-iris/` and every page beneath it. A route that is the site
+ * `schemas/<layer>/` and every page beneath it. A route that is the site
  * root, or a locale root, holds every page and so names no folder.
  *
  * `path` and each href are compared as written, both from the page, so the
@@ -1299,7 +1299,7 @@ export const NAV_CONTROL_ATTR = "data-fa-nav-control";
  * root and from the platform's).
  */
 export function folderOfPage(links: readonly NavItem[], paths: readonly string[], instance: string): NavItem | undefined {
-  // The LAYER's own segment, which ends a folder's href (`library/who-iris/`):
+  // The LAYER's own segment, which ends a folder's href (`library/<layer>/`):
   // the instance as named, as a slug, and — because a layer's display name
   // need not be its slug ("C@T Harness", `cat-harness`) — the last segment
   // most of the Folders rows end in, read off the rows themselves.

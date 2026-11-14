@@ -307,10 +307,10 @@ test.describe("the count fetch survives a page that moves its own address (bean 
 
 function railedWithHarnesses(row: unknown, shell = SHELL): string {
   const html = injectRail(shell, {
-    instance: "WHO IRIS",
+    instance: "Folio X",
     toRoot: "..",
-    links: [{ label: "Catalogue", href: "../cat-harness/catalogue/who-iris/" }],
-    harnesses: [{ label: "C@T Harness", href: "../cat-harness/" }, { label: "WHO IRIS", href: "../who-iris/" }],
+    links: [{ label: "Catalogue", href: "../cat-harness/catalogue/folio-x/" }],
+    harnesses: [{ label: "C@T Harness", href: "../cat-harness/" }, { label: "Folio X", href: "../folio-x/" }],
     navbarRow: row,
   });
   if (!html) throw new Error("injectRail declined the fixture");
