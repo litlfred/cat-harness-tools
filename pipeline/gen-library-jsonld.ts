@@ -767,10 +767,10 @@ const contributionsByRoot = new Map<string, ContributionRegistry | null>();
  * content repository) and its declared dependencies contribute — the DAK
  * layer's `functional-requirement`, `non-functional-requirement`, `indicator`
  * and the rest. Keyed by `subgraphStart` rather than a single global root so a
- * mounted layer's `library/` (such as `who-iris/library/`, which does not
- * depend on `smart-base`) is generated and checked against its own declared
- * dependencies rather than the host index's root. A layer whose contributions
- * cannot be loaded types only the core kinds, which is what it did before.
+ * mounted layer's `library/` (which does not depend on a sibling layer) is
+ * generated and checked against its own declared dependencies rather than the
+ * host index's root. A layer whose contributions cannot be loaded types only
+ * the core kinds, which is what it did before.
  */
 function contributedKinds(subgraphStart?: string): ContributionRegistry | undefined {
   const root =
