@@ -18,7 +18,7 @@
  *   `none` / `not-extracted`, from the record and the artefacts.
  *
  * Usage (the last ingest arm):
- *   bun run scripts/entry-extraction.ts --staging <entry> [--library <library root>] [--structure-tool <script>]
+ *   bun run cat-harness-tools/scripts/entry-extraction.ts --staging <entry> [--library <library root>] [--structure-tool <script>]
  *
  * `--library` is where the entry will be promoted to: a kind a later step
  * recorded there (references, glossary) is kept when this ingest has nothing

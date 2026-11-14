@@ -36,7 +36,7 @@
  * datatype is `undetermined`. The narrative is `not-authored`.
  *
  * Usage:
- *   bun run scripts/pdf-tables-csvw.ts --staging <entry> [--library <library root>] FILE.pdf
+ *   bun run cat-harness-tools/scripts/pdf-tables-csvw.ts --staging <entry> [--library <library root>] FILE.pdf
  *
  * @module scripts/pdf-tables-csvw
  */
