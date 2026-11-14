@@ -646,6 +646,7 @@
     "translate-bpmn:extract": "bun run cat-harness-tools/scripts/translate-bpmn.ts --extract",
     "translate-user-scenarios": "bun run cat-harness-tools/scripts/translate-user-scenarios.ts --extract",
     "translate-user-scenarios:check": "bun run cat-harness-tools/scripts/translate-user-scenarios.ts --check",
+    "translate-pot": "bun run cat-harness-tools/scripts/translate-pot.ts",
     "translate-kg-viewer": "bun run cat-harness-tools/scripts/translate-kg-viewer.ts",
     "translate-kg-viewer:check": "bun run cat-harness-tools/scripts/translate-kg-viewer.ts --check",
     "translation:block-qa": "bun run cat-harness-tools/pipeline/translation-block-qa.ts",
