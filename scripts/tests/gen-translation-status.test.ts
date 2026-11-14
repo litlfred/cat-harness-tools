@@ -399,7 +399,7 @@ describe("the review projection", () => {
     const layer = join(root, "lay");
     mkdirSync(join(layer, "translations", "fr"), { recursive: true });
     writeFileSync(join(layer, "lay.json"), JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "lay", repository: "acme/lay", directories: [{ id: "lay-tr", path: "translations/", graphTypologies: ["translation-sources"] }] }));
-    writeFileSync(join(layer, "translations", "fr", "page.po"), '#: docs/page.md:1\nmsgid "Hi"\nmsgstr "Salut"\n');
+    writeFileSync(join(layer, "translations", "fr", "page.po"), '#: docs/no-such-review-page.md:1\nmsgid "Hi"\nmsgstr "Salut"\n');
     const layers = reviewLayers(root, layer);
     const p = JSON.parse(reviewProjection(layers, "en/h/translation-status/index.md"));
     expect(p.$schema).toBe("folio-translation-review/v1");
@@ -407,6 +407,6 @@ describe("the review projection", () => {
     expect(p.issue).toMatchObject({ schema: "translation-adjudication/v1", label: "translation-adjudication", fence: "json translation-adjudication", candidatesSchema: "translation-candidates/v1", candidatesSuffix: ".candidates.json" });
     const lay = p.layers.find((l: { name: string }) => l.name === "lay");
     expect(lay).toMatchObject({ repository: "acme/lay", translations: "translations", locales: ["fr"] });
-    expect(lay.rows[0]).toMatchObject({ catalogue: "page", sources: ["docs/page.md"], cells: { fr: { state: "machine", translated: 1 } } });
+    expect(lay.rows[0]).toMatchObject({ catalogue: "page", sources: ["docs/no-such-review-page.md"], cells: { fr: { state: "machine", translated: 1 } } });
   });
 });

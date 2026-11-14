@@ -26,7 +26,7 @@
  *
  * - **acceptable**: the catalogue's translation node (`<locale>/<cat>.json`,
  *   `translation-node/v1`) gets `status.official: true` with `signedOffBy` /
- *   `signedOffAt` — what fhir-harness's `catalogueReview` and the status page
+ *   `signedOffAt` — what a layer's per-catalogue review reader and the status page
  *   read as "reviewed by a person" — and an entry is appended to the audited
  *   `translation-qa` attestation (`qa-attestations/v1`, criterion
  *   {@link ADJUDICATION_CRITERION}) naming the issue and the hash of the
