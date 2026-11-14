@@ -22,7 +22,8 @@
  * `ho66`): standing alone, cat-harness has no such root to read.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { readFileSync } from "../../../test/support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
