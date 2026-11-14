@@ -263,22 +263,84 @@ export function isRawRepoLink(href: string): boolean {
   return RAW_REPO.test(href);
 }
 
-/** The part of a page that holds its rows: `<main>`, without the rail or scripts. */
-export function rowsRegion(html: string): string {
-  const m = /<main\b[^>]*>([\s\S]*?)<\/main>/i.exec(html);
-  let body = m ? m[1]! : html;
-  body = body.replace(/<nav class="fa-nav"[\s\S]*?<\/nav>/g, "");
-  body = body.replace(/<script\b[\s\S]*?<\/script>/gi, "");
-  body = body.replace(/<style\b[\s\S]*?<\/style>/gi, "");
-  return body;
+/**
+ * What one page holds, read by an HTML parser (Bun's `HTMLRewriter`, as
+ * `build-instance-site.ts` reads its links), never by stripping tags with a
+ * regex: the rows' anchors, the inline JSON blocks and the JSON-LD the page
+ * names. A link inside a `<script>` string is not an element, so it is not
+ * read as a row.
+ */
+export interface PageRead {
+  /** `href`s of anchors in `<main>` (the whole page when it has none), outside the rail. */
+  rowHrefs: string[];
+  /** Texts of `<script type="application/json">` blocks, except the site's own `fa-*` ones. */
+  jsonBlocks: string[];
+  /** The `href` of `<link rel="alternate" type="application/ld+json">`, if any. */
+  alternate?: string;
+}
+
+export async function readPage(html: string): Promise<PageRead> {
+  const inMain: string[] = [];
+  const all: string[] = [];
+  const rail = new Set<string>();
+  let hasMain = false;
+  const jsonBlocks: string[] = [];
+  let alternate: string | undefined;
+  let block: string[] | undefined;
+  await new HTMLRewriter()
+    .on("main", {
+      element() {
+        hasMain = true;
+      },
+    })
+    .on("main a[href]", {
+      element(el) {
+        inMain.push(el.getAttribute("href")!);
+      },
+    })
+    .on("a[href]", {
+      element(el) {
+        all.push(el.getAttribute("href")!);
+      },
+    })
+    .on("nav.fa-nav a[href]", {
+      element(el) {
+        rail.add(el.getAttribute("href")!);
+      },
+    })
+    .on('script[type="application/json"]', {
+      element(el) {
+        if ((el.getAttribute("id") ?? "").startsWith("fa-")) {
+          block = undefined;
+          return;
+        }
+        const parts: string[] = [];
+        block = parts;
+        el.onEndTag(() => {
+          jsonBlocks.push(parts.join(""));
+          block = undefined;
+        });
+      },
+      text(t) {
+        block?.push(t.text);
+      },
+    })
+    .on('link[rel="alternate"][type="application/ld+json"]', {
+      element(el) {
+        alternate ??= el.getAttribute("href") ?? undefined;
+      },
+    })
+    .transform(new Response(html))
+    .text();
+  const rowHrefs = (hasMain ? inMain : all).filter((h) => !rail.has(h));
+  return { rowHrefs, jsonBlocks, ...(alternate ? { alternate } : {}) };
 }
 
 /** The absolute links (fragment dropped) in a page's rows. */
-export function htmlLinks(html: string, pageUrl: string): string[] {
+export async function htmlLinks(html: string, pageUrl: string): Promise<string[]> {
   const out = new Set<string>();
-  for (const m of rowsRegion(html).matchAll(/<a\b[^>]*\bhref="([^"]*)"/gi)) {
-    const href = m[1]!.replace(/&amp;/g, "&");
-    if (!href || href.startsWith("#") || /^(mailto|javascript|data):/i.test(href) || /['+]/.test(href)) continue;
+  for (const href of (await readPage(html)).rowHrefs) {
+    if (!href || href.startsWith("#") || /^(mailto|javascript|data):/i.test(href)) continue;
     try {
       out.add(new URL(href, pageUrl).href.split("#")[0]!);
     } catch {
@@ -310,13 +372,11 @@ export function dataFileRefs(html: string, pageUrl: string, siteUrl: string, vis
 }
 
 /** The inline `application/json` blocks a page carries, except the site's own `fa-*` ones. */
-export function inlineData(html: string): unknown[] {
+export async function inlineData(html: string): Promise<unknown[]> {
   const out: unknown[] = [];
-  for (const m of html.matchAll(/<script\b([^>]*)type="application\/json"([^>]*)>([\s\S]*?)<\/script>/gi)) {
-    const id = /\bid="([^"]*)"/.exec(m[1]! + m[2]!)?.[1] ?? "";
-    if (id.startsWith("fa-")) continue;
+  for (const t of (await readPage(html)).jsonBlocks) {
     try {
-      out.push(JSON.parse(m[3]!));
+      out.push(JSON.parse(t));
     } catch {
       // unreadable block: not rows
     }
@@ -459,19 +519,14 @@ export function httpFetcher(concurrency = 16, impl: typeof fetch = fetch): Fetch
 const ok = (s: number): boolean => s >= 200 && s < 300;
 
 /** The `<link rel="alternate" type="application/ld+json">` a page names, absolute. */
-export function alternateJsonld(html: string, pageUrl: string): string | undefined {
-  for (const m of html.matchAll(/<link\b[^>]*>/gi)) {
-    const t = m[0];
-    if (!/\brel="alternate"/i.test(t) || !/type="application\/ld\+json"/i.test(t)) continue;
-    const href = /\bhref="([^"]+)"/.exec(t)?.[1];
-    if (!href) continue;
-    try {
-      return new URL(href.replace(/&amp;/g, "&"), pageUrl).href;
-    } catch {
-      return undefined;
-    }
+export async function alternateJsonld(html: string, pageUrl: string): Promise<string | undefined> {
+  const href = (await readPage(html)).alternate;
+  if (!href) return undefined;
+  try {
+    return new URL(href, pageUrl).href;
+  } catch {
+    return undefined;
   }
-  return undefined;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -540,8 +595,8 @@ export async function coverRow(r: RowInput): Promise<CoverageRow> {
       if (html === undefined) continue;
       folderUrl = u;
       folderFound = true;
-      const set = new Set(htmlLinks(html, u));
-      const datas = [...inlineData(html)];
+      const set = new Set(await htmlLinks(html, u));
+      const datas = [...(await inlineData(html))];
       for (const d of dataFileRefs(html, u, r.siteUrl, r.vis ?? "")) {
         const t = await f.text(d);
         if (t === undefined) continue;
@@ -639,7 +694,7 @@ export async function coverRow(r: RowInput): Promise<CoverageRow> {
       let iri = n.iri;
       let iriFromPage = false;
       if (iri === undefined && pageUrl && f) {
-        const alt = alternateJsonld((await f.text(pageUrl)) ?? "", pageUrl);
+        const alt = await alternateJsonld((await f.text(pageUrl)) ?? "", pageUrl);
         if (alt) {
           iri = alt.replace(/\.jsonld$/, "");
           iriFromPage = true;

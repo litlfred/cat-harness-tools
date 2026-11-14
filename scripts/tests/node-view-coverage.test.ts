@@ -21,6 +21,7 @@ import {
   exportNodesOf,
   findingsOf,
   htmlLinks,
+  inlineData,
   httpFetcher,
   iriHasExtension,
   isRawRepoLink,
@@ -115,10 +116,17 @@ describe("reading a folder page", () => {
     `<script type="application/json" id="fa-site-links">{"page":"en/nav/"}</script>` +
     `<script>fetch("../../../../assets/schemas/index.json")</script><script src="../../../../assets/beans/index.json"></script>` +
     `</main></body></html>`;
-  test("the rows' links: not the rail, not fragments, not JS string pieces", () => {
-    expect(htmlLinks(html, page).sort()).toEqual(["https://github.com/o/r/blob/main/x.ts", "https://s/en/h/schemas/l/a/"]);
+  test("the rows' links: not the rail, not fragments, not JS string pieces", async () => {
+    expect((await htmlLinks(html, page)).sort()).toEqual(["https://github.com/o/r/blob/main/x.ts", "https://s/en/h/schemas/l/a/"]);
     expect(isRawRepoLink("https://github.com/o/r/blob/main/x.ts")).toBe(true);
     expect(isRawRepoLink("https://github.com/o/r/issues/1")).toBe(false);
+  });
+  test("read by a parser: a script closed as `</script >` hides no row, and its strings are not rows", async () => {
+    const odd = `<main><script>var s = '<a href="fake/">';</script ><a href="real/">r</a><style>a{}</style ></main>`;
+    expect(await htmlLinks(odd, page)).toEqual(["https://s/en/h/schemas/l/real/"]);
+  });
+  test("inline JSON rows, not the site's own fa-* blocks", async () => {
+    expect(await inlineData(html)).toEqual([{ rows: [{ page: "en/h/schemas/l/b/" }] }]);
   });
   test("the folder's data files: its visualiser's assets, not the site's", () => {
     expect(dataFileRefs(html, page, "https://s/", "schemas")).toEqual(["https://s/assets/schemas/index.json"]);
