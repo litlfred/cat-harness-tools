@@ -35,7 +35,7 @@
 import { readdirSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { basename, join, relative, resolve, dirname } from "path";
 import { detangleResultsDir, sidecarFor, sidecarPathFor, staleFields } from "../../../schemas/kg/detangle-sidecar.ts";
-import { overlayDirs, overlayPath, writePathAt } from "../../../scripts/lib/layer-output.ts";
+import { overlayDirs, overlayPath, writePathOf } from "../../../scripts/lib/layer-output.ts";
 import { gitCorpus } from "../../../schemas/sdlc/git-corpus.ts";
 import { groupDepthFor } from "./group-depth.ts";
 import { TOPICS_FILE, topicsOf } from "../../../scripts/skill-topics.ts";
@@ -660,7 +660,7 @@ function writeSidecars(): { written: string[]; stale: { path: string; fields: st
     // this comment is how it was hit the first time the guard was measured.
     if (!checking && !gatingDirection && import.meta.main) {
       // Never into a mount: a mounted layer's sidecar goes to its layer output root.
-      const to = writePathAt(abs);
+      const to = writePathOf(abs);
       mkdirSync(dirname(to), { recursive: true });
       writeFileSync(to, JSON.stringify(fresh, null, 2) + "\n", "utf-8");
     }
