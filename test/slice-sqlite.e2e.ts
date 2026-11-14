@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { overlayPath } from "../scripts/lib/layer-output.ts";
+import { linkOverlay, readdirSync as siteReaddirSync } from "./support/site-fs.ts";
 
 /**
  * Every SQLite slice in a real Chromium, through the ONE search page. Bean `q8ar`.
@@ -74,15 +75,15 @@ const freePort = () => new Promise<number>((resolve, reject) => {
 
 test.beforeAll(async () => {
   site = mkdtempSync(join(tmpdir(), "q8ar-site-"));
-  for (const e of readdirSync(DOCS)) if (e !== "assets" && e !== "payload") symlinkSync(join(DOCS, e), join(site, e));
+  for (const e of siteReaddirSync(DOCS) as string[]) if (e !== "assets" && e !== "payload") linkOverlay(join(DOCS, e), join(site, e));
   mkdirSync(join(site, "assets"));
-  for (const e of readdirSync(join(DOCS, "assets"))) if (e !== "slices") symlinkSync(join(DOCS, "assets", e), join(site, "assets", e));
+  for (const e of siteReaddirSync(join(DOCS, "assets")) as string[]) if (e !== "slices") linkOverlay(join(DOCS, "assets", e), join(site, "assets", e));
   // The committed KG payloads, which the `kg` slice points at, are COPIED in
   // as links one by one, so the deploy payloads can be written beside them.
   const payloads = join(site, "payload", "sha256");
   mkdirSync(payloads, { recursive: true });
   const committed = join(DOCS, "payload", "sha256");
-  if (existsSync(committed)) for (const f of readdirSync(committed)) symlinkSync(join(committed, f), join(payloads, f));
+  if (existsSync(overlayPath(committed))) for (const f of siteReaddirSync(committed) as string[]) symlinkSync(overlayPath(join(committed, f)), join(payloads, f));
   execFileSync("bun", [
     "run", join(TOOLS_ROOT, "scripts", "gen-slice-sqlite.ts"),
     "--out", join(site, "assets", "slices"),
@@ -220,8 +221,8 @@ const libraryIndex = JSON.parse(readFileSync(overlayPath(join(DOCS, "assets", "l
 const knownBlock = (() => {
   for (const e of [...libraryIndex.entries].sort((a, b) => (a.id < b.id ? -1 : 1))) {
     const p = join(DOCS, "assets", "library", "entries", `${e.id}.json`);
-    if (!existsSync(p)) continue;
-    const entry = JSON.parse(readFileSync(p, "utf-8")) as { blocks: { id: string; title: string; content: string | null }[] };
+    if (!existsSync(overlayPath(p))) continue;
+    const entry = JSON.parse(readFileSync(overlayPath(p), "utf-8")) as { blocks: { id: string; title: string; content: string | null }[] };
     // THREE words on one line, so the phrase is rare enough to rank its block
     // inside the page's 50-row limit.
     const three = /[A-Za-z]{5,} [A-Za-z]{5,} [A-Za-z]{5,}/;
