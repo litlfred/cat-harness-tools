@@ -30,7 +30,7 @@
  * without anything being wrong. Hence `<=` rather than `===`.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "../../../test/support/site-fs.ts";
 import { join } from "node:path";
 
 import { readTileCounts } from "../../../schemas/ui/tile-count.ts";
