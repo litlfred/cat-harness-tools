@@ -353,7 +353,7 @@ function readFhirProfile(sd: Json, moduleRel: string): ClassModelRead {
     const min = el.min ?? s?.min;
     const maxRaw = el.max ?? s?.max;
     const max = maxRaw === undefined ? undefined : maxRaw === "*" ? ("*" as const) : Number(maxRaw);
-    const types = (el.type ?? s?.type ?? []) as Element["type"] & {}[];
+    const types = (el.type ?? s?.type ?? []) as NonNullable<Element["type"]>;
     const shown: string[] = [];
     const names: string[] = [];
     const typeLinks: Record<string, string> = {};
