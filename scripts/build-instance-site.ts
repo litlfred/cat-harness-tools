@@ -100,7 +100,7 @@ import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { editedMountsIn, relayAdvice } from "./remote-mount.ts";
 import { BESIDE_SOURCE_OUT_ENV } from "./lib/beside-source-out.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
-import { describeFeatures, droppedByRuling, type DroppedByRuling, PARITY_REPORT, parityReport, siteFeatures, writeParityReport } from "./site-parity.ts";
+import { describeFeatures, droppedByRuling, type DroppedByRuling, PARITY_REPORT, parityReport, readParityReport, siteFeatures, writeParityReport } from "./site-parity.ts";
 
 /**
  * The rail pass ("rail on every page") replaces the theme's side bar on every
@@ -1266,13 +1266,16 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
       console.log(`parity: ${describeFeatures("this build  ", cand)}`);
       for (const d of droppedByRuling(cur, cand, dropped)) console.log(`parity: ${d.words} is dropped by ruling, not a shortfall — ${d.ruling}`);
       const refuse = Boolean(o.publish) && o.parity === "refuse";
-      const report = parityReport(cur, cand, dropped, refuse);
+      // The replaced root's own report carries the last clean publish (owner, 2026-11-14: "last clean").
+      const previous = readParityReport(against);
+      if (previous?.baseline) console.log(`parity: also against the last clean publish${previous.baseline.from ? ` (${previous.baseline.from})` : ""}`);
+      const report = parityReport(cur, cand, dropped, refuse, previous, capture("git rev-parse --short=12 HEAD", root) || undefined);
       const short = report.shortfall;
       writeParityReport(site, report);
       for (const m of short) console.error(`  ✗ ${m}`);
       if (short.length && refuse) throw new Error(`this build lacks ${short.length} thing(s) the published root carries: the root is not replaced`);
       if (short.length) console.error(`  (parity: reported, not gated — published with ${short.length} shortfall(s); the QA page reads ${PARITY_REPORT})`);
-      else console.log("parity: ✓ this build carries everything the published root does");
+      else console.log("parity: ✓ this build carries everything the published root and the last clean publish do");
     }
   }
 
