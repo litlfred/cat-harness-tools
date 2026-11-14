@@ -200,7 +200,13 @@ describe("stage-local: the folio's main site keeps what publish-main keeps", () 
     const pages = tmp("stage-local-pages-");
     put(pages, "index.html", "last main");
     writeFileSync(join(pages, "_main-site.json"), JSON.stringify({ $schema: "folio-main-site/v1", commit: "old", files: ["index.html"] }));
-    expect(() => composeMain(pages, tmp("stage-local-empty-"), { branch: "main", sha: "a", runUrl: "u", script: scripts })).toThrow();
+    let refusal = "";
+    try {
+      composeMain(pages, tmp("stage-local-empty-"), { branch: "main", sha: "a", runUrl: "u", script: scripts, stderr: "pipe" });
+    } catch (e) {
+      refusal = String((e as { stderr?: unknown }).stderr ?? "");
+    }
+    expect(refusal).toContain("is empty; refusing to publish");
     expect(readFileSync(join(pages, "index.html"), "utf-8")).toBe("last main");
   });
 });

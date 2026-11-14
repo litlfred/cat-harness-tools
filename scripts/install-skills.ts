@@ -66,7 +66,8 @@
  * Every installed `SKILL.md` carries {@link INSTALLED_MARKER}. A re-run
  * removes installed directories whose skill is gone, and touches nothing
  * without the marker. `--check` writes nothing and exits 1 when the host
- * directory differs from what an install would write.
+ * directory differs from what an install would write, or holds any file
+ * without {@link INSTALLED_MARKER} ({@link unmarkedFiles}).
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
@@ -254,7 +255,31 @@ export function ownedInstalls(hostDir: string): string[] {
   });
 }
 
-function main(argv: string[]): number {
+/**
+ * Every file under `hostDir` (relative to `hostDir`, `/`-separated, sorted)
+ * that does not carry {@link INSTALLED_MARKER}.
+ *
+ * {@link ownedInstalls} skips unmarked files when installing so a re-run
+ * never deletes someone else's work on disk; `--check` calls this function
+ * so any hand-written file in a host skill directory fails the gate (bean
+ * `folio-assistant-dtda`).
+ */
+export function unmarkedFiles(hostDir: string): string[] {
+  if (!existsSync(hostDir)) return [];
+  const out: string[] = [];
+  const walk = (dir: string, prefix: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      const rel = prefix ? `${prefix}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(p, rel);
+      else if (e.isFile() && !readFileSync(p, "utf-8").includes(INSTALLED_MARKER)) out.push(rel);
+    }
+  };
+  walk(hostDir, "");
+  return out.sort();
+}
+
+export function main(argv: string[]): number {
   const flag = (f: string) => (argv.includes(f) ? argv[argv.indexOf(f) + 1] : undefined);
   const root = resolve(flag("--root") ?? process.cwd());
   const host = (flag("--host") ?? "claude") as Host;
@@ -278,10 +303,14 @@ function main(argv: string[]): number {
 
   for (const c of plan.collisions) console.warn(`  ! ${c.name}: ${c.won} replaces ${c.lost}`);
   if (check) {
+    const unmarked = unmarkedFiles(hostDir);
     for (const [d] of changed) console.error(`  ✗ ${relative(root, join(hostDir, d))} is stale or missing`);
     for (const d of stale) console.error(`  ✗ ${relative(root, join(hostDir, d))} is no longer a skill`);
-    console.log(`install-skills --check: ${plan.files.size} skill(s), ${changed.length + stale.length} out of date, ${plan.skipped.length} skipped`);
-    return changed.length + stale.length > 0 ? 1 : 0;
+    for (const f of unmarked) console.error(`  ✗ ${relative(root, join(hostDir, f))} lacks INSTALLED_MARKER`);
+    console.log(
+      `install-skills --check: ${plan.files.size} skill(s), ${changed.length + stale.length} out of date, ${unmarked.length} unmarked, ${plan.skipped.length} skipped`,
+    );
+    return changed.length + stale.length + unmarked.length > 0 ? 1 : 0;
   }
   for (const [d, text] of changed) {
     mkdirSync(join(hostDir, d), { recursive: true });

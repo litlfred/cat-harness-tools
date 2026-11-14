@@ -187,35 +187,50 @@ describe("the workflow's wiring", () => {
   const wf = parse(readFileSync(WORKFLOW, "utf-8"));
   const jobs = wf.jobs;
 
+  // The "Already judged?" check is a step of prepare-head (owner,
+  // 2026-11-13, "A. Collapse into one job"): its own job waited a minute for
+  // a runner to run for 9 seconds.
+  const head = () => jobs["prepare-head"].steps as { id?: string; name?: string; if?: string; run?: string; env?: Record<string, string> }[];
+  const step = (id: string) => head().find((s) => s.id === id)!;
+
   test("only a ready_for_review PR event asks", () => {
-    expect(jobs["ready-reuse"].if).toContain("github.event.action == 'ready_for_review'");
-    expect(jobs["ready-reuse"].if).toContain("github.event_name == 'pull_request'");
+    expect(jobs["ready-reuse"]).toBeUndefined();
+    expect(step("decide").name).toBe("Already judged? (marked ready for review)");
+    expect(step("decide").if).toContain("github.event.action == 'ready_for_review'");
+    expect(step("decide").if).toContain("github.event_name == 'pull_request'");
   });
 
-  test("both prepare jobs are skipped exactly when the answer is reuse", () => {
-    for (const j of ["prepare-head", "prepare-base"]) {
-      expect(jobs[j].needs).toContain("ready-reuse");
-      expect(jobs[j].if).toContain("needs.ready-reuse.outputs.reuse != 'true'");
-      expect(jobs[j].if).toContain("!cancelled()");
-    }
+  test("a reused answer prepares nothing on either side", () => {
+    // In prepare-head: the decision sets REUSED, and every preparing step
+    // reads skip-prep, which a reused run hits.
+    expect(step("decide").run).toContain('echo "REUSED=true" >> "$GITHUB_ENV"');
+    expect(step("skip-prep").run).toContain("env.REUSED == 'true'");
+    expect(step("judged-key").if).toContain("env.REUSED != 'true'");
+    // prepare-base (and with it the shards) is skipped.
+    expect(jobs["prepare-base"].needs).toContain("prepare-head");
+    expect(jobs["prepare-base"].if).toContain("needs.prepare-head.outputs.reuse != 'true'");
+    expect(jobs["prepare-base"].if).toContain("!cancelled()");
+    expect(jobs["prepare-head"].outputs.reuse).toBe("${{ steps.decide.outputs.reuse }}");
   });
 
   test("ready-reuse pins the run as prepare-head does, before deciding", () => {
-    const names = (steps: { id?: string; name?: string }[]) => steps.map((s) => s.id ?? s.name ?? "");
-    const mine = names(jobs["ready-reuse"].steps);
-    expect(mine.indexOf("pins")).toBeGreaterThan(-1);
-    expect(mine.indexOf("pins")).toBeLessThan(mine.indexOf("decide"));
-    const pinSteps = jobs["prepare-head"].steps.slice(0, names(jobs["prepare-head"].steps).indexOf("pins") + 1);
-    for (const s of pinSteps.filter((s: { id?: string }) => s.id && s.id !== "shards")) expect(mine).toContain(s.id);
+    const names = head().map((s) => s.id ?? s.name ?? "");
+    expect(names.indexOf("pins")).toBeGreaterThan(-1);
+    expect(names.indexOf("pins")).toBeLessThan(names.indexOf("decide"));
+    expect(step("decide").env!.INDEX).toBe("${{ steps.pins.outputs.index }}");
   });
 
   test("a full-tier PR run records its key; compare reports the reuse under the full verdict's name", () => {
-    const key = jobs["prepare-head"].steps.find((s: { id?: string }) => s.id === "judged-key");
+    const key = step("judged-key");
     expect(key.if).toContain("github.event_name == 'pull_request'");
-    expect(key.if).toContain("needs.tier.outputs.full == 'true'");
-    expect(jobs.compare.needs).toContain("ready-reuse");
+    expect(key.if).toContain("env.FULL == 'true'");
+    expect(jobs.compare.needs).toContain("prepare-head");
     const pinsOnly = jobs.compare.steps.find((s: { id?: string }) => s.id === "pins-only");
-    expect(pinsOnly.env.REUSED).toContain("needs.ready-reuse.outputs.reuse == 'true'");
+    expect(pinsOnly.env.REUSED).toContain("needs.prepare-head.outputs.reuse == 'true'");
     expect(pinsOnly.run).toContain("SKIPPED — already passed as judged in run");
+    // A fast-tier reuse is reported by prepare-head's fast-tier step.
+    const fast = head().find((s) => s.name === "Fast tier only (advisory; the full checks gate a release)")!;
+    expect(fast.env!.REUSED).toBe("${{ steps.decide.outputs.reuse == 'true' }}");
+    expect(fast.run).toContain("SKIPPED — already passed as judged in run");
   });
 });
