@@ -6,6 +6,7 @@ import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { UN_LOCALES } from "../../schemas/content/translation.ts";
 import { qaResultHref } from "../../scripts/qa-result-link.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * What the reader is told about translation, at the top of every page.
@@ -38,8 +39,8 @@ import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 
 const PAGE_URL = "http://tr.test/page.html";
 const QA_INDEX_URL = "/assets/qa/harness/qa-index.json";
@@ -865,10 +866,10 @@ test.describe("on a folio's site the sweep badge is the folio's or says why — 
  */
 test.describe("on an Arabic page the rest of the chrome is English, laid out as English", () => {
   const SITE_ABS = join(ROOT, SITE);
-  const ROW_JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8");
-  const NAVBAR = (JSON.parse(readFileSync(join(SITE_ABS, "_data/harness.json"), "utf8")) as { navbar: unknown }).navbar;
+  const ROW_JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js"))), "utf8");
+  const NAVBAR = (JSON.parse(readFileSync(overlayPath(join(SITE_ABS, "_data/harness.json")), "utf8")) as { navbar: unknown }).navbar;
   const FOOTER = (() => {
-    const src = readFileSync(join(SITE_ABS, "_includes/generated/navbar-footer.html"), "utf8");
+    const src = readFileSync(overlayPath(join(SITE_ABS, "_includes/generated/navbar-footer.html")), "utf8");
     const line = src.split("\n").find((l) => l.startsWith('<div class="fa-nav-in">'));
     if (!line) throw new Error("navbar-footer.html carries no regions line — run `bun run cat navbar:include`.");
     return line.replace(/\{\{\s*'([^']*)'\s*\|\s*relative_url\s*\}\}/g, (_m, p: string) => "/folio-assistant" + p);

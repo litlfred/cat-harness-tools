@@ -36,14 +36,15 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { declaredPagePath } from "./support/site-pages.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
 /** The page under test, at the route the harness declares for `todos`. */
 const TODOS_PAGE = declaredPagePath(ROOT, "todos");
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const TODOS = readFileSync(join(SITE, "assets/todos/index.json"), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const TODOS = readFileSync(overlayPath(join(SITE, "assets/todos/index.json")), "utf8");
 const ITEM_COUNT = (JSON.parse(TODOS) as { items: unknown[] }).items.length;
 
 const engine = new Liquid({
@@ -56,13 +57,13 @@ engine.registerFilter("relative_url", (s: unknown) => String(s ?? ""));
 engine.registerFilter("markdownify", (s: unknown) => String(s ?? ""));
 
 const data = {
-  harness: JSON.parse(readFileSync(join(SITE, "_data/harness.json"), "utf8")),
-  stickies: JSON.parse(readFileSync(join(SITE, "_data/stickies.json"), "utf8")),
+  harness: JSON.parse(readFileSync(overlayPath(join(SITE, "_data/harness.json")), "utf8")),
+  stickies: JSON.parse(readFileSync(overlayPath(join(SITE, "_data/stickies.json")), "utf8")),
 };
 
 /** A page's body with its front matter removed, through Liquid. `rel` is site-relative, or absolute. */
 async function render(rel: string): Promise<string> {
-  const src = readFileSync(resolve(SITE, rel), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
+  const src = readFileSync(overlayPath(resolve(SITE, rel)), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
   return engine.parseAndRender(src, { site: { data } });
 }
 
@@ -85,7 +86,7 @@ ${body}
  * opacity), which says nothing about this page.
  */
 async function footer(): Promise<string> {
-  const src = readFileSync(join(ROOT, siteFileFor(ROOT, "_includes/footer_custom.html")), "utf8");
+  const src = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "_includes/footer_custom.html"))), "utf8");
   const line = /\{%-?\s*include generated\/todo-listing\.html\s*-?%\}/.exec(src);
   if (!line) throw new Error("footer_custom.html no longer includes the todo floor");
   return engine.parseAndRender(line[0], { site: { data } });

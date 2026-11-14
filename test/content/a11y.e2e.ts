@@ -45,6 +45,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { artefactStubFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /** This file's own repo root: it resolves assets from three different
  * local variables, so the site root gets one name here too. */
@@ -254,7 +255,7 @@ const tilesPage = (scheme: "light" | "dark") => `<!doctype html><html lang="en" 
      sidebar is a harness artefact, and leaving it in would have this gate
      failing on markup the site does not ship. */
   .site-nav a { color: inherit; }
-  ${readFileSync(join(INSTANCE_ROOT, siteFileFor(INSTANCE_ROOT, "assets/css/docs-ui.css")), "utf8")}
+  ${readFileSync(overlayPath(join(INSTANCE_ROOT, siteFileFor(INSTANCE_ROOT, "assets/css/docs-ui.css"))), "utf8")}
 </style></head><body>
   <script type="application/json" id="fa-translation-meta">{"lang":"en","availableLocales":["fr","es"]}<\/script>
   <script type="application/json" id="fa-site-links">{"kg":"/folio-assistant/folio-assistant/","jsonld":"/folio-assistant/folio-assistant.jsonld","source":"https://example.invalid/r"}<\/script>
@@ -274,8 +275,8 @@ const tilesPage = (scheme: "light" | "dark") => `<!doctype html><html lang="en" 
   </div><div class="main-content"><h1>Harness</h1></div></div>
   <script>window.jtd = { theme: "${scheme}", getTheme: function () { return this.theme; },
     setTheme: function (t) { this.theme = t; } };<\/script>
-  <script>${readFileSync(join(INSTANCE_ROOT, siteFileFor(INSTANCE_ROOT, "assets/js/vendor/qrcode.js")), "utf8")}<\/script>
-  <script>${readFileSync(join(INSTANCE_ROOT, siteFileFor(INSTANCE_ROOT, "assets/js/docs-ui.js")), "utf8")}<\/script>
+  <script>${readFileSync(overlayPath(join(INSTANCE_ROOT, siteFileFor(INSTANCE_ROOT, "assets/js/vendor/qrcode.js"))), "utf8")}<\/script>
+  <script>${readFileSync(overlayPath(join(INSTANCE_ROOT, siteFileFor(INSTANCE_ROOT, "assets/js/docs-ui.js"))), "utf8")}<\/script>
 </body></html>`;
 
 test.describe("accessibility — the docs-site UI", () => {
@@ -547,11 +548,11 @@ test.describe("the sticky todo board", () => {
   const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>Sticky todo harness</title>
 <meta name="fa-todo-src" content="/assets/todos/index.json">
-<style>${readFileSync(join(ROOT2, siteFileFor(ROOT2, "assets/css/docs-ui.css")), "utf8")}</style></head><body>
+<style>${readFileSync(overlayPath(join(ROOT2, siteFileFor(ROOT2, "assets/css/docs-ui.css"))), "utf8")}</style></head><body>
 <div class="side-bar"><div class="site-header"><a class="site-title">Site</a></div><nav class="site-nav"></nav></div>
 <div class="main-content-wrap"><div class="main-content" id="main-content"><h1>Harness</h1>
 <h2 id="s" data-fa-label="sec:a11y-one">A section</h2><p>Body.</p></div></div>
-<script>${readFileSync(join(ROOT2, siteFileFor(ROOT2, "assets/js/docs-ui.js")), "utf8")}</script></body></html>`;
+<script>${readFileSync(overlayPath(join(ROOT2, siteFileFor(ROOT2, "assets/js/docs-ui.js"))), "utf8")}</script></body></html>`;
 
   for (const colorScheme of ["light", "dark"] as const) {
     for (const [name, viewport] of [
@@ -627,7 +628,7 @@ test.describe("the sticky todo board", () => {
  */
 test.describe("the per-node edit link", () => {
   const EDIT_CSS = readFileSync(
-    join(REPO_A11Y, siteFileFor(REPO_A11Y, "assets/css/docs-ui.css")),
+    overlayPath(join(REPO_A11Y, siteFileFor(REPO_A11Y, "assets/css/docs-ui.css"))),
     "utf8",
   );
   const page_ = (scheme: string) => `<!doctype html><html lang="en" data-fa-scheme="${scheme}">

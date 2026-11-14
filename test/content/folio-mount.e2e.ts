@@ -6,6 +6,7 @@ import { repoRootFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { MARKER } from "../../scripts/folio-mount.ts";
 import { TRANSLATION_META_ID } from "../../scripts/lib/translation-meta.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * THE FOLIO MOUNT on a REAL generated who-iris page. Bean `jpjt`, F8/F9.
@@ -46,8 +47,8 @@ import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 const ROOT = join(HARNESS_ROOT);
 const REPO = repoRootFor(ROOT);
 
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 
 /**
  * A page the generator wrote. `index.html` is the replica's home, the page a

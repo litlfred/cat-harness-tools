@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { railedViewer } from "./railed-fixture.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * Every harness row in "▦ Harnesses" sits at ONE indent, whatever its mark is
@@ -28,11 +29,11 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const QR = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js"))), "utf8");
 const BASEURL = "/folio-assistant";
-const DATA = JSON.parse(readFileSync(join(SITE, "_data/harness.json"), "utf8")) as {
+const DATA = JSON.parse(readFileSync(overlayPath(join(SITE, "_data/harness.json")), "utf8")) as {
   navbar: unknown;
   harnesses: { name: string; instantiated?: boolean; mark?: { src?: string; glyph?: string } | null }[];
 };
@@ -40,7 +41,7 @@ const DATA = JSON.parse(readFileSync(join(SITE, "_data/harness.json"), "utf8")) 
 // standalone viewer this read has since moved onto the theme's layout.
 const VIEWER = railedViewer();
 const FOOTER = (() => {
-  const src = readFileSync(join(SITE, "_includes/generated/navbar-footer.html"), "utf8");
+  const src = readFileSync(overlayPath(join(SITE, "_includes/generated/navbar-footer.html")), "utf8");
   const line = src.split("\n").find((l) => l.startsWith('<div class="fa-nav-in">'));
   if (!line) throw new Error("navbar-footer.html carries no regions line — run `bun run cat navbar:include`.");
   return line.replace(/\{\{\s*'([^']*)'\s*\|\s*relative_url\s*\}\}/g, (_m, p: string) => BASEURL + p);
