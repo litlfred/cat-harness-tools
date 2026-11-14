@@ -1229,7 +1229,7 @@ describe("check 5 under --full-tier — the full tier must be green on the head"
     expect(c.status).toBe("refuse");
     expect(c.kind).toBe("not-ready");
     expect(c.detail).toContain("the full tier has not run on the head");
-    expect(c.detail).toContain("`ready-to-merge` or `release` runs it");
+    expect(c.detail).toContain("the `release` label runs it");
   });
 
   test("a red judge is a defect; one still running is not-ready; the latest run of a judge counts", () => {

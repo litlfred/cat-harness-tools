@@ -10,7 +10,9 @@
 # `scripts/merge-guard.ts` pass, run with `--full-tier`:
 #   - the FULL tier is green on the head (a `No new failures` judge concluded
 #     success; the fast tier alone is not enough). Labelling the PR
-#     `ready-to-merge` or `release` runs the full tier;
+#     `release` runs the full tier, and so does `ready-to-merge` in a layer
+#     whose PR checks read the live labels (layer-pr-checks.yml); this
+#     repository's own pr-tests.yml reads only `release`;
 #   - the `ready-to-merge` label is on (check 4), and the PR's own session said
 #     ready (check 3: its `ready: <sha>`, or one the merge manager relays for it);
 #   - and the rest: base is main, not a draft, no unticked box, no open
