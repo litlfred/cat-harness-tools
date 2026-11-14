@@ -60,11 +60,11 @@ export function declarationFileNames(registry: GraphTypologyRegistry = defaultGr
 /**
  * Check the layer's declaration files out at the pin, WITH the kinds the
  * layer declares itself. A layer may declare a kind of its own in its own
- * `typologies/` graph (smart-base's `l1-extraction`, `web-annex`) and use it
+ * `typologies/` graph (a document-kind layer's `l1-extraction`, `web-annex`) and use it
  * in its own `<name>.json`. On disk that graph is read before the
  * declaration; at a pin only the declaration files were checked out, so the
  * kind was "unknown" and every downstream re-pin of the layer was refused
- * (2026-11-14, dth-hrh re-pinning smart-base main). So the layer's own
+ * (2026-11-14, a folio re-pinning such a layer at main). So the layer's own
  * `typologies/` files are checked out too, and its kinds this checkout does
  * not know are added to a PRIVATE copy of `registry` — never to the shared
  * one, whose kinds must keep pointing at files that still exist once the

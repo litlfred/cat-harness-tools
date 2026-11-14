@@ -53,6 +53,7 @@ import { directoriesForGraph, readDeclaration } from "../schemas/kg/cat-harness.
 import { ContributionRegistry, type FolioContribution } from "../schemas/content/contributions.ts";
 import { loadContributionsSync } from "../schemas/kg/harness-config.ts";
 import type { TabularCsvwTables } from "../schemas/library/tabular-csvw.ts";
+import type { ExtractionStep } from "../schemas/library/entry-extraction.ts";
 import type { Block } from "../schemas/types.ts";
 import { checkoutInstanceRoots } from "../scripts/viewer-declarations.ts";
 import { contributionsRoot } from "./repo-root";
@@ -146,6 +147,34 @@ export interface BlockStatusOverlayPlugin {
   overlay(block: Block, tsPath: string, paperDir: string): void;
 }
 
+/** Where a library-entry arm runs: a PROMOTED entry, in its library, in its layer. */
+export interface LibraryEntryArmContext {
+  /** The layer that holds the library (`--instance`, else the working layer). */
+  instanceRoot: string;
+  /** The library directory, absolute. */
+  library: string;
+  /** The entry directory, absolute. */
+  entry: string;
+  slug: string;
+}
+
+/**
+ * Extraction steps a higher layer runs over each promoted library entry —
+ * a reference-list reader, a glossary reader (owner, 2026-11-14: "not sure
+ * all have biblio, glossary, ... fully extracted"). Those readers live in the
+ * content core, which this layer may not name, so `cat ingest` reaches them
+ * through this slot after promotion. Each arm returns its own
+ * `extraction.json` step (`schemas/library/entry-extraction.ts`), which the
+ * ingest records under `kind`.
+ *
+ * OPTIONAL: a composition that does not fill it has no such arm, and the ingest
+ * records each kind it would have covered as `not-extracted`, saying the slot
+ * is unfilled — never `none-in-source`.
+ */
+export interface LibraryEntryArmsPlugin {
+  arms(ctx: LibraryEntryArmContext): Array<{ kind: string; run(): ExtractionStep }>;
+}
+
 /** Every slot, keyed by the kind string a contributor registers under. */
 export interface PipelinePlugins {
   "lean-lexer": LeanLexerPlugin;
@@ -153,6 +182,7 @@ export interface PipelinePlugins {
   "lean-coverage": LeanCoveragePlugin;
   "tabular-csvw": TabularCsvwPlugin;
   "block-status-overlay": BlockStatusOverlayPlugin;
+  "library-entry-arms": LibraryEntryArmsPlugin;
 }
 
 export type PipelinePluginKind = keyof PipelinePlugins;
@@ -167,6 +197,13 @@ export const PIPELINE_PLUGIN_KINDS: readonly PipelinePluginKind[] = [
 ];
 
 // ── The process registry ───────────────────────────────────────────
+
+/**
+ * Slots a composition need not fill, asked for only through
+ * {@link optionalPipelinePlugin}. Kept out of {@link PIPELINE_PLUGIN_KINDS},
+ * whose every member a full checkout is expected to fill.
+ */
+export const OPTIONAL_PIPELINE_PLUGIN_KINDS: readonly PipelinePluginKind[] = ["library-entry-arms"];
 
 /** Thrown when a slot is asked for and nothing filled it. */
 export class UnregisteredPipelinePluginError extends Error {
