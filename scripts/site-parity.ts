@@ -185,16 +185,33 @@ export function parityShortfall(current: SiteFeatures, candidate: SiteFeatures, 
  */
 export const PARITY_REPORT = "assets/site-qa/parity.json";
 
+/**
+ * The last CLEAN publish: the measures of the newest root that published with
+ * no shortfall, and which build it was. Carried from report to report until a
+ * build is clean again.
+ */
+export interface ParityBaseline {
+  /** What the clean build carried, the stamp reduced to presence. */
+  features: SiteFeatures;
+  /** Which build it was (a commit), when the caller knows. */
+  from?: string;
+}
+
 /** The parity result as the QA page reads it. */
 export interface ParityReport {
   $schema: "site-parity-report/v1";
   /** `refused` only when the caller asked for the old gate (`parity: "refuse"`). */
   outcome: "carries-everything" | "published-with-shortfall" | "refused";
+  /** Against the root replaced, then against the last clean publish, each named once. */
   shortfall: string[];
   droppedByRuling: { what: string; ruling: string }[];
   current: SiteFeatures;
   candidate: SiteFeatures;
+  /** The last clean publish, for the next build to compare with: this build when it is clean. */
+  baseline?: ParityBaseline;
 }
+
+const forReport = (f: SiteFeatures): SiteFeatures => ({ ...f, stamp: f.stamp ? { present: true } : undefined });
 
 /**
  * The parity result for QA. Pure.
@@ -203,17 +220,64 @@ export interface ParityReport {
  * missing from its `index.html`: *"It shouldn't fail if there is an issue it
  * should be a QA report."* A shortfall is a finding about the build. It is
  * reported and the site is still published.
+ *
+ * AGAINST THE LAST CLEAN PUBLISH TOO (owner, 2026-11-14, "last clean"). The
+ * root replaced is the previous publish, so a loss published once became the
+ * next build's baseline and was never named again: the same folio's next
+ * three publishes read "carries-everything" while its home page still lacked
+ * the icon row. `previous` is the replaced root's own report. Its `baseline`
+ * is the last clean publish, and what the candidate lacks against it is named
+ * too, once. With no recorded baseline the replaced root stands in (a site
+ * from before this was recorded). A clean build becomes the next baseline;
+ * a build with a shortfall carries the old one forward, so a loss is named on
+ * every publish until it is fixed or dropped by a ruling.
  */
-export function parityReport(current: SiteFeatures, candidate: SiteFeatures, dropped: readonly DroppedByRuling[] = [], refused = false): ParityReport {
-  const shortfall = parityShortfall(current, candidate, dropped);
+export function parityReport(
+  current: SiteFeatures,
+  candidate: SiteFeatures,
+  dropped: readonly DroppedByRuling[] = [],
+  refused = false,
+  previous?: Pick<ParityReport, "baseline">,
+  from?: string,
+): ParityReport {
+  const vsCurrent = parityShortfall(current, candidate, dropped);
+  const baseline = previous?.baseline;
+  const vsClean = baseline
+    ? parityShortfall(baseline.features, candidate, dropped)
+        .filter((m) => !vsCurrent.includes(m))
+        .map((m) => `${m} (against the last clean publish${baseline.from ? `, ${baseline.from}` : ""})`)
+    : [];
+  const shortfall = [...vsCurrent, ...vsClean];
+  const next: ParityBaseline | undefined =
+    shortfall.length === 0 ? { features: forReport(candidate), ...(from ? { from } : {}) } : (baseline ?? { features: forReport(current) });
   return {
     $schema: "site-parity-report/v1",
     outcome: shortfall.length === 0 ? "carries-everything" : refused ? "refused" : "published-with-shortfall",
     shortfall,
     droppedByRuling: droppedByRuling(current, candidate, dropped).map((d) => ({ what: d.words, ruling: d.ruling })),
-    current: { ...current, stamp: current.stamp ? { present: true } : undefined },
-    candidate: { ...candidate, stamp: candidate.stamp ? { present: true } : undefined },
+    current: forReport(current),
+    candidate: forReport(candidate),
+    baseline: next,
   };
+}
+
+/**
+ * The parity report a built or published site carries, or undefined when it
+ * has none or it does not parse. A report from before baselines were recorded
+ * reads as one without a baseline.
+ */
+export function readParityReport(site: string): ParityReport | undefined {
+  const file = join(site, PARITY_REPORT);
+  if (!existsSync(file)) return undefined;
+  try {
+    const r = JSON.parse(readFileSync(file, "utf-8")) as ParityReport;
+    if (r?.$schema !== "site-parity-report/v1") return undefined;
+    const b = r.baseline;
+    const ok = b && typeof b === "object" && b.features && typeof b.features === "object" && b.features.counts && Array.isArray(b.features.dirs);
+    return ok ? r : { ...r, baseline: undefined };
+  } catch {
+    return undefined;
+  }
 }
 
 /** Write {@link PARITY_REPORT} into `site`. Deterministic. */
