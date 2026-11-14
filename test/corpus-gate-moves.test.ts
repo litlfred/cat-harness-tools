@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { changedContentFiles } from "../src/workflow/corpus-gate.ts";
+import { changedContentFiles, checkCorpusGate } from "../src/workflow/corpus-gate.ts";
 
 describe("changedContentFiles", () => {
   test("a pure move is not an edit", () => {
@@ -18,9 +21,6 @@ describe("changedContentFiles", () => {
 // diagram lives in an opt-in group, and a root that leaves the group off (an
 // IG re-pinning its layers) has no copy of it. A block still needs it.
 describe("checkCorpusGate without the editing process on disk", () => {
-  const { mkdtempSync, mkdirSync, writeFileSync } = require("node:fs") as typeof import("node:fs");
-  const { tmpdir } = require("node:os") as typeof import("node:os");
-  const { join } = require("node:path") as typeof import("node:path");
   const platformRoot = mkdtempSync(join(tmpdir(), "corpus-gate-platform-"));
   const repoRoot = mkdtempSync(join(tmpdir(), "corpus-gate-repo-"));
   mkdirSync(join(repoRoot, "folio", "d"), { recursive: true });
@@ -29,7 +29,6 @@ describe("checkCorpusGate without the editing process on disk", () => {
   writeFileSync(join(repoRoot, "index.lock.json"), "{}\n");
 
   test("no block changed: nothing to gate, so no process is needed", async () => {
-    const { checkCorpusGate } = await import("../src/workflow/corpus-gate.ts");
     const findings = await checkCorpusGate(repoRoot, {
       files: ["index.lock.json", "folio/d/block.md"],
       platformRoot,
@@ -39,7 +38,6 @@ describe("checkCorpusGate without the editing process on disk", () => {
   });
 
   test("a block changed: the missing process is still refused", async () => {
-    const { checkCorpusGate } = await import("../src/workflow/corpus-gate.ts");
     await expect(
       checkCorpusGate(repoRoot, { files: ["folio/d/block.md"], platformRoot, labelFor: () => "blk" }),
     ).rejects.toThrow(/writes a content block, and there is no editing-hci-validation\.bpmn/);
