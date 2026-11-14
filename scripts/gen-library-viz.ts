@@ -624,7 +624,25 @@ function renderList(){
     return "<th" + (sorted ? ' aria-sort="'+(SORT.dir>0?"ascending":"descending")+'"' : "") +
       '><button type="button" data-k="'+c.k+'">'+esc(c.t)+"</button></th>";
   }).join("") + "</tr></thead><tbody>";
-  h += r.map(function(e){
+  h += r.map(rowHtml).join("") || '<tr><td colspan="'+COLS.length+'"><p class="empty">Nothing matches.</p></td></tr>';
+  $("listing").innerHTML = h + "</tbody></table>";
+}
+
+/* THE ENTRY'S OWN ROW, AT THE TOP OF ITS PAGE -- owner, 2026-11-14: "i
+   wanted this at the top of the page". The row the whole-library listing
+   draws for this entry was the only place its counts were said, and on an
+   entry page that listing is folded away at the bottom. The same COLS and
+   the same rowHtml, so the two rows cannot disagree; a plain header, since
+   one row has nothing to sort. */
+function renderEntryRow(e){
+  var el = $("entry-row");
+  if (!el) return;
+  el.hidden = false;
+  el.innerHTML = '<table class="entry-row"><thead><tr>' + COLS.map(function(c){ return "<th>" + esc(c.t) + "</th>"; }).join("") +
+    "</tr></thead><tbody>" + rowHtml(e) + "</tbody></table>";
+}
+
+function rowHtml(e){
     /* THE ROW DECLARES ITSELF, and the folio reads nothing else.
        A selector guessing at cell positions would bind to this generator's
        markup and break silently the next time a column moves; an attribute
@@ -666,8 +684,6 @@ function renderList(){
       return "<td" + (cls ? ' class="'+cls+'"' : "") + (i === 0 ? " data-fa-pullout-host" : "") +
         ' data-label="'+esc(c.t)+'">' + (c.f ? c.f(e) : esc(e[c.k])) + "</td>";
     }).join("") + "</tr>";
-  }).join("") || '<tr><td colspan="'+COLS.length+'"><p class="empty">Nothing matches.</p></td></tr>';
-  $("listing").innerHTML = h + "</tbody></table>";
 }
 
 function renderDesk(){
@@ -731,6 +747,7 @@ function selectEntry(known){
     row.setAttribute("data-fa-anchored", "1");
     row.scrollIntoView({ block: "center" });
   }
+  renderEntryRow(known);
   document.title = (known.title || known.id) + " \u2014 " + known.instance + " library";
   /* The graph of the thing the reader just opened -- bean 7nvr. */
   loadDocument(known.id);
@@ -815,7 +832,7 @@ function renderBlocks(id, data, err, entry){
       /* A narrative state is three-valued and none of them is an error:
          not-authored means nobody has written one, which is a fact rather
          than a gap. Rendered as plain text for that reason. */
-      var nar = b.summary ? summaryBadge(b.summary)
+      var nar = b.summary ? summaryDisclosure(b.summary)
         : b.narrative == null ? '\u2014' : esc(b.narrative);
       /* THE CONTENT IS BEHIND A NATIVE <details> — bean lrmo.
          The owner opened this view and said "i expected to be able to see
@@ -867,6 +884,16 @@ ${DOCUMENT_VIEW_JS}
 function summaryBadge(s){
   var l = summaryLabel(s);
   return '<span class="pill ' + l.cls + '">' + esc(l.t) + '</span>';
+}
+/* THE SUMMARY TEXT, BEHIND A DISCLOSURE -- owner, 2026-11-14: "disclosure
+   agent summary even if not verified. just indicate". The cell used to carry
+   the state alone, so 62 drafted summaries read as 62 identical pills. The
+   pill stays as the disclosure's label, so an unconfirmed draft still says it
+   is one before anyone opens it; summaryPanel inside says who drafted it and
+   that no person has confirmed it. A state with no text keeps the bare pill. */
+function summaryDisclosure(s){
+  if (!s.text) return summaryBadge(s);
+  return '<details class="sumd"><summary>' + summaryBadge(s) + '</summary>' + summaryPanel(s).replace(summaryBadge(s), '') + '</details>';
 }
 function summaryPanel(s){
   var why = {
@@ -1342,6 +1369,13 @@ const ENTRY_BODY = `<div class="lib-main">
 ${VIEWER_BODY.replace(/\n\s*<section id="(?:document|blocks)"[^\n]*<\/section>/g, "")}
 </details>`;
 
+/**
+ * THE ENTRY'S OWN LISTING ROW, first thing under its catalogue record —
+ * owner, 2026-11-14: "i wanted this at the top of the page". `renderEntryRow`
+ * fills it with the row the whole library draws for this entry.
+ */
+const ENTRY_ROW = `<section id="entry-row" class="wrap" hidden></section>\n`;
+
 /** The shared stylesheet and script sit beside the projection. */
 const assetsOf = (dataHref: string): string => dataHref.slice(0, dataHref.lastIndexOf("/") + 1);
 
@@ -1416,7 +1450,7 @@ function libraryPageHtml(p: LibraryPage): string {
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
 <div class="${LIBRARY_MOUNT}" data-fa-no-filter${decl?.attrs ?? ""}${attrs}>
 ${decl ? `${decl.stub}\n` : ""}${p.entryTitle === undefined ? VIEWER_HEAD : VIEWER_HEAD.replace('<h1 id="lib-title">Library</h1>', `<h1 id="lib-title">${escHtml(p.entryTitle)}</h1>`)}
-${p.record ? `${p.record}\n` : ""}${p.versions ? `${p.versions}\n` : ""}${p.summary ? `${p.summary}\n` : ""}${p.view ? `${p.view}\n` : ""}${p.entryTitle === undefined ? VIEWER_BODY : ENTRY_BODY}
+${p.record ? `${p.record}\n` : ""}${p.entryTitle === undefined ? "" : ENTRY_ROW}${p.versions ? `${p.versions}\n` : ""}${p.summary ? `${p.summary}\n` : ""}${p.view ? `${p.view}\n` : ""}${p.entryTitle === undefined ? VIEWER_BODY : ENTRY_BODY}
 ${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>

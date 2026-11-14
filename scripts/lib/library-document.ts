@@ -143,7 +143,7 @@ export interface DocumentView {
     pageLabelConflicts?: { count: number; items: string[] };
   };
   /**
-   * The entry's KEPT figures (role `figure`, a WebP file on disk), with every
+   * The entry's KEPT figures (role `figure`, a WebP or PNG file on disk), with every
    * language's description (who-iris#224). Absent when the entry keeps none.
    * `file` is relative to the entry; the site copies it to
    * `assets/library/files/<id>/<file>` ({@link entryFigureFiles}).
@@ -217,12 +217,17 @@ export function parseCsv(text: string): string[][] {
 
 interface RawImage { id: string; file?: string; role?: string; basis?: { page?: number }; narrative?: unknown; shows?: string[] }
 
-/** The kept figures of an entry: raster images and vector renders whose role is `figure` and whose WebP file exists. */
+/**
+ * The kept figures of an entry: raster images and vector renders whose role
+ * is `figure` and whose image file (WebP or PNG) exists. PNG was left out
+ * (owner, 2026-11-14: "has no figures"): 9789240116191-eng has 15 PNG vector
+ * figures and its gallery showed none.
+ */
 export function readEntryImages(dir: string): DocImage[] {
   const out: DocImage[] = [];
   const add = (r: RawImage, page: number | null) => {
     if (r.role !== undefined && r.role !== "figure") return;
-    if (!r.file || !r.file.endsWith(".webp") || !existsSync(join(dir, r.file))) return;
+    if (!r.file || !/\.(?:webp|png)$/i.test(r.file) || !existsSync(join(dir, r.file))) return;
     const { map, state } = narrativeMap(r.narrative);
     out.push({ id: r.id, file: r.file, page, ...(r.shows?.length ? { shows: r.shows } : {}), narratives: map, state });
   };

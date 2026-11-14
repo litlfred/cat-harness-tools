@@ -252,6 +252,16 @@ describe("kept figures and transcribed tables (who-iris#224)", () => {
   test("the site copies exactly the files the page shows", () => {
     expect(entryFigureFiles(withFiles())).toEqual(["images/img-p002-1.webp", "tables/table-1.csv"]);
   });
+  // Owner, 2026-11-14: "has no figures". Vector renders are kept as PNG
+  // (9789240116191-eng holds 15) and a WebP-only filter showed none of them.
+  test("a vector figure kept as PNG is shown and copied", () => {
+    const dir = withFiles();
+    mkdirSync(join(dir, "figures"));
+    writeFileSync(join(dir, "figures", "vfig-p010.png"), "x");
+    writeFileSync(join(dir, "vector-figures.json"), JSON.stringify({ figures: [{ id: "vfig-p010", file: "figures/vfig-p010.png", page: 10 }] }));
+    expect(readEntryDocument(dir, "r")!.images?.map((i) => i.id)).toEqual(["img-p002-1", "vfig-p010"]);
+    expect(entryFigureFiles(dir)).toContain("figures/vfig-p010.png");
+  });
 });
 
 /**
