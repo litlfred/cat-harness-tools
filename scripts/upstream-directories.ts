@@ -24,10 +24,12 @@
  * is `{ ok: false, detail }`, never an empty list read as "declares nothing
  * from within".
  */
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 
-import { defaultGraphTypologies, instanceDirectories, type GraphTypologyRegistry } from "../schemas/kg/cat-harness.js";
+import { defaultGraphTypologies, GraphTypologyRegistry, instanceDirectories } from "../schemas/kg/cat-harness.js";
+import { ownDeclaredDirectories } from "../schemas/kg/declared-nodes.js";
+import { GraphTypologyNodeSchema, kindDefOf } from "../schemas/kg/graph-typology-node.js";
 import type { RemoteTree } from "./remote-tree.ts";
 import { groupsOfDeclaration } from "./concern-groups.ts";
 
@@ -56,6 +58,51 @@ export function declarationFileNames(registry: GraphTypologyRegistry = defaultGr
 }
 
 /**
+ * Check the layer's declaration files out at the pin, WITH the kinds the
+ * layer declares itself. A layer may declare a kind of its own in its own
+ * `typologies/` graph (smart-base's `l1-extraction`, `web-annex`) and use it
+ * in its own `<name>.json`. On disk that graph is read before the
+ * declaration; at a pin only the declaration files were checked out, so the
+ * kind was "unknown" and every downstream re-pin of the layer was refused
+ * (2026-11-14, dth-hrh re-pinning smart-base main). So the layer's own
+ * `typologies/` files are checked out too, and its kinds this checkout does
+ * not know are added to a PRIVATE copy of `registry` — never to the shared
+ * one, whose kinds must keep pointing at files that still exist once the
+ * tree is closed. A kind this checkout already knows keeps this checkout's
+ * definition, as the checkout under inspection wins on disk.
+ */
+function checkoutWithOwnKinds(
+  tree: RemoteTree,
+  at: string,
+  declarationFile: string,
+  registry: GraphTypologyRegistry,
+): { work: string; registry: GraphTypologyRegistry } {
+  const under = at ? `${at}/` : "";
+  const declarations = (r: GraphTypologyRegistry) => [declarationFile, ...declarationFileNames(r).map((f) => `${under}**/${f}`)];
+  let work = tree.checkout(declarations(registry));
+  const dirs = ownDeclaredDirectories(join(work, at), "typologies", work).map((d) => relative(work, d).replace(/\/+$/, ""));
+  if (dirs.length === 0) return { work, registry };
+  const kindFiles = dirs.map((d) => `${d}/*.json`);
+  work = tree.checkout([...declarations(registry), ...kindFiles]);
+  const own: [string, ReturnType<typeof kindDefOf>][] = [];
+  for (const d of dirs) {
+    const dir = join(work, d);
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir).filter((n) => n.endsWith(".json")).sort()) {
+      const parsed = GraphTypologyNodeSchema.safeParse(JSON.parse(readFileSync(join(dir, f), "utf-8")));
+      if (!parsed.success) throw new Error(`${d}/${f} is not a folio-graph-typology/v1 node: ${parsed.error.message}`);
+      if (!registry.has(parsed.data.kind)) own.push([parsed.data.kind, kindDefOf(parsed.data)]);
+    }
+  }
+  if (own.length === 0) return { work, registry };
+  const local = new GraphTypologyRegistry(Object.fromEntries(registry.names().map((n) => [n, registry.get(n)!])));
+  for (const [kind, def] of own) local.register(kind, def);
+  // A kind of the layer's own may name a declaration file of its own.
+  if (declarationFileNames(local).length !== declarationFileNames(registry).length) work = tree.checkout([...declarations(local), ...kindFiles]);
+  return { work, registry: local };
+}
+
+/**
  * The directories layer `root` (repository-relative, `""` for the root)
  * declares at the tree's pin, `<name>.json`'s own first, then those declared
  * from within, each with an instance-relative `path`.
@@ -71,10 +118,9 @@ export function upstreamDirectories(
   registry: GraphTypologyRegistry = defaultGraphTypologies,
 ): UpstreamDirectories {
   const at = root.replace(/\/+$/, "");
-  const under = at ? `${at}/` : "";
   let work: string;
   try {
-    work = tree.checkout([declarationFile, ...declarationFileNames(registry).map((f) => `${under}**/${f}`)]);
+    ({ work, registry } = checkoutWithOwnKinds(tree, at, declarationFile, registry));
   } catch (e) {
     return { ok: false, detail: `could not check the declaration files out at ${tree.sha.slice(0, 12)}: ${(e as Error).message}` };
   }
@@ -114,10 +160,9 @@ export function upstreamConcernMembers(
   registry: GraphTypologyRegistry = defaultGraphTypologies,
 ): UpstreamDirectories {
   const at = root.replace(/\/+$/, "");
-  const under = at ? `${at}/` : "";
   let work: string;
   try {
-    work = tree.checkout([declarationFile, ...declarationFileNames(registry).map((f) => `${under}**/${f}`)]);
+    ({ work, registry } = checkoutWithOwnKinds(tree, at, declarationFile, registry));
   } catch (e) {
     return { ok: false, detail: `could not check the declaration files out at ${tree.sha.slice(0, 12)}: ${(e as Error).message}` };
   }
