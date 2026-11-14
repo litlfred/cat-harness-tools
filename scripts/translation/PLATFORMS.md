@@ -146,6 +146,27 @@ platform is not an error.
 - **Where the content goes:** the `.pot` templates and `.po` catalogues named in
   the config, stored on Transifex's servers.
 
+## Scale (measured 2026-11-14)
+
+Counts are unique source strings in each layer's declared `translations/`, for 5 locales each:
+
+| Layer | Catalogues | Strings | Words |
+|---|---|---|---|
+| cat-harness | 113 | 4,610 | ~99k |
+| smart-trust | 56 | 3,516 | ~50k |
+| who-iris | 6 | 276 | ~2.5k |
+
+who-iris is expected to grow to about 400k library items, so 400k strings or more. The free plans compare like this; check each provider's current terms before relying on them:
+
+| Plan | Limit | Fits who-iris? |
+|---|---|---|
+| Hosted Weblate Libre | 160,000 hosted strings | No |
+| Crowdin open-source plan | No hosted-word limit, according to Crowdin staff (the general free plan's 60k words count source words × languages) | Yes, if Crowdin approves the application |
+| Transifex Open Source Program | Words don't count against plan limits | Only for OSI-licensed projects with no funding or commercial model |
+| Self-hosted Weblate | None | Yes |
+
+Platforms are configured per layer, so different layers may use different platforms.
+
 ## Turning one on (owner)
 
 1. Choose a platform, and create the account or project there. Nothing in this
