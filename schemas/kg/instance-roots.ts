@@ -108,8 +108,8 @@ export const CONFIG_SUFFIX = ".config.json";
 /**
  * A candidate file's parsed `{ name }`, read once per version of the file.
  *
- * Measured 2026-11-13 (folio-assistant-core main red, issue #753): in the
- * full folio-assistant index, one `kg-audit --instance ./folio-assistant-core`
+ * Measured 2026-11-13 (a content layer's main red): in a full index of 12
+ * layers, one `kg-audit --instance` of that layer
  * took 2 min 55 s, and 126 s of it was this function re-reading and
  * re-parsing the same layer declarations: `instanceRootsIn` and
  * `declaredOptInRequires` call it on every layer for every directory resolved.
