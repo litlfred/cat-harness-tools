@@ -321,6 +321,12 @@ export const PdfDiagnosticsSchema = z
     chars_total: z.number().int().min(0),
     /** Running heads, footers, folios and side tabs `strip_furniture` took out before the split. */
     furniture_lines_stripped: z.number().int().min(0).optional(),
+    /**
+     * Runs of GRADE quality-of-evidence marks drawn as vector rings and
+     * written into the text as ⊕/⊖ (`add_grade_marks`, issue #1925). Absent
+     * when none was.
+     */
+    grade_marks_written: z.number().int().min(1).optional(),
     /** The flat outline ran against its own pages and `repair_outline` put it in page order. Absent when not. */
     outline_reordered: z.literal(true).optional(),
     /**

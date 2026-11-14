@@ -45,8 +45,9 @@
  *   a committed sidecar that is stale or absent. This is the gate CI runs.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { RAIL_DATA_DIR, expandRail, railDataJson } from "./lib/harness-rail.ts";
+import { outputTwinOf, readPathAt } from "./lib/layer-output.ts";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -242,7 +243,7 @@ export interface NavNamesResult {
   destinations: number;
 }
 
-/** Every tracked file under `dir`, repo-relative. */
+/** Every tracked (or output-root computed) file under `dir`, repo-relative. */
 function tracked(repoRoot: string, dir: string): string[] {
   // In a composed checkout every layer is a REMOTE MOUNT, laid down from
   // `index.lock.json` and ignored by the index repository's git, so a bare
@@ -250,7 +251,19 @@ function tracked(repoRoot: string, dir: string): string[] {
   // mount's files as it counted a submodule's, and is tracked-plus-untracked
   // exactly as before everywhere else. A DIRECTORY is spelled `<dir>/**`:
   // a mount's files are matched as globs, and a bare directory matches none.
-  return (gitCorpus(repoRoot, [`${dir}/**`]) ?? []).map((f) => relative(repoRoot, f));
+  const pinned = (gitCorpus(repoRoot, [`${dir}/**`]) ?? []).map((f) => relative(repoRoot, f).split(sep).join("/"));
+  const twin = outputTwinOf(repoRoot, join(repoRoot, dir));
+  if (twin === undefined || !existsSync(twin)) return pinned;
+  const computed: string[] = [];
+  const walk = (d: string): void => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else computed.push(join(dir, relative(twin, p)).split(sep).join("/"));
+    }
+  };
+  walk(twin);
+  return [...new Set([...pinned, ...computed])].sort();
 }
 
 /**
@@ -265,21 +278,23 @@ export function checkNavNames(repoRoot: string, siteAbs: string, files?: readonl
   const sightings: NameSighting[] = [];
   const templates: TemplateFinding[] = [];
 
-  const dataPath = join(siteAbs, "_data", "harness.json");
+  const dataRel = rel(join(siteAbs, "_data", "harness.json"));
+  const dataPath = readPathAt(repoRoot, join(siteAbs, "_data", "harness.json"));
   if (!existsSync(dataPath)) {
-    return { undetermined: `${rel(dataPath)} is missing`, sightings, conflicts: [], templates, read, destinations: 0 };
+    return { undetermined: `${dataRel} is missing`, sightings, conflicts: [], templates, read, destinations: 0 };
   }
   try {
-    sightings.push(...sightingsFromHarnessData(JSON.parse(readFileSync(dataPath, "utf-8")) as HarnessData, rel(dataPath)));
+    sightings.push(...sightingsFromHarnessData(JSON.parse(readFileSync(dataPath, "utf-8")) as HarnessData, dataRel));
     read.harnessData = true;
   } catch (e) {
-    return { undetermined: `${rel(dataPath)} will not parse: ${String(e)}`, sightings, conflicts: [], templates, read, destinations: 0 };
+    return { undetermined: `${dataRel} will not parse: ${String(e)}`, sightings, conflicts: [], templates, read, destinations: 0 };
   }
 
-  const stickiesPath = join(siteAbs, "_data", "stickies.json");
+  const stickiesRel = rel(join(siteAbs, "_data", "stickies.json"));
+  const stickiesPath = readPathAt(repoRoot, join(siteAbs, "_data", "stickies.json"));
   if (existsSync(stickiesPath)) {
     try {
-      sightings.push(...sightingsFromStickies(JSON.parse(readFileSync(stickiesPath, "utf-8")), rel(stickiesPath)));
+      sightings.push(...sightingsFromStickies(JSON.parse(readFileSync(stickiesPath, "utf-8")), stickiesRel));
       read.stickies = true;
     } catch {
       // Unreadable stickies are a finding of `docs:landing`'s gate, not this
@@ -287,9 +302,10 @@ export function checkNavNames(repoRoot: string, siteAbs: string, files?: readonl
     }
   }
 
-  const include = join(siteAbs, "_includes", "generated", "navbar-footer.html");
+  const includeRel = rel(join(siteAbs, "_includes", "generated", "navbar-footer.html"));
+  const include = readPathAt(repoRoot, join(siteAbs, "_includes", "generated", "navbar-footer.html"));
   if (existsSync(include)) {
-    sightings.push(...sightingsFromNavHtml(readFileSync(include, "utf-8"), "/", "Jekyll sidebar harnesses", rel(include)));
+    sightings.push(...sightingsFromNavHtml(readFileSync(include, "utf-8"), "/", "Jekyll sidebar harnesses", includeRel));
     read.include = true;
   }
 
@@ -304,12 +320,12 @@ export function checkNavNames(repoRoot: string, siteAbs: string, files?: readonl
   const list = files ?? tracked(repoRoot, siteRel);
   for (const f of list) {
     if (!f.endsWith(".html") || f.includes("/_includes/") || f.includes("/_layouts/")) continue;
-    const abs = join(repoRoot, f);
+    const abs = readPathAt(repoRoot, join(repoRoot, f));
     if (!existsSync(abs)) continue;
     // A rail drawn from SHARED data (bean `lnoy`) is read as the reader sees it.
     const html = expandRail(readFileSync(abs, "utf-8"), (name) => {
-      const f = join(siteAbs, RAIL_DATA_DIR, `${name}.js`);
-      return existsSync(f) ? railDataJson(readFileSync(f, "utf-8")) : undefined;
+      const rf = readPathAt(repoRoot, join(siteAbs, RAIL_DATA_DIR, `${name}.js`));
+      return existsSync(rf) ? railDataJson(readFileSync(rf, "utf-8")) : undefined;
     });
     if (!html.includes('class="fa-nav"')) continue;
     const under = f.slice(siteRel.length + 1);
@@ -368,7 +384,7 @@ export function navNamesQaResult(r: NavNamesResult): QaResult {
 if (import.meta.main) {
   const siteAbs = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
   const check = process.argv.includes("--check");
-  if (!check && !existsSync(join(siteAbs, "_data", "harness.json"))) {
+  if (!check && !existsSync(readPathAt(REPO_ROOT, join(siteAbs, "_data", "harness.json")))) {
     spawnSync("bun", ["run", "cat", "docs:harness"], { cwd: REPO_ROOT, stdio: "inherit" });
   }
   const r = checkNavNames(REPO_ROOT, siteAbs);

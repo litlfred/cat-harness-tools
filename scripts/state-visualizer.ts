@@ -87,7 +87,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, posix, relative, resolve, sep } from "node:path";
 
 import {
   graphTypologiesOfLayer,
@@ -171,8 +171,12 @@ import {
   withViewers,
 } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { overlayPath, writePathOf } from "./lib/layer-output.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { subjectIri } from "./lib/subject-pages.ts";
+import { describeAttestation } from "./lib/attestation-nodes.ts";
+import { ATTESTATIONS_SUFFIX, QA_ATTESTATIONS_SCHEMA, QaAttestationsKind } from "../schemas/sdlc/qa-attestations.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
@@ -373,7 +377,9 @@ function esc(s: string): string {
  * believes the notice either avoids the feature or rebuilds it.
  */
 function projectionFor(id: string): string | null {
-  const p = join(SITE, "assets", id, "index.json");
+  // Over the overlay: in a mounted layer gen-docs-pages writes the projection
+  // to the output root, not beside the pinned site.
+  const p = overlayPath(join(SITE, "assets", id, "index.json"));
   return existsSync(p) ? p : null;
 }
 
@@ -560,17 +566,21 @@ function emit(path: string, content: string): void {
   const rel = relative(ROOT, path);
   if (check && builtAtPublishHere(path)) return;
   if (check) {
-    if (!existsSync(path)) {
+    // Over the overlay: in a mounted layer the page is at the output root.
+    const at = overlayPath(path);
+    if (!existsSync(at)) {
       console.error(`  ✗ ${rel} is missing`);
       stale++;
-    } else if (readFileSync(path, "utf-8") !== content) {
+    } else if (readFileSync(at, "utf-8") !== content) {
       console.error(`  ✗ ${rel} is stale`);
       stale++;
     }
     return;
   }
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
+  // A mounted layer is read-only: its pages go to the output root's twin.
+  const to = writePathOf(path);
+  mkdirSync(dirname(to), { recursive: true });
+  writeFileSync(to, content);
   wrote++;
   console.log(`  ✓ ${rel}`);
 }
@@ -1053,8 +1063,11 @@ export function qaPanelsOf(
  * capabilities, which carry no `$schema`), `policies` (ODRL, `.jsonld`),
  * `test-plan`, `tool-release`, `vocab-mapping` and `substrate-snapshot`
  * (`<id>.substrate.json`, written by `kg:subscribe` and not committed).
+ * `attestations` is listed too (owner, 2026-11-13, node-kind audit): its page
+ * was a census of `$schema` families that named no attestation, so each file
+ * is now a row linking its page and its IRI (`QaAttestationsKind`).
  */
-export const LISTED_KINDS: readonly string[] = ["scenarios", "policies", "test-plan", "tool-release", "vocab-mapping", "substrate-snapshot"];
+export const LISTED_KINDS: readonly string[] = ["scenarios", "policies", "test-plan", "tool-release", "vocab-mapping", "substrate-snapshot", "attestations"];
 
 /**
  * The file endings a listed node is read from: JSON, and JSON-LD, which is
@@ -1123,6 +1136,78 @@ export interface RegistryRow {
   text?: string;
   /** Why the file is not listed with its fields. */
   note?: string;
+  /** The node's IRI, where its layer's document mints one ({@link withSubjectIris}); its JSON-LD is the IRI plus `.jsonld`. */
+  iri?: string;
+  /** The node's own page on this site, relative to the listing page, where its kind has one. */
+  page?: string;
+}
+
+/** Where in a listed kind's directory its knowledge-graph SUBJECTS are, and how each is named. */
+export interface SubjectRows {
+  /** The sub-directory they sit DIRECTLY in; absent for every file of the directory, at any depth. */
+  dir?: string;
+  /** The subject kind `kg-export` mints their IRI as (`scripts/lib/subject-iri.ts`). */
+  kind: string;
+  /** The subject's id from its row; the row's id when absent. */
+  id?: (row: RegistryRow) => string | undefined;
+  /**
+   * The node's own page, relative to the layer's listing page
+   * (`<locale>/<harness>/<vis>/<instance>/`), where `gen-node-kind-pages`
+   * writes one: `<locale>/<declaring>/<kind>/<harness>/<path>/`.
+   */
+  page?: (row: RegistryRow, instance: string, layerPath: string) => string | undefined;
+}
+
+/**
+ * The files of a listed kind that are knowledge-graph SUBJECTS, and the
+ * subject kind `kg-export` mints their IRI as: `scenarios/actors/<f>.json` is
+ * an `actor`, `scenarios/capabilities/<f>.json` a `capability`
+ * (`collectRegistryNodes`, which reads only the files directly in each), and
+ * every `<family>/<path>.attestations.json` an `attestation`
+ * (`attestation-nodes.ts`). Their rows link the IRI and its `.jsonld` (owner,
+ * 2026-11-13, node-kind audit: the 58 scenario rows on a downstream's site
+ * named `actors/admin.json` and linked nothing).
+ */
+export const SUBJECT_ROWS: Readonly<Record<string, readonly SubjectRows[]>> = {
+  scenarios: [
+    { dir: "actors", kind: "actor" },
+    { dir: "capabilities", kind: "capability" },
+  ],
+  attestations: [
+    {
+      kind: "attestation",
+      id: (r) => (r.file.endsWith(ATTESTATIONS_SUFFIX) ? r.file.slice(0, -ATTESTATIONS_SUFFIX.length) : undefined),
+      // `qa-attestations` is cat-harness-tools' kind (its `validators/` node,
+      // beside the code that defines it), so its pages are under
+      // `<locale>/cat-harness-tools/`, a sibling of this visualiser's harness.
+      page: (r, instance, layerPath) => `../../../cat-harness-tools/${QaAttestationsKind.id}/${instance}/${posix.join(layerPath, r.file.replace(/\.json$/, ""))}/`,
+    },
+  ],
+};
+
+/**
+ * `rows` with each subject's IRI ({@link SUBJECT_ROWS}), minted by `iriOf`
+ * from the node's file, kind and id, and its page where the kind has one.
+ * `layerPath` is the listed directory's path under its layer's root, the
+ * prefix of a node's path on its page.
+ */
+export function withSubjectIris(
+  rows: readonly RegistryRow[],
+  absPath: string,
+  kinds: readonly string[],
+  iriOf: (file: string, kind: string, id: string) => string | undefined = subjectIri,
+  where: { instance: string; layerPath: string } | undefined = undefined,
+): RegistryRow[] {
+  const rules = kinds.flatMap((k) => SUBJECT_ROWS[k] ?? []);
+  return rows.map((r) => {
+    const at = rules.find((x) => (x.dir === undefined ? true : r.file.startsWith(`${x.dir}/`) && !r.file.slice(x.dir.length + 1).includes("/")));
+    if (at === undefined || r.note !== undefined) return r;
+    const id = at.id ? at.id(r) : r.id;
+    if (id === undefined) return r;
+    const iri = iriOf(join(absPath, r.file), at.kind, id);
+    const page = where && at.page ? at.page(r, where.instance, where.layerPath) : undefined;
+    return { ...r, ...(iri !== undefined ? { iri } : {}), ...(page !== undefined ? { page } : {}) };
+  });
 }
 
 /** Every `.json` node under a registry directory, in path order. Absent is an empty list; the page says unknown from the projection. */
@@ -1141,6 +1226,13 @@ export function registryRowsOf(absPath: string): RegistryRow[] {
       }
       if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return { file, id: stem, note: "not a JSON object" };
       const r = doc as Record<string, unknown>;
+      // An attestation names no id or title of its own: its id is its path in
+      // the store, and its words are what it judges (`attestation-nodes.ts`).
+      if (r["$schema"] === QA_ATTESTATIONS_SCHEMA && file.endsWith(ATTESTATIONS_SUFFIX)) {
+        const sub = r["subject"] as { kind?: unknown; id?: unknown; path?: unknown } | undefined;
+        const subject = sub && typeof sub.kind === "string" && typeof sub.id === "string" ? { kind: sub.kind, id: sub.id, path: typeof sub.path === "string" ? sub.path : null } : undefined;
+        return { file, schema: QA_ATTESTATIONS_SCHEMA, id: file.slice(0, -ATTESTATIONS_SUFFIX.length), text: describeAttestation(String(r["family"] ?? ""), subject).title };
+      }
       const text = str(r["title"]) ?? str(r["label"]) ?? str(r["summary"]) ?? str(r["description"]) ?? str(r["rationale"]);
       return {
         file,
@@ -1154,16 +1246,20 @@ export function registryRowsOf(absPath: string): RegistryRow[] {
 /** The node table of a registry page. */
 export function registryTable(rows: readonly RegistryRow[]): string {
   if (rows.length === 0) return "";
+  // A JSON-LD column only where some node has an IRI, so a registry with none keeps its shape.
+  const linked = rows.some((r) => r.iri !== undefined);
   const tr = rows
     .map(
       (r) =>
-        `<tr><td><code>${esc(r.id)}</code></td><td>${esc(r.note ?? r.text ?? "")}</td>` +
-        `<td>${r.schema ? `<code>${esc(r.schema)}</code>` : ""}</td><td><code>${esc(r.file)}</code></td></tr>`,
+        `<tr><td>${(r.page ?? r.iri) ? `<a href="${esc(r.page ?? r.iri!)}"><code>${esc(r.id)}</code></a>` : `<code>${esc(r.id)}</code>`}</td><td>${esc(r.note ?? r.text ?? "")}</td>` +
+        `<td>${r.schema ? `<code>${esc(r.schema)}</code>` : ""}</td><td><code>${esc(r.file)}</code></td>` +
+        (linked ? `<td>${r.iri ? `${r.page ? `<a href="${esc(r.iri)}">IRI</a> · ` : ""}<a href="${esc(r.iri)}.jsonld" type="application/ld+json">.jsonld</a>` : ""}</td>` : "") +
+        `</tr>`,
     )
     .join("");
   return (
     `<h2 class="sv-h2">Nodes — ${rows.length}</h2>` +
-    `<div style="overflow-x:auto"><table class="sv-table"><thead><tr><th>id</th><th>title or summary</th><th>$schema</th><th>file</th></tr></thead>` +
+    `<div style="overflow-x:auto"><table class="sv-table"><thead><tr><th>id</th><th>title or summary</th><th>$schema</th><th>file</th>${linked ? "<th>JSON-LD</th>" : ""}</tr></thead>` +
     `<tbody>${tr}</tbody></table></div>`
   );
 }
@@ -1794,8 +1890,9 @@ export async function writeDynamicState(
   // input-site: traced #574cb84e — the wall clock stamped into the dynamic state document, unless the caller gives one: a run that reads it records no hash
   inputSiteReached("state-visualizer: dynamic state's time");
   const doc = dynamicStateDocument(harness, inputs, opts.now ?? new Date(), unread, docIri);
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, JSON.stringify(doc, null, 2) + "\n");
+  const to = writePathOf(out);
+  mkdirSync(dirname(to), { recursive: true });
+  writeFileSync(to, JSON.stringify(doc, null, 2) + "\n");
   return { doc, unread, out };
 }
 
@@ -2531,7 +2628,7 @@ export function instanceSubjectPage(
       `<h1 id="${esc(vis.id)}-${esc(s.name)}">${esc(title)}: ${esc(s.name)}</h1>` +
       `<p class="sv-sub">${esc(s.name)} · ${esc(s.path)} · <a href="../">every instance's ${esc(title)}</a></p>` +
       (loadsLive ? qaLivePanel(live!) : qaPanelsOf(ix, undefined, { qaFamilies })) +
-      (registry ? registryTable(registryRowsOf(s.absPath)) : "") +
+      (registry ? registryTable(withSubjectIris(registryRowsOf(s.absPath), s.absPath, vis.coversKinds ?? [], subjectIri, { instance: s.name, layerPath: relative(s.instanceRoot, s.absPath).split(sep).join("/") })) : "") +
       `<h2 class="sv-h2">Instances holding ${esc(title)}</h2>` +
       `<ul class="sv-list">${others}</ul>`,
   });
@@ -3320,8 +3417,13 @@ if (check) {
   }
   console.log(`state visualiser: ${graphs.length} dashboard(s) up to date, no orphans`);
 } else {
-  for (const o of orphans) unlinkSync(join(SITE, o));
-  for (const o of subjectOrphans) rmSync(join(SITE, o), { recursive: true });
+  // In a mounted layer only the output root's copy is this run's to remove;
+  // the pinned bytes are the layer's own and are never written.
+  for (const o of orphans) {
+    const at = writePathOf(join(SITE, o));
+    if (existsSync(at)) unlinkSync(at);
+  }
+  for (const o of subjectOrphans) rmSync(writePathOf(join(SITE, o)), { recursive: true, force: true });
   // The workflow pages read `<site>/<harness>/state.jsonld` when they load.
   // The platform's own render pipeline exports it as stage 3 (`kg-dynamic`),
   // but a folio's site build runs this writer and no stage 3, so its pages

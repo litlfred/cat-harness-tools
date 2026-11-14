@@ -28,6 +28,7 @@ const EVERY_EMITTED_KIND: Record<DeclKind, true> = {
   "type-alias": true,
   "json-schema": true,
   "fhir-logical": true,
+  "fhir-profile": true,
   undetermined: true,
 };
 

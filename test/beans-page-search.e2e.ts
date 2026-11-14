@@ -33,7 +33,7 @@ const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
 const read = (rel: string) => readFileSync(overlayPath(join(SITE, rel)), "utf8");
 
-const PAGE = readFileSync(declaredPagePath(ROOT, "beans"), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
+const PAGE = readFileSync(overlayPath(declaredPagePath(ROOT, "beans")), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
 const CSS = read("assets/css/work-plan.css");
 const KG = read("assets/js/kg-render.js");
 const WP = read("assets/js/work-plan.js");

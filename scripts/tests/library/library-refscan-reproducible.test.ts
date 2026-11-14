@@ -17,7 +17,7 @@
  * key of the same kind is added beside it.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "../../../test/support/site-fs.ts";
 import { join, resolve } from "node:path";
 import { siteDirFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";

@@ -99,6 +99,12 @@ describe("placeholder guard", () => {
     expect(placeholders("100% sure, no tokens")).toEqual([]);
   });
 
+  test("TeX math, liquid tags and Markdown strong/strike markers are kept too", () => {
+    expect(placeholders("If $x^2$ then $$y$$, \\(z\\) and \\[w\\]")).toEqual(["$$y$$", "$x^2$", "\\(z\\)", "\\[w\\]"].sort());
+    expect(placeholders("{% if a %}**bold** ~~old~~{% endif %}")).toEqual(["**", "**", "{% endif %}", "{% if a %}", "~~", "~~"].sort());
+    expect(placeholderProblem("**Note** $x$", "Nota $x$")).toContain('lost "**"');
+  });
+
   test("accepts a reordered but complete translation", () => {
     expect(placeholderProblem("{a} before {b}", "{b} después de {a}")).toBeUndefined();
     expect(placeholderProblem("<a0>x</a0> %s", "%s <a0>y</a0>")).toBeUndefined();
@@ -139,6 +145,18 @@ describe("masking", () => {
     expect(unmaskPlaceholders("Ver [0] y [1]", tokens)).toBe("Ver [0] y {x}");
   });
 
+  test("a mangled stand-in is refused, never leaked into the text (bean cat-tools-ph0s)", () => {
+    const { masked, tokens } = maskPlaceholders("Shown in {language}.");
+    expect(masked).not.toContain("__PH");
+    for (const mangled of ["Affiché en [0.", "Affiché en 0].", "Affiché en (0).", "Affiché en [0]_."]) {
+      const back = unmaskPlaceholders(mangled, tokens);
+      const r = checkedCandidate("Shown in {language}.", back);
+      if (mangled.includes("[0]")) expect(back).toBe("Affiché en {language}_.");
+      else expect(r).toEqual({ refused: 'placeholders do not round-trip (lost "{language}")' });
+    }
+    expect(unmaskPlaceholders("Affiché en [ 0 ].", tokens)).toBe("Affiché en {language}.");
+  });
+
   test("a dropped or duplicated stand-in is still caught by the guard", () => {
     const { tokens } = maskPlaceholders("Open {name}");
     expect(placeholderProblem("Open {name}", unmaskPlaceholders("Abrir", tokens))).toContain("lost");
@@ -147,16 +165,25 @@ describe("masking", () => {
 });
 
 describe("which entries are translated", () => {
-  test("empty and fuzzy singular entries; never a reviewed one; plural reported", () => {
+  test("empty and fuzzy entries, plural ones included; never a reviewed one", () => {
     const { wanted, skipped } = entriesToTranslate(PO);
     expect(wanted).toEqual([
       { msgid: "Open {name} now", empty: true },
       { msgctxt: "button", msgid: "Open", empty: true },
       { msgid: "Open", empty: true },
+      { msgid: "%d file", msgidPlural: "%d files", empty: true },
       { msgid: "  Run %(cmd)s in <a0>the shell</a0>.\n", empty: true },
       { msgid: "Already a machine guess", empty: false },
     ]);
-    expect(skipped).toEqual([{ msgid: "%d file", reason: "plural entry: its forms are left for a person" }]);
+    expect(skipped).toEqual([]);
+  });
+
+  test("a plural a person has started is left to them", () => {
+    const started = PO.replace('msgstr[0] ""\nmsgstr[1] ""', 'msgstr[0] "%d archivo"\nmsgstr[1] ""');
+    expect(entriesToTranslate(started).wanted.some((w) => w.msgid === "%d file")).toBe(false);
+    expect(entriesToTranslate(started).skipped).toEqual([]);
+    const fuzzyStarted = started.replace('#: docs/a.md:5\n', '#: docs/a.md:5\n#, fuzzy\n');
+    expect(entriesToTranslate(fuzzyStarted).skipped).toEqual([{ msgid: "%d file", reason: "plural entry with some forms filled: left for a person" }]);
   });
 
   test("a catalogue that forbids machine filling is recognised", () => {
@@ -175,7 +202,7 @@ describe("which entries are translated", () => {
 
 describe("mergeCandidates: the never-overwrite rule and the first-candidate fill", () => {
   const all = (src: CandidateSource, f: (s: string) => string): CandidateInput[] =>
-    entriesToTranslate(PO).wanted.map((w) => ({ ...(w.msgctxt !== undefined ? { msgctxt: w.msgctxt } : {}), msgid: w.msgid, text: f(splitWhitespace(w.msgid).core), source: src }));
+    entriesToTranslate(PO).wanted.filter((w) => w.msgidPlural === undefined).map((w) => ({ ...(w.msgctxt !== undefined ? { msgctxt: w.msgctxt } : {}), msgid: w.msgid, text: f(splitWhitespace(w.msgid).core), source: src }));
 
   test("every non-empty msgstr is kept byte-for-byte; each empty one gets the first candidate, fuzzy", () => {
     const r = mergeCandidates(PO, emptySidecar("es", "a"), [...all(OPUS, (s) => `ES:${s}`), ...all(ARGOS, (s) => `AR:${s}`)]);
@@ -231,7 +258,7 @@ describe("mergeCandidates: the never-overwrite rule and the first-candidate fill
     const r = mergeCandidates(PO, emptySidecar("es", "a"), [{ msgid: "Nope", text: "No", source: OPUS }]);
     expect(r.rejected[0]!.reason).toBe("no such entry in the catalogue");
     const plural = mergeCandidates(PO, emptySidecar("es", "a"), [{ msgid: "%d file", text: "%d archivo", source: OPUS }]);
-    expect(plural.rejected[0]!.reason).toBe("plural entry: one candidate cannot supply its forms");
+    expect(plural.rejected[0]!.reason).toBe("Helsinki-NLP/opus-mt-en-es: plural entry: the candidate gives no forms");
     expect(plural.added).toBe(0);
   });
 
@@ -316,8 +343,10 @@ describe("collectCandidates over a layer", () => {
     const argos = fakeSource("argos", "A:");
     const { reports, potOnly } = await collectCandidates({ root, translations: "translations", sources: [opus, argos], now });
     const es = reports.find((r) => r.locale === "es")!;
-    expect(es.added).toBe(10);
-    expect(es.filled).toHaveLength(4);
+    expect(es.added).toBe(12);
+    expect(es.filled).toHaveLength(5);
+    // The plural entry: one candidate per source, every form, filled fuzzy.
+    expect(read(root, "es/start/a.po")).toContain('#, fuzzy\nmsgid "%d file"\nmsgid_plural "%d files"\nmsgstr[0] "O:%d file"\nmsgstr[1] "O:%d files"');
     const side = JSON.parse(read(root, "es/start/a.candidates.json"));
     expect(candidatesProblems(side)).toEqual([]);
     expect(side.entries.find((e: { msgid: string }) => e.msgid === "Open {name} now").candidates).toEqual([
@@ -357,7 +386,7 @@ describe("collectCandidates over a layer", () => {
 
     const root2 = layer();
     const r2 = await collectCandidates({ root: root2, translations: "translations", sources: [fakeSource("o", "O:")], locales: ["es"], dryRun: true, now });
-    expect(r2.reports[0]!.filled).toHaveLength(4);
+    expect(r2.reports[0]!.filled).toHaveLength(5);
     expect(read(root2, "es/start/a.po")).toBe(PO);
     expect(existsSync(join(root2, "translations", "es", "start", "a.candidates.json"))).toBe(false);
   });
@@ -397,7 +426,7 @@ describe("collectCandidates over a layer", () => {
     rmSync(join(root3, "translations", "es", "start", "a.json"));
     const skip = await collectCandidates({ root: root3, translations: "translations", sources: [fakeSource("o", "O:")], locales: ["es"], createNode: false, now });
     expect(skip.reports[0]!.noFill).toContain("no translation node");
-    expect(skip.reports[0]!.added).toBe(5);
+    expect(skip.reports[0]!.added).toBe(6);
     expect(read(root3, "es/start/a.po")).toBe(PO);
   });
 
@@ -413,5 +442,27 @@ describe("collectCandidates over a layer", () => {
     expect(r.added).toBe(1);
     expect(r.filled).toHaveLength(1);
     expect(JSON.parse(read(root, "es/start/a.json")).status.generatedBy).toBe("web-service");
+  });
+
+  test("addCandidates takes a region-tagged locale (pt-BR) and creates its node", () => {
+    const root = layer();
+    mkdirSync(join(root, "translations", "pt-BR", "start"), { recursive: true });
+    const empty = PO.replace(/msgstr "[^"]+"/g, 'msgstr ""');
+    writeFileSync(join(root, "translations", "pt-BR", "start", "a.pot"), empty);
+    writeFileSync(join(root, "translations", "pt-BR", "start", "a.po"), empty);
+    const r = addCandidates([{ msgid: "Open {name} now", text: "Abrir {name} agora", source: { kind: "web-service", id: "crowdin", at: "2026-11-14T00:00:00Z" } }], {
+      root,
+      translations: "translations",
+      locale: "pt-BR",
+      catalogue: "start/a",
+      now,
+    });
+    expect(r.refused).toBeUndefined();
+    expect(r.added).toBe(1);
+    expect(r.filled).toHaveLength(1);
+    expect(r.nodeCreated).toBe(true);
+    const node = JSON.parse(read(root, "pt-BR/start/a.json"));
+    expect(node).toMatchObject({ label: "trans:pt-BR/start/a", locale: "pt-BR", status: { locale: "pt-BR", official: false, generatedBy: "web-service" } });
+    expect(read(root, "pt-BR/start/a.po")).toContain('msgstr "Abrir {name} agora"');
   });
 });

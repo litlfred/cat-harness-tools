@@ -16,7 +16,7 @@
  *                  `skillMdDirs()` instead of re-deriving what it encodes.
  */
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "../../test/support/site-fs.ts";
 import { join, resolve } from "node:path";
 
 import { TYPES, autoDocPage, declaredDirectories, levelPage, owningDirectory } from "../gen-auto-docs.ts";

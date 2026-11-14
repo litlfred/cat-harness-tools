@@ -13,7 +13,7 @@
  *
  * @module test/support/site-pages
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { repoRootFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
@@ -21,11 +21,13 @@ import type { VisualiserRouteParts } from "../../schemas/kg/visualiser-route.ts"
 import {
   declaredVisualisers,
   existingPageDir,
+  forwardingParts,
   heldVisualiserPages,
   pageParts,
   siteOwnerDir,
   visualiserPageDir,
 } from "../../scripts/viewer-declarations.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * The absolute directory of the visualiser `id` declared by the harness at
@@ -78,6 +80,14 @@ function pageDirOf(repoRoot: string, harness: string, id: string, rest: Pick<Vis
   const parts = { harness, visualiser: id, ...rest };
   const existing = existingPageDir(site, parts);
   if (existing !== undefined) return existing;
+  // A page written at publish to the layer's OUTPUT ROOT is held by neither
+  // address at the pinned mount, so existingPageDir answers undefined and the
+  // localised route would be guessed. Ask both addresses through the overlay,
+  // in the same order (bean cat-tools-sm8r).
+  const overlaid = [visualiserPageDir(site, pageParts(parts)), visualiserPageDir(site, forwardingParts(parts))].find(
+    (d) => existsSync(overlayPath(join(d, "index.html"))) || existsSync(overlayPath(join(d, "index.md"))),
+  );
+  if (overlaid !== undefined) return overlaid;
   const held = rest.subgraph === undefined
     ? heldVisualiserPages(repoRoot).find((h) => h.visualiser.harness === harness && h.visualiser.id === id)
     : undefined;

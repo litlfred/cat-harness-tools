@@ -394,6 +394,7 @@ export function projection(
           card: cardinalityOf(f),
           // The type the diagram shows, when it differs from the written one.
           ...(utype !== f.type ? { utype } : {}),
+          ...(f.constraint ? { constraint: f.constraint } : {}),
           ...(Object.keys(links).length ? { links } : {}),
           ...(f.doc ? { doc: f.doc.slice(0, DOC_MAX) } : {}),
         };
@@ -777,7 +778,7 @@ function umlClass(t, sel) {
     fields: (t.fields || []).map(function (f) {
       var links = f.links || {}, first = Object.keys(links)[0];
       return {
-        name: f.name, type: f.utype || f.type, card: f.card,
+        name: f.name, type: f.utype || f.type, card: f.card, note: f.constraint || "",
         href: targets[f.name] ? "#" + encodeURIComponent(targets[f.name]) : (first ? links[first] : "")
       };
     })
@@ -839,7 +840,9 @@ function detail(d) {
      UML: 14 of 15 compositions reproduced, 0 of 9 id associations.
      NOTE: no backticks in this file's embedded script — they terminate the
      template literal that carries the whole page. */
-  if ((d.fields || []).some(function (f) { return /(^|[a-z])Id$|(^|[a-z])Ids$|(^|_)ref$/.test(f.name); })) {
+  /* A FHIR source states its references (a type, a Reference target), so the
+     id-field caveat is about the TypeScript sources only. */
+  if (!/^fhir/.test(d.source || "") && (d.fields || []).some(function (f) { return /(^|[a-z])Id$|(^|[a-z])Ids$|(^|_)ref$/.test(f.name); })) {
     h += '<p class="note"><strong>This type carries id-style fields.</strong> ' +
       "The diagram draws containment and generalisation only: a reference held as a string id " +
       "(<code>actorId: z.string()</code>) carries no syntactic link to the schema it names, so it is " +
@@ -849,7 +852,7 @@ function detail(d) {
     h += "<table><caption class=\\"sub\\" style=\\"text-align:left;padding:0 0 4px\\">Fields</caption><thead><tr><th>name</th><th>type</th><th>notes</th></tr></thead><tbody>";
     d.fields.forEach(function (f) {
       h += "<tr><td><code>" + esc(f.name) + (f.optional ? '<span class="opt">?</span>' : "") +
-        "</code></td><td><code>" + esc(f.type) + "</code></td><td class=\\"sub\\">" + withCode(f.doc || "") + "</td></tr>";
+        "</code></td><td><code>" + esc(f.type) + "</code></td><td class=\\"sub\\">" + (f.constraint ? "<code>{" + esc(f.constraint) + "}</code> " : "") + withCode(f.doc || "") + "</td></tr>";
     });
     h += "</tbody></table>";
   }

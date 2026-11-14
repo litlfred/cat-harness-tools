@@ -16,7 +16,7 @@
  */
 
 /** The source a declaration was read from, as the diagram labels it. */
-export type ClassSource = "zod" | "typescript" | "json-schema" | "fhir" | "skill";
+export type ClassSource = "zod" | "typescript" | "json-schema" | "fhir" | "fhir:profile" | "skill";
 
 const FHIR_DATATYPES = "https://hl7.org/fhir/datatypes.html";
 const FHIR_CORE_SD = "http://hl7.org/fhir/StructureDefinition/";
@@ -76,6 +76,7 @@ export function typeLink(source: ClassSource, name: string, known?: Readonly<Rec
   if (known?.[bare]) return fhirPage(known[bare]!);
   switch (source) {
     case "fhir":
+    case "fhir:profile":
       if (!/^[A-Za-z][A-Za-z0-9]*$/.test(bare)) return undefined;
       return /^[a-z]/.test(bare) ? `${FHIR_DATATYPES}#${bare}` : `${FHIR_CORE_SD}${bare}`;
     case "json-schema":
@@ -103,6 +104,7 @@ function fhirPage(url: string): string {
 export function sourceOfKind(kind: string): ClassSource {
   if (kind === "json-schema") return "json-schema";
   if (kind === "fhir-logical") return "fhir";
+  if (kind === "fhir-profile") return "fhir:profile";
   if (kind === "interface" || kind === "type-alias") return "typescript";
   return "zod";
 }

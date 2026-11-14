@@ -37,6 +37,7 @@ import {
 } from "../../check-nav-names.js";
 import { audit as auditViewerNav } from "../../check-viewer-nav.js";
 import { siteNotBuilt } from "../../../test/support/checkout.ts";
+import { overlayPath } from "../../lib/layer-output.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..", "..");
 const INSTANCE = join(REPO, "cat-harness");
@@ -79,7 +80,7 @@ function siteCopy(): { root: string; site: string; files: string[] } {
   const site = join(root, "site");
   for (const rel of ["_data/harness.json", "_data/stickies.json", "_includes/generated/navbar-footer.html", "_includes/harness_details.html", "_includes/landing.html"]) {
     mkdirSync(join(site, rel, ".."), { recursive: true });
-    cpSync(join(SITE, rel), join(site, rel));
+    cpSync(overlayPath(join(SITE, rel)), join(site, rel));
   }
   writeRail(site, "Methodologies");
   return { root, site, files: [`site/${FIXTURE}`] };

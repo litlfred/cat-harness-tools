@@ -122,6 +122,41 @@ export function isGrid(t: PdfTable): boolean {
 }
 
 /**
+ * How often a cell boundary cuts a word: of the side-by-side pairs of
+ * non-empty cells, the share where the left cell ends in a lower-case
+ * letter and the right one opens with one ("relat" | "ionship"). A table's
+ * cells hold whole words; a column split laid over running prose cuts them.
+ */
+export function wordSplitShare(rows: readonly (readonly (string | null)[])[]): { share: number; pairs: number } {
+  let pairs = 0;
+  let cut = 0;
+  for (const r of rows) {
+    for (let j = 0; j + 1 < r.length; j++) {
+      const a = r[j] ?? "";
+      const b = r[j + 1] ?? "";
+      if (!a.trim() || !b.trim()) continue;
+      pairs++;
+      if (/\p{Ll}$/u.test(a) && /^\p{Ll}/u.test(b)) cut++;
+    }
+  }
+  return { share: pairs ? cut / pairs : 0, pairs };
+}
+
+/**
+ * Prose cut into columns, not a table: a word is cut at a quarter or more of
+ * at least five cell boundaries. Measured on a content layer's re-ingest pilot
+ * (2026-11-14, two WHO handbooks, 109 candidates): every grid a reader would
+ * call a table scored 0.12 or less, every page of prose read as one 0.42 or
+ * more, so the line sits in an empty stretch and moving it within it changes
+ * nothing there. Below five boundaries there is too little to judge, and the
+ * table is kept.
+ */
+export function isProseCut(t: PdfTable): boolean {
+  const { share, pairs } = wordSplitShare(Array.isArray(t.rows) ? t.rows : []);
+  return pairs >= 5 && share >= 0.25;
+}
+
+/**
  * The CSVW record and the CSV files for `pdf-tables/v1` tables. Pure: the
  * caller writes the files. `source` is the entry's own source block (the
  * structure's), so the record names the same bytes the entry does.
@@ -135,7 +170,7 @@ export function csvwFromPdfTables(
 ): { record: Record<string, unknown>; files: Array<{ path: string; content: string }> } {
   const files: Array<{ path: string; content: string }> = [];
   const tables = (artefact.tables ?? [])
-    .filter(isGrid)
+    .filter((t) => isGrid(t) && !isProseCut(t))
     .map((t, i) => {
       const url = `${TABULAR_TABLES_DIR}/table-${i + 1}.csv`;
       const [head, ...body] = t.rows;
@@ -234,8 +269,14 @@ export function runTableArm(staging: string, pdf: string, library?: string): { s
   const { record, files } = csvwFromPdfTables(structure?.doc_id ?? slug, artefact, structure?.source ?? {}, at, version);
   const n = (record.tables as unknown[]).length;
   const backend = artefact.producer?.backend ? `${artefact.producer.backend} ${artefact.producer.backend_version ?? ""}`.trim() : undefined;
-  const dropped = (artefact.tables ?? []).length - n;
-  const extra = [backend ? `backend ${backend}` : "", dropped > 0 ? `${dropped} candidate(s) dropped: under two columns or no row under the header` : ""]
+  const candidates = artefact.tables ?? [];
+  const prose = candidates.filter((t) => isGrid(t) && isProseCut(t)).length;
+  const dropped = candidates.length - n - prose;
+  const extra = [
+    backend ? `backend ${backend}` : "",
+    dropped > 0 ? `${dropped} candidate(s) dropped: under two columns or no row under the header` : "",
+    prose > 0 ? `${prose} dropped as prose cut into columns (a word cut at a quarter or more of the cell boundaries)` : "",
+  ]
     .filter(Boolean)
     .join("; ");
   if (n === 0) {

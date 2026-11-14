@@ -10,6 +10,7 @@
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { overlayPath } from "../lib/layer-output.ts";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -37,7 +38,9 @@ describe("the real corpus — the map the gate reads", () => {
   });
 
   test("every key is a file that exists, so the mapping is not composing paths", () => {
-    const missing = [...byFile!.keys()].filter((f) => !existsSync(f));
+    // A key names the page a reader serves; the build writes it at the layer
+    // output root (bean cat-tools-sm8r), so it is asked for through the overlay.
+    const missing = [...byFile!.keys()].filter((f) => !existsSync(overlayPath(f)));
     expect(missing).toEqual([]);
   });
 
