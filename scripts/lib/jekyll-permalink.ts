@@ -25,6 +25,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { overlayPath } from "./layer-output.ts";
+
 import { parse as parseYaml } from "yaml";
 
 export interface PermalinkDefault {
@@ -204,7 +206,9 @@ export function sourceForPermalink(siteDir: string, url: string): string | undef
     if (prefix.length > 1 && want.startsWith(prefix)) candidates.push(asFile(`/${want.slice(prefix.length)}`));
   }
   for (const rel of candidates) {
-    const file = join(siteDir, rel);
+    // Over the layer overlay: a mounted layer's generated pages are at its
+    // output root (bean `cat-tools-sm8r`, item 4).
+    const file = overlayPath(join(siteDir, rel));
     if (!existsSync(file)) continue;
     if (norm(pagePermalink(rel, frontMatterOf(file), defaults)) === want) return rel;
   }
