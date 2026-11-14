@@ -574,6 +574,7 @@ var COLS = [
   { k:"sections", t:"sections", n:true },
   { k:"blocks",   t:"blocks",   n:true },
   { k:"images",   t:"images",   n:true },
+  { k:"figures",  t:"figures",  n:true, f:function(e){ return e.figures==null?'<span class="pill">—</span>':esc(String(e.figures)); } },
   { k:"ocrPages", t:"ocr",      n:true, f:function(e){ var s=ocrState(e); return '<span class="pill '+s.cls+'">'+esc(s.label)+"</span>"; } },
   { k:"pageEnd",  t:"pages",    n:true, f:function(e){ return e.pageStart==null?'<span class="pill">—</span>':esc(e.pageStart+"–"+e.pageEnd); } },
   { k:"words",    t:"words",    n:true, f:function(e){ return e.words.toLocaleString(); } },
@@ -689,6 +690,7 @@ function renderDesk(){
         "<span>blocks</span><b>"+e.blocks+"</b>" +
         (e.summaries && e.summaries.prose ? "<span>summarised</span><b>"+e.summaries.summarised+" / "+e.summaries.prose+"</b>" : "") +
         "<span>images</span><b>"+e.images+"</b>" +
+        "<span>figures</span><b>"+(e.figures==null?"—":e.figures)+"</b>" +
         "<span>pages</span><b>"+(e.pageStart==null?"—":e.pageStart+"–"+e.pageEnd)+"</b>" +
         "<span>words</span><b>"+e.words.toLocaleString()+"</b>" +
         "<span>size</span><b>"+kb(e.bytes)+"</b>" +
