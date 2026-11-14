@@ -52,7 +52,7 @@ import { checkoutRootFor, findInstanceRoot } from "../schemas/kg/cat-harness.js"
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, rootInstanceName } from "../schemas/kg/harness-config.js";
 import { withConcernGroupDirs } from "./concern-groups.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { isFhirStructureDefinition, readFhirLogicalModel } from "./fhir-logical-model.ts";
+import { FHIR_CORE_SD, fhirCoreRelease, isFhirStructureDefinition, readFhirLogicalModel } from "./fhir-logical-model.ts";
 
 /**
  * Which layers' `schemas` directories a reading covers.
@@ -323,6 +323,9 @@ export interface SchemaGraph {
 
 /** The graph typology an IG's artefact index is declared under (the FHIR layer's kind). */
 const FHIR_ARTIFACT_INDEX = "fhir-artifact-index";
+
+/** The graph typology FHIR core's StructureDefinitions are declared under (by whichever layer holds it; never named here). */
+const FHIR_CORE_DEFINITIONS = "fhir-core-definitions";
 
 const TAG = /@graphNode\s+(\S+)(?:\s*[—-]\s*(.*))?/;
 
@@ -884,6 +887,8 @@ export interface ClassModelRef {
   by?: "canonical";
   /** A miss is expected (FHIR core not held here): no edge, and not reported as unresolved. */
   quietMiss?: true;
+  /** The FHIR version of the model the ref was written in, for choosing a fhir-core release. */
+  fhirVersion?: string;
 }
 
 /** What a reader over one JSON document returns. */
@@ -1223,6 +1228,92 @@ export function readJsonDocument(text: string, moduleRel: string): ClassModelRea
 }
 
 /**
+ * Load the FHIR core definitions `refs` reference, from declared
+ * `fhir-core-definitions` directories (bean `cat-tools-t6fz`).
+ *
+ * Only what is referenced, one level deep, from the release the referencing
+ * model states (`fhirVersion` → `r4` / `r4b` / `r5`). A release that is unread,
+ * a body not materialised, or a model that states no version is reported in
+ * `unread`, and the type stays an external, linked name — never a box guessed
+ * from another release.
+ */
+export function loadFhirCore(
+  coreDirs: readonly string[],
+  refs: readonly ClassModelRef[],
+  alreadyLoaded: ReadonlySet<string>,
+  rel: (p: string) => string,
+  fallbackInstance?: string,
+): { modules: SchemaGraphModule[]; decls: SchemaDecl[]; edges: SchemaEdge[]; unread: string[] } {
+  const out = { modules: [] as SchemaGraphModule[], decls: [] as SchemaDecl[], edges: [] as SchemaEdge[], unread: [] as string[] };
+  if (coreDirs.length === 0) return out;
+  const wanted = new Map<string, Set<string>>();
+  let noVersion = 0;
+  for (const r of refs) {
+    if (!r.quietMiss || !r.ref.startsWith(FHIR_CORE_SD)) continue;
+    const release = fhirCoreRelease(r.fhirVersion);
+    if (!release) {
+      noVersion++;
+      continue;
+    }
+    const set = wanted.get(release) ?? new Set<string>();
+    set.add(r.ref.split("|")[0]!);
+    wanted.set(release, set);
+  }
+  if (noVersion > 0) out.unread.push(`fhir-core: ${noVersion} reference(s) to FHIR core from models that state no fhirVersion — left external`);
+  const loaded = new Set(alreadyLoaded);
+  for (const [release, urls] of [...wanted.entries()].sort()) {
+    const dir = coreDirs.map((d) => join(d, release)).find((d) => existsSync(join(d, "manifest.json")));
+    if (!dir) {
+      out.unread.push(`fhir-core/${release}: no declared release directory with a manifest`);
+      continue;
+    }
+    let manifest: { status?: string; reason?: string; definitions?: { url: string; file: string }[] };
+    try {
+      manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+    } catch (e) {
+      out.unread.push(`${rel(dir)}: manifest unreadable — ${(e as Error).message.slice(0, 80)}`);
+      continue;
+    }
+    if (manifest.status !== "read") {
+      out.unread.push(`${rel(dir)}: release unread — ${manifest.reason ?? "no reason recorded"}`);
+      continue;
+    }
+    const byUrl = new Map((manifest.definitions ?? []).map((d) => [d.url, d.file]));
+    const layerRoot = findInstanceRoot(dir) ?? dir;
+    const instance = rel(layerRoot).split("/")[0] || fallbackInstance || basename(layerRoot);
+    let missing = 0;
+    for (const url of [...urls].sort()) {
+      if (loaded.has(url)) continue;
+      const file = byUrl.get(url);
+      if (!file) continue; // a primitive, or not in this release: stays external
+      const abs = join(dir, file);
+      if (!existsSync(abs)) {
+        missing++;
+        continue;
+      }
+      const moduleRel = rel(abs);
+      const read = readFhirLogicalModel(readFileSync(abs, "utf-8"), moduleRel);
+      if (read.decls.length === 0) continue;
+      loaded.add(url);
+      out.modules.push({
+        module: moduleRel,
+        instance,
+        name: basename(file, ".json"),
+        graphNode: "schema",
+        ...(read.summary ? { summary: read.summary } : {}),
+        isTest: false,
+        decls: read.decls.map((d) => d.id),
+      });
+      out.decls.push(...read.decls);
+      // Its own references stay external (one level deep): only its local edges are kept.
+      out.edges.push(...read.edges);
+    }
+    if (missing > 0) out.unread.push(`${rel(dir)}: ${missing} referenced definition(s) not materialised (run fhir-core:materialise)`);
+  }
+  return out;
+}
+
+/**
  * Read the whole schema graph.
  *
  * Returns `null` — not an empty graph — when the declared directory does not
@@ -1418,6 +1509,28 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
         jsonLocalEdges.push(...read.edges);
       }
     }
+  }
+
+  // FHIR core types, from a layer's declared `fhir-core-definitions` graph
+  // (bean `cat-tools-t6fz`). Only the core definitions a
+  // reading REFERENCES are loaded, one level deep, from the release its model
+  // states (`fhirVersion`): the bodies are the full package files, 12 MB, and a
+  // reference to `Patient` needs Patient, not the whole specification. A
+  // release that is unread, a body not materialised, or a model that states no
+  // version is listed in `unread` — the type stays an external, linked name,
+  // never a box guessed from another release.
+  if (opts.scope === "checkout") {
+    let coreDirs: string[] = [];
+    try {
+      coreDirs = checkoutDirectoriesForGraph(FHIR_CORE_DEFINITIONS, root);
+    } catch {
+      coreDirs = [];
+    }
+    const core = loadFhirCore(coreDirs, jsonRefs, new Set(decls.map((d) => d.canonical).filter((c): c is string => !!c)), rel, rootName);
+    modules.push(...core.modules);
+    decls.push(...core.decls);
+    jsonLocalEdges.push(...core.edges);
+    unread.push(...core.unread);
   }
 
   // Resolution, second pass — every module's exports are known by now, so a
