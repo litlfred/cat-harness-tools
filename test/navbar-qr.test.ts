@@ -326,14 +326,18 @@ describe("LHS navbar QR code capability (bean folio-assistant-5rmf)", () => {
     expect(qrBtn!.innerHTML).toContain("<svg");
   });
 
-  it("places the .fa-qr-panel as a sibling directly after .fa-nav-icons", () => {
+  // ABOVE the row since the row moved to the navbar's foot (owner,
+  // 2026-11-13: "put these controls at the bottom of the navbar"), so the
+  // code opens upward and the row stays where it is.
+  it("places the .fa-qr-panel as a sibling directly BEFORE .fa-nav-icons, at the navbar's foot", () => {
     const { bar } = createTestEnv({ barClass: "side-bar" });
     const host = bar.querySelector(".fa-nav-icons");
     const panel = bar.querySelector(".fa-qr-panel");
     expect(host).not.toBeNull();
     expect(panel).not.toBeNull();
     expect(panel!.parentNode).toBe(bar);
-    expect(host!.nextSibling).toBe(panel);
+    expect(panel!.nextSibling).toBe(host);
+    expect(host!.nextSibling).toBeNull();
     expect(panel!.getAttribute("data-open")).toBe("false");
     expect(panel!.getAttribute("role")).toBe("region");
     expect(panel!.getAttribute("aria-label")).toBe("QR code for this page");

@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { siteFileFor } from "../../../schemas/kg/cat-harness.ts";
-import { layoutFlags, stripFlags, untippedControls } from "../../check-viewer-nav.ts";
+import { harnessesControl, layoutFlags, stripFlags, untippedControls } from "../../check-viewer-nav.ts";
 import { injectRail } from "../../lib/harness-rail.ts";
 import { withHeadingIds } from "../../viewer-page.ts";
 
@@ -119,19 +119,23 @@ describe("ob3m finding 1 — tooltips on icon-only controls, ▦ Harnesses at re
     expect(untippedControls(nav)).toEqual([]);
   });
 
-  it("flags ▦ Harnesses hidden at rest, and not a rule conditioned on another state", () => {
-    const hide = (rule: string): string => real().replace("</head>", `<style>${rule}</style></head>`);
-    expect(layoutFlags(hide(".fa-nav-group>summary{opacity:0}"))).toEqual(["harnesses-at-rest"]);
-    expect(layoutFlags(hide(".x .fa-nav-group > summary{max-height:0;overflow:hidden}"))).toEqual(["harnesses-at-rest"]);
-    // Another state, and a pseudo-element: neither is the summary at rest.
-    expect(layoutFlags(hide(".fa-nav:hover .fa-nav-group>summary{opacity:0}"))).toEqual([]);
-    expect(layoutFlags(hide(".fa-nav-group>summary::marker{display:none}"))).toEqual([]);
+  // Owner, 2026-11-13: "remove the harnesses navbar, instead add an icon to
+  // the controls to show the harnesses". What is visible at rest is now that
+  // icon, and it must open a panel the rail really holds.
+  it("flags a rail with no Harnesses icon, or one whose panel is missing", () => {
+    const noIcon = real().replace(/<button type="button" class="fa-nav-icon fa-nav-harnesses"[\s\S]*?<\/button>/, "");
+    expect(noIcon).not.toBe(real());
+    expect(layoutFlags(noIcon)).toContain("harnesses-at-rest");
+    const noPanel = real().replace('<div class="fa-nav-pop" id="fa-nav-harnesses"', '<div class="fa-nav-pop" id="elsewhere"');
+    expect(noPanel).not.toBe(real());
+    expect(layoutFlags(noPanel)).toContain("harnesses-at-rest");
   });
 
-  it("flags a rail with no ▦ Harnesses disclosure at all", () => {
-    const gone = real().replace(/<details class="fa-nav-group"><summary><span class="fa-nav-glyph"[^>]*>(?:[^<]*|<svg[\s\S]*?<\/svg>)<\/span><span class="fa-nav-label">Harnesses<\/span>/, "<details><summary>");
-    expect(gone).not.toBe(real());
-    expect(layoutFlags(gone)).toContain("harnesses-at-rest");
+  it("the Harnesses icon is a tipped, labelled button that controls its panel", () => {
+    const nav = /<nav class="fa-nav"[\s\S]*?<\/nav>/.exec(real())![0];
+    expect(harnessesControl(nav)).toBe(true);
+    expect(nav).toContain('aria-expanded="false" aria-controls="fa-nav-harnesses" aria-label="Harnesses" data-fa-tip="Harnesses"');
+    expect(nav).toMatch(/<div class="fa-nav-pop" id="fa-nav-harnesses" role="region" aria-label="Harnesses" hidden>/);
   });
 });
 
@@ -165,12 +169,12 @@ describe("stripFlags — the same two questions of the docs site's strip", () =>
     expect(stripFlags(JS, css, ROW)).toEqual(["rail-tips"]);
   });
 
-  it("flags ▦ Harnesses left to the at-rest lists, which hide it", () => {
-    // The rule may be a selector LIST: #1808 adds the rail's
-    // `.fa-nav-harness-group` beside the footer's group in one rule.
-    const css = CSS.replace(/\.side-bar \.fa-nav-bottom > \.fa-nav-group > summary(?:,\s*[^{,]+)* \{[^}]*\}/, "");
-    expect(css).not.toBe(CSS);
-    expect(stripFlags(JS, css, ROW)).toEqual(["harnesses-at-rest"]);
+  it("flags a row that leaves the rail's own Harnesses icon behind", () => {
+    // `navbar-row.js` moves every `data-fa-nav-control` into the row it mounts
+    // at the foot of the rail (owner, 2026-11-13).
+    const row = ROW.split("data-fa-nav-control").join("data-fa-nav-x");
+    expect(row).not.toBe(ROW);
+    expect(stripFlags(JS, CSS, row)).toEqual(["harnesses-at-rest"]);
   });
 });
 

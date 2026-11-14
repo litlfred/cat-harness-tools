@@ -336,8 +336,21 @@ export interface NavbarModel {
    * module follows for a row with no destination.
    */
   graphs?: NavGroup;
-  /** The instantiated harnesses. The expandable group in the fixed bottom. */
+  /**
+   * The instantiated harnesses: a PANEL in the fixed bottom, opened by the
+   * Harnesses icon in the controls row. Owner, 2026-11-13: *"remove the
+   * harnesses navbar, instead add an icon to the controls to show the
+   * harnesses."* It was a `<details>` disclosure with its own row.
+   */
   harnesses?: NavGroup;
+  /**
+   * The FOLDER the page is in, shown under the layer's name in the header.
+   * Owner, 2026-11-13: on a page opened from "Library" in Folders the header
+   * reads "WHO IRIS" with "Library" beneath it. Derived from the Folders list
+   * by the page's address ({@link folderOfPage}); absent on a page in no
+   * folder, and then the header is the name alone.
+   */
+  folder?: string;
   /**
    * Where the header goes: the site's landing page. Owner, 2026-10-30: *"who
    * eblmen not clicable to go to landing page. also dont need home on bottomof
@@ -631,6 +644,23 @@ export function navbarCss(): string {
     // lines. The row's `title` carries the whole name (itemHtml), and the
     // drag edge still widens the bar for a reader who wants more of it.
     `.fa-nav-label{min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .12s ease}`,
+    // THE HEADER'S TWO LINES: the layer, and under it the open folder
+    // (owner, 2026-11-13), each cut to one line like every label here.
+    `.fa-nav-titles{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;line-height:1.25}`,
+    `.fa-nav-folder{font-size:12px;font-weight:400}`,
+    // THE CONTROLS AND THEIR PANEL, at the foot (owner, 2026-11-13). The panel
+    // opens upward over the scrolling middle, which shrinks to make room.
+    `.fa-nav-controls{display:flex;flex-wrap:wrap;padding:4px 8px;gap:2px}`,
+    `.fa-nav-controls:empty{display:none}`,
+    // Its icon moved into the row and its panel shut, the bottom is empty.
+    `.fa-nav-bottom:has(>.fa-nav-pop[hidden]):has(>.fa-nav-controls:empty){display:none}`,
+    `.fa-nav .fa-nav-controls>.fa-nav-icon,.fa-nav .fa-nav-icons>.fa-nav-harnesses{display:flex;align-items:center;justify-content:center;width:32px;height:32px;`,
+    `padding:0;border:0;border-radius:4px;background:none;color:inherit;cursor:pointer}`,
+    `.fa-nav .fa-nav-harnesses svg{width:18px;height:18px}`,
+    `.fa-nav .fa-nav-harnesses:hover,.fa-nav .fa-nav-harnesses:focus-visible,.fa-nav .fa-nav-harnesses[aria-expanded="true"]{background:var(--fa-nav-hover)}`,
+    `.fa-nav-pop{max-height:50vh;overflow-y:auto;overflow-x:hidden;padding:4px 0;border-bottom:1px solid var(--fa-nav-line)}`,
+    `.fa-nav-pop[hidden]{display:none}`,
+    `.fa-nav-pop-title{padding:4px ${NAV_PAD_PX}px;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;opacity:.8}`,
     // A bullet is a dot, not a 32px mark: its column is the dot's width.
     `.fa-nav-glyph.fa-nav-bullet{flex-basis:8px}`,
     `.fa-nav-glyph.fa-nav-bullet:empty{flex-basis:0;margin-inline-end:-8px}`,
@@ -873,8 +903,49 @@ export function wireNavFolds(doc: Document): void {
   const w = doc as Document & { faNavFolds?: boolean };
   if (w.faNavFolds) return;
   w.faNavFolds = true;
+  // A CONTROL THAT OPENS A PANEL IN THE RAIL (the Harnesses icon; owner,
+  // 2026-11-13). The panel is beside the rail's other rows, so the rail is
+  // pinned open while it shows (the labels are hidden at rest), and unpinned
+  // on close only if this pinned it. Escape closes it and returns focus.
+  const setPop = (b: Element, open: boolean): void => {
+    const panel = doc.getElementById(b.getAttribute("aria-controls") || "");
+    if (!panel) return;
+    b.setAttribute("aria-expanded", String(open));
+    if (open) panel.removeAttribute("hidden");
+    else panel.setAttribute("hidden", "");
+    const box = doc.getElementById("fa-nav-open") as HTMLInputElement | null;
+    if (!box) return;
+    if (open && !box.checked) {
+      box.checked = true;
+      b.setAttribute("data-fa-pinned", "");
+      box.dispatchEvent(new Event("change"));
+    } else if (!open && b.hasAttribute("data-fa-pinned")) {
+      b.removeAttribute("data-fa-pinned");
+      if (box.checked) {
+        box.checked = false;
+        box.dispatchEvent(new Event("change"));
+      }
+    }
+  };
+  // ONE owner of the panel toggles per document: `navbar-row.js` carries the
+  // same few lines for a page with no `navbar.js` (a theme page), and two
+  // handlers would open and shut the panel on one click.
+  const ownsPop = !(doc as Document & { faNavPop?: boolean }).faNavPop;
+  (doc as Document & { faNavPop?: boolean }).faNavPop = true;
+  doc.addEventListener("keydown", (e) => {
+    if (!ownsPop || e.key !== "Escape") return;
+    const b = doc.querySelector('button[data-fa-nav-pop][aria-expanded="true"]') as HTMLElement | null;
+    if (!b) return;
+    setPop(b, false);
+    b.focus();
+  });
   doc.addEventListener("click", (e) => {
     const t = e.target as Element | null;
+    const pop = ownsPop && t && typeof t.closest === "function" ? t.closest("button[data-fa-nav-pop]") : null;
+    if (pop) {
+      setPop(pop, pop.getAttribute("aria-expanded") !== "true");
+      return;
+    }
     const b = t && typeof t.closest === "function" ? t.closest("button.fa-nav-twisty") : null;
     if (!b) return;
     const list = doc.getElementById(b.getAttribute("aria-controls") || "");
@@ -1113,7 +1184,14 @@ export function headMark(m: NavbarModel): NavItem {
 export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
   const item = headMark(m);
   const name = m.headName ?? m.instance;
-  const inner = mark(item, c) + `<span class="fa-nav-name fa-nav-label">${esc(name)}</span>`;
+  // The name, and under it the open folder (owner, 2026-11-13), as one
+  // column beside the mark. The name keeps its own span: `check-viewer-nav`
+  // reads it.
+  const titles = m.folder
+    ? `<span class="fa-nav-titles"><span class="fa-nav-name fa-nav-label">${esc(name)}</span>` +
+      `<span class="fa-nav-folder fa-nav-label">${esc(m.folder)}</span></span>`
+    : `<span class="fa-nav-name fa-nav-label">${esc(name)}</span>`;
+  const inner = mark(item, c) + titles;
   if (m.headHref === undefined) {
     return `<label class="fa-nav-head" for="fa-nav-open" title="${esc(NAV_TOGGLE_LABEL)}">` + inner + `</label>`;
   }
@@ -1168,9 +1246,86 @@ export function navbarRegionsHtml(m: NavbarModel): string {
         (graphs ? groupHtml(graphsOnArrival(graphs, m.visualiser !== undefined), c) : "") +
         `</div>`
       : "") +
-    (m.harnesses ? `<div class="fa-nav-bottom">` + groupHtml(m.harnesses, c) + `</div>` : "") +
+    (m.harnesses ? harnessesBottomHtml(m.harnesses, c) : "") +
     `</div>`
   );
+}
+
+/**
+ * The HARNESSES CONTROL and its panel, in the fixed bottom — owner,
+ * 2026-11-13: *"remove the harnesses navbar, instead add an icon to the
+ * controls to show the harnesses."*
+ *
+ * The icon is drawn HERE, by the rail itself, rather than by `navbar-row.js`:
+ * a layer that declares no icon row, or a page that never loads that script,
+ * still reaches its harnesses. Where the row IS drawn, `navbar-row.js` moves
+ * this button into it ({@link NAV_CONTROL_ATTR}), so the controls are one line
+ * at the foot of the rail. The panel is a plain list above it, hidden until
+ * the button opens it ({@link wireNavFolds}).
+ */
+export function harnessesBottomHtml(g: NavGroup, c: Ctx): string {
+  const label = g.label;
+  const id = "fa-nav-harnesses";
+  const items = g.items.map((i) => itemHtml(i, c)).join("");
+  return (
+    `<div class="fa-nav-bottom">` +
+    `<div class="fa-nav-pop" id="${id}" role="region" aria-label="${esc(label)}" hidden>` +
+    `<div class="fa-nav-pop-title"><span class="fa-nav-label">${esc(label)}</span></div>${items}</div>` +
+    `<div class="fa-nav-controls">` +
+    `<button type="button" class="fa-nav-icon fa-nav-harnesses" ${NAV_CONTROL_ATTR} data-fa-nav-pop` +
+    ` aria-expanded="false" aria-controls="${id}" aria-label="${esc(label)}" data-fa-tip="${esc(label)}">` +
+    `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${esc(g.glyphPath ?? GROUP_GLYPHS.harnesses)}"` +
+    ` fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>` +
+    `</button></div></div>`
+  );
+}
+
+/**
+ * Marks a control the rail draws for the icon row: `navbar-row.js` moves every
+ * element carrying it into the row it mounts, in order, after its own icons.
+ */
+export const NAV_CONTROL_ATTR = "data-fa-nav-control";
+
+/**
+ * The folder the page at `path` is in: the Folders row whose ROUTE holds the
+ * page, longest first. A folder's route is its href, less a final
+ * layer segment (see below) — `library/who-iris/` routes `library/`, so the
+ * all-layers page `schemas/` is in the Schemas folder as well as
+ * `schemas/who-iris/` and every page beneath it. A route that is the site
+ * root, or a locale root, holds every page and so names no folder.
+ *
+ * `path` and each href are compared as written, both from the page, so the
+ * caller passes every spelling of the page's address it has (from the site's
+ * root and from the platform's).
+ */
+export function folderOfPage(links: readonly NavItem[], paths: readonly string[], instance: string): NavItem | undefined {
+  // The LAYER's own segment, which ends a folder's href (`library/who-iris/`):
+  // the instance as named, as a slug, and — because a layer's display name
+  // need not be its slug ("C@T Harness", `cat-harness`) — the last segment
+  // most of the Folders rows end in, read off the rows themselves.
+  const last = (h: string) => h.replace(/\/$/, "").split("/").pop() ?? "";
+  const counts = new Map<string, number>();
+  for (const i of links) if (i.href?.endsWith("/")) counts.set(last(i.href), (counts.get(last(i.href)) ?? 0) + 1);
+  const common = [...counts].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const layer = new Set([instance, instance.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), ...(common ? [common] : [])]);
+  let best: { item: NavItem; len: number } | undefined;
+  for (const item of links) {
+    const h = item.href;
+    if (!h || !h.endsWith("/")) continue;
+    const seg = last(h);
+    const route = layer.has(seg) ? h.slice(0, -seg.length - 1) : h;
+    // A route must name at least one folder segment past the root and locale.
+    const segs = route.replace(/^(?:\.\.?\/)+|^[a-z]+:\/\/[^/]+\//i, "").split("/").filter((x) => x && x !== "." && x !== "..");
+    if (segs.length === 0 || (segs.length === 1 && /^[a-z]{2}(?:-[A-Za-z]+)?$/.test(segs[0]!))) continue;
+    if (!paths.some((p) => p.startsWith(route))) continue;
+    if (!best || route.length > best.len) best = { item, len: route.length };
+  }
+  return best?.item;
+}
+
+/** A folder row's short name: its label before any ` — ` gloss. */
+export function folderName(i: NavItem): string {
+  return i.label.split(" \u2014 ")[0]!.trim();
 }
 
 /**

@@ -92,12 +92,14 @@ function railedBare(row: unknown): string {
   return html;
 }
 
-test("the rail carries the harness row, directly under its fixed top", async ({ page }) => {
+test("the rail carries the harness row, at its FOOT (owner, 2026-11-13)", async ({ page }) => {
   await serve(page, railed(LIVE));
   const row = page.locator("nav.fa-nav .fa-nav-in > .fa-nav-icons");
   await expect(row).toHaveCount(1);
-  // Placement: the row's previous sibling is the rail's fixed top.
-  expect(await row.evaluate((r) => r.previousElementSibling?.className)).toBe("fa-nav-top");
+  // Placement: "put these controls at the bottom of the navbar" -- the row is
+  // the rail's last region, and it sits at the bottom of the window.
+  expect(await row.evaluate((r) => r.nextElementSibling)).toBeNull();
+  expect(await row.evaluate((r) => Math.round(r.getBoundingClientRect().bottom))).toBe(page.viewportSize()!.height);
   // Every declared slot but `close` (CSS-placed, never drawn in the row).
   const declared = LIVE.icons.filter((i) => i !== "close").length;
   expect(await row.locator(".fa-nav-icon").count()).toBeGreaterThanOrEqual(declared);
@@ -165,7 +167,7 @@ test("a railed page WITHOUT docs-ui.js draws the row — the link slots, at full
   const row = page.locator("nav.fa-nav .fa-nav-in > .fa-nav-icons");
   await expect(row).toHaveCount(1);
   await expect(row).toHaveAttribute("data-fa-row", "lite");
-  expect(await row.evaluate((r) => r.previousElementSibling?.className)).toBe("fa-nav-top");
+  expect(await row.evaluate((r) => r.nextElementSibling)).toBeNull();
   // Links, prefixed with the site base the SCRIPT was served under: this page
   // carries no `fa-baseurl` meta, which is the case the derivation is for.
   const hrefs = await row.locator("a.fa-nav-icon").evaluateAll((as) => as.map((a) => a.getAttribute("href")));
@@ -228,6 +230,11 @@ test("docs-ui.js running BEFORE the row script still ends with the full row", as
   await expect(row).toHaveCount(1);
 });
 
+/** The live row with Todos and Beans put back, linked: cat-harness's own row
+ *  dropped them on 2026-11-13, and a layer may still declare them (ihris
+ *  declares beans), so the badge is tested on a row that carries them. */
+const COUNTED = { ...LIVE, icons: [...LIVE.icons, "todos", "beans"], hrefs: { ...((LIVE as { hrefs?: Record<string, string> }).hrefs ?? {}), todos: "/todos/", beans: "/beans/" } };
+
 /* COUNT BADGES ON TODOS AND BEANS — bean `gkv6`. Owner, 2026-10-05: "why no
  * count on beans and todos on LHS top navbar as badges like fsh-guts has?".
  * Fetched from the `count.json` beside each index; drawn in the LITE row, so
@@ -236,7 +243,7 @@ test.describe("the Todos and Beans icons carry a live count badge (bean gkv6)", 
   const count = (id: string, n: number) => JSON.stringify({ tile: { [id]: { count: n, unit: id } } });
 
   test("the published counts are drawn, and the name says them", async ({ page }) => {
-    await serve(page, railedBare(LIVE), {
+    await serve(page, railedBare(COUNTED), {
       "/folio-assistant/assets/todos/count.json": count("todos", 3),
       "/folio-assistant/assets/beans/count.json": count("beans", 528),
     });
@@ -253,7 +260,7 @@ test.describe("the Todos and Beans icons carry a live count badge (bean gkv6)", 
   });
 
   test("nothing published is NO badge, and an unreadable file says '?' — never a made-up number", async ({ page }) => {
-    await serve(page, railedBare(LIVE), {
+    await serve(page, railedBare(COUNTED), {
       "/folio-assistant/assets/beans/count.json": "not json",
     });
     const row = page.locator("nav.fa-nav .fa-nav-icons");
@@ -281,7 +288,7 @@ test.describe("the count fetch survives a page that moves its own address (bean 
   test("a replaceState one level deeper still fetches the right count.json", async ({ page }) => {
     // At the END of <body>: the deferred scripts are already requested (their
     // URLs resolved) and have not run yet — the order the library page has.
-    const deeper = railedBare(LIVE).replace("</body>", '<script>history.replaceState(null, "", "deeper/than/before/")</script></body>');
+    const deeper = railedBare(COUNTED).replace("</body>", '<script>history.replaceState(null, "", "deeper/than/before/")</script></body>');
     const asked: string[] = [];
     page.on("request", (r) => { if (r.url().includes("count.json")) asked.push(new URL(r.url()).pathname); });
     await serve(page, deeper, {
@@ -292,4 +299,109 @@ test.describe("the count fetch survives a page that moves its own address (bean 
     await expect(beans.locator(".fa-nav-count")).toHaveText("528");
     expect(asked.sort()).toEqual(["/folio-assistant/assets/beans/count.json", "/folio-assistant/assets/todos/count.json"]);
   });
+});
+
+/* THE FOLIO AND HARNESSES ICONS — owner, 2026-11-13: "remove the folio purple
+ * tab at top instead add an icon to the controls for the folio. remove the
+ * harnesses navbar, instead add an icon to the controls to show the harnesses." */
+
+function railedWithHarnesses(row: unknown, shell = SHELL): string {
+  const html = injectRail(shell, {
+    instance: "WHO IRIS",
+    toRoot: "..",
+    links: [{ label: "Catalogue", href: "../cat-harness/catalogue/who-iris/" }],
+    harnesses: [{ label: "C@T Harness", href: "../cat-harness/" }, { label: "WHO IRIS", href: "../who-iris/" }],
+    navbarRow: row,
+  });
+  if (!html) throw new Error("injectRail declined the fixture");
+  return html;
+}
+
+for (const [name, html] of [
+  ["full (docs-ui.js)", () => railedWithHarnesses(LIVE)],
+  ["lite (no docs-ui.js)", () => railedWithHarnesses(LIVE, BARE)],
+] as const) {
+  test(`the Harnesses icon is IN the row and opens the harness list — ${name}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await serve(page, html());
+    const row = page.locator("nav.fa-nav .fa-nav-in > .fa-nav-icons");
+    const icon = row.locator("button.fa-nav-harnesses");
+    await expect(icon).toHaveCount(1);
+    // Last in the row, and no Harnesses disclosure left anywhere in the rail.
+    expect(await row.evaluate((r) => r.lastElementChild?.classList.contains("fa-nav-harnesses"))).toBe(true);
+    await expect(page.locator("nav.fa-nav details.fa-nav-group summary", { hasText: "Harnesses" })).toHaveCount(0);
+    await expect(icon).toHaveAttribute("aria-label", "Harnesses");
+    await expect(icon).toHaveAttribute("aria-expanded", "false");
+    const panel = page.locator("#fa-nav-harnesses");
+    await expect(panel).toBeHidden();
+    // Keyboard: focus it and press Enter; the list shows, with its links.
+    await icon.focus();
+    await page.keyboard.press("Enter");
+    await expect(icon).toHaveAttribute("aria-expanded", "true");
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('a[href="../cat-harness/"]')).toBeVisible();
+    // The panel sits above the row, inside the window.
+    const [p, r] = await Promise.all([panel.boundingBox(), row.boundingBox()]);
+    expect(p!.y + p!.height).toBeLessThanOrEqual(r!.y + 1);
+    expect(p!.y).toBeGreaterThanOrEqual(0);
+    // Escape closes it and gives focus back to the icon.
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(icon).toHaveAttribute("aria-expanded", "false");
+    await expect(icon).toBeFocused();
+  });
+}
+
+test("the Harnesses icon stays reachable where the layer declares no row", async ({ page }) => {
+  await serve(page, railedWithHarnesses(undefined));
+  await expect(page.locator("nav.fa-nav .fa-nav-icons")).toHaveCount(0);
+  const icon = page.locator("nav.fa-nav .fa-nav-bottom button.fa-nav-harnesses");
+  await expect(icon).toHaveCount(1);
+  await icon.click();
+  await expect(page.locator("#fa-nav-harnesses")).toBeVisible();
+});
+
+test("the Folio icon is in the row, the top tab is gone, and the icon opens and closes the glass", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await serve(page, railedWithHarnesses(LIVE));
+  const folio = page.locator("nav.fa-nav .fa-nav-icons button.fa-nav-folio");
+  await expect(folio).toHaveCount(1);
+  await expect(page.locator(".fa-glass-handle")).toHaveCount(1);
+  await expect(page.locator(".fa-glass-handle")).toBeHidden();
+  await expect(folio).toHaveAttribute("aria-label", /^Pull down your folio/);
+  await expect(folio).toHaveAttribute("aria-expanded", "false");
+  await folio.click();
+  await expect(page.locator(".fa-sticky-layer")).toHaveAttribute("data-fa-glass", "open");
+  await expect(folio).toHaveAttribute("aria-expanded", "true");
+  await expect(folio).toHaveAttribute("aria-label", "Put your folio away");
+  // The rail stays above the glass, so the same icon puts it away.
+  await folio.click();
+  await expect(page.locator(".fa-sticky-layer")).toHaveAttribute("data-fa-glass", "closed");
+  // Keyboard: open, then Escape returns focus to the icon, not the hidden tab.
+  await folio.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".fa-sticky-layer")).toHaveAttribute("data-fa-glass", "open");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".fa-sticky-layer")).toHaveAttribute("data-fa-glass", "closed");
+  await expect(folio).toBeFocused();
+});
+
+test("todos, beans and fsh-guts are not in cat-harness's row (owner, 2026-11-13)", async () => {
+  for (const gone of ["todos", "beans", "fsh-guts"]) expect(LIVE.icons).not.toContain(gone);
+});
+
+test("at phone width the row and its icons stay in the window", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await serve(page, railedWithHarnesses(LIVE));
+  await page.mouse.move(300, 400);
+  const boxes = await page.$$eval("nav.fa-nav .fa-nav-icons > *", (els) =>
+    els.map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; }));
+  expect(boxes.length).toBeGreaterThanOrEqual(3);
+  for (const b of boxes) {
+    expect(b.l).toBeGreaterThanOrEqual(0);
+    expect(b.r).toBeLessThanOrEqual(56);
+    expect(b.t).toBeGreaterThanOrEqual(0);
+    expect(b.b).toBeLessThanOrEqual(844);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
