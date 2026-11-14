@@ -1175,7 +1175,7 @@ export function fullTierCheck(s: GuardSnapshot): CheckResult {
   }
   const judges = [...latest.values()];
   if (judges.length === 0) {
-    return R(5, "ci", "refuse", "the full tier has not run on the head (no `No new failures` judge; only the fast tier, or nothing). `ready-to-merge` or `release` runs it");
+    return R(5, "ci", "refuse", "the full tier has not run on the head (no `No new failures` judge; only the fast tier, or nothing). the `release` label runs it (and `ready-to-merge` too, in a layer whose PR checks read the live labels; this repository's `pr-tests.yml` reads only `release`)");
   }
   const red = judges.filter((j) => j.status === "completed" && j.conclusion !== "success");
   if (red.length) return R(5, "ci", "refuse", `full-tier judge red: ${red.map((j) => `${j.name} (${j.conclusion})`).join(", ")}`, "defect");
@@ -1183,7 +1183,7 @@ export function fullTierCheck(s: GuardSnapshot): CheckResult {
   if (going.length) return R(5, "ci", "refuse", `full-tier judge not finished: ${going.map((j) => j.name).join(", ")}`);
   const ran = s.checkRuns.filter((c) => SHARD.test(c.name) && !judgedNothing(c) && c.status === "completed" && c.conclusion !== "cancelled");
   if (ran.length === 0) {
-    return R(5, "ci", "refuse", `the full tier has not run on the head: ${judges.map((j) => j.name).join(", ")} is green, but no test shard ran (the fast tier). \`ready-to-merge\` or \`release\` runs it`);
+    return R(5, "ci", "refuse", `the full tier has not run on the head: ${judges.map((j) => j.name).join(", ")} is green, but no test shard ran (the fast tier). the \`release\` label runs it (and \`ready-to-merge\` too, in a layer whose PR checks read the live labels; this repository's \`pr-tests.yml\` reads only \`release\`)`);
   }
   return R(5, "ci", "pass", `full tier green: ${judges.map((j) => j.name).join(", ")}, after ${ran.length} test shard(s) ran`);
 }
