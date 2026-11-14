@@ -167,6 +167,30 @@ describe("the extraction record says which steps ran", () => {
   });
 });
 
+describe("counts that say what the source holds (re-ingest pilot, 2026-11-14)", () => {
+  test("footnotes count only the notes a mark calls", () => {
+    const dir = join(tmp("fn-"), "e1");
+    put(dir, "footnotes.json", { footnotes: [{}], uncalled_notes: [{}, {}, {}], unlinked_marks: [{}] });
+    expect(observeExtraction(dir).footnotes).toMatchObject({ state: "found", count: 1 });
+    put(dir, "footnotes.json", { footnotes: [], uncalled_notes: [{}, {}], unlinked_marks: [{}] });
+    const p = observeExtraction(dir).footnotes!;
+    expect([p.state, p.count]).toEqual(["partial", undefined]);
+    expect(p.note).toContain("no footnote linked to a mark");
+    put(dir, "footnotes.json", { footnotes: [], uncalled_notes: [], unlinked_marks: [] });
+    expect(observeExtraction(dir).footnotes).toMatchObject({ state: "none", count: 0 });
+  });
+
+  test("a re-run over a promoted entry takes the artefacts over the entry's old record", () => {
+    const dir = join(tmp("rerun-"), "lib", "e1");
+    put(dir, "vector-figures.json", { figures: [vfig(3, "figure"), vfig(4, "figure")] });
+    recordExtraction(dir, "figures", { state: "partial", count: 1, tool: "old", at: "2026-11-01", note: "1 vector render not yet inspected" });
+    recordExtraction(dir, "references", { state: "found", count: 12, tool: "references-extract", at: "2026-11-12" });
+    const k = stagedRecord(dir, dir);
+    expect([k.figures?.state, k.figures?.count]).toEqual(["found", 2]);
+    expect(k.references?.count).toBe(12);
+  });
+});
+
 describe("L1 completeness reports extraction as advice, never as a failure", () => {
   test("a paged entry carries one advisory per kind and the requirements and verdict are unchanged", () => {
     const dir = join(tmp("adv-"), "e1");
