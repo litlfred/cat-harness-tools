@@ -612,7 +612,7 @@ export function viewerHtml(dataHref: string, scope = "", subjects: readonly stri
 .sc-page .uml-t { fill: var(--fa-uml-edge, #1b2432); font: 600 12px ui-monospace, Menlo, monospace; }
 .sc-page .uml-f { fill: var(--fa-uml-edge, #1b2432); font: 11px ui-monospace, Menlo, monospace; }
 .sc-page .uml-st { fill: #4a5568; font: 10px ui-monospace, Menlo, monospace; }
-${CLASS_DIAGRAM_CSS.replace(/^\./gm, ".sc-page .")}
+${CLASS_DIAGRAM_CSS.replace(/^([^{}\n]+)\{/gm, (_m: string, sel: string) => sel.split(",").map((x) => `.sc-page ${x.trim()}`).join(", ") + " {")}
 .sc-page .uml-e { stroke: var(--muted); fill: none; }
 .sc-page .uml-head { fill: var(--box); stroke: var(--muted); }
 .sc-page .uml-tip { fill: none; stroke: var(--muted); stroke-width: 1.4; }
