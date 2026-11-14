@@ -128,9 +128,16 @@ export const NodeViewCoverageSchema = z.object({
 export type NodeViewCoverage = z.infer<typeof NodeViewCoverageSchema>;
 
 /**
- * `node-view-coverage/v1` as a node kind, so `validators/node-view-coverage.json`
- * names a kind and `node-kinds:check` files the family under it rather than
- * grandfathering it as unkinded. Unversioned, as `QaScriptKind` is: the family
- * tag is `node-view-coverage/v1`, so `$schema` stays a field of the shape.
+ * `node-view-coverage/v1` as a node kind, for the `folio-validator/v1` node
+ * that will name it (`validators/node-view-coverage.json` in cat-harness), so
+ * `node-kinds:check` files the family under a kind rather than grandfathering
+ * it as unkinded. Unversioned, as `QaScriptKind` is: the family tag is
+ * `node-view-coverage/v1`, so `$schema` stays a field of the shape.
+ *
+ * NOT YET LISTED under `qa`'s `nodeSchemas`. Listing the family here and
+ * declaring its validator node in cat-harness must land together: each
+ * repository's CI reads the other at `main`, and either half alone is red
+ * (a listed family with no validator node; a validator node for an unlisted
+ * family). That pair is a separate, sequenced change.
  */
 export const NodeViewCoverageKind = nodeKind("node-view-coverage", [], NodeViewCoverageSchema.shape);
