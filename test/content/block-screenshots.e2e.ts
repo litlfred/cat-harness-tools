@@ -4,7 +4,8 @@
  * and one whose anchor is missing from the preview.
  */
 import { test, expect } from "@playwright/test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "../support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 

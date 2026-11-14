@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import { mkdtempSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "./support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";

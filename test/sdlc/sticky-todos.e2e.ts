@@ -13,7 +13,7 @@
  * test pinning that the two agree.
  */
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "../support/site-fs.ts";
 import { join } from "node:path";
 import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync } from "./support/site-fs.ts";
 import { join } from "node:path";
 import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { navbarHtml } from "../scripts/lib/navbar.ts";

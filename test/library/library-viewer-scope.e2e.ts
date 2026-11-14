@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "../support/site-fs.ts";
 import { dirname, join } from "node:path";
 
 import { test, expect, type Page } from "@playwright/test";

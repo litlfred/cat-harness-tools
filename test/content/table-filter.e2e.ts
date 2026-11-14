@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "../support/site-fs.ts";
 import { join } from "node:path";
 import { AxeBuilder } from "@axe-core/playwright";
 import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";

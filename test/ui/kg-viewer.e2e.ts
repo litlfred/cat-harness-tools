@@ -14,7 +14,8 @@
  * @module test/kg-viewer.e2e
  */
 import { test, expect } from "@playwright/test";
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync } from "../support/site-fs.ts";
 import { join } from "node:path";
 
 import { artefactStubFor } from "../../schemas/kg/cat-harness.js";

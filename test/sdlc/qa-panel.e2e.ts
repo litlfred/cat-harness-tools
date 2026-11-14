@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "../support/site-fs.ts";
 import { join } from "node:path";
 
 import { applyVerdicts, sidecar, sidecarWithVerdicts } from "../support/qa-fixture.js";

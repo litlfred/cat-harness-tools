@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "../support/site-fs.ts";
 import { fileURLToPath } from "node:url";
 
 /**

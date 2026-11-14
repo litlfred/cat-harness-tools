@@ -28,7 +28,7 @@
  * not caught here; `bun run cat preview:site` is the check for that.
  */
 import { test, expect, type Page } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "./support/site-fs.ts";
 import { join, resolve } from "node:path";
 import { Liquid } from "liquidjs";
 import { AxeBuilder } from "@axe-core/playwright";

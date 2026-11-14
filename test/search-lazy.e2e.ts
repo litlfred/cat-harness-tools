@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "./support/site-fs.ts";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import { Liquid } from "liquidjs";

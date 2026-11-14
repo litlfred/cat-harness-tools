@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "../support/site-fs.ts";
 import { join } from "node:path";
 
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";

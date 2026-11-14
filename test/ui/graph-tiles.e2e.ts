@@ -28,7 +28,7 @@
  * than left to the absence of code.
  */
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "../support/site-fs.ts";
 import { join } from "node:path";
 
 import { siteFileFor } from "../../schemas/kg/cat-harness.ts";

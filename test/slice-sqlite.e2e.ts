@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, linkOverlay, readFileSync, readdirSync } from "./support/site-fs.ts";
 import { createServer } from "node:net";
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -73,15 +74,15 @@ const freePort = () => new Promise<number>((resolve, reject) => {
 
 test.beforeAll(async () => {
   site = mkdtempSync(join(tmpdir(), "q8ar-site-"));
-  for (const e of readdirSync(DOCS)) if (e !== "assets" && e !== "payload") symlinkSync(join(DOCS, e), join(site, e));
+  for (const e of readdirSync(DOCS)) if (e !== "assets" && e !== "payload") linkOverlay(join(DOCS, e), join(site, e));
   mkdirSync(join(site, "assets"));
-  for (const e of readdirSync(join(DOCS, "assets"))) if (e !== "slices") symlinkSync(join(DOCS, "assets", e), join(site, "assets", e));
+  for (const e of readdirSync(join(DOCS, "assets"))) if (e !== "slices") linkOverlay(join(DOCS, "assets", e), join(site, "assets", e));
   // The committed KG payloads, which the `kg` slice points at, are COPIED in
   // as links one by one, so the deploy payloads can be written beside them.
   const payloads = join(site, "payload", "sha256");
   mkdirSync(payloads, { recursive: true });
   const committed = join(DOCS, "payload", "sha256");
-  if (existsSync(committed)) for (const f of readdirSync(committed)) symlinkSync(join(committed, f), join(payloads, f));
+  if (existsSync(committed)) for (const f of readdirSync(committed)) linkOverlay(join(committed, f), join(payloads, f));
   execFileSync("bun", [
     "run", join(TOOLS_ROOT, "scripts", "gen-slice-sqlite.ts"),
     "--out", join(site, "assets", "slices"),

@@ -24,7 +24,7 @@
  * a frame that stays above the dock. That is asserted as such, not hidden.
  */
 import { test, expect, type Page } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "./support/site-fs.ts";
 import { join } from "node:path";
 
 import { siteFileFor } from "../schemas/kg/cat-harness.ts";
