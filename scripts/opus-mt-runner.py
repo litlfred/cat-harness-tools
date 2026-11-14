@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-opus-mt-runner — the local OPUS-MT runner `translate-pot.ts --engine opus-mt`
+opus-mt-runner — the local OPUS-MT runner `translation-candidates.ts --engine opus-mt`
 calls. Helsinki-NLP Marian models (CC-BY 4.0), run on this machine; nothing is
 sent to a translation service.
 
-    bun run cat translation:machine-fill --instance <layer> \
+    bun run cat translation:candidates --instance <layer> \
       --engine opus-mt        (this runner is the default for --engine opus-mt)
 
 Reads ONE JSON request on stdin and writes ONE JSON response on stdout:
