@@ -95,3 +95,13 @@ Feature: Re-ingestion extraction coverage
     Given a references arm that throws and a glossary arm that finds seven terms
     When the arms run
     Then references are not extracted with the error and glossary is found 7
+
+  @test:scripts/tests/library/reingest-extraction.test.ts::counts_that_say_what_the_source_holds_(re-ingest_pilot,_2026-11-14)::footnotes_count_only_the_notes_a_mark_calls
+  Scenario: Footnotes are the notes a mark calls
+    When the footnote arm links some notes to marks and keeps other foot-of-page lines
+    Then the count is the linked notes; with none linked and lines left over, the step is partial with no count
+
+  @test:scripts/tests/library/reingest-extraction.test.ts::counts_that_say_what_the_source_holds_(re-ingest_pilot,_2026-11-14)::a_re-run_over_a_promoted_entry_takes_the_artefacts_over_the_entry's_old_record
+  Scenario: Re-running the record over a promoted entry
+    When the record is rebuilt in the entry it describes after its sidecars changed
+    Then each kind the artefacts show is taken from them, and the kinds they do not show keep their record
