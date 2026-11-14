@@ -51,7 +51,7 @@ import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { officialityFindings, readLocale } from "./check-translation-officiality.ts";
 import { poHeader } from "./kg-viewer-strings.ts";
 import { reviewBody, reviewLayer, type ReviewLayer } from "./lib/translation-review-page.ts";
-import { ADJUDICATION_FENCE_INFO, ADJUDICATION_LABEL, ADJUDICATION_SCHEMA, ADJUDICATION_TITLE_PREFIX, MAX_ISSUE_URL } from "./lib/translation-adjudication.ts";
+import { ADJUDICATION_FENCE_INFO, ADJUDICATION_LABEL, CANDIDATES_SCHEMA, CANDIDATES_SUFFIX, ADJUDICATION_SCHEMA, ADJUDICATION_TITLE_PREFIX, MAX_ISSUE_URL } from "./lib/translation-adjudication.ts";
 import { criteriaAttestationsHome } from "../schemas/sdlc/qa-attestations.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
@@ -719,6 +719,8 @@ export function reviewProjection(layers: ReviewLayer[], statusPage: string): str
         titlePrefix: ADJUDICATION_TITLE_PREFIX,
         fence: ADJUDICATION_FENCE_INFO,
         maxUrl: MAX_ISSUE_URL,
+        candidatesSchema: CANDIDATES_SCHEMA,
+        candidatesSuffix: CANDIDATES_SUFFIX,
       },
       layers,
     },
