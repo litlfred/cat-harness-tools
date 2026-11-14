@@ -15,11 +15,14 @@ import {
   forbidsMachineFill,
   libreTranslateEngine,
   libreTranslateUrlProblem,
+  maskPlaceholders,
   opusMtEngine,
   opusMtModel,
   placeholderProblem,
   placeholders,
+  poFromPot,
   splitWhitespace,
+  unmaskPlaceholders,
   type MtEngine,
 } from "../lib/machine-translation.ts";
 import { poEntries } from "../lib/translation-adjudication.ts";
@@ -108,6 +111,37 @@ describe("placeholder guard", () => {
 
   test("surrounding whitespace is cut off and kept", () => {
     expect(splitWhitespace("  x y\n")).toEqual({ lead: "  ", core: "x y", trail: "\n" });
+  });
+});
+
+describe("masking", () => {
+  test("placeholders become numbered stand-ins and come back", () => {
+    const { masked, tokens } = maskPlaceholders("Run `ls` on <a0>{name}</a0>");
+    expect(masked).toBe("Run [0] on [1][2][3]");
+    expect(unmaskPlaceholders("Ejecuta [0] en [1][2][3]", tokens)).toBe("Ejecuta `ls` en <a0>{name}</a0>");
+    expect(unmaskPlaceholders("Ejecuta [ 0 ] en [1][2][3]", tokens)).toBe("Ejecuta `ls` en <a0>{name}</a0>");
+  });
+
+  test("the source's own bracketed numbers are not taken as stand-ins", () => {
+    const { masked, tokens } = maskPlaceholders("See [0] and {x}");
+    expect(masked).toBe("See [0] and [1]");
+    expect(unmaskPlaceholders("Ver [0] y [1]", tokens)).toBe("Ver [0] y {x}");
+  });
+
+  test("a dropped or duplicated stand-in is still caught by the guard", () => {
+    const { tokens } = maskPlaceholders("Open {name}");
+    expect(placeholderProblem("Open {name}", unmaskPlaceholders("Abrir", tokens))).toContain("lost");
+    expect(placeholderProblem("Open {name}", unmaskPlaceholders("Abrir [0] [0]", tokens))).toContain("do not round-trip");
+  });
+});
+
+describe("starting a catalogue", () => {
+  test("the template's header gains the locale and says unofficial; msgstr stays empty", () => {
+    const pot = `# template\nmsgid ""\nmsgstr ""\n"Project-Id-Version: x\\n"\n"Language: \\n"\n\nmsgid "Hi"\nmsgstr ""\n`;
+    const po = poFromPot(pot, "ru");
+    expect(po).toContain('"Project-Id-Version: x\\n"\n"Language: ru\\n"\n"X-Folio-Official: no\\n"\n\nmsgid "Hi"\nmsgstr ""');
+    expect(po.match(/Language:/g)).toHaveLength(1);
+    expect(() => poFromPot('msgid "Hi"\nmsgstr ""\n', "ru")).toThrow("no header");
   });
 });
 
@@ -236,7 +270,7 @@ describe("translateLayer", () => {
     expect(readFileSync(join(root, "translations", "fr", "kg.po"), "utf-8")).toBe(`# DO NOT MACHINE-FILL THIS FILE.\n${PO}`);
     expect(potOnly).toEqual(["fr/b.pot"]);
     // The engine saw cores only, never the surrounding whitespace.
-    expect(engine.calls.flat()).toContain("Run %(cmd)s in <a0>the shell</a0>.");
+    expect(engine.calls.flat()).toContain("Run [0] in [1]the shell[2].");
   });
 
   test("an official node is not filled, and a dry run writes nothing", async () => {
@@ -253,6 +287,33 @@ describe("translateLayer", () => {
     const r2 = await translateLayer({ root, translations: "translations", engine: fakeEngine(), locales: ["es"], dryRun: true, now });
     expect(r2.reports[0]!.filled).toBe(4);
     expect(readFileSync(join(root, "translations", "es", "start", "a.po"), "utf-8")).toBe(poBefore);
+  });
+
+  test("--init starts a .po from a template that has none, and fills it", async () => {
+    const root = layer();
+    const without = await translateLayer({ root, translations: "translations", engine: fakeEngine(), locales: ["fr"], now });
+    expect(without.potOnly).toEqual(["fr/b.pot"]);
+    const { reports, potOnly } = await translateLayer({ root, translations: "translations", engine: fakeEngine(), locales: ["fr"], init: true, now });
+    expect(potOnly).toEqual([]);
+    const b = reports.find((r) => r.catalogue === "b")!;
+    expect(b.initialised).toBe(true);
+    expect(b.nodeCreated).toBe(true);
+    const po = readFileSync(join(root, "translations", "fr", "b.po"), "utf-8");
+    expect(po).toContain('"Language: fr\\n"');
+    expect(po).toContain('"X-Folio-Official: no\\n"');
+    // The template carried translations; the started catalogue keeps them (never overwrite) and fills the empty ones.
+    expect(po).toContain('msgstr "Hola, ya traducido"');
+    expect(po).toContain('#, fuzzy\nmsgid "Open {name} now"\nmsgstr "ES:Open {name} now"');
+  });
+
+  test("the engine is sent masked text unless told not to", async () => {
+    const root = layer();
+    const masked = fakeEngine();
+    await translateLayer({ root, translations: "translations", engine: masked, locales: ["es"], dryRun: true, now });
+    expect(masked.calls.flat()).toContain("Run [0] in [1]the shell[2].");
+    const plain = fakeEngine();
+    await translateLayer({ root, translations: "translations", engine: plain, locales: ["es"], dryRun: true, mask: false, now });
+    expect(plain.calls.flat()).toContain("Run %(cmd)s in <a0>the shell</a0>.");
   });
 
   test("a missing node is created (and validates), unless told not to", async () => {

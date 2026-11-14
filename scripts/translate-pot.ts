@@ -15,7 +15,9 @@
  * <catalogue>` (e.g. `start/contributing`) · `--batch <n>` strings per engine
  * call (default 16) · `--model <id>` to override the recorded model ·
  * `--no-create-node` to skip a catalogue with no translation node instead of
- * writing one · `--dry-run` to translate and report without writing.
+ * writing one · `--init` to start a `.po` from each template that has none ·
+ * `--no-mask` to send placeholders to the engine as they are ·
+ * `--dry-run` to translate and report without writing.
  *
  * For each `<locale>/<name>.po` with a `<name>.pot` beside it, in the layer's
  * declared `translation-sources` directory, this fills only `msgstr ""`
@@ -24,8 +26,10 @@
  * are in `scripts/lib/machine-translation.ts`. A catalogue is NOT filled when
  * it says `DO NOT MACHINE-FILL`, or when its node is already official.
  *
- * A POT with no `.po` beside it is reported, not initialised: starting a
- * catalogue is a translator's decision (`msginit`), not this step's.
+ * A POT with no `.po` beside it is reported and left alone, unless `--init`
+ * is given: then the `.po` is started from the template (`poFromPot`: the
+ * locale named, `X-Folio-Official: no`, every `msgstr` empty) and filled like
+ * any other. Starting a catalogue is a decision, so it is never the default.
  *
  * Exit 0 something was filled (or would be, with `--dry-run`) · 3 nothing was
  * · 2 could not determine (no declaration, bad options) · 1 the engine failed.
@@ -44,8 +48,11 @@ import {
   generatorOf,
   libreTranslateEngine,
   machineNodeStatus,
+  maskPlaceholders,
   opusMtEngine,
+  poFromPot,
   splitWhitespace,
+  unmaskPlaceholders,
   type CommandRunner,
   type MtEngine,
   type Skipped,
@@ -96,6 +103,8 @@ export interface CatalogueReport {
   /** Why the whole catalogue was not filled. */
   refused?: string;
   nodeCreated?: boolean;
+  /** The `.po` was started from its template by this run (`--init`). */
+  initialised?: boolean;
 }
 
 export interface RunOptions {
@@ -107,6 +116,10 @@ export interface RunOptions {
   only?: string;
   batch?: number;
   createNode?: boolean;
+  /** Start a `.po` from each template that has none. */
+  init?: boolean;
+  /** Mask placeholders before translation (default true). */
+  mask?: boolean;
   dryRun?: boolean;
   now?: () => Date;
   log?: (s: string) => void;
@@ -123,23 +136,36 @@ export async function translateLayer(o: RunOptions): Promise<{ reports: Catalogu
   for (const locale of locales) {
     const ldir = join(tdir, locale);
     if (!existsSync(ldir)) continue;
-    // POTs with no .po beside them: reported, never initialised.
+    // POTs with no .po beside them: reported, and started only with `--init`.
+    const fresh = new Set<string>();
     const walkPot = (d: string) => {
       for (const n of readdirSync(d).sort()) {
         const p = join(d, n);
         if (statSync(p).isDirectory()) walkPot(p);
-        else if (n.endsWith(".pot") && !existsSync(p.slice(0, -1))) potOnly.push(`${locale}/${relative(ldir, p).split(sep).join("/")}`);
+        else if (n.endsWith(".pot") && !existsSync(p.slice(0, -1))) {
+          const name = relative(ldir, p).slice(0, -4).split(sep).join("/");
+          if (o.init) fresh.add(name);
+          else potOnly.push(`${locale}/${name}.pot`);
+        }
       }
     };
     walkPot(ldir);
-    for (const catalogue of catalogues(ldir)) {
+    for (const catalogue of [...new Set([...catalogues(ldir), ...fresh])].sort()) {
       if (o.only !== undefined && catalogue !== o.only) continue;
       const poPath = join(ldir, `${catalogue}.po`);
       const potPath = join(ldir, `${catalogue}.pot`);
       if (!existsSync(potPath)) continue; // a hand-authored catalogue (a glossary): no template, not a pair
       const report: CatalogueReport = { catalogue, locale, filled: 0, skipped: [] };
       reports.push(report);
-      const po = readFileSync(poPath, "utf-8");
+      const initialised = fresh.has(catalogue);
+      if (initialised) report.initialised = true;
+      let po: string;
+      try {
+        po = initialised ? poFromPot(readFileSync(potPath, "utf-8"), locale) : readFileSync(poPath, "utf-8");
+      } catch (e) {
+        report.refused = `could not start the catalogue: ${(e as Error).message}`;
+        continue;
+      }
       if (forbidsMachineFill(po)) {
         report.refused = "the catalogue says DO NOT MACHINE-FILL";
         continue;
@@ -171,9 +197,10 @@ export async function translateLayer(o: RunOptions): Promise<{ reports: Catalogu
       const size = Math.max(1, o.batch ?? 16);
       for (let i = 0; i < candidates.length; i += size) {
         const cores = candidates.slice(i, i + size).map((c) => splitWhitespace(c.msgid).core);
-        const out = await o.engine.translate(cores, SOURCE_LOCALE, locale);
+        const masks = cores.map((c) => (o.mask === false ? { masked: c, tokens: new Map<string, string>() } : maskPlaceholders(c)));
+        const out = await o.engine.translate(masks.map((m) => m.masked), SOURCE_LOCALE, locale);
         if (out.length !== cores.length) throw new Error(`${o.engine.name}: ${out.length} strings back for ${cores.length} sent`);
-        translated.push(...out);
+        translated.push(...out.map((t, k) => unmaskPlaceholders(t, masks[k]!.tokens)));
       }
       const applied = applyTranslations(po, candidates, translated);
       report.filled = applied.filled;
@@ -205,7 +232,7 @@ export async function translateLayer(o: RunOptions): Promise<{ reports: Catalogu
         writeFileSync(poPath, applied.text);
         writeFileSync(nodePath, `${JSON.stringify(nextNode, null, 2)}\n`);
       }
-      log(`  ${locale}/${catalogue}: ${applied.filled} filled (fuzzy)${report.nodeCreated ? ", node created" : ""}`);
+      log(`  ${locale}/${catalogue}: ${applied.filled} filled (fuzzy)${report.initialised ? ", catalogue started" : ""}${report.nodeCreated ? ", node created" : ""}`);
     }
   }
   return { reports, potOnly };
@@ -250,6 +277,8 @@ async function main(): Promise<number> {
       ...(arg("--only") ? { only: arg("--only")! } : {}),
       batch: Number(arg("--batch") ?? 16),
       createNode: !process.argv.includes("--no-create-node"),
+      init: process.argv.includes("--init"),
+      mask: !process.argv.includes("--no-mask"),
       dryRun,
       log: (s) => console.log(s),
     });

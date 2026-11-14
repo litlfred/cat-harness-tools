@@ -29,6 +29,9 @@
  *      code spans, link targets and URLs are compared as multisets, along with
  *      the number of line breaks. A string that does not round-trip is left
  *      EMPTY and reported, never "repaired".
+ *      Before translation the placeholders are MASKED as `[0]`, `[1]`, … and
+ *      restored after ({@link maskPlaceholders}), so an engine has no reason
+ *      to translate them; the check runs on the restored text all the same.
  *   4. **Surrounding whitespace is kept**: it is cut off before translation and
  *      put back after, so the engine never sees it.
  *   5. **The node records the machine** ({@link machineNodeStatus}):
@@ -98,6 +101,67 @@ export function splitWhitespace(s: string): { lead: string; core: string; trail:
   const rest = s.slice(lead.length);
   const trail = /\s*$/.exec(rest)![0];
   return { lead, core: rest.slice(0, rest.length - trail.length), trail };
+}
+
+// ── Masking ──────────────────────────────────────────────────────────────
+
+/**
+ * Replace every placeholder with a numbered stand-in, `[0]`, `[1]`, …, so the
+ * engine sees plain text it has no reason to translate. A number whose
+ * stand-in already occurs in the text is skipped, so restoring never touches
+ * the source's own brackets.
+ *
+ * Masking only raises how many strings get through; it proves nothing. The
+ * restored text still goes through {@link placeholderProblem}, so an engine
+ * that drops, duplicates or rewrites a stand-in leaves the string empty.
+ */
+export function maskPlaceholders(s: string): { masked: string; tokens: Map<string, string> } {
+  const tokens = new Map<string, string>();
+  let n = 0;
+  const masked = s.replace(TOKEN, (t) => {
+    while (s.includes(`[${n}]`)) n++;
+    const key = `[${n++}]`;
+    tokens.set(key, t);
+    return key;
+  });
+  return { masked, tokens };
+}
+
+/** Put the placeholders back. Tolerates the spaces an engine may add inside a stand-in (`[ 0 ]`). */
+export function unmaskPlaceholders(s: string, tokens: Map<string, string>): string {
+  if (tokens.size === 0) return s;
+  return s.replace(/\[\s*(\d+)\s*\]/g, (m, d: string) => tokens.get(`[${d}]`) ?? m);
+}
+
+// ── Starting a catalogue ─────────────────────────────────────────────────
+
+/**
+ * A new `.po` for `locale`, from its template: the POT's text with the header
+ * naming the locale and declaring itself unofficial (`X-Folio-Official: no`,
+ * read by `check-translation-officiality.ts`). Every `msgstr` stays as the
+ * template has it, which is empty.
+ */
+export function poFromPot(pot: string, locale: string): string {
+  const lines = pot.split("\n");
+  const header = poHeaderRange(lines);
+  if (!header) throw new Error("the template has no header entry (msgid \"\")");
+  const [from, to] = header;
+  const body = lines.slice(from, to).filter((l) => !/^"(Language|X-Folio-Official):/.test(l));
+  const extra = [`"Language: ${locale}\\n"`, `"X-Folio-Official: no\\n"`];
+  return [...lines.slice(0, from), ...body, ...extra, ...lines.slice(to)].join("\n");
+}
+
+/** Lines `[start, end)` of the header's `msgstr` continuation strings. */
+function poHeaderRange(lines: string[]): [number, number] | undefined {
+  for (let i = 0; i < lines.length - 1; i++) {
+    if (lines[i] === 'msgid ""' && /^msgstr ""\s*$/.test(lines[i + 1]!)) {
+      let k = i + 2;
+      while (k < lines.length && lines[k]!.startsWith('"')) k++;
+      return [i + 2, k];
+    }
+    if (lines[i]!.startsWith("msgid ") && lines[i] !== 'msgid ""') return undefined;
+  }
+  return undefined;
 }
 
 // ── What to fill ─────────────────────────────────────────────────────────
