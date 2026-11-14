@@ -9,7 +9,20 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { LAYER_OUTPUT_ROOT, mountedInstances, outputPathFor, outputTwinOf, readPathAt, readPathFor, writePathAt } from "../lib/layer-output.js";
+import {
+  LAYER_OUTPUT_ROOT,
+  checkoutRoot,
+  clearMountedCache,
+  mountedInstances,
+  outputPathFor,
+  outputTwinOf,
+  overlayPath,
+  readPathAt,
+  readPathFor,
+  writePathAt,
+} from "../lib/layer-output.js";
+import { movedInventory } from "../qa-verify-moved.js";
+import { overlayEntries } from "../qa-store.js";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -134,5 +147,81 @@ describe("derive-at-publish built() — an artefact of a mounted layer built at 
     }
     expect(built(file, root)).toBe(true);
     expect(built(dir, root)).toBe(true);
+  });
+});
+
+describe("overlayPath (step 5: the QA readers)", () => {
+  test("the checkout is the nearest directory holding .git, not a mount carrying its own lock", () => {
+    const root = checkout(LOCK);
+    mkdirSync(join(root, ".git"));
+    mkdirSync(join(root, "lower", "test"), { recursive: true });
+    writeFileSync(join(root, "lower", "index.lock.json"), "{}");
+    expect(checkoutRoot(join(root, "lower", "test"))).toBe(root);
+  });
+
+  test("outside a checkout the path is unchanged", () => {
+    expect(overlayPath("/x/lower/test/results/a.json", undefined)).toBe("/x/lower/test/results/a.json");
+  });
+
+  test("reads the computed twin over the pinned bytes, and the mount when there is none", () => {
+    clearMountedCache();
+    const root = checkout(LOCK);
+    const pinned = join(root, "lower", "test", "results", "a.qa-results.json");
+    expect(overlayPath(pinned, root)).toBe(pinned);
+    const twin = join(root, LAYER_OUTPUT_ROOT, "lower", "test", "results", "a.qa-results.json");
+    mkdirSync(join(twin, ".."), { recursive: true });
+    writeFileSync(twin, "{}");
+    expect(overlayPath(pinned, root)).toBe(twin);
+  });
+
+  test("an unparseable lock: a reader falls back to the pinned path", () => {
+    clearMountedCache();
+    const root = checkout("{ not json");
+    const p = join(root, "lower", "x.json");
+    expect(overlayPath(p, root)).toBe(p);
+  });
+});
+
+describe("the QA inventory and publish see the overlay (step 5)", () => {
+  function composed(): string {
+    clearMountedCache();
+    const root = checkout(LOCK);
+    const res = join(root, "lower", "test", "results");
+    mkdirSync(res, { recursive: true });
+    writeFileSync(join(res, "pinned.json"), "1");
+    writeFileSync(join(res, "both.json"), "old");
+    const out = join(root, LAYER_OUTPUT_ROOT, "lower", "test", "results", "sub");
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, "computed.json"), "22");
+    writeFileSync(join(out, "..", "both.json"), "newer");
+    return root;
+  }
+
+  test("movedInventory is the union, keyed by the layer's own path, the output root winning", () => {
+    const root = composed();
+    const inv = movedInventory(root, ["lower/test/results"]);
+    expect(inv.directories[0]!.files).toEqual([
+      { path: "lower/test/results/both.json", bytes: 5, at: `${LAYER_OUTPUT_ROOT}/lower/test/results/both.json` },
+      { path: "lower/test/results/pinned.json", bytes: 1 },
+      { path: "lower/test/results/sub/computed.json", bytes: 2, at: `${LAYER_OUTPUT_ROOT}/lower/test/results/sub/computed.json` },
+    ]);
+    expect(inv.files).toBe(3);
+  });
+
+  test("overlayEntries names each computed file at its logical path", () => {
+    const root = composed();
+    expect(overlayEntries(root, ["lower/test/results"])).toEqual([
+      { path: "lower/test/results/both.json", at: `${LAYER_OUTPUT_ROOT}/lower/test/results/both.json` },
+      { path: "lower/test/results/sub/computed.json", at: `${LAYER_OUTPUT_ROOT}/lower/test/results/sub/computed.json` },
+    ]);
+  });
+
+  test("with nothing mounted, both are what they were", () => {
+    clearMountedCache();
+    const root = checkout();
+    mkdirSync(join(root, "own", "test", "results"), { recursive: true });
+    writeFileSync(join(root, "own", "test", "results", "a.json"), "x");
+    expect(movedInventory(root, ["own/test/results"]).directories[0]!.files).toEqual([{ path: "own/test/results/a.json", bytes: 1 }]);
+    expect(overlayEntries(root, ["own/test/results"])).toEqual([]);
   });
 });

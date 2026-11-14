@@ -81,6 +81,7 @@ import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { TreeStore } from "./branch-store.js";
 import { inputSiteReached, qaRefLine, quietly } from "../schemas/sdlc/input-trace.ts";
+import { mountedInstancesCached, outputTwinOf } from "./lib/layer-output.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -874,6 +875,34 @@ function defaultSleep(ms: number): void {
 }
 
 /**
+ * The files under each root's layer output root, as `{ path, at }`: `path`
+ * the layer's own (the entry key), `at` where the bytes are, both relative to
+ * `repoRoot`. Empty when nothing is mounted, or no writer wrote there.
+ */
+export function overlayEntries(repoRoot: string, roots: readonly string[]): { path: string; at: string }[] {
+  let mounted: Map<string, string>;
+  try {
+    mounted = mountedInstancesCached(repoRoot);
+  } catch {
+    return [];
+  }
+  if (mounted.size === 0) return [];
+  const out: { path: string; at: string }[] = [];
+  for (const root of roots) {
+    const twin = outputTwinOf(repoRoot, join(repoRoot, root), mounted);
+    if (twin === undefined || !existsSync(twin) || !statSync(twin).isDirectory()) continue;
+    for (const f of readdirSync(twin, { recursive: true, withFileTypes: true })) {
+      if (!f.isFile()) continue;
+      const parent = (f as { parentPath?: string; path?: string }).parentPath ?? (f as { path?: string }).path ?? twin;
+      const abs = join(parent, f.name);
+      const rel = relative(twin, abs).split("\\").join("/");
+      out.push({ path: `${root.replace(/\/+$/, "")}/${rel}`, at: relative(repoRoot, abs).split("\\").join("/") });
+    }
+  }
+  return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
  * Build the entry tree for `roots` through a private index (spike finding 3).
  * Never touches the checkout's index or object store.
  */
@@ -891,6 +920,20 @@ function buildEntry(
     // -f: once `test/results/` is .gitignored (when `storage` is set) the
     // working copy is ignored by design, and it is still what gets published.
     store.must([`--work-tree=${repoRoot}`, "add", "-f", "--", ...roots], { env, cwd: repoRoot });
+    // A mounted layer's computed results are under its output root
+    // (`build/layers/<instance>/`, bean `cat-tools-sm8r` item 4). They are
+    // published at the layer's own path, over whatever the mount pins there,
+    // so the entry is keyed exactly as before the move.
+    const overlay = overlayEntries(repoRoot, roots);
+    if (overlay.length) {
+      const ids = store
+        .must(["hash-object", "-w", "--stdin-paths"], { input: overlay.map((o) => o.at).join("\n") + "\n", cwd: repoRoot })
+        .trim()
+        .split("\n");
+      if (ids.length !== overlay.length) throw new Error(`git hash-object returned ${ids.length} ids for ${overlay.length} overlay paths`);
+      const info = overlay.map((o, i) => `100644 ${ids[i]}\t${o.path}`).join("\n") + "\n";
+      store.must(["update-index", "--add", "--index-info"], { env, input: info });
+    }
     const payload = store.must(["write-tree"], { env }).trim();
     const listing = store.must(["ls-tree", "-r", "-l", "-z", payload]);
     let files = 0;
