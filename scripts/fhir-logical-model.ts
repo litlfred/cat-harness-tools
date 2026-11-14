@@ -113,7 +113,7 @@ export function readFhirLogicalModel(text: string, moduleRel: string): ClassMode
   } catch (e) {
     return { decls: [undetermined(moduleRel, lastSegment(moduleRel).replace(/\.json$/, ""), `not valid JSON: ${(e as Error).message}`.slice(0, 120))], refs: [], edges: [] };
   }
-  if (isFhirProfile(sd)) return readFhirProfile(sd, moduleRel);
+  if (isFhirProfile(sd)) return withRelease(readFhirProfile(sd, moduleRel), sd);
   if (!isFhirLogicalModel(sd)) return { decls: [], refs: [], edges: [] };
   const name = typeof sd.name === "string" && sd.name ? sd.name : typeof sd.id === "string" ? sd.id : lastSegment(moduleRel);
   const canonical = typeof sd.url === "string" ? sd.url : undefined;
@@ -271,7 +271,26 @@ export function readFhirLogicalModel(text: string, moduleRel: string): ClassMode
     parent.fields.push(field);
   }
   for (const d of decls.values()) d.external = [...new Set([...d.external, ...(externals.get(d.id) ?? [])])].sort();
-  return { decls: [...decls.values()], refs, edges, ...(summary ? { summary } : {}) };
+  return withRelease({ decls: [...decls.values()], refs, edges, ...(summary ? { summary } : {}) }, sd);
+}
+
+/**
+ * Stamp each reference with the FHIR version its model is written against
+ * (`fhirVersion`), so a core type resolves against THAT release's definition
+ * (bean `cat-tools-t6fz`): `Patient` in R4 and in R5 are different classes.
+ */
+function withRelease(read: ClassModelRead, sd: Json): ClassModelRead {
+  if (typeof sd.fhirVersion === "string") for (const r of read.refs) r.fhirVersion = sd.fhirVersion;
+  return read;
+}
+
+/** The fhir-core release directory a `fhirVersion` belongs to: 4.0.x → r4, 4.3.x → r4b, 5.0.x → r5. */
+export function fhirCoreRelease(fhirVersion: string | undefined): "r4" | "r4b" | "r5" | undefined {
+  if (!fhirVersion) return undefined;
+  if (/^4\.0\./.test(fhirVersion)) return "r4";
+  if (/^4\.3\./.test(fhirVersion)) return "r4b";
+  if (/^5\.0\./.test(fhirVersion)) return "r5";
+  return undefined;
 }
 
 function undetermined(moduleRel: string, name: string, note: string): SchemaDecl {
