@@ -25,6 +25,7 @@ import {
   blockId,
   candidateMeta,
   candidateTypes,
+  candidateTypesSeen,
   ingestRungOf,
   RUNG_INPUT,
   buildEntryNodes,
@@ -35,6 +36,7 @@ import {
   unknownArgument,
 } from "../../pipeline/gen-library-jsonld";
 import { CONTENT_CONTEXT } from "../../schemas/kg/jsonld.ts";
+import { ContributionRegistry } from "../../schemas/content/contributions.ts";
 import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import { STANDARD_PREFIXES, contextBindings, vocabMapping } from "../../schemas/content/vocab-mapping.ts";
 import { manifestLicence } from "../../schemas/library/source-licence.ts";
@@ -769,6 +771,30 @@ describe("a candidate's @type (cat-harness-tools#1356)", () => {
     // A core kind keeps its own pair.
     expect(candidateTypes("theorem").length).toBeGreaterThan(0);
     expect(candidateTypes("theorem")).not.toContain("cat-harness:Block");
+  });
+
+  // In an index that mounts a layer ABOVE a library's, that layer's kinds
+  // typed the library's nodes, while the library's own checkout wrote
+  // `cat-harness:Block`; the committed nodes matched only one of the two.
+  const upper = new ContributionRegistry();
+  upper.register({
+    name: "upper",
+    blockKinds: [
+      { kind: "fixture-indicator", adapter: "fixture", builder: "fixtureIndicator", labelPrefix: "fxi", folioType: "upper:Indicator" },
+    ],
+  } as never);
+
+  test("a kind contributed by a layer the library's layer does not need does not type its nodes", () => {
+    expect(candidateTypesSeen("fixture-indicator", upper, new Set(["lower", "core"]))).toEqual(["cat-harness:Block"]);
+  });
+
+  test("a kind contributed by the library's own layer or one it needs types its nodes", () => {
+    expect(candidateTypesSeen("fixture-indicator", upper, new Set(["upper"]))).toEqual(["upper:Indicator"]);
+    expect(candidateTypesSeen("fixture-indicator", upper, new Set(["above", "upper"]))).toEqual(["upper:Indicator"]);
+  });
+
+  test("an entry no layer holds sees every contributed kind, as before", () => {
+    expect(candidateTypesSeen("fixture-indicator", upper, undefined)).toEqual(["upper:Indicator"]);
   });
 });
 

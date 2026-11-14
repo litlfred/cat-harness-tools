@@ -494,6 +494,15 @@ export class ContributionRegistry {
   }
 
   /**
+   * The layer that contributed `kind`, or `undefined` for a kind nobody
+   * contributed (a built-in one included). Lets a caller typing one layer's
+   * content refuse a kind from a layer that one cannot see.
+   */
+  kindContributor(kind: string): string | undefined {
+    return this.kinds.get(kind)?.contributor;
+  }
+
+  /**
    * Contributed builder name → kind, for manifest discovery. Pass it to
    * `kindForBuilder` / `blockBuilderAlt` in `block-kinds.ts`, or as
    * `walkBlocks`' `contributedBuilders`.

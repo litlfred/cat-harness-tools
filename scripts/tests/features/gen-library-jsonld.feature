@@ -406,6 +406,27 @@ Feature: Library entries become graph nodes
     Then they are "cat-harness:Block"
     And the kind "theorem" has its own types, without "cat-harness:Block"
 
+  @test:scripts/tests/gen-library-jsonld.test.ts::a_candidate's_@type_(cat-harness-tools#1356)::a_kind_contributed_by_a_layer_the_library's_layer_does_not_need_does_not_type_its_nodes
+  Scenario: A kind from a layer the library's layer does not need does not type its nodes
+    Given the layer "upper" contributes the kind "fixture-indicator" typed "upper:Indicator"
+    And the library's layer sees only "lower" and "core"
+    When the candidate types of "fixture-indicator" are read
+    Then they are "cat-harness:Block"
+
+  @test:scripts/tests/gen-library-jsonld.test.ts::a_candidate's_@type_(cat-harness-tools#1356)::a_kind_contributed_by_the_library's_own_layer_or_one_it_needs_types_its_nodes
+  Scenario: A kind from the library's own layer or one it needs types its nodes
+    Given the layer "upper" contributes the kind "fixture-indicator" typed "upper:Indicator"
+    And the library's layer sees "upper"
+    When the candidate types of "fixture-indicator" are read
+    Then they are "upper:Indicator"
+
+  @test:scripts/tests/gen-library-jsonld.test.ts::a_candidate's_@type_(cat-harness-tools#1356)::an_entry_no_layer_holds_sees_every_contributed_kind,_as_before
+  Scenario: An entry no layer holds sees every contributed kind
+    Given the layer "upper" contributes the kind "fixture-indicator" typed "upper:Indicator"
+    And the entry is held by no layer
+    When the candidate types of "fixture-indicator" are read
+    Then they are "upper:Indicator"
+
   @test:scripts/tests/gen-library-jsonld.test.ts::tables_transcribed_from_a_paged_entry's_pages_are_blocks_(who-iris#224)::each_transcribed_table_is_a_table_block_carrying_its_narrative
   Scenario: A table transcribed from a paged entry's pages is a table block with its narrative
     Given a paged entry whose tabular.csvw.json transcribes "Table 1" on pages 3 and 4, with a draft narrative

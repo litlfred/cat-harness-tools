@@ -73,7 +73,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { basename, dirname, join, resolve } from "path";
 import { typesForKind } from "../schemas/kg/jsonld.ts";
 import { ContributionRegistry, type FolioContribution } from "../schemas/content/contributions.ts";
-import { loadContributionsSync } from "../schemas/kg/harness-config.ts";
+import { loadContributionsSync, orderedDependencies } from "../schemas/kg/harness-config.ts";
 import { contributionsRoot } from "./repo-root";
 import {
   defaultInstancePrefixes,
@@ -528,6 +528,10 @@ export function buildDocumentNodes(
   // to land on and is not a reason.
   const figureOwned = new Set<string>();
 
+  // The layer whose library holds the entry: only the kinds it and its
+  // dependencies declare type its candidates ({@link candidateTypes}).
+  const kindsRoot = instance !== undefined ? subgraphStart : undefined;
+
   // Tables transcribed from the pages (`tabular.csvw.json` beside the
   // structure), placed like figures: in the FIRST section containing the
   // table's first page. Until this, the paged rung never read that file, so
@@ -599,10 +603,10 @@ export function buildDocumentNodes(
         path: `blocks/${bid}.jsonld`,
         content: node({
           "@id": iri(`blocks/${bid}`),
-          // A dependency's kind (a higher layer's `functional-requirement`
-          // or `indicator`) is typed through the contribution registry; without
-          // it such a node had no `@type` at all.
-          "@type": candidateTypes(c.kind),
+          // A dependency's kind (a DAK layer's `functional-requirement` or
+          // `indicator`) is typed through the registry of the layers the
+          // library's own layer sees; without it such a node had no `@type`.
+          "@type": candidateTypes(c.kind, kindsRoot),
           kind: c.kind,
           title: c.name ?? undefined,
           pageStart: sec.page_start ?? undefined,
@@ -779,14 +783,53 @@ function contributedKinds(): ContributionRegistry | undefined {
   return contributions ?? undefined;
 }
 
+const visible = new Map<string, ReadonlySet<string>>();
+
+/**
+ * The layers the layer at `root` can see: itself and everything its `needs`
+ * reach. Its library's nodes may be typed by these layers' kinds and no other.
+ */
+function layersVisibleFrom(root: string): ReadonlySet<string> {
+  let names = visible.get(root);
+  if (names === undefined) {
+    const own = readDeclaration(root)?.name;
+    names = new Set([...(own ? [own] : []), ...orderedDependencies(root).map((d) => d.dependency.name)]);
+    visible.set(root, names);
+  }
+  return names;
+}
+
 /**
  * A candidate's `@type`: its kind's, through the contribution registry, or the
- * generic library block class when no mounted layer types the kind. An
- * L1 library may hold another layer's `indicator` without mounting that
+ * generic library block class when no layer it may see types the kind. An
+ * L1 library may hold another layer's `indicator` without depending on that
  * layer; its node is then still a typed block, never one with no type.
+ *
+ * `layerRoot` is the layer whose library holds the entry. A kind contributed
+ * by a layer outside its `needs` closure does not type its nodes. Without
+ * that, a node's `@type` depended on what else was mounted: in an index that
+ * mounts a layer ABOVE the library's, the library's `indicator` nodes took
+ * that higher layer's type, while the library's own checkout, which does not
+ * mount it, wrote `cat-harness:Block`, so the committed nodes could match only
+ * one of the two and `gen:jsonld:check` was red in the other.
  */
-export function candidateTypes(kind: string): string[] {
-  const types = typesForKind(kind, contributedKinds());
+export function candidateTypes(kind: string, layerRoot?: string): string[] {
+  return candidateTypesSeen(kind, contributedKinds(), layerRoot === undefined ? undefined : layersVisibleFrom(layerRoot));
+}
+
+/**
+ * {@link candidateTypes} over a given registry and the layers the library's
+ * layer can see (`undefined`: every one). Separate so the rule is tested
+ * without a composed checkout.
+ */
+export function candidateTypesSeen(
+  kind: string,
+  registry: ContributionRegistry | undefined,
+  visibleLayers: ReadonlySet<string> | undefined,
+): string[] {
+  const contributor = registry?.kindContributor(kind);
+  const seen = contributor === undefined || visibleLayers === undefined || visibleLayers.has(contributor);
+  const types = typesForKind(kind, seen ? registry : undefined);
   return types.length ? types : [termCurie("Block")];
 }
 
