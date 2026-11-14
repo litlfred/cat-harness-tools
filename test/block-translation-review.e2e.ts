@@ -44,6 +44,7 @@ const PO = [
   'msgstr "Bonjour, lecteur."',
   "",
   "#: docs/guide.md:5",
+  "#, fuzzy",
   'msgctxt "button"',
   'msgid "Save"',
   'msgstr "Sauver"',
@@ -53,6 +54,24 @@ const PO = [
   'msgstr "Ailleurs."',
   "",
 ].join("\n");
+const CANDIDATES_URL = "https://raw.githubusercontent.com/o/r/main/translations/fr/docs/guide.candidates.json";
+/** The candidates sidecar (translation-candidates/v1): "Sauver" is the .po's fuzzy default, so it is not offered again. */
+const CANDIDATES = {
+  $schema: "translation-candidates/v1",
+  locale: "fr",
+  catalogue: "docs/guide",
+  entries: [
+    {
+      msgctxt: "button",
+      msgid: "Save",
+      candidates: [
+        { text: "Sauver", source: { kind: "agent", id: "claude-opus-5-5" } },
+        { text: "Enregistrer", source: { kind: "open-mt", id: "opus-mt-en-fr" } },
+        { text: "Sauvegarder", source: { kind: "web-service", id: "deepl" } },
+      ],
+    },
+  ],
+};
 const HASH = createHash("sha256").update(PO, "utf-8").digest("hex").slice(0, 16);
 
 const cell = (o: object) => ({ entries: 3, translated: 3, fuzzy: 0, hash: "0123456789abcdef", ...o });
@@ -67,7 +86,7 @@ const review = (maxUrl = 7500) => ({
       translations: "translations",
       locales: ["ar", "fr"],
       rows: [
-        { catalogue: "docs/guide", sources: ["docs/guide.md", "docs/other.md"], cells: { fr: cell({ state: "machine", hash: HASH, generatedBy: "agent" }), ar: cell({ state: "empty", translated: 0 }) } },
+        { catalogue: "docs/guide", sources: ["docs/guide.md", "docs/other.md"], cells: { fr: cell({ state: "machine", translated: 2, fuzzy: 1, hash: HASH, generatedBy: "agent" }), ar: cell({ state: "empty", translated: 0 }) } },
         { catalogue: "docs/rev", sources: ["docs/rev.md"], cells: { fr: cell({ state: "reviewed", by: "alice", at: "2026-11-01T10:00:00Z" }) } },
         { catalogue: "docs/stale", sources: ["docs/stale.md"], cells: { fr: cell({ state: "stale", by: "bob", at: "2026-10-02T10:00:00Z" }) } },
         { catalogue: "docs/flag", sources: ["docs/flag.md"], cells: { fr: cell({ state: "flagged", flagReason: "mistranslation reported by carol" }) } },
@@ -110,7 +129,7 @@ function harness(meta: object, scheme: "light" | "dark"): string {
   );
 }
 
-async function serve(page: Page, opts: { scheme?: "light" | "dark"; meta?: object; review?: { code: number; body?: unknown } } = {}) {
+async function serve(page: Page, opts: { scheme?: "light" | "dark"; meta?: object; review?: { code: number; body?: unknown }; candidates?: boolean } = {}) {
   const rv = opts.review ?? { code: 200, body: review() };
   await page.addInitScript(() => {
     (window as unknown as { __opened: string[] }).__opened = [];
@@ -127,6 +146,10 @@ async function serve(page: Page, opts: { scheme?: "light" | "dark"; meta?: objec
     return route.fulfill({ status: 404, body: "" });
   });
   await page.route(PO_URL, (route) => route.fulfill({ contentType: "text/plain", body: PO, headers: { "access-control-allow-origin": "*" } }));
+  await page.route(CANDIDATES_URL, (route) =>
+    opts.candidates === false
+      ? route.fulfill({ status: 404, body: "", headers: { "access-control-allow-origin": "*" } })
+      : route.fulfill({ contentType: "application/json", body: JSON.stringify(CANDIDATES), headers: { "access-control-allow-origin": "*" } }));
   await page.goto("https://tr.test/fr/page.html");
 }
 
@@ -156,6 +179,8 @@ for (const scheme of ["light", "dark"] as const) {
       return pane;
     };
     await say("b-guide", "Machine translation, not reviewed by a person (made by agent)");
+    // A string showing its first candidate as a default (fuzzy) is machine until adjudicated.
+    await say("b-guide", "1 string show a machine default that no person has reviewed.");
     await say("b-rev", "Reviewed by alice on 2026-11-01");
     await say("b-stale", "Reviewed by bob on 2026-10-02; changed since the review");
     await say("b-flag", "mistranslation reported by carol");
@@ -268,4 +293,45 @@ test("a source-language page shows no translation pane", async ({ page }) => {
   await openPanel(page, "b-guide");
   await expect(page.locator(".fa-block-panel .fa-trf")).toHaveCount(0);
   await expect(page.locator('.ba-ic[data-pane="translation"]')).toHaveCount(0);
+});
+
+test("fix translation offers each string's candidates by source; a picked one is filed with its source, an edited one without", async ({ page }) => {
+  await serve(page);
+  const pane = await openPanel(page, "b-guide");
+  await pane.getByRole("button", { name: "✎ Fix translation" }).click();
+  const dlg = page.locator("dialog.fa-trf-dialog");
+  const save = dlg.locator(".fa-trf-strings > li").nth(1);
+  await expect(save).toContainText("(machine default, not reviewed)");
+  // The .po's own text is not offered again; the others name their source.
+  const choices = save.locator(".fa-trf-cand");
+  await expect(choices).toHaveCount(2);
+  await expect(choices.nth(0)).toContainText("Enregistrer — open-mt opus-mt-en-fr");
+  await expect(choices.nth(1)).toContainText("Sauvegarder — web-service deepl");
+  for (const c of await choices.all()) expect((await c.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // A string with no candidates shows no choices, only the free-text field.
+  await expect(dlg.locator(".fa-trf-strings > li").nth(0).locator(".fa-trf-cands")).toHaveCount(0);
+
+  await save.getByRole("radio", { name: /Sauvegarder/ }).check();
+  await expect(save.getByLabel("Your suggestion")).toHaveValue("Sauvegarder");
+  await dlg.getByRole("button", { name: "Make the GitHub issue" }).click();
+  let { body, record } = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!);
+  expect(record.items[0].suggestions).toEqual([
+    { msgid: "Save", current: "Sauver", suggested: "Sauvegarder", source: { kind: "web-service", id: "deepl" }, msgctxt: "button" },
+  ]);
+  expect(body).toContain("`Sauver` → `Sauvegarder` (candidate from web-service `deepl`)");
+
+  // Edited after picking: the text is the reviewer's own, and carries no source.
+  await save.getByLabel("Your suggestion").fill("Sauvegarder le texte");
+  await dlg.getByRole("button", { name: "Make the GitHub issue" }).click();
+  ({ record } = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!));
+  expect(record.items[0].suggestions).toEqual([{ msgid: "Save", current: "Sauver", suggested: "Sauvegarder le texte", msgctxt: "button" }]);
+});
+
+test("no candidates sidecar (404): the reviewer types their own", async ({ page }) => {
+  await serve(page, { candidates: false });
+  const pane = await openPanel(page, "b-guide");
+  await pane.getByRole("button", { name: "✎ Fix translation" }).click();
+  const dlg = page.locator("dialog.fa-trf-dialog");
+  await expect(dlg.locator(".fa-trf-strings > li")).toHaveCount(2);
+  await expect(dlg.locator(".fa-trf-cands")).toHaveCount(0);
 });
