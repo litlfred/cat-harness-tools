@@ -111,7 +111,7 @@ import {
 } from "./library-title.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { presentGroupsIn } from "../scripts/concern-groups.ts";
-import { libraryEntryDirs } from "../scripts/lib/library-entry-graphs.ts";
+import { libraryEntryDirs, nonEntryDirs, type LibraryEntryDir } from "../scripts/lib/library-entry-graphs.ts";
 
 /** A resolved manifest title and where it came from (issue #1794). */
 export interface ManifestTitle {
@@ -302,6 +302,7 @@ export function latexSourceNode(
   title: string,
   licence: unknown,
   instance?: string,
+  subgraphStart: string = findContentRepoRoot(),
 ): { path: string; content: string } {
   const iri = iriFor(docId, instance);
   return {
@@ -324,7 +325,7 @@ export function latexSourceNode(
         files: (src.files ?? []).map((f) => ({ ...f, path: `source/${f.path}` })),
         disposition: "ingested source material — the authors' LaTeX, attributed to its document, not folio content",
       },
-    }),
+    }, subgraphStart),
   };
 }
 
@@ -559,7 +560,7 @@ export function buildDocumentNodes(
         derivedFrom: owner,
         sourceDocument: iri("manifest"),
         provenance: "ingested",
-      }),
+      }, subgraphStart),
     });
     return iri(`blocks/${bid}`);
   };
@@ -585,7 +586,7 @@ export function buildDocumentNodes(
           derivedFrom: iri("manifest"),
           sourceDocument: iri("manifest"),
           provenance: "ingested",
-        }),
+        }, subgraphStart),
       });
     }
 
@@ -602,7 +603,7 @@ export function buildDocumentNodes(
           // A dependency's kind (a higher layer's `functional-requirement`
           // or `indicator`) is typed through the contribution registry; without
           // it such a node had no `@type` at all.
-          "@type": candidateTypes(c.kind),
+          "@type": candidateTypes(c.kind, subgraphStart),
           kind: c.kind,
           title: c.name ?? undefined,
           pageStart: sec.page_start ?? undefined,
@@ -612,7 +613,7 @@ export function buildDocumentNodes(
           sourceDocument: iri("manifest"),
           provenance: "ingested",
           meta: candidateMeta(c),
-        }),
+        }, subgraphStart),
       });
       if (statement) out.push({ path: `blocks/${bid}.md`, content: `${statement}\n` });
     });
@@ -648,7 +649,7 @@ export function buildDocumentNodes(
               derivedFrom: iri(`sections/${key}`),
               sourceDocument: iri("manifest"),
               provenance: "ingested",
-            }),
+            }, subgraphStart),
           });
         }
       }
@@ -680,7 +681,7 @@ export function buildDocumentNodes(
         derivedFrom: iri("manifest"),
         sourceDocument: iri("manifest"),
         provenance: "ingested",
-      }),
+      }, subgraphStart),
     });
   }
 
@@ -727,17 +728,18 @@ export function buildDocumentNodes(
           candidates?.disposition ??
           "ingested source material — attributed to its document, not folio content",
       },
-    }),
+    }, subgraphStart),
   });
 
   return out;
 }
 
-let contentPrefixes: Map<string, string> | undefined;
+const contentPrefixes = new Map<string, Map<string, string>>();
 
 /**
  * The layer prefixes a library node may use: this checkout's, plus every
- * layer the CONTENT repository declares as a dependency.
+ * layer the entry's owning layer (`subgraphStart`, defaulting to the content
+ * repository root) declares as a dependency.
  *
  * `defaultInstancePrefixes` reads only the checkout this module sits in, so
  * run from a content repository it could not bind a dependency's prefix
@@ -745,48 +747,62 @@ let contentPrefixes: Map<string, string> | undefined;
  * the prefix of the `Theorem` and `Definition` types that theorem candidates
  * carry — and every entry with a candidate threw. Measured on qou 2026-10-11:
  * 18 entries had no section nodes for that reason. `instancePrefixes` already
- * takes the content root and walks its declared dependency chain; the
- * generator simply never passed it.
+ * takes the layer root and walks its declared dependency chain; keyed per
+ * `subgraphStart` so a mounted layer's library resolves its own dependencies.
  */
-function libraryPrefixes(): Map<string, string> {
-  if (contentPrefixes === undefined) {
-    const root = findContentRepoRoot();
-    contentPrefixes = new Map([...defaultInstancePrefixes(), ...instancePrefixes(root, root)]);
+function libraryPrefixes(subgraphStart: string = findContentRepoRoot()): Map<string, string> {
+  const root = resolve(subgraphStart);
+  let prefixes = contentPrefixes.get(root);
+  if (prefixes === undefined) {
+    prefixes = new Map([...defaultInstancePrefixes(), ...instancePrefixes(root, root)]);
+    contentPrefixes.set(root, prefixes);
   }
-  return contentPrefixes;
+  return prefixes;
 }
 
-let contributions: ContributionRegistry | null | undefined;
+const contributionsByRoot = new Map<string, ContributionRegistry | null>();
 
 /**
- * The block kinds the content repository's dependencies contribute — the DAK
+ * The block kinds the entry's owning layer (`subgraphStart`, defaulting to the
+ * content repository) and its declared dependencies contribute — the DAK
  * layer's `functional-requirement`, `non-functional-requirement`, `indicator`
- * and the rest. Loaded once, as `gen-block-jsonld` loads them. A checkout
- * whose contributions cannot be loaded types only the core kinds, which is
- * what it did before.
+ * and the rest. Keyed by `subgraphStart` rather than a single global root so a
+ * mounted layer's `library/` (such as `who-iris/library/`, which does not
+ * depend on `smart-base`) is generated and checked against its own declared
+ * dependencies rather than the host index's root. A layer whose contributions
+ * cannot be loaded types only the core kinds, which is what it did before.
  */
-function contributedKinds(): ContributionRegistry | undefined {
-  if (contributions === undefined) {
+function contributedKinds(subgraphStart?: string): ContributionRegistry | undefined {
+  const root =
+    subgraphStart === undefined || resolve(subgraphStart) === resolve(findContentRepoRoot())
+      ? contributionsRoot()
+      : resolve(subgraphStart);
+  if (!contributionsByRoot.has(root)) {
     try {
-      contributions = loadContributionsSync<FolioContribution, ContributionRegistry>(
-        contributionsRoot(),
-        new ContributionRegistry(),
+      contributionsByRoot.set(
+        root,
+        loadContributionsSync<FolioContribution, ContributionRegistry>(
+          root,
+          new ContributionRegistry(),
+        ),
       );
     } catch {
-      contributions = null;
+      contributionsByRoot.set(root, null);
     }
   }
-  return contributions ?? undefined;
+  return contributionsByRoot.get(root) ?? undefined;
 }
 
 /**
- * A candidate's `@type`: its kind's, through the contribution registry, or the
- * generic library block class when no mounted layer types the kind. An
- * L1 library may hold another layer's `indicator` without mounting that
- * layer; its node is then still a typed block, never one with no type.
+ * A candidate's `@type`: its kind's, through the owning layer's contribution
+ * registry (`subgraphStart`), or the generic library block class when no
+ * dependency of that layer types the kind. An L1 library may hold another
+ * layer's `indicator` without depending on that layer; its node is then still
+ * a typed block, never one with no type and never one whose `@type` shifts when
+ * the library is mounted into a host index that also mounts the other layer.
  */
-export function candidateTypes(kind: string): string[] {
-  const types = typesForKind(kind, contributedKinds());
+export function candidateTypes(kind: string, subgraphStart?: string): string[] {
+  const types = typesForKind(kind, contributedKinds(subgraphStart));
   return types.length ? types : [termCurie("Block")];
 }
 
@@ -809,9 +825,9 @@ export function candidateMeta(c: Candidate): Record<string, string> | undefined 
 }
 
 /** Serialise, dropping undefined so output is byte-stable. */
-function node(doc: Record<string, unknown>): string {
+function node(doc: Record<string, unknown>, subgraphStart?: string): string {
   const clean: Record<string, unknown> = {
-    "@context": documentContext((doc["@type"] as string[] | undefined) ?? [], { prefixes: libraryPrefixes() }),
+    "@context": documentContext((doc["@type"] as string[] | undefined) ?? [], { prefixes: libraryPrefixes(subgraphStart) }),
   };
   for (const [k, v] of Object.entries(doc)) {
     if (v === undefined) continue;
@@ -1075,7 +1091,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       Array.isArray(transcribed?.tables) ? transcribed.tables : undefined,
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
-    if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance));
+    if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance, subgraphStart));
     return { state: "built", rung, files };
   }
 
@@ -1129,7 +1145,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
     }, locatedAt);
     if (!titled) return { state: "unreadable", rung };
     const manifest = {
-      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes() }),
+      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes(subgraphStart) }),
       "@id": iri("manifest"),
       "@type": [termCurie("SourceDocument")],
       title: titled.title,
@@ -1206,11 +1222,11 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
           sourceDocument: iri("manifest"),
           // Authored (LIBRARY_BLOCK_ORIGIN.transcript): who drafted it.
           provenance: t.drafted_by,
-        }),
+        }, subgraphStart),
       });
     }
     const manifest = {
-      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes() }),
+      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes(subgraphStart) }),
       "@id": iri("manifest"),
       "@type": [termCurie("SourceDocument")],
       title: titled.title,
@@ -1252,6 +1268,18 @@ export function unknownArgument(argv: readonly string[]): string | undefined {
     if (VALUED.has(a)) i++;
   }
   return undefined;
+}
+
+/**
+ * Entry directories in `libraryDir`, dropping dotfiles and directories declared
+ * for another graph typology (`nonEntryDirs`, e.g. `library/processes/` or
+ * `library/skills/`).
+ */
+export function libraryEntriesIn(libraryDir: string): LibraryEntryDir[] {
+  const others = nonEntryDirs(libraryDir);
+  return libraryEntryDirs(libraryDir).filter(
+    ({ slug, dir }) => !slug.startsWith(".") && !others.has(dir) && !others.has(resolve(dir)),
+  );
 }
 
 async function run(): Promise<number> {
@@ -1312,8 +1340,7 @@ async function run(): Promise<number> {
   for (const libraryDir of libraryDirs) {
     // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`):
     // the slug is the docId either way, so ids do not move with the entry.
-    for (const { slug: d, dir } of libraryEntryDirs(libraryDir)) {
-      if (d.startsWith(".")) continue;
+    for (const { slug: d, dir } of libraryEntriesIn(libraryDir)) {
       if (only && d !== only) continue;
       const prior = seen.get(d);
       if (prior !== undefined) {
