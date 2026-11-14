@@ -35,11 +35,18 @@ import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { indexSummary, orphanPages, twinsInCheckout, unpublishedTwins } from "../gen-skill-docs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { overlayPath } from "../lib/layer-output.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 const GENERATED = join(HARNESS, siteDirFor(HARNESS), "reference", "skill-instructions");
+/**
+ * Where `skills:docs` wrote the pages: the layer's output root where it is
+ * mounted (bean `cat-tools-sm8r`), else {@link GENERATED}. Links still resolve
+ * from GENERATED, through the same overlay a reader sees.
+ */
+const WRITTEN = overlayPath(GENERATED);
 /** The generated pages are written at publish and gitignored (bean w1gy F18). */
-const NOT_GENERATED = siteNotBuilt("the skill reference pages `skills:docs` writes at publish (gitignored)", GENERATED);
+const NOT_GENERATED = siteNotBuilt("the skill reference pages `skills:docs` writes at publish (gitignored)", WRITTEN);
 
 /** Every inline markdown link target on a page, anchors and titles stripped. */
 function linkTargets(body: string): string[] {
@@ -59,15 +66,15 @@ function relativeTarget(t: string): boolean {
 }
 
 describe.skipIf(NOT_GENERATED)("generated skill instruction pages", () => {
-  const pages = existsSync(GENERATED)
-    ? readdirSync(GENERATED).filter((f) => f.endsWith(".md"))
+  const pages = existsSync(WRITTEN)
+    ? readdirSync(WRITTEN).filter((f) => f.endsWith(".md"))
     : [];
 
   const resolvesFrom = (dir: string, t: string): boolean => {
     const dest = resolve(dir, t);
     const candidates = [dest, `${dest}.md`, join(dest, "index.md")];
     if (dest.endsWith(".html")) candidates.push(`${dest.slice(0, -".html".length)}.md`);
-    return candidates.some(existsSync);
+    return candidates.some((c) => existsSync(overlayPath(c)));
   };
 
   test("the generated directory exists and has pages", () => {
@@ -99,7 +106,7 @@ describe.skipIf(NOT_GENERATED)("generated skill instruction pages", () => {
       const abs = join(GENERATED, page);
       const own = dirname(abs);
       const atSource = dirname(own); // one level up — the source page's depth
-      for (const t of linkTargets(readFileSync(abs, "utf-8"))) {
+      for (const t of linkTargets(readFileSync(join(WRITTEN, page), "utf-8"))) {
         if (!relativeTarget(t)) continue;
         if (resolvesFrom(own, t)) continue;
         if (resolvesFrom(atSource, t)) unrebased.push(`${page}: ${t}`);
@@ -173,7 +180,7 @@ describe("orphanPages", () => {
     // The vacuity control. `orphanPages(onDisk, [])` over the live tree must
     // name essentially all of it; a guard that returned `[]` unconditionally
     // would pass every assertion above this one's absence.
-    expect(orphanPages(readdirSync(GENERATED), []).length).toBeGreaterThan(10);
+    expect(orphanPages(readdirSync(WRITTEN), []).length).toBeGreaterThan(10);
   });
 });
 

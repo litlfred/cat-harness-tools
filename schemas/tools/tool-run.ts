@@ -40,7 +40,7 @@ import { z } from "zod";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { RunContextRefSchema, RunReleaseSchema } from "../sdlc/run-context";
-import { overlayDirs, overlayPath, writePathAt } from "../../scripts/lib/layer-output.ts";
+import { overlayDirs, overlayPath, writePathOf } from "../../scripts/lib/layer-output.ts";
 
 /** The `$schema` tag every run record carries. */
 export const TOOL_RUN_SCHEMA_ID = "folio-tool-run/v1";
@@ -123,7 +123,7 @@ export function parseToolRun(text: string | undefined): ToolRunRecord | undefine
 export function writeToolRun(instanceRoot: string, record: Omit<ToolRunRecord, "$schema">): string {
   // A mounted layer's record goes to its layer output root, never into the
   // mount (bean `cat-tools-sm8r`, item 4); `readToolRun` finds it there.
-  const p = writePathAt(toolRunPath(instanceRoot, record.tool, record.target));
+  const p = writePathOf(toolRunPath(instanceRoot, record.tool, record.target));
   const body = JSON.stringify({ $schema: TOOL_RUN_SCHEMA_ID, ...record }, null, 2) + "\n";
   if (existsSync(p) && readFileSync(p, "utf8") === body) return p;
   mkdirSync(dirname(p), { recursive: true });

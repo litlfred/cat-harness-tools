@@ -48,7 +48,7 @@ import { DOCUMENT_VIEW_JS, entryFigureFiles, readEntryDocument, type EntryKeywor
 import { LANGUAGE_TOGGLE_JS, entryLanguages, listingTitles, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
 import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
 import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
-import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
+import { repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
 import { blobUrl, elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
@@ -160,10 +160,28 @@ export const VIEWER_CSS = `/* The block content panel — bean lrmo. Tokens only
 .lib-page #document .docbody { padding: 0 16px 8px; }
 .lib-page #document .dockw { padding: 4px 16px; }
 /* Kept figures and transcribed tables (who-iris#224). */
-.lib-page #document .doc-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: .5rem 0 1rem; }
-.lib-page #document .doc-figure { margin: 0; border: 1px solid var(--border, #8884); border-radius: 6px; padding: 6px; background: var(--card, transparent); }
-.lib-page #document .doc-figure img { display: block; width: 100%; height: auto; max-height: 320px; object-fit: contain; background: #fff; border-radius: 4px; }
-.lib-page #document .doc-figure figcaption { font-size: .85em; margin-top: 6px; }
+.lib-page #document .doc-gallery { display: flex; flex-direction: column; gap: 8px; margin: .5rem 0 1rem; }
+.lib-page #document .doc-figure { margin: 0; display: flex; align-items: center; gap: 12px; border: 1px solid var(--border, #8884); border-radius: 6px; padding: 6px; background: var(--card, transparent); }
+.lib-page #document .fig-thumb { flex: 0 0 auto; padding: 0; border: 0; background: #fff; border-radius: 4px; cursor: zoom-in; }
+.lib-page #document .fig-thumb:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+.lib-page #document .doc-figure img { display: block; width: 120px; height: 90px; object-fit: contain; border-radius: 4px; }
+.lib-page #document .doc-figure figcaption { flex: 1 1 auto; min-width: 0; font-size: .9em; display: flex; gap: 8px; align-items: baseline; }
+.lib-page #document .fig-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.lib-page .fig-print-desc { display: none; }
+.lib-page .doc-print { margin-inline-start: 8px; font-size: .8rem; cursor: pointer; }
+@media print {
+  .lib-page .fig-print-desc { display: block; margin: 4px 0 0; font-size: .85em; }
+  .lib-page #document .doc-figure { display: block; break-inside: avoid; }
+  .lib-page #document .doc-figure img { width: auto; height: auto; max-width: 100%; max-height: 60vh; }
+  .lib-page #document .fig-thumb { cursor: default; }
+  .lib-page .doc-print, .lib-page .fig-pop { display: none; }
+}
+.lib-page .fig-pop { max-width: min(92vw, 1100px); max-height: 92vh; padding: 0; border: 1px solid var(--border, #8884); border-radius: 8px; background: var(--bg, #fff); color: inherit; }
+.lib-page .fig-pop::backdrop { background: rgba(0,0,0,.6); }
+.lib-page .fig-pop-box { position: relative; padding: 12px 16px; }
+.lib-page .fig-pop-box img { display: block; max-width: 100%; max-height: 70vh; margin: 8px auto; background: #fff; object-fit: contain; }
+.lib-page .fig-pop-box h3 { margin: 0 32px 0 0; }
+.lib-page .fig-pop-x { position: absolute; top: 6px; inset-inline-end: 8px; min-width: 32px; min-height: 32px; font-size: 22px; line-height: 1; border: 0; background: none; color: inherit; cursor: pointer; }
 .lib-page #document .doc-table { margin: .4rem 0; }
 .lib-page #document .doc-table-scroll { overflow-x: auto; max-width: 100%; }
 .lib-page #document .doc-table table { font-size: .85em; }
@@ -574,6 +592,7 @@ var COLS = [
   { k:"sections", t:"sections", n:true },
   { k:"blocks",   t:"blocks",   n:true },
   { k:"images",   t:"images",   n:true },
+  { k:"figures",  t:"figures",  n:true, f:function(e){ return e.figures==null?'<span class="pill">—</span>':esc(String(e.figures)); } },
   { k:"ocrPages", t:"ocr",      n:true, f:function(e){ var s=ocrState(e); return '<span class="pill '+s.cls+'">'+esc(s.label)+"</span>"; } },
   { k:"pageEnd",  t:"pages",    n:true, f:function(e){ return e.pageStart==null?'<span class="pill">—</span>':esc(e.pageStart+"–"+e.pageEnd); } },
   { k:"words",    t:"words",    n:true, f:function(e){ return e.words.toLocaleString(); } },
@@ -624,7 +643,25 @@ function renderList(){
     return "<th" + (sorted ? ' aria-sort="'+(SORT.dir>0?"ascending":"descending")+'"' : "") +
       '><button type="button" data-k="'+c.k+'">'+esc(c.t)+"</button></th>";
   }).join("") + "</tr></thead><tbody>";
-  h += r.map(function(e){
+  h += r.map(rowHtml).join("") || '<tr><td colspan="'+COLS.length+'"><p class="empty">Nothing matches.</p></td></tr>';
+  $("listing").innerHTML = h + "</tbody></table>";
+}
+
+/* THE ENTRY'S OWN ROW, AT THE TOP OF ITS PAGE -- owner, 2026-11-14: "i
+   wanted this at the top of the page". The row the whole-library listing
+   draws for this entry was the only place its counts were said, and on an
+   entry page that listing is folded away at the bottom. The same COLS and
+   the same rowHtml, so the two rows cannot disagree; a plain header, since
+   one row has nothing to sort. */
+function renderEntryRow(e){
+  var el = $("entry-row");
+  if (!el) return;
+  el.hidden = false;
+  el.innerHTML = '<table class="entry-row"><thead><tr>' + COLS.map(function(c){ return "<th>" + esc(c.t) + "</th>"; }).join("") +
+    "</tr></thead><tbody>" + rowHtml(e) + "</tbody></table>";
+}
+
+function rowHtml(e){
     /* THE ROW DECLARES ITSELF, and the folio reads nothing else.
        A selector guessing at cell positions would bind to this generator's
        markup and break silently the next time a column moves; an attribute
@@ -666,8 +703,6 @@ function renderList(){
       return "<td" + (cls ? ' class="'+cls+'"' : "") + (i === 0 ? " data-fa-pullout-host" : "") +
         ' data-label="'+esc(c.t)+'">' + (c.f ? c.f(e) : esc(e[c.k])) + "</td>";
     }).join("") + "</tr>";
-  }).join("") || '<tr><td colspan="'+COLS.length+'"><p class="empty">Nothing matches.</p></td></tr>';
-  $("listing").innerHTML = h + "</tbody></table>";
 }
 
 function renderDesk(){
@@ -689,6 +724,7 @@ function renderDesk(){
         "<span>blocks</span><b>"+e.blocks+"</b>" +
         (e.summaries && e.summaries.prose ? "<span>summarised</span><b>"+e.summaries.summarised+" / "+e.summaries.prose+"</b>" : "") +
         "<span>images</span><b>"+e.images+"</b>" +
+        "<span>figures</span><b>"+(e.figures==null?"—":e.figures)+"</b>" +
         "<span>pages</span><b>"+(e.pageStart==null?"—":e.pageStart+"–"+e.pageEnd)+"</b>" +
         "<span>words</span><b>"+e.words.toLocaleString()+"</b>" +
         "<span>size</span><b>"+kb(e.bytes)+"</b>" +
@@ -702,7 +738,21 @@ function renderDesk(){
 }
 
 
-function render(){ if (VIEW === "list") renderList(); else renderDesk(); }
+/* LAZY on an entry page (owner, 2026-11-14: "do lazy load content"): the
+   whole library's listing sits in a closed <details> under the entry, and
+   drawing every row there is work for a reader who never opens it. It is
+   drawn on the first open; until then nothing is. */
+function render(){
+  var fold = $("listing").closest("details.lib-all");
+  if (fold && !fold.open) {
+    if (!fold.getAttribute("data-lazy")) {
+      fold.setAttribute("data-lazy", "1");
+      fold.addEventListener("toggle", function(){ if (fold.open) render(); });
+    }
+    return;
+  }
+  if (VIEW === "list") renderList(); else renderDesk();
+}
 
 /* WHICH ENTRY THIS PAGE IS ABOUT -- read off its own PATH (#1881).
 
@@ -724,13 +774,14 @@ function byKey(key){
 function selectEntry(known){
   if (VIEW !== "list") setView("list");
   $("q").value = known.id;
-  renderList();
+  render();
   var key = known.instance + "/" + known.id;
   var row = document.querySelector('[data-fa-library-item="' + key.replace(/"/g, '\\"') + '"]');
   if (row) {
     row.setAttribute("data-fa-anchored", "1");
     row.scrollIntoView({ block: "center" });
   }
+  renderEntryRow(known);
   document.title = (known.title || known.id) + " \u2014 " + known.instance + " library";
   /* The graph of the thing the reader just opened -- bean 7nvr. */
   loadDocument(known.id);
@@ -815,7 +866,7 @@ function renderBlocks(id, data, err, entry){
       /* A narrative state is three-valued and none of them is an error:
          not-authored means nobody has written one, which is a fact rather
          than a gap. Rendered as plain text for that reason. */
-      var nar = b.summary ? summaryBadge(b.summary)
+      var nar = b.summary ? summaryDisclosure(b.summary)
         : b.narrative == null ? '\u2014' : esc(b.narrative);
       /* THE CONTENT IS BEHIND A NATIVE <details> — bean lrmo.
          The owner opened this view and said "i expected to be able to see
@@ -860,13 +911,27 @@ function summaryLabel(s){
   }
 }
 ${WITHHELD_VIEW_JS}
-/* The shared edit/feedback recipe (bean v433): the Document panel's [source],
-   [feedback] and [edit] links are built by it (bean zcak). */
-${EDIT_LINKS_RUNTIME}
+/* The shared edit/feedback recipe (bean v433) builds the Document panel's
+   [source], [feedback] and [edit] links (bean zcak). It is NOT inlined here
+   any more: every library page is a themed Jekyll page, whose head already
+   loads assets/js/edit-links.js, so the inline copy was about 79 KB every
+   library page downloaded and parsed twice (owner, 2026-11-14: "do lazy load
+   content and libs"). withEditLinks, in DOCUMENT_VIEW_JS, waits for that copy
+   and loads it itself on a host that has none. */
 ${DOCUMENT_VIEW_JS}
 function summaryBadge(s){
   var l = summaryLabel(s);
   return '<span class="pill ' + l.cls + '">' + esc(l.t) + '</span>';
+}
+/* THE SUMMARY TEXT, BEHIND A DISCLOSURE -- owner, 2026-11-14: "disclosure
+   agent summary even if not verified. just indicate". The cell used to carry
+   the state alone, so 62 drafted summaries read as 62 identical pills. The
+   pill stays as the disclosure's label, so an unconfirmed draft still says it
+   is one before anyone opens it; summaryPanel inside says who drafted it and
+   that no person has confirmed it. A state with no text keeps the bare pill. */
+function summaryDisclosure(s){
+  if (!s.text) return summaryBadge(s);
+  return '<details class="sumd"><summary>' + summaryBadge(s) + '</summary>' + summaryPanel(s).replace(summaryBadge(s), '') + '</details>';
 }
 function summaryPanel(s){
   var why = {
@@ -886,10 +951,17 @@ function summaryPanel(s){
     (s.text ? '<p>' + esc(s.text) + '</p>' : '<p>' + esc(why || "") + '</p>') +
     (who ? '<p class="note">' + esc(who) + '</p>' : '') + '</div>';
 }
+/* REVALIDATED, NOT REFETCHED: "no-cache" asks the server every time, as
+   "no-store" did, so a page never shows a stale graph -- but an unchanged
+   file comes back as a 304 rather than its whole body again (on who-iris,
+   66 KB an entry on average and 2.3 MB at most). */
+function fetchBlocks(id){
+  return fetch(blocksHref(id), {cache: "no-cache"})
+    .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
 function loadBlocks(id, entry){
   DOC_BLOCKS = null;
-  fetch(blocksHref(id), {cache: "no-store"})
-    .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  takeEarly("blocks", id, fetchBlocks)
     .then(function(d){ renderBlocks(id, d, null, entry); })
     .catch(function(e){ renderBlocks(id, null, String(e && e.message || e), entry); });
 }
@@ -902,6 +974,33 @@ function setView(v){
   $("desktop").hidden = v !== "desk";
   render();
 }
+
+/* THE ENTRY'S OWN FILES START NOW, beside the index rather than behind it.
+   An entry page exists to show one document, and its id is in the page's own
+   path: waiting for the whole library's index.json before asking for the
+   entry's document and blocks put a full round trip, and the largest file on
+   the page, in front of the thing the reader came for. The responses are
+   held here and handed to loadDocument and loadBlocks when selectEntry
+   (which needs the index, for the entry's row) calls them, so nothing is
+   fetched twice. A path that names no entry of this library starts nothing:
+   honourAddress still says "not found", from the index, as before. */
+var EARLY = {};
+function takeEarly(kind, id, start){
+  var held = EARLY[kind];
+  if (held && held.id === id) { EARLY[kind] = null; return held.p; }
+  return start(id);
+}
+(function startEntry(){
+  if (!SCOPE) return;
+  var at = entryFromPath(location.pathname, LIB_ROOT);
+  if (!at || at.instance !== SCOPE) return;
+  /* A rejection is caught where it is TAKEN; this only stops an unhandled
+     warning when it never is (an id the index turns out not to hold). */
+  EARLY.blocks = { id: at.id, p: fetchBlocks(at.id) };
+  EARLY.blocks.p.catch(function(){});
+  EARLY.document = { id: at.id, p: fetchDocument(at.id) };
+  EARLY.document.p.catch(function(){});
+})();
 
 fetch(DATA_HREF).then(function(r){
   if (!r.ok) throw new Error(String(r.status));
@@ -1342,6 +1441,13 @@ const ENTRY_BODY = `<div class="lib-main">
 ${VIEWER_BODY.replace(/\n\s*<section id="(?:document|blocks)"[^\n]*<\/section>/g, "")}
 </details>`;
 
+/**
+ * THE ENTRY'S OWN LISTING ROW, first thing under its catalogue record —
+ * owner, 2026-11-14: "i wanted this at the top of the page". `renderEntryRow`
+ * fills it with the row the whole library draws for this entry.
+ */
+const ENTRY_ROW = `<section id="entry-row" class="wrap" hidden></section>\n`;
+
 /** The shared stylesheet and script sit beside the projection. */
 const assetsOf = (dataHref: string): string => dataHref.slice(0, dataHref.lastIndexOf("/") + 1);
 
@@ -1416,7 +1522,7 @@ function libraryPageHtml(p: LibraryPage): string {
     body: `<link rel="stylesheet" href="${escHtml(assets)}viewer.css">
 <div class="${LIBRARY_MOUNT}" data-fa-no-filter${decl?.attrs ?? ""}${attrs}>
 ${decl ? `${decl.stub}\n` : ""}${p.entryTitle === undefined ? VIEWER_HEAD : VIEWER_HEAD.replace('<h1 id="lib-title">Library</h1>', `<h1 id="lib-title">${escHtml(p.entryTitle)}</h1>`)}
-${p.record ? `${p.record}\n` : ""}${p.versions ? `${p.versions}\n` : ""}${p.summary ? `${p.summary}\n` : ""}${p.view ? `${p.view}\n` : ""}${p.entryTitle === undefined ? VIEWER_BODY : ENTRY_BODY}
+${p.record ? `${p.record}\n` : ""}${p.entryTitle === undefined ? "" : ENTRY_ROW}${p.versions ? `${p.versions}\n` : ""}${p.summary ? `${p.summary}\n` : ""}${p.view ? `${p.view}\n` : ""}${p.entryTitle === undefined ? VIEWER_BODY : ENTRY_BODY}
 ${p.sources ?? ""}
 </div>
 <noscript>${p.noscript}</noscript>

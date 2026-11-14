@@ -31,7 +31,7 @@ import { detect, parseSkillExclusions } from "../src/crdm/detect-signals.ts";
 import { buildTestRun, hashesReproduce, TestRunSchema } from "../schemas/sdlc/test-run.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { TEST_RUN_OUT_ENV } from "./test-run-compute.ts";
-import { writePathAt } from "./lib/layer-output.ts";
+import { writePathOf } from "./lib/layer-output.ts";
 import { harnessPath, harnessRel } from "./lib/harness-layout.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -132,7 +132,7 @@ console.log(
 // temporary directory (test-run-compute.ts, #1191).
 const OUT_DIR = process.env[TEST_RUN_OUT_ENV];
 // A mounted harness's run goes to its layer output root, never into the mount (bean `cat-tools-sm8r`, item 4).
-const OUT = OUT_DIR ? join(OUT_DIR, "crdm-detect-eval.test-run.json") : writePathAt(join(root, "test/results/crdm-detect-eval.test-run.json"));
+const OUT = OUT_DIR ? join(OUT_DIR, "crdm-detect-eval.test-run.json") : writePathOf(join(root, "test/results/crdm-detect-eval.test-run.json"));
 const run = buildTestRun({
   // bean 70lx: the corpus and the code are this layer's, the skill is the harness's
   root: dirname(root),

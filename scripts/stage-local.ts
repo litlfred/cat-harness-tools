@@ -132,6 +132,7 @@ import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
 import { buildInstanceSite, recipeFromConfig, siteFields, siteScopeOf, type SiteRecipe } from "./build-instance-site.ts";
 import { makeRecord, RECORD_FILE } from "./preview-record.ts";
+import { findReport, injectSite } from "./preview-qa.ts";
 import { reviewSiteSize, SITE_SIZE_FILE } from "./site-size.ts";
 import { isPreviewPath, PREVIEW_PREFIX, previewPath } from "./lib/preview-prefix.ts";
 import { ensurePublishBranch } from "./lib/publish-branch.ts";
@@ -914,7 +915,10 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
     ]);
   }
 
-  if (target === "preview") writePreviewRecord(repo, site, { slug, sha, base, log });
+  if (target === "preview") {
+    previewQa(repo, site, sha, log);
+    writePreviewRecord(repo, site, { slug, sha, base, log });
+  }
   sizeReview(repo, site, name, log);
 
   if (o.artifact) return done({ bundle: writeArtifact(site, o.artifact, platform, { slug, branch, sha }, log) });
@@ -993,10 +997,11 @@ export async function stageDeclared(
   log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
   if (d.recipe.finalSteps?.length) log(`final       ${d.recipe.finalSteps.join(", ")} (after the platform's own writers)`);
   log(`profile     ${d.recipe.profile ?? "folio"}${d.recipe.profile === "ig-repo-site" ? " (the platform steps folio-site.yml runs: the shell, its navbar, Jekyll, the rail)" : ""}`);
-  if (d.recipe.links === "report") log("links       report: unresolved links are said, not refused (the recipe says so)");
+  log(`links       ${d.recipe.links === "refuse" ? "refuse: an unresolved link refuses the publish (the recipe says so)" : "report: unresolved links are said, not refused"}`);
+  log("refuses     only on graph data (.json/.jsonld) and a build that cannot run; pages, links, scripts and stylesheets are QA findings (assets/site-qa/)");
   if (target === "main") {
     log(`keeps       branches/, STAGING/, _render-log/${(d.recipe.keep ?? []).map((k) => `, ${k}/`).join("")}`);
-    log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
+    log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall is reported to QA (assets/site-qa/parity.json), not refused`);
   }
   relayEditedMounts(repo, o, log);
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
@@ -1021,6 +1026,7 @@ export async function stageDeclared(
     ...(d.recipe.rootIndex ? { rootIndex: true } : {}),
     ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => {
       previewData(repo, { instance: d.instance, branch, sha, base, owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log);
+      previewQa(repo, site, sha, log);
       writePreviewRecord(repo, site, { slug: branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, ""), sha, base, log });
     } } : {}),
     ...(scope ? { scope } : {}),
@@ -1041,6 +1047,21 @@ export async function stageDeclared(
  * last, after every step that changes the site, and never for the main site,
  * which stays CI-built.
  */
+/**
+ * "This change (preview)" on top of every QA page of a preview (owner,
+ * 2026-11-14; `preview-qa.ts`): the cone run's report when the checkout has
+ * one for this commit (`build/preview-qa/preview-qa.json`, or
+ * `PREVIEW_QA_REPORT`; the site-publish workflow fetches it), else a section
+ * that says no cone run is recorded and how to start one. The main QA
+ * report stays below it, unchanged.
+ */
+export function previewQa(repo: string, site: string, sha: string, log: (s: string) => void): void {
+  const report = findReport(repo);
+  const pages = injectSite(site, report, { sha });
+  const state = report === undefined ? "no cone run recorded" : report.head.startsWith(sha.slice(0, 7)) ? `cone run of ${report.head.slice(0, 7)}` : `cone run of ${report.head.slice(0, 7)}, not this commit`;
+  log(`· preview QA (${state}) on ${pages.length} QA page(s)`);
+}
+
 export function writePreviewRecord(repo: string, site: string, o: { slug: string; sha: string; base: string; log: (s: string) => void }): void {
   let baseSha: string | undefined;
   try {

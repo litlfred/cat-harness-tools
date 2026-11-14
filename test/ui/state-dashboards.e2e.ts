@@ -7,6 +7,7 @@ import { repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 import { declaredVisualisers } from "../../scripts/viewer-declarations.ts";
 import { declaredPagePath, firstPaintBlock, SCHEME_INK } from "../support/site-pages.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * Every generated state dashboard, audited — bean `5wrg`.
@@ -98,7 +99,7 @@ function dashboards(): Map<string, string> {
 const PAGES = dashboards();
 const IDS = [...PAGES.keys()];
 
-const asset = (rel: string) => readFileSync(join(ROOT, SITE, rel), "utf8");
+const asset = (rel: string) => readFileSync(overlayPath(join(ROOT, SITE, rel)), "utf8");
 
 /**
  * A stand-in for the default layout: what it contributes to these pages and

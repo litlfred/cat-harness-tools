@@ -47,6 +47,7 @@ import { TOOL_TYPES, toolTypeNameOf } from "../schemas/tools/tool-types.js";
 import type { ToolDefinition } from "../schemas/tools/tool.js";
 import type { McpToolEntry } from "./tool-api.ts";
 import { contractFile, contractIdentity, skillContracts, type SkillContract } from "./skill-contracts.ts";
+import { CLASS_DIAGRAM_STYLE, contractDiagramHtml } from "./class-diagram.ts";
 
 /** A skill as a Tool page shows it. */
 export interface SkillInfo {
@@ -208,6 +209,9 @@ export function toolPage(d: ToolPageData, generatedFm: string): string {
   b.push(
     `<script type="application/ld+json">${JSON.stringify(node).replace(/</g, "\\u003c")}</script>`,
     "",
+    // The class diagrams below share one stylesheet (scripts/class-diagram.ts).
+    CLASS_DIAGRAM_STYLE,
+    "",
     `# ${cell(t.title)}`,
     "",
     t.description,
@@ -245,6 +249,12 @@ export function toolPage(d: ToolPageData, generatedFm: string): string {
     if (others.length) b.push(`Also satisfied by: ${others.map((x) => link(code(x), d.toolHref(x))).join(", ")}.`, "");
     if (info.io.length === 0) {
       b.push("The skill declares no I/O contract (`schemas/skills/" + s + "/{input,output}.schema.json`).", "");
+    }
+    if (info.io.length) {
+      // The contracts as one class diagram (bean `cat-tools-4xq6`): the skill
+      // box points at each contract's root class, every class is the schemas
+      // viewer's own drawing, and the skill box links to the skill's page.
+      b.push(contractDiagramHtml({ name: s, source: "skill", ...(d.skillHref(s) ? { href: d.skillHref(s)! } : {}) }, info.io), "");
     }
     for (const c of info.io) {
       b.push(`**${c.io}** — ${code(c.file)}${typeof c.schema.$id === "string" ? `, ${code(c.schema.$id)}` : ""}`, "");
@@ -336,6 +346,16 @@ export function toolPage(d: ToolPageData, generatedFm: string): string {
     for (const m of d.mcpTools) {
       b.push(`**${code(m.name)}** — ${m._meta.source === "registrar" ? "read from its registrar" : "built from the Tool's declared inputs"}.`, "");
       const rows = schemaRows(m.inputSchema);
+      if (rows.length) {
+        // The MCP input as a class diagram, the Tool box pointing at it and
+        // linking to the layer's MCP tool list, where this entry is served.
+        b.push(
+          contractDiagramHtml({ name: t.id, source: "tool", ...(d.api ? { href: d.api.mcp } : {}) }, [
+            { io: m.name, file: `mcp/${m.name}.input.schema.json`, schema: { title: `${m.name} input`, ...m.inputSchema } },
+          ]),
+          "",
+        );
+      }
       if (rows.length) b.push("| parameter | type | required | description |", "|---|---|---|---|", ...rows, "");
       else b.push("It takes no parameters.", "");
     }
@@ -621,4 +641,37 @@ export function mcpServersOf(repo: string): ToolPageData["mcpServers"] {
 export function pageHref(fromPage: string, toPage: string): string {
   const r = posix.relative(posix.dirname(fromPage), toPage);
   return r.endsWith("index.md") ? r.slice(0, -"index.md".length) || "./" : r;
+}
+
+/**
+ * A skill page's "Input and output" section: the skill's declared contracts as
+ * one class diagram, the same drawing a Tool page shows for that skill, plus a
+ * link to each contract file. Empty when the skill declares none, so a page
+ * without contracts gains no empty heading.
+ */
+export function skillContractSectionMd(
+  skill: string,
+  roots: readonly string[],
+  repo: string,
+  fileHref: (file: string) => string | undefined = () => undefined,
+): string[] {
+  const io = skillIoContracts(skill, roots, repo);
+  if (io.length === 0) return [];
+  const docs = io.map((c) => {
+    const href = fileHref(c.file);
+    return { ...c, ...(href ? { href } : {}) };
+  });
+  return [
+    "",
+    "## Input and output contracts",
+    "",
+    "What this skill takes and gives, as a class diagram drawn from its JSON Schema contracts by the schemas viewer's own renderer. Each box links to its definition; each type to its specification.",
+    "",
+    CLASS_DIAGRAM_STYLE,
+    "",
+    contractDiagramHtml({ name: skill, source: "skill" }, docs),
+    "",
+    ...docs.map((c) => `- **${c.io}**: ${c.href ? `[\`${c.file}\`](${c.href})` : `\`${c.file}\``}`),
+    "",
+  ];
 }

@@ -64,7 +64,7 @@ import { BURNDOWN_SCHEMA, DEFAULT_BURNDOWN_DAYS, buildBurndownFeed, burndownTarg
 import { snapshotsFromGit } from "./epic-burndown.ts";
 import { missingTopLevelKeys } from "./lib/json-shape.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
-import { writePathAt } from "./lib/layer-output.ts";
+import { overlayPath, writePathOf } from "./lib/layer-output.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { resolveThemeBackdrop } from "../schemas/ui/theme.js";
 import { THEMES, themeById } from "../schemas/ui/themes.js";
@@ -402,7 +402,7 @@ function qaStoredFor(path: string): boolean {
     const logical = qaAssetDirOf(src);
     // A witness is emitted at its layer output root when its layer is mounted
     // (bean `cat-tools-sm8r`, item 4); its storage is still its layer's.
-    const dir = [logical, writePathAt(logical)].find((d) => path === d || path.startsWith(d + sep));
+    const dir = [logical, writePathOf(logical)].find((d) => path === d || path.startsWith(d + sep));
     if (dir !== undefined) {
       if (!storedTrees.has(logical)) storedTrees.set(logical, src.base ? QA_ASSETS_STORED : qaStorageOf(logical) !== undefined);
       return storedTrees.get(logical)!;
@@ -1162,7 +1162,12 @@ function renderPage(page: WebPage): string {
  * for review; gating them could only ever fire on a graph that changed, which
  * is precisely what bean `d2kp` exists to stop the gate doing.
  */
-function emit(path: string, content: string, kind: "page" | "data" | "verdict" | "stored" = "page"): void {
+function emit(logical: string, content: string, kind: "page" | "data" | "verdict" | "stored" = "page"): void {
+  // A page or datum of a MOUNTED layer is computed output (bean `cat-tools-sm8r`,
+  // item 4): a check compares the copy a reader sees (output root, else the
+  // pinned page), a write goes to the layer's output root, never the mount. In
+  // the layer's own checkout both are `logical`.
+  const path = check ? overlayPath(logical) : writePathOf(logical);
   if (check) {
     const present = existsSync(path);
     const current = present ? readFileSync(path, "utf-8") : "";
@@ -1202,6 +1207,7 @@ function emit(path: string, content: string, kind: "page" | "data" | "verdict" |
     stale++;
     return;
   }
+  if (path !== logical) mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, content);
   if (kind === "verdict" || kind === "stored") qaWritten++;
   else written++;
@@ -1218,7 +1224,7 @@ function emit(path: string, content: string, kind: "page" | "data" | "verdict" |
 function emitWitness(logical: string, content: string): void {
   // A mounted layer's witness goes to its layer output root, never into the
   // mount (bean `cat-tools-sm8r`, item 4). Compared, emitted and swept there.
-  const path = writePathAt(logical);
+  const path = writePathOf(logical);
   // Directories only on the WRITE path: `--check` creates nothing, so a check
   // run cannot leave an empty witness tree that a later reader mistakes for a
   // fetched one.
@@ -2352,7 +2358,7 @@ const orphanedQaAssets = new Set<string>();
 // base that loses a page must lose that page's projections too.
 // Where each tree is WRITTEN: the sweep lists and removes only what this
 // generator writes, never a mount's pinned bytes (bean `cat-tools-sm8r`, item 4).
-const witnessTrees = [...new Set(allDocsSources().map((s) => writePathAt(qaAssetDirOf(s))))];
+const witnessTrees = [...new Set(allDocsSources().map((s) => writePathOf(qaAssetDirOf(s))))];
 for (const orphan of witnessTrees.flatMap((d) => listQaAssets(d))) {
   if (emittedQa.has(orphan)) continue;
   orphanedQaAssets.add(orphan);

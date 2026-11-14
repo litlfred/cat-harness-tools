@@ -40,7 +40,7 @@ import { QA_CRITERIA_BY_ID } from "./qa-criteria-registry";
 import { findContentRepoRoot } from "./repo-root";
 import { loadBlockModuleSync, type BlockLoadFailure } from "./block-module";
 import { blockQaPath, existingBlockQaPath } from "./qa-paths";
-import { overlayPath, writePathAt } from "../scripts/lib/layer-output.ts";
+import { overlayPath, writePathOf } from "../scripts/lib/layer-output.ts";
 import { readBaseline } from "../scripts/qa-results.ts";
 import { evaluateJsonManifest, isJsonManifest } from "./json-manifest.ts";
 import type { QaStoreOptions } from "../scripts/qa-store.ts";
@@ -1328,7 +1328,7 @@ export function saveQaReport(path: string, report: BlockQaReport): void {
   // separately by each of them is one that will be forgotten by the fifth.
   // A mounted layer's verdict goes to its layer output root, never into the
   // mount (bean `cat-tools-sm8r`, item 4); `existingBlockQaPath` reads it there.
-  const to = writePathAt(path);
+  const to = writePathOf(path);
   mkdirSync(dirname(to), { recursive: true });
   writeFileSync(to, JSON.stringify(report, null, 2) + "\n");
 }
@@ -1763,7 +1763,7 @@ export function saveQaScriptSidecar(
   ) {
     return;
   }
-  const p = writePathAt(scriptSidecarPath(sidecar.criterion_id, repoRoot));
+  const p = writePathOf(scriptSidecarPath(sidecar.criterion_id, repoRoot));
   // Use `dirname(p)` (not `join(p, "..")`) — the latter happens to
   // normalise to the parent on POSIX but reads as "go up from this
   // FILE", which is semantically wrong. `dirname` is the standard

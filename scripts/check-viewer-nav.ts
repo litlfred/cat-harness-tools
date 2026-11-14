@@ -27,7 +27,7 @@
  *   navbar regressed
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { overlayPath, writePathAt } from "./lib/layer-output.ts";
+import { overlayPath, writePathOf } from "./lib/layer-output.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
@@ -451,7 +451,7 @@ if (import.meta.main) {
     }
   } else {
     // A mounted layer's sidecar goes to its layer output root (bean `cat-tools-sm8r`, item 4).
-    const to = writePathAt(SIDECAR);
+    const to = writePathOf(SIDECAR);
     mkdirSync(dirname(to), { recursive: true });
     writeFileSync(to, text);
     console.log(`  ✓ ${relative(REPO, SIDECAR)}`);

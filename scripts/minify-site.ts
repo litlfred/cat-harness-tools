@@ -70,6 +70,38 @@
  * `restore-staging.ts` lays previously-published previews back into `_site`,
  * and a pass that drifted on re-entry would rewrite them on every deploy.
  *
+ * ## Shared scripts and stylesheets — the same pass, a second walk
+ *
+ * The chrome every page loads (`docs-ui.js`, `docs-ui.css`, `edit-links.js`,
+ * `navbar-row.js` …) is written to be read: about half of `docs-ui.js` is
+ * comments. `runMinifyAssets` minifies every `.js`, `.mjs` and `.css` in the
+ * built tree, after the HTML walk, under the same rule — the BUILT copy only;
+ * the committed source stays readable, so every check that compares a
+ * committed generated asset (`edit-links.js`, `navbar.js`) with its generator
+ * still sees the readable text, and `fa_asset_version` still hashes it.
+ * No source map is published, which is the convention already
+ * (`sourcemap: never`, `build-instance-site.ts`): the readable copy is the
+ * source in the repository the page's edit link points at.
+ *
+ * - **JS** goes through `Bun.Transpiler` with whitespace
+ *   minification only (comments and whitespace). Identifiers are NOT renamed: a classic script's
+ *   top-level names are globals other scripts read, and the transpiler would
+ *   rename them. Nothing is tree-shaken either (`Bun.build` drops unused
+ *   top-level functions, which in a classic script are globals).
+ * - **`"use strict"`** — the transpiler parses as a module and drops every
+ *   directive. A file whose ONLY directive opens the outermost IIFE that is
+ *   the whole script (the chrome's shape), or the script itself, gets one
+ *   directive back at the top, which is the same semantics. Any other placement
+ *   is copied through untouched rather than silently made sloppy.
+ * - **CSS** goes through `Bun.build` with `minify`, every import external.
+ * - **Licence comments** (`/*!`, `@license`, `@preserve`) are carried over.
+ * - **Not touched:** anything under a `vendor/` directory, `*.min.*` files,
+ *   the pinned pdf.js viewer, and any file the minifier cannot parse — it is
+ *   left as it was and counted, never reported as an error.
+ *
+ * Minifying changes WHAT a script is, not WHEN it loads, so the print path is
+ * unaffected: nothing here defers or skips a byte a printed page needs.
+ *
  * ## Three states, never two
  *
  * Exit 0 the tree was walked and the result reported · 2 the site directory
@@ -78,7 +110,8 @@
  *
  *   bun run cat-harness-tools/scripts/minify-site.ts --site ./_site [--check]
  */
-import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
 import { join, relative } from "path";
 import { isVendoredViewer } from "./pdf-viewer.ts";
 
@@ -417,13 +450,183 @@ export function runMinifySite(opts: RunOptions): RunResult {
   };
 }
 
+// ── Shared scripts and stylesheets ──────────────────────────────────────
+
+/** A licence comment the minified copy must keep (MIT requires it to travel). */
+const LICENCE_BLOCK = /\/\*(?:![\s\S]*?|\*?[\s\S]*?(?:@license|@preserve)[\s\S]*?)\*\//g;
+
+/** A `"use strict"` directive on its own line — the only form this corpus writes. */
+const STRICT_LINE = /^[ \t]*(["'])use strict\1;?[ \t]*$/gm;
+
+/** Strip block and line comments from a SHORT prefix (never a whole file). */
+function stripComments(s: string): string {
+  return s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\n)\s*\/\/[^\n]*/g, "$1");
+}
+
+/** The opening of an IIFE: `(function () {`, `;(function(){`, `(() => {`, `!function(){`. */
+const IIFE_OPEN = /^\s*[;!]?\s*\(?\s*(?:function\s*\(\s*\)|\(\s*\)\s*=>)\s*\{\s*$/;
+
+/** The minified shape of a script that is ONE IIFE and nothing else. */
+const IIFE_WHOLE = /^(?:\(function\(\)\{|\(\(\)=>\{|!function\(\)\{)[\s\S]*\}\)?\(\);?\s*$/;
+
+/**
+ * Where a script's strictness lives, so the minified copy can keep it.
+ *
+ * `none` — no directive. `whole` — one directive, which covers the whole
+ * script (at its top, or opening the IIFE the script is). `other` — anything
+ * else; the caller then leaves the file as it was.
+ */
+export function strictness(src: string): "none" | "whole" | "other" {
+  const hits = [...src.matchAll(STRICT_LINE)];
+  if (hits.length === 0) return "none";
+  if (hits.length > 1) return "other";
+  const before = stripComments(src.slice(0, hits[0].index));
+  if (/^\s*$/.test(before)) return "whole";
+  return IIFE_OPEN.test(before) ? "whole" : "other";
+}
+
+/** Prepend the licence comments the minifier dropped. */
+function keepLicences(src: string, out: string): string {
+  const lost = (src.match(LICENCE_BLOCK) ?? []).filter((c) => !out.includes(c));
+  return lost.length ? `${lost.join("\n")}\n${out}` : out;
+}
+
+const transpiler = new Bun.Transpiler({ loader: "js", minifyWhitespace: true });
+
+/** Minify one script, or `null` when it is left as it was (and why not, in `skip`). */
+export function minifyJs(src: string): { text: string } | { skip: string } {
+  const strict = strictness(src);
+  if (strict === "other") return { skip: "use strict placed where minifying would drop it" };
+  let out: string;
+  try {
+    out = transpiler.transformSync(src).trim();
+  } catch (e) {
+    return { skip: `does not parse: ${(e as Error).message.split("\n")[0]}` };
+  }
+  if (strict === "whole") {
+    // A directive that opened the IIFE goes back at the top of the script:
+    // the script IS that IIFE, so the scope it covers is the same.
+    const opensIife = !/^\s*$/.test(stripComments(src.slice(0, [...src.matchAll(STRICT_LINE)][0].index)));
+    if (opensIife && !IIFE_WHOLE.test(out)) return { skip: "use strict opens an IIFE that is not the whole script" };
+    // On its own line, so a second pass reads it as a directive again.
+    out = `"use strict";\n${out}`;
+  }
+  return { text: `${keepLicences(src, out)}\n` };
+}
+
+/** Minify one stylesheet with Bun's CSS minifier, every import left external. */
+export async function minifyCss(src: string): Promise<{ text: string } | { skip: string }> {
+  const dir = mkdtempSync(join(tmpdir(), "minify-css-"));
+  try {
+    const at = join(dir, "in.css");
+    writeFileSync(at, src);
+    const r = await Bun.build({ entrypoints: [at], minify: true, external: ["*"], throw: false });
+    if (!r.success || r.outputs.length !== 1) {
+      return { skip: `does not parse: ${r.logs.map(String).join("; ").split("\n")[0] || "no output"}` };
+    }
+    return { text: `${keepLicences(src, (await r.outputs[0].text()).trim())}\n` };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** A script or stylesheet this pass may rewrite: ours, not a vendored copy. */
+export function isOwnAsset(siteRelative: string): boolean {
+  const p = siteRelative.split(/[\\/]/).join("/");
+  if (!/\.(?:m?js|css)$/i.test(p)) return false;
+  if (/\.min\.(?:m?js|css)$/i.test(p)) return false;
+  if (p.split("/").includes("vendor") || p.split("/").includes("node_modules")) return false;
+  return !isVendoredViewer(p);
+}
+
+function allFiles(dir: string): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry);
+    let st;
+    try {
+      st = statSync(path);
+    } catch {
+      continue;
+    }
+    if (st.isDirectory()) found.push(...allFiles(path));
+    else found.push(path);
+  }
+  return found;
+}
+
+export interface AssetResult {
+  exitCode: number;
+  text: string;
+  bytesBefore: number;
+  bytesAfter: number;
+  /** gzip -9 of the same files, before and after: what a reader downloads. */
+  gzipBefore: number;
+  gzipAfter: number;
+  filesChanged: number;
+  filesSeen: number;
+  /** Files left as they were, with why. */
+  skipped: { path: string; why: string }[];
+}
+
+const gz = (s: string) => Bun.gzipSync(Buffer.from(s), { level: 9 }).length;
+const kib = (b: number) => `${(b / 1024).toFixed(0)} KiB`;
+
+/** Walk a built site and minify every script and stylesheet of ours. */
+export async function runMinifyAssets(opts: RunOptions): Promise<AssetResult> {
+  let files: string[];
+  try {
+    files = allFiles(opts.site).filter((f) => isOwnAsset(relative(opts.site, f)));
+  } catch (e) {
+    return {
+      exitCode: 2, text: `could not read ${opts.site}: ${(e as Error).message}`,
+      bytesBefore: 0, bytesAfter: 0, gzipBefore: 0, gzipAfter: 0, filesChanged: 0, filesSeen: 0, skipped: [],
+    };
+  }
+  let before = 0, after = 0, gzBefore = 0, gzAfter = 0, changed = 0;
+  const skipped: { path: string; why: string }[] = [];
+  for (const file of files) {
+    const src = readFileSync(file, "utf-8");
+    const r = /\.css$/i.test(file) ? await minifyCss(src) : minifyJs(src);
+    const text = "text" in r && r.text.length < src.length ? r.text : src;
+    if ("skip" in r) skipped.push({ path: relative(opts.site, file), why: r.skip });
+    before += Buffer.byteLength(src);
+    after += Buffer.byteLength(text);
+    gzBefore += gz(src);
+    gzAfter += gz(text);
+    if (text === src) continue;
+    changed += 1;
+    if (!opts.check) writeFileSync(file, text);
+  }
+  const verb = opts.check ? "would save" : "saved";
+  return {
+    exitCode: 0,
+    text:
+      `${files.length} script(s) and stylesheet(s) seen, ${changed} changed — ${verb} ` +
+      `${kib(before - after)} of ${kib(before)} raw, ${kib(gzBefore - gzAfter)} of ${kib(gzBefore)} gzip. ` +
+      `${skipped.length} left as they were` +
+      (skipped.length ? `: ${skipped.map((s) => `${s.path} (${s.why})`).join("; ")}` : "") + ".",
+    bytesBefore: before,
+    bytesAfter: after,
+    gzipBefore: gzBefore,
+    gzipAfter: gzAfter,
+    filesChanged: changed,
+    filesSeen: files.length,
+    skipped,
+  };
+}
+
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const siteAt = args.indexOf("--site");
-  const result = runMinifySite({
+  const opts = {
     site: siteAt >= 0 ? args[siteAt + 1] : "_site",
     check: args.includes("--check") || args.includes("--dry-run"),
-  });
+  };
+  const result = runMinifySite(opts);
   console.log(result.text);
-  process.exit(result.exitCode);
+  if (result.exitCode !== 0) process.exit(result.exitCode);
+  const assets = await runMinifyAssets(opts);
+  console.log(assets.text);
+  process.exit(assets.exitCode);
 }

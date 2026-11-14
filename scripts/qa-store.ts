@@ -81,7 +81,7 @@ import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { TreeStore } from "./branch-store.js";
 import { inputSiteReached, qaRefLine, quietly } from "../schemas/sdlc/input-trace.ts";
-import { mountedInstancesCached, outputTwinOf, overlayDirs, writePathAt } from "./lib/layer-output.ts";
+import { mountedInstancesCached, outputTwinOf, overlayDirs, writePathOf } from "./lib/layer-output.ts";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -838,7 +838,7 @@ export function fetchQa(args: { ref: string; into?: string; prefix?: string }, o
   for (const [p, text] of t.files) {
     // Never into a mount: a mounted layer's results are materialised under its
     // layer output root (bean `cat-tools-sm8r`, item 4), where every reader looks.
-    const dest = writePathAt(join(into, p));
+    const dest = writePathOf(join(into, p));
     mkdirSync(dirname(dest), { recursive: true });
     writeFileSync(dest, text);
   }

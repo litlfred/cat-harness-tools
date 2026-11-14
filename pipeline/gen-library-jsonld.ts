@@ -86,7 +86,8 @@ import { findContentRepoRoot } from "./repo-root";
 import { serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
-import type { DocumentImage, ImagesSidecar } from "../schemas/content/document-image.ts";
+import type { ImagesSidecar } from "../schemas/content/document-image.ts";
+import { VECTOR_FIGURES_FILE, type VectorFigure, type VectorFiguresSidecar } from "../schemas/content/vector-figure.ts";
 import { buildTabularNodes, tableBlockId, tabularShapeOf } from "./tabular-nodes.ts";
 import { TABULAR_CSVW_FILENAME } from "../schemas/library/tabular-csvw.ts";
 import {
@@ -453,6 +454,47 @@ function tablePages(t: TranscribedTable): number[] {
   return Array.isArray(p) ? p.filter((n): n is number => Number.isInteger(n)).sort((a, b) => a - b) : [];
 }
 
+/** A kept figure, raster or vector, as a figure block reads it. */
+export interface PlacedFigure {
+  id: string;
+  /** Relative to the entry. */
+  file: string;
+  page: number;
+  narrative?: unknown;
+}
+
+/**
+ * Every figure an entry KEEPS, in page order, raster before vector on a page:
+ * `images.json`'s placed images and `vector-figures.json`'s renders whose role
+ * an inspection set to `figure`.
+ *
+ * The vector half is why this exists. The figure blocks were built from
+ * `images.json` alone, so a figure drawn in vector ink — a diagram, a chart,
+ * a flow — reached the sidecar, the narrative queue and the viewer, and never
+ * the graph: 330 such figures in 49 entries of one library had a render and a
+ * description and no block (owner, 2026-11-14: "has no figures ... needs
+ * reingesting"). A render with no file (`unrendered_reason`) and an
+ * assembly-only record (`role: undetermined`) are not kept figures, so neither
+ * becomes a block.
+ */
+export function placedFigures(
+  images: ImagesSidecar | undefined | null,
+  vectorFigures?: { figures?: readonly unknown[] | null } | null,
+): PlacedFigure[] {
+  const out: PlacedFigure[] = [];
+  for (const img of images?.images ?? []) {
+    if (img.role !== "figure" || img.basis === undefined) continue;
+    out.push({ id: img.id, file: img.file, page: img.basis.page, narrative: img.narrative });
+  }
+  for (const raw of vectorFigures?.figures ?? []) {
+    const f = raw as Partial<VectorFigure>;
+    if (f.role !== "figure" || typeof f.file !== "string" || !f.file || typeof f.id !== "string") continue;
+    if (typeof f.page !== "number" || !Number.isInteger(f.page)) continue;
+    out.push({ id: f.id, file: f.file, page: f.page, narrative: f.narrative });
+  }
+  return out;
+}
+
 /** Everything one document contributes, as files to write. */
 export function buildDocumentNodes(
   docId: string,
@@ -466,6 +508,9 @@ export function buildDocumentNodes(
   subgraphStart: string = findContentRepoRoot(),
   sourceMaterialization?: unknown,
   tables?: readonly TranscribedTable[],
+  /** The owning layer's root, whose dependency closure types the blocks ({@link owningLayerRoot}). */
+  typingRoot?: string,
+  vectorFigures?: VectorFiguresSidecar | { figures?: readonly unknown[] | null } | null,
 ): Array<{ path: string; content: string }> {
   // Without a resolved title (a test, a caller with no disk), resolve from the
   // structure alone: the Info dictionary or a text heading, never the page-1
@@ -497,12 +542,11 @@ export function buildDocumentNodes(
   // `images: null` means the extractor could not look, which is not the same
   // as "no figures" and must not become an empty map silently; it does become
   // one here, but the sidecar keeps the reason and `pdf-images.py` exits 2.
-  const figuresByPage = new Map<number, DocumentImage[]>();
-  for (const img of images?.images ?? []) {
-    if (img.role !== "figure" || img.basis === undefined) continue;
-    const list = figuresByPage.get(img.basis.page) ?? [];
-    list.push(img);
-    figuresByPage.set(img.basis.page, list);
+  const figuresByPage = new Map<number, PlacedFigure[]>();
+  for (const f of placedFigures(images, vectorFigures)) {
+    const list = figuresByPage.get(f.page) ?? [];
+    list.push(f);
+    figuresByPage.set(f.page, list);
   }
 
   const sectionIris: string[] = [];
@@ -602,7 +646,7 @@ export function buildDocumentNodes(
           // A dependency's kind (a higher layer's `functional-requirement`
           // or `indicator`) is typed through the contribution registry; without
           // it such a node had no `@type` at all.
-          "@type": candidateTypes(c.kind),
+          "@type": candidateTypes(c.kind, typingRoot),
           kind: c.kind,
           title: c.name ?? undefined,
           pageStart: sec.page_start ?? undefined,
@@ -756,37 +800,62 @@ function libraryPrefixes(): Map<string, string> {
   return contentPrefixes;
 }
 
-let contributions: ContributionRegistry | null | undefined;
+const contributionsByRoot = new Map<string, ContributionRegistry | null>();
 
 /**
- * The block kinds the content repository's dependencies contribute — the DAK
+ * The block kinds a layer and its declared dependencies contribute — the DAK
  * layer's `functional-requirement`, `non-functional-requirement`, `indicator`
- * and the rest. Loaded once, as `gen-block-jsonld` loads them. A checkout
- * whose contributions cannot be loaded types only the core kinds, which is
- * what it did before.
+ * and the rest — loaded once per root, as `gen-block-jsonld` loads them.
+ *
+ * Rooted at the layer that OWNS the library entry, not at the checkout. From
+ * the checkout root the registry held every mounted layer's kinds, so the same
+ * committed node was typed by whatever happened to be mounted: a library
+ * layer's indicators were a DAK layer's `Indicator` in the folio-assistant
+ * index (where that DAK layer, ABOVE the library's, is mounted) and
+ * `cat-harness:Block` in the library layer's own checkout, and no committed
+ * file passed both checks
+ * (folio-assistant#3124). `loadContributionsSync` walks the root's own
+ * declared dependencies, so a layer is typed only by kinds it can see in any
+ * checkout. A root whose contributions cannot be loaded types only the core
+ * kinds, which is what it did before.
  */
-function contributedKinds(): ContributionRegistry | undefined {
-  if (contributions === undefined) {
+function contributedKinds(root: string = contributionsRoot()): ContributionRegistry | undefined {
+  const key = resolve(root);
+  if (!contributionsByRoot.has(key)) {
     try {
-      contributions = loadContributionsSync<FolioContribution, ContributionRegistry>(
-        contributionsRoot(),
-        new ContributionRegistry(),
+      contributionsByRoot.set(
+        key,
+        loadContributionsSync<FolioContribution, ContributionRegistry>(key, new ContributionRegistry()),
       );
     } catch {
-      contributions = null;
+      contributionsByRoot.set(key, null);
     }
   }
-  return contributions ?? undefined;
+  return contributionsByRoot.get(key) ?? undefined;
 }
 
 /**
- * A candidate's `@type`: its kind's, through the contribution registry, or the
- * generic library block class when no mounted layer types the kind. An
- * L1 library may hold another layer's `indicator` without mounting that
- * layer; its node is then still a typed block, never one with no type.
+ * The layer a library entry belongs to, for typing its blocks: the nearest
+ * directory above it that carries a layer declaration. An entry with none
+ * above it (a bare content repository) is typed from the checkout, as before.
  */
-export function candidateTypes(kind: string): string[] {
-  const types = typesForKind(kind, contributedKinds());
+export function owningLayerRoot(locatedAt: string): string {
+  for (let at = dirname(resolve(locatedAt)); at !== dirname(at); at = dirname(at)) {
+    if (readDeclaration(at) !== undefined) return at;
+  }
+  return contributionsRoot();
+}
+
+/**
+ * A candidate's `@type`: its kind's, through the contribution registry of
+ * `root` (the owning layer; the checkout when not given), or the generic
+ * library block class when no layer in that root's dependency closure types
+ * the kind. An L1 library may hold another layer's `indicator` without
+ * depending on that layer; its node is then still a typed block, never one
+ * with no type.
+ */
+export function candidateTypes(kind: string, root?: string): string[] {
+  const types = typesForKind(kind, contributedKinds(root));
   return types.length ? types : [termCurie("Block")];
 }
 
@@ -1073,6 +1142,10 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       subgraphStart,
       readJson<unknown>(join(dir, SOURCE_MATERIALIZATION_RECORD)),
       Array.isArray(transcribed?.tables) ? transcribed.tables : undefined,
+      owningLayerRoot(locatedAt),
+      // Vector figures an inspection kept (`role: figure`), blocks beside the
+      // raster ones — see `placedFigures`.
+      readJson<{ figures?: unknown[] | null }>(join(dir, VECTOR_FIGURES_FILE)),
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
     if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance));

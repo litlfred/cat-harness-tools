@@ -10,12 +10,12 @@
  */
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { publishedRoot, recipeFromConfig, siteStepEnv } from "../../build-instance-site.ts";
-import { droppedByRuling, matchesDropped, parityShortfall, siteFeatures } from "../../site-parity.ts";
+import { droppedByRuling, matchesDropped, PARITY_REPORT, parityReport, parityShortfall, readParityReport, siteFeatures, writeParityReport } from "../../site-parity.ts";
 import { THEME_SIDEBAR_RULING } from "../../build-instance-site.ts";
 
 const tmp = (p: string) => mkdtempSync(join(tmpdir(), p));
@@ -96,6 +96,89 @@ describe("parityShortfall — what the candidate would lose", () => {
   });
 });
 
+describe("a shortfall is a QA finding, not a refusal (owner, 2026-11-14)", () => {
+  // A folio's root publish was refused because its index.html lacked the icon row.
+  // Owner: "It shouldn't fail if there is an issue it should be a QA report."
+  const current = siteFeatures(folioSiteRoot(), ["branches"]);
+  const noRowOnIndex = { ...current, index: (current.index ?? []).filter((k) => k !== "navbarRow") };
+
+  test("an index.html without the icon row is published with the shortfall reported", () => {
+    const r = parityReport(current, noRowOnIndex);
+    expect(r.outcome).toBe("published-with-shortfall");
+    expect(r.shortfall).toEqual(["the harness icon row (#fa-navbar-row): on the current root's index.html, not on the candidate's"]);
+  });
+
+  test("the guard still finds the missing icon row; only a caller that asks for refuse is refused", () => {
+    expect(parityReport(current, noRowOnIndex, [], true).outcome).toBe("refused");
+    expect(parityReport(current, current, [], true).outcome).toBe("carries-everything");
+  });
+
+  test("the report is written beside the link report, for the QA page", () => {
+    const site = tmp("parity-qa-");
+    writeParityReport(site, parityReport(current, noRowOnIndex));
+    expect(PARITY_REPORT).toBe("assets/site-qa/parity.json");
+    const back = JSON.parse(readFileSync(join(site, PARITY_REPORT), "utf-8"));
+    expect(back.$schema).toBe("site-parity-report/v1");
+    expect(back.outcome).toBe("published-with-shortfall");
+    expect(back.shortfall).toHaveLength(1);
+    expect(back.current.stamp).toEqual({ present: true });
+    rmSync(site, { recursive: true, force: true });
+  });
+});
+
+describe("a loss is named against the last clean publish until it is fixed (owner, 2026-11-14: \"last clean\")", () => {
+  // The case that showed it: a folio's root lost the icon row; the next three
+  // publishes each compared with the one before, which also lacked it, and read clean.
+  const clean = siteFeatures(folioSiteRoot(), ["branches"]);
+  const lost = { ...clean, index: (clean.index ?? []).filter((k) => k !== "navbarRow") };
+  const ROW = "the harness icon row (#fa-navbar-row): on the current root's index.html, not on the candidate's";
+
+  test("a publish that loses the icon row is named, and the clean root it replaced becomes the baseline", () => {
+    const r1 = parityReport(clean, lost, [], false, undefined, "aaa111");
+    expect(r1.shortfall).toEqual([ROW]);
+    expect(r1.baseline?.features.index).toContain("navbarRow");
+    expect(r1.baseline?.from).toBeUndefined();
+  });
+
+  test("the next publish, still without it, is named against the last clean publish, not read as clean", () => {
+    const r1 = parityReport(clean, lost, [], false, undefined, "aaa111");
+    const r2 = parityReport(lost, lost, [], false, r1, "bbb222");
+    expect(r2.outcome).toBe("published-with-shortfall");
+    expect(r2.shortfall).toEqual([`${ROW} (against the last clean publish)`]);
+    const r3 = parityReport(lost, lost, [], false, r2, "ccc333");
+    expect(r3.shortfall).toEqual(r2.shortfall);
+    expect(r3.baseline).toEqual(r1.baseline);
+  });
+
+  test("once fixed it reads clean, and the fixed build becomes the next baseline, named by its commit", () => {
+    const r1 = parityReport(clean, lost, [], false, undefined, "aaa111");
+    const fixed = parityReport(lost, clean, [], false, r1, "ddd444");
+    expect(fixed.outcome).toBe("carries-everything");
+    expect(fixed.baseline?.from).toBe("ddd444");
+    expect(parityReport(clean, lost, [], false, fixed).shortfall[0]).toBe(ROW);
+    expect(parityReport(lost, lost, [], false, parityReport(clean, lost, [], false, fixed)).shortfall).toEqual([`${ROW} (against the last clean publish, ddd444)`]);
+  });
+
+  test("a loss the owner's ruling drops is not named against the baseline either", () => {
+    const r1 = parityReport(clean, lost, [], false, undefined);
+    const ruling = [{ feature: "navbarRow" as const, ruling: "the row moved off the home page (test)" }];
+    expect(parityReport(lost, lost, ruling, false, r1).shortfall).toEqual([]);
+  });
+
+  test("a site's own report is read back with its baseline; an older one without a baseline, or none, reads as having none", () => {
+    const site = tmp("parity-prev-");
+    expect(readParityReport(site)).toBeUndefined();
+    writeParityReport(site, parityReport(clean, lost, [], false, undefined, "aaa111"));
+    expect(readParityReport(site)?.baseline?.features.index).toContain("navbarRow");
+    const { baseline: _b, ...old } = parityReport(clean, lost);
+    writeParityReport(site, old as never);
+    expect(readParityReport(site)?.baseline).toBeUndefined();
+    writeFileSync(join(site, PARITY_REPORT), "not json");
+    expect(readParityReport(site)).toBeUndefined();
+    rmSync(site, { recursive: true, force: true });
+  });
+});
+
 describe("the recipe an IG declares (site.build)", () => {
   const checkout = (build: unknown) => {
     const d = tmp("recipe-");
@@ -104,9 +187,11 @@ describe("the recipe an IG declares (site.build)", () => {
   };
 
   test("keep, profile and links are read and checked", () => {
-    expect(recipeFromConfig(checkout({ pre: ["site:ast"], keep: ["branches"], profile: "ig-repo-site", links: "report" }), "r")).toEqual({
-      pre: ["site:ast"], sourceSteps: [], siteSteps: [], keep: ["branches"], profile: "ig-repo-site", links: "report",
+    // `report` is the default (owner, 2026-11-14), so only `refuse` is carried.
+    expect(recipeFromConfig(checkout({ pre: ["site:ast"], keep: ["branches"], profile: "ig-repo-site", links: "refuse" }), "r")).toEqual({
+      pre: ["site:ast"], sourceSteps: [], siteSteps: [], keep: ["branches"], profile: "ig-repo-site", links: "refuse",
     });
+    expect(recipeFromConfig(checkout({ links: "report", coverage: "report" }), "r")).toEqual({ pre: [], sourceSteps: [], siteSteps: [] });
     expect(() => recipeFromConfig(checkout({ keep: ["../x"] }), "r")).toThrow(/keep/);
     expect(() => recipeFromConfig(checkout({ keep: ["."] }), "r")).toThrow(/keep/);
     expect(() => recipeFromConfig(checkout({ profile: "ig" }), "r")).toThrow(/profile/);

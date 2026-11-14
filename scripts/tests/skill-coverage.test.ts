@@ -47,6 +47,7 @@ import { isPublishedSkill, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { ownElementPattern } from "../../schemas/kg/namespaces.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { overlayPath } from "../lib/layer-output.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -68,7 +69,7 @@ const ROOT = resolve(HARNESS_ROOT);
  * run on somebody's machine.
  */
 const EXPORTED = await buildExport({ baseUrl: "https://example.invalid/fa" });
-const PUBLISHED = join(ROOT, siteDirFor(ROOT), "reference/skill-instructions");
+const PUBLISHED = overlayPath(join(ROOT, siteDirFor(ROOT), "reference/skill-instructions"));
 /** The published reference pages are written at publish and gitignored (bean w1gy F18). */
 const NOT_PUBLISHED = (): boolean =>
   siteNotBuilt("the skill reference pages `skills:docs` writes at publish (gitignored)", PUBLISHED);

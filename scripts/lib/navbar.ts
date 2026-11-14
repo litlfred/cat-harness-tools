@@ -625,11 +625,12 @@ export function navbarCss(): string {
     // is a geometry argument, and a host stylesheet moves where a label starts
     // without touching any of these numbers. `opacity`, not `display:none` --
     // a screen reader should still reach them.
-    // LONG NAMES WRAP (owner, 2026-11-10, option D): a second line rather
-    // than an ellipsis, a hover or a sideways scroll. The column is
-    // `.fa-nav-in`'s fixed width at rest and open alike, so a row's height
-    // does not change when the bar opens.
-    `.fa-nav-label{min-width:0;white-space:normal;overflow-wrap:anywhere;opacity:0;transition:opacity .12s ease}`,
+    // ONE LINE, FULL NAME ON HOVER (owner, 2026-11-14, replacing the
+    // 2026-11-10 option D wrap): "titles on LHS navbar too long … they need
+    // to be one line w/ hover to show more". A wrapped IRIS title ran to ten
+    // lines. The row's `title` carries the whole name (itemHtml), and the
+    // drag edge still widens the bar for a reader who wants more of it.
+    `.fa-nav-label{min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .12s ease}`,
     // A bullet is a dot, not a 32px mark: its column is the dot's width.
     `.fa-nav-glyph.fa-nav-bullet{flex-basis:8px}`,
     `.fa-nav-glyph.fa-nav-bullet:empty{flex-basis:0;margin-inline-end:-8px}`,
@@ -789,7 +790,8 @@ function itemHtml(i: NavItem, c: Ctx): string {
   const text = same ? `<span class="fa-nav-sr">${esc(i.label)}</span>` : esc(i.label);
   const body = `${mark(i, c)}<span class="fa-nav-label">${text}${q}${sr}</span>`;
   const named = i.qualifier ? `${i.label} · ${i.qualifier}` : i.label;
-  const title = i.description ? ` title="${esc(`${named} — ${i.description}`)}"` : "";
+  // Every row names itself in full on hover: its label is cut to one line.
+  const title = ` title="${esc(i.description ? `${named} — ${i.description}` : named)}"`;
   // Indent by PADDING rather than by a nested list: a nested `<ul>` would make
   // the document index a different shape from every other group here, and the
   // rows are links either way.

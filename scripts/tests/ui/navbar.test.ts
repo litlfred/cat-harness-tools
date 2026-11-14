@@ -168,13 +168,15 @@ describe("three regions, and only the middle one scrolls", () => {
     expect(graphs).toContain('<span class="fa-nav-note">no viewer yet</span>');
     // Inside the same element as the label, so it is read as one row rather
     // than as a label and a detached aside.
-    expect(graphs).toMatch(/<span class="fa-nav-dead">.*?catalogue.*?no viewer yet.*?<\/span>/s);
+    expect(graphs).toMatch(/<span class="fa-nav-dead" title="catalogue">.*?catalogue.*?no viewer yet.*?<\/span>/s);
     // NOT `aria-disabled`, and this is the owner's "so it does not read as a
     // control": nothing here is disabled, because nothing here is a control.
     // Marking a `<span>` disabled announces a widget that does not exist.
     expect(graphs).not.toContain("aria-disabled");
-    // And not `title` either — the thing that was already tried.
-    expect(graphs).not.toContain("title=");
+    // And not `title` either — the thing that was already tried. A row's
+    // title is its full NAME (its label is cut to one line, owner
+    // 2026-11-14), never the reason, which stays content.
+    expect(graphs).not.toMatch(/title="[^"]*viewer/);
   });
 
   it("a row that OPENS carries no note — only an inert row owes a reason", () => {
@@ -191,7 +193,7 @@ describe("three regions, and only the middle one scrolls", () => {
     // it must not be drawn as a link.
     const graphs = region(navbarHtml(model), "fa-nav-graphs");
     expect(graphs).toContain("catalogue");
-    expect(graphs).toContain('<span class="fa-nav-dead">');
+    expect(graphs).toContain('<span class="fa-nav-dead" title="catalogue">');
     expect(graphs).not.toContain('href="undefined"');
   });
 
@@ -248,7 +250,7 @@ describe("the exploding menu", () => {
     // `pb04`: a dead link is worse than no link, because it invites a click
     // and then reads as "this site is broken". `bootstrap` has href null.
     const html = navbarHtml(model);
-    expect(html).toContain('<span class="fa-nav-dead">');
+    expect(html).toContain('<span class="fa-nav-dead" title="bootstrap">');
     expect(html).not.toContain('<a href="undefined"');
   });
 });
@@ -303,9 +305,8 @@ describe("at rest it is a strip, and opens three ways", () => {
     expect(src).toContain(String(NAV_RESIZE_MIN_PX));
     expect(src).toContain(String(NAV_RESIZE_MAX_PX));
     expect(src).toContain(`"${NAV_WIDTH_KEY}"`);
-    // Long names wrap rather than being cut.
-    expect(css).toContain(".fa-nav-label{min-width:0;white-space:normal");
-    expect(css).not.toContain("text-overflow:ellipsis");
+    // One line, full name on hover (owner, 2026-11-14, replacing option D's wrap).
+    expect(css).toContain(".fa-nav-label{min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis");
   });
 
   it("renders no [x] and no ☰ — the header is the one control (#1757)", () => {
@@ -1225,7 +1226,7 @@ describe("a harness row is not a graph-typology row, whatever its mark (#2151)",
       }),
     );
     const at = html.indexOf('<div class="fa-nav-bottom">');
-    expect(html.slice(at)).toContain('<a href="../smart-trust/"><span class="fa-nav-glyph');
+    expect(html.slice(at)).toContain('<a href="../smart-trust/" title="smart-trust"><span class="fa-nav-glyph');
     expect(html.slice(at)).not.toContain("fa-nav-kind");
     // ...while the kind rows above keep it.
     expect(html.slice(0, at)).toContain('class="fa-nav-kind"');

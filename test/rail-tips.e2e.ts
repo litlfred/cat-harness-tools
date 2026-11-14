@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { railedViewer } from "./railed-fixture.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * Bean `ob3m` finding 1 — the owner's ruling, 2026-10-01, option 1 of 4:
@@ -33,16 +34,16 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
 // The row's own stylesheet FIRST, as `head_custom.html` links it (beans `lhvt`, `9rq1`).
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
 // `navbar-row.js` FIRST — it draws the row, and `docs-ui.js` calls it — as `head_custom.html` loads them.
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const QR = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js"))), "utf8");
 const BASEURL = "/folio-assistant";
-const ROW = (JSON.parse(readFileSync(join(SITE, "_data/harness.json"), "utf8")) as { navbar: unknown }).navbar;
+const ROW = (JSON.parse(readFileSync(overlayPath(join(SITE, "_data/harness.json")), "utf8")) as { navbar: unknown }).navbar;
 
 /** The canonical (non-staging) bottom region, with `relative_url` applied. */
 const FOOTER = (() => {
-  const src = readFileSync(join(SITE, "_includes/generated/navbar-footer.html"), "utf8");
+  const src = readFileSync(overlayPath(join(SITE, "_includes/generated/navbar-footer.html")), "utf8");
   const line = src.split("\n").find((l) => l.startsWith('<div class="fa-nav-in">'));
   if (!line) throw new Error("navbar-footer.html carries no regions line — run `bun run cat navbar:include`.");
   return line.replace(/\{\{\s*'([^']*)'\s*\|\s*relative_url\s*\}\}/g, (_m, p: string) => BASEURL + p);

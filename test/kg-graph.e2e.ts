@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * The UML overview's Interactive view: a DOT laid out in the browser by the
@@ -65,7 +66,7 @@ async function open(page: Page, errors: string[], requests: string[]): Promise<v
   await page.goto(`${ORIGIN}/${PAGE}.html`);
 }
 
-const dotText = () => readFileSync(siteFile("assets/img/uml/overview/bootstrap.dot"), "utf8");
+const dotText = () => readFileSync(overlayPath(siteFile("assets/img/uml/overview/bootstrap.dot")), "utf8");
 
 test.describe("UML overview, Interactive view", () => {
   test("is lazy: Graphviz is fetched only when the view is picked, then lays the DOT out", async ({ page }) => {
