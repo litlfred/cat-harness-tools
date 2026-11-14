@@ -314,17 +314,17 @@ test("fix translation offers each string's candidates by source; a picked one is
   await save.getByRole("radio", { name: /Sauvegarder/ }).check();
   await expect(save.getByLabel("Your suggestion")).toHaveValue("Sauvegarder");
   await dlg.getByRole("button", { name: "Make the GitHub issue" }).click();
-  let { body, record } = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!);
-  expect(record.items[0].suggestions).toEqual([
+  const picked = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!);
+  expect(picked.record.items[0].suggestions).toEqual([
     { msgid: "Save", current: "Sauver", suggested: "Sauvegarder", source: { kind: "web-service", id: "deepl" }, msgctxt: "button" },
   ]);
-  expect(body).toContain("`Sauver` → `Sauvegarder` (candidate from web-service `deepl`)");
+  expect(picked.body).toContain("`Sauver` → `Sauvegarder` (candidate from web-service `deepl`)");
 
   // Edited after picking: the text is the reviewer's own, and carries no source.
   await save.getByLabel("Your suggestion").fill("Sauvegarder le texte");
   await dlg.getByRole("button", { name: "Make the GitHub issue" }).click();
-  ({ record } = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!));
-  expect(record.items[0].suggestions).toEqual([{ msgid: "Save", current: "Sauver", suggested: "Sauvegarder le texte", msgctxt: "button" }]);
+  const edited = recordOf((await dlg.locator("a.fa-trf-open").getAttribute("href"))!);
+  expect(edited.record.items[0].suggestions).toEqual([{ msgid: "Save", current: "Sauver", suggested: "Sauvegarder le texte", msgctxt: "button" }]);
 });
 
 test("no candidates sidecar (404): the reviewer types their own", async ({ page }) => {
