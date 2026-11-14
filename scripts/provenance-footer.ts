@@ -32,6 +32,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFile
 import { dirname, join } from "node:path";
 
 import { withInlineCode } from "../schemas/content/inline-code.js";
+import { checkoutRoot, overlayDirs, writePathAt } from "./lib/layer-output.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { escapeHtml, todoListingFileFor } from "./todo-listing.js";
 
@@ -246,17 +247,23 @@ export function writeProvenanceListing(opts: {
   emit?: (path: string, content: string) => void;
   banner?: string;
 }): ProvenanceListingResult {
+  // Where the site's layer is MOUNTED (bean `cat-tools-sm8r`, item 4), the
+  // slice is computed output and goes to the layer's output root; the pinned
+  // mount is never written. In the layer's own checkout both are the site.
+  const root = checkoutRoot();
+  const writeAt = (abs: string): string => (root === undefined ? abs : writePathAt(root, abs));
   const emit =
     opts.emit ??
     ((path: string, content: string) => {
-      if (!opts.check) writeFileSync(path, content);
+      if (!opts.check) writeFileSync(writeAt(path), content);
     });
   const fragDir = join(opts.siteDir, "_includes", "generated", "provenance", opts.producer);
+  const fragOut = writeAt(fragDir);
   const indexFile = join(opts.siteDir, "_data", "provenance", `${opts.producer}.json`);
   const index: { pages: Record<string, string> } = { pages: {} };
   const written = new Set<string>();
   let entries = 0;
-  if (!opts.check) mkdirSync(fragDir, { recursive: true });
+  if (!opts.check) mkdirSync(fragOut, { recursive: true });
   for (const [page, sources] of [...opts.pages].sort(([a], [b]) => a.localeCompare(b))) {
     const found = provenanceOf(sources);
     if (found.length === 0) continue;
@@ -266,15 +273,17 @@ export function writeProvenanceListing(opts: {
     index.pages[page] = `generated/provenance/${opts.producer}/${file}`;
     emit(join(fragDir, file), (opts.banner ?? "") + renderProvenanceFooter(found));
   }
-  const stale: string[] = [];
-  if (existsSync(fragDir)) {
-    for (const f of readdirSync(fragDir)) {
+  // Stale fragments in the overlay (output root, then the site): reported
+  // from both, deleted only where this run may write.
+  const stale = new Set<string>();
+  for (const dir of overlayDirs(fragDir, root)) {
+    for (const f of readdirSync(dir)) {
       if (!f.endsWith(".html") || written.has(f)) continue;
-      stale.push(f);
-      if (!opts.check) unlinkSync(join(fragDir, f));
+      stale.add(f);
+      if (!opts.check && dir === fragOut) unlinkSync(join(dir, f));
     }
   }
-  if (!opts.check) mkdirSync(dirname(indexFile), { recursive: true });
+  if (!opts.check) mkdirSync(dirname(writeAt(indexFile)), { recursive: true });
   emit(indexFile, JSON.stringify(index, null, 2) + "\n");
-  return { pages: written.size, entries, stale };
+  return { pages: written.size, entries, stale: [...stale].sort() };
 }
