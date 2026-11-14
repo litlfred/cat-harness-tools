@@ -347,6 +347,12 @@ Feature: Composing the docs layers into one site
     When docsLayers resolves the layers
     Then "docs@output" and "root-docs" are returned and missing is empty
 
+  @test:scripts/tests/compose-docs.test.ts::a_MOUNTED_base_layer's_computed_pages_at_the_output_root_(bean_cat-tools-sm8r,_item_4,_step_4)::a_chrome_layer's_output-root_twin_is_that_layer,_not_a_second_chrome_layer
+  Scenario: A chrome layer's output-root twin is that layer, not a second chrome layer
+    Given a checkout whose lock mounts cat-harness with a site-chrome layer and its output-root twin
+    When chromeLayers lists the harness's chrome layers
+    Then only "site-chrome" is listed, and "site-chrome@output" only once its base is absent
+
   @test:scripts/tests/compose-docs.test.ts::a_MOUNTED_base_layer's_computed_pages_at_the_output_root_(bean_cat-tools-sm8r,_item_4,_step_4)::a_checkout_that_does_not_mount_the_layer_has_no_twin,_even_with_files_at_that_path
   Scenario: A checkout that does not mount the layer has no output-root twin even with files at that path
     Given a checkout whose lock does not mount cat-harness even though files exist under build/layers/cat-harness/docs
