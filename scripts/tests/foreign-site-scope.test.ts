@@ -55,7 +55,7 @@ import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
-import { notApplicableAlone, qaResultDirsIn, restoringTracked, siteNotBuilt } from "../../test/support/checkout.ts";
+import { copyBuiltAtPublish, notApplicableAlone, scratchCheckoutOf, siteNotBuilt } from "../../test/support/checkout.ts";
 import { ensureThemesCss } from "../../test/support/themes-css.ts";
 import { declaredPlan, runWriter, writersOf } from "../derive-at-publish.ts";
 
@@ -137,18 +137,23 @@ try {
       `foreign-site-scope: built nothing — expected a builtAtPublish entry for each of ${[...READS].join(", ")}; found ${READ_PLAN.map((a) => `${a.instance}/${a.path}`).join(", ") || "none"}`,
     );
   } else {
-    // `docs:pages` also re-derives the committed QA witnesses under every
-    // layer's `test/results/`: they are put back as they were, so this
-    // build leaves no tracked file changed (bean w1gy F24).
-    restoringTracked(qaResultDirsIn(REPO), () => {
+    // `docs:pages` also re-renders every layer's committed pages and QA
+    // witnesses, so the writers run over a scratch copy of the checkout and
+    // only what the layers build at publish is copied back (bean
+    // `cat-tools-sm8r` item 4: in place, a mounted layer read `edited`).
+    const scratch = scratchCheckoutOf(REPO);
+    try {
       for (const w of writersOf(READ_PLAN)) {
-        const o = runWriter(["bun", "run", "cat", w], REPO);
+        const o = runWriter(["bun", "run", "cat", w], scratch);
         if (o.kind !== "ran") {
           console.warn(`foreign-site-scope: the publish-time writer \`${w}\` did not build what this file reads (${JSON.stringify(o)}; is the state mounted? \`bun run cat state:mount\`)`);
           break;
         }
       }
-    });
+      copyBuiltAtPublish(scratch, REPO);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   }
 } catch (e) {
   console.warn(`foreign-site-scope: built nothing — could not read the publish plan: ${(e as Error).message}`);

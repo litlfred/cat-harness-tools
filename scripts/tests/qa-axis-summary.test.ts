@@ -23,7 +23,7 @@ const SUMMARY = join(TOOLS_ROOT, "scripts", "ci", "qa-axis-summary.py");
 const SWEEP = join(TOOLS_ROOT, "pipeline", "qa-sweep.ts");
 
 function summarise(stdin: string): { status: number | null; stdout: string; stderr: string } {
-  const r = spawnSync("python3", [SUMMARY], { input: stdin, encoding: "utf-8" });
+  const r = spawnSync("python3", ["-B", SUMMARY], { input: stdin, encoding: "utf-8" });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 

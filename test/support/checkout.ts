@@ -40,12 +40,14 @@
  *
  * @module test/support/checkout
  */
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { spawnSync, type SpawnSyncReturns } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { instanceRootsIn, siteDirFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
+import { builtAtPublishOf } from "../../scripts/mount-from-lock.ts";
 
 /** The cat-harness layer root — the directory this file's `test/` sits in. */
 export const INSTANCE = resolve(HARNESS_ROOT);
@@ -167,15 +169,6 @@ export function noRootManifest(repo: string, needs: string): boolean {
 }
 
 /**
- * The `test/results/` directory of every layer in `repo`: where a full
- * `docs:pages` run re-derives committed QA witnesses, and so what
- * {@link restoringTracked} protects around one.
- */
-export function qaResultDirsIn(repo: string): string[] {
-  return instanceRootsIn(repo).map((r) => join(r, "test", "results"));
-}
-
-/**
  * Build the publish-time projections `gen-docs-pages.ts` writes
  * (`assets/todos/index.json`, `assets/beans/index.json`,
  * `assets/beans/count.json`, `todos.jsonld`) when running in the composed
@@ -187,11 +180,104 @@ export function ensureDocsPages(instanceRoot: string = INSTANCE): void {
   const root = resolve(instanceRoot);
   const index = join(root, siteDirFor(root), "assets", "todos", "index.json");
   if (existsSync(index)) return;
-  const repo = checkoutHolding(root);
-  restoringTracked(qaResultDirsIn(repo), () =>
-    // input-site: runs */scripts/gen-docs-pages.ts,scripts/gen-docs-pages.ts #857537b4 — builds the docs pages a fixture checkout lacks, inheriting this environment
-    spawnSync("bun", [join(TOOLS_ROOT, "scripts", "gen-docs-pages.ts")], { cwd: repo, encoding: "utf-8" }),
-  );
+  buildDocsProjections(checkoutHolding(root));
+}
+
+/**
+ * Write into `repo` the projections a full `gen-docs-pages.ts` run builds at
+ * publish, WITHOUT running it over `repo`: it runs over a
+ * {@link scratchCheckoutOf} `repo`, and only the paths each layer declares
+ * `builtAtPublish` are copied back ({@link copyBuiltAtPublish}).
+ */
+export function buildDocsProjections(repo: string): void {
+  const scratch = scratchCheckoutOf(repo);
+  try {
+    runDocsPagesIn(scratch, repo);
+    copyBuiltAtPublish(scratch, repo);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+/**
+ * A COPY of the checkout `repo`, in a fresh temporary directory, for a test
+ * that must run a writer over the whole checkout (bean `cat-tools-sm8r` item
+ * 4): `gen-docs-pages.ts` re-renders every layer's committed pages, process
+ * diagrams and translation templates, and run in place it left 7 of 12 mounts
+ * of a composed checkout `edited` after one `bun test`. The mounts are not git
+ * work trees, so {@link restoringTracked} — which asks git what to restore —
+ * restored nothing there.
+ *
+ * Every file is copied except `.git`, which is SYMLINKED to the original (the
+ * writer reads git — the origin's URL, the state branches — but never writes
+ * it), and `node_modules/`, which is LINKED rather than copied
+ * ({@link linkNodeModules}). The caller removes the copy.
+ */
+export function scratchCheckoutOf(repo: string): string {
+  const from = resolve(repo);
+  // input-site: inert #89b3cdd3 — a temp dir the caller removes; its name never reaches an answer
+  const to = mkdtempSync(join(tmpdir(), "scratch-checkout-"));
+  cpSync(from, to, {
+    recursive: true,
+    verbatimSymlinks: true,
+    filter: (src, dest) => {
+      const name = basename(src);
+      if (src === from) return true;
+      if (name === ".git") {
+        mkdirSync(dirname(dest), { recursive: true });
+        symlinkSync(src, dest);
+        return false;
+      }
+      if (name === "node_modules") {
+        linkNodeModules(src, dest);
+        return false;
+      }
+      return true;
+    },
+  });
+  return to;
+}
+
+/**
+ * `node_modules/` for a scratch copy: a real directory whose packages are
+ * symlinks to the originals, but whose WORKSPACE links are recreated as they
+ * are. A workspace link is relative (`@litlfred/cat-harness ->
+ * ../../cat-harness`), so recreated it names the layer IN THE COPY. Symlinking
+ * the whole directory instead resolved it through the original, so the copy's
+ * writer imported the real checkout's modules and wrote the real tree.
+ */
+function linkNodeModules(src: string, dest: string): void {
+  mkdirSync(dest, { recursive: true });
+  for (const e of readdirSync(src, { withFileTypes: true })) {
+    const from = join(src, e.name);
+    const to = join(dest, e.name);
+    if (e.isSymbolicLink()) symlinkSync(readlinkSync(from), to);
+    else if (e.isDirectory() && e.name.startsWith("@")) linkNodeModules(from, to);
+    else symlinkSync(from, to);
+  }
+}
+
+/** Run the full `gen-docs-pages.ts` in `scratch`, a {@link scratchCheckoutOf} `repo`: the copy's own script, with the copy as the working directory. */
+export function runDocsPagesIn(scratch: string, repo: string): SpawnSyncReturns<string> {
+  // input-site: runs */scripts/gen-docs-pages.ts,scripts/gen-docs-pages.ts #dad99286 — builds the docs pages in a scratch copy of the checkout, inheriting this environment
+  return spawnSync("bun", [join(scratch, relative(resolve(repo), TOOLS_ROOT), "scripts", "gen-docs-pages.ts")], { cwd: scratch, encoding: "utf-8" });
+}
+
+/**
+ * Copy back, from a scratch copy into the checkout it was made from, only what
+ * each layer declares it builds at publish (`builtAtPublish`): the projections
+ * a test reads (`assets/todos/index.json`, `assets/beans/`, `todos.jsonld`, …)
+ * and nothing a mount digest hashes, so every mount stays `current`.
+ */
+export function copyBuiltAtPublish(scratch: string, repo: string): void {
+  for (const root of instanceRootsIn(repo)) {
+    const rel = relative(repo, root);
+    for (const path of builtAtPublishOf(root)) {
+      const src = join(scratch, rel, path);
+      if (!existsSync(src)) continue;
+      cpSync(src, join(root, path), { recursive: true, force: true });
+    }
+  }
 }
 
 /** One tracked file's bytes, as found before a run that may rewrite it. */
