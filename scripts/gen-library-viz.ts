@@ -160,10 +160,19 @@ export const VIEWER_CSS = `/* The block content panel — bean lrmo. Tokens only
 .lib-page #document .docbody { padding: 0 16px 8px; }
 .lib-page #document .dockw { padding: 4px 16px; }
 /* Kept figures and transcribed tables (who-iris#224). */
-.lib-page #document .doc-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: .5rem 0 1rem; }
-.lib-page #document .doc-figure { margin: 0; border: 1px solid var(--border, #8884); border-radius: 6px; padding: 6px; background: var(--card, transparent); }
-.lib-page #document .doc-figure img { display: block; width: 100%; height: auto; max-height: 320px; object-fit: contain; background: #fff; border-radius: 4px; }
-.lib-page #document .doc-figure figcaption { font-size: .85em; margin-top: 6px; }
+.lib-page #document .doc-gallery { display: flex; flex-direction: column; gap: 8px; margin: .5rem 0 1rem; }
+.lib-page #document .doc-figure { margin: 0; display: flex; align-items: center; gap: 12px; border: 1px solid var(--border, #8884); border-radius: 6px; padding: 6px; background: var(--card, transparent); }
+.lib-page #document .fig-thumb { flex: 0 0 auto; padding: 0; border: 0; background: #fff; border-radius: 4px; cursor: zoom-in; }
+.lib-page #document .fig-thumb:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+.lib-page #document .doc-figure img { display: block; width: 120px; height: 90px; object-fit: contain; border-radius: 4px; }
+.lib-page #document .doc-figure figcaption { flex: 1 1 auto; min-width: 0; font-size: .9em; display: flex; gap: 8px; align-items: baseline; }
+.lib-page #document .fig-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.lib-page .fig-pop { max-width: min(92vw, 1100px); max-height: 92vh; padding: 0; border: 1px solid var(--border, #8884); border-radius: 8px; background: var(--bg, #fff); color: inherit; }
+.lib-page .fig-pop::backdrop { background: rgba(0,0,0,.6); }
+.lib-page .fig-pop-box { position: relative; padding: 12px 16px; }
+.lib-page .fig-pop-box img { display: block; max-width: 100%; max-height: 70vh; margin: 8px auto; background: #fff; object-fit: contain; }
+.lib-page .fig-pop-box h3 { margin: 0 32px 0 0; }
+.lib-page .fig-pop-x { position: absolute; top: 6px; inset-inline-end: 8px; min-width: 32px; min-height: 32px; font-size: 22px; line-height: 1; border: 0; background: none; color: inherit; cursor: pointer; }
 .lib-page #document .doc-table { margin: .4rem 0; }
 .lib-page #document .doc-table-scroll { overflow-x: auto; max-width: 100%; }
 .lib-page #document .doc-table table { font-size: .85em; }
@@ -718,7 +727,21 @@ function renderDesk(){
 }
 
 
-function render(){ if (VIEW === "list") renderList(); else renderDesk(); }
+/* LAZY on an entry page (owner, 2026-11-14: "do lazy load content"): the
+   whole library's listing sits in a closed <details> under the entry, and
+   drawing every row there is work for a reader who never opens it. It is
+   drawn on the first open; until then nothing is. */
+function render(){
+  var fold = $("listing").closest("details.lib-all");
+  if (fold && !fold.open) {
+    if (!fold.getAttribute("data-lazy")) {
+      fold.setAttribute("data-lazy", "1");
+      fold.addEventListener("toggle", function(){ if (fold.open) render(); });
+    }
+    return;
+  }
+  if (VIEW === "list") renderList(); else renderDesk();
+}
 
 /* WHICH ENTRY THIS PAGE IS ABOUT -- read off its own PATH (#1881).
 
@@ -740,7 +763,7 @@ function byKey(key){
 function selectEntry(known){
   if (VIEW !== "list") setView("list");
   $("q").value = known.id;
-  renderList();
+  render();
   var key = known.instance + "/" + known.id;
   var row = document.querySelector('[data-fa-library-item="' + key.replace(/"/g, '\\"') + '"]');
   if (row) {

@@ -712,20 +712,70 @@ function docFileHref(id, file){
   var dir = DATA_HREF.slice(0, DATA_HREF.lastIndexOf("/") + 1);
   return dir + "files/" + encodeURIComponent(id) + "/" + file.split("/").map(encodeURIComponent).join("/");
 }
+/* A FIGURE'S SHORT NAME -- owner, 2026-11-14: "very duplicative and long
+   text. blue figure titles should be shortened". The description opens with
+   the figure's own label as the caption gives it ("Fig. 10, 'Product
+   packaging hierarchy' (source: ...)"), so that label is the name. Failing
+   it, the caption the text carries on the same page; failing that, the
+   description's first words. Never the whole description. */
+var FIG_LABEL = /^\s*((?:Fig(?:ure)?|Graph|Chart|Map|Box)\.?\s*[A-Z]?\d+[a-z]?)\s*[,:.–-]?\s*['‘"“]([^'’"”]{1,120})['’"”]\s*[.,;:]?\s*/i;
+function figName(im, d){
+  var text = pickNarrative(im.narratives);
+  var m = FIG_LABEL.exec(text);
+  if (m) return m[1] + " · " + m[2];
+  var c = (d.figures || []).filter(function(f){ return f.page === im.page && /fig/i.test(f.kind) && f.title; })[0];
+  if (c) return (c.number ? c.kind + " " + c.number + " · " : "") + c.title;
+  var w = text.split(/\s+/).slice(0, 8).join(" ");
+  return w ? w + (text.length > w.length ? "…" : "") : im.id;
+}
+/* THE GALLERY: a THUMBNAIL that pops out -- owner, 2026-11-14: "i wanted to
+   actually see the figure thumbnail as a popout", "figures should be
+   vertically stacked". One figure per row: its thumbnail, its short name on
+   one line and its page; the description is in the
+   popout only, so it is said once. Thumbnails load as they scroll near
+   (loading="lazy"); the popout is one <dialog>, built on first use. */
 function docGallery(d){
   if (!d.images || !d.images.length) return "";
-  var rtl = { ar: 1, fa: 1, he: 1, ur: 1 }[docLang()] ? ' dir="rtl"' : '';
+  DOC_GALLERY = d;
   return '<h3>Figures <span class="note">(' + d.images.length + ')</span></h3>' +
-    '<p class="note">Descriptions are drafts written by an agent and not yet reviewed.</p>' +
-    '<div class="doc-gallery">' + d.images.map(function(im){
-      var text = pickNarrative(im.narratives);
+    '<p class="note">Select a figure to see it large with its description. Descriptions are drafts written by an agent and not yet reviewed.</p>' +
+    '<div class="doc-gallery">' + d.images.map(function(im, i){
+      var name = figName(im, d);
       return '<figure class="doc-figure" id="fig-' + esc(im.id) + '">' +
-        '<a href="' + esc(docFileHref(DOC_ID, im.file)) + '" target="_blank" rel="noopener">' +
-        '<img loading="lazy" src="' + esc(docFileHref(DOC_ID, im.file)) + '" alt="' + esc(text) + '"></a>' +
-        '<figcaption' + rtl + '>' + (im.shows && im.shows.length ? '<strong>' + esc(im.shows.join(", ")) + '.</strong> ' : '') +
-        esc(text) + ' <span class="note">' + pageText(im.page, null) + '</span></figcaption></figure>';
+        '<button type="button" class="fig-thumb" data-fig="' + i + '" title="' + esc(name) + '">' +
+        '<img loading="lazy" decoding="async" src="' + esc(docFileHref(DOC_ID, im.file)) + '" alt="' + esc(name) + '"></button>' +
+        '<figcaption><span class="fig-name" title="' + esc(name) + '">' + esc(name) + '</span> <span class="note">' +
+        pageText(im.page, null) + '</span></figcaption></figure>';
     }).join("") + '</div>';
 }
+var DOC_GALLERY = null;
+function figPopout(i){
+  var d = DOC_GALLERY, im = d && d.images[i];
+  if (!im) return;
+  var dlg = document.getElementById("fig-pop");
+  if (!dlg) {
+    dlg = document.createElement("dialog");
+    dlg.id = "fig-pop"; dlg.className = "fig-pop";
+    (document.querySelector(".lib-page") || document.body).appendChild(dlg);
+    /* A click on the backdrop (the dialog itself, outside its box) closes it. */
+    dlg.addEventListener("click", function(ev){ if (ev.target === dlg || (ev.target.closest && ev.target.closest("[data-fig-close]"))) dlg.close(); });
+  }
+  var rtl = { ar: 1, fa: 1, he: 1, ur: 1 }[docLang()] ? ' dir="rtl"' : '';
+  var href = docFileHref(DOC_ID, im.file), name = figName(im, d), full = pickNarrative(im.narratives);
+  /* The heading already names the figure: the description goes on from there. */
+  var named = FIG_LABEL.test(full), text = named ? full.replace(FIG_LABEL, "") : full;
+  var shows = named ? [] : (im.shows || []);
+  dlg.innerHTML = '<div class="fig-pop-box"><button type="button" class="fig-pop-x" data-fig-close aria-label="Close">×</button>' +
+    '<h3>' + esc(name) + ' <span class="note">' + pageText(im.page, null) + '</span></h3>' +
+    '<img decoding="async" src="' + esc(href) + '" alt="' + esc(name) + '">' +
+    '<p' + rtl + '>' + (shows.length ? '<strong>' + esc(shows.join(", ")) + '.</strong> ' : '') + esc(text) + '</p>' +
+    '<p class="note">Agent draft, not yet reviewed. <a href="' + esc(href) + '" target="_blank" rel="noopener">Open the image on its own</a></p></div>';
+  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+}
+document.addEventListener("click", function(ev){
+  var b = ev.target && ev.target.closest && ev.target.closest("button.fig-thumb[data-fig]");
+  if (b) figPopout(+b.getAttribute("data-fig"));
+});
 function docTable(t){
   var groups = t.columns.some(function(c){ return c.group; });
   var head = "";
