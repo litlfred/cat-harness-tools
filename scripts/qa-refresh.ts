@@ -239,7 +239,6 @@ export const QA_WRITERS: readonly QaWriter[] = [
       ["check:source-licence", "source-licence"],
       ["check:layout-norms", "layout-norms"],
       ["check:rendered-labels", "rendered-labels"],
-      ["check:nav-names", "nav-names"],
       ["check:lane-documentation", "lane-documentation"],
       ["check:methodology-evidence", "methodology-evidence"],
       ["check:avatar-coverage", "avatar-coverage"],
@@ -287,6 +286,18 @@ export const QA_WRITERS: readonly QaWriter[] = [
     writes: [`${R}/reference-direction.qa-results.json`],
     okExits: [0, 1],
     because: "exits 1 when it finds a wrong-direction reference, and writes the sidecar either way",
+  },
+  {
+    // Claimed, never run here: `check:nav-names` reads the BUILT site (the
+    // navbar include, harness.json and every railed viewer page), and a
+    // consumer's QA working copy runs qa:refresh BEFORE derive:publish builds
+    // it, so running it here judged an empty site UNDETERMINED and left the
+    // refresh INCOMPLETE (folio-assistant#3124). Its report form writes the
+    // sidecar after the site is built; `check:nav-names:check` gates it.
+    id: "check:nav-names",
+    run: "external",
+    writes: [`${R}/nav-names.qa-results.json`],
+    because: "written by `check:nav-names` once the site is built, which qa:refresh's pre-publish pass cannot do; judged by `check:nav-names:check`",
   },
   {
     id: "kg-export:bootstrap",
