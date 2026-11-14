@@ -724,7 +724,9 @@ export const TODOS_SLICE: SliceDef = {
     body: "markdown",
   },
   async load(root) {
-    const p = join(INSTANCE_ROOT, TODO_INDEX);
+    // Read through the layer overlay: `docs:pages` writes a mounted layer's
+    // todo index at its output root (bean `cat-tools-sm8r`, item 4).
+    const p = overlayPath(join(INSTANCE_ROOT, TODO_INDEX));
     if (!existsSync(p)) return null;
     // The todo reader is imported lazily: it resolves its graph at import.
     const { readTodoFiles } = await import("./todos.ts");
