@@ -230,6 +230,9 @@ describe("mergeCandidates: the never-overwrite rule and the first-candidate fill
   test("a candidate for an entry the catalogue does not have is refused", () => {
     const r = mergeCandidates(PO, emptySidecar("es", "a"), [{ msgid: "Nope", text: "No", source: OPUS }]);
     expect(r.rejected[0]!.reason).toBe("no such entry in the catalogue");
+    const plural = mergeCandidates(PO, emptySidecar("es", "a"), [{ msgid: "%d file", text: "%d archivo", source: OPUS }]);
+    expect(plural.rejected[0]!.reason).toBe("plural entry: one candidate cannot supply its forms");
+    expect(plural.added).toBe(0);
   });
 
   test("a web-service import can skip the guard (a person wrote it), and still never overwrites", () => {
