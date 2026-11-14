@@ -58,6 +58,24 @@ Feature: The layer output resolver
     And once the twin is written, the file and its directory each resolve to the twin
     And a local instance's file resolves to itself
 
+  @test:scripts/tests/layer-output.test.ts::writePathAt_—_a_writer_holding_an_absolute_path::a_path_in_a_mounted_layer_is_written_at_its_twin;_a_local_or_outside_path_where_it_is
+  Scenario: A writer writes a mounted layer's path at its output twin and any other path where it is
+    When the write path is asked of a path inside upper-ig
+    Then it is the same path under the output root
+    And a local instance's path and a path outside the checkout are written where they are
+
+  @test:scripts/tests/layer-output.test.ts::writePathAt_—_a_writer_holding_an_absolute_path::what_a_writer_wrote_is_what_readPathAt_reads_back
+  Scenario: What a writer wrote is what the overlay read returns
+    Given a page of a mounted layer written through its write path
+    When its read path is resolved
+    Then it is the file the writer wrote
+
+  @test:scripts/tests/layer-output.test.ts::derive-at-publish_built()_—_an_artefact_of_a_mounted_layer_built_at_its_output_root::a_declared_artefact_counts_as_built_when_only_its_output-root_twin_holds_it
+  Scenario: An artefact of a mounted layer counts as built when only its output-root twin holds it
+    Given a declared file and a declared directory of a mounted layer, neither built
+    When each is written only at its output-root twin
+    Then each counts as built
+
   @test:scripts/tests/layer-output.test.ts::overlayPath_(step_5:_the_QA_readers)::the_checkout_is_the_nearest_directory_holding_.git,_not_a_mount_carrying_its_own_lock
   Scenario: The checkout is the nearest directory holding .git, not a mount carrying its own lock
     Given a checkout holding .git and a mounted lower directory carrying its own index.lock.json
@@ -99,7 +117,6 @@ Feature: The layer output resolver
     Given a checkout with no mounted layers and a local results directory
     When movedInventory and overlayEntries are computed
     Then movedInventory lists the local files and overlayEntries is empty
-
 
   @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_mounted_layer's_path_is_written_under_build/layers/<instance>/
   Scenario: A mounted layer's path is written under the layer output root

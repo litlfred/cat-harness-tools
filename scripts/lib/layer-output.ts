@@ -199,14 +199,33 @@ export function overlayPath(abs: string, root: string | undefined = checkoutRoot
 
 /**
  * Where a WRITER writes the computed file a reader finds at `abs`: its
- * output-root twin when `abs` is in a mounted layer, else `abs`. The write
- * half of {@link overlayPath} (plan step 5: the QA writers). Unlike a
- * reader, a writer refuses an unparseable lock (see {@link mountedInstances}):
- * reading it as "nothing mounted" would write into the mounts.
+ * output-root twin when `abs` is in a mounted layer, else `abs`. Supports both
+ * `writePathAt(abs, root?)` (step 5 QA writers) and
+ * `writePathAt(root, abs, mounted?)` (step 4 docs writers). Unlike a reader, a
+ * writer refuses an unparseable lock (see {@link mountedInstances}): reading
+ * it as "nothing mounted" would write into the mounts.
  */
-export function writePathAt(abs: string, root: string | undefined = checkoutRoot()): string {
-  if (root === undefined) return abs;
-  const mounted = mountedInstancesCached(root);
+export function writePathAt(a: string, b?: string, mountedArg?: Map<string, string>): string {
+  if (arguments.length <= 1) {
+    const root = checkoutRoot();
+    if (root === undefined) return a;
+    const mounted = mountedInstancesCached(root);
+    return mounted.size === 0 ? a : (outputTwinOf(root, a, mounted) ?? a);
+  }
+  if (b === undefined) return a;
+  if (mountedArg !== undefined) {
+    return outputTwinOf(a, b, mountedArg) ?? b;
+  }
+  const ra = resolve(a);
+  const rb = resolve(b);
+  const bIsRoot =
+    (ra.startsWith(rb + sep) && !rb.startsWith(ra + sep)) ||
+    ((existsSync(join(rb, "index.lock.json")) || existsSync(join(rb, ".git"))) &&
+      !existsSync(join(ra, "index.lock.json")) &&
+      !existsSync(join(ra, ".git")));
+  const root = bIsRoot ? b : a;
+  const abs = bIsRoot ? a : b;
+  const mounted = bIsRoot ? mountedInstancesCached(root) : mountedInstances(root);
   if (mounted.size === 0) return abs;
   return outputTwinOf(root, abs, mounted) ?? abs;
 }

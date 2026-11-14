@@ -116,6 +116,41 @@ describe("outputTwinOf / readPathAt — a reader holding an absolute path", () =
   });
 });
 
+describe("writePathAt — a writer holding an absolute path", () => {
+  test("a path in a mounted layer is written at its twin; a local or outside path where it is", () => {
+    const root = checkout(LOCK);
+    expect(writePathAt(root, join(root, "upper-ig", "docs", "_data", "x.json"))).toBe(join(root, LAYER_OUTPUT_ROOT, "upper-ig", "docs", "_data", "x.json"));
+    expect(writePathAt(root, join(root, "own", "docs", "x.json"))).toBe(join(root, "own", "docs", "x.json"));
+    expect(writePathAt(root, "/elsewhere/x")).toBe("/elsewhere/x");
+  });
+
+  test("what a writer wrote is what readPathAt reads back", () => {
+    const root = checkout(LOCK);
+    const abs = join(root, "lower", "docs", "page.html");
+    const at = writePathAt(root, abs);
+    mkdirSync(join(at, ".."), { recursive: true });
+    writeFileSync(at, "computed");
+    expect(readPathAt(root, abs)).toBe(at);
+  });
+});
+
+describe("derive-at-publish built() — an artefact of a mounted layer built at its output root", () => {
+  test("a declared artefact counts as built when only its output-root twin holds it", async () => {
+    const { built } = await import("../derive-at-publish.ts");
+    const root = checkout(LOCK);
+    const file = { abs: join(root, "lower", "docs", "_data", "x.json"), path: "docs/_data/x.json" };
+    const dir = { abs: join(root, "lower", "docs", "pages"), path: "docs/pages/" };
+    expect(built(file, root)).toBe(false);
+    expect(built(dir, root)).toBe(false);
+    for (const [at, body] of [[writePathAt(root, file.abs), "{}"], [join(writePathAt(root, dir.abs), "a", "index.html"), "<p>"]] as const) {
+      mkdirSync(join(at, ".."), { recursive: true });
+      writeFileSync(at, body);
+    }
+    expect(built(file, root)).toBe(true);
+    expect(built(dir, root)).toBe(true);
+  });
+});
+
 describe("overlayPath (step 5: the QA readers)", () => {
   test("the checkout is the nearest directory holding .git, not a mount carrying its own lock", () => {
     const root = checkout(LOCK);

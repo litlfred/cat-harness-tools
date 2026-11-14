@@ -21,7 +21,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
+import { readPathAt } from "../../scripts/lib/layer-output.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 /** The generator, in this layer — `TOOLS_ROOT`, since Playwright loads specs under Node, where `import.meta.dir` is undefined. */
@@ -34,9 +35,14 @@ const GENERATOR = join(TOOLS_ROOT, "scripts", "gen-themes-css.ts");
  */
 export function ensureThemesCss(root: string): string {
   const path = join(root, siteFileFor(root, "assets/css/themes.css"));
-  if (!existsSync(path)) {
+  // A MOUNTED layer's generator writes the stylesheet at its output-root twin
+  // (`build/layers/<instance>/…`), not into the pinned mount (sm8r item 4,
+  // step 4), so look for it, and return it, where a reader of the checkout
+  // finds it: the twin when one was written, else the path itself.
+  const checkout = checkoutRootFor(root);
+  if (!existsSync(readPathAt(checkout, path))) {
     // input-site: runs */scripts/gen-themes-css.ts,scripts/gen-themes-css.ts #968cf591 — builds themes.css with this layer's generator when it is missing
     spawnSync("bun", [GENERATOR, `--harness=${root}`], { cwd: root, encoding: "utf-8", stdio: "inherit" });
   }
-  return path;
+  return readPathAt(checkout, path);
 }
