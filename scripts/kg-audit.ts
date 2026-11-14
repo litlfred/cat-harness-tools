@@ -385,6 +385,14 @@ const KG_QA_LOGICAL = join(QA_HOME.root, "kg-qa");
  * so they move together.
  */
 const KG_QA_TREE = writePathAt(KG_QA_LOGICAL);
+/**
+ * A sidecar's path as the layer lays it out: the key its `qa-reports`
+ * baseline is stored under, and the name a finding prints. The judge compares
+ * by it, so a finding computed at the layer output root is not read as new.
+ */
+function logicalSidecar(p: string): string {
+  return KG_QA_TREE === KG_QA_LOGICAL ? p : join(KG_QA_LOGICAL, relative(KG_QA_TREE, p));
+}
 
 /**
  * Where this run's JUDGEMENTS live — pair attestations and voice reviews —
@@ -3260,7 +3268,8 @@ for (const r of reports) {
     // a derived file leaving it — so a store this run would rewrite is still
     // a finding in judge mode (bean `oqe3`), unlike a derived sidecar.
     const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
-    if (current !== text) staleAttestations.push(relative(root, p));
+    // A MOUNTED layer's store is its own repository's to judge: reported, not failed (see ATT_IN_MOUNT).
+    if (current !== text) (ATT_IN_MOUNT ? attLeftInMount : staleAttestations).push(relative(root, p));
   } else if (ATT_IN_MOUNT) {
     const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
     if (current !== text) attLeftInMount.push(relative(root, p));
@@ -3527,7 +3536,7 @@ if (check) {
   if (asJson) console.log = console.error;
   const verdict = judgeSidecarTree({
     gate: JUDGE_GATE,
-    fresh: reports.map((r) => ({ path: sidecarPath(r), findings: graded(r) })),
+    fresh: reports.map((r) => ({ path: logicalSidecar(sidecarPath(r)), findings: graded(r) })),
     findingsOf: (text) => {
       try {
         const prior = JSON.parse(text) as KgQaReport;
