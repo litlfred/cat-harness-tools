@@ -4,13 +4,18 @@
  * @module scripts/lib/translation-sources/opus-mt
  * @covers translation-sources
  *
- * The runner is a local command (`scripts/opus-mt-runner.py` by default) that
- * reads ONE JSON request on stdin and writes ONE JSON response on stdout:
+ * The runner is a local command, by default `python3 -I
+ * scripts/translation/opus_mt_runner.py` (the runner `translate-pot.ts` uses
+ * too). It reads ONE JSON request on stdin and writes ONE JSON response:
  *
  * ```
- * → {"source":"en","target":"es","model":"Helsinki-NLP/opus-mt-en-es","targetToken":null,"texts":["…"]}
+ * → {"model":"Helsinki-NLP/opus-mt-en-es","texts":["…"]}
  * ← {"translations":["…"]}
  * ```
+ *
+ * The multi-target `en-ar` / `en-zh` models need a sentence-initial `>>id<<`
+ * token; this adapter puts it in front of each text, so the runner needs to
+ * know nothing about it.
  *
  * Nothing leaves the machine except the model download on first use.
  */
@@ -32,10 +37,10 @@ export function opusMtSource(runner: string[], run: CommandRunner, modelOverride
     id: "opus-mt",
     kind: "open-mt",
     source: (target) => ({ kind: "open-mt", id: modelOverride ?? opusMtModel(target).model }),
-    async translate(texts, from, to) {
+    async translate(texts, _from, to) {
       if (texts.length === 0) return [];
       const { model, targetToken } = opusMtModel(to);
-      const req = { source: from, target: to, model: modelOverride ?? model, targetToken: targetToken ?? null, texts };
+      const req = { model: modelOverride ?? model, texts: targetToken ? texts.map((t) => `${targetToken} ${t}`) : texts };
       const out = JSON.parse(await run(runner, JSON.stringify(req))) as { translations?: unknown };
       if (!Array.isArray(out.translations) || !out.translations.every((x) => typeof x === "string")) {
         throw new Error("opus-mt runner: response has no `translations` array of strings");
