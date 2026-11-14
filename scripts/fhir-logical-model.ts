@@ -67,6 +67,19 @@ export function isFhirLogicalModel(doc: unknown): doc is Json {
   );
 }
 
+/**
+ * True when `doc` is a FHIR profile: a `constraint` StructureDefinition, which
+ * narrows a base class rather than defining one (bean `cat-tools-t6fz`).
+ */
+export function isFhirProfile(doc: unknown): doc is Json {
+  return isObj(doc) && doc.resourceType === "StructureDefinition" && doc.derivation === "constraint" && typeof doc.baseDefinition === "string";
+}
+
+/** True for any StructureDefinition this module reads: a class, or a profile over one. */
+export function isFhirStructureDefinition(doc: unknown): doc is Json {
+  return isFhirLogicalModel(doc) || isFhirProfile(doc);
+}
+
 /** Where a type's definition is read, for a link: its canonical URL, which resolves on the web. */
 export function fhirTypeCanonical(code: string): string {
   return /^https?:\/\//.test(code) ? code : `${FHIR_CORE_SD}${code}`;
@@ -100,6 +113,7 @@ export function readFhirLogicalModel(text: string, moduleRel: string): ClassMode
   } catch (e) {
     return { decls: [undetermined(moduleRel, lastSegment(moduleRel).replace(/\.json$/, ""), `not valid JSON: ${(e as Error).message}`.slice(0, 120))], refs: [], edges: [] };
   }
+  if (isFhirProfile(sd)) return readFhirProfile(sd, moduleRel);
   if (!isFhirLogicalModel(sd)) return { decls: [], refs: [], edges: [] };
   const name = typeof sd.name === "string" && sd.name ? sd.name : typeof sd.id === "string" ? sd.id : lastSegment(moduleRel);
   const canonical = typeof sd.url === "string" ? sd.url : undefined;
@@ -265,4 +279,130 @@ function undetermined(moduleRel: string, name: string, note: string): SchemaDecl
     id: `${moduleRel}#${name}`, name, module: moduleRel, kind: "undetermined", note,
     fields: [], extendsNames: [], values: [], refs: [], unresolved: [], external: [], line: 1, exported: true,
   };
+}
+
+/** The value a `fixed[x]` / `pattern[x]` element pins, written short. */
+function pinned(e: Record<string, unknown>): string | undefined {
+  for (const [k, v] of Object.entries(e)) {
+    const m = /^(fixed|pattern)[A-Z]/.exec(k);
+    if (!m) continue;
+    const text = typeof v === "string" ? JSON.stringify(v) : JSON.stringify(v);
+    return `${m[1] === "fixed" ? "=" : "~"} ${text.length > 64 ? `${text.slice(0, 63)}…` : text}`;
+  }
+  return undefined;
+}
+
+/**
+ * Read a profile — a `constraint` StructureDefinition — as ONE class that
+ * generalises its base (bean `cat-tools-t6fz`).
+ *
+ * A profile does not define a structure; it narrows one. So its box holds only
+ * what it constrains — the differential's elements — each written as the
+ * diagram writes any field, `path : Type [min..max]`, with what the profile
+ * says about it as a constraint: `MS` (mustSupport), `= value` (fixed),
+ * `~ value` (pattern), `prohibited` (max 0). A slice is named `path:slice`.
+ * Everything the profile does not mention is inherited, and the generalisation
+ * edge to the base says so; the base is FHIR core's (an external box, linked)
+ * or another profile of the graph (resolved by canonical).
+ *
+ * A value the differential leaves out — a cardinality, a type — is read from
+ * the snapshot, as for a logical model; with neither, `?..?`.
+ */
+function readFhirProfile(sd: Json, moduleRel: string): ClassModelRead {
+  const name = typeof sd.name === "string" && sd.name ? sd.name : typeof sd.id === "string" ? sd.id : lastSegment(moduleRel);
+  const canonical = typeof sd.url === "string" ? sd.url : undefined;
+  const summary = firstLine(sd.title) ?? firstLine(sd.description);
+  const base = sd.baseDefinition as string;
+  const id = `${moduleRel}#${name}`;
+  const refs: ClassModelRef[] = [];
+  const diff = asElements(sd.differential);
+  const snap = asElements(sd.snapshot);
+  if (!diff || diff.length === 0) {
+    const d = undetermined(moduleRel, name, "could not determine: a profile with no differential elements");
+    if (canonical) d.canonical = canonical;
+    return { decls: [d], refs: [], edges: [] };
+  }
+  const snapById = new Map<string, Element>();
+  for (const e of snap ?? []) snapById.set(e.id ?? e.path, e);
+  const rootPath = diff[0]!.path.split(".")[0]!;
+  const coreBase = base.startsWith(FHIR_CORE_SD);
+  const decl: SchemaDecl = {
+    id, name, module: moduleRel, kind: "fhir-profile",
+    ...(canonical ? { canonical } : {}),
+    ...(summary ? { doc: summary } : {}),
+    fields: [], extendsNames: [lastSegment(base)], values: [], refs: [], unresolved: [],
+    external: coreBase ? [lastSegment(base)] : [], line: 1, exported: true,
+  };
+  refs.push({ from: id, ref: base, module: moduleRel, via: "", kind: "extends", optional: false, array: false, by: "canonical", ...(coreBase ? { quietMiss: true as const } : {}) });
+  const externals = new Set<string>(decl.external);
+
+  for (const raw of diff) {
+    const el = raw as Element & Record<string, unknown>;
+    if (el.path === rootPath) continue;
+    const s = snapById.get(el.id ?? el.path);
+    const slice = typeof el.sliceName === "string" ? `:${el.sliceName}` : "";
+    const fname = el.path.slice(rootPath.length + 1) + slice;
+    const notes: string[] = [];
+    if (el.mustSupport === true) notes.push("MS");
+    const pin = pinned(el);
+    if (pin) notes.push(pin);
+    if (el.max === "0") notes.push("prohibited");
+    const statesType = Array.isArray(el.type);
+    // A bare slicing declaration narrows nothing a box can show.
+    if (!slice && el.slicing && !statesType && el.min === undefined && el.max === undefined && notes.length === 0) continue;
+    const min = el.min ?? s?.min;
+    const maxRaw = el.max ?? s?.max;
+    const max = maxRaw === undefined ? undefined : maxRaw === "*" ? ("*" as const) : Number(maxRaw);
+    const types = (el.type ?? s?.type ?? []) as Element["type"] & {}[];
+    const shown: string[] = [];
+    const names: string[] = [];
+    const typeLinks: Record<string, string> = {};
+    const optional = min === undefined ? true : min === 0;
+    const array = max === "*" || (typeof max === "number" && max > 1);
+    for (const t of types as { code?: string; profile?: string[]; targetProfile?: string[] }[]) {
+      const code = t.code ?? "";
+      const n = lastSegment(code);
+      if (!n) continue;
+      typeLinks[n] = fhirTypeCanonical(code);
+      const targets = t.targetProfile ?? [];
+      const profiles = t.profile ?? [];
+      if (targets.length) {
+        shown.push(`${n}(${targets.map(lastSegment).join(" | ")})`);
+        for (const tp of targets) {
+          typeLinks[lastSegment(tp)] = tp;
+          const core = tp.startsWith(FHIR_CORE_SD);
+          if (core) externals.add(lastSegment(tp));
+          refs.push({ from: id, ref: tp, module: moduleRel, via: fname, kind: "id-ref", optional, array, by: "canonical", ...(core ? { quietMiss: true as const } : {}) });
+        }
+      } else if (profiles.length) {
+        // A type narrowed to a profile (an extension, a datatype profile): an edge to it.
+        shown.push(`${n}(${profiles.map(lastSegment).join(" | ")})`);
+        for (const p of profiles) {
+          typeLinks[lastSegment(p)] = p;
+          names.push(lastSegment(p));
+          // HL7's own (core, or a cross-version extension under hl7.org/fhir/<v>/) is
+          // FHIR's to define: external until a layer holds it, never a miss.
+          refs.push({ from: id, ref: p, module: moduleRel, via: fname, kind: "field", optional, array, by: "canonical", ...(p.startsWith("http://hl7.org/fhir/") ? { quietMiss: true as const } : {}) });
+        }
+      } else {
+        shown.push(n);
+        if (code.startsWith(FHIR_CORE_SD) || !/^https?:/.test(code)) externals.add(n);
+      }
+    }
+    decl.fields.push({
+      name: fname,
+      type: shown.length ? shown.join(" | ") : "(inherited)",
+      optional,
+      array,
+      names,
+      ...(min !== undefined ? { min } : {}),
+      ...(max !== undefined ? { max } : {}),
+      ...(min === undefined && max === undefined ? { cardinalityUnknown: true as const } : {}),
+      ...(notes.length ? { constraint: notes.join(", ") } : {}),
+      ...(Object.keys(typeLinks).length ? { typeLinks } : {}),
+      ...(el.short || el.definition ? { doc: el.short ?? firstLine(el.definition)! } : {}),
+    });
+  }
+  decl.external = [...externals].sort();
+  return { decls: [decl], refs, edges: [], ...(summary ? { summary } : {}) };
 }

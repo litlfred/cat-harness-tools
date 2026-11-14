@@ -34,7 +34,8 @@ export interface DiagramClass {
   id: string;
   name: string;
   source: string;
-  fields: { name: string; type: string; card?: string; href?: string }[];
+  /** `note`: what a profile says beyond type and cardinality (`MS`, `= value`), drawn `{note}`. */
+  fields: { name: string; type: string; card?: string; href?: string; note?: string }[];
   /** The class this diagram is about: outlined in the accent colour. */
   sel?: boolean;
   /** Outside the graph (a type no layer here declares). */
@@ -79,12 +80,26 @@ function classDiagram(model) {
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   var CH = 6.7, PAD = 10, LH = 15, HEAD = 34, GX = 34, GY = 74, MAXC = 64, MAXR = model.maxRows || 10;
-  var cls = model.classes || [], edges = model.edges || [], byId = {}, idx = {};
+  var cls = model.classes || [], byId = {}, idx = {};
+  /* Parallel edges (same ends, same kind) are ONE line with every field named:
+     two lines drawn over each other show one label and lose the other. */
+  var edges = [], par = {};
+  (model.edges || []).forEach(function (e) {
+    var k = e.from + "\u0000" + e.to + "\u0000" + e.kind, p = par[k];
+    if (p) {
+      if (e.via) p.via = p.via ? p.via + ", " + e.via : e.via;
+      if (e.card && p.card !== e.card) p.card = p.card ? p.card + ", " + e.card : e.card;
+      p.comp = p.comp || e.comp;
+      return;
+    }
+    par[k] = p = { from: e.from, to: e.to, kind: e.kind, via: e.via, card: e.card, comp: e.comp };
+    edges.push(p);
+  });
   cls.forEach(function (c, i) { byId[c.id] = c; idx[c.id] = i; });
   function rowsOf(c) {
     if (c.und) return [{ t: c.note || "could not determine", und: true }];
     var rows = (c.fields || []).map(function (f) {
-      return { name: f.name, type: f.type, card: f.card, href: f.href };
+      return { name: f.name, type: f.type, card: f.card, href: f.href, note: f.note };
     });
     if (c.values && c.values.length) rows.push({ name: "«enum»", type: c.values.join(" | ") });
     if (rows.length > MAXR) {
@@ -95,7 +110,7 @@ function classDiagram(model) {
   }
   function rowText(r) {
     if (r.t) return r.t;
-    return r.name + " : " + r.type + (r.card ? " [" + r.card + "]" : "");
+    return r.name + " : " + r.type + (r.card ? " [" + r.card + "]" : "") + (r.note ? " {" + clip(r.note, 28) + "}" : "");
   }
   function clip(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
   cls.forEach(function (c) {
@@ -231,10 +246,11 @@ function classDiagram(model) {
       c.__rows.forEach(function (r, i) {
         var ty = c.__y + HEAD + 15 + i * LH, tx = c.__x + PAD;
         if (r.t) { g += '<text class="' + (r.und ? "cd-n-note" : "cd-f") + '" x="' + tx + '" y="' + ty + '">' + esc(clip(r.t, MAXC)) + "</text>"; return; }
-        var head = r.name + " : ", type = clip(r.type, Math.max(8, MAXC - head.length - (r.card ? r.card.length + 3 : 0)));
+        var head = r.name + " : ", type = clip(r.type, Math.max(8, MAXC - head.length - (r.card ? r.card.length + 3 : 0) - (r.note ? Math.min(r.note.length, 28) + 3 : 0)));
         g += '<text class="cd-f" x="' + tx + '" y="' + ty + '">' + esc(head) +
           (r.href ? '<a class="cd-a" href="' + esc(r.href) + '"><tspan class="cd-ty">' + esc(type) + "</tspan></a>" : "<tspan>" + esc(type) + "</tspan>") +
-          (r.card ? '<tspan class="cd-c"> [' + esc(r.card) + "]</tspan>" : "") + "</text>";
+          (r.card ? '<tspan class="cd-c"> [' + esc(r.card) + "]</tspan>" : "") +
+          (r.note ? '<tspan class="cd-k"> {' + esc(clip(r.note, 28)) + "}</tspan>" : "") + "</text>";
       });
     }
     parts.push(g + "</g>");
@@ -266,6 +282,7 @@ export const CLASS_DIAGRAM_CSS = `
 .cd-st { fill: #4a5568; font: 10px ui-monospace, Menlo, Consolas, monospace; }
 .cd-f { fill: var(--fa-uml-edge, #1b2432); font: 11px ui-monospace, Menlo, Consolas, monospace; }
 .cd-c { fill: #4a5568; }
+.cd-k { fill: #7a3e9d; font-style: italic; }
 .cd-n-note { fill: #8a4b00; font: italic 11px ui-sans-serif, system-ui, sans-serif; }
 .cd-e { stroke: var(--fa-uml-edge, #1b2432); fill: none; stroke-width: 1.2; }
 .cd-e.cd-id { stroke-dasharray: 5 4; }
@@ -315,7 +332,7 @@ export function diagramOfDecls(
         const type = umlType(source, f.type);
         const target = byName.get(type.replace(/\[\]$/, ""));
         const link = target ? opts.hrefOf?.(target) : typeLink(source, type, f.typeLinks);
-        return { name: f.name, type, card: cardinalityOf(f), ...(link ? { href: link } : {}) };
+        return { name: f.name, type, card: cardinalityOf(f), ...(link ? { href: link } : {}), ...(f.constraint ? { note: f.constraint } : {}) };
       }),
       ...(d.values.length ? { values: d.values } : {}),
       ...(opts.focus?.includes(d.id) ? { sel: true } : {}),
