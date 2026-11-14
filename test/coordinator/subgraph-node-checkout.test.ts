@@ -17,6 +17,7 @@ import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { declaredSubgraphNode } from "../../scripts/kg-export.ts";
 import { subgraphPublicationFindings } from "../../scripts/subgraph-node.ts";
 import { ensureDocsPages, siteNotBuilt } from "../support/checkout.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -33,12 +34,12 @@ const TODOS_DOC = join(SITE, "todos.jsonld");
 
 describe("every adopting publisher follows the pattern", () => {
   // The document is written at publish and gitignored (bean w1gy F18).
-  test.skipIf(siteNotBuilt("the todos document `docs:pages` writes at publish (gitignored)", TODOS_DOC))(
+  test.skipIf(siteNotBuilt("the todos document `docs:pages` writes at publish (gitignored)", overlayPath(TODOS_DOC)))(
     "todos: the published todos.jsonld has no publication finding against the declared todos subgraph",
     () => {
       const declared = declaredSubgraphNode(ROOT, "todos");
       expect(declared).toBeDefined();
-      const doc = JSON.parse(readFileSync(TODOS_DOC, "utf8")) as Record<string, unknown>;
+      const doc = JSON.parse(readFileSync(overlayPath(TODOS_DOC), "utf8")) as Record<string, unknown>;
       expect(subgraphPublicationFindings(doc, { iri: declared!.iri })).toEqual([]);
     },
   );
