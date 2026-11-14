@@ -193,7 +193,7 @@ export function readFolioDirs(dirList: readonly string[], repo: string): FolioGr
  * A sticky's link to a page of the platform's own docs, where this build
  * publishes it. The href is authored site-rooted (`/concepts/…`) and the page
  * is published only on the platform's site, so on a downstream's site
- * (who-iris) it resolved against that site and 404'd: 5 of 5 sticky links on
+ * (a WHO library folio) it resolved against that site and 404'd: 5 of 5 sticky links on
  * `/folio/` (owner, 2026-11-13, node-kind audit). Where this build is not
  * the platform's site, a link to one of its docs pages names the platform's
  * site absolutely; on the platform's site it stays site-rooted, so a preview

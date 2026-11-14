@@ -102,7 +102,7 @@ describe("process rows and pages name the process's IRI", () => {
   });
 });
 
-describe("a sticky's link to a platform docs page (who-iris /folio/, 2026-11-13)", () => {
+describe("a sticky's link to a platform docs page (a downstream's /folio/, 2026-11-13)", () => {
   const site = mkdtempSync(join(tmpdir(), "folio-docs-"));
   mkdirSync(join(site, "concepts"), { recursive: true });
   writeFileSync(join(site, "concepts", "agentic-harness.md"), "---\ntitle: x\n---\n");
