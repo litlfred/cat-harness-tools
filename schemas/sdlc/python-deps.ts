@@ -147,6 +147,23 @@ export const PYTHON_DEPS: readonly PythonDep[] = [
     why: "`pdf-tables.py` only. 912 KB itself, but it pulls numpy, pandas and OpenCV — 323 MB measured 2026-09-20, more than the whole lean set. Kept out of CI for that reason alone; the script is live (two skills document it, bean `fj94` has 38 tests) and this is a cost statement, not a deprecation.",
   },
   {
+    distribution: "transformers",
+    tier: "extended",
+    why: "`translation/opus_mt_runner.py` only: runs the Helsinki-NLP OPUS-MT Marian models (CC-BY 4.0) locally for `translate-pot.ts --engine opus-mt`, so machine translation of empty catalogue entries needs no hosted API. Extended because CI never translates; the model weights come from the local cache on top.",
+  },
+  {
+    distribution: "torch",
+    tier: "extended",
+    transitive: true,
+    why: "Required by `transformers` to run the Marian models in `translation/opus_mt_runner.py`: without it `MarianMTModel` cannot load. The CPU wheel alone is hundreds of MB, which is why the whole OPUS-MT path is extended.",
+  },
+  {
+    distribution: "sentencepiece",
+    tier: "extended",
+    transitive: true,
+    why: "Required by `MarianTokenizer` in `translation/opus_mt_runner.py`: without it `transformers` refuses to build the OPUS-MT tokenizer.",
+  },
+  {
     distribution: "vosk",
     tier: "extended",
     why: "`meeting-recording.py transcribe` only: an offline second transcript of a recorded walkthrough, to compare with the meeting tool's own (skill `crdm-recorded-walkthrough`). Imported inside that one subcommand, so the other four run without it. The wheel is 7.2 MB (vosk 0.3.45, measured 2026-10-06), and it needs a speech model the caller supplies on top. Extended because nothing in CI transcribes, so CI should not pay for it.",

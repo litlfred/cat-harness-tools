@@ -48,6 +48,28 @@ Runs the full pipeline on a markdown page (default: `docs/guides/agent-onboardin
 
 Output goes to `translations/fr/`.
 
+## Machine translation of empty entries (`translate-pot`)
+
+`scripts/translate-pot.ts` fills the EMPTY msgstr entries of each
+`translations/<locale>/**/<name>.pot`/`.po` pair with a self-hosted open
+engine, so no hosted freemium API or quota is involved:
+
+| `--engine` | Engine | Licence | Runs |
+|---|---|---|---|
+| `opus-mt` (preferred) | Helsinki-NLP OPUS-MT Marian models | CC-BY 4.0 | locally, `python -I scripts/translation/opus_mt_runner.py` (needs `transformers` and the model in the local cache; `HF_HUB_OFFLINE=1` forbids downloads) |
+| `libretranslate` | LibreTranslate, Argos models | AGPL-3.0 | a self-hosted instance at `--url` / `LIBRETRANSLATE_URL`; libretranslate.com is refused |
+
+Every machine string is flagged `#, fuzzy`; a non-empty msgstr is never
+touched; a string whose placeholders, markup or math do not round-trip is
+left empty and reported; a catalogue signed off as official is skipped. The
+catalogue's `.json` translation node records `generatedBy: "machine"`,
+`generator` and `generatedAt`, and never `official`.
+
+```sh
+bun run cat translate-pot -- --engine opus-mt --locale fr
+bun run cat translate-pot -- --engine libretranslate --url http://localhost:5000 --dry-run
+```
+
 ## Tests
 
 ```sh
