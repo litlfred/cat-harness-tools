@@ -136,6 +136,7 @@
     "schemas/sdlc/kg-qa.ts",
     "schemas/sdlc/log-entry.ts",
     "schemas/sdlc/merge-queue.ts",
+    "schemas/sdlc/node-view-coverage.ts",
     "schemas/sdlc/python-deps.ts",
     "schemas/sdlc/qa-attestations.ts",
     "schemas/sdlc/qa-report.ts",
