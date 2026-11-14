@@ -53,7 +53,7 @@ import { declaredGraphs, instanceRootsIn } from "../schemas/kg/cat-harness.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { againstOrUsage, buildQaResult, judgeUsage, qaStorageOf, writeQaResult } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";
-import { overlayDirs, overlayPath, writePathAt } from "./lib/layer-output.ts";
+import { overlayDirs, overlayPath, writePathOf } from "./lib/layer-output.ts";
 import { downstreamState, parseToolRun, toolRunPath, writeToolRun, TOOL_RUNS_DIR, UNKNOWN_FINGERPRINT, type DownstreamState } from "../schemas/tools/tool-run.ts";
 import { specimenSections } from "../schemas/content/section-verdicts.ts";
 import {
@@ -298,7 +298,7 @@ export function index(t: GraphTarget, docs: string[] | undefined, opts: LsiOptio
   const { sidecar, ms } = computeIndex(t, docs, opts);
   // Never into a mount: a mounted harness's index goes to its layer output
   // root (bean `cat-tools-sm8r`, item 4); CHECKOUT_SOURCE reads it there.
-  const out = writePathAt(sidecarPath(t, docs));
+  const out = writePathOf(sidecarPath(t, docs));
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(sidecar, null, 2) + "\n");
   // The run record — only for a WHOLE-graph index, which is what the

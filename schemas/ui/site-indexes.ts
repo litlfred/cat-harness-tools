@@ -667,6 +667,19 @@ export const LibraryDocumentViewSchema = z
       )
       .optional(),
     withheld: z.boolean(),
+    /** What was extracted, kind by kind — found, none in the text, or not extracted (owner, 2026-11-14). */
+    coverage: z
+      .array(
+        z
+          .object({
+            kind: z.enum(["contents", "sections", "figures", "tables", "references", "glossary", "footnotes", "summaries"]),
+            state: z.enum(["found", "partial", "none", "not-extracted"]),
+            count: z.number().int().nonnegative().optional(),
+            note: z.string().optional(),
+          })
+          .strict(),
+      )
+      .optional(),
     /** Where [source] and [feedback] point: the repository and the entry's directory (bean zcak). */
     links: z.object({ repo: z.string().min(1), branch: z.string().min(1), dir: z.string().min(1) }).strict().optional(),
   })

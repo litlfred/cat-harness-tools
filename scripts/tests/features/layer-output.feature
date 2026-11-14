@@ -70,6 +70,13 @@ Feature: The layer output resolver
     When its read path is resolved
     Then it is the file the writer wrote
 
+  @test:scripts/tests/layer-output.test.ts::writePathAt_—_a_writer_holding_an_absolute_path::the_root_is_always_the_first_argument,_and_a_given_mounted_map_is_used_without_reading_the_lock
+  Scenario: The root is always the first argument, and a given mounted map is used without reading the lock
+    Given a checkout with no lock and a mounted map naming lower at lower
+    When the write path of a page in lower is asked with that map
+    Then it is the page under the output root
+    And without the map it is the page itself, and a path outside the root is written where it is
+
   @test:scripts/tests/layer-output.test.ts::derive-at-publish_built()_—_an_artefact_of_a_mounted_layer_built_at_its_output_root::a_declared_artefact_counts_as_built_when_only_its_output-root_twin_holds_it
   Scenario: An artefact of a mounted layer counts as built when only its output-root twin holds it
     Given a declared file and a declared directory of a mounted layer, neither built
@@ -118,39 +125,38 @@ Feature: The layer output resolver
     When movedInventory and overlayEntries are computed
     Then movedInventory lists the local files and overlayEntries is empty
 
-  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_mounted_layer's_path_is_written_under_build/layers/<instance>/
+  @test:scripts/tests/layer-output.test.ts::writePathOf_and_overlayDirs_(step_5:_the_QA_writers)::a_mounted_layer's_path_is_written_under_build/layers/<instance>/
   Scenario: A mounted layer's path is written under the layer output root
     Given a checkout whose lock mounts a lower layer
     When a writer resolves a results path inside the lower mount
     Then it writes under build/layers/lower/ at the same instance-relative path
 
-  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_local_layer's_path,_and_one_outside_the_checkout,_are_written_where_they_are
+  @test:scripts/tests/layer-output.test.ts::writePathOf_and_overlayDirs_(step_5:_the_QA_writers)::a_local_layer's_path,_and_one_outside_the_checkout,_are_written_where_they_are
   Scenario: A local layer's path, and one outside the checkout, are written where they are
     Given a checkout whose lock mounts a lower layer
     When a writer resolves a path in a local layer, or outside the checkout
     Then the path is unchanged
 
-  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_writer_refuses_an_unparseable_lock_rather_than_writing_into_the_mounts
+  @test:scripts/tests/layer-output.test.ts::writePathOf_and_overlayDirs_(step_5:_the_QA_writers)::a_writer_refuses_an_unparseable_lock_rather_than_writing_into_the_mounts
   Scenario: A writer refuses an unparseable lock rather than writing into the mounts
     Given a checkout whose index.lock.json is not valid JSON
     When a writer resolves a path inside a mounted directory
     Then it throws rather than reading the lock as nothing mounted
 
-  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::overlayDirs_lists_the_output_root_first,_then_the_layer's_own_directory,_each_only_if_it_exists
+  @test:scripts/tests/layer-output.test.ts::writePathOf_and_overlayDirs_(step_5:_the_QA_writers)::overlayDirs_lists_the_output_root_first,_then_the_layer's_own_directory,_each_only_if_it_exists
   Scenario: overlayDirs lists the output root first, then the layer's own directory
     Given a mounted layer's results directory and its output-root twin
     When the directories a reader lists are resolved as each comes to exist
     Then only existing ones are listed, the output root first
 
-  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_file_written_via_writePathAt_is_read_back_via_overlayPath_over_the_pinned_copy
-  Scenario: A file written via writePathAt is read back via overlayPath over the pinned copy
-    Given a mounted layer with a pinned result file and a twin written via writePathAt
+  @test:scripts/tests/layer-output.test.ts::writePathOf_and_overlayDirs_(step_5:_the_QA_writers)::a_file_written_via_writePathOf_is_read_back_via_overlayPath_over_the_pinned_copy
+  Scenario: A file written via writePathOf is read back via overlayPath over the pinned copy
+    Given a mounted layer with a pinned result file and a twin written via writePathOf
     When overlayPath resolves the pinned result path
-    Then it returns the output-root twin written via writePathAt
+    Then it returns the output-root twin written via writePathOf
 
   @test:scripts/tests/layer-output.test.ts::checkNavNames_—_reads_a_mounted_layer's_docs_surfaces_from_its_output-root_twin::reads__data/harness.json,_navbar-footer.html,_railed_html_pages,_and_rail_data_from_build/layers/<instance>/
   Scenario: checkNavNames reads a mounted layer's docs surfaces from its output-root twin
     Given a checkout where cat-harness is mounted and its generated docs surfaces live under build/layers/cat-harness/docs/
     When checkNavNames inspects the checkout
     Then it reads the output-root docs surfaces and passes with no failures
-

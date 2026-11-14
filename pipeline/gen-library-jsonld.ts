@@ -435,7 +435,7 @@ export function librarySubgraphStart(locatedAt: string): string {
 /**
  * One table transcribed from a paged source's pages: an entry of the
  * `tables` of a `tabular.csvw.json` that sits BESIDE `structure.json`
- * (who-iris#224). Read raw, as `library-document.ts` reads it for the site:
+ * (a content layer's issue #224). Read raw, as `library-document.ts` reads it for the site:
  * the `fac:` fields below are the transcriber's, and none is required.
  */
 export interface TranscribedTable {
@@ -466,6 +466,8 @@ export function buildDocumentNodes(
   subgraphStart: string = findContentRepoRoot(),
   sourceMaterialization?: unknown,
   tables?: readonly TranscribedTable[],
+  /** The owning layer's root, whose dependency closure types the blocks ({@link owningLayerRoot}). */
+  typingRoot?: string,
 ): Array<{ path: string; content: string }> {
   // Without a resolved title (a test, a caller with no disk), resolve from the
   // structure alone: the Info dictionary or a text heading, never the page-1
@@ -532,7 +534,7 @@ export function buildDocumentNodes(
   // structure), placed like figures: in the FIRST section containing the
   // table's first page. Until this, the paged rung never read that file, so
   // a transcribed table had no block and its `fac:narrative` drafts (1464 in
-  // who-iris) reached neither the graph nor the library viewer, though the
+  // one content layer) reached neither the graph nor the library viewer, though the
   // narrative queue offered them. The block carries the narrative as figure
   // blocks carry theirs: a copy, reviewed in the file it was copied from.
   const tableOwned = new Set<number>();
@@ -602,7 +604,7 @@ export function buildDocumentNodes(
           // A dependency's kind (a higher layer's `functional-requirement`
           // or `indicator`) is typed through the contribution registry; without
           // it such a node had no `@type` at all.
-          "@type": candidateTypes(c.kind),
+          "@type": candidateTypes(c.kind, typingRoot),
           kind: c.kind,
           title: c.name ?? undefined,
           pageStart: sec.page_start ?? undefined,
@@ -756,37 +758,60 @@ function libraryPrefixes(): Map<string, string> {
   return contentPrefixes;
 }
 
-let contributions: ContributionRegistry | null | undefined;
+const contributionsByRoot = new Map<string, ContributionRegistry | null>();
 
 /**
- * The block kinds the content repository's dependencies contribute — the DAK
+ * The block kinds a layer and its declared dependencies contribute — the DAK
  * layer's `functional-requirement`, `non-functional-requirement`, `indicator`
- * and the rest. Loaded once, as `gen-block-jsonld` loads them. A checkout
- * whose contributions cannot be loaded types only the core kinds, which is
- * what it did before.
+ * and the rest — loaded once per root, as `gen-block-jsonld` loads them.
+ *
+ * Rooted at the layer that OWNS the library entry, not at the checkout. From
+ * the checkout root the registry held every mounted layer's kinds, so the same
+ * committed node was typed by whatever happened to be mounted: a lower layer's
+ * indicator candidates were typed by an upper DAK layer when mounted in an
+ * index and as `cat-harness:Block` in the lower layer's own checkout, so no
+ * committed file passed both checks. `loadContributionsSync` walks the root's
+ * own declared dependencies, so a layer is typed only by kinds it can see in
+ * any checkout. A root whose contributions cannot be loaded types only the core
+ * kinds, which is what it did before.
  */
-function contributedKinds(): ContributionRegistry | undefined {
-  if (contributions === undefined) {
+function contributedKinds(root: string = contributionsRoot()): ContributionRegistry | undefined {
+  const key = resolve(root);
+  if (!contributionsByRoot.has(key)) {
     try {
-      contributions = loadContributionsSync<FolioContribution, ContributionRegistry>(
-        contributionsRoot(),
-        new ContributionRegistry(),
+      contributionsByRoot.set(
+        key,
+        loadContributionsSync<FolioContribution, ContributionRegistry>(key, new ContributionRegistry()),
       );
     } catch {
-      contributions = null;
+      contributionsByRoot.set(key, null);
     }
   }
-  return contributions ?? undefined;
+  return contributionsByRoot.get(key) ?? undefined;
 }
 
 /**
- * A candidate's `@type`: its kind's, through the contribution registry, or the
- * generic library block class when no mounted layer types the kind. An
- * L1 library may hold another layer's `indicator` without mounting that
- * layer; its node is then still a typed block, never one with no type.
+ * The layer a library entry belongs to, for typing its blocks: the nearest
+ * directory above it that carries a layer declaration. An entry with none
+ * above it (a bare content repository) is typed from the checkout, as before.
  */
-export function candidateTypes(kind: string): string[] {
-  const types = typesForKind(kind, contributedKinds());
+export function owningLayerRoot(locatedAt: string): string {
+  for (let at = dirname(resolve(locatedAt)); at !== dirname(at); at = dirname(at)) {
+    if (readDeclaration(at) !== undefined) return at;
+  }
+  return contributionsRoot();
+}
+
+/**
+ * A candidate's `@type`: its kind's, through the contribution registry of
+ * `root` (the owning layer; the checkout when not given), or the generic
+ * library block class when no layer in that root's dependency closure types
+ * the kind. An L1 library may hold another layer's `indicator` without
+ * depending on that layer; its node is then still a typed block, never one
+ * with no type.
+ */
+export function candidateTypes(kind: string, root?: string): string[] {
+  const types = typesForKind(kind, contributedKinds(root));
   return types.length ? types : [termCurie("Block")];
 }
 
@@ -1073,6 +1098,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       subgraphStart,
       readJson<unknown>(join(dir, SOURCE_MATERIALIZATION_RECORD)),
       Array.isArray(transcribed?.tables) ? transcribed.tables : undefined,
+      owningLayerRoot(locatedAt),
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
     if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance));

@@ -110,7 +110,7 @@ import { poResolveContext, resolvePoSources, type PoResolveContext } from "./po-
 import { extractMarkdown, extractFromManifest, type ManifestInput } from "./pot-extract.ts";
 import { gitFileCommitSha, gitHeadTree, hashFile, sweepActor, walkBlocks } from "./qa-utils.ts";
 import { existingTranslationQaPath, translationQaPath } from "./qa-paths.ts";
-import { writePathAt } from "../scripts/lib/layer-output.ts";
+import { writePathOf } from "../scripts/lib/layer-output.ts";
 import {
   isAsciiEscaped,
   missingAttestations,
@@ -1125,7 +1125,7 @@ function settleSidecar(
   const out = translationQaPath(INSTANCE_ROOT, subjectRoot, locale);
   // Where it is WRITTEN: the layer output root for a mounted layer (bean
   // `cat-tools-sm8r`, item 4). `out` stays the logical path every message names.
-  const target = writePathAt(out);
+  const target = writePathOf(out);
   if (!doc) {
     // An existing sidecar whose translation has gone is REPORTED, never
     // silently deleted: a verdict about a PO nobody can find any more is a
