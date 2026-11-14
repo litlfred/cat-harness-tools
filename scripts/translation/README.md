@@ -59,35 +59,40 @@ Runs the full pipeline on a markdown page (default: `docs/guides/agent-onboardin
 
 Output goes to `translations/fr/`.
 
-## Machine translation of empty entries (`translate-pot`)
+## Machine translation of empty entries (`translation:candidates`)
 
-`scripts/translate-pot.ts` fills the EMPTY msgstr entries of each
-`translations/<locale>/**/<name>.pot`/`.po` pair with a self-hosted open
-engine, so no hosted freemium API or quota is involved:
+`scripts/translation-candidates.ts` asks open, self-hosted engines for
+CANDIDATE translations of the empty and fuzzy entries of each
+`translations/<locale>/**/<name>.pot`/`.po` pair, so no hosted freemium API or
+quota is involved:
 
 | `--engine` | Engine | Licence | Runs |
 |---|---|---|---|
-| `opus-mt` (preferred) | Helsinki-NLP OPUS-MT Marian models | CC-BY 4.0 | locally, `python -I scripts/translation/opus_mt_runner.py` (needs `transformers` and the model in the local cache; `HF_HUB_OFFLINE=1` forbids downloads) |
-| `libretranslate` | LibreTranslate, Argos models | AGPL-3.0 | a self-hosted instance at `--url` / `LIBRETRANSLATE_URL`; libretranslate.com is refused |
+| `opus-mt` (preferred) | Helsinki-NLP OPUS-MT Marian models | CC-BY 4.0 | locally, `python3 -I scripts/translation/opus_mt_runner.py` (needs `transformers` and the model in the local cache; `HF_HUB_OFFLINE=1` forbids downloads) |
+| `libretranslate` | LibreTranslate, Argos models | AGPL-3.0 | a self-hosted instance at `--url`; libretranslate.com is refused |
 
-Each singular string goes through the one candidates writer,
-`addCandidates` in `scripts/lib/translation-candidates.ts`. The writer records
-the string in `<catalogue>.candidates.json` for the review page and fills the
-empty msgstr with it. Plural entries are filled directly with the target's
-plural count. `bun run cat translation:candidates --engine opus-mt,libretranslate`
-does the same for several engines in one run, and runs the same OPUS-MT
-runner.
+Every candidate goes through the one writer, `addCandidates` in
+`scripts/lib/translation-candidates.ts`, which records it in
+`<catalogue>.candidates.json` for the review page and fills an EMPTY msgstr
+with the first good candidate, flagged `#, fuzzy`. A plural entry gets one
+candidate carrying every form, as many as the catalogue's `Plural-Forms`
+count, and is filled only when all its forms are empty. Each line of a string
+is masked (`[0]`, `[1]`, …) and translated on its own.
 
-Every machine string is flagged `#, fuzzy`; a non-empty msgstr is never
-touched; a string whose placeholders, markup or math do not round-trip is
-left empty and reported; a catalogue signed off as official is skipped. The
+A non-empty msgstr is never touched; a string whose placeholders, markup or
+math do not round-trip is not recorded, and is reported; a catalogue signed
+off as official (its node, or `X-Folio-Official: yes`) or marked `DO NOT
+MACHINE-FILL` collects candidates but its `.po` is not changed. The
 catalogue's `.json` translation node records `generatedBy: "machine"`,
 `generator` and `generatedAt`, and never `official`.
 
 ```sh
-bun run cat translate-pot -- --engine opus-mt --locale fr
-bun run cat translate-pot -- --engine libretranslate --url http://localhost:5000 --dry-run
+bun run cat translation:candidates -- --instance . --engine opus-mt --locale fr --init
+bun run cat translation:candidates -- --instance . --engine opus-mt,libretranslate --url http://localhost:5000 --dry-run
 ```
+
+`bun run cat translate-pot` is the same command under its older name and
+flags (`--locale` repeated, a `.po` started unless `--no-create`).
 
 ## Tests
 

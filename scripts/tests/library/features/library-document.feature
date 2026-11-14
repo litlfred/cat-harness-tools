@@ -126,6 +126,11 @@ Feature: The document view of a library entry
     And "Not in the outline" does not appear
     And opening the first node shows "1.1 One A"
 
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::an_inferred_contents_gains_the_sections_it_does_not_list,_at_their_place
+  Scenario: Sections an inferred contents does not list are still in the tree
+    When the contents were inferred and some sections are named by no entry
+    Then each is placed by its first page at its own level, marked as not listed, and the note counts them
+
   @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::toc_absent:_the_tree_is_built_from_the_sections,_nested_by_level
   Scenario: Without a table of contents, the Contents tree is built from the sections, nested by level
     Given a document view with no outline and two level-1 sections "Page 1" and "Page 2"

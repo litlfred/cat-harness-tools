@@ -155,10 +155,53 @@ export function draftsOf(v: Verdict, who: unknown, when: string) {
   return out;
 }
 
+/**
+ * The drafts a verdict yields, with the narratives already held in the
+ * languages the verdict does not supply — kept only when the held narrative
+ * in the verdict's own language is the same text, since a translation of a
+ * description that has changed describes something else.
+ *
+ * `image-verdicts.json` holds the English verdict and, for most documents,
+ * no `translations`: the other five languages were drafted into the
+ * sidecars afterwards. Rebuilding a sidecar from the verdicts alone dropped
+ * them on every re-ingest and on every bare run of this script (who-iris
+ * re-ingest pilot, 2026-11-14: 15 images on two entries, and 10 other
+ * entries by a bare run).
+ */
+export function draftsKeeping(v: Verdict, who: unknown, when: string, held: unknown) {
+  const fresh = draftsOf(v, who, when);
+  const list = (Array.isArray(held) ? held : held ? [held] : []) as Array<{ lang?: string; text?: string }>;
+  const lang = v.lang ?? DEFAULT_NARRATIVE_LANG;
+  const same = list.some((n) => (n.lang ?? DEFAULT_NARRATIVE_LANG) === lang && typeof n.text === "string" && n.text.trim() === v.draft.trim());
+  if (!same) return fresh;
+  const have = new Set(fresh.map((n) => n.lang));
+  return [...fresh, ...list.filter((n) => n.lang !== undefined && !have.has(n.lang))] as typeof fresh;
+}
+
 /** The attribution for one document: its own, else the file's. */
 export function attributionFor(vf: VerdictFile, docId: string): { by: unknown; at: string } {
   const own = vf.attribution?.[docId];
   return own ? { by: own.inspected_by, at: own.inspected_at } : { by: vf.inspected_by, at: vf.inspected_at };
+}
+
+/** A narrative slot that holds some written text, else `undefined` (a fresh sidecar's "not-authored" placeholder holds none). */
+function withText(slot: unknown): unknown {
+  const list = (Array.isArray(slot) ? slot : slot ? [slot] : []) as Array<{ text?: unknown }>;
+  return list.some((n) => typeof n?.text === "string" && n.text.trim() !== "") ? slot : undefined;
+}
+
+/** The narratives a sidecar held, by image or render id; empty when there is none or it will not parse. */
+function heldNarratives(text: string | undefined, key: "images" | "figures"): Map<string, unknown> {
+  const out = new Map<string, unknown>();
+  if (!text) return out;
+  try {
+    for (const x of ((JSON.parse(text) as Record<string, unknown>)[key] ?? []) as Array<{ id?: string; narrative?: unknown }>) {
+      if (x?.id && x.narrative !== undefined) out.set(x.id, x.narrative);
+    }
+  } catch {
+    // An unreadable earlier sidecar holds nothing to keep.
+  }
+  return out;
 }
 
 export interface ApplyResult {
@@ -179,8 +222,11 @@ export function applyTo(
   docVerdicts: Record<string, Verdict>,
   by: unknown,
   at: string,
+  /** The sidecar the entry held before a re-ingest rebuilt this one: its narratives are kept (see {@link draftsKeeping}). */
+  priorText?: string,
 ): { text: string; result: Omit<ApplyResult, "docId"> } {
   const parsed = ImagesSidecarSchema.parse(JSON.parse(sidecarText));
+  const prior = heldNarratives(priorText, "images");
   const images = parsed.images ?? [];
   const unjudged: string[] = [];
   const seen = new Set<string>();
@@ -210,7 +256,9 @@ export function applyTo(
     }
     const who = AttributionSchema.parse(v.inspected_by ?? by);
     const when = v.inspected_at ?? at;
-    const narrative = DESCRIBABLE_ROLES.includes(v.role) ? draftsOf(v, who, when) : undefined;
+    const narrative = DESCRIBABLE_ROLES.includes(v.role)
+      ? draftsKeeping(v, who, when, withText((img as { narrative?: unknown }).narrative) ?? prior.get(img.id))
+      : undefined;
     return {
       ...img,
       role: v.role,
@@ -245,8 +293,10 @@ export function applyToVector(
   docVerdicts: Record<string, Verdict>,
   by: unknown,
   at: string,
+  priorText?: string,
 ): { text: string; result: Omit<ApplyResult, "docId"> } {
   const parsed = VectorFiguresSidecarSchema.parse(JSON.parse(sidecarText));
+  const prior = heldNarratives(priorText, "figures");
   const figures = parsed.figures ?? [];
   const unjudged: string[] = [];
   const seen = new Set<string>();
@@ -257,7 +307,7 @@ export function applyToVector(
       return f;
     }
     seen.add(f.id);
-    const { shows: _shows, narrative: _narrative, ...rest } = f;
+    const { shows: _shows, narrative: held, ...rest } = f;
     const who = AttributionSchema.parse(v.inspected_by ?? by);
     const when = v.inspected_at ?? at;
     return {
@@ -267,7 +317,7 @@ export function applyToVector(
       ...(v.shows && v.shows.length > 0 ? { shows: v.shows } : {}),
       ...(DESCRIBABLE_ROLES.includes(v.role)
         ? {
-            narrative: draftsOf(v, who, when),
+            narrative: draftsKeeping(v, who, when, withText(held) ?? prior.get(f.id)),
           }
         : {}),
     };
@@ -292,13 +342,15 @@ function applyVectorIn(
   by: unknown,
   at: string,
   check: boolean,
+  priorDir?: string,
 ): Omit<ApplyResult, "docId"> | undefined {
   const path = join(entryDir, VECTOR_FIGURES_FILE);
   const vectorIds = Object.keys(docVerdicts).filter(isVectorFigureId);
   if (!existsSync(path)) {
     return vectorIds.length ? { applied: 0, unjudged: [], orphaned: vectorIds } : undefined;
   }
-  const { text, result } = applyToVector(readFileSync(path, "utf-8"), docVerdicts, by, at);
+  const prior = priorDir && existsSync(join(priorDir, VECTOR_FIGURES_FILE)) ? readFileSync(join(priorDir, VECTOR_FIGURES_FILE), "utf-8") : undefined;
+  const { text, result } = applyToVector(readFileSync(path, "utf-8"), docVerdicts, by, at, prior);
   if (!check) writeFileSync(path, text, "utf-8");
   return result;
 }
@@ -342,10 +394,14 @@ export function runStaging(entryDir: string, libDir: string, check: boolean): nu
     return 0;
   }
   const who = attributionFor(verdicts, docId);
-  const { text, result } = applyTo(readFileSync(sidecar, "utf-8"), docVerdicts, who.by, who.at);
+  // The entry as it is filed now, when this is a re-ingest: its narratives in
+  // other languages are carried onto the rebuilt sidecars.
+  const filed = libraryEntryDir(libDir, docId) ?? join(libDir, docId);
+  const priorImages = existsSync(join(filed, "images.json")) ? readFileSync(join(filed, "images.json"), "utf-8") : undefined;
+  const { text, result } = applyTo(readFileSync(sidecar, "utf-8"), docVerdicts, who.by, who.at, priorImages);
   // Computed in check mode first so an orphan in EITHER sidecar refuses before
   // anything is written — a half-applied judgement is worse than none.
-  const vector = applyVectorIn(entryDir, docVerdicts, who.by, who.at, true);
+  const vector = applyVectorIn(entryDir, docVerdicts, who.by, who.at, true, filed);
   const orphans = [...result.orphaned, ...(vector?.orphaned ?? [])];
   if (orphans.length > 0) {
     console.error(`✗ ${docId}: ${orphans.length} verdict(s) name an image the sidecars do not have:`);
@@ -354,7 +410,7 @@ export function runStaging(entryDir: string, libDir: string, check: boolean): nu
   }
   if (!check) {
     writeFileSync(sidecar, text, "utf-8");
-    applyVectorIn(entryDir, docVerdicts, who.by, who.at, false);
+    applyVectorIn(entryDir, docVerdicts, who.by, who.at, false, filed);
   }
   if (vector) {
     console.log(

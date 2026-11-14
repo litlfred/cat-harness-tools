@@ -5,7 +5,7 @@
  * @covers translation-sources
  *
  * The runner is a local command, by default `python3 -I
- * scripts/translation/opus_mt_runner.py` (the runner `translate-pot.ts` uses
+ * scripts/translation/opus_mt_runner.py` (the runner `translate-pot.ts`, its older name, uses
  * too). It reads ONE JSON request on stdin and writes ONE JSON response:
  *
  * ```

@@ -41,7 +41,7 @@ const REPO = repoRootFor(ROOT);
 const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
 const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 const PAGE_FILE = join(REPO, "who-iris", "site", "index.html");
-const PAGE = existsSync(PAGE_FILE) ? readFileSync(PAGE_FILE, "utf8") : "";
+const PAGE = existsSync(overlayPath(PAGE_FILE)) ? readFileSync(overlayPath(PAGE_FILE), "utf8") : "";
 
 /** The generated page with its own `fa-translation-meta` block taken out. */
 function withoutTranslationMeta(html: string): string {

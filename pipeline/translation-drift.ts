@@ -56,11 +56,11 @@ import { directoryForGraph, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { buildTranslationIndex, instanceSiteRoot, siteRoot } from "./translation-index.ts";
 import { parsePoEntries, poContextKey } from "./po-inject.ts";
 import { sourceForPermalink } from "../scripts/lib/jekyll-permalink.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 import { pathToFileURL } from "node:url";
 import { explicitInstanceRoot, HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { PAGE_LOCALE, routesRecordedInSite, visualisersRenderedBy } from "../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "../schemas/kg/visualiser-route.ts";
-import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /** One heading, reduced to what can be compared ACROSS a translation. */
 export interface Heading {
@@ -406,9 +406,6 @@ export function driftFor(
 
   for (const page of Object.values(index.pages)) {
     const srcFile = fileForUrl(site, page.sourceUrl);
-    // Read over the overlay: in a mounted layer a generated page is written at
-    // the output root, not beside the pinned site. `srcFile` stays the site
-    // path, which names the page's catalogue below.
     const srcAt = overlayPath(srcFile);
     if (!existsSync(srcAt)) {
       findings.push({
@@ -431,7 +428,8 @@ export function driftFor(
     }
 
     for (const [locale, t] of Object.entries(page.translations)) {
-      const file = overlayPath(fileForUrl(site, t.url));
+      const file = fileForUrl(site, t.url);
+      const fileAt = overlayPath(file);
       // The page NAME is its SOURCE path, which keys its catalogue — not its
       // published URL, which since bean `kc7k` carries `docs/cat-harness/`.
       const name = relative(site, srcFile).replace(/\.md$/i, "").split(sep).join("/").replace(/(^|\/)index$/, "") || "index";
@@ -452,7 +450,7 @@ export function driftFor(
       // with `--overwrite`, replace a catalogue that may carry a human's sign-off.
       // That is the loss issue #206 exists to prevent.
       const subject = `${locale}/${name}`;
-      if (!existsSync(file)) {
+      if (!existsSync(fileAt)) {
         findings.push({
           severity: "unreadable",
           subject,
@@ -460,7 +458,7 @@ export function driftFor(
         });
         continue;
       }
-      const got = headingsOf(readFileSync(file, "utf-8"));
+      const got = headingsOf(readFileSync(fileAt, "utf-8"));
       compared++;
       const shape = `${subject} ${shapeOf(src)}->${shapeOf(got)}`;
       if (!sameStructure(src, got) && !knownDrift.has(shape)) {

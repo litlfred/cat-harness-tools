@@ -754,9 +754,11 @@ export function viewersOf(
     const writer =
       v.writer?.map((w) => renderedPath(repoRoot, writerAt(w))) ??
       (existsSync(overlayPath(join(repoRoot, ref))) ? undefined : (builtAtPublishWriter(repoRoot, v.harnessRoot, ref) ?? heldPageWriter(repoRoot, v)));
-    // The directory's tile is the DEFAULT dress; what the visualiser declares
-    // about itself wins, since a directory drawn twice needs two names.
-    out.push({ ...d.tile, ...tile, ...(writer ? { writer } : {}), ref, title: v.title ?? d.tile?.title ?? d.id });
+    // The directory's tile is the DEFAULT dress; what a visualiser that NAMES
+    // the directory declares about itself wins, since a directory drawn twice
+    // needs two names, whereas a kind-covering visualiser's generic title
+    // must not override the directory's own title or row label.
+    out.push({ ...d.tile, ...tile, ...(writer ? { writer } : {}), ref, title: (named ? v.title : undefined) ?? d.tile?.title ?? d.id });
   }
   return out;
 }

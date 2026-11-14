@@ -30,7 +30,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import {
   ENTRY_EXTRACTION_FILE,
@@ -192,9 +192,22 @@ export function observeExtraction(dir: string, opts: ObserveOptions = {}): Parti
   const tabular = readJson<{ tables?: unknown[] }>(join(dir, TABULAR_CSVW_FILENAME));
   if (tabular && Array.isArray(tabular.tables)) out.tables = counted(tabular.tables.length, TABULAR_CSVW_FILENAME, at);
   // FOOTNOTES — `pdf-footnotes.py`'s record.
-  const foot = readJson<{ footnotes?: unknown[]; uncalled_notes?: unknown[] }>(join(dir, FOOTNOTES_FILE));
+  // Only a note a mark calls is a footnote (skill l1-document-ingestion,
+  // "Footnotes and their marks"). The uncalled lines are table rows, figure
+  // labels and running footers as often as notes, and adding them gave
+  // 9 / 10 / 60 for entries that print 0 / 1 / 23 (re-ingest pilot,
+  // 2026-11-14). With nothing linked but lines or marks left over, the step
+  // could not decide: partial, for a reader, never a count of the leftovers.
+  const foot = readJson<{ footnotes?: unknown[]; uncalled_notes?: unknown[]; unlinked_marks?: unknown[] }>(join(dir, FOOTNOTES_FILE));
   if (foot && Array.isArray(foot.footnotes)) {
-    out.footnotes = counted(foot.footnotes.length + (foot.uncalled_notes?.length ?? 0), "pdf-footnotes.py", at);
+    const called = foot.footnotes.length;
+    const uncalled = foot.uncalled_notes?.length ?? 0;
+    const unlinked = foot.unlinked_marks?.length ?? 0;
+    const left = [uncalled ? `${uncalled} foot-of-page line(s) no mark calls` : "", unlinked ? `${unlinked} mark(s) with no note found` : ""].filter(Boolean).join(", ");
+    out.footnotes =
+      called === 0 && left
+        ? { state: "partial", tool: "pdf-footnotes.py", at, note: `no footnote linked to a mark; ${left}, kept for a reader to judge` }
+        : counted(called, "pdf-footnotes.py", at, left ? { note: `called from the text; also kept: ${left}` } : {});
   }
   // SUMMARIES — the block summaries drained so far.
   const sums = readJson<{ summaries?: unknown[] }>(join(dir, SUMMARIES_FILE));
@@ -285,7 +298,12 @@ export function stagedRecord(
 ): Record<string, ExtractionStep> {
   const prior = destinationEntry ? (readExtraction(destinationEntry)?.kinds ?? {}) : {};
   const observed = observeExtraction(staging, opts);
-  const ran = readExtraction(staging)?.kinds ?? {};
+  // Re-run over an entry already promoted (staging IS the destination), the
+  // record in it is the last run's, not this one's: it must not outrank what
+  // the artefacts show now. It kept 'figures partial 16' over the 30 the
+  // sidecars held once 14 renders were inspected (re-ingest pilot, 2026-11-14).
+  const same = destinationEntry !== undefined && resolve(destinationEntry) === resolve(staging);
+  const ran = same ? {} : (readExtraction(staging)?.kinds ?? {});
   const out: Record<string, ExtractionStep> = { ...prior };
   for (const [k, v] of Object.entries(observed)) if (v) out[k] = v;
   for (const [k, v] of Object.entries(ran)) out[k] = v;
