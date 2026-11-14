@@ -55,6 +55,7 @@ import { mountedInstanceRoots } from "../schemas/kg/remote-mount.js";
 import { DEFAULT_LOCALE } from "../schemas/content/translation.js";
 import { scriptTable } from "../schemas/sdlc/script-table.ts";
 import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "../schemas/kg/visualiser-route.js";
+import { overlayPath } from "./lib/layer-output.ts";
 
 // ── Provenance: which Tool drew a page ────────────────────────────────────
 
@@ -490,7 +491,9 @@ export function visualiserPageDir(site: string, parts: VisualiserRouteParts): st
   return join(site, ...visualiserRoute(parts).split("/").filter(Boolean));
 }
 
-const holdsPage = (dir: string): boolean => existsSync(join(dir, "index.html")) || existsSync(join(dir, "index.md"));
+// Over the layer overlay: a mounted layer's pages are written at its output
+// root (bean `cat-tools-sm8r`, item 4), so a page there is held too.
+const holdsPage = (dir: string): boolean => existsSync(overlayPath(join(dir, "index.html"))) || existsSync(overlayPath(join(dir, "index.md")));
 
 /**
  * The directory a view's page IS in under `site`: its localised directory
@@ -523,7 +526,7 @@ export function visualiserPageRef(repoRoot: string, parts: VisualiserRouteParts,
     : undefined;
   if (held !== undefined) return renderedPath(repoRoot, join(site, ...held.route.split("/").filter(Boolean), basename(held.page)));
   const dir = existingPageDir(site, parts) ?? visualiserPageDir(site, pageParts(parts));
-  const file = existsSync(join(dir, "index.md")) && !existsSync(join(dir, "index.html")) ? "index.md" : "index.html";
+  const file = existsSync(overlayPath(join(dir, "index.md"))) && !existsSync(overlayPath(join(dir, "index.html"))) ? "index.md" : "index.html";
   return renderedPath(repoRoot, join(dir, file));
 }
 
