@@ -3278,12 +3278,14 @@ for (const r of reports) {
     writeFileSync(p, text);
   }
 }
+// To STDERR: `--json` owns stdout (its report array is parsed whole), and
+// this advisory is printed before the judge redirects console.log.
 if (attLeftInMount.length > 0) {
-  console.log(
+  console.error(
     `\n  · ${attLeftInMount.length} committed attestation file(s) of a MOUNTED layer would change; left as pinned ` +
       "(a mount is read-only). Run `bun run cat kg:audit:all` in that layer's own repository to rewrite them:",
   );
-  for (const a of attLeftInMount) console.log(`    ${a}`);
+  for (const a of attLeftInMount) console.error(`    ${a}`);
 }
 if (attMoved > 0) {
   console.log(
