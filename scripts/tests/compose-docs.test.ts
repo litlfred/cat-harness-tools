@@ -35,6 +35,7 @@ import { join, resolve } from "node:path";
 
 import {
   carriedInstances,
+  chromeLayers,
   compose,
   docsLayers,
   instanceStub,
@@ -869,6 +870,21 @@ describe("a MOUNTED base layer's computed pages at the output root (bean cat-too
     const { layers, missing } = docsLayers(root);
     expect(layers.map((l) => l.id)).toEqual(["docs@output", "root-docs"]);
     expect(missing).toEqual([]);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a chrome layer's output-root twin is that layer, not a second chrome layer", () => {
+    const root = mounted({}, {}, {});
+    writeDeclaration(
+      join(root, INSTANCE),
+      JSON.stringify({ name: INSTANCE, directories: [{ id: "site-chrome", path: "site-chrome/", graphTypologies: ["docs"] }, ...ENTRIES] }),
+    );
+    mkdirSync(join(root, INSTANCE, "site-chrome"), { recursive: true });
+    mkdirSync(join(root, "build", "layers", INSTANCE, "site-chrome", "assets"), { recursive: true });
+    expect(chromeLayers(root).map((l) => l.id)).toEqual(["site-chrome"]);
+    // A twin whose base is absent carries the layer, so it is still listed.
+    rmSync(join(root, INSTANCE, "site-chrome"), { recursive: true, force: true });
+    expect(chromeLayers(root).map((l) => l.id)).toEqual(["site-chrome@output"]);
     rmSync(root, { recursive: true, force: true });
   });
 

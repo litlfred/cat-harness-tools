@@ -1548,6 +1548,7 @@ export interface WorkflowInstanceView {
 /** The workflow pages' own styles: the token and the steps done, over the published drawing. */
 const WV_CSS = `.wv-diagram { margin: 0.6rem 0 1.2rem; overflow-x: auto; }
 .wv-diagram svg { max-width: 100%; height: auto; }
+.wv-diagram[data-wv-svg]:not(.wv-drawn) { min-height: 20rem; }
 .wv-diagram .wv-token .djs-visual > :first-child { stroke: #c62828 !important; stroke-width: 5px !important; }
 .wv-diagram .wv-done .djs-visual > :first-child { stroke-dasharray: 6 3; }
 .sv-tag.is-stuck { border: 1px solid currentColor; border-radius: 4px; padding: 0 0.3rem; }`;
@@ -1557,12 +1558,28 @@ const WV_CSS = `.wv-diagram { margin: 0.6rem 0 1.2rem; overflow-x: auto; }
  * drawing is fetched rather than embedded, so the page stays thin and the
  * drawing stays the one `render:bpmn` publishes; links inside it are written
  * relative to the SVG file, so they are re-anchored to its URL here.
+ *
+ * Lazy on screen, complete in print (owner, 2026-11-14: "do lazy load content
+ * and libs"; "make sure printing loads all of the content before it renders
+ * the PDF on the browser"; cat-harness `skills/ui/ui-core/web-apps.md`). Each
+ * drawing is fetched as it nears the viewport (an IntersectionObserver), or
+ * when the closed `<details>` holding it is opened; a hidden tab panel is not
+ * intersecting until it is shown, so it waits the same way. With no observer,
+ * every drawing is fetched at load, as before. A figure not yet drawn keeps
+ * a drawing's room (`min-height`), so the figures below it start out of
+ * reach rather than stacked at its edge. Printing fetches them all:
+ * `beforeprint` opens what holds a drawing and starts every fetch, Ctrl/Cmd+P
+ * waits for them before it prints, and `window.wvPrintPrep()` is the promise a
+ * Print button waits on. `afterprint` closes again what was opened. The
+ * library entry page's `docPrintPrep` is the worked example.
  */
-const WV_SCRIPT = `<script>
+export const WV_SCRIPT = `<script>
 (function () {
-  document.querySelectorAll("[data-wv-svg]").forEach(function (f) {
+  var figs = Array.prototype.slice.call(document.querySelectorAll("[data-wv-svg]"));
+  var load = function (f) {
+    if (f.wvLoad) return f.wvLoad;
     var url = new URL(f.getAttribute("data-wv-svg"), document.baseURI);
-    fetch(url).then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); }).then(function (text) {
+    return (f.wvLoad = fetch(url).then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); }).then(function (text) {
       var svg = new DOMParser().parseFromString(text, "image/svg+xml").documentElement;
       if (!svg || svg.nodeName.toLowerCase() !== "svg") return;
       svg.querySelectorAll("script").forEach(function (s) { s.remove(); });
@@ -1580,7 +1597,37 @@ const WV_SCRIPT = `<script>
       mark("data-wv-done", "wv-done");
       mark("data-wv-tokens", "wv-token");
       f.replaceChildren(document.importNode(svg, true));
-    }).catch(function () {});
+    }).catch(function () {}).then(function () { f.classList.add("wv-drawn"); }));
+  };
+  var io = typeof IntersectionObserver === "function" ? new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); load(e.target); } });
+  }, { rootMargin: "300px 0px" }) : null;
+  figs.forEach(function (f) { if (io) io.observe(f); else load(f); });
+  document.addEventListener("toggle", function (ev) {
+    var d = ev.target;
+    if (d && d.open && d.querySelectorAll) d.querySelectorAll("[data-wv-svg]").forEach(load);
+  }, true);
+  var opened = [];
+  var prep = function () {
+    figs.forEach(function (f) {
+      for (var d = f.parentElement; d; d = d.parentElement)
+        if (d.tagName === "DETAILS" && !d.open) { d.open = true; opened.push(d); }
+    });
+    return Promise.all(figs.map(load));
+  };
+  window.wvPrintPrep = prep;
+  window.addEventListener("beforeprint", function () { prep(); });
+  window.addEventListener("afterprint", function () {
+    opened.forEach(function (d) { d.open = false; });
+    opened = [];
+  });
+  // A print started from the keyboard waits for every drawing; the browser's
+  // menu print gets what beforeprint could fetch by then.
+  document.addEventListener("keydown", function (ev) {
+    if ((ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey && (ev.key === "p" || ev.key === "P")) {
+      ev.preventDefault();
+      prep().then(function () { window.print(); });
+    }
   });
   // The dynamic-state document (bean 6h47): the instance as the latest render
   // exported it. Shown beside what this page was built with, and any
