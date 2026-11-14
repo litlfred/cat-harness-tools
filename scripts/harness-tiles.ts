@@ -808,8 +808,8 @@ function tileFor(
     return undefined;
   };
   // THE MOUNT'S OWN ROUTE, last: a directory with no declared viewer that the
-  // mount pass publishes at its kind route (`docs/` → `/docs/who-iris/`) is a
-  // page the site serves, and the row opened nothing (who-iris, 2026-11-13).
+  // mount pass publishes at its kind route (`docs/` → `/docs/<layer>/`) is a
+  // page the site serves, and the row opened nothing (owner, 2026-11-13).
   // Read lazily, once: most layers resolve every kind above.
   let mounted: Map<string, string> | undefined;
   const mountedPageFor = (kind: string): string | undefined => {

@@ -371,3 +371,16 @@ Feature: Workflow script paths and working directories resolve where the step ru
     Given a temporary root holding ".github/workflows/code-quality-gates.yml"
     When the allowlists-not-ours reason is asked for
     Then it is null
+
+  @test:scripts/tests/sdlc/check-workflow-paths.test.ts::disallowed_.github/_invocations_(bean_folio-assistant-dtda)::a_workflow_run:_invoking_.github/skills/_fails_the_gate
+  Scenario: A workflow run step invoking a path under .github/skills/ produces a finding
+    Given a workflow step that runs "python .github/skills/cli/dak_skill.py run" and "bun run .github/skills/bpmn_author/validate.ts"
+    When the disallowed .github/ path findings are read from the workflow
+    Then their normalized paths are ".github/skills/cli/dak_skill.py" and ".github/skills/bpmn_author/validate.ts"
+
+  @test:scripts/tests/sdlc/check-workflow-paths.test.ts::disallowed_.github/_invocations_(bean_folio-assistant-dtda)::allows_.github/workflows/,_bootstrap_pointers,_CI_plumbing_and_declared_directories
+  Scenario: Workflows, bootstrap pointers, CI plumbing and declared directories under .github/ are allowed
+    When .github/ invocation paths are checked against the allowlist
+    Then ".github/workflows/helper.sh", ".github/mount-from-lock.sh", ".github/cat.ts" and ".github/scripts/repin-train.ts" are allowed
+    And ".github/skills/cli/dak_skill.py" is disallowed
+    And ".github/declared-tools/run.ts" is allowed when ".github/declared-tools" is a declared directory

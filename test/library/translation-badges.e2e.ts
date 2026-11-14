@@ -101,6 +101,8 @@ async function serve(
     /** The `translation-qa-pages.json` body; omitted, the list 404s. */
     list?: unknown;
     scheme?: "light" | "dark";
+    /** Where the page is served; the notice derives its source link from it. */
+    path?: string;
   } = {},
 ): Promise<void> {
   await page.route("http://tr.test/**", (route) => {
@@ -125,7 +127,7 @@ async function serve(
     }
     return route.fulfill({ status: 404, body: "not found" });
   });
-  await page.goto(PAGE_URL);
+  await page.goto(opts.path ? `http://tr.test${opts.path}` : PAGE_URL);
 }
 
 const coverage = ".fa-lang-coverage-badge";
@@ -596,33 +598,74 @@ test.describe("the translation badges are themed, not painted inline", () => {
   });
 });
 
-/* ── The unverified notice is ONE LINE that opens ─────────────────────────
+/* ── The unreviewed-translation notice is PROMINENT, and fails closed ───────
  *
- * Owner, 2026-09-21, on a translated page: *"should be a slim one line
- * '⚠️ Unverified translation — …' which then can open to the full
- * trnslation QA report."*
+ * Owner, 2026-11-13: *"need VERY prominent disclaimer when any translated text
+ * on page has not been human translated/adjudicated"* (cat-harness#1311). That
+ * supersedes the 2026-09-21 ruling for a slim one-line notice: the line was
+ * easy to miss, and it appeared only for the status "unverified".
  *
- * It was a four-line block above the page title, on every translated page,
- * permanently. Nothing guarded its shape, which is why it could grow to four
- * lines without anyone noticing — so these tests assert the SHAPE, not just
- * that the words are present. `textContent` is DOM order regardless of CSS,
- * so a collapsed drawer answers every text assertion; geometry and the
- * `open` attribute are what separate the two arrangements.
+ * So the notice is now a full-width block, first in the content, in the
+ * page's language and then English, linking to the source-language page. The
+ * detail the one-line form opened to is kept, behind a "Translation details"
+ * disclosure (`.fa-translation-warning__more`); the tests below that open it
+ * are the ones that guarded the old drawer, re-aimed at its new place.
+ *
+ * The first five cases moved here from cat-harness
+ * `test/docs-ui-translation-notice.test.ts`, which put a browser test in the
+ * content layer (`check:content-code-free`) where the unit-test job has no
+ * Chromium.
  */
-test.describe("the unverified-translation notice", () => {
-  test("is a collapsed disclosure, not a block", async ({ page }) => {
+test.describe("the unreviewed-translation notice", () => {
+  const FR = { lang: "fr", translationStatus: "unverified", translationSource: "page.md", availableLocales: ["en", "fr"] };
+  const prominent = ".fa-translation-warning--prominent";
+
+  test("an unverified French page shows it first, full width, in French and English, linking to the source", async ({ page }) => {
+    await serve(page, FR, { path: "/fr/page.html" });
+    const notice = page.locator(prominent);
+    await expect(notice).toHaveCount(1);
+    await expect(notice).toContainText("Traduction automatique");
+    await expect(notice).toContainText("Machine translation");
+    const r = await notice.evaluate((e) => ({
+      first: e.parentElement!.firstElementChild === e,
+      width: (e as HTMLElement).offsetWidth / (e.parentElement as HTMLElement).clientWidth,
+    }));
+    expect(r.first).toBe(true);
+    expect(r.width).toBeGreaterThan(0.95);
+    await expect(notice.locator(".fa-translation-warning__source").first()).toHaveAttribute("href", "/page.html");
+  });
+
+  test("a translated page with no status fails closed and shows it", async ({ page }) => {
+    await serve(page, { ...FR, translationStatus: "" }, { path: "/fr/page.html" });
+    await expect(page.locator(prominent)).toContainText("Traduction automatique");
+  });
+
+  test("a stale translation shows it", async ({ page }) => {
+    await serve(page, { ...FR, translationStatus: "stale" }, { path: "/fr/page.html" });
+    await expect(page.locator(prominent)).toContainText("Machine translation");
+  });
+
+  test("a locale with no notice text of its own falls back to English", async ({ page }) => {
+    await serve(page, { ...FR, lang: "de", availableLocales: ["en", "de"] }, { path: "/de/page.html" });
+    await expect(page.locator(prominent)).toContainText("Machine translation");
+    await expect(page.locator(prominent)).not.toContainText("Traduction automatique");
+  });
+
+  test("a verified translation, and a source-language page, show none", async ({ page }) => {
+    await serve(page, { ...FR, translationStatus: "verified" }, { path: "/fr/page.html" });
+    await expect(page.locator(".fa-translation-warning")).toHaveCount(0);
+    await page.unrouteAll();
+    await serve(page, { lang: "en", translationStatus: "", translationSource: "", availableLocales: ["en", "fr"] });
+    await expect(page.locator(".fa-translation-warning")).toHaveCount(0);
+  });
+
+  test("the detail is collapsed under the notice, not the notice itself", async ({ page }) => {
     await serve(page, { lang: "fr", translationStatus: "unverified", translationSource: "index.md" });
     const notice = page.locator(".fa-translation-warning");
     await expect(notice).toHaveCount(1);
-    await expect(notice).not.toHaveAttribute("open", "");
-
-    // ONE LINE. The old block ran to four, and a height assertion is the only
-    // thing that catches it growing back — the words are the same either way.
-    const box = await notice.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.height).toBeLessThan(64);
+    await expect(notice).toHaveClass(/fa-translation-warning--prominent/);
+    await expect(notice.locator(".fa-translation-warning__more")).not.toHaveAttribute("open", "");
   });
-
 
   test("the detail is hidden until opened, then reachable", async ({ page }) => {
     await serve(page, { lang: "fr", translationStatus: "unverified", translationSource: "index.md" });
@@ -631,23 +674,9 @@ test.describe("the unverified-translation notice", () => {
     const body = notice.locator(".fa-translation-warning__body");
 
     await expect(body).toBeHidden();
-    // NOT AT THE CENTRE, and this is the ACCEPTED design rather than a
-    // workaround waiting on a decision. `funp` (R25's glass, stage 1) puts
-    // `.fa-glass-handle` on EVERY page — `position: fixed; top: 0;
-    // left: 50%`, measured 2026-09-22 at 71 x 44 px. The notice is inserted
-    // as the first child of `.main-content`, so its one-line summary sits at
-    // y 14.75 spanning the full column, and the two overlap at the column's
-    // centre — exactly where Playwright clicks by default.
-    //
-    // Bean `tr1m` put three options to the owner — accept the overlap,
-    // reserve 44 px of top padding on every page, or move the tab out of the
-    // content column — and the owner chose ACCEPT (2026-09-22). A tab at the
-    // top edge is the pull-down metaphor, and 71 px of a full-width line is
-    // a dead spot rather than a dead control: a reader clicks anywhere else
-    // on the line, and the keyboard path has its own test below.
-    //
-    // So clicking off-centre is what a reader does. The test beneath is what
-    // keeps that sentence true as the glass changes.
+    // Off-centre, as a reader clicks: `tr1m` (owner, 2026-09-22) accepted the
+    // glass handle's overlap at the column's centre, and the test below
+    // guards that acceptance.
     await summary.click({ position: { x: 24, y: 12 } });
     await expect(body).toBeVisible();
     await expect(body).toContainText("index.md");
@@ -655,37 +684,25 @@ test.describe("the unverified-translation notice", () => {
   });
 
   test("the glass handle takes a slice of the notice, never the line", async ({ page }) => {
-    // THE GUARD ON AN ACCEPTED OVERLAP, which is what makes accepting it
-    // safe. The owner's choice on `tr1m` was "accept", and that choice rests
-    // on a measurement — 5.7% of one line — rather than on the overlap being
-    // harmless in principle. A decision resting on a number needs the number
-    // checked, or it silently becomes a decision about something else.
-    //
-    // Concretely: if the glass ever grows to cover the line, the test above
-    // would go on passing at x=24 while a reader met a control that did not
-    // respond.
+    // The guard on the overlap `tr1m` accepted: IF the handle meets the
+    // disclosure's line, a tenth of it at most (it was 71 of 1238, or 5.7%).
     await serve(page, { lang: "fr", translationStatus: "unverified", translationSource: "index.md" });
     const s = (await page.locator(".fa-translation-warning summary").boundingBox())!;
     const h = (await page.locator(".fa-glass-handle").boundingBox())!;
     const overlapX = Math.max(0, Math.min(s.x + s.width, h.x + h.width) - Math.max(s.x, h.x));
     const overlapY = Math.max(0, Math.min(s.y + s.height, h.y + h.height) - Math.max(s.y, h.y));
-    // They USED to overlap vertically: the notice was the panel's first
-    // line, level with the handle. Since #2201 the band's row (the locale
-    // selector and search) comes first, so the notice starts below the
-    // handle and there may be no overlap at all. The guard is unchanged: IF
-    // they meet, a tenth of the line at most (it was 71 of 1238, or 5.7%).
     if (overlapY > 0) expect(overlapX / s.width).toBeLessThan(0.1);
   });
 
-  test("opens from the keyboard, and closing is reachable — `l4zi`", async ({ page }) => {
+  test("the detail opens from the keyboard, and closing is reachable — `l4zi`", async ({ page }) => {
     await serve(page, { lang: "fr", translationStatus: "unverified", translationSource: "index.md" });
-    const notice = page.locator(".fa-translation-warning");
-    const summary = notice.locator("summary");
+    const more = page.locator(".fa-translation-warning__more");
+    const summary = more.locator("summary");
 
     await summary.press("Enter");
-    await expect(notice).toHaveAttribute("open", "");
+    await expect(more).toHaveAttribute("open", "");
     await summary.press("Enter");
-    await expect(notice).not.toHaveAttribute("open", "");
+    await expect(more).not.toHaveAttribute("open", "");
   });
 
   test("offers the QA report only when there IS one", async ({ page }) => {
@@ -724,23 +741,27 @@ test.describe("the unverified-translation notice", () => {
     await expect(page.locator(".fa-translation-warning__report")).toBeVisible();
   });
 
-  /* ── On an Arabic page the notice is still ENGLISH, laid out as English ──
+  /* ── On an Arabic page each language block is laid out as its own ──────
    *
-   * Bean `giiw`, from an owner screenshot of the Arabic staging preview: the
-   * notice read "…matically and has — Unverified translation ⚠" — the English
-   * sentence had inherited `dir="rtl"` from <html>, so its START sat at the
-   * right end and the one-line overflow took the beginning off the LEFT edge.
-   * The harness below sets `dir="rtl"` itself (as `init()` does for `ar`), so
-   * these fail on the old markup rather than passing over an LTR page. */
+   * Bean `giiw`, from an owner screenshot of the Arabic staging preview: an
+   * English sentence that inherited `dir="rtl"` from <html> lost its start
+   * off the LEFT edge. The prominent notice now carries an Arabic block and
+   * an English one, so each must carry its own `lang` and `dir`, and the
+   * English detail disclosure must still compute ltr. The harness sets
+   * `dir="rtl"` itself (as `init()` does for `ar`). */
   const AR = { lang: "ar", translationStatus: "unverified", translationSource: "index.md" } as const;
 
-  test("carries lang=en and dir=ltr, and computes ltr, on an RTL page", async ({ page }) => {
+  test("the Arabic block is rtl, the English block and the detail are ltr, on an RTL page", async ({ page }) => {
     await serve(page, AR);
     expect(await page.evaluate(() => document.documentElement.dir)).toBe("rtl");
     const notice = page.locator(".fa-translation-warning");
-    await expect(notice).toHaveAttribute("lang", "en");
-    await expect(notice).toHaveAttribute("dir", "ltr");
-    for (const sel of ["summary", ".fa-translation-warning__body"]) {
+    const blocks = notice.locator(".fa-translation-warning__lang");
+    await expect(blocks).toHaveCount(2);
+    await expect(blocks.nth(0)).toHaveAttribute("lang", "ar");
+    await expect(blocks.nth(0)).toHaveAttribute("dir", "rtl");
+    await expect(blocks.nth(1)).toHaveAttribute("lang", "en");
+    await expect(blocks.nth(1)).toHaveAttribute("dir", "ltr");
+    for (const sel of [".fa-translation-warning__more summary", ".fa-translation-warning__body"]) {
       const d = await notice.locator(sel).evaluate((e) => ({
         dir: getComputedStyle(e).direction,
         lang: e.closest("[lang]")!.getAttribute("lang"),
@@ -749,37 +770,30 @@ test.describe("the unverified-translation notice", () => {
     }
   });
 
-  test("its first word is visible and the clip falls at the logical END", async ({ page }) => {
-    // Narrow enough that the sentence cannot fit on one line, which is the
-    // case the screenshot showed. The ⚠ must sit at the summary's LEFT edge
-    // and inside it; the line must truncate with an ellipsis rather than
-    // overflow (scrollWidth > clientWidth on the text, not on the summary).
+  test("at a narrow width the English sentence starts at its left edge and wraps rather than clips", async ({ page }) => {
+    // The old one-line notice truncated with an ellipsis; the prominent one
+    // wraps (`white-space: normal`), so nothing is clipped and the start of
+    // the English sentence is at the block's LEFT edge even on an RTL page.
     await page.setViewportSize({ width: 480, height: 800 });
     await serve(page, AR);
-    const r = await page.locator(".fa-translation-warning summary").evaluate((s) => {
-      const text = s.querySelector(".fa-translation-warning__text") as HTMLElement;
-      const tn = document.createTreeWalker(s, NodeFilter.SHOW_TEXT).nextNode()!;
+    const r = await page.locator(".fa-translation-warning__lang[lang=en] .fa-translation-warning__text").evaluate((t) => {
+      const tn = document.createTreeWalker(t, NodeFilter.SHOW_TEXT).nextNode()!;
       const range = document.createRange();
       range.setStart(tn, 0);
       range.setEnd(tn, 1);
       const first = range.getBoundingClientRect();
-      const box = s.getBoundingClientRect();
-      const cs = getComputedStyle(text);
+      const box = t.getBoundingClientRect();
       return {
         firstLeft: first.left - box.left,
         firstInside: first.left >= box.left && first.right <= box.right,
-        overflow: cs.textOverflow,
-        truncated: text.scrollWidth > text.clientWidth,
-        summaryOverflows: s.scrollWidth > s.clientWidth + 1,
-        height: box.height,
+        clipped: (t as HTMLElement).scrollWidth > (t as HTMLElement).clientWidth + 1,
+        lines: box.height / parseFloat(getComputedStyle(t).lineHeight),
       };
     });
     expect(r.firstInside).toBe(true);
     expect(r.firstLeft).toBeLessThan(24);
-    expect(r.overflow).toBe("ellipsis");
-    expect(r.truncated).toBe(true);
-    expect(r.summaryOverflows).toBe(false);
-    expect(r.height).toBeLessThan(40);
+    expect(r.clipped).toBe(false);
+    expect(r.lines).toBeGreaterThan(1);
   });
 
   test("the coverage and sweep badges are marked English too", async ({ page }) => {

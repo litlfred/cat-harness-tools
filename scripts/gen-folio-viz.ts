@@ -240,7 +240,10 @@ export function viewerHtml(dataHref: string, instance?: string): string {
 .fo-page .pill.warn { color:var(--warn); border-color:var(--warn-edge); background:var(--warn-bg); }
 .fo-page .links { display:flex; flex-wrap:wrap; gap:.25rem .35rem; max-height:4.8rem; overflow-y:auto; padding-right:.2rem; }
 .fo-page .link-pill { display:inline-block; font-size:.8rem; line-height:1.25; padding:.1rem .4rem; border:1px solid var(--edge); background:var(--box); border-radius:2px; word-break:break-word; text-decoration:none; }
-.fo-page a.link-pill:hover { border-color:currentColor; text-decoration:underline; }
+/* The body text colour, underlined: the theme's link colour on the pill's grey
+   measured 3.55:1 (dark) and 4.41:1 (light), under WCAG AA's 4.5:1. */
+.fo-page a.link-pill { color:inherit; text-decoration:underline; }
+.fo-page a.link-pill:hover { border-color:currentColor; }
 .fo-page .empty { opacity:.9; }
 .fo-page .pill.ok { border-color:var(--edge); }
 .fo-page .pill.local { color:var(--warn); border-color:var(--warn-edge); background:var(--warn-bg); }

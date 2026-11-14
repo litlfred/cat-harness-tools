@@ -54,7 +54,7 @@ export const ROUTE_SEGMENT = /^[a-z0-9][a-z0-9-]*$/;
 /**
  * A sub-graph id as a route segment: lower-cased, since a URL segment is
  * lower case (`ROUTE_SEGMENT`) but a layer may name its subgraphs with capitals
- * (smart-base's `smart-base-L4-skills`, 2026-11-13). Two ids that differ only
+ * (e.g. `<layer>-L4-skills`, 2026-11-13). Two ids that differ only
  * in case would share a route; the segment check still refuses anything else.
  */
 export function subgraphSegment(id: string): string {
