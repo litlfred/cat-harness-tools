@@ -1027,6 +1027,29 @@ function docCoverage(d){
       esc(COVER_NAMES[c.kind] || c.kind) + ': ' + esc(word) + '</span>';
   }).join(" ") + '</p>';
 }
+/* THE SHARED LINK RUNTIME (edit-links.js), which the page's head loads with
+   defer: viewer.js runs before it, so the first document can render before
+   it is there. Wait for it -- deferred scripts have all run by
+   DOMContentLoaded -- and on a host whose head has none, load it from the
+   site root, as navbar-row.js loads its vendor scripts. */
+var EDIT_LINKS_WAIT = null;
+function withEditLinks(fn){
+  if (window.faEditLinks) { fn(window.faEditLinks); return; }
+  if (!EDIT_LINKS_WAIT) EDIT_LINKS_WAIT = new Promise(function(done){
+    function load(){
+      if (window.faEditLinks) { done(window.faEditLinks); return; }
+      var root = typeof SITE_ROOT === "string" ? SITE_ROOT : "/";
+      var s = document.createElement("script");
+      s.src = root + "assets/js/edit-links.js";
+      s.onload = function(){ done(window.faEditLinks || null); };
+      s.onerror = function(){ done(null); };
+      document.head.appendChild(s);
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", load);
+    else load();
+  });
+  EDIT_LINKS_WAIT.then(function(L){ if (L) fn(L); });
+}
 var DOC_TABS = [["contents","Contents",docContents],["pages","Pages",docPages],["figures","Figures & tables",docFigures],["sections","Sections",docSections],["checks","Checks",docChecks]];
 function renderDocument(id, d, err){
   var el = $("document");
@@ -1036,7 +1059,7 @@ function renderDocument(id, d, err){
   el.hidden = false;
   if (err) { el.innerHTML = '<h2>Document</h2><p class="empty">Could not read the document view for ' + esc(id) + ' — ' + esc(err) + '. This is a failure to read, not an empty document.</p>'; return; }
   DOC = d; DOC_ID = id;
-  if (d.links && window.faEditLinks) window.faEditLinks.configure({ repo: d.links.repo, branch: d.links.branch, content: id });
+
   var tab = DOC_TABS.filter(function(t){ return t[0] === DOC_TAB; })[0] || DOC_TABS[0];
   var whole = d.links ? ' <span class="doc-actions" data-src="' + esc(d.links.dir) + '" data-block="' + esc(id) + '"><a data-fa-link="source">source</a> ' +
     '<a data-fa-link="feedback" title="Give feedback on this document (opens a GitHub issue)">📣 feedback</a></span>' : '';
@@ -1091,8 +1114,13 @@ function renderDocument(id, d, err){
       var r = document.getElementById(a.getAttribute("data-blk")); if (r) r.scrollIntoView({ block: "center" });
     });
   }
-  /* Hrefs now, not on first hover: a keyboard reader tabs to these links. */
-  if (d.links && window.faEditLinks) window.faEditLinks.fill(el);
+  /* Hrefs now, not on first hover: a keyboard reader tabs to these links.
+     Configured and filled together, once the shared runtime is there. */
+  if (d.links) withEditLinks(function(L){
+    if (DOC !== d || DOC_ID !== id) return;   /* another entry or tab since */
+    L.configure({ repo: d.links.repo, branch: d.links.branch, content: id });
+    L.fill(el);
+  });
   /* A section link from any tab opens the Sections tab at that section. Only
      <a>: a link HOST carries data-sec too (its section's name, for an issue). */
   Array.prototype.forEach.call(el.querySelectorAll("a[data-sec]:not([data-fa-link])"), function(a){
@@ -1112,9 +1140,16 @@ function openSectionFromHash(){
   var t = document.getElementById(h.slice(1)); if (t) t.scrollIntoView();
 }
 window.addEventListener("hashchange", openSectionFromHash);
+/* "no-cache", not "no-store": revalidated every time, so never stale, but an
+   unchanged structure.json is a 304 rather than its body again. */
+function fetchDocument(id){
+  return fetch(docHref(id), {cache: "no-cache"})
+    .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+/* takeEarly is the viewer's (gen-library-viz.ts): the response the entry page
+   started before its index arrived. Without it, this fetches. */
 function loadDocument(id){
-  fetch(docHref(id), {cache: "no-store"})
-    .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  (typeof takeEarly === "function" ? takeEarly("document", id, fetchDocument) : fetchDocument(id))
     .then(function(d){ renderDocument(id, d, null); openSectionFromHash(); })
     .catch(function(e){ renderDocument(id, null, String(e && e.message || e)); });
 }

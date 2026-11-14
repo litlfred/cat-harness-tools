@@ -39,6 +39,7 @@
  * @module scripts/gen-object-model-uml
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { overlayDirs, overlayPath } from "./lib/layer-output.ts";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import type { z } from "zod";
@@ -57,7 +58,6 @@ import { VoiceProfileSchema } from "../schemas/content/voices.js";
 import { instanceDirectoryForGraph, readDeclaration, siteDir } from "../schemas/kg/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { overlayDirs, overlayPath } from "./lib/layer-output.ts";
 import { contentLayerInstance } from "../schemas/kg/graph-typology-registry.js";
 import { PAGE_LOCALE, declaredPageRoute, declaredRoute } from "./viewer-declarations.ts";
 
@@ -103,8 +103,9 @@ const GLOSSARY_FALLBACK = CONTENT ? `${CONTENT.name}/glossary` : "glossary";
 const GLOSSARY_ROUTE = (CONTENT && declaredPageRoute(CORE_ROOT, "glossary-page")) ?? `${PAGE_LOCALE}/${GLOSSARY_FALLBACK}`;
 const GLOSSARY_LEGACY_ROUTE = (CONTENT && declaredRoute(CORE_ROOT, "glossary-page")) ?? GLOSSARY_FALLBACK;
 const glossaryPageAt = (route: string): string => join(HARNESS, siteDir(OWN), ...route.split("/"), "index.md");
-// Through the layer output overlay: in a checkout that mounts the harness, the
-// glossary pages are computed at its output root (bean `cat-tools-sm8r`, item 4).
+// Found through the layer output overlay (sm8r): `glossary:page` writes a
+// mounted site's pages at the output root (core 4b6c738), so the path under
+// the mount is the logical name and `overlayPath` is where the bytes are.
 const GLOSSARY_PAGE = [GLOSSARY_ROUTE, GLOSSARY_LEGACY_ROUTE].map(glossaryPageAt).find((p) => existsSync(overlayPath(p))) ?? glossaryPageAt(GLOSSARY_ROUTE);
 /** The glossary page whose `<dt id>` anchors every class must reach — written at publish, so a test can ask whether it is there. */
 export const glossaryPage = (): string => GLOSSARY_PAGE;
@@ -355,13 +356,20 @@ function assertEdges(classes: ClassDef[], edges: Edge[]): string[] {
  */
 function glossaryAnchors(): Set<string> | null {
   if (!existsSync(overlayPath(GLOSSARY_PAGE))) return null;
+  // The per-layer pages, read through the overlay: the output-root twin and
+  // the mount are listed together and a page is read from wherever it is.
   const instanceDir = join(dirname(GLOSSARY_PAGE), "instance");
-  // The output root's pages first, then the pinned ones: the first to hold an instance wins.
-  const names = new Set<string>();
-  for (const d of overlayDirs(instanceDir)) {
-    for (const e of readdirSync(d, { withFileTypes: true })) if (e.isDirectory() && existsSync(join(d, e.name, "index.md"))) names.add(e.name);
-  }
-  const pages = [...names].map((n) => [n, readFileSync(overlayPath(join(instanceDir, n, "index.md")), "utf8")] as const);
+  const names = new Set(
+    overlayDirs(instanceDir).flatMap((d) =>
+      readdirSync(d, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name),
+    ),
+  );
+  const pages = [...names]
+    .map((name) => [name, overlayPath(join(instanceDir, name, "index.md"))] as const)
+    .filter(([, at]) => existsSync(at))
+    .map(([name, at]) => [name, readFileSync(at, "utf8")] as const);
   return new Set(
     pages.flatMap(([instance, page]) =>
       [...page.matchAll(/<dt id="([^"]+)"/g)].map((m) => m[1]!).filter((id) => id.split("--", 1)[0] === instance),

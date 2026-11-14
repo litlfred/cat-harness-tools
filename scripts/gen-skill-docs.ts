@@ -29,7 +29,7 @@ import { join, resolve, basename, dirname, relative, isAbsolute, sep } from "pat
 import { isSkillMd, kgDirectories, corpusScopeFor } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { processRows, type ProcessRow } from "./gen-processes-viz.js";
-import { readDeclaration, siteDirFor, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, readDeclaration, siteDirFor, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { stripInlineCode } from "../schemas/content/inline-code.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
@@ -37,6 +37,7 @@ import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { writeProvenanceListing } from "./provenance-footer.ts";
+import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 
 /** The repository the edit links name: this checkout's origin, else folio-assistant (bean v433). */
 const SKILL_DOCS_REPO = repoOf(detectRepoUrl(process.cwd()));
@@ -85,6 +86,32 @@ const PROCESSES_ROUTE = ((): string => {
 const OUT_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "reference", "skill-instructions");
 
 /**
+ * Where the pages are written, compared and listed.
+ *
+ * Where the layer is MOUNTED (bean `cat-tools-sm8r`, item 4), the pages are
+ * computed output and live whole at the layer's output root
+ * (`build/layers/<instance>/…`, `lib/layer-output.ts`), never in the pinned
+ * mount; `compose-docs` lays that twin over the mount. A write goes to the
+ * twin; `--check` compares each page a reader would see (the twin, else the
+ * pinned copy), and judges orphans in the twin once it exists, else in the
+ * pinned directory. In the layer's own checkout every path is `outDir`'s own.
+ */
+export function skillDocsTargets(
+  outDir: string,
+  check: boolean,
+  checkout: string,
+): { dir: string; writeAt: (abs: string) => string; readAt: (abs: string) => string } {
+  const writeAt = (abs: string): string => writePathAt(checkout, abs);
+  const readAt = (abs: string): string => readPathAt(checkout, abs);
+  const twin = writeAt(outDir);
+  return { dir: check && !existsSync(twin) ? outDir : twin, writeAt, readAt };
+}
+/** Resolved on first use, so a module that only imports a helper reads no lock. */
+let targets: ReturnType<typeof skillDocsTargets> | undefined;
+const TARGETS = (): ReturnType<typeof skillDocsTargets> =>
+  (targets ??= skillDocsTargets(OUT_DIR, process.argv.includes("--check"), checkoutRootFor(INSTANCE_ROOT)));
+
+/**
  * `--check`: verify the generated tree is current without writing to it.
  *
  * These pages are generated from skill sources and the repo forbids editing
@@ -125,11 +152,14 @@ const collisions: Array<{ published: string; kept: string; from: string }> = [];
 
 function emit(path: string, content: string): void {
   if (CHECK_ONLY) {
-    const current = existsSync(path) ? readFileSync(path, "utf-8") : null;
+    const at = TARGETS().readAt(path);
+    const current = existsSync(at) ? readFileSync(at, "utf-8") : null;
     if (current !== content) drifted.push(path);
     return;
   }
-  writeFileSync(path, content);
+  const to = TARGETS().writeAt(path);
+  mkdirSync(dirname(to), { recursive: true });
+  writeFileSync(to, content);
 }
 
 /**
@@ -308,14 +338,14 @@ function reportUnpublishedTwins(produced: Iterable<string>): void {
 }
 
 function reportOrphans(produced: Iterable<string>): void {
-  const orphans = orphanPages(readdirSync(OUT_DIR), produced);
+  const orphans = orphanPages(existsSync(TARGETS().dir) ? readdirSync(TARGETS().dir) : [], produced);
   if (orphans.length === 0) return;
   console.error(
     `\n✗ ${orphans.length} page(s) in the output directory were produced by NO source.\n` +
       `  Each carries a "Generated from … — do not edit here" banner naming a source that\n` +
       `  publishes nothing, which a reader cannot distinguish from a live page.\n`,
   );
-  for (const f of orphans) console.error(`  ${join(OUT_DIR, f)}`);
+  for (const f of orphans) console.error(`  ${join(TARGETS().dir, f)}`);
   console.error(
     `\n  TWO opposite causes, and this cannot tell them apart, so it removes nothing:\n` +
       `    - the skill was deleted, and the page should be deleted too; or\n` +
@@ -1072,7 +1102,7 @@ function processesSection(name: string, rows: readonly ProcessRow[]): string[] {
 }
 
 async function main(): Promise<void> {
-  mkdirSync(OUT_DIR, { recursive: true });
+  if (!CHECK_ONLY) mkdirSync(TARGETS().dir, { recursive: true });
   const procRows = await processRows();
 
   const indexRows: Record<string, string[]> = {};
@@ -1322,7 +1352,7 @@ async function main(): Promise<void> {
   reportOrphans(written.keys());
   reportUnpublishedTwins(written.keys());
   reportDrift();
-  console.log(`\nWrote skill instruction docs to ${OUT_DIR}`);
+  console.log(`\nWrote skill instruction docs to ${TARGETS().dir}`);
 }
 
 if (import.meta.main) await main();
