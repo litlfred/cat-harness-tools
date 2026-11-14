@@ -27,6 +27,7 @@ import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { workflowFiles } from "../../scripts/known-skills.js";
 import { loadProcessModel, processDiagrams } from "../../src/workflow/process-model.js";
 import { buildDocsProjections } from "../support/checkout.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * The checkout's diagrams as the real parser reads them — each one's process id
@@ -150,11 +151,11 @@ describe("the published process hierarchy", () => {
   // witnesses, so it runs over a scratch copy of the checkout and only the
   // projections it builds at publish are copied back (bean `cat-tools-sm8r`).
   beforeAll(() => {
-    if (!existsSync(INDEX)) buildDocsProjections(repoRootFor(ROOT));
+    if (!existsSync(overlayPath(INDEX))) buildDocsProjections(repoRootFor(ROOT));
   }, 180_000);
   const index = () =>
     JSON.parse(
-      readFileSync(INDEX, "utf8"),
+      readFileSync(overlayPath(INDEX), "utf8"),
     ) as { processes: Record<string, string[]>; items: Array<{ tags: { processes: string[] } }> };
 
   test("no PHANTOM edge — the real parser is the oracle for the generator's regex", () => {
