@@ -29,7 +29,7 @@ const TIER_STEP = "Which tier (the PR's live labels)";
  * Run the tier step. `withToken` / `anonymous`: what the fake curl answers
  * for a request with and without the token (a JSON body, or null to fail).
  */
-function tier(opts: { event?: string; withToken?: string | null; anonymous?: string | null; payloadFull?: string }): { full: string; env: string; out: string } {
+function tier(opts: { event?: string; withToken?: string | null; anonymous?: string | null; payloadFull?: string; payloadPreview?: string }): { full: string; env: string; out: string; preview: string; previewEnv: string } {
   const dir = mkdtempSync(join(tmpdir(), "tier-"));
   const enc = (v: string | null | undefined) => (v === null || v === undefined ? "" : Buffer.from(v).toString("base64"));
   writeFileSync(
@@ -61,11 +61,15 @@ function tier(opts: { event?: string; withToken?: string | null; anonymous?: str
       REPO: "o/r",
       PR: "7",
       PAYLOAD_FULL: opts.payloadFull ?? "false",
+      ...(opts.payloadPreview !== undefined ? { PAYLOAD_PREVIEW: opts.payloadPreview } : {}),
     },
   });
-  const full = /full=(\w+)/.exec(readFileSync(output, "utf-8"))?.[1] ?? "";
-  const env = /FULL=(\w+)/.exec(readFileSync(envFile, "utf-8"))?.[1] ?? "";
-  return { full, env, out: r.stdout + r.stderr };
+  const outText = readFileSync(output, "utf-8");
+  const envText = readFileSync(envFile, "utf-8");
+  const last = (re: RegExp, t: string) => [...t.matchAll(re)].at(-1)?.[1] ?? "";
+  const full = last(/^full=(\w+)/gm, outText);
+  const env = last(/^FULL=(\w+)/gm, envText);
+  return { full, env, out: r.stdout + r.stderr, preview: last(/^preview=(\w+)/gm, outText), previewEnv: last(/^PREVIEW=(\w+)/gm, envText) };
 }
 
 const labels = (...names: string[]) => JSON.stringify(names.map((name) => ({ name })));
@@ -96,6 +100,27 @@ describe("tier: the PR's live labels decide, not the payload", () => {
     expect(tier({ withToken: "not json", anonymous: null, payloadFull: "false" }).full).toBe("false");
   });
 
+  test("preview live, without release -> the preview tier: the full machinery, cut to the change's cone", () => {
+    const r = tier({ withToken: labels("docs", "preview") });
+    expect(r.preview).toBe("true");
+    expect(r.previewEnv).toBe("true");
+    expect(r.full).toBe("true");
+    expect(r.out).toContain("live labels: docs preview -> preview tier");
+  });
+
+  test("release and preview -> the full tier, never the preview tier", () => {
+    const r = tier({ withToken: labels("preview", "release") });
+    expect(r.full).toBe("true");
+    expect(r.preview).toBe("false");
+    expect(r.out).toContain("-> full tier");
+  });
+
+  test("no read at all: the payload's preview label decides too; unset, it is not the preview tier", () => {
+    expect(tier({ withToken: null, anonymous: null, payloadPreview: "true" }).preview).toBe("true");
+    expect(tier({ withToken: null, anonymous: null }).preview).toBe("false");
+    expect(tier({ event: "push", withToken: null, anonymous: null }).preview).toBe("false");
+  });
+
   test("a push is always the full tier", () => {
     expect(tier({ event: "push", withToken: null, anonymous: null }).full).toBe("true");
     expect(tier({ event: "push", withToken: null, anonymous: null }).env).toBe("true");
@@ -104,7 +129,7 @@ describe("tier: the PR's live labels decide, not the payload", () => {
 
 describe("every tier condition reads the tier step", () => {
   test("no condition outside the tier job reads the payload's labels", () => {
-    const outside = TEXT.split("\n").filter((l) => l.includes("labels.*.name") && !l.includes("PAYLOAD_FULL:"));
+    const outside = TEXT.split("\n").filter((l) => l.includes("labels.*.name") && !l.includes("PAYLOAD_FULL:") && !l.includes("PAYLOAD_PREVIEW:"));
     expect(outside).toEqual([]);
   });
 
