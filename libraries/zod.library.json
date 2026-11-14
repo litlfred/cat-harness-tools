@@ -95,6 +95,7 @@
     "schemas/kg/validator-node.ts",
     "schemas/library/archive-contents.ts",
     "schemas/library/code-list.ts",
+    "schemas/library/entry-extraction.ts",
     "schemas/library/glossary-ledger.ts",
     "schemas/library/ingest-candidates.ts",
     "schemas/library/intake.ts",
