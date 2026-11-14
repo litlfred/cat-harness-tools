@@ -37,6 +37,8 @@ import {
   claimsReadyFlip,
   openQuestions,
   readyMarkers,
+  relayedFor,
+  labelReady,
   sameRepoNext,
   signingSession,
   untickedItems,
@@ -45,6 +47,8 @@ import {
   DEPLOY_ONLY_STEP,
   AGENT_BUILD_CONTEXT,
   agentBuildStatus,
+  fullTierCheck,
+  withFullTier,
   type CheckId,
   type GuardOptions,
   type GuardRun,
@@ -171,24 +175,48 @@ describe("check 2 — ready for review", () => {
     expect(status(s, "ready-for-review", { mergingSession: STEWARD }).status).toBe("pass");
   });
 
-  test("no Merge Manager active: the PR's OWN session may mark it ready and merge it", () => {
+  test("the merge manager landing its own PR: its own session may mark it ready and merge it", () => {
     const s = real(1957);
     const own = signingSession(s.pr.body)!;
     const ev = s.timeline.find((e) => e.event === "ready_for_review")!;
     s.comments.push(signed(3, shift(ev.created_at!, 4_000), own, `ready: ${s.pr.head.sha.slice(0, 11)}`));
     expect(status(s, "ready-for-review", { mergingSession: own }).status).toBe("refuse");
-    const c = status(s, "ready-for-review", { mergingSession: own, noMergeManager: true });
+    const c = status(s, "ready-for-review", { mergingSession: own, mergeManagerOwnPr: true });
     expect(c.status).toBe("pass");
-    expect(c.detail).toContain("no Merge Manager is active");
+    expect(c.detail).toContain("the merge manager is landing its own PR");
   });
 
-  test("no Merge Manager active still refuses a ready flip nobody from the PR's own session signed", () => {
+  test("the merge manager's own PR still refuses a ready flip nobody from the PR's own session signed", () => {
     const s = real(1957);
     const ev = s.timeline.find((e) => e.event === "ready_for_review")!;
     s.comments.push(signed(4, shift(ev.created_at!, 60_000), STEWARD, "Marking ready and labelling."));
-    const c = status(s, "ready-for-review", { mergingSession: STEWARD, noMergeManager: true });
+    const c = status(s, "ready-for-review", { mergingSession: STEWARD, mergeManagerOwnPr: true });
     expect(c.status).toBe("refuse");
     expect(c.detail).toContain("cannot be attributed to the PR's own session");
+  });
+
+  test("--merge-manager-own-pr refuses when the merging session is not the PR's own session", () => {
+    const s = real(1957);
+    const own = signingSession(s.pr.body)!;
+    const ev = s.timeline.find((e) => e.event === "ready_for_review")!;
+    s.comments.push(signed(3, shift(ev.created_at!, 4_000), own, `ready: ${s.pr.head.sha.slice(0, 11)}`));
+    const c = status(s, "ready-for-review", { mergingSession: STEWARD, mergeManagerOwnPr: true });
+    expect(c.status).toBe("refuse");
+    expect(c.kind).toBe("defect");
+    expect(c.detail).toContain("is not this PR's own session");
+  });
+
+  test("a `ready:` the merging session RELAYS for the PR's own session beside the event is not the merging session marking it ready", () => {
+    const s = real(1957);
+    const own = signingSession(s.pr.body)!;
+    const ev = s.timeline.find((e) => e.event === "ready_for_review")!;
+    s.comments.push(signed(3, shift(ev.created_at!, 60_000), own, "Marked ready."));
+    const relay = signed(4, shift(ev.created_at!, 4_000), STEWARD, `ready: ${s.pr.head.sha.slice(0, 11)}\nrelayed for ${own}`);
+    s.comments.push(relay);
+    expect(status(s, "ready-for-review", { mergingSession: STEWARD }).status).toBe("pass");
+    // The same comment without the relay line is the steward claiming the flip.
+    relay.body = relay.body.replace(/\nrelayed for \S+/, "");
+    expect(status(s, "ready-for-review", { mergingSession: STEWARD }).detail).toContain("MERGING session");
   });
 
   test("never a draft: nothing to attribute, passes", () => {
@@ -286,12 +314,10 @@ describe("isStewardAckComment and claimsReadyFlip (bean gdni)", () => {
 });
 
 describe("check 3 — the ready marker", () => {
-  test("#1960 and #1957: no `ready:` comment at all", () => {
-    for (const n of [1960, 1957] as const) {
-      const c = status(real(n), "ready-marker");
-      expect(c.status).toBe("refuse");
-      expect(c.detail).toBe("no `ready: <sha>` comment");
-    }
+  test("#1960: no `ready:` comment at all, and no label to stand in", () => {
+    const c = status(real(1960), "ready-marker");
+    expect(c.status).toBe("refuse");
+    expect(c.detail).toBe("no `ready: <sha>` comment");
   });
 
   test("#1937: its `ready: e75895610c4` is signed by no session", () => {
@@ -337,6 +363,123 @@ describe("check 3 — the ready marker", () => {
 
   test("a quoted marker is not a marker", () => {
     expect(readyMarkers([signed(4, "2026-10-03T10:30:00Z", STEWARD, "> ready: abcdef1")])).toEqual([]);
+  });
+});
+
+/** #1960 with nothing but a `ready:` the steward relays, for `forSession`. */
+function relayed(forSession: string | ((own: string) => string)) {
+  const s = real(1960);
+  const own = signingSession(s.pr.body)!;
+  const who = typeof forSession === "string" ? forSession : forSession(own);
+  s.comments.push(signed(30, "2026-10-03T10:30:00Z", STEWARD, `ready: ${s.pr.head.sha.slice(0, 11)}\n\nrelayed for https://claude.ai/code/${who}`));
+  return s;
+}
+
+describe("check 3 — a `ready:` the merge manager relays for the PR's own session", () => {
+  test("relayedFor reads an id or a URL, and not a quoted line or code", () => {
+    expect(relayedFor("ready: abc1234\nrelayed for session_01Abc")).toBe("session_01Abc");
+    expect(relayedFor("ready: abc1234 — Relayed for https://claude.ai/code/session_01Abc")).toBe("session_01Abc");
+    expect(relayedFor("> relayed for session_01Abc")).toBeUndefined();
+    expect(relayedFor("```\nrelayed for session_01Abc\n```")).toBeUndefined();
+    expect(relayedFor("ready: abc1234")).toBeUndefined();
+  });
+
+  test("a relayed marker for the PR's own session passes, signed by the merge manager", () => {
+    const s = relayed((own) => own);
+    expect(readyMarkers(s.comments).at(-1)).toMatchObject({ session: STEWARD, relayedFor: signingSession(s.pr.body) });
+    const c = status(s, "ready-marker");
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain(`relayed for \`${signingSession(s.pr.body)}\` by \`${STEWARD}\``);
+  });
+
+  test("a marker relayed for ANOTHER session is a defect, not this PR's marker", () => {
+    const c = status(relayed("session_01SomebodyElse"), "ready-marker");
+    expect(c.status).toBe("refuse");
+    expect(c.kind).toBe("defect");
+    expect(c.detail).toContain("relayed for `session_01SomebodyElse`");
+  });
+
+  test("a relayed marker is the point check 7 measures questions from", () => {
+    const s = relayed((own) => own);
+    s.comments.push(signed(31, "2026-10-03T10:40:00Z", STEWARD, "Owner, should this wait for the release?"));
+    expect(status(s, "open-question").status).toBe("refuse");
+  });
+});
+
+/**
+ * #1957 really did carry `ready-to-merge`: labelled at 11:31:46Z, twelve
+ * minutes after its last commit (11:19:32Z). Under the label path that is
+ * the agent's word that it is finished, so check 3 now passes on the record;
+ * each variant moves one date to show which side of the push the label must be.
+ */
+describe("check 3 — the `ready-to-merge` label added after the last push", () => {
+  const LABELLED = "2026-10-03T11:31:46Z";
+
+  test("#1957: labelled after its last push, so the label stands in for the marker", () => {
+    const s = real(1957);
+    expect(readyMarkers(s.comments)).toEqual([]);
+    const c = status(s, "ready-marker");
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain(`added at ${LABELLED}, after the last push (\`76244c5e`);
+    expect(labelReady(s)).toMatchObject({ ok: true, at: LABELLED });
+  });
+
+  test("a commit dated after the label refuses, and says why the label did not stand in", () => {
+    const s = real(1957);
+    s.commits.at(-1)!.commit.committer = { date: shift(LABELLED, 60_000) };
+    const c = status(s, "ready-marker");
+    expect(c.status).toBe("refuse");
+    expect(c.detail).toContain("no `ready: <sha>` comment; nor does the label stand in");
+    expect(c.detail).toContain("not after the last push");
+  });
+
+  test("a workflow run on the head that started after the label dates the push after it", () => {
+    const s = real(1957);
+    const runs = (s.runs as { runs: GuardRun[] }).runs;
+    for (const r of runs) {
+      r.head_sha = s.pr.head.sha;
+      r.created_at = shift(LABELLED, 30_000);
+    }
+    expect(status(s, "ready-marker").status).toBe("refuse");
+    // A run on the head that started BEFORE the label leaves the label standing.
+    runs[0]!.created_at = shift(LABELLED, -30_000);
+    expect(status(s, "ready-marker").status).toBe("pass");
+  });
+
+  test("a force-push after the label refuses", () => {
+    const s = real(1957);
+    s.timeline.push({ event: "head_ref_force_pushed", created_at: shift(LABELLED, 60_000) });
+    expect(status(s, "ready-marker").status).toBe("refuse");
+  });
+
+  test("the label with no `labeled` event in the timeline refuses", () => {
+    const s = real(1957);
+    s.timeline = s.timeline.filter((e) => e.event !== "labeled");
+    const c = status(s, "ready-marker");
+    expect(c.status).toBe("refuse");
+    expect(c.detail).toContain("no `labeled ready-to-merge` event");
+  });
+
+  test("only merge-main bot merges after the label: still passes", () => {
+    const s = real(1957);
+    s.commits.push({
+      sha: "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0",
+      author: { login: "github-actions[bot]" },
+      commit: { author: { name: "github-actions[bot]", date: shift(LABELLED, 600_000) } },
+      parents: [{ sha: s.commits.at(-1)!.sha }, { sha: "c0c0c0c0" }],
+    });
+    s.pr.head.sha = "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0";
+    const c = status(s, "ready-marker");
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain("the 1 commit(s) after it are merge-main bot merges");
+  });
+
+  test("a question to the owner after the label is open (check 7 measures from the label)", () => {
+    const s = real(1957);
+    s.comments.push(signed(40, shift(LABELLED, 60_000), STEWARD, "Owner: should this wait?"));
+    expect(status(s, "open-question").status).toBe("refuse");
+    s.comments.at(-1)!.created_at = shift(LABELLED, -60_000);
+    expect(status(s, "open-question").status).toBe("pass");
   });
 });
 
@@ -1055,5 +1198,94 @@ describe("check 5 gates a release only (owner, card Q-CIB-4 A, 2026-11-08)", () 
     expect(v.checks.filter((c) => c.id !== "ci" && c.status === "refuse").length).toBe(
       evaluateAny(red(), { release: true }).checks.filter((c) => c.id !== "ci" && c.status === "refuse").length,
     );
+  });
+});
+
+/**
+ * `--full-tier` (owner, 2026-11-13, card "A. merge-guard required status"):
+ * the status workflow's guard needs the full tier green on the head, not
+ * just green workflow runs, which the fast tier also gives.
+ */
+describe("check 5 under --full-tier — the full tier must be green on the head", () => {
+  const JUDGE = "No new failures (tests and gates)";
+  const FAST = "Fast tier only (advisory; the full checks gate a release)";
+  const cr = (name: string, status: string, conclusion: string | null, started_at = "2026-10-03T12:00:00Z") => ({ name, status, conclusion, started_at });
+  const ci = (s: GuardSnapshot) => evaluate(s, { fullTier: true }).checks.find((c) => c.id === "ci")!;
+  const SHARD_RAN = "head — tests and gates, shard 1/3";
+
+  test("a green full-tier judge on the head passes", () => {
+    const s = real(1960);
+    expect(status(s, "ci").status).toBe("pass");
+    s.checkRuns = [cr(JUDGE, "completed", "success"), cr(SHARD_RAN, "completed", "success")];
+    const c = ci(s);
+    expect(c.status).toBe("pass");
+    expect(c.detail).toContain(`full tier green: ${JUDGE}, after 1 test shard(s) ran`);
+  });
+
+  test("the fast tier alone is not-ready, and says how to run the full tier", () => {
+    const s = real(1960);
+    s.checkRuns = [cr(FAST, "completed", "success")];
+    const c = ci(s);
+    expect(c.status).toBe("refuse");
+    expect(c.kind).toBe("not-ready");
+    expect(c.detail).toContain("the full tier has not run on the head");
+    expect(c.detail).toContain("the `release` label runs it");
+  });
+
+  test("a red judge is a defect; one still running is not-ready; the latest run of a judge counts", () => {
+    const s = real(1960);
+    s.checkRuns = [cr(JUDGE, "completed", "failure")];
+    expect(ci(s)).toMatchObject({ status: "refuse", kind: "defect" });
+    s.checkRuns = [cr(JUDGE, "in_progress", null)];
+    expect(ci(s)).toMatchObject({ status: "refuse", kind: "not-ready" });
+    s.checkRuns = [cr(JUDGE, "completed", "failure", "2026-10-03T12:00:00Z"), cr(JUDGE, "completed", "success", "2026-10-03T13:00:00Z"), cr(SHARD_RAN, "completed", "success")];
+    expect(ci(s).status).toBe("pass");
+  });
+
+  test("a skipped judge, or one whose name was never rendered, judged nothing: not-ready, never a defect", () => {
+    const s = real(1960);
+    const unrendered = "${{ needs.prepare-head.outputs.full != 'true' && 'Fast tier only (advisory; the full checks gate a release)' || 'No new failures (tests and gates)' }}";
+    s.checkRuns = [cr(unrendered, "completed", "skipped"), cr(JUDGE, "completed", "skipped")];
+    const c = ci(s);
+    expect(c).toMatchObject({ status: "refuse", kind: "not-ready" });
+    expect(c.detail).toContain("the full tier has not run on the head");
+    s.checkRuns = [cr(unrendered, "completed", "skipped"), cr(JUDGE, "completed", "success"), cr(SHARD_RAN, "completed", "success")];
+    expect(ci(s).status).toBe("pass");
+  });
+
+  test("a green judge with every test shard skipped is the fast tier (#2103's real head): not-ready", () => {
+    const s = real(1960);
+    // ad8dff8 on #2103, 2026-11-13: pr-tests.yml's fast tier.
+    s.checkRuns = [
+      cr("Tests (no new failures)", "completed", "success"),
+      cr("bun test (head, ${{ matrix.shard }}/4)", "completed", "skipped"),
+      cr("bun test (base, ${{ matrix.shard }}/4)", "completed", "skipped"),
+      cr("Typecheck", "completed", "success"),
+    ];
+    const c = ci(s);
+    expect(c).toMatchObject({ status: "refuse", kind: "not-ready" });
+    expect(c.detail).toContain("no test shard ran (the fast tier)");
+    s.checkRuns.push(cr("bun test (head, 2/4)", "completed", "success"));
+    expect(ci(s).status).toBe("pass");
+  });
+
+  test("check runs not fetched or not readable are unknown, never a pass", () => {
+    const s = real(1960);
+    expect(ci(s).status).toBe("unknown");
+    s.checkRuns = { unknown: "HTTP 403" };
+    const c = ci(s);
+    expect(c.status).toBe("unknown");
+    expect(c.detail).toContain("HTTP 403");
+  });
+
+  test("--full-tier gates even without --release, and keeps a red workflow run's refusal", () => {
+    const s = real(1937);
+    s.checkRuns = [cr(JUDGE, "completed", "success"), cr(SHARD_RAN, "completed", "success")];
+    const ruled = evaluateAny(s, { fullTier: true }).checks.find((c) => c.id === "ci")!;
+    const releaseCi = status(real(1937), "ci");
+    expect(ruled.status).toBe(releaseCi.status);
+    expect(ruled.detail).not.toContain("advisory");
+    expect(fullTierCheck(s).status).toBe("pass");
+    expect(withFullTier({ n: 5, id: "ci", status: "pass", detail: "runs green" }, { ...s, checkRuns: [] })).toMatchObject({ status: "refuse", kind: "not-ready" });
   });
 });

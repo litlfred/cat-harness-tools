@@ -22,6 +22,11 @@ import {
   watchRepo,
   paginate,
   unreadSummary,
+  formatQueue,
+  queueLabels,
+  queueRepo,
+  queueUnread,
+  QUEUE_LABELS,
   type GitHub,
   type PinChange,
   type WorkflowRun,
@@ -216,7 +221,7 @@ describe("many repositories", () => {
     const cli = parseArgs(["--repo", "o/a", "--repos", "o/b, o/a", "--config", "c.json", "--json"], () =>
       JSON.stringify({ repos: ["o/c"], staleHours: 4, queuedMinutes: 30, excludedLayers: ["x"] }),
     );
-    expect(cli).toEqual({ repos: ["o/a", "o/b", "o/c"], json: true, opts: { staleHours: 4, queuedMinutes: 30, excludedLayers: ["x"] } });
+    expect(cli).toEqual({ repos: ["o/a", "o/b", "o/c"], json: true, queue: false, opts: { staleHours: 4, queuedMinutes: 30, excludedLayers: ["x"] } });
   });
   test("--exclude-layer replaces the default; a bad repo or flag is a usage error", () => {
     expect(parseArgs(["--repo", "o/a", "--exclude-layer", "y"]).opts.excludedLayers).toEqual(["y"]);
@@ -358,5 +363,81 @@ describe("exit 2 says why", () => {
     expect(line).toContain("runner queue");
     expect(line).toContain("main verdict");
     expect(unreadSummary([{ ...report, errors: [], queue: queueReading([], NOW), main: { sha: "m", verdict: "green" } }])).toEqual([]);
+  });
+});
+
+describe("the labelled queue (--queue)", () => {
+  const R = "litlfred/cat-harness";
+  const green = (n: number) => ({
+    [`repos/${R}/commits/h${n}/check-runs?per_page=100`]: {
+      check_runs: [{ id: n * 10, name: "bun test (head, 1/1)", status: "completed", conclusion: "success", check_suite: { id: n }, app: { slug: "github-actions" } }],
+    },
+    [`repos/${R}/actions/runs?head_sha=h${n}&per_page=100`]: {
+      workflow_runs: [{ id: n, workflow_id: 1, check_suite_id: n, status: "completed", conclusion: "success", event: "pull_request" }],
+    },
+    [`repos/${R}/actions/jobs/${n * 10}/logs`]: "**New failures: 0**",
+  });
+  const listed = (n: number, labels: string[], draft = false) => ({ number: n, title: `PR ${n}`, draft, labels: labels.map((name) => ({ name })), head: { sha: `h${n}` } });
+  const routes = {
+    [`repos/${R}/pulls?state=open&per_page=100`]: [
+      listed(9, ["needs-repin", "ready-to-merge"]),
+      listed(4, ["ready-to-merge"]),
+      listed(5, ["enhancement"]),
+      listed(7, ["needs-repin"]),
+    ],
+    ...green(4),
+    ...green(9),
+    [`repos/${R}/commits/h7/check-runs?per_page=100`]: {
+      check_runs: [{ id: 70, name: "bun test (head, 1/1)", status: "in_progress", conclusion: null, check_suite: { id: 7 }, app: { slug: "github-actions" } }],
+    },
+    [`repos/${R}/actions/runs?head_sha=h7&per_page=100`]: { workflow_runs: [] },
+  };
+
+  test("the queue labels are ready-to-merge and needs-repin, read in that order", () => {
+    expect(QUEUE_LABELS).toEqual(["ready-to-merge", "needs-repin"]);
+    expect(queueLabels(["needs-repin", "bug", "ready-to-merge"])).toEqual(["ready-to-merge", "needs-repin"]);
+    expect(queueLabels(["bug"])).toEqual([]);
+  });
+
+  test("lists only labelled open PRs, oldest first, with the verdict on each head and needs-repin flagged", () => {
+    const api = stub(routes);
+    const q = queueRepo(api, R);
+    expect(q.errors).toEqual([]);
+    expect(q.prs.map((p) => [p.number, p.labels, p.needsRepin, p.verdict])).toEqual([
+      [4, ["ready-to-merge"], false, "green"],
+      [7, ["needs-repin"], true, "pending: bun test (head, 1/1)"],
+      [9, ["ready-to-merge", "needs-repin"], true, "green"],
+    ]);
+    // The unlabelled PR's head is never read.
+    expect(api.asked.some((p) => p.includes("/h5/") || p.includes("head_sha=h5"))).toBe(false);
+  });
+
+  test("the text form names repo#n, the head, the verdict and NEEDS-REPIN; the JSON form carries the same rows", () => {
+    const q = queueRepo(stub(routes), R);
+    const text = formatQueue([q]).split("\n");
+    expect(text[0]).toBe(`${R}#4\th4\tgreen\t-\t-\tPR 4`);
+    expect(text[1]).toStartWith(`${R}#7\th7\tpending: `);
+    expect(text[1]).toContain("\tNEEDS-REPIN\t");
+    const json = JSON.parse(JSON.stringify([q])) as { prs: { number: number; needsRepin: boolean; verdict: string; headSha: string }[] }[];
+    expect(json[0]!.prs.map((p) => [p.number, p.needsRepin, p.headSha])).toEqual([
+      [4, false, "h4"],
+      [7, true, "h7"],
+      [9, true, "h9"],
+    ]);
+  });
+
+  test("an empty queue says so; an unread repository or head is unknown and named for exit 2, never red", () => {
+    expect(formatQueue([{ repo: R, prs: [], errors: [] }])).toBe("queue empty: no open PR labelled ready-to-merge or needs-repin");
+    const missing = queueRepo(stub({}), "o/x");
+    expect(missing.errors[0]).toStartWith("open PRs: ");
+    const unjudged = queueRepo(stub({ [`repos/o/y/pulls?state=open&per_page=100`]: [listed(2, ["ready-to-merge"])] }), "o/y");
+    expect(unjudged.prs[0]!.verdict).toStartWith("unknown: ");
+    expect(queueUnread([missing, unjudged])).toEqual([expect.stringMatching(/^o\/x: open PRs: /), "o/y: #2 verdict"]);
+    expect(queueUnread([queueRepo(stub(routes), R)])).toEqual([]);
+  });
+
+  test("--queue is a flag of the CLI, beside --json", () => {
+    expect(parseArgs(["--queue", "--repo", "o/a", "--json"])).toMatchObject({ queue: true, json: true, repos: ["o/a"] });
+    expect(parseArgs(["--repo", "o/a"]).queue).toBe(false);
   });
 });

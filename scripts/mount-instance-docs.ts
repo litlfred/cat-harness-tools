@@ -1672,14 +1672,13 @@ export function mountRoutes(built: string): string[] {
 
 /**
  * Where the mount pass publishes each KIND of one layer — `docs` →
- * `/docs/who-iris/` — read off the same `mountable()` / `withRoutes` /
+ * `/docs/<layer>/` — read off the same `mountable()` / `withRoutes` /
  * `resolve_` the pass itself runs, for `harness-tiles.ts`.
  *
  * The navbar's Folders row for a kind links a DECLARED viewer or a page under
  * the site directory, and nothing else, so a directory the mount publishes at
  * its kind route read "no viewer yet" over a page the site served. Measured on
- * litlfred.github.io/who-iris, 2026-11-13: `docs/` (the CDN proposal among
- * it) mounted at `/docs/who-iris/` and the Docs row was inert. Asking the
+ * one layer's published site, 2026-11-13: `docs/` mounted at `/docs/<layer>/` and the Docs row was inert. Asking the
  * mount's own routing is one answer; composing `/<kind>/<name>/` in the tiles
  * would be a second, free to disagree the day a sibling takes a sub-route.
  *

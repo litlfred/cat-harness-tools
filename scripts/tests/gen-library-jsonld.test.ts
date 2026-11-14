@@ -771,3 +771,77 @@ describe("a candidate's @type (cat-harness-tools#1356)", () => {
     expect(candidateTypes("theorem")).not.toContain("cat-harness:Block");
   });
 });
+
+describe("tables transcribed from a paged entry's pages are blocks (who-iris#224)", () => {
+  // who-iris transcribes a PDF's printed tables into `tabular.csvw.json`
+  // BESIDE `structure.json`, one draft narrative per table per language at
+  // `tables[i]["fac:narrative"]`. The paged rung never read that file, so
+  // those tables had no block: 1464 drafts the narrative queue offered were
+  // absent from the graph and the library viewer.
+  const narrative = [{ text: "What the table lists.", lang: "en", state: "draft", drafted_by: { kind: "agent", id: "a" }, drafted_at: "2026-11-11" }];
+  const tables = [
+    // Page 3 — on the boundary of both sections, so it goes to the first.
+    { url: "tables/table-1.csv", tableSchema: { columns: [{ titles: "Component" }, { titles: "Purpose" }] }, "fac:label": "Table 1", "fac:caption": "Table 1. Components", "fac:pages": [4, 3], "fac:narrative": narrative },
+    // Page 5 — inside the second section only; no label, no narrative.
+    { url: "tables/table-2.csv", tableSchema: { columns: [] }, "fac:pages": [5] },
+    // No page: placed under no section, and still not dropped.
+    { url: "tables/table-3.csv", tableSchema: { columns: [] } },
+  ];
+  let out: Array<{ path: string; content: string }>;
+  const read = (p: string) => JSON.parse(out.find((f) => f.path === p)!.content) as Record<string, unknown>;
+  beforeAll(() => {
+    out = buildDocumentNodes("0110001v3", structure, candidates, () => true, undefined, undefined, undefined, undefined, undefined, undefined, tables);
+  });
+
+  test("each transcribed table is a table block carrying its narrative", () => {
+    const n = read("blocks/table-001.jsonld");
+    expect(n.kind).toBe("table");
+    expect(n["@type"]).toContain("doco:Table");
+    expect(n.label).toBe("Table 1");
+    expect(n.title).toBe("Table 1. Components");
+    expect(n.file).toBe("../tables/table-1.csv");
+    expect(n.headers).toEqual(["Component", "Purpose"]);
+    expect([n.pageStart, n.pageEnd]).toEqual([3, 4]);
+    expect(n.narrative).toEqual(narrative);
+    expect(n.provenance).toBe("ingested");
+  });
+
+  test("a table belongs to the FIRST section holding its first page, as a figure does", () => {
+    const contains = (sid: string) => (read(`sections/${sectionKey(sid)}.jsonld`).contains as string[]) ?? [];
+    expect(read("blocks/table-001.jsonld").derivedFrom).toBe(`library/0110001v3/sections/${sectionKey("sec-000-1-introduction")}`);
+    expect(contains("sec-000-1-introduction")).toContain("library/0110001v3/blocks/table-001");
+    expect(contains("sec-001-2-the-formula")).not.toContain("library/0110001v3/blocks/table-001");
+    expect(contains("sec-001-2-the-formula")).toContain("library/0110001v3/blocks/table-002");
+  });
+
+  test("a table with no label is named by its block id, and one with no narrative carries none", () => {
+    const n = read("blocks/table-002.jsonld");
+    expect(n.label).toBe("table-002");
+    expect("narrative" in n).toBe(false);
+    expect("headers" in n).toBe(false);
+  });
+
+  test("a table no section holds hangs off the manifest rather than being dropped", () => {
+    expect(read("blocks/table-003.jsonld").derivedFrom).toBe("library/0110001v3/manifest");
+    expect(read("manifest.jsonld").contains).toContain("library/0110001v3/blocks/table-003");
+  });
+
+  test("with no transcribed tables nothing changes: no table block is written", () => {
+    const plain = buildDocumentNodes("0110001v3", structure, candidates, () => true);
+    expect(plain.some((f) => f.path.startsWith("blocks/table-"))).toBe(false);
+  });
+
+  test("the entry path reads tabular.csvw.json beside structure.json, and stays paged", () => {
+    const dir = mkdtempSync(join(DIR, "paged-tables-"));
+    writeFileSync(join(dir, "structure.json"), asPdfStructureFile({ doc_id: "d", sections: [], metadata: { title: "A report" } }));
+    writeFileSync(join(dir, "tabular.csvw.json"), JSON.stringify({ tables: [tables[0]] }));
+    const r = buildEntryNodes("d", dir);
+    expect(r.state).toBe("built");
+    if (r.state !== "built") return;
+    expect(r.rung).toBe("paged");
+    const block = r.files.find((f) => f.path === "blocks/table-001.jsonld");
+    expect(block).toBeDefined();
+    expect(JSON.parse(block!.content).narrative).toEqual(narrative);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

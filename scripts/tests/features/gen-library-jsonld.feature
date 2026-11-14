@@ -405,3 +405,44 @@ Feature: Library entries become graph nodes
     When its candidate types are read
     Then they are "cat-harness:Block"
     And the kind "theorem" has its own types, without "cat-harness:Block"
+
+  @test:scripts/tests/gen-library-jsonld.test.ts::tables_transcribed_from_a_paged_entry's_pages_are_blocks_(who-iris#224)::each_transcribed_table_is_a_table_block_carrying_its_narrative
+  Scenario: A table transcribed from a paged entry's pages is a table block with its narrative
+    Given a paged entry whose tabular.csvw.json transcribes "Table 1" on pages 3 and 4, with a draft narrative
+    When the document's nodes are built
+    Then "blocks/table-001.jsonld" is a "table" block typed "doco:Table"
+    And it names its label, caption, CSV, column headers and pages 3 to 4
+    And it carries the table's narrative as it is in tabular.csvw.json
+
+  @test:scripts/tests/gen-library-jsonld.test.ts::tables_transcribed_from_a_paged_entry's_pages_are_blocks_(who-iris#224)::a_table_belongs_to_the_FIRST_section_holding_its_first_page,_as_a_figure_does
+  Scenario: A transcribed table belongs to the first section holding its first page
+    Given sections on pages 1 to 3 and 3 to 8, a table starting on page 3 and a table on page 5
+    When the document's nodes are built
+    Then the first table is derived from, and listed only by, the first section
+    And the second table is listed by the second section
+
+  @test:scripts/tests/gen-library-jsonld.test.ts::tables_transcribed_from_a_paged_entry's_pages_are_blocks_(who-iris#224)::a_table_with_no_label_is_named_by_its_block_id,_and_one_with_no_narrative_carries_none
+  Scenario: A transcribed table with no label or narrative is still a block
+    Given a transcribed table with no label, no columns and no narrative
+    When the document's nodes are built
+    Then its block is labelled "table-002" and has no narrative and no headers
+
+  @test:scripts/tests/gen-library-jsonld.test.ts::tables_transcribed_from_a_paged_entry's_pages_are_blocks_(who-iris#224)::a_table_no_section_holds_hangs_off_the_manifest_rather_than_being_dropped
+  Scenario: A transcribed table no section holds is kept under the manifest
+    Given a transcribed table that names no page
+    When the document's nodes are built
+    Then its block is derived from the manifest
+    And the manifest lists it after the sections
+
+  @test:scripts/tests/gen-library-jsonld.test.ts::tables_transcribed_from_a_paged_entry's_pages_are_blocks_(who-iris#224)::with_no_transcribed_tables_nothing_changes:_no_table_block_is_written
+  Scenario: A paged entry with no transcribed tables gets no table blocks
+    Given a paged entry with no tabular.csvw.json
+    When the document's nodes are built
+    Then no "blocks/table-" file is written
+
+  @test:scripts/tests/gen-library-jsonld.test.ts::tables_transcribed_from_a_paged_entry's_pages_are_blocks_(who-iris#224)::the_entry_path_reads_tabular.csvw.json_beside_structure.json,_and_stays_paged
+  Scenario: The entry path reads the transcribed tables beside the structure
+    Given an entry directory with structure.json and a tabular.csvw.json beside it
+    When the entry's nodes are built
+    Then the entry is on the "paged" rung
+    And "blocks/table-001.jsonld" carries the table's narrative

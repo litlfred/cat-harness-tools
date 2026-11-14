@@ -460,8 +460,15 @@ export function composePreview(pages: string, site: string, o: { slug: string; b
  * `_render-log/` and anything a person put at the root stay; then the
  * `main-site` render-log entry for `/`.
  */
-export function composeMain(pages: string, site: string, o: { branch: string; sha: string; runUrl: string; script: Script }): Composed {
-  execFileSync("bun", ["run", o.script("publish-main-site.ts"), "--site", site, "--pages", pages, "--commit", o.sha], { stdio: ["ignore", "inherit", "inherit"] });
+export function composeMain(
+  pages: string,
+  site: string,
+  // `stderr: "pipe"` keeps the script's `::error::` refusal off a CI log: the
+  // test that EXPECTS the refusal set a GitHub error annotation on every run.
+  // The text is then on the thrown error's `stderr`.
+  o: { branch: string; sha: string; runUrl: string; script: Script; stderr?: "inherit" | "pipe" },
+): Composed {
+  execFileSync("bun", ["run", o.script("publish-main-site.ts"), "--site", site, "--pages", pages, "--commit", o.sha], { stdio: ["ignore", "inherit", o.stderr ?? "inherit"] });
   renderLog(o.script, pages, { kind: "main-site", path: "/", slug: o.branch, branch: o.branch, sha: o.sha, runUrl: o.runUrl, summary: `${o.branch}'s site published at the root (built locally by an agent)` });
   return { commit: mainCommitMessage(o.sha, o.branch, o.runUrl), add: ["."] };
 }

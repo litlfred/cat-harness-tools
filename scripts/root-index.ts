@@ -90,7 +90,7 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
   // The repository's subgraph index: the site's own copy by default. A layer
   // site that does not publish the subgraph tree (it is served at the
   // harness's canonical site, whose IRIs it carries) names the file it
-  // framed instead (`publish-root-index.ts`, litlfred/who-iris).
+  // framed instead (`publish-root-index.ts`).
   const subgraphIndex = opts.subgraphIndex ?? join(site, "subgraph", SUBGRAPH_INDEX_FILE);
   const repoIndex = existsSync(subgraphIndex) ? (JSON.parse(readFileSync(subgraphIndex, "utf-8")) as Doc) : undefined;
   if (!repoIndex) problems.push(`${subgraphIndex} is missing — the subgraph roots cannot be named`);
