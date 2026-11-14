@@ -84,6 +84,7 @@ import { claimsEntry, judgePair, rootScripts } from "./pair-claims.js";
 import { auditFolioBlocks } from "./block-reference-resolver.js";
 // `Dirent` for the orphan-sidecar sweep (bean `3jj9`), which walks the
 // results tree with `withFileTypes` to tell a directory from a file.
+import { writePathAt } from "./lib/layer-output.ts";
 import { withPriorAdversarialReviews } from "./lib/kg-qa-carry.ts";
 import { judgeSkillRef, switchedOffSkillHomes } from "./lib/switched-off-skills.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
@@ -374,7 +375,24 @@ const INSTANCE_RUN = root !== AUDITOR_ROOT;
  * sweeps through these two paths and composes no other.
  */
 const QA_HOME = kgQaHomeFor(root, INSTANCE_RUN ? AUDITOR_ROOT : undefined);
-const KG_QA_TREE = join(QA_HOME.root, "kg-qa");
+/** The layer's `kg-qa/` tree as the layer lays it out: what its declarations and the stored-directory test name. */
+const KG_QA_LOGICAL = join(QA_HOME.root, "kg-qa");
+/**
+ * Where this run writes and reads the tree: the logical one for a local
+ * layer, its layer output root (`build/layers/<instance>/…`) for a mounted
+ * one, so the audit never writes into a mount (bean `cat-tools-sm8r`, item
+ * 4). Every sidecar, relocation and orphan sweep below is computed from it,
+ * so they move together.
+ */
+const KG_QA_TREE = writePathAt(KG_QA_LOGICAL);
+/**
+ * A sidecar's path as the layer lays it out: the key its `qa-reports`
+ * baseline is stored under, and the name a finding prints. The judge compares
+ * by it, so a finding computed at the layer output root is not read as new.
+ */
+function logicalSidecar(p: string): string {
+  return KG_QA_TREE === KG_QA_LOGICAL ? p : join(KG_QA_LOGICAL, relative(KG_QA_TREE, p));
+}
 
 /**
  * Where this run's JUDGEMENTS live — pair attestations and voice reviews —
@@ -388,12 +406,21 @@ const KG_ATT_TREE = join(ATT_HOME.root, "kg-qa");
 /** The declared directory whose absence makes every read `unknown` (never a re-baseline). */
 const ATT_STORE = ATT_HOME.storeRoot;
 /**
+ * The attestation store is COMMITTED content (ruling D2 (a)). In a layer this
+ * checkout MOUNTS it is the pinned bytes, and nothing here may rewrite it
+ * (bean `cat-tools-sm8r`, item 4): a write that would change it is reported,
+ * and the layer's own repository makes it.
+ */
+const ATT_IN_MOUNT = writePathAt(ATT_STORE) !== ATT_STORE;
+/** Attestation files a write run would have rewritten in a mounted layer: reported, never written. */
+const attLeftInMount: string[] = [];
+/**
  * Is the derived kg-qa tree STORED on `qa-reports` (bean `oqe3`)? Then its
  * working copy is a measurement of the last run, not a record: a stale or
  * orphaned sidecar there is advisory in judge mode. Unstored, it is still the
  * committed record and both are findings, as they were.
  */
-const derivedStored = qaStorageOf(KG_QA_TREE) !== undefined;
+const derivedStored = qaStorageOf(KG_QA_LOGICAL) !== undefined;
 
 
 /**
@@ -3028,8 +3055,9 @@ const manifest: KgQaManifest = {
     engine_version: ENGINE_VERSION,
   },
 };
-const manifestPath =
-  QA_HOME.by === "hosted" ? join(QA_HOME.root, "kg-qa.manifest.json") : join(root, KG_QA_MANIFEST_PATH);
+const manifestPath = writePathAt(
+  QA_HOME.by === "hosted" ? join(QA_HOME.root, "kg-qa.manifest.json") : join(root, KG_QA_MANIFEST_PATH),
+);
 const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;
 if (check) {
   const current = existsSync(manifestPath) ? readFileSync(manifestPath, "utf-8") : undefined;
@@ -3119,14 +3147,15 @@ if (!check) {
     // conditions `relocateSidecars` already checked — and only onto a vacant path.
     const from = attestationPathFor(join(root, m.from), KG_QA_TREE, ATT_HOME.root, "kg-qa", KG_QA_SIDECAR_SUFFIX);
     const to = attestationPathFor(join(root, m.to), KG_QA_TREE, ATT_HOME.root, "kg-qa", KG_QA_SIDECAR_SUFFIX);
-    if (existsSync(from) && !existsSync(to)) {
+    // A mounted layer's committed store is never moved (see ATT_IN_MOUNT).
+    if (!ATT_IN_MOUNT && existsSync(from) && !existsSync(to)) {
       mkdirSync(dirname(to), { recursive: true });
       renameSync(from, to);
       console.log(`  → moved ${relative(root, from)}\n      to ${relative(root, to)}  (its attestations)`);
     }
   }
 }
-if (initAttestations && !check && !existsSync(ATT_STORE)) {
+if (initAttestations && !check && !ATT_IN_MOUNT && !existsSync(ATT_STORE)) {
   mkdirSync(ATT_STORE, { recursive: true });
   console.log(`  → started the attestation store at ${relative(root, ATT_STORE)} — declare it as an \`attestations\` directory`);
 }
@@ -3239,11 +3268,24 @@ for (const r of reports) {
     // a derived file leaving it — so a store this run would rewrite is still
     // a finding in judge mode (bean `oqe3`), unlike a derived sidecar.
     const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
-    if (current !== text) staleAttestations.push(relative(root, p));
+    // A MOUNTED layer's store is its own repository's to judge: reported, not failed (see ATT_IN_MOUNT).
+    if (current !== text) (ATT_IN_MOUNT ? attLeftInMount : staleAttestations).push(relative(root, p));
+  } else if (ATT_IN_MOUNT) {
+    const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
+    if (current !== text) attLeftInMount.push(relative(root, p));
   } else {
     mkdirSync(join(p, ".."), { recursive: true });
     writeFileSync(p, text);
   }
+}
+// To STDERR: `--json` owns stdout (its report array is parsed whole), and
+// this advisory is printed before the judge redirects console.log.
+if (attLeftInMount.length > 0) {
+  console.error(
+    `\n  · ${attLeftInMount.length} committed attestation file(s) of a MOUNTED layer would change; left as pinned ` +
+      "(a mount is read-only). Run `bun run cat kg:audit:all` in that layer's own repository to rewrite them:",
+  );
+  for (const a of attLeftInMount) console.error(`    ${a}`);
 }
 if (attMoved > 0) {
   console.log(
@@ -3496,7 +3538,7 @@ if (check) {
   if (asJson) console.log = console.error;
   const verdict = judgeSidecarTree({
     gate: JUDGE_GATE,
-    fresh: reports.map((r) => ({ path: sidecarPath(r), findings: graded(r) })),
+    fresh: reports.map((r) => ({ path: logicalSidecar(sidecarPath(r)), findings: graded(r) })),
     findingsOf: (text) => {
       try {
         const prior = JSON.parse(text) as KgQaReport;

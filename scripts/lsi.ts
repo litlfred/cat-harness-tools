@@ -53,6 +53,7 @@ import { declaredGraphs, instanceRootsIn } from "../schemas/kg/cat-harness.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { againstOrUsage, buildQaResult, judgeUsage, qaStorageOf, writeQaResult } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";
+import { overlayDirs, overlayPath, writePathAt } from "./lib/layer-output.ts";
 import { downstreamState, parseToolRun, toolRunPath, writeToolRun, TOOL_RUNS_DIR, UNKNOWN_FINGERPRINT, type DownstreamState } from "../schemas/tools/tool-run.ts";
 import { specimenSections } from "../schemas/content/section-verdicts.ts";
 import {
@@ -295,7 +296,9 @@ export function index(t: GraphTarget, docs: string[] | undefined, opts: LsiOptio
   // the build from before the change.
   computed.delete(targetOf(t));
   const { sidecar, ms } = computeIndex(t, docs, opts);
-  const out = sidecarPath(t, docs);
+  // Never into a mount: a mounted harness's index goes to its layer output
+  // root (bean `cat-tools-sm8r`, item 4); CHECKOUT_SOURCE reads it there.
+  const out = writePathAt(sidecarPath(t, docs));
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(sidecar, null, 2) + "\n");
   // The run record — only for a WHOLE-graph index, which is what the
@@ -398,7 +401,7 @@ export function needOf(t: GraphTarget): { needed: false; verdict: GraphVerdict }
  * (proposal §2.3: compute and judge).
  */
 export function indexesInCheckout(): boolean {
-  return existsSync(RESULTS);
+  return overlayDirs(RESULTS).length > 0;
 }
 
 /** The index directory, repository-relative: its path in the checkout and on the `qa-reports` branch alike. */
@@ -429,7 +432,7 @@ export const CHECKOUT_SOURCE: IndexSource = {
     return indexesInCheckout();
   },
   read(repoPath) {
-    const abs = join(REPO, repoPath);
+    const abs = overlayPath(join(REPO, repoPath));
     return existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
   },
 };

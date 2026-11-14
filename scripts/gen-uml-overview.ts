@@ -68,6 +68,7 @@ import { detangleResultsDir, sidecarFor } from "../schemas/kg/detangle-sidecar.j
 import { QaUsageError, readQaManifest, readQaTree } from "./qa-store.ts";
 import { requireCurrentWorkingCopy } from "./qa-working-copy.ts";
 import { JUDGEMENT_EXIT } from "./qa-results.ts";
+import { overlayDirs } from "./lib/layer-output.ts";
 import { spawnSync } from "node:child_process";
 import { glossaryLinksMd, schemasViewPuml } from "./gen-object-model-uml.js";
 import { resolveKindValidator, resolveNodeSchemas, type NodeSchemaResolution } from "../schemas/kg/kind-validator.js";
@@ -334,7 +335,12 @@ const QA_REF = (() => {
  */
 function tagsForSection(path: string, kind: string): Set<string> | null {
   const abs = join(REPO, path);
-  if (kind !== "qa" || existsSync(abs)) return tagsUnder(abs);
+  if (kind !== "qa") return tagsUnder(abs);
+  // A `qa` directory in the checkout, through the layer output overlay: a
+  // mounted layer's computed results are under `build/layers/<instance>/`
+  // (bean `cat-tools-sm8r`, item 4). The union of its families.
+  const dirs = overlayDirs(abs);
+  if (dirs.length > 0) return new Set(dirs.flatMap((d) => [...tagsUnder(d)]));
   const where = `${path}/ is not in the checkout, and qa-reports at ${QA_REF}`;
   try {
     return storedTags(path, where);

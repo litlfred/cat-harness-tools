@@ -40,6 +40,7 @@ import { z } from "zod";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { RunContextRefSchema, RunReleaseSchema } from "../sdlc/run-context";
+import { overlayDirs, overlayPath, writePathAt } from "../../scripts/lib/layer-output.ts";
 
 /** The `$schema` tag every run record carries. */
 export const TOOL_RUN_SCHEMA_ID = "folio-tool-run/v1";
@@ -98,7 +99,7 @@ export function toolRunPath(instanceRoot: string, tool: string, target: string):
 
 /** The record, or `undefined` when there is none — a file that fails to parse is not a record. */
 export function readToolRun(instanceRoot: string, tool: string, target: string): ToolRunRecord | undefined {
-  const p = toolRunPath(instanceRoot, tool, target);
+  const p = overlayPath(toolRunPath(instanceRoot, tool, target));
   if (!existsSync(p)) return undefined;
   return parseToolRun(readFileSync(p, "utf8"));
 }
@@ -120,7 +121,9 @@ export function parseToolRun(text: string | undefined): ToolRunRecord | undefine
 
 /** Write a record; returns its path. Written only when its content changes. */
 export function writeToolRun(instanceRoot: string, record: Omit<ToolRunRecord, "$schema">): string {
-  const p = toolRunPath(instanceRoot, record.tool, record.target);
+  // A mounted layer's record goes to its layer output root, never into the
+  // mount (bean `cat-tools-sm8r`, item 4); `readToolRun` finds it there.
+  const p = writePathAt(toolRunPath(instanceRoot, record.tool, record.target));
   const body = JSON.stringify({ $schema: TOOL_RUN_SCHEMA_ID, ...record }, null, 2) + "\n";
   if (existsSync(p) && readFileSync(p, "utf8") === body) return p;
   mkdirSync(dirname(p), { recursive: true });
@@ -156,7 +159,9 @@ export type ToolRunListing = { state: "hit"; runs: ListedToolRun[] } | { state: 
 
 export function listToolRuns(instanceRoot: string): ToolRunListing {
   const base = join(instanceRoot, TOOL_RUNS_DIR);
-  if (!existsSync(base)) {
+  // The output root first, then the layer's own directory (bean `cat-tools-sm8r`, item 4).
+  const bases = overlayDirs(base);
+  if (bases.length === 0) {
     return {
       state: "unknown",
       reason:
@@ -177,10 +182,20 @@ export function listToolRuns(instanceRoot: string): ToolRunListing {
         } catch {
           record = undefined;
         }
-        out.push({ path: relative(instanceRoot, p), record });
+        // Listed by its path inside the layer, wherever the bytes are.
+        const path = relative(instanceRoot, join(base, relative(root, p)));
+        if (!seen.has(path)) {
+          seen.add(path);
+          out.push({ path, record });
+        }
       }
     }
   };
-  walk(base);
+  const seen = new Set<string>();
+  let root = base;
+  for (const b of bases) {
+    root = b;
+    walk(b);
+  }
   return { state: "hit", runs: out.sort((a, b) => (a.path < b.path ? -1 : 1)) };
 }

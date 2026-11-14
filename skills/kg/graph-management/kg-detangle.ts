@@ -35,6 +35,7 @@
 import { readdirSync, readFileSync, statSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { basename, join, relative, resolve, dirname } from "path";
 import { detangleResultsDir, sidecarFor, sidecarPathFor, staleFields } from "../../../schemas/kg/detangle-sidecar.ts";
+import { overlayDirs, overlayPath, writePathAt } from "../../../scripts/lib/layer-output.ts";
 import { gitCorpus } from "../../../schemas/sdlc/git-corpus.ts";
 import { groupDepthFor } from "./group-depth.ts";
 import { TOPICS_FILE, topicsOf } from "../../../scripts/skill-topics.ts";
@@ -583,7 +584,9 @@ const RESULTS_DIR = detangleResultsDir(HARNESS);
  * qa:fetch`, the comparison and the orphan sweep run exactly as before, so a
  * group with no sidecar beside ones that have them is still STALE.
  */
-const pinnedInCheckout = existsSync(RESULTS_DIR);
+// Through the layer output overlay: a mounted layer's sidecars are under
+// `build/layers/<instance>/` (bean `cat-tools-sm8r`, item 4).
+const pinnedInCheckout = overlayDirs(RESULTS_DIR).length > 0;
 
 /**
  * Is the detangle tree STORED on `qa-reports` (bean `oqe3`)? cat-harness
@@ -608,7 +611,7 @@ function writeSidecars(): { written: string[]; stale: { path: string; fields: st
     const fresh = sidecarFor(r);
     let committed: unknown = null;
     try {
-      committed = JSON.parse(readFileSync(abs, "utf-8"));
+      committed = JSON.parse(readFileSync(overlayPath(abs), "utf-8"));
     } catch {
       // Absent or unreadable — every field differs, which `staleFields` says.
     }
@@ -656,8 +659,10 @@ function writeSidecars(): { written: string[]; stale: { path: string; fields: st
     // necessarily contains the tag — `audit-coverage` records the same trap, and
     // this comment is how it was hit the first time the guard was measured.
     if (!checking && !gatingDirection && import.meta.main) {
-      mkdirSync(dirname(abs), { recursive: true });
-      writeFileSync(abs, JSON.stringify(fresh, null, 2) + "\n", "utf-8");
+      // Never into a mount: a mounted layer's sidecar goes to its layer output root.
+      const to = writePathAt(abs);
+      mkdirSync(dirname(to), { recursive: true });
+      writeFileSync(to, JSON.stringify(fresh, null, 2) + "\n", "utf-8");
     }
     written.push(rel);
   }
@@ -693,8 +698,9 @@ function sweepOrphans(accountedFor: string[]): string[] {
       else if (e.name.endsWith(".detangle.json") && !known.has(rel)) out.push(rel);
     }
   };
-  walk(RESULTS_DIR);
-  return out.sort();
+  // The union of the output root and the layer's own directory.
+  for (const d of overlayDirs(RESULTS_DIR)) walk(d);
+  return [...new Set(out)].sort();
 }
 
 const checking = process.argv.includes("--check");

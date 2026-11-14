@@ -133,18 +133,6 @@ export function readPathAt(root: string, abs: string, mounted: Map<string, strin
   return existsSync(twin) ? twin : abs;
 }
 
-/**
- * Where a writer WRITES the computed file it would otherwise put at the
- * absolute path `abs`: its output-root twin when `abs` lies in a mounted
- * layer, else `abs` itself. The write-side partner of {@link readPathAt}:
- * a writer writes here and reads its own earlier output (a `--check`)
- * through `readPathAt`, so a fresh mounted checkout still judges the pinned
- * copy and a checkout that has run the writer judges what it wrote.
- */
-export function writePathAt(root: string, abs: string, mounted: Map<string, string> = mountedInstances(root)): string {
-  return outputTwinOf(root, abs, mounted) ?? abs;
-}
-
 /** Per-root cache of {@link mountedInstances}: a reader asks per file, and the lock does not change during a run. */
 const mountedCache = new Map<string, Map<string, string>>();
 
@@ -207,4 +195,56 @@ export function overlayPath(abs: string, root: string | undefined = checkoutRoot
   }
   if (mounted.size === 0) return abs;
   return readPathAt(root, abs, mounted);
+}
+
+/**
+ * Where a WRITER writes the computed file a reader finds at `abs`: its
+ * output-root twin when `abs` is in a mounted layer, else `abs`. Supports both
+ * `writePathAt(abs, root?)` (step 5 QA writers) and
+ * `writePathAt(root, abs, mounted?)` (step 4 docs writers). Unlike a reader, a
+ * writer refuses an unparseable lock (see {@link mountedInstances}): reading
+ * it as "nothing mounted" would write into the mounts.
+ */
+export function writePathAt(a: string, b?: string, mountedArg?: Map<string, string>): string {
+  if (arguments.length <= 1) {
+    const root = checkoutRoot();
+    if (root === undefined) return a;
+    const mounted = mountedInstancesCached(root);
+    return mounted.size === 0 ? a : (outputTwinOf(root, a, mounted) ?? a);
+  }
+  if (b === undefined) return a;
+  if (mountedArg !== undefined) {
+    return outputTwinOf(a, b, mountedArg) ?? b;
+  }
+  const ra = resolve(a);
+  const rb = resolve(b);
+  const bIsRoot =
+    (ra.startsWith(rb + sep) && !rb.startsWith(ra + sep)) ||
+    ((existsSync(join(rb, "index.lock.json")) || existsSync(join(rb, ".git"))) &&
+      !existsSync(join(ra, "index.lock.json")) &&
+      !existsSync(join(ra, ".git")));
+  const root = bIsRoot ? b : a;
+  const abs = bIsRoot ? a : b;
+  const mounted = bIsRoot ? mountedInstancesCached(root) : mountedInstances(root);
+  if (mounted.size === 0) return abs;
+  return outputTwinOf(root, abs, mounted) ?? abs;
+}
+
+/**
+ * The directories a reader LISTS for the directory it knows as `abs`: the
+ * output-root twin first, then `abs` itself, each only if it exists. A
+ * directory reader walks both and lets the first hold a relative path win,
+ * which is the union {@link readPathAt} gives file by file.
+ */
+export function overlayDirs(abs: string, root: string | undefined = checkoutRoot()): string[] {
+  let twin: string | undefined;
+  if (root !== undefined) {
+    try {
+      const mounted = mountedInstancesCached(root);
+      twin = mounted.size ? outputTwinOf(root, abs, mounted) : undefined;
+    } catch {
+      twin = undefined;
+    }
+  }
+  return [twin, abs].filter((d): d is string => d !== undefined && existsSync(d));
 }

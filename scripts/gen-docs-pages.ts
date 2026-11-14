@@ -64,6 +64,7 @@ import { BURNDOWN_SCHEMA, DEFAULT_BURNDOWN_DAYS, buildBurndownFeed, burndownTarg
 import { snapshotsFromGit } from "./epic-burndown.ts";
 import { missingTopLevelKeys } from "./lib/json-shape.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
+import { writePathAt } from "./lib/layer-output.ts";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { resolveThemeBackdrop } from "../schemas/ui/theme.js";
 import { THEMES, themeById } from "../schemas/ui/themes.js";
@@ -398,10 +399,13 @@ const storedTrees = new Map<string, boolean>();
 /** {@link QA_ASSETS_STORED}, asked of whichever witness tree `path` is in. */
 function qaStoredFor(path: string): boolean {
   for (const src of [CUR, ...(DOCS_SOURCES ?? [])]) {
-    const dir = qaAssetDirOf(src);
-    if (path === dir || path.startsWith(dir + sep)) {
-      if (!storedTrees.has(dir)) storedTrees.set(dir, src.base ? QA_ASSETS_STORED : qaStorageOf(dir) !== undefined);
-      return storedTrees.get(dir)!;
+    const logical = qaAssetDirOf(src);
+    // A witness is emitted at its layer output root when its layer is mounted
+    // (bean `cat-tools-sm8r`, item 4); its storage is still its layer's.
+    const dir = [logical, writePathAt(logical)].find((d) => path === d || path.startsWith(d + sep));
+    if (dir !== undefined) {
+      if (!storedTrees.has(logical)) storedTrees.set(logical, src.base ? QA_ASSETS_STORED : qaStorageOf(logical) !== undefined);
+      return storedTrees.get(logical)!;
     }
   }
   return QA_ASSETS_STORED;
@@ -1195,7 +1199,10 @@ function emit(path: string, content: string, kind: "page" | "data" | "verdict" |
  * committed directory, so the gate this generator has always had on a
  * committed witness tree is unchanged until the declaration says otherwise.
  */
-function emitWitness(path: string, content: string): void {
+function emitWitness(logical: string, content: string): void {
+  // A mounted layer's witness goes to its layer output root, never into the
+  // mount (bean `cat-tools-sm8r`, item 4). Compared, emitted and swept there.
+  const path = writePathAt(logical);
   // Directories only on the WRITE path: `--check` creates nothing, so a check
   // run cannot leave an empty witness tree that a later reader mistakes for a
   // fetched one.
@@ -2327,7 +2334,9 @@ publishAuthoredPageTranslationQa();
 const orphanedQaAssets = new Set<string>();
 // Every source's tree, each judged by its own storage — a layer above the
 // base that loses a page must lose that page's projections too.
-const witnessTrees = [...new Set(allDocsSources().map(qaAssetDirOf))];
+// Where each tree is WRITTEN: the sweep lists and removes only what this
+// generator writes, never a mount's pinned bytes (bean `cat-tools-sm8r`, item 4).
+const witnessTrees = [...new Set(allDocsSources().map((s) => writePathAt(qaAssetDirOf(s))))];
 for (const orphan of witnessTrees.flatMap((d) => listQaAssets(d))) {
   if (emittedQa.has(orphan)) continue;
   orphanedQaAssets.add(orphan);

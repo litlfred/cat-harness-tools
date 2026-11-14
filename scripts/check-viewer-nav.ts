@@ -27,6 +27,7 @@
  *   navbar regressed
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { overlayPath, writePathAt } from "./lib/layer-output.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
@@ -449,8 +450,10 @@ if (import.meta.main) {
       }
     }
   } else {
-    mkdirSync(dirname(SIDECAR), { recursive: true });
-    writeFileSync(SIDECAR, text);
+    // A mounted layer's sidecar goes to its layer output root (bean `cat-tools-sm8r`, item 4).
+    const to = writePathAt(SIDECAR);
+    mkdirSync(dirname(to), { recursive: true });
+    writeFileSync(to, text);
     console.log(`  ✓ ${relative(REPO, SIDECAR)}`);
   }
 
@@ -459,7 +462,8 @@ if (import.meta.main) {
   // diff is the one who did it. Gated in `check` on that basis; the absolute
   // list is `strict`'s.
   if (check || strict) {
-    const have = existsSync(SIDECAR) ? readFileSync(SIDECAR, "utf-8") : null;
+    const at = overlayPath(SIDECAR);
+    const have = existsSync(at) ? readFileSync(at, "utf-8") : null;
     let prior: ViewerNavQa | undefined;
     try {
       const parsed = have ? ViewerNavQaSchema.safeParse(JSON.parse(have)) : undefined;

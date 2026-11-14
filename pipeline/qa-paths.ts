@@ -49,6 +49,7 @@ import { existsSync, statSync } from "node:fs";
 
 import { findDeclarationFile } from "../schemas/kg/cat-harness.ts";
 import { manifestPath } from "./json-manifest.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /** Where block verdicts live now, relative to the layer root. */
 export const BLOCK_QA_RESULTS_DIR = join("test", "results", "block-qa");
@@ -81,7 +82,9 @@ export function legacyBlockQaPath(blockRoot: string): string {
  * callers auditing for duplicates want the whole list.
  */
 export function blockQaReadPaths(repoRoot: string, blockRoot: string): string[] {
-  return [blockQaPath(repoRoot, blockRoot), legacyBlockQaPath(blockRoot)];
+  // The results-tree entry through the layer output overlay: a mounted
+  // layer's verdict is under `build/layers/<instance>/` (bean `cat-tools-sm8r`, item 4).
+  return [overlayPath(blockQaPath(repoRoot, blockRoot)), legacyBlockQaPath(blockRoot)];
 }
 
 /**
@@ -154,7 +157,7 @@ export function translationQaReadPaths(
   locale: string,
 ): string[] {
   return [
-    translationQaPath(repoRoot, subjectRoot, locale),
+    overlayPath(translationQaPath(repoRoot, subjectRoot, locale)),
     legacyTranslationQaPath(subjectRoot, locale),
   ];
 }

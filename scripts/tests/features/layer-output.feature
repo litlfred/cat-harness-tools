@@ -117,3 +117,33 @@ Feature: The layer output resolver
     Given a checkout with no mounted layers and a local results directory
     When movedInventory and overlayEntries are computed
     Then movedInventory lists the local files and overlayEntries is empty
+
+  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_mounted_layer's_path_is_written_under_build/layers/<instance>/
+  Scenario: A mounted layer's path is written under the layer output root
+    Given a checkout whose lock mounts a lower layer
+    When a writer resolves a results path inside the lower mount
+    Then it writes under build/layers/lower/ at the same instance-relative path
+
+  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_local_layer's_path,_and_one_outside_the_checkout,_are_written_where_they_are
+  Scenario: A local layer's path, and one outside the checkout, are written where they are
+    Given a checkout whose lock mounts a lower layer
+    When a writer resolves a path in a local layer, or outside the checkout
+    Then the path is unchanged
+
+  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_writer_refuses_an_unparseable_lock_rather_than_writing_into_the_mounts
+  Scenario: A writer refuses an unparseable lock rather than writing into the mounts
+    Given a checkout whose index.lock.json is not valid JSON
+    When a writer resolves a path inside a mounted directory
+    Then it throws rather than reading the lock as nothing mounted
+
+  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::overlayDirs_lists_the_output_root_first,_then_the_layer's_own_directory,_each_only_if_it_exists
+  Scenario: overlayDirs lists the output root first, then the layer's own directory
+    Given a mounted layer's results directory and its output-root twin
+    When the directories a reader lists are resolved as each comes to exist
+    Then only existing ones are listed, the output root first
+
+  @test:scripts/tests/layer-output.test.ts::writePathAt_and_overlayDirs_(step_5:_the_QA_writers)::a_file_written_via_writePathAt_is_read_back_via_overlayPath_over_the_pinned_copy
+  Scenario: A file written via writePathAt is read back via overlayPath over the pinned copy
+    Given a mounted layer with a pinned result file and a twin written via writePathAt
+    When overlayPath resolves the pinned result path
+    Then it returns the output-root twin written via writePathAt

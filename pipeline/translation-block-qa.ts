@@ -110,6 +110,7 @@ import { poResolveContext, resolvePoSources, type PoResolveContext } from "./po-
 import { extractMarkdown, extractFromManifest, type ManifestInput } from "./pot-extract.ts";
 import { gitFileCommitSha, gitHeadTree, hashFile, sweepActor, walkBlocks } from "./qa-utils.ts";
 import { existingTranslationQaPath, translationQaPath } from "./qa-paths.ts";
+import { writePathAt } from "../scripts/lib/layer-output.ts";
 import {
   isAsciiEscaped,
   missingAttestations,
@@ -1122,6 +1123,9 @@ function settleSidecar(
   // READ wherever it is, WRITE only to the results tree — `qa-paths.ts`.
   const existing = existingTranslationQaPath(INSTANCE_ROOT, subjectRoot, locale);
   const out = translationQaPath(INSTANCE_ROOT, subjectRoot, locale);
+  // Where it is WRITTEN: the layer output root for a mounted layer (bean
+  // `cat-tools-sm8r`, item 4). `out` stays the logical path every message names.
+  const target = writePathAt(out);
   if (!doc) {
     // An existing sidecar whose translation has gone is REPORTED, never
     // silently deleted: a verdict about a PO nobody can find any more is a
@@ -1154,7 +1158,7 @@ function settleSidecar(
   // A verdict identical in substance but sitting at the LEGACY path is not
   // up to date: it still has to be written to the results tree, or every run
   // would report the corpus migrated while nothing moved.
-  if (current && existing === out && substantive(current) === substantive(doc)) return;
+  if (current && existing === target && substantive(current) === substantive(doc)) return;
   if (check) {
     // Bean `oqe3`: "stale" decides nothing in a stored tree — judge, never
     // compare. Counted for one advisory line; still a finding unstored.
@@ -1168,8 +1172,8 @@ function settleSidecar(
       asciiEscape: existing !== undefined && isAsciiEscaped(readFileSync(existing, "utf-8")),
     });
   }
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, body);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, body);
   tally.written++;
   const cov = doc.criteria["translation-coverage"]?.[0]?.metrics;
   console.log(`  ✓ ${relative(INSTANCE_ROOT, out)} (${cov?.translated}/${cov?.total} strings)`);

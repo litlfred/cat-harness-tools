@@ -29,6 +29,7 @@
  * @module scripts/test-plan-audit
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { overlayPath } from "./lib/layer-output.ts";
 import { join, relative, resolve, sep } from "node:path";
 import { switchedOffGroups } from "../schemas/kg/opt-in-roots.js";
 import type { KgCriterionEntry, KgFinding } from "../schemas/sdlc/kg-qa.js";
@@ -200,7 +201,8 @@ export function auditTestPlans(input: TestPlanAuditInput): Record<TestPlanCriter
   // ── Plan-runs ──────────────────────────────────────────────────────────
   let planRuns = 0;
   for (const f of input.runs) {
-    const raw = readJson(f);
+    // A run's name is logical; its bytes may be under the layer output root (bean `cat-tools-sm8r`, item 4).
+    const raw = readJson(overlayPath(f));
     if (!raw.ok) continue; // `test-run-skill-resolves` owns an unreadable run.
     if ((raw.value as { plan?: unknown })?.plan === undefined) continue;
     planRuns++;

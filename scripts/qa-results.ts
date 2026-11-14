@@ -30,7 +30,7 @@ import { dirname, join, resolve, sep } from "node:path";
 
 import { parseQaRef, QaUsageError, readQa, readQaManifest, resolveQaLocation, type QaLocation, type QaStoreOptions } from "./qa-store.js";
 import type { QaResultFamily, QaResult } from "../schemas/kg/qa-record-shapes.ts";
-import { overlayPath } from "./lib/layer-output.ts";
+import { overlayPath, writePathAt } from "./lib/layer-output.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { QaResultFamily, QaResult };
 
@@ -131,7 +131,9 @@ function key(r: QaResult): string {
  * nothing to compare and the file is written — correct in both states.
  */
 export function writeQaResult(root: string, stem: string, result: QaResult): string {
-  const out = qaResultPath(root, stem);
+  // A mounted layer's result goes to its layer output root, never into the
+  // mount (bean `cat-tools-sm8r`, item 4); readers find it through the overlay.
+  const out = writePathAt(qaResultPath(root, stem));
   mkdirSync(dirname(out), { recursive: true });
 
   if (existsSync(out)) {

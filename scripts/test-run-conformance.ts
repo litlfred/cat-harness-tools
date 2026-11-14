@@ -20,11 +20,12 @@
  *
  * @module scripts/test-run-conformance
  */
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fromJSONSchema, type ZodType } from "zod";
 import { TestRunSchema } from "../schemas/sdlc/test-run.js";
 import { contractFile, skillContracts } from "./skill-contracts.js";
+import { overlayDirs, overlayPath } from "./lib/layer-output.ts";
 
 export interface RunFinding {
   where: string;
@@ -54,13 +55,16 @@ export interface TestRunConformance {
   looked: boolean;
 }
 
-/** The `*.test-run.json` files directly under `dir`. */
+/**
+ * The `*.test-run.json` files directly under `dir`, named by their path in
+ * `dir` wherever the bytes are: the union of the layer output root and `dir`
+ * itself (bean `cat-tools-sm8r`, item 4). Read each through `overlayPath`.
+ * The names stay logical, since they are what a finding's `where` records.
+ */
 export function testRunFiles(dir: string): string[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(".test-run.json"))
-    .sort()
-    .map((f) => join(dir, f));
+  const names = new Set<string>();
+  for (const d of overlayDirs(dir)) for (const f of readdirSync(d)) if (f.endsWith(".test-run.json")) names.add(f);
+  return [...names].sort().map((f) => join(dir, f));
 }
 
 /** At most this many violations are listed per run; the count is always given. */
@@ -79,11 +83,11 @@ export function checkTestRuns(
   opts: { determined?: boolean } = {},
 ): TestRunConformance {
   const local = testRunFiles(resultsDir);
-  const looked = local.length > 0 || (opts.determined === true && existsSync(resultsDir));
+  const looked = local.length > 0 || (opts.determined === true && overlayDirs(resultsDir).length > 0);
   const out: TestRunConformance = { unresolved: [], nonconforming: [], unchecked: [], checked: 0, runs: 0, looked };
   let entries: { where: string; text: string }[] = [];
   if (out.looked) {
-    entries = local.map((file) => ({ where: relative(root, file), text: readFileSync(file, "utf-8") }));
+    entries = local.map((file) => ({ where: relative(root, file), text: readFileSync(overlayPath(file), "utf-8") }));
   } else if (storeFallback) {
     const fb = storeFallback();
     if (fb.looked) {
