@@ -5,7 +5,7 @@
  * The tabs (`a.fa-page-lang-tab`, `a.fa-lang-tab`) are drawn by cat-harness's
  * `site-chrome/assets/js/docs-ui.js` at load time, so they are not in the
  * built HTML and the publish link check never saw them. Owner, 2026-11-13:
- * the who-iris home's tabs linked `/who-iris/fr/` (and ar, zh, ru, es), all
+ * a layer home's tabs linked `/<layer>/fr/` (and ar, zh, ru, es), all
  * 404, while the page's own `hreflang` alternates named the translations that
  * exist. This module repeats the chrome's rule so `checkLinks` can hold the
  * tabs to the same standard as every other link:

@@ -1143,7 +1143,7 @@ def derive(root, given, tmp, env=None):
             # pins differ by design, so a gate added to the list after the
             # index's pin named a script no mount declared, and `bun run cat`
             # failed it as "no script" on every layer PR whose cone ran it
-            # (smart-base#357, jsonld:site:check: workflow 31e8a3e, index pin
+            # (jsonld:site:check: workflow 31e8a3e, index pin
             # ed3c8eb, script added in be54df93). Nothing was judged, so it is
             # listed as skipped, never counted, and runs once the pin has it.
             skipped[f"{owner}:{script}"] = {

@@ -373,6 +373,7 @@
     "check:bean-issues": "bun run cat-harness-tools/scripts/check-bean-issues.ts",
     "check:draft-beans": "bun run cat-harness-tools/scripts/check-draft-beans.ts",
     "ci:watch": "bun run cat-harness-tools/scripts/watch-ci.ts",
+    "ci:job-shape": "bun run cat-harness-tools/scripts/ci-job-shape.ts",
     "check:declared-dirs": "bun run cat-harness-tools/scripts/check-declared-dirs.ts",
     "check:declaration-resolution": "bun run cat-harness-tools/scripts/check-declaration-resolution.ts",
     "check:journey-refs": "bun run cat-harness-tools/scripts/check-journey-refs.ts",
