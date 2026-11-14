@@ -16,6 +16,25 @@
  *      `--url` (or `LIBRETRANSLATE_URL`). The public libretranslate.com
  *      instance is refused: it is the freemium API this step exists to avoid.
  *
+ * ## One writer: singular strings are candidates
+ *
+ * The owner, 2026-11-14, chose to merge this command with
+ * `translation:candidates` into one mechanism. Each singular string the
+ * engine produces is passed to `addCandidates`
+ * (`scripts/lib/translation-candidates.ts`), the one writer every source uses.
+ * That writer:
+ *
+ *   - records the string in `<catalogue>.candidates.json`
+ *     (`translation-candidates/v1`, source `{kind: "open-mt", id: <generator>}`)
+ *     for the review page to offer;
+ *   - fills the EMPTY msgstr with it, `#, fuzzy`;
+ *   - records the node.
+ *
+ * A catalogue that says `DO NOT MACHINE-FILL` gets candidates, and its `.po`
+ * is not changed. Plural entries cannot be candidates, because a candidate is
+ * one string and a plural entry is `nplurals` of them, so they are still
+ * filled here, as below.
+ *
  * ## The rules
  *
  *   - Only an entry whose msgstr (every `msgstr[n]`, for a plural) is EMPTY is
@@ -53,6 +72,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { poEntries } from "./lib/translation-adjudication.ts";
 
 // ── PO string escaping ───────────────────────────────────────────
 
@@ -361,14 +382,16 @@ export interface FillResult {
 export async function fillCatalogue(
   poText: string,
   engine: Engine,
-  opts: { source?: string; target: string },
+  opts: { source?: string; target: string; entries?: "singular" | "plural" },
 ): Promise<FillResult> {
   const source = opts.source ?? "en";
   const cat = parseCatalogue(poText);
   const n = nplurals(cat, opts.target);
 
   // Every entry's source strings, one per msgstr form.
-  const work = cat.entries.filter(isEmptyEntry).map((e) => {
+  const wanted = (e: Entry) =>
+    opts.entries === undefined || (opts.entries === "plural") === (field(e, "msgid_plural") !== undefined);
+  const work = cat.entries.filter((e) => isEmptyEntry(e) && wanted(e)).map((e) => {
     const id = field(e, "msgid")!.value;
     const plural = field(e, "msgid_plural")?.value;
     const forms = plural === undefined ? [id] : Array.from({ length: n }, (_, k) => (k === 0 && n > 1 ? id : plural));
@@ -477,6 +500,14 @@ export function isOfficial(poText: string | undefined, node: Record<string, unkn
 
 // ── CLI ──────────────────────────────────────────────────────────
 
+/** The singular entries that were empty in `before` and have text in `after`. */
+export function newSingulars(before: string, after: string): Array<{ msgctxt?: string; msgid: string; text: string }> {
+  const was = new Map(poEntries(before).map((e) => [`${e.msgctxt ?? ""}\x04${e.msgid}`, e]));
+  return poEntries(after)
+    .filter((e) => e.msgidPlural === undefined && e.msgstr !== "" && was.get(`${e.msgctxt ?? ""}\x04${e.msgid}`)?.msgstr === "")
+    .map((e) => ({ ...(e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {}), msgid: e.msgid, text: e.msgstr }));
+}
+
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
     const p = join(dir, n);
@@ -544,6 +575,9 @@ async function declaredHome(instance: string): Promise<{ root: string; scope: re
 
 export async function main(argv: string[], engineOverride?: Engine): Promise<number> {
   const a = parseArgs(argv);
+  // The one candidates writer; loaded here, like the declaration reader, so
+  // the pure functions above load without the schema modules.
+  const { addCandidates } = await import("./lib/translation-candidates.ts");
   const engine = engineOverride ?? engineFor(a);
   const home = a.dir !== undefined ? { root: a.dir, scope: [] as readonly string[] } : await declaredHome(a.instance);
   const tdir = home.root;
@@ -579,17 +613,43 @@ export async function main(argv: string[], engineOverride?: Engine): Promise<num
       const have = entryKeys(base);
       const missing = [...entryKeys(potText)].filter((k) => !have.has(k)).length;
 
-      const r = await fillCatalogue(base, engine, { source: a.source, target: locale });
-      console.log(`${label}: filled ${r.filled} as fuzzy, refused ${r.refused.length}${missing ? `, ${missing} template entries absent from the .po (run msgmerge)` : ""}`);
-      for (const f of r.refused) console.log(`  refused ${f.msgctxt ? `[${f.msgctxt}] ` : ""}${JSON.stringify(f.msgid)}: ${f.reason}`);
-      if (a.dryRun || (r.filled === 0 && poText !== undefined)) continue;
+      if (poText === undefined && !a.dryRun) writeFileSync(po, base);
+      const catalogue = relative(join(tdir, locale), pot).split("\\").join("/").slice(0, -4);
+      const generator = engine.generator(locale);
 
-      writeFileSync(po, r.text);
-      if (r.filled > 0) {
-        const stem = relative(ldir, pot).split("\\").join("/").slice(0, -4);
-        const next = updatedNode(node, { po: rel(po), pot: rel(pot), locale, stem }, engine.generator(locale), at);
-        writeFileSync(nodePath, JSON.stringify(next, null, 2) + "\n");
-      }
+      // 1. Singular strings are CANDIDATES (owner, 2026-11-14: merge the two
+      //    machine-translation commands into one): the engine's text goes
+      //    through the one writer, which records it in
+      //    <catalogue>.candidates.json for the review page and fills the
+      //    empty msgstr with it, fuzzy.
+      const r1 = await fillCatalogue(base, engine, { source: a.source, target: locale, entries: "singular" });
+      const inputs = newSingulars(base, r1.text).map((e) => ({ ...e, source: { kind: "open-mt" as const, id: generator, at } }));
+      const c = addCandidates(inputs, {
+        root: a.instance,
+        translations: rel(tdir),
+        locale,
+        catalogue,
+        ...(a.dryRun ? { dryRun: true } : {}),
+        ...(a.dryRun && poText === undefined ? { init: true } : {}),
+      });
+
+      // 2. Plural entries are not candidates (a candidate is one string, a
+      //    plural entry is nplurals of them), so they are filled here, fuzzy,
+      //    with the target's plural count, exactly as before.
+      const afterSingular = a.dryRun || !existsSync(po) ? base : readFileSync(po, "utf8");
+      const r2 = await fillCatalogue(afterSingular, engine, { source: a.source, target: locale, entries: "plural" });
+
+      const refused = [...r1.refused, ...c.rejected, ...r2.refused];
+      const note = c.refused ?? c.noFill;
+      console.log(`${label}: ${c.added} candidate(s), filled ${c.filled.length} singular and ${r2.filled} plural as fuzzy, refused ${refused.length}${missing ? `, ${missing} template entries absent from the .po (run msgmerge)` : ""}${note ? ` — ${note}` : ""}`);
+      for (const f of refused) console.log(`  refused ${f.msgctxt ? `[${f.msgctxt}] ` : ""}${JSON.stringify(f.msgid)}: ${f.reason}`);
+      if (a.dryRun || r2.filled === 0 || c.refused || c.noFill) continue;
+
+      writeFileSync(po, r2.text);
+      const stem = relative(ldir, pot).split("\\").join("/").slice(0, -4);
+      const current = existsSync(nodePath) ? (JSON.parse(readFileSync(nodePath, "utf8")) as Record<string, unknown>) : undefined;
+      const next = updatedNode(current, { po: rel(po), pot: rel(pot), locale, stem }, generator, at);
+      writeFileSync(nodePath, JSON.stringify(next, null, 2) + "\n");
     }
   }
   if (catalogues === 0) {

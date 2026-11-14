@@ -406,6 +406,19 @@ Feature: Library entries become graph nodes
     Then they are "cat-harness:Block"
     And the kind "theorem" has its own types, without "cat-harness:Block"
 
+  @test:scripts/tests/gen-library-jsonld.test.ts::a_candidate's_@type_(cat-harness-tools#1356)::an_entry_in_a_mounted_layer_resolves_contributed_kinds_and_prefixes_from_that_layer's_dependencies,_not_a_sibling's
+  Scenario: A mounted layer's library entry resolves contributed kinds and prefixes from that layer's own dependencies
+    Given a layer "dak" contributing the kind "indicator" as "dak:Indicator", a layer "ig" needing "dak", and a sibling layer "iris" that does not need "dak"
+    When an entry with an "indicator" candidate is built in "ig/library/d" and in "iris/library/d"
+    Then the block in "ig" is typed "dak:Indicator" with the "dak" prefix bound in its local context
+    And the block in "iris" is typed "cat-harness:Block" with no "dak" prefix bound
+
+  @test:scripts/tests/gen-library-jsonld.test.ts::non-entry_directories_inside_a_library_are_skipped::libraryEntriesIn_drops_dotfiles_and_directories_declared_for_another_graph_typology
+  Scenario: Directories declared for another graph typology inside a library are skipped as entries
+    Given an instance declaring "library/" along with "library/processes/" as "processes" and "library/skills/" as "skills", plus the entry "library/doc-1" and ".hidden"
+    When the library's entries are listed by libraryEntriesIn
+    Then only "doc-1" is returned
+
   @test:scripts/tests/gen-library-jsonld.test.ts::tables_transcribed_from_a_paged_entry's_pages_are_blocks_(who-iris#224)::each_transcribed_table_is_a_table_block_carrying_its_narrative
   Scenario: A table transcribed from a paged entry's pages is a table block with its narrative
     Given a paged entry whose tabular.csvw.json transcribes "Table 1" on pages 3 and 4, with a draft narrative

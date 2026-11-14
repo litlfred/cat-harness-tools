@@ -48,12 +48,13 @@ import { join } from "node:path";
 
 import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const KG = readFileSync(join(ROOT, SITE, "assets/js/kg-render.js"), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const KG = readFileSync(overlayPath(join(ROOT, SITE, "assets/js/kg-render.js")), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 
 /**
  * The real index, read from the corpus rather than pinned here.
@@ -65,7 +66,7 @@ const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "
  * thing `getTranslationIndex` validates.
  */
 const INDEX = JSON.parse(
-  readFileSync(join(ROOT, SITE, "_data/translations.json"), "utf8"),
+  readFileSync(overlayPath(join(ROOT, SITE, "_data/translations.json")), "utf8"),
 ) as { sourceLocale: string; locales: string[]; pages: Record<string, unknown> };
 
 const SITE_INDEX_URL = "/assets/harness/site.json";

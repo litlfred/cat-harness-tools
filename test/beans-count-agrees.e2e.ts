@@ -27,9 +27,10 @@ import { join } from "node:path";
 
 import { siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const read = (p: string) => readFileSync(join(ROOT, siteFileFor(ROOT, p)), "utf8");
+const read = (p: string) => readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, p))), "utf8");
 const CSS = read("assets/css/docs-ui.css");
 const JS = read("assets/js/docs-ui.js");
 const QR = read("assets/js/vendor/qrcode.js");

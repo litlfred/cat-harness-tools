@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { lockSkews, type LockFetcher, type LockLike } from "../check-lock-consistency.ts";
+import { exitCodeOf, lockSkews, type LockFetcher, type LockLike } from "../check-lock-consistency.ts";
 
 const dirs: string[] = [];
 afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
@@ -59,4 +59,12 @@ test("a lock that cannot be read is could-not-determine, never a pass", () => {
   expect(r.undetermined).toContain("upper-layer: cannot fetch o/upper-layer@s1");
   expect(r.undetermined).toHaveLength(2);
   expect(r.skews).toEqual([]);
+  expect(exitCodeOf(r)).toBe(2);
+});
+
+test("skews are a report by default (exit 0), and exit 1 only when --gate is asked", () => {
+  const root = index({ instances: [inst("bootstrap", "c90ef456"), inst("cat-harness", "c1")] }, { "cat-harness": { instances: [inst("bootstrap", "a83ae82d")] } });
+  const r = lockSkews(root, none);
+  expect(exitCodeOf(r)).toBe(0);
+  expect(exitCodeOf(r, { gate: true })).toBe(1);
 });

@@ -39,6 +39,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { baseDocsDir } from "./compose-docs.js";
+import { forgeHrefFor, skillContractSectionMd } from "./tool-page.ts";
 import { skillLinksOf, skillSourceFilesOf, skillTarget, sourceSkillPage, type SkillPages } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { businessProcessFiles, workflowFiles, kgRoots } from "./known-skills.js";
@@ -669,6 +670,8 @@ export function sourceSkillPageMd(
   file: string,
   localNames: ReadonlySet<string>,
   rows: readonly ProcessRow[],
+  /** The contract section (`skillContractSectionMd`), when the caller read one. */
+  contracts?: readonly string[],
 ): string {
   const p = sourceSkillPage(name, text, url, localNames);
   const users = rows.filter(
@@ -691,6 +694,9 @@ export function sourceSkillPageMd(
   if (users.length) L.push(`**Named by:** ${users.map((r) => `[${esc(r.name)}](../${r.stem}.html)`).join(", ")}`, "");
   L.push(...lines);
   L.push(...wrapRaw(L.splice(rawFrom).join("\n")));
+  // The skill's I/O contracts as a class diagram (bean `cat-tools-4xq6`),
+  // outside the raw block so its HTML renders.
+  if (contracts) L.push(...contracts);
   return `${L.join("\n")}\n`;
 }
 
@@ -1523,9 +1529,14 @@ if (import.meta.main) {
   }
   const ctx = panelContext(REPO, skillPages);
   const localSet = new Set(localSkills);
+  const contractRoots = instanceRoots(REPO);
+  const contractHref = forgeHrefFor(REPO);
   for (const n of localSkills) {
     const src = sourceFiles.get(n)!;
-    pages.set(join(dirname(out), SOURCE_SKILLS_DIR, `${n}.md`), sourceSkillPageMd(n, readFileSync(src.file, "utf-8"), src.url, relative(REPO, src.file), localSet, rows));
+    pages.set(
+      join(dirname(out), SOURCE_SKILLS_DIR, `${n}.md`),
+      sourceSkillPageMd(n, readFileSync(src.file, "utf-8"), src.url, relative(REPO, src.file), localSet, rows, skillContractSectionMd(n, contractRoots, REPO, contractHref)),
+    );
   }
   // Whether the ⓘ panel shows skills: the site's declaration, on unless it
   // says `site.taskSkills: false` (`taskSkillsDeclared`).

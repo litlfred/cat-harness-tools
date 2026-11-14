@@ -26,6 +26,17 @@ The TypeScript ports in `pipeline/` are the folio-assistant equivalents.
 | `register_all_dak_projects.py` | Bulk DAK project registration |
 | `generate_weblate_yaml.py` | Weblate component discovery config |
 
+## Translation platforms
+
+The `pull_*_translations.py` scripts above write a platform's strings straight
+into `msgstr`. Under the owner's 2026-11-14 rule, a platform is never an
+adjudicator, so do not use them to import into a layer. Weblate, Crowdin and
+Transifex are connected through `scripts/translation-platforms.ts` and the
+reusable `layer-translation-platform-import.yml` workflow instead, which turn
+their strings into candidates. [`PLATFORMS.md`](PLATFORMS.md) describes each
+platform's account, keys, network hosts, open-source plan and where the
+content goes.
+
 ## TypeScript ports (folio-assistant native)
 
 | Module | Smart-base source | Functions ported |
@@ -58,6 +69,14 @@ engine, so no hosted freemium API or quota is involved:
 |---|---|---|---|
 | `opus-mt` (preferred) | Helsinki-NLP OPUS-MT Marian models | CC-BY 4.0 | locally, `python -I scripts/translation/opus_mt_runner.py` (needs `transformers` and the model in the local cache; `HF_HUB_OFFLINE=1` forbids downloads) |
 | `libretranslate` | LibreTranslate, Argos models | AGPL-3.0 | a self-hosted instance at `--url` / `LIBRETRANSLATE_URL`; libretranslate.com is refused |
+
+Each singular string goes through the one candidates writer,
+`addCandidates` in `scripts/lib/translation-candidates.ts`. The writer records
+the string in `<catalogue>.candidates.json` for the review page and fills the
+empty msgstr with it. Plural entries are filled directly with the target's
+plural count. `bun run cat translation:candidates --engine opus-mt,libretranslate`
+does the same for several engines in one run, and runs the same OPUS-MT
+runner.
 
 Every machine string is flagged `#, fuzzy`; a non-empty msgstr is never
 touched; a string whose placeholders, markup or math do not round-trip is

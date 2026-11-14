@@ -485,9 +485,9 @@ export function checkSlice(def: SliceDef, data: SliceData, opts: { publishedPayl
       writePayloads(data.payloads, payloadDir);
       problems.push(...auditPayloadTree(payloadDir, data.payloads.links));
     } else {
-      const pdir = opts.publishedPayloadDir ?? readPathAt(REPO_ROOT, join(INSTANCE_ROOT, payloadOutDir(INSTANCE_ROOT)));
+      const pdir = opts.publishedPayloadDir ?? join(INSTANCE_ROOT, payloadOutDir(INSTANCE_ROOT));
       for (const [ref, link] of data.payloads.links) {
-        if (!existsSync(join(pdir, link.sha256))) problems.push(`${ref}: points at payload ${link.sha256}, which the published tree does not hold`);
+        if (!existsSync(overlayPath(join(pdir, link.sha256)))) problems.push(`${ref}: points at payload ${link.sha256}, which the published tree does not hold`);
       }
     }
   } finally {
@@ -724,6 +724,8 @@ export const TODOS_SLICE: SliceDef = {
     body: "markdown",
   },
   async load(root) {
+    // Read through the layer overlay: `docs:pages` writes a mounted layer's
+    // todo index at its output root (bean `cat-tools-sm8r`, item 4).
     const p = readPathAt(root, join(INSTANCE_ROOT, TODO_INDEX));
     if (!existsSync(p)) return null;
     // The todo reader is imported lazily: it resolves its graph at import.

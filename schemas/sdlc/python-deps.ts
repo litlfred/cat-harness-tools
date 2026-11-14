@@ -25,6 +25,10 @@
  * OpenCV), for ONE script — `pdf-tables.py` — so it is installed separately.
  * The sizes were measured with a warm cache; a cold CI runner pays more.
  *
+ * The table predates the OPUS-MT runner's entries (`transformers`, `torch`,
+ * `sentencepiece`, 2026-11-14), each of which states its own wheel size; with
+ * them, `extended` is dominated by `torch`, not `camelot-py`.
+ *
  * @module schemas/python-deps
  * @graphNode schema
  */
@@ -147,26 +151,26 @@ export const PYTHON_DEPS: readonly PythonDep[] = [
     why: "`pdf-tables.py` only. 912 KB itself, but it pulls numpy, pandas and OpenCV — 323 MB measured 2026-09-20, more than the whole lean set. Kept out of CI for that reason alone; the script is live (two skills document it, bean `fj94` has 38 tests) and this is a cost statement, not a deprecation.",
   },
   {
+    distribution: "vosk",
+    tier: "extended",
+    why: "`meeting-recording.py transcribe` only: an offline second transcript of a recorded walkthrough, to compare with the meeting tool's own (skill `crdm-recorded-walkthrough`). Imported inside that one subcommand, so the other four run without it. The wheel is 7.2 MB (vosk 0.3.45, measured 2026-10-06), and it needs a speech model the caller supplies on top. Extended because nothing in CI transcribes, so CI should not pay for it.",
+  },
+  {
     distribution: "transformers",
     tier: "extended",
-    why: "`translation/opus_mt_runner.py` only: runs the Helsinki-NLP OPUS-MT Marian models (CC-BY 4.0) locally for `translate-pot.ts --engine opus-mt`, so machine translation of empty catalogue entries needs no hosted API. Extended because CI never translates; the model weights come from the local cache on top.",
+    why: "`translation/opus_mt_runner.py` only: runs the Helsinki-NLP OPUS-MT Marian models (CC-BY 4.0) locally for `translate-pot.ts --engine opus-mt` and `translation-candidates.ts --engine opus-mt`, open machine translation with no freemium API quota (owner, 2026-11-14). Imported inside `main()`, so an empty request needs no model. The wheel is 13.3 MB (transformers 5.23.0, PyPI, 2026-11-14), but it needs `torch` below, and each OPUS-MT model is a further download on first use. Extended because nothing in CI translates; the TypeScript side is tested with a fake engine.",
   },
   {
     distribution: "torch",
     tier: "extended",
     transitive: true,
-    why: "Required by `transformers` to run the Marian models in `translation/opus_mt_runner.py`: without it `MarianMTModel` cannot load. The CPU wheel alone is hundreds of MB, which is why the whole OPUS-MT path is extended.",
+    why: "The tensor backend `transformers` needs to run a Marian model in `translation/opus_mt_runner.py` (`return_tensors=\"pt\"`). Never imported by name; declared because `transformers` does not install it. The heaviest entry here: the manylinux x86_64 wheel alone is 539.2 MB (torch 2.15.0, cp312, PyPI, 2026-11-14), before any CUDA libraries it pulls.",
   },
   {
     distribution: "sentencepiece",
     tier: "extended",
     transitive: true,
-    why: "Required by `MarianTokenizer` in `translation/opus_mt_runner.py`: without it `transformers` refuses to build the OPUS-MT tokenizer.",
-  },
-  {
-    distribution: "vosk",
-    tier: "extended",
-    why: "`meeting-recording.py transcribe` only: an offline second transcript of a recorded walkthrough, to compare with the meeting tool's own (skill `crdm-recorded-walkthrough`). Imported inside that one subcommand, so the other four run without it. The wheel is 7.2 MB (vosk 0.3.45, measured 2026-10-06), and it needs a speech model the caller supplies on top. Extended because nothing in CI transcribes, so CI should not pay for it.",
+    why: "`MarianTokenizer` in `translation/opus_mt_runner.py` loads the OPUS-MT `.spm` vocabularies with it, and `transformers` does not install it. Never imported by name. 1.7 MB (sentencepiece 0.2.3, cp312 manylinux wheel, PyPI, 2026-11-14).",
   },
 ];
 
