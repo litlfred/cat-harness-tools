@@ -48,7 +48,7 @@ import { DOCUMENT_VIEW_JS, entryFigureFiles, readEntryDocument, type EntryKeywor
 import { LANGUAGE_TOGGLE_JS, entryLanguages, listingTitles, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
 import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
 import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
-import { EDIT_LINKS_RUNTIME, repoOf } from "../src/core/edit-links.ts";
+import { repoOf } from "../src/core/edit-links.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { VIEWER_PATH, embed as pdfEmbed } from "./pdf-viewer.ts";
 import { blobUrl, elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, type RepoLink, type ViewSource } from "./lib/library-source.ts";
@@ -909,9 +909,13 @@ function summaryLabel(s){
   }
 }
 ${WITHHELD_VIEW_JS}
-/* The shared edit/feedback recipe (bean v433): the Document panel's [source],
-   [feedback] and [edit] links are built by it (bean zcak). */
-${EDIT_LINKS_RUNTIME}
+/* The shared edit/feedback recipe (bean v433) builds the Document panel's
+   [source], [feedback] and [edit] links (bean zcak). It is NOT inlined here
+   any more: every library page is a themed Jekyll page, whose head already
+   loads assets/js/edit-links.js, so the inline copy was about 79 KB every
+   library page downloaded and parsed twice (owner, 2026-11-14: "do lazy load
+   content and libs"). withEditLinks, in DOCUMENT_VIEW_JS, waits for that copy
+   and loads it itself on a host that has none. */
 ${DOCUMENT_VIEW_JS}
 function summaryBadge(s){
   var l = summaryLabel(s);
@@ -945,10 +949,17 @@ function summaryPanel(s){
     (s.text ? '<p>' + esc(s.text) + '</p>' : '<p>' + esc(why || "") + '</p>') +
     (who ? '<p class="note">' + esc(who) + '</p>' : '') + '</div>';
 }
+/* REVALIDATED, NOT REFETCHED: "no-cache" asks the server every time, as
+   "no-store" did, so a page never shows a stale graph -- but an unchanged
+   file comes back as a 304 rather than its whole body again (on who-iris,
+   66 KB an entry on average and 2.3 MB at most). */
+function fetchBlocks(id){
+  return fetch(blocksHref(id), {cache: "no-cache"})
+    .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
 function loadBlocks(id, entry){
   DOC_BLOCKS = null;
-  fetch(blocksHref(id), {cache: "no-store"})
-    .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  takeEarly("blocks", id, fetchBlocks)
     .then(function(d){ renderBlocks(id, d, null, entry); })
     .catch(function(e){ renderBlocks(id, null, String(e && e.message || e), entry); });
 }
@@ -961,6 +972,33 @@ function setView(v){
   $("desktop").hidden = v !== "desk";
   render();
 }
+
+/* THE ENTRY'S OWN FILES START NOW, beside the index rather than behind it.
+   An entry page exists to show one document, and its id is in the page's own
+   path: waiting for the whole library's index.json before asking for the
+   entry's document and blocks put a full round trip, and the largest file on
+   the page, in front of the thing the reader came for. The responses are
+   held here and handed to loadDocument and loadBlocks when selectEntry
+   (which needs the index, for the entry's row) calls them, so nothing is
+   fetched twice. A path that names no entry of this library starts nothing:
+   honourAddress still says "not found", from the index, as before. */
+var EARLY = {};
+function takeEarly(kind, id, start){
+  var held = EARLY[kind];
+  if (held && held.id === id) { EARLY[kind] = null; return held.p; }
+  return start(id);
+}
+(function startEntry(){
+  if (!SCOPE) return;
+  var at = entryFromPath(location.pathname, LIB_ROOT);
+  if (!at || at.instance !== SCOPE) return;
+  /* A rejection is caught where it is TAKEN; this only stops an unhandled
+     warning when it never is (an id the index turns out not to hold). */
+  EARLY.blocks = { id: at.id, p: fetchBlocks(at.id) };
+  EARLY.blocks.p.catch(function(){});
+  EARLY.document = { id: at.id, p: fetchDocument(at.id) };
+  EARLY.document.p.catch(function(){});
+})();
 
 fetch(DATA_HREF).then(function(r){
   if (!r.ok) throw new Error(String(r.status));
