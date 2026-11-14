@@ -436,7 +436,7 @@ export function librarySubgraphStart(locatedAt: string): string {
 /**
  * One table transcribed from a paged source's pages: an entry of the
  * `tables` of a `tabular.csvw.json` that sits BESIDE `structure.json`
- * (who-iris#224). Read raw, as `library-document.ts` reads it for the site:
+ * (a content layer's issue #224). Read raw, as `library-document.ts` reads it for the site:
  * the `fac:` fields below are the transcriber's, and none is required.
  */
 export interface TranscribedTable {
@@ -533,7 +533,7 @@ export function buildDocumentNodes(
   // structure), placed like figures: in the FIRST section containing the
   // table's first page. Until this, the paged rung never read that file, so
   // a transcribed table had no block and its `fac:narrative` drafts (1464 in
-  // who-iris) reached neither the graph nor the library viewer, though the
+  // one content layer) reached neither the graph nor the library viewer, though the
   // narrative queue offered them. The block carries the narrative as figure
   // blocks carry theirs: a copy, reviewed in the file it was copied from.
   const tableOwned = new Set<number>();
