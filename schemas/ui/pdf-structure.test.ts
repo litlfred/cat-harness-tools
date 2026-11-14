@@ -72,7 +72,7 @@ describe("pdf-structure/v1", () => {
     // pdf-structure.py wrote both before the schema named them, so every fresh
     // ingest failed in l1-blocks.ts (found 2026-11-01 on an L1 ingest).
     const d = minimal();
-    d.diagnostics = { pages_without_text: 0, likely_scanned: false, toc_entries: 0, sections: 1, chars_total: 5, furniture_lines_stripped: 12, outline_reordered: true };
+    d.diagnostics = { pages_without_text: 0, likely_scanned: false, toc_entries: 0, sections: 1, chars_total: 5, furniture_lines_stripped: 12, outline_reordered: true, grade_marks_written: 14 };
     const r = PdfStructureSchema.safeParse(d);
     expect(r.success ? "" : r.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")).toBe("");
     d.diagnostics = { ...(d.diagnostics as Record<string, unknown>), outline_reordered: false };
