@@ -105,3 +105,9 @@ Feature: Re-ingestion extraction coverage
   Scenario: Re-running the record over a promoted entry
     When the record is rebuilt in the entry it describes after its sidecars changed
     Then each kind the artefacts show is taken from them, and the kinds they do not show keep their record
+
+  @test:scripts/tests/library/reingest-extraction.test.ts::the_extraction_record_is_a_node_kind::its_validator_judges_a_record_as_the_writer's_schema_does:_strict,_and_each_step's_rules_apply
+  Scenario: The extraction record is a node kind
+    Given the library kind's family folio-library-extraction/v1 and its validator node
+    When a record is judged by the node kind the validator names
+    Then a record the writer's schema accepts passes, and one with an unknown key or a found step with no count fails

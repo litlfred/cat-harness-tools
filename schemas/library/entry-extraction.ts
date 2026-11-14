@@ -38,6 +38,8 @@
  */
 import { z } from "zod";
 
+import { nodeKind } from "../kg/node-kind.js";
+
 export const ENTRY_EXTRACTION_SCHEMA_ID = "folio-library-extraction/v1" as const;
 
 /** The file each library entry carries, beside `structure.json`. */
@@ -92,3 +94,15 @@ export const EntryExtractionSchema = z
   })
   .strict();
 export type EntryExtraction = z.infer<typeof EntryExtractionSchema>;
+
+/**
+ * `folio-library-extraction/v1` as a node kind, the validator of the library
+ * kind's family of that name (`validators/library-extraction.json`). Strict, as
+ * {@link EntryExtractionSchema} is, so the validator judges a file exactly as
+ * the writer's own schema does.
+ */
+export const EntryExtractionKind = nodeKind(ENTRY_EXTRACTION_SCHEMA_ID, [], EntryExtractionSchema.shape, {
+  strict: true,
+  term: "Library extraction record",
+  summary: "Which extractor read a library entry and, per kind (contents, sections, figures, tables, references, glossary, footnotes, summaries), whether it found some, part, none, or was not run.",
+});

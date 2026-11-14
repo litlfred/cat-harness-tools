@@ -20,7 +20,7 @@ import {
   runEntryArms,
   stagedRecord,
 } from "../../entry-extraction.ts";
-import { ExtractionStepSchema } from "../../../schemas/library/entry-extraction.ts";
+import { ENTRY_EXTRACTION_SCHEMA_ID, EntryExtractionKind, ExtractionStepSchema } from "../../../schemas/library/entry-extraction.ts";
 import { advisoryLine, checkEntry, sidecarDocument } from "../../check-l1-complete.ts";
 import { csvwFromPdfTables, captionLabel, isGrid, isProseCut, runTableArm, toCsv, wordSplitShare } from "../../pdf-tables-csvw.ts";
 import { TabularCsvwSchema } from "../../../schemas/library/tabular-csvw.ts";
@@ -318,5 +318,14 @@ describe("references and glossary run through an optional pipeline slot", () => 
     expect(k.references?.state).toBe("not-extracted");
     expect(k.references?.note).toContain("no sections");
     expect(k.glossary?.count).toBe(7);
+  });
+});
+
+describe("the extraction record is a node kind", () => {
+  test("its validator judges a record as the writer's schema does: strict, and each step's rules apply", () => {
+    const ok = { $schema: ENTRY_EXTRACTION_SCHEMA_ID, doc_id: "x", kinds: { figures: { state: "found", count: 3 } } };
+    expect(EntryExtractionKind.schema.safeParse(ok).success).toBe(true);
+    expect(EntryExtractionKind.schema.safeParse({ ...ok, extra: 1 }).success).toBe(false);
+    expect(EntryExtractionKind.schema.safeParse({ ...ok, kinds: { figures: { state: "found" } } }).success).toBe(false);
   });
 });
