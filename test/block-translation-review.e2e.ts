@@ -78,7 +78,7 @@ const cell = (o: object) => ({ entries: 3, translated: 3, fuzzy: 0, hash: "01234
 const review = (maxUrl = 7500) => ({
   $schema: "folio-translation-review/v1",
   reviewPage: "en/cat-harness/translation-status/review.html",
-  issue: { schema: "translation-adjudication/v1", label: "translation-adjudication", titlePrefix: "[translation review]", fence: "json translation-adjudication", maxUrl },
+  issue: { schema: "translation-adjudication/v1", label: "translation-adjudication", titlePrefix: "[translation review]", fence: "json translation-adjudication", maxUrl, candidatesSchema: "translation-candidates/v1", candidatesSuffix: ".candidates.json" },
   layers: [
     {
       name: "demo",
