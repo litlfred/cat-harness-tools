@@ -98,7 +98,7 @@ export type ExternalIdentity = z.infer<typeof ExternalIdentitySchema>;
  * platform, not the folio, is where a node kind is declared.
  */
 export const KG_NODE_KINDS = [
-  "agent", "asset", "bean", "block", "capability", "decision", "directory", "package",
+  "agent", "asset", "attestation", "bean", "block", "capability", "decision", "directory", "package",
   "process", "requirement", "role", "schema", "skill", "todo", "tool",
   "user-story", "voice",
 ] as const;
