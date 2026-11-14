@@ -81,6 +81,8 @@ import { SUMMARIES_FILE } from "../schemas/content/block-summary.ts";
 import { DocumentErrataSchema, ERRATA_FILE } from "../schemas/content/document-errata.ts";
 import { DocumentFootnotesSchema, FOOTNOTES_FILE } from "../schemas/content/document-footnotes.ts";
 import { KEYWORDS_FILE } from "../schemas/library/library-keywords.ts";
+import { ENTRY_EXTRACTION_FILE } from "../schemas/library/entry-extraction.ts";
+import { extractionAdvisories, type ExtractionAdvisory } from "./entry-extraction.ts";
 import { entryDirs, entryItems, sidecarDefects, summaryLangs, tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResult, type QaResultState } from "./qa-results.ts";
 import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
@@ -114,6 +116,15 @@ export interface EntryReport {
    */
   library?: string;
   requirements: Requirement[];
+  /**
+   * ADVISORY, never gating: per extracted kind (contents, sections, figures,
+   * tables, references, glossary, footnotes, summaries), found N / partial /
+   * none in source / not extracted — from the entry's `extraction.json` and its artefacts
+   * (`scripts/entry-extraction.ts`). A paged entry only. The requirements
+   * above pass an entry whose tables, references or glossary were never
+   * looked for; this says so without failing it (owner, 2026-11-14).
+   */
+  advisories?: ExtractionAdvisory[];
 }
 
 /**
@@ -274,6 +285,9 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // which gen-library-jsonld turns into typed blocks: requirements, indicators
   // and normative statements in a DAK or DTH source (cat-harness-tools#1356).
   "candidates.json",
+  // Which extractors ran over the entry and what each found, per kind
+  // (`scripts/entry-extraction.ts`, the last ingest arm). Advisory only.
+  ENTRY_EXTRACTION_FILE,
 ];
 
 /**
@@ -1635,6 +1649,9 @@ export function audioTranscripts(dir: string): Requirement[] {
 }
 
 export function checkEntry(dir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): EntryReport {
+  const advisories = entryKind((f) => existsSync(join(dir, f))) === "paged"
+    ? extractionAdvisories(dir, { referencesDir: referencesDirFor(dir, registry) })
+    : undefined;
   return {
     slug: dir.split("/").filter(Boolean).pop() ?? dir,
     requirements: [
@@ -1645,7 +1662,46 @@ export function checkEntry(dir: string, registry: GraphTypologyRegistry = defaul
         detail: `no arm builds this yet — bean ${nd.bean}`,
       })),
     ],
+    ...(advisories ? { advisories } : {}),
   };
+}
+
+/**
+ * The `references` directory of the layer that holds an entry, where a
+ * reference-list reader writes `<slug>.<section>.<n>.json` — or `undefined`
+ * when no layer above the entry declares one. Read, never required.
+ */
+const referencesDirCache = new Map<string, string | undefined>();
+export function referencesDirFor(dir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): string | undefined {
+  const key = resolve(dir, "..");
+  if (registry === defaultGraphTypologies && referencesDirCache.has(key)) return referencesDirCache.get(key);
+  const found = findReferencesDir(dir, registry);
+  if (registry === defaultGraphTypologies) referencesDirCache.set(key, found);
+  return found;
+}
+
+function findReferencesDir(dir: string, registry: GraphTypologyRegistry): string | undefined {
+  let at = resolve(dir);
+  for (let i = 0; i < 4; i++) {
+    const up = resolve(at, "..");
+    if (up === at) return undefined;
+    at = up;
+    try {
+      const refs = instanceDirectoryForGraph(at, "references", registry);
+      if (refs !== undefined) return refs;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/** One line for an entry's advisories: `contents 12 · tables none in source · …`. */
+export function advisoryLine(advisories: readonly ExtractionAdvisory[]): string {
+  const word = { found: "", partial: "partial", none: "none in source", "not-extracted": "not extracted" } as const;
+  return advisories
+    .map((a) => `${a.kind} ${a.state === "found" ? String(a.count) : word[a.state]}`)
+    .join(" · ");
 }
 
 /**
@@ -1884,6 +1940,22 @@ function format(reports: EntryReport[]): string {
       out.push(`    ${qa ? "◦" : mark[q.state]} ${q.name.padEnd(16)} ${qa ? "QA finding, not gating: " : ""}${q.detail}`);
     }
     for (const q of unmet) void q;
+    if (r.advisories?.length) out.push(`    ◦ extraction     advisory, not gating: ${advisoryLine(r.advisories)}`);
+  }
+  // Per kind across every entry: how many found something, found none in the
+  // source, could not tell, or were never looked at.
+  const withAdvisories = reports.filter((r) => r.advisories?.length);
+  if (withAdvisories.length) {
+    const kinds = [...new Set(withAdvisories.flatMap((r) => r.advisories!.map((a) => a.kind)))];
+    out.push("");
+    out.push(`  ◦ extraction across ${withAdvisories.length} paged entr${withAdvisories.length === 1 ? "y" : "ies"} (advisory — extraction.json):`);
+    for (const k of kinds) {
+      const n = (st: string) => withAdvisories.filter((r) => r.advisories!.some((a) => a.kind === k && a.state === st)).length;
+      out.push(
+        `    ${k.padEnd(11)} found ${n("found")}, partial ${n("partial")}, ` +
+          `none in source ${n("none")}, not extracted ${n("not-extracted")}`,
+      );
+    }
   }
   const nd = reports[0]?.requirements.filter((q) => q.state === "not-derivable") ?? [];
   if (nd.length) {

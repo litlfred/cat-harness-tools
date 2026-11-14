@@ -86,7 +86,8 @@ import { findContentRepoRoot } from "./repo-root";
 import { serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
-import type { DocumentImage, ImagesSidecar } from "../schemas/content/document-image.ts";
+import type { ImagesSidecar } from "../schemas/content/document-image.ts";
+import { VECTOR_FIGURES_FILE, type VectorFigure, type VectorFiguresSidecar } from "../schemas/content/vector-figure.ts";
 import { buildTabularNodes, tableBlockId, tabularShapeOf } from "./tabular-nodes.ts";
 import { TABULAR_CSVW_FILENAME } from "../schemas/library/tabular-csvw.ts";
 import {
@@ -454,6 +455,47 @@ function tablePages(t: TranscribedTable): number[] {
   return Array.isArray(p) ? p.filter((n): n is number => Number.isInteger(n)).sort((a, b) => a - b) : [];
 }
 
+/** A kept figure, raster or vector, as a figure block reads it. */
+export interface PlacedFigure {
+  id: string;
+  /** Relative to the entry. */
+  file: string;
+  page: number;
+  narrative?: unknown;
+}
+
+/**
+ * Every figure an entry KEEPS, in page order, raster before vector on a page:
+ * `images.json`'s placed images and `vector-figures.json`'s renders whose role
+ * an inspection set to `figure`.
+ *
+ * The vector half is why this exists. The figure blocks were built from
+ * `images.json` alone, so a figure drawn in vector ink — a diagram, a chart,
+ * a flow — reached the sidecar, the narrative queue and the viewer, and never
+ * the graph: 330 such figures in 49 entries of one library had a render and a
+ * description and no block (owner, 2026-11-14: "has no figures ... needs
+ * reingesting"). A render with no file (`unrendered_reason`) and an
+ * assembly-only record (`role: undetermined`) are not kept figures, so neither
+ * becomes a block.
+ */
+export function placedFigures(
+  images: ImagesSidecar | undefined | null,
+  vectorFigures?: { figures?: readonly unknown[] | null } | null,
+): PlacedFigure[] {
+  const out: PlacedFigure[] = [];
+  for (const img of images?.images ?? []) {
+    if (img.role !== "figure" || img.basis === undefined) continue;
+    out.push({ id: img.id, file: img.file, page: img.basis.page, narrative: img.narrative });
+  }
+  for (const raw of vectorFigures?.figures ?? []) {
+    const f = raw as Partial<VectorFigure>;
+    if (f.role !== "figure" || typeof f.file !== "string" || !f.file || typeof f.id !== "string") continue;
+    if (typeof f.page !== "number" || !Number.isInteger(f.page)) continue;
+    out.push({ id: f.id, file: f.file, page: f.page, narrative: f.narrative });
+  }
+  return out;
+}
+
 /** Everything one document contributes, as files to write. */
 export function buildDocumentNodes(
   docId: string,
@@ -469,6 +511,7 @@ export function buildDocumentNodes(
   tables?: readonly TranscribedTable[],
   /** The owning layer's root, whose dependency closure types the blocks ({@link owningLayerRoot}). */
   typingRoot?: string,
+  vectorFigures?: VectorFiguresSidecar | { figures?: readonly unknown[] | null } | null,
 ): Array<{ path: string; content: string }> {
   // Without a resolved title (a test, a caller with no disk), resolve from the
   // structure alone: the Info dictionary or a text heading, never the page-1
@@ -500,12 +543,11 @@ export function buildDocumentNodes(
   // `images: null` means the extractor could not look, which is not the same
   // as "no figures" and must not become an empty map silently; it does become
   // one here, but the sidecar keeps the reason and `pdf-images.py` exits 2.
-  const figuresByPage = new Map<number, DocumentImage[]>();
-  for (const img of images?.images ?? []) {
-    if (img.role !== "figure" || img.basis === undefined) continue;
-    const list = figuresByPage.get(img.basis.page) ?? [];
-    list.push(img);
-    figuresByPage.set(img.basis.page, list);
+  const figuresByPage = new Map<number, PlacedFigure[]>();
+  for (const f of placedFigures(images, vectorFigures)) {
+    const list = figuresByPage.get(f.page) ?? [];
+    list.push(f);
+    figuresByPage.set(f.page, list);
   }
 
   const sectionIris: string[] = [];
@@ -768,11 +810,19 @@ const contributionsByRoot = new Map<string, ContributionRegistry | null>();
  * The block kinds the entry's owning layer (`subgraphStart`, defaulting to the
  * content repository) and its declared dependencies contribute — the DAK
  * layer's `functional-requirement`, `non-functional-requirement`, `indicator`
- * and the rest. Keyed by `subgraphStart` rather than a single global root so a
- * mounted layer's `library/` (which does not depend on a sibling layer) is
- * generated and checked against its own declared dependencies rather than the
- * host index's root. A layer whose contributions cannot be loaded types only
- * the core kinds, which is what it did before.
+ * and the rest — loaded once per root, as `gen-block-jsonld` loads them.
+ *
+ * Rooted at the layer that OWNS the library entry, not at the checkout. From
+ * the checkout root the registry held every mounted layer's kinds, so the same
+ * committed node was typed by whatever happened to be mounted: a library
+ * layer's indicators were a DAK layer's `Indicator` in the folio-assistant
+ * index (where that DAK layer, ABOVE the library's, is mounted) and
+ * `cat-harness:Block` in the library layer's own checkout, and no committed
+ * file passed both checks
+ * (folio-assistant#3124). `loadContributionsSync` walks the root's own
+ * declared dependencies, so a layer is typed only by kinds it can see in any
+ * checkout. A root whose contributions cannot be loaded types only the core
+ * kinds, which is what it did before.
  */
 function contributedKinds(subgraphStart?: string): ContributionRegistry | undefined {
   const root =
@@ -1104,6 +1154,9 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       readJson<unknown>(join(dir, SOURCE_MATERIALIZATION_RECORD)),
       Array.isArray(transcribed?.tables) ? transcribed.tables : undefined,
       owningLayerRoot(locatedAt),
+      // Vector figures an inspection kept (`role: figure`), blocks beside the
+      // raster ones — see `placedFigures`.
+      readJson<{ figures?: unknown[] | null }>(join(dir, VECTOR_FIGURES_FILE)),
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
     if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance, subgraphStart));
