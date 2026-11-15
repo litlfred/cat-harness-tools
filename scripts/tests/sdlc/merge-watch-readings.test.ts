@@ -399,6 +399,11 @@ describe("the labelled queue (--queue)", () => {
     expect(queueLabels(["bug"])).toEqual([]);
   });
 
+  test("a content PR is never queued, whatever else it carries (owner, 2026-11-15)", () => {
+    expect(queueLabels(["ready-to-merge", "content"])).toEqual([]);
+    expect(queueLabels(["needs-repin", "release", "content"])).toEqual([]);
+  });
+
   test("lists only labelled open PRs, oldest first, with the verdict on each head and needs-repin flagged", () => {
     const api = stub(routes);
     const q = queueRepo(api, R);
