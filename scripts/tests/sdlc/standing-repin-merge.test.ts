@@ -33,7 +33,7 @@ function step(): Step {
 }
 
 /** Run the step as `event` would; `existing` is an open repin PR, or none. */
-function runStep(event: string, existing?: number, labelFails = false, gitBody?: string): { code: number; calls: string[]; summary: string } {
+function runStep(event: string, existing?: number, labelFails = false, gitBody?: string, createFails?: string): { code: number; calls: string[]; summary: string } {
   const dir = mkdtempSync(join(tmpdir(), "standing-repin-"));
   const log = join(dir, "calls.log");
   const stub = (name: string, body: string) => {
@@ -49,6 +49,7 @@ function runStep(event: string, existing?: number, labelFails = false, gitBody?:
       `if [ "$1 $2" = "pr list" ]; then echo '${listed}'; fi`,
       `if [ "$1 $2" = "pr view" ]; then echo 42; fi`,
       labelFails ? `if [ "$1 $2" = "pr edit" ] && [[ "$*" == *--add-label* ]]; then exit 1; fi` : "",
+      createFails ? `if [ "$1 $2" = "pr create" ]; then echo '${createFails}' >&2; exit 1; fi` : "",
     ].join("\n"),
   );
   writeFileSync(join(dir, "repin.md"), "moved cat-harness\n");
@@ -105,6 +106,20 @@ describe("standing repin never merges: it labels needs-repin on every trigger", 
       "gh pr edit 7 --add-label needs-repin",
       "gh pr merge 7 --disable-auto",
     ]);
+  });
+
+  test("a repository where Actions may not open PRs gets a warning, not a red run (Q-REPIN-TOK C)", () => {
+    const r = runStep("schedule", undefined, false, undefined, "pull request create failed: GraphQL: GitHub Actions is not permitted to create or approve pull requests (createPullRequest)");
+    expect(r.code).toBe(0);
+    expect(r.calls.some((c) => c.startsWith("gh pr create"))).toBe(true);
+    expect(ghCalls(r.calls)).toEqual([]);
+    expect(r.summary).toContain("No PR opened: GitHub Actions may not create pull requests here");
+  });
+
+  test("any other refused create still fails the run", () => {
+    const r = runStep("schedule", undefined, false, undefined, "pull request create failed: HTTP 502");
+    expect(r.code).not.toBe(0);
+    expect(ghCalls(r.calls)).toEqual([]);
   });
 
   test("a label that cannot be added fails the run, so the merge manager is not left unaware", () => {

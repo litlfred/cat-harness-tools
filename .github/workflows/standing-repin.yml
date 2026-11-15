@@ -232,7 +232,22 @@ jobs:
           if [ -n "$number" ]; then
             gh pr edit "$number" --title "$title" --body-file "$RUNNER_TEMP/repin.md"
           else
-            gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/repin.md"
+            # A repository that passes no repin-token AND keeps "Allow GitHub
+            # Actions to create and approve pull requests" off refuses the
+            # create. Owner, 2026-11-15, card Q-REPIN-TOK "C": that is a
+            # warning, not a red run. The branch is pushed above, so the
+            # re-pin waits there for a hand-opened PR; six repositories
+            # failed this way every six hours, one email each.
+            if ! out=$(gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/repin.md" 2>&1); then
+              echo "$out" >&2
+              if grep -q "not permitted to create or approve pull requests" <<<"$out"; then
+                echo "::warning::$branch is pushed, but this repository lets GitHub Actions open no pull request: pass repin-token (REPIN_TOKEN), or turn on Settings → Actions → General → \"Allow GitHub Actions to create and approve pull requests\", or open the PR from $branch by hand."
+                echo "No PR opened: GitHub Actions may not create pull requests here. The re-pin is on \`$branch\`; open a PR from it by hand, or pass repin-token." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+              exit 1
+            fi
+            echo "$out"
             number=$(gh pr view "$branch" --json number --jq .number)
           fi
           # Never merge, never auto-merge (owner, 2026-11-13, "C. No auto-merge"):
