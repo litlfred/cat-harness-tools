@@ -34,7 +34,7 @@ import { workflowFiles, corpusScopeFor, roleGraphFor } from "./known-skills.js";
 import { fulfilmentKindsForBpmnType } from "../schemas/process/role-graph.js";
 import { isActivity, loadProcessModel, processDiagrams } from "../src/workflow/process-model.js";
 import { CAPABILITIES_DIRNAME, capabilitiesDir } from "../schemas/process/role-graph.ts";
-import { instanceDirectoriesForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { instanceDirectoriesForGraph, layerRootsIn } from "../schemas/kg/cat-harness.js";
 import { skillDefinitionDirs } from "../schemas/kg/skill-definitions-dir.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -89,12 +89,12 @@ export function declaredCapabilityFacts(root: string): Map<string, CapabilityFac
  * {@link declaredCapabilityFacts} reads the platform's registry only, and a
  * capability is declared by the layer its subject belongs to: the Lean pair
  * moved up to the layer that writes papers, and the platform's registry has no
- * `fallbackTo` left. The layers are DISCOVERED (`instanceRootsIn`), never
+ * `fallbackTo` left. The layers are DISCOVERED (`layerRootsIn`), never
  * named, because this layer may not name the layers above it.
  */
 export function checkoutCapabilityFacts(repoRoot: string): Map<string, CapabilityFacts> {
   const out = new Map<string, CapabilityFacts>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     // Its OWN `scenarios` directories: a layer may declare more than one,
     // and a dependency's, which it can see, is read where that one is visited.
     for (const scenarios of instanceDirectoriesForGraph(root, "scenarios")) {

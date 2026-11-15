@@ -18,7 +18,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { readDeclaration } from "../../schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../../schemas/kg/instance-roots.ts";
 
 /** A layer's root and its declared name. */
 export interface InstanceRoot {
@@ -42,7 +42,7 @@ export function repoPathOf(src: string | undefined, repo: string): string | unde
 /** Every layer root with its name, longest first, so a path resolves to the MOST specific layer holding it. */
 export function instanceRoots(repo: string): InstanceRoot[] {
   const out: InstanceRoot[] = [];
-  for (const root of instanceRootsIn(repo)) {
+  for (const root of layerRootsIn(repo)) {
     const decl = readDeclaration(root);
     if (decl) out.push({ root: resolve(root), name: decl.name });
   }

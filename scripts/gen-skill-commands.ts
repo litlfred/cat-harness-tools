@@ -41,7 +41,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-import { checkoutRootFor, findDeclarationFile, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, findDeclarationFile, layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { lockedMountPaths } from "../schemas/kg/index-config.js";
 import { mountChoiceOf, mountScopeFor } from "../schemas/kg/remote-mount.js";
 import { userInvocableSkills, type InvocableSkill } from "./invocable-skills.ts";
@@ -238,7 +238,7 @@ export function runSkillCommands(
       ? [explicitDir]
       : [
           baseRoot,
-          ...instanceRootsIn(baseRoot).filter(
+          ...layerRootsIn(baseRoot).filter(
             (r) => resolve(r) !== resolve(baseRoot) && existsSync(join(r, COMMANDS_DIR)),
           ),
         ];

@@ -91,7 +91,7 @@ import { basename, dirname, join, posix, relative, resolve, sep } from "node:pat
 
 import {
   graphTypologiesOfLayer,
-  instanceRootsIn,
+  layerRootsIn,
   isStateGraph,
   readDeclaration,
   repoRootFor,
@@ -2926,7 +2926,7 @@ let processFiles: Map<string, string> | undefined;
 function processFileOf(processId: string): string | undefined {
   if (processFiles === undefined) {
     processFiles = new Map();
-    for (const inst of instanceRootsIn(REPO_ROOT)) {
+    for (const inst of layerRootsIn(REPO_ROOT)) {
       for (const f of workflowFiles(inst)) {
         if (!f.endsWith(".bpmn")) continue;
         let xml: string;

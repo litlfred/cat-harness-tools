@@ -13,7 +13,7 @@
  * ## It works on COPIES, never on the mounts
  *
  * The gates run concurrently over one tree, and no gate may change it: a
- * `.git` inside a mount makes `instanceRootsIn` (cat-harness
+ * `.git` inside a mount makes `layerRootsIn` (cat-harness
  * `schemas/kg/instance-roots.ts`) drop it as a foreign checkout, and
  * `closureOf` (`seed-ready.ts`) then skips the missing need silently.
  *

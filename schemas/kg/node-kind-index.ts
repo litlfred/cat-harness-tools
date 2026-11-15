@@ -42,7 +42,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { CatHarnessDeclarationKind, declaredAssetPath, findInstanceRoot, readDeclaration, resolveGraphTypology, UNKINDED_BASELINE_ROLE, type GraphTypologyRegistry } from "./cat-harness.js";
 import { BASE_GRAPH_TYPOLOGIES, REGISTRATION_MODULE, type NodeSchemaRef } from "./graph-typology-registry.js";
-import { instanceRootsIn } from "./instance-roots.js";
+import { layerRootsIn } from "./instance-roots.js";
 import { harnessRoot } from "../harness-root.js";
 import { moduleRootOf, parseValidatorRef } from "./kind-validator.js";
 import { isNodeKind, nodeKind, type NodeKind } from "./node-kind.js";
@@ -335,7 +335,7 @@ export function typologyOwner(registry: GraphTypologyRegistry, typology: string)
     return Object.hasOwn(BASE_GRAPH_TYPOLOGIES, name) || Object.hasOwn(REGISTRATION_MODULE, name) ? OWN_INSTANCE() || undefined : undefined;
   }
   const abs = resolve(file);
-  const roots = [...new Set(registry.roots().flatMap((r) => instanceRootsIn(r)))].sort((a, b) => b.length - a.length);
+  const roots = [...new Set(registry.roots().flatMap((r) => layerRootsIn(r)))].sort((a, b) => b.length - a.length);
   const root = roots.find((r) => abs.startsWith(resolve(r) + "/"));
   if (root === undefined) return undefined;
   // The NEAREST declaring layer inside that root, not the root itself: the
@@ -370,7 +370,7 @@ function checkoutNames(checkout: string): Set<string> {
   let names = namesByCheckout.get(key);
   if (!names) {
     names = new Set();
-    for (const r of instanceRootsIn(key)) {
+    for (const r of layerRootsIn(key)) {
       try {
         const name = readDeclaration(r)?.name;
         if (name) names.add(name);

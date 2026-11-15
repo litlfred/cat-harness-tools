@@ -84,7 +84,7 @@ import ts from "typescript";
 import { z } from "zod";
 
 import { defaultGraphTypologies, ownDirectories } from "../schemas/kg/cat-harness.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import {
   HELD_DIR,
   LIBRARY_FILE_SUFFIX,
@@ -606,7 +606,7 @@ export const HOLDER = basename(resolve(import.meta.dir, ".."));
 /** `needs` as each layer in the checkout declares it, by layer name. */
 function needsByInstance(repoRoot: string): Map<string, { root: string; needs: string[] }> {
   const out = new Map<string, { root: string; needs: string[] }>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const name = basename(root);
     const decl = join(root, `${name}.json`);
     let needs: string[] = [];
@@ -825,7 +825,7 @@ export function renderNode(node: SoftwareLibrary): string {
 /** Every layer in the checkout that declares a `software-library` directory of its own. */
 export function libraryLayers(repoRoot: string): LibraryLayer[] {
   const out: LibraryLayer[] = [];
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const name = basename(root);
     let dirs;
     try {

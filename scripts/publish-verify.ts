@@ -56,7 +56,7 @@ import jsonld from "jsonld";
 
 import { CONTENT_CONTEXT_URL } from "../schemas/kg/jsonld.ts";
 import { INSTANCE_CONTEXT_PATH, instanceContextUrl } from "../pipeline/instance-document-context.ts";
-import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { ownNamespaceValues } from "../schemas/kg/graph-typology-registry.js";
 import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "../schemas/kg/prov-jsonld.ts";
 import { duplicateIds } from "./check-duplicate-ids";
@@ -164,7 +164,7 @@ let contextFiles: Map<string, string> | undefined;
 export function instanceContextFiles(repoRoot = resolve(dirname(HARNESS_ROOT))): Map<string, string> {
   if (contextFiles === undefined) {
     contextFiles = new Map();
-    for (const root of instanceRootsIn(repoRoot)) {
+    for (const root of layerRootsIn(repoRoot)) {
       const iriBase = (readDeclaration(root) as { iriBase?: unknown } | undefined)?.iriBase;
       if (typeof iriBase === "string") contextFiles.set(instanceContextUrl(iriBase), join(root, INSTANCE_CONTEXT_PATH));
     }

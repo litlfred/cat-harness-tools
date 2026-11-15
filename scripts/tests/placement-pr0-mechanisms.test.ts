@@ -24,7 +24,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { harnessRel } from "../lib/harness-layout.ts";
 
-import { instanceRootsIn, readDeclaration, resolveDirectories } from "../../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration, resolveDirectories } from "../../schemas/kg/cat-harness.js";
 import {
   checkoutDependentsOf,
   checkoutDirectories,
@@ -422,7 +422,7 @@ describe("this checkout", () => {
       .filter((d) => d.scope === "repository")
       .map((d) => d.path.replace(/\/+$/, ""));
     expect(hosted.length).toBeGreaterThan(0);
-    const instances = new Set(instanceRootsIn(REPO).map((r) => relative(REPO, r)));
+    const instances = new Set(layerRootsIn(REPO).map((r) => relative(REPO, r)));
     expect(hosted.filter((h) => instances.has(h))).toEqual([]);
     const alone = resolveDirectories(declarationChain(PLATFORM)).map((d) => relative(REPO, d.absPath));
     const above = alone.filter(

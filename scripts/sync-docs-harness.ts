@@ -30,7 +30,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join, relative, resolve } from "node:path";
 
 import { detectRepoUrl } from "../pipeline/readme-toc.js";
-import { instanceDeclarationFilename, instanceRootsIn, readDeclaration, resolveInherited, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { instanceDeclarationFilename, layerRootsIn, readDeclaration, resolveInherited, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { imageForRole, imagesForRole } from "../schemas/kg/kg-node.js";
 import { graphTiles, resolveGlassStrip, withTileCounts } from "./graph-tiles.js";
@@ -111,7 +111,7 @@ if (landingChoice.kind === "none") {
 /** The landing harness's own directory: where its declaration and its directories are. */
 const LANDING_DIR =
   landingChoice.kind === "instance"
-    ? instanceRootsIn(REPO_ROOT).find((r) => readDeclaration(r)?.name === landingChoice.name)
+    ? layerRootsIn(REPO_ROOT).find((r) => readDeclaration(r)?.name === landingChoice.name)
     : readDeclaration(REPO_ROOT) !== undefined
       ? REPO_ROOT
       : ROOT;
@@ -584,7 +584,7 @@ const tiles = withTileCounts(
   scanTileCounts(join(ROOT, siteDirFor(ROOT), "assets")),
 );
 const glassStrip = (() => {
-  const decls = instanceRootsIn(REPO_ROOT).flatMap((root) => {
+  const decls = layerRootsIn(REPO_ROOT).flatMap((root) => {
     const d = readDeclaration(root);
     return d ? [d] : [];
   });
@@ -711,7 +711,7 @@ const payload = {
    * from the declarations, so a bump is one edit.
    */
   releases: Object.fromEntries(
-    instanceRootsIn(REPO_ROOT).flatMap((root) => {
+    layerRootsIn(REPO_ROOT).flatMap((root) => {
       const d = readDeclaration(root);
       if (!d) return [];
       const r = releaseIris(d);

@@ -103,7 +103,7 @@ import { nodeKind } from "../kg/node-kind.ts";
 import {
   artefactStub,
   defaultGraphTypologies,
-  instanceRootsIn,
+  layerRootsIn,
   kgQaHomeFor,
   readDeclaration,
   resolveDirectories,
@@ -797,7 +797,7 @@ export const KG_QA_SIDECAR_SUFFIX = ".kg-qa.json";
  */
 export function kgAttestationTrees(repoRoot: string, hostRoot: string): KgAttestationTree[] {
   const out = new Map<string, KgAttestationTree>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const kgTree = resolve(kgQaHomeFor(root, hostRoot).root, "kg-qa");
     if (out.has(kgTree)) continue;
     const home = attestationsHomeFor(root, hostRoot);

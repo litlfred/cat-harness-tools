@@ -26,7 +26,7 @@ import { readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { Glob } from "bun";
 
-import { declarationPathIn, instanceRootsIn } from "../../schemas/kg/cat-harness.js";
+import { declarationPathIn, layerRootsIn } from "../../schemas/kg/cat-harness.js";
 import { themeByRef } from "../../schemas/ui/theme-by-ref.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
@@ -40,7 +40,7 @@ type Found = { where: string; ref: Ref; citing?: string };
 
 function refs(): Found[] {
   const out: Found[] = [];
-  for (const root of instanceRootsIn(REPO)) {
+  for (const root of layerRootsIn(REPO)) {
     const p = declarationPathIn(root);
     if (!p) continue;
     const d = JSON.parse(readFileSync(p, "utf-8")) as {

@@ -61,7 +61,7 @@ import { join, relative, resolve } from "node:path";
 import {
   ContentAdapterDeclarationSchema,
   findDeclarationFile,
-  instanceRootsIn,
+  layerRootsIn,
   repoRootFor,
   type ContentAdapterDeclaration,
 } from "../schemas/kg/cat-harness.js";
@@ -116,7 +116,7 @@ export function discoverBuiltinAdapters(
 ): { adapters: BuiltinAdapterDeclaration[]; problems: string[] } {
   const found: BuiltinAdapterDeclaration[] = [];
   const problems: string[] = [];
-  for (const root of instanceRootsIn(checkoutRoot)) {
+  for (const root of layerRootsIn(checkoutRoot)) {
     const file = findDeclarationFile(root);
     if (file === undefined) continue;
     let raw: { name?: unknown; contentAdapters?: unknown };

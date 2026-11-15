@@ -414,7 +414,7 @@ import {
   materialiseDirectories,
   ownDirectories,
   instanceDirectories,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   siblingScopeFor,
   checkoutRootFor as checkoutRootForInstance,
@@ -1094,7 +1094,7 @@ export function dependenciesFromNeeds(instanceRoot: string): {
   // moved it below the one-level scan.
   const repoRoot = mountScopeFor(abs) ?? siblingScopeFor(abs);
   const byName = new Map<string, string>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     try {
       const n = readDeclaration(root)?.name;
       if (n !== undefined) byName.set(n, root);
@@ -1482,7 +1482,7 @@ function checkoutGraph(root: string): CheckoutGraph {
     // that dependents and implementers across sibling instances resolve.
     discovered = true;
     const seen = new Set<string>();
-    for (const inst of instanceRootsIn(root)) {
+    for (const inst of layerRootsIn(root)) {
       if (resolve(inst) === resolve(root)) continue;
       try {
         const deps = orderedDependencies(inst);
@@ -1873,7 +1873,7 @@ export function repositoryMirrors(start: string): string[] {
   // repository path is, and that is what is reported.
   if (safeDeclaration(root) === undefined) {
     const byPath = new Map<string, string[]>();
-    for (const inst of instanceRootsIn(root)) {
+    for (const inst of layerRootsIn(root)) {
       let decl: ReturnType<typeof readDeclaration>;
       try {
         decl = readDeclaration(inst);
@@ -1899,7 +1899,7 @@ export function repositoryMirrors(start: string): string[] {
   // wrong-way arrow the ruling retired), or two non-root instances claiming
   // the same repository path. The root's own entries are its own and an
   // override, never a claim against these.
-  const instances = instanceRootsIn(root).map((r) => resolve(r));
+  const instances = layerRootsIn(root).map((r) => resolve(r));
   const others = instances.filter((r) => r !== root);
   const byPath = new Map<string, string[]>();
   for (const inst of others) {

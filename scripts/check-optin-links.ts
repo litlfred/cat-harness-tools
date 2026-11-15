@@ -38,7 +38,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn, readDeclaration, rootForScope, isDerivedGraph, isStateGraph } from "../schemas/kg/cat-harness.js";
+import { findDeclarationFile, layerRootsIn, readDeclaration, rootForScope, isDerivedGraph, isStateGraph } from "../schemas/kg/cat-harness.js";
 import { groupOf, optInRootsOf, type OptInRoot } from "../schemas/kg/opt-in-roots.js";
 import { declaresGenerated, declaresTranslationMirror } from "./check-reference-direction.ts";
 
@@ -124,7 +124,7 @@ function markdownUnder(dir: string, skip: (abs: string) => boolean): string[] {
 }
 
 export function checkOptInLinks(checkout: string): { layers: number; files: number; findings: OptInLinkFinding[] } {
-  const layers = instanceRootsIn(checkout);
+  const layers = layerRootsIn(checkout);
   const roots = layers.flatMap(optInRootsOf);
   const written = layers.flatMap(machineWrittenDirs);
   const isWritten = (abs: string): boolean => written.some((d) => abs === d || abs.startsWith(d + sep));

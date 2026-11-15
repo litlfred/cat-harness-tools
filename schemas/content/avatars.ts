@@ -32,7 +32,7 @@ import { fileURLToPath } from "node:url";
 
 import { BLANK_AVATAR } from "../ui/blank-avatar";
 import { defaultGraphTypologies } from "../kg/graph-typology-registry";
-import { findDeclarationFile, instanceRootsIn } from "../kg/instance-roots";
+import { findDeclarationFile, layerRootsIn } from "../kg/instance-roots";
 
 export { BLANK_AVATAR };
 
@@ -729,7 +729,7 @@ let instanceAvatarCache: Map<string, Avatar> | undefined;
 function instanceAvatars(): Map<string, Avatar> {
   if (instanceAvatarCache) return instanceAvatarCache;
   const out = new Map<string, Avatar>();
-  for (const root of instanceRootsIn(PLATFORM_ROOT)) {
+  for (const root of layerRootsIn(PLATFORM_ROOT)) {
     const file = findDeclarationFile(root);
     if (file === undefined) continue;
     try {

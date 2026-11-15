@@ -27,7 +27,7 @@ import { dirname, join, relative, sep } from "node:path";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 
 import { resolveLandingInstance } from "../schemas/kg/harness-config.js";
-import { instanceRootNamed } from "../schemas/kg/instance-roots.js";
+import { layerRootNamed } from "../schemas/kg/instance-roots.js";
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.js";
 import {
   checkoutRootFor,
@@ -68,7 +68,7 @@ function landingRoot(): string {
     throw new Error(`gen-landing-data: the site's landing is undecided (${landing.kind}) — run \`bun run cat check:landing-instance\``);
   }
   if (landing.kind !== "instance") return own;
-  const root = instanceRootNamed(checkout, landing.name) ?? mountedInstanceRoots(checkout).get(landing.name);
+  const root = layerRootNamed(checkout, landing.name) ?? mountedInstanceRoots(checkout).get(landing.name);
   if (root === undefined) throw new Error(`gen-landing-data: the landing instance \`${landing.name}\` has no root under ${checkout}`);
   return root;
 }
@@ -88,7 +88,7 @@ const ROOT = landingRoot();
 function contributorSiteDir(contributor: string | undefined): string {
   if (contributor) {
     const checkout = checkoutRootFor(HARNESS_ROOT);
-    const root = instanceRootNamed(checkout, contributor) ?? mountedInstanceRoots(checkout).get(contributor);
+    const root = layerRootNamed(checkout, contributor) ?? mountedInstanceRoots(checkout).get(contributor);
     if (root !== undefined) return join(root, siteDirFor(root));
   }
   return join(ROOT, siteDirFor(ROOT));

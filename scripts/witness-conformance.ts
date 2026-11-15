@@ -30,7 +30,7 @@
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { Glob } from "bun";
-import { directoriesForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { directoriesForGraph, layerRootsIn } from "../schemas/kg/cat-harness.js";
 import {
   ComputationWitnessConformanceSchema,
   ComputationWitnessSchema,
@@ -101,7 +101,7 @@ function main(): number {
   const root = findContentRepoRoot();
   const dirs = dirArg
     ? [resolve(dirArg)]
-    : [...new Set(instanceRootsIn(root).flatMap((inst) => directoriesForGraph(inst, "computation-witness")))];
+    : [...new Set(layerRootsIn(root).flatMap((inst) => directoriesForGraph(inst, "computation-witness")))];
   if (dirs.length === 0) {
     console.error(
       "witness:conformance: no directory declares the `computation-witness` graph typology here, so there is " +

@@ -29,7 +29,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { findDeclarationFile, readDeclaration } from "../schemas/kg/cat-harness.js";
-import { instanceConfigFilename, LEGACY_HARNESS_CONFIG } from "../schemas/kg/harness-config.js";
+import { layerConfigFilename, LEGACY_HARNESS_CONFIG } from "../schemas/kg/harness-config.js";
 import { rootConfigStems } from "../schemas/kg/instance-roots.js";
 
 const CHECKOUT = resolve(import.meta.dir, "..", "..");
@@ -71,12 +71,12 @@ export function sweep(checkout: string): { findings: Finding[]; expected: Set<st
       findings.push({ kind: "unknown", detail: `${root}: declaration names no instance` });
       continue;
     }
-    expected.add(instanceConfigFilename(name));
+    expected.add(layerConfigFilename(name));
     // A harness a SUBSCRIPTION chose is instantiated by a config of its name
     // with no local declaration (`kg-instantiate.ts`, issue #1719): claimed,
     // not orphaned.
     for (const s of readDeclaration(root)?.subscriptions ?? []) {
-      for (const h of s.harnesses ?? []) expected.add(instanceConfigFilename(h));
+      for (const h of s.harnesses ?? []) expected.add(layerConfigFilename(h));
     }
 
     // The retired name, wherever it sits: beside the declaration or at the
@@ -87,7 +87,7 @@ export function sweep(checkout: string): { findings: Finding[]; expected: Set<st
         findings.push({
           kind: "legacy",
           detail: `${legacy} is the RETIRED global name — nothing reads it`,
-          fix: `git mv ${legacy} ${join(checkout, instanceConfigFilename(name))}`,
+          fix: `git mv ${legacy} ${join(checkout, layerConfigFilename(name))}`,
         });
       }
     }
@@ -96,7 +96,7 @@ export function sweep(checkout: string): { findings: Finding[]; expected: Set<st
   // A `*.config.json` at the instantiation root that no layer claims.
   // `rootConfigStems` — the one scan, which excludes the retired name and the
   // reserved `index.config.json` (not a layer's config, so never an orphan).
-  for (const f of rootConfigStems(checkout).map(instanceConfigFilename)) {
+  for (const f of rootConfigStems(checkout).map(layerConfigFilename)) {
     if (expected.has(f)) continue;
     findings.push({
       kind: "orphan",

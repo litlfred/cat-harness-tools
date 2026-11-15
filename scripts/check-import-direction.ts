@@ -62,7 +62,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { specifiersOf, stripComments } from "@litlfred/bootstrap-tools/scripts/check-closure.js";
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/cat-harness.js";
 import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
 import { allowedFromNeeds, directionOf, type LayerRule } from "../schemas/kg/layer-direction.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -106,7 +106,7 @@ export interface ImportDirectionReport {
 }
 
 export function readInstances(repoRoot: string): Instance[] {
-  return instanceRootsIn(repoRoot).flatMap((root) => {
+  return layerRootsIn(repoRoot).flatMap((root) => {
     const decl = JSON.parse(readFileSync(join(root, findDeclarationFile(root)!), "utf-8")) as {
       name?: string;
       needs?: string[];

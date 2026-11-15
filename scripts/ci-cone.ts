@@ -1343,7 +1343,7 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   const stdio = o.stdio ?? "inherit";
   // When `runner` is omitted, run the resolved command directly via `sh -c`
   // (as `run-script.ts` does) instead of spawning `bun run cat <script>` under
-  // `strace`: `run-script.ts` calls `scriptTable(REPO)` -> `instanceRootsIn(REPO)`
+  // `strace`: `run-script.ts` calls `scriptTable(REPO)` -> `layerRootsIn(REPO)`
   // to look up the script name `main()` already resolved in `o.scripts`, which
   // polluted every traced check's read set with every layer directory and
   // declaration in the checkout (cat-harness-tools#634).

@@ -24,7 +24,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { ArchimateConfigSchema, readArchimate, type ArchimateConfig, type ArchimateModel } from "../schemas/archimate.ts";
-import { checkoutRootFor, findDeclarationFile, instanceRootsIn } from "../../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, findDeclarationFile, layerRootsIn } from "../../schemas/kg/cat-harness.ts";
 
 export const CONFIG_FILE = "cat-archimate.config.json";
 
@@ -209,7 +209,7 @@ export function declaresArchimate(instanceRoot: string): boolean {
 
 /** Every layer in the checkout at `repo` that {@link declaresArchimate}, sorted. */
 export function archimateInstances(repo: string): string[] {
-  return instanceRootsIn(repo).filter(declaresArchimate).sort();
+  return layerRootsIn(repo).filter(declaresArchimate).sort();
 }
 
 /** {@link checkCommitted} for one layer, a thrown config error reported as a problem rather than ending the sweep. */

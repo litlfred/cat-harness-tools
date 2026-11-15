@@ -63,7 +63,7 @@ import { scanLibraryRefs, type RefSource } from "./library-refs.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
-import { checkoutRootFor, findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, findInstanceRoot, layerRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
@@ -1669,7 +1669,7 @@ export function orphanFiles(root: string, wanted: ReadonlySet<string>): string[]
  */
 export function instanceRootRoutes(repoRoot: string): Map<string, string> {
   const out = new Map<string, string>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     let decl;
     try {
       decl = readDeclaration(inst);
@@ -1843,7 +1843,7 @@ if (import.meta.main) {
   {
     const repo = repoRootFor(ROOT);
     const sources: RefSource[] = [];
-    for (const inst of instanceRootsIn(repo)) {
+    for (const inst of layerRootsIn(repo)) {
       const decl = readDeclaration(inst);
       if (!decl) continue;
       const siteDir = join(inst, siteDirFor(inst));

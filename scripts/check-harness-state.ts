@@ -38,7 +38,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { directoriesForGraph, directoryEntriesForGraph, instanceRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { directoriesForGraph, directoryEntriesForGraph, layerRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { absenceAt } from "./branch-store.ts";
 // The producer's OWN hash, not a re-derivation. See `healthProducerCurrent`.
 import { checkerHash } from "../test/health/run.js";
@@ -124,7 +124,7 @@ export interface Family {
  * reported both families could-not-determine over a mounted store holding them.
  */
 function declaringRoots(): string[] {
-  return [...new Set([resolve(REPO), ...instanceRootsIn(REPO).map((r) => resolve(r))])];
+  return [...new Set([resolve(REPO), ...layerRootsIn(REPO).map((r) => resolve(r))])];
 }
 
 function nodesOf(kind: string, ext: string): string[] {
@@ -255,7 +255,7 @@ export function healthProducerCurrent(opts: { against?: string; now?: Date } = {
     examined: 0,
     findings: [],
   };
-  const roots = instanceRootsIn(REPO);
+  const roots = layerRootsIn(REPO);
   const allLocal = nodesOf("health", ".json");
   // Mounted layers' reports are left to their own repositories (Q-FAD-6 A).
   const local = allLocal.filter((p) => isOwnHealthReport(p, REPO, roots));

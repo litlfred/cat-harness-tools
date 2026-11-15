@@ -20,7 +20,7 @@
  */
 import { dirname, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { CONTENT_CONTEXT_URL } from "../schemas/kg/jsonld.js";
 
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
@@ -42,7 +42,7 @@ export interface InstanceContextDecl {
 
 /** Every layer under `checkoutRoot`, with its declared `iriBase`. */
 export function instancesIn(checkoutRoot: string): InstanceContextDecl[] {
-  return instanceRootsIn(checkoutRoot).flatMap((root) => {
+  return layerRootsIn(checkoutRoot).flatMap((root) => {
     const decl = readDeclaration(root);
     if (decl === undefined) return [];
     // `iriBase` is declared (`CatHarnessSchema`) but not named by the

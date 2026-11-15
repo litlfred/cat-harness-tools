@@ -115,7 +115,7 @@ describe("the checker, run as a command", () => {
  * Bean `oqdr`, merged from a sibling's branch as `#1394`. The assertions below
  * are about bootstrap specifically, because that is the layer whose diagrams
  * nothing reached — but the fix is not a second hand-built list: `bpmnSources()`
- * unions `workflowFiles` over `instanceRootsIn`, and it **throws** on a basename
+ * unions `workflowFiles` over `layerRootsIn`, and it **throws** on a basename
  * collision rather than reporting one. This branch's own first attempt named
  * `bootstrap` by hand and was corrected by that bean's wording.
  *

@@ -41,7 +41,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   repoRootFor,
   resolveDirectories,
@@ -116,7 +116,7 @@ export function checkLayoutNorms(
   baselineFile = BASELINE,
   registry: GraphTypologyRegistry = defaultGraphTypologies,
 ): LayoutReport {
-  const roots = instanceRootsIn(repoRoot);
+  const roots = layerRootsIn(repoRoot);
   const r: LayoutReport = {
     undetermined: roots.length === 0,
     instances: 0,

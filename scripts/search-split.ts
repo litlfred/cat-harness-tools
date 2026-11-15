@@ -63,7 +63,7 @@ import { basename, join, resolve } from "node:path";
 // @ts-expect-error -- lunr ships no types; only `lunr()`, `tokenizer` and `Index.load` are used.
 import lunr from "lunr";
 
-import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { targetLocales } from "../pipeline/translation-index.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -401,7 +401,7 @@ export function render(
 /** The declared layer names in this checkout: each declaration's `name`, else its directory's. */
 export function declaredInstanceNames(repo: string): Set<string> {
   const names = new Set<string>();
-  for (const root of instanceRootsIn(repo)) {
+  for (const root of layerRootsIn(repo)) {
     let name: string | undefined;
     try {
       name = readDeclaration(root)?.name;
@@ -421,7 +421,7 @@ export function declaredInstanceNames(repo: string): Set<string> {
  * are the site's target locales.
  */
 export function harnessRootIn(repo: string): string {
-  for (const root of instanceRootsIn(repo)) {
+  for (const root of layerRootsIn(repo)) {
     try {
       if (readDeclaration(root)?.name === "cat-harness") return root;
     } catch {

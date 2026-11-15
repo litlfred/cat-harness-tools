@@ -18,7 +18,7 @@ import {
   materialiseDeclaredDirectories,
 } from "./kg/harness-config.ts";
 import { instanceConfigPathIn, writeInstanceConfig } from "../test/support/instance-fixture.js";
-import { instanceRootNamed } from "./kg/instance-roots.ts";
+import { layerRootNamed } from "./kg/instance-roots.ts";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an
 // in-tree scratch directory is visible to every test that enumerates the
@@ -297,7 +297,7 @@ describe("resolveTranslationDirs", () => {
 // content core passes `library/` (owner, 2026-11-04, card "Library rule" option 1).
 const LIBRARY_SUBGRAPH = existsSync(join(HARNESS_ROOT, "library", "graph.json"));
 const FROM_HARNESS = LIBRARY_SUBGRAPH ? ["uploads"] : ["uploads", "library"];
-const CORE_ROOT = instanceRootNamed(join(HARNESS_ROOT, ".."), "folio-assistant-core");
+const CORE_ROOT = layerRootNamed(join(HARNESS_ROOT, ".."), "folio-assistant-core");
 
 describe("a dependent instance inherits the ingestion directories", () => {
   // Its OWN temporary root, deliberately NOT under `TMP`. `TMP` already holds a

@@ -45,7 +45,7 @@ import { declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } fro
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { hostSchemaBase } from "../lib/host-schema.ts";
-import { artefactStub, findDeclarationFile, findInstanceRoot, instanceDirectoryForGraph, instanceRootsIn, optInDirectoriesForGraph, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { artefactStub, findDeclarationFile, findInstanceRoot, instanceDirectoryForGraph, layerRootsIn, optInDirectoriesForGraph, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
 import { termIri } from "../../schemas/kg/namespaces.js";
 import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import { inAggregate } from "../../test/support/checkout.js";
@@ -442,7 +442,7 @@ describe("kg export", () => {
     // whose nodes have no absolute identity cannot be merged with anyone
     // else's. It holds per-instance, so it is asserted per-instance.
     const repoRoot = repoRootFor(join(HARNESS_ROOT));
-    const instances = instanceRootsIn(repoRoot);
+    const instances = layerRootsIn(repoRoot);
     // An empty list is a broken probe, not a clean run — the `dh4f` shape.
     // Without this, a resolver that stopped finding layers would make every
     // assertion below vacuous and this test would pass by checking nothing.
@@ -1241,7 +1241,7 @@ describe("exporting ANOTHER instance's graph", () => {
     // minted as that layer's export mints it. bootstrap was the only one
     // until the split (bean `4ak5` item 2); since then a skill held by a
     // layer stacked on this one links into that layer's document.
-    const homes = instanceRootsIn(REPO)
+    const homes = layerRootsIn(REPO)
       .map((r) => publishedIdentity(r, ALT_BASE).docIri)
       .filter((d) => d !== own);
     for (const n of e["@graph"] as Array<Record<string, unknown>>) {
@@ -1265,7 +1265,7 @@ describe("exporting ANOTHER instance's graph", () => {
 describe("an instance export carries that instance's Tools", () => {
   const withTools = ["smart-base", "fhir-harness"]
     .map((n) => join(REPO, n))
-    .filter((r) => instanceRootsIn(REPO).some((i) => resolve(i) === resolve(r)));
+    .filter((r) => layerRootsIn(REPO).some((i) => resolve(i) === resolve(r)));
 
   test.skipIf(!inAggregate() || withTools.length === 0)("every Tool discovery finds, and with harness-base port types", async () => {
     for (const root of withTools) {
@@ -1545,7 +1545,7 @@ describe("an actor's roles are links to Role nodes (#1168 B8)", () => {
 const OWNER_EXPORTS = new Map<string, Set<string>>();
 /** The same builds, whole, by layer root — for the schema-link tests below. */
 const OWNER_DOCS = new Map<string, Awaited<ReturnType<typeof buildExport>>>();
-for (const r of instanceRootsIn(REPO)) {
+for (const r of layerRootsIn(REPO)) {
   if (resolve(r) === resolve(join(HARNESS_ROOT))) continue;
   const own = declaresOwnCanonical(readDeclaration(r));
   const e = await buildExport({ instanceRoot: r, ...(own ? {} : { baseUrl: BASE }) });
@@ -1719,7 +1719,7 @@ describe("a lane's role links into the document of the layer that declares it (c
   // process's own document, 461 links on the folio-assistant site pointed at
   // `folio-assistant-core/role/user`, a page no export writes.
   const BASE = "https://example.invalid/fa";
-  const roots = instanceRootsIn(repoRootFor(resolve(import.meta.dir, "../..")));
+  const roots = layerRootsIn(repoRootFor(resolve(import.meta.dir, "../..")));
   const ids = (r: string) => new Set((readRoleGraph(join(r, "scenarios"))?.roles ?? []).map((x) => x.id));
 
   test("a role this layer declares, an unknown role, and no base all stay in this document", () => {

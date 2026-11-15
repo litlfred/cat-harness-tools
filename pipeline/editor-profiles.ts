@@ -53,7 +53,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { ownDeclaredDirectories } from "../schemas/kg/declared-nodes.ts";
 import type { SuggestTokenRule } from "../src/core/edit-links.ts";
 
@@ -99,7 +99,7 @@ export interface SuggestProfile {
 /** Every editor-checker node the checkout declares for `contentType`, in declaration order. */
 export function editorProfiles(repoRoot: string, contentType: string): FoundProfile[] {
   const out: FoundProfile[] = [];
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     for (const dir of ownDeclaredDirectories(root, EDITOR_CHECKERS_TYPOLOGY, repoRoot)) {
       if (!existsSync(dir)) continue;
       for (const f of readdirSync(dir).filter((n) => n.endsWith(".json")).sort()) {

@@ -32,7 +32,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { instanceRootsIn } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn } from "../schemas/kg/cat-harness.ts";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.ts";
 import { scriptTable } from "../schemas/sdlc/script-table.ts";
 import { readDeclaration } from "../schemas/kg/cat-harness.ts";
@@ -173,7 +173,7 @@ function* filesUnder(dir: string): Generator<string> {
 }
 
 export function audit(repo: string = REPO): { scanned: number; marked: Record<Exclude<MarkerKind, "none">, number>; findings: Finding[] } {
-  const roots = instanceRootsIn(repo).map((r) => resolve(r));
+  const roots = layerRootsIn(repo).map((r) => resolve(r));
   const tasks = new Set(scriptTable(repo).keys());
   const registry = generatedSchemas();
   const seen = new Set<string>();

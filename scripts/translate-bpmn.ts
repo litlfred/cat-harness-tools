@@ -46,7 +46,7 @@
  * @covers processes, translation-sources
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { instanceRootsIn, localeDirIn, translationsHomeFor } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, localeDirIn, translationsHomeFor } from "../schemas/kg/cat-harness.js";
 import { notJudgedInSwitchedOff, switchedOffGroups } from "../schemas/kg/opt-in-roots.js";
 import { gateOwnsFile } from "./lib/gate-own.ts";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
@@ -200,7 +200,7 @@ function potPathFor(file: string, loc: string): string {
  * home. Owner, that day: *"move things to semantically appropriate place"*
  * (bean riit) — a diagram's templates sit with the layer that draws it.
  */
-const INSTANCE_ROOTS = [root, ...instanceRootsIn(REPO_ROOT)]
+const INSTANCE_ROOTS = [root, ...layerRootsIn(REPO_ROOT)]
   .map((r) => resolve(r))
   .sort((a, b) => b.length - a.length);
 function ownerRootOf(file: string): string {

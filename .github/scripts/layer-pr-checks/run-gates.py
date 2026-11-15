@@ -645,12 +645,12 @@ TREE_TOOLS = {
     # Hashes every file of every instance before and after its writer and
     # calls any committed file that moved stale.
     "publish-check.ts": "hashes the tree around its writer",
-    # Copies the layer's closure, found by `instanceRootsIn` over the shared
+    # Copies the layer's closure, found by `layerRootsIn` over the shared
     # tree, then tests the copy: a file a neighbour is writing, or an instance
     # a neighbour has hidden, is what it tests.
     "check-standalone.ts": "copies the closure out of the shared tree",
     # `git init`s bootstrap/ and bootstrap-tools/ IN the shared tree for its
-    # whole run. `instanceRootsIn` skips a directory with its own `.git`, so
+    # whole run. `layerRootsIn` skips a directory with its own `.git`, so
     # every neighbour that discovers instances meanwhile sees no bootstrap:
     # check:cat-harness-standalone then copies a closure without it and five
     # `render-exemption.test.ts` tests fail (measured, folio-assistant index).

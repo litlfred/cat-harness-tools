@@ -113,7 +113,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import jsonld from "jsonld";
 import { buildContext, buildExport, graphTypologyId } from "./kg-export.js";
 import { corpusScopeFor, kgDirectories, workflowFiles } from "./known-skills.js";
-import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
 import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
@@ -827,7 +827,7 @@ export function planSubgraphs(
  */
 export function unframedRepoIndexes(repoRoot: string, framed: ReadonlySet<string>): string[] {
   const out = new Set<string>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     if (framed.has(resolve(inst))) continue;
     if (!workflowFiles(inst, "instance").some((f) => f.endsWith(".bpmn"))) continue;
     const base = publicationBase(readKnowledgeGraphDeclaration(inst));

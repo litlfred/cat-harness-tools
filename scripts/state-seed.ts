@@ -99,7 +99,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { resolveDirectories, type ResolvedDirectory } from "../schemas/kg/cat-harness.ts";
 import { FROZEN_SUBTREE_KIND, FSH_GUTS_KIND, FSH_GUTS_SCHEMA_ID } from "../schemas/kg/fsh-guts.ts";
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { instanceStateBranch } from "../schemas/kg/subgraph-source.ts";
 import { BranchStore, gitBlobId, MANIFEST_FILE, MANIFEST_SCHEMA, tipLocations, type TreeEntry } from "./branch-store.ts";
 import { candidatesOf, defaultRepoRoot, observedRows, type SpecialBranch } from "./state-drift.ts";
@@ -383,12 +383,12 @@ type GutsTarget =
  * layer's. A folio linking the platform must not deposit into the
  * platform's trashcan (a branch its own remote does not carry), and the
  * submodule's declarations are not this checkout's layers anyway
- * (`instanceRootsIn` excludes foreign checkouts).
+ * (`layerRootsIn` excludes foreign checkouts).
  */
 export function fshGutsTargetFor(repoRoot: string, path: string): GutsTarget {
   let roots: string[];
   try {
-    roots = instanceRootsIn(repoRoot);
+    roots = layerRootsIn(repoRoot);
   } catch (e) {
     return { state: "unknown", reason: `could not list the instances under ${repoRoot}: ${(e as Error).message}` };
   }
@@ -960,7 +960,7 @@ export function retireInstance(path: string, opts: RetireOptions): RetireResult 
 
   let roots: string[];
   try {
-    roots = instanceRootsIn(repoRoot);
+    roots = layerRootsIn(repoRoot);
   } catch (e) {
     return { state: "unknown", reason: `could not list the instances under ${repoRoot}: ${(e as Error).message}` };
   }

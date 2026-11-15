@@ -1,5 +1,5 @@
 /**
- * `instanceRootNamed` — one rule for both layouts (bean `uxn1`).
+ * `layerRootNamed` — one rule for both layouts (bean `uxn1`).
  *
  * Three callers wrote `join(repoRoot, "cat-harness")`, which is right only in
  * the monorepo. Standalone, a layer IS its repository, so that path does not
@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { instanceRootNamed } from "./kg/instance-roots";
+import { layerRootNamed } from "./kg/instance-roots";
 
 const made: string[] = [];
 afterAll(() => {
@@ -30,31 +30,31 @@ function tmp(): string {
   return d;
 }
 
-describe("instanceRootNamed", () => {
+describe("layerRootNamed", () => {
   test("monorepo: the instance one level down that declares the name", () => {
     const repo = tmp();
     writeDeclaration(repo, "folio-assistant");
     writeDeclaration(join(repo, "cat-harness"), "cat-harness");
     writeDeclaration(join(repo, "folio-assistant-core"), "folio-assistant-core");
-    expect(instanceRootNamed(repo, "cat-harness")).toBe(join(repo, "cat-harness"));
+    expect(layerRootNamed(repo, "cat-harness")).toBe(join(repo, "cat-harness"));
   });
 
   test("standalone: the repository root itself, when it declares the name", () => {
     const repo = tmp();
     writeDeclaration(repo, "cat-harness");
-    expect(instanceRootNamed(repo, "cat-harness")).toBe(repo);
+    expect(layerRootNamed(repo, "cat-harness")).toBe(repo);
   });
 
   test("a directory merely NAMED like the instance is not it — the declaration decides", () => {
     const repo = tmp();
     writeDeclaration(repo, "folio-assistant");
     mkdirSync(join(repo, "cat-harness"));
-    expect(instanceRootNamed(repo, "cat-harness")).toBeUndefined();
+    expect(layerRootNamed(repo, "cat-harness")).toBeUndefined();
   });
 
   test("absent is undefined, never a guessed path", () => {
     const repo = tmp();
     writeDeclaration(repo, "folio-assistant");
-    expect(instanceRootNamed(repo, "cat-harness")).toBeUndefined();
+    expect(layerRootNamed(repo, "cat-harness")).toBeUndefined();
   });
 });

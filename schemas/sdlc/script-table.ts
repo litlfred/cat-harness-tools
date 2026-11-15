@@ -18,7 +18,7 @@
  *
  * By asking the declared layers, never by naming one: this module is the
  * LOWEST layer's, so a literal list here would point up the layer order.
- * {@link instanceRootsIn} answers which directories are layers; each one's
+ * {@link layerRootsIn} answers which directories are layers; each one's
  * `package.json` is read for `checkoutScripts`. A name defined twice is an
  * error, not a precedence rule, except within the root's own manifest, where
  * `scripts` wins over the same name in its `checkoutScripts`.
@@ -29,7 +29,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "../kg/instance-roots.ts";
+import { layerRootsIn } from "../kg/instance-roots.ts";
 
 /** The key a layer's `package.json` carries its checkout-root scripts under. */
 export const CHECKOUT_SCRIPTS_KEY = "checkoutScripts";
@@ -77,7 +77,7 @@ export function scriptTable(repoRoot: string): Map<string, ScriptEntry> {
   if (own !== null && typeof own === "object") {
     add(Object.fromEntries(Object.entries(own as Record<string, unknown>).filter(([n]) => !out.has(n))), "package.json");
   }
-  for (const inst of instanceRootsIn(root)) {
+  for (const inst of layerRootsIn(root)) {
     if (resolve(inst) === root) continue;
     const manifest = join(relative(root, inst), "package.json");
     add(readJson(join(root, manifest))?.[CHECKOUT_SCRIPTS_KEY], manifest);

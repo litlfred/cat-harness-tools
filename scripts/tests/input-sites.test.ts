@@ -19,7 +19,7 @@ import { declaredDirectories } from "../../schemas/kg/declared-nodes.ts";
 import { orderedDependencies } from "../../schemas/kg/harness-config.ts";
 import { defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry.ts";
 import { moduleRootOf, parseValidatorRef } from "../../schemas/kg/kind-validator.ts";
-import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/theme-by-ref.ts";
 
 import { blankSource, auditClosure, isChildSpawn, mainBlockLines, outsideTemplates, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
@@ -353,12 +353,12 @@ describe("annotations hold to the data that chooses their targets", () => {
   const repo = join(dirname(HARNESS_ROOT));
   const globMatch = (glob: string, rel: string) => new Bun.Glob(glob).match(rel);
 
-  // The loaders reach a layer only through `instanceRootsIn` (one level
+  // The loaders reach a layer only through `layerRootsIn` (one level
   // below the checkout) and its declared dependencies, so the claim is held
   // over exactly those roots. None found is a pass — standalone, a computed
   // load with no data loads nothing.
   const roots = () => {
-    const out = new Set(instanceRootsIn(repo).map((r) => resolve(r)));
+    const out = new Set(layerRootsIn(repo).map((r) => resolve(r)));
     for (const r of [...out]) for (const d of orderedDependencies(r)) out.add(resolve(d.rootPath));
     return [...out];
   };
@@ -407,7 +407,7 @@ describe("annotations hold to the data that chooses their targets", () => {
   test("every Tool's in-process registrar is a module tool-api's `declared tool-registrars` names", () => {
     const named = toolRegistrarModules(repo);
     expect(named).toBeDefined();
-    const all = instanceRootsIn(repo);
+    const all = layerRootsIn(repo);
     for (const inst of all) {
       for (const def of discoverTools(repo, undefined, inst).tools) {
         const ip = def.invoke.inProcess;

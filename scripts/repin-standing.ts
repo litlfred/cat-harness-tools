@@ -191,11 +191,11 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
  * "declares unknown graph typology" before it read a pin.
  */
 export async function cascadeOf(root: string, harnessRoot?: string): Promise<{ harness: string; below: Set<string> }> {
-  const { instanceRootsIn } = await import("../schemas/kg/cat-harness.ts");
+  const { layerRootsIn } = await import("../schemas/kg/cat-harness.ts");
   const { needsOfRoots } = await import("./declarations-retag.ts");
   const { belowHarness } = await import("./lib/needs-reach.ts");
   harnessRoot ??= (await import("./lib/roots.ts")).HARNESS_ROOT;
-  const needs = needsOfRoots(instanceRootsIn(root));
+  const needs = needsOfRoots(layerRootsIn(root));
   const harness = [...needsOfRoots([harnessRoot]).keys()][0] ?? "";
   return { harness, below: harness ? belowHarness(harness, needs) : new Set<string>() };
 }

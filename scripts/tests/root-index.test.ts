@@ -18,7 +18,7 @@ import { expandFindings, localLoader } from "../publish-verify.ts";
 import { exportIdentity } from "../kg-export.ts";
 import { instanceDocPath } from "../instance-exports.ts";
 import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "../../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration, repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { SUBGRAPH_INDEX_FILE } from "../../schemas/kg/subgraph-manifest.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { siteNotBuilt } from "../../test/support/checkout.ts";
@@ -31,7 +31,7 @@ afterAll(() => {
   for (const d of made) rmSync(d, { recursive: true, force: true });
 });
 
-const declared = instanceRootsIn(REPO).filter((i) => readDeclaration(i) !== undefined);
+const declared = layerRootsIn(REPO).filter((i) => readDeclaration(i) !== undefined);
 
 // The repository subgraph index each site below carries is written at publish
 // and gitignored (bean w1gy F18); not built, there is no real site to index.

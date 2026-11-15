@@ -42,7 +42,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import {
   findDeclarationFile,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   siteDirFor,
   type KnownSubstrate,
@@ -94,7 +94,7 @@ export function knownSubstrates(repoRoot: string): SubstrateRow[] {
     if (!staged) continue;
     put({ name: e.name, repository: e.repository, status: "planned", source: "staged instance" });
   }
-  const decls = instanceRootsIn(repoRoot)
+  const decls = layerRootsIn(repoRoot)
     .map((r) => readDeclaration(r))
     .filter((d): d is NonNullable<typeof d> => d !== undefined);
   for (const d of decls) {
@@ -108,7 +108,7 @@ export function knownSubstrates(repoRoot: string): SubstrateRow[] {
       });
     }
   }
-  for (const r of instanceRootsIn(repoRoot)) {
+  for (const r of layerRootsIn(repoRoot)) {
     const d = readDeclaration(r);
     if (!d?.subscriptions?.length) continue;
     const declName = findDeclarationFile(r);
@@ -151,7 +151,7 @@ export function subscriptionCards(repoRoot: string): SubscriptionCard[] {
   } catch {
     names = new Set();
   }
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const d = readDeclaration(root);
     if (!d?.subscriptions?.length) continue;
     const declName = findDeclarationFile(root);

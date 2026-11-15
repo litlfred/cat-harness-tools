@@ -83,7 +83,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { mountScopeFor } from "../schemas/kg/remote-mount.js";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { clearCheckoutCache, resolveImplementingPath } from "../schemas/kg/harness-config.js";
 import { toolsOf } from "../tools/discover.js";
 import { QA_CRITERIA_BY_ID, getCriterionSourceFile } from "../pipeline/qa-criteria-registry.js";
@@ -147,7 +147,7 @@ export interface LayerDecl {
 export function readLayers(repoRoot: string): LayerDecl[] {
   const root = resolve(repoRoot);
   const out: LayerDecl[] = [];
-  for (const at of instanceRootsIn(root)) {
+  for (const at of layerRootsIn(root)) {
     if (resolve(at) === root) continue;
     const d = readDeclaration(at);
     if (!d?.name) continue;

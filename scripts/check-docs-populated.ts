@@ -60,7 +60,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { readRoleGraph } from "../schemas/process/role-graph.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -567,7 +567,7 @@ export function assess(repoRoot: string, instance: string, dirs: string[], insta
  */
 export function harnessesWithDocs(repoRoot: string): { instance: string; root: string; dirs: string[] }[] {
   const out: { instance: string; root: string; dirs: string[] }[] = [];
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     const decl = readDeclaration(inst);
     if (!decl) continue;
     const publishTime = builtAtPublishDirs(inst);
@@ -586,7 +586,7 @@ export function harnessesWithDocs(repoRoot: string): { instance: string; root: s
 if (import.meta.main) {
   // FROM THIS MODULE'S OWN LOCATION, never the CWD. The first draft used
   // `repoRootFor(process.cwd())`, which resolved to the repository's PARENT
-  // when run from anywhere but the root: `instanceRootsIn` then found one
+  // when run from anywhere but the root: `layerRootsIn` then found one
   // layer, no `docs` graph, and the check printed a clean pass over a
   // sweep that had looked at nothing. That is the CWD-vs-instance-root defect
   // bean `a6kl` swept every gate for, committed by the gate written after it.
