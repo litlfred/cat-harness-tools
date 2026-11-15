@@ -409,6 +409,7 @@ export const RULES: Rule[] = [
       "schemas/kg/remote-mount.ts",             // declared-path-literal: a partition plan names modules by path. Remote mounts (bean `0mpw`): mountDefaults, remoteMounts, the lock
       "schemas/kg/mount-trust.ts",              // declared-path-literal: a partition plan names modules by path. What a remote mount needs to be trusted (bean `ieum`, H8) — read by remote-mount.ts
       "schemas/kg/index-config.ts",             // declared-path-literal: a partition plan names modules by path. The root index.config.json (bean `ymvt`): instantiated harnesses, their sources, the landing — read by harness-config.ts
+      "schemas/kg/repo-owner.ts",               // declared-path-literal: a partition plan names modules by path. Same-owner repository names and the derived checkout owner (cat-harness-tools#2337) — read by remote-mount.ts and index-config.ts
       "schemas/kg/built-at-publish.ts",         // what a layer serves and never commits — read by the declaration schema itself (B1)
       // What one run ran on (bean `3sbm`), cited by digest from the harness's
       // own run records — tool-run, test-report, health-report and kg-qa — so
