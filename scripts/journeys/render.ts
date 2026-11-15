@@ -55,7 +55,8 @@ import {
   type JourneyCorpus,
   type WorkshopEntry,
 } from "./read.ts";
-import { igProcessPage, PRESENT_ASSETS, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
+import { igProcessPage, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
+import { PRESENT_ASSETS } from "./present-assets.ts";
 import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
 
 export const TOOL_ID = "journeys-viewer";
