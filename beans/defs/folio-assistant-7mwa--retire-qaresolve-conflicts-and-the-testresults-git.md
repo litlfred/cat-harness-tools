@@ -2,11 +2,11 @@
 # folio-assistant-7mwa
 $schema: bean/1.0.0
 title: Retire qa:resolve-conflicts and the test/results .gitattributes entries; move the 14 per-instance test/results dirs and the folio_init template
-status: in-progress
+status: completed
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-11-01T11:40:00Z
+updated_at: 2026-11-15T17:35:00Z
 parent: folio-assistant-3fva
 ---
 
@@ -75,3 +75,16 @@ _2026-11-01T11:40:00Z_ — Took over from the stalled claim (owner: "if stalled 
 - This PR deletes `scripts/qa-resolve-conflicts.ts`, its test and its `package.json` script, and drops the `qa-sidecar` strategy and the `kg-qa-sidecar` pattern. `**/test/results/kg-qa/**` joins `derived-results` (take-base), so a branch still carrying a sidecar takes the base's deletion, and `test/attestations/` stays refused. It also drops the `merge-base.ts` step that called the command, and the `oxka`/`eqxp` `test/results` entries in `test/coordinator/gitattributes.test.ts`, with their two CI-gate names. Box 1 is ticked for this layer: no gate or test here reads a committed `test/results` file.
 - Kept, on purpose: `merge-train.ts` `keepTrackedIgnored` / `checkTestResultsDrops`. They guard against dropping tracked files and do nothing where nothing is tracked. fhir-harness, smart-*, who-* and the root checkout could not be read from this session, so whether any of them still commits `test/results` is unverified. Also kept: the `regen-after-merge.ts` writer overrides, checked one gate at a time. `check:term-mapping`→`term:mapping`, `check:published-instance-exports`→`kg:export:bootstrap` and `kg:export:check`→`kg:export:sidecars` still pair a gate with the writer of its working copy (`ensureWorkingCopy`), so each remains the correct repair.
 - Not done here: the matching `.gitattributes` lines live in the root `litlfred/folio-assistant` checkout, which this session could not reach. The other per-instance `test/results/` dirs (fhir-harness, smart-*, who-*, sci, agent-skills, large-datasets) and the `qou` consumer are still open, so the bean stays in progress. Session https://claude.ai/code/session_01Qmmkt91bg25J6So9QAApgm.
+
+_2026-11-15T17:35:00Z_ — Completed: all remaining per-instance `test/results/` removals, `qa` storage declarations, per-layer `qa-reports` publication (`layer-qa-publish.yml`), and root `.gitattributes` cleanup have merged to `main` and been verified across all repositories:
+- **`cat-harness-tools`:** `#1258` (`c21ce141`, retired `scripts/qa-resolve-conflicts.ts`, its test, its `package.json` script, the `qa-sidecar` merge strategy, and the `oxka`/`eqxp` `test/results` entries in `test/coordinator/gitattributes.test.ts`), `#1274` (`0cec02de`, `kg-validate` nested test reads core's sidecar from `qa-store`), `#1427` (`f14a2120`, `layer-qa-publish.yml`, per-layer reader, and `init-folio` caller setup), and `#1433` (`8fb3b58f`, `layer-qa-publish` `writers` input).
+- **`cat-harness`:** `#857` (`161b243`, removed `test/results/`) and `#911` (`777bc1cb`, retired `qa:resolve-conflicts` in `prepare-merge`, `merge-conflict-patterns`, `qa-reports`, and `merge-base.bpmn`).
+- **Per-instance `test/results/` removal and `qa` storage verification across all declared instances (measured on `main`):**
+  - `folio-assistant-core`: `litlfred/folio-assistant-core#482` (`c030667d`, `0` tracked files under `test/results/`; `qa` directory declares `storage: {"branch": "cat/cat-harness/qa-reports", "keyedBy": "commit"}`).
+  - `smart-base`: `litlfred/smart-base#275` (`2df06629`, `0` tracked files under `test/results/`; `qa` directory declares `storage: {"branch": "cat/cat-harness/qa-reports", "keyedBy": "commit"}`).
+  - `fhir-harness`: `litlfred/fhir-harness#267` (`a5e07932`, `0` tracked files under `test/results/`; `qa` directory declares `storage: {"branch": "cat/cat-harness/qa-reports", "keyedBy": "commit"}`).
+  - `folio-assistant-sci`: `litlfred/folio-assistant-sci#166` (`3f0e4809`, `0` tracked files under `test/results/`; `qa` directory declares `storage: {"branch": "cat/cat-harness/qa-reports", "keyedBy": "commit"}`).
+  - `smart-immunizations` and `who-iris`: `0` tracked files under `test/results/` (`who-iris#162` closed `2026-11-01`); both `qa` directories declare `storage: {"branch": "cat/cat-harness/qa-reports", "keyedBy": "commit"}`.
+  - `smart-trust` and `smart-trust-phw`: `0` tracked files under `test/results/` (neither declares a `qa` directory).
+- **Root `.gitattributes` in `litlfred/folio-assistant`:** `litlfred/folio-assistant#3060` (`0fdc1a8f5ac5`, merged `2026-11-10T17:32:21Z`) removed the last two legacy `cat-harness/test/results/` rules (`audit-coverage.qa-results.json` and `tool-runs/lsi-index/cat-harness/skills.tool-run.json`) from root `.gitattributes`, and `test/coordinator/gitattributes.test.ts` passes (4/4).
+- **Downstream `qou` (`s3p2`):** `folio-assistant-s3p2` is completed and archived (`qa-sweep` anchors at the folio root). Session https://claude.ai/code/session_01E667391F74184786BF4B9D.
