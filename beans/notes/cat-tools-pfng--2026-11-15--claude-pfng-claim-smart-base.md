@@ -185,3 +185,15 @@ PR: https://github.com/litlfred/smart-base/pull/412 (branch `translations/opus-m
 ## claim smart-base-clinical
 
 PFNG Sibling 2 (agent session e667391f-7418-4786-bf4b-9d08d07cc4a3) claiming litlfred/smart-base-clinical.
+
+## done smart-base-clinical
+
+no catalogues — `litlfred/smart-base-clinical` (default branch `main`) has 0 `.pot` / `.po` files, `smart-base-clinical.json` declares `"directories": []` ("It holds no process or encounter catalogue yet (bean 2ipj). Declared with no directories yet"), and `translation:pot` / `translation:candidates` produce 0 templates (`translation:candidates` exits 2: declares no `translation-sources` directory). Per `cat-tools-pfng`, noted as having no catalogues.
+
+## claim smart-ra
+
+PFNG Sibling 2 (agent session e667391f-7418-4786-bf4b-9d08d07cc4a3) claiming litlfred/smart-ra.
+
+## done smart-ra
+
+no catalogues — `litlfred/smart-ra` (default branch `main`, declaration `dpi-h-ra.json`) has no `translations/` directory (0 `.pot` / `.po` files), declares no `translation-sources`, `processes`, or `user-scenario` directory in `dpi-h-ra.json`, and has 0 `"status": "authored"` glossary terms across `glossary/*.glossary.json` (`dpi-h-ra.glossary.json`: 72 `candidate` + 2 `could-not-extract`; `dpi-h-ra-acronyms.glossary.json`: 18 `candidate`; `organizations.glossary.json`: 17 `candidate`; `full-stac.glossary.json`: 7 `candidate` + 3 `could-not-extract`). Running `translation:pot`, `glossary:pot`, and `translation:candidates` produces 0 templates (`translation:candidates` exits 2: declares no `translation-sources` directory). Per `cat-tools-pfng`, noted as having no catalogues.
