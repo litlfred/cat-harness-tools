@@ -237,3 +237,9 @@ Feature: Registering a skill
     When the verifies are chosen
     Then check:glossary and kg:audit:check are left to the gates
     And every other step is verified here, kg:audit:check not among them
+
+  @test:scripts/tests/skill-register.test.ts::the_red_diagnostic_names_both_'red_in_CI,_green_here'_failure_modes_(bean_1xhc)::names_both_the_corpus_distortion_(xd1g)_and_the_merge_tree_(refs/pull/N/merge,_check:merged)
+  Scenario: The red diagnostic names both the corpus distortion and the merge tree
+    When the chain red diagnostic is formatted for --check and for regeneration
+    Then the --check diagnostic says nothing was regenerated and the regeneration diagnostic says still red after regenerating
+    And both diagnostics name scripts/git-corpus.ts, refs/pull/N/merge and bun run cat check:merged
