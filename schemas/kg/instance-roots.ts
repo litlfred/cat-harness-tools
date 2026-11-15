@@ -111,7 +111,7 @@ export const CONFIG_SUFFIX = ".config.json";
  * Measured 2026-11-13 (a content layer's main red): in a full index of 12
  * layers, one `kg-audit --instance` of that layer
  * took 2 min 55 s, and 126 s of it was this function re-reading and
- * re-parsing the same layer declarations: `instanceRootsIn` and
+ * re-parsing the same layer declarations: `layerRootsIn` and
  * `declaredOptInRequires` call it on every layer for every directory resolved.
  * Four `kg-audit` tests have a 30 s budget, so they timed out on core's main
  * once the index grew, though every answer was right.
@@ -210,7 +210,7 @@ export function findDeclarationFile(dir: string): string | undefined {
   //
   // With NOTHING valid, the broken one is returned rather than thrown on, and
   // that is the whole third-state design. DISCOVERY MUST BE TOTAL —
-  // `instanceRootsIn` asks "which directories are instances" and a throw there
+  // `layerRootsIn` asks "which directories are instances" and a throw there
   // takes out every caller, including the ones written to REPORT an unreadable
   // declaration (`workPlanGraphsIn`, `isActiveKg`). Returning it reproduces
   // the old semantics exactly: `harness.json` present made the directory a
@@ -267,9 +267,9 @@ export function findDeclarationFile(dir: string): string | undefined {
  * may not import that module.
  */
 // input-site: inert #0f548420 — the build-output directories layer discovery leaves out; it reads none of them
-export const NOT_INSTANCE_DIRS: readonly string[] = ["build", "_kg", "_site", "dist"];
+export const NOT_LAYER_DIRS: readonly string[] = ["build", "_kg", "_site", "dist"];
 
-export function instanceRootsIn(repoRoot: string): string[] {
+export function layerRootsIn(repoRoot: string): string[] {
   const root = resolve(repoRoot);
   const out: string[] = [];
   if (findDeclarationFile(root) !== undefined) out.push(root);
@@ -293,7 +293,7 @@ export function instanceRootsIn(repoRoot: string): string[] {
   // 86 tests failed standalone on `main` at 24b5c12 (2026-10-05).
   const inCheckout = insideGitCheckout(root);
   const subs = entries
-    .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !NOT_INSTANCE_DIRS.includes(e.name))
+    .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !NOT_LAYER_DIRS.includes(e.name))
     .map((e) => join(root, e.name))
     .filter((p) => !inCheckout || !isForeignCheckout(p, submodules))
     .filter((p) => findDeclarationFile(p) !== undefined)
@@ -313,9 +313,9 @@ export function instanceRootsIn(repoRoot: string): string[] {
  * no skill-definitions directory. Asking the declarations answers both
  * layouts with one rule, and never guesses a path that does not exist.
  */
-export function instanceRootNamed(repoRoot: string, name: string): string | undefined {
+export function layerRootNamed(repoRoot: string, name: string): string | undefined {
   const want = `${name}${DECLARATION_SUFFIX}`;
-  return instanceRootsIn(repoRoot).find((root) => findDeclarationFile(root) === want);
+  return layerRootsIn(repoRoot).find((root) => findDeclarationFile(root) === want);
 }
 
 /**
@@ -343,7 +343,7 @@ function submodulePathsOf(root: string): ReadonlySet<string> {
  * the checkout. In a Claude Code worktree that lands on `.claude/worktrees/`,
  * whose every child is a sibling worktree declaring `folio-assistant` at its
  * root. Measured 2026-10-03 from `agent-aefc4dcac619f2e1f`:
- * `instanceRootsIn(repoRootFor(root))` returned **ten sibling worktrees** as
+ * `layerRootsIn(repoRootFor(root))` returned **ten sibling worktrees** as
  * instances of this one. A caller asking for its siblings that way reads other
  * sessions' uncommitted work as its own corpus.
  *
@@ -387,7 +387,7 @@ export const LEGACY_HARNESS_CONFIG = "harness.config.json";
  *
  * It ends in {@link CONFIG_SUFFIX}, so every scan that read "each root
  * `*.config.json` is a harness" would have read it as a harness called
- * `index`. That is why the name is RESERVED ({@link RESERVED_INSTANCE_NAMES})
+ * `index`. That is why the name is RESERVED ({@link RESERVED_LAYER_NAMES})
  * and why the scan below is the one place the suffix is matched.
  */
 export const INDEX_CONFIG_FILENAME = "index.config.json";
@@ -396,7 +396,7 @@ export const INDEX_CONFIG_FILENAME = "index.config.json";
  * Layer names no harness may take, because a file the platform owns
  * already spells `<name>.config.json` with them. `index` is the root index.
  */
-export const RESERVED_INSTANCE_NAMES: readonly string[] = ["index"];
+export const RESERVED_LAYER_NAMES: readonly string[] = ["index"];
 
 /**
  * Every `<name>.config.json` directly in `root`, as its stem, sorted — the
@@ -423,7 +423,7 @@ export function rootConfigStems(root: string): string[] {
   return entries
     .filter((f) => f.endsWith(CONFIG_SUFFIX) && f !== LEGACY_HARNESS_CONFIG && !isReservedIndexFile(f))
     .map((f) => f.slice(0, -CONFIG_SUFFIX.length))
-    .filter((n) => n.length > 0 && !RESERVED_INSTANCE_NAMES.includes(n))
+    .filter((n) => n.length > 0 && !RESERVED_LAYER_NAMES.includes(n))
     .sort();
 }
 
@@ -478,3 +478,14 @@ export function lockFilesIn(dir: string): { files: string[]; conflict?: string }
   }
   return { files: legacy };
 }
+
+// Old names, kept so callers in other layers keep working while they move to
+// the layer names (cat-harness#1138 P4). Remove once no layer imports them.
+/** @deprecated Use {@link NOT_LAYER_DIRS}. */
+export const NOT_INSTANCE_DIRS = NOT_LAYER_DIRS;
+/** @deprecated Use {@link layerRootsIn}. */
+export const instanceRootsIn = layerRootsIn;
+/** @deprecated Use {@link layerRootNamed}. */
+export const instanceRootNamed = layerRootNamed;
+/** @deprecated Use {@link RESERVED_LAYER_NAMES}. */
+export const RESERVED_INSTANCE_NAMES = RESERVED_LAYER_NAMES;
