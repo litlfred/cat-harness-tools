@@ -23,12 +23,15 @@ import {
   fetchQa,
   githubPublishDecision,
   keyPath,
+  lostRace,
   parseQaKey,
   parseQaRef,
   pickQaBranch,
   planPrune,
   publishQa,
   pruneQa,
+  PUBLISH_ATTEMPTS,
+  PUBLISH_RACE_ATTEMPTS,
   QA_EXIT,
   qaBranchCandidates,
   QaUsageError,
@@ -325,6 +328,38 @@ describe("writing", () => {
     expect(idx.main.sha).toBe(SHA_A);
     expect(idx.pr["9999"].sha).toBe(SHA_B);
   }, T);
+
+  test("MANY LOST RACES: a writer that loses more races than the ordinary budget still lands", () => {
+    const f = fixture();
+    publishQa({ ref: `main/${SHA_C}`, roots: [RESULTS] }, f.container("seed"));
+    const losses = PUBLISH_ATTEMPTS + 2;
+    const a = publishQa(
+      { ref: `main/${SHA_A}`, roots: [RESULTS], force: true },
+      f.container("writer-a", {
+        // A sibling lands between every one of A's fetches and pushes, five
+        // times over: more than the three tries a non-race failure gets.
+        beforePush: (attempt) => {
+          if (attempt > losses) return;
+          const b = publishQa({ ref: `pr/${9000 + attempt}/${SHA_B}`, roots: ["other/test/results"] }, f.container(`sib-${attempt}`));
+          expect(b.state).toBe("published");
+        },
+      }),
+    );
+    expect(a.state).toBe("published");
+    expect(a.attempts).toBe(losses + 1);
+    const tip = git(f.bare, "rev-parse", "refs/heads/cat/cat-harness/qa-reports").trim();
+    const listing = git(f.bare, "ls-tree", "-r", "--name-only", tip);
+    expect(listing).toContain(`main/${SHA_A}/manifest.json`);
+    for (let i = 1; i <= losses; i++) expect(listing).toContain(`pr/${9000 + i}/${SHA_B}/manifest.json`);
+  }, T);
+
+  test("a lost race is told apart from any other rejection", () => {
+    expect(PUBLISH_RACE_ATTEMPTS).toBeGreaterThan(PUBLISH_ATTEMPTS);
+    expect(lostRace(" ! [rejected]        abc -> cat/cat-harness/qa-reports (fetch first)")).toBe(true);
+    expect(lostRace(" ! [rejected]        abc -> cat/cat-harness/qa-reports (non-fast-forward)")).toBe(true);
+    expect(lostRace("remote: Permission to litlfred/x.git denied to github-actions[bot].")).toBe(false);
+    expect(lostRace(" ! [remote rejected] abc -> cat/cat-harness/qa-reports (protected branch hook declined)")).toBe(false);
+  });
 
   test("CONCURRENT PROCESSES: two CLI writers started together both land", async () => {
     const f = fixture();
