@@ -21,7 +21,11 @@ name: Site publish
 
 on:
   push:
-    branches: [main]
+    # `master` is for the repositories whose default branch is still master
+    # (smart-anc, smart-fp): without it their merges published nothing. The
+    # shared workflow publishes the gh-pages root only from the repository's
+    # default branch, so either name is safe here.
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       plan:
