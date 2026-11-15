@@ -6,6 +6,7 @@ import { navbarHtml } from "../scripts/lib/navbar.ts";
 import { NAV_COLLAPSED_PX, NAV_OPEN_PX, NAV_OPEN_WIDE_PX } from "../scripts/lib/navbar-geometry.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { overlayPath } from "../scripts/lib/layer-output.ts";
+import { COPY_ID_SUFFIX } from "../scripts/gen-navbar-include.ts";
 
 /**
  * The theme sidebar wears the viewer rail's layout: ONE scroll region.
@@ -74,7 +75,9 @@ function footer(): string {
   const end = src.indexOf("{%- else -%}", at);
   if (at < 0 || end < 0) throw new Error("navbar-footer.html: canonical branch not found");
   const branch = src.slice(at + open.length, end);
-  const html = branch.replace(/\{\{ '([^']*)' \| relative_url \}\}/g, (_m, p: string) => BASEURL + p);
+  // The FIRST copy of the include, as the theme renders it: its ids carry no
+  // per-copy suffix (gen-navbar-include COPY_ID_SUFFIX).
+  const html = branch.split(COPY_ID_SUFFIX).join("").replace(/\{\{ '([^']*)' \| relative_url \}\}/g, (_m, p: string) => BASEURL + p);
   if (/\{\{|\{%/.test(html)) throw new Error("navbar-footer.html: unresolved Liquid in the canonical branch");
   return '<input type="checkbox" class="fa-nav-open" id="fa-nav-open">' + html;
 }

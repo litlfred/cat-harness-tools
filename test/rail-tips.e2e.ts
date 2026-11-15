@@ -5,6 +5,7 @@ import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { railedViewer } from "./railed-fixture.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { overlayPath } from "../scripts/lib/layer-output.ts";
+import { COPY_ID_SUFFIX } from "../scripts/gen-navbar-include.ts";
 
 /**
  * Bean `ob3m` finding 1 — the owner's ruling, 2026-10-01, option 1 of 4:
@@ -46,7 +47,9 @@ const FOOTER = (() => {
   const src = readFileSync(overlayPath(join(SITE, "_includes/generated/navbar-footer.html")), "utf8");
   const line = src.split("\n").find((l) => l.startsWith('<div class="fa-nav-in">'));
   if (!line) throw new Error("navbar-footer.html carries no regions line — run `bun run cat navbar:include`.");
-  return line.replace(/\{\{\s*'([^']*)'\s*\|\s*relative_url\s*\}\}/g, (_m, p: string) => BASEURL + p);
+  // The FIRST copy of the include, as the theme renders it: its ids carry no
+  // per-copy suffix (gen-navbar-include COPY_ID_SUFFIX).
+  return line.split(COPY_ID_SUFFIX).join("").replace(/\{\{\s*'([^']*)'\s*\|\s*relative_url\s*\}\}/g, (_m, p: string) => BASEURL + p);
 })();
 
 // BUILT, not read (2026-10-07). This read one committed standalone viewer —
