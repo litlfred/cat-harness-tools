@@ -44,6 +44,7 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readLockFile } from "../schemas/kg/repo-owner.ts";
 
 const WORKFLOWS = ".github/workflows";
 
@@ -344,7 +345,7 @@ if (import.meta.main) {
   const findings: Finding[] = [];
   const composites: Finding[] = [];
   // No lock (a layer's own checkout): no remote action is readable, so none clears a checkout.
-  const pinned = existsSync("index.lock.json") ? pinnedMountsOf(JSON.parse(readFileSync("index.lock.json", "utf8"))) : new Map<string, PinnedMount>();
+  const pinned = existsSync("index.lock.json") ? pinnedMountsOf(readLockFile("index.lock.json")) : new Map<string, PinnedMount>();
   for (const f of files) {
     const r = auditWorkflow(f, readFileSync(join(WORKFLOWS, f), "utf8"), readLocalAction, pinned);
     findings.push(...r.findings);

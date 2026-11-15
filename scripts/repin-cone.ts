@@ -48,6 +48,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { repositoryOwner, resolveLockJson } from "../schemas/kg/repo-owner.ts";
 
 // ── The network, behind one seam ────────────────────────────────────────────
 
@@ -337,7 +338,7 @@ export function gitFleetApi(dir: string, host = "https://github.com"): FleetApi 
   return {
     async lockOf(r) {
       const text = git(["-C", clone(r), "show", "HEAD:index.lock.json"], true);
-      return text === undefined ? undefined : (JSON.parse(text) as FleetLock);
+      return text === undefined ? undefined : resolveLockJson(JSON.parse(text) as FleetLock, repositoryOwner(r));
     },
     async head(r) {
       return git(["-C", clone(r), "rev-parse", "HEAD"])!.trim();

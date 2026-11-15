@@ -66,6 +66,7 @@ import { join, resolve } from "node:path";
 import { contentIsOffCheckout, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { standingCovers, standingGrantOf, type StandingCandidate, type StandingConsent } from "../schemas/kg/mount-trust.js";
 import type { RemoteMount } from "../schemas/kg/remote-mount.js";
+import { readLockFile, repositoryOwner, resolveLockJson } from "../schemas/kg/repo-owner.ts";
 
 // ── The network, behind one seam ────────────────────────────────────────────
 
@@ -161,7 +162,7 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
         throw e;
       }
       if (!file.content || file.encoding !== "base64") return undefined;
-      return lockPinsOf(JSON.parse(Buffer.from(file.content, "base64").toString("utf-8")));
+      return lockPinsOf(resolveLockJson(JSON.parse(Buffer.from(file.content, "base64").toString("utf-8")), repositoryOwner(repository)));
     },
     async declarationAt(repository, sha, instance, at) {
       const path = [...(at ?? "").split("/").filter(Boolean), `${instance}.json`].map(encodeURIComponent).join("/");
@@ -559,7 +560,7 @@ if (import.meta.main) {
     const api = githubApi();
     const mounts = readDeclaredMounts(root).mounts;
     const lockFile = join(root, "index.lock.json");
-    const roots = existsSync(lockFile) ? upstreamRootsOf(JSON.parse(readFileSync(lockFile, "utf-8"))) : {};
+    const roots = existsSync(lockFile) ? upstreamRootsOf(readLockFile(lockFile)) : {};
     const extendFrom = valueOf("--extend-from");
     if (extendFrom !== undefined) {
       const done = await extendExplicitDirectories({ moves: movesSince(JSON.parse(readFileSync(extendFrom, "utf-8")), mounts), held: [], unknown: [] }, mounts, api, roots);

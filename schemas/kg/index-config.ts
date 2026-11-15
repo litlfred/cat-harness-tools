@@ -88,6 +88,7 @@ import {
   effectiveMountPathOf,
   type MountCollisionFinding,
 } from "./remote-mount";
+import { checkoutOwner, isSameOwnerName, repositoryName, resolveRepository } from "./repo-owner";
 
 export {
   INDEX_CONFIG_FILENAME,
@@ -524,9 +525,9 @@ export function readDeclaredMounts(instanceRoot: string): DeclaredMounts {
   const declFile = findDeclarationFile(instanceRoot);
   const declMounts = readMountFields(instanceRoot)?.remoteMounts ?? [];
   if (idx.state === "absent") {
-    return declMounts.length > 0 ? { from: "declaration", file: join(instanceRoot, declFile!), mounts: declMounts } : { from: "none", mounts: [] };
+    return declMounts.length > 0 ? { from: "declaration", file: join(instanceRoot, declFile!), mounts: resolveSameOwner(instanceRoot, declMounts) } : { from: "none", mounts: [] };
   }
-  const mounts = idx.config.instances.map(remoteMountOf).filter((m): m is RemoteMount => m !== undefined);
+  const mounts = resolveSameOwner(instanceRoot, idx.config.instances.map(remoteMountOf).filter((m): m is RemoteMount => m !== undefined));
   if (declMounts.length > 0) {
     const both = declMounts.map((m) => m.harness).filter((h) => mounts.some((x) => x.harness === h));
     throw new Error(
@@ -536,6 +537,29 @@ export function readDeclaredMounts(instanceRoot: string): DeclaredMounts {
     );
   }
   return { from: "index", file: idx.file, mounts };
+}
+
+/**
+ * Same-owner mounts (a bare `repository`, or `sameOwner: true`) resolved to
+ * `<owner of instanceRoot>/<name>` and marked `sameOwner: true`, so every
+ * consumer sees `owner/name` and the writer can put the bare name back
+ * (cat-harness-tools#2337). The owner is looked up only when one is needed.
+ */
+export function resolveSameOwner(instanceRoot: string, mounts: readonly RemoteMount[]): RemoteMount[] {
+  let owner: string | undefined | null = null;
+  const ownerOf = () => (owner === null ? (owner = checkoutOwner(instanceRoot)) : owner);
+  return mounts.map((m) => {
+    if (!isSameOwnerName(m.repository) && m.sameOwner !== true) return m;
+    const repository = resolveRepository(repositoryName(m.repository), ownerOf());
+    return { ...m, repository, sameOwner: true as const };
+  });
+}
+
+/** A mount as it is written to disk: a same-owner mount's `repository` is its bare name. */
+export function onDiskMount<M extends { repository: string; sameOwner?: true }>(m: M): Omit<M, "sameOwner"> {
+  if (m.sameOwner !== true) return m;
+  const { sameOwner: _s, ...rest } = m;
+  return { ...rest, repository: repositoryName(m.repository) };
 }
 
 /**
@@ -570,7 +594,7 @@ export function writeDeclaredMounts(instanceRoot: string, mounts: readonly Remot
   for (const entry of config.instances) {
     const m = wanted.get(entry.name);
     if (m !== undefined) {
-      const { harness: _h, ...remote } = m;
+      const { harness: _h, ...remote } = onDiskMount(m);
       out.push({ ...entry, source: { remote } });
       wanted.delete(entry.name);
       continue;
@@ -585,7 +609,7 @@ export function writeDeclaredMounts(instanceRoot: string, mounts: readonly Remot
     out.push(entry);
   }
   for (const m of wanted.values()) {
-    const { harness, ...remote } = m;
+    const { harness, ...remote } = onDiskMount(m);
     out.push({ name: harness, source: { remote } });
   }
   const next = IndexConfigSchema.parse({ ...config, instances: out });

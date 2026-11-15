@@ -178,6 +178,7 @@ import { subjectIri } from "./lib/subject-pages.ts";
 import { describeAttestation } from "./lib/attestation-nodes.ts";
 import { ATTESTATIONS_SUFFIX, QA_ATTESTATIONS_SCHEMA, QaAttestationsKind } from "../schemas/sdlc/qa-attestations.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
+import { readLockFile } from "../schemas/kg/repo-owner.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 export const VIEWER_TOOL = "state-viewer";
@@ -2819,7 +2820,7 @@ export function pinnedBlobBase(repoRoot: string, instance: string): string | und
 /** The repository and commit `index.lock.json` pins a layer at, or `undefined` when the lock does not name it plainly. */
 export function pinnedMount(repoRoot: string, instance: string): { repository: string; ref: string } | undefined {
   try {
-    const lock = JSON.parse(readFileSync(join(repoRoot, "index.lock.json"), "utf-8")) as {
+    const lock = readLockFile(join(repoRoot, "index.lock.json")) as {
       mounts?: Array<{ harness?: string; repository?: string; ref?: string }>;
     };
     const m = (lock.mounts ?? []).find((x) => x.harness === instance);

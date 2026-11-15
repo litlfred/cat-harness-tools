@@ -63,6 +63,7 @@ import { UN_LOCALES } from "../schemas/content/translation.ts";
 import { composedInstances } from "./compose-docs.ts";
 import { unpinSite } from "./lib/pin-links.ts";
 import { PREVIEW_PREFIX_ALT, PREVIEW_PREFIXES } from "./lib/preview-prefix.ts";
+import { readLockFile } from "../schemas/kg/repo-owner.ts";
 
 /** Locales a page can be TRANSLATED into: the UN set without the source. */
 export const TRANSLATED_LOCALES: ReadonlySet<string> = new Set(UN_LOCALES.filter((l) => l !== "en"));
@@ -145,7 +146,7 @@ export function originsOf(root: string, self: { repository: string; ref: string 
   const out: Origin[] = [];
   const lockFile = join(root, "index.lock.json");
   if (existsSync(lockFile)) {
-    const lock = JSON.parse(readFileSync(lockFile, "utf-8")) as {
+    const lock = readLockFile(lockFile) as {
       mounts?: { harness: string; path?: string; repository: string; ref: string }[];
       instances?: { path: string; repository: string; sha: string; upstreamRoot?: string }[];
     };

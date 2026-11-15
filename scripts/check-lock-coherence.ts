@@ -122,6 +122,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
 import { relate as gitRelate, type Relation } from "./git-ancestry.ts";
+import { readLockFile, repositoryOwner, resolveLockJson } from "../schemas/kg/repo-owner.ts";
 
 /** One `mounts[]` entry of a lock. */
 export interface Pin {
@@ -500,7 +501,7 @@ export class LockReader {
     const show = git(dir, "show", `${commit}:index.lock.json`);
     if (show.status !== 0) return { state: "could-not-determine", reason: `git show failed: ${(show.stderr || "").trim()}` };
     try {
-      return { state: "lock", pins: pinsOf(JSON.parse(show.stdout)) };
+      return { state: "lock", pins: pinsOf(resolveLockJson(JSON.parse(show.stdout), repositoryOwner(repository))) };
     } catch (e) {
       return { state: "could-not-determine", reason: `index.lock.json is not a readable lock: ${(e as Error).message}` };
     }
@@ -618,7 +619,7 @@ export function main(argv: readonly string[]): number {
       }
     }
     try {
-      root = pinsOf(JSON.parse(readFileSync(file, "utf-8")));
+      root = pinsOf(readLockFile(file));
     } catch (e) {
       console.error(`lock:coherence:check: ${file}: ${(e as Error).message}`);
       return 2;

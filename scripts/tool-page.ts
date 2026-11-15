@@ -48,6 +48,7 @@ import type { ToolDefinition } from "../schemas/tools/tool.js";
 import type { McpToolEntry } from "./tool-api.ts";
 import { contractFile, contractIdentity, skillContracts, type SkillContract } from "./skill-contracts.ts";
 import { CLASS_DIAGRAM_STYLE, contractDiagramHtml } from "./class-diagram.ts";
+import { readLockFile } from "../schemas/kg/repo-owner.ts";
 
 /** A skill as a Tool page shows it. */
 export interface SkillInfo {
@@ -541,7 +542,7 @@ export function skillIoContracts(skill: string, roots: readonly string[], repo: 
 export function forgeHrefFor(repo: string, fallbackWeb?: string): (file: string) => string | undefined {
   let mounts: { harness: string; repository: string; ref: string }[] = [];
   try {
-    mounts = (JSON.parse(readFileSync(join(repo, "index.lock.json"), "utf-8")) as { mounts?: typeof mounts }).mounts ?? [];
+    mounts = readLockFile<{ mounts?: typeof mounts }>(join(repo, "index.lock.json")).mounts ?? [];
   } catch {
     // No lock: nothing is remote-mounted, so every file is the checkout's own.
   }

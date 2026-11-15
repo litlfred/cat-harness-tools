@@ -1645,3 +1645,30 @@ describe("Tools chosen by id, mounted runnable (bean `mo75` G3; owner, 2026-10-2
     expect(p.outcomes.find((o) => o.instance === "def")!.detail).toContain("`tools` and `hydrated` both asked for");
   });
 });
+
+describe("same-owner mounts (cat-harness-tools#2337, WHO migration plan T3)", () => {
+  test("a bare repository mounts from the checkout's owner, and the lock keeps it bare", () => {
+    // input-site: inert #ff7a5eaa — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
+    const prev = process.env.CAT_REPO_OWNER;
+    process.env.CAT_REPO_OWNER = "o";
+    try {
+      const root = downstream({ repository: "up" });
+      const r = mountRemote({ instanceRoot: root, urlFor });
+      expect(Object.fromEntries(r.plan.outcomes.map((o) => [o.instance, o.state]))).toEqual({ core: "mounted", base: "mounted", boot: "mounted" });
+      const raw = JSON.parse(readFileSync(join(root, "index.lock.json"), "utf-8"));
+      // the mount and the layer reached in the same tree stay same-owner; the gitlink stays absolute
+      expect(raw.mounts[0].repository).toBe("up");
+      expect(raw.instances.find((i: { instance: string }) => i.instance === "base").repository).toBe("up");
+      expect(raw.instances.find((i: { instance: string }) => i.instance === "boot").repository).toBe("o/boot");
+      // readers see owner/name, and the check agrees with the declaration
+      expect(readLock(root).mounts[0]!.repository).toBe("up");
+      expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+      // another owner reads the same files as its own: declared and locked names move together
+      process.env.CAT_REPO_OWNER = "who";
+      expect(readDeclaredMounts(root).mounts[0]).toMatchObject({ repository: "who/up", sameOwner: true });
+    } finally {
+      if (prev === undefined) delete process.env.CAT_REPO_OWNER;
+      else process.env.CAT_REPO_OWNER = prev;
+    }
+  });
+});
