@@ -801,16 +801,20 @@ def cone_scripts(gates, runner):
 # neighbour's write would otherwise be stored as a state the gate never read.
 # The other records are kept with `ci-cone.ts keep`, which stores them exactly
 # as a lone run would. A side whose ci-cone.ts predates this traces one at a
-# time, as before; `GATE_CONE_PARALLEL=0` does too.
+# time, as before, and so does any run without `GATE_CONE_PARALLEL=1`.
 CONE_PARALLEL_MARKS = ("CI_CONE_TOUCHED_OUT", "CI_CONE_RECORD_OUT", '"keep"')
 
 
 def cone_parallel(root, env):
-    """Whether this side's ci-cone.ts can trace gates side by side."""
-    if (env.get("GATE_CONE_PARALLEL") or "").strip() == "0":
+    """Whether to trace gates side by side: only when `GATE_CONE_PARALLEL=1`
+    asks for it and this side's ci-cone.ts can. Off by default: on who-iris
+    main one long gate whose writes were unknown sent all 49 pooled gates of a
+    shard back to run alone, so the step took longer than tracing one at a
+    time (cat-harness-tools#1859)."""
+    if (env.get("GATE_CONE_PARALLEL") or "").strip() != "1":
         return False
     if (env.get("GATE_CONE_CLI") or "").strip():
-        return (env.get("GATE_CONE_PARALLEL") or "").strip() == "1"
+        return True
     try:
         with open(os.path.join(root, CONE_CLI)) as f:
             src = f.read()
