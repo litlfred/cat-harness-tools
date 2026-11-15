@@ -165,7 +165,8 @@ describe("RDF vocabulary reader", () => {
     expect(svg).toContain("«owl»");
     expect(svg).toContain("«rdfs»");
     // Every text node of the SVG, joined: the row reads the same once the markup is gone.
-    expect(svg.replace(/<[^>]+>/g, "")).toContain("ex:name : xsd:string [0..1]");
+    const text = [...svg.matchAll(/>([^<]*)</g)].map((m) => m[1]).join("");
+    expect(text).toContain("ex:name : xsd:string [0..1]");
   });
 });
 
