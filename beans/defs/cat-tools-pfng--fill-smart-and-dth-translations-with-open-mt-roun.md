@@ -10,7 +10,13 @@ updated_at: 2026-11-15T09:00:00Z
 parent: folio-assistant-bzyu
 ---
 
-The owner, 2026-11-15: fill in the translations of every `smart-*` and `dth-*` repository, with **blind round-trip verification** and **glossary review** as part of the work. Hand-off: agy may take any repository below; claim one by adding a note here (`bun run cat beans:note cat-tools-pfng "…"`) naming the repository, so two workers never fill the same one.
+The owner, 2026-11-15: fill in the translations of every `smart-*` and `dth-*` repository, with **blind round-trip verification** and **glossary review** as part of the work. Hand-off: agy may take any repository below. Do not claim the whole bean (`beans:claim` locks it for everyone); claim ONE repository with a note, from a cat-harness-tools checkout on its own branch, and merge that note PR before starting:
+
+```
+bun run cat beans:note cat-tools-pfng --title "claim smart-trust" --body "Taken by <worker/session>. Branch: translations/opus-mt-candidates in litlfred/smart-trust."
+```
+
+Report progress the same way, one note per event: `--title "done smart-trust"` with the PR link and the counts (candidates, filled, refused, glossary findings, round-trip verdicts), or `--title "blocked smart-trust"` with what blocks it. Never edit this bean's text to tick a box; the owner ticks boxes from the notes.
 
 Every repository should already have `.pot` templates (owner, 2026-11-15). If one does not, generate them first (`bun run cat translation:pot`), and record which repository needed it.
 
