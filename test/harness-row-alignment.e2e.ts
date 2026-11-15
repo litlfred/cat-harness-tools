@@ -44,7 +44,7 @@ const FOOTER = (() => {
   const src = readFileSync(overlayPath(join(SITE, "_includes/generated/navbar-footer.html")), "utf8");
   const line = src.split("\n").find((l) => l.startsWith('<div class="fa-nav-in">'));
   if (!line) throw new Error("navbar-footer.html carries no regions line — run `bun run cat navbar:include`.");
-  return line.replace(/\{\{\s*'([^']*)'\s*\|\s*relative_url\s*\}\}/g, (_m, p: string) => BASEURL + p);
+  return line.replaceAll("{%- unless fa_nav_copy == 1 -%}-{{ fa_nav_copy }}{%- endunless -%}", "").replace(/\{\{\s*'([^']*)'\s*\|\s*relative_url\s*\}\}/g, (_m, p: string) => BASEURL + p);
 })();
 
 function landing(): string {

@@ -258,7 +258,7 @@ export interface KindPages {
    * in place of their table of nodes, and no per-node page is written: the
    * kind still has its pages, which the schemas page links (owner,
    * 2026-11-13, every node kind gets pages), without a second copy of every
-   * node. who-iris carried 7,110 generic reference pages and a 2.3 MB index
+   * node. A reference-catalogue layer carried 7,110 generic reference pages and a 2.3 MB index
    * beside its bibliography until this (owner, 2026-11-15, option A).
    */
   nodesShownBy?: NodesShownBy;
@@ -268,7 +268,7 @@ export interface KindPages {
 export interface NodesShownBy {
   /** The visualiser's title, as a link text: "Bibliography". */
   label: string;
-  /** Its page directory, site-relative with no trailing slash: `en/folio-assistant-core/bibliography`. */
+  /** Its page directory, site-relative with no trailing slash: `en/<layer>/bibliography`. */
   route(locale: string): string;
   /** One node's page directory there, site-relative, when it has one. Absent or undefined: the visualiser's page. */
   node?(n: Pick<KindNode, "harness" | "path" | "node">, locale: string): string | undefined;

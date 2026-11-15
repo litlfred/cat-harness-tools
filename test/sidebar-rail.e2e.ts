@@ -74,7 +74,7 @@ function footer(): string {
   const end = src.indexOf("{%- else -%}", at);
   if (at < 0 || end < 0) throw new Error("navbar-footer.html: canonical branch not found");
   const branch = src.slice(at + open.length, end);
-  const html = branch.replace(/\{\{ '([^']*)' \| relative_url \}\}/g, (_m, p: string) => BASEURL + p);
+  const html = branch.replaceAll("{%- unless fa_nav_copy == 1 -%}-{{ fa_nav_copy }}{%- endunless -%}", "").replace(/\{\{ '([^']*)' \| relative_url \}\}/g, (_m, p: string) => BASEURL + p);
   if (/\{\{|\{%/.test(html)) throw new Error("navbar-footer.html: unresolved Liquid in the canonical branch");
   return '<input type="checkbox" class="fa-nav-open" id="fa-nav-open">' + html;
 }

@@ -872,7 +872,7 @@ test.describe("on an Arabic page the rest of the chrome is English, laid out as 
     const src = readFileSync(overlayPath(join(SITE_ABS, "_includes/generated/navbar-footer.html")), "utf8");
     const line = src.split("\n").find((l) => l.startsWith('<div class="fa-nav-in">'));
     if (!line) throw new Error("navbar-footer.html carries no regions line — run `bun run cat navbar:include`.");
-    return line.replace(/\{\{\s*'([^']*)'\s*\|\s*relative_url\s*\}\}/g, (_m, p: string) => "/folio-assistant" + p);
+    return line.replaceAll("{%- unless fa_nav_copy == 1 -%}-{{ fa_nav_copy }}{%- endunless -%}", "").replace(/\{\{\s*'([^']*)'\s*\|\s*relative_url\s*\}\}/g, (_m, p: string) => "/folio-assistant" + p);
   })();
   /** The page badge as a TRANSLATED copy of a generated page still carries it: no `lang`, no `dir`. */
   const LEGACY_BADGE = PAGE_BADGE.replace(' lang="en" dir="ltr"', "");
