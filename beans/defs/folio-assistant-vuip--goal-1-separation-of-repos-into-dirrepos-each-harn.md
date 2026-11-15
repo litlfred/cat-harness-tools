@@ -6,7 +6,7 @@ status: in-progress
 type: milestone
 priority: high
 created_at: 2026-09-20T18:47:55Z
-updated_at: 2026-10-09T17:47:39Z
+updated_at: 2026-11-15T18:56:00Z
 ---
 
 The owner's words, 2026-09-20 (session_017PqeiS4JYySSWGAYLedmus), kept verbatim
@@ -283,3 +283,9 @@ The precondition the 2026-10-04 proof differed on is now gone: the layer reposit
 1. **Re-run the proof against the live repositories** (agent work; a new empty repo bootstraps from litlfred/cat-harness + cat-harness-tools, and from folio-assistant-core) and tick box 1 on that run. Recommended: it is what the box says.
 2. **Accept the 2026-10-04 proof plus today's cutover as meeting the box** and close the milestone.
 If nothing is said, the box stays open and option 1 is the next agent task. Children: `7x5n`, `iirv`, `vke6`, `whlc` remain open (`7x5n` and `iirv` carry 2026-10-09 notes). Session https://claude.ai/code/session_017QXvm7c7RDYFguWzSxhrMb.
+
+---
+
+_2026-11-15T18:56:00Z_ — Child status audit (session https://claude.ai/code/session_01E667391F74184786BF4B9D):
+- All four children still open on 2026-10-09 (`7x5n`, `iirv`, `vke6`, `whlc`), together with `zmdo`, `wggr`, `b5f0`, `uhkv`, `zzmr`, and `f6gq`, are now **`completed`** on `main` across `cat-harness` and `cat-harness-tools`.
+- The only open child under `folio-assistant-vuip` is `folio-assistant-pga6` (`Separation Phase III: L4/L5 Content, Tool and Test repos on the harness, plus current and future architecture write-up`, `status: todo` in `cat-harness`), which is deferred until after the MVP freeze per owner card Q-SEP-1 A (`2026-11-01`). Box 1 of this milestone remains unticked for the owner's call.

@@ -6,7 +6,7 @@ status: in-progress
 type: epic
 priority: normal
 created_at: 2026-09-19T11:43:44Z
-updated_at: 2026-10-04T15:12:14Z
+updated_at: 2026-11-15T18:56:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -143,11 +143,17 @@ rather than either instance.
 
 ### Adds to "Done when"
 
-- [ ] a contributor can run what CI runs. MEASURED AFTER: one command produces
+- [x] a contributor can run what CI runs. MEASURED AFTER: one command produces
       the merge tree (`git merge origin/main` into a throwaway worktree, or
       fetching `refs/pull/N/merge`) and runs the gate set against it, and its
-      verdict matches CI's on a case where the head's verdict does not
-- [ ] the failure MODE is documented where an agent meets it: `skill:register`'s
+      verdict matches CI's on a case where the head's verdict does not (`bun run cat check:merged` in `scripts/check-merged.ts`, hardened and verified in `folio-assistant-qook` `#1444` / `#2395` `b26c63a773e7` and `folio-assistant-g5o5` `a760b2fa`)
+- [x] the failure MODE is documented where an agent meets it: `skill:register`'s
       own red message says "if it is red in CI but green here: ask git what the
       corpus is" — correct advice for `xd1g`, and it sent me down that path for
-      a case where the corpus was identical and the TREE was not
+      a case where the corpus was identical and the TREE was not (added the merge-vs-head sentence pointing to `bun run cat check:merged` in `scripts/skill-register.ts`)
+
+---
+
+_2026-11-15T18:56:00Z_ — Audit update (session https://claude.ai/code/session_01E667391F74184786BF4B9D):
+- Both `Adds to "Done when"` items above are met on `main`: `bun run cat check:merged` (`scripts/check-merged.ts`, verified in `folio-assistant-qook` `#1444` / `#2395` `b26c63a773e7`) runs the gate set against the merge tree in a throwaway worktree, and `scripts/skill-register.ts`'s red message now documents the merge-vs-head case alongside the corpus check (`"And if the corpus matches, you ran against your HEAD; CI ran against your head merged into main (bun run cat check:merged)."`).
+- Every child bean of `folio-assistant-1xhc` in `cat-harness-tools` is now `completed` (including `folio-assistant-g196`, `folio-assistant-sm8r` `#2323` `1860dd6b`, and `folio-assistant-qook` `#2395` `b26c63a7`). In `cat-harness`, only `folio-assistant-fwtz` (`docs-site must rebuild when the bean branch moves`) remains `in-progress` with its three boxes held open by design under the owner's 2026-10-20 ruling (`"leave as is"` on the bean-branch trigger).

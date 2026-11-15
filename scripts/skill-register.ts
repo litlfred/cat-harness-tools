@@ -1057,7 +1057,8 @@ async function main(): Promise<number> {
         "the disk. A gitignored `node_modules/` in a subpackage inflated\n" +
         "`cat-harness/schemas` from 227 nodes to 1441 in one container while a\n" +
         "fresh checkout saw 227 — see `kg-detangle.ts`'s `walk` and\n" +
-        "`scripts/git-corpus.ts`.\n",
+        "`scripts/git-corpus.ts`. And if the corpus matches, you ran against\n" +
+        "your HEAD; CI ran against your head merged into `main` (`bun run cat check:merged`).\n",
     );
   }
 
