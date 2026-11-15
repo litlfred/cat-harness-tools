@@ -331,6 +331,34 @@ export function defaultMountDirectoryIds(
 }
 
 /**
+ * A downstream's named directory list, plus every top-level opt-in sub-graph
+ * of `name` it switches on that the list leaves out.
+ *
+ * Switching a sub-graph on means it comes down: `enableSubgraphs` and what an
+ * enabled group `requires` (implied; owner, 2026-11-13) are the downstream's
+ * choice too. A named list written before a layer grew its groups (or before
+ * a group gained a `requires`) silently dropped them, so the switch resolved
+ * nowhere: a root enabling a layer's `collab` group, which requires that
+ * layer's level groups, mounted `collab/` without the levels, and a group
+ * declared from within one of those levels was one nobody could read
+ * (2026-11-15). Only top-level entries are added: one declared from within
+ * comes down inside its parent's directory.
+ */
+export function withEnabledOptIns(
+  name: string,
+  decl: Pick<UpstreamDeclaration, "directories">,
+  named: readonly string[],
+  enabled: EnabledSubgraphs,
+): string[] {
+  const out = [...named];
+  for (const d of decl.directories) {
+    if ((d as { optIn?: unknown }).optIn !== true || out.includes(d.id)) continue;
+    if (enabled !== "all" && isSubgraphEnabled(enabled, qualifiedSubgraphId(name, d.id))) out.push(d.id);
+  }
+  return out;
+}
+
+/**
  * What a WHOLE-layer mount leaves out: every opt-in sub-graph of `name` the
  * downstream has not switched on, top-level or declared from within, as a
  * layer-relative path (no trailing slash), outermost only.
@@ -967,7 +995,7 @@ function resolveClosureWith(
       const choosesTools = Object.values(m.overrides ?? {}).some((o) => o.tools?.length);
       const ids = whole
         ? []
-        : override?.directories ??
+        : (override?.directories && withEnabledOptIns(q.name, decl, override.directories, dsEnabled)) ??
         (choosesTools ? [] : undefined) ??
         defaultMountDirectoryIds(q.name, decl, dsEnabled);
       const lookup = directoriesById(tree, found, ids, kinds);
