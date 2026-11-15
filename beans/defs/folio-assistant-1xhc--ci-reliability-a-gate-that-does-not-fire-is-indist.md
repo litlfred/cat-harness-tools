@@ -6,7 +6,7 @@ status: in-progress
 type: epic
 priority: normal
 created_at: 2026-09-19T11:43:44Z
-updated_at: 2026-10-04T15:12:14Z
+updated_at: 2026-11-15T18:55:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -143,11 +143,17 @@ rather than either instance.
 
 ### Adds to "Done when"
 
-- [ ] a contributor can run what CI runs. MEASURED AFTER: one command produces
+- [x] a contributor can run what CI runs. MEASURED AFTER: one command produces
       the merge tree (`git merge origin/main` into a throwaway worktree, or
       fetching `refs/pull/N/merge`) and runs the gate set against it, and its
-      verdict matches CI's on a case where the head's verdict does not
-- [ ] the failure MODE is documented where an agent meets it: `skill:register`'s
+      verdict matches CI's on a case where the head's verdict does not (`bun run cat check:merged`, `scripts/check-merged.ts`, bean `nytj`)
+- [x] the failure MODE is documented where an agent meets it: `skill:register`'s
       own red message says "if it is red in CI but green here: ask git what the
       corpus is" — correct advice for `xd1g`, and it sent me down that path for
-      a case where the corpus was identical and the TREE was not
+      a case where the corpus was identical and the TREE was not (`formatChainRedDiagnostic` in `scripts/skill-register.ts` now documents both the `xd1g` corpus distortion and the `1xhc`/`nytj` merge-tree `refs/pull/N/merge` vs branch head cause via `bun run cat check:merged`, pinned by `scripts/tests/skill-register.test.ts`)
+
+_2026-11-15T18:55:00Z_ — Progress rollup (`lane-43c1`, subagent `43c12887-2733-443d-b8ef-0e369f856d33`):
+- Checked off both `Adds to "Done when"` items above:
+  1. `bun run cat check:merged` (`scripts/check-merged.ts`, bean `nytj`) produces the merge tree in a throwaway worktree and runs the gate set against it.
+  2. Exported `formatChainRedDiagnostic(checking, red)` in `scripts/skill-register.ts` so `skill:register`'s red diagnostic names both causes of "red in CI, green here" (`1. THE CORPUS (xd1g)` via `scripts/git-corpus.ts` and `2. THE MERGE TREE (1xhc / nytj)` via `refs/pull/N/merge` and `bun run cat check:merged`), pinned by unit test in `scripts/tests/skill-register.test.ts` and scenario in `scripts/tests/features/skill-register.feature`.
+- Across all direct child beans of `folio-assistant-1xhc` in `cat-harness-tools/beans/defs/`, every active child is now `completed` (including `cat-tools-sm8r` via [`litlfred/cat-harness-tools#2323`](https://github.com/litlfred/cat-harness-tools/pull/2323) `1860dd6b` and `folio-assistant-g196` completed with live `origin/gh-pages` @ `2b16b35` re-measurement in this PR; 2 are `scrapped`: `m5gx`, `rmcf`), leaving only `folio-assistant-fwtz` in `cat-harness` open by design under the owner's 2026-10-20 `"leave as is"` ruling on the bean-branch `docs-site.yml` trigger.

@@ -2,11 +2,11 @@
 # folio-assistant-g196
 $schema: bean/1.0.0
 title: Every preview stores a full copy of the site because per-preview facts are baked into every page
-status: in-progress
+status: completed
 type: feature
 priority: normal
 created_at: 2026-09-19T12:53:43Z
-updated_at: 2026-10-31T22:42:32Z
+updated_at: 2026-11-15T18:56:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -128,13 +128,11 @@ different facts about one node. Left alone.
       preview** — continual-progress is explicit that a rendered artefact
       cannot be assessed from a description of it, and a byte-equality test is
       a description.
-- [ ] `docs-ui.js` derives the baseurl at runtime. **Not done — deliberately.**
-- [ ] Presentational hrefs emitted document-relative. **Not done — deliberately.**
-- [ ] Re-measure STAGING and compare against the ~77 MB projection.
-      **Cannot be done from a checkout**: it needs previews deployed from the
-      new code. The projection is NOT claimed until then.
-- [ ] `STAGING_WARN_BYTES` revisited with its floor restated, once the real
-      number is known. Blocked on the row above.
+- [x] `docs-ui.js` derives the baseurl at runtime (`SCRIPT_BASE` derived from its own `<script>` URL in `cat-harness/site-chrome/docs-ui.js`, `navKey` resolving relative hrefs via `new URL(href, location)`, and `fa-translation-index` moved to `assets/harness/site.json`, landed in `cat-harness#439` and `cat-harness-tools#676`).
+- [x] Presentational hrefs emitted document-relative (`cat-harness/site-chrome/_plugins/fa-root-relative.rb` in `cat-harness#439` / `#478`, content-hash `?v=` in `cat-harness#432`, `liquidSiteBase` in `fhir-harness#137`, scope-hashed rail/row assets in `cat-harness-tools#904` `bfaaa9f`, and `staging-share.ts` serving pages identical to `main` from `main` in `cat-harness-tools#1115` + `isReleaseBuild` in `staging-stamp.ts`).
+- [x] Re-measure STAGING and compare against the ~77 MB projection (measured 2026-11-15 on `litlfred/folio-assistant` `origin/gh-pages` @ `2b16b35dd0050bc7c225a236abe525e4a51cd679` — see §"2026-11-15: Re-measured on deployed previews (`origin/gh-pages` @ `2b16b35`)" below).
+- [x] `STAGING_WARN_BYTES` revisited with its floor restated, once the real
+      number is known (`STAGING_WARN_BYTES = MAX_PREVIEW_BYTES` = 3 GB in `cat-harness-tools/test/health/checks.ts:551`, enforced by `staging-rotate.ts` per owner ruling 2026-10-04 `"Cap by size, not count"`, `"3gb"`, with the two-budget floor documented in `stagingPreviewSize`'s `basis` in beans `1dre` and `xxku`).
 
 ## Risks
 
@@ -704,3 +702,12 @@ _2026-10-31T22:42:32Z_ — Claimed by sibling S1 of the bean drain (thread "Slim
 - **Row 2 of "Shrinking the cone" is already met another way.** `staging-share.ts` (cat-harness-tools#1115) compares preview pages to main's with the banner, the two metas, the SEO strip and the TypeDoc title set aside, and serves the equal ones from main. The four live previews share 16,675 to 18,462 files each and keep 9,213 to 11,243. The footer is already filled in the browser (main pages render `deployed dev`).
 - **What the kept pages differ by.** A sample of 120 kept pages of `claude-repin-core-figure-kinds`: 59 are graph pages (preview IRIs and `alternateOf`, kept by the owner's 2026-10-30 ruling, plus the `staging` stamp); 50 are Jekyll pages with a different `?v=` asset hash, which is real (that preview re-pins cat-harness-tools).
 - **The bigger cone: the `staging` stamp on main.** Main deploy `ee02d1d..5bdefb2` (19:33Z to 21:14Z) changed 10,635 files; in a sample of 150, 112 (75%) differed only by the stamp's `sha` and `run`. Fixed here: a build of `main`/`master` with no `KG_BRANCH` writes no stamp (`isReleaseBuild` in `staging-stamp.ts`), which is what the term's gloss already says ("when it is a staging preview rather than a release"). `build.json` names main's commit once.
+
+---
+
+_2026-11-15T18:56:00Z_ — **Re-measured on deployed previews (`litlfred/folio-assistant` `origin/gh-pages` @ `2b16b35dd0050bc7c225a236abe525e4a51cd679`) and completed (session https://claude.ai/code/session_01E667391F74184786BF4B9D):**
+
+- **Preview-to-main sharing (`staging-share.ts`, `cat-harness-tools#1115`):** Previews built with `mainPagesKnown: true` omit HTML pages identical to `main` and serve them from `main` via `staging.json`. Per-preview HTML file counts dropped from `15,564` HTML files (`504.0 MiB`, unshared builds `repin-train-20261105-2025` / `2222`) to `6,095–9,037` HTML files (`226.5–357.2 MiB`, e.g. `repin-train-20261106-0041` at `6,095` HTML files / `226.5 MiB`, `claude-tv20-qa-copy-reuse-probe` at `6,529` HTML files / `240.9 MiB`, `claude-repin-subgraphs-and-deploy-fix` at `6,711` HTML files / `287.9 MiB`, `repin-train-20261106-0425` at `9,016` HTML files / `353.3 MiB`, `repin-train-20261106-0658` at `9,037` HTML files / `357.2 MiB`) — a **42.0%–60.8% reduction in per-preview HTML file count**.
+- **Preview-to-preview git blob deduplication:** Between consecutive previews built on current code (`repin-train-20261106-0425` with `9,016` HTML blobs and `repin-train-20261106-0658` with `9,037` HTML blobs), **`5,451` HTML blobs (`60.4%`) are byte-for-byte identical git blobs** (compared against **0 shared HTML blobs** before `g196`).
+- **Whole-`STAGING/` deduplication vs initial ~77 MB projection:** Across all `15` live previews plus `_retired` (`282,167` file entries whose raw entry sizes sum to `5,487,008,675 B` = `5,232.8 MiB`), git stores **`169,560` distinct blobs totaling `2,630,442,977 B` (`2,508.6 MiB`)** — a **52.1% reduction in unique blob bytes** (`144,119` HTML entries deduplicated to `88,160` unique HTML blobs, `1,753.0 MiB`). Total unique storage exceeds the 2026-09-19 `~77 MB` projection because the corpus grew ~30× (`~530` pages / `37.5 MB` per preview in Sept 2026 → `15,564` pages / `~504 MiB` per full preview across 12 mounted instances in Nov 2026) and `STAGING_WARN_BYTES` was raised by the owner (`2026-10-04`) to `MAX_PREVIEW_BYTES = 3 GB` (`cat-harness-tools/test/health/checks.ts:551`), under which `STAGING/` holds 15 previews within budget (`2.51 GiB` unique blob bytes < `3 GB`).
+- All six `Done when` items are met on `main` and `gh-pages`. Marking `completed`.
