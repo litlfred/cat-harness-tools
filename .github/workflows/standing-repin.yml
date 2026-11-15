@@ -172,7 +172,7 @@ jobs:
         # mounted layer's package.json in bun.lock, so a re-pin that moves a
         # layer's dependencies leaves the lock stale and every
         # `bun install --frozen-lockfile` after it fails ("lockfile had
-        # changes, but lockfile is frozen"; smart-base 54ff8bd,
+        # changes, but lockfile is frozen";
         # cat-harness-tools#2315). Refresh it while the mounts are down.
         if: inputs.dry-run == false && steps.repin.outputs.moved != '0'
         working-directory: site
