@@ -68,7 +68,7 @@ import { join, relative, sep } from "node:path";
 import {
   BASE_GRAPH_TYPOLOGIES,
   findDeclarationFile,
-  instanceRootsIn,
+  layerRootsIn,
   isDerivedGraph,
   isStateGraph,
   rootForScope,
@@ -113,7 +113,7 @@ const INSTANCE_ROOT = HARNESS_ROOT;
 
 // ── What is scanned ─────────────────────────────────────────────
 //
-// Layer roots come from `instanceRootsIn`, never from a glob and never
+// Layer roots come from `layerRootsIn`, never from a glob and never
 // from a list here: a literal written for this purpose on 2026-09-21 was
 // silently missing six nodes (64 where the declaration resolves 70), and the
 // run over it looked exactly like a complete one.
@@ -824,7 +824,7 @@ export function subgraphMachineWritten(root: string, dirs: readonly { path?: str
 }
 
 function instances(repoRoot: string): Instance[] {
-  return instanceRootsIn(repoRoot).map((root) => {
+  return layerRootsIn(repoRoot).map((root) => {
     const decl = JSON.parse(readFileSync(join(root, findDeclarationFile(root)!), "utf-8")) as {
       name?: string;
       needs?: string[];
@@ -1462,7 +1462,7 @@ export function moveEvidence(root = REPO_ROOT): MoveEvidence {
   });
   return {
     exists: (p) => existsSync(join(root, p)),
-    instanceRoots: instanceRootsIn(root).map(rel).filter((r) => r !== ""),
+    instanceRoots: layerRootsIn(root).map(rel).filter((r) => r !== ""),
     pageMoves,
   };
 }

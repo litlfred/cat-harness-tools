@@ -43,7 +43,7 @@ import {
   subgraphTree,
 } from "../schemas/kg/cat-harness.js";
 import { checkoutDirectories, checkoutRootFor } from "../schemas/kg/harness-config.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { layerRootsIn } from "../schemas/kg/instance-roots.js";
 import type { GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
 import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
@@ -560,7 +560,7 @@ export function linkContext(root: string = ROOT): LinkContext {
     .filter((d) => mayLeaveMain(d as { graphTypologies?: string[]; storage?: unknown }))
     .map((d) => resolve(d.absPath ?? join(root, d.path)))
     .filter((a) => !existsSync(a));
-  const instances = [root, ...instanceRootsIn(checkoutRootFor(root))];
+  const instances = [root, ...layerRootsIn(checkoutRootFor(root))];
   const moves = declaredMoves(instances);
   const unbuilt = unbuiltPublishPaths(instances);
   return { root, own, dirs, label, absentOffMain, archiveViews: beanArchiveViews(dirs, root), moves, unbuilt };

@@ -19,7 +19,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { scriptTable } from "../schemas/sdlc/script-table.ts";
 import { mountScopeFor } from "../schemas/kg/remote-mount.ts";
 
@@ -28,7 +28,7 @@ const REPO = resolve(import.meta.dir, "..", "..");
 /** The layers of this repository (not submodules), each with its declared `needs`. */
 export function layersOf(repo: string): Map<string, string[]> {
   const out = new Map<string, string[]>();
-  for (const inst of instanceRootsIn(repo)) {
+  for (const inst of layerRootsIn(repo)) {
     if (resolve(inst) === resolve(repo)) continue;
     if (existsSync(join(inst, ".git"))) continue; // a submodule: another repository
     const name = basename(inst);

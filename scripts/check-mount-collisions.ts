@@ -25,7 +25,7 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration, visualisationsOf } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration, visualisationsOf } from "../schemas/kg/cat-harness.js";
 import { readDeclaredMounts, readIndexConfig } from "../schemas/kg/index-config.js";
 import {
   RESERVED_ROOT_AND_ROUTE_NAMES,
@@ -84,7 +84,7 @@ export function checkAllCollisions(root: string): CheckCollisionsResult {
   const visualizers: VisualizerRouteClaim[] = [];
   const harnessNames: string[] = [];
 
-  const candidateRoots = instanceRootsIn(absRoot);
+  const candidateRoots = layerRootsIn(absRoot);
   if (candidateRoots.length === 0 && existsSync(join(absRoot, "cat-harness.json"))) {
     candidateRoots.push(absRoot);
   }

@@ -45,7 +45,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, resolveDirectories } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, resolveDirectories } from "../schemas/kg/cat-harness.js";
 import "../schemas/kg/folio-graph-typology.js";
 import { resolveSubgraphSource, type ResolvedSubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { absenceAt } from "./branch-store.ts";
@@ -123,7 +123,7 @@ function declaredEntry(
   id: string,
   repoRoot: string,
 ): { absPath: string; resolved: ResolvedSubgraphSource } | undefined {
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
       if (d.id !== id) continue;
       return { absPath: d.absPath, resolved: resolveSubgraphSource(d) };

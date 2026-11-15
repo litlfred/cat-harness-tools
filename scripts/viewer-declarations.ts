@@ -40,7 +40,7 @@ import {
   declarationPathIn,
   directoriesForGraph,
   instanceDirectoryForGraph,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   repoRootFor,
   siteDir,
@@ -208,7 +208,7 @@ export function builtAtPublishWriter(repoRoot: string, harnessRoot: string, ref:
 export function checkoutInstanceRoots(repoRoot: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const r of [...instanceRootsIn(repoRoot), ...mountedInstanceRoots(repoRoot).values()]) {
+  for (const r of [...layerRootsIn(repoRoot), ...mountedInstanceRoots(repoRoot).values()]) {
     const abs = resolve(r);
     if (seen.has(abs)) continue;
     seen.add(abs);
@@ -827,7 +827,7 @@ function checkoutSharedDirectories<T extends ViewedDirectory>(
   } catch {
     return undefined; // an unreadable declaration is `check:harness-dirs`'s to report
   }
-  const ownerRoot = owner === undefined ? undefined : instanceRootsIn(repoRoot).find((r) => readDeclaration(r)?.name === owner);
+  const ownerRoot = owner === undefined ? undefined : layerRootsIn(repoRoot).find((r) => readDeclaration(r)?.name === owner);
   const q = ownerRoot === undefined ? undefined : declarationPathIn(ownerRoot);
   const decl = q === undefined ? undefined : read(q);
   if (ownerRoot === undefined || decl === undefined) return undefined;
@@ -847,7 +847,7 @@ function checkoutSharedDirectories<T extends ViewedDirectory>(
 export function landingRoot(repoRoot: string, fallback: string): string {
   const choice = resolveLandingInstance(repoRoot);
   if (choice.kind === "instance") {
-    const r = instanceRootsIn(repoRoot).find((x) => readDeclaration(x)?.name === choice.name);
+    const r = layerRootsIn(repoRoot).find((x) => readDeclaration(x)?.name === choice.name);
     if (r !== undefined) return r;
   }
   return readDeclaration(repoRoot) !== undefined ? repoRoot : fallback;

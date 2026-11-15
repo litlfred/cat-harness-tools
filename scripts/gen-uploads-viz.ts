@@ -45,7 +45,7 @@ import { viewerPlacement } from "./gen-schema-viz.ts";
 import {
   checkoutRootFor,
   directoriesForGraph,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   siteDirFor,
 } from "../schemas/kg/cat-harness.ts";
@@ -340,7 +340,7 @@ const emitPage = makeEmit({ check, onStale: () => { stale++; } });
 if (import.meta.main) {
   const repoRoot = checkoutRootFor(ROOT);
   const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
-  const g = readLibraryGraph(instanceRootsIn(repoRoot), repoRoot);
+  const g = readLibraryGraph(layerRootsIn(repoRoot), repoRoot);
   if (g === null) {
     console.log("  · no library graph could be read — nothing to publish");
     process.exit(0);

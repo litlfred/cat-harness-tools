@@ -17,7 +17,7 @@
  */
 import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { instanceRootsIn, readDeclaration } from "../kg/cat-harness.js";
+import { layerRootsIn, readDeclaration } from "../kg/cat-harness.js";
 import { checkoutRootFor, declarationChain } from "../kg/harness-config.js";
 import { instanceNamespace } from "../kg/instance-repositories.js";
 import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL, FOLIO_BASE, instanceContextUrl } from "../kg/jsonld.js";
@@ -30,7 +30,7 @@ import { harnessRoot } from "../harness-root.ts";
  * was read first.
  */
 export function instancePrefixes(checkoutRoot: string, folioRoot?: string): Map<string, string> {
-  const roots = new Set(instanceRootsIn(checkoutRoot).map((r) => resolve(r)));
+  const roots = new Set(layerRootsIn(checkoutRoot).map((r) => resolve(r)));
   if (folioRoot !== undefined) for (const link of declarationChain(folioRoot)) roots.add(resolve(link.root));
   const out = new Map<string, string>();
   const from = new Map<string, string>();
@@ -116,7 +116,7 @@ let checkoutInstances: InstanceContextDecl[] | undefined;
 function defaultCheckoutInstances(): InstanceContextDecl[] {
   if (checkoutInstances === undefined) {
     const checkout = checkoutRootFor(harnessRoot() ?? dirname(dirname(dirname(fileURLToPath(import.meta.url)))));
-    checkoutInstances = instanceRootsIn(checkout).flatMap((root) => {
+    checkoutInstances = layerRootsIn(checkout).flatMap((root) => {
       const decl = readDeclaration(root);
       if (decl === undefined) return [];
       // `iriBase` is declared (`CatHarnessSchema`), read structurally as

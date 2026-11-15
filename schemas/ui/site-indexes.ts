@@ -212,7 +212,8 @@ export const TranslationStatusSchema = z
 // by `scripts/tests/schema-graph-kinds.test.ts` rather than by memory.
 export const DECL_KINDS = [
   "zod-object", "zod-union", "zod-enum", "zod-array", "zod-record", "zod-scalar",
-  "interface", "type-alias", "json-schema", "fhir-logical", "fhir-profile", "undetermined",
+  "interface", "type-alias", "json-schema", "fhir-logical", "fhir-profile",
+  "owl-class", "rdfs-class", "rdf-property-set", "moddle-class", "moddle-enum", "undetermined",
 ] as const;
 
 export const SchemaGraphIndexSchema = z
@@ -266,7 +267,7 @@ export const SchemaGraphIndexSchema = z
           unresolved: StringList,
           external: StringList,
           // The source label drawn upper right of the box (bean `cat-tools-4xq6`).
-          source: z.enum(["zod", "typescript", "json-schema", "fhir", "fhir:profile", "skill"]).optional(),
+          source: z.enum(["zod", "typescript", "json-schema", "fhir", "fhir:profile", "skill", "owl", "rdfs", "rdf", "moddle"]).optional(),
           canonical: z.string().optional(),
           exported: z.boolean(),
         })

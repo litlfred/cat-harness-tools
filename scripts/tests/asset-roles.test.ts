@@ -22,7 +22,7 @@ import { join } from "node:path";
 
 import { AGENT_INSTRUCTIONS_ROLE, ASSET_ROLES, INSTANCE_README_ROLE, REQUIRED_ASSET_ROLES, ROLE_OWNED_ASSET_KEYS, assetRoleDelivery, assetRoleLayer, assetRolePurpose, declaredAssetPath, graphLayer, layerIsWritable, processMayWrite, processMayWriteAsset, strayAssetRoleKeys } from "../../schemas/kg/cat-harness.js";
 import { collect, formatReport, isClean } from "../check-asset-roles.js";
-import { instanceRootsIn } from "../../schemas/kg/cat-harness.js";
+import { layerRootsIn } from "../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 const REPO = join(import.meta.dir, "..", "..", "..");
@@ -107,7 +107,7 @@ describe("the delivery path — read as a file, with no injection budget", () =>
    */
   function longestDeclared(role: string): { path: string; lines: number } | undefined {
     let best: { path: string; lines: number } | undefined;
-    for (const root of instanceRootsIn(REPO)) {
+    for (const root of layerRootsIn(REPO)) {
       const path = declaredAssetPath(root, role);
       if (path === undefined || !existsSync(path)) continue;
       const lines = readFileSync(path, "utf8").split("\n").length;

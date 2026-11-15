@@ -26,7 +26,7 @@
  * `--check` with one · 2 could not determine.
  */
 import {
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
 } from "../schemas/kg/cat-harness.js";
 import {
@@ -57,9 +57,9 @@ function main(): number {
   const repoRoot = process.cwd();
   const check = process.argv.includes("--check");
 
-  const roots = instanceRootsIn(repoRoot);
+  const roots = layerRootsIn(repoRoot);
   if (roots.length === 0) {
-    console.error("✗ no instance declaration read — refusing (see `instanceRootsIn`).");
+    console.error("✗ no instance declaration read — refusing (see `layerRootsIn`).");
     return 2;
   }
 

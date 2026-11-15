@@ -53,7 +53,7 @@ import { basename, join, relative, resolve } from "node:path";
 import {
   findDeclarationFile,
   instanceRootFor,
-  instanceRootsIn,
+  layerRootsIn,
   declaredKinds,
   readDeclaration,
   renderExemptionProblems,
@@ -261,7 +261,7 @@ export async function renderInstance(root: string): Promise<InstanceRender> {
  * before — the sibling gate's own docstring recorded that.
  */
 export function instancesIn(repoRoot: string): string[] {
-  return instanceRootsIn(repoRoot);
+  return layerRootsIn(repoRoot);
 }
 
 export function formatReport(rs: InstanceRender[]): string {

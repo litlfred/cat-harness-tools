@@ -86,7 +86,7 @@ import { ODRL_ACTIONS } from "../content/odrl";
 import { termIri } from "../kg/namespaces";
 import { ACTOR_KINDS, SUT_ACTOR_KINDS, SystemUnderTestFacetSchema, type ActorKind, type SystemUnderTestFacet } from "../kg/skill-package";
 import { NETWORK_REACHES, directoryForGraph, findInstanceRoot, ownPrefixTable, type NetworkReach } from "../kg/cat-harness";
-import { findDeclarationFile, instanceRootNamed, repoRootFor } from "../kg/instance-roots";
+import { findDeclarationFile, layerRootNamed, repoRootFor } from "../kg/instance-roots";
 import { SkillNameSchema } from "../tools/tool-types";
 import { ModelCapabilitiesSchema, type ModelCapabilities } from "../conduct/model-capabilities.js";
 
@@ -794,7 +794,7 @@ export function capabilitiesDir(repoRoot: string): string | undefined {
 function scenariosSubdir(repoRoot: string, name: string): string | undefined {
   // The platform layer by its declaration, not `<repoRoot>/cat-harness`:
   // standalone, cat-harness IS the repository root (bean `uxn1`).
-  const platform = instanceRootNamed(repoRoot, "cat-harness");
+  const platform = layerRootNamed(repoRoot, "cat-harness");
   if (platform === undefined) return undefined;
   const scenarios = directoryForGraph(platform, "scenarios");
   return scenarios === undefined ? undefined : join(scenarios, name);
@@ -843,7 +843,7 @@ export function lowerRoleIds(kgRoot: string): ReadonlySet<string> {
       // A self-mounting checkout (`bun .github/cat.ts`) holds its `needs`
       // INSIDE its own root (`who-iris/cat-harness/`), not beside it, so the
       // layer's own root is searched first and its parent second.
-      const lowerRoot = instanceRootNamed(own, need) ?? instanceRootNamed(repo, need);
+      const lowerRoot = layerRootNamed(own, need) ?? layerRootNamed(repo, need);
       if (lowerRoot === undefined) continue;
       visit(lowerRoot);
       let scenarios: string | undefined;

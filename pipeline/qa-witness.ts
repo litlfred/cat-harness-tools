@@ -61,7 +61,7 @@ import { basename, dirname, join, relative } from "node:path";
 import type { BlockQaReport, QaCriterionEntry } from "../schemas/sdlc/block-qa.ts";
 import { KG_QA_MANIFEST_PATH, KG_QA_RESULTS_DIR, kgQaSidecarPath, owningInstanceOf, subjectEscapes } from "../schemas/sdlc/kg-qa.ts";
 import { overlayDirs, overlayPath } from "../scripts/lib/layer-output.ts";
-import { instanceRootsIn } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn } from "../schemas/kg/cat-harness.ts";
 import { checkoutRootFor } from "../schemas/kg/harness-config.ts";
 import type { KgQaManifest, KgQaReport } from "../schemas/sdlc/kg-qa.ts";
 import type { ScriptQaReport } from "../schemas/sdlc/script-qa.ts";
@@ -357,7 +357,7 @@ export function sidecarPaths(family: QaFamily, subjectPath: string, repoRoot: st
       // function, rooted where the verdict actually is. No owner in the
       // checkout means no verdict, which reads as unaudited, as it should.
       if (subjectEscapes(repoRoot, dir)) {
-        const owner = owningInstanceOf(dir, instanceRootsIn(checkoutRootFor(repoRoot)));
+        const owner = owningInstanceOf(dir, layerRootsIn(checkoutRootFor(repoRoot)));
         if (owner === undefined || subjectEscapes(owner, dir)) return [];
         return [overlayPath(kgQaSidecarPath(owner, dir, stem))].filter((p) => existsSync(p));
       }

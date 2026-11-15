@@ -19,11 +19,11 @@ import {
   type VoiceReview,
 } from "../../skill-voice-review.ts";
 
-import { checkoutRootFor, instanceRootsIn, repoRootFor } from "../../../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, layerRootsIn, repoRootFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const REPO = instanceRootsIn(repoRootFor(ROOT)).length ? repoRootFor(ROOT) : checkoutRootFor(ROOT);
+const REPO = layerRootsIn(repoRootFor(ROOT)).length ? repoRootFor(ROOT) : checkoutRootFor(ROOT);
 
 describe("which voices judge skills", () => {
   test("nothing active is an empty set, and an unreadable config is undefined", () => {

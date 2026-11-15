@@ -14,7 +14,7 @@
  * is one line. A declaration that carries some other `$schema` is reported and
  * left alone.
  *
- * Which declarations: every layer `instanceRootsIn` finds under this
+ * Which declarations: every layer `layerRootsIn` finds under this
  * checkout's repository root (in an index checkout, including mounted
  * layers of other repositories, which `--check` names rather than
  * passes), or only the one named by `--instance <dir>`.
@@ -40,7 +40,7 @@ import {
   CatHarnessDeclarationKind,
   repoRootFor,
 } from "../schemas/kg/cat-harness.ts";
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { acceptsSchemaTag } from "../schemas/kg/node-kind.ts";
 
 import { belowHarness } from "./lib/needs-reach.ts";
@@ -185,14 +185,14 @@ function main(argv: readonly string[]): void {
     }
     roots = [dir];
   } else {
-    roots = instanceRootsIn(base);
+    roots = layerRootsIn(base);
   }
   if (roots.length === 0) {
     console.error(`::error::declarations-retag: no instance declaration under ${base}, so every count here would be vacuous`);
     process.exit(2);
   }
 
-  const r = retagDeclarations(roots, base, { write: !check, needs: needsOfRoots(instanceRootsIn(base)) });
+  const r = retagDeclarations(roots, base, { write: !check, needs: needsOfRoots(layerRootsIn(base)) });
   for (const f of r.foreign) {
     console.error(`::error::declarations-retag: ${f.file} carries \`$schema: ${f.tag}\`, which ${CAT_HARNESS_DECLARATION_SCHEMA_TAG} does not accept. Left as it is`);
   }

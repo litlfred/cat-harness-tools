@@ -55,7 +55,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { availableParallelism, tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
 import { readRoleGraph } from "../../schemas/process/role-graph.js";
 import { orderedDependencies } from "../../schemas/kg/harness-config.js";
 import { knownSkills } from "../known-skills.js";
@@ -183,7 +183,7 @@ function declaresLayering(root: string): boolean {
   }
 }
 
-const INSTANCES = instanceRootsIn(REPO);
+const INSTANCES = layerRootsIn(REPO);
 
 // No root-instance exclusion: `kg:audit --instance .` used to throw before
 // auditing anything (bean `pgzn`), and this file excluded that layer by

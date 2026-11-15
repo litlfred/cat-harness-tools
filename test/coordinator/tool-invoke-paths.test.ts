@@ -48,7 +48,7 @@ import { join, resolve } from "node:path";
 
 import { unresolvedPaths } from "../../scripts/check-tools.ts";
 import { tools, toolsOf } from "../../tools/discover.js";
-import { instanceRootsIn } from "../../schemas/kg/cat-harness.js";
+import { layerRootsIn } from "../../schemas/kg/cat-harness.js";
 import { resolveImplementingPath } from "../../schemas/kg/harness-config.js";
 import { resolveScriptCommand } from "../../scripts/lib/script-command.ts";
 
@@ -99,7 +99,7 @@ describe("the two roots, asserted separately because conflating them breaks 20 n
     // Each node is resolved from the layer that DECLARES it — the harness's
     // from cat-harness, sci's `lean-formal-edges` from folio-assistant-sci —
     // which is how both MCP servers resolve them (bean riit, 3c).
-    const mods = instanceRootsIn(REPO).flatMap((inst) =>
+    const mods = layerRootsIn(REPO).flatMap((inst) =>
       toolsOf(inst)
         .map((t) => ({ inst, id: t.id, mod: (t.invoke as { inProcess?: { module?: string } })?.inProcess?.module }))
         .filter((x): x is { inst: string; id: string; mod: string } => typeof x.mod === "string"),
@@ -163,7 +163,7 @@ describe("a harness Tool names its command by a script key, resolved from a decl
   });
 
   test("no command or install line of the harness's own Tools names the tools layer's code", () => {
-    const harness = instanceRootsIn(REPO).find((r) => resolve(r) === INSTANCE)!;
+    const harness = layerRootsIn(REPO).find((r) => resolve(r) === INSTANCE)!;
     const lines = toolsOf(harness).flatMap((t) => [
       ...Object.values(t.invoke as Record<string, unknown>).filter((v): v is string => typeof v === "string").map((v) => ({ id: t.id, v })),
       ...Object.values(t.install as Record<string, unknown>).filter((v): v is string => typeof v === "string").map((v) => ({ id: t.id, v })),
@@ -174,7 +174,7 @@ describe("a harness Tool names its command by a script key, resolved from a decl
   });
 
   test("every key a harness Tool names is declared, so every one of them runs", () => {
-    const harness = instanceRootsIn(REPO).find((r) => resolve(r) === INSTANCE)!;
+    const harness = layerRootsIn(REPO).find((r) => resolve(r) === INSTANCE)!;
     const keyed = toolsOf(harness)
       .flatMap((t) => [t.invoke.shell, t.install.cli, t.install.container].filter((v): v is string => typeof v === "string" && /^bun run cat [^\s]+/.test(v)).map((v) => ({ id: t.id, v })));
     expect(keyed.length).toBeGreaterThan(40);

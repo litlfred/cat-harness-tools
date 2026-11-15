@@ -74,7 +74,7 @@ import { join, resolve } from "node:path";
 
 import { readDeclaration, siteDirFor, visualisationResolves, visualisationsOf } from "../../schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry.ts";
-import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { generatedPageOf, isGeneratedSite, publishedUrlOf } from "../harness-tiles.ts";
 
 /** What the scoping needs to know about the site and the declarations. */
@@ -463,7 +463,7 @@ export function foreignScopeFor(
   repo: string,
   opts: { instance?: string; platformBase: string; title?: string },
 ): ForeignScope {
-  const decls = instanceRootsIn(repo).flatMap((root) => {
+  const decls = layerRootsIn(repo).flatMap((root) => {
     const d = readDeclaration(root);
     return d ? [d] : [];
   });

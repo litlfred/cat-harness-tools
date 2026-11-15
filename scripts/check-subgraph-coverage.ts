@@ -33,7 +33,7 @@ import {
   AGENT_INSTRUCTIONS_ROLE,
   assetRolePurpose,
   INSTANCE_README_ROLE,
-  instanceRootsIn,
+  layerRootsIn,
   isExemptFrom,
   readDeclaration,
   siteDirFor,
@@ -445,7 +445,7 @@ function dependencyRoots(root: string): string[] {
  * obligation listed rather than silently satisfied.
  */
 export function serialisationsProducerDeclared(repoRoot: string): boolean {
-  for (const r of instanceRootsIn(repoRoot)) {
+  for (const r of layerRootsIn(repoRoot)) {
     try {
       const decl = readDeclaration(r);
       if (!decl) continue;
@@ -672,7 +672,7 @@ export function auditInstance(
 export function auditAll(repoRoot: string): InstanceCoverage[] {
   // Asked once for the checkout, not once per layer.
   const serialisationsProducer = serialisationsProducerDeclared(repoRoot);
-  return instanceRootsIn(repoRoot).map((r) => auditInstance(r, repoRoot, { serialisationsProducer }));
+  return layerRootsIn(repoRoot).map((r) => auditInstance(r, repoRoot, { serialisationsProducer }));
 }
 
 export function formatReport(rs: InstanceCoverage[]): string {

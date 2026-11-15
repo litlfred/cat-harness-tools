@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { declarationChain } from "../../schemas/kg/harness-config.ts";
-import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { RemoteSourceSchema, resolveSubgraphSource } from "../../schemas/kg/subgraph-source.ts";
 import { MountLockSchema, mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
 import { AGENT_SURFACE_GENERATORS, checkRemote, currentPerLock, editedOnlyPerLock, optInDriftFromLock, exitCode, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise, switchedOffOptInPaths } from "../remote-mount.ts";
@@ -251,7 +251,7 @@ describe("mount:remote over fixture repositories", () => {
   test("3. the overlay reads a mounted dependency like a local one", () => {
     const root = downstream({}, { needs: ["core"] });
     mountRemote({ instanceRoot: root, urlFor });
-    expect(instanceRootsIn(root).map((p) => p.slice(root.length))).toEqual(["", "/base", "/boot", "/core"]);
+    expect(layerRootsIn(root).map((p) => p.slice(root.length))).toEqual(["", "/base", "/boot", "/core"]);
     expect(declarationChain(root).map((c) => c.name)).toEqual(["boot", "base", "core", "(root)"]);
   });
 
@@ -1127,7 +1127,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     expect(existsSync(join(root, "hh/skills"))).toBe(false);
     expect(existsSync(join(root, "hh/hh.json"))).toBe(false);
     // nothing discovers a code-less layer there, and the overlay offers none
-    expect(instanceRootsIn(root)).toEqual([root]);
+    expect(layerRootsIn(root)).toEqual([root]);
     expect(mountedInstanceRoots(root).has("hh")).toBe(false);
 
     const inst = readLock(root).instances.find((i) => i.instance === "hh")!;

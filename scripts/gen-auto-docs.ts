@@ -48,7 +48,7 @@ import {
   checkoutRootFor,
   findDeclarationFile,
   findInstanceRoot,
-  instanceRootsIn,
+  layerRootsIn,
   isExemptFrom,
   readDeclaration,
   repoRootFor,
@@ -217,7 +217,7 @@ function frontMatterDescription(text: string): string | undefined {
 /**
  * Docs directories across EVERY layer, each read from its own declaration.
  *
- * `instanceRootsIn` rather than a list: its own docstring records two gates
+ * `layerRootsIn` rather than a list: its own docstring records two gates
  * that each carried `["cat-harness", "bootstrap"]` while four layers
  * existed, and reported clean runs over half the subject. A list that must be
  * edited when a directory is added is a list that will be wrong.
@@ -232,7 +232,7 @@ function frontMatterDescription(text: string): string | undefined {
 function docsDirectoriesAcrossInstances(): Array<{ id: string; absPath: string; path: string }> {
   const out = new Map<string, { id: string; absPath: string; path: string }>();
   for (const d of declaredDirectories("docs")) out.set(d.absPath, d);
-  for (const instance of instanceRootsIn(REPO)) {
+  for (const instance of layerRootsIn(REPO)) {
     // `findDeclarationFile` returns a BASENAME, not a path — join it.
     // Without the join this reads relative to the process cwd, which silently
     // "works" for whichever layer happens to sit there and fails for every
@@ -482,7 +482,7 @@ function bpmnishFiles(ext: string, nameRe: RegExp): AutoDocItem[] {
 function skillsDirectoriesAcrossInstances(): Array<{ id: string; absPath: string; path: string }> {
   const out = new Map<string, { id: string; absPath: string; path: string }>();
   for (const d of declaredDirectories("skills")) out.set(d.absPath, d);
-  for (const instance of instanceRootsIn(REPO)) {
+  for (const instance of layerRootsIn(REPO)) {
     const decl = readDeclaration(instance);
     if (!decl || isExemptFrom(decl, "visualiser")) continue;
     for (const e of decl.directories ?? []) {
@@ -516,7 +516,7 @@ export const TYPES: AutoDocType[] = [
       // re-deriving the rule and disagreeing by seven.
       const items: AutoDocItem[] = [];
       const roots: Array<[string, string[][]]> = [[ROOT, skillMdDirs(ROOT, corpusScopeFor(ROOT))]];
-      for (const instance of instanceRootsIn(REPO)) {
+      for (const instance of layerRootsIn(REPO)) {
         const decl = readDeclaration(instance);
         if (!decl || isExemptFrom(decl, "visualiser")) continue;
         roots.push([instance, skillMdDirs(instance, "instance")]);

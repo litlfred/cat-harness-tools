@@ -29,7 +29,7 @@ import { isOwnExtensionNamespace, OWN_BPMN_EXTENSION_NAMESPACES, OWN_XML_NAMESPA
 import { ownNamespaceValues } from "../schemas/kg/graph-typology-registry.js";
 import { portableSegment } from "../schemas/kg/portable-path.ts";
 import { directoriesForGraph, instanceDirectoriesForGraph } from "../schemas/kg/cat-harness.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { layerRootsIn } from "../schemas/kg/instance-roots.js";
 import { workflowFiles } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
@@ -329,7 +329,7 @@ export function skosTermsInUse(root = resolve(ROOT, "..")): string[] {
   // (separation placement review, 2026-10-06, bean `0r7u` step 0).
   const dirs = [
     join(root, "cat-harness-tools", "scripts"),
-    ...new Set(instanceRootsIn(root).flatMap((i) => instanceDirectoriesForGraph(i, "schemas"))),
+    ...new Set(layerRootsIn(root).flatMap((i) => instanceDirectoriesForGraph(i, "schemas"))),
   ];
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;

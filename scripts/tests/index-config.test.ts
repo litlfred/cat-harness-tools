@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import {
-  effectiveInstanceConfig,
+  effectiveLayerConfig,
   indexAgreement,
   instantiatedHarnessNames,
   readHarnessConfig,
@@ -28,7 +28,7 @@ import {
   IGNORE_BLOCK_END,
   INDEX_CONFIG_SCHEMA,
   IndexConfigSchema,
-  addIndexInstance,
+  addIndexLayer,
   checkIgnoreBlock,
   ignoreBlockLines,
   readDeclaredMounts,
@@ -41,7 +41,7 @@ import {
   type IndexConfig,
 } from "../../schemas/kg/index-config.ts";
 import { readDeclaration } from "../../schemas/kg/cat-harness.ts";
-import { findDeclarationFile, instanceRootsIn, isReservedIndexFile, lockFilesIn, rootConfigStems } from "../../schemas/kg/instance-roots.ts";
+import { findDeclarationFile, layerRootsIn, isReservedIndexFile, lockFilesIn, rootConfigStems } from "../../schemas/kg/instance-roots.ts";
 import { mountLockPathFor, mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
 import { applyMigration, planMigration } from "../index-config-migrate.ts";
 import { lockNames, readLocks } from "../mount-from-lock.ts";
@@ -156,7 +156,7 @@ describe("import, then override", () => {
       "a.config.json": { contentType: "paper", site: { landing: true }, translation: { defaultLocale: "en", supportedLocales: ["en", "fr"] } },
       "index.config.json": index([{ name: "a", contentType: "document", site: { landing: false }, translation: { supportedLocales: ["es"] } }]),
     });
-    const c = effectiveInstanceConfig(r, "a")!;
+    const c = effectiveLayerConfig(r, "a")!;
     expect(c.contentType).toBe("document");
     expect(c.site).toEqual({ landing: false });
     expect(c.translation?.defaultLocale).toBe("en");
@@ -165,9 +165,9 @@ describe("import, then override", () => {
 
   test("`import` names another file; an entry with nothing to import is its inline fields alone", () => {
     const r = root({ "legacy-a.config.json": { contentType: "paper" }, "index.config.json": index([{ name: "a", import: "legacy-a.config.json" }, { name: "b", contentType: "document" }]) });
-    expect(effectiveInstanceConfig(r, "a")?.contentType).toBe("paper");
-    expect(effectiveInstanceConfig(r, "b")?.contentType).toBe("document");
-    expect(effectiveInstanceConfig(r, "zzz")).toBeNull();
+    expect(effectiveLayerConfig(r, "a")?.contentType).toBe("paper");
+    expect(effectiveLayerConfig(r, "b")?.contentType).toBe("document");
+    expect(effectiveLayerConfig(r, "zzz")).toBeNull();
   });
 
   test("readHarnessConfig returns the effective config for an indexed instance, and the file otherwise", () => {
@@ -299,12 +299,12 @@ describe("remote mounts: one read path, one write path", () => {
     expect(instantiatedHarnessNames(fresh)).toEqual(["down", "m"]);
   });
 
-  test("addIndexInstance records a newly instantiated harness (kg:instantiate)", () => {
+  test("addIndexLayer records a newly instantiated harness (kg:instantiate)", () => {
     const r = root({ "index.config.json": index([{ name: "a" }]) });
-    expect(addIndexInstance(r, { name: "b" })).toBe(true);
-    expect(addIndexInstance(r, { name: "b" })).toBe(false);
+    expect(addIndexLayer(r, { name: "b" })).toBe(true);
+    expect(addIndexLayer(r, { name: "b" })).toBe(false);
     expect(instantiatedHarnessNames(r)).toEqual(["a", "b"]);
-    expect(addIndexInstance(root(), { name: "b" })).toBe(false);
+    expect(addIndexLayer(root(), { name: "b" })).toBe(false);
   });
 });
 
@@ -405,7 +405,7 @@ describe("index.lock.json, and the legacy name", () => {
 
   test("the lock is never read as a declaration", () => {
     const r = root({ "index.lock.json": lock([inst("a")]) });
-    expect(instanceRootsIn(r)).toEqual([]);
+    expect(layerRootsIn(r)).toEqual([]);
   });
 });
 
@@ -485,9 +485,9 @@ describe("the new form: layers + harnesses (cat-harness#1138)", () => {
     expect(withDeclaredHarnesses(r, done)).toBe(done);
   });
 
-  test("addIndexInstance records a new harness in both lists in the new form", () => {
+  test("addIndexLayer records a new harness in both lists in the new form", () => {
     const r = root({ "index.config.json": newForm([{ name: "base" }]) });
-    expect(addIndexInstance(r, { name: "fresh" })).toBe(true);
+    expect(addIndexLayer(r, { name: "fresh" })).toBe(true);
     expect(instantiatedHarnessNames(r)).toEqual(["base", "fresh"]);
   });
 });

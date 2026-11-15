@@ -38,7 +38,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { gitCorpus } from "../schemas/sdlc/git-corpus.ts";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { directoryEntriesForGraph, findInstanceRoot, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { directoryEntriesForGraph, findInstanceRoot, layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas } from "../schemas/kg/kind-validator.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 import { ContributionRegistry } from "../schemas/content/contributions.js";
@@ -287,7 +287,7 @@ export async function sweepFamilies(
   // hold is computed over OTHER layers, so a family met only there is the
   // projected layer's (see `FamilySweep.projected`).
   const checkoutBuilt: string[] = [];
-  for (const inst of instanceRootsIn(join(root, ".."))) {
+  for (const inst of layerRootsIn(join(root, ".."))) {
     for (const b of readDeclaration(inst)?.builtAtPublish ?? []) {
       if (b.because === "checkout") checkoutBuilt.push(join(inst, b.path).replace(/\/+$/, "") + (b.path.endsWith("/") ? "/" : ""));
     }
@@ -342,7 +342,7 @@ export async function sweepFamilies(
     const liveStores = new Map<string, string>();
     const derivedStores = new Map<string, { at: string; branch: string }>();
     let declared = 0;
-    for (const inst of instanceRootsIn(repoRoot)) {
+    for (const inst of layerRootsIn(repoRoot)) {
       for (const e of readDeclaration(inst)?.directories ?? []) {
         const st = e.storage as { keyedBy?: string } | undefined;
         const src = e.source as { kind?: string } | undefined;

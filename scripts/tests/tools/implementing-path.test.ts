@@ -25,7 +25,7 @@ import {
 } from "../../../schemas/kg/harness-config.ts";
 import { unresolvedPaths } from "../../check-tools.ts";
 import { toolsOf } from "../../../tools/discover.ts";
-import { instanceRootsIn } from "../../../schemas/kg/cat-harness.ts";
+import { layerRootsIn } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 
 const made: string[] = [];
@@ -146,7 +146,7 @@ describe("in this checkout", () => {
     // `lean-formal-edges` from folio-assistant-sci (bean riit, 3c). Resolving
     // every one from the harness asked a question no server asks.
     let count = 0;
-    for (const inst of instanceRootsIn(resolve(HARNESS_ROOT, ".."))) {
+    for (const inst of layerRootsIn(resolve(HARNESS_ROOT, ".."))) {
       for (const t of toolsOf(inst)) {
         const m = (t.invoke as { inProcess?: { module?: string } } | undefined)?.inProcess?.module;
         if (typeof m !== "string") continue;

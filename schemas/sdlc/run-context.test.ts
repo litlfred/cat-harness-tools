@@ -19,12 +19,12 @@ import { addressBook, provJsonldDocument } from "../kg/prov-jsonld";
 import type { ProvActivity } from "../content/prov";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { instanceDirectoryForGraph, instanceRootsIn } from "../kg/cat-harness";
+import { instanceDirectoryForGraph, layerRootsIn } from "../kg/cat-harness";
 
 /** The `<name>@<version>` of the one release of `name` the checkout's `tool-release` graphs catalogue. */
 function cataloguedRelease(repo: string, name: string): string {
   const refs = new Set<string>();
-  for (const root of instanceRootsIn(repo)) {
+  for (const root of layerRootsIn(repo)) {
     const dir = instanceDirectoryForGraph(root, "tool-release");
     if (!dir) continue;
     for (const f of readdirSync(dir)) {

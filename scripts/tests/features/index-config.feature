@@ -198,7 +198,7 @@ Feature: The index config
     And for a declaration with a config and no index, writing mount "m" makes the instantiated names "down" and "m"
 
   @test:scripts/tests/index-config.test.ts::remote_mounts:_one_read_path,_one_write_path::addIndexInstance_records_a_newly_instantiated_harness_(kg:instantiate)
-  Scenario: addIndexInstance records a newly instantiated harness once
+  Scenario: addIndexLayer records a newly instantiated harness once
     Given an index listing "a"
     When instance "b" is added
     Then the add reports true
@@ -317,7 +317,7 @@ Feature: The index config
     And a new-form index is returned unchanged
 
   @test:scripts/tests/index-config.test.ts::the_new_form:_layers_+_harnesses_(cat-harness#1138)::addIndexInstance_records_a_new_harness_in_both_lists_in_the_new_form
-  Scenario: addIndexInstance in the new form records the new harness
+  Scenario: addIndexLayer in the new form records the new harness
     # Gap: that "fresh" is also added to the layers list is not checked
     Given a new-form index with harness "base"
     When instance "fresh" is added

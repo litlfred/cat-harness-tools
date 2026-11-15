@@ -36,7 +36,7 @@ import {
   type DocumentKind,
   type DocumentKindCoverage,
 } from "../schemas/content/document-kind.ts";
-import { directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { directoriesForGraph, layerRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { resolveInstanceGraph } from "../schemas/kg/harness-config.ts";
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
@@ -78,7 +78,7 @@ export function documentKindInstanceRoots(repoRoot: string): string[] {
     seen.add(abs);
     roots.push(abs);
   };
-  for (const r of instanceRootsIn(repoRoot)) add(r);
+  for (const r of layerRootsIn(repoRoot)) add(r);
   for (const r of mountedInstanceRoots(repoRoot).values()) add(r);
   for (let i = 0; i < roots.length; i++) {
     const r = roots[i]!;

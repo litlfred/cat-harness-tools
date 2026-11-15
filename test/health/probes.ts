@@ -49,7 +49,7 @@ import {
   PAGES_SERVING_FILENAME,
   PagesServingObservationSchema,
 } from "../../schemas/sdlc/health-report.ts";
-import { instanceRootsIn, nestedDirectories, readDeclaration } from "../../schemas/kg/cat-harness.ts";
+import { layerRootsIn, nestedDirectories, readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
 import { checkRemote } from "../../scripts/remote-mount.ts";
 import { lsiHealthEvidence, readIndexes, type LsiHealthEvidence } from "../../scripts/lsi-health.ts";
@@ -999,7 +999,7 @@ export interface SpecialBranchDecl {
  * `declaredBranches`, keyed by the kind instead of the directory's id.
  */
 export function declaredFamilyPrefix(repoRoot: string, typology: string): string | undefined {
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     let decl;
     try {
       decl = readDeclaration(root);

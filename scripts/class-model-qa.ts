@@ -20,15 +20,17 @@
  * | `class-model-cardinality-known` | a field's cardinality is `?..?` |
  * | `class-model-sources-read` | a declared source could not be opened (`unknown`, never a pass) |
  * | `class-model-sources-drawn` | nothing — it lists what each reader drew, so a zero is visible |
+ * | `class-model-vocabularies-recorded` | a vocabulary or metamodel read (SKOS, BPMN, …) is named by no external-schema record; `n/a` when none is read, `unknown` when the registry is not found |
  *
  * Usage:
  *   bun run cat schema:qa            # write <qa home>/kg-qa/schema-class-model.kg-qa.json
  *   bun run cat schema:qa --stdout   # print it instead
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { kgQaHomeFor } from "../schemas/kg/cat-harness.js";
+import { checkoutDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { KG_QA_SCHEMA, type KgCriterionEntry, type KgQaReport } from "../schemas/sdlc/kg-qa.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { readSchemaGraph, type SchemaGraph } from "./schema-graph.ts";
@@ -44,8 +46,44 @@ function sourceOf(d: SchemaGraph["decls"][number]): string {
   return d.module.endsWith(".json") ? "json-schema" : "zod";
 }
 
+/**
+ * A namespace without its closing `#` or `/`, so `…/core#` and `…/core` are
+ * one, and with `https:` read as `http:`: schema.org publishes both, and
+ * `@vocabulary/schema` writes `http://schema.org/` where the record says https.
+ */
+const bareNs = (ns: string): string => ns.replace(/^https:/, "http:").replace(/[#/]+$/, "");
+
+/**
+ * The external-schema records (`folio-external-schema/v1`) in the declared
+ * `external-schema` directories, as `{id, namespaces}`; `undefined` when no
+ * directory is declared or none exists — the registry not found, which is not
+ * the registry empty.
+ */
+export function externalSchemaRecords(root: string): { id: string; namespaces: string[] }[] | undefined {
+  let dirs: string[] = [];
+  try {
+    dirs = checkoutDirectoriesForGraph("external-schema", root).filter((d) => existsSync(d));
+  } catch {
+    dirs = [];
+  }
+  if (dirs.length === 0) return undefined;
+  const out: { id: string; namespaces: string[] }[] = [];
+  for (const dir of dirs) {
+    for (const f of readdirSync(dir).filter((n) => n.endsWith(".json")).sort()) {
+      try {
+        const r = JSON.parse(readFileSync(join(dir, f), "utf-8")) as { $schema?: unknown; id?: unknown; namespaces?: unknown };
+        if (r.$schema !== "folio-external-schema/v1" || typeof r.id !== "string") continue;
+        out.push({ id: r.id, namespaces: Array.isArray(r.namespaces) ? r.namespaces.filter((n): n is string => typeof n === "string") : [] });
+      } catch {
+        continue;
+      }
+    }
+  }
+  return out;
+}
+
 /** The report over `g`. Pure: the caller decides where it goes. */
-export function classModelQa(g: SchemaGraph): KgQaReport {
+export function classModelQa(g: SchemaGraph, records?: readonly { id: string; namespaces: readonly string[] }[]): KgQaReport {
   const criteria: Record<string, KgCriterionEntry> = {};
   const verdict = (findings: KgCriterionEntry["findings"]): KgCriterionEntry => ({ result: findings.length ? "fail" : "pass", findings });
 
@@ -87,6 +125,22 @@ export function classModelQa(g: SchemaGraph): KgQaReport {
       .map(([s, n]) => ({ where: s, detail: `${n.decls} declaration(s) in ${n.modules.size} module(s), ${n.edges} edge(s)` })),
   };
 
+  // Every vocabulary the class model draws is a specification the platform
+  // depends on, so the registry names it (`external-schema.ts`): one it does
+  // not name is a dependency nobody recorded the edition of.
+  const vocabs = g.vocabularies ?? [];
+  if (vocabs.length === 0) criteria["class-model-vocabularies-recorded"] = { result: "n/a", findings: [] };
+  else if (!records) {
+    criteria["class-model-vocabularies-recorded"] = { result: "unknown", findings: [{ where: "external-schema", detail: "no external-schema registry found: the vocabularies read cannot be checked against it" }] };
+  } else {
+    const known = new Set(records.flatMap((r) => r.namespaces.map(bareNs)));
+    criteria["class-model-vocabularies-recorded"] = verdict(
+      vocabs
+        .filter((v) => !known.has(bareNs(v.namespace)))
+        .map((v) => ({ where: v.module, detail: `${v.prefix}: ${v.namespace} (${v.source}) is read and no external-schema record names it` })),
+    );
+  }
+
   const totals = { pass: 0, fail: 0, "n/a": 0, unknown: 0 } as KgQaReport["totals"];
   for (const c of Object.values(criteria)) totals[c.result]++;
   return { $schema: KG_QA_SCHEMA, subject: { kind: "graph", id: CLASS_MODEL_QA_ID, path: null }, source_hash: null, criteria, totals };
@@ -98,7 +152,7 @@ if (import.meta.main) {
     console.log("  · no schemas directory — no class model to report on");
     process.exit(0);
   }
-  const report = classModelQa(g);
+  const report = classModelQa(g, externalSchemaRecords(HARNESS_ROOT));
   const text = JSON.stringify(report, null, 2) + "\n";
   if (process.argv.includes("--stdout")) {
     process.stdout.write(text);

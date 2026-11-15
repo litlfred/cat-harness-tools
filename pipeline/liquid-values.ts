@@ -48,7 +48,7 @@ import { existsSync, readFileSync } from "fs";
 import { dirname, join, relative } from "path";
 import {
   findDeclarationFile,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   rootForScope,
 } from "../schemas/kg/cat-harness.js";
@@ -104,7 +104,7 @@ export function buildValueScope(repoRoot: string): ValueScope {
   const problems: string[] = [];
   const instances: ScopeInstance[] = [];
   const seen = new Map<string, string>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     let decl;
     try {
       decl = readDeclaration(root);

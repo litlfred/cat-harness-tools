@@ -40,7 +40,7 @@ import {
   TEMPLATE_PLACEHOLDER_RE,
   type InitFolioOptions,
 } from "../init-folio";
-import { instanceConfigFilename } from "../../schemas/kg/harness-config.js";
+import { layerConfigFilename } from "../../schemas/kg/harness-config.js";
 import { IndexConfigSchema, checkIgnoreBlock } from "../../schemas/kg/index-config.ts";
 import { instanceDeclarationFilename, readDeclaration } from "../../schemas/kg/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
@@ -59,7 +59,7 @@ import { dirname } from "node:path";
  * declaration too.
  */
 const SLUG = "cold-chain-guidance";
-const SCAFFOLD_CONFIG = instanceConfigFilename(SLUG);
+const SCAFFOLD_CONFIG = layerConfigFilename(SLUG);
 const scaffoldConfigIn = (dir: string): string => join(dir, SCAFFOLD_CONFIG);
 /**
  * The scaffold's config as written: INLINE in its `index.config.json` entry

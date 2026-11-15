@@ -173,7 +173,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { z } from "zod";
 
 import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "../schemas/kg/mount-trust.js";
-import { checkoutRootFor, defaultGraphTypologies, instanceDirectories, instanceRootsIn, readDeclaration, type GraphTypologyRegistry } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, defaultGraphTypologies, instanceDirectories, layerRootsIn, readDeclaration, type GraphTypologyRegistry } from "../schemas/kg/cat-harness.js";
 import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "../schemas/kg/index-config.js";
 import {
   MOUNT_LOCK_SCHEMA,
@@ -831,7 +831,7 @@ function resolveClosureWith(
   // submodule, a lock deleted by hand). It is a mount target, adopted only if
   // it is exactly the pinned bytes (folio-assistant#2467, decision 2).
   const inCheckout = gitIn(ds.instanceRoot, ["rev-parse", "--is-inside-work-tree"]).stdout.trim() === "true";
-  for (const root of instanceRootsIn(ds.instanceRoot)) {
+  for (const root of layerRootsIn(ds.instanceRoot)) {
     const rel = relative(ds.instanceRoot, root);
     if (inCheckout && rel !== "" && !tracked(ds.instanceRoot, rel)) continue;
     try {
@@ -869,9 +869,9 @@ function resolveClosureWith(
 
   // The kinds EVERY listed layer declares in its own `typologies/`, at its
   // pin, before any layer's nesting is read ({@link withKindsOf}): a layer may
-  // use a kind a layer listed after it contributes (smart-base names
-  // fhir-harness's `fhir-artifact-index`). A layer that cannot be opened or
-  // found here is skipped; the loop below reports it.
+  // use a kind a layer listed after it contributes (a layer's declaration
+  // names a kind only a layer it depends on registers). A layer that cannot be
+  // opened or found here is skipped; the loop below reports it.
   let kinds: GraphTypologyRegistry = defaultGraphTypologies;
   for (const m of ds.mounts) {
     if (m.overrides?.[m.harness]?.skip) continue;
@@ -2174,7 +2174,7 @@ export function declaringInstances(checkout: string): { roots: string[]; unreada
   const roots: string[] = [];
   const unreadable: Array<{ root: string; why: string }> = [];
   const mounted = new Set(lockedMountPaths(checkout));
-  const candidates = [...new Set([checkout, ...instanceRootsIn(checkout)])];
+  const candidates = [...new Set([checkout, ...layerRootsIn(checkout)])];
   for (const root of candidates) {
     if (root !== checkout && mounted.has(relative(checkout, root))) continue;
     try {

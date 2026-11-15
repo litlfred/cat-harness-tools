@@ -21,7 +21,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { scriptTable } from "../schemas/sdlc/script-table.ts";
 
 function repoRoot(): string {
@@ -63,7 +63,7 @@ export interface LayerScriptEntry {
 export function layerScript(repoRoot: string, name: string): LayerScriptEntry | undefined {
   const root = resolve(repoRoot);
   let found: LayerScriptEntry | undefined;
-  for (const inst of instanceRootsIn(root)) {
+  for (const inst of layerRootsIn(root)) {
     const absInst = resolve(inst);
     if (absInst === root) continue;
     const pkgPath = join(absInst, "package.json");

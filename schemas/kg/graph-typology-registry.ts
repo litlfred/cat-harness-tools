@@ -32,7 +32,7 @@ import { ValidatorNodeSchema, type ValidatorNode } from "./validator-node";
 import { instanceNamespaceOf, namespaceForLayer, NS_PREFIXES, OWN_NAMESPACE_VALUES } from "./namespaces";
 import type { NewInstanceSource } from "./subgraph-source";
 import { BOOTSTRAP_GRAPH_TYPOLOGIES } from "@litlfred/bootstrap-tools/schemas/graph.ts";
-import { findDeclarationFile, instanceRootsIn } from "./instance-roots";
+import { findDeclarationFile, layerRootsIn } from "./instance-roots";
 import { readFileSync } from "node:fs";
 
 
@@ -3687,7 +3687,7 @@ export function declaredKindNodes(
 
 /** The layer roots a checkout holds now, as one comparable string; empty when it holds none. */
 function layersSignature(root: string): string {
-  return instanceRootsIn(root).slice().sort().join("\n");
+  return layerRootsIn(root).slice().sort().join("\n");
 }
 
 /** Every `folio-validator/v1` node in every declared `validators/` graph (bean riit). */
@@ -3733,8 +3733,8 @@ export function defaultTypologyRoots(
   if (env.REPO_ROOT) return [resolve(env.REPO_ROOT)];
   const up2 = resolve(moduleDir, "..", "..", "..");
   const up1 = resolve(moduleDir, "..", "..");
-  const own = instanceRootsIn(up2).length > 0 ? up2 : up1;
-  const inspected = instanceRootsIn(cwd).length > 0 ? resolve(cwd) : undefined;
+  const own = layerRootsIn(up2).length > 0 ? up2 : up1;
+  const inspected = layerRootsIn(cwd).length > 0 ? resolve(cwd) : undefined;
   return inspected !== undefined && inspected !== own ? [inspected, own] : [own];
 }
 

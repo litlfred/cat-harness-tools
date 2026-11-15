@@ -58,7 +58,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { checkQaDirs } from "../pipeline/qa-graph-integrity.ts";
-import { directoriesForGraph, instanceRootsIn, kgQaHomeFor, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { directoriesForGraph, layerRootsIn, kgQaHomeFor, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
 // `directoriesForGraph` reads declarations, which throw on the `folio` kind
 // unless core has registered it — the same side-effect import qa-store carries.
 import "../schemas/kg/folio-graph-typology.js";
@@ -256,7 +256,7 @@ export function corpusLayout(repoRoot: string = REPO, harness: string = join(rep
 } {
   const dirs = new Set<string>();
   const homes = new Map<string, CorpusHome["by"]>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     for (const d of directoriesForGraph(inst, "qa")) dirs.add(rel(repoRoot, d));
     const h = kgQaHomeFor(inst, harness);
     const home = rel(repoRoot, h.root);

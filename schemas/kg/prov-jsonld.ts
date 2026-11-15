@@ -57,7 +57,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
 import { releaseIris, releaseIri } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
-import { instanceDirectoryForGraph, instanceRootsIn, readDeclaration } from "./cat-harness.ts";
+import { instanceDirectoryForGraph, layerRootsIn, readDeclaration } from "./cat-harness.ts";
 import { CAT_HARNESS_NS, FOLIO_BASE } from "./namespaces.ts";
 import { CRED_NS, DCAT_NS, PROV_CONTEXT, PROV_LOCAL_EXTENSION_TERMS, SPDX_NS, type ProvActivity } from "../content/prov.ts";
 
@@ -156,11 +156,11 @@ const rel = (root: string, file: string): string => relative(root, file).split("
 /**
  * The address book for a checkout: who owns each actor, role and process, and
  * at what release address. Built once; nested layers are their own owners
- * (`instanceRootsIn`), so a process file is attributed to the DEEPEST layer
+ * (`layerRootsIn`), so a process file is attributed to the DEEPEST layer
  * holding it.
  */
 export function addressBook(repo: string, mint?: SubjectMinter): AddressBook {
-  const roots = instanceRootsIn(repo).sort((a, b) => b.length - a.length);
+  const roots = layerRootsIn(repo).sort((a, b) => b.length - a.length);
   const owner = (file: string): string | undefined => roots.find((r) => file.startsWith(`${r}/`));
   const actors = new Map<string, Owned>();
   const roles = new Map<string, Owned>();

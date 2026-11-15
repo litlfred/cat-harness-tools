@@ -30,7 +30,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { defaultGraphTypologies, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { lockedMountPaths } from "../schemas/kg/index-config.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { layerRootsIn } from "../schemas/kg/instance-roots.js";
 import {
   baselinePath,
   NodeKindIndexFileKind,
@@ -93,7 +93,7 @@ interface DeclaredBaseline {
 export function readBaselines(root = repoRoot): DeclaredBaseline[] {
   const out: DeclaredBaseline[] = [];
   const mounts = new Set(lockedMountPaths(root).map((p) => resolve(root, p)));
-  for (const r of instanceRootsIn(root)) {
+  for (const r of layerRootsIn(root)) {
     const instance = readDeclaration(r)?.name;
     if (!instance) continue;
     const mounted = mounts.has(resolve(r));

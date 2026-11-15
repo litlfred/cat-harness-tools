@@ -28,7 +28,7 @@ import { alternativesWithoutSelection, danglingRemedies, networkToolsWithoutReme
 import { toJsonSchema } from "../schemas/kg/to-json-schema.js";
 import { contractFile, skillContracts } from "./skill-contracts.js";
 import { corpusScopeFor, knownSkills as knownSkillsIn, workflowFiles } from "./known-skills.js";
-import { instanceDirectoryForGraph, instanceRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.js";
+import { instanceDirectoryForGraph, layerRootsIn, nestedDirectories, readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.js";
 import { judgeSkillRef, switchedOffSkillHomes } from "./lib/switched-off-skills.ts";
 import { inlineToolDeclarations } from "../schemas/tools/tool-folders.js";
 import { resolveImplementingPath } from "../schemas/kg/harness-config.js";
@@ -138,7 +138,7 @@ export function unresolvedPaths(
   // A `module`, by contrast, is resolved against the layer that DECLARED
   // the Tool, and then against the layer that implements it — so the Tools
   // are read per declaring layer rather than as one flat list.
-  const roots = instance === undefined ? instanceRootsIn(REPO) : [instance];
+  const roots = instance === undefined ? layerRootsIn(REPO) : [instance];
   const declared: Array<{ declaringRoot: string; t: ToolDefinition }> = roots.flatMap((r) =>
     toolsOf(r).map((t) => ({ declaringRoot: resolve(r), t })),
   );
@@ -362,7 +362,7 @@ export interface ToolCheck {
  */
 function declaredProcessIds(instance: string = ROOT): Set<string> {
   const out = new Set<string>();
-  for (const inst of new Set([resolve(instance), ...instanceRootsIn(siblingScopeFor(instance)).map((r) => resolve(r))])) {
+  for (const inst of new Set([resolve(instance), ...layerRootsIn(siblingScopeFor(instance)).map((r) => resolve(r))])) {
     for (const f of workflowFiles(inst)) {
       if (f.endsWith(".bpmn")) out.add(f.replace(/^.*\//, "").slice(0, -".bpmn".length));
     }
@@ -390,7 +390,7 @@ function satisfiableSkills(instance: string = ROOT): Set<string> {
   // one here returns an empty list that looks exactly like "no siblings
   // declare it" — the vacuous-green shape, arrived at by using a variable
   // whose name does not say which root it is.
-  for (const sibling of instanceRootsIn(siblingScopeFor(instance))) {
+  for (const sibling of layerRootsIn(siblingScopeFor(instance))) {
     if (resolve(sibling) === resolve(instance)) continue;
     for (const id of knownSkillsIn(sibling)) out.add(id);
   }
@@ -409,7 +409,7 @@ function satisfiableSkills(instance: string = ROOT): Set<string> {
 export function danglingStorageTools(repoRoot: string = REPO): Array<{ instance: string; directory: string; tool: string }> {
   const known = new Set(tools().map((t) => t.id));
   const out: Array<{ instance: string; directory: string; tool: string }> = [];
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     let decl;
     try {
       decl = readDeclaration(root);
@@ -437,7 +437,7 @@ export function danglingStorageTools(repoRoot: string = REPO): Array<{ instance:
  */
 export function declaredToolsDirs(repoRoot: string = REPO): Array<{ instance: string; dir: string }> {
   const out: Array<{ instance: string; dir: string }> = [];
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     let dir: string | undefined;
     try {
       dir = instanceDirectoryForGraph(root, "tools");
@@ -506,7 +506,7 @@ export function checkTools(instance?: string): ToolCheck {
   // Computed only when a target resolves nowhere, which a clean run never reaches.
   let off: ReturnType<typeof switchedOffSkillHomes> | undefined;
   let layerOfTool: Map<string, string> | undefined;
-  const layersHere = (): string[] => [...new Set([resolve(instance ?? ROOT), ...instanceRootsIn(siblingScopeFor(instance ?? ROOT)).map((r) => resolve(r))])];
+  const layersHere = (): string[] => [...new Set([resolve(instance ?? ROOT), ...layerRootsIn(siblingScopeFor(instance ?? ROOT)).map((r) => resolve(r))])];
   const unknownTypes: Array<{ tool: string; port: string; ref: string }> = [];
   const unsafeArgs: Array<{ tool: string; port: string; type: string }> = [];
   const unmetContracts: ToolCheck["unmetContracts"] = [];

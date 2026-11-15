@@ -49,7 +49,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteArg, siteTarget } from "./lib/site-target.ts";
 import { baseDocsDir } from "./compose-docs.js";
 import { KEYWORDS_GRAPH_DIR, KeywordsGraphSchema, type KeywordsGraph } from "../schemas/library/library-keywords.ts";
-import { checkoutRootFor, declaredGraphs, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, declaredGraphs, layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { checkMethodologyEvidence, frontMatterOf, methodologyNodes } from "./check-methodology-evidence.ts";
@@ -126,7 +126,7 @@ export interface EvidenceModel {
 /** Every skill document in the checkout: name, instance, description, typologies, methods. */
 function skillCatalogue(repo = REPO): Map<string, { instance: string; description: string; typologies: string[]; methods: string[] }> {
   const out = new Map<string, { instance: string; description: string; typologies: string[]; methods: string[] }>();
-  for (const root of instanceRootsIn(repo)) {
+  for (const root of layerRootsIn(repo)) {
     const instance = readDeclaration(root)?.name ?? posix.basename(root);
     for (const parts of skillMdDirs(root)) {
       const dir = join(root, ...parts);
@@ -183,7 +183,7 @@ function bpmnFiles(dir: string, out: string[] = []): string[] {
 function processesBySkill(repo = REPO): Map<string, string[]> {
   const out = new Map<string, Set<string>>();
   const seen = new Set<string>();
-  for (const root of instanceRootsIn(repo)) {
+  for (const root of layerRootsIn(repo)) {
     for (const g of declaredGraphs(root)) {
       if (!g.absPath || seen.has(g.absPath) || !g.graphTypologies.some((k) => k === "processes" || k === "business-processes")) continue;
       seen.add(g.absPath);

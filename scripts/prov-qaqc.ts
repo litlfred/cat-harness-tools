@@ -44,7 +44,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { addressBook, provJsonldDocument, type AddressBook, type SubjectMinter } from "../schemas/kg/prov-jsonld.js";
 import { ProvActivitySchema, ProvConsentRefSchema, agreementsCited, isConsentBasedRecord, isConsentPolicyUid, verifyProvHashChain, type ProvActivity } from "../schemas/content/prov.js";
 import { actorsDir, laneBinding, type RoleGraph } from "../schemas/process/role-graph.js";
@@ -392,7 +392,7 @@ export function publishedSubjects(repo: string = REPO): SubjectMinter {
     return docs.get(root)!;
   };
   const actors = actorsDir(repo);
-  const actorHome = actors ? instanceRootsIn(repo).filter((r) => actors.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0] : undefined;
+  const actorHome = actors ? layerRootsIn(repo).filter((r) => actors.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0] : undefined;
   return (root, kind, id) => {
     if (kind !== "actor") return subjectIri(docOf(root), kind, id);
     if (!actors || !actorHome || !existsSync(join(actors, `${id}.json`))) return undefined;

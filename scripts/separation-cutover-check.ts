@@ -38,7 +38,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.js";
 
 import { checkDeclarationResolution } from "./check-declaration-resolution.ts";
 import { analyse as importDirection } from "./check-import-direction.ts";
@@ -78,7 +78,7 @@ export interface CutoverReport {
  */
 export function ownInstances(root: string): string[] {
   const out: string[] = [];
-  for (const r of instanceRootsIn(root)) {
+  for (const r of layerRootsIn(root)) {
     const name = findDeclarationFile(r)?.replace(/\.json$/, "");
     if (name === undefined) continue;
     const rel = relative(root, r);
@@ -198,7 +198,7 @@ export function checkCutover(rootArg: string, opts: { site?: boolean; monorepo?:
 
   // mounts
   if (!existsSync(join(root, "index.config.json"))) {
-    const needsOutside = instanceRootsIn(root).length <= 1 ? [] : ["(instances beside the root)"];
+    const needsOutside = layerRootsIn(root).length <= 1 ? [] : ["(instances beside the root)"];
     conditions.push({
       id: "mounts",
       state: needsOutside.length === 0 ? "pass" : "fail",

@@ -58,7 +58,7 @@ import {
   type Plan,
   plan,
 } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
-import { instanceDirectories, declaredAssetPath, INSTANCE_README_ROLE, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { instanceDirectories, declaredAssetPath, INSTANCE_README_ROLE, layerRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { mountScopeFor } from "../schemas/kg/remote-mount.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
 import { contentIsOffCheckout } from "../schemas/kg/subgraph-source.ts";
@@ -143,7 +143,7 @@ export function harnessInstances(repo: string): InstanceInput[] {
   // not pay for a walk whose answer nothing asks for.
   let processes: ProcessIndex | undefined;
   const index = (): ProcessIndex => (processes ??= processIndex(repo));
-  for (const inst of instanceRootsIn(repo)) {
+  for (const inst of layerRootsIn(repo)) {
     // A remote mount is another repository's bytes (bean `nn8e`, `hupw`): its READMEs
     // are generated there, and writing here would only break the lock's digest.
     if (resolve(inst) !== resolve(repo) && mountScopeFor(inst) !== undefined) continue;
@@ -278,7 +278,7 @@ export function repoArg(argv: readonly string[]): string | undefined {
  * `--check`, 2 when the directory is not a checkout this harness can read.
  */
 async function runForRepo(repo: string, check: boolean): Promise<number> {
-  if (!existsSync(repo) || instanceRootsIn(repo).length === 0) {
+  if (!existsSync(repo) || layerRootsIn(repo).length === 0) {
     console.error(`${GATE}: UNKNOWN — ${repo} holds no instance declaration; nothing was written or checked.`);
     return 2;
   }

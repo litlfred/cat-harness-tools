@@ -20,7 +20,7 @@ import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { join, relative, resolve, sep } from "node:path";
 import { loadProcessModel, isActivity, processDiagrams } from "../src/workflow/process-model.js";
 import { knownSkills } from "./known-skills.js";
-import { instanceRootsIn, repoRootFor, siblingScopeFor } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, repoRootFor, siblingScopeFor } from "../schemas/kg/cat-harness.js";
 import { judgeSkillRef, switchedOffSkillHomes } from "./lib/switched-off-skills.ts";
 import { beanCallFindings, noteTakers, type DiagramFacts } from "./check-bean-lifecycle-calls.ts";
 
@@ -204,7 +204,7 @@ for (const file of files) {
 // The same split `check:tools` makes for a `satisfies` target, from the same
 // resolver, so the two cannot disagree about one skill name.
 if (unresolved.length > 0) {
-  const layers = [...new Set([resolve(INSTANCE_ROOT), ...instanceRootsIn(siblingScopeFor(INSTANCE_ROOT)).map((r) => resolve(r))])];
+  const layers = [...new Set([resolve(INSTANCE_ROOT), ...layerRootsIn(siblingScopeFor(INSTANCE_ROOT)).map((r) => resolve(r))])];
   const layerOf = (abs: string): string | undefined =>
     layers.filter((l) => abs === l || abs.startsWith(l + sep)).sort((a, b) => b.length - a.length)[0];
   const off = switchedOffSkillHomes(layers);

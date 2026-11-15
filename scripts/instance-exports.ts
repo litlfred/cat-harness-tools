@@ -8,7 +8,7 @@
  *
  * ## The set is DERIVED from the declarations, never listed
  *
- * The workflows run THIS script, which asks {@link instanceRootsIn}, so a new
+ * The workflows run THIS script, which asks {@link layerRootsIn}, so a new
  * declaration is published with no workflow edit.
  *
  * ## Published elsewhere — the only list, and each entry is CHECKED
@@ -40,7 +40,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { artefactStub, instanceRootsIn, ownDirectories, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { artefactStub, layerRootsIn, ownDirectories, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { loadCodeLists } from "../schemas/library/code-list.ts";
 import { buildCodeListsDoc } from "./code-lists.ts";
 import { isPublished, publishedPath } from "../schemas/kg/url-space.js";
@@ -164,7 +164,7 @@ export function publishesInstanceSchema(instanceRoot: string, repo: string = REP
 /** Every declared layer's stub, readable declarations only. */
 export function declaredInstanceStubs(repo: string = REPO): Set<string> {
   const out = new Set<string>();
-  for (const abs of instanceRootsIn(repo)) {
+  for (const abs of layerRootsIn(repo)) {
     try {
       const d = readDeclaration(abs);
       if (d) out.add(artefactStub(d));
@@ -182,7 +182,7 @@ export function declaredInstanceStubs(repo: string = REPO): Set<string> {
  */
 export function instanceExportPlan(repo: string = REPO): PlannedExport[] {
   const out: PlannedExport[] = [];
-  for (const abs of instanceRootsIn(repo)) {
+  for (const abs of layerRootsIn(repo)) {
     let name: string;
     let stub: string;
     let ownCanonical: boolean;

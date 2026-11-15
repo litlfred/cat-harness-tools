@@ -168,3 +168,15 @@ Feature: SQLite slices of the beans, todos, library and knowledge graph
     Then it has more than 1000 nodes and more than 100 payload links
     And --check reports no problems
     And the built slice is not over budget
+
+  @test:scripts/tests/gen-slice-sqlite.test.ts::gen-slice-sqlite_—_a_reached_but_empty_work-plan_store::an_empty_bean_store_still_refuses_--check,_so_building_it_is_not_applicable_rather_than_green
+  Scenario: A reached but empty work-plan store is not applicable, not a refusal
+    Given a bean store that was reached and holds no beans
+    Then --check over it still reports that there is no row to probe FTS5 with
+    And the beans and todos slices report it as not applicable, naming the empty store
+
+  @test:scripts/tests/gen-slice-sqlite.test.ts::gen-slice-sqlite_—_a_reached_but_empty_work-plan_store::a_store_with_rows_is_sliced_as_before,_and_an_empty_content_slice_(library,_kg)_still_refuses
+  Scenario: Only an empty work-plan store is excused
+    Given a bean store with one bean
+    Then it is sliced as before
+    And an empty library or kg slice is not excused, so it still refuses

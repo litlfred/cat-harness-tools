@@ -43,7 +43,7 @@ import {
   checkoutRootFor,
   deferResolution,
   findDeclarationFile,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
 } from "../schemas/kg/cat-harness.js";
 import { lockedMountPaths } from "../schemas/kg/index-config.js";
@@ -1256,7 +1256,7 @@ export async function runAgentMemory(
       ? [explicitDir]
       : [
           baseRoot,
-          ...instanceRootsIn(baseRoot).filter(
+          ...layerRootsIn(baseRoot).filter(
             (r) => resolve(r) !== resolve(baseRoot) && existsSync(join(r, ".claude", "agents")),
           ),
         ];

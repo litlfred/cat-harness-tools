@@ -42,7 +42,7 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
-import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { buildCommand, installCommand, parseWebApp, WEB_APP_FILE, type WebApp } from "../schemas/ui/web-app.ts";
 import { makeEmit, NAVBAR_OPT_OUT } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedBy, withRenderedByFrontMatter } from "./viewer-declarations.js";
@@ -81,7 +81,7 @@ export function unmountedApps(repoRoot: string): DeclaredApp[] {
 
 function appDeclarations(repoRoot: string): DeclaredApp[] {
   const out: DeclaredApp[] = [];
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const decl = readDeclaration(root);
     for (const d of decl?.directories ?? []) {
       if (!(d.graphTypologies ?? []).includes(KIND)) continue;

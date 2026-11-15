@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "../../schemas/kg/cat-harness.ts";
+import { findDeclarationFile, layerRootsIn } from "../../schemas/kg/cat-harness.ts";
 import { KnowledgeGraphDeclarationSchema } from "@litlfred/bootstrap-tools/schemas/graph.ts";
 
 /** The directory these tests were written in (`cat-harness/schemas/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
@@ -21,7 +21,7 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");
 const REPO_ROOT = join(ORIGIN_DIR, "..", "..");
 
 describe("every declaration in this repository is a Knowledge Graph declaration", () => {
-  const roots = instanceRootsIn(REPO_ROOT);
+  const roots = layerRootsIn(REPO_ROOT);
   test("there are declarations to check", () => expect(roots.length).toBeGreaterThan(3));
   test.each(roots.map((root): [string, string] => [root.slice(REPO_ROOT.length) || "/", root]))(
     "the declaration at %s parses as a Knowledge Graph declaration",

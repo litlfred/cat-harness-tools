@@ -21,7 +21,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
-import { instanceDirectoriesForGraph, instanceRootsIn } from "../../schemas/kg/cat-harness.ts";
+import { instanceDirectoriesForGraph, layerRootsIn } from "../../schemas/kg/cat-harness.ts";
 import { tokenize } from "../../pipeline/lsi.ts";
 import type { KeywordVariant, KeywordsGraph, ScoredKeyword } from "../../schemas/library/library-keywords.ts";
 import type { LibraryLinks, LibraryResolver } from "./library-links.ts";
@@ -256,7 +256,7 @@ export function glossaryLabels(repo: string): { labels: Set<string>; files: stri
   const labels = new Set<string>();
   const files: string[] = [];
   // Every layer's declared `glossary` graphs, not a `glossary/` found by name.
-  for (const dir of instanceRootsIn(repo).flatMap((inst) => instanceDirectoriesForGraph(inst, "glossary"))) {
+  for (const dir of layerRootsIn(repo).flatMap((inst) => instanceDirectoriesForGraph(inst, "glossary"))) {
     if (!existsSync(dir)) continue;
     for (const f of readdirSync(dir).filter((n) => n.endsWith(".glossary.json")).sort()) {
       try {

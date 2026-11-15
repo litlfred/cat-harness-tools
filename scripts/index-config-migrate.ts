@@ -62,7 +62,7 @@ import {
   withDeclaredHarnesses,
   withIgnoreBlock,
   type IndexConfig,
-  type IndexInstance,
+  type IndexLayer,
   type IndexMigration,
 } from "../schemas/kg/index-config.js";
 
@@ -94,13 +94,13 @@ function readLegacy(file: string): Record<string, unknown> {
 /**
  * Every index entry with its imported `<name>.config.json` folded in: the
  * file's content overlaid by the entry's inline fields — the same overlay
- * `effectiveInstanceConfig` reads — with `import` dropped. The file's
+ * `effectiveLayerConfig` reads — with `import` dropped. The file's
  * `_comment` is kept as the entry's when the entry has none. Returns the new
  * config and the files whose content moved. Pure apart from reading.
  */
 export function inlineEntries(root: string, config: IndexConfig): { config: IndexConfig; retire: string[] } {
   const retire: string[] = [];
-  const instances = config.instances.map((entry): IndexInstance => {
+  const instances = config.instances.map((entry): IndexLayer => {
     const file = importedConfigFilename(entry);
     const path = join(root, file);
     if (!existsSync(path)) return entry;
@@ -109,7 +109,7 @@ export function inlineEntries(root: string, config: IndexConfig): { config: Inde
     const { import: _i, ...head } = entry;
     retire.push(file);
     const comment = entry._comment ?? (typeof legacyComment === "string" ? legacyComment : undefined);
-    return { ...head, ...(comment !== undefined ? { _comment: comment } : {}), ...merged } as IndexInstance;
+    return { ...head, ...(comment !== undefined ? { _comment: comment } : {}), ...merged } as IndexLayer;
   });
   // Two entries importing ONE file each get its content; it is deleted once.
   return { config: { ...config, instances }, retire: [...new Set(retire)] };

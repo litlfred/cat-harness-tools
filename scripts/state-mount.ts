@@ -78,7 +78,7 @@ import {
   type BranchStoreOptions,
   type TipLocation,
 } from "./branch-store.js";
-import { instanceRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { tools } from "../tools/discover.js";
 import { exitCode as remoteExitCode, remoteFanOut } from "./remote-mount.ts";
 
@@ -493,7 +493,7 @@ export interface DelegatedStore {
 export function delegatedStores(root: string = repoRootOf()): DelegatedStore[] {
   const byId = new Map(tools().map((t) => [t.id, t]));
   const out: DelegatedStore[] = [];
-  for (const inst of instanceRootsIn(root)) {
+  for (const inst of layerRootsIn(root)) {
     let decl;
     try {
       decl = readDeclaration(inst);

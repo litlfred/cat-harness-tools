@@ -251,10 +251,32 @@ export interface KindPages {
   dashboard?(nodes: readonly KindNode[], ctx: KindPagesContext): PageSection[];
   /** Sections on a node's page, after its heading and before its fields. */
   node?(n: KindNode, ctx: KindPagesContext): PageSection[];
+  /**
+   * Where a visualiser of the kind's own layer already shows its nodes, as
+   * one page per node or as summaries (core's Bibliography for
+   * `folio-reference`). Set, the kind page and its harness pages link there
+   * in place of their table of nodes, and no per-node page is written: the
+   * kind still has its pages, which the schemas page links (owner,
+   * 2026-11-13, every node kind gets pages), without a second copy of every
+   * node. who-iris carried 7,110 generic reference pages and a 2.3 MB index
+   * beside its bibliography until this (owner, 2026-11-15, option A).
+   */
+  nodesShownBy?: NodesShownBy;
+}
+
+/** A visualiser page that shows a kind's nodes ({@link KindPages.nodesShownBy}). */
+export interface NodesShownBy {
+  /** The visualiser's title, as a link text: "Bibliography". */
+  label: string;
+  /** Its page directory, site-relative with no trailing slash: `en/folio-assistant-core/bibliography`. */
+  route(locale: string): string;
+  /** One node's page directory there, site-relative, when it has one. Absent or undefined: the visualiser's page. */
+  node?(n: Pick<KindNode, "harness" | "path" | "node">, locale: string): string | undefined;
 }
 
 export const isKindPages = (v: unknown): v is KindPages =>
-  !!v && typeof v === "object" && (typeof (v as KindPages).dashboard === "function" || typeof (v as KindPages).node === "function");
+  !!v && typeof v === "object" &&
+  (typeof (v as KindPages).dashboard === "function" || typeof (v as KindPages).node === "function" || typeof (v as KindPages).nodesShownBy?.route === "function");
 
 const sectionsHtml = (extra: readonly PageSection[]): string =>
   extra.map((x) => `<h2 id="${esc(x.id)}">${esc(x.label)}</h2>\n${x.html}`).join("\n");
@@ -304,7 +326,9 @@ export function dashboardHtml(
   harness?: string,
   extra: readonly PageSection[] = [],
   shape: PageShape = "themed",
+  shownByOf: ReadonlyMap<string, NodesShownBy> = new Map(),
 ): string {
+  const shownBy = shownByOf.get(k.id);
   const base = kindDir(locale, k);
   const here = harness ? `${base}/${harness}` : base;
   const cols = columnsFor(fields);
@@ -342,14 +366,20 @@ export function dashboardHtml(
     .map((n) => {
       // A node's page is under the kind it IS — one address per node — so a
       // subclass's row links into its own kind's pages.
-      const to = href(here, `${kindDir(locale, byId.get(n.kind) ?? k)}/${n.harness}/${n.path}`);
+      const shown = shownByOf.get(n.kind);
+      const to = shown !== undefined
+        ? href(here, shown.node?.(n, locale) ?? shown.route(locale))
+        : href(here, `${kindDir(locale, byId.get(n.kind) ?? k)}/${n.harness}/${n.path}`);
       return `<tr data-kind="${esc(n.kind)}" data-harness="${esc(n.harness)}"><td class="p"><a href="${to}">${esc(n.path)}</a></td>${
         harness ? "" : `<td class="s">${esc(n.harness)}</td>`
       }${oneKind ? "" : `<td class="s">${esc(n.kind)}</td>`}${cols.map((c) => `<td class="${cls(c)}">${esc(cell(n.node[c.name]))}</td>`).join("")}</tr>`;
     })
     .join("\n");
 
-  const table = nodes.length
+  const table = shownBy !== undefined
+    ? `<h2 id="nodes">Nodes</h2>
+<p>${nodes.length ? `${nodes.length} node(s)${harness ? " in this harness" : ""}, shown` : "Nodes of this kind are shown"} in the <a href="${href(here, shownBy.route(locale))}">${esc(shownBy.label)}</a>.</p>`
+    : nodes.length
     ? `<h2 id="nodes">Nodes</h2>
 <p>${select("kind", "Kind", kinds)}${harness ? "" : select("harness", "Harness", harnesses)}<span class="m"><span id="shown">${nodes.length}</span> of ${nodes.length} shown</span></p>
 <div class="clip"><table>
@@ -370,7 +400,7 @@ ${where}
 ${tiles}
 ${sectionsHtml(extra)}
 ${table}`,
-    nodes.length ? FILTER : "",
+    nodes.length && shownBy === undefined ? FILTER : "",
     shape,
   );
 }
@@ -552,13 +582,26 @@ export async function buildNodeKindPages(o: BuildOptions): Promise<{ pages: stri
     // Themed: the plain emit, no rail. Standalone: the rail, with the page's own section (#1757).
     makeEmit({ check: o.check, onStale: () => { stale++; }, ...(shape === "standalone" ? { nav: { ...nav, section } } : {}), quiet: true })(file, html);
   };
+  // Read first, so a renderer linking to another kind's nodes links where they are shown.
+  const shownByOf = new Map<string, NodesShownBy>();
+  for (const k of index.kinds) {
+    if (!hasKindPages(k)) continue;
+    const shown = (await pagesOf(k)).nodesShownBy;
+    if (shown !== undefined) shownByOf.set(k.id, shown);
+  }
   for (const locale of LOCALES) {
     const ctxFor = (here: string): KindPagesContext => ({
       locale,
       nodesOf,
       linkTo: (kindId, n) => {
         const t = byId.get(kindId);
-        return hasKindPages(t) ? href(here, `${kindDir(locale, t)}/${n.harness}/${n.path}`) : undefined;
+        if (!hasKindPages(t)) return undefined;
+        const shown = shownByOf.get(kindId);
+        if (shown !== undefined) {
+          const to = "node" in n ? shown.node?.(n as KindNode, locale) : undefined;
+          return href(here, to ?? shown.route(locale));
+        }
+        return href(here, `${kindDir(locale, t)}/${n.harness}/${n.path}`);
       },
     });
     for (const k of index.kinds) {
@@ -569,12 +612,14 @@ export async function buildNodeKindPages(o: BuildOptions): Promise<{ pages: stri
       const base = kindDir(locale, k);
       const dash = (scoped: readonly KindNode[], here: string) => own.dashboard?.(scoped, ctxFor(here)) ?? [];
       const top = dash(nodes, base);
-      write(base, dashboardHtml(k, nodes, fields, byId, locale, undefined, top, shape), dashboardSection(k, nodes, fields, undefined, top));
+      const shown = own.nodesShownBy;
+      write(base, dashboardHtml(k, nodes, fields, byId, locale, undefined, top, shape, shownByOf), dashboardSection(k, nodes, fields, undefined, top));
       for (const h of new Set(nodes.map((n) => n.harness))) {
         const scoped = nodes.filter((n) => n.harness === h);
         const extra = dash(scoped, `${base}/${h}`);
-        write(`${base}/${h}`, dashboardHtml(k, scoped, fields, byId, locale, h, extra, shape), dashboardSection(k, nodes, fields, h, extra));
+        write(`${base}/${h}`, dashboardHtml(k, scoped, fields, byId, locale, h, extra, shape, shownByOf), dashboardSection(k, nodes, fields, h, extra));
       }
+      if (shown !== undefined) continue; // its nodes are shown by `shown`, not a page each
       for (const n of nodes) {
         if (n.kind !== k.id) continue; // written under its own kind
         const here = `${base}/${n.harness}/${n.path}`;

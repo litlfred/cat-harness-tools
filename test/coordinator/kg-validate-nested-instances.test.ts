@@ -54,7 +54,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, kgQaHomeFor, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { layerRootsIn, kgQaHomeFor, readDeclaration } from "../../schemas/kg/cat-harness.js";
 import { owningInstanceRoot, validatePath, validateText } from "../../scripts/kg-validate.js";
 import { readLayerQaTree } from "../../scripts/layer-qa.ts";
 import { readQaTree, type QaStoreOptions } from "../../scripts/qa-store.js";
@@ -86,7 +86,7 @@ const isKgQaFile = (rel: string, home: string): boolean =>
 function readSidecars(): { byInstance: Map<string, Sidecar[]>; storeState: string } {
   const out = new Map<string, Sidecar[]>();
   const absent: Array<{ key: string; home: string }> = [];
-  for (const inst of instanceRootsIn(REPO)) {
+  for (const inst of layerRootsIn(REPO)) {
     const key = relative(REPO, inst) || ".";
     const home = kgQaHomeFor(inst, HARNESS).root;
     if (!existsSync(home)) {
