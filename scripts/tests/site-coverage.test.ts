@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { expectedPages, igIndexSubjects, INDEX_PAGE_NEEDS_SUBJECTS, legacyOnlyPages, instanceSubgraph, missingPages, SUBJECT_READERS, subjectInstances, webAppSubjects, type ExpectedPage } from "../site-coverage.ts";
+import { expectedPages, igIndexSubjects, owedOnScopedSite, INDEX_PAGE_NEEDS_SUBJECTS, legacyOnlyPages, instanceSubgraph, missingPages, SUBJECT_READERS, subjectInstances, webAppSubjects, type ExpectedPage } from "../site-coverage.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 
@@ -192,5 +192,25 @@ describe("instanceSubgraph: subgraphUnder nests the per-instance page, as the ti
   });
   test("a visualiser with no subgraphUnder keeps <instance>/", () => {
     expect(instanceSubgraph("smart-base", [{ instance: "smart-base" }, { instance: "who-iris", under: "instance" }])).toBe("smart-base");
+  });
+});
+
+describe("owedOnScopedSite: a host-site visualiser is owed where a layer in scope holds its subjects", () => {
+  // who-iris, 2026-11-15: core's bibliography is `subgraphs: "directory"` and
+  // `builtOnHostSite`; who-iris's site is scoped to who-iris, so the page was
+  // owed nowhere, never written, and the guard passed.
+  const bib = { harness: "folio-assistant-core", builtOnHostSite: {} };
+  const scope = new Set(["who-iris"]);
+  test("owed when a layer in scope holds a covered directory with anything in it", () => {
+    expect(owedOnScopedSite(bib, scope, [], [{ instance: "who-iris" }])).toBe(true);
+  });
+  test("not owed when only layers out of scope hold one", () => {
+    expect(owedOnScopedSite(bib, scope, [], [{ instance: "smart-base" }])).toBe(false);
+  });
+  test("a visualiser not built on the host site keeps the old rule", () => {
+    const plain = { harness: "folio-assistant-core" };
+    expect(owedOnScopedSite(plain, scope, [], [{ instance: "who-iris" }])).toBe(false);
+    expect(owedOnScopedSite(plain, scope, ["who-iris"], [])).toBe(true);
+    expect(owedOnScopedSite(plain, new Set(["folio-assistant-core"]), [], [])).toBe(true);
   });
 });
