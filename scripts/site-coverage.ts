@@ -202,12 +202,12 @@ export function instanceSubgraph(instance: string, dirs: readonly { instance: st
  * sub-graph page for is. A `builtOnHostSite` visualiser (bean
  * folio-assistant-uldr) is drawn on the site that HOSTS its subjects, so it is
  * also owed when a layer in scope holds anything in a directory it covers,
- * whatever its `subgraphs`. Without that, core's `bibliography`
- * (`subgraphs: "directory"`, covering who-iris's `references/` and
- * `catalogue/`) was owed by no scoped site: who-iris's own site dropped
- * `en/folio-assistant-core/bibliography/`, its writer never ran, and this
- * guard reported every declared page present (who-iris publish run
- * 43710187461, 2026-11-15).
+ * whatever its `subgraphs`. Without that, a `bibliography` visualiser
+ * declared by a layer above this one (`subgraphs: "directory"`, covering a
+ * content layer's `references/` and `catalogue/`) was owed by no scoped
+ * site: that content layer's own site dropped `en/<harness>/bibliography/`,
+ * its writer never ran, and this guard reported every declared page present
+ * (publish run 43710187461, 2026-11-15).
  */
 export function owedOnScopedSite(
   v: { harness: string; builtOnHostSite?: unknown },
