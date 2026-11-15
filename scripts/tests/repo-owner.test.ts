@@ -12,6 +12,7 @@ import { join } from "node:path";
 import {
   checkoutOwner,
   HARNESS_OWNER,
+  HARNESS_ADDRESSES,
   isHarnessRepository,
   isSameOwnerName,
   ownerFromUrl,
@@ -86,6 +87,8 @@ describe("names", () => {
 
   test("harness layers are known, content layers are not", () => {
     expect(HARNESS_OWNER).toBe("litlfred");
+    // every harness address moves with HARNESS_OWNER
+    for (const url of HARNESS_ADDRESSES) expect(ownerFromUrl(url)).toBe(HARNESS_OWNER);
     expect(isHarnessRepository("litlfred/cat-harness-tools")).toBe(true);
     expect(isHarnessRepository("fhir-harness")).toBe(true);
     expect(isHarnessRepository("litlfred/smart-base")).toBe(false);

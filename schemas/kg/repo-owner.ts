@@ -5,19 +5,19 @@
  * @graphNode none — repository naming helpers, not a schema
  *
  * WHO migration, plan step T3 (owner decision Q-WP-1 = A, 2026-11-15;
- * cat-harness-tools#2337). The content layers (smart-*, dth-*) move from
- * `litlfred/` to `WorldHealthOrganization/` by PRs from the forks, and the
+ * cat-harness-tools#2337). The content layers move from one GitHub owner
+ * to another by PRs from the forks, and the
  * same commit must build correctly in both places. So a content layer's pin
  * on ANOTHER content layer does not name an owner:
  *
  * ```json
- * { "name": "smart-base", "source": { "remote": { "repository": "smart-base", "ref": "<sha>" } } }
+ * { "name": "base", "source": { "remote": { "repository": "base", "ref": "<sha>" } } }
  * ```
  *
  * A repository written without an owner is a SAME-OWNER name: it resolves to
  * `<owner of the checkout that holds the file>/<name>`. A fork resolves to
  * the fork and WHO resolves to WHO, at the same commit, because WHO merges
- * with merge commits (plan rule M1). `{ "repository": "smart-base",
+ * with merge commits (plan rule M1). `{ "repository": "base",
  * "sameOwner": true }` is read the same way.
  *
  * The owner of a checkout is never declared ({@link checkoutOwner}).
@@ -27,8 +27,8 @@
  * mirror it) is what changes when the harness moves to its own org.
  *
  * A repository that must name another owner on purpose keeps the absolute
- * form. smart-immunizations-uganda stays at litlfred after the move, so its
- * pins on smart-base and smart-immunizations name `WorldHealthOrganization/…`.
+ * form: a content repository that stays behind while the layers it pins
+ * move names their new owner in each of those pins.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -39,17 +39,25 @@ import { inputSiteReached } from "../sdlc/input-trace.ts";
 /** The GitHub owner of the harness layers. Change here when the harness moves. */
 export const HARNESS_OWNER = "litlfred";
 
-/** The harness layers: always pinned with an owner ({@link HARNESS_OWNER}), never same-owner. */
-export const HARNESS_REPOSITORIES: readonly string[] = [
-  "bootstrap",
-  "bootstrap-tools",
-  "cat-harness",
-  "cat-harness-tools",
-  "folio-assistant",
-  "folio-assistant-core",
-  "folio-assistant-sci",
-  "fhir-harness",
+/**
+ * The harness layers, as their GitHub addresses: always pinned with an owner
+ * ({@link HARNESS_OWNER}), never same-owner. Written as addresses because
+ * they name REPOSITORIES, not layers this one depends on; a test holds every
+ * address to {@link HARNESS_OWNER}, so a move rewrites both together.
+ */
+export const HARNESS_ADDRESSES: readonly string[] = [
+  "https://github.com/litlfred/bootstrap",
+  "https://github.com/litlfred/bootstrap-tools",
+  "https://github.com/litlfred/cat-harness",
+  "https://github.com/litlfred/cat-harness-tools",
+  "https://github.com/litlfred/folio-assistant",
+  "https://github.com/litlfred/folio-assistant-core",
+  "https://github.com/litlfred/folio-assistant-sci",
+  "https://github.com/litlfred/fhir-harness",
 ];
+
+/** The harness layers' repository names: the last segment of each of {@link HARNESS_ADDRESSES}. */
+export const HARNESS_REPOSITORIES: readonly string[] = HARNESS_ADDRESSES.map((u) => u.slice(u.lastIndexOf("/") + 1));
 
 /** A GitHub owner or repository name segment. */
 const SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;

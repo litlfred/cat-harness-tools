@@ -7,10 +7,10 @@
  * @graphNode none — a one-time converter over index.config.json and index.lock.json
  *
  * WHO migration, plan step T3/T4 (owner decision Q-WP-1 = A, 2026-11-15;
- * cat-harness-tools#2337). A content repository (smart-*, dth-*) that pins
+ * cat-harness-tools#2337). A content repository that pins
  * another content repository under its OWN owner names it without the owner,
- * so the same commit resolves to `litlfred/<name>` in the fork and
- * `WorldHealthOrganization/<name>` in WHO (`schemas/kg/repo-owner.ts`).
+ * so the same commit resolves to `<fork owner>/<name>` in the fork and
+ * `<new owner>/<name>` upstream (`schemas/kg/repo-owner.ts`).
  *
  * A mount is converted when all hold:
  *  - it is not a harness layer (`HARNESS_REPOSITORIES`: those stay absolute
@@ -23,14 +23,14 @@
  * converted repository as its bare name. Refs, digests and trust are not
  * touched, so `mount:remote:check` stays as it was.
  *
- * It refuses to run in a harness repository (folio-assistant and the other
+ * It refuses to run in a harness repository (any of
  * `HARNESS_REPOSITORIES`): those stay put while the content moves, so their
  * pins on content layers name the owner. A layer that has ALREADY moved
- * (who-iris, dth-hrh) is re-pinned to its new owner first; it then names
+ * is re-pinned to its new owner first; it then names
  * another owner and is kept.
  *
  * Do NOT run it in a repository that stays behind while the layers it pins
- * move (smart-immunizations-uganda): its pins must name the new owner
+ * move: its pins must name the new owner
  * explicitly instead.
  *
  *   bun run cat mount:same-owner                 # report what would change
@@ -68,7 +68,7 @@ export interface SameOwnerPlan {
 /** What {@link convertSameOwner} would do at `root`, changing nothing. */
 export function planSameOwner(root: string, keep: readonly string[] = [], owner = checkoutOwner(root), self = checkoutName(root)): SameOwnerPlan {
   if (!owner) throw new Error(`cannot tell who owns ${root}: no CAT_REPO_OWNER, no origin, no GITHUB_REPOSITORY_OWNER`);
-  // A harness checkout (folio-assistant, …) stays under HARNESS_OWNER while
+  // A harness checkout stays under HARNESS_OWNER while
   // the content layers it mounts move: its pins on them must name their
   // owner, so it is never converted.
   if (isHarnessRepository(self)) throw new Error(`${self} is a harness repository: its content-layer pins stay owner-qualified (re-pin them to the new owner instead)`);

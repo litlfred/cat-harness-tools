@@ -7,8 +7,8 @@
  *
  * WHO migration, plan step T3 (owner decision Q-WP-1 = A, 2026-11-15;
  * cat-harness-tools#2337). Nothing here knows any particular organisation:
- * the profile is data a higher layer supplies (smart-base keeps the one the
- * smart-* and dth-* layers share), so this layer stays generic.
+ * the profile is data a higher layer supplies (one file the content layers
+ * share), so this layer stays generic.
  *
  * A **profile** (a JSON file in a mounted layer) holds three roots:
  *
@@ -27,8 +27,8 @@
  * A layer declares only `publish` on its entry in `index.config.json`:
  *
  * ```json
- * { "name": "smart-x", "source": { "local": { "at": "smart-x" } },
- *   "publish": { "id": "x", "stage": "staging", "profile": "smart-base/schemas/publishing.json" } }
+ * { "name": "layer-x", "source": { "local": { "at": "layer-x" } },
+ *   "publish": { "id": "x", "stage": "staging", "profile": "<base layer>/schemas/publishing.json" } }
  * ```
  *
  * and its `iriBase` follows: `<iriRoot>/<repository name>/` while staged,
