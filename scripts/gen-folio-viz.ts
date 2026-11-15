@@ -44,6 +44,7 @@ import { basename, join, relative, sep } from "node:path";
 import { viewerPlacement } from "./gen-schema-viz.ts";
 import { folioFileList, formatBytes, type FolioFile } from "@litlfred/cat-harness/folio-render/file-list.ts";
 import {
+  checkoutRootFor,
   directoriesForGraph,
   readDeclaration,
   repoRootFor,
@@ -59,6 +60,7 @@ import { checkoutDirectories } from "../schemas/kg/harness-config.js";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { mountedInstances } from "./lib/layer-output.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "folio-viewer";
@@ -510,6 +512,19 @@ if (import.meta.main) {
   const handler = readDeclaration(ROOT)?.name;
   if (!handler) {
     console.log("  · this instance declares no name — no handler segment to publish under");
+    process.exit(0);
+  }
+
+  // A MOUNTED HARNESS'S PAGES ARE NOT THIS CHECKOUT'S TO JUDGE. Here the
+  // full view reads this checkout's folio directories too, and its links
+  // resolve against this site's host, so what it computes describes the
+  // checkout, never the bytes the harness committed at its pin: every
+  // downstream read them as stale (dth-sc, smart-immunizations-uganda,
+  // 2026-11-15), and nothing a downstream does can make them current. The
+  // harness's own repository checks them; a downstream builds them at
+  // publish. A lower layer never waits on a higher one.
+  if (check && mountedInstances(checkoutRootFor(ROOT)).has(handler)) {
+    console.log(`  · ${handler} is a mounted layer here: its folio pages are checked in its own repository and built at this site's publish`);
     process.exit(0);
   }
 
