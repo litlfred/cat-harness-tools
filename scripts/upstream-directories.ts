@@ -110,9 +110,9 @@ function checkoutWithOwnKinds(
  * A planner folds this over EVERY layer it plans, before it reads any one's
  * nesting, so a kind one layer contributes is known while another layer that
  * uses it is read, whatever order the mounts are listed in. Without it a
- * standing re-pin of smart-ra refused smart-base, whose `smart-base.json`
- * names fhir-harness's `fhir-artifact-index` kind, because smart-base comes
- * before fhir-harness in the lock (2026-11-15, smart-ra runs 43686466920 and
+ * downstream's standing re-pin refused a layer whose declaration names a kind
+ * only a layer it depends on registers, because the using layer comes before
+ * the registering one in the lock (2026-11-15, runs 43686466920 and
  * 43688289116, exit 2).
  *
  * Side effect, stated: it sets the tree's sparse checkout, as
