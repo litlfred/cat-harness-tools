@@ -13,7 +13,9 @@
  * `ho66`): standing alone, cat-harness has no such root to read.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+// Publish-time files are written to the layer output overlay (bean sm8r);
+// these read the copy a site reader sees, falling back to the path given.
+import { existsSync, readFileSync } from "../../test/support/site-fs.ts";
 import { join } from "node:path";
 import jsonld from "jsonld";
 

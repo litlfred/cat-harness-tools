@@ -9,7 +9,9 @@
  * so nothing they read changed.
  */
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+// Publish-time files are written to the layer output overlay (bean sm8r);
+// these read the copy a site reader sees, falling back to the path given.
+import { existsSync, readFileSync } from "../support/site-fs.ts";
 import { join, resolve } from "node:path";
 
 import { forgeLocation, siteDirFor } from "../../schemas/kg/cat-harness.ts";
