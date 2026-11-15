@@ -85,6 +85,9 @@
  *
  * `--queue` lists every open PR carrying either label across the repositories
  * named, with the same verdict on its head as above, and flags `needs-repin`.
+ * It leaves out every PR labelled `content` (owner, 2026-11-15: "dont include
+ * content PRs in the table"): content merges on the owner's approval of its
+ * documented review (merge-guard check 9), never from the queue.
  * It only reads. The merge path is `merge:guard --merge`, the merge manager's
  * alone; this report never merges, re-pins or labels anything.
  *
@@ -710,6 +713,8 @@ export function watchRepo(api: GitHub, repo: string, opts: Options = DEFAULT_OPT
       // its pre-merge value (bean fx5r). The verdict reads the checks only.
       const pr = api.json<PullDetail>(`repos/${repo}/pulls/${number}`);
       details.push(pr);
+      // Content PRs are not the merge manager's (owner, 2026-11-15): no row.
+      if (pr.labels.some((l) => l.name === CONTENT_LABEL)) continue;
       row = { ...row, draft: pr.draft, headSha: pr.head.sha, mergeableState: pr.mergeable_state ?? "unknown" };
       let verdict: Verdict;
       try {
@@ -786,6 +791,8 @@ export function watchRepo(api: GitHub, repo: string, opts: Options = DEFAULT_OPT
 export const READY_LABEL = "ready-to-merge";
 /** The label for "green except the re-pin": the merge manager re-pins, then merges. */
 export const REPIN_LABEL = "needs-repin";
+/** A PR that changes folio content text; the queue never lists it (merge-guard check 9). */
+export const CONTENT_LABEL = "content";
 /** The labels that put a PR in the merge manager's queue. */
 export const QUEUE_LABELS: readonly string[] = [READY_LABEL, REPIN_LABEL];
 
@@ -816,14 +823,18 @@ interface PullListed {
   head: { sha: string };
 }
 
-/** The queue labels among `labels`, in {@link QUEUE_LABELS} order; empty when it is not queued. */
+/**
+ * The queue labels among `labels`, in {@link QUEUE_LABELS} order; empty when
+ * it is not queued, which includes every {@link CONTENT_LABEL} PR.
+ */
 export function queueLabels(labels: readonly string[]): string[] {
+  if (labels.includes(CONTENT_LABEL)) return [];
   return QUEUE_LABELS.filter((l) => labels.includes(l));
 }
 
 /**
- * The open PRs of `repo` labelled {@link READY_LABEL} or {@link REPIN_LABEL},
- * oldest number first, each with the verdict on its head. A head that could
+ * The open PRs of `repo` labelled {@link READY_LABEL} or {@link REPIN_LABEL}
+ * and not {@link CONTENT_LABEL}, oldest number first, each with the verdict on its head. A head that could
  * not be judged is `unknown`, never red.
  */
 export function queueRepo(api: GitHub, repo: string): QueueReport {
