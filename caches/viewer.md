@@ -10,7 +10,6 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 | [bundle-qa-working-copy](#bundle-qa-working-copy) | artifact-reuse | a-provenance | `artifact qa-working-copy + record bundle-qa-working-copy-<digest>` | script: `sha256(recipe 3, bundle name, HEAD^{tree}, ImageOS + RUNNER_ARCH, exact bun/git/node/python3/java versions, every state ref tip + qa-reports head, extras)` | undetermined — computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) | undetermined — the implied key: computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) |
 | [ci-image](#ci-image) | ghcr-image | a | `ghcr.io/<owner>/<repo>-ci of the INDEX repository (folio-assistant: ghcr.io/litlfred/folio-assistant-ci), tag = key` | script: `sha256(index.lock.json, bun.lock, package.json, every file under .github/ci-image and .github/actions/ci-setup sorted by path, bun --version, $ImageOS uname -m)` | undetermined — computed only by .github/ci-image/key.sh | from the daily report (not read) | undetermined — the implied key: computed only by .github/ci-image/key.sh | from the daily report (not read) |
 | [layers-ref](#layers-ref) | git-ref | a | `refs/cat/layers/<key> (and the moving refs/cat/layers/main), in the INDEX repository` | script: `sha256(JSON.stringify(index.lock.json .instances))` | undetermined — computed only by scripts/mount-from-lock.ts#layersKey | from the daily report (not read) | undetermined — the implied key: computed only by scripts/mount-from-lock.ts#layersKey | from the daily report (not read) |
-| [lpc-cat-mount](#lpc-cat-mount) | actions-cache | a | `cat-mount-v1-` | hashFiles: `cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}` | undetermined — fa/index.lock.json is not a file in this checkout | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 | [lpc-cone](#lpc-cone) | actions-cache | c | `layer-pr-checks-cone-v1-` | cache:key --base: `layer-pr-checks-cone-v1-${repo}-<hash of the base key>` | undetermined — one key per gate (`cache:key --base <gate>`), not one for the cache | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 | [lpc-derive-cache](#lpc-derive-cache) | actions-cache | c | `derive-cache-v1-` | per-run: `derive-cache-v1-${{ github.repository }}-${{ env.SIDE }}-${{ github.run_id }}-${{ github.run_attempt }}` | undetermined — run-scoped: no key is implied between runs | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 | [lpc-main-answer](#lpc-main-answer) | actions-cache | c | `layer-pr-checks-main-v5-` | script: `layer-pr-checks-main-v5-${repo}-${scripts:0:16}-<own_tree>-sha256(v5\|mode\|instance\|root_tree\|src_tree\|lower layer shas\|scripts\|test_path\|readers\|state.json)` | undetermined — computed only by .github/workflows/layer-pr-checks.yml (compare job) | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
@@ -72,20 +71,7 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 - **Save policy:** written when the lock changes, by its writer; refused unless every mount hashes to the lock; pruned to the newest 20 lock refs plus main and every open PR's lock
 - **Verify:** per instance, against the lock: the declaration's and each asset's sha256 and each directory's treeDigest (mount-from-lock layDownFrom); a layer that does not verify is fetched from its own repository, a missing ref falls back for all
 - **Uses:** `scripts/mount-from-lock.ts:841 layersKey`, `scripts/mount-from-lock.ts:870 openLayersCache (reader)`, `scripts/mount-from-lock.ts:974 publishLayers (writer)`, `scripts/mount-from-lock.ts:1086 layersSummaryLine (hit/warm/miss)`, `scripts/remote-mount.ts:2186 the committer's publish after a lock change`
-- **Notes:** Supersedes lpc-cat-mount and the other cat-mount Actions caches. Untrusted but exactly verified, so a stale or tampered ref only costs time. Measured on folio-assistant's lock (12 layers, ~32k files): 69 s per repository against 27 s on a hit with every byte verified. Every target needs it (it is the root of every needs closure), so it carries no `materializes`.
-
-### lpc-cat-mount
-
-**Layer PR checks: remote mounts** — cat-harness-tools, trust class a, owner cache-first CI (CI speed 14).
-
-- **Holds:** /home/runner/.cache/cat-mount
-- **Derived inputs:** the lock of the folio-assistant checkout the layer checks compose over, which pins every mounted tree
-- **Producer:** each job (actions/cache)
-- **Consumers:** prepare-head; prepare-base; record-writers; run (matrix, both sides × gate-shards)
-- **Save policy:** any missed run
-- **Verify:** mount-from-lock re-checks every mounted tree against the lock's digest; a bad entry is re-fetched
-- **Uses:** `.github/workflows/layer-pr-checks.yml:694`, `.github/workflows/layer-pr-checks.yml:1404`, `.github/workflows/layer-pr-checks.yml:1455`, `.github/workflows/layer-pr-checks.yml:1530`, `.github/workflows/pr-tests.yml:176`
-- **Notes:** Superseded by the layers ref (refs/cat/layers/<key>, cat-harness-tools#1506), which verifies per layer. Saves on any missed run, PRs included (PR-scoped by GitHub).
+- **Notes:** Supersedes the retired cat-mount-v1-* Actions caches. Untrusted but exactly verified, so a stale or tampered ref only costs time. Measured on folio-assistant's lock (12 layers, ~32k files): 69 s per repository against 27 s on a hit with every byte verified. Every target needs it (it is the root of every needs closure), so it carries no `materializes`.
 
 ### lpc-cone
 

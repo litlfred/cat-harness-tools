@@ -993,15 +993,6 @@ jobs:
         # --repo` lists only what git tracks.
         if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true'
         run: cp -a src "$RUNNER_TEMP/own"
-      - &mount-cache
-        name: Cache remote mounts (bean cis1)
-        if: steps.skip-prep.outputs.hit != 'true'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: /home/runner/.cache/cat-mount
-          key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
-          restore-keys: |
-            cat-mount-v1-
       - &mount
         # A root that carries its own replayer (folio-assistant's
         # `.github/mount-from-lock.sh`) is mounted with it: it knows which
@@ -1012,8 +1003,6 @@ jobs:
         # the IRIS instance's checks.yml does.
         name: Mount every instance from the root's lock
         if: steps.skip-prep.outputs.hit != 'true'
-        env:
-          CAT_MOUNT_CACHE_DIR: /home/runner/.cache/cat-mount
         run: |
           set -euo pipefail
           if [ -f fa/.github/mount-from-lock.sh ]; then
@@ -1946,7 +1935,6 @@ jobs:
         with:
           path: ${{ runner.temp }}/integration-stamp
           key: integration-stamp-v1-${{ github.repository }}-${{ steps.integ-bucket.outputs.bucket }}
-      - *mount-cache
       - *mount
       - *mark
       - *lower-layers-main
@@ -2010,7 +1998,6 @@ jobs:
       - *setup-bun
       - *caller
       - *caller-base
-      - *mount-cache
       - *mount
       - *mark
       - *lower-layers-main
@@ -2049,7 +2036,7 @@ jobs:
   # (smart-immunizations-uganda#4, run 38784912691: 2514 s base, 2637 s
   # head), and cannot share one machine's pool because some of them write. A
   # shard no longer prepares its side (cat-harness-tools#397): it mounts the
-  # same lock, which the mount cache makes quick, and applies what its side's
+  # same lock, which the layers ref makes quick, and applies what its side's
   # prepare job built on top of it. The base side is not run at all when
   # main's answer is cached. The gates are split by the seconds the last run
   # recorded, so the shards finish together, rather than by count (trial
@@ -2098,7 +2085,6 @@ jobs:
           path: fa
       - *base-root
       - *setup-bun
-      - *mount-cache
       - *mount
       - name: Fetch what this side's prepare job built
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8

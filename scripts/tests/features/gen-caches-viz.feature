@@ -38,6 +38,12 @@ Feature: Caches viewer
     When the viewer is rendered without a report
     Then it equals the committed viewer.md followed by a newline
 
+  @test:scripts/tests/gen-caches-viz.test.ts::retired_cat-mount-v1-_Actions_cache_steps_stay_out_of_workflows_and_declared_caches_(bean_9ml4)
+  Scenario: Retired cat-mount-v1- Actions cache steps stay out of workflows and declared caches
+    Given the layer's ci-setup action, layer-pr-checks.yml, pr-tests.yml and declared cache nodes
+    Then none of those workflows or actions contains a "cat-mount-v1-" cache key
+    And the declared cache nodes carry neither "lpc-cat-mount" nor location "cat-mount-v1-"
+
   @test:scripts/tests/gen-caches-viz.test.ts::storedFromReport_—_the_daily_report's_raw_facts,_matched_by_location::the_stored_key_is_main's_newest_entry_under_the_location,_size_is_every_entry's
   Scenario: The stored key is main's newest entry under the location and size sums every entry
     Given a daily report with two "derive-cache-v1-" entries, one on a pull request and one on main, and a hit rate of 0.5
