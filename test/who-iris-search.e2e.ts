@@ -123,13 +123,19 @@ test.describe("WHO-IRIS search & faceted exploration", () => {
   test("search index payload operates purely on structured KG metadata without full text blobs", async ({ page }) => {
     await page.goto("/who-iris/site/index.html");
 
-    // Evaluate client-side index items directly from window.__irisSearch
-    const indexData = await page.evaluate(() => {
-      const g = window as unknown as { __irisSearch?: { index: unknown[] } };
-      return g.__irisSearch ? g.__irisSearch.index : null;
+    // Evaluate client-side index items directly from window.__irisSearch.
+    // The home page fetches its records on first use (who-iris 81026d6a5:
+    // `home-search.json`, read on the box's first focus), so `index` is empty
+    // until `load()` resolves — load it first, or every check below is vacuous.
+    const indexData = await page.evaluate(async () => {
+      const g = window as unknown as { __irisSearch?: { index: unknown[]; load?: () => Promise<void> } };
+      if (!g.__irisSearch) return null;
+      if (typeof g.__irisSearch.load === "function") await g.__irisSearch.load();
+      return g.__irisSearch.index;
     });
 
     expect(Array.isArray(indexData)).toBe(true);
+    expect((indexData as unknown[]).length).toBeGreaterThan(0);
     for (const item of indexData as Array<Record<string, unknown>>) {
       // Must contain structured KG metadata
       expect(item).toHaveProperty("title");

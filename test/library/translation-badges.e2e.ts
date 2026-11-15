@@ -952,7 +952,10 @@ test.describe("on an Arabic page the rest of the chrome is English, laid out as 
     ["the glass", ".fa-sticky-layer"],
     ["the glass handle (Folio ▾)", ".fa-glass-handle"],
     ["the search band's search", ".fa-search-home"],
-    ["each icon in the sidebar's row, so its tooltip and count", ".fa-nav-icons > *"],
+    // The rail's own controls (`[data-fa-nav-control]`, e.g. Harnesses) join
+    // the row but are named in the PAGE's language, so `navbar-row.js` leaves
+    // them unmarked (cat-harness 2565c93fa). Only the row's own icons are English.
+    ["each icon in the sidebar's row, so its tooltip and count", ".fa-nav-icons > :not([data-fa-nav-control])"],
     ["the page's TR badge, from a translated copy's markup", '.fa-qa-badge[data-qa-key="page.translation"]'],
     ["an older generator's inert badge, which nothing paints", ".fa-qa-badge.fa-qa-fam-block"],
   ] as const) {
