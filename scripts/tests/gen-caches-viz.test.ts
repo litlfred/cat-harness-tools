@@ -67,6 +67,20 @@ test("the committed viewer.md is current", () => {
   expect(readFileSync(VIEW_FILE, "utf8")).toBe(render(loadCaches(), LAYER, undefined) + "\n");
 });
 
+test("retired cat-mount-v1- Actions cache steps stay out of workflows and declared caches (bean 9ml4)", () => {
+  const LAYER = join(import.meta.dir, "..", "..");
+  for (const rel of [
+    ".github/actions/ci-setup/action.yml",
+    ".github/workflows/layer-pr-checks.yml",
+    ".github/workflows/pr-tests.yml",
+  ]) {
+    expect(readFileSync(join(LAYER, rel), "utf8")).not.toContain("cat-mount-v1-");
+  }
+  const loaded = loadCaches();
+  expect(loaded.caches.map((n) => n.id)).not.toContain("lpc-cat-mount");
+  expect(loaded.caches.map((n) => n.location)).not.toContain("cat-mount-v1-");
+});
+
 describe("storedFromReport — the daily report's raw facts, matched by location", () => {
   const node = (id: string, location: string, kind = "actions-cache") => ({ id, location, kind }) as unknown as Parameters<typeof storedFromReport>[1][number];
   const report = {

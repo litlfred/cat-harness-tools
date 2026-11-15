@@ -320,20 +320,9 @@ jobs:
       - id: base-cache
         if: false
         run: ":"
-      - &mount-cache
-        name: Cache remote mounts (bean cis1)
-        if: steps.base-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: /home/runner/.cache/cat-mount
-          key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
-          restore-keys: |
-            cat-mount-v1-
       - &mount
         name: Mount every instance from the index lock
         if: steps.base-cache.outputs.cache-hit != 'true'
-        env:
-          CAT_MOUNT_CACHE_DIR: /home/runner/.cache/cat-mount
         run: bash fa/.github/mount-from-lock.sh --root fa
       - &cat-harness-main
         # cat-harness and the closure its main is generated with, and the two
@@ -427,7 +416,6 @@ jobs:
             git checkout -q --detach FETCH_HEAD
           fi
           git log -1 --format='base side: %h %s'
-      - *mount-cache
       - *mount
       - *cat-harness-main
       - *swap
@@ -552,7 +540,6 @@ jobs:
           path: pr-checker
           sparse-checkout: scripts/check-standalone.ts
           sparse-checkout-cone-mode: false
-      - *mount-cache
       - *mount
       - *cat-harness-main
       - *swap
