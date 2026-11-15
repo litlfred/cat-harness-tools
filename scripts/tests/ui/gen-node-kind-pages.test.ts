@@ -255,3 +255,34 @@ describe("pages under a route built at publish", () => {
     expect(pageBuiltAtPublish("en/cat-harness/node-kind-index", undefined)).toBe(false);
   });
 });
+
+describe("nodesShownBy: a kind whose nodes a visualiser of its layer already shows (who-iris, owner 2026-11-15)", () => {
+  const ref = kind("folio-reference");
+  const shown = { label: "Bibliography", route: (l: string) => `${l}/core/bibliography` };
+  const byId = new Map([[ref.id, ref]]);
+  const nodes = [node("folio-reference", "who-iris", "references/a", { title: "A" }), node("folio-reference", "who-iris", "references/b", { title: "B" })];
+
+  test("is a KindPages on its own", () => {
+    expect(isKindPages({ nodesShownBy: shown })).toBe(true);
+  });
+
+  test("the kind page links to the visualiser in place of a table of nodes", () => {
+    const html = dashboardHtml(ref, nodes, [], byId, "en", undefined, [], "standalone", new Map([[ref.id, shown]]));
+    expect(html).toContain('href="../bibliography/"');
+    expect(html).toContain("Bibliography");
+    expect(html).not.toContain("<table>");
+    expect(html).not.toContain("references/a/");
+  });
+
+  test("a harness page links there too", () => {
+    const html = dashboardHtml(ref, nodes, [], byId, "en", "who-iris", [], "standalone", new Map([[ref.id, shown]]));
+    expect(html).toContain('href="../../bibliography/"');
+    expect(html).not.toContain("<table>");
+  });
+
+  test("without it, the table of node pages is unchanged", () => {
+    const html = dashboardHtml(ref, nodes, [], byId, "en", undefined, [], "standalone");
+    expect(html).toContain("<table>");
+    expect(html).toContain('href="who-iris/references/a/"');
+  });
+});
