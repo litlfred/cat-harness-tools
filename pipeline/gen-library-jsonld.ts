@@ -814,14 +814,12 @@ const contributionsByRoot = new Map<string, ContributionRegistry | null>();
  *
  * Rooted at the layer that OWNS the library entry, not at the checkout. From
  * the checkout root the registry held every mounted layer's kinds, so the same
- * committed node was typed by whatever happened to be mounted: a library
- * layer's indicators were a DAK layer's `Indicator` in the folio-assistant
- * index (where that DAK layer, ABOVE the library's, is mounted) and
- * `cat-harness:Block` in the library layer's own checkout, and no committed
- * file passed both checks
- * (folio-assistant#3124). `loadContributionsSync` walks the root's own
- * declared dependencies, so a layer is typed only by kinds it can see in any
- * checkout. A root whose contributions cannot be loaded types only the core
+ * committed node was typed by whatever happened to be mounted: a lower layer's
+ * indicator candidates were typed by an upper DAK layer when mounted in an
+ * index and as `cat-harness:Block` in the lower layer's own checkout, so no
+ * committed file passed both checks. `loadContributionsSync` walks the root's
+ * own declared dependencies, so a layer is typed only by kinds it can see in
+ * any checkout. A root whose contributions cannot be loaded types only the core
  * kinds, which is what it did before.
  */
 function contributedKinds(subgraphStart?: string): ContributionRegistry | undefined {
