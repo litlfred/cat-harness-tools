@@ -289,6 +289,18 @@ describe("at rest it is a strip, and opens three ways", () => {
     expect(css).not.toContain("translateX(-100%)");
   });
 
+  it("slides the rail but steps the page, and holds still under reduced motion (owner, 2026-11-15, #2343)", () => {
+    // Animating the page's padding re-laid out the whole document every
+    // frame. Only the rail's width may carry a duration; the page's padding
+    // moves once, so its only transition is a 0s one.
+    expect(css).not.toMatch(/transition:padding-inline-start \.?[1-9]/);
+    expect(css).toContain("body{transition:padding-inline-start 0s linear .14s}");
+    const motion = css.indexOf("@media(prefers-reduced-motion:no-preference){.fa-nav{transition:width .14s ease}");
+    expect(motion).toBeGreaterThan(-1);
+    // No width transition on the rail outside that guard.
+    expect(css.replace(/@media\(prefers-reduced-motion:no-preference\)\{[^@]*?\}\}/g, "")).not.toContain("transition:width");
+  });
+
   it("opens on hover, on keyboard focus, and on the pinned checkbox", () => {
     expect(css).toContain(
       `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_PX}px)}`,
