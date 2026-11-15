@@ -536,7 +536,10 @@ export function prunableDashboards(site: string, wantedIds: readonly string[]): 
   // prunable set, and its callers act on that; the directories declined are
   // reported by the caller that wants them. Keeping the signature means the
   // three tests below still falsify the same things.
-  const { owned } = orphanSubjectPages(site, wantedIds, carriesMarker(GENERATED_BY));
+  // Scanned where this run WRITES and deletes: in a mounted layer the pages
+  // are at the output root, so the pinned directory never holds an orphan this
+  // run could remove (bean `cat-tools-sm8r`). Outside a mount it is `site`.
+  const { owned } = orphanSubjectPages(writePathOf(site), wantedIds, carriesMarker(GENERATED_BY));
   return owned.map((dir) => join(dir, "index.html")).sort();
 }
 
@@ -3198,7 +3201,7 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
     // an unreadable archive leaves those beans "not in this store", which the page says
   }
   const pbOrphans = drawProcessedBeans(s.name, s.instanceRoot, storeDir, flows, [...read.beans, ...archived], models);
-  const { owned } = orphanSubjectPages(hubDir, ids, carriesMarker(GENERATED_BY));
+  const { owned } = orphanSubjectPages(writePathOf(hubDir), ids, carriesMarker(GENERATED_BY));
   return check && builtAtPublishHere(join(hubDir, "x", "index.html")) ? [] : [...owned.map((name) => relative(SITE, join(hubDir, name))), ...pbOrphans];
 }
 /**
@@ -3284,7 +3287,7 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
   return ([[all, routes.processes], [one, routes.beans]] as const).flatMap(([dir, keep]) =>
     check && builtAtPublishHere(join(dir, "x", "index.html"))
       ? []
-      : orphanSubjectPages(dir, [...keep], carriesMarker(GENERATED_BY)).owned.map((name) => relative(SITE, join(dir, name))),
+      : orphanSubjectPages(writePathOf(dir), [...keep], carriesMarker(GENERATED_BY)).owned.map((name) => relative(SITE, join(dir, name))),
   );
 }
 
@@ -3362,7 +3365,7 @@ for (const { v, harness: vh, hosted } of perInstance) {
       withRenderedByFrontMatter(page({ title: "Beans by process — every store", noLiquid: true, body: `<style>\n${PB_CSS}\n</style>\n${processedBeansCombinedBody(combinedParts, NOW)}` }), VIEWER_TOOL),
     );
   }
-  const { owned, foreign } = orphanSubjectPages(parent, [...subjects.map((s) => s.name), ...(beans ? RESERVED_STORE_NAMES : [])], carriesMarker(GENERATED_BY));
+  const { owned, foreign } = orphanSubjectPages(writePathOf(parent), [...subjects.map((s) => s.name), ...(beans ? RESERVED_STORE_NAMES : [])], carriesMarker(GENERATED_BY));
   for (const name of foreign) console.error(`  ! ${relative(SITE, join(parent, name))} is not an instance page and does not identify itself — left in place`);
   // Under a built-at-publish route a stale local copy is not a committed
   // orphan, so `--check` does not report it; a write run still prunes it.
