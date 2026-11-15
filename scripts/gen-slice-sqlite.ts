@@ -220,6 +220,25 @@ export interface SliceDef {
   readonly search: SliceSearch;
   /** `null` is could-not-determine (no source), never an empty slice. */
   load(root: string): Promise<SliceData | null>;
+  /**
+   * A work-plan store (beans, todos) that was REACHED and holds no entries
+   * yet: a new folio's plan. Such a slice is not applicable, like an absent
+   * store, rather than a refusal: nothing is built and nothing is credited
+   * as clean. A content slice (library, kg) leaves this unset, so an empty
+   * one still refuses.
+   */
+  readonly emptyStoreNotApplicable?: true;
+}
+
+/**
+ * Why this slice is not applicable because its store was reached and is
+ * empty, or `null` when it has rows or is not a store slice. Only a loaded
+ * source reaches here: an unmounted store has already thrown.
+ */
+export function emptyStoreReason(def: SliceDef, data: SliceData): string | null {
+  if (!def.emptyStoreNotApplicable) return null;
+  if ((data.rows[def.fts.rowsOf] ?? []).length > 0) return null;
+  return `the store at ${def.source.path} was reached and holds no ${def.fts.rowsOf} yet, so there is nothing to slice`;
 }
 
 export interface SliceManifest {
@@ -568,6 +587,7 @@ const BEAN_DEFS = resolveBeanDefs(REPO_ROOT);
 
 export const BEANS_SLICE: SliceDef = {
   slice: "beans",
+  emptyStoreNotApplicable: true,
   source: {
     graph: "bean-defs",
     path: BEAN_DEFS.dir
@@ -682,6 +702,7 @@ export function todosData(
 
 export const TODOS_SLICE: SliceDef = {
   slice: "todos",
+  emptyStoreNotApplicable: true,
   source: { graph: "todos", path: posix(join("cat-harness", TODO_INDEX)) },
   ddl: [
     `CREATE TABLE todos (
@@ -1169,6 +1190,12 @@ if (import.meta.main) {
       // No source is not an empty source: say so, and build nothing.
       console.error(`  ✗ ${def.slice}: no source at ${def.source.path} — could not determine the slice`);
       failed = true;
+      continue;
+    }
+    const empty = emptyStoreReason(def, data);
+    if (empty !== null) {
+      console.log(`  · ${def.slice}: not applicable here — ${empty}`);
+      notApplicable.push(def.slice);
       continue;
     }
     if (args.includes("--check")) {
