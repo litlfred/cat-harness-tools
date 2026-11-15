@@ -486,7 +486,7 @@ export function navbarCss(): string {
     // Phone stays an overlay drawer.
     `body{padding-inline-start:${NAV_COLLAPSED_PX}px}`,
     `.fa-nav{position:fixed;top:0;inset-inline-start:0;bottom:0;width:${NAV_COLLAPSED_PX}px;z-index:2147483000;`,
-    `background:var(--fa-nav-bg);color:var(--fa-nav-ink);overflow:hidden;transition:width .14s ease;`,
+    `background:var(--fa-nav-bg);color:var(--fa-nav-ink);overflow:hidden;`,
     `font:14px/1.5 var(--fa-font-sans,system-ui,sans-serif)}`,
     `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_PX}px)}`,
     `.fa-nav:not(:hover):not(:has(:focus-visible)):not(:has(.fa-nav-open:checked)) .fa-glass-handle__label{opacity:0}`,
@@ -496,7 +496,20 @@ export function navbarCss(): string {
     `.fa-nav:hover,.fa-nav:has(:focus-visible),.fa-nav:has(.fa-nav-open:checked){width:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}`,
     `.fa-nav-in{width:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}`,
     `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){padding-inline-start:var(--fa-nav-w,${NAV_OPEN_WIDE_PX}px)}}`,
-    `@media(prefers-reduced-motion:no-preference){body{transition:padding-inline-start .14s ease}}`,
+    // SMOOTH: THE RAIL SLIDES, THE PAGE STEPS (owner, 2026-11-15: *"open and
+    // closing the LHS navbar is not smooth"*, issue #2343). The push above
+    // used to ANIMATE `body`'s padding, which re-lays out and re-wraps the
+    // whole document every frame: on smart-ra's DPI-H page (22,101 elements)
+    // one open was 14 layouts, 140ms of layout and 648ms of style, with 13
+    // frames over 20ms. Only the rail's own width animates now; its inner
+    // column has a fixed width, so that costs the rail and nothing else. The
+    // page moves ONCE: at once on open, so the rail slides into the space it
+    // left, and after the rail has finished on close, so the two never
+    // overlap. A 0s transition with a delay is that one step. No motion at all
+    // under `prefers-reduced-motion`: the rail's slide used to sit outside it.
+    `@media(prefers-reduced-motion:no-preference){.fa-nav{transition:width .14s ease}`,
+    `body{transition:padding-inline-start 0s linear .14s}`,
+    `body:has(.fa-nav:hover),body:has(.fa-nav :focus-visible),body:has(.fa-nav-open:checked){transition-delay:0s}}`,
     // Clipped in place, never parked at `left:-9999px`: on a right-to-left
     // page that is the scrollable side, and it widened the page ~10,000px
     // (bean `2r2n`). Same rule as `.fa-nav-open` in docs-ui.css.
