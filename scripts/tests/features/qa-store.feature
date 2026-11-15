@@ -91,6 +91,18 @@ Feature: The qa-reports store reads in four states and writes without losing ent
     And the tip holds the seed's, A's and B's manifests on a first-parent chain of 3 ending at the seed
     And the PR entry reads as a hit, and the index names main <sha A> and PR 9999 <sha B>
 
+  @test:scripts/tests/qa-store.test.ts::writing::MANY_LOST_RACES:_a_writer_that_loses_more_races_than_the_ordinary_budget_still_lands
+  Scenario: A writer that keeps losing races keeps trying
+    Given an entry published as a seed
+    And a sibling that publishes between writer A's fetch and push on each of A's first five attempts
+    Then A publishes on its sixth attempt
+    And the tip holds A's entry and all five siblings'
+
+  @test:scripts/tests/qa-store.test.ts::writing::a_lost_race_is_told_apart_from_any_other_rejection
+  Scenario: Only a lost race earns the longer budget
+    Then a rejection for "fetch first" or "non-fast-forward" is a lost race
+    And a permission denial or a hook's refusal is not, and keeps the budget of 3
+
   @test:scripts/tests/qa-store.test.ts::writing::CONCURRENT_PROCESSES:_two_CLI_writers_started_together_both_land
   Scenario: Two CLI writers started together both land
     When two qa-store publish processes for main/<sha A> and main/<sha B> start together
