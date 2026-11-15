@@ -556,7 +556,18 @@ jobs:
           [ "$repo" != "-" ] || { echo "::notice::the lock pins no cat-harness-tools: the gate is not enabled"; exit 0; }
           work="$(mktemp -d)" && git -C "$work" init -q
           git -C "$work" fetch -q --depth 1 --filter=blob:none "https://github.com/${repo}.git" "$sha"
-          if ! git -C "$work" checkout -q FETCH_HEAD -- scripts/check-lock-coherence.ts scripts/git-ancestry.ts 2>/dev/null; then
+          # The script's import closure, file by file (a directory checkout
+          # under --filter=blob:none fetches each blob in turn and takes
+          # minutes). Since c042c0c3 the script imports schemas/kg/repo-owner.ts,
+          # which imports schemas/sdlc/input-trace.ts and read-projections.ts;
+          # the old two-file checkout crashed bun before any verdict, and the
+          # case below reported that crash as a stale pin. An older pin lacks
+          # the schemas files, so they are taken one at a time and may be absent.
+          git -C "$work" checkout -q FETCH_HEAD -- scripts/check-lock-coherence.ts scripts/git-ancestry.ts 2>/dev/null || true
+          for f in schemas/kg/repo-owner.ts schemas/sdlc/input-trace.ts schemas/sdlc/read-projections.ts; do
+            git -C "$work" checkout -q FETCH_HEAD -- "$f" 2>/dev/null || true
+          done
+          if [ ! -f "$work/scripts/check-lock-coherence.ts" ]; then
             echo "::notice::the pinned cat-harness-tools (${sha:0:12}) predates lock:coherence:check; the gate starts with the next re-pin"
             exit 0
           fi
