@@ -756,6 +756,43 @@ export interface FigureTarget {
 }
 
 /**
+ * Lays out every DOT a site build draws, before the pages are written.
+ *
+ * One Graphviz WebAssembly instance does not survive many layouts: its heap
+ * grows with each one until a later layout fails with "Out of bounds memory
+ * access" (smart-ra#221: the eleventh drawing of 0.3.0-draft.1). Loading is
+ * async and `pagesFor` is not, so a first pass collects the DOTs, each is laid
+ * out here, and a failed layout is retried once on a freshly loaded instance.
+ * The function returned looks each drawing up, so the second pass is sync.
+ */
+export async function drawEveryDot(
+  Graphviz: { load(): Promise<{ dot(dot: string): string }>; unload(): void },
+  collect: (draw: (dot: string) => string) => unknown,
+): Promise<(dot: string) => string> {
+  const dots = new Set<string>();
+  collect((dot) => {
+    dots.add(dot);
+    return "";
+  });
+  const svgs = new Map<string, string>();
+  let gv = await Graphviz.load();
+  for (const dot of dots) {
+    try {
+      svgs.set(dot, gv.dot(dot));
+    } catch {
+      Graphviz.unload();
+      gv = await Graphviz.load();
+      svgs.set(dot, gv.dot(dot));
+    }
+  }
+  return (dot) => {
+    const svg = svgs.get(dot);
+    if (svg === undefined) throw new Error("drawEveryDot: a DOT the first pass did not collect");
+    return svg;
+  };
+}
+
+/**
  * Every figure the layer's config maps to a view (`figures`), with the site
  * paths `archimate-pages --out` writes for it, so a document site can show the
  * live drawing in the figure's place and link its page. Empty when the
@@ -912,8 +949,7 @@ if (import.meta.main) {
   if (out) {
     try {
       const { Graphviz } = await import("@hpcc-js/wasm-graphviz");
-      const gv = await Graphviz.load();
-      drawDot = (dot) => gv.dot(dot);
+      drawDot = await drawEveryDot(Graphviz, (draw) => pagesFor(root, { site: true, drawDot: draw }));
     } catch (e) {
       console.warn(`! no metamodel drawing: @hpcc-js/wasm-graphviz would not load (${(e as Error).message})`);
     }
