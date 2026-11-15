@@ -1,5 +1,5 @@
 /**
- * The three `node:fs` reads an end-to-end spec makes of a site, through the
+ * The four `node:fs` reads an end-to-end spec makes of a site, through the
  * layer overlay (bean `cat-tools-sm8r`, item 4).
  *
  * In a composed checkout a mounted layer's computed files (`_data/harness.json`,
@@ -24,6 +24,10 @@ export const readFileSync = ((path: fs.PathOrFileDescriptor, ...rest: unknown[])
 /** `fs.existsSync`: true when the output root or the layer itself holds `path`. */
 export const existsSync = ((path: fs.PathLike) =>
   fs.existsSync(typeof path === "string" ? overlayPath(path) : path)) as typeof fs.existsSync;
+
+/** `fs.statSync` of the copy a reader of the site sees: the output root's when it holds `path`. */
+export const statSync = ((path: fs.PathLike, ...rest: unknown[]) =>
+  (fs.statSync as (...a: unknown[]) => unknown)(typeof path === "string" ? overlayPath(path) : path, ...rest)) as typeof fs.statSync;
 
 /**
  * `fs.readdirSync` over the overlay: the union of the output-root directory

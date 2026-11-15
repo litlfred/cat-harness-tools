@@ -9,7 +9,7 @@ tags:
     - ci-speed
     - pp9g
 created_at: 2026-11-06T05:00:00Z
-updated_at: 2026-11-13T22:00:00Z
+updated_at: 2026-11-15T07:00:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -200,6 +200,23 @@ by its write sites, in the same style as `check:input-sites`.
    14 lands on the same paths, so coordinate. Merged in `litlfred/cat-harness-tools#2110` (`03bcf884`), `#2121` (`8040f49c`) and `#2122` (`b31b1104`).
 - [x] 6. (sibling session_01VQDpPd28pjkLtPQc3hFUEz) Find the prose rewriter, and stop it writing committed source. FOUND by the measurement below: it is the root `bun test` run, whose tests re-render committed pages, diagrams and translation templates in place. Merged in `litlfred/cat-harness-tools#2109` (`25557f6f`), with the stale pages regenerated in `litlfred/cat-harness#1321`, `litlfred/folio-assistant-core#792` and `litlfred/smart-base#395`.
 - [x] 7. The write-site check goes from warning to red (owner, 2026-11-14, card "Step 7": "A. Measure, then red"). Merged in `litlfred/cat-harness-tools#2183` (`29f3876f`): each `layer-pr-checks` shard marks the root before its tests (`snapshot.py mark`) and after its gates names every file written, changed or removed under a mount path (`snapshot.py diff`), recorded as the gate `mounts:untouched (shard i/N)` and judged like any gate. `mount-from-lock --check` could not be the check: CI swaps the caller in and takes lower layers at main, so those mounts never hash to the lock on either side. The remaining writers and readers it needed first: `#2128` (`1b095fc4`, subgraph/payload), `#2142` (`1f38a5c8`, uml:overview), `#2152` (`df9a0b94`, skills:docs, lsi:viz), `#2163` (`0e83963c`, docs:pages), `litlfred/folio-assistant-core#793` (glossary pages), and the readers `#2168` (`7f6bba8e`, e2e), `#2172` (`e78cf98b`, gates), `#2173` (`2bf84dfd`, tests), `#2174` (`37877738`), `#2190` (`dccd8e20`, viewer pages, permalinks, subgraph links, translation index).
+
+- [x] 8. The readers and writers left behind, found on `litlfred/folio-assistant#3124` once the writers had moved: `#2211` (`e0a82445`, `sync-docs-harness` tile counts), `#2213` (`4b7d139b`, state-visualizer projection and writes, `viewersOf`, `translation-drift`, `check-published-packages` built in a scratch copy, so `block-qa-schema/dist/` is no longer written into a mount), `#2223` (`2c59c685`, `check-subgraph-coverage`), `#2227` (`7a391ec3`, state-visualizer orphan passes scan the output root they write in), and the QA claim of `check:nav-names`: `#2217` registered it, `#2219` made it `external`, `#2220` exempted only `afterPublish` writers from "produced nothing". The test-side readers were session_01VQDpPekpt4uRRDkhFD45cc's (`#2209`, `#2214`, `#2226`, `litlfred/folio-assistant-core#804`).
+- [ ] 9. `derive:publish`'s UNDECLARED writes into mounts (owner, 2026-11-15, card "2b"). See the measurement below. In this layer, `render:bpmn` and `library:viz`; the rest go to the layer that owns each.
+
+### Measurement for item 9 (2026-11-15)
+
+A full `derive:publish` in a composed folio-assistant (tools at `#2213`'s head, core at main, every mount fresh) wrote 18,916 files inside mounts. 17,934 are declared `builtAtPublish`, so they are allowed. **982 are undeclared:**
+
+| files | what | owner |
+|---|---|---|
+| 784 | `smart-immunizations/fhir-artifact-index/` (`ig-index:build`) | smart-immunizations declares no `builtAtPublish` for it, or `ig-index:build` moves onto `writePathOf` (`litlfred/fhir-harness#412`) |
+| 165 | beside-source BPMN drawings (`render:bpmn`): 152 byte-identical rewrites, 13 smart-trust-phw drawings whose committed copies are stale | this layer: never rewrite unchanged bytes; a changed one goes to the output root |
+| 22 | `cat-harness/docs/docs/assets/img/…` (`library:viz`): an entry's figures named `../../../docs/assets/img/…` escaped `files/<id>/` | this layer: the published path stays inside `files/<id>/` |
+| 9 | `cat-harness/docs/en/{fhir-harness/ig-ast,smart-base/l1-extraction}/…` | the writer's layer, or cat-harness declares them |
+| 2 | `smart-base/document-kinds/dak.json`, `smart-base/test/results/p2-refusals.qa-results.json` | smart-base |
+
+After this layer's fixes, measured on fresh mounts: `render:bpmn` writes nothing undeclared (its 165 mount writes are the declared site copies in `docs/assets/img/workflows/`, and the 13 changed drawings go to `build/layers/`), and `library:viz` writes 2,696 files in mounts, all declared.
 
 ### Measurement for step 7 (2026-11-14)
 

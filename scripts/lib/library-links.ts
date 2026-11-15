@@ -32,6 +32,7 @@ import { detectRepoUrl } from "../../src/core/git-refs.js";
 import { baseDocsDir } from "../compose-docs.js";
 import { itemFacts } from "../library-readmes.ts";
 import { existingPageDir } from "../viewer-declarations.ts";
+import { overlayPath } from "./layer-output.ts";
 import { corpusDirectoriesForGraph } from "../../schemas/kg/harness-config.js";
 
 /** The links a library reference resolves to; each absent where it does not. */
@@ -84,8 +85,10 @@ export function libraryResolver(repo: string, instanceRoot: string, site?: strin
   const seg = libs.length > 0 ? topOf(libs[0]!) : undefined;
   const projection = base === undefined ? undefined : join(base, "assets", "library", "index.json");
   const entries: Entry[] =
-    projection !== undefined && existsSync(projection)
-      ? ((JSON.parse(readFileSync(projection, "utf-8")) as { entries?: Entry[] }).entries ?? [])
+    // Written at publish, so in a composed checkout it is at the layer's
+    // output root (bean sm8r), not in the pinned mount.
+    projection !== undefined && existsSync(overlayPath(projection))
+      ? ((JSON.parse(readFileSync(overlayPath(projection), "utf-8")) as { entries?: Entry[] }).entries ?? [])
       : [];
   const repoUrl = detectRepoUrl(repo);
 
@@ -102,12 +105,12 @@ export function libraryResolver(repo: string, instanceRoot: string, site?: strin
         // folio-assistant#2527) or, on a site not yet regenerated, at the old
         // address — never the forwarding page compose-docs writes there.
         const dir = existingPageDir(base, { harness: handler, visualiser: seg, subgraph: e.instance });
-        if (dir !== undefined && existsSync(join(dir, "index.html"))) {
+        if (dir !== undefined && existsSync(overlayPath(join(dir, "index.html")))) {
           // The viewer's own anchor key is `<instance>/<id>` (`honourAnchor` in
           // gen-library-viz.ts matches `e.instance + "/" + e.id`), so a bare id
           // would open the page without selecting anything.
           out.viewer = `${relative(base, dir).split(sep).join("/")}/#${encodeURIComponent(`${e.instance}/${e.id}`)}`;
-          if (existsSync(join(dir, e.id, "index.html"))) out.entry = `${relative(base, join(dir, e.id)).split(sep).join("/")}/`;
+          if (existsSync(overlayPath(join(dir, e.id, "index.html")))) out.entry = `${relative(base, join(dir, e.id)).split(sep).join("/")}/`;
         }
       }
       const readme = `${e.dir}/README.md`;

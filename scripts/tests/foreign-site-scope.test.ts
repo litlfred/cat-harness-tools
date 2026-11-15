@@ -347,7 +347,12 @@ describe.skipIf(NO_REAL_DATA)("smart-trust, against the platform's real harness 
     for (const id of ["beans", "todos"]) expect(out.tiles.find((t) => t.id === id)?.href).toBeUndefined();
     expect(out.navbar.hrefs.beans).toBeUndefined();
     expect(out.navbar.hrefs.todos).toBeUndefined();
-    expect(out.navbar.notes.beans).toBe("smart-trust declares no beans graph");
+    // Only a navbar row that carries the beans slot owes its note: the
+    // platform's row dropped beans, todos and fsh-guts on 2026-11-13
+    // (cat-harness's `navbarIcons`), so whether it is there is read from the data.
+    const icons = ((data.navbar as { icons?: string[] } | undefined)?.icons ?? []);
+    if (icons.includes("beans")) expect(out.navbar.notes.beans).toBe("smart-trust declares no beans graph");
+    else expect(out.navbar.notes.beans).toBeUndefined();
   });
 
   test("(d) the platform's fsh-guts is a labelled link, and the chrome is told it is not this site's", () => {
@@ -358,10 +363,16 @@ describe.skipIf(NO_REAL_DATA)("smart-trust, against the platform's real harness 
     // Re-based onto the platform: the platform's OWN root-relative href for its
     // fsh-guts page (since 2026-10-09 under its declared `<locale>/<harness>/`
     // route), read from the platform's data rather than restated here.
-    const platformHref = (data.navbar as { hrefs: Record<string, string> }).hrefs["fsh-guts"]!;
-    expect(platformHref.startsWith("/")).toBe(true);
-    expect(o.navbar.hrefs["fsh-guts"]).toBe(`${BASE}${platformHref}`);
-    expect(o.navbar.whose?.["fsh-guts"]).toBe("the platform's: smart-trust declares no fsh-guts graph");
+    // The navbar half applies only while the platform's row has the slot
+    // (it left the row on 2026-11-13); the chrome's `absent` half always does.
+    const platformHref = (data.navbar as { hrefs: Record<string, string> }).hrefs["fsh-guts"];
+    if (platformHref !== undefined) {
+      expect(platformHref.startsWith("/")).toBe(true);
+      expect(o.navbar.hrefs["fsh-guts"]).toBe(`${BASE}${platformHref}`);
+      expect(o.navbar.whose?.["fsh-guts"]).toBe("the platform's: smart-trust declares no fsh-guts graph");
+    } else {
+      expect(o.navbar.hrefs["fsh-guts"]).toBeUndefined();
+    }
     expect(o.foreignSite.absent.fshGuts).toBe("smart-trust declares no fsh-guts graph");
     expect(o.foreignSite.absent.translationQa).toBe("smart-trust publishes no translation QA sweep on this site");
   });

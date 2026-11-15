@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DOCUMENT_VIEW_JS, entryFigureFiles, extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
+import { DOCUMENT_VIEW_JS, containedRel, entryFigureCopies, entryFigureFiles, extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
 import { VIEWER_JS } from "../../gen-library-viz.ts";
 import { LibraryDocumentSchema } from "../../../schemas/ui/site-indexes.ts";
 
@@ -261,6 +261,27 @@ describe("kept figures and transcribed tables (who-iris#224)", () => {
     writeFileSync(join(dir, "vector-figures.json"), JSON.stringify({ figures: [{ id: "vfig-p010", file: "figures/vfig-p010.png", page: 10 }] }));
     expect(readEntryDocument(dir, "r")!.images?.map((i) => i.id)).toEqual(["img-p002-1", "vfig-p010"]);
     expect(entryFigureFiles(dir)).toContain("figures/vfig-p010.png");
+  });
+  // kg-folio-asst-2026-09-30's images are `../../../docs/assets/img/…`: joined
+  // as-is, the copy escaped `files/<id>/` and landed inside the layer's mount
+  // at `docs/docs/assets/…` (bean `cat-tools-sm8r`).
+  test("a figure outside the entry is published INSIDE files/<id>/ and read from where it is", () => {
+    const dir = withFiles();
+    mkdirSync(join(dir, "..", "shared"), { recursive: true });
+    writeFileSync(join(dir, "..", "shared", "pic.webp"), "x");
+    writeFileSync(join(dir, "images.json"), JSON.stringify({ images: [{ id: "pic", file: "../shared/pic.webp", role: "figure" }] }));
+    expect(entryFigureCopies(dir)).toContainEqual({ rel: "_up/shared/pic.webp", source: "../shared/pic.webp" });
+    expect(entryFigureFiles(dir).every((r) => !r.split("/").includes(".."))).toBe(true);
+    // The page links the same contained path, and the document stays schema-valid.
+    const v = readEntryDocument(dir, "r")!;
+    expect(v.images?.map((i) => i.file)).toEqual(["_up/shared/pic.webp"]);
+    const r = LibraryDocumentSchema.safeParse(JSON.parse(JSON.stringify(v)));
+    expect(r.success ? [] : r.error.issues).toEqual([]);
+  });
+  test("containedRel never climbs out", () => {
+    expect(containedRel("images/a.webp")).toBe("images/a.webp");
+    expect(containedRel("./images/a.webp")).toBe("images/a.webp");
+    expect(containedRel("../../../docs/assets/img/x.webp")).toBe("_up/_up/_up/docs/assets/img/x.webp");
   });
 });
 
