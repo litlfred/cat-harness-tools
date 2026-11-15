@@ -183,11 +183,18 @@ describe("completeness", () => {
     expect(r.empty).toEqual(["two"]);
   });
 
-  test("an external writer that has not written yet is not 'produced nothing': this refresh never runs it", () => {
-    const ext: QaWriter = { id: "ext", run: "external", writes: ["r/ext.json"], because: "written by a later step" };
-    const r = assess({ mode: "computed", inventory: inventory(["r/one/a.json", "r/two.json"]), runs: ok, writers: [...W, ext] });
+  test("an after-publish writer that has not written yet is not 'produced nothing'", () => {
+    const late: QaWriter = { id: "late", run: "external", afterPublish: true, writes: ["r/late.json"], because: "written after the site is built" };
+    const r = assess({ mode: "computed", inventory: inventory(["r/one/a.json", "r/two.json"]), runs: ok, writers: [...W, late] });
     expect(r.empty).toEqual([]);
     expect(r.complete).toBe(true);
+  });
+
+  test("an ordinary external writer with no file is still 'produced nothing': its earlier step broke", () => {
+    const ext: QaWriter = { id: "ext", run: "external", writes: ["r/ext.json"], because: "written by an earlier step" };
+    const r = assess({ mode: "computed", inventory: inventory(["r/one/a.json", "r/two.json"]), runs: ok, writers: [...W, ext] });
+    expect(r.empty).toEqual(["ext"]);
+    expect(r.complete).toBe(false);
   });
 
   test("a writer that exited outside its okExits is INCOMPLETE, and a killed one (null) too", () => {
