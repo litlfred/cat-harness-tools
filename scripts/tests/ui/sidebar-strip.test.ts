@@ -36,7 +36,9 @@
  * wants to fail in the fast gate set rather than behind a 90 MB extract.
  */
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+// Publish-time files are written to the layer output overlay (bean sm8r);
+// these read the copy a site reader sees, falling back to the path given.
+import { readFileSync } from "../../../test/support/site-fs.ts";
 import { join, resolve } from "node:path";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";

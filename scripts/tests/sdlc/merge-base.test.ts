@@ -9,6 +9,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+// The built site is read through the layer-output overlay (bean cat-tools-sm8r).
+import * as siteFs from "../../../test/support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
@@ -73,7 +75,7 @@ function frontMatter(text: string): string {
 function generatedDocsPages(): string[] {
   const out: string[] = [];
   const walk = (abs: string): void => {
-    for (const e of readdirSync(abs, { withFileTypes: true })) {
+    for (const e of siteFs.readdirSync(abs, { withFileTypes: true }) as import("node:fs").Dirent[]) {
       if (e.name.startsWith(".") || e.name.startsWith("_")) continue;
       const p = join(abs, e.name);
       if (e.isDirectory()) {
@@ -82,7 +84,7 @@ function generatedDocsPages(): string[] {
         continue;
       }
       if (!e.isFile() || !e.name.endsWith(".md")) continue;
-      if (/^generated:\s*scripts\/gen-docs-pages\.ts/m.test(frontMatter(readFileSync(p, "utf8")))) {
+      if (/^generated:\s*scripts\/gen-docs-pages\.ts/m.test(frontMatter(siteFs.readFileSync(p, "utf8") as string))) {
         out.push(relative(REPO, p));
       }
     }
@@ -277,7 +279,7 @@ describe("classify", () => {
   test.skipIf(
     siteNotBuilt("the skill-instructions page gen-skill-docs writes at publish (gitignored)", join(REPO, quoting)),
   )("the page that QUOTES the generated marker really quotes it", () => {
-    expect(readFileSync(join(REPO, quoting), "utf8")).toContain("generated: scripts/gen-docs-pages.ts");
+    expect(siteFs.readFileSync(join(REPO, quoting), "utf8")).toContain("generated: scripts/gen-docs-pages.ts");
   });
 
   test("a page that QUOTES the generated marker is not a subject of it", () => {

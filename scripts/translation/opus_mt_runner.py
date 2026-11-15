@@ -1,4 +1,4 @@
-"""Local OPUS-MT runner for scripts/translate-pot.ts.
+"""Local OPUS-MT runner for scripts/translation-candidates.ts (and its older name, translate-pot).
 
 Reads one JSON object on stdin, {"model": "<hf id or local dir>", "texts": [...]},
 and writes {"translations": [...]} on stdout, same length and order.
@@ -7,7 +7,7 @@ The model is a Helsinki-NLP OPUS-MT Marian checkpoint (CC-BY 4.0), loaded with
 `transformers` from the local cache or a local directory. Set HF_HUB_OFFLINE=1
 to forbid any download. No hosted inference API is called.
 
-Run it with `python -I` (isolated mode), as translate-pot.ts does, so nothing
+Run it with `python -I` (isolated mode), as translation-candidates.ts does, so nothing
 from the working directory is imported.
 """
 

@@ -122,19 +122,17 @@ async function open(p: Page, which: "landing" | "viewer"): Promise<string[]> {
 
 const STRIP = { landing: ".side-bar", viewer: ".fa-nav" } as const;
 
-/** The ▦ summary, at rest: drawn, opaque, inside the strip and the viewport. */
+/**
+ * The Harnesses ICON, at rest: drawn, opaque, inside the strip and the
+ * viewport. Owner, 2026-11-13: *"remove the harnesses navbar, instead add an
+ * icon to the controls to show the harnesses"* -- it was a disclosure's summary.
+ */
 async function harnessesAtRest(p: Page, which: "landing" | "viewer") {
   return p.evaluate((sel) => {
     const strip = document.querySelector(sel)!.getBoundingClientRect();
-    // In the footer, or -- on a theme page, once `mountSidebarRail` (ob3m
-    // finding 7) has moved it -- beside Folders in the one scroller.
-    const sum = [...document.querySelectorAll(
-      sel + " .fa-nav-bottom > .fa-nav-group > summary, " + sel + " .fa-nav-middle > .fa-nav-harness-group > summary",
-    )].find(
-      (s) => s.querySelector(".fa-nav-label")?.textContent === "Harnesses",
-    ) as HTMLElement | undefined;
+    const sum = document.querySelector(sel + ' button.fa-nav-harnesses[aria-label="Harnesses"]') as HTMLElement | null;
     if (!sum) return null;
-    const g = sum.querySelector(".fa-nav-glyph")!.getBoundingClientRect();
+    const g = sum.querySelector("svg")!.getBoundingClientRect();
     let op = 1;
     for (let n: Element | null = sum; n; n = n.parentElement) op *= +getComputedStyle(n).opacity;
     return {
@@ -151,9 +149,7 @@ async function harnessesAtRest(p: Page, which: "landing" | "viewer") {
 async function visibleHarnessLinks(p: Page, which: "landing" | "viewer"): Promise<number> {
   return p.evaluate((sel) => {
     const strip = document.querySelector(sel)!.getBoundingClientRect();
-    return [...document.querySelectorAll(
-      sel + " .fa-nav-bottom > .fa-nav-group .fa-nav-sub a, " + sel + " .fa-nav-middle > .fa-nav-harness-group .fa-nav-sub a",
-    )].filter((a) => {
+    return [...document.querySelectorAll(sel + " #fa-nav-harnesses a")].filter((a) => {
       const r = a.getBoundingClientRect();
       let op = 1;
       for (let n: Element | null = a; n; n = n.parentElement) op *= +getComputedStyle(n).opacity;
@@ -176,7 +172,9 @@ for (const which of ["landing", "viewer"] as const) {
     const at = await harnessesAtRest(page, which);
     expect(at).not.toBeNull();
     expect(at!.strip).toBe(56);
-    expect(at!.opacity).toBeGreaterThan(0.9);
+    // At the row's own resting opacity (`.fa-nav-icon`, .8), like every icon
+    // beside it; not faded further.
+    expect(at!.opacity).toBeGreaterThanOrEqual(0.8);
     expect(at!.glyph.left).toBeGreaterThanOrEqual(0);
     expect(at!.glyph.right).toBeLessThanOrEqual(56);
     expect(at!.glyph.bottom).toBeLessThanOrEqual(800);
@@ -202,7 +200,10 @@ test.describe("landing: every icon in the strip is named on hover and on keyboar
     // row (2026-10-05 dropped processes and kg, bean `82qs`).
     const declared = (JSON.parse(readFileSync(join(HARNESS_ROOT, "cat-harness.json"), "utf-8"))
       .navbarIcons as string[]).filter((i) => i !== "close");
-    expect(n).toBe(declared.length + 1);
+    // The light/dark switch, the Folio icon (owner, 2026-11-13) and the rail's
+    // own Harnesses icon, which the row carries along.
+    const extra = 2 + (await page.locator(".side-bar > .fa-nav-icons > .fa-nav-harnesses").count());
+    expect(n).toBe(declared.length + extra);
     for (let i = 0; i < n; i++) {
       const box = (await icons.nth(i).boundingBox())!;
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -232,13 +233,20 @@ test.describe("landing: every icon in the strip is named on hover and on keyboar
   test("keyboard focus: the tooltip shows, and the accessible name is still ONE name", async ({ page }) => {
     expect(await open(page, "landing")).toEqual([]);
     await page.locator(".side-bar .site-title").focus();
-    await page.keyboard.press("Tab");
+    // The row is at the FOOT of the bar since 2026-11-13 (owner: "put these
+    // controls at the bottom of the navbar"), so the keyboard reaches it after
+    // the bar's other stops: Tab until it lands in the row, bounded.
+    for (let i = 0; i < 80; i++) {
+      await page.keyboard.press("Tab");
+      if (await page.evaluate(() => !!document.activeElement?.closest(".fa-nav-icons"))) break;
+    }
     await page.waitForTimeout(250);
     const r = await page.evaluate(() => {
       const e = document.activeElement as HTMLElement;
       const a = getComputedStyle(e, "::after");
       return {
         inRow: !!e.closest(".fa-nav-icons"),
+        role: e.tagName === "A" ? "link" : "button",
         fv: e.matches(":focus-visible"),
         name: e.getAttribute("aria-label"),
         content: a.content,
@@ -254,7 +262,7 @@ test.describe("landing: every icon in the strip is named on hover and on keyboar
     expect(r.left).toBeGreaterThan(r.strip);
     // The tooltip's text has an EMPTY alternative, so a screen reader hears
     // the aria-label once — exact-name lookup finds exactly one control.
-    await expect(page.getByRole("link", { name: r.name!, exact: true })).toHaveCount(1);
+    await expect(page.getByRole(r.role as "link" | "button", { name: r.name!, exact: true })).toHaveCount(1);
     const snap = await page.locator(".side-bar .fa-nav-icons").ariaSnapshot();
     expect(snap).not.toContain(r.name + " " + r.name);
   });

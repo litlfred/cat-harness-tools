@@ -313,6 +313,28 @@ describe("the Contents tree", () => {
     expect(T.docTreeKids(0)).toContain("1.1 One A");
   });
 
+  test("an inferred contents gains the sections it does not list, at their place", () => {
+    // 10665-75211: Part 1's contents pages name 70 entries; the chapters of Parts 2 and 3 were cut
+    // inside the last one by the oversized split and appeared nowhere in the tree.
+    T.setBlocks([]);
+    const d = view({
+      tocSource: "inferred",
+      tocMethod: "contents",
+      toc: [
+        { level: 1, title: "Vision", number: "1", page: 3, pageLabel: null, confidence: 0.9, evidence: ["contents"], source: "inferred", section: "s1" },
+        { level: 1, title: "Definitions of terms", number: null, page: 10, pageLabel: null, confidence: 0.8, evidence: ["contents"], source: "inferred", section: "s2" },
+      ],
+      sections: [sec("s0", "Front matter", 1, 1), sec("s1", "Vision", 1, 3), sec("s2", "Definitions of terms", 1, 10), sec("s3", "Part 2: Action plan", 2, 12), sec("s4", "Chapter 1. Framework", 2, 14)],
+    });
+    const h = T.docContents(d);
+    expect(h).toContain("2 entries. 3 section(s) the contents do not list are shown at their place.");
+    expect(h.indexOf("Front matter")).toBeLessThan(h.indexOf("Vision"));
+    expect(h).toContain("a section the contents do not list");
+    const kids = T.docTreeKids(2);
+    expect(kids).toContain('data-sec="s3">Part 2: Action plan</a>');
+    expect(kids).toContain('data-sec="s4">Chapter 1. Framework</a>');
+  });
+
   test("toc absent: the tree is built from the sections, nested by level", () => {
     T.setBlocks([]);
     const h = T.docContents(pages);

@@ -2,11 +2,11 @@
 # cat-tools-ph0s
 $schema: bean/1.0.0
 title: 'translate-pot.ts: __PH<n>__ placeholder sentinel triggers OPUS-MT underscore/hyphen hallucinations, 36/64 placeholder refusals, and silent single-underscore leaks'
-status: todo
+status: completed
 type: bug
 priority: high
 created_at: 2026-11-14T10:46:00Z
-updated_at: 2026-11-14T10:46:00Z
+updated_at: 2026-11-14T20:30:00Z
 parent: folio-assistant-bzyu
 ---
 
@@ -105,5 +105,10 @@ Running the exact same 16 placeholder-bearing `msgid`s from `kg-viewer.po` throu
 
 ## Done when
 
-- [ ] `mask()` / `unmask()` in `scripts/translate-pot.ts` (or unified via `scripts/lib/machine-translation.ts` in `#2144`) replaces `__PH<n>__` with `[0]`, `[1]` bracket sentinels, which achieve `64/64` (`16/16` per locale) round-trip survival across `fr`, `es`, `ar`, and `zh`.
-- [ ] Unit tests cover the failing `__PH<n>__` outputs recorded above (`_PH0__`, `__PH0_`, `__PH0___`, `--PH0--`) and verify `[0]` round-trip behaviour.
+- [x] `mask()` / `unmask()` in `scripts/translate-pot.ts` (or unified via `scripts/lib/machine-translation.ts` in `#2144`) replaces `__PH<n>__` with `[0]`, `[1]` bracket sentinels, which achieve `64/64` (`16/16` per locale) round-trip survival across `fr`, `es`, `ar`, and `zh`.
+- [x] Unit tests cover the failing `__PH<n>__` outputs recorded above (`_PH0__`, `__PH0_`, `__PH0___`, `--PH0--`) and verify `[0]` round-trip behaviour.
+
+## Resolution (2026-11-14)
+
+`translate-pot` is now the older name of `translation-candidates` (owner, 2026-11-14: one machine-translation command, through the one candidates writer). Its own `mask()` / `unmask()` and `__PH<n>__` sentinel are gone; every string is masked by `scripts/lib/machine-translation.ts` `maskPlaceholders` with `[0]`, `[1]`, … stand-ins, line by line. `scripts/tests/translation-candidates.test.ts` "a mangled stand-in is refused, never leaked into the text" covers the failure shapes: a broken stand-in loses its placeholder and is refused by the guard, and a spaced `[ 0 ]` still restores. The `_` an engine adds beside an intact stand-in is not a placeholder, so it is not caught by the guard; it reaches a reviewer as a fuzzy candidate.
+

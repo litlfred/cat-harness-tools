@@ -12,7 +12,10 @@
  */
 import * as fs from "node:fs";
 
+import { join } from "node:path";
+
 import { overlayDirs, overlayPath } from "../../scripts/lib/layer-output.ts";
+import { siteFileFor, siteLayersFor } from "../../schemas/kg/cat-harness.ts";
 
 /** `fs.readFileSync`, reading the copy a reader of the site sees. */
 export const readFileSync = ((path: fs.PathOrFileDescriptor, ...rest: unknown[]) =>
@@ -58,4 +61,19 @@ export function linkOverlay(src: string, dest: string): void {
   }
   fs.mkdirSync(dest, { recursive: true });
   for (const name of readdirSync(src) as string[]) linkOverlay(`${src}/${name}`, `${dest}/${name}`);
+}
+
+/**
+ * `siteFileFor` over the overlay: the site-relative path of `rel` in the
+ * highest site layer that holds it, at the layer's output root or in the layer
+ * itself. `siteFileFor` asks only the pinned mounts, so a file only the output
+ * root holds (`assets/beans/count.json`) resolved to the base layer and was
+ * read from where nothing writes it.
+ */
+export function siteFileAt(root: string, rel: string): string {
+  const layers = siteLayersFor(root);
+  for (let i = layers.length - 1; i >= 0; i--) {
+    if (fs.existsSync(overlayPath(join(root, layers[i]!, rel)))) return join(layers[i]!, rel);
+  }
+  return siteFileFor(root, rel);
 }

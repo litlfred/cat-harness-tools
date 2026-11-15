@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { existsSync, readFileSync } from "node:fs";
+// Overlay-aware drop-ins: the library view and its data are written at publish (bean cat-tools-sm8r).
+import { existsSync, readFileSync } from "../support/site-fs.ts";
 import { join } from "node:path";
 
 import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";

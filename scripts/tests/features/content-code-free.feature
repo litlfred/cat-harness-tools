@@ -34,10 +34,10 @@ Feature: Content stays free of code outside the committed list
     And when listed with the built paths only "schemas/x.ts" is listed
 
   @test:scripts/tests/content-code-free.test.ts::check:content-code-free::the_folio_file-list_renderer_and_the_Jekyll_plugins_are_kept_by_rule
-  Scenario: The folio file-list renderer and Jekyll plugins are not code
-    Given "folio-render/file-list.ts", its test, and .rb plugins under site-chrome/_plugins and docs/_plugins
+  Scenario: The folio file-list renderer, site-chrome tests, and Jekyll plugins are not code
+    Given "folio-render/file-list.ts", its test, site-chrome tests, and .rb plugins under site-chrome/_plugins and docs/_plugins
     Then none of them is code
-    And "_plugins/x.ts", "site-chrome/_plugins/sub/x.ts" and "render/file-list.ts" are code
+    And "_plugins/x.ts", "site-chrome/_plugins/sub/x.ts", "site-chrome/tests/sub/x.ts" and "render/file-list.ts" are code
 
   @test:scripts/tests/content-code-free.test.ts::check:content-code-free::an_unlisted_file_is_added;_a_listed_file_that_is_gone_is_only_reported
   Scenario: Unlisted code is added and missing listed code is reported as gone

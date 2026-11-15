@@ -83,7 +83,12 @@ const visOf = (graph: string) => VIS[graph] ?? graph;
  */
 const pageDir = (graph: string) => {
   const parts = { harness: "cat-harness", visualiser: visOf(graph) };
-  return existingPageDir(SITE, parts) ?? visualiserPageDir(SITE, pageParts(parts));
+  // Through the overlay first (bean cat-tools-sm8r): the writer puts the page at
+  // the layer's OUTPUT ROOT, while a stale committed copy may still sit at the old
+  // address in the pinned mount, which `existingPageDir` (mount only) would pick.
+  const holds = (d: string) => existsSync(join(d, "index.html")) || existsSync(join(d, "index.md"));
+  const overlaid = [visualiserPageDir(SITE, pageParts(parts)), visualiserPageDir(SITE, forwardingParts(parts))].find(holds);
+  return overlaid ?? existingPageDir(SITE, parts) ?? visualiserPageDir(SITE, pageParts(parts));
 };
 /** The directory every dashboard of this harness sits in. */
 const dashboardsDir = () => dirname(pageDir("beans"));

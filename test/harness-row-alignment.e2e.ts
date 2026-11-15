@@ -90,10 +90,9 @@ async function open(p: Page, which: "landing" | "viewer"): Promise<string[]> {
   await p.evaluate(() => {
     const box = document.getElementById("fa-nav-open") as HTMLInputElement | null;
     if (box) box.checked = true;
-    for (const s of document.querySelectorAll("summary")) {
-      if (s.textContent?.includes("Harnesses")) (s.parentElement as HTMLDetailsElement).open = true;
-    }
   });
+  // The harness list is the panel the Harnesses icon opens (owner, 2026-11-13).
+  await p.locator("button.fa-nav-harnesses").first().click();
   await p.mouse.move(1200, 700);
   await p.waitForTimeout(300);
   return errors;
@@ -102,11 +101,8 @@ async function open(p: Page, which: "landing" | "viewer"): Promise<string[]> {
 /** Each harness row's mark: its row's label, its left edge, and whether it is an image or a drawn glyph. */
 async function harnessMarks(p: Page) {
   return p.evaluate(() => {
-    const group = [...document.querySelectorAll("details")].find(
-      (d) => d.querySelector(":scope > summary")?.textContent?.includes("Harnesses"),
-    );
-    if (!group) return [];
-    const sub = group.querySelector(":scope > .fa-nav-sub")!;
+    const sub = document.getElementById("fa-nav-harnesses");
+    if (!sub) return [];
     // A harness row is a direct link of the group, or the link of a
     // `.fa-nav-row` (a row with a ⚙ or children). Never a nested graph row.
     const rows = [...sub.querySelectorAll(":scope > a, :scope > .fa-nav-row > a")];

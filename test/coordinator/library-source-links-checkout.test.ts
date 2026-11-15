@@ -8,7 +8,10 @@
  * standing alone, cat-harness holds none of these libraries.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
+// Publish-time files are written to the layer output overlay (bean sm8r);
+// these read the copy a site reader sees, falling back to the path given.
+import { existsSync, readFileSync } from "../support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { basename, join, relative, resolve, sep } from "node:path";
 

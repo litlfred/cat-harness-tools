@@ -75,6 +75,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { overlayDirs, overlayPath, writePathOf } from "../scripts/lib/layer-output.ts";
 import { readEffectiveConfig } from "../schemas/kg/harness-config.ts";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -440,8 +441,18 @@ function indexPathFor(instanceRoot: string, siteDir?: string): string {
 /** Every file under `dir` whose extension is translatable for `type`, sorted. */
 function translatablePages(root: string, type: string): string[] {
   const out: string[] = [];
+  // Over the layer overlay (bean `cat-tools-sm8r`, item 4): a mounted layer's
+  // generated pages are at its output root, so a directory is the union of
+  // the output root's copy and the layer's own, each name once.
+  const entries = (abs: string) => {
+    const seen = new Map<string, import("node:fs").Dirent>();
+    for (const d of overlayDirs(abs).length ? overlayDirs(abs) : [abs]) {
+      for (const e of readdirSync(d, { withFileTypes: true })) if (!seen.has(e.name)) seen.set(e.name, e);
+    }
+    return [...seen.values()];
+  };
   const walk = (abs: string): void => {
-    for (const e of readdirSync(abs, { withFileTypes: true }).sort((a, b) =>
+    for (const e of entries(abs).sort((a, b) =>
       a.name.localeCompare(b.name),
     )) {
       const p = join(abs, e.name);
@@ -524,7 +535,7 @@ export function buildTranslationIndex(instanceRoot: string, siteDir?: string): B
   for (const rel of files) {
     let fm: Record<string, unknown> | undefined;
     try {
-      fm = frontMatter(readFileSync(join(site, rel), "utf-8"));
+      fm = frontMatter(readFileSync(overlayPath(join(site, rel)), "utf-8"));
     } catch (e) {
       unreadable.set(rel.split(sep).join("/"), e instanceof Error ? e.message.split("\n")[0] : String(e));
       continue;
@@ -589,7 +600,7 @@ export function buildTranslationIndex(instanceRoot: string, siteDir?: string): B
       continue;
     }
     const sourceRel = source.split("/").join(sep);
-    const sourceAbs = join(site, sourceRel);
+    const sourceAbs = overlayPath(join(site, sourceRel));
     const why = unreadable.get(source);
     if (why !== undefined) {
       findings.push({
@@ -691,9 +702,12 @@ export function writeTranslationIndex(
   index: TranslationIndex,
   siteDir?: string,
 ): boolean {
-  const p = indexPathFor(instanceRoot, siteDir);
+  // A mounted layer's index is computed output: read over the overlay,
+  // written at its output root, never into the mount (bean `cat-tools-sm8r`).
+  const p = writePathOf(indexPathFor(instanceRoot, siteDir));
   const next = serialise(index);
-  const prev = existsSync(p) ? readFileSync(p, "utf-8") : null;
+  const at = overlayPath(indexPathFor(instanceRoot, siteDir));
+  const prev = existsSync(at) ? readFileSync(at, "utf-8") : null;
   if (prev === next) return false;
   mkdirSync(dirname(p), { recursive: true });
   writeFileSync(p, next, "utf-8");
@@ -712,7 +726,8 @@ export function checkTranslationIndex(instanceRoot: string, siteDir?: string): {
   }
   if (findings.some((f) => f.severity === "error")) return { state: "stale", findings };
   const p = indexPathFor(instanceRoot, siteDir);
-  const prev = existsSync(p) ? readFileSync(p, "utf-8") : null;
+  const at = overlayPath(p);
+  const prev = existsSync(at) ? readFileSync(at, "utf-8") : null;
   if (prev !== serialise(index)) return { state: "stale", findings, stalePath: relative(instanceRoot, p) };
   return { state: "ok", findings };
 }

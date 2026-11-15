@@ -22,7 +22,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { runStaging } from "../apply-image-verdicts.ts";
+import { applyTo, runStaging } from "../apply-image-verdicts.ts";
 
 const BY = { kind: "agent", id: "claude", model: "claude-opus-5" };
 
@@ -182,5 +182,46 @@ describe("runStaging — what it writes", () => {
     const once = readFileSync(f.path, "utf-8");
     runStaging(f.entry, f.lib, false);
     expect(readFileSync(f.path, "utf-8")).toBe(once);
+  });
+});
+
+describe("translations drafted after the verdict survive a re-ingest (re-ingest pilot, 2026-11-14)", () => {
+  const held = (draft: string) => [
+    { text: draft, lang: "en", state: "draft", drafted_by: BY, drafted_at: "2026-09-23" },
+    { text: "Logo d'OpenHands.", lang: "fr", state: "draft", drafted_by: BY, drafted_at: "2026-11-11" },
+    { text: "Логотип OpenHands.", lang: "ru", state: "draft", drafted_by: BY, drafted_at: "2026-11-11" },
+  ];
+  /** The entry as filed before the re-ingest, holding its five-language narratives. */
+  function filed(f: ReturnType<typeof fixture>, draft: string) {
+    const dir = join(f.lib, f.docId);
+    mkdirSync(dir, { recursive: true });
+    const s = sidecar(f.docId);
+    const img = { ...s.images[0]!, role: "logo", basis: { method: "inspection", by: BY, at: "2026-09-23", saw: LOGO.saw, page: 3 }, narrative: held(draft) };
+    writeFileSync(join(dir, "images.json"), JSON.stringify({ ...s, images: [img] }, null, 2) + "\n");
+  }
+
+  test("a staged sidecar takes the filed entry's other languages when the English is unchanged", () => {
+    const f = fixture();
+    writeVerdicts(f.lib, { [f.docId]: { "img-p003-1": LOGO } });
+    filed(f, LOGO.draft);
+    expect(runStaging(f.entry, f.lib, false)).toBe(0);
+    const n = JSON.parse(readFileSync(f.path, "utf-8")).images[0].narrative;
+    expect(n.map((x: { lang: string }) => x.lang)).toEqual(["en", "fr", "ru"]);
+  });
+
+  test("a changed English description does not carry the old translations", () => {
+    const f = fixture();
+    writeVerdicts(f.lib, { [f.docId]: { "img-p003-1": LOGO } });
+    filed(f, "An older, different description.");
+    expect(runStaging(f.entry, f.lib, false)).toBe(0);
+    const n = JSON.parse(readFileSync(f.path, "utf-8")).images[0].narrative;
+    expect(n.map((x: { lang: string }) => x.lang)).toEqual(["en"]);
+  });
+
+  test("a bare run over a filed sidecar keeps what it holds", () => {
+    const s = sidecar("d");
+    const img = { ...s.images[0]!, role: "logo", basis: { method: "inspection", by: BY, at: "2026-09-23", saw: LOGO.saw, page: 3 }, narrative: held(LOGO.draft) };
+    const { text } = applyTo(JSON.stringify({ ...s, images: [img] }), { "img-p003-1": LOGO as never }, BY, "2026-09-23");
+    expect(JSON.parse(text).images[0].narrative.map((x: { lang: string }) => x.lang)).toEqual(["en", "fr", "ru"]);
   });
 });
