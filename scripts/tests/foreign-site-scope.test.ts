@@ -135,7 +135,14 @@ afterAll(() => {
 try {
   const READS = new Set([PLATFORM_DATA, join(SMART_TRUST, siteDirFor(SMART_TRUST))].map((p) => resolve(p)));
   const READ_PLAN = declaredPlan(REPO).filter((a) => READS.has(resolve(a.abs)));
-  if (READ_PLAN.length !== READS.size) {
+  // Built already (the publish wrote them, into the overlay): build nothing.
+  // A scratch rebuild copied back over the publish's own `harness.json` left
+  // it out of step with the include `navbar:include` wrote from it, and later
+  // files in the shard (gen-navbar-include's fixpoint, nav-names) read that.
+  const ALREADY_BUILT = [...READS].every((p) => existsSync(p));
+  if (ALREADY_BUILT) {
+    // nothing to do: read what the publish built
+  } else if (READ_PLAN.length !== READS.size) {
     console.warn(
       `foreign-site-scope: built nothing — expected a builtAtPublish entry for each of ${[...READS].join(", ")}; found ${READ_PLAN.map((a) => `${a.instance}/${a.path}`).join(", ") || "none"}`,
     );
