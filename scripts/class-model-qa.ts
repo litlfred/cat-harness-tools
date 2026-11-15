@@ -46,8 +46,12 @@ function sourceOf(d: SchemaGraph["decls"][number]): string {
   return d.module.endsWith(".json") ? "json-schema" : "zod";
 }
 
-/** A namespace without its closing `#` or `/`, so `…/core#` and `…/core` are one. */
-const bareNs = (ns: string): string => ns.replace(/[#/]+$/, "");
+/**
+ * A namespace without its closing `#` or `/`, so `…/core#` and `…/core` are
+ * one, and with `https:` read as `http:`: schema.org publishes both, and
+ * `@vocabulary/schema` writes `http://schema.org/` where the record says https.
+ */
+const bareNs = (ns: string): string => ns.replace(/^https:/, "http:").replace(/[#/]+$/, "");
 
 /**
  * The external-schema records (`folio-external-schema/v1`) in the declared

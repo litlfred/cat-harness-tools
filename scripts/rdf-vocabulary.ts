@@ -18,6 +18,16 @@
  * `vocabularies.unread`, with the reason, and reported as not read: nothing is
  * stood in for it.
  *
+ * A package named under `vocabularies.referencedOnly` (schema.org: 1,011
+ * classes; owner, 2026-11-15, option C) is read only for the classes the
+ * corpus NAMES — a CURIE or IRI in a field type or literal, such as a JSON-LD
+ * shape's `"@type": z.literal("schema:DefinedTerm")` — with the properties
+ * whose domain is one of them. Its other classes stay external, linked names,
+ * never unresolved ones, and with nothing named the package is not parsed.
+ * schema.org states `schema:domainIncludes` / `schema:rangeIncludes` rather
+ * than `rdfs:domain` / `rdfs:range`; they are read when no `rdfs:` one is
+ * stated, and the field says so, since they carry no entailment.
+ *
  * ## What becomes what
  *
  * | vocabulary | class model |
@@ -69,6 +79,8 @@ const OWL = "http://www.w3.org/2002/07/owl#";
 const XSD = "http://www.w3.org/2001/XMLSchema#";
 const SKOS = "http://www.w3.org/2004/02/skos/core#";
 const DCT = "http://purl.org/dc/terms/";
+/** schema.org, as `@vocabulary/schema` writes it (http, not https). */
+const SDO = "http://schema.org/";
 
 /** The scope of the npm packages this reader reads. */
 export const VOCABULARY_SCOPE = "@vocabulary/";
@@ -87,6 +99,12 @@ export interface DeclaredVocabulary {
   pkg: string;
   /** The version the `package.json` pins. */
   version: string;
+  /**
+   * Read only the classes the corpus names (`vocabularies.referencedOnly`):
+   * schema.org is 1,011 classes, and the corpus types two shapes by it
+   * (owner, 2026-11-15, option C).
+   */
+  referencedOnly?: true;
 }
 
 /** A vocabulary the layer names as not read, and why (`vocabularies.unread` in its `package.json`). */
@@ -105,6 +123,8 @@ export interface VocabularyRead {
   module: string;
   classes: number;
   properties: number;
+  /** Only the classes the corpus names were read (`vocabularies.referencedOnly`). */
+  referencedOnly?: true;
 }
 
 /**
@@ -113,7 +133,7 @@ export interface VocabularyRead {
  */
 export function declaredVocabularies(packageJson: string): { declared: DeclaredVocabulary[]; unread: UnreadVocabulary[] } {
   if (!existsSync(packageJson)) return { declared: [], unread: [] };
-  let pj: { dependencies?: Record<string, string>; vocabularies?: { unread?: Record<string, string> } };
+  let pj: { dependencies?: Record<string, string>; vocabularies?: { unread?: Record<string, string>; referencedOnly?: string[] } };
   try {
     pj = JSON.parse(readFileSync(packageJson, "utf-8"));
   } catch {
@@ -121,7 +141,7 @@ export function declaredVocabularies(packageJson: string): { declared: DeclaredV
   }
   const declared = Object.entries(pj.dependencies ?? {})
     .filter(([n]) => n.startsWith(VOCABULARY_SCOPE))
-    .map(([pkg, version]) => ({ pkg, version }))
+    .map(([pkg, version]) => ({ pkg, version, ...(pj.vocabularies?.referencedOnly?.includes(pkg) ? { referencedOnly: true as const } : {}) }))
     .sort((a, b) => a.pkg.localeCompare(b.pkg));
   const unread = Object.entries(pj.vocabularies?.unread ?? {})
     .map(([namespace, reason]) => ({ namespace, reason }))
@@ -139,7 +159,16 @@ interface Loaded {
   source: string;
   module: string;
   store: InstanceType<typeof oxigraph.Store>;
+  /** Read only these classes (IRIs), and only the properties whose domain is one of them. */
+  only?: ReadonlySet<string>;
 }
+
+/**
+ * The classes of a vocabulary the corpus names, for a `referencedOnly`
+ * vocabulary: given its prefix and namespace, the class IRIs. An empty set
+ * reads nothing of it.
+ */
+export type Mentions = (prefix: string, namespace: string) => ReadonlySet<string>;
 
 /**
  * Read the vocabularies a layer declares.
@@ -152,6 +181,7 @@ export function readRdfVocabularies(
   packageJson: string,
   rel: (p: string) => string,
   instance: string,
+  mentions: Mentions = () => new Set(),
 ): {
   modules: SchemaGraphModule[];
   decls: SchemaDecl[];
@@ -164,7 +194,7 @@ export function readRdfVocabularies(
   const unread = named.map((u) => `${u.namespace}: not read — ${u.reason}`);
   const req = createRequire(packageJson);
   const loaded: Loaded[] = [];
-  for (const { pkg, version } of declared) {
+  for (const { pkg, version, referencedOnly } of declared) {
     let pjPath: string;
     try {
       pjPath = req.resolve(`${pkg}/package.json`);
@@ -187,6 +217,9 @@ export function readRdfVocabularies(
       unread.push(`${pkg}: states no vocabulary prefix and namespace, or ships no N-Quads`);
       continue;
     }
+    const only = referencedOnly ? mentions(prefix, namespace) : undefined;
+    // Nothing named: nothing to load. The 2.6 MB of schema.org is not parsed for no box.
+    if (only && only.size === 0) continue;
     const store = new oxigraph.Store();
     try {
       for (const f of files) store.load(readFileSync(join(dir, f), "utf-8"), { format: "application/n-quads" });
@@ -194,7 +227,7 @@ export function readRdfVocabularies(
       unread.push(`${pkg}: N-Quads unparseable — ${(e as Error).message.slice(0, 80)}`);
       continue;
     }
-    loaded.push({ prefix, namespace, source: `${pkg}@${meta.version ?? version}`, module: rel(join(dir, files[0]!)), store });
+    loaded.push({ prefix, namespace, source: `${pkg}@${meta.version ?? version}`, module: rel(join(dir, files[0]!)), store, ...(only ? { only } : {}) });
   }
   const out = readLoadedVocabularies(loaded, instance);
   return { ...out, unread };
@@ -205,14 +238,14 @@ export function readRdfVocabularies(
  * a caller holding the text already.
  */
 export function readRdfVocabularyTexts(
-  vocabs: readonly { prefix: string; namespace: string; nquads: string; module: string; source?: string }[],
+  vocabs: readonly { prefix: string; namespace: string; nquads: string; module: string; source?: string; only?: ReadonlySet<string> }[],
   instance = "test",
 ): ReturnType<typeof readLoadedVocabularies> {
   return readLoadedVocabularies(
     vocabs.map((v) => {
       const store = new oxigraph.Store();
       store.load(v.nquads, { format: "application/n-quads" });
-      return { prefix: v.prefix, namespace: v.namespace, source: v.source ?? v.module, module: v.module, store };
+      return { prefix: v.prefix, namespace: v.namespace, source: v.source ?? v.module, module: v.module, store, ...(v.only ? { only: v.only } : {}) };
     }),
     instance,
   );
@@ -251,7 +284,7 @@ function readLoadedVocabularies(
     decls.push(...r.decls);
     edges.push(...r.edges);
     refs.push(...r.refs);
-    vocabularies.push({ prefix: v.prefix, namespace: v.namespace, source: v.source, module: v.module, classes: r.classes, properties: r.properties });
+    vocabularies.push({ prefix: v.prefix, namespace: v.namespace, source: v.source, module: v.module, classes: r.classes, properties: r.properties, ...(v.only ? { referencedOnly: true as const } : {}) });
   }
   return { modules, decls, edges, refs, vocabularies };
 }
@@ -332,8 +365,10 @@ function readOne(
   const isA = (iri: string, set: Set<string>): boolean => [...(typesOf.get(iri) ?? [])].some((t) => set.has(t));
   const datatypeTypes = new Set([`${RDFS}Datatype`]);
 
-  const classIris = [...typesOf.keys()].filter((i) => own(i) && isA(i, classTypes) && !isA(i, propTypes)).sort();
+  const classIris = [...typesOf.keys()].filter((i) => own(i) && isA(i, classTypes) && !isA(i, propTypes) && (!v.only || v.only.has(i))).sort();
   const propIris = [...typesOf.keys()].filter((i) => own(i) && isA(i, propTypes)).sort();
+  /** A class this reading leaves out on purpose (a `referencedOnly` vocabulary): a reference to it stays an external, linked name. */
+  const leftOut = (iri: string): boolean => !!v.only && own(iri) && !v.only.has(iri);
   const classSet = new Set(classIris);
 
   const idOf = (iri: string): string => `${module}#${curie(iri)}`;
@@ -355,7 +390,7 @@ function readOne(
     for (const sup of named(s, `${RDFS}subClassOf`).sort()) {
       if (sup === iri || sup === `${OWL}Thing` || sup === `${RDFS}Resource`) continue;
       d.extendsNames.push(curie(sup));
-      refs.push({ from: d.id, ref: sup, module, via: "", kind: "extends", optional: false, array: false, by: "canonical" });
+      refs.push({ from: d.id, ref: sup, module, via: "", kind: "extends", optional: false, array: false, by: "canonical", ...(leftOut(sup) ? { quietMiss: true as const } : {}) });
     }
     // Named individuals of the class: its values, as an enum's.
     d.values = [...typesOf.entries()]
@@ -426,10 +461,18 @@ function readOne(
     return d;
   };
 
-  const addField = (d: SchemaDecl, propIri: string, rangeIri: string | undefined, notes: string[], bounds?: { min?: number; max?: number }): void => {
+  const addField = (
+    d: SchemaDecl,
+    propIri: string,
+    rangeIri: string | undefined,
+    notes: string[],
+    bounds?: { min?: number; max?: number },
+    union: readonly string[] = [],
+  ): void => {
     const functional = (typesOf.get(propIri) ?? new Set()).has(`${OWL}FunctionalProperty`);
     const name = curie(propIri);
-    const type = rangeIri ? curie(rangeIri) : "(no range)";
+    // Several ranges are a union, written as one; with no edge, since no one class is the type.
+    const type = rangeIri ? curie(rangeIri) : union.length > 1 ? union.map(curie).sort().join(" | ") : "(no range)";
     const max: number | "*" = bounds?.max ?? (functional ? 1 : "*");
     const min = bounds?.min ?? 0;
     const doc = text(nn(propIri), `${SKOS}definition`, `${RDFS}comment`, `${DCT}description`);
@@ -451,27 +494,37 @@ function readOne(
     d.fields.push(field);
     // A datatype (`csvw:uriTemplate`, an XSD type) is a value, linked; a class is an edge.
     if (rangeIri && !datatype) {
-      refs.push({ from: d.id, ref: rangeIri, module, via: name, kind: "field", optional: field.optional, array: field.array, by: "canonical" });
+      refs.push({ from: d.id, ref: rangeIri, module, via: name, kind: "field", optional: field.optional, array: field.array, by: "canonical", ...(leftOut(rangeIri) ? { quietMiss: true as const } : {}) });
     }
   };
 
   for (const p of propIris) {
-    const dom = entailed(p, `${RDFS}domain`);
-    const rng = entailed(p, `${RDFS}range`);
+    // schema.org states neither rdfs:domain nor rdfs:range: it says
+    // `schema:domainIncludes` / `schema:rangeIncludes`, which are weaker (an
+    // expectation, no entailment). Read when there is no rdfs: one, and noted.
+    let dom = entailed(p, `${RDFS}domain`);
+    let domIncludes = false;
+    if (dom.values.length === 0 && (dom = entailed(p, `${SDO}domainIncludes`)).values.length) domIncludes = true;
+    let rng = entailed(p, `${RDFS}range`);
+    let rngIncludes = false;
+    if (rng.values.length === 0 && (rng = entailed(p, `${SDO}rangeIncludes`)).values.length) rngIncludes = true;
     const ranges = rng.values.flatMap(classesOf);
     const range = ranges.length === 1 ? ranges[0] : undefined;
     const notes: string[] = [];
+    if (domIncludes) notes.push("domainIncludes");
+    if (rngIncludes) notes.push("rangeIncludes");
     if (dom.via) notes.push(`domain via ${curie(dom.via)}`);
     if (rng.via) notes.push(`range via ${curie(rng.via)}`);
-    if (ranges.length > 1) notes.push(`range ${ranges.map(curie).join(" ∪ ")}`);
     const domains = dom.values.flatMap(classesOf).filter((c) => c !== `${OWL}Thing` && c !== `${RDFS}Resource`);
     const home = domains.filter((c) => decls.has(c));
     const foreign = domains.filter((c) => !decls.has(c));
-    for (const c of home) addField(decls.get(c)!, p, range, notes, restricted.get(c)?.get(p));
+    for (const c of home) addField(decls.get(c)!, p, range, notes, restricted.get(c)?.get(p), ranges);
+    // A property of a class left out on purpose is left out with it.
+    if (home.length === 0 && v.only) continue;
     if (home.length === 0) {
       const n = [...notes];
       if (foreign.length) n.unshift(`domain ${foreign.map(curie).join(" ∪ ")}`);
-      addField(ownBox(), p, range, n);
+      addField(ownBox(), p, range, n, undefined, ranges);
     }
   }
   // A restriction on a property the class is not the domain of: the class
@@ -490,5 +543,5 @@ function readOne(
   const ontology = match(null, `${RDF}type`, nn(`${OWL}Ontology`))[0]?.subject;
   const title = ontology ? text(ontology, `${DCT}title`, "http://purl.org/dc/elements/1.1/title", `${RDFS}label`) : undefined;
   const all = [...decls.values()].sort((a, b) => a.id.localeCompare(b.id));
-  return { decls: all, edges, refs, ...(title ? { title } : {}), classes: classIris.length, properties: propIris.length };
+  return { decls: all, edges, refs, ...(title ? { title } : {}), classes: classIris.length, properties: v.only ? all.reduce((n, d) => n + d.fields.length, 0) : propIris.length };
 }

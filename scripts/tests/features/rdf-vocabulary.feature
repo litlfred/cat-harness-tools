@@ -46,11 +46,23 @@ Feature: Published vocabularies and metamodels drawn as classes
     When it is drawn
     Then the boxes are labelled «owl» and «rdfs» and the row reads "ex:name : xsd:string [0..1]"
 
+  @test:scripts/tests/rdf-vocabulary.test.ts::a_vocabulary_read_only_where_the_corpus_names_it_(schema.org,_owner_option_C)::finds_a_class_named_by_CURIE_or_by_IRI_in_either_scheme,_and_not_a_property
+  Scenario: The corpus's mentions of a vocabulary's classes are found
+    Given text naming schema:MediaObject by CURIE, https://schema.org/DefinedTerm by IRI, and the property schema:name
+    When the class mentions are read
+    Then the two classes are found, under the package's own http namespace, and the property is not
+
+  @test:scripts/tests/rdf-vocabulary.test.ts::a_vocabulary_read_only_where_the_corpus_names_it_(schema.org,_owner_option_C)::draws_only_the_named_class,_with_its_domainIncludes_properties,_and_leaves_its_superclass_an_external_name
+  Scenario: A referenced-only vocabulary draws just the classes the corpus names
+    Given a schema.org fixture where only schema:MediaObject is named
+    When it is read
+    Then only schema:MediaObject is drawn, its fields come from domainIncludes and say so, two rangeIncludes read as one union type, and schema:CreativeWork stays an external name, not unresolved
+
   @test:scripts/tests/rdf-vocabulary.test.ts::installed_vocabularies::reads_SKOS_from_its_installed_package:_skos:broader_lands_on_skos:Concept_by_entailment
   Scenario: Installed vocabularies are read, and ODRL is reported as not read
     Given this layer depends on @vocabulary/skos, @vocabulary/csvw and @vocabulary/prov and names ODRL as unread
     When they are read
-    Then skos:broader is a field of skos:Concept through skos:semanticRelation, csvw:Table and prov:Activity are drawn, and ODRL is reported and not drawn
+    Then skos:broader is a field of skos:Concept through skos:semanticRelation, csvw:Table and prov:Activity are drawn, schema.org is not parsed until a class is named and then only that class is drawn, and ODRL is reported and not drawn
 
   @test:scripts/tests/rdf-vocabulary.test.ts::installed_vocabularies::reports_a_declared_package_that_is_not_installed,_and_stands_nothing_in_for_it
   Scenario: A declared vocabulary that is not installed is reported
