@@ -61,6 +61,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { readLockFile, repositoryOwner, resolveLockJson } from "../schemas/kg/repo-owner.ts";
 
 /** The fields of a lock this check reads. */
 export interface LockLike {
@@ -90,7 +91,7 @@ export const fetchLockFromGit: LockFetcher = (repository, sha, file) => {
     if (f.status !== 0) throw new Error(`cannot fetch ${repository}@${sha.slice(0, 12)}: ${(f.stderr ?? "").trim().split("\n")[0]}`);
     const show = git("show", `${sha}:${file}`);
     if (show.status !== 0) return undefined; // the layer has no lock at that commit
-    return JSON.parse(show.stdout) as LockLike;
+    return resolveLockJson(JSON.parse(show.stdout) as LockLike, repositoryOwner(repository));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -98,7 +99,7 @@ export const fetchLockFromGit: LockFetcher = (repository, sha, file) => {
 
 /** The index's lock and the skews between it and each mounted layer's own lock. */
 export function lockSkews(root: string, fetch: LockFetcher = fetchLockFromGit): { skews: Skew[]; undetermined: string[]; compared: number } {
-  const index = JSON.parse(readFileSync(join(root, "index.lock.json"), "utf-8")) as LockLike;
+  const index = readLockFile<LockLike>(join(root, "index.lock.json"));
   const pinned = new Map(index.instances.map((i) => [i.instance, i.sha]));
   const skews: Skew[] = [];
   const undetermined: string[] = [];
@@ -107,7 +108,8 @@ export function lockSkews(root: string, fetch: LockFetcher = fetchLockFromGit): 
     let own: LockLike | undefined;
     const onDisk = join(root, layer.path, "index.lock.json");
     try {
-      if (existsSync(onDisk)) own = JSON.parse(readFileSync(onDisk, "utf-8")) as LockLike;
+      // A mounted layer's own lock: its same-owner names are its own owner's.
+      if (existsSync(onDisk)) own = resolveLockJson(JSON.parse(readFileSync(onDisk, "utf-8")) as LockLike, repositoryOwner(layer.repository));
       else own = fetch(layer.repository, layer.sha, "index.lock.json");
     } catch (e) {
       undetermined.push(`${layer.instance}: ${(e as Error).message}`);

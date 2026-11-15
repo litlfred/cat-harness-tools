@@ -167,6 +167,7 @@
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { checkoutOwner, isSameOwnerName, relativizeLockRepositories, resolveRepository } from "../schemas/kg/repo-owner.ts";
 import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -1853,7 +1854,11 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
         })
         .sort((a, b) => a.instance.localeCompare(b.instance)),
     };
-    writeFileSync(lockFile, JSON.stringify(lock, null, 2) + "\n");
+    // A same-owner mount stays same-owner on disk: its repository, and every
+    // layer reached in the same repository, is written as the bare name
+    // (cat-harness-tools#2337).
+    const sameOwnerRepos = plan.mounts.filter((m) => m.sameOwner === true).map((m) => m.repository);
+    writeFileSync(lockFile, JSON.stringify(relativizeLockRepositories(lock, sameOwnerRepos), null, 2) + "\n");
     syncIgnoreBlock(plan.instanceRoot, blockConfig);
     // The shared-workflow calls follow the lock (owner, 2026-11-01, security
     // audit S1): `uses: litlfred/<layer>/…@<the ref just written>`.
@@ -1886,8 +1891,9 @@ export interface SeedSpec {
 
 /** Parse `<name>=<owner/repo>@<40-char sha>`; throws with the expected shape. */
 export function parseSeed(arg: string): SeedSpec {
-  const m = /^([^=\s]+)=([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$/.exec(arg);
-  if (!m) throw new Error(`--seed \`${arg}\`: expected <name>=<owner/repo>@<40-character sha>`);
+  // `<repo>` without an owner is a same-owner name (cat-harness-tools#2337).
+  const m = /^([^=\s]+)=([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)?)@([0-9a-f]{40})$/.exec(arg);
+  if (!m) throw new Error(`--seed \`${arg}\`: expected <name>=<owner/repo or repo>@<40-character sha>`);
   return { harness: m[1]!, repository: m[2]!, ref: m[3]! };
 }
 
@@ -1921,7 +1927,17 @@ export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], gra
   const next: RemoteMount[] = [...current];
   for (const spec of specs) {
     const at = next.findIndex((m) => m.harness === spec.harness);
-    let m: RemoteMount = at >= 0 ? { ...next[at]!, repository: spec.repository, ref: spec.ref } : { harness: spec.harness, repository: spec.repository, ref: spec.ref };
+    // A bare name seeds a same-owner mount; an owner-qualified one keeps an
+    // entry same-owner only when it names the repository the entry already
+    // resolves to (cat-harness-tools#2337).
+    const was = at >= 0 ? next[at]! : undefined;
+    const bare = isSameOwnerName(spec.repository);
+    const repository = bare ? resolveRepository(spec.repository, checkoutOwner(instanceRoot)) : spec.repository;
+    const keepSame = bare || (was?.sameOwner === true && was.repository.toLowerCase() === repository.toLowerCase());
+    const { sameOwner: _was, ...rest } = was ?? ({} as Partial<RemoteMount>);
+    let m: RemoteMount = was
+      ? { ...(rest as RemoteMount), repository, ref: spec.ref, ...(keepSame ? { sameOwner: true as const } : {}) }
+      : { harness: spec.harness, repository, ref: spec.ref, ...(keepSame ? { sameOwner: true as const } : {}) };
     if (spec.whole) m = { ...m, overrides: { ...m.overrides, [spec.harness]: { ...m.overrides?.[spec.harness], whole: true } } };
     m = withConsent(m, grant);
     if (at >= 0) next[at] = m;

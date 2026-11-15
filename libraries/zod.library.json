@@ -81,6 +81,7 @@
     "schemas/kg/node-kind.ts",
     "schemas/kg/nquads-distribution.ts",
     "schemas/kg/portfolio.ts",
+    "schemas/kg/publishing-profile.ts",
     "schemas/kg/remote-mount.ts",
     "schemas/kg/repo-full-name.ts",
     "schemas/kg/semantic-zoom.ts",

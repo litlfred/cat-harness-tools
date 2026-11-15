@@ -76,6 +76,7 @@ import {
   type RenderedRole,
 } from "../schemas/ui/rendered-impact.ts";
 import { PREVIEW_PREFIX_ALT } from "./lib/preview-prefix.ts";
+import { checkoutOwner, resolveLockJson } from "../schemas/kg/repo-owner.ts";
 
 export const STAGING_CHANGES_TAG = "staging-changes/v1" as const;
 
@@ -809,8 +810,9 @@ if (import.meta.main) {
       repository: arg("--repo") ?? process.env.GITHUB_REPOSITORY ?? "unknown/unknown",
       head: arg("--head"),
       changed,
-      base: readJson<Lock>(arg("--base-lock")),
-      headLock: readJson<Lock>(arg("--head-lock") ?? "index.lock.json"),
+      // Same-owner names resolve against this checkout's owner (cat-harness-tools#2337).
+      base: resolveLockJson(readJson<Lock>(arg("--base-lock")), () => checkoutOwner(".")),
+      headLock: resolveLockJson(readJson<Lock>(arg("--head-lock") ?? "index.lock.json"), () => checkoutOwner(".")),
       differ: gitDiffer,
     });
     const list = coneInputs(sources);

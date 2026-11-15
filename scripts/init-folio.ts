@@ -55,6 +55,7 @@ import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-e
 import { parseRemote } from "./pages-bootstrap.ts";
 import { DEFAULT_TODO_GRAPH, DEFAULT_TODO_GRAPH_ROOT, nodeOfKind } from "../schemas/sdlc/todo-graph.js";
 import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
+import { HARNESS_OWNER as CANONICAL_HARNESS_OWNER } from "../schemas/kg/repo-owner.ts";
 
 /** The version a new layer declares beside its `iriBase` (bean folio-assistant-63q4). */
 export const INITIAL_VERSION = "0.1.0";
@@ -64,7 +65,7 @@ export const INITIAL_VERSION = "0.1.0";
  * …): `HARNESS_OWNER`, else litlfred. A new folio may live under any owner;
  * only the harness it calls is assumed to live here.
  */
-export const HARNESS_OWNER = process.env.HARNESS_OWNER || "litlfred";
+export const HARNESS_OWNER = process.env.HARNESS_OWNER || CANONICAL_HARNESS_OWNER;
 
 /** The upstream this folio pins its platform to. */
 export const FOLIO_ASSISTANT_REPO = `https://github.com/${HARNESS_OWNER}/folio-assistant.git`;

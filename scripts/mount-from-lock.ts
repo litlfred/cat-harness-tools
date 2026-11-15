@@ -539,11 +539,37 @@ export function readLocks(root: string): { file: string; instances?: LockInstanc
           (i.assets !== undefined && (!Array.isArray(i.assets) || i.assets.some((a) => typeof a?.src !== "string" || !DIGEST.test(String(a?.sha256))))),
       );
       if (bad) return { file, error: `instance \`${String((bad as { instance?: unknown })?.instance)}\` is malformed` };
-      return { file, instances: raw.instances as LockInstance[] };
+      // A same-owner entry (a bare repository name) is fetched from the
+      // owner of the checkout holding the lock: so a fork replays from the
+      // fork and the WHO repository from WHO (cat-harness-tools#2337; the
+      // rule is schemas/kg/repo-owner.ts, inlined because this script
+      // imports only node:*).
+      const instances = raw.instances as LockInstance[];
+      if (!instances.some((i) => SAME_OWNER_NAME.test(i.repository))) return { file, instances };
+      const owner = lockOwner(dirname(file));
+      if (!owner) return { file, error: "the lock names a same-owner repository and this checkout's owner is unknown (set CAT_REPO_OWNER, or give the checkout an origin)" };
+      return { file, instances: instances.map((i) => (SAME_OWNER_NAME.test(i.repository) ? { ...i, repository: `${owner}/${i.repository}` } : i)) };
     } catch (e) {
       return { file, error: `not JSON: ${(e as Error).message}` };
     }
   });
+}
+
+/** A bare repository name, with no owner: a same-owner name (schemas/kg/repo-owner.ts). */
+const SAME_OWNER_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/** The owner of the checkout at `dir`: CAT_REPO_OWNER, else origin's, else GITHUB_REPOSITORY_OWNER (schemas/kg/repo-owner.ts `checkoutOwner`). */
+export function lockOwner(dir: string): string | undefined {
+  // input-site: env CAT_REPO_OWNER #73a2ec1d — the owner a same-owner lock entry resolves to, when the environment names it
+  const explicit = process.env.CAT_REPO_OWNER?.trim();
+  if (explicit) return explicit;
+  // input-site: traced #712f6302 — origin's URL, from this clone's git config: no fingerprint names it, so a run that reaches it records no hash
+  inputSiteReached("mount-from-lock: origin's URL");
+  const r = spawnSync("git", ["-C", dir, "remote", "get-url", "origin"], { encoding: "utf-8" });
+  const url = r.status === 0 ? r.stdout.trim().replace(/\/+$/, "").replace(/\.git$/, "") : "";
+  const o = url.match(/[/:]([A-Za-z0-9][A-Za-z0-9._-]*)\/[A-Za-z0-9][A-Za-z0-9._-]*$/)?.[1];
+  // input-site: env GITHUB_REPOSITORY_OWNER #77acd249 — CI's owner, when the checkout has no origin
+  return o ?? (process.env.GITHUB_REPOSITORY_OWNER?.trim() || undefined);
 }
 
 /** A lock path may not climb out of the root or land on it. */

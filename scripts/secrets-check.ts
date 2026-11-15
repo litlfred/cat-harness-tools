@@ -27,6 +27,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
+import { checkoutOwner, resolveLockJson } from "../schemas/kg/repo-owner.ts";
 
 export type Severity = "critical" | "major" | "minor" | "advisory";
 
@@ -216,7 +217,7 @@ function repoName(dir: string): string {
 
 function lockRepositories(indexRoot: string): Map<string, string> {
   const out = new Map<string, string>();
-  const lock = readJson(join(indexRoot, "index.lock.json")) as { instances?: { path?: string; repository?: string }[] } | undefined;
+  const lock = resolveLockJson(readJson(join(indexRoot, "index.lock.json")), () => checkoutOwner(indexRoot)) as { instances?: { path?: string; repository?: string }[] } | undefined;
   for (const i of lock?.instances ?? []) if (i.path && i.repository) out.set(i.path, i.repository);
   return out;
 }

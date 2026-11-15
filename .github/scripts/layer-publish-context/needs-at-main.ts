@@ -47,12 +47,29 @@ export function lockedInstances(root: string): Map<string, LockedInstance> {
   if (!existsSync(file)) return out;
   type Entry = { instance?: string; harness?: string; repository?: string; upstreamRoot?: string };
   const lock = JSON.parse(readFileSync(file, "utf-8")) as { instances?: Entry[]; mounts?: Entry[] };
+  let owner: string | undefined;
   for (const i of [...(lock.instances ?? []), ...(lock.mounts ?? [])]) {
     const name = i.instance ?? i.harness;
-    if (typeof name === "string" && typeof i.repository === "string" && !out.has(name))
-      out.set(name, { repository: i.repository, upstreamRoot: i.upstreamRoot ?? "" });
+    if (typeof name !== "string" || typeof i.repository !== "string" || out.has(name)) continue;
+    // A bare name is same-owner: the owner of the checkout holding the lock
+    // (cat-harness-tools#2337, schemas/kg/repo-owner.ts).
+    const repository = i.repository.includes("/") ? i.repository : `${(owner ??= rootOwner(root))}/${i.repository}`;
+    out.set(name, { repository, upstreamRoot: i.upstreamRoot ?? "" });
   }
   return out;
+}
+
+/** The owner of the checkout at `root`: CAT_REPO_OWNER, origin's, GITHUB_REPOSITORY_OWNER, else {@link DEFAULT_OWNER}. */
+export function rootOwner(root: string): string {
+  if (process.env.CAT_REPO_OWNER?.trim()) return process.env.CAT_REPO_OWNER.trim();
+  try {
+    const url = execFileSync("git", ["-C", root, "remote", "get-url", "origin"], { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const o = url.replace(/\/+$/, "").replace(/\.git$/, "").match(/[/:]([A-Za-z0-9][A-Za-z0-9._-]*)\/[A-Za-z0-9][A-Za-z0-9._-]*$/)?.[1];
+    if (o) return o;
+  } catch {
+    /* no origin */
+  }
+  return process.env.GITHUB_REPOSITORY_OWNER?.trim() || DEFAULT_OWNER;
 }
 
 /** The owner for a layer the lock does not name: `HARNESS_OWNER`, else litlfred (where the harness lives). */

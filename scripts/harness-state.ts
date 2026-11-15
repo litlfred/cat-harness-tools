@@ -65,6 +65,7 @@ import {
 } from "../schemas/sdlc/harness-state.ts";
 
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { readLockFile } from "../schemas/kg/repo-owner.ts";
 
 export {
   HARNESS_STATE_SCHEMA,
@@ -115,7 +116,7 @@ export function partiallyMounted(instanceRoot: string, repoRoot: string): boolea
   if (!existsSync(lockPath)) return false;
   let lock: { instances?: { path?: string; directories?: { path?: string }[] }[] };
   try {
-    lock = JSON.parse(readFileSync(lockPath, "utf-8"));
+    lock = readLockFile(lockPath);
   } catch {
     return false;
   }

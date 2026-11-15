@@ -1464,6 +1464,14 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "iri-base:check",
+    kind: "no-folio",
+    reason:
+      "judges only a layer whose `index.config.json` entry declares `publish` (WHO migration T3, cat-harness-tools#2337), " +
+      "and runs in that content layer's own checkout; the platform index mounts no such layer, so here it judges nothing. " +
+      "Covered by repo-owner.test.ts in `bun test`; wired into the content layers' CI when the first one declares `publish` (T4)",
+  },
+  {
     script: "check:optin-links",
     kind: "covered-by",
     reason:

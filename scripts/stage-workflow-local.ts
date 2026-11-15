@@ -53,6 +53,7 @@ import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 import { readIndexConfig } from "../schemas/kg/index-config.js";
+import { checkoutOwner } from "../schemas/kg/repo-owner.ts";
 
 // ── Expressions ───────────────────────────────────────────────────
 
@@ -282,7 +283,11 @@ export function instanceRepos(repo: string): string[] {
   const out = new Set<string>();
   for (const i of (r.config as { instances?: Array<{ source?: { remote?: { repository?: string } } }> }).instances ?? []) {
     const name = i.source?.remote?.repository;
-    if (name && /^[\w.-]+\/[\w.-]+$/.test(name)) out.add(name);
+    // A bare name is same-owner (cat-harness-tools#2337).
+    if (name && /^[\w.-]+$/.test(name)) {
+      const owner = checkoutOwner(repo);
+      if (owner) out.add(`${owner}/${name}`);
+    } else if (name && /^[\w.-]+\/[\w.-]+$/.test(name)) out.add(name);
   }
   return [...out].sort();
 }

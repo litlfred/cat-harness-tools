@@ -95,6 +95,7 @@ import { z } from "zod";
 import { INDEX_LOCK_FILENAME, LEGACY_MOUNT_LOCK_SUFFIX, lockFilesIn } from "./instance-roots.js";
 import { MountTrustBasisSchema, MountTrustSchema } from "./mount-trust.js";
 import { RepoFullNameSchema } from "./repo-full-name.js";
+import { checkoutOwner, isSameOwnerName, resolveLockRepositories } from "./repo-owner.js";
 import { ToolIdSchema } from "../tools/tool-id.js";
 
 /** A layer name — the same rule `cat-harness.ts` applies to `needs` and subscriptions. */
@@ -197,6 +198,26 @@ export const MountOverrideSchema = z
   .strict();
 export type MountOverride = z.infer<typeof MountOverrideSchema>;
 
+/** A bare repository name: a same-owner name (`schemas/kg/repo-owner.ts`). */
+export const SameOwnerNameSchema = z
+  .string()
+  .refine(isSameOwnerName, "a same-owner repository is a bare repository name")
+  .describe("A repository name with no owner: the declaring checkout's owner is used");
+
+const lockOwners = new Map<string, string | undefined>();
+/**
+ * The owner a lock's same-owner names resolve against: the owner of the
+ * checkout holding `file` ({@link checkoutOwner}), once per directory and
+ * environment.
+ */
+export function lockOwner(file: string): string | undefined {
+  const dir = dirname(resolve(file));
+  // input-site: env CAT_REPO_OWNER,GITHUB_REPOSITORY_OWNER #93790cf8 — a cache key over the variables checkoutOwner reads
+  const key = `${dir}\0${process.env.CAT_REPO_OWNER ?? ""}\0${process.env.GITHUB_REPOSITORY_OWNER ?? ""}`;
+  if (!lockOwners.has(key)) lockOwners.set(key, checkoutOwner(dir));
+  return lockOwners.get(key);
+}
+
 /**
  * One remote mount a downstream declares: a harness, the repository it lives
  * in and the pin. Everything else — which directories, where, and which other
@@ -207,7 +228,16 @@ export const RemoteMountSchema = z
   .object({
     /** The harness's layer name, as its own declaration states it. */
     harness: InstanceNameSchema,
-    repository: RepoFullNameSchema,
+    /**
+     * `owner/name`, or a bare `name`: a SAME-OWNER name, resolved to the
+     * owner of the checkout that declares it (`schemas/kg/repo-owner.ts`,
+     * cat-harness-tools#2337). Readers ({@link readMountLock},
+     * `readDeclaredMounts`) hand callers the resolved `owner/name` with
+     * `sameOwner: true`; writers put the bare name back.
+     */
+    repository: z.union([RepoFullNameSchema, SameOwnerNameSchema]),
+    /** In memory: `repository` was declared without an owner. Accepted on disk; written as a bare name. */
+    sameOwner: z.literal(true).optional(),
     ref: CommitShaSchema,
     /** Per-instance overrides across the closure, keyed by layer name. */
     overrides: z.record(InstanceNameSchema, MountOverrideSchema).optional(),
@@ -540,7 +570,14 @@ export function readMountLock(file: string): { ok: true; lock: MountLock } | { o
   }
   const p = MountLockSchema.safeParse(raw);
   if (!p.success) return { ok: false, absent: false, why: `${file} is not a ${MOUNT_LOCK_SCHEMA} lock: ${p.error.issues[0]?.message ?? "invalid"}` };
-  return { ok: true, lock: p.data };
+  // Same-owner entries (a bare repository name) resolve against the owner of
+  // the checkout that holds the lock (cat-harness-tools#2337).
+  try {
+    const bare = [...p.data.mounts, ...p.data.instances].some((e) => isSameOwnerName(e.repository));
+    return { ok: true, lock: bare ? resolveLockRepositories(p.data, lockOwner(file)) : p.data };
+  } catch (e) {
+    return { ok: false, absent: false, why: `${file}: ${(e as Error).message}` };
+  }
 }
 
 // ── Reserved names and collision checks (bean folio-assistant-t4xb) ─────────

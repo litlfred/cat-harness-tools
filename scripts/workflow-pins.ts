@@ -46,9 +46,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
+import { checkoutOwner, HARNESS_OWNER, isSameOwnerName, resolveLockRepositories } from "../schemas/kg/repo-owner.ts";
 
 /** The owner assumed when nothing else names one (no CI env, no origin). */
-export const DEFAULT_OWNER = "litlfred";
+export const DEFAULT_OWNER = HARNESS_OWNER;
 const SHA = /^[0-9a-f]{40}$/;
 /** `  - uses: <owner>/<repo>/<path>@<ref>  # comment` — groups: lead, step dash, owner, repo, path, ref. */
 const USES = /^(\s*(-\s+)?uses:\s*)([A-Za-z0-9_-][A-Za-z0-9_.-]*)\/([A-Za-z0-9_.-]+)\/(\S+?)@(\S+)(\s+#.*)?$/;
@@ -69,7 +70,11 @@ type LockMount = { harness?: string; repository?: string; ref?: string };
 function lockMounts(root: string): LockMount[] {
   const f = join(root, "index.lock.json");
   if (!existsSync(f)) return [];
-  return (JSON.parse(readFileSync(f, "utf8")) as { mounts?: LockMount[] }).mounts ?? [];
+  const lock = JSON.parse(readFileSync(f, "utf8")) as { mounts?: LockMount[] };
+  // A same-owner mount (bare repository name) is called under this
+  // checkout's owner (cat-harness-tools#2337): `uses:` cannot be relative.
+  if (!(lock.mounts ?? []).some((m) => typeof m.repository === "string" && isSameOwnerName(m.repository))) return lock.mounts ?? [];
+  return resolveLockRepositories(lock, checkoutOwner(root) ?? DEFAULT_OWNER).mounts ?? [];
 }
 
 /** The repository name of a lock mount: the name part of `repository`, else the harness name. */
