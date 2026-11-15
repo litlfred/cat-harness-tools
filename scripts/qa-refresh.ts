@@ -456,7 +456,11 @@ export function assess(args: {
       if (by.length === 0 && !trackedSet.has(p)) unclaimed.push(p);
       for (const id of by) families[id]!++;
     }
-    for (const w of writers) if (families[w.id] === 0 && !na.has(w.id)) empty.push(w.id);
+    // An EXTERNAL writer is not run by this refresh, so an empty family is
+    // not evidence that it failed: its step may simply come later (check:nav-names
+    // writes after the site is built, folio-assistant#3124). Its claim still
+    // keeps its file from being `unclaimed`.
+    for (const w of writers) if (families[w.id] === 0 && !na.has(w.id) && w.run !== "external") empty.push(w.id);
     for (const r of args.runs) {
       const w = writers.find((x) => x.id === r.id);
       if (na.has(r.id)) continue;

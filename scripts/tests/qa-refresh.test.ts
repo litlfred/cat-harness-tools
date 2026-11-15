@@ -183,6 +183,13 @@ describe("completeness", () => {
     expect(r.empty).toEqual(["two"]);
   });
 
+  test("an external writer that has not written yet is not 'produced nothing': this refresh never runs it", () => {
+    const ext: QaWriter = { id: "ext", run: "external", writes: ["r/ext.json"], because: "written by a later step" };
+    const r = assess({ mode: "computed", inventory: inventory(["r/one/a.json", "r/two.json"]), runs: ok, writers: [...W, ext] });
+    expect(r.empty).toEqual([]);
+    expect(r.complete).toBe(true);
+  });
+
   test("a writer that exited outside its okExits is INCOMPLETE, and a killed one (null) too", () => {
     const files = inventory(["r/one/a.json", "r/two.json"]);
     expect(assess({ mode: "computed", inventory: files, runs: [{ id: "one", exit: 2, seconds: 1 }, ok[1]!], writers: W }).failed).toEqual(["one"]);
