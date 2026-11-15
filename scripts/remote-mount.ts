@@ -173,7 +173,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { z } from "zod";
 
 import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "../schemas/kg/mount-trust.js";
-import { checkoutRootFor, instanceDirectories, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, defaultGraphTypologies, instanceDirectories, instanceRootsIn, readDeclaration, type GraphTypologyRegistry } from "../schemas/kg/cat-harness.js";
 import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "../schemas/kg/index-config.js";
 import {
   MOUNT_LOCK_SCHEMA,
@@ -196,7 +196,7 @@ import { builtAtPublishOf, installDependencies, isInstallArtefact, publishLayers
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
-import { upstreamConcernMembers, upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
+import { upstreamConcernMembers, upstreamDirectories, withKindsOf, type UpstreamDirectory } from "./upstream-directories.ts";
 import { run as syncWorkflowPins } from "./workflow-pins.ts";
 import { afterMountHealth } from "./lib/repin-health.ts";
 import { ConcernGroupCodeSchema } from "../schemas/kg/concern-groups.ts";
@@ -368,10 +368,11 @@ function wholeExcept(
   tree: RemoteTree,
   found: { root: string; file: string; decl: UpstreamDeclaration },
   enabled: EnabledSubgraphs,
+  kinds?: GraphTypologyRegistry,
 ): { except?: string[] } {
   if (enabled === "all") return {};
   const top = found.decl.directories as Array<{ id: string; path: string; optIn?: unknown }>;
-  const nested = upstreamDirectories(tree, found.root, found.file);
+  const nested = upstreamDirectories(tree, found.root, found.file, kinds);
   const except = switchedOffOptInPaths(name, top, nested.ok ? nested.directories : [], enabled);
   return except.length ? { except } : {};
 }
@@ -608,10 +609,11 @@ function directoriesById(
   tree: RemoteTree,
   found: { root: string; file: string; decl: UpstreamDeclaration },
   named: readonly string[],
+  kinds?: GraphTypologyRegistry,
 ): { byId: Map<string, UpstreamDirectory>; ids: string[] } | { unknown: string[]; why: string } {
   const byId = new Map<string, UpstreamDirectory>(found.decl.directories.map((d) => [d.id, d]));
   if (named.every((id) => byId.has(id))) return { byId, ids: [...named] };
-  const nested = upstreamDirectories(tree, found.root, found.file);
+  const nested = upstreamDirectories(tree, found.root, found.file, kinds);
   if (nested.ok) for (const d of nested.directories) if (!byId.has(d.id)) byId.set(d.id, d);
   // A CONCERN NAME (bean `mo75`): an id that is no directory but a concern
   // group's code expands to its kind-first members, `processes/sdlc/`,
@@ -655,6 +657,8 @@ function planHydrated(a: {
   tools?: readonly string[];
   /** The downstream's switched-on opt-in sub-graphs: a switched-off one is not offered, even as metadata. */
   enabled: EnabledSubgraphs;
+  /** Every planned layer's own kinds ({@link withKindsOf}); the shared registry when absent. */
+  kinds?: GraphTypologyRegistry;
 }): { instance: PlannedInstance } | { outcome: InstanceOutcome } {
   const { q, tree, found, path, named } = a;
   const { decl } = found;
@@ -672,7 +676,7 @@ function planHydrated(a: {
   const ids =
     named ??
     defaultMountDirectoryIds(q.name, { directories: decl.directories }, a.enabled);
-  const lookup = directoriesById(tree, found, ids);
+  const lookup = directoriesById(tree, found, ids, a.kinds);
   if ("unknown" in lookup) {
     return { outcome: { instance: q.name, state: "could-not-determine", detail: `\`${lookup.unknown.join("`, `")}\` named for mounting but not declared by \`${q.name}\` at ${q.sha.slice(0, 12)} — ${lookup.why}` } };
   }
@@ -835,6 +839,23 @@ function resolveClosureWith(
     return f;
   };
 
+  // The kinds EVERY listed layer declares in its own `typologies/`, at its
+  // pin, before any layer's nesting is read ({@link withKindsOf}): a layer may
+  // use a kind a layer listed after it contributes (smart-base names
+  // fhir-harness's `fhir-artifact-index`). A layer that cannot be opened or
+  // found here is skipped; the loop below reports it.
+  let kinds: GraphTypologyRegistry = defaultGraphTypologies;
+  for (const m of ds.mounts) {
+    if (m.overrides?.[m.harness]?.skip) continue;
+    try {
+      const tree = open(m.repository, m.ref);
+      const found = findInstance(tree, m.harness);
+      if (found !== undefined && !("error" in found)) kinds = withKindsOf(tree, found.root, found.file, kinds);
+    } catch {
+      // reported by the loop below
+    }
+  }
+
   /** Every layer laid down as files, with the tree and declaration it was planned from — for the Tool closure. */
   const reached = new Map<string, { tree: RemoteTree; found: { root: string; file: string; text: string; decl: UpstreamDeclaration }; whole: boolean; via: RemoteMount }>();
   const seen = new Map<string, { repository: string; sha: string }>();
@@ -921,7 +942,7 @@ function resolveClosureWith(
       // The entry's own `hydrated` is its harness's; an override decides for any layer.
       const hydrated = override?.hydrated ?? (q.name === m.harness && m.hydrated === true);
       if (hydrated) {
-        const h = planHydrated({ q, via: m.harness, tree, found, path, named: override?.directories, whole: override?.whole, pkgFor: pkgAt(q.repository, q.sha), tools: override?.tools, enabled: dsEnabled });
+        const h = planHydrated({ q, via: m.harness, tree, found, path, named: override?.directories, whole: override?.whole, pkgFor: pkgAt(q.repository, q.sha), tools: override?.tools, enabled: dsEnabled, kinds });
         if ("outcome" in h) plan.outcomes.push(h.outcome);
         else plan.instances.push(h.instance);
         continue;
@@ -937,7 +958,7 @@ function resolveClosureWith(
           via: m.harness,
           pinnedBy: q.pinnedBy,
           declarationFile: found.file,
-          directories: [{ id: WHOLE_INSTANCE_ID, path, upstreamPath: found.root || ".", ...wholeExcept(q.name, tree, found, dsEnabled) }],
+          directories: [{ id: WHOLE_INSTANCE_ID, path, upstreamPath: found.root || ".", ...wholeExcept(q.name, tree, found, dsEnabled, kinds) }],
           assets: [],
         });
       }
@@ -949,7 +970,7 @@ function resolveClosureWith(
         : override?.directories ??
         (choosesTools ? [] : undefined) ??
         defaultMountDirectoryIds(q.name, decl, dsEnabled);
-      const lookup = directoriesById(tree, found, ids);
+      const lookup = directoriesById(tree, found, ids, kinds);
       if ("unknown" in lookup) {
         plan.outcomes.push({
           instance: q.name,
@@ -1035,7 +1056,7 @@ function resolveClosureWith(
       }
     }
   }
-  applyToolChoices(plan, reached, local, pkgAt);
+  applyToolChoices(plan, reached, local, pkgAt, kinds);
   return { plan, dsEnabled };
 }
 
@@ -1113,6 +1134,7 @@ function applyToolChoices(
   reached: Map<string, { tree: RemoteTree; found: { root: string; file: string; text: string; decl: UpstreamDeclaration }; whole: boolean; via: RemoteMount }>,
   local: Map<string, string>,
   pkgAt: (repository: string, sha: string) => (harness: string) => SubgraphIndexFetch,
+  kinds?: GraphTypologyRegistry,
 ): void {
   const choosing = plan.mounts.filter(entryChoosesTools);
   if (choosing.length === 0) return;
@@ -1124,7 +1146,7 @@ function applyToolChoices(
   for (const [name, r] of reached) {
     const p = plan.instances.find((i) => i.instance === name);
     if (!p) continue;
-    const nested = upstreamDirectories(r.tree, r.found.root, r.found.file);
+    const nested = upstreamDirectories(r.tree, r.found.root, r.found.file, kinds);
     // A nesting this checkout cannot read leaves the top-level list, which
     // over-mounts (a parent for its nested child) and never under-mounts.
     const dirs = (nested.ok ? nested.directories : r.found.decl.directories).filter(

@@ -27,7 +27,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { defaultGraphTypologies, GraphTypologyRegistry, instanceDirectories } from "../schemas/kg/cat-harness.js";
+import { defaultGraphTypologies, GraphTypologyRegistry, instanceDirectories, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { ownDeclaredDirectories } from "../schemas/kg/declared-nodes.js";
 import { GraphTypologyNodeSchema, kindDefOf } from "../schemas/kg/graph-typology-node.js";
 import type { RemoteTree } from "./remote-tree.ts";
@@ -103,6 +103,36 @@ function checkoutWithOwnKinds(
 }
 
 /**
+ * `registry` plus the kinds layer `at` declares in its own `typologies/` at the
+ * tree's pin, as a PRIVATE copy ({@link checkoutWithOwnKinds}); `registry`
+ * itself when the layer declares none or they cannot be read.
+ *
+ * A planner folds this over EVERY layer it plans, before it reads any one's
+ * nesting, so a kind one layer contributes is known while another layer that
+ * uses it is read, whatever order the mounts are listed in. Without it a
+ * standing re-pin of smart-ra refused smart-base, whose `smart-base.json`
+ * names fhir-harness's `fhir-artifact-index` kind, because smart-base comes
+ * before fhir-harness in the lock (2026-11-15, smart-ra runs 43686466920 and
+ * 43688289116, exit 2).
+ *
+ * Side effect, stated: it sets the tree's sparse checkout, as
+ * {@link upstreamDirectories} does.
+ */
+export function withKindsOf(
+  tree: RemoteTree,
+  root: string,
+  declarationFile: string,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): GraphTypologyRegistry {
+  try {
+    return checkoutWithOwnKinds(tree, root.replace(/\/+$/, ""), declarationFile, registry).registry;
+  } catch {
+    // Unreadable kinds: the layer's own read reports it, with the reason.
+    return registry;
+  }
+}
+
+/**
  * The directories layer `root` (repository-relative, `""` for the root)
  * declares at the tree's pin, `<name>.json`'s own first, then those declared
  * from within, each with an instance-relative `path`.
@@ -127,7 +157,9 @@ export function upstreamDirectories(
   try {
     return {
       ok: true,
-      directories: instanceDirectories(join(work, at), undefined, registry).map((d) => ({
+      // The declaration is read with `registry` too: read with the shared one,
+      // a kind only `registry` holds was refused before the nesting was walked.
+      directories: instanceDirectories(join(work, at), readDeclaration(join(work, at), registry), registry).map((d) => ({
         id: d.id,
         path: d.path,
         ...(d.source !== undefined ? { source: d.source } : {}),
