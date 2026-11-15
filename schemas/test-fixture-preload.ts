@@ -28,14 +28,14 @@
 import { basename, resolve } from "node:path";
 
 import { harnessRoot } from "./harness-root";
-import { instanceRootsIn, repoRootFor } from "./kg/instance-roots";
+import { layerRootsIn, repoRootFor } from "./kg/instance-roots";
 
 /** The checkout this preload's harness sits in. */
 const CHECKOUT = repoRootFor(harnessRoot() ?? resolve(import.meta.dir, ".."));
 
 const FIXTURE = resolve(import.meta.dir, "..", "test", "fixtures", "standalone-checkout");
-const ownNames = new Set(instanceRootsIn(CHECKOUT).map((r) => basename(r)));
-const allFixtureInstancesPresent = instanceRootsIn(FIXTURE).every((r) => ownNames.has(basename(r)));
+const ownNames = new Set(layerRootsIn(CHECKOUT).map((r) => basename(r)));
+const allFixtureInstancesPresent = layerRootsIn(FIXTURE).every((r) => ownNames.has(basename(r)));
 // input-site: env-unset FOLIO_FIXTURE_CHECKOUT #7c8758d4 — a test-only override naming a checkout outside the tree
 const override = process.env.FOLIO_FIXTURE_CHECKOUT;
 if (!allFixtureInstancesPresent && override === undefined) setFixtureCheckout();

@@ -34,7 +34,7 @@ import { readVoicesGraph, type VoicesGraph } from "./voices-graph.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import {
   directoriesForGraph,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   repoRootFor,
   siteDirFor,
@@ -462,7 +462,7 @@ if (import.meta.main) {
   // the file exists; anything else stays text.
   const skillPages = skillPagesOf(repoRoot);
   const repoUrl = detectRepoUrl(repoRoot);
-  const roots = new Map(instanceRootsIn(repoRoot).map((r) => [readDeclaration(r)?.name ?? basename(r), r]));
+  const roots = new Map(layerRootsIn(repoRoot).map((r) => [readDeclaration(r)?.name ?? basename(r), r]));
   const kgLinks = (kgPath: string, instance: string | undefined) => {
     const root = instance === undefined ? undefined : roots.get(instance);
     if (root === undefined || !existsSync(join(root, kgPath))) return undefined;

@@ -63,11 +63,12 @@ import { scanLibraryRefs, type RefSource } from "./library-refs.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
-import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, findInstanceRoot, layerRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
+import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { escHtml, nodeStubPageHtml, themedNodeDeclaration, type PageNode } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
@@ -81,6 +82,7 @@ const VIEWER_TOOL = "library-viewer";
 
 const ROOT = join(HARNESS_ROOT);
 const REPO_ROOT = repoRootFor(ROOT);
+const CHECKOUT = checkoutRootFor(ROOT);
 /**
  * In a layer's PR checks, `--check` judges only the output the caller commits
  * (owner ruling 2026-11-05, "Move the checks", generator checks included; `lib/gate-own.ts`). The
@@ -1667,7 +1669,7 @@ export function orphanFiles(root: string, wanted: ReadonlySet<string>): string[]
  */
 export function instanceRootRoutes(repoRoot: string): Map<string, string> {
   const out = new Map<string, string>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     let decl;
     try {
       decl = readDeclaration(inst);
@@ -1760,15 +1762,17 @@ const emit = (path: string, content: string): void => {
 function emitBytes(path: string, content: Buffer): void {
   if (check) {
     if (!mineToCheck(path)) return;
-    if (existsSync(path) && readFileSync(path).equals(content)) return;
-    console.error(`  ✗ ${path} ${existsSync(path) ? "is stale" : "is missing"}`);
+    const at = readPathAt(CHECKOUT, path);
+    if (existsSync(at) && readFileSync(at).equals(content)) return;
+    console.error(`  ✗ ${path} ${existsSync(at) ? "is stale" : "is missing"}`);
     stale++;
     return;
   }
-  if (existsSync(path) && readFileSync(path).equals(content)) return;
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
-  console.log(`  ✓ ${path}`);
+  const to = writePathAt(CHECKOUT, path);
+  if (existsSync(to) && readFileSync(to).equals(content)) return;
+  mkdirSync(dirname(to), { recursive: true });
+  writeFileSync(to, content);
+  console.log(`  ✓ ${to}`);
 }
 
 /**
@@ -1839,7 +1843,7 @@ if (import.meta.main) {
   {
     const repo = repoRootFor(ROOT);
     const sources: RefSource[] = [];
-    for (const inst of instanceRootsIn(repo)) {
+    for (const inst of layerRootsIn(repo)) {
       const decl = readDeclaration(inst);
       if (!decl) continue;
       const siteDir = join(inst, siteDirFor(inst));
@@ -2119,8 +2123,11 @@ if (import.meta.main) {
         stale++;
         continue;
       }
-      rmSync(abs);
-      console.log(`  ✗ pruned orphan avatar ${abs}`);
+      const prune = writePathAt(CHECKOUT, abs);
+      if (existsSync(prune)) {
+        rmSync(prune);
+        console.log(`  ✗ pruned orphan avatar ${prune}`);
+      }
     }
   }
   // ── THE SHARED VIEWER ASSETS (#1881) ──────────────────────────────────
@@ -2307,8 +2314,11 @@ if (import.meta.main) {
         stale++;
         continue;
       }
-      rmSync(dir, { recursive: true });
-      console.log(`  ✗ pruned ${dir}`);
+      const prune = writePathAt(CHECKOUT, dir);
+      if (existsSync(prune)) {
+        rmSync(prune, { recursive: true });
+        console.log(`  ✗ pruned ${prune}`);
+      }
     }
   }
 
@@ -2321,8 +2331,11 @@ if (import.meta.main) {
       stale++;
       continue;
     }
-    rmSync(abs);
-    console.log(`  ✗ pruned orphan ${abs}`);
+    const prune = writePathAt(CHECKOUT, abs);
+    if (existsSync(prune)) {
+      rmSync(prune);
+      console.log(`  ✗ pruned orphan ${prune}`);
+    }
   }
 
 
@@ -2344,8 +2357,11 @@ if (import.meta.main) {
       stale++;
       continue;
     }
-    rmSync(dir, { recursive: true });
-    console.log(`  ✗ pruned ${dir}`);
+    const prune = writePathAt(CHECKOUT, dir);
+    if (existsSync(prune)) {
+      rmSync(prune, { recursive: true });
+      console.log(`  ✗ pruned ${prune}`);
+    }
   }
 
   if (!check) {

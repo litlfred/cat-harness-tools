@@ -66,6 +66,24 @@
     "@unified-latex/unified-latex-util-arguments": "^1.8.4",
     "@unified-latex/unified-latex-util-parse": "^1.8.4",
     "@unified-latex/unified-latex-util-print-raw": "^1.8.4",
+    "@vocabulary/bibo": "1.0.6",
+    "@vocabulary/csvw": "1.0.6",
+    "@vocabulary/dc11": "1.0.6",
+    "@vocabulary/dcam": "1.0.6",
+    "@vocabulary/dcat": "2.0.0",
+    "@vocabulary/dcterms": "1.0.6",
+    "@vocabulary/foaf": "1.0.6",
+    "@vocabulary/hydra": "1.0.6",
+    "@vocabulary/ical": "1.0.6",
+    "@vocabulary/oa": "1.0.6",
+    "@vocabulary/org": "1.0.6",
+    "@vocabulary/owl": "1.0.6",
+    "@vocabulary/prov": "1.0.6",
+    "@vocabulary/rdf": "1.0.6",
+    "@vocabulary/rdfs": "1.0.6",
+    "@vocabulary/schema": "1.1.0",
+    "@vocabulary/skos": "1.0.6",
+    "@vocabulary/xsd": "1.0.6",
     "bpmn-moddle": "^10.2.0",
     "csl-json": "^0.1.0",
     "dmn-moddle": "^12.1.0",
@@ -89,6 +107,18 @@
     "unist-util-visit": "^5.1.0",
     "yaml": "^2.9.1",
     "zod": "^4.6.6"
+  },
+  "vocabularies": {
+    "unread": {
+      "http://www.w3.org/ns/odrl/2/": "no @vocabulary/odrl package: ODRL is not in the @zazuko/vocabularies bundle (bean cat-tools-xfd4)",
+      "http://purl.org/spar/fabio/": "no @vocabulary/fabio package: the SPAR ontologies are not in the @zazuko/vocabularies bundle",
+      "http://purl.org/spar/doco/": "no @vocabulary/doco package: the SPAR ontologies are not in the @zazuko/vocabularies bundle",
+      "http://purl.org/spar/deo/": "no @vocabulary/deo package: the SPAR ontologies are not in the @zazuko/vocabularies bundle",
+      "http://purl.org/spar/cito/": "no @vocabulary/cito package: the SPAR ontologies are not in the @zazuko/vocabularies bundle"
+    },
+    "referencedOnly": [
+      "@vocabulary/schema"
+    ]
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

@@ -74,7 +74,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, resolveDirectories } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, resolveDirectories } from "../schemas/kg/cat-harness.js";
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `check-declared-dirs.ts` carries, same reason.
 import "../schemas/kg/folio-graph-typology.js";
@@ -289,7 +289,7 @@ export interface QaLocation {
 export function resolveQaLocation(repoRoot: string = gitTopLevel()): QaLocation {
   const directories: QaDirectory[] = [];
   const seen = new Set<string>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     try {
       for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
         if (!d.graphTypologies.includes("qa" as never) || seen.has(d.absPath)) continue;

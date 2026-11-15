@@ -53,6 +53,8 @@ import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, rootInstanceNam
 import { withConcernGroupDirs } from "./concern-groups.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { FHIR_CORE_SD, fhirCoreRelease, isFhirStructureDefinition, readFhirLogicalModel } from "./fhir-logical-model.ts";
+import { readModdleMetamodels } from "./moddle-metamodel.ts";
+import { readRdfVocabularies, type VocabularyRead } from "./rdf-vocabulary.ts";
 
 /**
  * Which layers' `schemas` directories a reading covers.
@@ -123,6 +125,11 @@ export type DeclKind =
   | "json-schema"
   | "fhir-logical"
   | "fhir-profile"
+  | "owl-class"
+  | "rdfs-class"
+  | "rdf-property-set"
+  | "moddle-class"
+  | "moddle-enum"
   | "undetermined";
 
 /** One field of an object-like declaration. */
@@ -172,6 +179,11 @@ export interface SchemaField {
   max?: number | "*";
   /** The source states no cardinality and none can be read: drawn `?..?`, never guessed. */
   cardinalityUnknown?: true;
+  /**
+   * The source states the upper bound and not the lower one — a moddle
+   * descriptor says `isMany` and nothing else: drawn `?..1` / `?..*`.
+   */
+  minUnknown?: true;
   /**
    * Type name → where its definition is (a canonical URL), for a type that is
    * not a declaration of this graph — a FHIR datatype while no layer holds FHIR
@@ -319,6 +331,12 @@ export interface SchemaGraph {
    * viewer says "not read", never shows the IG as having no logical models.
    */
   unread: string[];
+  /**
+   * The published vocabularies and metamodels the checkout read (SKOS, PROV,
+   * BPMN, …), each with the namespace it defines, for the QA report's check
+   * that an external-schema record names it (bean `cat-tools-xfd4`).
+   */
+  vocabularies?: VocabularyRead[];
 }
 
 /** The graph typology an IG's artefact index is declared under (the FHIR layer's kind). */
@@ -968,6 +986,7 @@ const SHAPE_KEYWORDS = [
  */
 export function cardinalityOf(f: SchemaField): string {
   if (f.cardinalityUnknown) return "?..?";
+  if (f.minUnknown) return `?..${f.max ?? (f.array ? "*" : 1)}`;
   let min = f.min;
   if (min === undefined) {
     if (f.optional) min = 0;
@@ -1314,6 +1333,27 @@ export function loadFhirCore(
 }
 
 /**
+ * The class IRIs of the vocabulary `prefix` / `namespace` that `text` names:
+ * a CURIE (`schema:DefinedTerm`) or a full IRI, in either scheme
+ * (`https://schema.org/X` is the same name as `http://schema.org/X`). A class
+ * is a capitalised local name, as every vocabulary read here writes one.
+ */
+export function classMentions(text: string, prefix: string, namespace: string): Set<string> {
+  const esc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const bare = namespace.replace(/^https?:\/\//, "");
+  const re = new RegExp(`(?:\\b${esc(prefix)}:|https?://${esc(bare)})([A-Z][A-Za-z0-9_]*)`, "g");
+  const out = new Set<string>();
+  for (const m of text.matchAll(re)) out.add(`${namespace}${m[1]}`);
+  return out;
+}
+
+/** What the corpus's declarations name of a vocabulary: every field type and literal value, scanned. */
+function vocabularyMentions(decls: readonly SchemaDecl[]): (prefix: string, namespace: string) => Set<string> {
+  const text = decls.map((d) => `${d.fields.map((f) => f.type).join(" ")} ${d.values.join(" ")}`).join("\n");
+  return (prefix, namespace) => classMentions(text, prefix, namespace);
+}
+
+/**
  * Read the whole schema graph.
  *
  * Returns `null` — not an empty graph — when the declared directory does not
@@ -1511,6 +1551,40 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
     }
   }
 
+  // Published vocabularies and metamodels (bean `cat-tools-xfd4`): the RDF
+  // vocabularies this layer's package.json depends on (`@vocabulary/*`, owner
+  // option A) and the OMG metamodels its `*-moddle` dependencies describe.
+  // Read for the checkout scope only, like the IG's models: they are what the
+  // corpus's own types point at, not modules of the corpus.
+  const vocabularies: VocabularyRead[] = [];
+  if (opts.scope === "checkout") {
+    const pj = join(import.meta.dir, "..", "package.json");
+    const layer = rel(join(import.meta.dir, "..")).split("/")[0] || rootName || "cat-harness-tools";
+    const mentions = vocabularyMentions(decls);
+    const rdf = readRdfVocabularies(pj, rel, layer, mentions);
+    // A shape the corpus types by a class of such a vocabulary (`"@type":
+    // z.literal("schema:DefinedTerm")`) names that class by IRI: an id-ref.
+    const byCanonical = new Map(rdf.decls.filter((d) => d.canonical).map((d) => [d.canonical!, d.id]));
+    for (const v of rdf.vocabularies.filter((x) => x.referencedOnly)) {
+      for (const d of decls) {
+        for (const f of d.fields) {
+          for (const iri of classMentions(`${f.type} ${d.values.join(" ")}`, v.prefix, v.namespace)) {
+            const to = byCanonical.get(iri);
+            if (to) jsonLocalEdges.push({ from: d.id, to, via: f.name, kind: "id-ref", optional: f.optional, array: f.array });
+          }
+        }
+      }
+    }
+    for (const read of [rdf, readModdleMetamodels(pj, rel, layer)]) {
+      modules.push(...read.modules);
+      decls.push(...read.decls);
+      jsonRefs.push(...read.refs);
+      jsonLocalEdges.push(...read.edges);
+      vocabularies.push(...read.vocabularies);
+      unread.push(...read.unread);
+    }
+  }
+
   // FHIR core types, from a layer's declared `fhir-core-definitions` graph
   // (bean `cat-tools-t6fz`). Only the core definitions a
   // reading REFERENCES are loaded, one level deep, from the release its model
@@ -1540,7 +1614,7 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
   const byId = new Map(decls.map((d) => [d.id, d]));
   const edges: SchemaEdge[] = [];
   /** Modules a JSON reader read: their edges are the resolver's, not the AST walk's. */
-  const jsonModules = new Set(modules.filter((m) => /\.json$/.test(m.module)).map((m) => m.module));
+  const jsonModules = new Set(modules.filter((m) => /\.(json|nq)$/.test(m.module)).map((m) => m.module));
 
   /**
    * A bound name → the declaration it names, `"external"`, or `null`.
@@ -1696,7 +1770,7 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
 
   refProblems.sort();
 
-  return { roots: dirs.map(rel), modules, decls, edges, refProblems, unread };
+  return { roots: dirs.map(rel), modules, decls, edges, refProblems, unread, ...(vocabularies.length ? { vocabularies } : {}) };
 }
 
 if (import.meta.main) {

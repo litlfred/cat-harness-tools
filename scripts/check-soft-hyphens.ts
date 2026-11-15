@@ -16,7 +16,7 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { declaredGraphs, instanceRootsIn } from "../schemas/kg/cat-harness.ts";
+import { declaredGraphs, layerRootsIn } from "../schemas/kg/cat-harness.ts";
 import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";
 
 const REPO = resolve(import.meta.dir, "../..");
@@ -24,7 +24,7 @@ const REPO = resolve(import.meta.dir, "../..");
 export function sectionsWithSoftHyphens(): Array<{ file: string; count: number }> {
   const seen = new Set<string>();
   const out: Array<{ file: string; count: number }> = [];
-  for (const root of instanceRootsIn(REPO)) {
+  for (const root of layerRootsIn(REPO)) {
     for (const g of declaredGraphs(root)) {
       if (!g.absPath || !g.graphTypologies.includes("library") || seen.has(g.absPath) || !existsSync(g.absPath)) continue;
       seen.add(g.absPath);

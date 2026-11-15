@@ -58,7 +58,7 @@ import { siteDirFor } from "../schemas/kg/cat-harness.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { discoverBlockKinds } from "../schemas/content/block-kinds.js";
 import { defaultInstancePrefixes } from "../schemas/content/content-context.js";
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.js";
 import { ownDeclaredDirectories } from "../schemas/kg/declared-nodes.js";
 import {
   CLASS_GLOSSES,
@@ -171,7 +171,7 @@ export function instancesPublishingNs(root = ROOT): string[] {
   const platform = findPlatformRoot(root);
   // input-site: env FOLIO_FIXTURE_CHECKOUT #eac4c68c — a fixture checkout whose layers join the platform's when the variable is set
   const fixture = process.env.FOLIO_FIXTURE_CHECKOUT;
-  const roots = [...instanceRootsIn(platform), ...(fixture ? instanceRootsIn(fixture) : [])];
+  const roots = [...layerRootsIn(platform), ...(fixture ? layerRootsIn(fixture) : [])];
   for (const instRoot of roots) {
     if (ownDeclaredDirectories(instRoot, "block-kinds", platform).length > 0) {
       const declFile = findDeclarationFile(instRoot);

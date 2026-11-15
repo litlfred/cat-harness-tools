@@ -27,13 +27,13 @@ import { basename, join, relative, resolve } from "node:path";
 import { Liquid } from "liquidjs";
 
 import { splice } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
-import { checkoutRootFor, directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, directoriesForGraph, layerRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const REPO = instanceRootsIn(repoRootFor(ROOT)).length ? repoRootFor(ROOT) : checkoutRootFor(ROOT);
+const REPO = layerRootsIn(repoRootFor(ROOT)).length ? repoRootFor(ROOT) : checkoutRootFor(ROOT);
 const TEMPLATES = join(import.meta.dir, "templates", "readme");
 
 /** What one item's README says, all of it read from the item. */
@@ -98,7 +98,7 @@ export async function plan(repo = REPO, own?: ReadonlySet<string>): Promise<{ wr
   const writes = new Map<string, string>();
   const unmarked: string[] = [];
   const seen = new Set<string>();
-  for (const instance of instanceRootsIn(repo)) {
+  for (const instance of layerRootsIn(repo)) {
     const name = readDeclaration(instance)?.name ?? basename(instance);
     if (own && !own.has(name)) continue;
     for (const lib of directoriesForGraph(instance, "library")) {

@@ -41,7 +41,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   siteFileFor,
 } from "../schemas/kg/cat-harness.js";
@@ -49,6 +49,7 @@ import { THEME_KINDS, type ThemeKind } from "../schemas/ui/theme.js";
 import { instanceThemes } from "../schemas/ui/theme-by-ref.js";
 import { instanceThemesDataPath } from "./gen-themes-css.js";
 import { KIND_TILE_ICONS } from "./graph-tiles.js";
+import { readPathAt } from "./lib/layer-output.ts";
 
 /**
  * The client that owns both glyph registries, resolved through `siteDirFor`
@@ -352,7 +353,7 @@ function main(): number {
     return 2;
   }
 
-  const roots = instanceRootsIn(repoRoot);
+  const roots = layerRootsIn(repoRoot);
   const art: InstanceArt[] = [];
   for (const r of roots) {
     try {
@@ -371,7 +372,7 @@ function main(): number {
     }
   }
   if (art.length === 0) {
-    console.error("✗ no instance declaration read — refusing (see `instanceRootsIn`).");
+    console.error("✗ no instance declaration read — refusing (see `layerRootsIn`).");
     return 2;
   }
 
@@ -507,7 +508,7 @@ function main(): number {
   const instanceRoot = join(repoRoot, CLIENT_INSTANCE);
   const headFile = join(instanceRoot, siteFileFor(instanceRoot, "_includes/head_custom.html"));
   const wiring: ThemeWiring = {
-    webpageData: readWebpageData(join(instanceRoot, instanceThemesDataPath(instanceRoot))),
+    webpageData: readWebpageData(readPathAt(repoRoot, join(instanceRoot, instanceThemesDataPath(instanceRoot)))),
     headConsumesData: existsSync(headFile) && readFileSync(headFile, "utf8").includes("site.data.instance-themes"),
   };
   const declared: DeclaredThemes[] = themed.map((a) => {

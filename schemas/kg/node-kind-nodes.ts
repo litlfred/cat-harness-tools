@@ -34,7 +34,7 @@ import { join, relative } from "node:path";
 
 import { readDeclaration, resolveDirectories, type ResolvedDirectory } from "./cat-harness.js";
 import { parse as parseYaml } from "yaml";
-import { findDeclarationFile, instanceRootsIn } from "./instance-roots.js";
+import { findDeclarationFile, layerRootsIn } from "./instance-roots.js";
 import { kindAndSubclasses, type NameRule, type NodeKindEntry, type NodeKindIndex } from "./node-kind-index.js";
 import { acceptsSchemaTag } from "./node-kind.js";
 import { contentIsOffCheckout } from "./subgraph-source.js";
@@ -163,7 +163,7 @@ export function nodesOfKind(index: Pick<NodeKindIndex, "kinds">, kindId: string,
       node,
     });
   };
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const harness = readDeclaration(root)?.name;
     if (!harness) continue;
     if (typologies.length > 0) {
@@ -188,7 +188,7 @@ export function kindDirectories(index: Pick<NodeKindIndex, "kinds">, repoRoot: s
   const typologies = [...new Set(index.kinds.filter(hasNodes).flatMap((k) => k.holdings.map((h) => h.typology)))];
   const byRule = index.kinds.some((k) => k.version && k.foundBy === "instance-declaration");
   const out = new Set<string>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     if (!readDeclaration(root)?.name) continue;
     for (const { absPath } of checkoutDirectories(root, typologies)) out.add(absPath);
     // A name-rule node is a FILE at the layer root, not a directory; the

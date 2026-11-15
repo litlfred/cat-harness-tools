@@ -13,7 +13,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceDirectoryForGraph, instanceRootsIn } from "../../schemas/kg/cat-harness.js";
+import { instanceDirectoryForGraph, layerRootsIn } from "../../schemas/kg/cat-harness.js";
 import { buildToolTypes } from "../../scripts/harness-schema-export.ts";
 import { discoverTools, tools, toolsOf } from "../../tools/discover.js";
 
@@ -38,7 +38,7 @@ describe("tools() over this checkout", () => {
     // EVERY declaring layer, not three named ones: each layer root in the
     // checkout whose declaration resolves a `tools` graph is a source.
     const repo = resolve(ORIGIN_DIR, "../../..");
-    const declaring = instanceRootsIn(repo)
+    const declaring = layerRootsIn(repo)
       .filter((r) => instanceDirectoryForGraph(r, "tools") !== undefined)
       .map((r) => relative(repo, r) || ".");
     expect(declaring.length).toBeGreaterThanOrEqual(3);

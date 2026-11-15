@@ -148,7 +148,7 @@ import {
   remotePackageSkills,
 } from "./known-skills.js";
 import { LOCAL_PACKAGES } from "./skill-packages.js";
-import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, kgQaHomeFor} from "../schemas/kg/cat-harness.js";
+import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, layerRootsIn, readDeclaration, kgQaHomeFor} from "../schemas/kg/cat-harness.js";
 import { toolDownstreamEntry, undeclaredDownstreamEntry } from "./downstream-runs.ts";
 import { VERIFIERS } from "./publish-verify.ts";
 import { checkoutRootFor, orderedDependencies } from "../schemas/kg/harness-config.js";
@@ -535,7 +535,7 @@ interface RepoProcess {
 
 function loadRepoProcesses(repoRoot: string): Map<string, RepoProcess> {
   const map = new Map<string, RepoProcess>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     const instName = readDeclaration(inst)?.name ?? basename(inst);
     let files: string[] = [];
     try {
@@ -3025,7 +3025,7 @@ reports.push(...auditFolioBlocks(root));
  * loudly: dropping it would be a clean run over nothing (`dh4f`), and giving
  * it a path is what `_external/` was.
  */
-const ownership = partitionBySubjectOwner(reports, root, instanceRootsIn(checkoutRootFor(root)));
+const ownership = partitionBySubjectOwner(reports, root, layerRootsIn(checkoutRootFor(root)));
 if (ownership.unowned.length > 0) {
   console.error(`${ownership.unowned.length} subject(s) lie outside ${root} and no instance in the checkout owns them:`);
   for (const r of ownership.unowned) console.error(`  · ${r.subject.kind}:${r.subject.id}  ${r.subject.path}`);

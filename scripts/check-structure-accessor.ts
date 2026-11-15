@@ -28,7 +28,7 @@ import { relative, resolve } from "node:path";
 
 import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { gitCorpus } from "../schemas/sdlc/git-corpus.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 
@@ -55,7 +55,7 @@ export const ALLOWED: Readonly<Record<string, string>> = {
  */
 export function declaredAllowed(repo: string = REPO): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const root of instanceRootsIn(repo)) {
+  for (const root of layerRootsIn(repo)) {
     for (const e of readDeclaration(root)?.gateExemptions?.files ?? []) {
       if (e.gate !== GATE) continue;
       out[relative(repo, resolve(root, e.file)).split("\\").join("/")] = e.reason;

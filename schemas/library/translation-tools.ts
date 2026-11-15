@@ -43,7 +43,7 @@ import {
   type TranslatableFormat,
 } from "../kg/cat-harness.ts";
 import { declarationChain, resolveImplementingPath } from "../kg/harness-config.ts";
-import { instanceRootsIn } from "../kg/instance-roots.ts";
+import { layerRootsIn } from "../kg/instance-roots.ts";
 
 import { harnessRoot } from "../harness-root.ts";
 import { subgraphHarnessPath } from "../../scripts/lib/harness-layout.ts";
@@ -77,7 +77,7 @@ export type DeclaredContentTypeTranslation = ContentTypeTranslation & { declared
 export function collectContentTypeTranslations(repoRoot: string): DeclaredContentTypeTranslation[] {
   const out: DeclaredContentTypeTranslation[] = [];
   const ownerOf = new Map<string, string>();
-  for (const instance of instanceRootsIn(repoRoot)) {
+  for (const instance of layerRootsIn(repoRoot)) {
     for (const ct of readDeclaration(instance)?.contentTranslations ?? []) {
       const prior = ownerOf.get(ct.contentType);
       if (prior !== undefined) {

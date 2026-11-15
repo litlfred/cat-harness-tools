@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { itemState, viewerHtml } from "../gen-uploads-viz.ts";
 import { unscopedSelectors } from "../lib/themed-page.ts";
 import { readLibraryGraph } from "../library-graph.ts";
-import { checkoutRootFor, instanceRootsIn } from "../../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, layerRootsIn } from "../../schemas/kg/cat-harness.ts";
 import type { UploadItem } from "../library-graph.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -142,7 +142,7 @@ describe("a sidecar is not a queued document", () => {
   // files stood in the table as units "waiting to be ingested", 0 KB each,
   // inflating the headline from 20 to 27 — the one number the page exists for.
   const root = checkoutRootFor(join(HARNESS_ROOT));
-  const g = readLibraryGraph(instanceRootsIn(root), root);
+  const g = readLibraryGraph(layerRootsIn(root), root);
 
   test("the corpus is readable, so the assertions below are not vacuous", () => {
     expect(g).not.toBeNull();

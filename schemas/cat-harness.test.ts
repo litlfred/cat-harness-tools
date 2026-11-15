@@ -15,7 +15,7 @@ import { registerFolioGraphTypology } from "./kg/folio-graph-typology.ts";
 import { THEMES } from "./ui/themes.ts";
 import { BEAN_GRAPH_FILE } from "./sdlc/bean-graph.ts";
 import { TODO_GRAPH_FILE } from "./sdlc/todo-graph.ts";
-import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, instanceRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "./kg/cat-harness.ts";
+import { defaultGraphTypologies, graphTypologyIri, GraphTypologyRegistry, graphLayer, isContentGraph, isContextGraph, isStateGraph, processMayWrite, graphTypologiesOfLayer, BASE_GRAPH_TYPOLOGIES, GraphTypologyConflictError, isRenderable, readDeclaration, keepMarker, materialiseDirectories, renderableDirectories, DEFAULT_DIRECTORIES, declaredKinds, directoryForGraph, directoriesForGraph, resolveDirectories, resolveGraphTypology, ContentDirectorySchema, GraphNodeDirectorySchema, layerRootsIn, ownDirectoryById, toJsonLd, type ResolvedDirectory } from "./kg/cat-harness.ts";
 import { writeDeclaration } from "../test/support/instance-fixture.js";
 import { checkoutDirectories, corpusDirectoriesForGraph } from "./kg/harness-config.ts";
 
@@ -974,7 +974,7 @@ describe("instanceRootsIn — discovered, never listed", () => {
     // declares nothing — present, but not a layer
     mkdirSync(join(base, "plain"), { recursive: true });
 
-    expect(instanceRootsIn(base)).toEqual([
+    expect(layerRootsIn(base)).toEqual([
       resolve(base),
       join(resolve(base), "alpha"),
       join(resolve(base), "beta"),
@@ -986,7 +986,7 @@ describe("instanceRootsIn — discovered, never listed", () => {
     const base = mkdtempSync(join(tmpdir(), "roots-"));
     mkdirSync(join(base, "only"), { recursive: true });
     writeDeclaration(join(base, "only"), JSON.stringify({ name: "only", directories: [] }));
-    expect(instanceRootsIn(base)).toEqual([join(resolve(base), "only")]);
+    expect(layerRootsIn(base)).toEqual([join(resolve(base), "only")]);
     rmSync(base, { recursive: true, force: true });
   });
 
@@ -994,7 +994,7 @@ describe("instanceRootsIn — discovered, never listed", () => {
     const base = mkdtempSync(join(tmpdir(), "roots-"));
     mkdirSync(join(base, ".hidden"), { recursive: true });
     writeDeclaration(join(base, ".hidden"), JSON.stringify({ name: "hidden", directories: [] }));
-    expect(instanceRootsIn(base)).toEqual([]);
+    expect(layerRootsIn(base)).toEqual([]);
     rmSync(base, { recursive: true, force: true });
   });
 
@@ -1002,7 +1002,7 @@ describe("instanceRootsIn — discovered, never listed", () => {
     const base = mkdtempSync(join(tmpdir(), "roots-"));
     mkdirSync(join(base, "outer", "inner"), { recursive: true });
     writeDeclaration(join(base, "outer", "inner"), JSON.stringify({ name: "inner", directories: [] }));
-    expect(instanceRootsIn(base)).toEqual([]);
+    expect(layerRootsIn(base)).toEqual([]);
     rmSync(base, { recursive: true, force: true });
   });
 
@@ -1020,7 +1020,7 @@ describe("instanceRootsIn — discovered, never listed", () => {
     // folio-assistant-core and folio-assistant are three distinct layers.
     // Four of eleven is what the old literal would have gone on reporting.
     const repo = resolve(import.meta.dir, "..", "..");
-    const found = instanceRootsIn(repo).map((r) => r.slice(repo.length + 1) || ".");
+    const found = layerRootsIn(repo).map((r) => r.slice(repo.length + 1) || ".");
     expect(found).toEqual([
       // `"."`, the ROOT, led this list until the owner removed its declaration
       // (3d4caf6, 2026-10-08: "should not need folio-assistant declared at

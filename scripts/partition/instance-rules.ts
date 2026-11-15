@@ -909,7 +909,7 @@ export const RULES: Rule[] = [
       // dropped. Harness machinery over declarations; imports only node:fs.
       // The same audit over every declared layer rather than the root alone
       // (bean `bjzs`). Harness layer for exactly the reason `kg-audit.ts` is —
-      // it spawns that audit and imports only `instanceRootsIn`, so its subject
+      // it spawns that audit and imports only `layerRootsIn`, so its subject
       // is the layer declarations, never the content vocabulary. Assigned
       // here in the same change that added it: `unassigned` is what the tool's
       // own report says not to read as clean, and four scripts sat that way

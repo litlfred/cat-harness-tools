@@ -46,7 +46,7 @@ import { directoriesForGraph } from "../schemas/kg/cat-harness.ts";
 import { splitOwnCodeRef } from "../schemas/kg/contribution-nodes.ts";
 import { orderedDependencies } from "../schemas/kg/harness-config.ts";
 import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { moduleRootOf, parseValidatorRef } from "../schemas/kg/kind-validator.ts";
 import { discoverTools } from "../tools/discover.ts";
 
@@ -63,7 +63,7 @@ export const PLUGIN_TABLE_GRAPHS = ["qa-checkers", "pipeline-plugins"] as const;
  * level below the checkout.
  */
 export function loaderRoots(root: string): string[] {
-  const out = new Set(instanceRootsIn(root).map((r) => resolve(r)));
+  const out = new Set(layerRootsIn(root).map((r) => resolve(r)));
   for (const r of [...out]) for (const d of orderedDependencies(r)) out.add(resolve(d.rootPath));
   return [...out].sort();
 }
@@ -140,7 +140,7 @@ export function pluginTableModules(root: string): string[] {
  */
 export function toolRegistrarModules(root: string): string[] | undefined {
   const abs = resolve(root);
-  const roots = instanceRootsIn(abs);
+  const roots = layerRootsIn(abs);
   const out = new Set<string>();
   for (const inst of roots) {
     const d = discoverTools(abs, undefined, inst);

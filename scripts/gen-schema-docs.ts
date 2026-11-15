@@ -144,22 +144,23 @@ function emit(path: string, content: string): void {
  * and never deleted, for `gen-skill-docs.ts`' `reportOrphans` reason
  * (`deletion-requires-confirmation`).
  *
- * Reported, not yet failed: 13 such pages were already committed when this
- * check arrived, and this repository promotes a ratchet to a hard failure only
- * once its count is zero. Raise it to `process.exit(1)` then, as
- * `gen-skill-docs.ts` did.
+ * A hard failure, in writing mode too, since a re-run does not fix it. It
+ * reported only while the 13 pages the placement moves left behind were still
+ * committed; cat-harness#1349 removed them, so the count is zero and the
+ * ratchet holds, as `gen-skill-docs.ts`'s does.
  */
 function reportOrphans(produced: Iterable<string>): void {
   const orphans = orphanPages(readdirSync(OUT_DIR), produced);
   if (orphans.length === 0) return;
   console.error(
-    `\n⚠ ${orphans.length} schema page(s) in the output directory were produced by NO contract:\n`,
+    `\n✗ ${orphans.length} schema page(s) in the output directory were produced by NO contract:\n`,
   );
   for (const f of orphans) console.error(`  ${join(OUT_DIR, f)}`);
   console.error(
     `\n  The contract moved to another layer or was removed. Check which; if it is gone\n` +
       `  from this instance, a person deletes the page (\`deletion-requires-confirmation\`).`,
   );
+  process.exit(1);
 }
 
 function reportDrift(): void {

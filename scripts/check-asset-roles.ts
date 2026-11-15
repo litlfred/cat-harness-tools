@@ -32,7 +32,7 @@ import {
   REQUIRED_ASSET_ROLES,
   ROLE_OWNED_ASSET_KEYS,
   assetRoleLayer,
-  instanceRootsIn,
+  layerRootsIn,
   processMayWriteAsset,
   strayAssetRoleKeys,
 } from "../schemas/kg/cat-harness.js";
@@ -88,7 +88,7 @@ export function formatReport(r: AssetRoleReport): string {
 }
 
 export function collect(repoRoot: string): AssetRoleReport {
-  const roots = instanceRootsIn(repoRoot);
+  const roots = layerRootsIn(repoRoot);
   return {
     ungoverned: REQUIRED_ASSET_ROLES.filter((r) => assetRoleLayer(r) === undefined),
     // `=== true` and not truthiness: `undefined` is the third state and an

@@ -31,7 +31,7 @@ import {
   readIndexConfig,
   withIgnoreBlock,
   type IndexConfig,
-  type IndexInstance,
+  type IndexLayer,
   type RemoteSource,
 } from "../schemas/kg/index-config.ts";
 import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "../schemas/kg/cat-harness.ts";
@@ -610,7 +610,7 @@ function resolveRemoteLayerSource(layer: string): RemoteSource {
   };
 }
 
-function remotePlatformInstances(contentType: InitFolioOptions["contentType"] | undefined): IndexInstance[] {
+function remotePlatformInstances(contentType: InitFolioOptions["contentType"] | undefined): IndexLayer[] {
   return remotePlatformLayers(contentType).map((layer) => ({
     name: layer,
     source: { remote: resolveRemoteLayerSource(layer) },
@@ -626,9 +626,9 @@ function remotePlatformInstances(contentType: InitFolioOptions["contentType"] | 
 export function newFolioIndex(
   slug: string,
   config: Record<string, unknown> = {},
-  remoteInstances: IndexInstance[] = [],
+  remoteInstances: IndexLayer[] = [],
 ): IndexConfig {
-  const instances: IndexInstance[] = [
+  const instances: IndexLayer[] = [
     { name: slug, source: { local: { at: "." } }, ...config },
     ...remoteInstances,
   ];

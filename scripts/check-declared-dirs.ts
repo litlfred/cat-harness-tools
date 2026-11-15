@@ -32,7 +32,7 @@
  *
  * ## Layers are DISCOVERED, not listed
  *
- * Via {@link instanceRootsIn}, the same way `check:declared-assets` does.
+ * Via {@link layerRootsIn}, the same way `check:declared-assets` does.
  *
  * ## A MIRROR of another layer's directory
  *
@@ -73,7 +73,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { DEFAULT_DIRECTORIES, instanceRootsIn, nestedDirectories, readDeclaration, rootForScope } from "../schemas/kg/cat-harness.js";
+import { DEFAULT_DIRECTORIES, instanceRootsIn, layerRootsIn, nestedDirectories, readDeclaration, rootForScope } from "../schemas/kg/cat-harness.js";
 import type { DeclarationScope } from "../schemas/kg/kg-node.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import {
@@ -780,7 +780,7 @@ export function auditNested(
 
 if (import.meta.main) {
   const repoRoot = process.cwd();
-  const instances = instanceRootsIn(repoRoot);
+  const instances = layerRootsIn(repoRoot);
   let findings: DirFinding[] = [];
   let declared = 0;
   let exempt = 0;
@@ -818,4 +818,4 @@ if (import.meta.main) {
   process.exit(findings.length > 0 ? 1 : 0);
 }
 
-export { instanceRootsIn, resolve };
+export { layerRootsIn, instanceRootsIn, resolve };

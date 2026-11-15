@@ -16,7 +16,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below
@@ -49,7 +49,7 @@ describe("kg:audit over the instance declared at the repository root (bean `pgzn
     };
     const names = (index.instances ?? index.layers ?? []).map((i) => i.name);
     expect(names.length).toBeGreaterThan(0);
-    const roots = instanceRootsIn(REPO).filter((r) => r !== REPO);
+    const roots = layerRootsIn(REPO).filter((r) => r !== REPO);
     const declared = new Set(roots.map((r) => readDeclaration(r)?.name));
     expect(names.filter((n) => !declared.has(n))).toEqual([]);
   });

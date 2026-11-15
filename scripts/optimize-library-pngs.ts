@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { instanceDirectoriesForGraph } from "../schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 
 export interface OptimizeOptions {
   dirs?: string[];
@@ -253,7 +253,7 @@ export async function optimizeLibraryPngs(opts: OptimizeOptions = {}): Promise<O
       : // Every layer's own `library` directory, read from its declaration
         // rather than spelled: the four this listed were a monorepo's, and a
         // literal here names another layer's directory (check:foreign-paths).
-        instanceRootsIn(process.cwd())
+        layerRootsIn(process.cwd())
           .flatMap((root) => instanceDirectoriesForGraph(root, "library"))
           .filter((d) => existsSync(d));
 

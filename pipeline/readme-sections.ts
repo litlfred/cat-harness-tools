@@ -70,7 +70,7 @@ import { discoverPapers, injectSection, loadReadmeConfig, renderToc, type Readme
 import { findContentRepoRoot } from "./repo-root";
 import { optionalPipelinePlugin } from "./pipeline-plugins";
 import { readEffectiveConfig } from "../schemas/kg/harness-config.ts";
-import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declaredAssetPath, instanceRootsIn, readDeclaration, workPlanGraphsIn } from "../schemas/kg/cat-harness.ts";
+import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declaredAssetPath, layerRootsIn, readDeclaration, workPlanGraphsIn } from "../schemas/kg/cat-harness.ts";
 import { generatedBanner } from "@litlfred/bootstrap-tools/scripts/generated-by.ts";
 import { frontMatter, nodeSummary } from "../scripts/front-matter.ts";
 import { isSkillMd, skillMdDirs } from "../scripts/known-skills.ts";
@@ -492,7 +492,7 @@ const instancesSection: ReadmeSection = {
     // section. Called that way it enumerated the CONTAINING directory and
     // rendered a one-row table listing this repository as its own child.
     const repo = ctx.root;
-    const roots = instanceRootsIn(repo);
+    const roots = layerRootsIn(repo);
     // Zero layers is UNDETERMINED, not "this repository has none": the
     // reader is holding a README that sits in a repository which, by
     // construction, contains at least the layer that declared it.
@@ -685,7 +685,7 @@ const coldStartSection: ReadmeSection = {
   summary: "What an arriving agent does first — four pointers, skills reached by query",
   render(ctx) {
     const repo = ctx.root;
-    const roots = instanceRootsIn(repo);
+    const roots = layerRootsIn(repo);
     if (roots.length === 0) {
       return { markdown: "", notes: ["no instance declares a <name>.json — nothing was read"], skip: true };
     }
@@ -1437,7 +1437,7 @@ if (import.meta.main) {
   // other one — correct the day it was synced and silently wrong after.
   if (argv.includes("--all")) {
     const repo = resolve(flag("dir") ?? ".");
-    const roots = instanceRootsIn(repo);
+    const roots = layerRootsIn(repo);
     if (roots.length === 0) {
       console.error(`no instance declares a <name>.json under ${repo} — nothing was read`);
       process.exit(2);

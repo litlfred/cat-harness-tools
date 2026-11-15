@@ -28,7 +28,7 @@
 
 import { relative, resolve } from "node:path";
 
-import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { instanceRootFor, layerRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { dependsOnFor } from "../schemas/kg/depends-on.js";
 import { readEffectiveConfig } from "../schemas/kg/harness-config.js";
 
@@ -138,7 +138,7 @@ export function dependencyRefs(repoRoot: string): CarrierReport {
   let examined = 0;
   const seen: string[] = [];
 
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     // INDEX FIRST (bean `ymvt`): a layer an `index.config.json` lists is
     // configured by its entry; a `<name>.config.json` alone is the legacy
     // fallback, named as such in `seen`. `absent` with no `from` is "nothing
@@ -197,7 +197,7 @@ export function assetSourceRefs(repoRoot: string): CarrierReport {
   const findings: RefFinding[] = [];
   let examined = 0;
 
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     let decl;
     try {
       decl = readDeclaration(root);
@@ -251,7 +251,7 @@ export function publishedGraphRefs(repoRoot: string): CarrierReport {
   let examined = 0;
   let emitting = 0;
 
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const where = relative(repoRoot, root) || ".";
     let deps;
     try {

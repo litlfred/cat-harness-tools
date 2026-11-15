@@ -1,4 +1,4 @@
-# Layer discovery in schemas/kg/cat-harness.ts (instanceRootsIn, repoRootFor, checkoutRootFor and friends)
+# Layer discovery in schemas/kg/cat-harness.ts (layerRootsIn, repoRootFor, checkoutRootFor and friends)
 # and the repository-level readers that use it, with real git worktrees under .claude/worktrees/ (bean g43f).
 # Each Scenario names the test that executes it.
 Feature: Layer discovery with git worktrees present
@@ -6,14 +6,14 @@ Feature: Layer discovery with git worktrees present
   @test:schemas/instance-roots-worktrees.test.ts::instanceRootsIn_with_git_worktrees_present::the_main_checkout_does_not_see_its_nested_worktrees
   Scenario: The main checkout does not see its nested worktrees
     Given a git checkout declaring "root" and "core", with agent worktrees "agent-a" and "agent-b" under .claude/worktrees/
-    When instanceRootsIn scans the main checkout
+    When layerRootsIn scans the main checkout
     Then it finds exactly the checkout and its "core" instance
     And no path found lies under .claude
 
   @test:schemas/instance-roots-worktrees.test.ts::instanceRootsIn_with_git_worktrees_present::a_worktree_sees_its_own_instances_and_nothing_of_its_sibling
   Scenario: A worktree sees its own instances and nothing of its sibling
     Given the agent-b worktree holds an extra "only-in-sibling" instance
-    When instanceRootsIn scans the agent-a worktree
+    When layerRootsIn scans the agent-a worktree
     Then it finds exactly agent-a and agent-a's "core"
 
   @test:schemas/instance-roots-worktrees.test.ts::instanceRootsIn_with_git_worktrees_present::the_escape:_scanning_`repoRootFor(<worktree_root>)`_lists_no_sibling_worktree
@@ -35,18 +35,18 @@ Feature: Layer discovery with git worktrees present
     And false for the main checkout's "core"
     Given a superproject declaring "super" with a "sub" instance whose .git file points into the superproject and is listed in .gitmodules
     Then the submodule is not foreign
-    And instanceRootsIn on the superproject finds both "super" and "sub"
+    And layerRootsIn on the superproject finds both "super" and "sub"
 
   @test:schemas/instance-roots-worktrees.test.ts::sibling_clones_in_a_plain_directory_—_the_separated_layout_(ho66)::every_clone_is_an_instance_when_no_checkout_encloses_them
   Scenario: Sibling clones in a plain directory are all instances
     Given a plain directory holding two separately git-initialised clones "lower" and "upper"
-    When instanceRootsIn scans the plain directory
+    When layerRootsIn scans the plain directory
     Then it finds both "lower" and "upper"
     And siblingScopeFor of "upper" is "upper" itself
 
   @test:schemas/instance-roots-worktrees.test.ts::sibling_clones_in_a_plain_directory_—_the_separated_layout_(ho66)::inside_a_checkout,_a_clone_is_still_foreign
   Scenario: Inside a checkout, a nested clone is still foreign
-    When instanceRootsIn scans the main checkout's .claude/worktrees directory
+    When layerRootsIn scans the main checkout's .claude/worktrees directory
     Then it finds no instances
 
   @test:schemas/instance-roots-worktrees.test.ts::checkoutRootFor_—_repository-level_reads_stay_inside_the_checkout_(g43f)::THIS_checkout_—_the_main_one_or_a_nested_agent_worktree_—_answers_itself

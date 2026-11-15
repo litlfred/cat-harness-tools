@@ -65,7 +65,7 @@
  */
 import { dirname } from "node:path";
 import { checkoutRootFor, readDeclaration } from "../schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { mountScopeFor } from "../schemas/kg/remote-mount.ts";
 import { TRACKED, type PairIO } from "./input-hash.ts";
 
@@ -360,7 +360,7 @@ export function collectTaskIo(
 ): Readonly<Record<string, ScriptIO>> {
   const out: Record<string, ScriptIO> = { ...own };
   const ownerOf = new Map<string, string>(Object.keys(own).map((k) => [k, "cat-harness-tools/scripts/task-io.ts"]));
-  for (const instance of instanceRootsIn(repoRoot)) {
+  for (const instance of layerRootsIn(repoRoot)) {
     // A REMOTE-MOUNTED layer's `taskIo` names scripts in ITS repository's
     // package.json, not this checkout's (bean `hupw`: a retired layer's
     // gates leave with it), so it contributes nothing here.
@@ -416,7 +416,7 @@ export interface TaskWrites {
 export function collectTaskWrites(repoRoot: string, own: Readonly<Record<string, readonly string[]>> = OWN_WRITES): TaskWrites[] {
   const toolsRoot = dirname(import.meta.dir);
   const out: TaskWrites[] = Object.entries(own).map(([task, globs]) => ({ task, instance: toolsRoot, globs }));
-  for (const instance of instanceRootsIn(repoRoot)) {
+  for (const instance of layerRootsIn(repoRoot)) {
     if (mountScopeFor(instance) !== undefined) continue;
     for (const [task, io] of Object.entries(readDeclaration(instance)?.taskIo ?? {})) {
       const globs = (io as { writes?: readonly string[] }).writes;

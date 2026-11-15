@@ -86,7 +86,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, resolveDirectories, type ResolvedDirectory } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, resolveDirectories, type ResolvedDirectory } from "../schemas/kg/cat-harness.js";
 import { lockFilesIn } from "../schemas/kg/instance-roots.js";
 import { mountScopeFor, readMountLock } from "../schemas/kg/remote-mount.js";
 import { subgraphSourceOverrides } from "../schemas/kg/harness-config.js";
@@ -350,7 +350,7 @@ export function tipLocations(repoRoot: string = gitTopLevel(), keyedBy: BranchKe
 function allBranchLocations(repoRoot: string, wantId: (id: string) => boolean = () => true): TipLocation[] {
   const found: Array<TipLocation & { instRoot: string }> = [];
   const remotes = new Map<string, RemoteInstance | undefined>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     // The layer's overrides, read ONCE for all its directories and only
     // when one needs them. Read per directory, they were ~4.5 s of a ~9 s
     // `gen-docs-pages` run (2026-10-30, #871): `subgraphSourceOverrides` re-reads
@@ -460,7 +460,7 @@ export function resolveTipLocation(
     if (keyedBy !== "any" && l.keyedBy !== keyedBy) throw new BranchStoreUsageError(`directory ${id} is keyed by ${l.keyedBy}, not ${keyedBy}`);
     return l;
   }
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
       if (d.id !== id) continue;
       const at = keptAt(inst, repoRoot, d);
@@ -1791,7 +1791,7 @@ export type ContentAt =
   | { state: "undeclared"; reason: string };
 
 export function contentAt(id: string, repoRoot: string = gitTopLevel()): ContentAt {
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
       if (d.id !== id) continue;
       const dir = d.absPath.replace(/[/\\]+$/, "");

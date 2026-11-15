@@ -39,7 +39,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { defaultContentTypes, type ContentTypeRegistry } from "./content-type";
 import { CONFIG_SUFFIX, findDeclarationFile } from "../kg/cat-harness";
-import { instanceConfigFilename, instanceConfigFor } from "../kg/harness-config";
+import { layerConfigFilename, instanceConfigFor } from "../kg/harness-config";
 import { isReservedIndexFile } from "../kg/instance-roots";
 import { termIri } from "../kg/namespaces";
 
@@ -73,7 +73,7 @@ function folioMarkerFilename(repoRoot: string): string | undefined {
     return undefined;
   }
   if (inst === undefined) return undefined;
-  const file = instanceConfigFilename(inst.name);
+  const file = layerConfigFilename(inst.name);
 
   // IT MUST ACTUALLY DECLARE A CONTENT TYPE, which this did not have to check
   // while `harness.json` existed: the declaration and the config were two

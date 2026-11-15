@@ -25,7 +25,7 @@
  */
 import { relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import {
   orderedDependencies,
   repositoryMirrors,
@@ -71,7 +71,7 @@ async function exporterIri(): Promise<IriOf> {
 }
 
 export function collect(repoRoot: string, iriOf?: IriOf): InstanceGraphReport {
-  const roots = instanceRootsIn(repoRoot);
+  const roots = layerRootsIn(repoRoot);
   const seen = new Set<string>();
   const problems: InstanceGraphReport["problems"] = [];
   const iris: Record<string, string> = {};

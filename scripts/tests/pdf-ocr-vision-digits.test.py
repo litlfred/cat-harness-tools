@@ -48,7 +48,54 @@ def main() -> int:
             rc = 1
 
     o = load("pdf-ocr.py")
-    from PIL import Image
+    try:
+        from PIL import Image
+    except ModuleNotFoundError:
+        # `typescript-test` runs `bun test` without `pip install -r requirements.txt`
+        # (the `python` CI job installs Pillow and exercises the real PIL crop).
+        class _FakeImg:
+            def __init__(self, size=(1600, 2200)):
+                self.width, self.height = size
+            def __enter__(self):
+                return self
+            def __exit__(self, *a):
+                pass
+            def convert(self, _mode):
+                return self
+            def crop(self, box):
+                return _FakeImg((max(1, box[2] - box[0]), max(1, box[3] - box[1])))
+            def resize(self, size, _resample=None):
+                return _FakeImg(size)
+            def save(self, dst, format=None):
+                data = b"\x89PNG\r\n\x1a\n"
+                if hasattr(dst, "write"):
+                    dst.write(data)
+                else:
+                    open(dst, "wb").write(data)
+
+        class _FakeImageMod:
+            LANCZOS = 1
+            @staticmethod
+            def new(_mode, size, _color=None):
+                return _FakeImg(size)
+            @staticmethod
+            def open(_path):
+                return _FakeImg()
+
+        class _FakeDraw:
+            def rectangle(self, *_a, **_kw):
+                pass
+
+        class _FakeImageDrawMod:
+            @staticmethod
+            def Draw(_im):
+                return _FakeDraw()
+
+        pil = types.ModuleType("PIL")
+        pil.Image = _FakeImageMod
+        pil.ImageDraw = _FakeImageDrawMod
+        sys.modules["PIL"] = pil
+        Image = _FakeImageMod
     tmp = tempfile.mkdtemp()
     png = os.path.join(tmp, "page.png")
     Image.new("RGB", (1600, 2200), "white").save(png)

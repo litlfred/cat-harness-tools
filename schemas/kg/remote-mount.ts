@@ -69,7 +69,7 @@
  * A mounted layer lands, by default, at the path it has in its own
  * repository (`livesAt.path`), relative to the DOWNSTREAM layer's root —
  * where its lock sits, and for a folio repository the checkout root. Two things then hold with no further machinery:
- * `instanceRootsIn` — which scans a checkout one level deep — finds every
+ * `layerRootsIn` — which scans a checkout one level deep — finds every
  * mounted sibling, so `needs` resolves exactly as it does in the monorepo; and
  * a relative import from one mounted layer into another
  * (`../../cat-harness/schemas/…`) finds the file it names, because the
@@ -404,7 +404,7 @@ export type MountLock = z.infer<typeof MountLockSchema>;
  * overlay asks this rather than guessing a directory: `resolveDependencyPath`
  * used to fall back to `.deps/<name>/`, which the owner ruled out
  * (2026-10-06). A mount at its default (home) path is ALSO found by
- * `instanceRootsIn`'s one-level scan; this is what finds one an override
+ * `layerRootsIn`'s one-level scan; this is what finds one an override
  * moved deeper.
  *
  * A lock that cannot be parsed contributes nothing HERE — the overlay is not

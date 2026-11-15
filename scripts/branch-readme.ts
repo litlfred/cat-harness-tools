@@ -40,7 +40,7 @@
 import { readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { StateManifestSchema, type StateManifest } from "../schemas/kg/state-manifest.ts";
 
 import { BranchStore, storeOptionsFor, tipLocations, type BranchKeying, type FileRead } from "./branch-store.ts";
@@ -81,7 +81,7 @@ export function declaredBranches(root: string): Map<string, BranchDeclaration[]>
   } catch {
     // An unresolvable location is reported per branch by the read, not here.
   }
-  for (const inst of instanceRootsIn(root)) {
+  for (const inst of layerRootsIn(root)) {
     const file = findDeclarationFile(inst);
     if (!file) continue;
     let decl: { name?: string; directories?: Array<Record<string, unknown>> };

@@ -43,7 +43,7 @@ import {
 import { libraryResolver, type LibraryResolver } from "./lib/library-links.ts";
 import { blobUrl, forgeAt } from "./lib/library-source.ts";
 import { repoOf } from "../src/core/edit-links.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { detectRepoUrl } from "../src/core/git-refs.ts";
 import { readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
@@ -406,7 +406,7 @@ export interface AppliedBy {
  */
 export function appliedByIndex(repoRoot = REPO, nodeHref?: (path: string) => string | undefined): Map<string, AppliedBy[]> {
   const out = new Map<string, AppliedBy[]>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     for (const u of methodologyUses(root)) {
       const href = nodeHref?.(relative(repoRoot, join(root, u.file)).split("\\").join("/"));
       for (const n of u.names) out.set(n, [...(out.get(n) ?? []), { skill: u.skill, ...(href ? { href } : {}) }]);

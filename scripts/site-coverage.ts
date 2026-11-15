@@ -196,6 +196,30 @@ export function instanceSubgraph(instance: string, dirs: readonly { instance: st
 }
 
 /**
+ * Whether a site scoped to `scoped` owes visualiser `v`'s page at its own route.
+ *
+ * It does when the declaring layer is in scope, or one of the layers it has a
+ * sub-graph page for is. A `builtOnHostSite` visualiser (bean
+ * folio-assistant-uldr) is drawn on the site that HOSTS its subjects, so it is
+ * also owed when a layer in scope holds anything in a directory it covers,
+ * whatever its `subgraphs`. Without that, core's `bibliography`
+ * (`subgraphs: "directory"`, covering who-iris's `references/` and
+ * `catalogue/`) was owed by no scoped site: who-iris's own site dropped
+ * `en/folio-assistant-core/bibliography/`, its writer never ran, and this
+ * guard reported every declared page present (who-iris publish run
+ * 43710187461, 2026-11-15).
+ */
+export function owedOnScopedSite(
+  v: { harness: string; builtOnHostSite?: unknown },
+  scoped: ReadonlySet<string>,
+  instances: readonly string[],
+  withAnything: readonly { instance: string }[],
+): boolean {
+  if (scoped.has(v.harness) || instances.some((i) => scoped.has(i))) return true;
+  return v.builtOnHostSite !== undefined && withAnything.some((d) => scoped.has(d.instance));
+}
+
+/**
  * Every page the declarations of the checkout at `root` say a built site must
  * carry. A visualiser declared `publish: "staging-only"` (fsh-guts, the
  * trashcan kept but not published) is expected in a preview and never on a
@@ -225,7 +249,7 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     // A scoped site owes a layer's visualiser only when the layer is in scope or
     // one of its subjects is: the platform's own pages (its processes, skills,
     // tools, schemas) are linked on the platform's site, not copied (owner, 2026-11-10).
-    if (scoped !== undefined && !scoped.has(v.harness) && !instances.some((i) => scoped.has(i))) continue;
+    if (scoped !== undefined && !owedOnScopedSite(v, scoped, instances, withAnything)) continue;
     out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
     if (v.subgraphs !== "instance") continue;
     for (const instance of instances) {

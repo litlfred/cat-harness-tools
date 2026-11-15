@@ -95,7 +95,7 @@ Feature: Navbar consistency check
     When the check is run on the repository
     Then the "declaring a themes graph" count is greater than 0
 
-  @test:scripts/tests/ui/navbar-consistency.test.ts::the_denominator_comes_from_the_declared_enumerator::`instanceRootsIn`_excludes_the_repository_root_and_graph_declarations
+  @test:scripts/tests/ui/navbar-consistency.test.ts::the_denominator_comes_from_the_declared_enumerator::`layerRootsIn`_excludes_the_repository_root_and_graph_declarations
   Scenario: The instance enumerator excludes the repository root and graph declarations
     When the instance roots of the repository are enumerated
     Then the repository root is not among them

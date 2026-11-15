@@ -51,7 +51,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { loadProcessModel, processDiagrams, type ProcessModel, type ProcessNode } from "../src/workflow/process-model.ts";
 import { belowHarness } from "./lib/needs-reach.ts";
 import { workflowFiles } from "./known-skills.js";
@@ -193,7 +193,7 @@ export function checklistFor(model: ProcessModel, sourceRel: string): string {
 /** Every `.bpmn` in every layer of the repository, by its declared knowledge-graph directories. */
 export function bpmnSources(root: string = HARNESS_ROOT): string[] {
   const all = new Set<string>();
-  for (const inst of instanceRootsIn(repoRootFor(root))) for (const f of processDiagrams(workflowFiles(inst))) all.add(f);
+  for (const inst of layerRootsIn(repoRootFor(root))) for (const f of processDiagrams(workflowFiles(inst))) all.add(f);
   return [...all].sort();
 }
 
@@ -216,7 +216,7 @@ export interface Placement {
  * root and kept beside its diagram.
  */
 export function placementOf(sources: readonly string[], repoRoot: string, harnessRoot: string = HARNESS_ROOT): Map<string, Placement> {
-  const instances = instanceRootsIn(repoRoot)
+  const instances = layerRootsIn(repoRoot)
     .map((root) => ({ root: resolve(root), decl: readDeclaration(root) }))
     .filter((i): i is { root: string; decl: NonNullable<typeof i.decl> } => i.decl?.name !== undefined)
     // Deepest first, so a nested layer owns its own files.

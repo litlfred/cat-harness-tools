@@ -15,7 +15,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { relative, resolve } from "node:path";
-import { instanceRootsIn, readDeclaration, type InstanceLocation } from "./cat-harness.js";
+import { layerRootsIn, readDeclaration, type InstanceLocation } from "./cat-harness.js";
 import { declarationChain } from "./harness-config.js";
 import { instanceNamespaceOf } from "./namespaces.js";
 import { mountScopeFor } from "./remote-mount.js";
@@ -50,7 +50,7 @@ export interface InstanceRepositoryMap {
  * makes a reference resolve to whichever was read first.
  */
 export function instanceRepositories(checkoutRoot: string, folioRoot?: string): InstanceRepositoryMap {
-  const roots = new Set<string>(instanceRootsIn(checkoutRoot).map((r) => resolve(r)));
+  const roots = new Set<string>(layerRootsIn(checkoutRoot).map((r) => resolve(r)));
   if (folioRoot !== undefined) for (const link of declarationChain(folioRoot)) roots.add(resolve(link.root));
 
   const entries: InstanceRepository[] = [];

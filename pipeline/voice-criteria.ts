@@ -43,7 +43,7 @@
  */
 
 import { loadVoices, VOICE_ARTEFACT_KINDS, type VoiceProfile } from "../schemas/content/voices.ts";
-import { instanceRootsIn, readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.ts";
 import type { QaCriterionDefinition } from "../schemas/sdlc/block-qa.ts";
 
 /**
@@ -76,7 +76,7 @@ export function shippedVoices(instanceRoot: string): OwnedVoice[] {
   // outside the checkout and lists no layer at all — zero voices (g43f).
   const repo = siblingScopeFor(instanceRoot);
   const out: OwnedVoice[] = [];
-  for (const root of instanceRootsIn(repo)) {
+  for (const root of layerRootsIn(repo)) {
     const name = readDeclaration(root)?.name;
     if (name === undefined) continue;
     for (const voice of loadVoices(root)) out.push({ voice, instance: name });

@@ -16,7 +16,7 @@
  */
 import { describe, expect, it } from "bun:test";
 import { join, resolve } from "node:path";
-import { instanceRootsIn, instanceDirectories, isPublishedGraphTypology } from "../../schemas/kg/cat-harness.ts";
+import { layerRootsIn, instanceDirectories, isPublishedGraphTypology } from "../../schemas/kg/cat-harness.ts";
 // Every layer's Tools: a viewer Tool may live in a dependency's `tools`
 // graph (fhir-harness's `ig-pages`).
 import { tools } from "../../tools/discover.js";
@@ -31,7 +31,7 @@ interface Dir { id: string; graphTypologies?: string[] }
 
 const dirs: { instance: string; dir: Dir }[] = [];
 // Own entries AND those declared from within (bean `cmsl`).
-for (const root of instanceRootsIn(REPO)) {
+for (const root of layerRootsIn(REPO)) {
   for (const dir of instanceDirectories(root)) dirs.push({ instance: root, dir });
 }
 

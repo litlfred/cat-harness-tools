@@ -113,7 +113,7 @@ import { BranchPrefixSchema, KeyedBySchema, SubgraphSourceSchema, contentIsOffCh
  * spelled once is now each filename rather than both, and the pair below is
  * what keeps them from drifting.
  */
-export function instanceConfigFilename(name: string): string {
+export function layerConfigFilename(name: string): string {
   return `${name}${CONFIG_SUFFIX}`;
 }
 
@@ -4224,7 +4224,7 @@ export function checkoutRootFor(instanceRoot: string): string {
  *
  * ```
  * repoRootFor("/home/user/folio-assistant")  -> "/home/user"
- * instanceRootsIn("/home/user")              -> 1   (only folio-assistant)
+ * layerRootsIn("/home/user")              -> 1   (only folio-assistant)
  * ```
  *
  * so the root layer's `needs` on the content core derived **nothing**,
@@ -4254,7 +4254,7 @@ export function checkoutRootFor(instanceRoot: string): string {
  */
 export function siblingScopeFor(instanceRoot: string): string {
   const abs = resolve(instanceRoot);
-  for (const found of instanceRootsIn(abs)) {
+  for (const found of layerRootsIn(abs)) {
     if (resolve(found) !== abs) return abs;
   }
   // NEVER outside the checkout (owner ruling 2026-10-11, bean `68k7`): a
@@ -6205,7 +6205,7 @@ export function workPlanGraphsIn(
 ): { plan: Array<{ instance: string; kinds: string[] }>; unreadable: string[] } {
   const plan: Array<{ instance: string; kinds: string[] }> = [];
   const unreadable: string[] = [];
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     let decl;
     try {
       decl = readDeclaration(root, registry);
@@ -7822,11 +7822,16 @@ import "./folio-graph-typology.js";
 // is now a node in the content layer's own `typologies/` graph (owner
 // 2026-09-23, "put glossary into" the content layer).
 import { ThemeRefSchema, type ThemeRef } from "../ui/theme";
-import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
+import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, layerRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
 import { projectedRead } from "../sdlc/read-projections";
 import { closeOverRequires, declaredEnableSubgraphs, declaredOptInRequires, enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
 import { leftOutByMount, mountScopeFor } from "./remote-mount";
 // Layer DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this
 // file, which imports the registry. Re-exported here so no caller moves.
-export { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout } from "./instance-roots";
+export { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, layerRootsIn, instanceRootsIn, isForeignCheckout } from "./instance-roots";
+
+// Old names, kept so callers in other layers keep working while they move to
+// the layer names (cat-harness#1138 P4). Remove once no layer imports them.
+/** @deprecated Use {@link layerConfigFilename}. */
+export const instanceConfigFilename = layerConfigFilename;

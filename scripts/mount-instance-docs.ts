@@ -895,7 +895,7 @@ export function generatedChromeBytes(rel: string): Buffer | undefined {
 export function pinPlatformChrome(siteAbs: string, harnessRoot: string = HARNESS_ROOT): { copied: string[]; same: string[]; differing: string[] } {
   const out = { copied: [] as string[], same: [] as string[], differing: [] as string[] };
   for (const rel of [...PINNED_CHROME_FILES, ...PINNED_DATA_FILES]) {
-    const from = join(harnessRoot, siteFileFor(harnessRoot, rel));
+    const from = readPathAt(REPO, join(harnessRoot, siteFileFor(harnessRoot, rel)));
     // `avatars.css` and `themes.css` are generated, not committed
     // (`avatars:css`, `themes:css`): a mount that has not run the writer is
     // given its bytes from the same renderer.
