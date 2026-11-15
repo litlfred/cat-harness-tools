@@ -115,7 +115,7 @@ function stub(spec: Spec): { cli: string; specPath: string; log: string } {
   writeFileSync(join(dir, "stub.py"), STUB);
   writeFileSync(join(dir, "spec.json"), JSON.stringify(spec));
   writeFileSync(join(dir, "log"), "");
-  return { cli: `python3 -I ${join(dir, "stub.py")}`, specPath: join(dir, "spec.json"), log: join(dir, "log") };
+  return { cli: `python3 -I -B ${join(dir, "stub.py")}`, specPath: join(dir, "spec.json"), log: join(dir, "log") };
 }
 
 interface Run {
@@ -135,7 +135,7 @@ function runGates(root: string, mode: string | undefined, spec: Spec | undefined
   const env: NodeJS.ProcessEnv = { ...rest, RUNNER_TEMP, ...extraEnv };
   if (mode !== undefined) env.GATE_CONE = mode;
   if (s !== undefined) Object.assign(env, { GATE_CONE_CLI: s.cli, CONE_STUB_SPEC: s.specPath, CONE_STUB_LOG: s.log });
-  const r = spawnSync("python3", ["-I", RUN_GATES, root, join(out, "gates.json"), "--instance", "c"], { encoding: "utf-8", env });
+  const r = spawnSync("python3", ["-I", "-B", RUN_GATES, root, join(out, "gates.json"), "--instance", "c"], { encoding: "utf-8", env });
   return {
     status: r.status,
     stdout: r.stdout + r.stderr,
@@ -255,7 +255,7 @@ describe("run-gates.py footprint (2b): derived from the record, never declared",
       "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
       `print(json.dumps(${expr}))`,
     ].join("\n");
-    const r = spawnSync("python3", ["-I", "-c", code], { encoding: "utf-8" });
+    const r = spawnSync("python3", ["-I", "-B", "-c", code], { encoding: "utf-8" });
     if (r.status !== 0) throw new Error(r.stderr);
     return JSON.parse(r.stdout);
   };
@@ -421,7 +421,7 @@ describe("merge-shards.py with cone-skipped gates", () => {
     writeFileSync(join(d, "junit.xml"), `<?xml version="1.0"?><testsuites tests="0"></testsuites>`);
     return results;
   }
-  const merge = (results: string) => spawnSync("python3", ["-I", MERGE, results, "head", "1", mkdtempSync(join(tmpdir(), "cone-merged-"))], { encoding: "utf-8" });
+  const merge = (results: string) => spawnSync("python3", ["-I", "-B", MERGE, results, "head", "1", mkdtempSync(join(tmpdir(), "cone-merged-"))], { encoding: "utf-8" });
 
   test("an unchanged gate counts toward covering the set", () => {
     const results = shardDir(
@@ -454,7 +454,7 @@ describe("compare-gates.py with cone-skipped gates", () => {
     writeFileSync(join(d, "head.json"), JSON.stringify(head));
     // input-site: inert #30464c2d — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const { GITHUB_STEP_SUMMARY: _s, ...env } = process.env;
-    const r = spawnSync("python3", ["-I", COMPARE, join(d, "base.json"), join(d, "head.json")], { encoding: "utf-8", env });
+    const r = spawnSync("python3", ["-I", "-B", COMPARE, join(d, "base.json"), join(d, "head.json")], { encoding: "utf-8", env });
     return { status: r.status, out: r.stdout };
   }
   const U = { command: "c", skipped: "inputs unchanged since abc (3 paths)", unchanged: "abc" };
@@ -506,7 +506,7 @@ describe("compare-gates.py with a gate main did not run", () => {
     writeFileSync(join(d, "head.json"), JSON.stringify(head));
     // input-site: inert #30464c2d — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const { GITHUB_STEP_SUMMARY: _s, ...env } = process.env;
-    const r = spawnSync("python3", ["-I", COMPARE, join(d, "base.json"), join(d, "head.json")], { encoding: "utf-8", env });
+    const r = spawnSync("python3", ["-I", "-B", COMPARE, join(d, "base.json"), join(d, "head.json")], { encoding: "utf-8", env });
     return { status: r.status, out: r.stdout };
   }
 
@@ -551,7 +551,7 @@ describe("merge-cone.py", () => {
   }
   const run = (results: string, n: number) => {
     const out = join(mkdtempSync(join(tmpdir(), "cone-records-out-")), "records.json");
-    const r = spawnSync("python3", ["-I", MERGE_CONE, results, "base", String(n), out, "mainsha"], { encoding: "utf-8" });
+    const r = spawnSync("python3", ["-I", "-B", MERGE_CONE, results, "base", String(n), out, "mainsha"], { encoding: "utf-8" });
     return { status: r.status, stdout: r.stdout, file: existsSync(out) ? JSON.parse(readFileSync(out, "utf-8")) : undefined };
   };
   const rec = { sha: "s", base: "fp", reads: {}, git: {} };
@@ -594,7 +594,7 @@ describe("merge-results.py: the shards' result stores, unioned, newest 16 per ga
     put(b, "2", "2026-11-05T02:00:00Z");
     put(b, "3", "2026-11-05T03:00:00Z");
     const out = mkdtempSync(join(tmpdir(), "store-out-"));
-    const r = spawnSync("python3", ["-I", MERGE_RESULTS, join(out, "build", "result-store"), join(a, "build", "result-store"), join(b, "build", "result-store"), join(b, "absent")], { encoding: "utf-8" });
+    const r = spawnSync("python3", ["-I", "-B", MERGE_RESULTS, join(out, "build", "result-store"), join(a, "build", "result-store"), join(b, "build", "result-store"), join(b, "absent")], { encoding: "utf-8" });
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("3 result(s) of 1 gate(s) kept");
     expect(listResults<{ reads: { p: string } }>(out, "x:check", "r").map((e) => e.entry.reads.p)).toEqual(["3", "2", "1"]);
@@ -608,7 +608,7 @@ describe("merge-results.py: the shards' result stores, unioned, newest 16 per ga
     for (let i = 12; i < 24; i++) putResult(b, { gate: "x:check", recipe: "r", recordedAt: `2026-11-05T00:00:${String(i).padStart(2, "0")}Z`, run: "b", entry: { i } });
     writeFileSync(join(gateDir(b, "x:check"), "junk.json"), "{not json");
     const out = mkdtempSync(join(tmpdir(), "store-out-"));
-    const r = spawnSync("python3", ["-I", MERGE_RESULTS, join(out, "build", "result-store"), join(a, "build", "result-store"), join(b, "build", "result-store")], { encoding: "utf-8" });
+    const r = spawnSync("python3", ["-I", "-B", MERGE_RESULTS, join(out, "build", "result-store"), join(a, "build", "result-store"), join(b, "build", "result-store")], { encoding: "utf-8" });
     expect(r.status).toBe(0);
     const kept = listResults<{ i: number }>(out, "x:check", "r").map((e) => e.entry.i);
     expect(kept).toHaveLength(16);

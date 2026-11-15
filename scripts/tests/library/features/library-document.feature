@@ -126,6 +126,11 @@ Feature: The document view of a library entry
     And "Not in the outline" does not appear
     And opening the first node shows "1.1 One A"
 
+  @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::an_inferred_contents_gains_the_sections_it_does_not_list,_at_their_place
+  Scenario: Sections an inferred contents does not list are still in the tree
+    When the contents were inferred and some sections are named by no entry
+    Then each is placed by its first page at its own level, marked as not listed, and the note counts them
+
   @test:scripts/tests/library/library-document.test.ts::the_Contents_tree::toc_absent:_the_tree_is_built_from_the_sections,_nested_by_level
   Scenario: Without a table of contents, the Contents tree is built from the sections, nested by level
     Given a document view with no outline and two level-1 sections "Page 1" and "Page 2"
@@ -163,3 +168,33 @@ Feature: The document view of a library entry
     And the second section has no blocks field
     And the view passes the library document schema
     And the viewer script stores the loaded blocks and gives each block table row an anchor id
+
+  @test:scripts/tests/library/library-document.test.ts::kept_figures_and_transcribed_tables_(who-iris#224)::a_vector_figure_kept_as_PNG_is_shown_and_copied
+  Scenario: A vector figure kept as PNG is shown and copied
+    Given a vector figure rendered as a PNG file
+    When the entry's document view is built
+    Then the figure is included in the view and its PNG is copied
+
+  @test:scripts/tests/library/library-document.test.ts::what_was_extracted_(coverage)::a_References_heading_is_found_but_its_entries_are_not_extracted;_no_glossary_heading_is_'none'
+  Scenario: A References heading is found without extracted entries and an absent glossary heading is none
+    Given an entry with a References section heading and no glossary heading
+    When extraction coverage is computed
+    Then references is found-not-extracted and glossary is none
+
+  @test:scripts/tests/library/library-document.test.ts::what_was_extracted_(coverage)::a_page-split_entry_says_its_contents_were_not_extracted_and_its_sections_are_pages
+  Scenario: A page-split entry reports unextracted contents and page sections
+    Given an entry whose sections are page-split
+    When extraction coverage is computed
+    Then it reports that contents were not extracted and its sections are pages
+
+  @test:scripts/tests/library/library-document.test.ts::what_was_extracted_(coverage)::the_ingest's_extraction.json_wins_for_the_kinds_it_names
+  Scenario: The ingest's extraction.json overrides inferred coverage for the kinds it names
+    Given an entry carrying an extraction.json record
+    When extraction coverage is computed
+    Then the kinds named in extraction.json take their status from that record
+
+  @test:scripts/tests/library/library-document.test.ts::what_was_extracted_(coverage)::the_view_with_coverage_is_one_the_schema_accepts
+  Scenario: A document view carrying extraction coverage validates against the schema
+    Given a document view with extraction coverage populated
+    When it is validated against the library document schema
+    Then validation succeeds

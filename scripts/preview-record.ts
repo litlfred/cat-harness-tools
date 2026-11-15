@@ -57,6 +57,7 @@ import { join, relative, resolve } from "node:path";
 
 import { normalisePreviewHtml } from "./staging-share.ts";
 import { previewPath } from "./lib/preview-prefix.ts";
+import { SITE_REPORT as PREVIEW_QA_REPORT, stripSection as stripPreviewQa } from "./preview-qa.ts";
 
 /** The record's own file name, at the preview root. */
 export const RECORD_FILE = "_build-record.json";
@@ -69,9 +70,11 @@ export const RECORD_FILE = "_build-record.json";
  * - `staging.json` and `build.json`: the build's time, run and builder;
  * - `shared.json` and `staging-sw.js`: written by `staging-share` against the
  *   live site at push time, which moves between the two builds;
+ * - `preview-qa.json`: the change's cone run (`preview-qa.ts`), which two
+ *   builds of the same tree can find at different stages (not yet run, run);
  * - `_render-log/`: the publish branch's log, never part of a site.
  */
-export const BUILD_FACTS: readonly string[] = [RECORD_FILE, "staging.json", "build.json", "shared.json", "staging-sw.js"];
+export const BUILD_FACTS: readonly string[] = [RECORD_FILE, "staging.json", "build.json", "shared.json", "staging-sw.js", PREVIEW_QA_REPORT];
 const BUILD_FACT_DIRS: readonly string[] = ["_render-log/"];
 
 export type Builder = "agent" | "ci";
@@ -105,9 +108,14 @@ function sha256(b: Buffer | string): string {
   return createHash("sha256").update(b).digest("hex");
 }
 
-/** The hash a record keeps for one file: HTML with the per-preview edits set aside, anything else byte for byte. */
+/**
+ * The hash a record keeps for one file: HTML with the per-preview edits set
+ * aside, anything else byte for byte. The "This change (preview)" section is
+ * set aside here only, never in `staging-share.ts`: a QA page that differs
+ * from the live one only by it must still be served from the preview.
+ */
 export function fileHash(rel: string, bytes: Buffer, slug: string): string {
-  if (rel.endsWith(".html")) return sha256(normalisePreviewHtml(bytes.toString("utf-8"), slug));
+  if (rel.endsWith(".html")) return sha256(normalisePreviewHtml(stripPreviewQa(bytes.toString("utf-8")), slug));
   return sha256(bytes);
 }
 

@@ -55,6 +55,7 @@ import { mountedInstanceRoots } from "../schemas/kg/remote-mount.js";
 import { DEFAULT_LOCALE } from "../schemas/content/translation.js";
 import { scriptTable } from "../schemas/sdlc/script-table.ts";
 import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "../schemas/kg/visualiser-route.js";
+import { overlayPath } from "./lib/layer-output.ts";
 
 // ── Provenance: which Tool drew a page ────────────────────────────────────
 
@@ -490,7 +491,9 @@ export function visualiserPageDir(site: string, parts: VisualiserRouteParts): st
   return join(site, ...visualiserRoute(parts).split("/").filter(Boolean));
 }
 
-const holdsPage = (dir: string): boolean => existsSync(join(dir, "index.html")) || existsSync(join(dir, "index.md"));
+// Over the layer overlay: a mounted layer's pages are written at its output
+// root (bean `cat-tools-sm8r`, item 4), so a page there is held too.
+const holdsPage = (dir: string): boolean => existsSync(overlayPath(join(dir, "index.html"))) || existsSync(overlayPath(join(dir, "index.md")));
 
 /**
  * The directory a view's page IS in under `site`: its localised directory
@@ -523,7 +526,7 @@ export function visualiserPageRef(repoRoot: string, parts: VisualiserRouteParts,
     : undefined;
   if (held !== undefined) return renderedPath(repoRoot, join(site, ...held.route.split("/").filter(Boolean), basename(held.page)));
   const dir = existingPageDir(site, parts) ?? visualiserPageDir(site, pageParts(parts));
-  const file = existsSync(join(dir, "index.md")) && !existsSync(join(dir, "index.html")) ? "index.md" : "index.html";
+  const file = existsSync(overlayPath(join(dir, "index.md"))) && !existsSync(overlayPath(join(dir, "index.html"))) ? "index.md" : "index.html";
   return renderedPath(repoRoot, join(dir, file));
 }
 
@@ -704,13 +707,14 @@ export function viewersOf(
             ? [at(d.id)]
             : [at(`${owner}-${d.id}`), ...(harnessIds.has(d.id) ? [] : [at(d.id)])]
           : [];
-    // A sub-graph page counts when it is on disk OR when the declaring harness
+    // A sub-graph page counts when it is on disk (over the layer overlay: a
+    // mounted layer's pages are at its output root, bean `cat-tools-sm8r`) OR when the declaring harness
     // builds it at publish (`writer` or `builtAtPublish`): a page that is
     // deliberately not committed is not missing, and its writer is named on the
     // tile instead.
     const subRef = subs
       .map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!))
-      .find((r) => existsSync(join(repoRoot, r)) || v.writer !== undefined || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
+      .find((r) => existsSync(overlayPath(join(repoRoot, r))) || v.writer !== undefined || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
     // Covered BY KIND, a visualiser that draws per-sub-graph views covers a
     // directory only where it drew that directory's view: the full KG page of
     // a viewer that never reached this layer is not its viewer.
@@ -749,10 +753,12 @@ export function viewersOf(
     };
     const writer =
       v.writer?.map((w) => renderedPath(repoRoot, writerAt(w))) ??
-      (existsSync(join(repoRoot, ref)) ? undefined : (builtAtPublishWriter(repoRoot, v.harnessRoot, ref) ?? heldPageWriter(repoRoot, v)));
-    // The directory's tile is the DEFAULT dress; what the visualiser declares
-    // about itself wins, since a directory drawn twice needs two names.
-    out.push({ ...d.tile, ...tile, ...(writer ? { writer } : {}), ref, title: v.title ?? d.tile?.title ?? d.id });
+      (existsSync(overlayPath(join(repoRoot, ref))) ? undefined : (builtAtPublishWriter(repoRoot, v.harnessRoot, ref) ?? heldPageWriter(repoRoot, v)));
+    // The directory's tile is the DEFAULT dress; what a visualiser that NAMES
+    // the directory declares about itself wins, since a directory drawn twice
+    // needs two names, whereas a kind-covering visualiser's generic title
+    // must not override the directory's own title or row label.
+    out.push({ ...d.tile, ...tile, ...(writer ? { writer } : {}), ref, title: (named ? v.title : undefined) ?? d.tile?.title ?? d.id });
   }
   return out;
 }

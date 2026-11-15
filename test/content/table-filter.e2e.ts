@@ -5,6 +5,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 import { declaredPagePath } from "../support/site-pages.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * The site-wide table filter, as a browser builds it (bean 0fua).
@@ -20,8 +21,8 @@ import { declaredPagePath } from "../support/site-pages.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 /** A file under the site's `assets/`, served as itself — `undefined` for anything else. */
 function siteAsset(path: string): { contentType: string; body: string } | undefined {
   const at = path.indexOf("/assets/");
@@ -114,7 +115,7 @@ test.describe("table filter", () => {
  * inherit. The light one is the theme's (#7253ed, about 5.0:1 on white).
  */
 const GLOSSARY = readFileSync(
-  declaredPagePath(ROOT, "auto-docs", "index.html", { subgraph: "glossary/swimlane-glossary" }),
+  overlayPath(declaredPagePath(ROOT, "auto-docs", "index.html", { subgraph: "glossary/swimlane-glossary" })),
   "utf8",
 );
 /** What Jekyll leaves of the themed page: no front matter, no raw tags. */

@@ -20,8 +20,10 @@ import {
   allowlistsNotOursReason,
   cdTarget,
   cwdFlag,
+  githubPathFindingsFrom,
   invocationsFrom,
   invokedPath,
+  isAllowedGithubInvocation,
   workDirBaseline,
   workDirKey,
   workDirsFrom,
@@ -701,5 +703,27 @@ describe("the allowlist ratchets are the harness root's (cat-harness-tools#1701)
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("disallowed .github/ invocations (bean folio-assistant-dtda)", () => {
+  test("a workflow run: invoking .github/skills/ fails the gate", () => {
+    const findings = githubPathFindingsFrom(
+      "skill-l2-dak.yml",
+      wf("python .github/skills/cli/dak_skill.py run\nbun run .github/skills/bpmn_author/validate.ts"),
+    );
+    expect(findings.map((f) => f.githubPath)).toEqual([
+      ".github/skills/cli/dak_skill.py",
+      ".github/skills/bpmn_author/validate.ts",
+    ]);
+  });
+
+  test("allows .github/workflows/, bootstrap pointers, CI plumbing and declared directories", () => {
+    expect(isAllowedGithubInvocation(".github/workflows/helper.sh")).toBe(true);
+    expect(isAllowedGithubInvocation(".github/mount-from-lock.sh")).toBe(true);
+    expect(isAllowedGithubInvocation(".github/cat.ts")).toBe(true);
+    expect(isAllowedGithubInvocation(".github/scripts/repin-train.ts")).toBe(true);
+    expect(isAllowedGithubInvocation(".github/skills/cli/dak_skill.py")).toBe(false);
+    expect(isAllowedGithubInvocation(".github/declared-tools/run.ts", new Set([".github/declared-tools"]))).toBe(true);
   });
 });

@@ -178,7 +178,7 @@ describe("composing the existing compare scripts", () => {
     const dir = mkdtempSync(join(tmpdir(), "jt-cmp-"));
     writeFileSync(join(dir, "b.json"), JSON.stringify({ a: { exit: 0 }, b: { exit: 1 }, c: { exit: 0 } }));
     writeFileSync(join(dir, "h.json"), JSON.stringify({ a: { exit: 1, tail: "" }, b: { exit: 1, tail: "" }, c: { exit: 2, tail: "" }, d: { command: "x", skipped: "why" } }));
-    const r = spawnSync("python3", [join(SCRIPTS, "compare-gates.py"), join(dir, "b.json"), join(dir, "h.json")], { encoding: "utf-8", env: { ...process.env, GITHUB_STEP_SUMMARY: "" } });
+    const r = spawnSync("python3", ["-B", join(SCRIPTS, "compare-gates.py"), join(dir, "b.json"), join(dir, "h.json")], { encoding: "utf-8", env: { ...process.env, GITHUB_STEP_SUMMARY: "" } });
     expect(r.status).toBe(1);
     expect(newGatesFromCompare(r.stdout).sort()).toEqual(["a", "c"]);
     const entries = gateEntries(JSON.parse(readFileSync(join(dir, "h.json"), "utf-8")), JSON.parse(readFileSync(join(dir, "b.json"), "utf-8")), ["a", "c"]);

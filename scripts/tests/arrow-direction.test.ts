@@ -9,7 +9,7 @@ const decl = (name: string, general = false): SchemaDecl => ({
 const ref = (from: string, via: string, to: string): SchemaEdge => ({
   from: `m.ts#${from}`, to: `m.ts#${to}`, via, kind: "id-ref", optional: false, array: false,
 });
-const graph = (decls: SchemaDecl[], edges: SchemaEdge[]): SchemaGraph => ({ roots: [], modules: [], decls, edges, refProblems: [] });
+const graph = (decls: SchemaDecl[], edges: SchemaEdge[]): SchemaGraph => ({ roots: [], modules: [], decls, edges, refProblems: [], unread: [] });
 
 describe("the dependent holds the pointer (#1168, B5)", () => {
   test("a general node pointing at a dependent is a finding; general to general is not", () => {

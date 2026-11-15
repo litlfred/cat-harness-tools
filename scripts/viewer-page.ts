@@ -48,7 +48,8 @@ export { schemeKey, withSavedScheme } from "./lib/scheme-css.js";
 import { VISUALISER_NAV_ATTR, visualiserNavDeclaration, type VisualiserNavEntry } from "./lib/navbar.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { declaredGraphs, instanceMark, instantiatedHarnesses, navbarRowData, publishedGraphs, railNames } from "./mount-instance-docs.js";
-import { siteFileFor } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, siteFileFor } from "../schemas/kg/cat-harness.js";
+import { mountedInstances, readPathAt, writePathAt } from "./lib/layer-output.ts";
 
 /**
  * The opt-out a visualisation writes into its own page.
@@ -351,6 +352,15 @@ export interface EmitOptions {
  * generator — a gate that cannot see what it is gating.
  */
 export function makeEmit(o: EmitOptions): (path: string, content: string) => void {
+  // Inside a MOUNTED layer a computed page lives at the layer's output root
+  // (bean `cat-tools-sm8r`, item 4, step 4; `lib/layer-output.ts`): written
+  // there, and read back through the overlay so a fresh mounted checkout
+  // still judges the pinned copy. A path outside every mount (a layer's own
+  // checkout, a folio's `_site`) is read and written where it is.
+  const checkout = checkoutRootFor(HARNESS_ROOT);
+  const mounted = mountedInstances(checkout);
+  const readAt = (path: string): string => readPathAt(checkout, path, mounted);
+  const writeAt = (path: string): string => writePathAt(checkout, path, mounted);
   // The rail's shared data (bean `lnoy`): many pages name one file, so it is
   // checked or written once per run, under the same contract as a page.
   const seen = new Set<string>();
@@ -358,29 +368,33 @@ export function makeEmit(o: EmitOptions): (path: string, content: string) => voi
     if (seen.has(path)) return;
     seen.add(path);
     if (o.check) {
-      const current = existsSync(path) ? readFileSync(path, "utf-8") : "";
+      const at = readAt(path);
+      const current = existsSync(at) ? readFileSync(at, "utf-8") : "";
       if (current === body) return;
-      console.error(`  ✗ ${path} ${existsSync(path) ? "is stale" : "is missing"}`);
+      console.error(`  ✗ ${path} ${existsSync(at) ? "is stale" : "is missing"}`);
       o.onStale();
       return;
     }
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, body);
+    const to = writeAt(path);
+    mkdirSync(dirname(to), { recursive: true });
+    writeFileSync(to, body);
   };
   return (path: string, content: string): void => {
     const railed = o.nav ? withViewerNav(content, path, { ...o.nav, emitAsset }) : undefined;
     const final = railed ?? content;
 
     if (o.check) {
-      const current = existsSync(path) ? readFileSync(path, "utf-8") : "";
+      const at = readAt(path);
+      const current = existsSync(at) ? readFileSync(at, "utf-8") : "";
       if (current === final) return;
-      console.error(`  ✗ ${path} ${existsSync(path) ? "is stale" : "is missing"}`);
+      console.error(`  ✗ ${path} ${existsSync(at) ? "is stale" : "is missing"}`);
       o.onStale();
       return;
     }
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, final);
-    if (!o.quiet) console.log(`  ✓ ${path}`);
+    const to = writeAt(path);
+    mkdirSync(dirname(to), { recursive: true });
+    writeFileSync(to, final);
+    if (!o.quiet) console.log(`  ✓ ${to}`);
   };
 }
 

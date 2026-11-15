@@ -53,8 +53,9 @@ Feature: Site parity guard for the root publish
   @test:scripts/tests/ui/site-parity.test.ts::the_recipe_an_IG_declares_(site.build)::keep,_profile_and_links_are_read_and_checked
   Scenario: An IG's site.build keep, profile and links are read and checked
     Given a checkout whose r.config.json declares site.build
-    When the recipe is read with pre "site:ast", keep "branches", profile "ig-repo-site" and links "report"
+    When the recipe is read with pre "site:ast", keep "branches", profile "ig-repo-site" and links "refuse"
     Then those values come back with empty source and site steps
+    And links "report" and coverage "report", the defaults, are not carried
     And a keep of "../x" or "." is refused naming keep
     And a profile of "ig" is refused naming profile
     And links "ignore" is refused naming links
@@ -149,3 +150,61 @@ Feature: Site parity guard for the root publish
     Then without rulings the shortfall has 1 line
     And with the theme side-bar ruling the shortfall is empty
     And a railed candidate without a search box still falls short only for the search box under that ruling
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_shortfall_is_a_QA_finding,_not_a_refusal_(owner,_2026-11-14)::an_index.html_without_the_icon_row_is_published_with_the_shortfall_reported
+  Scenario: A root index.html without the icon row is published, the shortfall reported
+    Given the current root's measures
+    And a candidate whose index.html lacks the harness icon row
+    When the parity report is made
+    Then its outcome is "published-with-shortfall"
+    And its only shortfall names the harness icon row on index.html
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_shortfall_is_a_QA_finding,_not_a_refusal_(owner,_2026-11-14)::the_guard_still_finds_the_missing_icon_row;_only_a_caller_that_asks_for_refuse_is_refused
+  Scenario: The missing icon row is still found, and refused only when the caller asks
+    Given the same candidate
+    When the parity report is made with refuse
+    Then its outcome is "refused"
+    And a candidate that loses nothing is "carries-everything" even with refuse
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_shortfall_is_a_QA_finding,_not_a_refusal_(owner,_2026-11-14)::the_report_is_written_beside_the_link_report,_for_the_QA_page
+  Scenario: The parity report is written for the QA page
+    Given a built site
+    When the parity report is written into it
+    Then "assets/site-qa/parity.json" holds a "site-parity-report/v1" with the outcome and one shortfall
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_loss_is_named_against_the_last_clean_publish_until_it_is_fixed_(owner,_2026-11-14:_"last_clean")::a_publish_that_loses_the_icon_row_is_named,_and_the_clean_root_it_replaced_becomes_the_baseline
+  Scenario: A publish that loses the icon row is named, and the clean root becomes the baseline
+    Given a clean root carrying the icon row on index.html
+    When a build without it is reported with no recorded baseline
+    Then the icon row is the only shortfall
+    And the report's baseline is the clean root
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_loss_is_named_against_the_last_clean_publish_until_it_is_fixed_(owner,_2026-11-14:_"last_clean")::the_next_publish,_still_without_it,_is_named_against_the_last_clean_publish,_not_read_as_clean
+  Scenario: The next publishes without the icon row are still named against the last clean publish
+    Given the report of the publish that lost the icon row
+    When the next build, still without it, is compared with that root
+    Then its outcome is "published-with-shortfall"
+    And it names the icon row "against the last clean publish"
+    And the publish after that names it the same way and keeps the same baseline
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_loss_is_named_against_the_last_clean_publish_until_it_is_fixed_(owner,_2026-11-14:_"last_clean")::once_fixed_it_reads_clean,_and_the_fixed_build_becomes_the_next_baseline,_named_by_its_commit
+  Scenario: Once fixed the build is clean and becomes the next baseline
+    Given the report of the publish that lost the icon row
+    When a build that carries it again is reported as "ddd444"
+    Then its outcome is "carries-everything" and its baseline is from "ddd444"
+    And a later loss is named against the last clean publish "ddd444"
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_loss_is_named_against_the_last_clean_publish_until_it_is_fixed_(owner,_2026-11-14:_"last_clean")::a_loss_the_owner's_ruling_drops_is_not_named_against_the_baseline_either
+  Scenario: A loss dropped by the owner's ruling is not named against the baseline
+    Given the report of the publish that lost the icon row
+    When the next build is compared with a ruling that drops the icon row
+    Then no shortfall is named
+
+  @test:scripts/tests/ui/site-parity.test.ts::a_loss_is_named_against_the_last_clean_publish_until_it_is_fixed_(owner,_2026-11-14:_"last_clean")::a_site's_own_report_is_read_back_with_its_baseline;_an_older_one_without_a_baseline,_or_none,_reads_as_having_none
+  Scenario: A site's parity report is read back with its baseline
+    Given a site with no parity report
+    Then reading it gives nothing
+    And a report written with a baseline reads back with it
+    And an older report without one reads as having no baseline
+    And a file that is not JSON reads as no report
+

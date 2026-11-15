@@ -31,7 +31,10 @@ describe("the platform renderer delegates beside-source SVGs (bean gm9g)", () =>
 
   test("it imports bootstrap-tools' own besideSource", () => {
     expect(src).toMatch(/besideSource as besideSourceSvg[\s\S]*?from "@litlfred\/bootstrap-tools\/scripts\/render-bpmn\.ts"/);
-    expect(src).toContain("besideSourceSvg(renderer, file, processPath)");
+    // Called with the renderer and the diagram. The third argument is the
+    // process-id map; since e48025f9 it is resolved per referrer
+    // (`definersFrom`), so its spelling is not what this test is about.
+    expect(src).toMatch(/besideSourceSvg\(renderer, file, [^)]+\)/);
   });
 
   test("every diagram gets a copy beside its source, not only an exempt layer's (bean akiq)", () => {

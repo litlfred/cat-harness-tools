@@ -26,9 +26,10 @@ import { join } from "node:path";
 
 import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
 
 /** A landing sticky as `landing.html` emits it: a LAPTOP crop, deliberately
  *  wide, so a square result can only have come from the docked rule. */

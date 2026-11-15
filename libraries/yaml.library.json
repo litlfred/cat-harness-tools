@@ -46,7 +46,9 @@
     "scripts/tests/init-folio.test.ts",
     "scripts/tests/qa-reports-ci.test.ts",
     "scripts/tests/requirements-standards-assessment.test.ts",
+    "scripts/tests/sdlc/layer-merge-guard.test.ts",
     "scripts/tests/sdlc/red-gate-is-last.test.ts",
+    "scripts/tests/sdlc/standing-repin-merge.test.ts",
     "scripts/tool-page.ts",
     "src/core/workflow-events.ts",
     "src/tools/skill-update.ts",
@@ -55,6 +57,7 @@
     "test/coordinator/gates-workflows.test.ts",
     "test/layer-main-qa-guard.test.ts",
     "test/layer-pr-checks-deferred-verdict.test.ts",
+    "test/layer-pr-checks-job-graph.test.ts",
     "test/layer-pr-checks-live-labels.test.ts",
     "test/layer-ready-reuse.test.ts",
     "test/release-gated-ci.test.ts"

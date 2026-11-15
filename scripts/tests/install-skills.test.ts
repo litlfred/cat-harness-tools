@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { HOSTS, INSTALLED_MARKER, ownedInstalls, planInstall, readChecklistSkill, renderInstalled, type SourceSkill } from "../install-skills.ts";
+import { HOSTS, INSTALLED_MARKER, ownedInstalls, planInstall, readChecklistSkill, renderInstalled, unmarkedFiles, type SourceSkill } from "../install-skills.ts";
 
 const tmp = mkdtempSync(join(tmpdir(), "install-skills-"));
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
@@ -78,6 +78,17 @@ describe("ownedInstalls", () => {
     skillFile("host/.claude/skills/my-own/SKILL.md", "---\nname: my-own\n---\nmine\n");
     expect(ownedInstalls(host)).toEqual(["cat-old"]);
     expect(ownedInstalls(join(tmp, "nowhere"))).toEqual([]);
+  });
+});
+
+describe("unmarkedFiles (bean folio-assistant-dtda)", () => {
+  it("lists every file under a host skill directory that lacks INSTALLED_MARKER", () => {
+    const host = join(tmp, "unmarked/.github/skills");
+    skillFile("unmarked/.github/skills/cat-good/SKILL.md", `---\nname: cat-good\n---\n${INSTALLED_MARKER}\n`);
+    skillFile("unmarked/.github/skills/hand-written/SKILL.md", "---\nname: hand-written\n---\nbody\n");
+    skillFile("unmarked/.github/skills/bpmn_author/validate.py", "# hand-written script\n");
+    expect(unmarkedFiles(host)).toEqual(["bpmn_author/validate.py", "hand-written/SKILL.md"]);
+    expect(unmarkedFiles(join(tmp, "nowhere"))).toEqual([]);
   });
 });
 

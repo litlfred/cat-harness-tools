@@ -9,7 +9,7 @@ tags:
     - ci-speed
     - pp9g
 created_at: 2026-11-06T05:00:00Z
-updated_at: 2026-11-08T14:35:00Z
+updated_at: 2026-11-13T22:00:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -88,8 +88,8 @@ untouched, so it cannot change the outcome.
 - [x] 2. a local `gates` run does each setup command once (fix 2) — merged in `litlfred/cat-harness-tools#1578` (`64f0aa0b`);
 - [x] 3. regenerate the stale committed glossaries in cat-harness, who-iris and
    folio-assistant-core against the pins, one PR per layer — measured as pin skew between locks and dropped per owner's ruling in `litlfred/cat-harness-tools#1554` (`a9374293`), replaced by pin alignment (`litlfred/smart-trust-phw#47` `b0d1ef8b`) and lock-consistency gate `litlfred/cat-harness-tools#1571` (`c73e95b2`);
-- [ ] 4. **no CI step writes inside a mount**: move the IG index, the QA copy, the
-   docs and the glossary output out of the mounted layers. It touches many
+- [x] 4. **no CI step writes inside a mount**: move the IG index, the QA copy, the
+   docs and the glossary output out of the mounted layers. Done 2026-11-14 (steps 1–7 below); measured clean before step 7 went red. It touches many
    writers, so it is a written plan in this bean before any code.
 
 Measure before and after for each.
@@ -194,12 +194,53 @@ by its write sites, in the same style as `check:input-sites`.
 ### Order (one PR each, measured before and after)
 - [x] 1. The resolver (`scripts/lib/layer-output.ts`, merged in `litlfred/cat-harness-tools#1602` `b22a9cec`) and its write-site check, warning only.
 - [x] 2. `ig-index:build` and its readers (`builtAtPublish` multi-directory support merged in `litlfred/cat-harness-tools#1558` `7e6976d3`, plus `fhir-artifact-index/sidecars/` and `contexts/` declared built in `litlfred/smart-base#310` `f0f2d443`, `litlfred/smart-trust#142` `a8061b23`, and `litlfred/smart-trust-phw#33` `307b6c40`, with pin alignment in `litlfred/smart-trust-phw#47` `b0d1ef8b`; migration of `ig-index:build` onto `layer-output.ts` can follow as readers move).
-- [ ] 3. `glossary:page`.
-- [ ] 4. The docs writers.
-- [ ] 5. `qa:refresh`, the largest and most-read; the QA stamp work of CI speed
-   14 lands on the same paths, so coordinate.
-- [ ] 6. Find the prose rewriter, and stop it writing committed source.
-- [ ] 7. The write-site check goes from warning to red.
+- [x] 3. `glossary:page` (owner, 2026-11-13, card "Step 3": "own layers only"): it writes, deletes and `--check`s extracted schemes only outside the checkout's mounts; a mounted layer's stay as pinned. Merged in `litlfred/folio-assistant-core#785` (`ef03802d`). The tools readers of the IG index moved onto the overlay in `litlfred/cat-harness-tools#2057` (`51d9a779`).
+- [x] 4. The docs writers: merged in `litlfred/cat-harness-tools#2102` (`03a32fbe`, the reader: `compose-docs` lays a mounted layer's output-root twin over its base) and `litlfred/cat-harness-tools#2106` (`cb8bf34a`, the writers: `docs:harness`, `navbar:include`, `themes:css`, `auto:docs`, `node-kind:pages` and `publish:check` write a mounted cat-harness's pages through `writePathAt`). Before them, the measurement below found the non-test docs writers wrote only declared `builtAtPublish` paths, which `mount-from-lock` leaves out of the digest (owner, 2026-11-13, card "Step 4": "Close as covered"); the move now keeps those writes out of the mount altogether.
+- [x] 5. (sibling session_01VQDpPfbULqPnitwJLVe6b5) `qa:refresh`, the largest and most-read; the QA stamp work of CI speed
+   14 lands on the same paths, so coordinate. Merged in `litlfred/cat-harness-tools#2110` (`03bcf884`), `#2121` (`8040f49c`) and `#2122` (`b31b1104`).
+- [x] 6. (sibling session_01VQDpPd28pjkLtPQc3hFUEz) Find the prose rewriter, and stop it writing committed source. FOUND by the measurement below: it is the root `bun test` run, whose tests re-render committed pages, diagrams and translation templates in place. Merged in `litlfred/cat-harness-tools#2109` (`25557f6f`), with the stale pages regenerated in `litlfred/cat-harness#1321`, `litlfred/folio-assistant-core#792` and `litlfred/smart-base#395`.
+- [x] 7. The write-site check goes from warning to red (owner, 2026-11-14, card "Step 7": "A. Measure, then red"). Merged in `litlfred/cat-harness-tools#2183` (`29f3876f`): each `layer-pr-checks` shard marks the root before its tests (`snapshot.py mark`) and after its gates names every file written, changed or removed under a mount path (`snapshot.py diff`), recorded as the gate `mounts:untouched (shard i/N)` and judged like any gate. `mount-from-lock --check` could not be the check: CI swaps the caller in and takes lower layers at main, so those mounts never hash to the lock on either side. The remaining writers and readers it needed first: `#2128` (`1b095fc4`, subgraph/payload), `#2142` (`1f38a5c8`, uml:overview), `#2152` (`df9a0b94`, skills:docs, lsi:viz), `#2163` (`0e83963c`, docs:pages), `litlfred/folio-assistant-core#793` (glossary pages), and the readers `#2168` (`7f6bba8e`, e2e), `#2172` (`e78cf98b`, gates), `#2173` (`2bf84dfd`, tests), `#2174` (`37877738`), `#2190` (`dccd8e20`, viewer pages, permalinks, subgraph links, translation index).
+
+### Measurement for step 7 (2026-11-14)
+
+A composed folio-assistant 44e3a88, tools at main with the reader fixes, core at main, every mount fresh: each of the 359 gates `run-gates.py --list` gives, run alone with a marker before it; then the full `bun test` between `snapshot.py mark` and `snapshot.py diff`. **0 files written inside any of the 12 mounts**, by the gates or by the tests. `render:bpmn`'s site SVGs are written by `derive:publish` in the prepare job, before the mark, into declared `builtAtPublish` paths, so they are not counted. Still to watch: the first layer PR whose checks run the new gate on both sides.
+
+### Measurement for steps 4 and 6 (2026-11-13)
+
+A fresh clone of folio-assistant main, mounted from its `index.lock.json`;
+each of the 286 fast gates run on its own; after each, the files newer than a
+marker inside every mount. Then `mount-from-lock --check`, and each edited
+mount compared file by file with its pinned tree by git blob hash.
+
+- `mount-from-lock --check` after the run: 7 of 12 instances edited
+  (cat-harness, cat-harness-tools, fhir-harness, folio-assistant-core,
+  folio-assistant-sci, smart-base, smart-trust-phw).
+- Committed files whose CONTENT changed: cat-harness 89, folio-assistant-core
+  39, folio-assistant-sci 3, smart-base 2. cat-harness-tools' 29 are `.bat`
+  files whose CRLF line endings differ from the blob (not edits).
+- Every content change was written by the `bun test` gate:
+  - pages re-rendered from `docs/source/` by `gen-docs-pages`, differing from
+    the committed page: cat-harness `docs/guides/beans-and-todos.md` (loses
+    its BPMN figure, and its edit link moves to `docs/source/…`),
+    `docs/process/crdm-methodology.md`, `docs/en/cat-harness/fsh-guts/index.md`;
+    core `docs/guides/document-ingestion.md`,
+    `docs/process/publication-workflow.md`; smart-base
+    `site-docs/{concepts,guides}/…`;
+  - process diagrams: cat-harness `sdlc/processes/*.svg` (34), core and sci
+    `processes/**/*.svg`, bootstrap `processes/*.svg`;
+  - translation templates: cat-harness `translations/<locale>/*` (about 10 per
+    locale), core `translations/<locale>/processes`.
+- The non-test writers that write into mounts write only declared
+  `builtAtPublish` paths, so the digest does not count them:
+  `smart:pages` writes `smart-base/docs/` (declared, writer
+  `smart-base:pages`) and `cat-harness/docs/smart-base/` (declared by
+  cat-harness); `ig-index:build` writes the IGs' `fhir-artifact-index/`
+  (declared; its move is `litlfred/fhir-harness#412`); `state:mount` writes
+  only branch-kept state graphs.
+- `qa:refresh` was not exercised: the fast set never builds the QA working
+  copy. Step 5 measures it.
+- The full `bun test` exceeded the 900 s per-gate bound, so step 6 has more
+  to find than this run saw.
 
 ### Done when
 In a fresh composed checkout, after a full local gate run,

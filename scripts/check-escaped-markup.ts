@@ -181,10 +181,75 @@ export interface LeakedTable {
  */
 const DASH_RUN = String.raw`(?:[-—–]|&mdash;|&ndash;|&#8212;|&#8211;)+`;
 const DELIMITER_CELL = String.raw`[ \t]*:?${DASH_RUN}:?[ \t]*`;
+/**
+ * The whole of one candidate segment is a delimiter row. A row holds no `<`,
+ * `>` or line break, so a match always spans one segment from boundary to
+ * boundary: a line start or `>` before it, a line end or `<` after it. Testing
+ * only the segments that hold a `|` (every row has one) finds exactly what a
+ * `(?<=^|>)…(?=$|<)` scan with the `m` flag finds, without a lookbehind tried
+ * at every character of every page — on a 29,727-page site that scan took
+ * longer than the job's whole time limit.
+ */
 const DELIMITER_ROW = new RegExp(
-  String.raw`(?<=^|>)[ \t]*(?:\|(?:${DELIMITER_CELL}\|)+|${DELIMITER_CELL}(?:\|${DELIMITER_CELL})+\|?)[ \t]*(?=$|<)`,
-  "gm",
+  String.raw`^[ \t]*(?:\|(?:${DELIMITER_CELL}\|)+|${DELIMITER_CELL}(?:\|${DELIMITER_CELL})+\|?)[ \t]*$`,
 );
+
+/** A character `^` or `$` stops at under the `m` flag. */
+const isLineBreak = (c: string): boolean => c === "\n" || c === "\r" || c === "\u2028" || c === "\u2029";
+
+/** Where each delimiter row in `text` starts, in order. */
+export function delimiterRowStarts(text: string): number[] {
+  const starts: number[] = [];
+  let pipe = text.indexOf("|");
+  while (pipe !== -1) {
+    let start = pipe;
+    while (start > 0 && text[start - 1] !== ">" && !isLineBreak(text[start - 1]!)) start -= 1;
+    // A `>` ends this segment too, but a row cannot end there: it starts the next one.
+    let end = pipe;
+    while (end < text.length && text[end] !== "<" && text[end] !== ">" && !isLineBreak(text[end]!)) end += 1;
+    if (text[end] !== ">" && DELIMITER_ROW.test(text.slice(start, end))) starts.push(start);
+    pipe = text.indexOf("|", end);
+  }
+  return starts;
+}
+
+/**
+ * Plain text for a report, never HTML: each `<…>` tag is dropped whole, and any
+ * angle bracket a nested or broken tag left behind goes too, so the result holds
+ * no `<` or `>` at all. One pass over the characters; the same output as
+ * removing `<[^>]+>` and then `[<>]`.
+ */
+export function plainText(x: string): string {
+  let out = "";
+  for (let i = 0; i < x.length; i += 1) {
+    const c = x[i]!;
+    if (c === "<") {
+      const close = x.indexOf(">", i + 1);
+      if (close > i + 1) i = close;
+      continue;
+    }
+    if (c !== ">") out += c;
+  }
+  return out;
+}
+
+/**
+ * The text of the last non-empty line above `at`, as plain text: a line ends at
+ * a newline or a `<br>`. Reads backwards in growing windows, so a page with many
+ * leaked tables is not re-split from its first byte once per table.
+ */
+function lineAbove(html: string, at: number): string {
+  for (let size = 4096; ; size *= 4) {
+    const from = Math.max(0, at - size);
+    const pieces = html
+      .slice(from, at)
+      .split(/\n|<br\s*\/?>/i)
+      .map((x) => plainText(x).replace(/\s+/g, " ").trim());
+    // The first piece may be cut by the window, so it counts only at the start of the page.
+    for (let i = pieces.length - 1; i >= (from === 0 ? 0 : 1); i -= 1) if (pieces[i]!.length > 0) return pieces[i]!;
+    if (from === 0) return "";
+  }
+}
 
 /**
  * Blank every region whose text is not prose, preserving byte offsets: the
@@ -221,19 +286,10 @@ export function blankRawRegions(html: string): string {
 export function leakedTablesIn(page: string, html: string): LeakedTable[] {
   const found: LeakedTable[] = [];
   const scannable = blankRawRegions(html);
-  let m: RegExpExecArray | null;
-  DELIMITER_ROW.lastIndex = 0;
-  while ((m = DELIMITER_ROW.exec(scannable)) !== null) {
+  for (const at of delimiterRowStarts(scannable)) {
     // The header row is the text just above the delimiter: that is what a
     // reader would recognise, and what names the table in a report.
-    const pieces = html
-      .slice(0, m.index)
-      .split(/\n|<br\s*\/?>/i)
-      // Plain text for a report, never HTML: drop the tags, then any angle
-      // bracket a nested or broken tag left behind.
-      .map((x) => x.replace(/<[^>]+>/g, "").replace(/[<>]/g, "").replace(/\s+/g, " ").trim())
-      .filter((x) => x.length > 0);
-    found.push({ page, excerpt: (pieces[pieces.length - 1] ?? "").slice(0, 110) });
+    found.push({ page, excerpt: lineAbove(html, at).slice(0, 110) });
   }
   return found;
 }

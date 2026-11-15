@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 import { siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * IG site diagrams get the shared figure viewer (bean `n7f8`).
@@ -27,8 +28,8 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  * test that read a dependant layer's source would point the wrong way.
  */
 const ROOT = join(HARNESS_ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 
 /** The page-level opt-in, as a page writer stamps it. */
 const FIGURE_IMAGES_STAMP = '<span hidden data-fa-figure-images="ig"></span>';

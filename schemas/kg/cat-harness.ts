@@ -1927,7 +1927,7 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    * to the layer root, with `{locale}` standing for the locale and `*` for any
    * one path segment's name, e.g. `input/*\/translations/{locale}.po`.
    *
-   * The case it exists for is a FHIR IG built on smart-base: smart-base's
+   * The case it exists for is a FHIR IG built on a DAK base layer: that layer's
    * injector reads exactly one catalogue per locale per source directory,
    * `input/<area>/translations/<locale>.po`, so those files cannot move into
    * the harness layout without breaking the published translations. The

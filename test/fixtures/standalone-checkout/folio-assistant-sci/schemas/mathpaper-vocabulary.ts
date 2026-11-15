@@ -281,6 +281,7 @@ export function constraintContext(run: {
         while (stack.length) {
           const dir = stack.pop()!;
           for (const entry of readdirSync(dir, { withFileTypes: true })) {
+            // input-site: inert #49074d14 — names the build and dependency directories the .lean walk skips; never reads them
             if (entry.name === "node_modules" || entry.name === ".git" || entry.name === ".lake" || entry.name === "build") continue;
             const full = join(dir, entry.name);
             if (entry.isDirectory()) stack.push(full);

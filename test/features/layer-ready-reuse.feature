@@ -61,29 +61,35 @@ Feature: A ready-for-review run reuses an earlier verdict only on equal inputs
     And the summary says "Could not determine"
 
   @test:test/layer-ready-reuse.test.ts::the_workflow's_wiring::only_a_ready_for_review_PR_event_asks
-  Scenario: The ready-reuse job runs on a ready_for_review pull_request event
-    # Gap: checks that the job's if contains both clauses; other events are not exercised
-    Given the ready-reuse job of layer-pr-checks.yml
-    Then its if condition contains "github.event.action == 'ready_for_review'"
+  Scenario: The "Already judged?" step of prepare-head runs on a ready_for_review pull_request event
+    # Gap: checks that the step's if contains both clauses; other events are not exercised
+    Given the jobs of layer-pr-checks.yml
+    Then there is no "ready-reuse" job
+    And prepare-head's step "decide" is named "Already judged? (marked ready for review)"
+    And its if condition contains "github.event.action == 'ready_for_review'"
     And it contains "github.event_name == 'pull_request'"
 
-  @test:test/layer-ready-reuse.test.ts::the_workflow's_wiring::both_prepare_jobs_are_skipped_exactly_when_the_answer_is_reuse
-  Scenario: Both prepare jobs are skipped when the answer is reuse
-    # Gap: checks the if condition's text; the runtime skip is not exercised
-    Given the jobs "prepare-head" and "prepare-base" of layer-pr-checks.yml
-    Then each needs "ready-reuse"
-    And each if condition contains "needs.ready-reuse.outputs.reuse != 'true'" and "!cancelled()"
+  @test:test/layer-ready-reuse.test.ts::the_workflow's_wiring::a_reused_answer_prepares_nothing_on_either_side
+  Scenario: A reused answer prepares nothing on either side
+    # Gap: checks the conditions' text; the runtime skip is not exercised
+    Given prepare-head's steps "decide", "skip-prep" and "judged-key"
+    Then "decide" writes "REUSED=true" to GITHUB_ENV
+    And "skip-prep" hits when "env.REUSED == 'true'"
+    And "judged-key" runs only when "env.REUSED != 'true'"
+    And prepare-base needs "prepare-head" and its if condition contains "needs.prepare-head.outputs.reuse != 'true'" and "!cancelled()"
+    And prepare-head's output "reuse" is the decide step's
 
   @test:test/layer-ready-reuse.test.ts::the_workflow's_wiring::ready-reuse_pins_the_run_as_prepare-head_does,_before_deciding
-  Scenario: ready-reuse pins the run as prepare-head does before deciding
-    Given the steps of the ready-reuse and prepare-head jobs
-    Then ready-reuse has a "pins" step before its "decide" step
-    And every prepare-head step with an id up to its "pins" step, other than "shards", is also a ready-reuse step
+  Scenario: The reuse decision reads the run's pins
+    Given the steps of the prepare-head job
+    Then its "pins" step comes before its "decide" step
+    And "decide" reads INDEX from the pins step
 
   @test:test/layer-ready-reuse.test.ts::the_workflow's_wiring::a_full-tier_PR_run_records_its_key;_compare_reports_the_reuse_under_the_full_verdict's_name
   Scenario: A full-tier PR run records its key and compare reports the reuse under the full verdict
     Given the "judged-key" step of prepare-head
-    Then its if condition contains "github.event_name == 'pull_request'" and "needs.tier.outputs.full == 'true'"
-    And the compare job needs "ready-reuse"
-    And compare's "pins-only" step has REUSED reading "needs.ready-reuse.outputs.reuse == 'true'"
+    Then its if condition contains "github.event_name == 'pull_request'" and "env.FULL == 'true'"
+    And the compare job needs "prepare-head"
+    And compare's "pins-only" step has REUSED reading "needs.prepare-head.outputs.reuse == 'true'"
     And its script says "SKIPPED — already passed as judged in run"
+    And prepare-head's step "Fast tier only (advisory; the full checks gate a release)" reads REUSED from the decide step and says the same

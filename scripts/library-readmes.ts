@@ -28,6 +28,7 @@ import { Liquid } from "liquidjs";
 
 import { splice } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
 import { checkoutRootFor, directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -92,12 +93,14 @@ function countIn(dir: string, sub: string): number {
 }
 
 /** Every item README this checkout owes: path → full file contents. */
-export async function plan(repo = REPO): Promise<{ writes: Map<string, string>; unmarked: string[] }> {
+export async function plan(repo = REPO, own?: ReadonlySet<string>): Promise<{ writes: Map<string, string>; unmarked: string[] }> {
   const liquid = new Liquid({ root: [TEMPLATES], extname: ".liquid", jekyllInclude: true, strictFilters: true });
   const writes = new Map<string, string>();
   const unmarked: string[] = [];
   const seen = new Set<string>();
   for (const instance of instanceRootsIn(repo)) {
+    const name = readDeclaration(instance)?.name ?? basename(instance);
+    if (own && !own.has(name)) continue;
     for (const lib of directoriesForGraph(instance, "library")) {
       if (seen.has(lib) || !existsSync(lib)) continue;
       seen.add(lib);
@@ -126,7 +129,12 @@ export async function plan(repo = REPO): Promise<{ writes: Map<string, string>; 
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
-  const { writes, unmarked } = await plan();
+  const own = check ? gateOwnInstances() : undefined;
+  const { writes, unmarked } = await plan(REPO, own);
+  if (own && writes.size === 0 && unmarked.length === 0) {
+    console.log(nothingOwnLine("library:readmes", "library item README", own));
+    process.exit(0);
+  }
   const stale = [...writes].filter(([p, body]) => !existsSync(p) || readFileSync(p, "utf-8") !== body).map(([p]) => p);
   for (const u of unmarked) console.log(`  · ${u} has no kg:subgraph markers — left alone`);
   if (check) {

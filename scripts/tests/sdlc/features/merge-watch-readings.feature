@@ -171,3 +171,41 @@ Feature: Merge watch readings, flags and runner relief
     When the unread summary is made
     Then its line starts with "o/x: " and mentions "runner queue" and "main verdict"
     And a report with no errors, a queue reading and a green main verdict gives no line
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::the_labelled_queue_(--queue)::the_queue_labels_are_ready-to-merge_and_needs-repin,_read_in_that_order
+  Scenario: The queue labels are ready-to-merge and needs-repin, in that order
+    Given the labels "needs-repin", "bug" and "ready-to-merge"
+    When the queue labels among them are read
+    Then they are "ready-to-merge" then "needs-repin"
+    And "bug" alone puts a PR in no queue
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::the_labelled_queue_(--queue)::lists_only_labelled_open_PRs,_oldest_first,_with_the_verdict_on_each_head_and_needs-repin_flagged
+  Scenario: The queue lists only labelled open PRs, oldest first, with each head's verdict and needs-repin flagged
+    Given open PRs #9 (needs-repin and ready-to-merge, green), #4 (ready-to-merge, green), #5 (unlabelled) and #7 (needs-repin, a shard in progress)
+    When the queue is read
+    Then it lists #4 green, #7 pending and flagged needs-repin, and #9 green and flagged needs-repin
+    And #5's head is never read
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::the_labelled_queue_(--queue)::the_text_form_names_repo#n,_the_head,_the_verdict_and_NEEDS-REPIN;_the_JSON_form_carries_the_same_rows
+  Scenario: The queue's text form and JSON form carry the same rows
+    Given the queue of #4, #7 and #9
+    When it is printed as text
+    Then the first line is repo#4, its head, "green", no flag and its title
+    And #7's line says "NEEDS-REPIN"
+    When it is printed as JSON
+    Then the rows are #4, #7 and #9 with their heads and needs-repin flags
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::the_labelled_queue_(--queue)::an_empty_queue_says_so;_an_unread_repository_or_head_is_unknown_and_named_for_exit_2,_never_red
+  Scenario: An empty queue says so, and an unread repository or head is unknown, never red
+    Given a repository with no labelled PR, one whose PR list cannot be read and one whose labelled PR's head cannot be read
+    When the queue is read
+    Then the empty one prints "queue empty: no open PR labelled ready-to-merge or needs-repin"
+    And the unreadable list and the unjudged head are named for exit 2
+    And the unjudged head's verdict is "unknown"
+
+  @test:scripts/tests/sdlc/merge-watch-readings.test.ts::the_labelled_queue_(--queue)::--queue_is_a_flag_of_the_CLI,_beside_--json
+  Scenario: --queue is a CLI flag beside --json
+    Given the arguments "--queue --repo o/a --json"
+    When they are parsed
+    Then queue and json are both set
+    And without "--queue" queue is not set

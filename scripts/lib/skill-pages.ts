@@ -15,6 +15,7 @@ import { basename, join, posix, relative, sep } from "node:path";
 import { baseDocsDir } from "../compose-docs.js";
 import { isSkillMd, skillMdDirs } from "../known-skills.ts";
 import { blobUrl, forgeAt } from "./library-source.ts";
+import { overlayDirs } from "./layer-output.ts";
 import { repoOf } from "../../src/core/edit-links.ts";
 import { detectRepoUrl } from "../../src/core/git-refs.ts";
 import { parse as parseYaml } from "yaml";
@@ -24,10 +25,14 @@ export const SKILL_PAGES_DIR = "reference/skill-instructions";
 
 /** The base docs layer, the same answer `compose-docs.ts` uses. */
 
-/** The skills with a generated instruction page. */
+/**
+ * The skills with a generated instruction page: in the base docs layer, and,
+ * where that layer is MOUNTED, at its output root, where `skills:docs` writes
+ * them (bean `cat-tools-sm8r`, item 4).
+ */
 export function skillPagesOf(repo: string): ReadonlySet<string> {
   const dir = join(baseDocsDir(repo), SKILL_PAGES_DIR);
-  return new Set(existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => basename(f, ".md")) : []);
+  return new Set(overlayDirs(dir, repo).flatMap((d) => readdirSync(d).filter((f) => f.endsWith(".md")).map((f) => basename(f, ".md"))));
 }
 
 /**

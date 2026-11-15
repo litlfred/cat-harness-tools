@@ -42,9 +42,9 @@ Feature: The Python dependency declaration stays true
     Then the schema refuses it
     And the same entry with why "required by y, which imports it" is accepted
 
-  @test:scripts/tests/python-deps.test.ts::the_two_tiers,_and_what_each_costs::each_extended_entry_carries_its_measured_cost,_and_camelot_is_the_expensive_one
-  Scenario: The extended tier is camelot-py and vosk, each with a measured cost
-    Then the extended tier's distributions are exactly "camelot-py" and "vosk"
+  @test:scripts/tests/python-deps.test.ts::the_two_tiers,_and_what_each_costs::each_extended_entry_carries_its_measured_cost
+  Scenario: The extended tier is camelot-py, vosk and the OPUS-MT runner's three, each with a measured cost
+    Then the extended tier's distributions are exactly "camelot-py", "vosk", "transformers", "torch" and "sentencepiece"
     And each one's reason states a size in MB
 
   @test:scripts/tests/python-deps.test.ts::the_two_tiers,_and_what_each_costs::every_lean_entry_is_installable_by_CI's_own_file

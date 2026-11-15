@@ -53,7 +53,8 @@ const REPO_URL = (root: string): string | undefined => {
 import { proseBody, type SummaryStatus } from "../schemas/content/block-summary.ts";
 import { withheldEntryFor } from "./lib/withheld.ts";
 import { entryItems, type SummaryTally } from "./summaries.ts";
-import { ingestRungOf, type IngestRung } from "../pipeline/gen-library-jsonld.ts";
+import { ingestRungOf, placedFigures, type IngestRung } from "../pipeline/gen-library-jsonld.ts";
+import { VECTOR_FIGURES_FILE } from "../schemas/content/vector-figure.ts";
 import { pagesOf, readStructure, STRUCTURE_FILENAME } from "../schemas/content/document-structure.ts";
 import { corpusDirectoriesForGraph, rootInstanceName } from "../schemas/kg/harness-config.js";
 import { ReferencedSourceSchema } from "../schemas/library/referenced-source.ts";
@@ -105,7 +106,15 @@ export interface LibraryEntry {
   /** Counts of what ingestion actually produced. */
   sections: number;
   blocks: number;
+  /** Raster images the entry placed (`images.json`), whatever their role: scans, logos and figures alike. */
   images: number;
+  /**
+   * FIGURES the entry keeps — raster images and vector renders whose role is
+   * `figure` (`images.json` + `vector-figures.json`). Not `images`: an entry
+   * whose figures are drawn in vector ink read "images 1" with 15 figures,
+   * because only the raster sidecar was counted (owner, 2026-11-14).
+   */
+  figures: number;
   /** OCR page files — a THIRD state: 0 may mean "never scanned", not "failed". */
   ocrPages: number;
   /** `true` when the entry has an `ocr/` directory at all. */
@@ -975,6 +984,10 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
         sections: filesIn(join(dir, "sections")).filter((f) => f.endsWith(".md")).length,
         blocks: filesIn(join(dir, "blocks")).filter((f) => f.endsWith(".jsonld")).length,
         images: images?.images?.length ?? filesIn(join(dir, "images")).length,
+        figures: placedFigures(
+          images as Parameters<typeof placedFigures>[0],
+          readJson<{ figures?: unknown[] | null }>(join(dir, VECTOR_FIGURES_FILE)),
+        ).length,
         ocrPages: filesIn(join(dir, "ocr")).length,
         hasOcr: existsSync(join(dir, "ocr")),
         hasManifest: has("manifest.jsonld"),
@@ -1227,7 +1240,7 @@ export function referencedCatalogueEntries(roots: string[], repoRoot: string, ta
           provenance: "catalogued",
           rung: "none",
           docId: id, sourceFile, sourceSha256: "", arxiv: "", doi: "", documentClass: "",
-          sections: 0, blocks: 0, images: 0, ocrPages: 0,
+          sections: 0, blocks: 0, images: 0, figures: 0, ocrPages: 0,
           hasOcr: false, hasManifest: false, hasStructure: false, hasImagesJson: false,
           pageStart: null, pageEnd: null, words: 0, chars: 0, bytes: 0,
           upload: "unknown", uploadInstance: "",

@@ -98,6 +98,7 @@ import { z } from "zod";
 import { SignOffSchema } from "@litlfred/bootstrap-tools/schemas/requirement-set.ts";
 
 import { AdversarialReviewSchema } from "./red-flag";
+import { nodeKind } from "../kg/node-kind.ts";
 
 import {
   artefactStub,
@@ -180,6 +181,29 @@ export const QaAttestationsBaseSchema = z.object({
   family: z.enum(ATTESTATION_FAMILIES),
   subject: AttestationSubjectSchema,
 });
+
+/**
+ * The NODE KIND of an attestation file (owner, 2026-11-13, node-kind audit:
+ * every listed node kind gets per-node pages, no waivers). Built from the
+ * envelope every family shares, so each family's file is one node of it: the
+ * family's own judgement arrays are extra keys the kind does not refuse, and
+ * the family's strict schema stays what a writer is held to. With a kind, the
+ * `attestations` typology names `qa-attestations/v1` in its `nodeSchemas`, its
+ * nodes get a page each (`gen-node-kind-pages`), and it leaves cat-harness's
+ * `node-kinds.baseline.json`.
+ */
+export const QaAttestationsKind = nodeKind(
+  // Unversioned, as `qa-script` is: the files carry `qa-attestations/v1`, the
+  // family its validator node names, which is how their nodes are found.
+  "qa-attestations",
+  [],
+  { family: z.enum(ATTESTATION_FAMILIES), subject: AttestationSubjectSchema },
+  {
+    summary:
+      "One subject's QA judgements — pair attestations, voice reviews, agent and human verdicts, bibliography " +
+      "verifications — kept on main, each pinned to the hash it attested.",
+  },
+);
 
 /** The `kg-qa` family: pair attestations and voice reviews. */
 export const KgAttestationsSchema = QaAttestationsBaseSchema.extend({

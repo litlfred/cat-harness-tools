@@ -13,7 +13,7 @@
  */
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "../../test/support/site-fs.ts";
 import { join, relative } from "node:path";
 
 import { declaredDiagrams, diagramPath, framedInstances, publishedProcesses, unframedProcesses } from "../check-process-index.ts";

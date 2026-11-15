@@ -28,7 +28,7 @@ function py(file: string, expr: string): unknown {
     "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
     `print(json.dumps(${expr}))`,
   ].join("\n");
-  const r = spawnSync("python3", ["-I", "-c", code], { encoding: "utf-8" });
+  const r = spawnSync("python3", ["-I", "-B", "-c", code], { encoding: "utf-8" });
   if (r.status !== 0) throw new Error(r.stderr);
   return JSON.parse(r.stdout);
 }
@@ -69,7 +69,7 @@ describe("run-root-gates.py diagnostics", () => {
   test("no gate list is could-not-determine, never an empty pass", () => {
     const dir = mkdtempSync(join(tmpdir(), "root-gates-"));
     writeFileSync(join(dir, "gates.json"), JSON.stringify({ gates: {} }));
-    const r = spawnSync("python3", ["-I", join(DIR, "run-root-gates.py"), dir, join(dir, "gates.json"), join(dir, "out.json")], { encoding: "utf-8" });
+    const r = spawnSync("python3", ["-I", "-B", join(DIR, "run-root-gates.py"), dir, join(dir, "gates.json"), join(dir, "out.json")], { encoding: "utf-8" });
     expect(r.status).toBe(2);
   });
 
@@ -87,7 +87,7 @@ describe("compare-gates.py with diagnostics", () => {
     const dir = mkdtempSync(join(tmpdir(), "compare-root-"));
     writeFileSync(join(dir, "base.json"), JSON.stringify(base));
     writeFileSync(join(dir, "head.json"), JSON.stringify(head));
-    return spawnSync("python3", ["-I", join(DIR, "compare-gates.py"), join(dir, "base.json"), join(dir, "head.json")], {
+    return spawnSync("python3", ["-I", "-B", join(DIR, "compare-gates.py"), join(dir, "base.json"), join(dir, "head.json")], {
       encoding: "utf-8",
       // input-site: env PATH #34b0985f — PATH handed to a child process, which decides which binaries it runs
       env: { PATH: process.env.PATH ?? "" },

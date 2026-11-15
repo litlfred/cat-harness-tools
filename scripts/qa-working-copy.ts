@@ -45,7 +45,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join } from "node:path";
 
 import { CACHE_FILE, FileDigests, cacheEnabled, trackedTreeDigest } from "./input-hash.ts";
-import { movedInventory } from "./qa-verify-moved.ts";
+import { locationOf, movedInventory } from "./qa-verify-moved.ts";
 import { INDEX_CONFIG_FILENAME } from "../schemas/kg/instance-roots.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
@@ -83,7 +83,7 @@ export function qaTreeDigest(repoRoot: string, roots?: string[]): { hash: string
   const files = new Map<string, string>();
   const h = createHash("sha256");
   for (const f of movedInventory(repoRoot, roots).directories.flatMap((d) => d.files)) {
-    const d = createHash("sha256").update(readFileSync(join(repoRoot, f.path))).digest("hex");
+    const d = createHash("sha256").update(readFileSync(join(repoRoot, locationOf(f)))).digest("hex");
     files.set(f.path, d);
     h.update(`${f.path} ${d}\n`);
   }

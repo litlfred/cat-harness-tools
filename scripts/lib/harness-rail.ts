@@ -46,7 +46,7 @@ export {
 } from "./navbar.js";
 export type { NavGroup, NavItem, NavbarModel } from "./navbar.js";
 
-import { GROUP_GLYPHS, NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
+import { GROUP_GLYPHS, NAVBAR_CSS, RAIL_SECTION_LABELS, bodyTag, folderName, folderOfPage, hasRail, headEndTag, documentIndexOf, injectNavbar, navbarRegionsHtml, visualiserLabelOf, visualiserNavOf, type NavGroup, type NavItem, type NavbarModel } from "./navbar.js";
 
 /** What a mounted page needs in order to describe its own navbar. */
 export interface RailOptions {
@@ -86,6 +86,12 @@ export interface RailOptions {
    * (owner, 2026-11-10). Absent, the header names the instance.
    */
   homeName?: string;
+  /**
+   * The folder the page is in, for the header's second line (owner,
+   * 2026-11-13). Absent, it is derived from {@link links} and {@link here}
+   * ({@link folderOfPage}); empty, the page is in none.
+   */
+  folder?: string;
   /**
    * Where the PLATFORM's site root is from this page, when it is not `toRoot`
    * — a folio's own Pages site, whose platform links and row files live on the
@@ -196,6 +202,15 @@ export interface RailOptions {
  * The header is the home link, and its href is the one this file composes,
  * because `toRoot` is the only piece of routing a mounted page knows about itself.
  */
+/** The header's folder line: declared, or the Folders row whose route holds {@link RailOptions.here}. */
+function folderOf(o: RailOptions): string | undefined {
+  if (o.folder !== undefined) return o.folder || undefined;
+  if (o.here === undefined) return undefined;
+  const paths = [`${o.toRoot}${o.here}`, ...(o.assetRoot ? [`${o.assetRoot}${o.here}`] : [])];
+  const hit = folderOfPage(o.links, paths, o.instance);
+  return hit ? folderName(hit) : undefined;
+}
+
 export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
   const harnesses: NavGroup | undefined =
     o.harnesses === undefined
@@ -226,6 +241,7 @@ export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
     // No home row (owner, 2026-10-30: "dont need home on bottomof harnes
     // navbars"): the header's mark and name are the link to the landing page.
     headHref: o.homeHref ?? `${o.toRoot}/`,
+    ...(folderOf(o) ? { folder: folderOf(o)! } : {}),
     ...(o.homeName ? { headName: o.homeName } : {}),
   };
 }
@@ -577,10 +593,16 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
       if (page.here === undefined || item.href !== `${page.toRoot}${page.here}`) return { ...item, ...kids };
       return { ...item, ...kids, current: true };
     });
+  // The page's folder, from the rows BEFORE "you are here" took a link away.
+  const inFolder =
+    page.here === undefined
+      ? undefined
+      : folderOfPage(shared.links, [`${page.toRoot}${page.here}`, `${page.root}${page.here}`], shared.instance);
   return navbarRegionsHtml(
     railModel({
       ...shared,
       links,
+      folder: inFolder ? folderName(inFolder) : "",
       ...(shared.pages ? { pages: markHere(shared.pages) } : {}),
       toRoot: page.toRoot,
       ...(page.home ? { homeHref: page.home } : {}),

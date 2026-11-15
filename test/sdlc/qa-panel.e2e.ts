@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { applyVerdicts, sidecar, sidecarWithVerdicts } from "../support/qa-fixture.js";
 import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * The QA icon has to OPEN, and what it opens has to name its witnesses.
@@ -43,8 +44,8 @@ import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 // `import.meta.dir` is a Bun extension and undefined under Node, which is what
 // Playwright runs this spec with.
 const ROOT = join(HARNESS_ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 
 /**
  * A block witness doc — the fixture copy of the generator's projection for

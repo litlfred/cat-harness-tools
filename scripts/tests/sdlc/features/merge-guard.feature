@@ -55,21 +55,37 @@ Feature: Merge guard
     When the "ready-for-review" check is read with the steward as merging session
     Then it passes
 
-  @test:scripts/tests/sdlc/merge-guard.test.ts::check_2_—_ready_for_review::no_Merge_Manager_active:_the_PR's_OWN_session_may_mark_it_ready_and_merge_it
-  Scenario: With no Merge Manager active the PR's own session may mark it ready and merge it
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_2_—_ready_for_review::the_merge_manager_landing_its_own_PR:_its_own_session_may_mark_it_ready_and_merge_it
+  Scenario: The merge manager landing its own PR may have marked it ready itself
     Given PR #1957 with its own signed "ready:" marker beside the ready event
     When the "ready-for-review" check is read with the PR's own session as merging session
     Then it refuses
-    When it is read again with no Merge Manager active
+    When it is read again with --merge-manager-own-pr
     Then it passes
-    And its detail says "no Merge Manager is active"
+    And its detail says "the merge manager is landing its own PR"
 
-  @test:scripts/tests/sdlc/merge-guard.test.ts::check_2_—_ready_for_review::no_Merge_Manager_active_still_refuses_a_ready_flip_nobody_from_the_PR's_own_session_signed
-  Scenario: With no Merge Manager active a ready flip nobody from the PR's session signed is still refused
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_2_—_ready_for_review::the_merge_manager's_own_PR_still_refuses_a_ready_flip_nobody_from_the_PR's_own_session_signed
+  Scenario: The merge manager's own PR still refuses a ready flip nobody from the PR's session signed
     Given PR #1957 with only a steward-signed comment beside the ready event
-    When the "ready-for-review" check is read with no Merge Manager active
+    When the "ready-for-review" check is read with --merge-manager-own-pr
     Then it refuses
     And its detail says it "cannot be attributed to the PR's own session"
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_2_—_ready_for_review::--merge-manager-own-pr_refuses_when_the_merging_session_is_not_the_PR's_own_session
+  Scenario: --merge-manager-own-pr refuses when the merging session is not the PR's own
+    Given PR #1957 with its own signed "ready:" marker beside the ready event
+    When the "ready-for-review" check is read with --merge-manager-own-pr and the steward as merging session
+    Then it refuses as a defect
+    And its detail says the merging session "is not this PR's own session"
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_2_—_ready_for_review::a_`ready:`_the_merging_session_RELAYS_for_the_PR's_own_session_beside_the_event_is_not_the_merging_session_marking_it_ready
+  Scenario: A ready marker the merging session relays for the PR's own session is not it marking the PR ready
+    Given PR #1957 with a "Marked ready." comment signed by its own session a minute after the ready event
+    And a "ready:" comment signed by the steward four seconds after the event, saying "relayed for" the PR's own session
+    When the "ready-for-review" check is read with the steward as merging session
+    Then it passes
+    When the "relayed for" line is removed
+    Then it refuses, naming the "MERGING session"
 
   @test:scripts/tests/sdlc/merge-guard.test.ts::check_2_—_ready_for_review::never_a_draft:_nothing_to_attribute,_passes
   Scenario: A PR that was never a draft passes the ready-for-review check
@@ -111,11 +127,11 @@ Feature: Merge guard
     Then a "ready:" marker, "Marking ready", "now marked ready for review", "Re-marked ready" and "Ready-for-review: I converted this PR" are claims
     And "not ready for review yet", a Merge queue ACK, a steward:ack-marked comment, unrelated text and no body are not
 
-  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_ready_marker::#1960_and_#1957:_no_`ready:`_comment_at_all
-  Scenario: #1960 and #1957 have no ready marker at all
-    Given the snapshots of PR #1960 and #1957
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_ready_marker::#1960:_no_`ready:`_comment_at_all,_and_no_label_to_stand_in
+  Scenario: #1960 has no ready marker and no label to stand in for one
+    Given the snapshot of PR #1960
     When the "ready-marker" check is read
-    Then each refuses with detail "no `ready: <sha>` comment"
+    Then it refuses with detail "no `ready: <sha>` comment"
 
   @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_ready_marker::#1937:_its_`ready:_e75895610c4`_is_signed_by_no_session
   Scenario: #1937's ready marker is signed by no session
@@ -148,6 +164,81 @@ Feature: Merge guard
     Given a comment "> ready: abcdef1"
     When ready markers are read
     Then there are none
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_a_`ready:`_the_merge_manager_relays_for_the_PR's_own_session::relayedFor_reads_an_id_or_a_URL,_and_not_a_quoted_line_or_code
+  Scenario: "relayed for" names a session by id or URL, never from a quoted line or code
+    Given "relayed for session_01Abc", "Relayed for https://claude.ai/code/session_01Abc", a quoted relay line, a relay line in a code fence and a bare marker
+    When the relayed-for session is read from each
+    Then the first two give "session_01Abc" and the rest give none
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_a_`ready:`_the_merge_manager_relays_for_the_PR's_own_session::a_relayed_marker_for_the_PR's_own_session_passes,_signed_by_the_merge_manager
+  Scenario: A ready marker the merge manager relays for the PR's own session passes
+    Given PR #1960 with a "ready:" on its head signed by the steward and "relayed for" the PR's own session
+    When the "ready-marker" check is read
+    Then it passes
+    And its detail names the relay and the steward that posted it
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_a_`ready:`_the_merge_manager_relays_for_the_PR's_own_session::a_marker_relayed_for_ANOTHER_session_is_a_defect,_not_this_PR's_marker
+  Scenario: A ready marker relayed for another session is a defect
+    Given PR #1960 with a "ready:" signed by the steward and "relayed for" another session
+    When the "ready-marker" check is read
+    Then it refuses as a defect, naming the session it was relayed for
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_a_`ready:`_the_merge_manager_relays_for_the_PR's_own_session::a_relayed_marker_is_the_point_check_7_measures_questions_from
+  Scenario: A relayed ready marker is where check 7 starts looking for open questions
+    Given PR #1960 with a relayed "ready:" for its own session
+    And a later comment asking the owner a question
+    When the "open-question" check is read
+    Then it refuses
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_`ready-to-merge`_label_added_after_the_last_push::#1957:_labelled_after_its_last_push,_so_the_label_stands_in_for_the_marker
+  Scenario: #1957 was labelled ready-to-merge after its last push, so the label stands in for a marker
+    Given PR #1957, with no "ready:" comment, labelled at 11:31:46Z after its last commit at 11:19:32Z
+    When the "ready-marker" check is read
+    Then it passes
+    And its detail says the label was added after the last push of "76244c5e"
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_`ready-to-merge`_label_added_after_the_last_push::a_commit_dated_after_the_label_refuses,_and_says_why_the_label_did_not_stand_in
+  Scenario: A commit dated after the label keeps the label from standing in
+    Given PR #1957 with its last commit re-dated a minute after the label
+    When the "ready-marker" check is read
+    Then it refuses with "no `ready: <sha>` comment; nor does the label stand in"
+    And its detail says the label was "not after the last push"
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_`ready-to-merge`_label_added_after_the_last_push::a_workflow_run_on_the_head_that_started_after_the_label_dates_the_push_after_it
+  Scenario: A workflow run on the head dates the push
+    Given PR #1957 whose head's workflow runs all started 30 seconds after the label
+    When the "ready-marker" check is read
+    Then it refuses
+    When one run is moved to 30 seconds before the label
+    Then it passes
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_`ready-to-merge`_label_added_after_the_last_push::a_force-push_after_the_label_refuses
+  Scenario: A force-push after the label keeps the label from standing in
+    Given PR #1957 with a head_ref_force_pushed event a minute after the label
+    When the "ready-marker" check is read
+    Then it refuses
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_`ready-to-merge`_label_added_after_the_last_push::the_label_with_no_`labeled`_event_in_the_timeline_refuses
+  Scenario: The label with no labeled event in the timeline does not stand in
+    Given PR #1957 with its labeled events removed from the timeline
+    When the "ready-marker" check is read
+    Then it refuses, saying there is "no `labeled ready-to-merge` event"
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_`ready-to-merge`_label_added_after_the_last_push::only_merge-main_bot_merges_after_the_label:_still_passes
+  Scenario: Only merge-main bot merges after the label still pass
+    Given PR #1957 with a merge-main bot merge pushed ten minutes after the label as its head
+    When the "ready-marker" check is read
+    Then it passes
+    And its detail says "the 1 commit(s) after it are merge-main bot merges"
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_3_—_the_`ready-to-merge`_label_added_after_the_last_push::a_question_to_the_owner_after_the_label_is_open_(check_7_measures_from_the_label)
+  Scenario: Check 7 measures open questions from the label when the label stands in
+    Given PR #1957 labelled ready-to-merge, with a question to the owner a minute after the label
+    When the "open-question" check is read
+    Then it refuses
+    When the question is moved to a minute before the label
+    Then it passes
 
   @test:scripts/tests/sdlc/merge-guard.test.ts::check_4_—_labels::#1937:_`needs-merge-human`_was_still_on_it
   Scenario: #1937 still carried needs-merge-human
@@ -602,3 +693,51 @@ Feature: Merge guard
     Given PR #1937 with red CI
     When it is evaluated as a non-release merge and as a release merge
     Then the number of refusals other than ci is the same
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::a_green_full-tier_judge_on_the_head_passes
+  Scenario: Under --full-tier a green full-tier judge on the head passes check 5
+    Given PR #1960 with a green "No new failures (tests and gates)" check run and a test shard that ran on its head
+    When check 5 is read with --full-tier
+    Then it passes, naming the judge and the shard count
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::the_fast_tier_alone_is_not-ready,_and_says_how_to_run_the_full_tier
+  Scenario: Under --full-tier the fast tier alone is not ready
+    Given PR #1960 whose only check run is the green "Fast tier only" job
+    When check 5 is read with --full-tier
+    Then it refuses as not-ready
+    And its detail says the full tier has not run and that ready-to-merge or release runs it
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::a_red_judge_is_a_defect;_one_still_running_is_not-ready;_the_latest_run_of_a_judge_counts
+  Scenario: Under --full-tier a red judge is a defect, a running one not ready, and the latest run counts
+    Given PR #1960 with its full-tier judge red, then running, then red followed by a later green run
+    When check 5 is read with --full-tier each time
+    Then it is a defect, then not-ready, then a pass
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::check_runs_not_fetched_or_not_readable_are_unknown,_never_a_pass
+  Scenario: Under --full-tier unread check runs are unknown, never a pass
+    Given PR #1960 with no check runs fetched, and then check runs unreadable with "HTTP 403"
+    When check 5 is read with --full-tier
+    Then it is unknown both times, and names "HTTP 403"
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::--full-tier_gates_even_without_--release,_and_keeps_a_red_workflow_run's_refusal
+  Scenario: --full-tier gates without --release and keeps a workflow run's refusal
+    Given PR #1937 with a green full-tier judge
+    When check 5 is read with --full-tier and no --release
+    Then it has the same status as the release judgement, and is not advisory
+    And a passing workflow-run judgement with no full-tier judge refuses as not-ready
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::a_skipped_judge,_or_one_whose_name_was_never_rendered,_judged_nothing:_not-ready,_never_a_defect
+  Scenario: Under --full-tier a skipped or unrendered judge judged nothing
+    Given PR #1960 whose only "No new failures" check runs are a skipped one and a skipped one whose name is still a template
+    When check 5 is read with --full-tier
+    Then it refuses as not-ready, saying the full tier has not run
+    When a green "No new failures (tests and gates)" run is added beside the unrendered one
+    Then it passes
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_under_--full-tier_—_the_full_tier_must_be_green_on_the_head::a_green_judge_with_every_test_shard_skipped_is_the_fast_tier_(#2103's_real_head):_not-ready
+  Scenario: Under --full-tier a green judge with every test shard skipped is the fast tier
+    Given PR #1960 with #2103's real fast-tier check runs: "Tests (no new failures)" green and every "bun test" shard skipped and unrendered
+    When check 5 is read with --full-tier
+    Then it refuses as not-ready, saying no test shard ran
+    When a "bun test (head, 2/4)" shard that ran is added
+    Then it passes

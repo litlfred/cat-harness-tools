@@ -78,6 +78,13 @@ describe("the page", () => {
     const one = { ...MODEL.entries[1]!, document: { a: [k("back\\")], b: [k("x")] } };
     expect(keywordsPage({ ...MODEL, entries: [one] }, "generated: fixture")).toContain("| 1 | back\\\\ | x |");
   });
+  test("each entry's details block lets kramdown read the table inside it", () => {
+    // Without markdown="1" kramdown leaves a block-HTML body unparsed, and the
+    // reader sees rows of pipes (check:escaped-markup on folio-assistant#3124).
+    const opens = page.split("\n").filter((l) => l.startsWith("<details"));
+    expect(opens.length).toBeGreaterThan(0);
+    for (const l of opens) expect(l.startsWith('<details markdown="1">')).toBe(true);
+  });
   test("every table row has as many cells as its header", () => {
     let cols = 0;
     for (const line of page.split("\n")) {

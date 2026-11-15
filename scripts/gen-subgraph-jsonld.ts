@@ -135,6 +135,7 @@ import {
   SubgraphIndexSchema,
 } from "../schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { writePathAt } from "./lib/layer-output.ts";
 import { resolveImplementingPath } from "../schemas/kg/harness-config.js";
 import { libraryContextLoader, libraryEntryNodes } from "./lib/library-subgraph-nodes.ts";
 import { readInstanceDecls } from "./gen-instance-contexts.ts";
@@ -1074,6 +1075,41 @@ function listFiles(abs: string): string[] {
   return out;
 }
 
+/**
+ * Where `main` reads and writes the subgraph tree and the payloads.
+ *
+ * Where the layer is MOUNTED (bean `cat-tools-sm8r`, item 4), the tree is
+ * computed output and lives whole at the layer's output root
+ * (`build/layers/<instance>/…`, `lib/layer-output.ts`), never in the pinned
+ * mount; `compose-docs` lays that twin over the mount. The twin is complete,
+ * so strays and the payload audit are judged in it alone. `--check` judges
+ * the twin once one exists, else the pinned tree. In the layer's own
+ * checkout the twin IS the tree, and nothing changes.
+ *
+ * `at(p)` maps a layer-relative output path to the absolute file to compare
+ * or write.
+ */
+export function subgraphTargets(
+  root: string,
+  outDir: string,
+  payloadDir: string,
+  check: boolean,
+  checkout: string = checkoutRootFor(root),
+): { treeAbs: string; payloadAbs: string; at: (p: string) => string } {
+  const twinOf = (abs: string): string => writePathAt(checkout, abs);
+  const pick = (abs: string): string => (check && !existsSync(twinOf(abs)) ? abs : twinOf(abs));
+  const bases = [join(root, outDir), join(root, payloadDir)];
+  const dirs = bases.map(pick);
+  const at = (p: string): string => {
+    const abs = join(root, p);
+    for (let i = 0; i < bases.length; i++) {
+      if (abs.startsWith(bases[i] + sep)) return join(dirs[i], abs.slice(bases[i].length + 1));
+    }
+    return check ? abs : twinOf(abs);
+  };
+  return { treeAbs: dirs[0], payloadAbs: dirs[1], at };
+}
+
 async function main(): Promise<number> {
   const check = process.argv.includes("--check");
   const { plan, files, outDir, payloadPlan, payloadFiles, payloadDir, warnings } = await generateSubgraphs();
@@ -1089,10 +1125,10 @@ async function main(): Promise<number> {
   // layer's tree is written here too, and one that stops being overlaid
   // must not leave its files behind looking current. Payloads (f233) live in
   // their own directory and are checked the same way.
+  const checkout = checkoutRootFor(ROOT);
+  const { treeAbs, payloadAbs, at } = subgraphTargets(ROOT, outDir, payloadDir, check, checkout);
   const all = new Map<string, Buffer | string>([...files, ...payloadFiles]);
-  const treeAbs = join(ROOT, outDir);
-  const payloadAbs = join(ROOT, payloadDir);
-  const expected = new Set([...all.keys()].map((p) => join(ROOT, p)));
+  const expected = new Set([...all.keys()].map(at));
   const strays = [...listFiles(treeAbs), ...listFiles(payloadAbs)].filter((p) => !expected.has(p)).sort();
   const size = (files_: Map<string, Buffer | string>): number =>
     [...files_.values()].reduce((s, t) => s + (typeof t === "string" ? Buffer.byteLength(t, "utf8") : t.length), 0);
@@ -1103,14 +1139,14 @@ async function main(): Promise<number> {
     `${payloadPlan.payloads.size} payload(s) for ${payloadPlan.links.size} node(s), ${payloadFiles.size} file(s), ${size(payloadFiles)} bytes`;
 
   if (check) {
-    const stale = [...all].filter(([p, t]) => !same(join(ROOT, p), t)).map(([p]) => p).sort();
+    const stale = [...all].filter(([p, t]) => !same(at(p), t)).map(([p]) => p).sort();
     const audit = auditPayloadTree(payloadAbs, payloadPlan.links);
     if (stale.length === 0 && strays.length === 0 && audit.length === 0) {
       console.log(`gen-subgraph-jsonld --check: ${summary} — up to date.`);
       return 0;
     }
     for (const p of stale) console.error(`  stale or missing: ${p}`);
-    for (const p of strays) console.error(`  not generated:    ${relative(ROOT, p)}`);
+    for (const p of strays) console.error(`  not generated:    ${relative(checkout, p)}`);
     for (const p of audit) console.error(`  payload:          ${p}`);
     console.error("Run: bun run cat subgraph:jsonld");
     return 1;
@@ -1118,7 +1154,7 @@ async function main(): Promise<number> {
 
   for (const p of strays) rmSync(p);
   for (const [p, t] of all) {
-    const abs = join(ROOT, p);
+    const abs = at(p);
     mkdirSync(dirname(abs), { recursive: true });
     if (!same(abs, t)) writeFileSync(abs, t);
   }

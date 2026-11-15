@@ -91,6 +91,57 @@ function send(res, status, body, headers) {
  * committed file always wins, the fallback is checked to stay under ROOT, and
  * only that one route is emulated: anything else still 404s, as it should.
  */
+/**
+ * THE LAYER OUTPUT OVERLAY (bean `cat-tools-sm8r`, item 4). A mounted layer
+ * is read-only: the pages and data the build COMPUTES for it are written to
+ * `build/layers/<instance>/<the same instance-relative path>`, and a reader
+ * reads that twin first, else the pinned bytes. `scripts/lib/layer-output.ts`
+ * is the one answer; this file runs under plain `node` and cannot import
+ * TypeScript, so the rule is restated here: the instances `index.lock.json`
+ * lists with a mount path, and the twin under `LAYER_OUTPUT_ROOT`.
+ */
+const LAYER_OUTPUT_ROOT = "build/layers";
+const MOUNTED = (() => {
+  const out = [];
+  try {
+    const lock = JSON.parse(fs.readFileSync(path.join(ROOT, "index.lock.json"), "utf8"));
+    for (const i of lock?.instances ?? []) {
+      if (typeof i?.instance === "string" && typeof i?.path === "string" && i.path !== "") {
+        out.push({ instance: i.instance, dir: path.resolve(ROOT, i.path) });
+      }
+    }
+  } catch {
+    // No lock, or an unreadable one: nothing is mounted, so nothing is overlaid.
+  }
+  return out;
+})();
+
+/** The output-root twin of `abs` when it is a FILE there, else undefined. */
+function overlayFile(abs) {
+  for (const m of MOUNTED) {
+    if (!abs.startsWith(m.dir + path.sep)) continue;
+    const twin = path.join(ROOT, LAYER_OUTPUT_ROOT, m.instance, path.relative(m.dir, abs));
+    try {
+      if (fs.statSync(twin).isFile()) return twin;
+    } catch {
+      // not computed for this layer
+    }
+  }
+  return undefined;
+}
+
+/** `abs` read through the overlay: its twin when that is a file, else `abs`. */
+const overlaid = (abs) => overlayFile(abs) ?? abs;
+
+/** Whether `abs` is a file, asked through the overlay. */
+function isFileOverlaid(abs) {
+  try {
+    return fs.statSync(overlaid(abs)).isFile();
+  } catch {
+    return false;
+  }
+}
+
 const SITE_ROOT = "/cat-harness/docs";
 // A layer's site directory, relative to the layer root. The one answer is
 // `siteDir()` in cat-harness/schemas/cat-harness.ts; this file runs under plain
@@ -102,11 +153,7 @@ function mountedPath(pathname) {
   if (!m) return undefined;
   const candidate = path.resolve(ROOT, m[1], INSTANCE_SITE_DIR, m[2]);
   if (!candidate.startsWith(path.join(ROOT, m[1], INSTANCE_SITE_DIR) + path.sep)) return undefined;
-  try {
-    return fs.statSync(candidate).isFile() ? candidate : undefined;
-  } catch {
-    return undefined;
-  }
+  return isFileOverlaid(candidate) ? overlaid(candidate) : undefined;
 }
 
 /**
@@ -135,11 +182,7 @@ function composedPath(pathname) {
     const dir = path.resolve(ROOT, m[1], d.path);
     const candidate = path.resolve(dir, m[2]);
     if (!candidate.startsWith(dir + path.sep)) continue;
-    try {
-      if (fs.statSync(candidate).isFile()) return candidate;
-    } catch {
-      // not in this directory
-    }
+    if (isFileOverlaid(candidate)) return overlaid(candidate);
   }
   return undefined;
 }
@@ -160,11 +203,16 @@ const server = http.createServer((req, res) => {
     return send(res, 403, "Forbidden", { "Content-Type": "text/plain" });
   }
 
+  // A computed file the build wrote at the layer output root wins over the
+  // pinned bytes, as it does for every reader (see overlayFile).
+  filePath = overlaid(filePath);
   let stat;
   try {
     stat = fs.statSync(filePath);
   } catch {
-    const mounted = mountedPath(pathname) ?? composedPath(pathname);
+    // A directory the build wrote only at the output root: its index there.
+    const builtIndex = overlayFile(path.join(filePath, "index.html"));
+    const mounted = builtIndex ?? mountedPath(pathname) ?? composedPath(pathname);
     if (mounted === undefined) {
       return send(res, 404, `Not found: ${pathname}`, { "Content-Type": "text/plain" });
     }
@@ -173,7 +221,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (stat.isDirectory()) {
-    const index = path.join(filePath, "index.html");
+    const index = overlaid(path.join(filePath, "index.html"));
     if (!fs.existsSync(index)) {
       return send(res, 404, `No index.html in ${pathname}`, { "Content-Type": "text/plain" });
     }

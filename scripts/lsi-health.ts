@@ -39,19 +39,31 @@ import {
 } from "./lsi.ts";
 import { readQaTree } from "./qa-store.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { overlayDirs } from "./lib/layer-output.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 // declared-path-literal: the LSI run records under cat-harness's `qa` graph. cat-harness-tools reads cat-harness's directory here; 70lx moved this code up a layer and kept the path, which is now an implementer reading the layer below it (downward). Resolving it through cat-harness's declaration is the follow-up; counted, not hidden.
 const RESULTS = join(REPO, "cat-harness/test/results/lsi");
 
-function sidecars(dir = RESULTS, out: string[] = []): string[] {
+function walkSidecars(dir: string, out: string[]): string[] {
   if (!existsSync(dir)) return out;
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
-    if (e.isDirectory()) sidecars(p, out);
+    if (e.isDirectory()) walkSidecars(p, out);
     else if (e.name.endsWith(".lsi.json")) out.push(p);
   }
-  return out.sort();
+  return out;
+}
+
+/**
+ * Every index in the checkout, named by its path in the layer: the union of
+ * the layer output root and the layer's own directory (bean `cat-tools-sm8r`,
+ * item 4). `CHECKOUT_SOURCE` reads each through the same overlay.
+ */
+function sidecars(): string[] {
+  const out = new Set<string>();
+  for (const d of overlayDirs(RESULTS)) for (const f of walkSidecars(d, [])) out.add(join(RESULTS, relative(d, f)));
+  return [...out].sort();
 }
 
 /** The stored indexes, and where they came from — or why they could not be read. */

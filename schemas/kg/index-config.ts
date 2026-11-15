@@ -346,6 +346,11 @@ const IndexConfigObject = z
      * `IndexSectionMarker` in `content-type.ts`. It sits on the index for the
      * reason `site.agentRun` does: an IG repository may declare no instance
      * of its own, so its index is all it has.
+     *
+     * One key inside a section is the platform's: `testSpecifications`, the
+     * paths whose `.feature` files are specifications for implementers rather
+     * than tests of the tree (`check:test-gherkin`,
+     * `scripts/lib/test-gherkin.ts`). It reads the same on every type.
      */
     contentTypes: z.record(IndexContentTypeIdSchema, z.record(z.string(), z.unknown())).optional(),
     /**

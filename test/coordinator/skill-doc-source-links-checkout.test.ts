@@ -10,7 +10,9 @@
  * changed.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+// Publish-time files are written to the layer output overlay (bean sm8r);
+// these read the copy a site reader sees, falling back to the path given.
+import { existsSync, readdirSync, readFileSync } from "../support/site-fs.ts";
 import { join, resolve } from "node:path";
 
 import { repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.ts";

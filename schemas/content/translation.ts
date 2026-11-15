@@ -67,6 +67,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { blockKindNode } from "./block-kinds";
+import { LANGUAGE_TAG } from "./narrative";
 import { declaredDirectories } from "../kg/declared-nodes";
 import { poKey, readPoStrings } from "./po-strings";
 import { z } from "zod";
@@ -126,6 +127,14 @@ export const LOCALE_RTL: Partial<Record<string, boolean>> = {
   fa: true,
   ur: true,
 };
+
+/**
+ * Whether a BCP 47 tag is written right-to-left, by its primary subtag when
+ * the tag itself has no entry: `ar-EG` is `ar`.
+ */
+export function localeIsRtl(locale: string): boolean {
+  return LOCALE_RTL[locale] ?? LOCALE_RTL[locale.split("-")[0]!] ?? false;
+}
 
 // ── Translation status schema ────────────────────────────────────
 
@@ -346,12 +355,24 @@ export interface TranslationNode {
   description?: string;
 }
 
-/** Zod schema for `TranslationNode`. */
-export const TranslationNodeSchema = z.object({
-  label: z.string().regex(/^trans:[a-z]{2,}\//, {
-    message: 'label must follow "trans:<locale>/<stem>" convention',
+/**
+ * The `trans:<locale>/<stem>` label, with `<locale>` a BCP 47 tag
+ * ({@link LANGUAGE_TAG}): `trans:fr/index`, `trans:pt-BR/index`,
+ * `trans:zh-Hans/glossary`. Group 1 is the locale.
+ *
+ * The owner, 2026-11-14: region-tagged locales are supported. The label had
+ * taken only a lowercase primary subtag (`^trans:[a-z]{2,}\/`), so
+ * `addCandidates` refused every `pt-BR` or `zh-Hans` catalogue a translation
+ * platform offered.
+ */
+export const TRANSLATION_LABEL = new RegExp(`^trans:(${LANGUAGE_TAG.source.slice(1, -1)})/`);
+
+/** The fields of `TranslationNode`, before the cross-field check. */
+const TranslationNodeFields = z.object({
+  label: z.string().regex(TRANSLATION_LABEL, {
+    message: 'label must follow "trans:<locale>/<stem>" convention, <locale> a BCP 47 tag',
   }),
-  locale: z.string().min(2),
+  locale: z.string().regex(LANGUAGE_TAG, { message: "locale must be a BCP 47 language tag" }),
   sourceFile: z.string().min(1),
   sourceHash: z.string().min(1).optional(),
   potFile: z.string().endsWith(".pot").optional(),
@@ -367,6 +388,18 @@ export const TranslationNodeSchema = z.object({
     .optional(),
   title: z.string().optional(),
   description: z.string().optional(),
+});
+
+/** Zod schema for `TranslationNode`. */
+export const TranslationNodeSchema = TranslationNodeFields.superRefine((n, ctx) => {
+  // One locale, said three times: the label, the node, and its status.
+  const inLabel = TRANSLATION_LABEL.exec(n.label)?.[1];
+  if (inLabel !== undefined && inLabel !== n.locale) {
+    ctx.addIssue({ code: "custom", path: ["label"], message: `label locale "${inLabel}" is not the node's locale "${n.locale}"` });
+  }
+  if (n.status.locale !== n.locale) {
+    ctx.addIssue({ code: "custom", path: ["status", "locale"], message: `status.locale "${n.status.locale}" is not the node's locale "${n.locale}"` });
+  }
 });
 
 // ── Translation config (harness.config.json section) ───────────────

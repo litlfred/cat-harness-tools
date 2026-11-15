@@ -96,6 +96,7 @@ import { discoverTools } from "../tools/discover.ts";
 import { declaredVisualisers, siteOwnerDir, visualiserPageDir } from "./viewer-declarations.ts";
 import { flattenDependencies } from "../schemas/kg/dependency-order.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { outputTwinOf } from "./lib/layer-output.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { buildTypeOf, isIndexWriter } from "./lib/build-type.ts";
 import { dirname } from "node:path";
@@ -450,12 +451,22 @@ export function writersOf(plan: readonly DeclaredArtefact[]): string[] {
   return out;
 }
 
-/** Built means present and, for a directory, holding at least one file. */
-export function built(a: Pick<DeclaredArtefact, "abs" | "path">): boolean {
-  if (!existsSync(a.abs)) return false;
-  if (!a.path.endsWith("/")) return statSync(a.abs).isFile();
+/**
+ * Built means present and, for a directory, holding at least one file. An
+ * artefact of a MOUNTED layer is built at the layer's output root (bean
+ * `cat-tools-sm8r`, item 4, step 4; `lib/layer-output.ts`), so either copy
+ * counts: the output root's, or the pinned one.
+ */
+export function built(a: Pick<DeclaredArtefact, "abs" | "path">, root: string = REPO_ROOT): boolean {
+  const twin = outputTwinOf(root, a.abs);
+  return [a.abs, ...(twin === undefined ? [] : [twin])].some((at) => builtAt(at, a.path.endsWith("/")));
+}
+
+function builtAt(at: string, directory: boolean): boolean {
+  if (!existsSync(at)) return false;
+  if (!directory) return statSync(at).isFile();
   const walk = (d: string): boolean => readdirSync(d, { withFileTypes: true }).some((e) => (e.isDirectory() ? walk(join(d, e.name)) : true));
-  return statSync(a.abs).isDirectory() && walk(a.abs);
+  return statSync(at).isDirectory() && walk(at);
 }
 
 /**

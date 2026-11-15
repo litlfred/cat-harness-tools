@@ -60,6 +60,7 @@ import { basename, dirname, join, relative } from "node:path";
 
 import type { BlockQaReport, QaCriterionEntry } from "../schemas/sdlc/block-qa.ts";
 import { KG_QA_MANIFEST_PATH, KG_QA_RESULTS_DIR, kgQaSidecarPath, owningInstanceOf, subjectEscapes } from "../schemas/sdlc/kg-qa.ts";
+import { overlayDirs, overlayPath } from "../scripts/lib/layer-output.ts";
 import { instanceRootsIn } from "../schemas/kg/cat-harness.ts";
 import { checkoutRootFor } from "../schemas/kg/harness-config.ts";
 import type { KgQaManifest, KgQaReport } from "../schemas/sdlc/kg-qa.ts";
@@ -125,7 +126,7 @@ export function qaCorpusAvailability(repoRoot: string): { present: boolean; tree
     { family: "block", dir: join(repoRoot, BLOCK_QA_RESULTS_DIR), present: false },
     { family: "translation", dir: join(repoRoot, TRANSLATION_QA_RESULTS_DIR), present: false },
     { family: "kg", dir: join(repoRoot, KG_QA_RESULTS_DIR), present: false },
-  ].map((t) => ({ ...t, present: existsSync(t.dir) }) as QaCorpusTree);
+  ].map((t) => ({ ...t, present: overlayDirs(t.dir).length > 0 }) as QaCorpusTree);
   return { present: trees.some((t) => t.present), trees };
 }
 
@@ -333,7 +334,8 @@ export function sidecarPaths(family: QaFamily, subjectPath: string, repoRoot: st
       );
       const byLocale = new Map<string, string>();
       const resultsDir = dirname(translationQaPath(repoRoot, subjectRoot, "xx"));
-      for (const d of [resultsDir, dir]) {
+      // The results tree through the layer output overlay first (bean `cat-tools-sm8r`, item 4).
+      for (const d of [...overlayDirs(resultsDir), dir]) {
         if (!existsSync(d)) continue;
         for (const f of readdirSync(d).sort()) {
           const m = re.exec(f);
@@ -357,9 +359,9 @@ export function sidecarPaths(family: QaFamily, subjectPath: string, repoRoot: st
       if (subjectEscapes(repoRoot, dir)) {
         const owner = owningInstanceOf(dir, instanceRootsIn(checkoutRootFor(repoRoot)));
         if (owner === undefined || subjectEscapes(owner, dir)) return [];
-        return [kgQaSidecarPath(owner, dir, stem)].filter((p) => existsSync(p));
+        return [overlayPath(kgQaSidecarPath(owner, dir, stem))].filter((p) => existsSync(p));
       }
-      return [kgQaSidecarPath(repoRoot, dir, stem)].filter((p) => existsSync(p));
+      return [overlayPath(kgQaSidecarPath(repoRoot, dir, stem))].filter((p) => existsSync(p));
   }
 }
 
@@ -586,7 +588,7 @@ export function readWitnessDoc(
     // `KG_QA_MANIFEST_SCHEMA`. Absent manifest reports "unrecorded" rather
     // than inventing a hash, the same rule this file already applies to the
     // timestamp `kg-audit` does not keep.
-    const auditor = readJson<KgQaManifest>(join(repoRoot, KG_QA_MANIFEST_PATH))?.auditor;
+    const auditor = readJson<KgQaManifest>(overlayPath(join(repoRoot, KG_QA_MANIFEST_PATH)))?.auditor;
     const live = { source: hash12(subjectPath) };
     const { freshness, changed } = freshnessOf({ source: doc.source_hash ?? undefined }, live);
     subject = doc.subject?.id ? `${doc.subject.kind} ${doc.subject.id}` : rel(subjectPath);

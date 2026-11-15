@@ -15,10 +15,11 @@ import { readTileCounts } from "../../schemas/ui/tile-count.ts";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
+import { overlayPath } from "../lib/layer-output.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
 const SITE = join(INSTANCE, siteDirFor(INSTANCE));
-const json = (p: string) => JSON.parse(readFileSync(join(SITE, p), "utf8")) as unknown;
+const json = (p: string) => JSON.parse(readFileSync(overlayPath(join(SITE, p)), "utf8")) as unknown;
 
 describe("openBeanCount", () => {
   test("counts draft, todo and in-progress; not completed, scrapped or a bean with no status", () => {
@@ -40,7 +41,7 @@ describe("the two projections every Beans badge reads agree", () => {
   // Standing alone, neither is built: `docs:pages` writes both at publish from
   // the composed bean store, and `assets/beans/` is gitignored (bean w1gy F18).
   const notBuilt = (...rels: string[]): boolean =>
-    siteNotBuilt("the beans projections `docs:pages` writes at publish (gitignored)", ...rels.map((r) => join(SITE, r)));
+    siteNotBuilt("the beans projections `docs:pages` writes at publish (gitignored)", ...rels.map((r) => overlayPath(join(SITE, r))));
 
   test.skipIf(notBuilt("assets/beans/index.json", "assets/beans/count.json"))("index.json's tile count (the glass and launcher tiles) equals count.json's (the icon row)", () => {
     const tile = readTileCounts(json("assets/beans/index.json")).get("beans");

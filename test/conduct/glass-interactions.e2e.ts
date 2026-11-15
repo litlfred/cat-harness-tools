@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * FOUR THINGS THE GLASS GOT WRONG IN THE HAND — after bean `b8eq` (PR #1160).
@@ -23,8 +24,8 @@ import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
  */
 
 const ROOT = join(HARNESS_ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 
 const COVER = "/library/who-iris/book-cover.png";
 const PNG = Buffer.from(

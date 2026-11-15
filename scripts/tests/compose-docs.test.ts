@@ -35,12 +35,14 @@ import { join, resolve } from "node:path";
 
 import {
   carriedInstances,
+  chromeLayers,
   compose,
   docsLayers,
   instanceStub,
   isChrome,
   isWithheld,
   mergeConfig,
+  OUTPUT_LAYER_SUFFIX,
   redirectStub,
   treeDigest,
   withheldFromCanonical,
@@ -148,7 +150,11 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     // PARSE to the merge, while every other file stays byte-identical.
     const { layers } = docsLayers(REPO);
     const instanceLayers = layers.filter((l) => !l.repositoryScoped);
-    expect(instanceLayers.map((l) => l.id)).toEqual(["site-chrome", "docs"]);
+    // A mounted cat-harness's computed files are an `@output` layer laid over
+    // its own (bean `cat-tools-sm8r`, item 4): part of the base, not a layer
+    // of their own, so the declared layers are named without them.
+    const isTwin = (id: string): boolean => id.endsWith(OUTPUT_LAYER_SUFFIX);
+    expect(instanceLayers.map((l) => l.id).filter((id) => !isTwin(id))).toEqual(["site-chrome", "docs"]);
 
     const dest = join(mkdtempSync(join(tmpdir(), "composereal-")), "site");
     const report = compose(dest, REPO);
@@ -159,12 +165,19 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
     // The only shadows are the chrome's empty stand-ins for the includes the
     // harness's pages generate: anything else would be a page silently lost.
     for (const o of report.overrides) {
+      // A layer's own output-root twin replacing a pinned copy is the overlay
+      // doing its job, not a page lost.
+      if (o.by === `${o.baseLayer}${OUTPUT_LAYER_SUFFIX}`) continue;
       expect(o.baseLayer).toBe("site-chrome");
       expect(o.path.startsWith("_includes/generated/")).toBe(true);
     }
     // D1: the config is the merge of the two, setting for setting.
-    const chromeCfg = parseYaml(readFileSync(join(instanceLayers[0]!.dir, "_config.yml"), "utf-8"));
-    const docsCfg = parseYaml(readFileSync(join(instanceLayers[1]!.dir, "_config.yml"), "utf-8"));
+    // By id, not by position: a mounted cat-harness's `@output` twins
+    // (`site-chrome@output`, `docs@output`) sit among the layers too, and a
+    // twin holds computed files, not the layer's `_config.yml`.
+    const layerDir = (id: string): string => instanceLayers.find((l) => l.id === id)!.dir;
+    const chromeCfg = parseYaml(readFileSync(join(layerDir("site-chrome"), "_config.yml"), "utf-8"));
+    const docsCfg = parseYaml(readFileSync(join(layerDir("docs"), "_config.yml"), "utf-8"));
     expect(parseYaml(readFileSync(join(dest, "_config.yml"), "utf-8"))).toEqual(mergeConfig(chromeCfg, docsCfg).merged);
 
     const before = new Map<string, string>();
@@ -824,5 +837,74 @@ describe("a composed instance's docs SOURCE is never composed (owner, 2026-10-23
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("a MOUNTED base layer's computed pages at the output root (bean cat-tools-sm8r, item 4, step 4)", () => {
+  /** The fixture, with the checkout's lock mounting cat-harness, and `files` written at its output-root twin. */
+  function mounted(base: Record<string, string>, overlay: Record<string, string>, computed: Record<string, string>): string {
+    const root = fixture(base, overlay);
+    writeFileSync(join(root, "index.lock.json"), JSON.stringify({ instances: [{ instance: INSTANCE, path: INSTANCE, sha: "a".repeat(40) }] }));
+    const twin = join(root, "build", "layers", INSTANCE, "docs");
+    for (const [rel, body] of Object.entries(computed)) {
+      mkdirSync(join(twin, rel, ".."), { recursive: true });
+      writeFileSync(join(twin, rel), body);
+    }
+    return root;
+  }
+
+  test("the twin is laid directly over its base, before the repository overlay", () => {
+    const root = mounted({ "a.md": "base" }, {}, { "gen.md": "computed" });
+    expect(docsLayers(root).layers.map((l) => l.id)).toEqual(["docs", "docs@output", "root-docs"]);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("no twin layer while nothing was written there: the composed tree is unchanged", () => {
+    const root = mounted({ "a.md": "base" }, {}, {});
+    expect(docsLayers(root).layers.map((l) => l.id)).toEqual(["docs", "root-docs"]);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a computed page shadows the pinned copy and says so; the overlay still wins over both", () => {
+    const root = mounted({ "p.md": "PINNED", "q.md": "PINNED Q" }, { "q.md": "OVERLAY Q" }, { "p.md": "COMPUTED", "q.md": "COMPUTED Q", "new.md": "NEW" });
+    const r = compose(out(root), root);
+    expect(readFileSync(join(out(root), "p.md"), "utf-8")).toBe("COMPUTED");
+    expect(readFileSync(join(out(root), "q.md"), "utf-8")).toBe("OVERLAY Q");
+    expect(readFileSync(join(out(root), "new.md"), "utf-8")).toBe("NEW");
+    expect(r.overrides).toContainEqual({ path: "p.md", baseLayer: "docs", by: "docs@output" });
+    expect(r.suppliedBy["new.md"]).toBe("docs@output");
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a base layer absent from the mount but present at the output root is carried, not missing", () => {
+    const root = mounted({}, {}, { "gen.md": "computed" });
+    rmSync(layerDir(root, "docs"), { recursive: true, force: true });
+    const { layers, missing } = docsLayers(root);
+    expect(layers.map((l) => l.id)).toEqual(["docs@output", "root-docs"]);
+    expect(missing).toEqual([]);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a chrome layer's output-root twin is that layer, not a second chrome layer", () => {
+    const root = mounted({}, {}, {});
+    writeDeclaration(
+      join(root, INSTANCE),
+      JSON.stringify({ name: INSTANCE, directories: [{ id: "site-chrome", path: "site-chrome/", graphTypologies: ["docs"] }, ...ENTRIES] }),
+    );
+    mkdirSync(join(root, INSTANCE, "site-chrome"), { recursive: true });
+    mkdirSync(join(root, "build", "layers", INSTANCE, "site-chrome", "assets"), { recursive: true });
+    expect(chromeLayers(root).map((l) => l.id)).toEqual(["site-chrome"]);
+    // A twin whose base is absent carries the layer, so it is still listed.
+    rmSync(join(root, INSTANCE, "site-chrome"), { recursive: true, force: true });
+    expect(chromeLayers(root).map((l) => l.id)).toEqual(["site-chrome@output"]);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("a checkout that does not mount the layer has no twin, even with files at that path", () => {
+    const root = fixture({ "a.md": "base" }, {});
+    mkdirSync(join(root, "build", "layers", INSTANCE, "docs"), { recursive: true });
+    writeFileSync(join(root, "build", "layers", INSTANCE, "docs", "gen.md"), "stray");
+    expect(docsLayers(root).layers.map((l) => l.id)).toEqual(["docs", "root-docs"]);
+    rmSync(root, { recursive: true, force: true });
   });
 });

@@ -125,3 +125,25 @@ Feature: The rail's Pages section from a Jekyll site
     Then "Bibliography: x" under Bibliography is "x"
     And "Bibliography: x/y" under "Bibliography: x" is "y"
     And "WHO: a handbook" and "Plain" are unchanged
+
+  @test:scripts/tests/jekyll-pages-nav.test.ts::a_page_that_declares_its_own_navigation_gives_its_Pages_subtree_(owner,_2026-11-14)::declaredNavsIn_reads_a_parent_page's_declaration_with_site-absolute_hrefs;_anchors_and_leaf_pages_give_none
+  Scenario: A parent page's declared navigation is read with site-absolute hrefs
+    Given a site whose section page "Guide" declares a menu in its built page, and a leaf page that declares only an in-page anchor
+    When the declarations are read for the site's pages
+    Then only "/" has one, with entries Home, Framework and Indices
+    And Home's items link to "/index.html", "/dependencies.html" and "/faq.html"
+    And Framework links to "/framework.pdf" and the off-site Bibliography keeps its URL
+    And a declaration of in-page anchors gives none
+
+  @test:scripts/tests/jekyll-pages-nav.test.ts::a_page_that_declares_its_own_navigation_gives_its_Pages_subtree_(owner,_2026-11-14)::the_declaring_page's_children_are_the_declaration:_same_entries,_order_and_nesting,_unsorted_and_unfolded;_stubs_gone,_uncovered_pages_kept_after
+  Scenario: The declaring page's Pages children are its declaration
+    Given the same site's Pages rows with its declarations and locale "en"
+    Then Guide's children are Home, Framework, Indices in the declared order, then Notes
+    And Home holds Summary, Dependencies and FAQ, and Indices holds Artifact Index, Bibliography, "Profile: B" and "Profile: A", neither sorted nor folded
+    And the stub group pages are not drawn, and Notes, which the declaration does not reach, is kept
+
+  @test:scripts/tests/jekyll-pages-nav.test.ts::a_page_that_declares_its_own_navigation_gives_its_Pages_subtree_(owner,_2026-11-14)::without_declarations_the_front-matter_tree_is_unchanged:_stubs_as_groups,_sorted_in_the_reader's_locale
+  Scenario: Without declarations the front-matter tree is unchanged
+    Given the same site's Pages rows without declarations
+    Then Guide's children are Home, Indices and Notes, sorted in the reader's locale
+    And Home links to its stub page

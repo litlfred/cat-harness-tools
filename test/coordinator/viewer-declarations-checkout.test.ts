@@ -9,6 +9,8 @@
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
+// A page written at publish is at the layer output root (bean cat-tools-sm8r).
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 import { join, resolve } from "node:path";
 
 import { declarationPathIn, instanceRootsIn, visualisationResolves } from "../../schemas/kg/cat-harness.ts";
@@ -102,7 +104,7 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
   test("every resolved page exists, or is built at publish by a writer that exists", () => {
     const missing = dirs.flatMap(({ root, instance, dir }) =>
       viewersOf(dir, root, REPO)
-        .filter((v) => !visualisationResolves(v, (p: string) => existsSync(join(REPO, p))))
+        .filter((v) => !visualisationResolves(v, (p: string) => existsSync(overlayPath(join(REPO, p)))))
         .map((v) => `${instance}/${dir.id} → ${v.ref}`),
     );
     expect(missing).toEqual([]);

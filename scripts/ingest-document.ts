@@ -67,6 +67,8 @@ import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { resolveWorkingInstanceRoot } from "./lib/roots.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
+import { runEntryArms } from "./entry-extraction.ts";
+import { optionalPipelinePlugin } from "../pipeline/pipeline-plugins.ts";
 
 /**
  * This module's own layer root — where its `harness.json` is.
@@ -447,6 +449,13 @@ export function withDerivedArms(
       // that holds its page; it reads the PDF's layout, never changes a block,
       // and writes `footnotes.json` (`schemas/content/document-footnotes.ts`).
       ["python3", pyHelper("pdf-footnotes.py"), staging, pdf],
+      // TABLES — `pdf-tables.py`, named as a rung in this file's header and
+      // never run until 2026-11-14 (owner: "not sure all have biblio,
+      // glossary, table, figure ... fully extracted"). It writes the CSVW
+      // drafts a paged entry's tables live in, keeps a transcription the
+      // destination already holds, and is GUARDED: any failure is recorded as
+      // `not-extracted` in `extraction.json` and the arm exits 0.
+      ["bun", "run", tsHelper("pdf-tables-csvw.ts"), "--staging", staging, "--library", library, pdf],
       aspectsArm(staging),
       // ── The fourth arm, and it must come AFTER `pdf-images.py` — bean `8suc`
       //
@@ -474,8 +483,33 @@ export function withDerivedArms(
       // says why), and `avatarOf` takes `cover.png` before any figure. Last,
       // because nothing here reads it.
       ["python3", pyHelper("pdf-cover.py"), pdf, "-o", join(staging, COVER_FILENAME), "--width", "300"],
+      // THE EXTRACTION RECORD — last, because it reads what every arm above
+      // wrote: per kind (contents, sections, figures, tables, …) found N,
+      // partial, none or not extracted, so a viewer can tell
+      // "this document has none" from "nothing looked"
+      // (`schemas/library/entry-extraction.ts`).
+      extractionArm(staging, library, plan),
     ],
   };
+}
+
+/**
+ * The extraction-record arm. It names the rung that wrote `structure.json`
+ * (the script of the plan's last rung step that writes one), so the contents
+ * and captions it records say which tool found them.
+ */
+export function extractionArm(staging: string, library: string, plan: Plan): string[] {
+  const rung = [...plan.steps].reverse().find((s) => /(?:pdf-structure|pdf-pages)\.py$/.test(s[1] ?? ""));
+  return [
+    "bun",
+    "run",
+    tsHelper("entry-extraction.ts"),
+    "--staging",
+    staging,
+    "--library",
+    library,
+    ...(rung?.[1] ? ["--structure-tool", rung[1]] : []),
+  ];
 }
 
 /**
@@ -1638,6 +1672,23 @@ if (import.meta.main) {
   );
   for (const r of verdict.requirements.filter((r) => r.state === "not-derivable")) {
     console.log(`  · ${r.name}: ${r.detail}`);
+  }
+  // A higher layer's extraction arms over the PROMOTED entry — the reference
+  // list and the glossary (owner, 2026-11-14), which read `sections/` where
+  // they now are. Through the optional `library-entry-arms` slot, because
+  // those readers live in a layer above this one. Guarded: each records its
+  // own `extraction.json` step, a failure included, and none stops this.
+  try {
+    const entryDir = resolve(INSTANCE_ROOT, destination, slug);
+    const ran = runEntryArms(optionalPipelinePlugin("library-entry-arms"), {
+      instanceRoot: resolve(INSTANCE_ROOT),
+      library: resolve(INSTANCE_ROOT, destination),
+      entry: entryDir,
+      slug,
+    });
+    for (const { kind, step } of ran) console.log(`  · ${kind}: ${step.state}${step.count !== undefined ? ` (${step.count})` : ""}${step.note ? ` — ${step.note}` : ""}`);
+  } catch (e) {
+    console.log(`  · extraction arms not run: ${e instanceof Error ? e.message : String(e)}`);
   }
   // The library changed, so its LSI index is stale by construction. Advisory:
   // an index is not part of L1 (skill `lsi-indexing`, option B of bean `ansc`).

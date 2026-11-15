@@ -45,6 +45,22 @@ function localise(nav: Element, siteRoot: string): void {
   document.head.appendChild(s);
 }
 
+/**
+ * THE OPEN FOLDER IN THE PAGE'S TOP BAR TOO (owner, 2026-11-13): the bar's
+ * site name reads "<site>: Library" on a page in the Library folder, as the
+ * rail's header reads the site's name over "Library". Read from the header the
+ * rail just drew, so the two cannot disagree; no folder, no suffix.
+ */
+function folderInPageBar(nav: Element): void {
+  const folder = nav.querySelector(".fa-nav-head .fa-nav-folder")?.textContent?.trim();
+  const home = document.querySelector(".fa-page-bar-home");
+  if (!folder || !home || home.querySelector(".fa-page-bar-folder")) return;
+  const s = document.createElement("span");
+  s.className = "fa-page-bar-folder";
+  s.textContent = `: ${folder}`;
+  home.appendChild(s);
+}
+
 function draw(): void {
   const block = document.getElementById(RAIL_PAGE_ID);
   const nav = document.querySelector('nav.fa-nav[data-fa-rail="pending"]');
@@ -70,6 +86,7 @@ function draw(): void {
   }
   nav.innerHTML = renderRailRegions(shared, page);
   nav.removeAttribute("data-fa-rail");
+  folderInPageBar(nav);
   // The SITE's root (`data-fa-to-root`), where the shared rail data and the
   // strings files are: on a site composed onto the platform (an IG),
   // `data-fa-root` is the platform's address, for the platform's links.

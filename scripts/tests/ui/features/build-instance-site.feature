@@ -128,6 +128,17 @@ Feature: Building an instance site
     Then "folio-build.json" is named as missing
     And once folio-build.json is written, nothing is missing
 
+  @test:scripts/tests/ui/build-instance-site.test.ts::build-instance-site_—_a_checkout_that_only_mounts_layers_(an_IG_repository)::only_graph_data_refuses:_a_missing_.json_or_.jsonld_is_graph_data,_a_page_or_stylesheet_is_not
+  Scenario: Only graph data refuses a publish
+    Then "folio-build.json", "index.jsonld", "layer/layer.jsonld" and "INDEX.JSONLD" are graph data
+    And "index.html", "assets/css/avatars.css", "assets/js/x.js", "a.jsonl" and "json/index.html" are not
+
+  @test:scripts/tests/ui/build-instance-site.test.ts::build-instance-site_—_a_checkout_that_only_mounts_layers_(an_IG_repository)::what_the_build_published_with_is_written_beside_the_link_report,_for_the_QA_page
+  Scenario: The findings a build published with are written for the QA page
+    Given a built site
+    When one coverage finding is written
+    Then "assets/site-qa/build.json" holds a "site-build-qa/v1" listing that finding
+
   @test:scripts/tests/ui/build-instance-site.test.ts::build-instance-site_—_a_checkout_that_only_mounts_layers_(an_IG_repository)::a_dead_link_on_a_content_page_is_reported_apart;_one_on_any_other_page_still_refuses
   Scenario: A dead link on a content page is reported apart from one on any other page
     # Gap: that a miss refuses the build is not checked
@@ -186,17 +197,24 @@ Feature: Building an instance site
     Then the writer is called once, for "avatars:css"
     And the result reports "avatars:css" as ran
 
-  @test:scripts/tests/ui/build-instance-site.test.ts::the_chrome's_publish-time_writers_run_before_the_chrome_is_composed_(smart-ra_avatars.css)::a_writer_that_fails_refuses_the_build
-  Scenario: A writer that fails refuses the build
+  @test:scripts/tests/ui/build-instance-site.test.ts::the_chrome's_publish-time_writers_run_before_the_chrome_is_composed_(smart-ra_avatars.css)::a_stylesheet_writer_that_fails_is_a_QA_finding,_and_the_build_goes_on
+  Scenario: A stylesheet writer that fails is a QA finding, not a refusal
     Given a chrome artefact written by "avatars:css"
     When the chrome is built and the writer fails with exit 1
-    Then the build is refused naming "avatars:css failed"
+    Then the build goes on with one "chrome" finding naming "avatars:css failed (exit 1)"
 
-  @test:scripts/tests/ui/build-instance-site.test.ts::the_chrome's_publish-time_writers_run_before_the_chrome_is_composed_(smart-ra_avatars.css)::a_writer_that_ran_and_built_nothing_refuses_the_build:_the_chrome_links_it
-  Scenario: A writer that ran but built nothing refuses the build
+  @test:scripts/tests/ui/build-instance-site.test.ts::the_chrome's_publish-time_writers_run_before_the_chrome_is_composed_(smart-ra_avatars.css)::a_script_writer_that_ran_and_built_nothing_is_a_QA_finding,_and_the_build_goes_on
+  Scenario: A script writer that ran but built nothing is a QA finding, not a refusal
     Given a chrome artefact "assets/js/never.js" whose file does not exist
     When the chrome is built and the writer reports it ran
-    Then the build is refused as the artefact missing or empty
+    Then the build goes on with one finding naming never.js missing or empty
+
+  @test:scripts/tests/ui/build-instance-site.test.ts::the_chrome's_publish-time_writers_run_before_the_chrome_is_composed_(smart-ra_avatars.css)::graph_data_still_refuses:_a_JSON(-LD)_writer_that_fails,_or_a_JSON(-LD)_that_came_out_missing
+  Scenario: Graph data still refuses the build
+    Given a chrome artefact "assets/graph/index.jsonld" written by "graph:jsonld"
+    When the chrome is built and the writer fails
+    Then the build is refused naming "graph:jsonld failed" and graph data
+    And when the writer reports it ran but the file does not exist the build is refused as graph data missing or empty
 
   @test:scripts/tests/ui/build-instance-site.test.ts::the_chrome's_publish-time_writers_run_before_the_chrome_is_composed_(smart-ra_avatars.css)::a_writer_that_does_not_apply_to_this_root_(exit_78)_is_reported,_and_its_artefacts_excused
   Scenario: A writer that does not apply to this root is reported, and its artefacts excused

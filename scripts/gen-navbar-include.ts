@@ -37,7 +37,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { siteDirFor } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
@@ -62,7 +63,15 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 // The site is the harness's, and this script moved out of it (bean 70lx).
 const INSTANCE = HARNESS_ROOT;
 const SITE = join(INSTANCE, siteDirFor(INSTANCE));
-const DATA = join(SITE, "_data", "harness.json");
+/**
+ * The checkout holding the layer. Where it MOUNTS cat-harness, this
+ * generator's computed files live at the layer's output root rather than in
+ * the pinned mount (bean `cat-tools-sm8r`, item 4, step 4): reads go through
+ * `readPathAt` (the output root, else the pinned copy), writes through
+ * `writePathAt`. In cat-harness's own checkout both are the site's own path.
+ */
+const CHECKOUT = checkoutRootFor(INSTANCE);
+const DATA = readPathAt(CHECKOUT, join(SITE, "_data", "harness.json"));
 const OUT = join(SITE, "_includes", "generated", "navbar-footer.html");
 
 /**
@@ -329,7 +338,7 @@ function main(): void {
 
   let current: string | undefined;
   try {
-    current = readFileSync(OUT, "utf-8");
+    current = readFileSync(readPathAt(CHECKOUT, OUT), "utf-8");
   } catch {
     current = undefined;
   }
@@ -341,9 +350,10 @@ function main(): void {
     console.error("docs/_includes/generated/navbar-footer.html is stale — run `bun run cat navbar:include` and commit");
     process.exit(1);
   }
-  mkdirSync(dirname(OUT), { recursive: true });
-  writeFileSync(OUT, next);
-  console.log(`wrote ${OUT}`);
+  const at = writePathAt(CHECKOUT, OUT);
+  mkdirSync(dirname(at), { recursive: true });
+  writeFileSync(at, next);
+  console.log(`wrote ${at}`);
 }
 
 // Guarded so a test can import `render` without rewriting the committed include.

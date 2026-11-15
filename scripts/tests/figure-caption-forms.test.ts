@@ -34,7 +34,7 @@ cands = lab.caption_candidates(blocks)
 labels = [(m.group(1) if (m := fig.LABEL.match(c)) else None) for c in cands]
 print(json.dumps({"candidates": cands, "labels": labels}))
 `;
-  const r = spawnSync("python3", ["-I", "-c", code, SCRIPTS, JSON.stringify(lines)], { encoding: "utf-8" });
+  const r = spawnSync("python3", ["-I", "-B", "-c", code, SCRIPTS, JSON.stringify(lines)], { encoding: "utf-8" });
   if (r.status !== 0) throw new Error(r.stderr);
   return JSON.parse(r.stdout);
 }
@@ -43,7 +43,7 @@ print(json.dumps({"candidates": cands, "labels": labels}))
  * pdf-vector-figures.py needs PyMuPDF at import time; without it there is
  * nothing to run, and the test reports a skip rather than a pass.
  */
-const NO_PYMUPDF = spawnSync("python3", ["-I", "-c", "import fitz"], { encoding: "utf-8" }).status !== 0;
+const NO_PYMUPDF = spawnSync("python3", ["-I", "-B", "-c", "import fitz"], { encoding: "utf-8" }).status !== 0;
 
 describe("caption patterns accept `Fig N.`", () => {
   test.skipIf(NO_PYMUPDF)("the Python arms find `Fig 1.` and still refuse non-captions", () => {

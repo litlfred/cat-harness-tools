@@ -52,12 +52,25 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { QaUsageError, parseQaRef, readQaBlobIds, resolveQaLocation, type QaStoreOptions } from "./qa-store.ts";
+import { mountedInstancesCached, outputTwinOf } from "./lib/layer-output.ts";
 
 export const VERIFY_EXIT = { identical: 0, differs: 1, unknown: 2, usage: 3 } as const;
 
 export interface MovedFile {
+  /** Repository-relative, as the layer lays it out: the `qa-reports` key. */
   path: string;
   bytes: number;
+  /**
+   * Repository-relative, where the bytes ARE when that is not {@link path}:
+   * the layer output root (`build/layers/<instance>/…`) of a mounted layer
+   * (bean `cat-tools-sm8r`, item 4). Absent, the file is at `path`.
+   */
+  at?: string;
+}
+
+/** Where a {@link MovedFile}'s bytes are, repository-relative. */
+export function locationOf(f: MovedFile): string {
+  return f.at ?? f.path;
 }
 
 export interface MovedDirectory {
@@ -101,6 +114,15 @@ function walk(abs: string, repoRoot: string, out: MovedFile[]): void {
   }
 }
 
+/** The checkout's mounted layers; none when its lock does not parse, so the inventory is the mounts alone, as before. */
+function mountedForInventory(repoRoot: string): Map<string, string> {
+  try {
+    return mountedInstancesCached(repoRoot);
+  } catch {
+    return new Map();
+  }
+}
+
 /** The declared `qa` roots, repository-relative — or `roots` when given. */
 export function movedRoots(repoRoot: string, roots?: string[]): string[] {
   if (roots && roots.length) return roots.map((r) => r.replace(/^\.\//, "").replace(/\/+$/, ""));
@@ -114,10 +136,27 @@ export function movedRoots(repoRoot: string, roots?: string[]): string[] {
  */
 export function movedInventory(repoRoot: string, roots?: string[]): MovedInventory {
   const directories: MovedDirectory[] = [];
+  const mounted = mountedForInventory(repoRoot);
   for (const path of movedRoots(repoRoot, roots)) {
     const abs = join(repoRoot, path);
     const files: MovedFile[] = [];
     if (existsSync(abs) && statSync(abs).isDirectory()) walk(abs, repoRoot, files);
+    // A mounted layer's computed results are under its output root, and its
+    // pinned ones stay in the mount. The inventory is their union, keyed by
+    // the layer's own path; the output root wins where both hold a file, as
+    // `readPathAt` reads it.
+    const twin = mounted.size ? outputTwinOf(repoRoot, abs, mounted) : undefined;
+    if (twin !== undefined && existsSync(twin) && statSync(twin).isDirectory()) {
+      const computed: MovedFile[] = [];
+      walk(twin, repoRoot, computed);
+      const twinRel = relative(repoRoot, twin).split("\\").join("/");
+      const byPath = new Map(files.map((f) => [f.path, f]));
+      for (const c of computed) {
+        const logical = path + c.path.slice(twinRel.length);
+        byPath.set(logical, { path: logical, bytes: c.bytes, at: c.path });
+      }
+      files.splice(0, files.length, ...byPath.values());
+    }
     files.sort((a, b) => a.path.localeCompare(b.path));
     directories.push({ path, files });
   }
@@ -157,8 +196,10 @@ export function verifyMoved(args: { ref: string; roots?: string[] }, opts: QaSto
   if (read.state !== "hit") {
     return { state: "unknown", reason: `entry ${args.ref} is ${read.state.toUpperCase()}: ${read.reason} — an unread entry verifies nothing`, ...empty };
   }
-  const paths = inv.directories.flatMap((d) => d.files.map((f) => f.path));
-  const local = hashWorkingFiles(repoRoot, paths);
+  const files = inv.directories.flatMap((d) => d.files);
+  const paths = files.map((f) => f.path);
+  const hashed = hashWorkingFiles(repoRoot, files.map(locationOf));
+  const local = new Map(files.map((f) => [f.path, hashed.get(locationOf(f))!]));
   const res: VerifyResult = { state: "identical", reason: "", key: read.key, identical: [], differs: [], missing: [], extra: [] };
   for (const p of paths) {
     const there = read.blobs.get(p);

@@ -52,7 +52,7 @@ function alone(root: string): string[] {
     "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
     "print(json.dumps(sorted(m.tree_snapshotting(sys.argv[2]))))",
   ].join("\n");
-  const r = spawnSync("python3", ["-I", "-c", py, RUN_GATES, root], { encoding: "utf-8" });
+  const r = spawnSync("python3", ["-I", "-B", "-c", py, RUN_GATES, root], { encoding: "utf-8" });
   if (r.status !== 0) throw new Error(`python3 exited ${r.status}: ${r.stderr}`);
   return JSON.parse(r.stdout);
 }

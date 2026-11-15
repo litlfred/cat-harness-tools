@@ -8,6 +8,8 @@ import { join } from "node:path";
 
 import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
+import { linkOverlay, readdirSync as siteReaddirSync } from "./support/site-fs.ts";
 
 /**
  * Every SQLite slice in a real Chromium, through the ONE search page. Bean `q8ar`.
@@ -73,15 +75,15 @@ const freePort = () => new Promise<number>((resolve, reject) => {
 
 test.beforeAll(async () => {
   site = mkdtempSync(join(tmpdir(), "q8ar-site-"));
-  for (const e of readdirSync(DOCS)) if (e !== "assets" && e !== "payload") symlinkSync(join(DOCS, e), join(site, e));
+  for (const e of siteReaddirSync(DOCS) as string[]) if (e !== "assets" && e !== "payload") linkOverlay(join(DOCS, e), join(site, e));
   mkdirSync(join(site, "assets"));
-  for (const e of readdirSync(join(DOCS, "assets"))) if (e !== "slices") symlinkSync(join(DOCS, "assets", e), join(site, "assets", e));
+  for (const e of siteReaddirSync(join(DOCS, "assets")) as string[]) if (e !== "slices") linkOverlay(join(DOCS, "assets", e), join(site, "assets", e));
   // The committed KG payloads, which the `kg` slice points at, are COPIED in
   // as links one by one, so the deploy payloads can be written beside them.
   const payloads = join(site, "payload", "sha256");
   mkdirSync(payloads, { recursive: true });
   const committed = join(DOCS, "payload", "sha256");
-  if (existsSync(committed)) for (const f of readdirSync(committed)) symlinkSync(join(committed, f), join(payloads, f));
+  if (existsSync(overlayPath(committed))) for (const f of siteReaddirSync(committed) as string[]) symlinkSync(overlayPath(join(committed, f)), join(payloads, f));
   execFileSync("bun", [
     "run", join(TOOLS_ROOT, "scripts", "gen-slice-sqlite.ts"),
     "--out", join(site, "assets", "slices"),
@@ -178,7 +180,7 @@ test("beans: with no Worker the slice opens in memory and still answers", async 
 
 // ── todos ────────────────────────────────────────────────────────────────
 
-const todoIndex = JSON.parse(readFileSync(join(DOCS, "assets", "todos", "index.json"), "utf-8")) as {
+const todoIndex = JSON.parse(readFileSync(overlayPath(join(DOCS, "assets", "todos", "index.json")), "utf-8")) as {
   items: { id: string; summary: string; comment: string }[];
 };
 const knownTodo = todoIndex.items.find((t) => /[A-Za-z]{4,}\s+[A-Za-z]{4,}/.test(t.summary))!;
@@ -215,12 +217,12 @@ test("a redraw that still lists a row keeps the body the reader opened", async (
 
 // ── library ──────────────────────────────────────────────────────────────
 
-const libraryIndex = JSON.parse(readFileSync(join(DOCS, "assets", "library", "index.json"), "utf-8")) as { entries: { id: string; title: string }[] };
+const libraryIndex = JSON.parse(readFileSync(overlayPath(join(DOCS, "assets", "library", "index.json")), "utf-8")) as { entries: { id: string; title: string }[] };
 const knownBlock = (() => {
   for (const e of [...libraryIndex.entries].sort((a, b) => (a.id < b.id ? -1 : 1))) {
     const p = join(DOCS, "assets", "library", "entries", `${e.id}.json`);
-    if (!existsSync(p)) continue;
-    const entry = JSON.parse(readFileSync(p, "utf-8")) as { blocks: { id: string; title: string; content: string | null }[] };
+    if (!existsSync(overlayPath(p))) continue;
+    const entry = JSON.parse(readFileSync(overlayPath(p), "utf-8")) as { blocks: { id: string; title: string; content: string | null }[] };
     // THREE words on one line, so the phrase is rare enough to rank its block
     // inside the page's 50-row limit.
     const three = /[A-Za-z]{5,} [A-Za-z]{5,} [A-Za-z]{5,}/;
@@ -259,7 +261,7 @@ test("kg: the whole-repo slice finds a skill node, and its instruction body is t
 
 type Manifest = { slice: string; file: string; sha256: string } & Record<string, unknown>;
 const manifestOf = (slice: string) =>
-  JSON.parse(readFileSync(join(site, "assets", "slices", `${slice}.sqlite3.json`), "utf-8")) as Manifest;
+  JSON.parse(readFileSync(overlayPath(join(site, "assets", "slices", `${slice}.sqlite3.json`)), "utf-8")) as Manifest;
 
 test("wixl: the manifest names a content-addressed database, and that named file is what the page downloads", async ({ page }) => {
   const m = manifestOf("beans");

@@ -65,9 +65,9 @@
  */
 import { TOOLS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 
-import { repoRootFor } from "../schemas/kg/cat-harness.js";
+import { repoRootFor, resolveDirectories } from "../schemas/kg/cat-harness.js";
 import { parse } from "yaml";
 
 import { rootProfile } from "./lib/root-gate-set.ts";
@@ -732,6 +732,169 @@ export function allowlistsNotOursReason(root: string): string | null {
     : null;
 }
 
+/**
+ * `.github/` prefixes and bootstrap files a workflow `run:` step may invoke
+ * directly (bean `folio-assistant-dtda`). Skill and tool source belongs in
+ * declared KG directories, never under `.github/skills/` or another hidden
+ * `.github/` subtree.
+ */
+export const ALLOWED_GITHUB_PREFIXES = [
+  ".github/workflows/",
+  ".github/scripts/",
+  ".github/ci-image/",
+  ".github/actions/",
+] as const;
+
+export const ALLOWED_GITHUB_FILES = [
+  ".github/mount-from-lock.sh",
+  ".github/cat.ts",
+] as const;
+
+/** A workflow `run:` step invoking a disallowed path under `.github/`. */
+export interface GithubPathFinding {
+  file: string;
+  job: string;
+  step: string;
+  /** The path as written in the `run:` block. */
+  path: string;
+  /** The normalised `.github/...` path. */
+  githubPath: string;
+}
+
+/**
+ * Whether a `.github/...` path is allowed as a workflow `run:` invocation:
+ * `.github/workflows/`, CI plumbing (`.github/scripts/`, `.github/ci-image/`,
+ * `.github/actions/`, `.github/mount-from-lock.sh`, `.github/cat.ts`), or a
+ * directory declared in a graph manifest (`declaredDirs`).
+ */
+export function isAllowedGithubInvocation(
+  ghPath: string,
+  declaredDirs: ReadonlySet<string> = new Set(),
+): boolean {
+  const clean = ghPath.replace(/^\.\//, "");
+  if (!clean.startsWith(".github/")) return true;
+  if ((ALLOWED_GITHUB_FILES as readonly string[]).includes(clean)) return true;
+  if (ALLOWED_GITHUB_PREFIXES.some((p) => clean.startsWith(p))) return true;
+  for (const raw of declaredDirs) {
+    const d = raw.replace(/^\.\//, "").replace(/\/+$/, "");
+    if (clean === d || clean.startsWith(`${d}/`)) return true;
+  }
+  return false;
+}
+
+function invokedCandidateOnLine(line: string): string | undefined {
+  const direct = invokedPath(line);
+  if (direct) return direct;
+  const t = line.trim();
+  const pyMod = /^python3?\s+(?:-[\w-]+\s+)*-m\s+["']?(\.github\.[\w.]+)["']?(?:\s|$)/.exec(t);
+  if (pyMod) return pyMod[1]!.replace(/\./g, "/");
+  const interp = /^(?:python3?|node|deno\s+run)\s+(?:-[\w-]+\s+)*["']?(\S+?)["']?(?:\s|$)/.exec(t);
+  if (interp && !interp[1]!.startsWith("-") && /\.(?:py|ts|mts|js|mjs|cjs|sh)$/.test(interp[1]!)) {
+    return interp[1]!;
+  }
+  const bare = /^["']?((?:\.{1,2}\/)*\.github\/\S+?)["']?(?:\s|$)/.exec(t);
+  if (bare) return bare[1]!;
+  return undefined;
+}
+
+/**
+ * Disallowed `.github/` invocations in one workflow (bean
+ * `folio-assistant-dtda`).
+ */
+export function githubPathFindingsFrom(
+  file: string,
+  text: string,
+  declaredDirs: ReadonlySet<string> = new Set(),
+): GithubPathFinding[] {
+  const doc = parse(text) as WorkflowDoc;
+  const out: GithubPathFinding[] = [];
+  for (const [job, def] of Object.entries(doc.jobs ?? {})) {
+    const jobCwd =
+      def.defaults?.run?.["working-directory"] ??
+      doc.defaults?.run?.["working-directory"] ??
+      "";
+    const layout = checkoutLayout(def.steps);
+    for (const step of def.steps ?? []) {
+      if (!step.run) continue;
+      let cwd: string | null = step["working-directory"] ?? jobCwd;
+      for (const raw of step.run.split("\n")) {
+        for (const segment of raw.split("&&")) {
+          const line = segment.trim();
+          if (!line || line.startsWith("#")) continue;
+          const cd = cdTarget(line);
+          if (cd === null) {
+            cwd = null;
+            continue;
+          }
+          if (cd !== undefined) {
+            cwd = cwd === null ? null : applyCd(cwd, cd);
+            continue;
+          }
+          const candidate = invokedCandidateOnLine(line);
+          if (!candidate) continue;
+          const flag = cwdFlag(line);
+          const effective = cwd === null ? "" : flag ? applyCd(cwd, flag) : cwd;
+          const joined = applyCd(effective, candidate);
+          const inTree = stripCheckout(joined, layout.paths);
+          const m =
+            /(?:^|\/)(\.github\/\S+)$/.exec(inTree) ??
+            /(?:^|\/)(\.github\/\S+)$/.exec(candidate);
+          if (!m) continue;
+          const githubPath = m[1]!;
+          if (!isAllowedGithubInvocation(githubPath, declaredDirs)) {
+            out.push({
+              file,
+              job,
+              step: step.name ?? "(unnamed step)",
+              path: candidate,
+              githubPath,
+            });
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** Declared directories across `root` and its mounted instance directories, relative to `root`. */
+export function declaredDirsFor(root = ROOT): Set<string> {
+  const out = new Set<string>();
+  const addFrom = (inst: string): void => {
+    try {
+      for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
+        const rel = d.absPath ? relative(root, d.absPath) : d.path;
+        if (rel) out.add(rel.replace(/\/+$/, ""));
+      }
+    } catch {
+      // Non-instance directory contributes nothing.
+    }
+  };
+  addFrom(root);
+  if (existsSync(root)) {
+    for (const e of readdirSync(root, { withFileTypes: true })) {
+      if (e.isDirectory() && !e.name.startsWith(".") && e.name !== "node_modules") {
+        addFrom(join(root, e.name));
+      }
+    }
+  }
+  return out;
+}
+
+/** Every disallowed `.github/` invocation across every workflow in `root`. */
+export function allGithubPathFindings(
+  root = ROOT,
+  declaredDirs: ReadonlySet<string> = declaredDirsFor(root),
+): GithubPathFinding[] {
+  const dir = join(root, WORKFLOW_DIR);
+  const out: GithubPathFinding[] = [];
+  if (!existsSync(dir)) throw new NoInvocationsFound();
+  for (const f of readdirSync(dir).filter((n) => /\.ya?ml$/.test(n)).sort()) {
+    out.push(...githubPathFindingsFrom(f, readFileSync(join(dir, f), "utf-8"), declaredDirs));
+  }
+  return out;
+}
+
 function main(): number {
   const list = process.argv.includes("--list");
   const invocations = allInvocations();
@@ -866,6 +1029,18 @@ function main(): number {
     );
   }
 
+  // ── The THIRD criterion: no workflow `run:` invokes undeclared `.github/` paths (bean `folio-assistant-dtda`) ──
+  const ghFindings = allGithubPathFindings();
+  for (const g of ghFindings) {
+    console.error(
+      `✗ ${g.file} › ${g.job} › ${g.step}: \`${g.path}\` invokes \`${g.githubPath}\` — ` +
+        `a workflow \`run:\` may not invoke a path under \`.github/\` other than ` +
+        `\`.github/workflows/\`, CI plumbing (\`.github/scripts/\`, \`.github/ci-image/\`, ` +
+        `\`.github/actions/\`, \`.github/mount-from-lock.sh\`, \`.github/cat.ts\`) or a ` +
+        `declared directory.`,
+    );
+  }
+
   const bad =
     missing.length +
     undetermined.length +
@@ -873,7 +1048,8 @@ function main(): number {
     badDirs.length +
     openDirs.length +
     unusedDirs.length +
-    staleBaseline.length;
+    staleBaseline.length +
+    ghFindings.length;
   if (bad === 0) {
     console.log(
       "✓ every workflow script path resolves, and every `working-directory` " +

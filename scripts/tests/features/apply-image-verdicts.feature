@@ -71,3 +71,19 @@ Feature: Applying image verdicts to a staged document
     Given a logo verdict for image "img-p003-1"
     When runStaging runs in write mode twice
     Then the images.json after the second run equals the one after the first
+
+  @test:scripts/tests/apply-image-verdicts.test.ts::translations_drafted_after_the_verdict_survive_a_re-ingest_(re-ingest_pilot,_2026-11-14)::a_staged_sidecar_takes_the_filed_entry's_other_languages_when_the_English_is_unchanged
+  Scenario: A re-ingest keeps the image descriptions in other languages
+    When the filed entry's sidecar holds the verdict's English text and five other languages
+    Then the rebuilt sidecar holds them too
+
+  @test:scripts/tests/apply-image-verdicts.test.ts::translations_drafted_after_the_verdict_survive_a_re-ingest_(re-ingest_pilot,_2026-11-14)::a_changed_English_description_does_not_carry_the_old_translations
+  Scenario: A changed description does not keep its old translations
+    When the verdict's English text differs from the filed one
+    Then only the verdict's own narratives are written
+
+  @test:scripts/tests/apply-image-verdicts.test.ts::translations_drafted_after_the_verdict_survive_a_re-ingest_(re-ingest_pilot,_2026-11-14)::a_bare_run_over_a_filed_sidecar_keeps_what_it_holds
+  Scenario: Re-applying the verdicts to a filed sidecar keeps its other languages
+    When the verdicts are applied to a sidecar that already holds translations of the same text
+    Then the translations stay
+

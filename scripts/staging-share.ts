@@ -56,6 +56,7 @@ import { stripSeo } from "./strip-preview-seo.ts";
 import { parseRetained, readRetained, RETAINED_FILE, type Retained } from "./keep-shared-payloads.ts";
 import { blobId, forEachBlob, isRegular, objectFormat, prefetchBlobs, sparseEntries, type GitEntry } from "./lib/git-blobs.ts";
 import { isPreviewPath } from "./lib/preview-prefix.ts";
+import { SITE_REPORT as PREVIEW_QA_REPORT } from "./preview-qa.ts";
 
 /**
  * Files a preview always keeps: they describe this preview, or serve it. The
@@ -63,7 +64,7 @@ import { isPreviewPath } from "./lib/preview-prefix.ts";
  * that installs the worker on a first visit, and the file `staging-review`
  * lists to tell that a preview was published.
  */
-export const NEVER_SHARED = new Set(["index.html", "staging.json", "shared.json", "staging-sw.js", "staging-banner.js", "404.html", "build.json", "_build-record.json"]);
+export const NEVER_SHARED = new Set(["index.html", "staging.json", "shared.json", "staging-sw.js", "staging-banner.js", "404.html", "build.json", "_build-record.json", PREVIEW_QA_REPORT]);
 
 const META_STAGING = /<meta name="fa-staging" content="[^"]*">/g;
 const META_SEARCH = /<meta name="fa-search-index" content="([^"]*)">/g;

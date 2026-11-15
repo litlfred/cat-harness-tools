@@ -35,14 +35,14 @@ Feature: The schemas visualiser
     Then table code cells use "word-break: normal" with "overflow-wrap: anywhere", both generally and under "#detail"
     And the first-column field names in "#detail" use "white-space: nowrap"
 
-  @test:scripts/tests/gen-schema-viz.test.ts::schemas_visualiser_wireframe_fixes_(folio-assistant-nnpk)::Finding_5:_UML_box_adjusts_field_type_truncation_width_for_desktop_viewports
-  Scenario: The UML box truncates field types wider on desktop than on phones
-    # Gap: only the script text is checked; no diagram is drawn
+  @test:scripts/tests/gen-schema-viz.test.ts::schemas_visualiser_wireframe_fixes_(folio-assistant-nnpk)::Finding_5:_UML_box_truncation_is_stated,_through_the_one_shared_renderer
+  Scenario: The UML box states what it truncates, drawn by the shared renderer
+    # Gap: only the script text is checked; the drawing itself is tested in class-diagram.test.ts
     Given the schemas visualiser page for "cat-harness"
     When its HTML is read
-    Then the script sets maxChars to 42 under 640px wide and 76 otherwise
-    And it sets maxTypeChars to 28 under 640px wide and 64 otherwise
-    And the box width is bounded by maxChars and field types are sliced to maxTypeChars
+    Then it carries the shared classDiagram renderer and calls it for the selected type
+    And a box with more rows than it shows ends with "… n more"
+    And a clipped name or type ends in an ellipsis
 
   @test:scripts/tests/gen-schema-viz.test.ts::source_descriptors_in_a_schemas_directory_(folio-assistant-1nu0)::reads_only_folio-source-descriptor/v1_files,_attributed_to_the_instance_holding_them
   Scenario: Only source descriptor files become rows, attributed to their instance

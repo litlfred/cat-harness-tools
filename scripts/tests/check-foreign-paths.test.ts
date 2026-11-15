@@ -120,7 +120,7 @@ describe("a block that MOVES between files is the same finding (dth-sc#24)", () 
     const py = join(TOOLS_ROOT, ".github", "scripts", "layer-pr-checks");
     const r = spawnSync(
       "python3",
-      ["-I", "-c", `import sys; sys.path.insert(0, ${JSON.stringify(py)}); from gate_diagnostics import diagnostics; print("\\n".join(diagnostics(sys.stdin.read())))`],
+      ["-I", "-B", "-c", `import sys; sys.path.insert(0, ${JSON.stringify(py)}); from gate_diagnostics import diagnostics; print("\\n".join(diagnostics(sys.stdin.read())))`],
       { input: out.join("\n") + "\n", encoding: "utf-8" },
     );
     expect(r.status).toBe(0);

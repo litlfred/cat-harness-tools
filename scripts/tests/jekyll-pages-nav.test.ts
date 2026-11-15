@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { jekyllNavPages, harnessOfUrl, labelUnder, pagesNav } from "../lib/jekyll-pages-nav.ts";
+import { declaredNavsIn, jekyllNavPages, harnessOfUrl, labelUnder, pagesNav, siteAbsoluteDeclaration } from "../lib/jekyll-pages-nav.ts";
 import { expandRail, injectRail, railDataJson } from "../lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS } from "../lib/navbar.ts";
 import { pageLangOf } from "../mount-instance-docs.ts";
@@ -253,5 +253,85 @@ describe("bibliography pages nest under Bibliography by parent (owner, 2026-11-1
     expect(labelUnder("Bibliography: x/y", "Bibliography: x")).toBe("y");
     expect(labelUnder("WHO: a handbook", "Bibliography: x")).toBe("WHO: a handbook");
     expect(labelUnder("Plain", "Bibliography")).toBe("Plain");
+  });
+});
+
+describe("a page that declares its own navigation gives its Pages subtree (owner, 2026-11-14)", () => {
+  // A page set with a menu of its own: a section page whose front matter makes
+  // stub group pages, items ordered by nav_order, and a declaration of the menu
+  // in the built page. Before: the subtree sorted alphabetically, the stubs
+  // shown as groups, and every entry that is not a Jekyll page missing.
+  const SOURCE = {
+    "index.md": fm({ title: "Guide", has_children: true, nav_order: 900 }),
+    "menu-home.md": fm({ title: "Home", parent: "Guide", nav_order: 1, has_children: true }),
+    "faq.md": fm({ title: "FAQ", parent: "Home", grand_parent: "Guide", nav_order: 2 }),
+    "dependencies.md": fm({ title: "Dependencies", parent: "Home", grand_parent: "Guide", nav_order: 1 }),
+    "menu-indices.md": fm({ title: "Indices", parent: "Guide", nav_order: 3, has_children: true }),
+    "maps.md": fm({ title: "Mappings", parent: "Indices", grand_parent: "Guide", nav_order: 3 }),
+    "license.md": fm({ title: "License", parent: "Indices", grand_parent: "Guide", nav_order: 4 }),
+    "notes.md": fm({ title: "Notes", parent: "Guide", nav_order: 5 }),
+    "about.md": fm({ title: "About", nav_order: 1 }),
+  };
+  const MENU = [
+    { label: "Home", items: [
+      { label: "Summary", href: "./index.html" },
+      { label: "Dependencies", href: "./dependencies.html" },
+      { label: "FAQ", href: "./faq.html" },
+    ] },
+    { label: "Framework", href: "./framework.pdf" },
+    { label: "Indices", items: [
+      { label: "Artifact Index", href: "./artifacts.html" },
+      { label: "Bibliography", href: "https://example.org/bib/" },
+      { label: "Profile: B", href: "./maps.html" },
+      { label: "Profile: A", href: "./license.html" },
+    ] },
+  ];
+  const built = site({
+    "index.html": `<html><body><script type="application/json" data-fa-visualiser-nav>${JSON.stringify(MENU)}</script></body></html>`,
+    "about.html": `<html><body><script type="application/json" data-fa-visualiser-nav>[{"label":"Top","href":"#top"}]</script></body></html>`,
+  });
+  const pages = jekyllNavPages(site(SOURCE));
+  const declared = declaredNavsIn(built, pages);
+  const tree = (items: readonly { label: string; href?: string; children?: readonly unknown[] }[], ind = ""): string[] =>
+    items.flatMap((i) => [`${ind}${i.label}${i.href ? ` ${i.href}` : ""}`, ...tree((i.children ?? []) as typeof items, `${ind}  `)]);
+
+  test("declaredNavsIn reads a parent page's declaration with site-absolute hrefs; anchors and leaf pages give none", () => {
+    expect([...declared.keys()]).toEqual(["/"]);
+    const d = declared.get("/")!;
+    expect(d.map((e) => e.label)).toEqual(["Home", "Framework", "Indices"]);
+    expect(d[0]!.items!.map((k) => k.href)).toEqual(["/index.html", "/dependencies.html", "/faq.html"]);
+    expect(d[1]!.href).toBe("/framework.pdf");
+    expect(d[2]!.items![1]!.href).toBe("https://example.org/bib/");
+    expect(siteAbsoluteDeclaration([{ label: "Top", href: "#top" }], ".")).toBeUndefined();
+  });
+
+  test("the declaring page's children are the declaration: same entries, order and nesting, unsorted and unfolded; stubs gone, uncovered pages kept after", () => {
+    const { items } = pagesNav(pages, { prefix: "..", locale: "en", declared });
+    expect(tree(items)).toEqual([
+      "Guide ../",
+      "  Home",
+      "    Summary ../index.html",
+      "    Dependencies ../dependencies.html",
+      "    FAQ ../faq.html",
+      "  Framework ../framework.pdf",
+      "  Indices",
+      "    Artifact Index ../artifacts.html",
+      "    Bibliography https://example.org/bib/",
+      "    Profile: B ../maps.html",
+      "    Profile: A ../license.html",
+      "  Notes ../notes.html",
+      "About ../about.html",
+    ]);
+    const guide = items.find((i) => i.label === "Guide")!;
+    expect(guide.fold).toBe("4 pages");
+    expect(guide.children!.map((c) => c.depth)).toEqual([1, 1, 1, 1]);
+    expect(guide.children![0]!.children!.map((c) => c.depth)).toEqual([2, 2, 2]);
+  });
+
+  test("without declarations the front-matter tree is unchanged: stubs as groups, sorted in the reader's locale", () => {
+    const { items } = pagesNav(pages, { prefix: "..", locale: "en" });
+    const guide = items.find((i) => i.label === "Guide")!;
+    expect(guide.children!.map((c) => c.label)).toEqual(["Home", "Indices", "Notes"]);
+    expect(guide.children![0]!.href).toBe("../menu-home.html");
   });
 });

@@ -6,6 +6,7 @@ import { Liquid } from "liquidjs";
 
 import { siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * THE SEARCH INDEX IS BUILT WHEN A READER REACHES FOR SEARCH, NEVER ON LOAD —
@@ -36,8 +37,8 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  */
 
 const ROOT = join(HARNESS_ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const UI = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const UI = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 const LUNR = readFileSync(createRequire(import.meta.url).resolve("lunr/lunr.min.js"), "utf8");
 
 /**
@@ -49,7 +50,7 @@ const LUNR = readFileSync(createRequire(import.meta.url).resolve("lunr/lunr.min.
  */
 /** The override, rendered as Jekyll would: front matter off, the site's search settings in. */
 async function renderedJtd(): Promise<string> {
-  const src = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/just-the-docs.js")), "utf8").replace(/^---[\s\S]*?---\n/, "");
+  const src = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/just-the-docs.js"))), "utf8").replace(/^---[\s\S]*?---\n/, "");
   // The two includes are the theme's empty customisation hooks; Jekyll's
   // unquoted include names need `dynamicPartials: false`.
   const liquid = new Liquid({

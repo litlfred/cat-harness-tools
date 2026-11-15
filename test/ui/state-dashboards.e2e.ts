@@ -7,6 +7,7 @@ import { repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 import { declaredVisualisers } from "../../scripts/viewer-declarations.ts";
 import { declaredPagePath, firstPaintBlock, SCHEME_INK } from "../support/site-pages.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * Every generated state dashboard, audited — bean `5wrg`.
@@ -77,7 +78,8 @@ function dashboards(): Map<string, string> {
     .map((v) => v.id)
     .sort();
   for (const id of ids) {
-    const page = declaredPagePath(ROOT, id);
+    // Through the overlay: a declared page is written at publish (bean cat-tools-sm8r).
+    const page = overlayPath(declaredPagePath(ROOT, id));
     if (!existsSync(page)) continue;
     try {
       const html = readFileSync(page, "utf8");
@@ -98,7 +100,7 @@ function dashboards(): Map<string, string> {
 const PAGES = dashboards();
 const IDS = [...PAGES.keys()];
 
-const asset = (rel: string) => readFileSync(join(ROOT, SITE, rel), "utf8");
+const asset = (rel: string) => readFileSync(overlayPath(join(ROOT, SITE, rel)), "utf8");
 
 /**
  * A stand-in for the default layout: what it contributes to these pages and

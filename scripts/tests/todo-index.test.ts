@@ -23,15 +23,18 @@ import {
 } from "../../schemas/sdlc/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
+import { overlayPath } from "../lib/layer-output.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const ASSET = join(ROOT, siteDirFor(ROOT), "assets/todos/index.json");
+// Built at publish: a mounted layer's copy is at its output root (bean cat-tools-sm8r, item 4).
+const ASSET_LOGICAL = join(ROOT, siteDirFor(ROOT), "assets/todos/index.json");
+const ASSET = (): string => overlayPath(ASSET_LOGICAL);
 
 /** Standing alone, the published todo index is not built: `docs:pages` writes it at publish, and it is gitignored. */
-const NOT_BUILT = (): boolean => siteNotBuilt("the published todo index `docs:pages` writes at publish (gitignored)", ASSET);
+const NOT_BUILT = (): boolean => siteNotBuilt("the published todo index `docs:pages` writes at publish (gitignored)", ASSET());
 
 const published = (): { raw: string; doc: TodoIndex } => {
-  const raw = readFileSync(ASSET, "utf-8");
+  const raw = readFileSync(ASSET(), "utf-8");
   return { raw, doc: TodoIndexSchema.parse(JSON.parse(raw)) };
 };
 
@@ -43,8 +46,8 @@ describe("the artefact answers `what am I?` from itself", () => {
   test.skipIf(NOT_BUILT())("the published file parses against the schema that names it", () => {
     // The defect this module exists to end: `folio-todo-index` appeared in
     // exactly two places in this repository, neither of them a schema.
-    expect(existsSync(ASSET)).toBe(true);
-    const parsed = TodoIndexSchema.safeParse(JSON.parse(readFileSync(ASSET, "utf-8")));
+    expect(existsSync(ASSET())).toBe(true);
+    const parsed = TodoIndexSchema.safeParse(JSON.parse(readFileSync(ASSET(), "utf-8")));
     expect(parsed.success ? [] : parsed.error.issues).toEqual([]);
   });
 

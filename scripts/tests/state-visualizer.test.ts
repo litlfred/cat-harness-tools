@@ -11,7 +11,8 @@
  * bean is a test that gets deleted.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "../../test/support/site-fs.ts";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -62,6 +63,7 @@ import {
   visualiserPageRef,
 } from "../viewer-declarations.ts";
 import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
+import { overlayPath } from "../lib/layer-output.ts";
 
 const ROOT = HARNESS_ROOT;
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -81,7 +83,12 @@ const visOf = (graph: string) => VIS[graph] ?? graph;
  */
 const pageDir = (graph: string) => {
   const parts = { harness: "cat-harness", visualiser: visOf(graph) };
-  return existingPageDir(SITE, parts) ?? visualiserPageDir(SITE, pageParts(parts));
+  // Through the overlay first (bean cat-tools-sm8r): the writer puts the page at
+  // the layer's OUTPUT ROOT, while a stale committed copy may still sit at the old
+  // address in the pinned mount, which `existingPageDir` (mount only) would pick.
+  const holds = (d: string) => existsSync(join(d, "index.html")) || existsSync(join(d, "index.md"));
+  const overlaid = [visualiserPageDir(SITE, pageParts(parts)), visualiserPageDir(SITE, forwardingParts(parts))].find(holds);
+  return overlaid ?? existingPageDir(SITE, parts) ?? visualiserPageDir(SITE, pageParts(parts));
 };
 /** The directory every dashboard of this harness sits in. */
 const dashboardsDir = () => dirname(pageDir("beans"));
@@ -156,14 +163,14 @@ describe("each page reads the projection that already exists", () => {
   test.skipIf(
     siteNotBuilt(
       "the beans and todos projections `gen-docs-pages.ts` writes at publish (gitignored)",
-      join(SITE, "assets", "beans", "index.json"),
-      join(SITE, "assets", "todos", "index.json"),
+      overlayPath(join(SITE, "assets", "beans", "index.json")),
+      overlayPath(join(SITE, "assets", "todos", "index.json")),
     ),
   )("and that projection is really there", () => {
     // The generator publishes no data of its own — `gen-docs-pages.ts` does.
     // A second copy would be two answers to what the work plan holds.
-    expect(existsSync(join(SITE, "assets", "beans", "index.json"))).toBe(true);
-    expect(existsSync(join(SITE, "assets", "todos", "index.json"))).toBe(true);
+    expect(existsSync(overlayPath(join(SITE, "assets", "beans", "index.json")))).toBe(true);
+    expect(existsSync(overlayPath(join(SITE, "assets", "todos", "index.json")))).toBe(true);
   });
 
   test.skipIf(dashboardsNotBuilt("beans", "todos"))("a graph page names only its own graph", () => {

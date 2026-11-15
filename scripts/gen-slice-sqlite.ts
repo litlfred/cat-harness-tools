@@ -105,6 +105,7 @@ import { Database } from "bun:sqlite";
 import { mintsFragments, subjectBase, subjectPathOf } from "./lib/subject-iri.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { overlayDirs, overlayPath } from "./lib/layer-output.ts";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
@@ -486,7 +487,7 @@ export function checkSlice(def: SliceDef, data: SliceData, opts: { publishedPayl
     } else {
       const pdir = opts.publishedPayloadDir ?? join(INSTANCE_ROOT, payloadOutDir(INSTANCE_ROOT));
       for (const [ref, link] of data.payloads.links) {
-        if (!existsSync(join(pdir, link.sha256))) problems.push(`${ref}: points at payload ${link.sha256}, which the published tree does not hold`);
+        if (!existsSync(overlayPath(join(pdir, link.sha256)))) problems.push(`${ref}: points at payload ${link.sha256}, which the published tree does not hold`);
       }
     }
   } finally {
@@ -723,7 +724,9 @@ export const TODOS_SLICE: SliceDef = {
     body: "markdown",
   },
   async load(root) {
-    const p = join(INSTANCE_ROOT, TODO_INDEX);
+    // Read through the layer overlay: `docs:pages` writes a mounted layer's
+    // todo index at its output root (bean `cat-tools-sm8r`, item 4).
+    const p = overlayPath(join(INSTANCE_ROOT, TODO_INDEX));
     if (!existsSync(p)) return null;
     // The todo reader is imported lazily: it resolves its graph at import.
     const { readTodoFiles } = await import("./todos.ts");
@@ -867,14 +870,22 @@ export const LIBRARY_SLICE: SliceDef = {
     body: "library-entry",
   },
   async load() {
+    // Read through the layer output overlay: `library:viz` writes a mounted
+    // layer's projection at the output root (`makeEmit` → `writePathAt`), so
+    // the path under the mount is only the name. Read there, an index checkout
+    // found no source and the slice failed (folio-assistant#3124).
     const dir = join(INSTANCE_ROOT, LIBRARY_DIR);
-    if (!existsSync(join(dir, "index.json"))) return null;
+    const index = overlayPath(join(dir, "index.json"));
+    if (!existsSync(index)) return null;
     const entries = new Map<string, Buffer>();
     const edir = join(dir, "entries");
-    if (existsSync(edir)) {
-      for (const f of readdirSync(edir).sort()) if (f.endsWith(".json")) entries.set(f.slice(0, -5), readFileSync(join(edir, f)));
+    // The output twin first, then the mount: the first to hold an entry wins.
+    for (const d of overlayDirs(edir)) {
+      for (const f of readdirSync(d).sort()) {
+        if (f.endsWith(".json") && !entries.has(f.slice(0, -5))) entries.set(f.slice(0, -5), readFileSync(join(d, f)));
+      }
     }
-    return libraryData(JSON.parse(readFileSync(join(dir, "index.json"), "utf-8")), entries);
+    return libraryData(JSON.parse(readFileSync(index, "utf-8")), entries);
   },
 };
 

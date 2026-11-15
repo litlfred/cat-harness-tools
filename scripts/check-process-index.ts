@@ -40,6 +40,7 @@
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { docsSources } from "./lib/docs-sources.ts";
 import { existsSync, readFileSync } from "node:fs";
+import { overlayPath } from "./lib/layer-output.ts";
 import { join, relative, resolve, sep } from "node:path";
 
 import { workflowFiles } from "./known-skills.ts";
@@ -150,8 +151,10 @@ export function publishedProcesses(outDir: string = OUT): { processes: Published
   const problems: string[] = [];
   const processes: PublishedProcess[] = [];
   const read = (abs: string, schema: typeof SubgraphIndexSchema | typeof SubgraphHydratedSchema): Doc | undefined => {
-    if (!existsSync(abs)) { problems.push(`${relative(ROOT, abs)} is missing — run \`bun run cat subgraph:jsonld\``); return undefined; }
-    const doc = JSON.parse(readFileSync(abs, "utf-8")) as Doc;
+    // A mounted layer's subgraph tree is at its output root (bean `cat-tools-sm8r`, item 4).
+    const at = overlayPath(abs);
+    if (!existsSync(at)) { problems.push(`${relative(ROOT, abs)} is missing — run \`bun run cat subgraph:jsonld\``); return undefined; }
+    const doc = JSON.parse(readFileSync(at, "utf-8")) as Doc;
     const parsed = schema.safeParse(doc);
     if (!parsed.success) problems.push(`${relative(ROOT, abs)} does not validate: ${parsed.error.issues[0]?.message ?? "unknown"}`);
     return doc;
@@ -271,7 +274,7 @@ if (import.meta.main) {
     if (p.depiction) {
       const base = (repoIri ?? "").replace(/subgraph\/$/, "");
       const local = p.depiction.startsWith(base) ? join(SITE, p.depiction.slice(base.length)) : undefined;
-      if (!local || !existsSync(local)) problems.push(`a Process node depicts an SVG that is not there: ${p.depiction}`);
+      if (!local || !existsSync(overlayPath(local))) problems.push(`a Process node depicts an SVG that is not there: ${p.depiction}`);
     }
   }
   for (const [path, p] of unframed.byPath) {

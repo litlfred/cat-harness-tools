@@ -44,6 +44,7 @@ import type { QaCriterionEntry, QaReviewer } from "../schemas/sdlc/block-qa.ts";
 import { vacuityRefusal, type Source } from "./vacuity-refusal.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
+import { overlayDirs } from "./lib/layer-output.ts";
 const TOOLS_ROOT = resolve(import.meta.dir, "..");
 
 /**
@@ -193,10 +194,21 @@ export function scanCounted(
 ): { findings: Finding[]; examined: number; present: boolean } {
   const findings: Finding[] = [];
   let examined = 0;
-  for (const file of walkJson(resultsDir)) {
+  // The results tree through the layer output overlay (bean `cat-tools-sm8r`,
+  // item 4): a mounted layer's results are under `build/layers/<instance>/`.
+  // Each file is named by its path in the layer, the output root winning.
+  const dirs = overlayDirs(resultsDir);
+  const byLogical = new Map<string, string>();
+  for (const d of dirs) {
+    for (const at of walkJson(d)) {
+      const logical = join(resultsDir, relative(d, at));
+      if (!byLogical.has(logical)) byLogical.set(logical, at);
+    }
+  }
+  for (const [file, at] of [...byLogical].sort(([a], [b]) => a.localeCompare(b))) {
     let doc: unknown;
     try {
-      doc = JSON.parse(readFileSync(file, "utf-8"));
+      doc = JSON.parse(readFileSync(at, "utf-8"));
     } catch {
       continue;
     }
@@ -236,7 +248,7 @@ export function scanCounted(
       }
     }
   }
-  return { findings, examined, present: existsSync(resultsDir) };
+  return { findings, examined, present: dirs.length > 0 };
 }
 
 /** The backlog key: a reviewer id, not a file — the corpus has thousands of files and nine ids. */

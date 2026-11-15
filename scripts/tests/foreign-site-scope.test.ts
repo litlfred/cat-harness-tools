@@ -27,7 +27,10 @@
  *       (it showed "?").
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+// Publish-time files are written to the layer output overlay (bean sm8r);
+// these read the copy a site reader sees, falling back to the path given.
+import { existsSync, readFileSync, readdirSync } from "../../test/support/site-fs.ts";
 import type { Dirent } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -55,7 +58,7 @@ import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
-import { notApplicableAlone, qaResultDirsIn, restoringTracked, siteNotBuilt } from "../../test/support/checkout.ts";
+import { copyBuiltAtPublish, notApplicableAlone, scratchCheckoutOf, siteNotBuilt } from "../../test/support/checkout.ts";
 import { ensureThemesCss } from "../../test/support/themes-css.ts";
 import { declaredPlan, runWriter, writersOf } from "../derive-at-publish.ts";
 
@@ -132,23 +135,35 @@ afterAll(() => {
 try {
   const READS = new Set([PLATFORM_DATA, join(SMART_TRUST, siteDirFor(SMART_TRUST))].map((p) => resolve(p)));
   const READ_PLAN = declaredPlan(REPO).filter((a) => READS.has(resolve(a.abs)));
-  if (READ_PLAN.length !== READS.size) {
+  // Built already (the publish wrote them, into the overlay): build nothing.
+  // A scratch rebuild copied back over the publish's own `harness.json` left
+  // it out of step with the include `navbar:include` wrote from it, and later
+  // files in the shard (gen-navbar-include's fixpoint, nav-names) read that.
+  const ALREADY_BUILT = [...READS].every((p) => existsSync(p));
+  if (ALREADY_BUILT) {
+    // nothing to do: read what the publish built
+  } else if (READ_PLAN.length !== READS.size) {
     console.warn(
       `foreign-site-scope: built nothing — expected a builtAtPublish entry for each of ${[...READS].join(", ")}; found ${READ_PLAN.map((a) => `${a.instance}/${a.path}`).join(", ") || "none"}`,
     );
   } else {
-    // `docs:pages` also re-derives the committed QA witnesses under every
-    // layer's `test/results/`: they are put back as they were, so this
-    // build leaves no tracked file changed (bean w1gy F24).
-    restoringTracked(qaResultDirsIn(REPO), () => {
+    // `docs:pages` also re-renders every layer's committed pages and QA
+    // witnesses, so the writers run over a scratch copy of the checkout and
+    // only what the layers build at publish is copied back (bean
+    // `cat-tools-sm8r` item 4: in place, a mounted layer read `edited`).
+    const scratch = scratchCheckoutOf(REPO);
+    try {
       for (const w of writersOf(READ_PLAN)) {
-        const o = runWriter(["bun", "run", "cat", w], REPO);
+        const o = runWriter(["bun", "run", "cat", w], scratch);
         if (o.kind !== "ran") {
           console.warn(`foreign-site-scope: the publish-time writer \`${w}\` did not build what this file reads (${JSON.stringify(o)}; is the state mounted? \`bun run cat state:mount\`)`);
           break;
         }
       }
-    });
+      copyBuiltAtPublish(scratch, REPO);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   }
 } catch (e) {
   console.warn(`foreign-site-scope: built nothing — could not read the publish plan: ${(e as Error).message}`);
@@ -503,10 +518,14 @@ describe("the injected rail (rail-standalone-pages --foreign-site) over a fixtur
     // The row is written ONCE beside the rail's data (2026-10-10); read it as a browser would.
     const json = navbarRowJsonOf(html, (f) => (existsSync(join(root, f)) ? readFileSync(join(root, f), "utf-8") : undefined));
     expect(json).toBeDefined();
-    const row = JSON.parse(json!) as { hrefs: Record<string, string>; notes: Record<string, string> };
+    const row = JSON.parse(json!) as { icons: string[]; hrefs: Record<string, string>; notes: Record<string, string> };
     expect(row.hrefs.beans).toBeUndefined();
     expect(row.hrefs.todos).toBeUndefined();
-    expect(row.notes.todos).toBe("smart-trust declares no todos graph");
+    // cat-harness's row no longer carries Todos or Beans at all (owner,
+    // 2026-11-13: "remove the fsh-guts, beans and todos"); a layer that still
+    // declares them gets the note, which the cases above test.
+    expect(row.icons).not.toContain("todos");
+    expect(row.icons).not.toContain("beans");
     expect(rootRelativeLeft(row)).toEqual([]);
   });
 });

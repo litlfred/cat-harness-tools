@@ -56,3 +56,9 @@ Feature: Keyword viewer page
     Given the page rendered from the fixture model
     When each table's rows are counted, ignoring escaped bars
     Then every row has the same number of cells as its table's first row
+
+  @test:scripts/tests/keywords-page.test.ts::the_page::each_entry's_details_block_lets_kramdown_read_the_table_inside_it
+  Scenario: Each entry's details block lets kramdown read the table inside it
+    Given the page rendered from the fixture model
+    When each entry's details block is opened
+    Then it carries markdown="1", so the variants table renders as a table

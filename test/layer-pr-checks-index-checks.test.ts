@@ -25,7 +25,7 @@ function py(file: string, expr: string): unknown {
     "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
     `print(json.dumps(${expr}))`,
   ].join("\n");
-  const r = spawnSync("python3", ["-I", "-c", code], { encoding: "utf-8" });
+  const r = spawnSync("python3", ["-I", "-B", "-c", code], { encoding: "utf-8" });
   if (r.status !== 0) throw new Error(r.stderr);
   return JSON.parse(r.stdout);
 }
@@ -178,7 +178,7 @@ describe("reader-tests.py: other instances' tests that name the layer", () => {
   writeFileSync(join(root, "tools", "test", "path.test.ts"), "join(ROOT, `who-iris/typologies`)");
   writeFileSync(join(root, "tools", "test", "other.test.ts"), "// who-iris-like, not who-iris itself: who-irisx");
   writeFileSync(join(root, "tools", "test", "helper.ts"), '"who-iris"');
-  const run = (...a: string[]) => spawnSync("python3", ["-I", join(DIR, "reader-tests.py"), root, ...a], { encoding: "utf-8" });
+  const run = (...a: string[]) => spawnSync("python3", ["-I", "-B", join(DIR, "reader-tests.py"), root, ...a], { encoding: "utf-8" });
 
   test("who-iris#175: the navbar-checkout test that lists who-iris's graphs is a reader; the layer's own tests are not", () => {
     const r = run("who-iris");

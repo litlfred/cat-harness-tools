@@ -41,12 +41,12 @@
  */
 import { beforeAll, describe, expect, it } from "bun:test";
 import { spawnBounded } from "../../../test/support/bounded-spawn.ts";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { compose, isWithheld, withheldFromCanonical, withheldPathFor } from "../../compose-docs.js";
-import { gutsDir, gutsFiles, page } from "../../gen-fsh-guts-viz.js";
+import { baseDocsDir, compose, isWithheld, withheldFromCanonical, withheldPathFor } from "../../compose-docs.js";
+import { gutsDir, gutsFiles, page, pageRelPath } from "../../gen-fsh-guts-viz.js";
 import { notApplicableAlone } from "../../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
@@ -68,8 +68,15 @@ const REPO = resolve(dirname(HARNESS_ROOT));
 // shards 3 and 4 of main 03ded48, which failed as "(unnamed) a beforeAll hook
 // timed out" with no assertion run. It also rewrote, mid-shard, artefacts
 // other test files were reading. This file needs one page; it builds one page.
+//
+// Built only when the page is ABSENT (bean `cat-tools-sm8r` item 4): the
+// layer commits a copy, and a rebuild from the live state branch rewrote
+// those committed bytes inside a mounted layer. These tests need the page to
+// exist, not to be drawn from today's state.
 const BUILD_BUDGET_MS = 60_000;
 beforeAll(() => {
+  const rel = pageRelPath(REPO);
+  if (rel !== undefined && existsSync(join(baseDocsDir(REPO), rel))) return;
   // Bounded, and its whole process group killed on a timeout (`spawnBounded`):
   // a writer left running would keep writing into the tree after this hook.
   const r = spawnBounded(["bun", "run", "cat", "fsh-guts:viz"], REPO, BUILD_BUDGET_MS);

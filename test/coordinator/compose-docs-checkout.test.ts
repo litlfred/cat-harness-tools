@@ -12,7 +12,7 @@
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
-import { docsLayers } from "../../scripts/compose-docs.ts";
+import { docsLayers, OUTPUT_LAYER_SUFFIX } from "../../scripts/compose-docs.ts";
 import {  } from "../../schemas/kg/cat-harness.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
@@ -32,6 +32,14 @@ describe("compose-docs reads its layers from the declaration", () => {
     // Semantic subgraphs, slice 1 (owner, 2026-10-09): the just-the-docs
     // CHROME is its own `docs` layer, declared first, and the harness's pages
     // overlay it.
-    expect(layers.map((l) => l.id)).toEqual(["site-chrome", "docs"]);
+    // A mounted layer's computed pages are laid over it as `<id>@output` only
+    // when a writer has run in this checkout (sm8r item 4, step 4), so the
+    // DECLARED layers are what is asserted, and a twin, when one is there,
+    // sits directly over its base.
+    const ids = layers.map((l) => l.id);
+    expect(ids.filter((id) => !id.endsWith(OUTPUT_LAYER_SUFFIX))).toEqual(["site-chrome", "docs"]);
+    for (const [i, id] of ids.entries()) {
+      if (id.endsWith(OUTPUT_LAYER_SUFFIX)) expect(ids[i - 1]).toBe(id.slice(0, -OUTPUT_LAYER_SUFFIX.length));
+    }
   });
 });

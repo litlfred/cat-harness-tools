@@ -86,6 +86,7 @@ import {
 import { BEGIN as SUBGRAPH_README_BEGIN } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
 import { aliasRoute, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { gateOwnInstances, gateOwnsFile } from "./lib/gate-own.ts";
+import { overlayPath } from "./lib/layer-output.ts";
 import { declaredVisualisers, forwardingParts, pageParts, siteOwnerDir } from "./viewer-declarations.js";
 import { hostSiteArtefacts } from "./derive-at-publish.ts";
 import {
@@ -1306,7 +1307,7 @@ export function directionSidecarState(
   instanceRoot: string,
   fresh: QaResult,
 ): "absent" | "stale" | "current" {
-  const p = qaResultPath(instanceRoot, SIDECAR_STEM);
+  const p = overlayPath(qaResultPath(instanceRoot, SIDECAR_STEM));
   if (!existsSync(p)) return "absent";
   try {
     return comparableDirection(JSON.parse(readFileSync(p, "utf-8")) as QaResult) === comparableDirection(fresh)

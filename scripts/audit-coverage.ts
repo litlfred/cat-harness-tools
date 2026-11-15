@@ -105,6 +105,7 @@ import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { quietly } from "../schemas/sdlc/input-trace.ts";
 import { readQaTree } from "./qa-store.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
+import { overlayDirs } from "./lib/layer-output.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";
 import { absenceAt } from "./branch-store.ts";
@@ -690,10 +691,15 @@ export function adversarialCoverageByGraph(repo: string, root: string = ROOT): M
     }
   };
 
-  scanDir(join(root, "test", "results", "kg-qa"));
+  // Each tree through the layer output overlay: a mounted layer's sidecars are
+  // under `build/layers/<instance>/` (bean `cat-tools-sm8r`, item 4).
+  const scanOverlay = (dir: string): void => {
+    for (const d of overlayDirs(dir)) scanDir(d);
+  };
+  scanOverlay(join(root, "test", "results", "kg-qa"));
   if (repo !== root) {
-    scanDir(join(repo, "test", "results", "kg-qa"));
-    scanDir(join(repo, "cat-harness", "test", "results", "kg-qa"));
+    scanOverlay(join(repo, "test", "results", "kg-qa"));
+    scanOverlay(join(repo, "cat-harness", "test", "results", "kg-qa"));
   }
 
   // The committed half. The harness root's own store first, then every

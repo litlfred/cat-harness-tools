@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * The three JS-mounted navbar regions, as a browser actually builds them.
@@ -55,10 +56,10 @@ import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
 // The row's own stylesheet FIRST, as `head_custom.html` links it (beans `lhvt`, `9rq1`).
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
 // `navbar-row.js` FIRST — it draws the row, and `docs-ui.js` calls it — as `head_custom.html` loads them.
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const QR = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js"))), "utf8");
 
 const BASEURL = "/folio-assistant";
 
@@ -76,7 +77,7 @@ type NavbarRow = {
   notes?: Record<string, string>;
   folders: { kind: string; within?: string; path?: string; note?: string; stagingOnly?: true }[];
 };
-const HARNESS = JSON.parse(readFileSync(join(ROOT, SITE, "_data/harness.json"), "utf8")) as {
+const HARNESS = JSON.parse(readFileSync(overlayPath(join(ROOT, SITE, "_data/harness.json")), "utf8")) as {
   navbar: NavbarRow | null;
   harnesses: { name: string; visualisations?: { kind: string; within?: string }[] }[];
 };
@@ -246,7 +247,9 @@ test.describe("the icon row — line 2 of the fixed top", () => {
     const drawn = LIVE.icons.filter((i) => i !== "close");
     // The DECLARED slots. The light/dark switch follows them (owner,
     // 2026-09-27: "light dark mode on main icon tab") and is not one.
-    const slots = ".fa-nav-icons .fa-nav-icon:not(.fa-nav-scheme)";
+    // Nor are the Folio icon (owner, 2026-11-13: it replaces the tab at the
+    // top) and the rail's Harnesses icon: drawn where their panels exist.
+    const slots = ".fa-nav-icons .fa-nav-icon:not(.fa-nav-scheme):not(.fa-nav-folio):not(.fa-nav-harnesses)";
     await expect(page.locator(slots)).toHaveCount(drawn.length);
     expect(drawn).not.toContain("close");
     const labels = await page.locator(slots).evaluateAll((ns) =>
@@ -258,13 +261,15 @@ test.describe("the icon row — line 2 of the fixed top", () => {
     expect(labels.map((l) => (l ?? "").split(" — ")[0])).toEqual([
       // Processes and Knowledge graph left the row (owner, 2026-10-05, bean
       // `82qs`); language is the glass band's globe (#2211), not a row slot.
-      "Todos", "Beans", "fsh-guts, discarded items", "QR code for this page", "More actions",
+      // Todos, Beans and fsh-guts left it on 2026-11-13 (owner: "remove the
+      // fsh-guts, beans and todos").
+      "QR code for this page", "More actions",
     ]);
-    // ...then the switch, last. No [x] after it (ob3m finding 8).
+    // ...then the switch, then the Folio icon, last. No [x] after them (ob3m finding 8).
     const tail = await page.locator(".fa-nav-icons > *").evaluateAll((ns) =>
-      ns.slice(-1).map((n) => (n.classList.contains("fa-nav-scheme") ? "scheme" : n.className)),
+      ns.slice(-2).map((n) => (n.classList.contains("fa-nav-scheme") ? "scheme" : n.classList.contains("fa-nav-folio") ? "folio" : n.className)),
     );
-    expect(tail).toEqual(["scheme"]);
+    expect(tail).toEqual(["scheme", "folio"]);
   });
 
   test("SIX DISTINCT drawings — a row where slots look alike says nothing", async ({ page }) => {
@@ -386,7 +391,9 @@ test.describe("the icon row — line 2 of the fixed top", () => {
     // per layer is what let the next one through. This asserts the property
     // over both regions that compose from `#fa-navbar-row`, so a FOURTH
     // consumer added to either of them cannot repeat it quietly.
-    await load(page, LIVE);
+    // The live row has no link slot since 2026-11-13 (its Todos, Beans and
+    // fsh-guts left it), so two are added to it: the property is the class's.
+    await load(page, { ...LIVE, icons: [...LIVE.icons, "todos", "beans"], hrefs: { ...LIVE.hrefs, todos: "/todos/", beans: "/beans/" } });
     const hrefs = await page
       .locator(".fa-nav-icons a[href], .fa-nav-folders a[href]")
       .evaluateAll((ns) => ns.map((n) => n.getAttribute("href") ?? ""));
@@ -602,14 +609,21 @@ test.describe("at rest the strip carries marks and nothing else", () => {
     // every region shrank proportionally — the fixed bottom to 104px, showing
     // ONE of five harness avatars. Collapsing the middle to nothing instead
     // floated the bottom up to meet the icons, which is the opposite failure.
+    // Since 2026-11-13 the icon row is the bar's LAST region (owner: "put
+    // these controls at the bottom of the navbar"), so the fixed bottom sits
+    // directly on the row, and the row on the bar's foot.
     await load(page, CUSTOM);
-    const homeBottom = async () =>
-      await page.locator(".fa-nav-home").evaluate((n) => Math.round(n.getBoundingClientRect().bottom));
-    const barBottom = await page.locator(".side-bar").evaluate((n) => Math.round(n.getBoundingClientRect().bottom));
-    expect(barBottom - (await homeBottom())).toBeLessThan(24);
+    const bottomOf = async (sel: string) =>
+      await page.locator(sel).evaluate((n) => Math.round(n.getBoundingClientRect().bottom));
+    const topOf = async (sel: string) =>
+      await page.locator(sel).evaluate((n) => Math.round(n.getBoundingClientRect().top));
+    const barBottom = await bottomOf(".side-bar");
+    expect(barBottom - (await bottomOf(".side-bar > .fa-nav-icons"))).toBeLessThan(24);
+    expect((await topOf(".side-bar > .fa-nav-icons")) - (await bottomOf(".fa-nav-home"))).toBeLessThan(24);
     await page.hover(".side-bar");
     await page.waitForTimeout(250);
-    expect(barBottom - (await homeBottom())).toBeLessThan(24);
+    expect(barBottom - (await bottomOf(".side-bar > .fa-nav-icons"))).toBeLessThan(24);
+    expect((await topOf(".side-bar > .fa-nav-icons")) - (await bottomOf(".fa-nav-home"))).toBeLessThan(24);
   });
 });
 

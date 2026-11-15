@@ -7,7 +7,7 @@
       "failing": []
     },
     "cat-harness-tools": {
-      "failed": 412,
+      "failed": 414,
       "failing": [
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > --check catches a hand edit to a rendered document",
         "openapi/scripts/ingest-tools.test.ts > openapi-ingest-rendered > an unreachable URL is FAILED and writes nothing",
@@ -60,6 +60,8 @@
         "scripts/tests/check-document-kind-sources.test.ts > what an instance can name > a graph only an instance ABOVE declares is not reachable: fhir-harness cannot name smart-base-findings",
         "scripts/tests/check-document-kind-sources.test.ts > what an instance can name > smart-base reaches its own library",
         "scripts/tests/check-environment.test.ts > this repository, right now > is not distorted — otherwise `bun run cat gates` refuses for everyone",
+        "scripts/tests/check-node-kinds.test.ts > each instance's baseline, on this checkout > DAY ONE: the gate passes exactly as the shared baseline did — nothing new, gone, foreign or unattributed",
+        "scripts/tests/check-node-kinds.test.ts > the table is built at publish > the combined build is a node-kind-index whose unkinded families are exactly the instances' baselines",
         "scripts/tests/check-published-instance-exports.test.ts > committedSidecarSubjects — the comparison has a subject (bean r7v6, C2) > the real checkout's committed bootstrap sidecar is a subject — or its absence is UNKNOWN, never an empty list",
         "scripts/tests/check-published-instance-exports.test.ts > publishedInstances > finds it in the branches/ workflow too — the file `3jhq` showed was missed",
         "scripts/tests/check-published-instance-exports.test.ts > publishedInstances > finds the invocation in the real deploy workflow",

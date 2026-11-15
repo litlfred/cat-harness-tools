@@ -49,6 +49,7 @@ import { corpusScopeFor } from "./known-skills.js";
 import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { overlayPath } from "./lib/layer-output.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -298,9 +299,12 @@ export function decodeLinkTarget(target: string): string {
 }
 
 function resolveInTree(abs: string): string | undefined {
-  if (existsSync(abs)) return abs;
+  // Over the layer overlay: a mounted layer's generated pages are at its
+  // output root (bean `cat-tools-sm8r`, item 4).
+  const at = overlayPath(abs);
+  if (existsSync(at)) return at;
   if (abs.endsWith(".html")) {
-    const asSource = `${abs.slice(0, -".html".length)}.md`;
+    const asSource = overlayPath(`${abs.slice(0, -".html".length)}.md`);
     if (existsSync(asSource)) return asSource;
   }
   return undefined;

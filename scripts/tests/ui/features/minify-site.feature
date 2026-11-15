@@ -197,3 +197,68 @@ Feature: Site minification drops only what cannot render
     Then 1 file is seen and 1 changed
     And "a.html" reads "<head><meta></head>"
     And a second run changes no file and leaves bytes before equal to bytes after
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::comments_and_whitespace_go,_and_the_script_still_runs_the_same
+  Scenario: A script loses its comments and whitespace and still runs the same
+    Given a commented IIFE that opens with "use strict" and defines window.faX
+    When it is minified
+    Then it is shorter, its comment is gone, and a bare call of window.faX still sees this as undefined
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::a_directive_opening_the_whole-script_IIFE_comes_back_at_the_top
+  Scenario: A directive opening the whole-script IIFE comes back at the top
+    Given the chrome's shape, one IIFE whose body opens with "use strict"
+    Then its strictness is "whole" and the minified copy starts with the directive and the IIFE
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::a_directive_anywhere_else_leaves_the_file_as_it_was,_never_silently_sloppy
+  Scenario: A directive anywhere else leaves the file as it was
+    Given a script whose only "use strict" is inside a nested function
+    Then its strictness is "other" and the script is skipped rather than minified
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::top-level_names_are_kept:_a_classic_script's_globals_are_other_scripts'_API
+  Scenario: Top-level names are kept
+    Given a script declaring the function faShared and the var faCount
+    When it is minified
+    Then both names survive unchanged
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::a_licence_comment_travels_with_the_copy
+  Scenario: A licence comment travels with the copy
+    Given a script with an @license comment and a line comment
+    When it is minified
+    Then the licence is kept and the line comment is gone
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::a_script_that_does_not_parse_is_reported_and_left_alone
+  Scenario: A script that does not parse is left alone
+    Given Jekyll front matter followed by a statement
+    Then minifying it reports a skip
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::minifying_twice_is_minifying_once
+  Scenario: Minifying a script twice is minifying it once
+    Given the minified chrome-shaped IIFE
+    Then minifying it again changes nothing
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::CSS_is_minified,_url()_and_@import_untouched_in_meaning
+  Scenario: CSS is minified with url() and @import kept
+    Given a stylesheet with a comment, an @import, a url() background and a print media block
+    When it is minified
+    Then it is shorter, the comment is gone, the url, import and print block remain, and a second pass changes nothing
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::vendored,_already-minified_and_non-asset_files_are_not_ours_to_rewrite
+  Scenario: Vendored, already-minified and non-asset files are not rewritten
+    Then docs-ui.js and docs-ui.css are ours, and vendor/ scripts, a .min.css and a .json are not
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::the_runner_writes_once,_reports_bytes,_and_a_re-run_changes_nothing
+  Scenario: The asset runner writes once and a re-run changes nothing
+    Given a built tree with a script, a stylesheet and a vendored script
+    When it is checked, then written, then written again
+    Then the check writes nothing, the write shrinks both of ours and leaves the vendored one, and the re-run changes nothing
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::a_print_handler_survives:_minifying_changes_what_a_script_is,_not_what_it_does_on_print
+  Scenario: A beforeprint handler survives minification
+    Given a strict IIFE that opens a disclosure on beforeprint
+    When it is minified and run, and beforeprint fires
+    Then the disclosure is open
+
+  @test:scripts/tests/ui/minify-site.test.ts::shared_scripts_and_stylesheets::an_unreadable_site_directory_is_exit_2
+  Scenario: The asset runner on an unreadable directory exits 2
+    When it is pointed at a directory that does not exist
+    Then it exits 2

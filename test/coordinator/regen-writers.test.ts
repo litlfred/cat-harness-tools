@@ -31,7 +31,7 @@
  * composed from ORIGIN_DIR, the directory it was written in, so nothing it
  * reads changed.
  */
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -40,7 +40,7 @@ import { regenPass, writerFor, type Outcome, type Runner } from "../../scripts/r
 import { chromiumExecutable } from "../../scripts/bpmn-render.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
-import { noRootManifest } from "../support/checkout.ts";
+import { noRootManifest, scratchCheckoutOf } from "../support/checkout.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -49,18 +49,28 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 const REPO = repoRootFor(join(ORIGIN_DIR, "..", ".."));
 const SCRIPTS = scriptsOf(REPO);
 
-const runner: Runner = (script) => spawnSync("bun", ["run", "cat", script], { cwd: REPO, encoding: "utf-8" }).status === 0;
+/**
+ * Where the writers RUN: a scratch copy of the checkout, made once for the
+ * file (bean `cat-tools-sm8r` item 4). Each writer redraws or re-extracts
+ * EVERY artefact it owns, not only the one staled here, and the redraws
+ * differ from the committed bytes; run in place, `translate-bpmn` and
+ * `render:bpmn` rewrote every layer's process drawings and translation
+ * templates, and only the one staled artefact was put back.
+ */
+let WORK = REPO;
+
+const runner: Runner = (script) => spawnSync("bun", ["run", "cat", script], { cwd: WORK, encoding: "utf-8" }).status === 0;
 
 /** The first file in a directory with this suffix, so a rename does not silently skip the case. */
 function firstIn(dir: string, suffix: string): string {
-  const f = readdirSync(join(REPO, dir)).filter((n) => n.endsWith(suffix)).sort()[0];
+  const f = readdirSync(join(WORK, dir)).filter((n) => n.endsWith(suffix)).sort()[0];
   if (f === undefined) throw new Error(`no *${suffix} under ${dir} — the fixture this case stales is gone`);
   return join(dir, f);
 }
 
 /** An own drawing committed beside its `.bpmn` (bean akiq): the first `<name>.svg` under `<instance>/<dir>` whose `<name>.bpmn` sits next to it. */
 function firstBesideSource(instance: string, dir: string): string {
-  const root = join(REPO, instance, dir);
+  const root = join(WORK, instance, dir);
   const hits = (readdirSync(root, { recursive: true }) as string[])
     .filter((p) => p.endsWith(".bpmn") && existsSync(join(root, p.replace(/\.bpmn$/, ".svg"))))
     .map((p) => p.replace(/\.bpmn$/, ".svg"))
@@ -140,13 +150,20 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
   const browser = hasBrowser();
   // Every check and writer runs as `bun run cat <script>` from the checkout root.
   const noCatAlias = noRootManifest(REPO, "the `cat` alias every check and writer here runs through");
+  beforeAll(() => {
+    if (!noCatAlias) WORK = scratchCheckoutOf(REPO);
+  }, 180_000);
+  afterAll(() => {
+    if (WORK !== REPO) rmSync(WORK, { recursive: true, force: true });
+    WORK = REPO;
+  }, 180_000);
   /** The case for one check, staled, judged red, repaired by regen, judged green. */
   const run = (check: string) => async () => {
     const c = CASES.find((x) => x.check === check)!;
     const writer = writerFor(SCRIPTS, c.check);
     expect(writer, `${c.check} has no writer regen can run`).toBeDefined();
     const rel = c.artefact();
-    const abs = join(REPO, rel);
+    const abs = join(WORK, rel);
     // A derived QA artefact may be absent — the committed corpus is
     // leaving `main` (bean `cxcn`, reader audit F7). Then the WRITER
     // produces it fresh first, and the directory it had to create is

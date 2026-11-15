@@ -7,6 +7,7 @@ import { Liquid } from "liquidjs";
 import { siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { buildIndex } from "../scripts/search-split.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * A PAGE SEARCHES ITS OWN SCOPE, AND CAN ALWAYS WIDEN TO THE WHOLE SITE —
@@ -31,12 +32,12 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
  */
 
 const ROOT = join(HARNESS_ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const UI = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const UI = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 const LUNR = readFileSync(createRequire(import.meta.url).resolve("lunr/lunr.min.js"), "utf8");
 
 async function renderedJtd(): Promise<string> {
-  const src = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/just-the-docs.js")), "utf8").replace(/^---[\s\S]*?---\n/, "");
+  const src = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/just-the-docs.js"))), "utf8").replace(/^---[\s\S]*?---\n/, "");
   const liquid = new Liquid({ dynamicPartials: false, templates: { "lunr/custom-index.js": "", "js/custom.js": "" } });
   liquid.registerFilter("relative_url", (p: string) => `/folio-assistant/${String(p).replace(/^\//, "")}`);
   // As Jekyll renders the theme's default; see search-lazy.e2e.ts.

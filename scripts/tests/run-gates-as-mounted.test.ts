@@ -48,7 +48,7 @@ function runGates(root: string, ...args: string[]) {
   const env: Record<string, string | undefined> = { ...process.env, GATE_JOBS: "8", GATE_CONE: "" };
   delete env.GATE_SHARD;
   delete env.GATE_TIMINGS;
-  return spawnSync("python3", [RUN_GATES, root, ...args], { encoding: "utf-8", env, timeout: 120_000 });
+  return spawnSync("python3", ["-B", RUN_GATES, root, ...args], { encoding: "utf-8", env, timeout: 120_000 });
 }
 
 describe("run-gates.py --as-mounted", () => {

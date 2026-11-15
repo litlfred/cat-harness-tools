@@ -22,7 +22,7 @@ function py(body: string): unknown {
     "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
     body,
   ].join("\n");
-  const r = spawnSync("python3", ["-I", "-c", code], { encoding: "utf-8" });
+  const r = spawnSync("python3", ["-I", "-B", "-c", code], { encoding: "utf-8" });
   if (r.status !== 0) throw new Error(r.stderr);
   return JSON.parse(r.stdout);
 }

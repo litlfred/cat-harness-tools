@@ -38,6 +38,7 @@ import {
   escapedTagsIn,
   htmlPages,
   leakedTablesIn,
+  plainText,
 } from "../check-escaped-markup.js";
 
 /** The exact opening tag the broken build published, welded attributes and all. */
@@ -254,6 +255,25 @@ describe("a markdown table printed as text — bean `7w1a`", () => {
       "<table><thead><tr><th>role</th><th>file</th></tr></thead>" +
       "<tbody><tr><td>—</td><td>-</td></tr><tr><td>a</td><td><code>|---|</code></td></tr></tbody></table>";
     expect(leakedTablesIn("p.html", ok)).toEqual([]);
+  });
+
+  test("a row after a `>` is found even when an earlier pipe shares its line", () => {
+    // The scan jumps from pipe to pipe; a pipe before the `>` must not hide the
+    // row that starts after it.
+    expect(leakedTablesIn("p.html", "<p>| a |> -| &mdash;</p>")).toEqual([{ page: "p.html", excerpt: "| a |" }]);
+  });
+
+  test("a long page with pipes but no row is read in one pass", () => {
+    const page = "<p>a | b</p>\n".repeat(50_000) + "<p>| h |</p>\n<p>|—|</p>";
+    const t0 = performance.now();
+    expect(leakedTablesIn("p.html", page)).toEqual([{ page: "p.html", excerpt: "| h |" }]);
+    // Generous: the lookbehind scan this replaced took seconds on a page this size.
+    expect(performance.now() - t0).toBeLessThan(2000);
+  });
+
+  test("a report excerpt is plain text, with no angle bracket left", () => {
+    expect(plainText("<p>| a | <strong>b</strong> |</p>")).toBe("| a | b |");
+    expect(plainText("<<script>>alert</script> x < y > z <>")).toBe("alert x  z ");
   });
 
   test("the tree scan reports it", () => {

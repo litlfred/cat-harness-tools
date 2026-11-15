@@ -19,7 +19,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { compose, isWithheld, withheldFromCanonical } from "../../scripts/compose-docs.js";
+import { baseDocsDir, compose, isWithheld, withheldFromCanonical } from "../../scripts/compose-docs.js";
 import { gutsDir, gutsFiles, pageRelPath } from "../../scripts/gen-fsh-guts-viz.js";
 
 /**
@@ -45,8 +45,16 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 // shards 3 and 4 of main 03ded48, which failed as "(unnamed) a beforeAll hook
 // timed out" with no assertion run. It also rewrote, mid-shard, artefacts
 // other test files were reading. This file needs one page; it builds one page.
+//
+// Built only when the page is ABSENT (bean `cat-tools-sm8r` item 4). The
+// layer commits a copy, so in a mounted checkout it is there, and a rebuild
+// from the live state branch rewrote those committed bytes: the mount read
+// `edited` after one `bun test`. These tests need the page to exist; which
+// state it was drawn from is not what they assert.
 const BUILD_BUDGET_MS = 60_000;
 beforeAll(() => {
+  const page = pageRelPath(REPO);
+  if (page !== undefined && existsSync(join(baseDocsDir(REPO), page))) return;
   // Bounded, and its whole process group killed on a timeout (`spawnBounded`):
   // a writer left running would keep writing into the tree after this hook.
   const r = spawnBounded(["bun", "run", "cat", "fsh-guts:viz"], REPO, BUILD_BUDGET_MS);

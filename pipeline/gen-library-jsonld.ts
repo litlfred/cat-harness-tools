@@ -86,8 +86,9 @@ import { findContentRepoRoot } from "./repo-root";
 import { serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
-import type { DocumentImage, ImagesSidecar } from "../schemas/content/document-image.ts";
-import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
+import type { ImagesSidecar } from "../schemas/content/document-image.ts";
+import { VECTOR_FIGURES_FILE, type VectorFigure, type VectorFiguresSidecar } from "../schemas/content/vector-figure.ts";
+import { buildTabularNodes, tableBlockId, tabularShapeOf } from "./tabular-nodes.ts";
 import { TABULAR_CSVW_FILENAME } from "../schemas/library/tabular-csvw.ts";
 import {
   RECORDING_FILENAME,
@@ -111,7 +112,7 @@ import {
 } from "./library-title.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { presentGroupsIn } from "../scripts/concern-groups.ts";
-import { libraryEntryDirs } from "../scripts/lib/library-entry-graphs.ts";
+import { libraryEntryDirs, nonEntryDirs, type LibraryEntryDir } from "../scripts/lib/library-entry-graphs.ts";
 
 /** A resolved manifest title and where it came from (issue #1794). */
 export interface ManifestTitle {
@@ -302,6 +303,7 @@ export function latexSourceNode(
   title: string,
   licence: unknown,
   instance?: string,
+  subgraphStart: string = findContentRepoRoot(),
 ): { path: string; content: string } {
   const iri = iriFor(docId, instance);
   return {
@@ -324,7 +326,7 @@ export function latexSourceNode(
         files: (src.files ?? []).map((f) => ({ ...f, path: `source/${f.path}` })),
         disposition: "ingested source material — the authors' LaTeX, attributed to its document, not folio content",
       },
-    }),
+    }, subgraphStart),
   };
 }
 
@@ -432,6 +434,68 @@ export function librarySubgraphStart(locatedAt: string): string {
   return findContentRepoRoot();
 }
 
+/**
+ * One table transcribed from a paged source's pages: an entry of the
+ * `tables` of a `tabular.csvw.json` that sits BESIDE `structure.json`
+ * (a content layer's issue #224). Read raw, as `library-document.ts` reads it for the site:
+ * the `fac:` fields below are the transcriber's, and none is required.
+ */
+export interface TranscribedTable {
+  url: string;
+  tableSchema?: { columns?: { titles?: unknown }[] };
+  "fac:label"?: unknown;
+  "fac:caption"?: unknown;
+  "fac:pages"?: unknown;
+  "fac:narrative"?: unknown;
+}
+
+/** The pages a transcribed table spans, in order; `[]` when it does not say. */
+function tablePages(t: TranscribedTable): number[] {
+  const p = t["fac:pages"];
+  return Array.isArray(p) ? p.filter((n): n is number => Number.isInteger(n)).sort((a, b) => a - b) : [];
+}
+
+/** A kept figure, raster or vector, as a figure block reads it. */
+export interface PlacedFigure {
+  id: string;
+  /** Relative to the entry. */
+  file: string;
+  page: number;
+  narrative?: unknown;
+}
+
+/**
+ * Every figure an entry KEEPS, in page order, raster before vector on a page:
+ * `images.json`'s placed images and `vector-figures.json`'s renders whose role
+ * an inspection set to `figure`.
+ *
+ * The vector half is why this exists. The figure blocks were built from
+ * `images.json` alone, so a figure drawn in vector ink — a diagram, a chart,
+ * a flow — reached the sidecar, the narrative queue and the viewer, and never
+ * the graph: 330 such figures in 49 entries of one library had a render and a
+ * description and no block (owner, 2026-11-14: "has no figures ... needs
+ * reingesting"). A render with no file (`unrendered_reason`) and an
+ * assembly-only record (`role: undetermined`) are not kept figures, so neither
+ * becomes a block.
+ */
+export function placedFigures(
+  images: ImagesSidecar | undefined | null,
+  vectorFigures?: { figures?: readonly unknown[] | null } | null,
+): PlacedFigure[] {
+  const out: PlacedFigure[] = [];
+  for (const img of images?.images ?? []) {
+    if (img.role !== "figure" || img.basis === undefined) continue;
+    out.push({ id: img.id, file: img.file, page: img.basis.page, narrative: img.narrative });
+  }
+  for (const raw of vectorFigures?.figures ?? []) {
+    const f = raw as Partial<VectorFigure>;
+    if (f.role !== "figure" || typeof f.file !== "string" || !f.file || typeof f.id !== "string") continue;
+    if (typeof f.page !== "number" || !Number.isInteger(f.page)) continue;
+    out.push({ id: f.id, file: f.file, page: f.page, narrative: f.narrative });
+  }
+  return out;
+}
+
 /** Everything one document contributes, as files to write. */
 export function buildDocumentNodes(
   docId: string,
@@ -444,6 +508,10 @@ export function buildDocumentNodes(
   instance?: string,
   subgraphStart: string = findContentRepoRoot(),
   sourceMaterialization?: unknown,
+  tables?: readonly TranscribedTable[],
+  /** The owning layer's root, whose dependency closure types the blocks ({@link owningLayerRoot}). */
+  typingRoot?: string,
+  vectorFigures?: VectorFiguresSidecar | { figures?: readonly unknown[] | null } | null,
 ): Array<{ path: string; content: string }> {
   // Without a resolved title (a test, a caller with no disk), resolve from the
   // structure alone: the Info dictionary or a text heading, never the page-1
@@ -475,12 +543,11 @@ export function buildDocumentNodes(
   // `images: null` means the extractor could not look, which is not the same
   // as "no figures" and must not become an empty map silently; it does become
   // one here, but the sidecar keeps the reason and `pdf-images.py` exits 2.
-  const figuresByPage = new Map<number, DocumentImage[]>();
-  for (const img of images?.images ?? []) {
-    if (img.role !== "figure" || img.basis === undefined) continue;
-    const list = figuresByPage.get(img.basis.page) ?? [];
-    list.push(img);
-    figuresByPage.set(img.basis.page, list);
+  const figuresByPage = new Map<number, PlacedFigure[]>();
+  for (const f of placedFigures(images, vectorFigures)) {
+    const list = figuresByPage.get(f.page) ?? [];
+    list.push(f);
+    figuresByPage.set(f.page, list);
   }
 
   const sectionIris: string[] = [];
@@ -506,6 +573,42 @@ export function buildDocumentNodes(
   // to land on and is not a reason.
   const figureOwned = new Set<string>();
 
+  // Tables transcribed from the pages (`tabular.csvw.json` beside the
+  // structure), placed like figures: in the FIRST section containing the
+  // table's first page. Until this, the paged rung never read that file, so
+  // a transcribed table had no block and its `fac:narrative` drafts (1464 in
+  // one content layer) reached neither the graph nor the library viewer, though the
+  // narrative queue offered them. The block carries the narrative as figure
+  // blocks carry theirs: a copy, reviewed in the file it was copied from.
+  const tableOwned = new Set<number>();
+  const tableBlock = (t: TranscribedTable, i: number, owner: string): string => {
+    const bid = tableBlockId(i);
+    const pages = tablePages(t);
+    const label = typeof t["fac:label"] === "string" && t["fac:label"] ? t["fac:label"] : bid;
+    const caption = typeof t["fac:caption"] === "string" && t["fac:caption"] ? t["fac:caption"] : undefined;
+    const headers = (t.tableSchema?.columns ?? []).map((c) => (typeof c.titles === "string" ? c.titles : ""));
+    out.push({
+      path: `blocks/${bid}.jsonld`,
+      content: node({
+        "@id": iri(`blocks/${bid}`),
+        "@type": typesForKind("table"),
+        kind: "table",
+        label,
+        title: caption,
+        // The CSV, relative to the block, as `file` is for a figure.
+        file: `../${t.url}`,
+        headers: headers.length ? headers : undefined,
+        pageStart: pages[0],
+        pageEnd: pages[pages.length - 1],
+        narrative: t["fac:narrative"] ?? undefined,
+        derivedFrom: owner,
+        sourceDocument: iri("manifest"),
+        provenance: "ingested",
+      }, subgraphStart),
+    });
+    return iri(`blocks/${bid}`);
+  };
+
   for (const sec of sections) {
     const key = sectionKey(sec.id);
     const contained: string[] = [];
@@ -527,7 +630,7 @@ export function buildDocumentNodes(
           derivedFrom: iri("manifest"),
           sourceDocument: iri("manifest"),
           provenance: "ingested",
-        }),
+        }, subgraphStart),
       });
     }
 
@@ -544,7 +647,7 @@ export function buildDocumentNodes(
           // A dependency's kind (a higher layer's `functional-requirement`
           // or `indicator`) is typed through the contribution registry; without
           // it such a node had no `@type` at all.
-          "@type": candidateTypes(c.kind),
+          "@type": candidateTypes(c.kind, typingRoot ?? subgraphStart),
           kind: c.kind,
           title: c.name ?? undefined,
           pageStart: sec.page_start ?? undefined,
@@ -554,7 +657,7 @@ export function buildDocumentNodes(
           sourceDocument: iri("manifest"),
           provenance: "ingested",
           meta: candidateMeta(c),
-        }),
+        }, subgraphStart),
       });
       if (statement) out.push({ path: `blocks/${bid}.md`, content: `${statement}\n` });
     });
@@ -590,10 +693,20 @@ export function buildDocumentNodes(
               derivedFrom: iri(`sections/${key}`),
               sourceDocument: iri("manifest"),
               provenance: "ingested",
-            }),
+            }, subgraphStart),
           });
         }
       }
+    }
+
+    // Tables whose first page falls in this section, by the same rule.
+    if (from !== undefined && to !== undefined) {
+      (tables ?? []).forEach((t, i) => {
+        const first = tablePages(t)[0];
+        if (first === undefined || first < from || first > to || tableOwned.has(i)) return;
+        tableOwned.add(i);
+        contained.push(tableBlock(t, i, iri(`sections/${key}`)));
+      });
     }
 
     const sIri = iri(`sections/${key}`);
@@ -612,9 +725,17 @@ export function buildDocumentNodes(
         derivedFrom: iri("manifest"),
         sourceDocument: iri("manifest"),
         provenance: "ingested",
-      }),
+      }, subgraphStart),
     });
   }
+
+  // A table no section holds (no page, or a page outside every section) hangs
+  // off the document itself, after the sections, rather than being dropped:
+  // dropping it is the hiding this exists to end.
+  const unplaced: string[] = [];
+  (tables ?? []).forEach((t, i) => {
+    if (!tableOwned.has(i)) unplaced.push(tableBlock(t, i, iri("manifest")));
+  });
 
   const librarySubgraph = declaredSubgraphNode(subgraphStart, "library");
   out.push({
@@ -627,7 +748,7 @@ export function buildDocumentNodes(
       // corroborated extraction (bean `w6fu`, ruling of 2026-10-02 on #1838)
       // each have a slot. See `library-title.ts` for the order.
       title: resolvedTitle.title,
-      contains: sectionIris,
+      contains: [...sectionIris, ...unplaced],
       provenance: "ingested",
       ...(librarySubgraph ? memberOf(librarySubgraph.iri) : {}),
       ...licenceProperties(licence),
@@ -651,17 +772,18 @@ export function buildDocumentNodes(
           candidates?.disposition ??
           "ingested source material — attributed to its document, not folio content",
       },
-    }),
+    }, subgraphStart),
   });
 
   return out;
 }
 
-let contentPrefixes: Map<string, string> | undefined;
+const contentPrefixes = new Map<string, Map<string, string>>();
 
 /**
  * The layer prefixes a library node may use: this checkout's, plus every
- * layer the CONTENT repository declares as a dependency.
+ * layer the entry's owning layer (`subgraphStart`, defaulting to the content
+ * repository root) declares as a dependency.
  *
  * `defaultInstancePrefixes` reads only the checkout this module sits in, so
  * run from a content repository it could not bind a dependency's prefix
@@ -669,48 +791,82 @@ let contentPrefixes: Map<string, string> | undefined;
  * the prefix of the `Theorem` and `Definition` types that theorem candidates
  * carry — and every entry with a candidate threw. Measured on qou 2026-10-11:
  * 18 entries had no section nodes for that reason. `instancePrefixes` already
- * takes the content root and walks its declared dependency chain; the
- * generator simply never passed it.
+ * takes the layer root and walks its declared dependency chain; keyed per
+ * `subgraphStart` so a mounted layer's library resolves its own dependencies.
  */
-function libraryPrefixes(): Map<string, string> {
-  if (contentPrefixes === undefined) {
-    const root = findContentRepoRoot();
-    contentPrefixes = new Map([...defaultInstancePrefixes(), ...instancePrefixes(root, root)]);
+function libraryPrefixes(subgraphStart: string = findContentRepoRoot()): Map<string, string> {
+  const root = resolve(subgraphStart);
+  let prefixes = contentPrefixes.get(root);
+  if (prefixes === undefined) {
+    prefixes = new Map([...defaultInstancePrefixes(), ...instancePrefixes(root, root)]);
+    contentPrefixes.set(root, prefixes);
   }
-  return contentPrefixes;
+  return prefixes;
 }
 
-let contributions: ContributionRegistry | null | undefined;
+const contributionsByRoot = new Map<string, ContributionRegistry | null>();
 
 /**
- * The block kinds the content repository's dependencies contribute — the DAK
+ * The block kinds the entry's owning layer (`subgraphStart`, defaulting to the
+ * content repository) and its declared dependencies contribute — the DAK
  * layer's `functional-requirement`, `non-functional-requirement`, `indicator`
- * and the rest. Loaded once, as `gen-block-jsonld` loads them. A checkout
- * whose contributions cannot be loaded types only the core kinds, which is
- * what it did before.
+ * and the rest — loaded once per root, as `gen-block-jsonld` loads them.
+ *
+ * Rooted at the layer that OWNS the library entry, not at the checkout. From
+ * the checkout root the registry held every mounted layer's kinds, so the same
+ * committed node was typed by whatever happened to be mounted: a library
+ * layer's indicators were a DAK layer's `Indicator` in the folio-assistant
+ * index (where that DAK layer, ABOVE the library's, is mounted) and
+ * `cat-harness:Block` in the library layer's own checkout, and no committed
+ * file passed both checks
+ * (folio-assistant#3124). `loadContributionsSync` walks the root's own
+ * declared dependencies, so a layer is typed only by kinds it can see in any
+ * checkout. A root whose contributions cannot be loaded types only the core
+ * kinds, which is what it did before.
  */
-function contributedKinds(): ContributionRegistry | undefined {
-  if (contributions === undefined) {
+function contributedKinds(subgraphStart?: string): ContributionRegistry | undefined {
+  const root =
+    subgraphStart === undefined || resolve(subgraphStart) === resolve(findContentRepoRoot())
+      ? contributionsRoot()
+      : resolve(subgraphStart);
+  if (!contributionsByRoot.has(root)) {
     try {
-      contributions = loadContributionsSync<FolioContribution, ContributionRegistry>(
-        contributionsRoot(),
-        new ContributionRegistry(),
+      contributionsByRoot.set(
+        root,
+        loadContributionsSync<FolioContribution, ContributionRegistry>(
+          root,
+          new ContributionRegistry(),
+        ),
       );
     } catch {
-      contributions = null;
+      contributionsByRoot.set(root, null);
     }
   }
-  return contributions ?? undefined;
+  return contributionsByRoot.get(root) ?? undefined;
 }
 
 /**
- * A candidate's `@type`: its kind's, through the contribution registry, or the
- * generic library block class when no mounted layer types the kind. An
- * L1 library may hold another layer's `indicator` without mounting that
- * layer; its node is then still a typed block, never one with no type.
+ * The layer a library entry belongs to, for typing its blocks: the nearest
+ * directory above it that carries a layer declaration. An entry with none
+ * above it (a bare content repository) is typed from the checkout, as before.
  */
-export function candidateTypes(kind: string): string[] {
-  const types = typesForKind(kind, contributedKinds());
+export function owningLayerRoot(locatedAt: string): string {
+  for (let at = dirname(resolve(locatedAt)); at !== dirname(at); at = dirname(at)) {
+    if (readDeclaration(at) !== undefined) return at;
+  }
+  return contributionsRoot();
+}
+
+/**
+ * A candidate's `@type`: its kind's, through the owning layer's contribution
+ * registry (`subgraphStart`), or the generic library block class when no
+ * dependency of that layer types the kind. An L1 library may hold another
+ * layer's `indicator` without depending on that layer; its node is then still
+ * a typed block, never one with no type and never one whose `@type` shifts when
+ * the library is mounted into a host index that also mounts the other layer.
+ */
+export function candidateTypes(kind: string, subgraphStart?: string): string[] {
+  const types = typesForKind(kind, contributedKinds(subgraphStart));
   return types.length ? types : [termCurie("Block")];
 }
 
@@ -733,9 +889,9 @@ export function candidateMeta(c: Candidate): Record<string, string> | undefined 
 }
 
 /** Serialise, dropping undefined so output is byte-stable. */
-function node(doc: Record<string, unknown>): string {
+function node(doc: Record<string, unknown>, subgraphStart?: string): string {
   const clean: Record<string, unknown> = {
-    "@context": documentContext((doc["@type"] as string[] | undefined) ?? [], { prefixes: libraryPrefixes() }),
+    "@context": documentContext((doc["@type"] as string[] | undefined) ?? [], { prefixes: libraryPrefixes(subgraphStart) }),
   };
   for (const [k, v] of Object.entries(doc)) {
     if (v === undefined) continue;
@@ -977,6 +1133,9 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
     const structure = read.raw as unknown as Structure;
     const candidates = readJson<Candidates>(join(dir, "candidates.json"));
     const images = readJson<ImagesSidecar>(join(dir, "images.json"));
+    // Tables transcribed from the pages, when the entry has them. `rung` is
+    // `paged`, so this file is not the entry's own record: it is beside it.
+    const transcribed = readJson<{ tables?: TranscribedTable[] }>(join(dir, TABULAR_CSVW_FILENAME));
     const licence = readLicence(dir);
     // A catalogue node names a record that will not read: the title cannot be
     // determined, and the slug over a record that exists is the R8 defect.
@@ -993,9 +1152,14 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
       instance,
       subgraphStart,
       readJson<unknown>(join(dir, SOURCE_MATERIALIZATION_RECORD)),
+      Array.isArray(transcribed?.tables) ? transcribed.tables : undefined,
+      owningLayerRoot(locatedAt),
+      // Vector figures an inspection kept (`role: figure`), blocks beside the
+      // raster ones — see `placedFigures`.
+      readJson<{ figures?: unknown[] | null }>(join(dir, VECTOR_FIGURES_FILE)),
     );
     const latex = readJson<LatexSource>(join(dir, LATEX_SOURCE_RECORD));
-    if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance));
+    if (latex) files.push(latexSourceNode(docId, latex, titled.title, licence, instance, subgraphStart));
     return { state: "built", rung, files };
   }
 
@@ -1049,7 +1213,7 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
     }, locatedAt);
     if (!titled) return { state: "unreadable", rung };
     const manifest = {
-      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes() }),
+      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes(subgraphStart) }),
       "@id": iri("manifest"),
       "@type": [termCurie("SourceDocument")],
       title: titled.title,
@@ -1126,11 +1290,11 @@ function buildEntryNodesAtContentContext(docId: string, dir: string, locatedAt: 
           sourceDocument: iri("manifest"),
           // Authored (LIBRARY_BLOCK_ORIGIN.transcript): who drafted it.
           provenance: t.drafted_by,
-        }),
+        }, subgraphStart),
       });
     }
     const manifest = {
-      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes() }),
+      "@context": documentContext([termCurie("SourceDocument")], { prefixes: libraryPrefixes(subgraphStart) }),
       "@id": iri("manifest"),
       "@type": [termCurie("SourceDocument")],
       title: titled.title,
@@ -1172,6 +1336,18 @@ export function unknownArgument(argv: readonly string[]): string | undefined {
     if (VALUED.has(a)) i++;
   }
   return undefined;
+}
+
+/**
+ * Entry directories in `libraryDir`, dropping dotfiles and directories declared
+ * for another graph typology (`nonEntryDirs`, e.g. `library/processes/` or
+ * `library/skills/`).
+ */
+export function libraryEntriesIn(libraryDir: string): LibraryEntryDir[] {
+  const others = nonEntryDirs(libraryDir);
+  return libraryEntryDirs(libraryDir).filter(
+    ({ slug, dir }) => !slug.startsWith(".") && !others.has(dir) && !others.has(resolve(dir)),
+  );
 }
 
 async function run(): Promise<number> {
@@ -1232,8 +1408,7 @@ async function run(): Promise<number> {
   for (const libraryDir of libraryDirs) {
     // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`):
     // the slug is the docId either way, so ids do not move with the entry.
-    for (const { slug: d, dir } of libraryEntryDirs(libraryDir)) {
-      if (d.startsWith(".")) continue;
+    for (const { slug: d, dir } of libraryEntriesIn(libraryDir)) {
       if (only && d !== only) continue;
       const prior = seen.get(d);
       if (prior !== undefined) {

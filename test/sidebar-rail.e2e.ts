@@ -5,6 +5,7 @@ import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { navbarHtml } from "../scripts/lib/navbar.ts";
 import { NAV_COLLAPSED_PX, NAV_OPEN_PX, NAV_OPEN_WIDE_PX } from "../scripts/lib/navbar-geometry.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { overlayPath } from "../scripts/lib/layer-output.ts";
 
 /**
  * The theme sidebar wears the viewer rail's layout: ONE scroll region.
@@ -50,14 +51,14 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 const ROOT = join(HARNESS_ROOT);
 const SITE = siteDirFor(ROOT);
 // The row's own stylesheet FIRST, as `head_custom.html` links it (beans `lhvt`, `9rq1`).
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/navbar-row.css"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
 // `navbar-row.js` FIRST — it draws the row, and `docs-ui.js` calls it — as `head_custom.html` loads them.
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js")), "utf8") + "\n" + readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const QR = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js")), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/navbar-row.js"))), "utf8") + "\n" + readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const QR = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/vendor/qrcode.js"))), "utf8");
 const BASEURL = "/folio-assistant";
 
 type Folder = { kind: string; label?: string; path?: string; note?: string; stagingOnly?: true };
-const HARNESS = JSON.parse(readFileSync(join(ROOT, SITE, "_data/harness.json"), "utf8")) as {
+const HARNESS = JSON.parse(readFileSync(overlayPath(join(ROOT, SITE, "_data/harness.json")), "utf8")) as {
   navbar: { folders?: Folder[] } | null;
   railScopes?: { name: string; title: string; href: string; folders: Folder[] }[];
 };
@@ -67,7 +68,7 @@ if (HARNESS.navbar === null || HARNESS.navbar === undefined) {
 
 /** The generated footer include, canonical branch, Liquid resolved. */
 function footer(): string {
-  const src = readFileSync(join(ROOT, SITE, "_includes/generated/navbar-footer.html"), "utf8");
+  const src = readFileSync(overlayPath(join(ROOT, SITE, "_includes/generated/navbar-footer.html")), "utf8");
   const open = "{%- if _fa_staging == '' -%}";
   const at = src.indexOf(open);
   const end = src.indexOf("{%- else -%}", at);
@@ -145,7 +146,7 @@ function page(scoped = false): string {
 
 const fixturePage = (): string => page();
 
-const RAIL_CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/navbar.css")), "utf8");
+const RAIL_CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/navbar.css"))), "utf8");
 
 function railedPage(): string {
   const navHtml = navbarHtml({

@@ -28,6 +28,7 @@ import { join, resolve, sep } from "node:path";
 import type { Page } from "@playwright/test";
 
 import { themedBody } from "../../scripts/lib/themed-page.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * The theme's ground and body ink in each scheme — the ground as
@@ -98,9 +99,18 @@ export async function serveThemed(
     const path = decodeURIComponent(new URL(route.request().url()).pathname);
     let file = resolve(root, "." + path.slice(o.urlPrefix.length - 1));
     if (file !== root && !file.startsWith(root + sep)) return route.fallback();
-    if (existsSync(file) && statSync(file).isDirectory()) file = join(file, "index.html");
-    if (!file.endsWith(".html") || !existsSync(file)) return route.fallback();
-    const themed = parseThemed(readFileSync(file, "utf8"));
+    // A page the build wrote for a MOUNTED layer is at its output-root twin
+    // (bean cat-tools-sm8r), and a directory may exist only there. Read through
+    // the overlay as test-server.mjs serves it; otherwise the page falls through
+    // to the server unwrapped, with no ground and no scheme, and every colour
+    // spec on it fails (folio-assistant#3124, library-viewer-scope).
+    let read = overlayPath(file);
+    if (existsSync(read) && statSync(read).isDirectory()) {
+      file = join(file, "index.html");
+      read = overlayPath(file);
+    }
+    if (!file.endsWith(".html") || !existsSync(read)) return route.fallback();
+    const themed = parseThemed(readFileSync(read, "utf8"));
     if (!themed) return route.fallback();
     return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: layoutStandIn(themed, o) });
   });
@@ -137,6 +147,7 @@ ${themedBody(page)}
  */
 export async function serveThemedAt(p: Page, repoRoot: string, urlPath: string, scheme: Scheme = "dark"): Promise<void> {
   const file = join(repoRoot, urlPath.replace(/^\//, "").replace(/\/$/, "/index.html"));
-  const body = themedShell(readFileSync(file, "utf8"), scheme);
+  // A page the build wrote at the layer output root is read there (bean cat-tools-sm8r).
+  const body = themedShell(readFileSync(overlayPath(file), "utf8"), scheme);
   await p.route((url) => url.pathname === urlPath, (route) => route.fulfill({ contentType: "text/html", body }));
 }

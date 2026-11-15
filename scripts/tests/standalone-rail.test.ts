@@ -324,8 +324,14 @@ describe.skipIf(FOLIO_CHROME_NOT_BUILT())("a FOLIO's site (folio-staging.yml): p
     expect(html).toMatch(/<script type="application\/json" id="fa-navbar-row"[^>]* data-fa-row-src="row-[a-z0-9]+"><\/script>/);
     const row = navbarRowJsonOf(html, (f) => (existsSync(join(root, f)) ? readFileSync(join(root, f), "utf-8") : undefined));
     expect(row).toBeDefined();
-    const data = JSON.parse(row!) as { hrefs?: Record<string, string> };
-    const targets = Object.values(data.hrefs ?? {});
+    // Since cat-harness 2565c93fa the platform's row holds only page controls
+    // (close, qr, launcher), which carry no href; the links it still carries
+    // are its folders, which `scopeNavbarRow` re-bases the same way.
+    const data = JSON.parse(row!) as { hrefs?: Record<string, string>; folders?: { path?: string }[] };
+    const targets = [
+      ...Object.values(data.hrefs ?? {}),
+      ...(data.folders ?? []).flatMap((f) => (typeof f.path === "string" ? [f.path] : [])),
+    ];
     expect(targets.length).toBeGreaterThan(0);
     for (const t of targets) expect(t.startsWith(`${BASE}/`)).toBe(true);
     // A second pass adds nothing: the loader is marked.

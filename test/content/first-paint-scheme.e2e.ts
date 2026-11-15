@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { siteFileFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 
 /**
  * THE FIRST PAINT IS DARK — owner, 2026-09-24, verbatim:
@@ -42,9 +43,9 @@ import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
  */
 
 const ROOT = join(HARNESS_ROOT);
-const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css")), "utf8");
-const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
-const HEAD_CUSTOM = readFileSync(join(ROOT, siteFileFor(ROOT, "_includes/head_custom.html")), "utf8");
+const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
+const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
+const HEAD_CUSTOM = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "_includes/head_custom.html"))), "utf8");
 
 const BEGIN = "<!-- fa-first-paint:begin -->";
 const END = "<!-- fa-first-paint:end -->";
@@ -62,7 +63,7 @@ const SNIPPET = (() => {
  * rewrote the first stylesheet's href, which left the page unstyled while the
  * new file loaded; the shipped one loads it beside the old.
  */
-const JTD_SRC = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/just-the-docs.js")), "utf8");
+const JTD_SRC = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/just-the-docs.js"))), "utf8");
 const THEME_SWITCH = (() => {
   const a = JTD_SRC.indexOf("// fa-theme-switch:begin");
   const b = JTD_SRC.indexOf("// fa-theme-switch:end");

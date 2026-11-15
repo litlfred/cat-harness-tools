@@ -42,7 +42,7 @@ function env(shard?: string): NodeJS.ProcessEnv {
 }
 
 function list(root: string, shard?: string): { gates: Record<string, string>; skipped: object; shard?: { shard: number; of: number; total: number } } {
-  const r = spawnSync("python3", ["-I", RUN_GATES, root, "--list"], { encoding: "utf-8", env: env(shard) });
+  const r = spawnSync("python3", ["-I", "-B", RUN_GATES, root, "--list"], { encoding: "utf-8", env: env(shard) });
   if (r.status !== 0) throw new Error(`--list exited ${r.status}: ${r.stderr}`);
   return JSON.parse(r.stdout);
 }
@@ -51,7 +51,7 @@ function list(root: string, shard?: string): { gates: Record<string, string>; sk
 function runShard(root: string, results: string, side: string, i: number, n: number): void {
   const out = join(results, `results-${side}-${i}`);
   mkdirSync(out, { recursive: true });
-  const r = spawnSync("python3", ["-I", RUN_GATES, root, join(out, "gates.json")], {
+  const r = spawnSync("python3", ["-I", "-B", RUN_GATES, root, join(out, "gates.json")], {
     encoding: "utf-8",
     env: { ...env(`${i}/${n}`), RUNNER_TEMP },
   });
@@ -61,7 +61,7 @@ function runShard(root: string, results: string, side: string, i: number, n: num
 
 function merge(results: string, side: string, n: number): { status: number | null; out: string; stdout: string } {
   const out = mkdtempSync(join(tmpdir(), "gate-merged-"));
-  const r = spawnSync("python3", ["-I", MERGE, results, side, String(n), out], { encoding: "utf-8", env: env() });
+  const r = spawnSync("python3", ["-I", "-B", MERGE, results, side, String(n), out], { encoding: "utf-8", env: env() });
   return { status: r.status, out, stdout: r.stdout + r.stderr };
 }
 
@@ -102,7 +102,7 @@ describe("run-gates.py GATE_SHARD", () => {
   });
 
   test.each(["0/4", "5/4", "1/0", "x", "1/2/3", "-1/4"])("a malformed GATE_SHARD (%s) exits 2, never a guessed slice", (bad) => {
-    const r = spawnSync("python3", ["-I", RUN_GATES, root, "--list"], { encoding: "utf-8", env: env(bad) });
+    const r = spawnSync("python3", ["-I", "-B", RUN_GATES, root, "--list"], { encoding: "utf-8", env: env(bad) });
     expect(r.status).toBe(2);
     expect(r.stdout).toBe("");
   });
@@ -118,7 +118,7 @@ describe("run-gates.py GATE_TIMINGS (cat-harness-tools#397)", () => {
   const timed = (shard: string, path = file) => {
     // input-site: inert #5eb54616 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
     const { GATE_SHARD: _s, GATE_TIMINGS: _t, ...rest } = process.env;
-    const r = spawnSync("python3", ["-I", RUN_GATES, root, "--list"], { encoding: "utf-8", env: { ...rest, GATE_SHARD: shard, GATE_TIMINGS: path } });
+    const r = spawnSync("python3", ["-I", "-B", RUN_GATES, root, "--list"], { encoding: "utf-8", env: { ...rest, GATE_SHARD: shard, GATE_TIMINGS: path } });
     if (r.status !== 0) throw new Error(`--list exited ${r.status}: ${r.stderr}`);
     return Object.keys(JSON.parse(r.stdout).gates);
   };
@@ -152,7 +152,7 @@ describe("run-gates.py shard_names weighs alone gates by wall time", () => {
       "t, a, n, j = json.loads(sys.argv[2]), json.loads(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])",
       "print(json.dumps([rg.shard_names(sorted(t), i, n, t, set(a), j) for i in range(1, n + 1)]))",
     ].join("\n");
-    const r = spawnSync("python3", ["-I", "-c", code, RUN_GATES, JSON.stringify(timings), JSON.stringify(alone), String(n), String(jobs)], { encoding: "utf-8" });
+    const r = spawnSync("python3", ["-I", "-B", "-c", code, RUN_GATES, JSON.stringify(timings), JSON.stringify(alone), String(n), String(jobs)], { encoding: "utf-8" });
     if (r.status !== 0) throw new Error(r.stderr);
     return JSON.parse(r.stdout);
   };
@@ -248,7 +248,7 @@ describe("merge-shards.py", () => {
 describe("snapshot.py (cat-harness-tools#397)", () => {
   const SNAPSHOT = join(DIR, "snapshot.py");
   const py = (...a: string[]) => {
-    const r = spawnSync("python3", [SNAPSHOT, ...a], { encoding: "utf-8" });
+    const r = spawnSync("python3", ["-B", SNAPSHOT, ...a], { encoding: "utf-8" });
     expect(r.status).toBe(0);
   };
 

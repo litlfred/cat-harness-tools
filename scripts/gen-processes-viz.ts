@@ -39,6 +39,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { baseDocsDir } from "./compose-docs.js";
+import { forgeHrefFor, skillContractSectionMd } from "./tool-page.ts";
 import { skillLinksOf, skillSourceFilesOf, skillTarget, sourceSkillPage, type SkillPages } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { businessProcessFiles, workflowFiles, kgRoots } from "./known-skills.js";
@@ -81,7 +82,7 @@ import {
   type UnlinkedRef,
 } from "./lib/task-panel.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
-import { subjectHref } from "./lib/subject-pages.ts";
+import { subjectHref, subjectIri } from "./lib/subject-pages.ts";
 import { methodologyNodes } from "./check-methodology-evidence.js";
 import { instanceOf, pageRelPath as methodologiesPageRel } from "./gen-methodologies-viz.js";
 import { declaredRoute } from "./viewer-declarations.js";
@@ -669,6 +670,8 @@ export function sourceSkillPageMd(
   file: string,
   localNames: ReadonlySet<string>,
   rows: readonly ProcessRow[],
+  /** The contract section (`skillContractSectionMd`), when the caller read one. */
+  contracts?: readonly string[],
 ): string {
   const p = sourceSkillPage(name, text, url, localNames);
   const users = rows.filter(
@@ -691,6 +694,9 @@ export function sourceSkillPageMd(
   if (users.length) L.push(`**Named by:** ${users.map((r) => `[${esc(r.name)}](../${r.stem}.html)`).join(", ")}`, "");
   L.push(...lines);
   L.push(...wrapRaw(L.splice(rawFrom).join("\n")));
+  // The skill's I/O contracts as a class diagram (bean `cat-tools-4xq6`),
+  // outside the raw block so its HTML renders.
+  if (contracts) L.push(...contracts);
   return `${L.join("\n")}\n`;
 }
 
@@ -860,6 +866,18 @@ export interface PageScope {
   readonly instance?: string;
   /** On the full index: one row per sub-graph page, to browse by layer. */
   readonly subjects?: readonly { name: string; count: number; href: string }[];
+  /** A process's IRI ({@link processIri} unless given). */
+  readonly iriOf?: (r: ProcessRow) => string | undefined;
+}
+
+/**
+ * A process's IRI, `<doc dir>/process/<id>`, as its layer's document mints it
+ * (`kg-export`; `subjectIri`), and served with its `.jsonld` wherever that
+ * layer is published. Its row and its page link it (owner, 2026-11-13,
+ * node-kind audit: "link existing IRIs").
+ */
+export function processIri(r: Pick<ProcessRow, "file" | "id">, repo: string = REPO): string | undefined {
+  return subjectIri(join(repo, r.file), "process", r.id);
 }
 
 /**
@@ -966,7 +984,9 @@ export function page(
       ["process", "steps", "undocumented steps", "running instances"],
       ok.map((r) => {
         const undoc = r.steps.filter((st) => !st.documentation).length;
-        return `| [${esc(r.name)}](${base}${r.stem}.html) | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id, root)} |`;
+        const iri = (scope.iriOf ?? processIri)(r);
+        const node = iri === undefined ? "" : ` · [IRI](${iri}) · [JSON-LD](${iri}.jsonld)`;
+        return `| [${esc(r.name)}](${base}${r.stem}.html)${node} | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id, root)} |`;
       }),
       "_No process parsed._",
     ),
@@ -1195,7 +1215,9 @@ export function processPage(
   presentedOn: readonly Presentation[] = [],
   instances: InstancesRead = NO_INSTANCES,
   unlinked: (ref: string) => void = () => {},
+  iriOf: (r: ProcessRow) => string | undefined = processIri,
 ): string {
+  const iri = iriOf(row);
   const byId = new Map(rows.map((r) => [r.id, r]));
   // Process ids and skill names in authored prose become links (owner, 2026-10-31).
   const prose = (t: string): string => {
@@ -1243,6 +1265,10 @@ export function processPage(
   L.push("---");
   L.push(`title: '${row.name.replace(/'/g, "''")}'`);
   L.push("nav_exclude: true");
+  // The page renders the process; its JSON-LD is the asset (kg-viewer §"The
+  // asset and its rendering are two resources"): head_custom.html writes it
+  // as `rel=alternate type=application/ld+json`.
+  if (iri !== undefined) L.push(`alternate_jsonld: ${JSON.stringify(`${iri}.jsonld`)}`);
   L.push(GENERATED_FM);
   L.push("---");
   L.push("");
@@ -1523,9 +1549,14 @@ if (import.meta.main) {
   }
   const ctx = panelContext(REPO, skillPages);
   const localSet = new Set(localSkills);
+  const contractRoots = instanceRoots(REPO);
+  const contractHref = forgeHrefFor(REPO);
   for (const n of localSkills) {
     const src = sourceFiles.get(n)!;
-    pages.set(join(dirname(out), SOURCE_SKILLS_DIR, `${n}.md`), sourceSkillPageMd(n, readFileSync(src.file, "utf-8"), src.url, relative(REPO, src.file), localSet, rows));
+    pages.set(
+      join(dirname(out), SOURCE_SKILLS_DIR, `${n}.md`),
+      sourceSkillPageMd(n, readFileSync(src.file, "utf-8"), src.url, relative(REPO, src.file), localSet, rows, skillContractSectionMd(n, contractRoots, REPO, contractHref)),
+    );
   }
   // Whether the ⓘ panel shows skills: the site's declaration, on unless it
   // says `site.taskSkills: false` (`taskSkillsDeclared`).

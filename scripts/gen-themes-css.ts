@@ -28,7 +28,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { readDeclaration, repoRootFor, siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, readDeclaration, repoRootFor, siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.js";
+import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { pageThemeCssVars, themeCssVars, type ResolvedTheme } from "../schemas/ui/theme.js";
 import {
   explainStickyThemeConflict,
@@ -220,8 +221,14 @@ if (import.meta.main) {
   const count =
     `${THEMES.length} platform themes, ${found.themes.length} instance sticky theme(s), ` +
     `${webpage.length} instance webpage theme(s)`;
-  const current = existsSync(path) ? readFileSync(path, "utf8") : undefined;
-  const currentData = existsSync(dataPath) ? readFileSync(dataPath, "utf8") : undefined;
+  // In a checkout that MOUNTS this layer, both files are computed at the
+  // layer's output root, not in the pinned mount (bean `cat-tools-sm8r`,
+  // item 4, step 4): read through the overlay, written at the output root.
+  const checkout = checkoutRootFor(root);
+  const readPath = readPathAt(checkout, path);
+  const readDataPath = readPathAt(checkout, dataPath);
+  const current = existsSync(readPath) ? readFileSync(readPath, "utf8") : undefined;
+  const currentData = existsSync(readDataPath) ? readFileSync(readDataPath, "utf8") : undefined;
 
   if (check) {
     // BOTH artefacts, and each named separately when stale. One message for two
@@ -239,9 +246,11 @@ if (import.meta.main) {
     process.exit(1);
   }
 
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, next);
-  mkdirSync(dirname(dataPath), { recursive: true });
-  writeFileSync(dataPath, nextData);
+  const writePath = writePathAt(checkout, path);
+  const writeDataPath = writePathAt(checkout, dataPath);
+  mkdirSync(dirname(writePath), { recursive: true });
+  writeFileSync(writePath, next);
+  mkdirSync(dirname(writeDataPath), { recursive: true });
+  writeFileSync(writeDataPath, nextData);
   console.log(`wrote ${rel} (${count}, default ${DEFAULT_THEME_ID})`);
 }

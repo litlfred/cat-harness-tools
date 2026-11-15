@@ -17,7 +17,9 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "../../test/support/site-fs.ts";
+import { overlayPath } from "../lib/layer-output.ts";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
@@ -412,7 +414,7 @@ describe("the real backlog — not vacuous, and it adds up", () => {
       const entries: string[] = [];
       for (const top of readdirSync(lib)) {
         if (existsSync(join(lib, top, "blocks"))) entries.push(top);
-        else if (statSync(join(lib, top)).isDirectory())
+        else if (statSync(overlayPath(join(lib, top))).isDirectory())
           for (const sub of readdirSync(join(lib, top))) if (existsSync(join(lib, top, sub, "blocks"))) entries.push(join(top, sub));
       }
       for (const rel of entries) {

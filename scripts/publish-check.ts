@@ -324,7 +324,7 @@ if (import.meta.main) {
   for (const pre of prereqs) {
     if (scripts[pre] === undefined) continue;
     const preDeclared = declared.filter((a) => a.writer.includes(pre));
-    if (preDeclared.length > 0 && preDeclared.every((a) => built(a))) continue;
+    if (preDeclared.length > 0 && preDeclared.every((a) => built(a, work))) continue;
     run(`bun run cat ${pre}`, work);
   }
   const before = snapshot(roots, work);
@@ -344,7 +344,7 @@ if (import.meta.main) {
   const ownInstances = gateOwnInstances();
   const owns = (repoPath: string) => gateOwnsFile(repoPath) !== false;
   const empty = declared.filter(
-    (a) => a.writer.includes(writer) && a.writer.at(-1) === writer && a.optional !== true && !built(a) && (!ownInstances || ownInstances.has(a.instance)),
+    (a) => a.writer.includes(writer) && a.writer.at(-1) === writer && a.optional !== true && !built(a, work) && (!ownInstances || ownInstances.has(a.instance)),
   );
   for (const a of empty) console.error(`✗ publish:check: ${a.instance}/${a.path} is declared built by \`${writer}\` and is missing or empty`);
 

@@ -110,6 +110,10 @@ from concurrent.futures import ThreadPoolExecutor
 # Beside this file, found by its path: the tests and `python3 -I` put no
 # script directory on sys.path.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# No __pycache__/ beside the module: this directory is often a MOUNTED layer,
+# whose bytes a mount digest pins, and a caller passing `-I` cannot be asked
+# for PYTHONDONTWRITEBYTECODE (bean cat-tools-sm8r item 4).
+sys.dont_write_bytecode = True
 from gate_diagnostics import diagnostics, producer  # noqa: E402
 
 # Scoped to the instance where the check takes a scope (kg-audit, kg-export,
@@ -797,16 +801,20 @@ def cone_scripts(gates, runner):
 # neighbour's write would otherwise be stored as a state the gate never read.
 # The other records are kept with `ci-cone.ts keep`, which stores them exactly
 # as a lone run would. A side whose ci-cone.ts predates this traces one at a
-# time, as before; `GATE_CONE_PARALLEL=0` does too.
+# time, as before, and so does any run without `GATE_CONE_PARALLEL=1`.
 CONE_PARALLEL_MARKS = ("CI_CONE_TOUCHED_OUT", "CI_CONE_RECORD_OUT", '"keep"')
 
 
 def cone_parallel(root, env):
-    """Whether this side's ci-cone.ts can trace gates side by side."""
-    if (env.get("GATE_CONE_PARALLEL") or "").strip() == "0":
+    """Whether to trace gates side by side: only when `GATE_CONE_PARALLEL=1`
+    asks for it and this side's ci-cone.ts can. Off by default: on who-iris
+    main one long gate whose writes were unknown sent all 49 pooled gates of a
+    shard back to run alone, so the step took longer than tracing one at a
+    time (cat-harness-tools#1859)."""
+    if (env.get("GATE_CONE_PARALLEL") or "").strip() != "1":
         return False
     if (env.get("GATE_CONE_CLI") or "").strip():
-        return (env.get("GATE_CONE_PARALLEL") or "").strip() == "1"
+        return True
     try:
         with open(os.path.join(root, CONE_CLI)) as f:
             src = f.read()
@@ -1143,7 +1151,7 @@ def derive(root, given, tmp, env=None):
             # pins differ by design, so a gate added to the list after the
             # index's pin named a script no mount declared, and `bun run cat`
             # failed it as "no script" on every layer PR whose cone ran it
-            # (smart-base#357, jsonld:site:check: workflow 31e8a3e, index pin
+            # (jsonld:site:check: workflow 31e8a3e, index pin
             # ed3c8eb, script added in be54df93). Nothing was judged, so it is
             # listed as skipped, never counted, and runs once the pin has it.
             skipped[f"{owner}:{script}"] = {

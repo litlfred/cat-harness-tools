@@ -25,6 +25,49 @@
 import "./kg/folio-graph-typology.js";
 
 /*
+ * NO PYTHON BYTECODE IN THE TREE — bean `cat-tools-sm8r` item 4.
+ *
+ * A script under test that spawns Python (the PDF and LaTeX importers, the
+ * layer-pr-checks gates) has it import in-tree modules, and Python then writes
+ * `__pycache__/` beside them: inside a mounted layer, which `mount-from-lock
+ * --check` then reports edited after one `bun test`. Every child inherits this;
+ * a spawn passing `-I` ignores it, and passes `-B` instead.
+ */
+// input-site: inert #0b652d78 — written, never read: it keeps a child's bytecode out of the tree
+process.env.PYTHONDONTWRITEBYTECODE = "1";
+
+/*
+ * …and so every child sees it. `node:child_process` hands a child the CURRENT
+ * `process.env`; `Bun.spawn` and `Bun.spawnSync` hand it the environment the
+ * process STARTED with, so the line above never reached them (measured on bun
+ * 1.4.4: a preload-set variable read back `unset` in a `Bun.spawnSync` child,
+ * and the PDF importers, which spawn Python that way, kept writing
+ * `scripts/__pycache__/`). Under `bun test` only, a spawn that names no `env`
+ * gets the current one, as `node:child_process` already does; a spawn that
+ * names its own is left exactly as it is.
+ */
+type BunSpawnOptions = { env?: Record<string, string | undefined> } | undefined;
+type AnySpawn = (...args: unknown[]) => unknown;
+function currentEnvByDefault(spawn: AnySpawn): AnySpawn {
+  return (cmdOrOptions: unknown, options?: unknown) => {
+    // input-site: inert #09c28de2 — hands this process's environment on to a child, unread here
+    const env = { ...process.env };
+    if (Array.isArray(cmdOrOptions)) {
+      const o = options as BunSpawnOptions;
+      // input-site: inert #e0cf2153 — passes a test's own spawn through, with the current environment when it named none
+      return spawn(cmdOrOptions, o?.env === undefined ? { ...o, env } : o);
+    }
+    const o = cmdOrOptions as BunSpawnOptions;
+    // input-site: inert #3e6e99b8 — passes a test's own spawn through, with the current environment when it named none
+    return spawn(o?.env === undefined ? { ...o, env } : o);
+  };
+}
+// input-site: inert #17f38363 — wraps the spawn, runs nothing itself
+Bun.spawn = currentEnvByDefault(Bun.spawn as unknown as AnySpawn) as unknown as typeof Bun.spawn;
+// input-site: inert #c272410e — wraps the spawn, runs nothing itself
+Bun.spawnSync = currentEnvByDefault(Bun.spawnSync as unknown as AnySpawn) as unknown as typeof Bun.spawnSync;
+
+/*
  * THE SUITE'S DEFAULT TIMEOUT — bean `61n5`.
  *
  * bun's default is 5 s, and this repository has a whole class of tests that
