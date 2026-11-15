@@ -36,6 +36,7 @@
  *   bun run cat library:viz:check    # fail if either artefact is stale
  */
 import { inScope as siteInScope, scopeArg, siteScope } from "./lib/site-scope.ts";
+import { overlayPath } from "./lib/layer-output.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
@@ -1139,7 +1140,9 @@ export function instanceSubgraphFile(harnessRoot: string, site: string, instance
     return undefined; // no `docs` directory, so nothing is framed here
   }
   const abs = instance === undefined ? join(site, dir, SUBGRAPH_INDEX_FILE) : join(site, dir, instance, SUBGRAPH_INDEX_FILE);
-  return existsSync(abs) ? abs : undefined;
+  // The subgraph writer publishes at the layer's output root in a composed
+  // checkout (bean sm8r): ask there, and return the site address a link uses.
+  return existsSync(overlayPath(abs)) ? abs : undefined;
 }
 
 /**
