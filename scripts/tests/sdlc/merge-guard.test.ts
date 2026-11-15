@@ -1354,6 +1354,11 @@ describe("check 9 — content-review (owner, 2026-11-15)", () => {
     expect(c.status).toBe("pass");
   });
 
+  test("a template hint in an HTML comment, even over several lines, is not a record", () => {
+    expect(contentReviewRecord("## Content review\n<!--\nLink the card, e.g. https://example.org\nQ-AB-1\n-->\n").ok).toBe(false);
+    expect(contentReviewRecord("## Content review\n<!-- open to the end https://example.org").ok).toBe(false);
+  });
+
   test("a section with prose but no pointer is refused", () => {
     expect(contentReviewRecord("### Content review\nThe committee looked at it.").ok).toBe(false);
   });

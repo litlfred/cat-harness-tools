@@ -1157,6 +1157,23 @@ const RECORD_PATTERNS: readonly RegExp[] = [
 /** A section that only says the review has not happened yet. */
 const PLACEHOLDER = /^(?:\s|[-*>]|_|tbd|todo|pending|none|n\/a|not yet|to do|\.|:)*$/i;
 
+/**
+ * `text` with every HTML comment removed, including one that spans lines
+ * and one left open to the end (a template's hint is not a record).
+ */
+export function stripHtmlComments(text: string): string {
+  let out = "";
+  let at = 0;
+  for (;;) {
+    const open = text.indexOf("<!--", at);
+    if (open < 0) return out + text.slice(at);
+    out += text.slice(at, open);
+    const close = text.indexOf("-->", open + 4);
+    if (close < 0) return out;
+    at = close + 3;
+  }
+}
+
 export interface ContentReviewRecord {
   ok: boolean;
   /** The pointers found, when `ok`. */
@@ -1180,7 +1197,7 @@ export function contentReviewRecord(body: string | null | undefined): ContentRev
     if (h && h[1]!.length <= level) break;
     section.push(l);
   }
-  const text = section.filter((l) => !/^\s*<!--.*-->\s*$/.test(l)).join("\n");
+  const text = stripHtmlComments(section.join("\n"));
   if (PLACEHOLDER.test(text)) return { ok: false, records: [], why: `the \`${CONTENT_REVIEW_HEADING}\` section is empty or a placeholder` };
   const records = [...new Set(RECORD_PATTERNS.flatMap((re) => [...text.matchAll(re)].map((m) => (m[1] ?? m[0]).replace(/[).,]+$/, ""))))];
   return records.length
