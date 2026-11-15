@@ -3987,6 +3987,23 @@ const escHtml = (v: unknown): string =>
   String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /**
+ * A literal's text, escaped, with its Markdown code spans drawn as `<code>`.
+ *
+ * Declaration descriptions are written in Markdown, so a placeholder such as
+ * `` `<doc-id>.<section>.<n>` `` sits in a code span. Escaped and left as
+ * text, the backticks showed and `&lt;section&gt;` read as a block tag leaked
+ * into the page, which `check:escaped-markup` rightly refused on a declared
+ * directory's subject page (2026-11-15). Only code spans are drawn: the rest
+ * of the literal stays escaped text.
+ */
+export function literalHtml(s: string): string {
+  return s
+    .split(/(`[^`\n]+`)/)
+    .map((part) => (/^`[^`\n]+`$/.test(part) ? `<code>${escHtml(part.slice(1, -1))}</code>` : escHtml(part)))
+    .join("");
+}
+
+/**
  * A value as HTML: an IRI is a link, a list is each of its items.
  *
  * An IRI naming another node of the same graph is shown by that node's NAME,
@@ -4002,7 +4019,7 @@ function valueHtml(v: unknown, labels: ReadonlyMap<string, string> = new Map()):
     return typeof id === "string" ? valueHtml(id, labels) : `<code>${escHtml(JSON.stringify(v))}</code>`;
   }
   const s = String(v);
-  if (!/^https?:\/\//.test(s)) return escHtml(s);
+  if (!/^https?:\/\//.test(s)) return literalHtml(s);
   const label = labels.get(s);
   return label === undefined
     ? `<a class="iri" href="${escHtml(s)}">${escHtml(s)}</a>`
