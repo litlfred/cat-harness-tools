@@ -159,6 +159,12 @@ describe("OCR language hint (owner, 2026-11-10)", () => {
     expect(r.stdout.toString()).toContain("all checks passed");
     expect(r.exitCode).toBe(0);
   });
+
+  test("pdf-ocr's optional vision digit fallback holds (scripts/tests/pdf-ocr-vision-digits.test.py)", () => {
+    const r = Bun.spawnSync(["python3", join(SCRIPTS, "tests", "pdf-ocr-vision-digits.test.py")]);
+    expect(r.stdout.toString()).toContain("all checks passed");
+    expect(r.exitCode).toBe(0);
+  });
 });
 
 describe("which software ran, as a folio-run-context/v1 (turh, gap 2)", () => {
