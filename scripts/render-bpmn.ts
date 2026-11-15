@@ -27,6 +27,7 @@
 import { businessProcessFiles, workflowFiles } from "./known-skills.js";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
+import { overlayPath, writePathOf } from "./lib/layer-output.ts";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import {
   besideSource as besideSourceSvg,
@@ -246,8 +247,11 @@ const besideSource = new Set(sources);
 let stale = 0;
 
 /** Write `text` to `out`, or with `--check` report whether it is current. */
-async function emit(out: string, text: string): Promise<void> {
-  const previous = existsSync(out) ? await readFile(out, "utf8") : null;
+async function emit(out: string, text: string, besideSource = false): Promise<void> {
+  // Read over the layer overlay: a mounted layer's drawing may already sit at
+  // its output root (bean `cat-tools-sm8r`).
+  const at = overlayPath(out);
+  const previous = existsSync(at) ? await readFile(at, "utf8") : null;
   const shown = relative(repoRootFor(ROOT), out);
   if (check) {
     if (previous !== text) {
@@ -258,9 +262,20 @@ async function emit(out: string, text: string): Promise<void> {
     }
     return;
   }
-  await mkdir(dirname(out), { recursive: true });
-  await writeFile(out, text, "utf8");
-  console.log(`${previous === text ? "=" : "✓"} ${shown}`);
+  // Unchanged bytes are not rewritten: a rewrite of the same picture moved
+  // the file's mtime inside every mounted layer (152 of the 165 diagrams a
+  // composed publish touched in mounts, measured 2026-11-15). A changed
+  // BESIDE-SOURCE drawing of a mounted layer goes to the output root's twin,
+  // never into the mount; the site copy stays where it is declared
+  // `builtAtPublish` (`docs/assets/img/workflows/`), so no site reader moves.
+  if (previous === text) {
+    console.log(`= ${shown}`);
+    return;
+  }
+  const to = besideSource ? writePathOf(out) : out;
+  await mkdir(dirname(to), { recursive: true });
+  await writeFile(to, text, "utf8");
+  console.log(`✓ ${shown}${to === out ? "" : ` → ${relative(repoRootFor(ROOT), to)}`}`);
 }
 
 for (const file of sources) {
@@ -362,7 +377,7 @@ for (const file of sources) {
       process.exitCode = 1;
       continue;
     }
-    await emit(besideSourceTarget(file, repoRootFor(ROOT), besideOut), own.svg);
+    await emit(besideSourceTarget(file, repoRootFor(ROOT), besideOut), own.svg, true);
   }
 }
 

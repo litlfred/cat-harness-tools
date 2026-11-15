@@ -45,7 +45,7 @@ import { readLibraryGraph, referencedCatalogueEntries, type LibraryGraph, type L
 } from "./library-graph.ts";
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
-import { DOCUMENT_VIEW_JS, entryFigureFiles, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
+import { DOCUMENT_VIEW_JS, entryFigureCopies, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
 import { LANGUAGE_TOGGLE_JS, entryLanguages, listingTitles, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
 import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
 import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
@@ -2081,8 +2081,8 @@ if (import.meta.main) {
     // COPIED like the avatars: the entry's directory is not on the site.
     // A withheld entry shows none, so none is copied.
     if (doc && !e.withheld)
-      for (const rel of entryFigureFiles(join(repoRoot, e.dir)))
-        emitBytes(join(dataDir, "files", e.id, rel), readFileSync(join(repoRoot, e.dir, rel)));
+      for (const { rel, source } of entryFigureCopies(join(repoRoot, e.dir)))
+        emitBytes(join(dataDir, "files", e.id, rel), readFileSync(join(repoRoot, e.dir, source)));
   }
 
   for (const e of g.entries) {
