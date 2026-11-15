@@ -59,7 +59,7 @@ import {
   type SiteLinks,
 } from "./render.ts";
 
-export const PRESENT_ASSETS = ["present.css", "present.js", "gap-report.js"] as const;
+export { PRESENT_ASSETS } from "./present-assets.ts";
 /** The workshop segments these pages take: a module may not be called either. */
 export const PRESENT_SEGMENTS = ["overview", "walkthrough", ...VIEW_SEGMENTS] as const;
 

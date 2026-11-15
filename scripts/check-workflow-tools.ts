@@ -109,6 +109,32 @@ const INTERPRETED = new RegExp(
 const BARE = new RegExp(`(?:^|[;&|(]\\s*|\\s)(\\.{1,2}/[\\w.@/-]+\\.${SCRIPT_EXT})${END}`, "g");
 /** `script=ci/.github/scripts/x.py`: the step runs "$script" next. */
 const ASSIGNED = new RegExp(`(?:^|\\s)[A-Za-z_]\\w*=["']?${PATH}["']?${END}`, "g");
+
+/**
+ * A script copied out of a pinned tree before it runs: `git [-C d] show
+ * "<ref>:<src>" > "$var"` with `var=<dest>` in the same block, then `bun
+ * "$var"`. The step runs `<src>` at a pin (the judging scripts' version), and
+ * `<dest>` is a scratch name that exists in no tree, so it is read as `<src>`
+ * rather than reported as `unresolved` (the preview tier's
+ * `.preview-qa-ci.ts`, a copy of `scripts/preview-qa.ts`).
+ */
+const COPIED_FROM_PIN = new RegExp(
+  `\\bshow\\s+["']?[^\\s"':]*:${PATH}["']?\\s*>\\s*["']?\\$\\{?([A-Za-z_]\\w*)\\}?["']?`,
+  "g",
+);
+const VAR_PATH = new RegExp(`(?:^|\\s)([A-Za-z_]\\w*)=["']?${PATH}["']?${END}`, "g");
+
+/** In one `run:` block, each copy destination named by a variable → the path it was copied from. */
+export function pinnedCopies(block: string): Map<string, string> {
+  const vars = new Map<string, string>();
+  for (const m of block.matchAll(VAR_PATH)) vars.set(m[1]!, m[2]!);
+  const out = new Map<string, string>();
+  for (const m of block.matchAll(COPIED_FROM_PIN)) {
+    const dest = vars.get(m[2]!);
+    if (dest !== undefined) out.set(dest, m[1]!);
+  }
+  return out;
+}
 /** `bun run cat <key>` or `bun run <a:b>`. */
 const KEYED = /\bbun run (?:cat ([A-Za-z0-9:_.-]+)|([A-Za-z0-9_.-]+:[A-Za-z0-9:_.-]+))/g;
 
@@ -296,9 +322,10 @@ export function invocations(root: string = ROOT, files: readonly string[] = work
   for (const workflow of files) {
     const layer = layerOf(workflow, root);
     for (const block of runBlocks(readFileSync(join(root, workflow), "utf-8"))) {
+      const copies = pinnedCopies(block);
       for (const rx of [INTERPRETED, BARE, ASSIGNED]) {
         for (const m of block.matchAll(rx)) {
-          const raw = m[1]!;
+          const raw = copies.get(m[1]!) ?? m[1]!;
           if (raw.includes("$")) continue; // a path built at run time names no file here
           const script = resolvePath(raw, layer, root);
           push({ workflow, raw, script, qc: isQcScript(script ?? raw) || CHECK_FLAG.test(lineAround(block, m.index!)) });

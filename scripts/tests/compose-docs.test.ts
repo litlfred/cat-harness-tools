@@ -172,8 +172,12 @@ describe("an EMPTY overlay composes byte-identically — the safety property", (
       expect(o.path.startsWith("_includes/generated/")).toBe(true);
     }
     // D1: the config is the merge of the two, setting for setting.
-    const chromeCfg = parseYaml(readFileSync(join(instanceLayers[0]!.dir, "_config.yml"), "utf-8"));
-    const docsCfg = parseYaml(readFileSync(join(instanceLayers[1]!.dir, "_config.yml"), "utf-8"));
+    // By id, not by position: a mounted cat-harness's `@output` twins
+    // (`site-chrome@output`, `docs@output`) sit among the layers too, and a
+    // twin holds computed files, not the layer's `_config.yml`.
+    const layerDir = (id: string): string => instanceLayers.find((l) => l.id === id)!.dir;
+    const chromeCfg = parseYaml(readFileSync(join(layerDir("site-chrome"), "_config.yml"), "utf-8"));
+    const docsCfg = parseYaml(readFileSync(join(layerDir("docs"), "_config.yml"), "utf-8"));
     expect(parseYaml(readFileSync(join(dest, "_config.yml"), "utf-8"))).toEqual(mergeConfig(chromeCfg, docsCfg).merged);
 
     const before = new Map<string, string>();

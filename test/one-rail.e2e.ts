@@ -46,13 +46,19 @@ test.describe("one rail on every page (owner, 2026-10-15, option A)", () => {
     const errors = await open(page, "/guide/install.html");
     await expect(page.locator(".side-bar")).toHaveCount(0);
     await expect(page.locator("#site-nav")).toHaveCount(0);
-    expect(await sections(page)).toEqual(["On this page", "Pages", "Folders", "Harnesses"]);
+    expect(await sections(page)).toEqual(["On this page", "Pages", "Folders"]);
+    // Harnesses is an icon's panel since 2026-11-13 (owner: "remove the
+    // harnesses navbar, instead add an icon to the controls").
+    await expect(page.locator('nav.fa-nav button.fa-nav-harnesses[aria-controls="fa-nav-harnesses"]')).toHaveCount(1);
     expect(errors).toEqual([]);
   });
 
   test("a page the theme never laid out wears the same rail, the same sections", async ({ page }) => {
     const errors = await open(page, "/replica/page.html");
-    expect(await sections(page)).toEqual(["On this page", "Pages", "Folders", "Harnesses"]);
+    expect(await sections(page)).toEqual(["On this page", "Pages", "Folders"]);
+    // Harnesses is an icon's panel since 2026-11-13 (owner: "remove the
+    // harnesses navbar, instead add an icon to the controls").
+    await expect(page.locator('nav.fa-nav button.fa-nav-harnesses[aria-controls="fa-nav-harnesses"]')).toHaveCount(1);
     expect(errors).toEqual([]);
   });
 

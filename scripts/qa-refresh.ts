@@ -93,6 +93,13 @@ export interface QaWriter {
    * same job writes; it is still checked for files.
    */
   run: readonly string[] | "external";
+  /**
+   * An `external` family written only AFTER the site is published, so a
+   * pre-publish refresh finds it absent and must not call it empty. Every
+   * other external writer is still checked for files: its step runs earlier
+   * in the same job, and an empty family there means that step broke.
+   */
+  afterPublish?: true;
   /** Repository-relative globs (`*` one segment, `**` any) of what it writes. */
   writes: readonly string[];
   /**
@@ -288,6 +295,19 @@ export const QA_WRITERS: readonly QaWriter[] = [
     because: "exits 1 when it finds a wrong-direction reference, and writes the sidecar either way",
   },
   {
+    // Claimed, never run here: `check:nav-names` reads the BUILT site (the
+    // navbar include, harness.json and every railed viewer page), and a
+    // consumer's QA working copy runs qa:refresh BEFORE derive:publish builds
+    // it, so running it here judged an empty site UNDETERMINED and left the
+    // refresh INCOMPLETE (folio-assistant#3124). Its report form writes the
+    // sidecar after the site is built; `check:nav-names:check` gates it.
+    id: "check:nav-names",
+    run: "external",
+    afterPublish: true,
+    writes: [`${R}/nav-names.qa-results.json`],
+    because: "written by `check:nav-names` once the site is built, which qa:refresh's pre-publish pass cannot do; judged by `check:nav-names:check`",
+  },
+  {
     id: "kg-export:bootstrap",
     run: "external",
     writes: [`${R}/kg-export.bootstrap.qa-results.json`],
@@ -444,7 +464,11 @@ export function assess(args: {
       if (by.length === 0 && !trackedSet.has(p)) unclaimed.push(p);
       for (const id of by) families[id]!++;
     }
-    for (const w of writers) if (families[w.id] === 0 && !na.has(w.id)) empty.push(w.id);
+    // A writer that runs only AFTER publish (`afterPublish`) has not written
+    // yet, so its empty family is no evidence of failure (check:nav-names,
+    // folio-assistant#3124). Its claim still keeps its file from being
+    // `unclaimed`, and every other external writer is still held to its files.
+    for (const w of writers) if (families[w.id] === 0 && !na.has(w.id) && !w.afterPublish) empty.push(w.id);
     for (const r of args.runs) {
       const w = writers.find((x) => x.id === r.id);
       if (na.has(r.id)) continue;

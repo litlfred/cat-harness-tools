@@ -21,7 +21,7 @@
  * in, so nothing it reads changed.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "../support/site-fs.ts";
 import { join, relative, resolve } from "node:path";
 import { harnessPath } from "../../scripts/lib/harness-layout.ts";
 

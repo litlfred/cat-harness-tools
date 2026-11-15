@@ -320,6 +320,8 @@
     "translated-links:fix": "bun run cat-harness-tools/scripts/check-translated-link-depth.ts",
     "viewer:nav:audit": "bun run cat-harness-tools/scripts/check-viewer-nav.ts",
     "viewer:nav:strict": "bun run cat-harness-tools/scripts/check-viewer-nav.ts --check --strict",
+    "node-views:report": "bun run cat-harness-tools/scripts/node-view-coverage.ts",
+    "node-views:judge": "bun run cat-harness-tools/scripts/node-view-coverage.ts --check",
     "split:baseline": "bun run cat-harness-tools/scripts/split-baseline.ts",
     "split:baseline:check": "bun run cat-harness-tools/scripts/split-baseline.ts --check",
     "check:script-placement": "bun run cat-harness-tools/scripts/check-script-placement.ts",

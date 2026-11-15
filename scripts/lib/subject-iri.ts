@@ -49,6 +49,7 @@
 export const SUBJECT_KINDS: readonly string[] = [
   "actor",
   "asset",
+  "attestation",
   "capability",
   "convention",
   "decision",

@@ -60,6 +60,7 @@ margins can tell an RTL page from an LTR one instead of assuming LTR.
 
 Usage:
     pdf-ocr.py <pdf> [-o OUTDIR] [--lang jpn+eng | --lang-hint fr,en] [--dpi 200] [--force]
+               [--vision-digits]   # opt-in; needs IRIS_VISION_MODEL and ANTHROPIC_API_KEY
     pdf-ocr.py --check            # report whether the tools are present
 """
 
@@ -263,11 +264,21 @@ def ocr_releases(langs: list[str]) -> list[dict]:
     return out
 
 
-def write_ocr_run_context(pdf: str, root: str, cache: str, langs: list[str]) -> dict | None:
-    """Record which software produced `cache`, beside it. None when no checkout can be named."""
+def write_ocr_run_context(pdf: str, root: str, cache: str, langs: list[str],
+                          vision: bool = False) -> dict | None:
+    """Record which software produced `cache`, beside it. None when no checkout can be named.
+
+    A run with the vision fallback says so: a remote model has no bytes here
+    to digest, so it is recorded as not provisioned, with the reason.
+    """
+    releases = ocr_releases(langs)
+    if vision:
+        releases.append(_run_context.could_not_provision(
+            "vision-digits", "not-disclosed",
+            f"a remote vision model re-read unsure number words; see {VISION_LOG}"))
     ctx = _run_context.build(
         invoker_script=os.path.abspath(__file__),
-        releases=ocr_releases(langs),
+        releases=releases,
         inputs=[pdf],
         where=[root, os.getcwd()],
     )
@@ -329,7 +340,7 @@ def detect_lang(png: str, hints: list[str] | None = None) -> str:
 
 
 def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
-            force: bool, hints: list[str] | None = None) -> tuple[int, str]:
+            force: bool, hints: list[str] | None = None, vision_ask=None) -> tuple[int, str]:
     """Rasterise and OCR, caching one text file per page. Returns (pages, lang).
 
     `root` is the ROOT, not the cache directory: pages land in
@@ -351,9 +362,10 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
 
     # A context left by an earlier run would describe software that did not
     # make the pages about to be written; remove it before they are.
-    stale = os.path.join(cache, _run_context.RUN_CONTEXT_FILENAME)
-    if os.path.exists(stale):
-        os.remove(stale)
+    for name in (_run_context.RUN_CONTEXT_FILENAME, VISION_LOG):
+        stale = os.path.join(cache, name)
+        if os.path.exists(stale):
+            os.remove(stale)
     with tempfile.TemporaryDirectory() as tmp:
         stem = os.path.join(tmp, "pg")
         r = subprocess.run(["pdftoppm", "-r", str(dpi), "-png", pdf, stem],
@@ -372,6 +384,7 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
         have_langs = langs_present()
         used: list[str] = []
         pages_meta: list[dict] = []
+        vision_log: list[dict] = []
         for i, png in enumerate(pngs, 1):
             use = lang or (first if i == 1 or not hints else detect_lang(png, hints))
             if lang:
@@ -385,6 +398,9 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
             else:
                 txt, use = read_page_with_latin(png, use, have_langs)
                 txt = rescue_digits(pdf, i, png, txt, use, dpi)
+                if vision_ask is not None:
+                    txt, changed = vision_digits(png, txt, use, _tsv_words(png, use, SECOND_READ_TIMEOUT), vision_ask)
+                    vision_log.extend({"page": i, **c} for c in changed)
             open(os.path.join(cache, f"page-{i:03d}.txt"), "w",
                  encoding="utf-8").write(txt)
             for p in use.split("+"):
@@ -397,13 +413,17 @@ def ocr_pdf(pdf: str, root: str, lang: str | None, dpi: int,
         with open(os.path.join(cache, "languages.json"), "w", encoding="utf-8") as fh:
             _json.dump({"hints": hints or [], "forced": lang, "pages": pages_meta}, fh,
                        ensure_ascii=False, indent=1)
+        if vision_ask is not None:
+            with open(os.path.join(cache, VISION_LOG), "w", encoding="utf-8") as fh:
+                _json.dump({"confidence_below": VISION_CONFIDENCE, "model": "not-disclosed",
+                            "changes": vision_log}, fh, ensure_ascii=False, indent=1)
         use = "+".join(used)
         # Which software made these pages (bean `turh`). Written only for a
         # run that OCR'd: a cache hit was made by whatever ran then, and that
         # run's record is the one already beside it. Detection read the page
         # with `osd`, so it is a model this run used as well.
         models = use.split("+") + ([] if lang else ["osd"])
-        write_ocr_run_context(pdf, root, cache, models)
+        write_ocr_run_context(pdf, root, cache, models, vision=vision_ask is not None)
         return len(pngs), use
 
 
@@ -656,6 +676,188 @@ def replace_word(txt: str, old: str, new: str) -> str:
     return re.sub(f"(?<!{edge}){re.escape(old)}(?!{edge})", lambda _m: new, txt, count=1)
 
 
+# ---------------------------------------------------------------------------
+# Optional: a vision model re-reads the number words Tesseract is unsure of.
+#
+# Off unless `--vision-digits` is passed or IRIS_VISION_DIGITS=1 is set, and
+# then only on Arabic-script pages. 10665-94830-per (Persian, 2014) has no text
+# layer worth reading, and Tesseract's `fas` misreads single digits there with
+# no second source to correct them: page 65's heading "Annex 6" comes out as
+# "1.", and page 30's "۳ سال" (3 years) as another digit. Owner, 2026-11-15:
+# "B as a ack optional tool in case bad results". The model is named by
+# IRIS_VISION_MODEL; nothing here names one.
+#
+# A reading is kept only when it is sure: two crops of the word (tight, and
+# with its line around it, outlined in blue because the headings are red) must
+# give the same digits, as many digits as Tesseract read, and the model may
+# answer UNSURE. Each change is logged in
+# `vision-digits.json` beside the pages, so a reviewer can check every one.
+VISION_ENV = "IRIS_VISION_DIGITS"
+VISION_MODEL_ENV = "IRIS_VISION_MODEL"
+VISION_LOG = "vision-digits.json"
+# A number word at or above this Tesseract confidence is left alone. On
+# 10665-94830-per the misread "1." of page 65 scores 38 and page 15's correct
+# "۲" scores 90.
+VISION_CONFIDENCE = 80.0
+VISION_MAX_WORDS = 40
+VISION_LANGS = {"ara", "fas", "urd", "pus", "uig", "snd"}
+
+DIGIT_FAMILIES = ("0123456789", "٠١٢٣٤٥٦٧٨٩",
+                  "۰۱۲۳۴۵۶۷۸۹")
+TO_WESTERN = {ord(f[i]): str(i) for f in DIGIT_FAMILIES for i in range(10)}
+RE_VISION_ANSWER = re.compile(r"^\s*([0-9]+)\s+(WESTERN|EASTERN)\s*$")
+
+
+def vision_enabled(flag: bool = False) -> bool:
+    return flag or os.environ.get(VISION_ENV, "") not in ("", "0", "false", "no")
+
+
+def western(digits: str) -> str:
+    """`digits` in Western digits, whatever family they were written in. Pure."""
+    return digits.translate(TO_WESTERN)
+
+
+def eastern_family(lang: str) -> str:
+    """The Arabic-script digit family a page in `lang` prints. Pure.
+
+    Persian, Urdu, Pashto and the like use the extended forms (۴ ۵ ۶); Arabic
+    uses ٤ ٥ ٦.
+    """
+    packs = set(lang.split("+"))
+    return DIGIT_FAMILIES[1] if "ara" in packs and not packs & {"fas", "urd", "pus", "uig", "snd"} else DIGIT_FAMILIES[2]
+
+
+def vision_prompt(lang: str) -> str:
+    language = "Arabic" if eastern_family(lang) == DIGIT_FAMILIES[1] else "Persian or another Arabic-script language"
+    return (
+        f"This image is cut from a printed page in {language}. It shows one number; where a blue box is drawn, "
+        "the number is the word inside the box. Reply with exactly one line: the digits it shows, written as "
+        "Western digits 0-9 with the most significant digit first, then a space, then WESTERN if the page "
+        "prints them as 0-9 shapes or EASTERN if it prints Arabic-script digit shapes. Leave out any "
+        "punctuation around the number. If any digit is unclear, or the word is letters rather than a number, "
+        "reply UNSURE.")
+
+
+def parse_vision_answer(answer: str, lang: str) -> str | None:
+    """The digits a model's answer names, in the family it names; None unless sure. Pure."""
+    m = RE_VISION_ANSWER.match(answer or "")
+    if not m:
+        return None
+    fam = DIGIT_FAMILIES[0] if m.group(2) == "WESTERN" else eastern_family(lang)
+    return "".join(fam[int(d)] for d in m.group(1))
+
+
+def count_word(txt: str, word: str) -> int:
+    """How many WHOLE occurrences of `word` `txt` holds, as `replace_word` finds them. Pure."""
+    edge = r"[\u0660-\u0669\u06f0-\u06f9\w]"
+    return len(re.findall(f"(?<!{edge}){re.escape(word)}(?!{edge})", txt))
+
+
+def nth_word_span(txt: str, word: str, n: int) -> tuple[int, int] | None:
+    """The span of the `n`th (from 0) WHOLE occurrence of `word` in `txt`, as `replace_word` finds them. Pure."""
+    edge = r"[٠-٩۰-۹\w]"
+    spans = [m.span() for m in re.finditer(f"(?<!{edge}){re.escape(word)}(?!{edge})", txt)]
+    return spans[n] if n < len(spans) else None
+
+
+def crop_word(png: str, box: tuple, context: bool) -> bytes:
+    """PNG bytes of the word in `box` (left, top, width, height): tight, or with its line and a red outline."""
+    import io
+
+    from PIL import Image, ImageDraw
+    x, y, w, h = box
+    with Image.open(png) as im:
+        im = im.convert("RGB")
+        px, py = (max(3 * h, 40), h) if context else (max(h // 2, 4), max(h // 2, 4))
+        area = (max(x - px, 0), max(y - py, 0), min(x + w + px, im.width), min(y + h + py, im.height))
+        if context:
+            ImageDraw.Draw(im).rectangle((x - 2, y - 2, x + w + 2, y + h + 2), outline=(0, 90, 255), width=2)
+        out = im.crop(area)
+        # Small crops read better enlarged; the model sees no more detail, but
+        # thin strokes are not lost to its own downscaling.
+        scale = max(1, 96 // max(out.height, 1))
+        if scale > 1:
+            out = out.resize((out.width * scale, out.height * scale), Image.LANCZOS)
+        buf = io.BytesIO()
+        out.save(buf, format="PNG")
+        return buf.getvalue()
+
+
+def vision_digits(png: str, txt: str, lang: str, words: list[dict], ask) -> tuple[str, list[dict]]:
+    """`txt` with unsure number words re-read by `ask`, and the log of what changed.
+
+    `words` are Tesseract's words for the page (`_tsv_words`), in reading
+    order; `ask(images, prompt)` returns the model's answer for a list of PNG
+    byte strings. A word is re-read when it is digits with punctuation around
+    them, below VISION_CONFIDENCE. It is replaced only when both crops give
+    the same digits, as many as Tesseract read, and different from them; and
+    only when the page text holds that word as often as Tesseract's words do,
+    so the `n`th word in reading order is the `n`th in the text.
+    """
+    if not set(lang.split("+")) & VISION_LANGS or not RE_DIGIT.search(txt):
+        return txt, []
+    seen: Counter = Counter()
+    total = Counter(w["text"] for w in words)
+    edits: list[tuple[int, int, str, dict]] = []
+    asked = 0
+    for wd in words:
+        t = wd["text"]
+        n = seen[t]
+        seen[t] += 1
+        if not RE_DIGIT.search(t) or not RE_NUMBER_WORD.match(t) or wd["conf"] >= VISION_CONFIDENCE:
+            continue
+        lead = re.match(r"^\D*", t).group(0)
+        tail = re.search(r"\D*$", t).group(0)
+        core = t[len(lead):len(t) - len(tail)]
+        if not core.isdigit():
+            continue
+        span = nth_word_span(txt, t, n)
+        if span is None or count_word(txt, t) != total[t]:
+            continue
+        if asked >= VISION_MAX_WORDS:
+            break
+        asked += 1
+        prompt = vision_prompt(lang)
+        reads = [parse_vision_answer(ask([crop_word(png, wd["box"], c)], prompt), lang) for c in (False, True)]
+        new = reads[0]
+        if new is None or reads[1] != new or len(new) != len(core) or new == core:
+            continue
+        edits.append((*span, f"{lead}{new}{tail}",
+                      {"box": list(wd["box"]), "confidence": wd["conf"], "ocr": t, "read": f"{lead}{new}{tail}"}))
+    for start, end, new, _ in sorted(edits, key=lambda e: -e[0]):
+        txt = txt[:start] + new + txt[end:]
+    return txt, [e[3] for e in edits]
+
+
+def anthropic_ask(model: str):
+    """An `ask(images, prompt)` that sends the images to `model` through the Anthropic API.
+
+    Credentials come from the environment as the SDK reads them
+    (ANTHROPIC_API_KEY). An error or a refusal is an UNSURE answer: the word
+    keeps Tesseract's reading rather than the run failing.
+    """
+    import base64
+
+    import anthropic
+    client = anthropic.Anthropic()
+
+    def ask(images: list[bytes], prompt: str) -> str:
+        content = [{"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                                 "data": base64.standard_b64encode(b).decode("ascii")}}
+                   for b in images]
+        content.append({"type": "text", "text": prompt})
+        try:
+            msg = client.messages.create(model=model, max_tokens=2048,
+                                         messages=[{"role": "user", "content": content}])
+        except anthropic.APIError as e:
+            print(f"  vision-digits: {type(e).__name__}; word left as read", file=sys.stderr)
+            return "UNSURE"
+        if msg.stop_reason == "refusal":
+            return "UNSURE"
+        return "".join(b.text for b in msg.content if b.type == "text").strip()
+    return ask
+
+
 def _read_word_as_acronym(png: str, box: tuple) -> str | None:
     """The word in `box` read alone as English, if it is a sure acronym. None otherwise.
 
@@ -796,6 +998,9 @@ def main() -> int:
     ap.add_argument("--dpi", type=int, default=200)
     ap.add_argument("--force", action="store_true", help="re-OCR even if cached")
     ap.add_argument("--check", action="store_true", help="report tool availability and exit")
+    ap.add_argument("--vision-digits", action="store_true",
+                    help=f"re-read unsure number words on Arabic-script pages with a vision model "
+                         f"(also {VISION_ENV}=1; the model is {VISION_MODEL_ENV}; off by default)")
     args = ap.parse_args()
 
     tools = tools_present()
@@ -813,11 +1018,23 @@ def main() -> int:
         sys.exit(f"pdf-ocr: needs {', '.join(missing)} — "
                  "bun run cat software:ensure --for scripts/pdf-ocr.py")
 
+    vision_ask = None
+    if vision_enabled(args.vision_digits):
+        model = os.environ.get(VISION_MODEL_ENV, "").strip()
+        if not model:
+            sys.exit(f"pdf-ocr: --vision-digits needs {VISION_MODEL_ENV} set to the model to ask")
+        import importlib.util
+        lacking = [m for m in ("anthropic", "PIL") if importlib.util.find_spec(m) is None]
+        if lacking:
+            sys.exit(f"pdf-ocr: --vision-digits needs the {', '.join(lacking)} Python package(s) "
+                     "(pip install -r python/requirements-extended.txt)")
+        vision_ask = anthropic_ask(model)
+
     for pdf in args.pdfs:
         root = args.outdir or os.path.dirname(os.path.abspath(pdf))
         try:
             hints = [h for h in args.lang_hint.split(",") if h.strip()]
-            n, lang = ocr_pdf(pdf, root, args.lang, args.dpi, args.force, hints)
+            n, lang = ocr_pdf(pdf, root, args.lang, args.dpi, args.force, hints, vision_ask)
             # Name the directory, because it is no longer the one the caller
             # passed and a reader should not have to derive it.
             rel = os.path.join(derive_doc_id(pdf), OCR_DIRNAME)

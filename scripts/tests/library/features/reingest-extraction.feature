@@ -63,6 +63,11 @@ Feature: Re-ingestion extraction coverage
     When the arm writes it
     Then tabular.csvw.json validates and readEntryTables reads its label, columns, rows and pages
 
+  @test:scripts/tests/library/reingest-extraction.test.ts::the_table_arm_writes_CSVW_drafts,_guarded::prose_cut_into_columns_is_no_table,_and_is_counted_apart
+  Scenario: Prose a column split cut through is not drafted as a table
+    When a candidate's cell boundaries cut a word at a quarter or more of at least five boundaries
+    Then it is not drafted, and the record's note counts it apart from the other dropped candidates
+
   @test:scripts/tests/library/reingest-extraction.test.ts::the_table_arm_writes_CSVW_drafts,_guarded::a_failure_is_recorded_as_not_extracted_and_the_arm_does_not_throw
   Scenario: A table step that fails records not extracted
     Given a PDF the table step cannot read
@@ -90,3 +95,19 @@ Feature: Re-ingestion extraction coverage
     Given a references arm that throws and a glossary arm that finds seven terms
     When the arms run
     Then references are not extracted with the error and glossary is found 7
+
+  @test:scripts/tests/library/reingest-extraction.test.ts::counts_that_say_what_the_source_holds_(re-ingest_pilot,_2026-11-14)::footnotes_count_only_the_notes_a_mark_calls
+  Scenario: Footnotes are the notes a mark calls
+    When the footnote arm links some notes to marks and keeps other foot-of-page lines
+    Then the count is the linked notes; with none linked and lines left over, the step is partial with no count
+
+  @test:scripts/tests/library/reingest-extraction.test.ts::counts_that_say_what_the_source_holds_(re-ingest_pilot,_2026-11-14)::a_re-run_over_a_promoted_entry_takes_the_artefacts_over_the_entry's_old_record
+  Scenario: Re-running the record over a promoted entry
+    When the record is rebuilt in the entry it describes after its sidecars changed
+    Then each kind the artefacts show is taken from them, and the kinds they do not show keep their record
+
+  @test:scripts/tests/library/reingest-extraction.test.ts::the_extraction_record_is_a_node_kind::its_validator_judges_a_record_as_the_writer's_schema_does:_strict,_and_each_step's_rules_apply
+  Scenario: The extraction record is a node kind
+    Given the library kind's family folio-library-extraction/v1 and its validator node
+    When a record is judged by the node kind the validator names
+    Then a record the writer's schema accepts passes, and one with an unknown key or a found step with no count fails

@@ -867,6 +867,25 @@ function blockLabel(page: WebPage, node: WebPageNode): string | undefined {
   return m ? m[1] : undefined;
 }
 
+/**
+ * A rendered BPMN drawing as the page carries it.
+ *
+ * LAZY (owner, 2026-11-14: "do lazy load content and libs"): `loading="lazy"`
+ * and `decoding="async"`, so a drawing far down a processes page is not
+ * fetched until a reader nears it; `docs-ui.js` inlines it then. Printing is
+ * not affected ("Make sure printing loads all of the content before it
+ * renders the PDF"): browsers load lazy images for a printout, and
+ * `docs-ui.js` turns them eager on `beforeprint` and inlines every drawing.
+ */
+export function bpmnFigureLines(id: string, src: string, alt: string): string[] {
+  return [
+    `<div class="bpmn-figure" id="figure-${id}">`,
+    `  <img src="${src}" loading="lazy" decoding="async"`,
+    `       alt="${alt.replace(/"/g, "&quot;")}">`,
+    "</div>",
+  ];
+}
+
 function emitNode(page: WebPage, node: WebPageNode): string[] {
   const out: string[] = [];
   const level = node.level ?? 2;
@@ -907,10 +926,7 @@ function emitNode(page: WebPage, node: WebPageNode): string[] {
 
   if (node.asset) {
     const a = node.asset;
-    out.push(`<div class="bpmn-figure" id="figure-${node.id}">`);
-    out.push(`  <img src="${siteAddressed(page, a.rendered)}"`);
-    out.push(`       alt="${a.alt.replace(/"/g, "&quot;")}">`);
-    out.push("</div>");
+    out.push(...bpmnFigureLines(node.id, siteAddressed(page, a.rendered), a.alt));
     out.push("");
     // The source links are kept as well as the edit link: they are different
     // acts. Reading the XML and changing it are not the same request, and the

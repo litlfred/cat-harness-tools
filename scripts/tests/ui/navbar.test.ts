@@ -16,7 +16,7 @@
  * `7zz1`): standing alone, cat-harness has none of it.
  */
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync } from "../../../test/support/site-fs.ts";
 import { join } from "node:path";
 
 import {

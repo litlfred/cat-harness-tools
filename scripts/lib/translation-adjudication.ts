@@ -119,7 +119,12 @@ export interface CandidatesFile {
   entries: Array<{
     msgctxt?: string;
     msgid: string;
-    candidates: Array<{ text: string; source: CandidateSource }>;
+    /**
+     * `text` is the translation; for a plural entry it is form 0, and `forms`
+     * holds every `msgstr[n]`, in order (owner, 2026-11-14: plurals are
+     * machine-filled, fuzzy).
+     */
+    candidates: Array<{ text: string; forms?: string[]; source: CandidateSource }>;
   }>;
 }
 
@@ -139,6 +144,9 @@ export function candidatesProblems(c: unknown): string[] {
     e.candidates.forEach((c1, j) => {
       const cc = c1 as Record<string, unknown> | null;
       if (cc === null || typeof cc.text !== "string") out.push(`entries[${i}].candidates[${j}].text is required`);
+      if (cc?.forms !== undefined && (!Array.isArray(cc.forms) || cc.forms.length === 0 || !cc.forms.every((x) => typeof x === "string") || cc.forms[0] !== cc.text)) {
+        out.push(`entries[${i}].candidates[${j}].forms must be a non-empty list of strings whose first is text`);
+      }
       const p = sourceProblem(cc?.source);
       if (p) out.push(`entries[${i}].candidates[${j}].source ${p}`);
     });
@@ -358,6 +366,8 @@ export interface PoEntry {
   msgidPlural?: string;
   /** `msgstr`, or `msgstr[0]` for a plural entry. */
   msgstr: string;
+  /** Every `msgstr[n]` of a plural entry, in order; `[msgstr]` for a singular one. */
+  forms: string[];
   fuzzy: boolean;
   /** `#:` source references: where the string comes from. */
   references: string[];
@@ -367,6 +377,8 @@ export interface PoEntry {
   /** Line range `[start, end)` of the `msgstr` keyword and its continuations. */
   msgstrStart: number;
   msgstrEnd: number;
+  /** End of the last `msgstr[n]` and its continuations (`msgstrEnd` for a singular entry). */
+  formsEnd: number;
   /** The `#,` flags line, when there is one. */
   flagsLine?: number;
 }
@@ -395,6 +407,8 @@ export function poEntries(text: string): PoEntry[] {
     const e: Partial<PoEntry> & { references: string[] } = { references: [], fuzzy: false, start, end };
     let field: "msgctxt" | "msgid" | "msgidPlural" | "msgstr" | "other" | undefined;
     const acc: Record<string, string> = {};
+    const forms: string[] = [];
+    let formsEnd: number | undefined;
     let obsolete = false;
     for (let k = start; k < end; k++) {
       const l = lines[k]!;
@@ -411,9 +425,13 @@ export function poEntries(text: string): PoEntry[] {
         else if (name === "msgstr" || kw[2] === "0") { field = "msgstr"; e.msgstrStart = k; }
         else { field = "other"; if (e.msgstrEnd === undefined && e.msgstrStart !== undefined) e.msgstrEnd = k; }
         if (field !== "other") acc[field] = unquote(l);
+        if (name.startsWith("msgstr")) { forms.push(unquote(l)); formsEnd = k + 1; }
         continue;
       }
-      if (l.trimStart().startsWith('"') && field && field !== "other") acc[field] = (acc[field] ?? "") + unquote(l);
+      if (l.trimStart().startsWith('"') && field) {
+        if (field !== "other") acc[field] = (acc[field] ?? "") + unquote(l);
+        if (formsEnd === k) { forms[forms.length - 1] += unquote(l); formsEnd = k + 1; }
+      }
     }
     if (obsolete || acc.msgid === undefined || e.msgstrStart === undefined) continue;
     if (e.msgstrEnd === undefined) {
@@ -427,12 +445,14 @@ export function poEntries(text: string): PoEntry[] {
       msgid: acc.msgid,
       ...(acc.msgidPlural !== undefined ? { msgidPlural: acc.msgidPlural } : {}),
       msgstr: acc.msgstr ?? "",
+      forms,
       fuzzy: e.fuzzy!,
       references: e.references,
       start,
       end,
       msgstrStart: e.msgstrStart,
       msgstrEnd: e.msgstrEnd,
+      formsEnd: formsEnd ?? e.msgstrEnd,
       ...(e.flagsLine !== undefined ? { flagsLine: e.flagsLine } : {}),
     });
   }
@@ -458,16 +478,37 @@ export function applySuggestion(text: string, s: Suggestion): { text: string } |
   if (e.msgidPlural !== undefined) return { refused: `msgid ${JSON.stringify(s.msgid.slice(0, 80))} is a plural entry; suggest plural forms by hand` };
   if (e.msgstr !== s.current) return { refused: `msgid ${JSON.stringify(s.msgid.slice(0, 80))} no longer says what the reviewer saw` };
   const lines = text.split("\n");
-  const replaced = [...lines.slice(0, e.msgstrStart), `msgstr ${quote(s.suggested)}`, ...lines.slice(e.msgstrEnd)];
+  return { text: markFuzzy([...lines.slice(0, e.msgstrStart), `msgstr ${quote(s.suggested)}`, ...lines.slice(e.msgstrEnd)], e).join("\n") };
+}
+
+/**
+ * Fill an EMPTY plural entry's `msgstr[0..n-1]` and mark it `#, fuzzy`. Every
+ * form must be empty (a plural a person has started is theirs), and `forms`
+ * must have as many forms as the entry, or as the catalogue's plural count
+ * when the entry lists fewer.
+ */
+export function applyForms(text: string, f: { msgctxt?: string; msgid: string; forms: string[] }): { text: string } | { refused: string } {
+  const e = poEntries(text).find((x) => x.msgid === f.msgid && (x.msgctxt ?? undefined) === (f.msgctxt || undefined));
+  const what = `msgid ${JSON.stringify(f.msgid.slice(0, 80))}`;
+  if (!e) return { refused: `no entry for ${what}` };
+  if (e.msgidPlural === undefined) return { refused: `${what} is not a plural entry` };
+  if (e.forms.some((x) => x !== "")) return { refused: `${what} already has a form; plural forms are left for a person` };
+  if (f.forms.length === 0 || f.forms.length < e.forms.length) return { refused: `${what} has ${e.forms.length} forms; ${f.forms.length} given` };
+  const lines = text.split("\n");
+  const fresh = f.forms.map((v, n) => `msgstr[${n}] ${quote(v)}`);
+  return { text: markFuzzy([...lines.slice(0, e.msgstrStart), ...fresh, ...lines.slice(e.formsEnd)], e).join("\n") };
+}
+
+/** Add `fuzzy` to an entry's flags line, or add one after its other comments, before `msgctxt`/`msgid`. */
+function markFuzzy(lines: string[], e: PoEntry): string[] {
   if (e.flagsLine !== undefined) {
-    if (!e.fuzzy) replaced[e.flagsLine] = `${replaced[e.flagsLine]!}, fuzzy`;
-  } else {
-    // The flags line goes after the other comments, before msgctxt/msgid.
-    let k = e.start;
-    while (k < e.end && replaced[k]!.startsWith("#")) k++;
-    replaced.splice(k, 0, "#, fuzzy");
+    if (!e.fuzzy) lines[e.flagsLine] = `${lines[e.flagsLine]!}, fuzzy`;
+    return lines;
   }
-  return { text: replaced.join("\n") };
+  let k = e.start;
+  while (k < e.end && lines[k]!.startsWith("#")) k++;
+  lines.splice(k, 0, "#, fuzzy");
+  return lines;
 }
 
 // ── Planning the record ──────────────────────────────────────────────────

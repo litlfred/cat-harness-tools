@@ -1,7 +1,10 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+// Publish-time files are written to the layer output overlay (bean sm8r);
+// these read the copy a site reader sees, falling back to the path given.
+import { readFileSync, readdirSync } from "../../test/support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 

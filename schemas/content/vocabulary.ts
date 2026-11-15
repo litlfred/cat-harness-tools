@@ -181,6 +181,11 @@ export const CLASS_GLOSSES: Readonly<Record<string, TermGloss>> = {
       "A standing rule an actor must hold while performing a task, bound to a process, a lane or an activity rather than loaded unconditionally. Resolution is first-binding-wins along that order, not a merge, so a reader asking why a rule applies here gets one answer.",
     seeAlso: "/concepts/agentic-harness.html",
   },
+  QaAttestation: {
+    layer: "harness",
+    gloss:
+      "One subject's QA judgements — pair attestations, voice reviews, agent and human verdicts, bibliography verifications — kept as one `qa-attestations/v1` file in a layer's attestations store, each judgement pinned to the hash it attested so a stale one is detectable. The judgement half of a QA verdict: unlike a derived result, it cannot be regenerated.",
+  },
   Requirement: {
     layer: "harness",
     gloss:

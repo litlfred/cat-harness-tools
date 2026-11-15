@@ -280,7 +280,10 @@ export function copyBuiltAtPublish(scratch: string, repo: string): void {
       if (!existsSync(src)) continue;
       const dest = writePathAt(repo, join(root, path));
       mkdirSync(dirname(dest), { recursive: true });
-      cpSync(src, dest, { recursive: true, force: true });
+      // Fill what is missing; never replace a file the publish already built
+      // (a rebuild in a scratch copy is not byte-identical to it, and every
+      // later reader in the run would see the replacement).
+      cpSync(src, dest, { recursive: true, force: false });
     }
   }
 }

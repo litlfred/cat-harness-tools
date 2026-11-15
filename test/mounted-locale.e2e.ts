@@ -41,7 +41,7 @@ const REPO = repoRootFor(ROOT);
 const CSS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))), "utf8");
 const JS = readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js"))), "utf8");
 const PAGE_FILE = join(REPO, "who-iris", "site", "index.html");
-const PAGE = existsSync(PAGE_FILE) ? readFileSync(PAGE_FILE, "utf8") : "";
+const PAGE = existsSync(overlayPath(PAGE_FILE)) ? readFileSync(overlayPath(PAGE_FILE), "utf8") : "";
 
 /** The generated page with its own `fa-translation-meta` block taken out. */
 function withoutTranslationMeta(html: string): string {
@@ -98,9 +98,13 @@ for (const width of [1280, 390]) {
       // Every one is a link and none is greyed: #2229 built every locale.
       await expect(page.locator("a.fa-page-lang-tab")).toHaveText(["AR", "ZH", "EN", "FR", "RU", "ES"]);
       await expect(page.locator("span.fa-page-lang-tab.is-unavailable")).toHaveCount(0);
-      // ...and each goes where the generator wrote that locale's page.
-      await expect(page.locator("a.fa-page-lang-tab", { hasText: "FR" })).toHaveAttribute("href", "/who-iris/fr/");
-      await expect(page.locator("a.fa-page-lang-tab", { hasText: "EN" })).toHaveAttribute("href", "/who-iris/");
+      // ...and each goes where the generator wrote that locale's page. Since
+      // cat-harness 622931623 a tab follows the page's own declared
+      // `<link rel="alternate" hreflang>`, and gen-iris-pages declares the file
+      // (`fr/index.html`); the directory and its index.html are one page on a
+      // static host, so either spelling of that one address is right.
+      await expect(page.locator("a.fa-page-lang-tab", { hasText: "FR" })).toHaveAttribute("href", /^\/who-iris\/fr\/(index\.html)?$/);
+      await expect(page.locator("a.fa-page-lang-tab", { hasText: "EN" })).toHaveAttribute("href", /^\/who-iris\/(index\.html)?$/);
     });
 
     test("an untranslated mounted page: the globe, every declared locale, only English live", async ({ page }) => {

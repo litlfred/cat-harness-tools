@@ -25,12 +25,12 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { overlayPath } from "../scripts/lib/layer-output.ts";
+import { siteFileAt } from "./support/site-fs.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const read = (p: string) => readFileSync(overlayPath(join(ROOT, siteFileFor(ROOT, p))), "utf8");
+const read = (p: string) => readFileSync(overlayPath(join(ROOT, siteFileAt(ROOT, p))), "utf8");
 const CSS = read("assets/css/docs-ui.css");
 const JS = read("assets/js/docs-ui.js");
 const QR = read("assets/js/vendor/qrcode.js");

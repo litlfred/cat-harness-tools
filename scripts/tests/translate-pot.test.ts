@@ -1,5 +1,7 @@
 /**
- * The machine-translation fill: the placeholder guard and the never-overwrite rule.
+ * `translate-pot`, now the older name and flags of `translation-candidates`:
+ * the flags it maps, and the behaviour its users rely on, end to end through
+ * the one candidates writer.
  *
  * @module scripts/tests/translate-pot.test
  *
@@ -11,21 +13,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  type Engine,
-  fillCatalogue,
-  libreTranslateEngine,
-  main,
-  mask,
-  newSingulars,
-  parseCatalogue,
-  placeholdersRoundTrip,
-  poFromPot,
-  protectedTokens,
-  serialize,
-  unmask,
-  updatedNode,
-} from "../translate-pot.ts";
+import { poEntries } from "../lib/translation-adjudication.ts";
+import type { CandidateSourceAdapter } from "../lib/translation-sources/index.ts";
+import { candidatesArgs, main } from "../translate-pot.ts";
 
 const HEADER = `msgid ""
 msgstr ""
@@ -33,251 +23,168 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\\n"
 `;
 
-/** Upper-cases text and passes sentinels through, as a well-behaved engine would. */
-const upper: Engine = {
-  generator: (t) => `fake upper-${t}`,
-  translate: async (texts) => texts.map((t) => t.replace(/[a-z]+/g, (w) => w.toUpperCase()).replace(/__ph(\d+)__/gi, "__PH$1__")),
-};
+/** Upper-cases the words it is sent; the `[n]` stand-ins pass through, as a well-behaved engine's would. */
+function upper(): CandidateSourceAdapter & { calls: string[][] } {
+  const calls: string[][] = [];
+  return {
+    id: "upper",
+    kind: "open-mt",
+    calls,
+    source: (t) => ({ kind: "open-mt", id: `fake upper-${t}` }),
+    async translate(texts) {
+      calls.push(texts);
+      return texts.map((t) => t.toUpperCase());
+    },
+  };
+}
 
-/** Drops every sentinel, as an engine that mangles placeholders would. */
-const dropper: Engine = {
-  generator: () => "fake dropper",
-  translate: async (texts) => texts.map((t) => t.replace(/__PH\d+__/g, "").toUpperCase()),
-};
+const quiet = { log: () => {} };
 
-const calls: string[][] = [];
-const recording: Engine = {
-  generator: () => "fake rec",
-  translate: async (texts) => {
-    calls.push(texts);
-    return texts.map((t) => `T(${t})`);
-  },
-};
-
-describe("the catalogue model is lossless", () => {
-  test("parse then serialize is the identity, comments and obsolete entries included", () => {
-    const text = `# top comment\n${HEADER}\n#. extracted\n#: a.json:3\nmsgctxt "k"\nmsgid ""\n"two "\n"lines"\nmsgstr ""\n\n\n#~ msgid "old"\n#~ msgstr "vieux"\n`;
-    expect(serialize(parseCatalogue(text))).toBe(text);
-  });
-});
-
-describe("the placeholder guard", () => {
-  test("recognises brace, printf, python, liquid, HTML, entity, code, link and math tokens", () => {
-    const s = "Hi {name}, %s and %(count)d and %1$s {{ page.title }} <b>bold</b> &amp; `x` [link](http://a.b) $x^2$";
-    expect(protectedTokens(s)).toEqual(["{name}", "%s", "%(count)d", "%1$s", "{{ page.title }}", "<b>", "</b>", "&amp;", "`x`", "[", "](http://a.b)", "$x^2$"]);
+describe("the older flags map onto translation-candidates", () => {
+  test("--locale repeats into one list, a .po is started unless --no-create, and the rest pass through", () => {
+    expect(candidatesArgs(["--engine", "opus-mt", "--locale", "fr", "--locale", "es", "--dir", "t", "--dry-run"])).toEqual([
+      "--engine", "opus-mt", "--dir", "t", "--dry-run", "--locale", "fr,es", "--init",
+    ]);
+    expect(candidatesArgs(["--engine", "libretranslate", "--url", "http://localhost:5000", "--no-create"])).toEqual([
+      "--engine", "libretranslate", "--url", "http://localhost:5000",
+    ]);
+    expect(candidatesArgs(["--model", "m", "--python", "python3.12", "--source", "en"])).toEqual(["--model", "m", "--python", "python3.12", "--init"]);
   });
 
-  test("a translation that keeps every token round-trips, in any order", () => {
-    expect(placeholdersRoundTrip("{a} then {b}", "{b} puis {a}")).toBe(true);
-  });
-
-  test("a dropped, added or altered token does not round-trip", () => {
-    expect(placeholdersRoundTrip("Hello {name}", "Bonjour")).toBe(false);
-    expect(placeholdersRoundTrip("Hello", "Bonjour %s")).toBe(false);
-    expect(placeholdersRoundTrip("%(n)s files", "%(nom)s fichiers")).toBe(false);
-    expect(placeholdersRoundTrip("<b>x</b>", "<strong>x</strong>")).toBe(false);
-  });
-
-  test("mask and unmask are inverse, even when the engine spaces out a sentinel", () => {
-    const { text, tokens } = mask("Hi {name}, see <a href='x'>this</a>");
-    expect(text).toBe("Hi __PH0__, see __PH1__this__PH2__");
-    expect(unmask(text, tokens)).toBe("Hi {name}, see <a href='x'>this</a>");
-    expect(unmask("Salut __ PH0 __", tokens)).toBe("Salut {name}");
-  });
-
-  test("an entry whose placeholders do not survive is refused, left empty and NOT flagged fuzzy", async () => {
-    const po = `${HEADER}\nmsgid "Hello {name}"\nmsgstr ""\n`;
-    const r = await fillCatalogue(po, dropper, { target: "fr" });
-    expect(r.filled).toBe(0);
-    expect(r.refused).toHaveLength(1);
-    expect(r.refused[0]!.msgid).toBe("Hello {name}");
-    expect(r.refused[0]!.reason).toContain("did not round-trip");
-    expect(r.text).toBe(po);
-  });
-
-  test("a string with nothing but tokens is refused rather than copied", async () => {
-    const po = `${HEADER}\nmsgid "{count}"\nmsgstr ""\n`;
-    const r = await fillCatalogue(po, upper, { target: "fr" });
-    expect(r.filled).toBe(0);
-    expect(r.refused[0]!.reason).toContain("nothing translatable");
-  });
-});
-
-describe("never overwrite", () => {
-  test("a non-empty msgstr is untouched, fuzzy or not; only the empty one is filled", async () => {
-    const po = `${HEADER}\nmsgid "kept"\nmsgstr "gardé"\n\n#, fuzzy\nmsgid "kept fuzzy"\nmsgstr "flou"\n\nmsgid "empty"\nmsgstr ""\n`;
-    const r = await fillCatalogue(po, upper, { target: "fr" });
-    expect(r.filled).toBe(1);
-    expect(r.text).toContain(`msgid "kept"\nmsgstr "gardé"`);
-    expect(r.text).toContain(`#, fuzzy\nmsgid "kept fuzzy"\nmsgstr "flou"`);
-    expect(r.text).toContain(`#, fuzzy\nmsgid "empty"\nmsgstr "EMPTY"`);
-    expect(r.text.match(/#, fuzzy/g)).toHaveLength(2);
-  });
-
-  test("a plural with any form filled is not touched", async () => {
-    const po = `${HEADER}\nmsgid "file"\nmsgid_plural "files"\nmsgstr[0] "fichier"\nmsgstr[1] ""\n`;
-    const r = await fillCatalogue(po, upper, { target: "fr" });
-    expect(r.filled).toBe(0);
-    expect(r.text).toBe(po);
-  });
-
-  test("the header entry is never filled", async () => {
-    const r = await fillCatalogue(`msgid ""\nmsgstr ""\n`, upper, { target: "fr" });
-    expect(r.filled).toBe(0);
-  });
-
-  test("a second run over its own output changes nothing", async () => {
-    const po = `${HEADER}\nmsgid "empty"\nmsgstr ""\n`;
-    const once = await fillCatalogue(po, upper, { target: "fr" });
-    const twice = await fillCatalogue(once.text, upper, { target: "fr" });
-    expect(twice.filled).toBe(0);
-    expect(twice.text).toBe(once.text);
-  });
-});
-
-describe("what is kept intact", () => {
-  test("msgctxt, comments and an existing flag line survive; fuzzy joins the flags", async () => {
-    const po = `${HEADER}\n# translator\n#. extracted\n#: a.json\n#, c-format\nmsgctxt "block-kind:lemma"\nmsgid "Lemma %s"\nmsgstr ""\n`;
-    const r = await fillCatalogue(po, upper, { target: "fr" });
-    expect(r.text).toContain(`# translator\n#. extracted\n#: a.json\n#, fuzzy, c-format\nmsgctxt "block-kind:lemma"\nmsgid "Lemma %s"\nmsgstr "LEMMA %s"`);
-  });
-
-  test("leading and trailing whitespace, and line structure, come back verbatim", async () => {
-    const po = `${HEADER}\nmsgid ""\n"  Hello\\n"\n"\\n"\n"world  "\nmsgstr ""\n`;
-    const r = await fillCatalogue(po, upper, { target: "fr" });
-    expect(r.text).toContain(`msgstr ""\n"  HELLO\\n"\n"\\n"\n"WORLD  "`);
-  });
-
-  test("plural forms follow the target's nplurals: three for ru", async () => {
-    const po = `msgid ""\nmsgstr ""\n"Language: ru\\n"\n"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\\n"\n\nmsgid "%d file"\nmsgid_plural "%d files"\nmsgstr[0] ""\nmsgstr[1] ""\n`;
-    const r = await fillCatalogue(po, upper, { target: "ru" });
-    expect(r.text).toContain(`msgstr[0] "%d FILE"\nmsgstr[1] "%d FILES"\nmsgstr[2] "%d FILES"`);
-  });
-
-  test("markup and math reach the engine masked, and identical strings are sent once", async () => {
-    calls.length = 0;
-    const po = `${HEADER}\nmsgctxt "a"\nmsgid "See **$x^2$** in <em>Note</em>"\nmsgstr ""\n\nmsgctxt "b"\nmsgid "See **$x^2$** in <em>Note</em>"\nmsgstr ""\n`;
-    const r = await fillCatalogue(po, recording, { target: "fr" });
-    expect(calls).toEqual([["See __PH0____PH1____PH2__ in __PH3__Note__PH4__"]]);
-    expect(r.filled).toBe(2);
-    expect(r.text).toContain(`msgstr "T(See **$x^2$** in <em>Note</em>)"`);
-  });
-});
-
-describe("singular and plural passes", () => {
-  test("entries: singular fills only singular entries, plural only plural ones", async () => {
-    const po = `${HEADER.replace("fr", "ru")}\nmsgid "file"\nmsgid_plural "files"\nmsgstr[0] ""\nmsgstr[1] ""\nmsgstr[2] ""\n\nmsgid "Proof"\nmsgstr ""\n`;
-    const s1 = await fillCatalogue(po, upper, { target: "ru", entries: "singular" });
-    expect(s1.filled).toBe(1);
-    expect(s1.text).toContain('msgstr "PROOF"');
-    expect(s1.text).toContain('msgstr[0] ""');
-    const s2 = await fillCatalogue(po, upper, { target: "ru", entries: "plural" });
-    expect(s2.filled).toBe(1);
-    expect(s2.text).toContain('msgstr[0] "FILE"');
-    expect(s2.text).toContain('msgid "Proof"\nmsgstr ""');
-  });
-
-  test("newSingulars lists the singular entries a fill gave text, and no others", () => {
-    const before = `${HEADER}\nmsgid "A"\nmsgstr ""\n\nmsgid "B"\nmsgstr "b"\n\nmsgctxt "x"\nmsgid "A"\nmsgstr ""\n`;
-    const after = before.replace('msgid "A"\nmsgstr ""', 'msgid "A"\nmsgstr "AA"');
-    expect(newSingulars(before, after)).toEqual([{ msgid: "A", text: "AA" }]);
-  });
-});
-
-describe("engines and the node", () => {
-  test("the hosted libretranslate.com API is refused", () => {
-    expect(() => libreTranslateEngine({ url: "https://libretranslate.com" })).toThrow(/self-hosted/);
-  });
-
-  test("the node records machine generation and never claims official", () => {
-    const n = updatedNode({ label: "trans:fr/x", status: { locale: "fr", official: false, generatedBy: "agent" } }, { po: "p.po", pot: "p.pot", locale: "fr", stem: "x" }, "opus-mt m", "2026-01-01T00:00:00.000Z");
-    expect(n.status).toEqual({ locale: "fr", official: false, generatedBy: "machine", generator: "opus-mt m", generatedAt: "2026-01-01T00:00:00.000Z" });
-  });
-
-  test("a .po made from a .pot carries the locale", () => {
-    expect(poFromPot(`msgid ""\nmsgstr ""\n"Language: \\n"\n\nmsgid "a"\nmsgstr ""\n`, "zh")).toContain(`"Language: zh\\n"`);
+  test("an unknown flag, a missing value or a non-English source is refused", () => {
+    expect(candidatesArgs(["--bogus", "x"])).toEqual({ error: "unknown argument --bogus" });
+    expect(candidatesArgs(["--engine"])).toEqual({ error: "--engine needs a value" });
+    expect(candidatesArgs(["--source", "fr"])).toEqual({ error: "--source: only English (en) sources are translated" });
   });
 });
 
 describe("the CLI over a translations tree", () => {
-  function tree() {
+  function tree(po = `\nmsgid "Proof"\nmsgstr "Demostración"\n\nmsgid "Lemma"\nmsgstr ""\n`, locale = "es") {
     const root = mkdtempSync(join(tmpdir(), "translate-pot-"));
-    const dir = join(root, "translations", "es", "glossary");
+    const dir = join(root, "translations", locale, "glossary");
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "terms.pot"), `${HEADER.replace("fr", "")}\nmsgid "Proof"\nmsgstr ""\n\nmsgid "Lemma"\nmsgstr ""\n`);
-    writeFileSync(join(dir, "terms.po"), `${HEADER.replace("fr", "es")}\nmsgid "Proof"\nmsgstr "Demostración"\n\nmsgid "Lemma"\nmsgstr ""\n`);
-    return { root, dir };
+    const template = po.replace(/msgstr(\[\d\])? "[^"]+"/g, 'msgstr$1 ""');
+    writeFileSync(join(dir, "terms.pot"), `${HEADER.replace("fr", "")}${template}`);
+    writeFileSync(join(dir, "terms.po"), `${HEADER.replace("fr", locale)}${po}`);
+    return { root, dir, args: ["--instance", root, "--dir", join(root, "translations")] };
   }
+  const read = (dir: string, f: string) => readFileSync(join(dir, f), "utf8");
 
   test("fills the empty entry, keeps the filled one, and writes the node", async () => {
-    const { root, dir } = tree();
-    expect(await main(["--instance", root, "--dir", join(root, "translations")], upper)).toBe(0);
-    const po = readFileSync(join(dir, "terms.po"), "utf8");
+    const { dir, args } = tree();
+    expect(await main(args, { sources: [upper()], ...quiet })).toBe(0);
+    const po = read(dir, "terms.po");
     expect(po).toContain(`msgid "Proof"\nmsgstr "Demostración"`);
     expect(po).toContain(`#, fuzzy\nmsgid "Lemma"\nmsgstr "LEMMA"`);
-    const node = JSON.parse(readFileSync(join(dir, "terms.json"), "utf8"));
+    const node = JSON.parse(read(dir, "terms.json"));
     expect(node.label).toBe("trans:es/glossary/terms");
     expect(node.poFile).toBe("translations/es/glossary/terms.po");
-    expect(node.status.generatedBy).toBe("machine");
-    expect(node.status.generator).toBe("fake upper-es");
-    expect(node.status.official).toBe(false);
+    expect(node.status).toMatchObject({ generatedBy: "machine", generator: "fake upper-es", official: false });
   });
 
-  test("a catalogue signed off as official is skipped", async () => {
-    const { root, dir } = tree();
-    const before = readFileSync(join(dir, "terms.po"), "utf8").replace("Language: es", "X-Folio-Official: yes\\n\"\n\"Language: es");
-    writeFileSync(join(dir, "terms.po"), before);
-    expect(await main(["--instance", root, "--dir", join(root, "translations")], upper)).toBe(0);
-    expect(readFileSync(join(dir, "terms.po"), "utf8")).toBe(before);
-    expect(existsSync(join(dir, "terms.json"))).toBe(false);
-  });
-
-  test("singular strings become candidates through the one writer, for the review page", async () => {
-    const { root, dir } = tree();
-    expect(await main(["--instance", root, "--dir", join(root, "translations")], upper)).toBe(0);
-    const side = JSON.parse(readFileSync(join(dir, "terms.candidates.json"), "utf8"));
-    expect(side.$schema).toBe("translation-candidates/v1");
-    expect(side.catalogue).toBe("glossary/terms");
+  test("singular strings become candidates for the review page; a second run changes nothing", async () => {
+    const { dir, args } = tree();
+    expect(await main(args, { sources: [upper()], ...quiet })).toBe(0);
+    const side = JSON.parse(read(dir, "terms.candidates.json"));
+    expect(side).toMatchObject({ $schema: "translation-candidates/v1", catalogue: "glossary/terms" });
     expect(side.entries).toHaveLength(1);
-    expect(side.entries[0].msgid).toBe("Lemma");
-    expect(side.entries[0].candidates[0].text).toBe("LEMMA");
-    expect(side.entries[0].candidates[0].source).toMatchObject({ kind: "open-mt", id: "fake upper-es" });
-    // A second run records nothing new and changes nothing.
-    const po = readFileSync(join(dir, "terms.po"), "utf8");
-    expect(await main(["--instance", root, "--dir", join(root, "translations")], upper)).toBe(0);
-    expect(readFileSync(join(dir, "terms.po"), "utf8")).toBe(po);
-    expect(JSON.parse(readFileSync(join(dir, "terms.candidates.json"), "utf8")).entries[0].candidates).toHaveLength(1);
+    expect(side.entries[0].candidates[0]).toMatchObject({ text: "LEMMA", source: { kind: "open-mt", id: "fake upper-es" } });
+    const po = read(dir, "terms.po");
+    expect(await main(args, { sources: [upper()], ...quiet })).toBe(0);
+    expect(read(dir, "terms.po")).toBe(po);
+    expect(JSON.parse(read(dir, "terms.candidates.json")).entries[0].candidates).toHaveLength(1);
   });
 
-  test("plural entries are still filled with the target's plural count, outside the candidates file", async () => {
-    const root = mkdtempSync(join(tmpdir(), "translate-pot-"));
-    const dir = join(root, "translations", "ru");
-    mkdirSync(dir, { recursive: true });
-    const body = `\nmsgid "file"\nmsgid_plural "files"\nmsgstr[0] ""\nmsgstr[1] ""\nmsgstr[2] ""\n\nmsgid "Proof"\nmsgstr ""\n`;
-    writeFileSync(join(dir, "t.pot"), `${HEADER.replace("fr", "")}${body}`);
-    writeFileSync(join(dir, "t.po"), `${HEADER.replace("fr", "ru")}${body}`);
-    expect(await main(["--instance", root, "--dir", join(root, "translations")], upper)).toBe(0);
-    const po = readFileSync(join(dir, "t.po"), "utf8");
-    expect(po).toContain('msgstr[0] "FILE"\nmsgstr[1] "FILES"\nmsgstr[2] "FILES"');
+  test("plural entries are machine-filled, fuzzy, with the target's plural count, and are candidates too", async () => {
+    const plural = `"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\\n"\n\nmsgid "%d file"\nmsgid_plural "%d files"\nmsgstr[0] ""\nmsgstr[1] ""\n\nmsgid "Proof"\nmsgstr ""\n`;
+    const { dir, args } = tree(plural, "ru");
+    expect(await main(args, { sources: [upper()], ...quiet })).toBe(0);
+    const po = read(dir, "terms.po");
+    expect(po).toContain('#, fuzzy\nmsgid "%d file"\nmsgid_plural "%d files"\nmsgstr[0] "%d FILE"\nmsgstr[1] "%d FILES"\nmsgstr[2] "%d FILES"');
     expect(po).toContain('#, fuzzy\nmsgid "Proof"\nmsgstr "PROOF"');
-    const side = JSON.parse(readFileSync(join(dir, "t.candidates.json"), "utf8"));
-    expect(side.entries.map((e: { msgid: string }) => e.msgid)).toEqual(["Proof"]);
+    const side = JSON.parse(read(dir, "terms.candidates.json"));
+    const file = side.entries.find((e: { msgid: string }) => e.msgid === "%d file");
+    expect(file.candidates[0]).toMatchObject({ text: "%d FILE", forms: ["%d FILE", "%d FILES", "%d FILES"] });
+  });
+
+  test("a language with one form (zh) takes its only form from the plural", async () => {
+    const { dir, args } = tree(`\nmsgid "%d file"\nmsgid_plural "%d files"\nmsgstr[0] ""\n`, "zh");
+    expect(await main(args, { sources: [upper()], ...quiet })).toBe(0);
+    expect(read(dir, "terms.po")).toContain('msgid_plural "%d files"\nmsgstr[0] "%d FILES"\n');
+  });
+
+  test("leading and trailing whitespace, and line structure, come back verbatim; math and markup reach the engine masked", async () => {
+    const eng = upper();
+    const { dir, args } = tree(`\nmsgid ""\n"  Hello\\n"\n"\\n"\n"world  "\nmsgstr ""\n\nmsgctxt "a"\nmsgid "See **$x^2$** in <em>Note</em>"\nmsgstr ""\n\nmsgctxt "b"\nmsgid "See **$x^2$** in <em>Note</em>"\nmsgstr ""\n`);
+    expect(await main(args, { sources: [eng], ...quiet })).toBe(0);
+    const entries = poEntries(read(dir, "terms.po"));
+    expect(entries.find((e) => e.msgid.includes("Hello"))!.msgstr).toBe("  HELLO\n\nWORLD  ");
+    expect(entries.filter((e) => e.msgid.startsWith("See")).map((e) => e.msgstr)).toEqual(["SEE **$x^2$** IN <em>NOTE</em>", "SEE **$x^2$** IN <em>NOTE</em>"]);
+    // Each line on its own; the two identical strings sent once.
+    expect(eng.calls.flat().sort()).toEqual(["Hello", "See [0][1][2] in [3]Note[4]", "world"]);
+  });
+
+  test("a string with nothing but placeholders is not sent, and is reported", async () => {
+    const eng = upper();
+    const { dir, args } = tree(`\nmsgid "{count}"\nmsgstr ""\n`);
+    const said: string[] = [];
+    expect(await main(args, { sources: [eng], log: (s) => said.push(s) })).toBe(0);
+    expect(eng.calls.flat()).toEqual([]);
+    expect(read(dir, "terms.po")).toContain('msgid "{count}"\nmsgstr ""');
+    expect(said.join("\n")).toContain('"{count}": nothing translatable');
+  });
+
+  test("an entry whose placeholders do not survive is left empty and not flagged fuzzy", async () => {
+    const dropper: CandidateSourceAdapter = { ...upper(), translate: async (t) => t.map((x) => x.replace(/\[\d+\]/g, "").toUpperCase()) };
+    const { dir, args } = tree(`\nmsgid "Hello {name}"\nmsgstr ""\n`);
+    await main(args, { sources: [dropper], ...quiet });
+    expect(read(dir, "terms.po")).toContain('\nmsgid "Hello {name}"\nmsgstr ""');
+    expect(read(dir, "terms.po")).not.toContain("fuzzy");
+  });
+
+  test("a catalogue signed off as official gets candidates, but its .po and node are not changed", async () => {
+    const { dir, args } = tree();
+    const before = read(dir, "terms.po").replace("Language: es", 'X-Folio-Official: yes\\n"\n"Language: es');
+    writeFileSync(join(dir, "terms.po"), before);
+    expect(await main(args, { sources: [upper()], ...quiet })).toBe(0);
+    expect(read(dir, "terms.po")).toBe(before);
+    expect(existsSync(join(dir, "terms.json"))).toBe(false);
+    expect(existsSync(join(dir, "terms.candidates.json"))).toBe(true);
   });
 
   test("a catalogue that says DO NOT MACHINE-FILL gets candidates, but its .po is not changed", async () => {
-    const { root, dir } = tree();
-    const before = `# DO NOT MACHINE-FILL THIS FILE.\n${readFileSync(join(dir, "terms.po"), "utf8")}`;
+    const { dir, args } = tree();
+    const before = `# DO NOT MACHINE-FILL THIS FILE.\n${read(dir, "terms.po")}`;
     writeFileSync(join(dir, "terms.po"), before);
-    expect(await main(["--instance", root, "--dir", join(root, "translations")], upper)).toBe(0);
-    expect(readFileSync(join(dir, "terms.po"), "utf8")).toBe(before);
+    expect(await main(args, { sources: [upper()], ...quiet })).toBe(0);
+    expect(read(dir, "terms.po")).toBe(before);
     expect(existsSync(join(dir, "terms.candidates.json"))).toBe(true);
     expect(existsSync(join(dir, "terms.json"))).toBe(false);
   });
 
+  test("a template with no .po is started, unless --no-create", async () => {
+    const { root, dir, args } = tree();
+    const fr = join(root, "translations", "fr", "glossary");
+    mkdirSync(fr, { recursive: true });
+    writeFileSync(join(fr, "terms.pot"), read(dir, "terms.pot"));
+    expect(await main([...args, "--locale", "fr", "--no-create"], { sources: [upper()], ...quiet })).toBe(0);
+    expect(existsSync(join(fr, "terms.po"))).toBe(false);
+    expect(await main([...args, "--locale", "fr"], { sources: [upper()], ...quiet })).toBe(0);
+    expect(read(fr, "terms.po")).toContain('"Language: fr\\n"');
+    expect(read(fr, "terms.po")).toContain('#, fuzzy\nmsgid "Lemma"\nmsgstr "LEMMA"');
+  });
+
   test("--dry-run writes nothing", async () => {
-    const { root, dir } = tree();
-    const before = readFileSync(join(dir, "terms.po"), "utf8");
-    expect(await main(["--instance", root, "--dir", join(root, "translations"), "--dry-run"], upper)).toBe(0);
-    expect(readFileSync(join(dir, "terms.po"), "utf8")).toBe(before);
+    const { dir, args } = tree();
+    const before = read(dir, "terms.po");
+    expect(await main([...args, "--dry-run"], { sources: [upper()], ...quiet })).toBe(0);
+    expect(read(dir, "terms.po")).toBe(before);
+    expect(existsSync(join(dir, "terms.candidates.json"))).toBe(false);
+  });
+
+  test("no catalogue at all is reported, not passed", async () => {
+    const root = mkdtempSync(join(tmpdir(), "translate-pot-"));
+    mkdirSync(join(root, "translations", "es"), { recursive: true });
+    expect(await main(["--instance", root, "--dir", join(root, "translations")], { sources: [upper()], ...quiet })).toBe(2);
   });
 });

@@ -63,10 +63,27 @@ printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Tim
   | as_root tee /etc/apt/apt.conf.d/80-playwright-retries >/dev/null \
   || echo "::warning::could not write apt retry configuration; installing without it"
 
+# Each attempt is BOUNDED (2026-11-14: on smart-ips-pilgrimage#81 apt stalled
+# after fetching archive.ubuntu.com's InRelease files and logged nothing for
+# 59 minutes; Acquire::*::Timeout did not fire, so attempt 1 ran into the
+# job's 60-minute timeout and attempts 2 and 3 never happened). `timeout` runs
+# as root because install-deps hands the work to a root apt-get, which a
+# non-root `timeout` could not signal; PATH is passed so `node` still resolves
+# under sudo's secure_path. A stalled attempt then counts as a failed one and
+# the back-off below retries it.
+attempt_timeout="${PLAYWRIGHT_DEPS_ATTEMPT_TIMEOUT:-600}"
+bounded() {
+  if [ "$(id -u)" -eq 0 ]; then
+    timeout --kill-after=30 "$attempt_timeout" "$@"
+  else
+    sudo -n env "PATH=$PATH" timeout --kill-after=30 "$attempt_timeout" "$@"
+  fi
+}
+
 attempts=3
 for attempt in $(seq 1 "$attempts"); do
-  echo "::group::playwright install-deps chromium (attempt $attempt of $attempts)"
-  if "${pw[@]}" install-deps chromium; then
+  echo "::group::playwright install-deps chromium (attempt $attempt of $attempts, at most ${attempt_timeout}s)"
+  if bounded "${pw[@]}" install-deps chromium; then
     echo "::endgroup::"
     exit 0
   fi

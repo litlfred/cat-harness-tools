@@ -777,13 +777,15 @@ function selectEntry(known){
   if (VIEW !== "list") setView("list");
   $("q").value = known.id;
   render();
-  var key = known.instance + "/" + known.id;
-  var row = document.querySelector('[data-fa-library-item="' + key.replace(/"/g, '\\"') + '"]');
-  if (row) {
-    row.setAttribute("data-fa-anchored", "1");
-    row.scrollIntoView({ block: "center" });
-  }
+  /* The entry's own row is drawn at the top first, so on an entry page --
+     where the whole-library listing is folded and drawn only when opened --
+     the anchored row is that one; a listing row, when drawn, is anchored too. */
   renderEntryRow(known);
+  var key = known.instance + "/" + known.id;
+  var rows = document.querySelectorAll('[data-fa-library-item="' + key.replace(/"/g, '\\"') + '"]');
+  Array.prototype.forEach.call(rows, function(r){ r.setAttribute("data-fa-anchored", "1"); });
+  var listed = $("listing") && $("listing").querySelector('[data-fa-anchored="1"]');
+  if (listed && !listed.closest("details:not([open])")) listed.scrollIntoView({ block: "center" });
   document.title = (known.title || known.id) + " \u2014 " + known.instance + " library";
   /* The graph of the thing the reader just opened -- bean 7nvr. */
   loadDocument(known.id);
