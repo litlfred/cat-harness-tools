@@ -99,9 +99,18 @@ export async function serveThemed(
     const path = decodeURIComponent(new URL(route.request().url()).pathname);
     let file = resolve(root, "." + path.slice(o.urlPrefix.length - 1));
     if (file !== root && !file.startsWith(root + sep)) return route.fallback();
-    if (existsSync(file) && statSync(file).isDirectory()) file = join(file, "index.html");
-    if (!file.endsWith(".html") || !existsSync(file)) return route.fallback();
-    const themed = parseThemed(readFileSync(file, "utf8"));
+    // A page the build wrote for a MOUNTED layer is at its output-root twin
+    // (bean cat-tools-sm8r), and a directory may exist only there. Read through
+    // the overlay as test-server.mjs serves it; otherwise the page falls through
+    // to the server unwrapped, with no ground and no scheme, and every colour
+    // spec on it fails (folio-assistant#3124, library-viewer-scope).
+    let read = overlayPath(file);
+    if (existsSync(read) && statSync(read).isDirectory()) {
+      file = join(file, "index.html");
+      read = overlayPath(file);
+    }
+    if (!file.endsWith(".html") || !existsSync(read)) return route.fallback();
+    const themed = parseThemed(readFileSync(read, "utf8"));
     if (!themed) return route.fallback();
     return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: layoutStandIn(themed, o) });
   });
