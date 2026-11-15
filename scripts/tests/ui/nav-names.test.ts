@@ -146,17 +146,24 @@ describe("a planted second name fails", () => {
     const c = siteCopy();
     const path = join(c.site, "_data", "harness.json");
     const d = JSON.parse(readFileSync(path, "utf-8")) as { tiles: { id: string; title: string; href?: string }[] };
-    // Found by the NAME under test, not by id: the tile's id is whatever the
-    // generator gave it (`skills` before the split, `core-skills` since
-    // folio-assistant-core became the landing), and the plant renames a title.
-    const skills = d.tiles.find((t) => t.title === "Skills")!;
-    expect(skills.title).toBe("Skills");
-    skills.title = "Skills — cat-harness";
+    // A rename conflicts only with ANOTHER sighting of the same destination,
+    // so the plant is aimed at a tile some other surface also names, found in
+    // the unplanted run rather than by a title written here. It was the
+    // "Skills" tile until the navbar row lost its tiles (cat-harness,
+    // 2026-11-13), which left that tile the only place its page is named.
+    const TILES = "glass tiles, More and Stickies row";
+    const before = checkNavNames(c.root, c.site, c.files).sightings;
+    const elsewhere = new Set(before.filter((s) => s.surface !== TILES && s.surface !== "sticky card links").map((s) => s.href));
+    const target = before.find((s) => s.surface === TILES && elsewhere.has(s.href));
+    expect(target, "no tile's destination is named on a second surface, so no rename can conflict").toBeDefined();
+    const tile = d.tiles.find((t) => t.title === target!.label)!;
+    const renamed = `${tile.title} — cat-harness`;
+    tile.title = renamed;
     writeFileSync(path, JSON.stringify(d));
     const r = checkNavNames(c.root, c.site, c.files);
-    const hit = r.conflicts.find((x) => x.href === skills.href);
+    const hit = r.conflicts.find((x) => x.href === target!.href);
     expect(hit).toBeDefined();
-    expect(hit!.names.map((n) => n.label)).toEqual(["Skills", "Skills — cat-harness"]);
+    expect(hit!.names.map((n) => n.label)).toEqual([target!.label, renamed].sort((a, b) => a.localeCompare(b)));
   });
 
   test.skipIf(NOT_BUILT())("on the RAIL: one row's label changed in a viewer page", () => {

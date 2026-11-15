@@ -110,6 +110,21 @@ interface Case {
   /** Turn the committed bytes into a version no writer would emit. */
   stale: (text: string) => string;
   needsBrowser?: boolean;
+  /**
+   * The layer whose committed file this case stales, made LOCAL in the
+   * scratch checkout for the case (dropped from `WORK`'s `index.lock.json`,
+   * put back after).
+   *
+   * Since cat-harness-tools b2e4118d (bean `cat-tools-sm8r`) a writer never
+   * writes into a mount: render:bpmn puts a MOUNTED layer's changed
+   * beside-source drawing at its output-root twin, so publish-check sees no
+   * committed file move and stays green, and the red control cannot fire.
+   * That is right: a mounted layer's committed drawing is judged in its own
+   * repository, where it is not mounted. So the case stales a drawing the
+   * checkout OWNS, which is the contract the gate still enforces, by making
+   * that layer local here rather than by skipping the case.
+   */
+  localize?: string;
 }
 
 const CASES: Case[] = [
@@ -144,6 +159,7 @@ const CASES: Case[] = [
     artefact: () => firstBesideSource("bootstrap", "processes"),
     stale: (t) => t.replace("</svg>", "<!-- stale (i1q7 fixture) --></svg>"),
     needsBrowser: true,
+    localize: "bootstrap",
   },
 ];
 
@@ -164,6 +180,14 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
     const writer = writerFor(SCRIPTS, c.check);
     expect(writer, `${c.check} has no writer regen can run`).toBeDefined();
     const rel = c.artefact();
+    // Make the fixture's layer local for this case (see `Case.localize`).
+    const lockFile = join(WORK, "index.lock.json");
+    const lockBefore = c.localize !== undefined && existsSync(lockFile) ? readFileSync(lockFile, "utf-8") : undefined;
+    if (lockBefore !== undefined) {
+      const lock = JSON.parse(lockBefore) as { instances?: { instance?: string }[] };
+      lock.instances = (lock.instances ?? []).filter((i) => i.instance !== c.localize);
+      writeFileSync(lockFile, `${JSON.stringify(lock, null, 2)}\n`);
+    }
     // The file the check READS: a mounted layer's computed file is read over
     // its output-root twin when a writer put one there (bean `cat-tools-sm8r`),
     // so staling the pinned bytes under the twin changes nothing the check
@@ -219,6 +243,7 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
       expect(results[0]).toMatchObject({ check: c.check, writer });
       expect(readBack(), `${writer} left ${rel} staled`).not.toBe(staled);
     } finally {
+      if (lockBefore !== undefined) writeFileSync(lockFile, lockBefore);
       if (createdDir !== undefined) rmSync(createdDir, { recursive: true, force: true });
       else writeFileSync(abs, original);
       // A writer that put a twin under the output root for this case takes it

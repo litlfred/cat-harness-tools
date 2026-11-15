@@ -113,7 +113,7 @@ import { BranchPrefixSchema, KeyedBySchema, SubgraphSourceSchema, contentIsOffCh
  * spelled once is now each filename rather than both, and the pair below is
  * what keeps them from drifting.
  */
-export function instanceConfigFilename(name: string): string {
+export function layerConfigFilename(name: string): string {
   return `${name}${CONFIG_SUFFIX}`;
 }
 
@@ -7830,3 +7830,8 @@ import { leftOutByMount, mountScopeFor } from "./remote-mount";
 // registry can find each harness's declared `kinds/` without importing this
 // file, which imports the registry. Re-exported here so no caller moves.
 export { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout } from "./instance-roots";
+
+// Old names, kept so callers in other layers keep working while they move to
+// the layer names (cat-harness#1138 P4). Remove once no layer imports them.
+/** @deprecated Use {@link layerConfigFilename}. */
+export const instanceConfigFilename = layerConfigFilename;
