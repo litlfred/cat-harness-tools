@@ -46,7 +46,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { directoriesForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { directoriesForGraph, layerRootsIn } from "../schemas/kg/cat-harness.js";
 
 /** A start or end conflict marker, of any width git writes. */
 export const CONFLICT_MARKER = /^(?:<{7,}|>{7,})(?: |$)/m;
@@ -140,7 +140,7 @@ export function declaredQaDirs(
   kinds: readonly ("qa" | "attestations")[] = ["qa", "attestations"],
 ): string[] {
   const dirs = new Set<string>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     for (const kind of kinds) {
       for (const d of directoriesForGraph(inst, kind)) dirs.add(resolve(d));
     }

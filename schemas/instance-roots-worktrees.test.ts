@@ -22,7 +22,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { checkoutRootFor, isForeignCheckout, instanceRootsIn, repoRootFor, rootForScope, siblingScopeFor } from "./kg/cat-harness.js";
+import { checkoutRootFor, isForeignCheckout, layerRootsIn, repoRootFor, rootForScope, siblingScopeFor } from "./kg/cat-harness.js";
 import { checkoutHolding } from "../test/support/checkout.js";
 import { declareInstance } from "../test/support/instance-fixture.js";
 import { skillMdDirs } from "../scripts/known-skills.js";
@@ -77,29 +77,29 @@ afterAll(() => {
   rmSync(base, { recursive: true, force: true });
 });
 
-describe("instanceRootsIn with git worktrees present", () => {
+describe("layerRootsIn with git worktrees present", () => {
   test("the main checkout does not see its nested worktrees", () => {
-    const found = instanceRootsIn(checkout);
+    const found = layerRootsIn(checkout);
     expect(found).toEqual([checkout, join(checkout, "core")]);
     expect(found.some((p) => p.includes(".claude"))).toBe(false);
   });
 
   test("a worktree sees its own instances and nothing of its sibling", () => {
-    expect(instanceRootsIn(wtA)).toEqual([wtA, join(wtA, "core")]);
+    expect(layerRootsIn(wtA)).toEqual([wtA, join(wtA, "core")]);
   });
 
   test("the escape: scanning `repoRootFor(<worktree root>)` lists no sibling worktree", () => {
     // `repoRootFor` steps over `.claude/worktrees/` (every child of which is a
     // separate checkout) to the main checkout, which sees no worktree.
     expect(repoRootFor(wtA)).toBe(checkout);
-    const found = instanceRootsIn(repoRootFor(wtA));
+    const found = layerRootsIn(repoRootFor(wtA));
     expect(found).toEqual([checkout, join(checkout, "core")]);
     expect(found.some((p) => inside(p, join(checkout, ".claude", "worktrees")))).toBe(false);
   });
 
   test("siblingScopeFor keeps the root instance inside its own checkout", () => {
     expect(siblingScopeFor(wtA)).toBe(wtA);
-    expect(instanceRootsIn(siblingScopeFor(wtA)).some((p) => p.startsWith(wtB))).toBe(false);
+    expect(layerRootsIn(siblingScopeFor(wtA)).some((p) => p.startsWith(wtB))).toBe(false);
   });
 
   test("a worktree's `.git` is a FILE and marks it foreign; a declared submodule is not", () => {
@@ -113,7 +113,7 @@ describe("instanceRootsIn with git worktrees present", () => {
     writeFileSync(join(sup, "sub", ".git"), "gitdir: ../.git/modules/sub\n");
     writeFileSync(join(sup, ".gitmodules"), '[submodule "sub"]\n\tpath = sub\n\turl = https://example.invalid/sub\n');
     expect(isForeignCheckout(join(sup, "sub"))).toBe(false);
-    expect(instanceRootsIn(sup)).toEqual([sup, join(sup, "sub")]);
+    expect(layerRootsIn(sup)).toEqual([sup, join(sup, "sub")]);
   });
 });
 
@@ -135,7 +135,7 @@ describe("sibling clones in a plain directory — the separated layout (ho66)", 
         declareInstance(join(plain, name), name);
         git(join(plain, name), "init", "-q");
       }
-      expect(instanceRootsIn(plain)).toEqual([join(plain, "lower"), join(plain, "upper")]);
+      expect(layerRootsIn(plain)).toEqual([join(plain, "lower"), join(plain, "upper")]);
       expect(siblingScopeFor(join(plain, "upper"))).toBe(join(plain, "upper"));
     } finally {
       rmSync(plain, { recursive: true, force: true });
@@ -145,7 +145,7 @@ describe("sibling clones in a plain directory — the separated layout (ho66)", 
   test("inside a checkout, a clone is still foreign", () => {
     // `.claude/worktrees/` sits inside the main checkout, so the escape test
     // above keeps holding; pinned here beside the case it must not swallow.
-    expect(instanceRootsIn(join(checkout, ".claude", "worktrees"))).toEqual([]);
+    expect(layerRootsIn(join(checkout, ".claude", "worktrees"))).toEqual([]);
   });
 });
 

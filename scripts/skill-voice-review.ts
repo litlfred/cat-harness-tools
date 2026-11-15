@@ -41,7 +41,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
 import { loadVoices, readActiveVoices, resolveVoice, voiceKey, type ResolvedVoice, type VoiceProfile, type VoiceRef } from "../schemas/content/voices.ts";
-import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import type { KgCriterionEntry, KgFinding, KgQaReport } from "../schemas/sdlc/kg-qa.ts";
 import {
   kgAttestationFor,
@@ -115,7 +115,7 @@ export function skillVoices(
   if (active.length === 0) return [];
 
   const shipped = new Map<string, { instance: string; voice: VoiceProfile }>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const name = readDeclaration(root)?.name;
     if (name === undefined) continue;
     for (const voice of loadVoices(root)) shipped.set(voiceKey(name, voice.id), { instance: name, voice });

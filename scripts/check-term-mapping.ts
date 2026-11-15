@@ -30,7 +30,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
 import { instanceDirectoriesForGraph, readDeclaration } from "../schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 
 import { instanceRoots, schemeOwner } from "./lib/scheme-owner.ts";
 
@@ -128,7 +128,7 @@ function declaredGlossaryFiles(root: string, suffix: string): { abs: string; dec
       else if (n.endsWith(suffix)) out.push({ abs, declaredBy });
     }
   };
-  for (const instance of instanceRootsIn(root)) {
+  for (const instance of layerRootsIn(root)) {
     declaredBy = readDeclaration(instance)?.name ?? "";
     for (const dir of instanceDirectoriesForGraph(instance, "glossary")) walk(dir);
   }

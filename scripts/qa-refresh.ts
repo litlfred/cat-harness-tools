@@ -71,7 +71,7 @@ import { movedInventory, movedRoots, type MovedInventory } from "./qa-verify-mov
 import { BUILDING_ENV } from "./qa-working-copy.ts";
 import { TEST_RUN_WRITERS } from "./test-run-compute.ts";
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
-import { artefactStub, instanceRootsIn, kgQaHomeFor, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { artefactStub, layerRootsIn, kgQaHomeFor, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { scriptsOf, scriptTable } from "../schemas/sdlc/script-table.ts";
 import { coneMode, QaCone, straceWorks } from "./qa-cone.ts";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
@@ -145,7 +145,7 @@ export function hostedKgWrites(repoRoot: string | undefined = REPO_ROOT): string
     "folio-assistant-state",
   ]);
   if (repoRoot) {
-    for (const r of instanceRootsIn(repoRoot)) {
+    for (const r of layerRootsIn(repoRoot)) {
       if (kgQaHomeFor(r, HARNESS_ROOT).by !== "hosted") continue;
       const decl = readDeclaration(r);
       if (decl) stubs.add(artefactStub(decl));

@@ -1082,7 +1082,7 @@ jobs:
           done
       - &swap
         # A directory holding its own `.git` inside the index checkout is a
-        # FOREIGN checkout to `instanceRootsIn`, so it would not be discovered
+        # FOREIGN checkout to `layerRootsIn`, so it would not be discovered
         # as an instance. Lock mounts carry no `.git`; the swapped-in copy is
         # made to look the same.
         name: Put the caller in place of its locked mount

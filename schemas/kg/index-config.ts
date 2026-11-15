@@ -72,9 +72,9 @@ import { GateExemptionsSchema, readDeclaration } from "./cat-harness";
 import {
   CONFIG_SUFFIX,
   INDEX_CONFIG_FILENAME,
-  RESERVED_INSTANCE_NAMES,
+  RESERVED_LAYER_NAMES,
   findDeclarationFile,
-  instanceRootsIn,
+  layerRootsIn,
   lockFilesIn,
   rootConfigStems,
 } from "./instance-roots";
@@ -111,8 +111,8 @@ export const HUB_LANDING = "hub";
 const IndexInstanceNameSchema = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/, "an instance name: lowercase, digits and dashes")
-  .refine((n) => !RESERVED_INSTANCE_NAMES.includes(n), {
-    message: `reserved: \`${RESERVED_INSTANCE_NAMES.join("`, `")}\` names a file the platform owns (\`${INDEX_CONFIG_FILENAME}\`), never a harness`,
+  .refine((n) => !RESERVED_LAYER_NAMES.includes(n), {
+    message: `reserved: \`${RESERVED_LAYER_NAMES.join("`, `")}\` names a file the platform owns (\`${INDEX_CONFIG_FILENAME}\`), never a harness`,
   });
 
 /**
@@ -712,7 +712,7 @@ export function buildIndexConfig(root: string, opts: { preferDeclaration?: boole
 
   // Instances DECLARED in this checkout: the root's own, then one level down.
   const local = new Map<string, string>();
-  for (const r of instanceRootsIn(root)) {
+  for (const r of layerRootsIn(root)) {
     try {
       const n = readDeclaration(r)?.name;
       if (n !== undefined && !local.has(n)) local.set(n, relative(root, r) || ".");

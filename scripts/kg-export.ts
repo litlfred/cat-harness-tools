@@ -77,7 +77,7 @@ import {
   isPublishedSchemaModule,
   isPublishedSkill,
   forgeLocation,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   renderingPath,
   siteDirFor,
@@ -2106,7 +2106,7 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
   // published-paths walk in `kg-export.test.ts` caught it as two documents
   // the deploy does not write.
   if (knownSkills(ownRoot, scope).has(skillId)) return ownDoc;
-  for (const instance of instanceRootsIn(repoRootFor(ROOT))) {
+  for (const instance of layerRootsIn(repoRootFor(ROOT))) {
     if (resolve(instance) === resolve(ownRoot)) continue;
     if (!knownSkills(instance).has(skillId)) continue;
     // `publishedIdentity`, not `exportIdentity` with this base: a layer
@@ -2493,7 +2493,7 @@ const declaredRoleIds = (root: string, scope: CorpusScope = corpusScopeFor(root)
  */
 export function roleHome(base: string | undefined, ownDoc: string, roleId: string, ownRoot: string = ROOT, scope: CorpusScope = corpusScopeFor(ownRoot)): string {
   if (base === undefined || declaredRoleIds(ownRoot, scope).has(roleId)) return ownDoc;
-  for (const instance of instanceRootsIn(repoRootFor(ROOT))) {
+  for (const instance of layerRootsIn(repoRootFor(ROOT))) {
     if (resolve(instance) === resolve(ownRoot)) continue;
     if (!declaredRoleIds(instance).has(roleId)) continue;
     return publishedIdentity(instance, base || undefined).docIri;
@@ -3695,7 +3695,7 @@ export interface SidecarSubject {
 
 export function sidecarSubjects(
   dir: string = join(ROOT, QA_RESULTS_DIR),
-  roots: string[] = instanceRootsIn(checkoutRootFor(ROOT)),
+  roots: string[] = layerRootsIn(checkoutRootFor(ROOT)),
 ): { subjects: SidecarSubject[]; orphans: string[] } {
   const subjects: SidecarSubject[] = [{ stem: "kg-export" }];
   const orphans: string[] = [];

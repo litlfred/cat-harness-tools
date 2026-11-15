@@ -38,7 +38,7 @@ import {
   instanceDirectoriesForGraph,
   optInDirectoriesForGraph,
   instanceDirectoryForGraph,
-  instanceRootsIn,
+  layerRootsIn,
 } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
@@ -179,7 +179,7 @@ describe("an instance that declares a kind twice is auditable, not a crash", () 
    */
   test("the singular refuses exactly when the plural finds several", () => {
     const disagreements: string[] = [];
-    for (const inst of instanceRootsIn(REPO)) {
+    for (const inst of layerRootsIn(REPO)) {
       // The singular leaves out what sits inside a switched-on opt-in
       // sub-graph (an ADDITIONAL graph of the kind, `optInDirectoriesForGraph`),
       // and the plural keeps it, since a caller scanning every contract

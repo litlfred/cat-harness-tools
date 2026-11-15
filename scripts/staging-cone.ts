@@ -37,7 +37,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { importClosure as walkImports } from "@litlfred/bootstrap-tools/scripts/check-closure.js";
-import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { downstreamOf, type Edge, judge, readTree, renderingOrder } from "./check-derived-from.ts";
 
 export interface ConeDir {
@@ -68,7 +68,7 @@ export const DECLARED_COMPUTED_IMPORTS: Record<string, (repoRoot: string) => str
   // `loadBlockModule`: a folio's block manifests, which live in the directories
   // declared with graph typology `folio`.
   "cat-harness-tools/pipeline/block-module.ts": (repoRoot) =>
-    instanceRootsIn(repoRoot).flatMap((root) =>
+    layerRootsIn(repoRoot).flatMap((root) =>
       (readDeclaration(root)?.directories ?? [])
         .filter((d) => d.graphTypologies.includes("folio"))
         .flatMap((d) => tsFilesUnder(join(root, d.path)).map((f) => relative(repoRoot, f))),

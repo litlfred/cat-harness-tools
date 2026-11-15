@@ -51,7 +51,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, posix, resolve } from "node:path";
 
-import { fileStamp, findDeclarationFile, INDEX_CONFIG_FILENAME, instanceRootsIn } from "./instance-roots";
+import { fileStamp, findDeclarationFile, INDEX_CONFIG_FILENAME, layerRootsIn } from "./instance-roots";
 
 /** The development override: a comma list of `+<instance>.<id>` / `-<instance>.<id>`. */
 export const SUBGRAPHS_ENV = "CAT_SUBGRAPHS";
@@ -208,13 +208,13 @@ function inGitCheckout(dir: string): boolean {
  * The layers whose `requires` a resolution rooted at `root` can see: the
  * root and the layers mounted one level below it, and — in the separated
  * layout, where each layer is its own clone in a plain directory — its
- * siblings there, which is how `needs` finds them (`instanceRootsIn`).
+ * siblings there, which is how `needs` finds them (`layerRootsIn`).
  */
 function requireRootsFor(root: string): string[] {
-  const own = instanceRootsIn(root);
+  const own = layerRootsIn(root);
   const parent = dirname(resolve(root));
   if (findDeclarationFile(root) === undefined || parent === resolve(root) || inGitCheckout(parent)) return own;
-  return [...new Set([...own, ...instanceRootsIn(parent)])];
+  return [...new Set([...own, ...layerRootsIn(parent)])];
 }
 
 /**

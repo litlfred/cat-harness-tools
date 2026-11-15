@@ -56,7 +56,7 @@ import { instanceDirectories, readDeclaration, nestedDirectories, type CatHarnes
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { orderedDependencies, resolveInstanceGraph } from "../schemas/kg/harness-config.js";
 import { declaredEnableSubgraphs, enableSubgraphsProblems, requiresProblems, splitQualifiedSubgraphId, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.js";
 import "../schemas/kg/folio-graph-typology.js";
 
 import { auditInstance as auditDirs } from "./check-declared-dirs.ts";
@@ -127,7 +127,7 @@ export function coverageFindings(
 
 export function checkDeclarationResolution(rootArg: string): ResolutionReport {
   const root = resolve(rootArg);
-  const roots = instanceRootsIn(root);
+  const roots = layerRootsIn(root);
   const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0, enableSubgraphs: 0, optInLinks: 0, optInRefs: 0 };
   const findings: ResolutionFinding[] = [];
   const undetermined: string[] = [];

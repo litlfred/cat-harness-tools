@@ -23,7 +23,7 @@ import {
   isCriterionSourceMiss,
   resolveCriterionSource,
 } from "../../pipeline/criterion-source.ts";
-import { instanceRootsIn } from "../../schemas/kg/cat-harness.ts";
+import { layerRootsIn } from "../../schemas/kg/cat-harness.ts";
 import { loadContributions } from "../../schemas/kg/harness-config.ts";
 import {
   ContributionRegistry,
@@ -70,7 +70,7 @@ const registry = await loadContributions<FolioContribution, ContributionRegistry
  */
 function checkerFiles(): Array<{ label: string; abs: string }> {
   const out: Array<{ label: string; abs: string }> = [];
-  for (const instance of instanceRootsIn(REPO)) {
+  for (const instance of layerRootsIn(REPO)) {
     const dir = resolve(instance, CHECKER_DIR);
     if (!existsSync(dir)) continue;
     const name = instance.split("/").pop() ?? "";

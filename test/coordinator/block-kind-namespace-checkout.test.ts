@@ -9,7 +9,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { directoriesForGraph, instanceRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.ts";
+import { directoriesForGraph, layerRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { documentContext, instancePrefixes } from "../../schemas/content/content-context.ts";
 
 const ROOT = join(import.meta.dir, "../../..");
@@ -18,7 +18,7 @@ interface Row { instance: string; file: string; folioType: string }
 
 function blockKindRows(): Row[] {
   const rows: Row[] = [];
-  for (const root of instanceRootsIn(ROOT)) {
+  for (const root of layerRootsIn(ROOT)) {
     const decl = readDeclaration(root);
     if (decl === undefined) continue;
     for (const dir of directoriesForGraph(root, "block-kinds")) {

@@ -17,7 +17,7 @@ import { defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry
 import { sweep } from "../check-kind-validators.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { join } from "node:path";
-import { instanceRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
 import { typologyOwner } from "../../schemas/kg/node-kind-index.js";
 
 const INSTANCE = HARNESS_ROOT;
@@ -52,7 +52,7 @@ describe("the three states partition the registry", () => {
     // So `elsewhere` cannot become the place a kind of THIS checkout hides:
     // only the declaring layer's absence puts a kind there.
     const r = await sweep(INSTANCE);
-    const here = new Set(instanceRootsIn(join(INSTANCE, "..")).map((root) => readDeclaration(root)?.name));
+    const here = new Set(layerRootsIn(join(INSTANCE, "..")).map((root) => readDeclaration(root)?.name));
     for (const e of r.elsewhere) {
       expect(typologyOwner(defaultGraphTypologies, e.kind)).toBe(e.owner);
       expect(here.has(e.owner), `${e.kind} is owned by ${e.owner}, which this checkout holds`).toBe(false);

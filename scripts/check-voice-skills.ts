@@ -36,7 +36,7 @@ import { readVoicesGraph } from "./voices-graph.ts";
 import { loadVoices } from "../schemas/content/voices.ts";
 import {
   directoriesForGraph,
-  instanceRootsIn,
+  layerRootsIn,
   repoRootFor,
 } from "../schemas/kg/cat-harness.ts";
 
@@ -144,7 +144,7 @@ export function checkVoiceSkills(repoRoot: string): VoiceSkillFinding[] {
   // `terminology`, and both are checked here. Read through the declaration, as
   // everything over this graph does.
   const raw = new Map<string, Record<string, unknown>>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     if (directoriesForGraph(root, "voices").length === 0) continue;
     for (const v of loadVoices(root)) raw.set(v.id, v as unknown as Record<string, unknown>);
   }

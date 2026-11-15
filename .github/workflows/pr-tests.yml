@@ -361,7 +361,7 @@ jobs:
           path: src
       - &swap
         # A directory holding its own `.git` inside the index checkout is a
-        # FOREIGN checkout to `instanceRootsIn` (cat-harness
+        # FOREIGN checkout to `layerRootsIn` (cat-harness
         # schemas/kg/instance-roots.ts), so it is not discovered as an instance
         # and its scripts drop out of the script table. Lock mounts carry no
         # `.git`; make these two look the same.

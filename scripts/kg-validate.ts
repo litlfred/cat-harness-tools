@@ -20,7 +20,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
-import { instanceDirectories, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { instanceDirectories, layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { checkoutRootFor } from "../schemas/kg/harness-config.js";
 import type { z } from "zod";
 
@@ -100,7 +100,7 @@ export function owningInstanceRoot(filePath: string, fallback: string): string {
   const checkout = checkoutRootFor(fallback);
   let roots = checkoutRootsCache.get(checkout);
   if (!roots) {
-    roots = instanceRootsIn(checkout);
+    roots = layerRootsIn(checkout);
     checkoutRootsCache.set(checkout, roots);
   }
   let best: string | undefined;

@@ -37,7 +37,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { instanceRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.ts";
 
 import { BranchStore, MANIFEST_FILE, MANIFEST_SCHEMA } from "./branch-store.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -183,7 +183,7 @@ export function observedBranches(opts: { repoRoot?: string; remote?: string } = 
 export function declaredBranches(repoRoot: string = defaultRepoRoot()): { exact: Map<string, string>; prefixes: Map<string, string> } {
   const exact = new Map<string, string>();
   const prefixes = new Map<string, string>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     let decl;
     try {
       decl = readDeclaration(root);

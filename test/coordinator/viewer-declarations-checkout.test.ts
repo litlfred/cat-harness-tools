@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { overlayPath } from "../../scripts/lib/layer-output.ts";
 import { join, resolve } from "node:path";
 
-import { declarationPathIn, instanceRootsIn, visualisationResolves } from "../../schemas/kg/cat-harness.ts";
+import { declarationPathIn, layerRootsIn, visualisationResolves } from "../../schemas/kg/cat-harness.ts";
 import { declaredVisualisers, PAGE_LOCALE, viewersOf, type ViewedDirectory } from "../../scripts/viewer-declarations.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`). */
@@ -24,7 +24,7 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
 
   type Dir = ViewedDirectory;
   const dirs: { root: string; instance: string; dir: Dir; raw: { coverage?: { visualiser?: unknown } } }[] = [];
-  for (const root of instanceRootsIn(REPO)) {
+  for (const root of layerRootsIn(REPO)) {
     const p = declarationPathIn(root);
     if (!p) continue;
     const decl = JSON.parse(readFileSync(p, "utf-8")) as { name?: string; directories?: Dir[] };

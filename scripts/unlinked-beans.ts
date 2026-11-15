@@ -45,7 +45,7 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { buildLsi, buildTermMatrix, keywordsOf, type LsiIndex, type TermMatrix } from "../pipeline/lsi.ts";
-import { instanceRootsIn, declaredGraphs } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, declaredGraphs } from "../schemas/kg/cat-harness.ts";
 import { BEAN_GRAPH_FILE } from "../schemas/sdlc/bean-graph.ts";
 import type { QaResult } from "../schemas/kg/qa-record-shapes.ts";
 import { beanDefsDir, readArchivedBeans, readBeans, type BeanNode } from "./beans.ts";
@@ -596,7 +596,7 @@ export function diagramIdsOf(xml: string, file: string): DiagramId[] {
  * An unreadable file is NAMED, never dropped silently.
  */
 export function declaredDiagramIds(repo: string): { ids: Map<string, DiagramId>; files: number; unreadable: string[] } {
-  const files = [...new Set(instanceRootsIn(repo).flatMap((r) => workflowFiles(r)).filter((f) => f.endsWith(".bpmn")))].sort();
+  const files = [...new Set(layerRootsIn(repo).flatMap((r) => workflowFiles(r)).filter((f) => f.endsWith(".bpmn")))].sort();
   const ids = new Map<string, DiagramId>();
   const unreadable: string[] = [];
   let read = 0;
@@ -617,7 +617,7 @@ export function declaredDiagramIds(repo: string): { ids: Map<string, DiagramId>;
 
 /** Every bean store the checkout declares (`beans` graph typology), by absolute path. */
 export function beanStores(repo: string): string[] {
-  const roots = [repo, ...instanceRootsIn(repo), join(repo, "cat-harness")];
+  const roots = [repo, ...layerRootsIn(repo), join(repo, "cat-harness")];
   const out = new Set<string>();
   for (const r of roots) {
     for (const g of declaredGraphs(r)) if (g.graphTypologies.includes("beans") && g.absPath) out.add(g.absPath);

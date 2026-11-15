@@ -79,7 +79,7 @@ import {
   type ResolvedDirectory,
   declaredKinds,
   defaultGraphTypologies,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   repoRootFor,
   resolveDirectories,
@@ -607,7 +607,7 @@ export function gateCoverage(root: string, repo: string, given?: readonly Gate[]
 export function kindUniverse(repo: string): { registered: string[]; declaredOnly: string[] } {
   const registered = defaultGraphTypologies.names().sort();
   const extra = new Set<string>();
-  for (const inst of instanceRootsIn(repo)) {
+  for (const inst of layerRootsIn(repo)) {
     let decl;
     try {
       decl = readDeclaration(inst);
@@ -789,7 +789,7 @@ export function coverage(repo: string): { rows: KindCoverage[]; gates: GateCover
   // which under 1 s was the gates, the universe and the census). A layer
   // whose declaration will not resolve is skipped here as it was in the loop.
   const dirsByInstance: ResolvedDirectory[][] = [];
-  for (const inst of instanceRootsIn(repo)) {
+  for (const inst of layerRootsIn(repo)) {
     try {
       dirsByInstance.push(resolveDirectories([{ name: "(local)", root: inst, own: true }]));
     } catch {

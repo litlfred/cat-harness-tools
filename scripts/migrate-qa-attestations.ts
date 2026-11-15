@@ -50,7 +50,7 @@ import { dirname, join, relative, resolve } from "node:path";
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `qa-store.ts` carries, same reason.
 import "../schemas/kg/folio-graph-typology.js";
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/cat-harness.js";
 import {
   ATTESTATIONS_SUFFIX,
   attestationKeyForDerived,
@@ -358,7 +358,7 @@ if (import.meta.main) {
   }
   const crit: CriteriaMigrationReport[] = [];
   if (want("block-qa") || want("translation-qa")) {
-    for (const root of instanceRootsIn(repo)) crit.push(migrateCriteria(root, { check, dryRun }));
+    for (const root of layerRootsIn(repo)) crit.push(migrateCriteria(root, { check, dryRun }));
   }
 
   // kg-qa under --check: a sidecar still carrying a judgement is waiting,

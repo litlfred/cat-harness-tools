@@ -31,11 +31,11 @@ import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { spawn } from "node:child_process";
 
-import { instanceRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
 
 /** The layers under `repoRoot` that carry a `tsconfig.json`, as config paths. */
 export function instanceConfigs(repoRoot: string): string[] {
-  return instanceRootsIn(repoRoot)
+  return layerRootsIn(repoRoot)
     .map((r) => join(r, "tsconfig.json"))
     .filter((p) => existsSync(p))
     .sort();

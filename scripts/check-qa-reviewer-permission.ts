@@ -39,7 +39,7 @@ import { readPolicyGrants } from "../schemas/content/odrl.js";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { findDeclarationFile, instanceRootNamed } from "../schemas/kg/instance-roots.ts";
+import { findDeclarationFile, layerRootNamed } from "../schemas/kg/instance-roots.ts";
 import type { QaCriterionEntry, QaReviewer } from "../schemas/sdlc/block-qa.ts";
 import { vacuityRefusal, type Source } from "./vacuity-refusal.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
@@ -93,7 +93,7 @@ function directoryForGraph(instanceRoot: string, graphKind: string): string | un
 }
 
 function actorsDir(repoRoot: string): string | undefined {
-  const platform = instanceRootNamed(repoRoot, "cat-harness");
+  const platform = layerRootNamed(repoRoot, "cat-harness");
   if (!platform) return undefined;
   const scenarios = directoryForGraph(platform, "scenarios");
   return scenarios ? join(scenarios, "actors") : undefined;

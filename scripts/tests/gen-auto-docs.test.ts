@@ -21,7 +21,7 @@ import { join, resolve } from "node:path";
 
 import { TYPES, autoDocPage, declaredDirectories, levelPage, owningDirectory } from "../gen-auto-docs.ts";
 import { knownSkills } from "../known-skills.ts";
-import { instanceRootsIn, isExemptFrom, readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { layerRootsIn, isExemptFrom, readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { notApplicableAlone, siteNotBuilt } from "../../test/support/checkout.ts";
 
@@ -64,7 +64,7 @@ describe("index/skills agrees with knownSkills, exactly", () => {
     // stopped seeing a declared directory.
     const mine = new Set(items.map((i) => i.name));
     const known = new Set(knownSkills(INSTANCE));
-    for (const inst of instanceRootsIn(resolve(INSTANCE, ".."))) {
+    for (const inst of layerRootsIn(resolve(INSTANCE, ".."))) {
       const decl = readDeclaration(inst);
       if (decl && !isExemptFrom(decl, "visualiser")) {
         for (const s of knownSkills(inst, "instance")) known.add(s);

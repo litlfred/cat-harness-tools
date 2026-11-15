@@ -41,7 +41,7 @@ import { countLinks, EXPAND_LINK_CLASS, linkSteps, stepsOf, TITLE_LINK_CLASS } f
 import {
   siteDirFor,
   repoRootFor,
-  instanceRootsIn,
+  layerRootsIn,
 } from "../schemas/kg/cat-harness.ts";
 import { checkoutProcessPresentations, processTarget } from "./process-presentations.js";
 import { isGlobalTasksFile } from "../src/workflow/process-model.js";
@@ -76,7 +76,7 @@ const ROOT = resolve(HARNESS_ROOT);
  */
 function bpmnSources(): string[] {
   const all = new Set<string>();
-  for (const inst of instanceRootsIn(repoRootFor(ROOT))) {
+  for (const inst of layerRootsIn(repoRootFor(ROOT))) {
     // A layer's shared global tasks hold no process and so no diagram to
     // draw (owner, 2026-10-20, "a1"): each is drawn in the processes that call it.
     for (const f of workflowFiles(inst)) if (f.endsWith(".bpmn") && !isGlobalTasksFile(readFileSync(f, "utf8"))) all.add(f);

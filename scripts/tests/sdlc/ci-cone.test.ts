@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { decideRun, excluded, gitReplayable, keepRecords, loadRecords, parseTrace, pathState, preloadScripts, recordRun, recordsOnMain, inlineCodeOf, splitArgs, testGates, touchedOf, unquote } from "../../ci-cone.ts";
 import { BUILD_OUTPUT_DIRS, FileDigests, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
-import { NOT_INSTANCE_DIRS } from "../../../schemas/kg/instance-roots.ts";
+import { NOT_LAYER_DIRS } from "../../../schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
 
 const ROOT = "/work/repo";
@@ -296,7 +296,7 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
   });
 
   test("instance discovery skips exactly the build-output directories the tree digest leaves out", () => {
-    expect([...NOT_INSTANCE_DIRS].sort()).toEqual([...BUILD_OUTPUT_DIRS].sort());
+    expect([...NOT_LAYER_DIRS].sort()).toEqual([...BUILD_OUTPUT_DIRS].sort());
   });
 
   test("argument splitting respects quotes and brackets; escapes decode", () => {

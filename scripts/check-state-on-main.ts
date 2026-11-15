@@ -28,7 +28,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { findDeclarationFile, layerRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { contentIsOffCheckout } from "../schemas/kg/subgraph-source.ts";
 // The registration side-effect import, same reason `check:declared-dirs` has
@@ -87,7 +87,7 @@ function holdsState(kind: string): boolean {
 export function stateDirectories(repoRoot: string): StateDirectory[] {
   const root = resolve(repoRoot);
   const out: StateDirectory[] = [];
-  for (const inst of instanceRootsIn(root)) {
+  for (const inst of layerRootsIn(root)) {
     const decl = readDeclaration(inst);
     if (decl === undefined) continue;
     const instRel = relative(root, inst);

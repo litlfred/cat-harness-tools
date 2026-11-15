@@ -419,7 +419,7 @@ describe("could not determine is never a clean run", () => {
 
 describe("this repository", () => {
   it("is audited across every instance discovery finds", () => {
-    // Against the REAL repo, like `instanceRootsIn`'s own test: a fixture
+    // Against the REAL repo, like `layerRootsIn`'s own test: a fixture
     // would keep passing if the axis silently stopped seeing a layer.
     const repo = resolve(import.meta.dir, "..", "..", "..");
     const rs = realAuditAll(repo);

@@ -48,7 +48,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { provenanceSectionFor } from "./provenance-footer.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { layerRootsIn } from "../schemas/kg/instance-roots.js";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { KG_QA_DIRNAME, kgQaSidecarPath } from "../schemas/sdlc/kg-qa.js";
 import { visualiserRoute } from "../schemas/kg/visualiser-route.js";
@@ -214,7 +214,7 @@ function toolQaResolver(
   } else {
     let roots: readonly string[] = [];
     try {
-      roots = instanceRootsIn(repo);
+      roots = layerRootsIn(repo);
     } catch {
       roots = [];
     }
@@ -277,7 +277,7 @@ function toolQaResolver(
 function toolProvenanceResolver(repo: string, opts: { instanceRoot?: string } = {}): (toolId: string) => string | undefined {
   let roots: readonly string[] = [];
   try {
-    roots = opts.instanceRoot !== undefined ? [opts.instanceRoot] : instanceRootsIn(repo);
+    roots = opts.instanceRoot !== undefined ? [opts.instanceRoot] : layerRootsIn(repo);
   } catch {
     roots = [];
   }
@@ -435,7 +435,7 @@ export interface ToolSubject {
 
 /**
  * Every layer that declares a `tools` graph, with the Tools it yields, in
- * the order `instanceRootsIn` lists them. `empty` names the ones whose graph
+ * the order `layerRootsIn` lists them. `empty` names the ones whose graph
  * yields no Tool: they get no page, and are reported rather than drawn.
  *
  * Read through auto-discovery (`toolsOf`), which THROWS on a declared graph
@@ -445,7 +445,7 @@ export interface ToolSubject {
 export function toolSubjects(repo = REPO): { subjects: ToolSubject[]; empty: string[] } {
   const subjects: ToolSubject[] = [];
   const empty: string[] = [];
-  for (const inst of instanceRootsIn(repo)) {
+  for (const inst of layerRootsIn(repo)) {
     if (instanceDirectoryForGraph(inst, "tools") === undefined) continue;
     const p = declarationPathIn(inst);
     const name = p && existsSync(p) ? (JSON.parse(readFileSync(p, "utf-8")) as { name?: string }).name : undefined;
@@ -811,7 +811,7 @@ export async function toolPages(
   /** Each Tool's IRI, its published JSON-LD document, where its layer publishes one. */
   iriOf: (id: string) => string | undefined;
 }> {
-  const roots = instanceRootsIn(repo);
+  const roots = layerRootsIn(repo);
   const forge = forgeHrefFor(repo, repoWebFor(repo));
   const all = subjects.flatMap((x) => (x.defs ?? []).map((d) => ({ d, x })));
   const pageOf = new Map(all.map(({ d, x }) => [d.id, toolPageRelPath(repo, x.name, d.id)]));

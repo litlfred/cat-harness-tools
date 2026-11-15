@@ -50,7 +50,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { directoryEntriesForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { directoryEntriesForGraph, layerRootsIn } from "../schemas/kg/cat-harness.js";
 import "../schemas/kg/folio-graph-typology.js";
 import { MergeQueueEntrySchema, type MergeQueueEntry } from "../schemas/sdlc/merge-queue.ts";
 import { RESERVED, pushMount, readMarker, type BranchStoreOptions, type PushResult } from "./branch-store.ts";
@@ -109,7 +109,7 @@ export type QueueStore =
 
 /** The declared directory holding the queue: its id, and where to READ it. */
 function locate(root: string): { id: string; where: ReturnType<typeof graphReadPath> } | null {
-  for (const inst of instanceRootsIn(root)) {
+  for (const inst of layerRootsIn(root)) {
     for (const d of directoryEntriesForGraph(inst, QUEUE_KIND)) {
       return { id: d.id, where: graphReadPath(d.id, root) };
     }

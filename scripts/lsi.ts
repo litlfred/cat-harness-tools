@@ -49,7 +49,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { declaredGraphs, instanceRootsIn } from "../schemas/kg/cat-harness.ts";
+import { declaredGraphs, layerRootsIn } from "../schemas/kg/cat-harness.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { againstOrUsage, buildQaResult, judgeUsage, qaStorageOf, writeQaResult } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";
@@ -187,7 +187,7 @@ export function proseGraphs(): GraphTarget[] {
   // Index it once, attributed to the layer whose ROOT contains it (the
   // owner), falling back to the first declarer for a repository-scoped path.
   const byPath = new Map<string, GraphTarget & { rootLen: number }>();
-  for (const root of instanceRootsIn(REPO)) {
+  for (const root of layerRootsIn(REPO)) {
     for (const g of declaredGraphs(root)) {
       if (!g.absPath || !existsSync(g.absPath) || !statSync(g.absPath).isDirectory()) continue;
       if (!g.graphTypologies.some((k) => PROSE_KINDS.has(k))) continue;

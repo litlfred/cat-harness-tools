@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { allAvatars, GENERIC, avatarFor, avatarKinds, hasAvatar } from "../../schemas/content/avatars.ts";
-import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies, instanceRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.ts";
+import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies, layerRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { avatarsCssPath, renderAvatarsCss } from "../gen-avatars-css.ts";
 import { coverage, requiredKinds, trashDerivationPresent } from "../check-avatar-coverage.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -194,7 +194,7 @@ describe("coverage is a QA axis, not a promise", () => {
   // The avatar now lives on folio-assistant-core's own declaration (sod4 #4),
   // so it resolves only where that higher layer is composed.
   const NO_CORE =
-    !instanceRootsIn(resolve(ROOT, "..")).some((r) => readDeclaration(r)?.name === "folio-assistant-core") &&
+    !layerRootsIn(resolve(ROOT, "..")).some((r) => readDeclaration(r)?.name === "folio-assistant-core") &&
     notApplicableAlone("folio-assistant-core, whose declaration carries its avatar (an instance above the harness)");
   test.skipIf(NO_CORE)("and `folio-assistant-core` resolves to its own avatar, not the question mark", () => {
     expect(avatarFor("folio-assistant-core")).not.toBe(GENERIC);
@@ -208,11 +208,11 @@ describe("coverage is a QA axis, not a promise", () => {
     // The REPOSITORY root, not `ROOT`. `ROOT` is this LAYER (`cat-harness/`)
     // and is the right argument for `coverage`, which asks what this layer
     // declares — but layer NAMES are a repository-level fact, and asking
-    // `instanceRootsIn(ROOT)` returns cat-harness's own subdirectories. The
+    // `layerRootsIn(ROOT)` returns cat-harness's own subdirectories. The
     // two roots were the same directory before the split, which is why this
     // distinction is easy to get wrong and worth saying in place.
     const declared = new Set(
-      instanceRootsIn(resolve(ROOT, "..")).map((r) => readDeclaration(r)?.name),
+      layerRootsIn(resolve(ROOT, "..")).map((r) => readDeclaration(r)?.name),
     );
     for (const key of coverage(ROOT).orphaned) {
       expect([key, declared.has(key)]).toEqual([key, true]);

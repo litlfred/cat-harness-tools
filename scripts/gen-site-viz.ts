@@ -25,7 +25,7 @@
  */
 import { join } from "node:path";
 
-import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { BranchStore } from "./branch-store.ts";
 import { makeEmit } from "./viewer-page.ts";
 import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarations.js";
@@ -149,7 +149,7 @@ if (import.meta.main) {
     process.exit(0);
   }
   const sections: SiteSection[] = [];
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const decl = readDeclaration(root);
     for (const d of decl?.directories ?? []) {
       const branch = (d.storage as { branch?: string } | undefined)?.branch;

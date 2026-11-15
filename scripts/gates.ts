@@ -41,7 +41,7 @@ import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
 import { checkoutRootFor, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
 import { parse } from "yaml";
 
@@ -205,7 +205,7 @@ export const WORKFLOW_DIR = join(".github", "workflows");
 function declaredExemptions(root: string = checkoutRootFor(resolve(HARNESS_ROOT))): { steps: StepExemption[]; scripts: ScriptExemption[] } {
   const steps: StepExemption[] = [];
   const scripts: ScriptExemption[] = [];
-  for (const instance of instanceRootsIn(root)) {
+  for (const instance of layerRootsIn(root)) {
     const g = readDeclaration(instance)?.gateExemptions;
     steps.push(...(g?.steps ?? []));
     scripts.push(...(g?.scripts ?? []));

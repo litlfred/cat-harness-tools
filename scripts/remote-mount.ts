@@ -173,7 +173,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { z } from "zod";
 
 import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "../schemas/kg/mount-trust.js";
-import { checkoutRootFor, defaultGraphTypologies, instanceDirectories, instanceRootsIn, readDeclaration, type GraphTypologyRegistry } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, defaultGraphTypologies, instanceDirectories, layerRootsIn, readDeclaration, type GraphTypologyRegistry } from "../schemas/kg/cat-harness.js";
 import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "../schemas/kg/index-config.js";
 import {
   MOUNT_LOCK_SCHEMA,
@@ -803,7 +803,7 @@ function resolveClosureWith(
   // submodule, a lock deleted by hand). It is a mount target, adopted only if
   // it is exactly the pinned bytes (folio-assistant#2467, decision 2).
   const inCheckout = gitIn(ds.instanceRoot, ["rev-parse", "--is-inside-work-tree"]).stdout.trim() === "true";
-  for (const root of instanceRootsIn(ds.instanceRoot)) {
+  for (const root of layerRootsIn(ds.instanceRoot)) {
     const rel = relative(ds.instanceRoot, root);
     if (inCheckout && rel !== "" && !tracked(ds.instanceRoot, rel)) continue;
     try {
@@ -2146,7 +2146,7 @@ export function declaringInstances(checkout: string): { roots: string[]; unreada
   const roots: string[] = [];
   const unreadable: Array<{ root: string; why: string }> = [];
   const mounted = new Set(lockedMountPaths(checkout));
-  const candidates = [...new Set([checkout, ...instanceRootsIn(checkout)])];
+  const candidates = [...new Set([checkout, ...layerRootsIn(checkout)])];
   for (const root of candidates) {
     if (root !== checkout && mounted.has(relative(checkout, root))) continue;
     try {

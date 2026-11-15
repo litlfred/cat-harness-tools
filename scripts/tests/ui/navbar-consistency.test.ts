@@ -20,7 +20,7 @@
  * could-not-determine is never rendered as green, and a registry read as empty
  * would satisfy every family below.
  *
- * **The enumerator is `instanceRootsIn`, not a glob.** A per-directory `<dir>/<dir>.json` glob gets
+ * **The enumerator is `layerRootsIn`, not a glob.** A per-directory `<dir>/<dir>.json` glob gets
  * this wrong in BOTH directions — it misses the repository root, which
  * declares, and it counts `beans/beans.json`, `interaction/` and `todos/`,
  * which are graph declarations under a different schema. That is a 19 where the
@@ -33,7 +33,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync,
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, siteFileFor } from "../../../schemas/kg/cat-harness.js";
+import { layerRootsIn, siteFileFor } from "../../../schemas/kg/cat-harness.js";
 import { judgeThemeKinds, type ThemeWiring } from "../../check-navbar-consistency.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..", "..");
@@ -80,7 +80,7 @@ let CWD = REPO;
  * reader can see it instead.
  *
  * The copy is cheap because almost all of it is symlinks. The directories that
- * must be REAL are the root, every layer root (`instanceRootsIn` takes
+ * must be REAL are the root, every layer root (`layerRootsIn` takes
  * `isDirectory()`, which is false for a symlink, so a symlinked layer would
  * silently vanish from the scan) and every directory on the way to an edited
  * file; the edited file itself is a copy. Everything else links back.
@@ -88,7 +88,7 @@ let CWD = REPO;
 function withEdit(file: string, edit: (s: string) => string, body: () => void): void {
   const target = relative(REPO, file);
   const realDirs = new Set<string>([""]);
-  for (const r of instanceRootsIn(REPO)) realDirs.add(relative(REPO, r));
+  for (const r of layerRootsIn(REPO)) realDirs.add(relative(REPO, r));
   for (let d = dirname(target); d !== "." && d !== ""; d = dirname(d)) realDirs.add(d);
 
   const tmp = mkdtempSync(join(tmpdir(), "navbar-plant-"));
@@ -284,8 +284,8 @@ describe("the themes set is iterated, not hardcoded", () => {
 });
 
 describe("the denominator comes from the declared enumerator", () => {
-  test("`instanceRootsIn` excludes the repository root and graph declarations", () => {
-    const roots = instanceRootsIn(REPO).map((p) => resolve(p));
+  test("`layerRootsIn` excludes the repository root and graph declarations", () => {
+    const roots = layerRootsIn(REPO).map((p) => resolve(p));
     // The root DECLARED until the owner removed that declaration (3d4caf6,
     // 2026-10-08); it holds an index now, so it is not a layer and the
     // enumerator must not count it. Still compared as a PATH: its basename is
@@ -299,7 +299,7 @@ describe("the denominator comes from the declared enumerator", () => {
   });
 
   test("the report's denominator equals what the enumerator returns", () => {
-    const n = instanceRootsIn(REPO).length;
+    const n = layerRootsIn(REPO).length;
     const { out } = run();
     expect(out).toMatch(new RegExp(`instances read\\s+${n}\\b`));
   });

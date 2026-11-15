@@ -60,7 +60,7 @@ import { toJsonSchema } from "../schemas/kg/to-json-schema.js";
 
 import { compareRoute } from "./route-authority.ts";
 import { isDirectoryReadme } from "../schemas/kg/kg-node.ts";
-import { checkoutRootFor, instanceDirectoryForGraph, instanceRootsIn, instanceDirectories, readDeclaration, siteDir, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, instanceDirectoryForGraph, layerRootsIn, instanceDirectories, readDeclaration, siteDir, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { BASE_GRAPH_TYPOLOGIES, resolveGraphTypology } from "../schemas/kg/graph-typology-registry.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { bothViews, gridLinks, renderSvgs, safeId, sha256, svgStamp, views, type RenderJob } from "./plantuml-render.js";
@@ -935,7 +935,7 @@ function page(opts: {
 // ── main ──────────────────────────────────────────────────────────────────
 
 export async function overviewFilesFor(
-  roots: readonly string[] = instanceRootsIn(REPO),
+  roots: readonly string[] = layerRootsIn(REPO),
 ): Promise<{ files: Map<string, string>; instances: { name: string; sections: Section[] }[] }> {
   const files = new Map<string, string>();
   const instances: { name: string; sections: Section[] }[] = [];

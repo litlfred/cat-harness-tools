@@ -52,7 +52,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { checkoutDirectories } from "../schemas/kg/harness-config.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { kgQaHomeFor, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { ROUTE_SEGMENT, visualiserRoute } from "../schemas/kg/visualiser-route.ts";
 import {
@@ -147,7 +147,7 @@ export async function report(o: Options): Promise<{ docs: NodeViewCoverage[]; la
   const fetcher: Fetcher | undefined = o.siteDir ? dirFetcher(resolve(o.siteDir), siteUrl, o.network ? http : undefined) : o.base ? http : undefined;
   const iriFetcher: Fetcher | undefined = o.siteDir ? fetcher : http;
 
-  const roots = instanceRootsIn(root);
+  const roots = layerRootsIn(root);
   const nameOf = new Map<string, string>();
   for (const r of roots) {
     try {

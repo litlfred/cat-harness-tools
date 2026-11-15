@@ -29,7 +29,7 @@ import { basename, dirname, join, relative } from "node:path";
 
 import {
   directoriesForGraph,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   repoRootFor,
   siblingScopeFor,
@@ -262,7 +262,7 @@ export function readVoicesGraph(roots: string[], repoRootIn?: string): VoicesGra
   // that asked only its own root would find nothing and report it as an
   // absence rather than as somebody else's.
   const dirs = new Map<string, string>();
-  for (const root of [...roots, ...instanceRootsIn(repoRoot)]) {
+  for (const root of [...roots, ...layerRootsIn(repoRoot)]) {
     for (const d of directoriesForGraph(root, "voices")) {
       if (!dirs.has(d)) dirs.set(d, root);
     }

@@ -10,7 +10,7 @@
  *
  * ## What an entry carries
  *
- * One `Harness` per declared layer ({@link instanceRootsIn}),
+ * One `Harness` per declared layer ({@link layerRootsIn}),
  * read from its declaration and from the files the deploy already wrote:
  *
  * - `@id` — its export document, at the address {@link exportIdentity} gives
@@ -37,7 +37,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { overlayPath } from "./lib/layer-output.ts";
 import { join, resolve } from "node:path";
 
-import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { artefactStub, layerRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { exportIdentity } from "./kg-export.js";
 import { instanceDocPath } from "./instance-exports.js";
 import { isPublished } from "../schemas/kg/url-space.js";
@@ -105,7 +105,7 @@ export function buildRootIndex(site: string, opts: { baseUrl?: string; repo?: st
   // The site this index is published at: the host layer's base, which is
   // where `_site/` is served (`exportIdentity`'s `base` for the host).
   const siteBase = exportIdentity({ baseUrl: opts.baseUrl }).base;
-  for (const inst of instanceRootsIn(repo)) {
+  for (const inst of layerRootsIn(repo)) {
     const decl = readDeclaration(inst);
     // `"enabled": false` is a declaration that it is not published, so it has
     // no entry — the same answer the deploy's plan gives (`isPublished`).

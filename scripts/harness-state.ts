@@ -52,7 +52,7 @@ import { basename, join, relative, resolve, sep } from "node:path";
 import { initSteps, offlineProbe, type InitStep, type StepState } from "@litlfred/bootstrap-tools/scripts/init.ts";
 import { repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { healthReportPath, parseHealthReport } from "../schemas/sdlc/health-report.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import {
   HARNESS_STATE_SCHEMA,
   HARNESS_STATE_INDEX_SCHEMA,
@@ -169,7 +169,7 @@ export function stateOf(name: string, steps: readonly InitStep[], repoRoot: stri
 export async function harnessStates(harnessRoot: string = HARNESS_ROOT): Promise<HarnessState[]> {
   const repoRoot = repoRootFor(harnessRoot);
   const out: HarnessState[] = [];
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     // dryRun: never perform a step. offlineProbe: no gh, no network.
     const { name, steps } = await initSteps(root, { probe: offlineProbe, dryRun: true });
     const partial = partiallyMounted(root, repoRoot);

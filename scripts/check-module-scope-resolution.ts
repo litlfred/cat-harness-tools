@@ -24,7 +24,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn } from "../schemas/kg/cat-harness.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 
@@ -147,12 +147,12 @@ export function checkModuleScopeResolution(root = REPO_ROOT): ModuleScopeReport 
   // call site there was invisible to a gate reporting a clean run. Reading the
   // layer list rather than naming a second directory, because the next
   // layer would be invisible again.
-  // DEDUPED: `instanceRootsIn` yields the repository root as a layer in its
+  // DEDUPED: `layerRootsIn` yields the repository root as a layer in its
   // own right AND each layer directory inside it, so a naive loop walks
   // `cat-harness/**` twice and reports every finding twice. A doubled count is
   // not a harmless cosmetic — it is a number a reader would quote.
   const seen = new Set<string>();
-  for (const instance of instanceRootsIn(root)) {
+  for (const instance of layerRootsIn(root)) {
     const found: string[] = [];
     walk(instance, found);
     for (const f of found) if (!seen.has(f)) { seen.add(f); files.push(f); }

@@ -23,7 +23,7 @@ import { projection, viewerHtml } from "../../gen-voices-viz.ts";
 import { unscopedSelectors } from "../../lib/themed-page.ts";
 import { shippedVoices, overlaySeverityOf } from "../../../pipeline/voice-criteria.ts";
 import { overlayCriterionId } from "../../../pipeline/voice-criteria.ts";
-import { directoriesForGraph, instanceRootsIn, repoRootFor } from "../../../schemas/kg/cat-harness.ts";
+import { directoriesForGraph, layerRootsIn, repoRootFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
@@ -85,7 +85,7 @@ describe("a declared directory that is not there is a ROW, not a silence", () =>
     // above only if it dropped it there too — but a reader that drops them
     // only when SOME are present would not. So every declared voices directory
     // must appear in the graph, whatever its state on disk.
-    const declared = instanceRootsIn(REPO).flatMap((r) => directoriesForGraph(r, "voices"));
+    const declared = layerRootsIn(REPO).flatMap((r) => directoriesForGraph(r, "voices"));
     expect(G.directories.length).toBe(declared.length);
     for (const d of G.directories) {
       expect(typeof d.present).toBe("boolean");

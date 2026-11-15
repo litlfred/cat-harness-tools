@@ -41,7 +41,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   siteFileFor,
 } from "../schemas/kg/cat-harness.js";
@@ -353,7 +353,7 @@ function main(): number {
     return 2;
   }
 
-  const roots = instanceRootsIn(repoRoot);
+  const roots = layerRootsIn(repoRoot);
   const art: InstanceArt[] = [];
   for (const r of roots) {
     try {
@@ -372,7 +372,7 @@ function main(): number {
     }
   }
   if (art.length === 0) {
-    console.error("✗ no instance declaration read — refusing (see `instanceRootsIn`).");
+    console.error("✗ no instance declaration read — refusing (see `layerRootsIn`).");
     return 2;
   }
 

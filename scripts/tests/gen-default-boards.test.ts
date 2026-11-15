@@ -21,7 +21,7 @@ import { join, resolve } from "node:path";
 import { BoardSchema } from "../../schemas/ui/board.js";
 import { DECLARATION_SUFFIX } from "../../schemas/kg/cat-harness.js";
 import { INDEX_CONFIG_SCHEMA } from "../../schemas/kg/index-config.js";
-import { instanceConfigFilename } from "../../schemas/kg/harness-config.js";
+import { layerConfigFilename } from "../../schemas/kg/harness-config.js";
 import { defaultBoard, harnessesOwedABoard } from "../gen-default-boards.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -46,7 +46,7 @@ describe("who owes a board", () => {
         mkdirSync(join(repo, n));
         writeFileSync(join(repo, n, `${n}${DECLARATION_SUFFIX}`), JSON.stringify({ name: n, version: "0.1.0", directories: [] }));
       }
-      writeFileSync(join(repo, instanceConfigFilename("one")), "{}\n");
+      writeFileSync(join(repo, layerConfigFilename("one")), "{}\n");
       expect(harnessesOwedABoard(repo, ["one", "two"])).toEqual(["one"]);
       writeFileSync(
         join(repo, "index.config.json"),

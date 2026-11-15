@@ -38,7 +38,7 @@ import { basename, join, relative, resolve } from "node:path";
 
 import * as gitCorpusModule from "../schemas/sdlc/git-corpus.ts";
 import { gitCorpus } from "../schemas/sdlc/git-corpus.ts";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult, type QaResult } from "./qa-results.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
@@ -192,7 +192,7 @@ export function censusRepository(repo: string): { rows: ScanRow[]; scope: Instan
   const rows: ScanRow[] = [];
   const scope: InstanceScope[] = [];
   const seen = new Set<string>();
-  for (const root of instanceRootsIn(repo).sort()) {
+  for (const root of layerRootsIn(repo).sort()) {
     const dir = join(root, "scripts");
     if (seen.has(dir)) continue;
     seen.add(dir);

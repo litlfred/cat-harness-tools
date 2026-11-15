@@ -31,7 +31,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, relative, resolve } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn, optInDirectoriesForGraph } from "../schemas/kg/cat-harness.js";
+import { declarationPathIn, instanceDirectoryForGraph, layerRootsIn, optInDirectoriesForGraph } from "../schemas/kg/cat-harness.js";
 import type { EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { ToolDefinitionSchema, type ToolDefinition } from "../schemas/tools/tool.js";
 import { toolsFromFolders } from "../schemas/tools/tool-folders.js";
@@ -120,7 +120,7 @@ export function discoverTools(
   const seen = new Map<string, string>();
   const rel = (p: string) => relative(repoRoot, p) || ".";
 
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     if (onlyInstance !== undefined && resolve(inst) !== resolve(onlyInstance)) continue;
     let dirs: string[];
     try {
