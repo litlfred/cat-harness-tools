@@ -4,6 +4,10 @@
 # NOT installed in CI. Declared so the cost is visible rather than implied;
 # see each entry's reason in schemas/sdlc/python-deps.ts.
 
+# anthropic: `pdf-ocr.py --vision-digits` only: an opt-in fallback that asks a vision model to re-read the number words Tesseract is unsure of on Arabic-script pages (10665-94830-per, owner 2026-11-15). Imported inside `anthropic_ask`, so a run without the flag needs neither it nor credentials. The wheel is 2.3 MB (anthropic 2.8.0, py3-none-any, PyPI, 2026-11-15) and pulls httpx, pydantic and jiter. Extended because CI never calls a remote model; the tests drive the fallback with a fake `ask`.
+# imports: anthropic
+anthropic
+
 # camelot-py: `pdf-tables.py` only. 912 KB itself, but it pulls numpy, pandas and OpenCV — 323 MB measured 2026-09-20, more than the whole lean set. Kept out of CI for that reason alone; the script is live (two skills document it, bean `fj94` has 38 tests) and this is a cost statement, not a deprecation.
 # imports: camelot
 camelot-py

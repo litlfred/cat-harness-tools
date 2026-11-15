@@ -19,9 +19,9 @@ description: |
 
   FALLBACK: when there is no image for the key (a re-pin, a lockfile change, a
   first run), or the registry refuses, or anything in the restore fails, the
-  steps every job ran before this action: the mount cache, mount-from-lock,
-  `bun install --frozen-lockfile`, `playwright install`. A missing image costs
-  time, never a result.
+  steps every job ran before this action: mount-from-lock (served from
+  refs/cat/layers/<key>), `bun install --frozen-lockfile`, `playwright install`.
+  A missing image costs time, never a result.
 
   It does NOT run `state:mount`: the state branches move with every write, so
   no image can hold them, and each job mounts them itself.
@@ -102,25 +102,6 @@ runs:
         echo "::notice title=CI image::${why} (${image}:${KEY:0:12}); mounting and installing instead"
 
     # ── Fallback: the steps every job ran before (bean cis1, nn8e) ──────────
-    # Saved on main only; a pull request restores and never saves. Every PR
-    # job saving on a lock change cost ~9 s each in its post step, racing the
-    # others for the same key.
-    - name: Cache remote mounts (bean cis1), saved on main
-      if: steps.image.outputs.hit != 'true' && github.ref == 'refs/heads/main'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-      with:
-        path: ~/.cache/cat-mount
-        key: cat-mount-v1-${{ hashFiles('index.lock.json') }}
-        restore-keys: |
-          cat-mount-v1-
-    - name: Cache remote mounts (bean cis1), restore only
-      if: steps.image.outputs.hit != 'true' && github.ref != 'refs/heads/main'
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-      with:
-        path: ~/.cache/cat-mount
-        key: cat-mount-v1-${{ hashFiles('index.lock.json') }}
-        restore-keys: |
-          cat-mount-v1-
     - name: Mount the layers from the lock
       if: steps.image.outputs.hit != 'true'
       shell: bash

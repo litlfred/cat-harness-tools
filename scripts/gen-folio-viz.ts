@@ -44,6 +44,7 @@ import { basename, join, relative, sep } from "node:path";
 import { viewerPlacement } from "./gen-schema-viz.ts";
 import { folioFileList, formatBytes, type FolioFile } from "@litlfred/cat-harness/folio-render/file-list.ts";
 import {
+  checkoutRootFor,
   directoriesForGraph,
   readDeclaration,
   repoRootFor,
@@ -53,11 +54,13 @@ import { makeEmit } from "./viewer-page.ts";
 import { mergeFolio } from "./folio-merge.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
+import { buildsHostSite, hostSiteBase } from "./lib/subject-pages.ts";
 import { declaredPageRoute, renderedByOf, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { checkoutDirectories } from "../schemas/kg/harness-config.js";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { mountedInstances } from "./lib/layer-output.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 const VIEWER_TOOL = "folio-viewer";
@@ -174,7 +177,7 @@ export function readFolioDirs(dirList: readonly string[], repo: string): FolioGr
                 label: String(l.label ?? ""),
                 // Authored as the page's source location; published elsewhere
                 // for the docs-folder pages (bean `kc7k`).
-                href: publishedHref(join(ROOT, siteDirFor(ROOT)), String(l.href ?? "")),
+                href: platformDocHref(join(ROOT, siteDirFor(ROOT)), String(l.href ?? "")),
               }))
             : [],
           chars: String(raw.comment ?? raw.text ?? "").length,
@@ -186,6 +189,28 @@ export function readFolioDirs(dirList: readonly string[], repo: string): FolioGr
     g.directories.push({ dir: rel(dir), present, nodes: n, files: present ? folioFileList(dir) : [] });
   }
   return g;
+}
+
+/**
+ * A sticky's link to a page of the platform's own docs, where this build
+ * publishes it. The href is authored site-rooted (`/concepts/…`) and the page
+ * is published only on the platform's site, so on a downstream's site
+ * (a WHO library folio) it resolved against that site and 404'd: 5 of 5 sticky links on
+ * `/folio/` (owner, 2026-11-13, node-kind audit). Where this build is not
+ * the platform's site, a link to one of its docs pages names the platform's
+ * site absolutely; on the platform's site it stays site-rooted, so a preview
+ * keeps its links. Any other href is {@link publishedHref}'s.
+ */
+export function platformDocHref(
+  siteDir: string,
+  href: string,
+  host: { here: boolean; base: string | undefined } = { here: buildsHostSite(), base: hostSiteBase() },
+): string {
+  const published = publishedHref(siteDir, href);
+  if (host.here || host.base === undefined || !published.startsWith("/") || published.startsWith("//")) return published;
+  const path = /^([^#?]*)/.exec(href)![1]!.replace(/^\/+/, "");
+  const stem = path === "" || path.endsWith("/") ? `${path}index` : path.replace(/\.html$/i, "");
+  return existsSync(join(siteDir, `${stem}.md`)) || existsSync(join(siteDir, `${stem}.html`)) ? `${host.base}${published}` : published;
 }
 
 export function projection(g: FolioGraph): unknown {
@@ -487,6 +512,19 @@ if (import.meta.main) {
   const handler = readDeclaration(ROOT)?.name;
   if (!handler) {
     console.log("  · this instance declares no name — no handler segment to publish under");
+    process.exit(0);
+  }
+
+  // A MOUNTED HARNESS'S PAGES ARE NOT THIS CHECKOUT'S TO JUDGE. Here the
+  // full view reads this checkout's folio directories too, and its links
+  // resolve against this site's host, so what it computes describes the
+  // checkout, never the bytes the harness committed at its pin: every
+  // downstream read them as stale (dth-sc, smart-immunizations-uganda,
+  // 2026-11-15), and nothing a downstream does can make them current. The
+  // harness's own repository checks them; a downstream builds them at
+  // publish. A lower layer never waits on a higher one.
+  if (check && mountedInstances(checkoutRootFor(ROOT)).has(handler)) {
+    console.log(`  · ${handler} is a mounted layer here: its folio pages are checked in its own repository and built at this site's publish`);
     process.exit(0);
   }
 

@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
+import { overlayPath } from "../lib/layer-output.ts";
 import {
   SUBGRAPH_CONTEXT_PATH,
   auditPayloadTree,
@@ -443,7 +444,9 @@ describe("payloads", () => {
   // exports fewer, so their payloads read as orphans there. Skipped, not
   // passed, until the outputs are self-contained (bean `vj2p`; `ho66`).
   test.skipIf(!inAggregate())("the committed payload tree is that set, with no orphan either way", () => {
-    expect(auditPayloadTree(join(ROOT, payloadDir), payloadPlan.links)).toEqual([]);
+    // The tree is built at publish and gitignored, so it is at the layer
+    // output root (bean cat-tools-sm8r), not in the mount.
+    expect(auditPayloadTree(overlayPath(join(ROOT, payloadDir)), payloadPlan.links)).toEqual([]);
   });
 
   describe("synthetic", () => {

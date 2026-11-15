@@ -20,6 +20,7 @@
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
+import { overlayPath } from "./lib/layer-output.ts";
 import { join, relative, resolve, sep } from "node:path";
 
 import { orderedDependencies } from "../schemas/kg/harness-config.js";
@@ -32,7 +33,7 @@ import {
   AGENT_INSTRUCTIONS_ROLE,
   assetRolePurpose,
   INSTANCE_README_ROLE,
-  instanceRootsIn,
+  layerRootsIn,
   isExemptFrom,
   readDeclaration,
   siteDirFor,
@@ -195,7 +196,9 @@ function targetExists(repoRoot: string, target: string): boolean {
   // job, not this one — and reporting an id as "missing" because it is not a
   // file would be the axis lying about what it looked at.
   if (!target.includes("/") && !target.includes(".")) return true;
-  return existsSync(resolveCoveragePath(repoRoot, target));
+  // Over the layer overlay: a page a mounted layer builds at publish is at its
+  // output root, not beside the pinned mount (bean `cat-tools-sm8r`).
+  return existsSync(overlayPath(resolveCoveragePath(repoRoot, target)));
 }
 
 /**
@@ -442,7 +445,7 @@ function dependencyRoots(root: string): string[] {
  * obligation listed rather than silently satisfied.
  */
 export function serialisationsProducerDeclared(repoRoot: string): boolean {
-  for (const r of instanceRootsIn(repoRoot)) {
+  for (const r of layerRootsIn(repoRoot)) {
     try {
       const decl = readDeclaration(r);
       if (!decl) continue;
@@ -669,7 +672,7 @@ export function auditInstance(
 export function auditAll(repoRoot: string): InstanceCoverage[] {
   // Asked once for the checkout, not once per layer.
   const serialisationsProducer = serialisationsProducerDeclared(repoRoot);
-  return instanceRootsIn(repoRoot).map((r) => auditInstance(r, repoRoot, { serialisationsProducer }));
+  return layerRootsIn(repoRoot).map((r) => auditInstance(r, repoRoot, { serialisationsProducer }));
 }
 
 export function formatReport(rs: InstanceCoverage[]): string {

@@ -46,7 +46,7 @@
  *
  * The file ends in `.config.json`, so a scan reading "each root `*.config.json`
  * is a harness" would read a harness called `index`. `rootConfigStems` in
- * `instance-roots.ts` is the one scan and excludes it, and {@link IndexInstanceSchema}
+ * `instance-roots.ts` is the one scan and excludes it, and {@link IndexLayerSchema}
  * refuses an instance of that name.
  *
  * ## The mount lock stays a separate, generated file: `index.lock.json`
@@ -72,9 +72,9 @@ import { GateExemptionsSchema, readDeclaration } from "./cat-harness";
 import {
   CONFIG_SUFFIX,
   INDEX_CONFIG_FILENAME,
-  RESERVED_INSTANCE_NAMES,
+  RESERVED_LAYER_NAMES,
   findDeclarationFile,
-  instanceRootsIn,
+  layerRootsIn,
   lockFilesIn,
   rootConfigStems,
 } from "./instance-roots";
@@ -111,8 +111,8 @@ export const HUB_LANDING = "hub";
 const IndexInstanceNameSchema = z
   .string()
   .regex(/^[a-z0-9][a-z0-9-]*$/, "an instance name: lowercase, digits and dashes")
-  .refine((n) => !RESERVED_INSTANCE_NAMES.includes(n), {
-    message: `reserved: \`${RESERVED_INSTANCE_NAMES.join("`, `")}\` names a file the platform owns (\`${INDEX_CONFIG_FILENAME}\`), never a harness`,
+  .refine((n) => !RESERVED_LAYER_NAMES.includes(n), {
+    message: `reserved: \`${RESERVED_LAYER_NAMES.join("`, `")}\` names a file the platform owns (\`${INDEX_CONFIG_FILENAME}\`), never a harness`,
   });
 
 /**
@@ -147,12 +147,12 @@ export type InstanceSource = z.infer<typeof InstanceSourceSchema>;
  * - `import` absent imports `<name>.config.json` when it exists — a harness
  *   need not have one;
  * - every OTHER key is an inline `HarnessConfig` field, overriding the
- *   imported one (`effectiveInstanceConfig` in `harness-config.ts` merges and
+ *   imported one (`effectiveLayerConfig` in `harness-config.ts` merges and
  *   validates). Passthrough rather than a nested object because that is the
  *   shape the owner asked for, and because `HarnessConfig` files already carry
  *   fields the schema does not list.
  */
-export const IndexInstanceSchema = z
+export const IndexLayerSchema = z
   .object({
     name: IndexInstanceNameSchema,
     import: z.string().refine((f) => f.endsWith(CONFIG_SUFFIX) && !f.includes("/") && f !== INDEX_CONFIG_FILENAME, `a root \`<name>${CONFIG_SUFFIX}\` other than ${INDEX_CONFIG_FILENAME}`).optional(),
@@ -160,13 +160,13 @@ export const IndexInstanceSchema = z
     _comment: z.string().optional(),
   })
   .passthrough();
-export type IndexInstance = z.infer<typeof IndexInstanceSchema>;
+export type IndexLayer = z.infer<typeof IndexLayerSchema>;
 
 /**
  * One harness INSTANTIATED here (cat-harness#1138): an instance of the Harness
  * node kind, named in the index rather than inferred from which layers are
  * mounted. `name` must be a layer this index lists, because its config is
- * the one that layer's entry imports and overlays (`effectiveInstanceConfig`).
+ * the one that layer's entry imports and overlays (`effectiveLayerConfig`).
  * `definedBy`, when given, names the layer whose Harness this instantiates —
  * a content layer instantiates the document harness a lower layer defines.
  */
@@ -300,7 +300,7 @@ const IndexConfigObject = z
     /** One paragraph under that title, saying what the checkout is for. */
     description: z.string().min(1).optional(),
     instances: z
-      .array(IndexInstanceSchema)
+      .array(IndexLayerSchema)
       .refine((xs) => new Set(xs.map((x) => x.name)).size === xs.length, { message: "instances: a name appears twice" })
       .refine((xs) => !xs.some((x) => x.name === HUB_LANDING), { message: `instances: \`${HUB_LANDING}\` is the landing keyword, not an instance name` }),
     /**
@@ -405,13 +405,13 @@ export function indexHarnessNames(config: IndexConfig): string[] {
 }
 
 /** The inline `HarnessConfig` overrides an entry carries — every key but the index's own. */
-export function inlineOverrides(entry: IndexInstance): Record<string, unknown> {
+export function inlineOverrides(entry: IndexLayer): Record<string, unknown> {
   const { name: _n, import: _i, source: _s, _comment: _c, ...rest } = entry as Record<string, unknown>;
   return rest;
 }
 
 /** The file an entry imports: its `import`, else `<name>.config.json`. Existence is the caller's question. */
-export function importedConfigFilename(entry: IndexInstance): string {
+export function importedConfigFilename(entry: IndexLayer): string {
   return entry.import ?? `${entry.name}${CONFIG_SUFFIX}`;
 }
 
@@ -492,7 +492,7 @@ export function readMountFields(instanceRoot: string): MountFields | undefined {
 }
 
 /** A remote instance entry as the `RemoteMount` the mount tooling consumes. */
-export function remoteMountOf(entry: IndexInstance): RemoteMount | undefined {
+export function remoteMountOf(entry: IndexLayer): RemoteMount | undefined {
   const src = entry.source;
   if (src === undefined || !("remote" in src)) return undefined;
   return { harness: entry.name, ...src.remote } as RemoteMount;
@@ -566,7 +566,7 @@ export function writeDeclaredMounts(instanceRoot: string, mounts: readonly Remot
   const config: IndexConfig = idx.state === "ok" ? structuredClone(idx.config) : buildIndexConfig(instanceRoot).config;
 
   const wanted = new Map(parsed.map((m) => [m.harness, m]));
-  const out: IndexInstance[] = [];
+  const out: IndexLayer[] = [];
   for (const entry of config.instances) {
     const m = wanted.get(entry.name);
     if (m !== undefined) {
@@ -578,8 +578,8 @@ export function writeDeclaredMounts(instanceRoot: string, mounts: readonly Remot
     if (entry.source !== undefined && "remote" in entry.source) {
       const { source: _s, ...rest } = entry;
       const saysSomething =
-        rest.import !== undefined || Object.keys(inlineOverrides(rest as IndexInstance)).length > 0 || existsSync(join(instanceRoot, importedConfigFilename(rest as IndexInstance)));
-      if (saysSomething) out.push(rest as IndexInstance);
+        rest.import !== undefined || Object.keys(inlineOverrides(rest as IndexLayer)).length > 0 || existsSync(join(instanceRoot, importedConfigFilename(rest as IndexLayer)));
+      if (saysSomething) out.push(rest as IndexLayer);
       continue;
     }
     out.push(entry);
@@ -603,7 +603,7 @@ export function writeDeclaredMounts(instanceRoot: string, mounts: readonly Remot
  * Returns whether the file changed. No index: nothing to add to (the root
  * config the caller wrote is then the instantiation, as before).
  */
-export function addIndexInstance(root: string, entry: IndexInstance): boolean {
+export function addIndexLayer(root: string, entry: IndexLayer): boolean {
   const idx = readIndexConfig(root);
   if (idx.state === "unreadable") throw new Error(`${idx.file} is ${idx.why}`);
   if (idx.state === "absent" || idx.config.instances.some((e) => e.name === entry.name)) return false;
@@ -617,7 +617,7 @@ export function addIndexInstance(root: string, entry: IndexInstance): boolean {
 export function formatIndexConfig(config: IndexConfig): string {
   const { $schema, _comment, title, description, instances, harnesses, site, gateExemptions, contentTypes, mountApprovers, enableSubgraphs } = config;
   const layers = instances.map((e) => {
-    const { name, _comment: c, import: imp, source, ...rest } = e as IndexInstance & Record<string, unknown>;
+    const { name, _comment: c, import: imp, source, ...rest } = e as IndexLayer & Record<string, unknown>;
     return { name, ...(c !== undefined ? { _comment: c } : {}), ...(imp !== undefined ? { import: imp } : {}), ...(source !== undefined ? { source } : {}), ...rest };
   });
   const ordered = {
@@ -712,7 +712,7 @@ export function buildIndexConfig(root: string, opts: { preferDeclaration?: boole
 
   // Instances DECLARED in this checkout: the root's own, then one level down.
   const local = new Map<string, string>();
-  for (const r of instanceRootsIn(root)) {
+  for (const r of layerRootsIn(root)) {
     try {
       const n = readDeclaration(r)?.name;
       if (n !== undefined && !local.has(n)) local.set(n, relative(root, r) || ".");
@@ -749,7 +749,7 @@ export function buildIndexConfig(root: string, opts: { preferDeclaration?: boole
     } else if (have !== undefined) {
       have.source = { remote };
     } else {
-      const e: IndexInstance = { name: harness, source: { remote } };
+      const e: IndexLayer = { name: harness, source: { remote } };
       config.instances.push(e);
       byName.set(harness, e);
     }
@@ -758,7 +758,7 @@ export function buildIndexConfig(root: string, opts: { preferDeclaration?: boole
 
   // The root's own instance is instantiated here whether or not it has a config.
   if (decl?.name !== undefined && !byName.has(decl.name)) {
-    const e: IndexInstance = { name: decl.name, source: { local: { at: "." } } };
+    const e: IndexLayer = { name: decl.name, source: { local: { at: "." } } };
     config.instances.push(e);
     byName.set(decl.name, e);
   }
@@ -774,7 +774,7 @@ export function buildIndexConfig(root: string, opts: { preferDeclaration?: boole
       });
       continue;
     }
-    const e: IndexInstance = at === stem ? { name: stem } : { name: stem, source: { local: { at } } };
+    const e: IndexLayer = at === stem ? { name: stem } : { name: stem, source: { local: { at } } };
     config.instances.push(e);
     byName.set(stem, e);
   }
@@ -800,7 +800,7 @@ export function buildIndexConfig(root: string, opts: { preferDeclaration?: boole
   // A NEW index reads root first, then the local instances, then the mounts —
   // the order a reader expects. An existing index keeps the order it has.
   if (idx.state === "absent") {
-    const rank = (e: IndexInstance): number => (e.name === decl?.name ? 0 : e.source !== undefined && "remote" in e.source ? 2 : 1);
+    const rank = (e: IndexLayer): number => (e.name === decl?.name ? 0 : e.source !== undefined && "remote" in e.source ? 2 : 1);
     config.instances = config.instances.map((e, i) => ({ e, i })).sort((a, b) => rank(a.e) - rank(b.e) || a.i - b.i).map((x) => x.e);
   }
 
@@ -831,7 +831,7 @@ export const IGNORE_BLOCK_END = "# END index mounts";
  * same default `remote-mount.ts` gives an instance whose harness declares no
  * `mountDefaults.path`. No trailing slash.
  */
-export function remoteMountPathOf(entry: IndexInstance): string | undefined {
+export function remoteMountPathOf(entry: IndexLayer): string | undefined {
   const m = remoteMountOf(entry);
   if (m === undefined) return undefined;
   const p = m.overrides?.[entry.name]?.path ?? `${entry.name}/`;
@@ -917,3 +917,12 @@ export function syncIgnoreBlock(root: string, config: IndexConfig, extra: readon
   writeFileSync(file, next);
   return true;
 }
+
+// Old names, kept so callers in other layers keep working while they move to
+// the layer names (cat-harness#1138 P4). Remove once no layer imports them.
+/** @deprecated Use {@link IndexLayerSchema}. */
+export const IndexInstanceSchema = IndexLayerSchema;
+/** @deprecated Use {@link IndexLayer}. */
+export type IndexInstance = IndexLayer;
+/** @deprecated Use {@link addIndexLayer}. */
+export const addIndexInstance = addIndexLayer;

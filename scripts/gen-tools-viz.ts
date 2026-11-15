@@ -48,7 +48,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { provenanceSectionFor } from "./provenance-footer.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { layerRootsIn } from "../schemas/kg/instance-roots.js";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { KG_QA_DIRNAME, kgQaSidecarPath } from "../schemas/sdlc/kg-qa.js";
 import { visualiserRoute } from "../schemas/kg/visualiser-route.js";
@@ -214,7 +214,7 @@ function toolQaResolver(
   } else {
     let roots: readonly string[] = [];
     try {
-      roots = instanceRootsIn(repo);
+      roots = layerRootsIn(repo);
     } catch {
       roots = [];
     }
@@ -277,7 +277,7 @@ function toolQaResolver(
 function toolProvenanceResolver(repo: string, opts: { instanceRoot?: string } = {}): (toolId: string) => string | undefined {
   let roots: readonly string[] = [];
   try {
-    roots = opts.instanceRoot !== undefined ? [opts.instanceRoot] : instanceRootsIn(repo);
+    roots = opts.instanceRoot !== undefined ? [opts.instanceRoot] : layerRootsIn(repo);
   } catch {
     roots = [];
   }
@@ -435,7 +435,7 @@ export interface ToolSubject {
 
 /**
  * Every layer that declares a `tools` graph, with the Tools it yields, in
- * the order `instanceRootsIn` lists them. `empty` names the ones whose graph
+ * the order `layerRootsIn` lists them. `empty` names the ones whose graph
  * yields no Tool: they get no page, and are reported rather than drawn.
  *
  * Read through auto-discovery (`toolsOf`), which THROWS on a declared graph
@@ -445,7 +445,7 @@ export interface ToolSubject {
 export function toolSubjects(repo = REPO): { subjects: ToolSubject[]; empty: string[] } {
   const subjects: ToolSubject[] = [];
   const empty: string[] = [];
-  for (const inst of instanceRootsIn(repo)) {
+  for (const inst of layerRootsIn(repo)) {
     if (instanceDirectoryForGraph(inst, "tools") === undefined) continue;
     const p = declarationPathIn(inst);
     const name = p && existsSync(p) ? (JSON.parse(readFileSync(p, "utf-8")) as { name?: string }).name : undefined;
@@ -468,6 +468,12 @@ export interface PageScope {
   readonly upHref?: string;
   /** A Tool's own page, relative to this one; absent, the id links to its row. */
   readonly toolHref?: (id: string) => string | undefined;
+  /**
+   * A Tool's IRI, its published JSON-LD document (`toolIri`, as kg-export
+   * mints it), linked from its row beside its page (owner, 2026-11-13,
+   * node-kind audit: "link existing IRIs").
+   */
+  readonly toolIri?: (id: string) => string | undefined;
   /** The API documents for the Tools this page shows, relative to it. */
   readonly api?: { openapi: string; mcp: string; reference: string };
 }
@@ -734,8 +740,9 @@ export function page(
         ? `\`${cell(r.qaVerdict)}\``
         : "**—**";
     const own = scope.toolHref?.(r.id);
+    const iri = scope.toolIri?.(r.id);
     b.push(
-      `| <a id="${cell(r.id)}"></a>[\`${cell(r.id)}\`](${own ?? `#${cell(r.id)}`})<br>${cell(r.title)} | ${cell(r.description)} | ` +
+      `| <a id="${cell(r.id)}"></a>[\`${cell(r.id)}\`](${own ?? `#${cell(r.id)}`})${iri ? ` · [JSON-LD](${iri})` : ""}<br>${cell(r.title)} | ${cell(r.description)} | ` +
         `${[...r.invoke, ...(r.action ? ["action"] : [])].map(badge).join(" ")} | ${sat} | ${r.inputs} in / ${r.outputs} out | ${qa} |`,
     );
   }
@@ -801,8 +808,10 @@ export async function toolPages(
   hrefOf: (fromPage: string, id: string) => string | undefined;
   /** Each layer's API documents, site-relative, for its page to link. */
   apiOf: (instance: string) => { openapi: string; mcp: string; reference: string } | undefined;
+  /** Each Tool's IRI, its published JSON-LD document, where its layer publishes one. */
+  iriOf: (id: string) => string | undefined;
 }> {
-  const roots = instanceRootsIn(repo);
+  const roots = layerRootsIn(repo);
   const forge = forgeHrefFor(repo, repoWebFor(repo));
   const all = subjects.flatMap((x) => (x.defs ?? []).map((d) => ({ d, x })));
   const pageOf = new Map(all.map(({ d, x }) => [d.id, toolPageRelPath(repo, x.name, d.id)]));
@@ -1005,7 +1014,7 @@ export async function toolPages(
       pages.set(rel, withRenderedByFrontMatter(toolPage(data, GENERATED_FM), VIEWER_TOOL));
     }
   }
-  return { pages, actions, hrefOf, apiOf: (instance) => apiFiles.get(instance) };
+  return { pages, actions, hrefOf, apiOf: (instance) => apiFiles.get(instance), iriOf: (id) => iriOf.get(id) };
 }
 
 /**
@@ -1030,6 +1039,7 @@ export async function allPages(
     publishedPage(rows, known, repo, {
       subjects: subjects.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })),
       toolHref: (id) => built.hrefOf(PAGE, id),
+      toolIri: built.iriOf,
       ...(built.apiOf("") ? { api: { openapi: "openapi.json", mcp: "mcp-tools.json", reference: "api/" } } : {}),
     }),
   );
@@ -1039,6 +1049,7 @@ export async function allPages(
         instance: x.name,
         upHref: "../",
         toolHref: (id) => built.hrefOf(rel, id),
+        toolIri: built.iriOf,
         ...(built.apiOf(x.name) ? { api: { openapi: "openapi.json", mcp: "mcp-tools.json", reference: "api/" } } : {}),
       }));
   }

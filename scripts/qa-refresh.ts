@@ -71,7 +71,7 @@ import { movedInventory, movedRoots, type MovedInventory } from "./qa-verify-mov
 import { BUILDING_ENV } from "./qa-working-copy.ts";
 import { TEST_RUN_WRITERS } from "./test-run-compute.ts";
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
-import { artefactStub, instanceRootsIn, kgQaHomeFor, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { artefactStub, layerRootsIn, kgQaHomeFor, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { scriptsOf, scriptTable } from "../schemas/sdlc/script-table.ts";
 import { coneMode, QaCone, straceWorks } from "./qa-cone.ts";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
@@ -93,6 +93,13 @@ export interface QaWriter {
    * same job writes; it is still checked for files.
    */
   run: readonly string[] | "external";
+  /**
+   * An `external` family written only AFTER the site is published, so a
+   * pre-publish refresh finds it absent and must not call it empty. Every
+   * other external writer is still checked for files: its step runs earlier
+   * in the same job, and an empty family there means that step broke.
+   */
+  afterPublish?: true;
   /** Repository-relative globs (`*` one segment, `**` any) of what it writes. */
   writes: readonly string[];
   /**
@@ -138,7 +145,7 @@ export function hostedKgWrites(repoRoot: string | undefined = REPO_ROOT): string
     "folio-assistant-state",
   ]);
   if (repoRoot) {
-    for (const r of instanceRootsIn(repoRoot)) {
+    for (const r of layerRootsIn(repoRoot)) {
       if (kgQaHomeFor(r, HARNESS_ROOT).by !== "hosted") continue;
       const decl = readDeclaration(r);
       if (decl) stubs.add(artefactStub(decl));
@@ -248,7 +255,15 @@ export const QA_WRITERS: readonly QaWriter[] = [
   ).map(([script, stem]): QaWriter => ({
     id: script,
     run: [script],
-    writes: [`${R}/${stem}.qa-results.json`],
+    writes: [
+      `${R}/${stem}.qa-results.json`,
+      // kg:export qualifies a sidecar for any layer but the host with that
+      // layer's stub (`kg-export.<stub>`, kg-export.ts), so in a content
+      // layer's cone it writes `kg-export.<that layer>.qa-results.json`. Only
+      // the host's bare stem was claimed, so a content layer's PR refused its
+      // own `kg-export.<layer>.qa-results.json` as unclaimed (issue #2313).
+      ...(script === "kg:export" ? [`${R}/kg-export.*.qa-results.json`] : []),
+    ],
     // declared-path-literal: the skill artefacts the register's writer form regenerates, measured from the 2026-10-07 restore log.
     ...(script === "skill:register"
       ? {
@@ -286,6 +301,19 @@ export const QA_WRITERS: readonly QaWriter[] = [
     writes: [`${R}/reference-direction.qa-results.json`],
     okExits: [0, 1],
     because: "exits 1 when it finds a wrong-direction reference, and writes the sidecar either way",
+  },
+  {
+    // Claimed, never run here: `check:nav-names` reads the BUILT site (the
+    // navbar include, harness.json and every railed viewer page), and a
+    // consumer's QA working copy runs qa:refresh BEFORE derive:publish builds
+    // it, so running it here judged an empty site UNDETERMINED and left the
+    // refresh INCOMPLETE (folio-assistant#3124). Its report form writes the
+    // sidecar after the site is built; `check:nav-names:check` gates it.
+    id: "check:nav-names",
+    run: "external",
+    afterPublish: true,
+    writes: [`${R}/nav-names.qa-results.json`],
+    because: "written by `check:nav-names` once the site is built, which qa:refresh's pre-publish pass cannot do; judged by `check:nav-names:check`",
   },
   {
     id: "kg-export:bootstrap",
@@ -444,7 +472,11 @@ export function assess(args: {
       if (by.length === 0 && !trackedSet.has(p)) unclaimed.push(p);
       for (const id of by) families[id]!++;
     }
-    for (const w of writers) if (families[w.id] === 0 && !na.has(w.id)) empty.push(w.id);
+    // A writer that runs only AFTER publish (`afterPublish`) has not written
+    // yet, so its empty family is no evidence of failure (check:nav-names,
+    // folio-assistant#3124). Its claim still keeps its file from being
+    // `unclaimed`, and every other external writer is still held to its files.
+    for (const w of writers) if (families[w.id] === 0 && !na.has(w.id) && !w.afterPublish) empty.push(w.id);
     for (const r of args.runs) {
       const w = writers.find((x) => x.id === r.id);
       if (na.has(r.id)) continue;

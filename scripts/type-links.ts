@@ -16,7 +16,7 @@
  */
 
 /** The source a declaration was read from, as the diagram labels it. */
-export type ClassSource = "zod" | "typescript" | "json-schema" | "fhir" | "fhir:profile" | "skill";
+export type ClassSource = "zod" | "typescript" | "json-schema" | "fhir" | "fhir:profile" | "skill" | "owl" | "rdfs" | "rdf" | "moddle";
 
 const FHIR_DATATYPES = "https://hl7.org/fhir/datatypes.html";
 const FHIR_CORE_SD = "http://hl7.org/fhir/StructureDefinition/";
@@ -105,6 +105,10 @@ export function sourceOfKind(kind: string): ClassSource {
   if (kind === "json-schema") return "json-schema";
   if (kind === "fhir-logical") return "fhir";
   if (kind === "fhir-profile") return "fhir:profile";
+  if (kind === "owl-class") return "owl";
+  if (kind === "rdfs-class") return "rdfs";
+  if (kind === "rdf-property-set") return "rdf";
+  if (kind === "moddle-class" || kind === "moddle-enum") return "moddle";
   if (kind === "interface" || kind === "type-alias") return "typescript";
   return "zod";
 }

@@ -29,7 +29,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { findDeclarationFile, instanceRootFor, readDeclaration, repoRootFor, rootForScope } from "../schemas/kg/cat-harness.js";
-import { instanceConfigFilename } from "../schemas/kg/harness-config.js";
+import { layerConfigFilename } from "../schemas/kg/harness-config.js";
 
 /**
  * Repository-level files that belong at the root, each with why.
@@ -209,7 +209,7 @@ export function instanceConfigNames(repoRoot: string): Map<string, string> {
       continue; // unreadable ⇒ no claim
     }
     if (name !== undefined) {
-      out.set(instanceConfigFilename(name), `the config of the instance declared at ${relative(repoRoot, r) || "."}`);
+      out.set(layerConfigFilename(name), `the config of the instance declared at ${relative(repoRoot, r) || "."}`);
     }
   }
   return out;

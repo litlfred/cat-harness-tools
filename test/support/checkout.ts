@@ -45,7 +45,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { layerRootsIn, siteDirFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { overlayPath, readPathAt, writePathAt } from "../../scripts/lib/layer-output.ts";
 import { builtAtPublishOf } from "../../scripts/mount-from-lock.ts";
@@ -81,7 +81,7 @@ export function inAggregate(instanceRoot: string = INSTANCE): boolean {
   const inst = resolve(instanceRoot);
   const top = checkoutHolding(inst);
   if (top === inst) return false;
-  return instanceRootsIn(top).some((r) => resolve(r) !== inst);
+  return layerRootsIn(top).some((r) => resolve(r) !== inst);
 }
 
 /**
@@ -271,7 +271,7 @@ export function runDocsPagesIn(scratch: string, repo: string): SpawnSyncReturns<
  * and nothing a mount digest hashes, so every mount stays `current`.
  */
 export function copyBuiltAtPublish(scratch: string, repo: string): void {
-  for (const root of instanceRootsIn(repo)) {
+  for (const root of layerRootsIn(repo)) {
     const rel = relative(repo, root);
     for (const path of builtAtPublishOf(root)) {
       // A mounted layer's projections are written at its output root, in the
@@ -280,7 +280,10 @@ export function copyBuiltAtPublish(scratch: string, repo: string): void {
       if (!existsSync(src)) continue;
       const dest = writePathAt(repo, join(root, path));
       mkdirSync(dirname(dest), { recursive: true });
-      cpSync(src, dest, { recursive: true, force: true });
+      // Fill what is missing; never replace a file the publish already built
+      // (a rebuild in a scratch copy is not byte-identical to it, and every
+      // later reader in the run would see the replacement).
+      cpSync(src, dest, { recursive: true, force: false });
     }
   }
 }

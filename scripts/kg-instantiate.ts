@@ -78,12 +78,12 @@ import {
   type CatHarnessDeclaration,
   findDeclarationFile,
   graphLayer,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   repoRootFor,
 } from "../schemas/kg/cat-harness.js";
-import { instanceConfigFilename } from "../schemas/kg/harness-config.js";
-import { addIndexInstance, readIndexConfig } from "../schemas/kg/index-config.js";
+import { layerConfigFilename } from "../schemas/kg/harness-config.js";
+import { addIndexLayer, readIndexConfig } from "../schemas/kg/index-config.js";
 import { harnessHomeOf } from "./kg-parts.js";
 import { HARNESS_STATE_GRAPH_TYPOLOGY } from "../schemas/kg/substrate-snapshot.js";
 import { type HarnessDeclaration, harnessDeclarationIn, harnessStateDirFor, readSnapshot } from "./subscribed-harnesses.js";
@@ -167,7 +167,7 @@ export interface InstantiateOptions {
 function declarationsIn(root: string): { decls: { dir: string; decl: CatHarnessDeclaration }[]; unreadable: string[] } {
   const decls: { dir: string; decl: CatHarnessDeclaration }[] = [];
   const unreadable: string[] = [];
-  for (const dir of instanceRootsIn(root)) {
+  for (const dir of layerRootsIn(root)) {
     try {
       const decl = readDeclaration(dir);
       if (decl) decls.push({ dir, decl });
@@ -309,15 +309,15 @@ export function instantiate(opts: InstantiateOptions): InstantiateResult {
   if (idx.state === "unreadable") return refuse(`${idx.file} is ${idx.why}; nothing was written`);
   if (idx.state === "ok") {
     const configFile = idx.file;
-    if (idx.config.instances.some((e) => e.name === opts.harness) || existsSync(join(root, instanceConfigFilename(opts.harness)))) {
+    if (idx.config.instances.some((e) => e.name === opts.harness) || existsSync(join(root, layerConfigFilename(opts.harness)))) {
       return { ok: true, state: "already-instantiated", configFile, stateDirs, written };
     }
     written.push(configFile);
-    if (!opts.dryRun) addIndexInstance(root, { name: opts.harness, ...config });
+    if (!opts.dryRun) addIndexLayer(root, { name: opts.harness, ...config });
     return { ok: true, state: "instantiated", configFile, stateDirs, written };
   }
 
-  const configFile = join(root, instanceConfigFilename(opts.harness));
+  const configFile = join(root, layerConfigFilename(opts.harness));
   if (existsSync(configFile)) return { ok: true, state: "already-instantiated", configFile, stateDirs, written };
   written.push(configFile);
   if (!opts.dryRun) writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);

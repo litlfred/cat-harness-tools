@@ -43,8 +43,9 @@
  *    push's exit code is the verdict, never its stderr.
  * 5. **Never `-f`.** Fetch the tip, splice this entry in, `commit-tree -p tip`,
  *    push; on rejection back off ({@link waitFor}, the same numbers as
- *    `backoff-sleep.ts`) and rebuild on the new tip — 3 attempts. The server's
- *    ref lock is the concurrency primitive, so a sibling's entry survives.
+ *    `backoff-sleep.ts`) and rebuild on the new tip — 3 attempts, or up to
+ *    {@link PUBLISH_RACE_ATTEMPTS} while every rejection is a lost race. The
+ *    server's ref lock is the concurrency primitive, so a sibling's entry survives.
  *
  * ## Where its git objects live
  *
@@ -73,7 +74,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, resolveDirectories } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, resolveDirectories } from "../schemas/kg/cat-harness.js";
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `check-declared-dirs.ts` carries, same reason.
 import "../schemas/kg/folio-graph-typology.js";
@@ -103,8 +104,24 @@ export const MANIFEST_FILE = "manifest.json";
 export const MANIFEST_SCHEMA = "qa-reports-manifest/v1";
 export const INDEX_FILE = "index.json";
 export const INDEX_SCHEMA = "qa-reports-index/v1";
-/** Write attempts, the first included. Proposal §2.2 and spike finding 4. */
+/** Write attempts, the first included, for a failure that is not a lost race. Proposal §2.2 and spike finding 4. */
 export const PUBLISH_ATTEMPTS = 3;
+/**
+ * Write attempts, the first included, while every failure is a LOST RACE: the
+ * push was rejected because a sibling landed first (`fetch first`,
+ * `non-fast-forward`). That is progress on the branch, not a fault, so it
+ * earns more tries than {@link PUBLISH_ATTEMPTS}. Stacked merges put a dozen
+ * writers on the branch at once and three tries lost every race
+ * (smart-ra#189, #194, #221, 2026-11-15).
+ */
+export const PUBLISH_RACE_ATTEMPTS = 12;
+/** The longest wait between lost races: wider than {@link PUSH_CAP_MS}, so a herd spreads out. */
+export const PUBLISH_RACE_CAP_MS = 60_000;
+
+/** Was this push rejected only because the branch moved under it? */
+export function lostRace(stderr: string): boolean {
+  return /\[rejected\].*\((fetch first|non-fast-forward)\)|cannot lock ref|failed to update ref|stale info/i.test(stderr);
+}
 /** The committer the branch is written as. */
 export const QA_BOT = { name: "folio-qa-bot", email: "folio-qa-bot@users.noreply.github.com" };
 
@@ -272,7 +289,7 @@ export interface QaLocation {
 export function resolveQaLocation(repoRoot: string = gitTopLevel()): QaLocation {
   const directories: QaDirectory[] = [];
   const seen = new Set<string>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     try {
       for (const d of resolveDirectories([{ name: "(local)", root: inst, own: true }])) {
         if (!d.graphTypologies.includes("qa" as never) || seen.has(d.absPath)) continue;
@@ -1109,10 +1126,16 @@ function writeLoop(
 ): { state: "pushed" | "done" | "failed"; reason: string; commit?: string; attempts: number; skipped?: boolean; priorKp?: string } {
   const sleep = opts.sleep ?? defaultSleep;
   let lastReason = "";
-  for (let attempt = 1; attempt <= PUBLISH_ATTEMPTS; attempt++) {
+  // Every failure so far lost a race: the budget is the race budget until
+  // something else goes wrong, then the ordinary one.
+  let onlyRaces = true;
+  const budget = () => (onlyRaces ? PUBLISH_RACE_ATTEMPTS : PUBLISH_ATTEMPTS);
+  let attempt = 1;
+  for (; attempt <= budget(); attempt++) {
     const t = store.fetchTip();
     if (t.state === "unknown") {
       lastReason = t.reason;
+      onlyRaces = false;
     } else {
       const tip = t.state === "ok" ? t.tip : undefined;
       const base = tip ? store.must(["rev-parse", `${tip}^{tree}`]).trim() : undefined;
@@ -1147,14 +1170,16 @@ function writeLoop(
         .split("\n")
         .filter((l) => l.trim() && !/push negotiation failed|expected 'acknowledgments'/.test(l))
         .join(" | ");
+      if (!lostRace(push.stderr)) onlyRaces = false;
     }
-    if (attempt < PUBLISH_ATTEMPTS) {
-      const ms = waitFor(attempt, PUSH_BASE_MS, PUSH_CAP_MS);
+    if (attempt < budget()) {
+      const ms = waitFor(attempt, PUSH_BASE_MS, onlyRaces ? PUBLISH_RACE_CAP_MS : PUSH_CAP_MS);
       store.log(`qa-store: attempt ${attempt} did not land (${lastReason}); retrying in ${ms} ms`);
       sleep(ms);
     }
   }
-  return { state: "failed", reason: `gave up after ${PUBLISH_ATTEMPTS} attempts: ${lastReason}`, attempts: PUBLISH_ATTEMPTS };
+  const tried = attempt - 1;
+  return { state: "failed", reason: `gave up after ${tried} attempts: ${lastReason}`, attempts: tried };
 }
 
 /**

@@ -19,7 +19,7 @@ import {
   KG_SUBJECT_GRAPH_TYPOLOGIES,
   KG_SUBJECT_KINDS,
 } from "./sdlc/kg-qa.ts";
-import { defaultGraphTypologies, instanceRootsIn, kgQaHomeFor, repoRootFor } from "./kg/cat-harness.js";
+import { defaultGraphTypologies, layerRootsIn, kgQaHomeFor, repoRootFor } from "./kg/cat-harness.js";
 import { actorsDir } from "./process/role-graph.ts";
 
 describe("the criteria registry", () => {
@@ -288,7 +288,7 @@ describe("where an instance's verdicts live (kgQaHomeFor)", () => {
   // `cxcn`); the RESOLUTION it relied on stays asserted.
   test("every instance's home resolves, and bootstrap's is the hosted one", () => {
     const homes = new Set<string>();
-    for (const inst of instanceRootsIn(repo)) homes.add(kgQaHomeFor(inst, harness).root);
+    for (const inst of layerRootsIn(repo)) homes.add(kgQaHomeFor(inst, harness).root);
     expect(homes.has(join(harness, "test", "results", "bootstrap"))).toBe(true);
   });
 });

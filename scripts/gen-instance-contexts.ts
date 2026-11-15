@@ -79,7 +79,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/cat-harness.js";
 import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
 import { JsonldPrefixTableSchema, type DeclaredPrefixes, type JsonldPrefixTable } from "../schemas/kg/jsonld-prefixes.js";
 import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "../schemas/kg/jsonld.js";
@@ -146,7 +146,7 @@ export interface InstanceDecl {
 }
 
 export function readInstanceDecls(repoRoot: string): InstanceDecl[] {
-  return instanceRootsIn(repoRoot).flatMap((root) => {
+  return layerRootsIn(repoRoot).flatMap((root) => {
     const file = findDeclarationFile(root);
     if (file === undefined) return [];
     let raw: { name?: unknown; stub?: unknown; iriBase?: unknown; needs?: unknown; jsonldPrefixes?: unknown; builtAtPublish?: unknown };

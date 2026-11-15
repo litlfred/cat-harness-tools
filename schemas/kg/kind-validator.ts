@@ -35,7 +35,7 @@ import ts from "typescript";
 import {
   defaultGraphTypologies,
   declaresInstance,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   siblingScopeFor,
   resolveGraphTypology,
@@ -300,7 +300,7 @@ export function rootOf(instance: string | undefined, instanceRoot: string): stri
   let byName = rootsByName.get(repo);
   if (!byName) {
     byName = new Map();
-    for (const root of instanceRootsIn(repo)) {
+    for (const root of layerRootsIn(repo)) {
       try {
         const decl = readDeclaration(root);
         if (decl?.name) byName.set(decl.name, root);

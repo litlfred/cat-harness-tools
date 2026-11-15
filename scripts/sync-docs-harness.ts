@@ -30,7 +30,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join, relative, resolve } from "node:path";
 
 import { detectRepoUrl } from "../pipeline/readme-toc.js";
-import { instanceDeclarationFilename, instanceRootsIn, readDeclaration, resolveInherited, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { instanceDeclarationFilename, layerRootsIn, readDeclaration, resolveInherited, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { imageForRole, imagesForRole } from "../schemas/kg/kg-node.js";
 import { graphTiles, resolveGlassStrip, withTileCounts } from "./graph-tiles.js";
@@ -43,7 +43,7 @@ import { siteDirectories, withViewers } from "./viewer-declarations.js";
 import { harnessTitle, normaliseDestination } from "./lib/nav-label.js";
 import { checkoutDirectories, resolveLandingInstance } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { readPathAt, writePathAt } from "./lib/layer-output.ts";
+import { overlayDirs, overlayPath, readPathAt, writePathAt } from "./lib/layer-output.ts";
 
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -111,7 +111,7 @@ if (landingChoice.kind === "none") {
 /** The landing harness's own directory: where its declaration and its directories are. */
 const LANDING_DIR =
   landingChoice.kind === "instance"
-    ? instanceRootsIn(REPO_ROOT).find((r) => readDeclaration(r)?.name === landingChoice.name)
+    ? layerRootsIn(REPO_ROOT).find((r) => readDeclaration(r)?.name === landingChoice.name)
     : readDeclaration(REPO_ROOT) !== undefined
       ? REPO_ROOT
       : ROOT;
@@ -278,10 +278,16 @@ if (!repoUrl && existsSync(OUT_READ)) {
  */
 function scanTileCounts(assetsDir: string): Map<string, TileCount> {
   const out = new Map<string, TileCount>();
-  if (!existsSync(assetsDir)) return out;
-  for (const d of readdirSync(assetsDir, { withFileTypes: true })) {
-    if (!d.isDirectory()) continue;
-    const file = join(assetsDir, d.name, "index.json");
+  // Over the layer overlay (bean `cat-tools-sm8r`, item 4): a mounted layer's
+  // projections (`assets/beans/`, `assets/todos/`, …) are written at its
+  // output root, so the directories are the union of that copy and the
+  // layer's own, each name once, and each index is read where a reader sees it.
+  const dirs = overlayDirs(assetsDir);
+  if (dirs.length === 0) return out;
+  const names = new Set<string>();
+  for (const at of dirs) for (const d of readdirSync(at, { withFileTypes: true })) if (d.isDirectory()) names.add(d.name);
+  for (const name of [...names].sort()) {
+    const file = overlayPath(join(assetsDir, name, "index.json"));
     if (!existsSync(file)) continue;
     let parsed: unknown;
     try {
@@ -578,7 +584,7 @@ const tiles = withTileCounts(
   scanTileCounts(join(ROOT, siteDirFor(ROOT), "assets")),
 );
 const glassStrip = (() => {
-  const decls = instanceRootsIn(REPO_ROOT).flatMap((root) => {
+  const decls = layerRootsIn(REPO_ROOT).flatMap((root) => {
     const d = readDeclaration(root);
     return d ? [d] : [];
   });
@@ -705,7 +711,7 @@ const payload = {
    * from the declarations, so a bump is one edit.
    */
   releases: Object.fromEntries(
-    instanceRootsIn(REPO_ROOT).flatMap((root) => {
+    layerRootsIn(REPO_ROOT).flatMap((root) => {
       const d = readDeclaration(root);
       if (!d) return [];
       const r = releaseIris(d);

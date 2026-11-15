@@ -40,6 +40,7 @@ import { regenPass, writerFor, type Outcome, type Runner } from "../../scripts/r
 import { chromiumExecutable } from "../../scripts/bpmn-render.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
+import { mountedInstances, readPathAt } from "../../scripts/lib/layer-output.ts";
 import { noRootManifest, scratchCheckoutOf } from "../support/checkout.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
@@ -109,6 +110,21 @@ interface Case {
   /** Turn the committed bytes into a version no writer would emit. */
   stale: (text: string) => string;
   needsBrowser?: boolean;
+  /**
+   * The layer whose committed file this case stales, made LOCAL in the
+   * scratch checkout for the case (dropped from `WORK`'s `index.lock.json`,
+   * put back after).
+   *
+   * Since cat-harness-tools b2e4118d (bean `cat-tools-sm8r`) a writer never
+   * writes into a mount: render:bpmn puts a MOUNTED layer's changed
+   * beside-source drawing at its output-root twin, so publish-check sees no
+   * committed file move and stays green, and the red control cannot fire.
+   * That is right: a mounted layer's committed drawing is judged in its own
+   * repository, where it is not mounted. So the case stales a drawing the
+   * checkout OWNS, which is the contract the gate still enforces, by making
+   * that layer local here rather than by skipping the case.
+   */
+  localize?: string;
 }
 
 const CASES: Case[] = [
@@ -143,6 +159,7 @@ const CASES: Case[] = [
     artefact: () => firstBesideSource("bootstrap", "processes"),
     stale: (t) => t.replace("</svg>", "<!-- stale (i1q7 fixture) --></svg>"),
     needsBrowser: true,
+    localize: "bootstrap",
   },
 ];
 
@@ -163,14 +180,34 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
     const writer = writerFor(SCRIPTS, c.check);
     expect(writer, `${c.check} has no writer regen can run`).toBeDefined();
     const rel = c.artefact();
-    const abs = join(WORK, rel);
+    // Make the fixture's layer local for this case (see `Case.localize`).
+    const lockFile = join(WORK, "index.lock.json");
+    const lockBefore = c.localize !== undefined && existsSync(lockFile) ? readFileSync(lockFile, "utf-8") : undefined;
+    if (lockBefore !== undefined) {
+      const lock = JSON.parse(lockBefore) as { instances?: { instance?: string }[] };
+      lock.instances = (lock.instances ?? []).filter((i) => i.instance !== c.localize);
+      writeFileSync(lockFile, `${JSON.stringify(lock, null, 2)}\n`);
+    }
+    // The file the check READS: a mounted layer's computed file is read over
+    // its output-root twin when a writer put one there (bean `cat-tools-sm8r`),
+    // so staling the pinned bytes under the twin changes nothing the check
+    // sees. Stale what is read, and judge the writer by what is read after.
+    const mounted = mountedInstances(WORK);
+    const mountAbs = join(WORK, rel);
+    let abs = readPathAt(WORK, mountAbs, mounted);
+    const readBack = () => readFileSync(readPathAt(WORK, mountAbs, mounted), "utf-8");
+    let twinsBefore = abs !== mountAbs;
     // A derived QA artefact may be absent — the committed corpus is
     // leaving `main` (bean `cxcn`, reader audit F7). Then the WRITER
     // produces it fresh first, and the directory it had to create is
     // removed afterwards, so the test asserts on a fresh run rather than
     // on the committed copy, and leaves the checkout as it found it.
     const createdDir = existsSync(abs) ? undefined : firstMissingAncestor(abs);
-    if (createdDir !== undefined) expect(runner(writer!), `${writer} could not produce ${rel}`).toBe(true);
+    if (createdDir !== undefined) {
+      expect(runner(writer!), `${writer} could not produce ${rel}`).toBe(true);
+      abs = readPathAt(WORK, mountAbs, mounted);
+      twinsBefore = abs !== mountAbs;
+    }
     const original = readFileSync(abs, "utf-8");
     const staled = c.stale(original);
     expect(staled, `the fixture did not change ${rel}`).not.toBe(original);
@@ -195,18 +232,24 @@ describe("every writer regen pairs for these gates turns a STALED artefact's che
       // that the writer removed the staled bytes.
       let outcome = results[0]?.outcome;
       if (outcome === "unrepaired") {
-        const after = readFileSync(abs, "utf-8");
-        writeFileSync(abs, original);
+        const at = readPathAt(WORK, mountAbs, mounted);
+        const after = readFileSync(at, "utf-8");
+        writeFileSync(at, original);
         const redWithoutStale = !(await runner(c.check));
-        writeFileSync(abs, after);
+        writeFileSync(at, after);
         if (redWithoutStale) outcome = repaired[0];
       }
       expect(repaired).toContain(outcome);
       expect(results[0]).toMatchObject({ check: c.check, writer });
-      expect(readFileSync(abs, "utf-8"), `${writer} left ${rel} staled`).not.toBe(staled);
+      expect(readBack(), `${writer} left ${rel} staled`).not.toBe(staled);
     } finally {
+      if (lockBefore !== undefined) writeFileSync(lockFile, lockBefore);
       if (createdDir !== undefined) rmSync(createdDir, { recursive: true, force: true });
       else writeFileSync(abs, original);
+      // A writer that put a twin under the output root for this case takes it
+      // away again, so the checkout is left as it was found.
+      const twin = readPathAt(WORK, mountAbs, mounted);
+      if (!twinsBefore && twin !== mountAbs) rmSync(twin, { force: true });
     }
   };
   const skip = (check: string): boolean => noCatAlias || (CASES.find((x) => x.check === check)?.needsBrowser === true && !browser);

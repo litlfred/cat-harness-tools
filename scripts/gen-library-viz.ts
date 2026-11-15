@@ -36,6 +36,7 @@
  *   bun run cat library:viz:check    # fail if either artefact is stale
  */
 import { inScope as siteInScope, scopeArg, siteScope } from "./lib/site-scope.ts";
+import { overlayPath } from "./lib/layer-output.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
@@ -44,7 +45,7 @@ import { readLibraryGraph, referencedCatalogueEntries, type LibraryGraph, type L
 } from "./library-graph.ts";
 import { tally } from "./summaries.ts";
 import { WITHHELD_VIEW_JS } from "./lib/library-withheld-view.ts";
-import { DOCUMENT_VIEW_JS, entryFigureFiles, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
+import { DOCUMENT_VIEW_JS, entryFigureCopies, readEntryDocument, type EntryKeywordLists } from "./lib/library-document.ts";
 import { LANGUAGE_TOGGLE_JS, entryLanguages, listingTitles, summaryHtml, versionsHtml } from "./lib/library-languages.ts";
 import { upstreamPdfOf } from "./lib/library-upstream-pdf.ts";
 import { KEYWORD_VARIANTS, keywordsGraphs } from "./library-keywords.ts";
@@ -62,11 +63,12 @@ import { scanLibraryRefs, type RefSource } from "./library-refs.ts";
 import { orphanSubjectPages, viewerPlacement } from "./gen-schema-viz.ts";
 import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
-import { findInstanceRoot, instanceRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { checkoutRootFor, findInstanceRoot, layerRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { directoryByVisualisationRef } from "./graph-tiles.ts";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { itemState } from "./gen-uploads-viz.ts";
 import { makeEmit } from "./viewer-page.ts";
+import { readPathAt, writePathAt } from "./lib/layer-output.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { escHtml, nodeStubPageHtml, themedNodeDeclaration, type PageNode } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
@@ -80,6 +82,7 @@ const VIEWER_TOOL = "library-viewer";
 
 const ROOT = join(HARNESS_ROOT);
 const REPO_ROOT = repoRootFor(ROOT);
+const CHECKOUT = checkoutRootFor(ROOT);
 /**
  * In a layer's PR checks, `--check` judges only the output the caller commits
  * (owner ruling 2026-11-05, "Move the checks", generator checks included; `lib/gate-own.ts`). The
@@ -775,13 +778,15 @@ function selectEntry(known){
   if (VIEW !== "list") setView("list");
   $("q").value = known.id;
   render();
-  var key = known.instance + "/" + known.id;
-  var row = document.querySelector('[data-fa-library-item="' + key.replace(/"/g, '\\"') + '"]');
-  if (row) {
-    row.setAttribute("data-fa-anchored", "1");
-    row.scrollIntoView({ block: "center" });
-  }
+  /* The entry's own row is drawn at the top first, so on an entry page --
+     where the whole-library listing is folded and drawn only when opened --
+     the anchored row is that one; a listing row, when drawn, is anchored too. */
   renderEntryRow(known);
+  var key = known.instance + "/" + known.id;
+  var rows = document.querySelectorAll('[data-fa-library-item="' + key.replace(/"/g, '\\"') + '"]');
+  Array.prototype.forEach.call(rows, function(r){ r.setAttribute("data-fa-anchored", "1"); });
+  var listed = $("listing") && $("listing").querySelector('[data-fa-anchored="1"]');
+  if (listed && !listed.closest("details:not([open])")) listed.scrollIntoView({ block: "center" });
   document.title = (known.title || known.id) + " \u2014 " + known.instance + " library";
   /* The graph of the thing the reader just opened -- bean 7nvr. */
   loadDocument(known.id);
@@ -1137,7 +1142,9 @@ export function instanceSubgraphFile(harnessRoot: string, site: string, instance
     return undefined; // no `docs` directory, so nothing is framed here
   }
   const abs = instance === undefined ? join(site, dir, SUBGRAPH_INDEX_FILE) : join(site, dir, instance, SUBGRAPH_INDEX_FILE);
-  return existsSync(abs) ? abs : undefined;
+  // The subgraph writer publishes at the layer's output root in a composed
+  // checkout (bean sm8r): ask there, and return the site address a link uses.
+  return existsSync(overlayPath(abs)) ? abs : undefined;
 }
 
 /**
@@ -1662,7 +1669,7 @@ export function orphanFiles(root: string, wanted: ReadonlySet<string>): string[]
  */
 export function instanceRootRoutes(repoRoot: string): Map<string, string> {
   const out = new Map<string, string>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     let decl;
     try {
       decl = readDeclaration(inst);
@@ -1755,15 +1762,17 @@ const emit = (path: string, content: string): void => {
 function emitBytes(path: string, content: Buffer): void {
   if (check) {
     if (!mineToCheck(path)) return;
-    if (existsSync(path) && readFileSync(path).equals(content)) return;
-    console.error(`  ✗ ${path} ${existsSync(path) ? "is stale" : "is missing"}`);
+    const at = readPathAt(CHECKOUT, path);
+    if (existsSync(at) && readFileSync(at).equals(content)) return;
+    console.error(`  ✗ ${path} ${existsSync(at) ? "is stale" : "is missing"}`);
     stale++;
     return;
   }
-  if (existsSync(path) && readFileSync(path).equals(content)) return;
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
-  console.log(`  ✓ ${path}`);
+  const to = writePathAt(CHECKOUT, path);
+  if (existsSync(to) && readFileSync(to).equals(content)) return;
+  mkdirSync(dirname(to), { recursive: true });
+  writeFileSync(to, content);
+  console.log(`  ✓ ${to}`);
 }
 
 /**
@@ -1834,7 +1843,7 @@ if (import.meta.main) {
   {
     const repo = repoRootFor(ROOT);
     const sources: RefSource[] = [];
-    for (const inst of instanceRootsIn(repo)) {
+    for (const inst of layerRootsIn(repo)) {
       const decl = readDeclaration(inst);
       if (!decl) continue;
       const siteDir = join(inst, siteDirFor(inst));
@@ -2076,8 +2085,8 @@ if (import.meta.main) {
     // COPIED like the avatars: the entry's directory is not on the site.
     // A withheld entry shows none, so none is copied.
     if (doc && !e.withheld)
-      for (const rel of entryFigureFiles(join(repoRoot, e.dir)))
-        emitBytes(join(dataDir, "files", e.id, rel), readFileSync(join(repoRoot, e.dir, rel)));
+      for (const { rel, source } of entryFigureCopies(join(repoRoot, e.dir)))
+        emitBytes(join(dataDir, "files", e.id, rel), readFileSync(join(repoRoot, e.dir, source)));
   }
 
   for (const e of g.entries) {
@@ -2114,8 +2123,11 @@ if (import.meta.main) {
         stale++;
         continue;
       }
-      rmSync(abs);
-      console.log(`  ✗ pruned orphan avatar ${abs}`);
+      const prune = writePathAt(CHECKOUT, abs);
+      if (existsSync(prune)) {
+        rmSync(prune);
+        console.log(`  ✗ pruned orphan avatar ${prune}`);
+      }
     }
   }
   // ── THE SHARED VIEWER ASSETS (#1881) ──────────────────────────────────
@@ -2302,8 +2314,11 @@ if (import.meta.main) {
         stale++;
         continue;
       }
-      rmSync(dir, { recursive: true });
-      console.log(`  ✗ pruned ${dir}`);
+      const prune = writePathAt(CHECKOUT, dir);
+      if (existsSync(prune)) {
+        rmSync(prune, { recursive: true });
+        console.log(`  ✗ pruned ${prune}`);
+      }
     }
   }
 
@@ -2316,8 +2331,11 @@ if (import.meta.main) {
       stale++;
       continue;
     }
-    rmSync(abs);
-    console.log(`  ✗ pruned orphan ${abs}`);
+    const prune = writePathAt(CHECKOUT, abs);
+    if (existsSync(prune)) {
+      rmSync(prune);
+      console.log(`  ✗ pruned orphan ${prune}`);
+    }
   }
 
 
@@ -2339,8 +2357,11 @@ if (import.meta.main) {
       stale++;
       continue;
     }
-    rmSync(dir, { recursive: true });
-    console.log(`  ✗ pruned ${dir}`);
+    const prune = writePathAt(CHECKOUT, dir);
+    if (existsSync(prune)) {
+      rmSync(prune, { recursive: true });
+      console.log(`  ✗ pruned ${prune}`);
+    }
   }
 
   if (!check) {

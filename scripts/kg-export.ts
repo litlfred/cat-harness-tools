@@ -63,6 +63,7 @@ import { propertyIri, termIri } from "../schemas/kg/namespaces.js";
 import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
 import { STANDARD_PREFIXES, applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "../schemas/content/vocab-mapping.js";
 import { readPolicyGrants } from "../schemas/content/odrl.js";
+import { attestationNodes } from "./lib/attestation-nodes.ts";
 import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "../schemas/kg/depends-on.js";
 import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "../schemas/process/role-graph.js";
@@ -76,7 +77,7 @@ import {
   isPublishedSchemaModule,
   isPublishedSkill,
   forgeLocation,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   renderingPath,
   siteDirFor,
@@ -2105,7 +2106,7 @@ function skillHomeUncached(base: string, ownDoc: string, skillId: string, scope:
   // published-paths walk in `kg-export.test.ts` caught it as two documents
   // the deploy does not write.
   if (knownSkills(ownRoot, scope).has(skillId)) return ownDoc;
-  for (const instance of instanceRootsIn(repoRootFor(ROOT))) {
+  for (const instance of layerRootsIn(repoRootFor(ROOT))) {
     if (resolve(instance) === resolve(ownRoot)) continue;
     if (!knownSkills(instance).has(skillId)) continue;
     // `publishedIdentity`, not `exportIdentity` with this base: a layer
@@ -2492,12 +2493,33 @@ const declaredRoleIds = (root: string, scope: CorpusScope = corpusScopeFor(root)
  */
 export function roleHome(base: string | undefined, ownDoc: string, roleId: string, ownRoot: string = ROOT, scope: CorpusScope = corpusScopeFor(ownRoot)): string {
   if (base === undefined || declaredRoleIds(ownRoot, scope).has(roleId)) return ownDoc;
-  for (const instance of instanceRootsIn(repoRootFor(ROOT))) {
+  for (const instance of layerRootsIn(repoRootFor(ROOT))) {
     if (resolve(instance) === resolve(ownRoot)) continue;
     if (!declaredRoleIds(instance).has(roleId)) continue;
     return publishedIdentity(instance, base || undefined).docIri;
   }
   return ownDoc;
+}
+
+/**
+ * One node per attestation file the layer's OWN `attestations` directory
+ * holds (owner, 2026-11-13, node-kind audit: every listed node kind has an
+ * IRI, a JSON-LD document and a page). The IRI is
+ * `<doc dir>/attestation/<family>/<mirrored subject path>`, the file's path
+ * under the store without its `.attestations.json`, so
+ * `writeSubjectDocuments` serves it with its `.jsonld`. The node names its
+ * family and the subject it judges; the judgements stay in the file
+ * (`sourcePath`), which is what a reader of one opens.
+ */
+function collectAttestations(doc: string, root: string = ROOT): Node[] {
+  return attestationNodes(root).map((a) => ({
+    "@id": makeIri(doc, "attestation", a.id),
+    "@type": termIri("QaAttestation"),
+    title: a.title,
+    description: a.description,
+    sourceKind: a.family,
+    sourcePath: a.sourcePath,
+  }));
 }
 
 function collectGraphTypologies(root: string = ROOT): Node[] {
@@ -2764,6 +2786,7 @@ export async function collectInstanceNodes(
     ...collectSkills(doc, base, problems, root, corpusScopeFor(root), baseUrl),
     ...(await collectProcesses(doc, problems, root, notes, siteBase, corpusScopeFor(root), base)),
     ...collectGraphTypologies(root),
+    ...collectAttestations(doc, root),
     ...collectDeclaredRoles(doc, root),
     ...collectDeclaration(doc, problems, root),
     ...collectDeclaredAssets(doc, problems, root),
@@ -3379,6 +3402,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
           ...collectSchemas(docIri, base, scope),
           ...collectExternalSchemas(docIri),
           ...collectGraphTypologies(),
+          ...collectAttestations(docIri, ROOT),
           ...collectDeclaredRoles(docIri, ROOT, scope, base),
           ...collectDeclaration(docIri, problems),
           ...collectDeclaredAssets(docIri, problems),
@@ -3671,7 +3695,7 @@ export interface SidecarSubject {
 
 export function sidecarSubjects(
   dir: string = join(ROOT, QA_RESULTS_DIR),
-  roots: string[] = instanceRootsIn(checkoutRootFor(ROOT)),
+  roots: string[] = layerRootsIn(checkoutRootFor(ROOT)),
 ): { subjects: SidecarSubject[]; orphans: string[] } {
   const subjects: SidecarSubject[] = [{ stem: "kg-export" }];
   const orphans: string[] = [];
@@ -3963,6 +3987,23 @@ const escHtml = (v: unknown): string =>
   String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /**
+ * A literal's text, escaped, with its Markdown code spans drawn as `<code>`.
+ *
+ * Declaration descriptions are written in Markdown, so a placeholder such as
+ * `` `<doc-id>.<section>.<n>` `` sits in a code span. Escaped and left as
+ * text, the backticks showed and `&lt;section&gt;` read as a block tag leaked
+ * into the page, which `check:escaped-markup` rightly refused on a declared
+ * directory's subject page (2026-11-15). Only code spans are drawn: the rest
+ * of the literal stays escaped text.
+ */
+export function literalHtml(s: string): string {
+  return s
+    .split(/(`[^`\n]+`)/)
+    .map((part) => (/^`[^`\n]+`$/.test(part) ? `<code>${escHtml(part.slice(1, -1))}</code>` : escHtml(part)))
+    .join("");
+}
+
+/**
  * A value as HTML: an IRI is a link, a list is each of its items.
  *
  * An IRI naming another node of the same graph is shown by that node's NAME,
@@ -3978,7 +4019,7 @@ function valueHtml(v: unknown, labels: ReadonlyMap<string, string> = new Map()):
     return typeof id === "string" ? valueHtml(id, labels) : `<code>${escHtml(JSON.stringify(v))}</code>`;
   }
   const s = String(v);
-  if (!/^https?:\/\//.test(s)) return escHtml(s);
+  if (!/^https?:\/\//.test(s)) return literalHtml(s);
   const label = labels.get(s);
   return label === undefined
     ? `<a class="iri" href="${escHtml(s)}">${escHtml(s)}</a>`

@@ -29,7 +29,7 @@
 import { spawnSync } from "node:child_process";
 import { relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { NOT_APPLICABLE_EXIT } from "./lib/not-applicable.ts";
 
 export interface LayerVerdict {
@@ -62,7 +62,7 @@ function judge(root: string, instance: string): LayerVerdict {
 export function main(argv: readonly string[]): number {
   const at = argv.indexOf("--root");
   const root = resolve(at === -1 ? process.cwd() : argv[at + 1]!);
-  const rows = instanceRootsIn(root).map((i) => judge(root, i));
+  const rows = layerRootsIn(root).map((i) => judge(root, i));
   for (const r of rows) console.log(`${r.exit === 0 ? "✓" : r.exit === 1 ? "✗" : "?"} ${r.layer}: ${r.summary}`);
   const v = verdictOf(rows);
   console.log(

@@ -32,7 +32,7 @@ import { ValidatorNodeSchema, type ValidatorNode } from "./validator-node";
 import { instanceNamespaceOf, namespaceForLayer, NS_PREFIXES, OWN_NAMESPACE_VALUES } from "./namespaces";
 import type { NewInstanceSource } from "./subgraph-source";
 import { BOOTSTRAP_GRAPH_TYPOLOGIES } from "@litlfred/bootstrap-tools/schemas/graph.ts";
-import { findDeclarationFile, instanceRootsIn } from "./instance-roots";
+import { findDeclarationFile, layerRootsIn } from "./instance-roots";
 import { readFileSync } from "node:fs";
 
 
@@ -1635,6 +1635,12 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "derived family's tree. Kept on main where deleting derived results cannot reach them; each " +
       "entry pins the hash it attested, so a stale one is detectable.",
     schema: "schemas/sdlc/qa-attestations.ts",
+    // Every family's file is one `qa-attestations/v1` node (`QaAttestationsKind`,
+    // named by cat-harness's `validators/qa-attestations.json`), so each has
+    // an IRI, a JSON-LD document and a page (owner, 2026-11-13, node-kind audit).
+    nodeSchemas: {
+      "qa-attestations/v1": {},
+    },
     // declared-path-literal: this table IS the declaration, as on `health`.
   },
   // Source code. Registered 2026-09-22 (bean `ylj7`) after a measurement the
@@ -2407,6 +2413,10 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "folio-document-errata/v1": {},
       "folio-run-context/v1": {},
       "folio-tabular-csvw/v1": {},
+      // Which extractor read the entry and what each extraction step wrote
+      // (`extraction.json`, schemas/library/entry-extraction.ts), written by
+      // every re-derive since the reingest record (issue #2186).
+      "folio-library-extraction/v1": {},
       // A recorded meeting or talk, and one transcript per language
       // (bean `folio-assistant-1r0p`, `schemas/library/recording.ts`).
       "folio-recording/v1": {},
@@ -3677,7 +3687,7 @@ export function declaredKindNodes(
 
 /** The layer roots a checkout holds now, as one comparable string; empty when it holds none. */
 function layersSignature(root: string): string {
-  return instanceRootsIn(root).slice().sort().join("\n");
+  return layerRootsIn(root).slice().sort().join("\n");
 }
 
 /** Every `folio-validator/v1` node in every declared `validators/` graph (bean riit). */
@@ -3723,8 +3733,8 @@ export function defaultTypologyRoots(
   if (env.REPO_ROOT) return [resolve(env.REPO_ROOT)];
   const up2 = resolve(moduleDir, "..", "..", "..");
   const up1 = resolve(moduleDir, "..", "..");
-  const own = instanceRootsIn(up2).length > 0 ? up2 : up1;
-  const inspected = instanceRootsIn(cwd).length > 0 ? resolve(cwd) : undefined;
+  const own = layerRootsIn(up2).length > 0 ? up2 : up1;
+  const inspected = layerRootsIn(cwd).length > 0 ? resolve(cwd) : undefined;
   return inspected !== undefined && inspected !== own ? [inspected, own] : [own];
 }
 

@@ -13,7 +13,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "./instance-roots";
+import { findDeclarationFile, layerRootsIn } from "./instance-roots";
 
 /**
  * A TEST FIXTURE checkout scanned beside the real one: `FOLIO_FIXTURE_CHECKOUT`.
@@ -40,7 +40,7 @@ export type InstanceFilter = (instanceRoot: string) => boolean;
 export function declaredDirectories(repoRoot: string, graphTypology: string, include?: InstanceFilter): string[] {
   // input-site: env-unset FOLIO_FIXTURE_CHECKOUT #d3ac43d3 — a test-only override naming a checkout OUTSIDE the tree
   const fixture = process.env[FIXTURE_ENV];
-  const ownRoots = instanceRootsIn(repoRoot);
+  const ownRoots = layerRootsIn(repoRoot);
   // The fixture's layers are scanned BESIDE this checkout's, for every
   // graph typology. It was "only when no own instance declares the typology",
   // which hid the fixture's IG-pipeline layer's `typologies/` from a standalone
@@ -49,7 +49,7 @@ export function declaredDirectories(repoRoot: string, graphTypology: string, inc
   // fixture is set only when the checkout holds no vocabulary, never in a
   // composed checkout, so there a scan is unchanged.
   const ownNames = new Set(ownRoots.map((r) => basename(r)));
-  const roots = fixture ? [...ownRoots, ...instanceRootsIn(fixture).filter((r) => !ownNames.has(basename(r)))] : ownRoots;
+  const roots = fixture ? [...ownRoots, ...layerRootsIn(fixture).filter((r) => !ownNames.has(basename(r)))] : ownRoots;
   return roots.filter((root) => include === undefined || include(root)).flatMap((root) => ownDeclaredDirectories(root, graphTypology, repoRoot));
 }
 

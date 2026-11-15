@@ -43,12 +43,13 @@ import {
   subgraphTree,
 } from "../schemas/kg/cat-harness.js";
 import { checkoutDirectories, checkoutRootFor } from "../schemas/kg/harness-config.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { layerRootsIn } from "../schemas/kg/instance-roots.js";
 import type { GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
 import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { overlayPath } from "./lib/layer-output.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -298,9 +299,12 @@ export function decodeLinkTarget(target: string): string {
 }
 
 function resolveInTree(abs: string): string | undefined {
-  if (existsSync(abs)) return abs;
+  // Over the layer overlay: a mounted layer's generated pages are at its
+  // output root (bean `cat-tools-sm8r`, item 4).
+  const at = overlayPath(abs);
+  if (existsSync(at)) return at;
   if (abs.endsWith(".html")) {
-    const asSource = `${abs.slice(0, -".html".length)}.md`;
+    const asSource = overlayPath(`${abs.slice(0, -".html".length)}.md`);
     if (existsSync(asSource)) return asSource;
   }
   return undefined;
@@ -556,7 +560,7 @@ export function linkContext(root: string = ROOT): LinkContext {
     .filter((d) => mayLeaveMain(d as { graphTypologies?: string[]; storage?: unknown }))
     .map((d) => resolve(d.absPath ?? join(root, d.path)))
     .filter((a) => !existsSync(a));
-  const instances = [root, ...instanceRootsIn(checkoutRootFor(root))];
+  const instances = [root, ...layerRootsIn(checkoutRootFor(root))];
   const moves = declaredMoves(instances);
   const unbuilt = unbuiltPublishPaths(instances);
   return { root, own, dirs, label, absentOffMain, archiveViews: beanArchiveViews(dirs, root), moves, unbuilt };

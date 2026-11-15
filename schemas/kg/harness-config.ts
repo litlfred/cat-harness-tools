@@ -402,18 +402,19 @@ import {
   inlineOverrides,
   readIndexConfig,
   type IndexConfig,
-  type IndexInstance,
+  type IndexLayer,
 } from "./index-config";
 import {
   directoriesForGraph,
   ExactVersionSchema,
   instanceConfigFilename,
+  layerConfigFilename,
   findInstanceRoot,
   isKgOnlyDirectory,
   materialiseDirectories,
   ownDirectories,
   instanceDirectories,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   siblingScopeFor,
   checkoutRootFor as checkoutRootForInstance,
@@ -508,7 +509,7 @@ export interface ResolvedDependency {
 // dependency only runs one way. The alternative was two functions spelling one
 // filename, which is how a config and its declaration drift apart at the first
 // rename.
-export { instanceConfigFilename };
+export { instanceConfigFilename, layerConfigFilename };
 
 /**
  * The retired global name. Kept as a constant so `check:instance-config` can
@@ -575,7 +576,7 @@ export function instanceConfigFor(dir: string): { root: string; name: string } |
 export function resolveHarnessConfigPath(dir: string): { path: string } | undefined {
   const inst = instanceConfigFor(dir);
   if (inst === undefined) return undefined;
-  const file = instanceConfigFilename(inst.name);
+  const file = layerConfigFilename(inst.name);
 
   // From the instance root OUTWARD. The instance's own directory is tried
   // first so a standalone instance — a folio, where the instance root and the
@@ -621,7 +622,7 @@ export function expectedInstanceConfigPath(dir: string): string | undefined {
   const found = resolveHarnessConfigPath(dir);
   if (found) return found.path;
   const inst = instanceConfigFor(dir);
-  return inst === undefined ? undefined : join(inst.root, instanceConfigFilename(inst.name));
+  return inst === undefined ? undefined : join(inst.root, layerConfigFilename(inst.name));
 }
 
 /**
@@ -630,7 +631,7 @@ export function expectedInstanceConfigPath(dir: string): string | undefined {
  *
  * `via: "index"` is an instance an `index.config.json` lists — its config is
  * the entry's import overlaid by the entry's own fields
- * ({@link effectiveInstanceConfig}), exactly as {@link readHarnessConfig}
+ * ({@link effectiveLayerConfig}), exactly as {@link readHarnessConfig}
  * reads it. `via: "file"` is `<name>.config.json`.
  */
 export type EffectiveConfigRead =
@@ -651,16 +652,16 @@ export type EffectiveConfigRead =
  * the readers read keys `HarnessConfigSchema` does not name.
  */
 export function readEffectiveConfig(dir: string): EffectiveConfigRead {
-  let indexed: ReturnType<typeof indexedInstanceFor>;
+  let indexed: ReturnType<typeof indexedLayerFor>;
   try {
-    indexed = indexedInstanceFor(dir);
+    indexed = indexedLayerFor(dir);
   } catch (e) {
     return { state: "unreadable", via: "index", from: INDEX_CONFIG_FILENAME, why: (e as Error).message };
   }
   if (indexed !== undefined) {
     const from = `${INDEX_CONFIG_FILENAME} entry "${indexed.name}"`;
     try {
-      const config = effectiveInstanceConfig(indexed.root, indexed.name);
+      const config = effectiveLayerConfig(indexed.root, indexed.name);
       return config === null ? { state: "absent", via: "index", from } : { state: "ok", via: "index", from, config: config as Record<string, unknown> };
     } catch (e) {
       return { state: "unreadable", via: "index", from, why: (e as Error).message };
@@ -690,15 +691,15 @@ export function readHarnessConfig(dir: string): HarnessConfig | null {
   // reader crashed where it used to report "undetermined" (`qa-sweep`,
   // `profile-scoping`, 2026-10-09). A caller that must tell unreadable from
   // absent asks `readEffectiveConfig`, which keeps them apart.
-  let indexed: ReturnType<typeof indexedInstanceFor>;
+  let indexed: ReturnType<typeof indexedLayerFor>;
   try {
-    indexed = indexedInstanceFor(dir);
+    indexed = indexedLayerFor(dir);
   } catch {
     return null;
   }
   if (indexed !== undefined) {
     try {
-      return effectiveInstanceConfig(indexed.root, indexed.name);
+      return effectiveLayerConfig(indexed.root, indexed.name);
     } catch {
       return null;
     }
@@ -739,10 +740,10 @@ export function readHarnessConfig(dir: string): HarnessConfig | null {
  * its own). An unreadable index THROWS: it was written to override exactly
  * the fallback that silence would select.
  */
-export function indexedInstanceFor(dir: string): { root: string; name: string; entry: IndexInstance } | undefined {
+export function indexedLayerFor(dir: string): { root: string; name: string; entry: IndexLayer } | undefined {
   const inst = instanceConfigFor(dir);
   if (inst === undefined) return undefined;
-  const own = instanceConfigFilename(inst.name);
+  const own = layerConfigFilename(inst.name);
   // A MOUNTED instance is configured by the index that mounted it, so the
   // walk starts at the mount's scope. Starting at the instance root found the
   // instance's OWN `index.config.json` first — the file it uses standing
@@ -794,7 +795,7 @@ function readRawConfig(file: string): Record<string, unknown> | undefined {
  *
  * `null` when the index is absent or does not list `name`.
  */
-export function effectiveInstanceConfig(root: string, name: string): HarnessConfig | null {
+export function effectiveLayerConfig(root: string, name: string): HarnessConfig | null {
   const idx = readIndexConfig(root);
   if (idx.state === "unreadable") throw new Error(`${idx.file} is ${idx.why}`);
   if (idx.state === "absent") return null;
@@ -876,7 +877,7 @@ export function indexAgreement(repoRoot: string, config?: IndexConfig): IndexAgr
     c = idx.config;
   }
   const imported = new Set(c.instances.map(importedConfigFilename));
-  const unlisted = rootConfigStems(repoRoot).filter((s) => !imported.has(instanceConfigFilename(s)));
+  const unlisted = rootConfigStems(repoRoot).filter((s) => !imported.has(layerConfigFilename(s)));
   const missingImport: IndexAgreement["missingImport"] = [];
   const withoutConfig: string[] = [];
   for (const e of c.instances) {
@@ -932,7 +933,7 @@ export function resolveLandingInstance(repoRoot: string): LandingInstance {
     try {
       // Indexed: the EFFECTIVE config (import overlaid by inline fields), so an
       // inline `site` counts. Not indexed: the file at this root, as before.
-      raw = index ? effectiveInstanceConfig(repoRoot, name) ?? {} : JSON.parse(readFileSync(join(repoRoot, instanceConfigFilename(name)), "utf-8"));
+      raw = index ? effectiveLayerConfig(repoRoot, name) ?? {} : JSON.parse(readFileSync(join(repoRoot, layerConfigFilename(name)), "utf-8"));
     } catch {
       unreadable.push(name);
       continue;
@@ -1093,7 +1094,7 @@ export function dependenciesFromNeeds(instanceRoot: string): {
   // moved it below the one-level scan.
   const repoRoot = mountScopeFor(abs) ?? siblingScopeFor(abs);
   const byName = new Map<string, string>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     try {
       const n = readDeclaration(root)?.name;
       if (n !== undefined) byName.set(n, root);
@@ -1481,7 +1482,7 @@ function checkoutGraph(root: string): CheckoutGraph {
     // that dependents and implementers across sibling instances resolve.
     discovered = true;
     const seen = new Set<string>();
-    for (const inst of instanceRootsIn(root)) {
+    for (const inst of layerRootsIn(root)) {
       if (resolve(inst) === resolve(root)) continue;
       try {
         const deps = orderedDependencies(inst);
@@ -1872,7 +1873,7 @@ export function repositoryMirrors(start: string): string[] {
   // repository path is, and that is what is reported.
   if (safeDeclaration(root) === undefined) {
     const byPath = new Map<string, string[]>();
-    for (const inst of instanceRootsIn(root)) {
+    for (const inst of layerRootsIn(root)) {
       let decl: ReturnType<typeof readDeclaration>;
       try {
         decl = readDeclaration(inst);
@@ -1898,7 +1899,7 @@ export function repositoryMirrors(start: string): string[] {
   // wrong-way arrow the ruling retired), or two non-root instances claiming
   // the same repository path. The root's own entries are its own and an
   // override, never a claim against these.
-  const instances = instanceRootsIn(root).map((r) => resolve(r));
+  const instances = layerRootsIn(root).map((r) => resolve(r));
   const others = instances.filter((r) => r !== root);
   const byPath = new Map<string, string[]>();
   for (const inst of others) {
@@ -2336,3 +2337,10 @@ export function describeRepositoryClosure(
 
   return { types, disagreements };
 }
+
+// Old names, kept so callers in other layers keep working while they move to
+// the layer names (cat-harness#1138 P4). Remove once no layer imports them.
+/** @deprecated Use {@link effectiveLayerConfig}. */
+export const effectiveInstanceConfig = effectiveLayerConfig;
+/** @deprecated Use {@link indexedLayerFor}. */
+export const indexedInstanceFor = indexedLayerFor;

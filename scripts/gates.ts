@@ -41,7 +41,7 @@ import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
 import { checkoutRootFor, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
 import { parse } from "yaml";
 
@@ -205,7 +205,7 @@ export const WORKFLOW_DIR = join(".github", "workflows");
 function declaredExemptions(root: string = checkoutRootFor(resolve(HARNESS_ROOT))): { steps: StepExemption[]; scripts: ScriptExemption[] } {
   const steps: StepExemption[] = [];
   const scripts: ScriptExemption[] = [];
-  for (const instance of instanceRootsIn(root)) {
+  for (const instance of layerRootsIn(root)) {
     const g = readDeclaration(instance)?.gateExemptions;
     steps.push(...(g?.steps ?? []));
     scripts.push(...(g?.scripts ?? []));
@@ -616,24 +616,6 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     kind: "covered-by",
     reason: "`state:visualizer:check` is in the gate set; the site build runs the writer over the results it fetched",
   },
-  {
-    // Bean `tqjj`: the LSI viewer page, the same shape as the step above and
-    // for a sharper version of the same reason. It is an aggregate over every
-    // index, so one sentence added to one of 229 skills restaged it — 319 of
-    // the last 400 commits on `main`.
-    //
-    // It must be the SITE BUILD's step and not a gate's. With no index
-    // sidecar in the checkout, `lsi:viz` reads `qa-reports` at `main`, which
-    // resolves to the latest published entry — a value that depends on when
-    // the run happened rather than on the tree (bean `in5a`). The site build
-    // is the only job that fetches, so it is the only one that can pin the
-    // entry to the commit being built.
-    match: "bun run cat lsi:viz",
-    kind: "covered-by",
-    reason:
-      "`lsi:viz:check` is in the gate set; the site build runs the writer over the indexes it fetched for its own sha, " +
-      "which is the only place the entry read is pinned to the commit rather than to whatever was published last",
-  },
   // The two projection writers are run by the SITE BUILD and by nothing else.
   //
   // Their `--check` twins are deliberately not in the gate set (owner,
@@ -654,14 +636,6 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     reason:
       "the site build runs the writer at deploy, so nothing PUBLISHED goes stale; " +
       "`library:viz:check` is intentionally not gated — see code-quality-gates.yml",
-  },
-  {
-    match: "run cat library:keywords",
-    kind: "covered-by",
-    reason:
-      "the site build runs the writer at deploy (`derive:publish`, route `docs/assets/keywords/`, builtAtPublish), " +
-      "so nothing PUBLISHED goes stale and nothing is committed; keywords derive from a WHOLE library's " +
-      "term weights (issue #2302, cat-harness#1144)",
   },
   {
     match: "run cat uploads:viz",
@@ -1496,6 +1470,14 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "COMPOSED into `check:declaration-resolution`, which CI runs: its findings are that gate's `optInLinks` field, so a " +
       "step of its own would report every link twice. Kept as a script to list the links alone (owner, 2026-11-11: a gate " +
       "fails on links into a switched-off opt-in sub-graph, each fixed by hand)",
+  },
+  {
+    script: "check:optin-refs",
+    kind: "covered-by",
+    reason:
+      "COMPOSED into `check:declaration-resolution`, which CI runs: its findings are that gate's `optInRefs` field, so a " +
+      "step of its own would report every reference twice. Kept as a script to list the references alone (owner, " +
+      "2026-11-12, card Q-OPTINREFS-CI B: gated now, each always-on Tool or workflow naming an opt-in-only skill fixed at its source)",
   },
   {
     script: "layers:check",

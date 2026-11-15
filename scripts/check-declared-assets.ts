@@ -32,12 +32,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, resolve, sep } from "node:path";
 
-import { declaredAssets, instanceDirectories, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { declaredAssets, instanceDirectories, layerRootsIn } from "../schemas/kg/cat-harness.js";
 import { movesResolver } from "./check-agent-entry-links.ts";
 
 /**
  * Layers whose declarations this repository owns — **discovered, not
- * listed**, via {@link instanceRootsIn}.
+ * listed**, via {@link layerRootsIn}.
  *
  * This was a literal `["cat-harness", "bootstrap"]`, and the docstring on it
  * recorded the list being wrong ONCE already: the first entry was `"."`, which
@@ -60,7 +60,7 @@ import { movesResolver } from "./check-agent-entry-links.ts";
  * Widening it immediately found a dead link the list had been hiding.
  */
 export function declaredInstances(repoRoot: string): string[] {
-  return instanceRootsIn(repoRoot);
+  return layerRootsIn(repoRoot);
 }
 
 export interface AssetFinding {

@@ -260,9 +260,9 @@ const CHECKOUT_LEVEL_ABSENT = notApplicableAlone(
 
 describe("the real corpus", () => {
   test("every declared directory in this repository resolves", async () => {
-    const { instanceRootsIn } = await import("../../../schemas/kg/cat-harness.ts");
+    const { layerRootsIn } = await import("../../../schemas/kg/cat-harness.ts");
     await import("../../../schemas/kg/folio-graph-typology.ts");
-    const roots = instanceRootsIn(REPO);
+    const roots = layerRootsIn(REPO);
     // Vacuity guard: an empty discovery would make the assertion below pass
     // over nothing, which is the shape this whole check exists to catch.
     expect(roots.length).toBeGreaterThan(1);

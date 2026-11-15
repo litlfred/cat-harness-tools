@@ -29,6 +29,11 @@ const EVERY_EMITTED_KIND: Record<DeclKind, true> = {
   "json-schema": true,
   "fhir-logical": true,
   "fhir-profile": true,
+  "owl-class": true,
+  "rdfs-class": true,
+  "rdf-property-set": true,
+  "moddle-class": true,
+  "moddle-enum": true,
   undetermined: true,
 };
 

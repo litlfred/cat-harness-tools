@@ -39,7 +39,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { instanceDirectoriesForGraph, layerRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { THEME_LAYOUTS, resolveThemeBackdrop, type ResolvedTheme } from "../schemas/ui/theme.js";
 import { instanceThemes } from "../schemas/ui/theme-by-ref.js";
 import { THEMES } from "../schemas/ui/themes.js";
@@ -396,7 +396,7 @@ export function buildViz(root: string): { path: string; md: string; themes: numb
   const missing = [...platform.missing];
   let total = platform.themes;
   const sections: string[] = [];
-  const declaring = instanceRootsIn(repoRoot)
+  const declaring = layerRootsIn(repoRoot)
     .map((r) => ({ r, name: readDeclaration(r)?.name }))
     .filter((x): x is { r: string; name: string } => x.name !== undefined && instanceDirectoriesForGraph(x.r, "themes").length > 0)
     .sort((a, b) => a.name.localeCompare(b.name));

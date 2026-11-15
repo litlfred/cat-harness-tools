@@ -39,7 +39,7 @@ import { auditMarkdownFile } from "../src/core/markdown-links.js";
 import { publishTargets } from "../src/core/git-refs.js";
 import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { checkoutRootFor } from "../schemas/kg/harness-config.js";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { layerRootsIn } from "../schemas/kg/instance-roots.js";
 import { declaredMoves, resolveThroughMove } from "./check-subgraphs.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -52,9 +52,9 @@ export function movesResolver(
   start: string,
   today?: string,
 ): (abs: string) => { resolved: string; move: string } | undefined {
-  const roots = [start, ...instanceRootsIn(start)];
+  const roots = [start, ...layerRootsIn(start)];
   try {
-    roots.push(...instanceRootsIn(checkoutRootFor(start)));
+    roots.push(...layerRootsIn(checkoutRootFor(start)));
   } catch {
     // Not in a checkout: the layer's own moves are still honoured.
   }

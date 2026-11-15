@@ -172,6 +172,11 @@ export const PYTHON_DEPS: readonly PythonDep[] = [
     transitive: true,
     why: "`MarianTokenizer` in `translation/opus_mt_runner.py` loads the OPUS-MT `.spm` vocabularies with it, and `transformers` does not install it. Never imported by name. 1.7 MB (sentencepiece 0.2.3, cp312 manylinux wheel, PyPI, 2026-11-14).",
   },
+  {
+    distribution: "anthropic",
+    tier: "extended",
+    why: "`pdf-ocr.py --vision-digits` only: an opt-in fallback that asks a vision model to re-read the number words Tesseract is unsure of on Arabic-script pages (10665-94830-per, owner 2026-11-15). Imported inside `anthropic_ask`, so a run without the flag needs neither it nor credentials. The wheel is 2.3 MB (anthropic 2.8.0, py3-none-any, PyPI, 2026-11-15) and pulls httpx, pydantic and jiter. Extended because CI never calls a remote model; the tests drive the fallback with a fake `ask`.",
+  },
 ];
 
 /** The module name an entry provides — `imports` when given, else the distribution. */

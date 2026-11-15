@@ -9,9 +9,11 @@
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
+// A page written at publish is at the layer output root (bean cat-tools-sm8r).
+import { overlayPath } from "../../scripts/lib/layer-output.ts";
 import { join, resolve } from "node:path";
 
-import { declarationPathIn, instanceRootsIn, visualisationResolves } from "../../schemas/kg/cat-harness.ts";
+import { declarationPathIn, layerRootsIn, visualisationResolves } from "../../schemas/kg/cat-harness.ts";
 import { declaredVisualisers, PAGE_LOCALE, viewersOf, type ViewedDirectory } from "../../scripts/viewer-declarations.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`). */
@@ -22,7 +24,7 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
 
   type Dir = ViewedDirectory;
   const dirs: { root: string; instance: string; dir: Dir; raw: { coverage?: { visualiser?: unknown } } }[] = [];
-  for (const root of instanceRootsIn(REPO)) {
+  for (const root of layerRootsIn(REPO)) {
     const p = declarationPathIn(root);
     if (!p) continue;
     const decl = JSON.parse(readFileSync(p, "utf-8")) as { name?: string; directories?: Dir[] };
@@ -102,7 +104,7 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
   test("every resolved page exists, or is built at publish by a writer that exists", () => {
     const missing = dirs.flatMap(({ root, instance, dir }) =>
       viewersOf(dir, root, REPO)
-        .filter((v) => !visualisationResolves(v, (p: string) => existsSync(join(REPO, p))))
+        .filter((v) => !visualisationResolves(v, (p: string) => existsSync(overlayPath(join(REPO, p)))))
         .map((v) => `${instance}/${dir.id} → ${v.ref}`),
     );
     expect(missing).toEqual([]);

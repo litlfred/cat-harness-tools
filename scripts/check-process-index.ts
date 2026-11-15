@@ -46,7 +46,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { workflowFiles } from "./known-skills.ts";
 import { isGlobalTasksFile } from "../src/workflow/process-model.ts";
 import { SubgraphHydratedSchema, SubgraphIndexSchema, SUBGRAPH_HYDRATED_FILE, SUBGRAPH_INDEX_FILE } from "../schemas/kg/subgraph-manifest.ts";
-import { docsSourceDirFor, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { docsSourceDirFor, layerRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { framedInstances as framedRoots, subgraphOutDir } from "./gen-subgraph-jsonld.ts";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { buildSubgraphs, publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
@@ -77,7 +77,7 @@ export const PAGE_BLOCK = join("process-publication-workflow", "every-workflow-i
 export function processIndexPage(root: string = ROOT, repo: string = REPO): string {
   const stacked = docsSources(root).map((s) => join(s.srcDir, PAGE_BLOCK)).find((f) => existsSync(f));
   if (stacked !== undefined) return stacked;
-  for (const layer of instanceRootsIn(repo)) {
+  for (const layer of layerRootsIn(repo)) {
     let src: string;
     try {
       src = docsSourceDirFor(layer);
@@ -98,7 +98,7 @@ const repoRel = (abs: string): string => relative(REPO, abs).split(sep).join("/"
 /** Every `.bpmn` any layer under the repository declares, by owning layer root. */
 export function declaredDiagrams(repoRoot: string = REPO): Map<string, string> {
   const out = new Map<string, string>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     for (const abs of workflowFiles(inst, "instance")) {
       // A layer's shared global-tasks file holds no process, so it is no Process node.
       if (abs.endsWith(".bpmn") && !out.has(repoRel(abs)) && !isGlobalTasksFile(readFileSync(abs, "utf-8"))) {
@@ -131,7 +131,7 @@ const instanceByName = new Map<string, Map<string, string>>();
 export function diagramPath(p: PublishedProcess, repoRoot: string = REPO): string {
   let byName = instanceByName.get(repoRoot);
   if (byName === undefined) {
-    byName = new Map(instanceRootsIn(repoRoot).flatMap((r) => {
+    byName = new Map(layerRootsIn(repoRoot).flatMap((r) => {
       const name = readDeclaration(r)?.name;
       return name === undefined ? [] : [[name, r] as const];
     }));
@@ -210,7 +210,7 @@ export function publishedProcesses(outDir: string = OUT): { processes: Published
 export function unframedProcesses(seeAlso: readonly string[], framed: ReadonlySet<string>, repoRoot: string = REPO): { byPath: Map<string, PublishedProcess>; problems: string[] } {
   const byPath = new Map<string, PublishedProcess>();
   const problems: string[] = [];
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     if (framed.has(resolve(inst))) continue;
     const decl = readKnowledgeGraphDeclaration(inst);
     const base = publicationBase(decl);

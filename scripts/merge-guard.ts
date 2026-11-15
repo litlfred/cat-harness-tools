@@ -54,11 +54,11 @@
  * `--full-tier` makes check 5 a gate that ALSO needs the full tier green on
  * the head ({@link fullTierCheck}); `--root` names the repository whose
  * `pull_request` workflows check 5 owes. The status is `success` only when
- * all eight checks pass, so it means: the full tier is green, the
+ * all nine checks pass, so it means: the full tier is green, the
  * `ready-to-merge` label is on (check 4) and the PR's own session said ready
  * (check 3). It never merges; only the merge manager does.
  *
- * ## The eight checks
+ * ## The nine checks
  *
  * Every refusal names its check, by number and by id:
  *
@@ -109,6 +109,12 @@
  *    not-ready; `null` — GitHub has not finished computing it — is `unknown`,
  *    after {@link fetchSnapshot} re-asks a few times. `unstable` and
  *    `blocked` pass here: they are about checks, which check 5 judges.
+ * 9. `content-review` — a PR labelled `content` (it changes folio content
+ *    text) has a `## Content review` section in its body that points to a
+ *    review record: an owner decision card id, a committee or review-log
+ *    link, a bean, or an editing-hci-validation instance
+ *    ({@link contentReviewRecord}). A draft without one is not-ready; a PR
+ *    marked ready without one is a defect. Owner, 2026-11-15.
  *
  * ## Exit codes
  *
@@ -167,6 +173,13 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 export const BASE = "main";
 export const READY_LABEL = "ready-to-merge";
 export const HUMAN_LABEL = "needs-merge-human";
+/**
+ * The label on a PR that changes folio content text: wording, tables,
+ * figures, models, decisions, glossary entries, a change set (owner,
+ * 2026-11-15). Harness or tool code, re-pins and beans are not content.
+ * Check 9 reads it.
+ */
+export const CONTENT_LABEL = "content";
 export const BOT_LOGIN = "github-actions[bot]";
 /**
  * The commit status an agent-built preview's verify rebuild posts on the head
@@ -227,6 +240,7 @@ export const CHECKS = [
   "checklist",
   "open-question",
   "mergeable",
+  "content-review",
 ] as const;
 export type CheckId = (typeof CHECKS)[number];
 
@@ -287,7 +301,7 @@ export interface GuardRun extends RunRow {
 }
 
 /**
- * Everything the eight checks read, fetched once. The tests build this from
+ * Everything the nine checks read, fetched once. The tests build this from
  * fixture JSON; {@link fetchSnapshot} builds it from GitHub.
  */
 export interface GuardSnapshot {
@@ -655,7 +669,7 @@ export function parseMergeMainDispatches(text: string): string[] | undefined {
   return files.length > 0 && files.every((f) => /^[\w.-]+\.ya?ml$/.test(f)) ? files : undefined;
 }
 
-// ─── the eight checks ──────────────────────────────────────────────────────
+// ─── the checks ──────────────────────────────────────────────────────
 
 const R = (n: number, id: CheckId, status: CheckStatus, detail: string, kind?: RefusalKind): CheckResult =>
   status === "refuse" ? { n, id, status, detail, kind: kind ?? "not-ready" } : { n, id, status, detail };
@@ -1121,7 +1135,97 @@ function checkMergeable(s: GuardSnapshot): CheckResult {
   );
 }
 
-/** Run the eight checks. Pure: everything it reads is in `s`. */
+
+// ─── check 9: content review ──────────────────────────────────────────────
+
+/** The PR-body heading under which a content PR documents its review. */
+export const CONTENT_REVIEW_HEADING = "Content review";
+
+/**
+ * What counts as a pointer to a review record inside the "Content review"
+ * section: a link, an owner decision card (`Q-RA-VAL-2`), a bean id
+ * (`folio-assistant-n6ny`), or a path to an editing-hci-validation instance
+ * or a review log in the repository.
+ */
+const RECORD_PATTERNS: readonly RegExp[] = [
+  /https?:\/\/\S+/g,
+  /\bQ-[A-Z0-9]+(?:-[A-Z0-9]+)+\b/g,
+  /\bfolio-assistant-[a-z0-9]{4}\b/g,
+  /(?:^|[\s`(])((?:beans|review|processes|test\/attestations)\/[\w./-]*editing-hci-validation[\w./-]*|review\/[\w./-]+)/g,
+];
+
+/** A section that only says the review has not happened yet. */
+const PLACEHOLDER = /^(?:\s|[-*>]|_|tbd|todo|pending|none|n\/a|not yet|to do|\.|:)*$/i;
+
+/**
+ * `text` with every HTML comment removed, including one that spans lines
+ * and one left open to the end (a template's hint is not a record).
+ */
+export function stripHtmlComments(text: string): string {
+  let out = "";
+  let at = 0;
+  for (;;) {
+    const open = text.indexOf("<!--", at);
+    if (open < 0) return out + text.slice(at);
+    out += text.slice(at, open);
+    const close = text.indexOf("-->", open + 4);
+    if (close < 0) return out;
+    at = close + 3;
+  }
+}
+
+export interface ContentReviewRecord {
+  ok: boolean;
+  /** The pointers found, when `ok`. */
+  records: string[];
+  why: string;
+}
+
+/**
+ * The "Content review" section of a PR body (`## Content review` or
+ * `### Content review`, up to the next heading of the same or a higher
+ * level), and the review records it points to. Pure.
+ */
+export function contentReviewRecord(body: string | null | undefined): ContentReviewRecord {
+  const lines = (body ?? "").split(/\r?\n/);
+  const at = lines.findIndex((l) => /^(#{2,3})\s+Content review\s*:?\s*$/i.test(l.trim()));
+  if (at < 0) return { ok: false, records: [], why: `the body has no \`## ${CONTENT_REVIEW_HEADING}\` section` };
+  const level = (lines[at]!.trim().match(/^#+/) ?? ["##"])[0].length;
+  const section: string[] = [];
+  for (const l of lines.slice(at + 1)) {
+    const h = l.trim().match(/^(#+)\s/);
+    if (h && h[1]!.length <= level) break;
+    section.push(l);
+  }
+  const text = stripHtmlComments(section.join("\n"));
+  if (PLACEHOLDER.test(text)) return { ok: false, records: [], why: `the \`${CONTENT_REVIEW_HEADING}\` section is empty or a placeholder` };
+  const records = [...new Set(RECORD_PATTERNS.flatMap((re) => [...text.matchAll(re)].map((m) => (m[1] ?? m[0]).replace(/[).,]+$/, ""))))];
+  return records.length
+    ? { ok: true, records, why: "" }
+    : {
+        ok: false,
+        records: [],
+        why: `the \`${CONTENT_REVIEW_HEADING}\` section names no review record (a link, an owner card id such as \`Q-RA-VAL-2\`, a bean id, or an editing-hci-validation instance path)`,
+      };
+}
+
+/**
+ * Check 9 (owner, 2026-11-15): a PR labelled {@link CONTENT_LABEL} documents
+ * its content review in the body before it is ready. A content draft with no
+ * record is not-ready (pending); a content PR marked ready with no record is
+ * a defect (failure), because the record is part of making it ready. A PR
+ * without the label passes: it is not content.
+ */
+function checkContentReview(s: GuardSnapshot): CheckResult {
+  if (!s.pr.labels.some((l) => l.name === CONTENT_LABEL)) return R(9, "content-review", "pass", `not a content PR (no \`${CONTENT_LABEL}\` label)`);
+  const rec = contentReviewRecord(s.pr.body);
+  if (rec.ok) return R(9, "content-review", "pass", `content review documented: ${rec.records.slice(0, 4).join(", ")}${rec.records.length > 4 ? ", …" : ""}`);
+  return s.pr.draft
+    ? R(9, "content-review", "refuse", `a \`${CONTENT_LABEL}\` PR needs its review documented before it is ready: ${rec.why}`)
+    : R(9, "content-review", "refuse", `marked ready without a documented content review: ${rec.why}. Convert it back to draft, or add the \`## ${CONTENT_REVIEW_HEADING}\` section`, "defect");
+}
+
+/** Run the nine checks. Pure: everything it reads is in `s`. */
 /** The label that makes a merge a release, so CI gates it (check 5). */
 export const RELEASE_LABEL = "release";
 
@@ -1150,8 +1254,16 @@ export const FULL_TIER_JUDGE = /no new failures/i;
  */
 export const SHARD = /(?:shard |, )(\d+)\/(\d+)\b/i;
 
+/**
+ * A job name that is still template text. GitHub shows some with the `${{ }}`
+ * and some without it, as `needs.<job>.outputs.full == 'false' && '…' || '…'`
+ * (dth-hrh#133, 2026-11-14: a run cancelled before its tier was decided). The
+ * run that followed it was green, and this cancelled one kept check 5 red.
+ */
+const UNRENDERED = /\$\{\{|\bneeds\.[\w-]+\.outputs\./;
+
 function judgedNothing(c: GhCheckRun): boolean {
-  return c.conclusion === "skipped" || c.name.includes("${{");
+  return c.conclusion === "skipped" || UNRENDERED.test(c.name);
 }
 
 /**
@@ -1227,6 +1339,7 @@ export function evaluate(s: GuardSnapshot, o: GuardOptions = {}): GuardVerdict {
     checkChecklist(s),
     checkOpenQuestion(s),
     checkMergeable(s),
+    checkContentReview(s),
   ];
   const unknown = checks.some((c) => c.status === "unknown");
   const refused = checks.some((c) => c.status === "refuse");

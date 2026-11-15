@@ -23,7 +23,7 @@ import { basename, join } from "node:path";
 import {
   DEFAULT_DIRECTORIES,
   findDeclarationFile,
-  instanceConfigFilename,
+  layerConfigFilename,
   instanceDeclarationFilename,
 } from "../../schemas/kg/cat-harness.js";
 
@@ -43,7 +43,7 @@ export const FIXTURE_INSTANCE = "fixture";
 /**
  * `fixture.json` — the fallback name's DECLARATION.
  *
- * Named `FIXTURE_CONFIG` and built from `instanceConfigFilename` until
+ * Named `FIXTURE_CONFIG` and built from `layerConfigFilename` until
  * 2026-09-21, which was accurate only while the declaration and the config
  * shared one filename. Once the owner split them, these helpers went on
  * writing `<name>.config.json` while `findDeclarationFile` looked for
@@ -59,11 +59,11 @@ export function declarationNameFor(dir: string): string {
 }
 
 /** `fixture.config.json` — the fallback name's CONFIG, as against its declaration. */
-export const FIXTURE_CONFIG = instanceConfigFilename(FIXTURE_INSTANCE);
+export const FIXTURE_CONFIG = layerConfigFilename(FIXTURE_INSTANCE);
 
 /** `<basename>.config.json` for a directory — its CONFIG. */
 export function configNameFor(dir: string): string {
-  return instanceConfigFilename(basename(dir));
+  return layerConfigFilename(basename(dir));
 }
 
 /**
@@ -130,7 +130,7 @@ export function instanceDeclarationPathIn(dir: string, name: string = basename(d
  * returned the declaration's path and the distinction did not exist.
  */
 export function instanceConfigPathIn(dir: string, name: string = basename(dir)): string {
-  return join(dir, instanceConfigFilename(name));
+  return join(dir, layerConfigFilename(name));
 }
 
 /**

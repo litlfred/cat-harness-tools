@@ -43,7 +43,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { readStructure } from "../../schemas/content/document-structure.ts";
 import { displayNarrative } from "./narrative-display.ts";
 
@@ -254,7 +254,10 @@ export function entryCoverage(dir: string, v: DocumentView, captions: { kind: st
 /** One kept figure: where it is, and what it shows in each language (`lang` → text). */
 export interface DocImage {
   id: string;
+  /** Where the site publishes it, under `files/<id>/`: always inside that directory ({@link containedRel}). */
   file: string;
+  /** The entry-relative path it is READ from, when that differs from `file` (a file outside the entry). */
+  source?: string;
   page: number | null;
   /** The captions this render shows (`shows`), vector renders only. */
   shows?: string[];
@@ -274,6 +277,8 @@ export interface DocTable {
   narratives: Record<string, string>;
   /** The CSV beside the record, relative to the entry. */
   csv: string;
+  /** The entry-relative path it is READ from, when that differs from `csv`. */
+  source?: string;
 }
 
 interface RawNarrative { text?: string | null; lang?: string; state?: string }
@@ -324,7 +329,8 @@ export function readEntryImages(dir: string): DocImage[] {
     if (r.role !== undefined && r.role !== "figure") return;
     if (!r.file || !/\.(?:webp|png)$/i.test(r.file) || !existsSync(join(dir, r.file))) return;
     const { map, state } = narrativeMap(r.narrative);
-    out.push({ id: r.id, file: r.file, page, ...(r.shows?.length ? { shows: r.shows } : {}), narratives: map, state });
+    const file = containedRel(r.file);
+    out.push({ id: r.id, file, ...(file === r.file ? {} : { source: r.file }), page, ...(r.shows?.length ? { shows: r.shows } : {}), narratives: map, state });
   };
   const im = readJson<{ images?: RawImage[] }>(join(dir, "images.json"));
   for (const r of im?.images ?? []) add(r, r.basis?.page ?? null);
@@ -357,18 +363,46 @@ export function readEntryTables(dir: string): DocTable[] {
       rows: body,
       ...(t["fac:notes"] ? { notes: t["fac:notes"] } : {}),
       narratives: narrativeMap(t["fac:narrative"]).map,
-      csv: t.url,
+      csv: containedRel(t.url),
+      ...(containedRel(t.url) === t.url ? {} : { source: t.url }),
     });
   }
   return out;
 }
 
 /**
- * The files the site copies for an entry's figures: `[entry-relative path]`.
- * Through {@link readEntryImages}, so the page and the copy can never disagree.
+ * An entry-relative path made safe to publish under `files/<id>/`: each `..`
+ * becomes `_up`, so the copy and the page's link stay inside that directory.
+ * An entry may point at a file outside itself (`kg-folio-asst-2026-09-30`'s
+ * images are `../../../docs/assets/img/kg-deck/…`); joined as-is, the copy
+ * escaped `assets/library/files/<id>/` and landed at `docs/docs/assets/…`,
+ * inside the layer's mount (bean `cat-tools-sm8r`, measured 2026-11-15).
  */
+export function containedRel(rel: string): string {
+  return posix
+    .normalize(rel.split("\\").join("/"))
+    .split("/")
+    .filter((seg) => seg !== "" && seg !== ".")
+    .map((seg) => (seg === ".." ? "_up" : seg))
+    .join("/");
+}
+
+/**
+ * The files the site copies for an entry's figures: where each is published
+ * (`rel`, under `files/<id>/`) and where it is read from (`source`), both
+ * entry-relative. Through {@link readEntryImages}, so the page and the copy can
+ * never disagree.
+ */
+export function entryFigureCopies(dir: string): { rel: string; source: string }[] {
+  return [
+    ...readEntryImages(dir).map((i) => ({ rel: i.file, source: i.source ?? i.file })),
+    ...readEntryTables(dir).map((t) => ({ rel: t.csv, source: t.source ?? t.csv })),
+  ];
+}
+
+/** The published paths of {@link entryFigureCopies}. */
 export function entryFigureFiles(dir: string): string[] {
-  return [...readEntryImages(dir).map((i) => i.file), ...readEntryTables(dir).map((t) => t.csv)];
+  return entryFigureCopies(dir).map((c) => c.rel);
 }
 
 /** The raw `structure.json` fields this view reads (schemas/ui/pdf-structure.ts). */
@@ -625,9 +659,10 @@ export function readEntryDocument(
   // Figures and tables are the work's own content, so a WITHHELD entry
   // (bean cw35) shows neither, as it shows no body text.
   if (!withheld) {
-    const images = readEntryImages(dir);
+    // `source` is this module's own (where the copy is read from), not part of the published document.
+    const images = readEntryImages(dir).map(({ source: _s, ...i }) => i);
     if (images.length) view.images = images;
-    const tables = readEntryTables(dir);
+    const tables = readEntryTables(dir).map(({ source: _s, ...t }) => t);
     if (tables.length) view.tables = tables;
   }
   view.coverage = entryCoverage(dir, view, s.figures);
@@ -744,11 +779,32 @@ function docTreeBuild(details){
   ul.setAttribute("data-built", "1");
   ul.innerHTML = docTreeKids(Number(ul.getAttribute("data-kids")));
 }
+/* An INFERRED contents lists what the contents pages print. A section the
+   rung cut that no entry names -- the front matter, or the 30 chapters of
+   Parts 2 and 3 that 10665-75211's oversized split cut by running heads --
+   was not in the tree at all. Each is placed among the entries by its first
+   page, at its own level, and says it is not listed. An outline is the
+   PDF's own and is shown as it is. */
+function docTocWithSections(d){
+  if (d.tocSource === "outline") return d.toc;
+  var named = {};
+  d.toc.forEach(function(e){ if (e.section) named[e.section] = true; });
+  var extra = d.sections.filter(function(s){ return !named[s.id] && s.pageStart != null; }).map(function(s){
+    return { level: s.level || 1, title: s.title, number: s.number, page: s.pageStart, pageLabel: s.labelStart, section: s.id, unlisted: true };
+  });
+  if (!extra.length) return d.toc;
+  var out = [], j = 0;
+  d.toc.forEach(function(e){
+    while (j < extra.length && e.page != null && extra[j].page < e.page) out.push(extra[j++]);
+    out.push(e);
+  });
+  return out.concat(extra.slice(j));
+}
 function docContents(d){
   var bySec = {};
   d.sections.forEach(function(s){ bySec[s.id] = s; });
   var blocksOf = docBlocksBySection(d);
-  var useToc = d.toc.length > 0, items = useToc ? d.toc : d.sections;
+  var useToc = d.toc.length > 0, items = useToc ? docTocWithSections(d) : d.sections;
   if (!items.length) return d.variant && d.variant !== "pdf"
     ? '<p class="empty">No sections: the source has no headings.</p>'
     : '<p class="empty">No table of contents: the PDF carries no outline and none could be inferred.</p>';
@@ -756,7 +812,8 @@ function docContents(d){
     var sid = useToc ? e.section : e.id, s = sid && bySec[sid];
     var t = (e.number ? esc(e.number) + ' ' : '') + esc(e.title);
     var link = sid ? '<a href="#sec-' + esc(sid) + '" data-sec="' + esc(sid) + '">' + t + '</a>' : t;
-    var where = useToc ? ' <span class="note">' + pageText(e.page, e.pageLabel) + '</span> ' + confPill(e.confidence, e.evidence)
+    var where = useToc && e.unlisted ? ' <span class="note">' + pageText(e.page, e.pageLabel) + ' · a section the contents do not list</span>'
+      : useToc ? ' <span class="note">' + pageText(e.page, e.pageLabel) + '</span> ' + confPill(e.confidence, e.evidence)
       : e.pageStart != null ? ' <span class="note">' + pageText(e.pageStart, e.labelStart) + '</span>' : '';
     return link + where + (s && s.edit && d.links ? ' ' + editHost(s) : '');
   }
@@ -769,7 +826,8 @@ function docContents(d){
     ? (d.variant && d.variant !== "pdf" ? "Contents: the source’s own headings."
       : "No outline: the PDF carries none and none could be inferred, so its sections are listed.") + ' ' + d.sections.length + ' sections.'
     : 'Source: ' + (d.tocSource === "outline" ? "the PDF’s own outline"
-      : "inferred (" + esc(d.tocMethod || "unknown") + "); each entry’s confidence and the evidence behind it are shown") + '. ' + d.toc.length + ' entries.';
+      : "inferred (" + esc(d.tocMethod || "unknown") + "); each entry’s confidence and the evidence behind it are shown") + '. ' + d.toc.length + ' entries.' +
+      (items.length > d.toc.length ? ' ' + (items.length - d.toc.length) + ' section(s) the contents do not list are shown at their place.' : '');
   return '<p class="note">' + how + (DOC_BLOCKS ? '' : ' Blocks are listed once the block graph has loaded.') + '</p>' +
     '<p><button type="button" data-toc="open">Expand all</button> <button type="button" data-toc="close">Collapse all</button></p>' +
     '<ul class="toc">' + docTreeItems(t.top) + '</ul>';

@@ -186,7 +186,7 @@ describe("this repository's own instances", () => {
     // and neither looked at the repository. `folio-assist-core` and the root
     // were layers the gate never rendered (bean `6tkl`).
     //
-    // The order is root-first then sorted, which is what `instanceRootsIn`
+    // The order is root-first then sorted, which is what `layerRootsIn`
     // promises so that a report is stable.
     //
     // Updated 2026-09-20 when it fired as designed: seven layers arrived on
@@ -195,7 +195,7 @@ describe("this repository's own instances", () => {
     // — `schemas/cat-harness.test.ts` holds the other. Two copies is a real
     // cost and it is taken deliberately: they assert different things (that
     // discovery finds them, and that each one RENDERS), and deriving either
-    // from `instanceRootsIn` would make the test agree with the function by
+    // from `layerRootsIn` would make the test agree with the function by
     // construction, which is exactly how the `["cat-harness", "bootstrap"]`
     // literal passed for the whole period it was wrong.
     // The root by its DECLARED name (bean `t5dm`): its last path segment is

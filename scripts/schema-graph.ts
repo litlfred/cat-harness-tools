@@ -52,7 +52,9 @@ import { checkoutRootFor, findInstanceRoot } from "../schemas/kg/cat-harness.js"
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, rootInstanceName } from "../schemas/kg/harness-config.js";
 import { withConcernGroupDirs } from "./concern-groups.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { isFhirStructureDefinition, readFhirLogicalModel } from "./fhir-logical-model.ts";
+import { FHIR_CORE_SD, fhirCoreRelease, isFhirStructureDefinition, readFhirLogicalModel } from "./fhir-logical-model.ts";
+import { readModdleMetamodels } from "./moddle-metamodel.ts";
+import { readRdfVocabularies, type VocabularyRead } from "./rdf-vocabulary.ts";
 
 /**
  * Which layers' `schemas` directories a reading covers.
@@ -123,6 +125,11 @@ export type DeclKind =
   | "json-schema"
   | "fhir-logical"
   | "fhir-profile"
+  | "owl-class"
+  | "rdfs-class"
+  | "rdf-property-set"
+  | "moddle-class"
+  | "moddle-enum"
   | "undetermined";
 
 /** One field of an object-like declaration. */
@@ -172,6 +179,11 @@ export interface SchemaField {
   max?: number | "*";
   /** The source states no cardinality and none can be read: drawn `?..?`, never guessed. */
   cardinalityUnknown?: true;
+  /**
+   * The source states the upper bound and not the lower one — a moddle
+   * descriptor says `isMany` and nothing else: drawn `?..1` / `?..*`.
+   */
+  minUnknown?: true;
   /**
    * Type name → where its definition is (a canonical URL), for a type that is
    * not a declaration of this graph — a FHIR datatype while no layer holds FHIR
@@ -319,10 +331,19 @@ export interface SchemaGraph {
    * viewer says "not read", never shows the IG as having no logical models.
    */
   unread: string[];
+  /**
+   * The published vocabularies and metamodels the checkout read (SKOS, PROV,
+   * BPMN, …), each with the namespace it defines, for the QA report's check
+   * that an external-schema record names it (bean `cat-tools-xfd4`).
+   */
+  vocabularies?: VocabularyRead[];
 }
 
 /** The graph typology an IG's artefact index is declared under (the FHIR layer's kind). */
 const FHIR_ARTIFACT_INDEX = "fhir-artifact-index";
+
+/** The graph typology FHIR core's StructureDefinitions are declared under (by whichever layer holds it; never named here). */
+const FHIR_CORE_DEFINITIONS = "fhir-core-definitions";
 
 const TAG = /@graphNode\s+(\S+)(?:\s*[—-]\s*(.*))?/;
 
@@ -884,6 +905,8 @@ export interface ClassModelRef {
   by?: "canonical";
   /** A miss is expected (FHIR core not held here): no edge, and not reported as unresolved. */
   quietMiss?: true;
+  /** The FHIR version of the model the ref was written in, for choosing a fhir-core release. */
+  fhirVersion?: string;
 }
 
 /** What a reader over one JSON document returns. */
@@ -963,6 +986,7 @@ const SHAPE_KEYWORDS = [
  */
 export function cardinalityOf(f: SchemaField): string {
   if (f.cardinalityUnknown) return "?..?";
+  if (f.minUnknown) return `?..${f.max ?? (f.array ? "*" : 1)}`;
   let min = f.min;
   if (min === undefined) {
     if (f.optional) min = 0;
@@ -1223,6 +1247,113 @@ export function readJsonDocument(text: string, moduleRel: string): ClassModelRea
 }
 
 /**
+ * Load the FHIR core definitions `refs` reference, from declared
+ * `fhir-core-definitions` directories (bean `cat-tools-t6fz`).
+ *
+ * Only what is referenced, one level deep, from the release the referencing
+ * model states (`fhirVersion` → `r4` / `r4b` / `r5`). A release that is unread,
+ * a body not materialised, or a model that states no version is reported in
+ * `unread`, and the type stays an external, linked name — never a box guessed
+ * from another release.
+ */
+export function loadFhirCore(
+  coreDirs: readonly string[],
+  refs: readonly ClassModelRef[],
+  alreadyLoaded: ReadonlySet<string>,
+  rel: (p: string) => string,
+  fallbackInstance?: string,
+): { modules: SchemaGraphModule[]; decls: SchemaDecl[]; edges: SchemaEdge[]; unread: string[] } {
+  const out = { modules: [] as SchemaGraphModule[], decls: [] as SchemaDecl[], edges: [] as SchemaEdge[], unread: [] as string[] };
+  if (coreDirs.length === 0) return out;
+  const wanted = new Map<string, Set<string>>();
+  let noVersion = 0;
+  for (const r of refs) {
+    if (!r.quietMiss || !r.ref.startsWith(FHIR_CORE_SD)) continue;
+    const release = fhirCoreRelease(r.fhirVersion);
+    if (!release) {
+      noVersion++;
+      continue;
+    }
+    const set = wanted.get(release) ?? new Set<string>();
+    set.add(r.ref.split("|")[0]!);
+    wanted.set(release, set);
+  }
+  if (noVersion > 0) out.unread.push(`fhir-core: ${noVersion} reference(s) to FHIR core from models that state no fhirVersion — left external`);
+  const loaded = new Set(alreadyLoaded);
+  for (const [release, urls] of [...wanted.entries()].sort()) {
+    const dir = coreDirs.map((d) => join(d, release)).find((d) => existsSync(join(d, "manifest.json")));
+    if (!dir) {
+      out.unread.push(`fhir-core/${release}: no declared release directory with a manifest`);
+      continue;
+    }
+    let manifest: { status?: string; reason?: string; definitions?: { url: string; file: string }[] };
+    try {
+      manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+    } catch (e) {
+      out.unread.push(`${rel(dir)}: manifest unreadable — ${(e as Error).message.slice(0, 80)}`);
+      continue;
+    }
+    if (manifest.status !== "read") {
+      out.unread.push(`${rel(dir)}: release unread — ${manifest.reason ?? "no reason recorded"}`);
+      continue;
+    }
+    const byUrl = new Map((manifest.definitions ?? []).map((d) => [d.url, d.file]));
+    const layerRoot = findInstanceRoot(dir) ?? dir;
+    const instance = rel(layerRoot).split("/")[0] || fallbackInstance || basename(layerRoot);
+    let missing = 0;
+    for (const url of [...urls].sort()) {
+      if (loaded.has(url)) continue;
+      const file = byUrl.get(url);
+      if (!file) continue; // a primitive, or not in this release: stays external
+      const abs = join(dir, file);
+      if (!existsSync(abs)) {
+        missing++;
+        continue;
+      }
+      const moduleRel = rel(abs);
+      const read = readFhirLogicalModel(readFileSync(abs, "utf-8"), moduleRel);
+      if (read.decls.length === 0) continue;
+      loaded.add(url);
+      out.modules.push({
+        module: moduleRel,
+        instance,
+        name: basename(file, ".json"),
+        graphNode: "schema",
+        ...(read.summary ? { summary: read.summary } : {}),
+        isTest: false,
+        decls: read.decls.map((d) => d.id),
+      });
+      out.decls.push(...read.decls);
+      // Its own references stay external (one level deep): only its local edges are kept.
+      out.edges.push(...read.edges);
+    }
+    if (missing > 0) out.unread.push(`${rel(dir)}: ${missing} referenced definition(s) not materialised (run fhir-core:materialise)`);
+  }
+  return out;
+}
+
+/**
+ * The class IRIs of the vocabulary `prefix` / `namespace` that `text` names:
+ * a CURIE (`schema:DefinedTerm`) or a full IRI, in either scheme
+ * (`https://schema.org/X` is the same name as `http://schema.org/X`). A class
+ * is a capitalised local name, as every vocabulary read here writes one.
+ */
+export function classMentions(text: string, prefix: string, namespace: string): Set<string> {
+  const esc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const bare = namespace.replace(/^https?:\/\//, "");
+  const re = new RegExp(`(?:\\b${esc(prefix)}:|https?://${esc(bare)})([A-Z][A-Za-z0-9_]*)`, "g");
+  const out = new Set<string>();
+  for (const m of text.matchAll(re)) out.add(`${namespace}${m[1]}`);
+  return out;
+}
+
+/** What the corpus's declarations name of a vocabulary: every field type and literal value, scanned. */
+function vocabularyMentions(decls: readonly SchemaDecl[]): (prefix: string, namespace: string) => Set<string> {
+  const text = decls.map((d) => `${d.fields.map((f) => f.type).join(" ")} ${d.values.join(" ")}`).join("\n");
+  return (prefix, namespace) => classMentions(text, prefix, namespace);
+}
+
+/**
  * Read the whole schema graph.
  *
  * Returns `null` — not an empty graph — when the declared directory does not
@@ -1420,6 +1551,62 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
     }
   }
 
+  // Published vocabularies and metamodels (bean `cat-tools-xfd4`): the RDF
+  // vocabularies this layer's package.json depends on (`@vocabulary/*`, owner
+  // option A) and the OMG metamodels its `*-moddle` dependencies describe.
+  // Read for the checkout scope only, like the IG's models: they are what the
+  // corpus's own types point at, not modules of the corpus.
+  const vocabularies: VocabularyRead[] = [];
+  if (opts.scope === "checkout") {
+    const pj = join(import.meta.dir, "..", "package.json");
+    const layer = rel(join(import.meta.dir, "..")).split("/")[0] || rootName || "cat-harness-tools";
+    const mentions = vocabularyMentions(decls);
+    const rdf = readRdfVocabularies(pj, rel, layer, mentions);
+    // A shape the corpus types by a class of such a vocabulary (`"@type":
+    // z.literal("schema:DefinedTerm")`) names that class by IRI: an id-ref.
+    const byCanonical = new Map(rdf.decls.filter((d) => d.canonical).map((d) => [d.canonical!, d.id]));
+    for (const v of rdf.vocabularies.filter((x) => x.referencedOnly)) {
+      for (const d of decls) {
+        for (const f of d.fields) {
+          for (const iri of classMentions(`${f.type} ${d.values.join(" ")}`, v.prefix, v.namespace)) {
+            const to = byCanonical.get(iri);
+            if (to) jsonLocalEdges.push({ from: d.id, to, via: f.name, kind: "id-ref", optional: f.optional, array: f.array });
+          }
+        }
+      }
+    }
+    for (const read of [rdf, readModdleMetamodels(pj, rel, layer)]) {
+      modules.push(...read.modules);
+      decls.push(...read.decls);
+      jsonRefs.push(...read.refs);
+      jsonLocalEdges.push(...read.edges);
+      vocabularies.push(...read.vocabularies);
+      unread.push(...read.unread);
+    }
+  }
+
+  // FHIR core types, from a layer's declared `fhir-core-definitions` graph
+  // (bean `cat-tools-t6fz`). Only the core definitions a
+  // reading REFERENCES are loaded, one level deep, from the release its model
+  // states (`fhirVersion`): the bodies are the full package files, 12 MB, and a
+  // reference to `Patient` needs Patient, not the whole specification. A
+  // release that is unread, a body not materialised, or a model that states no
+  // version is listed in `unread` — the type stays an external, linked name,
+  // never a box guessed from another release.
+  if (opts.scope === "checkout") {
+    let coreDirs: string[] = [];
+    try {
+      coreDirs = checkoutDirectoriesForGraph(FHIR_CORE_DEFINITIONS, root);
+    } catch {
+      coreDirs = [];
+    }
+    const core = loadFhirCore(coreDirs, jsonRefs, new Set(decls.map((d) => d.canonical).filter((c): c is string => !!c)), rel, rootName);
+    modules.push(...core.modules);
+    decls.push(...core.decls);
+    jsonLocalEdges.push(...core.edges);
+    unread.push(...core.unread);
+  }
+
   // Resolution, second pass — every module's exports are known by now, so a
   // forward reference resolves the same as a backward one. Doing it inline
   // above would make an edge's existence depend on directory order, which is
@@ -1427,7 +1614,7 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
   const byId = new Map(decls.map((d) => [d.id, d]));
   const edges: SchemaEdge[] = [];
   /** Modules a JSON reader read: their edges are the resolver's, not the AST walk's. */
-  const jsonModules = new Set(modules.filter((m) => /\.json$/.test(m.module)).map((m) => m.module));
+  const jsonModules = new Set(modules.filter((m) => /\.(json|nq)$/.test(m.module)).map((m) => m.module));
 
   /**
    * A bound name → the declaration it names, `"external"`, or `null`.
@@ -1583,7 +1770,7 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
 
   refProblems.sort();
 
-  return { roots: dirs.map(rel), modules, decls, edges, refProblems, unread };
+  return { roots: dirs.map(rel), modules, decls, edges, refProblems, unread, ...(vocabularies.length ? { vocabularies } : {}) };
 }
 
 if (import.meta.main) {

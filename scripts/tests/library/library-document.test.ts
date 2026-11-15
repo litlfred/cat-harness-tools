@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DOCUMENT_VIEW_JS, entryFigureFiles, extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
+import { DOCUMENT_VIEW_JS, containedRel, entryFigureCopies, entryFigureFiles, extractOf, plainHeading, plainMarkdown, readEntryDocument } from "../../lib/library-document.ts";
 import { VIEWER_JS } from "../../gen-library-viz.ts";
 import { LibraryDocumentSchema } from "../../../schemas/ui/site-indexes.ts";
 
@@ -262,6 +262,27 @@ describe("kept figures and transcribed tables (who-iris#224)", () => {
     expect(readEntryDocument(dir, "r")!.images?.map((i) => i.id)).toEqual(["img-p002-1", "vfig-p010"]);
     expect(entryFigureFiles(dir)).toContain("figures/vfig-p010.png");
   });
+  // kg-folio-asst-2026-09-30's images are `../../../docs/assets/img/…`: joined
+  // as-is, the copy escaped `files/<id>/` and landed inside the layer's mount
+  // at `docs/docs/assets/…` (bean `cat-tools-sm8r`).
+  test("a figure outside the entry is published INSIDE files/<id>/ and read from where it is", () => {
+    const dir = withFiles();
+    mkdirSync(join(dir, "..", "shared"), { recursive: true });
+    writeFileSync(join(dir, "..", "shared", "pic.webp"), "x");
+    writeFileSync(join(dir, "images.json"), JSON.stringify({ images: [{ id: "pic", file: "../shared/pic.webp", role: "figure" }] }));
+    expect(entryFigureCopies(dir)).toContainEqual({ rel: "_up/shared/pic.webp", source: "../shared/pic.webp" });
+    expect(entryFigureFiles(dir).every((r) => !r.split("/").includes(".."))).toBe(true);
+    // The page links the same contained path, and the document stays schema-valid.
+    const v = readEntryDocument(dir, "r")!;
+    expect(v.images?.map((i) => i.file)).toEqual(["_up/shared/pic.webp"]);
+    const r = LibraryDocumentSchema.safeParse(JSON.parse(JSON.stringify(v)));
+    expect(r.success ? [] : r.error.issues).toEqual([]);
+  });
+  test("containedRel never climbs out", () => {
+    expect(containedRel("images/a.webp")).toBe("images/a.webp");
+    expect(containedRel("./images/a.webp")).toBe("images/a.webp");
+    expect(containedRel("../../../docs/assets/img/x.webp")).toBe("_up/_up/_up/docs/assets/img/x.webp");
+  });
 });
 
 /**
@@ -311,6 +332,28 @@ describe("the Contents tree", () => {
     expect(h).toContain('<a href="#sec-s1" data-sec="s1">1 One</a>');
     expect(h).not.toContain("Not in the outline");
     expect(T.docTreeKids(0)).toContain("1.1 One A");
+  });
+
+  test("an inferred contents gains the sections it does not list, at their place", () => {
+    // 10665-75211: Part 1's contents pages name 70 entries; the chapters of Parts 2 and 3 were cut
+    // inside the last one by the oversized split and appeared nowhere in the tree.
+    T.setBlocks([]);
+    const d = view({
+      tocSource: "inferred",
+      tocMethod: "contents",
+      toc: [
+        { level: 1, title: "Vision", number: "1", page: 3, pageLabel: null, confidence: 0.9, evidence: ["contents"], source: "inferred", section: "s1" },
+        { level: 1, title: "Definitions of terms", number: null, page: 10, pageLabel: null, confidence: 0.8, evidence: ["contents"], source: "inferred", section: "s2" },
+      ],
+      sections: [sec("s0", "Front matter", 1, 1), sec("s1", "Vision", 1, 3), sec("s2", "Definitions of terms", 1, 10), sec("s3", "Part 2: Action plan", 2, 12), sec("s4", "Chapter 1. Framework", 2, 14)],
+    });
+    const h = T.docContents(d);
+    expect(h).toContain("2 entries. 3 section(s) the contents do not list are shown at their place.");
+    expect(h.indexOf("Front matter")).toBeLessThan(h.indexOf("Vision"));
+    expect(h).toContain("a section the contents do not list");
+    const kids = T.docTreeKids(2);
+    expect(kids).toContain('data-sec="s3">Part 2: Action plan</a>');
+    expect(kids).toContain('data-sec="s4">Chapter 1. Framework</a>');
   });
 
   test("toc absent: the tree is built from the sections, nested by level", () => {

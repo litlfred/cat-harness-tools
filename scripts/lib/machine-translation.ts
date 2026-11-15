@@ -21,8 +21,14 @@
  *     translate it. The check still runs on the restored text.
  *   - **Surrounding whitespace** is cut off before translation and put back
  *     after ({@link splitWhitespace}).
+ *   - **Line by line** ({@link translateStrings}): each line of a string is
+ *     masked and sent on its own, its surrounding whitespace kept, so an
+ *     engine cannot merge or drop a line; a string with no letters outside
+ *     its placeholders is not sent at all; identical lines are sent once.
  *   - **Which entries are translated** ({@link entriesToTranslate}): an empty
- *     or fuzzy `msgstr`, never a plural entry.
+ *     or fuzzy `msgstr`. A plural entry's forms follow the target's plural
+ *     count ({@link nplurals}, {@link pluralSources}) (owner, 2026-11-14:
+ *     plurals are machine-filled, fuzzy).
  *   - **Starting a catalogue** from its template ({@link poFromPot}), and the
  *     author's `DO NOT MACHINE-FILL` opt-out ({@link forbidsMachineFill}).
  */
@@ -38,7 +44,12 @@ import { poEntries } from "./translation-adjudication.ts";
 const TOKEN = new RegExp(
   [
     "`[^`\\n]+`", // inline code span
+    String.raw`\$\$[\s\S]+?\$\$`, // $$ display math $$
+    String.raw`(?<![\\\w])\$(?!\s)[^$\n]+?(?<!\s)\$`, // $inline math$
+    String.raw`\\\([\s\S]+?\\\)`, // \( math \)
+    String.raw`\\\[[\s\S]+?\\\]`, // \[ math \]
     "\\{\\{[^{}]*\\}\\}", // {{ jinja / liquid }}
+    "\\{%[\\s\\S]*?%\\}", // {% liquid tag %}
     "\\{[^{}\\s]*\\}", // {name}, {0}, {}
     "%%", // a literal percent sign in a printf string
     "%\\d+\\$[-+#0]*\\d*(?:\\.\\d+)?[diouxXeEfFgGcsa]", // %1$s
@@ -48,6 +59,7 @@ const TOKEN = new RegExp(
     "\\]\\([^)\\s]+\\)", // a Markdown link target](url)
     "https?://[^\\s<>()\\]]+", // a bare URL
     "&(?:[a-zA-Z]+|#\\d+|#x[0-9a-fA-F]+);", // HTML entities
+    "\\*\\*|~~", // Markdown strong and strike-through markers
   ].join("|"),
   "g",
 );
@@ -154,6 +166,8 @@ function poHeaderRange(lines: string[]): [number, number] | undefined {
 export interface Wanted {
   msgctxt?: string;
   msgid: string;
+  /** The entry's `msgid_plural`, for a plural entry. */
+  msgidPlural?: string;
   /** The entry's `msgstr` is empty, so its first good candidate may fill it. */
   empty: boolean;
 }
@@ -168,29 +182,102 @@ export interface Skipped {
 /**
  * The entries of a catalogue worth candidates: an EMPTY `msgstr` (which the
  * first good candidate fills) or a FUZZY one (which a reviewer may replace
- * with a candidate). A reviewed translation is not re-translated. Plural
- * entries are reported and skipped: one string cannot supply the three or
- * six forms some languages need.
+ * with a candidate). A reviewed translation is not re-translated. A plural
+ * entry counts as empty only when every one of its forms is, so a plural a
+ * person has started is left to them.
  */
 export function entriesToTranslate(po: string): { wanted: Wanted[]; skipped: Skipped[] } {
   const wanted: Wanted[] = [];
   const skipped: Skipped[] = [];
   const seen = new Set<string>();
   for (const e of poEntries(po)) {
-    const empty = e.msgstr === "";
+    const plural = e.msgidPlural !== undefined;
+    const empty = plural ? e.forms.every((f) => f === "") : e.msgstr === "";
     if (!empty && !e.fuzzy) continue;
     const ctx = e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {};
-    if (e.msgidPlural !== undefined) {
-      if (empty) skipped.push({ ...ctx, msgid: e.msgid, reason: "plural entry: its forms are left for a person" });
+    if (plural && !empty && e.forms.some((f) => f === "")) {
+      skipped.push({ ...ctx, msgid: e.msgid, reason: "plural entry with some forms filled: left for a person" });
       continue;
     }
     if (e.msgid.trim() === "") continue;
     const key = entryKey(e.msgctxt, e.msgid);
     if (seen.has(key)) continue;
     seen.add(key);
-    wanted.push({ ...ctx, msgid: e.msgid, empty });
+    wanted.push({ ...ctx, msgid: e.msgid, ...(plural ? { msgidPlural: e.msgidPlural } : {}), empty });
   }
   return { wanted, skipped };
+}
+
+// ── Plural forms ─────────────────────────────────────────────────────────
+
+/** gettext's conventional plural counts, used only when the header has no `Plural-Forms`. */
+const DEFAULT_NPLURALS: Record<string, number> = { ar: 6, ru: 3, zh: 1, ja: 1, ko: 1, fr: 2, es: 2, en: 2, pt: 2, de: 2 };
+
+/** How many forms a plural entry has in this catalogue: its `Plural-Forms` header, else gettext's convention for the language. */
+export function nplurals(po: string, locale: string): number {
+  const m = /^"Plural-Forms:[^"]*\bnplurals\s*=\s*(\d+)/m.exec(po);
+  return m ? Number(m[1]) : (DEFAULT_NPLURALS[locale.split(/[-_]/)[0]!.toLowerCase()] ?? 2);
+}
+
+/**
+ * The English source of each of a plural entry's `n` forms: the singular for
+ * form 0 when the language has more than one form, the plural for the rest
+ * (and for the only form of a language without plurals, such as `zh`).
+ */
+export function pluralSources(msgid: string, msgidPlural: string, n: number): string[] {
+  return Array.from({ length: n }, (_, k) => (k === 0 && n > 1 ? msgid : msgidPlural));
+}
+
+// ── Translating strings, line by line ────────────────────────────────────
+
+const HAS_LETTER = /\p{L}/u;
+
+/**
+ * Translate source strings with one engine, line by line. Each line is cut
+ * from its surrounding whitespace, masked ({@link maskPlaceholders}) unless
+ * `mask` is false, and sent; a line with no letters outside its placeholders
+ * is kept as it is; identical lines are sent once, in batches of `batch`.
+ *
+ * Returns, per source string, the reassembled translation (still to be
+ * checked by {@link checkedCandidate}), or why it was not sent.
+ */
+export async function translateStrings(
+  sources: string[],
+  translate: (texts: string[]) => Promise<string[]>,
+  o: { mask?: boolean; batch?: number } = {},
+): Promise<Map<string, { text: string } | { refused: string }>> {
+  const plans = new Map(
+    [...new Set(sources)].map((src) => [
+      src,
+      src.split("\n").map((line) => {
+        const { lead, core, trail } = splitWhitespace(line);
+        const m = o.mask === false ? { masked: core, tokens: new Map<string, string>() } : maskPlaceholders(core);
+        const send = HAS_LETTER.test(m.masked.replace(/\[\d+\]/g, ""));
+        return { lead, core, trail, ...m, send };
+      }),
+    ]),
+  );
+  const unique = [...new Set([...plans.values()].flatMap((lines) => lines.filter((l) => l.send).map((l) => l.masked)))];
+  const back = new Map<string, string>();
+  const size = Math.max(1, o.batch ?? 16);
+  for (let i = 0; i < unique.length; i += size) {
+    const chunk = unique.slice(i, i + size);
+    const out = await translate(chunk);
+    if (out.length !== chunk.length) throw new Error(`${out.length} strings back for ${chunk.length} sent`);
+    chunk.forEach((u, k) => back.set(u, out[k]!));
+  }
+  const result = new Map<string, { text: string } | { refused: string }>();
+  for (const [src, lines] of plans) {
+    if (!lines.some((l) => l.send)) {
+      result.set(src, { refused: "nothing translatable (no letters outside placeholders)" });
+      continue;
+    }
+    const text = lines
+      .map((l) => (l.send ? l.lead + unmaskPlaceholders((back.get(l.masked) ?? "").trim(), l.tokens) + l.trail : l.lead + l.core + l.trail))
+      .join("\n");
+    result.set(src, { text });
+  }
+  return result;
 }
 
 /** The key gettext itself uses for an entry: context, EOT, msgid. */

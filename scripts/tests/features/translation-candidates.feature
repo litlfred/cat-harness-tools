@@ -53,11 +53,6 @@ Feature: Candidate translations from open engines
     When candidates are collected
     Then a dropped or duplicated stand-in is still caught by the guard
 
-  @test:scripts/tests/translation-candidates.test.ts::which_entries_are_translated::empty_and_fuzzy_singular_entries;_never_a_reviewed_one;_plural_reported
-  Scenario: Empty and fuzzy singular entries; never a reviewed one; plural reported
-    Given the case in which entries are translated
-    When candidates are collected
-    Then empty and fuzzy singular entries; never a reviewed one; plural reported
 
   @test:scripts/tests/translation-candidates.test.ts::which_entries_are_translated::a_catalogue_that_forbids_machine_filling_is_recognised
   Scenario: A catalogue that forbids machine filling is recognised
@@ -160,3 +155,33 @@ Feature: Candidate translations from open engines
     Given the case in collectCandidates over a layer
     When candidates are collected
     Then addCandidates is the shared entry point other sources call
+
+  @test:scripts/tests/translation-candidates.test.ts::placeholder_guard::TeX_math,_liquid_tags_and_Markdown_strong/strike_markers_are_kept_too
+  Scenario: TeX math, liquid tags and Markdown strong/strike markers are kept too
+    Given the case in placeholder guard
+    When candidates are collected
+    Then TeX math, liquid tags and Markdown strong/strike markers are kept too
+
+  @test:scripts/tests/translation-candidates.test.ts::which_entries_are_translated::empty_and_fuzzy_entries,_plural_ones_included;_never_a_reviewed_one
+  Scenario: Empty and fuzzy entries, plural ones included; never a reviewed one
+    Given the case in which entries are translated
+    When candidates are collected
+    Then empty and fuzzy entries, plural ones included; never a reviewed one
+
+  @test:scripts/tests/translation-candidates.test.ts::which_entries_are_translated::a_plural_a_person_has_started_is_left_to_them
+  Scenario: A plural a person has started is left to them
+    Given the case in which entries are translated
+    When candidates are collected
+    Then a plural a person has started is left to them
+
+  @test:scripts/tests/translation-candidates.test.ts::collectCandidates_over_a_layer::addCandidates_takes_a_region-tagged_locale_(pt-BR)_and_creates_its_node
+  Scenario: AddCandidates takes a region-tagged locale (pt-BR) and creates its node
+    Given the case in collectCandidates over a layer
+    When candidates are collected
+    Then addCandidates takes a region-tagged locale (pt-BR) and creates its node
+
+  @test:scripts/tests/translation-candidates.test.ts::masking::a_mangled_stand-in_is_refused,_never_leaked_into_the_text_(bean_cat-tools-ph0s)
+  Scenario: A mangled stand-in is refused, never leaked into the text (bean cat-tools-ph0s)
+    Given the case in masking
+    When candidates are collected
+    Then a mangled stand-in is refused, never leaked into the text (bean cat-tools-ph0s)

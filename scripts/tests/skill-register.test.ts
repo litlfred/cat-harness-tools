@@ -50,6 +50,7 @@ import {
   skillPackages,
   stepsToRun,
   deferredWhy,
+  formatChainRedDiagnostic,
   unlisted,
   verifyHere,
   VERIFIED_BY_GATES_ENV,
@@ -614,5 +615,20 @@ describe("in CI, the verifies the run's own gates ask are left to them (owner, 2
     expect(byGates.map((s) => s.verify.join(" "))).toEqual(["check:glossary", "kg:audit:check"]);
     expect(verify.length + byGates.length).toBe(STEPS.length);
     expect(verify.map((s) => s.verify.join(" "))).not.toContain("kg:audit:check");
+  });
+});
+
+describe("the red diagnostic names both 'red in CI, green here' failure modes (bean 1xhc)", () => {
+  test("names both the corpus distortion (xd1g) and the merge tree (refs/pull/N/merge, check:merged)", () => {
+    const checkMsg = formatChainRedDiagnostic(true, ["kg:audit:check"]);
+    expect(checkMsg).toContain("nothing was regenerated (`--check`)");
+    expect(checkMsg).toContain("scripts/git-corpus.ts");
+    expect(checkMsg).toContain("refs/pull/N/merge");
+    expect(checkMsg).toContain("bun run cat check:merged");
+
+    const regenMsg = formatChainRedDiagnostic(false, ["kg:audit:check"]);
+    expect(regenMsg).toContain("still red after regenerating");
+    expect(regenMsg).toContain("refs/pull/N/merge");
+    expect(regenMsg).toContain("bun run cat check:merged");
   });
 });

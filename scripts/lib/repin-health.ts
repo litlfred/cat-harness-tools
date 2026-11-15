@@ -31,7 +31,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { directoriesForGraph, instanceRootsIn } from "../../schemas/kg/cat-harness.js";
+import { directoriesForGraph, layerRootsIn } from "../../schemas/kg/cat-harness.js";
 
 /** The layer whose pin moving makes a health report stale: it holds the checker. */
 export const CHECKER_INSTANCE = "cat-harness-tools";
@@ -61,7 +61,7 @@ export function checkerMoved(before: string | undefined, after: string | undefin
 export function ownHealthPaths(root: string): string[] {
   const r = resolve(root);
   const mounted = mountedPaths(r).map((p) => resolve(r, p));
-  const own = instanceRootsIn(r).filter((i) => !mounted.some((m) => i === m || i.startsWith(m + sep)));
+  const own = layerRootsIn(r).filter((i) => !mounted.some((m) => i === m || i.startsWith(m + sep)));
   return [...new Set(own.flatMap((i) => directoriesForGraph(i, "health")).map((d) => relative(r, d)))];
 }
 

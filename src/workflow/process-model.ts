@@ -1516,7 +1516,7 @@ interface InstanceLayout {
  * was computed under.
  *
  * Bean `sff8`. Resolving the layout re-reads every declaration in the
- * checkout (`orderedDependencies` → `instanceRootsIn` → `findDeclarationFile`),
+ * checkout (`orderedDependencies` → `layerRootsIn` → `findDeclarationFile`),
  * and `ownInstanceProcessIndex`, `dependencyProcessIndex` and
  * `ownInstanceGlobalTaskIndex` each did it once per DIAGRAM. Measured
  * 2026-10-24 over 101 diagrams: one `loadProcessModel` pass ~7 s, 49 % of it

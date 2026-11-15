@@ -45,7 +45,7 @@
 import { existsSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn, readDeclaration, rootForScope } from "../../schemas/kg/cat-harness.js";
+import { findDeclarationFile, layerRootsIn, readDeclaration, rootForScope } from "../../schemas/kg/cat-harness.js";
 
 /** Where a graph id is declared: the ids, each with its declaring file(s). */
 export type GraphSources = Map<string, Set<string>>;
@@ -53,13 +53,13 @@ export type GraphSources = Map<string, Set<string>>;
 /**
  * Every declared graph id in the checkout, with the declaration file naming it.
  *
- * Built through `instanceRootsIn` and `readDeclaration` rather than by globbing
+ * Built through `layerRootsIn` and `readDeclaration` rather than by globbing
  * for `*.json`, so this answers the same question about "which files are
  * declarations" that every other consumer answers — one fact, one place.
  */
 export function declaredGraphs(repoRoot: string): GraphSources {
   const out: GraphSources = new Map();
-  for (const instance of instanceRootsIn(repoRoot)) {
+  for (const instance of layerRootsIn(repoRoot)) {
     const file = findDeclarationFile(instance);
     if (file === undefined) continue;
     const decl = readDeclaration(instance);
@@ -225,7 +225,7 @@ export function historicalPrefixes(repoRoot: string): string[] {
   // `roles.json`).
   const historical = new Set(["fsh-guts", "beans", "bean-defs", "workflow-state", "library", "substrate-snapshot"]);
   const out = new Set<string>();
-  for (const instance of instanceRootsIn(repoRoot)) {
+  for (const instance of layerRootsIn(repoRoot)) {
     for (const entry of readDeclaration(instance)?.directories ?? []) {
       if (!(entry.graphTypologies ?? []).some((g) => historical.has(g))) continue;
       // RESOLVED BY THE ENTRY'S OWN SCOPE, then made repo-relative. A draft
@@ -250,7 +250,7 @@ export function historicalPrefixes(repoRoot: string): string[] {
   // only keeps this function from pruning a walk by a path that is not there.
   //
   // `beans/beans.json` is a bean-graph declaration rather than a layer
-  // declaration, so `instanceRootsIn` does not reach it. The root declaration
+  // declaration, so `layerRootsIn` does not reach it. The root declaration
   // already carries `beans/` as the `beans` graph, which is the entry above —
   // stated because a draft looked for `bean-defs` here, found nothing, and let
   // the whole store back into the corpus.

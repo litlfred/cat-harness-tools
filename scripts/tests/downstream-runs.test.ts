@@ -5,7 +5,8 @@
  * each asserted on a case built to break it.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
+import { existsSync } from "../../test/support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 

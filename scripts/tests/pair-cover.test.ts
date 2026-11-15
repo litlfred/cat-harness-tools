@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 import { foldable, settleCovered } from "../pair-cover.ts";
 import { isJudgeCheck, regenPass, type Pair, type Runner } from "../regen-after-merge.ts";
 import { CHECKS } from "../skill-register.ts";
-import { instanceRootsIn, repoRootFor } from "../../schemas/kg/cat-harness.ts";
+import { layerRootsIn, repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
@@ -142,7 +142,7 @@ describe("the equivalences still hold in this tree", () => {
     expect(SCRIPTS["kg:audit:check"]).toBe("bun run cat-harness-tools/scripts/kg-audit.ts --check --against main");
     expect(SCRIPTS["kg:audit:all:check"]).toBe("bun run cat-harness-tools/scripts/kg-audit-all.ts --check --against main");
     // The default root of kg-audit.ts is its own layer; the sweep must reach it.
-    expect(instanceRootsIn(REPO).map((r) => resolve(r))).toContain(resolve(INSTANCE));
+    expect(layerRootsIn(REPO).map((r) => resolve(r))).toContain(resolve(INSTANCE));
     const all = readFileSync(join(TOOLS_ROOT, "scripts", "kg-audit-all.ts"), "utf-8");
     // Passes --check and --against through, and fails on any non-0/1 exit.
     expect(all).toContain('if (check) argv.push("--check")');

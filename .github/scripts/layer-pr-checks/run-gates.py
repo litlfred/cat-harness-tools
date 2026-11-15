@@ -645,12 +645,12 @@ TREE_TOOLS = {
     # Hashes every file of every instance before and after its writer and
     # calls any committed file that moved stale.
     "publish-check.ts": "hashes the tree around its writer",
-    # Copies the layer's closure, found by `instanceRootsIn` over the shared
+    # Copies the layer's closure, found by `layerRootsIn` over the shared
     # tree, then tests the copy: a file a neighbour is writing, or an instance
     # a neighbour has hidden, is what it tests.
     "check-standalone.ts": "copies the closure out of the shared tree",
     # `git init`s bootstrap/ and bootstrap-tools/ IN the shared tree for its
-    # whole run. `instanceRootsIn` skips a directory with its own `.git`, so
+    # whole run. `layerRootsIn` skips a directory with its own `.git`, so
     # every neighbour that discovers instances meanwhile sees no bootstrap:
     # check:cat-harness-standalone then copies a closure without it and five
     # `render-exemption.test.ts` tests fail (measured, folio-assistant index).
@@ -801,16 +801,20 @@ def cone_scripts(gates, runner):
 # neighbour's write would otherwise be stored as a state the gate never read.
 # The other records are kept with `ci-cone.ts keep`, which stores them exactly
 # as a lone run would. A side whose ci-cone.ts predates this traces one at a
-# time, as before; `GATE_CONE_PARALLEL=0` does too.
+# time, as before, and so does any run without `GATE_CONE_PARALLEL=1`.
 CONE_PARALLEL_MARKS = ("CI_CONE_TOUCHED_OUT", "CI_CONE_RECORD_OUT", '"keep"')
 
 
 def cone_parallel(root, env):
-    """Whether this side's ci-cone.ts can trace gates side by side."""
-    if (env.get("GATE_CONE_PARALLEL") or "").strip() == "0":
+    """Whether to trace gates side by side: only when `GATE_CONE_PARALLEL=1`
+    asks for it and this side's ci-cone.ts can. Off by default: on who-iris
+    main one long gate whose writes were unknown sent all 49 pooled gates of a
+    shard back to run alone, so the step took longer than tracing one at a
+    time (cat-harness-tools#1859)."""
+    if (env.get("GATE_CONE_PARALLEL") or "").strip() != "1":
         return False
     if (env.get("GATE_CONE_CLI") or "").strip():
-        return (env.get("GATE_CONE_PARALLEL") or "").strip() == "1"
+        return True
     try:
         with open(os.path.join(root, CONE_CLI)) as f:
             src = f.read()

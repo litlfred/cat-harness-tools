@@ -20,7 +20,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { RENDER_OBLIGATIONS, isExemptFrom, readDeclaration, renderExemptionProblems, repoRootFor, type RenderExemption, instanceRootsIn } from "./kg/cat-harness.js";
+import { RENDER_OBLIGATIONS, isExemptFrom, readDeclaration, renderExemptionProblems, repoRootFor, type RenderExemption, layerRootsIn } from "./kg/cat-harness.js";
 import { requireHarnessRoot } from "./harness-root.ts";
 const ROOT = requireHarnessRoot();
 const REPO = repoRootFor(ROOT);
@@ -56,7 +56,7 @@ describe("this repository's actual declaration", () => {
     // repository that lost the declaration. Every instance is DISCOVERED, not
     // listed: a hand-written list once spelled `folio-assist-core`, so the
     // layer it meant was never read and a second claimant there would pass.
-    const roots = instanceRootsIn(REPO);
+    const roots = layerRootsIn(REPO);
     expect(roots).toContain(CAT_BOOTSTRAP);
     const claiming = roots
       .map((r) => readDeclaration(r))

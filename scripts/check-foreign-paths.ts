@@ -45,7 +45,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, normalize, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration, resolveDirectories, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration, resolveDirectories, repoRootFor } from "../schemas/kg/cat-harness.js";
 import {
   LITERAL,
   firstLiteralIn,
@@ -86,7 +86,7 @@ export interface ForeignScan {
 
 /** Every layer's declared, non-code directories, repo-relative. */
 export function instanceDirsIn(repo: string): InstanceDirs[] {
-  return instanceRootsIn(repo).map((at) => {
+  return layerRootsIn(repo).map((at) => {
     const abs = resolve(at);
     const name = readDeclaration(abs)?.name ?? (relative(repo, abs) || ".");
     const dirs = resolveDirectories([{ name, root: abs, own: true }])

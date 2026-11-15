@@ -48,7 +48,7 @@ import {
 } from "./regen-after-merge.ts";
 import { isBuiltAtPublish, type BuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { layerRootsIn } from "../schemas/kg/instance-roots.ts";
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
 import { scriptsOf as scriptTableOf } from "../schemas/sdlc/script-table.ts";
 import { tipLocations } from "./branch-store.ts";
@@ -98,7 +98,7 @@ export interface PublishTimeDeclaration {
  * (beans `p7mb`, `ksek`).
  */
 export function publishTimeDeclarations(repoRoot: string): PublishTimeDeclaration[] {
-  return instanceRootsIn(repoRoot).flatMap((root) => {
+  return layerRootsIn(repoRoot).flatMap((root) => {
     let list: (Pick<BuiltAtPublish, "path"> & Partial<Pick<BuiltAtPublish, "writer">>)[] = [];
     try {
       const decl = readDeclaration(root);

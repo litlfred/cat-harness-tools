@@ -1018,47 +1018,7 @@ async function main(): Promise<number> {
   }
 
   if (red.length > 0) {
-    console.error(
-      // The wording must state WHICH mode ran, and that is a correction rather
-      // than a nicety. Under `--check` nothing is regenerated, so "still red
-      // after regenerating" was false in exactly the mode CI runs — measured
-      // on this gate's first CI run, where it also pointed the reader at a
-      // missing package-manifest entry that was not the cause. A diagnostic
-      // that names the wrong remedy costs more than none.
-      (checking
-        ? `\n${red.length} check(s) red — nothing was regenerated (\`--check\`):\n`
-        : `\n${red.length} check(s) still red after regenerating:\n`) +
-        red.map((r) => `    ${r}`).join("\n") +
-        (checking
-          ? `\n\nRun \`bun run cat skill:register\` (without \`--check\`) to regenerate, then\n` +
-            `commit what it writes. If a check is STILL red after that, read on.\n\n`
-          : "\n\n") +
-        "Three causes look identical from here and this command does NOT guess\n" +
-        "between them — run the red check above directly and read what it names:\n\n" +
-        "  · a MISSING PACKAGE-MANIFEST ENTRY. Reported above when this run found\n" +
-        "    one; this command deliberately does not add it.\n" +
-        "  · a subject was REMOVED, leaving a derived artefact orphaned. `kg:audit`\n" +
-        "    reports `SUBJECT GONE` and refuses to delete it, which is correct:\n" +
-        "    `deletion-requires-confirmation` makes removing a durable artefact a\n" +
-        "    person's decision, so no amount of regenerating can settle it. Delete\n" +
-        "    the named file yourself, or restore its subject. Measured 2026-09-26 by\n" +
-        "    registering a probe skill and then deleting it.\n" +
-        "  · the chain is not at a FIXED POINT yet. A later step can stale an\n" +
-        "    earlier step's artefact: `uml:overview` renders the QA tree `kg:audit`\n" +
-        "    writes, and its new pages stale `auto:docs`, two steps earlier.\n" +
-        "    Measured 2026-09-27: pass 1 red, pass 2 exit 0. If the red check is one\n" +
-        "    an EARLIER step owns, run this command again before reading on.\n" +
-        "  · the chain above is INCOMPLETE. Measure by running that ONE check against\n" +
-        "    a clean tree with and without your skill. Do NOT measure through\n" +
-        "    `bun run cat gates` — `bun test` runs some of these writers and repairs what\n" +
-        "    later gates read (bean `ymsu`), so gates reports artefacts as current\n" +
-        "    that are not. Four separate attempts to recall this list were wrong.\n\n" +
-        "And if it is red in CI but green here: ask git what the corpus is, not\n" +
-        "the disk. A gitignored `node_modules/` in a subpackage inflated\n" +
-        "`cat-harness/schemas` from 227 nodes to 1441 in one container while a\n" +
-        "fresh checkout saw 227 — see `kg-detangle.ts`'s `walk` and\n" +
-        "`scripts/git-corpus.ts`.\n",
-    );
+    console.error(formatChainRedDiagnostic(checking, red));
   }
 
   if (red.length > 0 || problems > 0) return 1;
@@ -1072,6 +1032,67 @@ async function main(): Promise<number> {
           `${f.skills} skill(s) across ${f.packages} package(s) declared.\n`,
   );
   return 0;
+}
+
+/**
+ * Format the diagnostic printed when one or more registration-chain steps fail.
+ *
+ * Names both causes of "red in CI, green here":
+ * 1. The CORPUS (`xd1g`): a gitignored `node_modules/` on disk distorts a
+ *    directory walk (`scripts/git-corpus.ts`).
+ * 2. The TREE (`1xhc` / `nytj`): CI judges `refs/pull/N/merge` (`origin/main`
+ *    merged into the branch), not the branch head alone, so an attestation or
+ *    glossary whose inputs `main` also touched is current on head and stale on
+ *    the merge (`bun run cat check:merged`).
+ */
+export function formatChainRedDiagnostic(checking: boolean, red: readonly string[]): string {
+  // The wording must state WHICH mode ran, and that is a correction rather
+  // than a nicety. Under `--check` nothing is regenerated, so "still red
+  // after regenerating" was false in exactly the mode CI runs — measured
+  // on this gate's first CI run, where it also pointed the reader at a
+  // missing package-manifest entry that was not the cause. A diagnostic
+  // that names the wrong remedy costs more than none.
+  return (
+    (checking
+      ? `\n${red.length} check(s) red — nothing was regenerated (\`--check\`):\n`
+      : `\n${red.length} check(s) still red after regenerating:\n`) +
+    red.map((r) => `    ${r}`).join("\n") +
+    (checking
+      ? `\n\nRun \`bun run cat skill:register\` (without \`--check\`) to regenerate, then\n` +
+        `commit what it writes. If a check is STILL red after that, read on.\n\n`
+      : "\n\n") +
+    "Three causes look identical from here and this command does NOT guess\n" +
+    "between them — run the red check above directly and read what it names:\n\n" +
+    "  · a MISSING PACKAGE-MANIFEST ENTRY. Reported above when this run found\n" +
+    "    one; this command deliberately does not add it.\n" +
+    "  · a subject was REMOVED, leaving a derived artefact orphaned. `kg:audit`\n" +
+    "    reports `SUBJECT GONE` and refuses to delete it, which is correct:\n" +
+    "    `deletion-requires-confirmation` makes removing a durable artefact a\n" +
+    "    person's decision, so no amount of regenerating can settle it. Delete\n" +
+    "    the named file yourself, or restore its subject. Measured 2026-09-26 by\n" +
+    "    registering a probe skill and then deleting it.\n" +
+    "  · the chain is not at a FIXED POINT yet. A later step can stale an\n" +
+    "    earlier step's artefact: `uml:overview` renders the QA tree `kg:audit`\n" +
+    "    writes, and its new pages stale `auto:docs`, two steps earlier.\n" +
+    "    Measured 2026-09-27: pass 1 red, pass 2 exit 0. If the red check is one\n" +
+    "    an EARLIER step owns, run this command again before reading on.\n" +
+    "  · the chain above is INCOMPLETE. Measure by running that ONE check against\n" +
+    "    a clean tree with and without your skill. Do NOT measure through\n" +
+    "    `bun run cat gates` — `bun test` runs some of these writers and repairs what\n" +
+    "    later gates read (bean `ymsu`), so gates reports artefacts as current\n" +
+    "    that are not. Four separate attempts to recall this list were wrong.\n\n" +
+    "And if it is red in CI but green here, check BOTH the corpus and the tree:\n" +
+    "  1. THE CORPUS (`xd1g`): ask git what the corpus is, not the disk. A\n" +
+    "     gitignored `node_modules/` in a subpackage inflated `cat-harness/schemas`\n" +
+    "     from 227 nodes to 1441 in one container while a fresh checkout saw 227 —\n" +
+    "     see `kg-detangle.ts`'s `walk` and `scripts/git-corpus.ts`.\n" +
+    "  2. THE MERGE TREE (`1xhc` / `nytj`): CI on `pull_request` checks out\n" +
+    "     `refs/pull/N/merge` (`origin/main` merged into your branch), not your\n" +
+    "     branch head alone. When `main` moved a file that a committed attestation\n" +
+    "     or glossary hashes, the corpus is identical and the TREE is not — run\n" +
+    "     `bun run cat check:merged`, or merge `origin/main` and re-run\n" +
+    "     `bun run cat skill:register`.\n"
+  );
 }
 
 if (import.meta.main) process.exit(await main());

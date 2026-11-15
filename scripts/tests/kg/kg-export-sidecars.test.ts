@@ -21,7 +21,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { instanceRootsIn } from "../../../schemas/kg/cat-harness.js";
+import { layerRootsIn } from "../../../schemas/kg/cat-harness.js";
 import { sidecarSubjects } from "../../kg-export.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
@@ -40,7 +40,7 @@ describe("kg-export sidecar subjects are DERIVED from what is committed (bean `v
     try {
       writeFileSync(join(dir, "kg-export.qa-results.json"), "{}");
       writeFileSync(join(dir, "kg-export.bootstrap.qa-results.json"), "{}");
-      const fromFixture = sidecarSubjects(dir, instanceRootsIn(REPO));
+      const fromFixture = sidecarSubjects(dir, layerRootsIn(REPO));
       const boot = (subjects.length > 1 ? subjects : fromFixture.subjects).find((s) => s.stem === "kg-export.bootstrap");
       expect(boot, "kg-export.bootstrap.qa-results.json is not resolved to ./bootstrap").toBeDefined();
       expect(boot!.instance).toBe(join(REPO, "bootstrap"));
@@ -58,7 +58,7 @@ describe("kg-export sidecar subjects are DERIVED from what is committed (bean `v
       writeFileSync(join(dir, "kg-export.bootstrap.qa-results.json"), "{}");
       writeFileSync(join(dir, "kg-export.no-such-instance.qa-results.json"), "{}");
       writeFileSync(join(dir, "something-else.qa-results.json"), "{}");
-      const { subjects, orphans } = sidecarSubjects(dir, instanceRootsIn(REPO));
+      const { subjects, orphans } = sidecarSubjects(dir, layerRootsIn(REPO));
       expect(subjects.map((s) => s.stem)).toEqual(["kg-export", "kg-export.bootstrap"]);
       expect(orphans).toEqual(["kg-export.no-such-instance.qa-results.json"]);
     } finally {

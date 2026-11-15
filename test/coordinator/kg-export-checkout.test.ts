@@ -15,7 +15,7 @@ import { readFileSync } from "node:fs";
 
 import { buildExport } from "../../scripts/kg-export.js";
 import { declaresOwnCanonical } from "../../scripts/instance-exports.js";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "../../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration, repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { termIri } from "../../schemas/kg/namespaces.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
@@ -51,7 +51,7 @@ const EXPORT_CHECKOUT = await buildExport({ baseUrl: BASE, scope: "checkout" });
 const OWNER_EXPORTS = new Map<string, Set<string>>();
 /** The same builds, whole, by layer root — for the schema-link tests below. */
 const OWNER_DOCS = new Map<string, Awaited<ReturnType<typeof buildExport>>>();
-for (const r of instanceRootsIn(REPO)) {
+for (const r of layerRootsIn(REPO)) {
   if (resolve(r) === resolve(join(ORIGIN_DIR, "../.."))) continue;
   const own = declaresOwnCanonical(readDeclaration(r));
   const e = await buildExport({ instanceRoot: r, ...(own ? {} : { baseUrl: BASE }) });

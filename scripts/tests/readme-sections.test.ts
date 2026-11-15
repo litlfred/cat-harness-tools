@@ -30,7 +30,7 @@ import {
   type SectionContext,
 } from "../../pipeline/readme-sections";
 import { loadReadmeConfig } from "../../pipeline/readme-toc";
-import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, instanceRootsIn } from "../../schemas/kg/cat-harness.js";
+import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, layerRootsIn } from "../../schemas/kg/cat-harness.js";
 import { FIXTURE_CONFIG, FIXTURE_INSTANCE, declareInstance , writeFixtureFile} from "../../test/support/instance-fixture.js";
 import {  } from "../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
@@ -265,7 +265,7 @@ describe("cat-harness:instances — both entries, per instance (issue #592)", ()
   const out = section.render({ root: repo, cfg: loadReadmeConfig(repo), fetch: false });
 
   it("renders a row for every instance that declares a harness.json", () => {
-    const declared = instanceRootsIn(repo).length;
+    const declared = layerRootsIn(repo).length;
     const rows = out.markdown.split("\n").filter((l) => l.startsWith("| `"));
     expect(rows).toHaveLength(declared);
     expect(declared).toBeGreaterThan(1);

@@ -42,6 +42,8 @@ import {
   sameRepoNext,
   signingSession,
   untickedItems,
+  contentReviewRecord,
+  CONTENT_LABEL,
   SELF_WORKFLOW_FILE,
   NOT_WAITED_FOR_WORKFLOW_FILES,
   DEPLOY_ONLY_STEP,
@@ -716,6 +718,7 @@ describe("every check passes only when every fact is in hand", () => {
       ["checklist", "pass"],
       ["open-question", "pass"],
       ["mergeable", "pass"],
+      ["content-review", "pass"],
     ]);
     expect(v.exitCode).toBe(0);
   });
@@ -1253,6 +1256,14 @@ describe("check 5 under --full-tier — the full tier must be green on the head"
     expect(ci(s).status).toBe("pass");
   });
 
+  test("a cancelled judge whose name GitHub showed without `${{ }}` judged nothing (dth-hrh#133)", () => {
+    const s = real(1960);
+    // e7b7187 on dth-hrh#133, 2026-11-14: the run cancelled by the ready flip, then the green one.
+    const bare = "checks / needs.prepare-head.outputs.full == 'false' && 'Fast tier only (advisory; the full checks gate a release)' || 'No new failures (tests and gates)'";
+    s.checkRuns = [cr(bare, "completed", "cancelled"), cr(`checks / ${JUDGE}`, "completed", "success"), cr(`checks / ${SHARD_RAN}`, "completed", "success")];
+    expect(ci(s).status).toBe("pass");
+  });
+
   test("a green judge with every test shard skipped is the fast tier (#2103's real head): not-ready", () => {
     const s = real(1960);
     // ad8dff8 on #2103, 2026-11-13: pr-tests.yml's fast tier.
@@ -1287,5 +1298,68 @@ describe("check 5 under --full-tier — the full tier must be green on the head"
     expect(ruled.detail).not.toContain("advisory");
     expect(fullTierCheck(s).status).toBe("pass");
     expect(withFullTier({ n: 5, id: "ci", status: "pass", detail: "runs green" }, { ...s, checkRuns: [] })).toMatchObject({ status: "refuse", kind: "not-ready" });
+  });
+});
+
+describe("check 9 — content-review (owner, 2026-11-15)", () => {
+  const withBody = (s: GuardSnapshot, body: string, draft: boolean, content = true): GuardSnapshot => {
+    s.pr.body = body;
+    s.pr.draft = draft;
+    s.pr.labels = content ? [...s.pr.labels, { name: CONTENT_LABEL }] : s.pr.labels.filter((l) => l.name !== CONTENT_LABEL);
+    return s;
+  };
+
+  test("a PR without the content label passes: it is not content", () => {
+    const c = status(withBody(real(1960), "no section", false, false), "content-review");
+    expect(c.status).toBe("pass");
+  });
+
+  test("a content draft with no section is not-ready (pending)", () => {
+    const c = status(withBody(real(1960), "## Summary\nchanges wording", true), "content-review");
+    expect(c.status).toBe("refuse");
+    expect(c.kind).toBe("not-ready");
+  });
+
+  test("a content PR marked ready with no section is a defect (failure)", () => {
+    const v = evaluate(withBody(real(1960), "## Summary\nchanges wording", false));
+    const c = v.checks.find((x) => x.id === "content-review")!;
+    expect(c.kind).toBe("defect");
+    expect(v.state).toBe("failure");
+  });
+
+  test("a placeholder section does not count", () => {
+    expect(contentReviewRecord("## Content review\n\nTODO\n\n## Testing\nhttps://example.org").ok).toBe(false);
+    expect(contentReviewRecord("## Content review\n- pending\n").ok).toBe(false);
+  });
+
+  test("a section that points to a record passes, and each kind of pointer is found", () => {
+    const body = [
+      "## Summary",
+      "x",
+      "## Content review",
+      "- Process: owner approval card Q-RA-VAL-2 (waiver of corpus-gate)",
+      "- Bean folio-assistant-n6ny records the rule",
+      "- Committee log: https://github.com/litlfred/smart-ra/issues/53",
+      "",
+      "## Testing",
+      "https://not-in-section.example",
+    ].join("\n");
+    const r = contentReviewRecord(body);
+    expect(r.ok).toBe(true);
+    expect(r.records).toContain("Q-RA-VAL-2");
+    expect(r.records).toContain("folio-assistant-n6ny");
+    expect(r.records).toContain("https://github.com/litlfred/smart-ra/issues/53");
+    expect(r.records).not.toContain("https://not-in-section.example");
+    const c = status(withBody(real(1960), body, false), "content-review");
+    expect(c.status).toBe("pass");
+  });
+
+  test("a template hint in an HTML comment, even over several lines, is not a record", () => {
+    expect(contentReviewRecord("## Content review\n<!--\nLink the card, e.g. https://example.org\nQ-AB-1\n-->\n").ok).toBe(false);
+    expect(contentReviewRecord("## Content review\n<!-- open to the end https://example.org").ok).toBe(false);
+  });
+
+  test("a section with prose but no pointer is refused", () => {
+    expect(contentReviewRecord("### Content review\nThe committee looked at it.").ok).toBe(false);
   });
 });

@@ -33,8 +33,9 @@
  * workflow file each layer resolves. Not read: a Tool inside an opt-in
  * sub-graph (it is switched off with the group it names).
  *
- * ADVISORY: no gate runs it yet. `check:optin-links` was turned on once every
- * link was fixed; this follows the same path.
+ * GATED: composed into `check:declaration-resolution` as its `optInRefs`
+ * field, which CI runs (owner, 2026-11-12, card Q-OPTINREFS-CI B: wire it
+ * now and fix every finding at its source), as `check:optin-links` is.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-optin-refs.ts [--json]
@@ -44,7 +45,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import { instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn } from "../schemas/kg/cat-harness.js";
 import { groupOf, optInRootsOf, type OptInRoot } from "../schemas/kg/opt-in-roots.js";
 import { declaredOptInRequires, requiredBy, type OptInRequires } from "../schemas/kg/opt-in-subgraphs.js";
 import { discoverTools } from "../tools/discover.js";
@@ -119,7 +120,7 @@ export function workflowSkillRefs(text: string): string[] {
 }
 
 export function checkOptInRefs(checkout: string): { layers: number; tools: number; workflows: number; findings: OptInRefFinding[] } {
-  const layers = instanceRootsIn(checkout);
+  const layers = layerRootsIn(checkout);
   const roots = layers.flatMap(optInRootsOf);
   const homes = skillHomes(layers, roots);
   const requires = declaredOptInRequires(checkout);

@@ -78,7 +78,8 @@ function dashboards(): Map<string, string> {
     .map((v) => v.id)
     .sort();
   for (const id of ids) {
-    const page = declaredPagePath(ROOT, id);
+    // Through the overlay: a declared page is written at publish (bean cat-tools-sm8r).
+    const page = overlayPath(declaredPagePath(ROOT, id));
     if (!existsSync(page)) continue;
     try {
       const html = readFileSync(page, "utf8");

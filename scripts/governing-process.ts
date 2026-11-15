@@ -31,7 +31,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 
 import {
   findInstanceRoot,
-  instanceRootsIn,
+  layerRootsIn,
   siteDirFor,
 } from "../schemas/kg/cat-harness.js";
 import { workflowFiles } from "./known-skills.js";
@@ -112,7 +112,7 @@ export function processIndex(repoRoot: string): ProcessIndex {
   const byProcessId = new Map<string, Diagram>();
   const svgDirs: string[] = [];
   const globalTaskIds = new Set<string>();
-  for (const inst of instanceRootsIn(repoRoot)) {
+  for (const inst of layerRootsIn(repoRoot)) {
     let site: string | undefined;
     try {
       site = siteDirFor(inst);

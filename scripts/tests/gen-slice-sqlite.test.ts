@@ -1,7 +1,10 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+// Publish-time files are written to the layer output overlay (bean sm8r);
+// these read the copy a site reader sees, falling back to the path given.
+import { readFileSync, readdirSync } from "../../test/support/site-fs.ts";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -21,6 +24,7 @@ import {
   beansData,
   buildSlice,
   checkSlice,
+  emptyStoreReason,
   databaseContentDigest,
   emptyPlan,
   expectedContentDigest,
@@ -227,6 +231,23 @@ describe.skipIf(!inAggregate())("gen-slice-sqlite — the real bean store", () =
 });
 
 // ── The engine is table-driven: every definition is complete ──────────────
+
+describe("gen-slice-sqlite — a reached but empty work-plan store", () => {
+  const empty = (rows: Record<string, never[]>): SliceData => ({ ...beansData([], REPO, BASE), rows });
+
+  test("an empty bean store still refuses --check, so building it is not applicable rather than green", () => {
+    const d = beansData([], REPO, BASE);
+    expect(checkSlice(BEANS_SLICE, d).some((p) => p.includes("no known row to probe"))).toBe(true);
+    expect(emptyStoreReason(BEANS_SLICE, d)).toContain("holds no beans yet");
+    expect(emptyStoreReason(TODOS_SLICE, empty({ todos: [], todo_relation: [] }))).toContain("holds no todos yet");
+  });
+
+  test("a store with rows is sliced as before, and an empty content slice (library, kg) still refuses", () => {
+    expect(emptyStoreReason(BEANS_SLICE, { ...empty({}), rows: { beans: [{ id: "b-1" }] } })).toBeNull();
+    expect(emptyStoreReason(LIBRARY_SLICE, empty({}))).toBeNull();
+    expect(emptyStoreReason(KG_SLICE, empty({}))).toBeNull();
+  });
+});
 
 describe("gen-slice-sqlite — the slice table", () => {
   test("one definition per slice, each naming its FTS rows among its tables and counting every table", () => {

@@ -39,7 +39,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { instanceRootFor, layerRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "./qa-results.js";
 import {
   type Bump,
@@ -236,7 +236,7 @@ export function surfaceAtHead(
 export function auditVersionBumps(repoRoot: string, opts: { against?: string } = {}): BumpReport {
   const rows: BumpRow[] = [];
   const publishable: { root: string; name: string; version: string }[] = [];
-  const roots = instanceRootsIn(repoRoot);
+  const roots = layerRootsIn(repoRoot);
 
   for (const root of roots) {
     let decl;

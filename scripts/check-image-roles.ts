@@ -41,7 +41,7 @@
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
 /* NO `folio-graph-typology` IMPORT IS NEEDED HERE, and that is recent: until #840
    `readDeclaration` THREW on this repository's own declaration unless the
@@ -258,7 +258,7 @@ export function run(repoRoot: string): {
     }
   }
 
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const abs = resolve(repoRoot, root);
     let decl;
     try {

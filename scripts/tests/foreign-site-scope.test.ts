@@ -27,7 +27,10 @@
  *       (it showed "?").
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+// Publish-time files are written to the layer output overlay (bean sm8r);
+// these read the copy a site reader sees, falling back to the path given.
+import { existsSync, readFileSync, readdirSync } from "../../test/support/site-fs.ts";
 import type { Dirent } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -132,7 +135,14 @@ afterAll(() => {
 try {
   const READS = new Set([PLATFORM_DATA, join(SMART_TRUST, siteDirFor(SMART_TRUST))].map((p) => resolve(p)));
   const READ_PLAN = declaredPlan(REPO).filter((a) => READS.has(resolve(a.abs)));
-  if (READ_PLAN.length !== READS.size) {
+  // Built already (the publish wrote them, into the overlay): build nothing.
+  // A scratch rebuild copied back over the publish's own `harness.json` left
+  // it out of step with the include `navbar:include` wrote from it, and later
+  // files in the shard (gen-navbar-include's fixpoint, nav-names) read that.
+  const ALREADY_BUILT = [...READS].every((p) => existsSync(p));
+  if (ALREADY_BUILT) {
+    // nothing to do: read what the publish built
+  } else if (READ_PLAN.length !== READS.size) {
     console.warn(
       `foreign-site-scope: built nothing — expected a builtAtPublish entry for each of ${[...READS].join(", ")}; found ${READ_PLAN.map((a) => `${a.instance}/${a.path}`).join(", ") || "none"}`,
     );
@@ -337,7 +347,12 @@ describe.skipIf(NO_REAL_DATA)("smart-trust, against the platform's real harness 
     for (const id of ["beans", "todos"]) expect(out.tiles.find((t) => t.id === id)?.href).toBeUndefined();
     expect(out.navbar.hrefs.beans).toBeUndefined();
     expect(out.navbar.hrefs.todos).toBeUndefined();
-    expect(out.navbar.notes.beans).toBe("smart-trust declares no beans graph");
+    // Only a navbar row that carries the beans slot owes its note: the
+    // platform's row dropped beans, todos and fsh-guts on 2026-11-13
+    // (cat-harness's `navbarIcons`), so whether it is there is read from the data.
+    const icons = ((data.navbar as { icons?: string[] } | undefined)?.icons ?? []);
+    if (icons.includes("beans")) expect(out.navbar.notes.beans).toBe("smart-trust declares no beans graph");
+    else expect(out.navbar.notes.beans).toBeUndefined();
   });
 
   test("(d) the platform's fsh-guts is a labelled link, and the chrome is told it is not this site's", () => {
@@ -348,10 +363,16 @@ describe.skipIf(NO_REAL_DATA)("smart-trust, against the platform's real harness 
     // Re-based onto the platform: the platform's OWN root-relative href for its
     // fsh-guts page (since 2026-10-09 under its declared `<locale>/<harness>/`
     // route), read from the platform's data rather than restated here.
-    const platformHref = (data.navbar as { hrefs: Record<string, string> }).hrefs["fsh-guts"]!;
-    expect(platformHref.startsWith("/")).toBe(true);
-    expect(o.navbar.hrefs["fsh-guts"]).toBe(`${BASE}${platformHref}`);
-    expect(o.navbar.whose?.["fsh-guts"]).toBe("the platform's: smart-trust declares no fsh-guts graph");
+    // The navbar half applies only while the platform's row has the slot
+    // (it left the row on 2026-11-13); the chrome's `absent` half always does.
+    const platformHref = (data.navbar as { hrefs: Record<string, string> }).hrefs["fsh-guts"];
+    if (platformHref !== undefined) {
+      expect(platformHref.startsWith("/")).toBe(true);
+      expect(o.navbar.hrefs["fsh-guts"]).toBe(`${BASE}${platformHref}`);
+      expect(o.navbar.whose?.["fsh-guts"]).toBe("the platform's: smart-trust declares no fsh-guts graph");
+    } else {
+      expect(o.navbar.hrefs["fsh-guts"]).toBeUndefined();
+    }
     expect(o.foreignSite.absent.fshGuts).toBe("smart-trust declares no fsh-guts graph");
     expect(o.foreignSite.absent.translationQa).toBe("smart-trust publishes no translation QA sweep on this site");
   });
@@ -508,10 +529,14 @@ describe("the injected rail (rail-standalone-pages --foreign-site) over a fixtur
     // The row is written ONCE beside the rail's data (2026-10-10); read it as a browser would.
     const json = navbarRowJsonOf(html, (f) => (existsSync(join(root, f)) ? readFileSync(join(root, f), "utf-8") : undefined));
     expect(json).toBeDefined();
-    const row = JSON.parse(json!) as { hrefs: Record<string, string>; notes: Record<string, string> };
+    const row = JSON.parse(json!) as { icons: string[]; hrefs: Record<string, string>; notes: Record<string, string> };
     expect(row.hrefs.beans).toBeUndefined();
     expect(row.hrefs.todos).toBeUndefined();
-    expect(row.notes.todos).toBe("smart-trust declares no todos graph");
+    // cat-harness's row no longer carries Todos or Beans at all (owner,
+    // 2026-11-13: "remove the fsh-guts, beans and todos"); a layer that still
+    // declares them gets the note, which the cases above test.
+    expect(row.icons).not.toContain("todos");
+    expect(row.icons).not.toContain("beans");
     expect(rootRelativeLeft(row)).toEqual([]);
   });
 });

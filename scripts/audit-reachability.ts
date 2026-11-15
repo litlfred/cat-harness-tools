@@ -100,7 +100,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join, normalize, relative } from "node:path";
 
-import { instanceRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
 import { corpusScopeFor, workflowFiles } from "./known-skills.js";
 import { processFiles } from "../src/workflow/process-files.js";
@@ -187,7 +187,7 @@ const STEM = "audit-reachability";
 /**
  * Every `.bpmn` and `.dmn` ANY layer declares, as absolute paths.
  *
- * The union over `instanceRootsIn`, not one layer's corpus scope: scoped
+ * The union over `layerRootsIn`, not one layer's corpus scope: scoped
  * from `cat-harness` alone the walk sees 79 of the 85 diagrams, and the six it
  * misses are `bootstrap`'s. A denominator that quietly omits a dependency's
  * artefacts reports a clean run over them — `dh4f`, in the tool whose subject
@@ -196,7 +196,7 @@ const STEM = "audit-reachability";
 export function declaredDiagrams(repo: string): { bpmn: string[]; dmn: string[]; instances: string[] } {
   const seen = new Set<string>();
   const instances: string[] = [];
-  for (const inst of instanceRootsIn(repo)) {
+  for (const inst of layerRootsIn(repo)) {
     let files: string[];
     try {
       files = workflowFiles(inst, corpusScopeFor(inst));

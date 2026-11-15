@@ -18,6 +18,7 @@
  * | `needs` | `check:instance-graph` → `resolveInstanceGraph` | every dependency resolves, no cycle |
  * | `enableSubgraphs` (and each opt-in entry's `requires`) | here → `enableSubgraphsProblems`, `requiresProblems` | each id names an opt-in sub-graph of this layer or its `needs` closure; only an opt-in entry requires, never itself |
  * | `optInLinks` (the opt-in `directories`, as link targets) | `check:optin-links` → `checkOptInLinks` | no always-on page links into an opt-in sub-graph, which is absent wherever it is switched off |
+| `optInRefs` (the opt-in `directories`, as skill homes) | `check:optin-refs` → `checkOptInRefs` | no always-on Tool's `satisfies` or workflow's skill ref names a skill only an opt-in sub-graph holds |
  *
  * It also resolves `visualisers[].coversKinds`, a graph typology, which
  * `checkVisualiserRoutes` drops unjudged (it filters to PUBLISHED kinds).
@@ -48,22 +49,24 @@
  *   bun run cat-harness-tools/scripts/check-declaration-resolution.ts [--root <checkout>] [--json]
  */
 import { spawnSync } from "node:child_process";
-import { basename, relative, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, join, relative, resolve } from "node:path";
 
 import { instanceDirectories, readDeclaration, nestedDirectories, type CatHarnessDeclaration } from "../schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { orderedDependencies, resolveInstanceGraph } from "../schemas/kg/harness-config.js";
-import { declaredEnableSubgraphs, enableSubgraphsProblems, requiresProblems, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
-import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { declaredEnableSubgraphs, enableSubgraphsProblems, requiresProblems, splitQualifiedSubgraphId, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
+import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.js";
 import "../schemas/kg/folio-graph-typology.js";
 
 import { auditInstance as auditDirs } from "./check-declared-dirs.ts";
 import { auditInstance as auditAssets } from "./check-declared-assets.ts";
 import { checkVisualiserRoutes } from "./check-visualiser-routes.ts";
 import { checkOptInLinks } from "./check-optin-links.ts";
+import { checkOptInRefs } from "./check-optin-refs.ts";
 
 /** The fields a declaration names paths or layers in, and the declaration itself (it must parse for any to be read). */
-export const RESOLVED_FIELDS = ["declaration", "directories", "assets", "visualisers", "needs", "enableSubgraphs", "optInLinks"] as const;
+export const RESOLVED_FIELDS = ["declaration", "directories", "assets", "visualisers", "needs", "enableSubgraphs", "optInLinks", "optInRefs"] as const;
 export type ResolvedField = (typeof RESOLVED_FIELDS)[number];
 
 export interface ResolutionFinding {
@@ -85,6 +88,13 @@ export interface ResolutionReport {
   findings: ResolutionFinding[];
   /** Reasons this run could not decide something. Non-empty means exit 2. */
   undetermined: string[];
+  /**
+   * References this root cannot see and another root judges, each with the
+   * reason: a mounted layer's `enableSubgraphs` id into its OWN declaration,
+   * when that layer's opt-in directories are not laid down here. Printed,
+   * never counted.
+   */
+  notJudgedHere?: string[];
 }
 
 type Visualiser = { id: string; renderedBy?: string; covers?: string[]; coversKinds?: string[] };
@@ -117,10 +127,11 @@ export function coverageFindings(
 
 export function checkDeclarationResolution(rootArg: string): ResolutionReport {
   const root = resolve(rootArg);
-  const roots = instanceRootsIn(root);
-  const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0, enableSubgraphs: 0, optInLinks: 0 };
+  const roots = layerRootsIn(root);
+  const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0, enableSubgraphs: 0, optInLinks: 0, optInRefs: 0 };
   const findings: ResolutionFinding[] = [];
   const undetermined: string[] = [];
+  const notJudgedHere: string[] = [];
   const names = new Map<string, string>();
 
   if (roots.length === 0) {
@@ -223,7 +234,30 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
           const dd = readDeclaration(dep.rootPath);
           if (dd !== undefined) closure.push({ name: dd.name, directories: instanceDirectories(dep.rootPath, dd) });
         }
+        // A layer's id into its OWN declaration can name a group declared from
+        // within one of its opt-in directories (`<layer>.L2-collab`, inside
+        // `L2/graph.json`). A root that does not enable that directory does not
+        // have it mounted, so the group's declaration is not on disk here, and
+        // "declares no directory" would be a claim about bytes this root never
+        // received. The layer's own root has every directory on disk and judges
+        // it there; this root says which ids it left to that root.
+        const optInDirs = (decl.directories ?? []) as Array<{ id?: string; path?: string; optIn?: boolean }>;
+        const unmounted =
+          resolve(inst) === root
+            ? []
+            : optInDirs
+                .filter((d) => d.optIn === true && typeof d.path === "string" && !existsSync(join(inst, d.path)))
+                .map((d) => d.id ?? d.path);
         for (const p of enableSubgraphsProblems(name, enable, closure)) {
+          const own = splitQualifiedSubgraphId(p.id)?.instance === name;
+          if (own && unmounted.length > 0 && p.detail.startsWith(`\`${name}\` declares no directory`)) {
+            notJudgedHere.push(
+              `${name} enableSubgraphs ${p.id}: ${name}'s opt-in director${unmounted.length === 1 ? "y" : "ies"} ` +
+                `${unmounted.map((u) => `\`${u}\``).join(", ")} ${unmounted.length === 1 ? "is" : "are"} not mounted in this root, ` +
+                `so a group declared from within ${unmounted.length === 1 ? "it" : "them"} cannot be seen here; ${name}'s own root judges it`,
+            );
+            continue;
+          }
           findings.push({ instance: name, field: "enableSubgraphs", subject: p.id, by: "check:declaration-resolution", detail: p.detail });
         }
         for (const p of requiresProblems(name, requiring, closure)) {
@@ -294,6 +328,31 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     undetermined.push(`check:optin-links could not run — ${(e as Error).message.split("\n")[0]}`);
   }
 
+  // The same defect for references that are not Markdown links: an always-on
+  // Tool's `satisfies`, or a workflow's skill ref, naming a skill only an
+  // opt-in sub-graph holds — check:optin-refs (owner, 2026-11-12, card
+  // Q-OPTINREFS-CI B: gated now, each finding fixed at its source).
+  // `optInRefs` counts the Tools and workflow files read.
+  try {
+    const refs = checkOptInRefs(root);
+    examined.optInRefs = refs.tools + refs.workflows;
+    const own = [...names.entries()].sort((a, b) => b[0].length - a[0].length);
+    for (const f of refs.findings) {
+      const abs = resolve(root, f.from);
+      // A Tool is named by id (discovery keeps no file), so it stands as its own subject.
+      const layer = f.kind === "workflow" ? own.find(([dir]) => abs === dir || abs.startsWith(dir + "/")) : undefined;
+      findings.push({
+        instance: layer?.[1] ?? (f.kind === "workflow" ? f.from.split("/")[0]! : f.from),
+        field: "optInRefs",
+        subject: f.from,
+        by: "check:optin-refs",
+        detail: `names skill ${f.ref} (${f.kind}), held only inside opt-in ${f.groups.map((g) => `\`${g}\``).join(", ")} — dangling wherever that group is switched off; fix it at its source by hand`,
+      });
+    }
+  } catch (e) {
+    undetermined.push(`check:optin-refs could not run — ${(e as Error).message.split("\n")[0]}`);
+  }
+
   // A kind problem is reported once per needs edge by every dependent; say each once.
   const seen = new Set<string>();
   const unique = findings.filter((f) => {
@@ -302,7 +361,7 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
     seen.add(k);
     return true;
   });
-  return { root, instances: [...names.values()].sort(), examined, findings: unique, undetermined };
+  return { root, instances: [...names.values()].sort(), examined, findings: unique, undetermined, notJudgedHere };
 }
 
 /** A certain finding is never hidden behind an undetermined one: 1 before 2. */
@@ -316,6 +375,7 @@ export function formatResolution(r: ResolutionReport): string {
   const lines: string[] = [];
   for (const f of r.findings) lines.push(`  ✗ ${f.instance} ${f.field} ${f.subject} [${f.by}]: ${f.detail}`);
   for (const u of r.undetermined) lines.push(`  ? ${u}`);
+  for (const n of r.notJudgedHere ?? []) lines.push(`  · not judged here: ${n}`);
   const counts = RESOLVED_FIELDS.map((k) => `${r.examined[k]} ${k}`).join(", ");
   const verdict = exitCodeOf(r) === 0 ? "✓ every reference resolves" : exitCodeOf(r) === 1 ? `✗ ${r.findings.length} unresolved` : "? COULD NOT DETERMINE — not a pass";
   lines.push(`${verdict}: ${counts} across ${r.instances.length} instance(s) (${r.instances.join(", ")}) in ${r.root}`);

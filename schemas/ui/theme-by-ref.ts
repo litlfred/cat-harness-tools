@@ -25,7 +25,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import { declaresInstance, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "../kg/cat-harness.js";
+import { declaresInstance, instanceDirectoriesForGraph, layerRootsIn, readDeclaration } from "../kg/cat-harness.js";
 import type { ResolvedTheme, ThemeRef } from "./theme.js";
 import { themeById } from "./themes.js";
 
@@ -60,7 +60,7 @@ export type ThemeRefResult = { ok: true; theme: ResolvedTheme; owner: string | u
  * generator actually renders from — so `check:instance-themes` calls this.
  */
 export function instanceThemes(repoRoot: string, instance: string): { ok: true; themes: readonly ResolvedTheme[] } | { ok: false; miss: ThemeRefMiss } {
-  const root = instanceRootsIn(repoRoot).find((r) => declaresInstance(readDeclaration(r), instance));
+  const root = layerRootsIn(repoRoot).find((r) => declaresInstance(readDeclaration(r), instance));
   if (root === undefined) return { ok: false, miss: { kind: "no-such-instance", instance } };
   const dirs = instanceDirectoriesForGraph(root, THEMES_GRAPH_TYPOLOGY);
   if (dirs.length === 0) return { ok: false, miss: { kind: "no-themes-directory", instance } };
@@ -127,7 +127,7 @@ export function themeByRef(ref: ThemeRef, repoRoot: string, citingInstance?: str
 /** The declared `name` of the layer `ref` identifies, or `ref` itself when none does. */
 function instanceNameIn(repoRoot: string, ref: string): string {
   if (!ref.includes("/")) return ref;
-  const root = instanceRootsIn(repoRoot).find((r) => declaresInstance(readDeclaration(r), ref));
+  const root = layerRootsIn(repoRoot).find((r) => declaresInstance(readDeclaration(r), ref));
   return (root === undefined ? undefined : readDeclaration(root)?.name) ?? ref;
 }
 
@@ -168,7 +168,7 @@ export interface OwnedWebpageTheme {
  */
 export function instanceWebpageThemes(repoRoot: string, platform = PLATFORM_THEME_OWNER): OwnedWebpageTheme[] {
   const out: OwnedWebpageTheme[] = [];
-  const names = instanceRootsIn(repoRoot)
+  const names = layerRootsIn(repoRoot)
     .map((r) => readDeclaration(r)?.name)
     .filter((n): n is string => n !== undefined && n !== platform)
     .sort();
@@ -214,7 +214,7 @@ export function instanceStickyThemes(
   platformIds: ReadonlySet<string> = new Set(),
 ): { themes: OwnedStickyTheme[]; conflicts: StickyThemeConflict[] } {
   const byId = new Map<string, OwnedStickyTheme[]>();
-  const names = instanceRootsIn(repoRoot)
+  const names = layerRootsIn(repoRoot)
     .map((r) => readDeclaration(r)?.name)
     .filter((n): n is string => n !== undefined && n !== platform)
     .sort();

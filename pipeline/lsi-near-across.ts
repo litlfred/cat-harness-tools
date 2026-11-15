@@ -42,7 +42,7 @@ import { join, relative } from "node:path";
 
 import {
   findDeclarationFile,
-  instanceRootsIn,
+  layerRootsIn,
   LsiUnitProviderDeclarationSchema,
   type LsiUnitProviderDeclaration,
 } from "../schemas/kg/cat-harness.js";
@@ -98,7 +98,7 @@ const MIN_UNITS = 3;
 export function discoverLsiUnitProviders(checkoutRoot: string): { providers: DiscoveredLsiProvider[]; problems: string[] } {
   const found: DiscoveredLsiProvider[] = [];
   const problems: string[] = [];
-  for (const root of instanceRootsIn(checkoutRoot)) {
+  for (const root of layerRootsIn(checkoutRoot)) {
     const file = findDeclarationFile(root);
     if (file === undefined) continue;
     let raw: { name?: unknown; lsiUnitProviders?: unknown };

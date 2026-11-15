@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { instanceRootsIn, readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { serveThemed, type Scheme } from "../support/themed-page.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 import { declaredPageUrl } from "../support/site-pages.ts";
@@ -81,7 +81,7 @@ async function themed(page: Page, scheme: Scheme = "dark"): Promise<void> {
  */
 function declaredLibrarySubjects(): { name: string; entries: string[] }[] {
   const out: { name: string; entries: string[] }[] = [];
-  for (const root of instanceRootsIn(REPO)) {
+  for (const root of layerRootsIn(REPO)) {
     let decl;
     try {
       decl = readDeclaration(root);

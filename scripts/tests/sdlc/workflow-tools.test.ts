@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { assess, invocations, processesOf, resolvePath, runBlocks, toolReach } from "../../check-workflow-tools.ts";
+import { assess, invocations, pinnedCopies, processesOf, resolvePath, runBlocks, toolReach } from "../../check-workflow-tools.ts";
 import type { ToolDefinition } from "../../../schemas/tools/tool.js";
 
 function tree(files: Record<string, string>): string {
@@ -94,6 +94,44 @@ describe("assess", () => {
   test("processesOf joins satisfies to BPMN skill refs, and adds subprocesses", () => {
     expect(processesOf(tool("t", "x", ["skill-a"], ["proc-c"]), bySkill)).toEqual(["proc-a", "proc-c"]);
     expect(processesOf(tool("t", "x", ["nope"]), bySkill)).toEqual([]);
+  });
+});
+
+describe("a script copied out of a pinned tree", () => {
+  // The preview tier runs `scripts/preview-qa.ts` at the judging scripts' pin
+  // by copying it beside the mount's scripts under a scratch name. The step
+  // runs the source; the scratch name exists in no tree.
+  const step = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - run: |",
+    '          tmp="fa/lay/scripts/.preview-qa-ci.ts"',
+    '          git -C ci show "HEAD:scripts/preview-qa.ts" > "$tmp"',
+    '          bun "$tmp" select --root src',
+    '          rm -f "$tmp"',
+  ].join("\n");
+
+  test("pinnedCopies maps the scratch name to the copied path", () => {
+    const [block] = runBlocks(step);
+    expect([...pinnedCopies(block!)]).toEqual([["fa/lay/scripts/.preview-qa-ci.ts", "scripts/preview-qa.ts"]]);
+  });
+
+  test("the run is read as the source, not reported unresolved", () => {
+    // The workflow is the layer's own, as layer-pr-checks.yml is, so the
+    // copied path resolves in that layer.
+    const root = tree({ "lay/.github/workflows/w.yml": step, "lay/scripts/preview-qa.ts": "" });
+    const runs = invocations(root, ["lay/.github/workflows/w.yml"]);
+    expect(runs.map((i) => i.script)).toEqual(["lay/scripts/preview-qa.ts"]);
+  });
+
+  test("a scratch name with no copy beside it is still unresolved", () => {
+    const root = tree({
+      "lay/.github/workflows/w.yml": ["jobs:", "  a:", "    steps:", "      - run: |", '          tmp="fa/lay/scripts/.gone.ts"', '          bun "$tmp"'].join("\n"),
+      "lay/scripts/preview-qa.ts": "",
+    });
+    const runs = invocations(root, ["lay/.github/workflows/w.yml"]);
+    expect(runs.map((i) => i.script)).toEqual([undefined]);
   });
 });
 

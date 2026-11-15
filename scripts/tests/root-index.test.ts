@@ -9,6 +9,7 @@
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { overlayPath } from "../lib/layer-output.ts";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -17,7 +18,7 @@ import { expandFindings, localLoader } from "../publish-verify.ts";
 import { exportIdentity } from "../kg-export.ts";
 import { instanceDocPath } from "../instance-exports.ts";
 import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "../../schemas/kg/cat-harness.ts";
+import { layerRootsIn, readDeclaration, repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { SUBGRAPH_INDEX_FILE } from "../../schemas/kg/subgraph-manifest.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { siteNotBuilt } from "../../test/support/checkout.ts";
@@ -30,7 +31,7 @@ afterAll(() => {
   for (const d of made) rmSync(d, { recursive: true, force: true });
 });
 
-const declared = instanceRootsIn(REPO).filter((i) => readDeclaration(i) !== undefined);
+const declared = layerRootsIn(REPO).filter((i) => readDeclaration(i) !== undefined);
 
 // The repository subgraph index each site below carries is written at publish
 // and gitignored (bean w1gy F18); not built, there is no real site to index.
@@ -42,7 +43,7 @@ function site(skip: string[] = []): string {
   const dir = mkdtempSync(join(tmpdir(), "root-index-"));
   made.push(dir);
   mkdirSync(join(dir, "subgraph"), { recursive: true });
-  copyFileSync(SUBGRAPH_INDEX, join(dir, "subgraph", SUBGRAPH_INDEX_FILE));
+  copyFileSync(overlayPath(SUBGRAPH_INDEX), join(dir, "subgraph", SUBGRAPH_INDEX_FILE));
   for (const inst of declared) {
     if (skip.includes(readDeclaration(inst)!.name)) continue;
     // Where the deploy writes it: the host at its docPath, every other

@@ -18,11 +18,15 @@
  *   3. **Candidates are never a barrier to having a translation** (owner,
  *      2026-11-14). An EMPTY `msgstr` gets the entry's first good candidate,
  *      marked `#, fuzzy`, so it is the default until a person adjudicates.
- *      A non-empty `msgstr` is never overwritten.
+ *      A non-empty `msgstr` is never overwritten. A plural entry's candidate
+ *      carries every form (`forms`, one per the catalogue's plural count),
+ *      each checked against the English it translates, and fills the entry
+ *      only when all its forms are empty (owner, 2026-11-14).
  *   4. **A candidate is never a verdict.** Nothing here sets `official`.
  *      The node records what produced the strings it filled.
  *   5. **The catalogue's author can say no.** A catalogue that says `DO NOT
- *      MACHINE-FILL`, or whose node is official, still collects candidates
+ *      MACHINE-FILL`, or that is signed off as official (its node, or its
+ *      `X-Folio-Official: yes` header), still collects candidates
  *      for a reviewer, but none is put in its `.po`: the sidecar is not
  *      shipped, the catalogue is.
  */
@@ -31,6 +35,7 @@ import { join, relative, sep } from "node:path";
 
 import { TranslationNodeSchema } from "../../schemas/content/translation.ts";
 import {
+  applyForms,
   applySuggestion,
   CANDIDATES_SCHEMA,
   CANDIDATES_SUFFIX,
@@ -40,13 +45,16 @@ import {
   type CandidateSourceKind,
   type CandidatesFile,
 } from "./translation-adjudication.ts";
-import { checkedCandidate, entryKey, forbidsMachineFill, poFromPot, type Skipped } from "./machine-translation.ts";
+import { checkedCandidate, entryKey, forbidsMachineFill, nplurals, pluralSources, poFromPot, type Skipped } from "./machine-translation.ts";
 
 /** One candidate for one entry. */
 export interface CandidateInput {
   msgctxt?: string;
   msgid: string;
+  /** The translation; for a plural entry, its form 0. */
   text: string;
+  /** For a plural entry: every `msgstr[n]`, in order, as many as the catalogue's plural count. */
+  forms?: string[];
   source: CandidateSource;
 }
 
@@ -76,6 +84,20 @@ export function emptySidecar(locale: string, catalogue: string): CandidatesFile 
   return { $schema: CANDIDATES_SCHEMA, locale, catalogue, entries: [] };
 }
 
+/** The checked forms of a plural candidate, or why they are refused. */
+function checkedForms(sources: string[], forms: string[] | undefined, check: boolean): { forms: string[] } | { refused: string } {
+  if (forms === undefined) return { refused: "plural entry: the candidate gives no forms" };
+  if (forms.length !== sources.length) return { refused: `plural entry: ${forms.length} form(s) given, the catalogue has ${sources.length}` };
+  if (!check) return { forms };
+  const out: string[] = [];
+  for (let k = 0; k < forms.length; k++) {
+    const r = checkedCandidate(sources[k]!, forms[k]!);
+    if ("refused" in r) return { refused: `form ${k}: ${r.refused}` };
+    out.push(r.text);
+  }
+  return { forms: out };
+}
+
 /**
  * Merge candidates into a sidecar and a catalogue, in memory. Pure: the
  * caller decides whether to write.
@@ -84,21 +106,30 @@ export function mergeCandidates(po: string, sidecar: CandidatesFile, input: Cand
   const out: CandidatesFile = { ...sidecar, entries: sidecar.entries.map((e) => ({ ...e, candidates: [...e.candidates] })) };
   const byKey = new Map(out.entries.map((e) => [entryKey(e.msgctxt, e.msgid), e]));
   const poByKey = new Map(poEntries(po).map((e) => [entryKey(e.msgctxt, e.msgid), e]));
+  const n = nplurals(po, sidecar.locale);
+  const sourcesOf = (e: { msgid: string; msgidPlural?: string }) => pluralSources(e.msgid, e.msgidPlural!, n);
+  const check = o.check !== false;
   const rejected: Skipped[] = [];
   let added = 0;
   for (const c of input) {
     const ctx = c.msgctxt !== undefined ? { msgctxt: c.msgctxt } : {};
     const key = entryKey(c.msgctxt, c.msgid);
-    if (!poByKey.has(key)) {
+    const target = poByKey.get(key);
+    if (!target) {
       rejected.push({ ...ctx, msgid: c.msgid, reason: "no such entry in the catalogue" });
       continue;
     }
-    if (poByKey.get(key)!.msgidPlural !== undefined) {
-      rejected.push({ ...ctx, msgid: c.msgid, reason: "plural entry: one candidate cannot supply its forms" });
-      continue;
-    }
     let text = c.text;
-    if (o.check !== false) {
+    let forms: string[] | undefined;
+    if (target.msgidPlural !== undefined) {
+      const r = checkedForms(sourcesOf(target), c.forms, check);
+      if ("refused" in r) {
+        rejected.push({ ...ctx, msgid: c.msgid, reason: `${c.source.id}: ${r.refused}` });
+        continue;
+      }
+      forms = r.forms;
+      text = forms[0]!;
+    } else if (check) {
       const r = checkedCandidate(c.msgid, c.text);
       if ("refused" in r) {
         rejected.push({ ...ctx, msgid: c.msgid, reason: `${c.source.id}: ${r.refused}` });
@@ -112,28 +143,42 @@ export function mergeCandidates(po: string, sidecar: CandidatesFile, input: Cand
       out.entries.push(entry);
       byKey.set(key, entry);
     }
-    if (entry.candidates.some((x) => x.text === text && sameSource(x.source, c.source))) continue;
-    entry.candidates.push({ text, source: c.source });
+    const same = (x: { text: string; forms?: string[]; source: CandidateSource }) =>
+      x.text === text && sameSource(x.source, c.source) && JSON.stringify(x.forms ?? null) === JSON.stringify(forms ?? null);
+    if (entry.candidates.some(same)) continue;
+    entry.candidates.push({ text, ...(forms ? { forms } : {}), source: c.source });
     added++;
   }
 
-  // Fill each empty msgstr from its entry's first good candidate.
+  // Fill each empty msgstr (every form, for a plural) from its entry's first good candidate.
   let text = po;
   const filled: MergeResult["filled"] = [];
   if (o.fill !== false) {
     for (const e of poEntries(po)) {
-      if (e.msgstr !== "" || e.msgidPlural !== undefined) continue;
+      const plural = e.msgidPlural !== undefined;
+      if (e.forms.some((f) => f !== "")) continue;
       const entry = byKey.get(entryKey(e.msgctxt, e.msgid));
-      const first = entry?.candidates.find((x) => o.check === false || !("refused" in checkedCandidate(e.msgid, x.text)));
-      if (!first) continue;
       const ctx = e.msgctxt !== undefined ? { msgctxt: e.msgctxt } : {};
-      const r = applySuggestion(text, { ...ctx, msgid: e.msgid, current: "", suggested: first.text });
-      if ("refused" in r) continue;
+      let r: { text: string } | { refused: string } | undefined;
+      let from: CandidateSource | undefined;
+      if (plural) {
+        const first = entry?.candidates.find((x) => !("refused" in checkedForms(sourcesOf(e), x.forms, check)));
+        if (first) [r, from] = [applyForms(text, { ...ctx, msgid: e.msgid, forms: first.forms! }), first.source];
+      } else {
+        const first = entry?.candidates.find((x) => !check || !("refused" in checkedCandidate(e.msgid, x.text)));
+        if (first) [r, from] = [applySuggestion(text, { ...ctx, msgid: e.msgid, current: "", suggested: first.text }), first.source];
+      }
+      if (!r || "refused" in r) continue;
       text = r.text;
-      filled.push({ ...ctx, msgid: e.msgid, source: first.source });
+      filled.push({ ...ctx, msgid: e.msgid, source: from! });
     }
   }
   return { sidecar: out, po: text, added, filled, rejected };
+}
+
+/** Whether a catalogue's header says a person signed it off (`X-Folio-Official: yes`). */
+export function officialByHeader(po: string): boolean {
+  return /^"X-Folio-Official:\s*yes\b/im.test(po);
 }
 
 /** What a translation node says produced its strings, by source kind. */
@@ -216,6 +261,7 @@ export function addCandidates(input: CandidateInput[], o: AddCandidatesOptions):
     node = raw;
     if ((raw.status as Record<string, unknown>).official === true) noFill = "its node is official; candidates are recorded for a reviewer, the catalogue is not changed";
   } else if (o.createNode === false) noFill = "no translation node beside it (--no-create-node); candidates are recorded, the catalogue is not changed";
+  if (officialByHeader(po)) noFill = "its header says X-Folio-Official: yes; candidates are recorded for a reviewer, the catalogue is not changed";
   if (forbidsMachineFill(po)) noFill = "the catalogue says DO NOT MACHINE-FILL; candidates are recorded for a reviewer, the catalogue is not changed";
 
   const merged = mergeCandidates(po, sidecar, input, { ...o, fill: o.fill !== false && noFill === undefined });

@@ -34,7 +34,7 @@ import { join, relative } from "node:path";
 
 import { readDeclaration, resolveDirectories, type ResolvedDirectory } from "./cat-harness.js";
 import { parse as parseYaml } from "yaml";
-import { findDeclarationFile, instanceRootsIn } from "./instance-roots.js";
+import { findDeclarationFile, layerRootsIn } from "./instance-roots.js";
 import { kindAndSubclasses, type NameRule, type NodeKindEntry, type NodeKindIndex } from "./node-kind-index.js";
 import { acceptsSchemaTag } from "./node-kind.js";
 import { contentIsOffCheckout } from "./subgraph-source.js";
@@ -125,17 +125,35 @@ function nodePath(root: string, repoRoot: string, file: string): string {
   return rel.replace(/\.(json|md)$/, "").split("\\").join("/");
 }
 
+/**
+ * Does a file stamped `tag` belong to kind `k`? A versioned kind by
+ * `acceptsSchemaTag`; an UNVERSIONED one by the family its validator node
+ * names, exactly (`qa-attestations` holds `qa-attestations/v1`, `qa-script`
+ * holds `qa-script/v1`). Until 2026-11-13 an unversioned kind found no nodes,
+ * so its nodes had no pages (owner, 2026-11-13, node-kind audit: every listed
+ * node kind gets per-node pages).
+ */
+export function kindAccepts(k: Pick<NodeKindEntry, "id" | "version" | "holdings">, tag: unknown): boolean {
+  if (k.version !== undefined) return acceptsSchemaTag(k, tag);
+  return typeof tag === "string" && k.holdings.some((h) => h.family === tag);
+}
+
+/** Whether a kind can have nodes: a versioned one, or an unversioned one that holds a named family ({@link kindAccepts}). */
+export function hasNodes(k: Pick<NodeKindEntry, "version" | "holdings"> | undefined): boolean {
+  return k !== undefined && (k.version !== undefined || k.holdings.some((h) => h.family !== undefined));
+}
+
 /** Every node of `kindId` and its subclasses in the checkout at `repoRoot`, sorted by harness then path. */
 export function nodesOfKind(index: Pick<NodeKindIndex, "kinds">, kindId: string, repoRoot: string): KindNode[] {
   const byId = new Map(index.kinds.map((k) => [k.id, k]));
-  const kinds = kindAndSubclasses(index, kindId).map((id) => byId.get(id)!).filter((k) => k?.version);
+  const kinds = kindAndSubclasses(index, kindId).map((id) => byId.get(id)!).filter(hasNodes);
   const typologies = [...new Set(kinds.flatMap((k) => k.holdings.map((h) => h.typology)))];
   const byRule = kinds.filter((k): k is NodeKindEntry & { foundBy: NameRule } => k.foundBy !== undefined);
   const out = new Map<string, KindNode>();
   const take = (file: string, harness: string, root: string, candidates: readonly NodeKindEntry[]): void => {
     if (out.has(file)) return;
     const node = readNode(file);
-    const kind = node && candidates.find((k) => acceptsSchemaTag(k, node.$schema));
+    const kind = node && candidates.find((k) => kindAccepts(k, node.$schema));
     if (!node || !kind) return;
     out.set(file, {
       kind: kind.id,
@@ -145,7 +163,7 @@ export function nodesOfKind(index: Pick<NodeKindIndex, "kinds">, kindId: string,
       node,
     });
   };
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const harness = readDeclaration(root)?.name;
     if (!harness) continue;
     if (typologies.length > 0) {
@@ -167,10 +185,10 @@ export function nodesOfKind(index: Pick<NodeKindIndex, "kinds">, kindId: string,
  * outside all of them cannot change one of its pages.
  */
 export function kindDirectories(index: Pick<NodeKindIndex, "kinds">, repoRoot: string): string[] {
-  const typologies = [...new Set(index.kinds.filter((k) => k.version).flatMap((k) => k.holdings.map((h) => h.typology)))];
+  const typologies = [...new Set(index.kinds.filter(hasNodes).flatMap((k) => k.holdings.map((h) => h.typology)))];
   const byRule = index.kinds.some((k) => k.version && k.foundBy === "instance-declaration");
   const out = new Set<string>();
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     if (!readDeclaration(root)?.name) continue;
     for (const { absPath } of checkoutDirectories(root, typologies)) out.add(absPath);
     // A name-rule node is a FILE at the layer root, not a directory; the

@@ -26,7 +26,7 @@ import { relative, resolve } from "node:path";
 import {
   type CatHarnessDeclaration,
   instanceRootFor,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
   repoRootFor,
 } from "../schemas/kg/cat-harness.js";
@@ -81,7 +81,7 @@ export function auditPublishable(repoRoot: string): PublishableReport {
   const rows: InstanceRow[] = [];
   const findings: PublishableFinding[] = [];
 
-  for (const root of instanceRootsIn(repoRoot)) {
+  for (const root of layerRootsIn(repoRoot)) {
     const where = relative(repoRoot, root) || ".";
     let decl: CatHarnessDeclaration | undefined;
     try {
@@ -95,7 +95,7 @@ export function auditPublishable(repoRoot: string): PublishableReport {
       });
       continue;
     }
-    // `undefined` is "this root declares no instance", which `instanceRootsIn`
+    // `undefined` is "this root declares no instance", which `layerRootsIn`
     // should not have returned — reported rather than dropped, for the same
     // reason as the parse failure above.
     if (decl === undefined) {

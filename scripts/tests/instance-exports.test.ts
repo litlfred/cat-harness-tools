@@ -20,7 +20,7 @@ import {
 import { publishedIdentity, publishedInstanceSchemas, scannedInstanceSchemas } from "../kg-export.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
-import { artefactStub, instanceRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { artefactStub, layerRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
 import { isPublished, publishedPath } from "../../schemas/kg/url-space.js";
 import {
   PUBLISHED_ELSEWHERE,
@@ -56,7 +56,7 @@ describe("the plan is the declarations, partitioned", () => {
   test("every declared instance is exactly one of: planned, published elsewhere, or declared not published", () => {
     const planned = new Set(plan.map((p) => p.stub));
     const disabled = new Set(
-      instanceRootsIn(REPO)
+      layerRootsIn(REPO)
         .map((r) => readDeclaration(r))
         .filter((d) => d !== undefined && !isPublished(d))
         .map((d) => artefactStub(d!)),

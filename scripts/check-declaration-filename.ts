@@ -40,7 +40,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { layerRootsIn, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { historicalPrefixes } from "../src/docs/declaration-claims.js";
 
 /**
@@ -299,7 +299,7 @@ export function classifyMarkdownLine(
  */
 function generatedPrefixes(repoRoot: string): string[] {
   const out = new Set<string>();
-  for (const instance of instanceRootsIn(repoRoot)) {
+  for (const instance of layerRootsIn(repoRoot)) {
     let site: string;
     try {
       site = siteDirFor(instance);

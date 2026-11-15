@@ -29,7 +29,7 @@ import { spawnSync } from "node:child_process";
 
 import {
   instanceDirectoriesForGraph,
-  instanceRootsIn,
+  layerRootsIn,
   readDeclaration,
 } from "../schemas/kg/cat-harness.js";
 
@@ -139,9 +139,9 @@ function main(): number {
   const check = process.argv.includes("--check");
   const fix = process.argv.includes("--fix");
 
-  const roots = instanceRootsIn(repoRoot);
+  const roots = layerRootsIn(repoRoot);
   if (roots.length === 0) {
-    console.error("✗ no instance declaration read — refusing (see `instanceRootsIn`).");
+    console.error("✗ no instance declaration read — refusing (see `layerRootsIn`).");
     return 2;
   }
 
