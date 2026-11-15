@@ -1498,6 +1498,14 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
       "fails on links into a switched-off opt-in sub-graph, each fixed by hand)",
   },
   {
+    script: "check:optin-refs",
+    kind: "covered-by",
+    reason:
+      "COMPOSED into `check:declaration-resolution`, which CI runs: its findings are that gate's `optInRefs` field, so a " +
+      "step of its own would report every reference twice. Kept as a script to list the references alone (owner, " +
+      "2026-11-12, card Q-OPTINREFS-CI B: gated now, each always-on Tool or workflow naming an opt-in-only skill fixed at its source)",
+  },
+  {
     script: "layers:check",
     kind: "covered-by",
     reason:
