@@ -20,6 +20,7 @@
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
+import { overlayPath } from "./lib/layer-output.ts";
 import { join, relative, resolve, sep } from "node:path";
 
 import { orderedDependencies } from "../schemas/kg/harness-config.js";
@@ -195,7 +196,9 @@ function targetExists(repoRoot: string, target: string): boolean {
   // job, not this one — and reporting an id as "missing" because it is not a
   // file would be the axis lying about what it looked at.
   if (!target.includes("/") && !target.includes(".")) return true;
-  return existsSync(resolveCoveragePath(repoRoot, target));
+  // Over the layer overlay: a page a mounted layer builds at publish is at its
+  // output root, not beside the pinned mount (bean `cat-tools-sm8r`).
+  return existsSync(overlayPath(resolveCoveragePath(repoRoot, target)));
 }
 
 /**
