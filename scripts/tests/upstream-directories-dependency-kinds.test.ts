@@ -1,9 +1,9 @@
 /**
  * A layer that uses a kind ANOTHER planned layer declares is readable at a
  * pin once the planner folds that layer's kinds in first ({@link withKindsOf}),
- * whatever order the two are listed in (2026-11-15: smart-ra's standing re-pin
- * refused smart-base, whose `smart-base.json` names fhir-harness's
- * `fhir-artifact-index` kind, because smart-base comes first in the lock).
+ * whatever order the two are listed in (2026-11-15: a downstream's standing
+ * re-pin refused a layer whose declaration names a kind only a layer it
+ * depends on registers, because the using layer comes first in the lock).
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
