@@ -19,6 +19,17 @@
  * | `documentation` — its DEFINITION | an author |
  * | extracted for translation (names reach every `.pot`) | the platform |
  *
+ * ## A lane may be defined BY REFERENCE (owner, 2026-11-15, Q-LANE-2 A)
+ *
+ * A lane whose standard BPMN `partitionElementRef` names a content block (a
+ * persona such as `pers:registration-officer`) whose prose is non-empty is
+ * documented: that block IS the definition, and the lane only points at it.
+ * Copying the sentence into `<bpmn:documentation>` would be a second source of
+ * truth that drifts the day the persona is reworded, so the check resolves the
+ * reference instead of asking for a copy. The block's text is translated with
+ * the block, so the extraction axis below asks only about a lane's OWN
+ * strings. A reference that resolves to nothing is still undocumented.
+ *
  * The translation axis checks EXTRACTION, not that a translation exists:
  * catalogues ship with empty `msgstr` awaiting a person. `extractBpmn`
  * already handles `<documentation>`, so a definition written here reaches
@@ -34,7 +45,7 @@
  * unknown flag, or a run that threw. An activity in no lane is a FINDING in
  * both modes.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import {
@@ -135,6 +146,8 @@ export interface LaneReport {
   readonly lanes: number;
   /** ...of those, carrying `<bpmn:documentation>`. */
   readonly documented: number;
+  /** ...of those documented, how many by a resolved `partitionElementRef` rather than their own text. */
+  readonly documentedByReference: number;
   /** ...of those, not. The finding. */
   readonly undocumented: LaneFinding[];
   /** ...of those, carrying no usable `name`. A term with no label. */
@@ -161,6 +174,28 @@ function bpmnFiles(root: string): string[] {
 }
 
 /**
+ * Content-block labels whose prose is non-empty: the definitions a lane's
+ * `partitionElementRef` may resolve to.
+ *
+ * A block is a `.ts` manifest declaring `label: "<label>"` beside a `.md` of
+ * the same stem; the `.md` is its text. Regex rather than an import, as
+ * `parseBlockManifest` reads manifests, so this layer names no content kind.
+ */
+export function definedBlockLabels(root: string): Set<string> {
+  const out = new Set<string>();
+  const manifests = gitFiles(root, (rel) => rel.endsWith(".ts") && !rel.split("/").some((s) => s.startsWith("."))).files;
+  for (const f of manifests) {
+    const md = f.replace(/\.ts$/, ".md");
+    if (!existsSync(md)) continue;
+    const label = /\blabel:\s*["']([^"']+)["']/.exec(readFileSync(f, "utf-8"))?.[1];
+    if (label === undefined) continue;
+    // Same guard as an empty `<documentation/>`: whitespace is not a definition.
+    if (/\S/.test(readFileSync(md, "utf-8"))) out.add(label);
+  }
+  return out;
+}
+
+/**
  * Read every diagram and answer the lane question for each activity.
  *
  * Regex rather than an XML parse, matching `check-workflow-refs` and
@@ -172,6 +207,9 @@ export function checkLanes(root = REPO): LaneReport {
   const files = bpmnFiles(root);
   let activities = 0;
   const documented: string[] = [];
+  const byReference = new Set<string>();
+  let blockDefs: Set<string> | undefined;
+  const resolves = (ref: string): boolean => (blockDefs ??= definedBlockLabels(root)).has(ref);
   const undocumented: LaneFinding[] = [];
   const unnamed: LaneFinding[] = [];
   const unextracted: LaneReport["unextracted"][number][] = [];
@@ -214,7 +252,10 @@ export function checkLanes(root = REPO): LaneReport {
     const msgids = msgidsFor(s, rel);
 
     // lane id -> { name, hasDoc, members }
-    const lanes = new Map<string, { name: string | null; hasDoc: boolean; doc: string | null; members: Set<string> }>();
+    const lanes = new Map<
+      string,
+      { name: string | null; hasDoc: boolean; doc: string | null; ref: string | null; members: Set<string> }
+    >();
     const laneRe = new RegExp(`<(?:bpmn:)?lane\\b([^>]*?)(?:/>|>([\\s\\S]*?)</(?:bpmn:)?lane>)`, "g");
     for (let m = laneRe.exec(s); m !== null; m = laneRe.exec(s)) {
       const attrs = m[1] ?? "";
@@ -231,6 +272,7 @@ export function checkLanes(root = REPO): LaneReport {
         // which is the shape of every gate that stops meaning anything.
         hasDoc: /<(?:bpmn:)?documentation[^>]*>\s*\S[\s\S]*?<\/(?:bpmn:)?documentation>/.test(body),
         doc: /<(?:bpmn:)?documentation[^>]*>([\s\S]*?)<\/(?:bpmn:)?documentation>/.exec(body)?.[1]?.trim() ?? null,
+        ref: /\bpartitionElementRef="([^"]+)"/.exec(attrs)?.[1] ?? null,
         members,
       });
     }
@@ -248,6 +290,9 @@ export function checkLanes(root = REPO): LaneReport {
       const key = `${rel}#${lid}`;
       if (lane.hasDoc) {
         if (!documented.includes(key)) documented.push(key);
+      } else if (lane.ref !== null && resolves(lane.ref)) {
+        if (!documented.includes(key)) documented.push(key);
+        byReference.add(key);
       } else if (!undocumented.some((u) => u.file === rel && u.lane === lid)) {
         undocumented.push({ file: rel, lane: lid, name: lane.name, activities: 0 });
       }
@@ -295,6 +340,7 @@ export function checkLanes(root = REPO): LaneReport {
     activities,
     lanes: documented.length + undocumented.length,
     documented: documented.length,
+    documentedByReference: byReference.size,
     undocumented: undocumented.sort((a, b) => b.activities - a.activities || a.file.localeCompare(b.file)),
     unnamed: unnamed.sort((a, b) => a.file.localeCompare(b.file)),
     unextracted: unextracted.sort((a, b) => a.file.localeCompare(b.file) || a.kind.localeCompare(b.kind)),
@@ -311,7 +357,8 @@ export function laneDocumentationDocument(r: LaneReport): QaResult {
     families: {
       "undocumented-lane": {
         summary:
-          "A lane containing at least one activity, carrying a `name` but no `<bpmn:documentation>`. " +
+          "A lane containing at least one activity, carrying a `name` but no `<bpmn:documentation>`, and no " +
+          "`partitionElementRef` to a content block with non-empty prose (a persona that defines it). " +
           "A reader meeting the task cannot learn what the lane is, and the glossary has a label with no definition.",
         entries: r.undocumented,
       },
@@ -408,6 +455,7 @@ if (import.meta.main) {
     console.log(`    with a name                  ${r.lanes - r.unnamed.length}`);
     console.log(`    UNNAMED                      ${r.unnamed.length}`);
     console.log(`    documented                   ${r.documented}`);
+    console.log(`      by persona reference       ${r.documentedByReference}`);
     console.log(`    UNDOCUMENTED                 ${r.undocumented.length}`);
     console.log(`    strings NOT extracted        ${r.unextracted.length}`);
     if (r.orphans.length > 0) console.log(`  activities in NO lane           ${r.orphans.length}  (undetermined)`);
