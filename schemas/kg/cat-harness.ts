@@ -7829,7 +7829,7 @@ import { leftOutByMount, mountScopeFor } from "./remote-mount";
 // Layer DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this
 // file, which imports the registry. Re-exported here so no caller moves.
-export { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, layerRootsIn, isForeignCheckout } from "./instance-roots";
+export { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, layerRootsIn, instanceRootsIn, isForeignCheckout } from "./instance-roots";
 
 // Old names, kept so callers in other layers keep working while they move to
 // the layer names (cat-harness#1138 P4). Remove once no layer imports them.

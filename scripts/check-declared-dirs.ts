@@ -73,7 +73,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { DEFAULT_DIRECTORIES, layerRootsIn, nestedDirectories, readDeclaration, rootForScope } from "../schemas/kg/cat-harness.js";
+import { DEFAULT_DIRECTORIES, instanceRootsIn, layerRootsIn, nestedDirectories, readDeclaration, rootForScope } from "../schemas/kg/cat-harness.js";
 import type { DeclarationScope } from "../schemas/kg/kg-node.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import {
@@ -818,4 +818,4 @@ if (import.meta.main) {
   process.exit(findings.length > 0 ? 1 : 0);
 }
 
-export { layerRootsIn, resolve };
+export { layerRootsIn, instanceRootsIn, resolve };
