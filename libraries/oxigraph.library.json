@@ -17,6 +17,7 @@
   "usedBy": [
     "scripts/beans-query.ts",
     "scripts/nquads-query.ts",
+    "scripts/rdf-vocabulary.ts",
     "scripts/tests/beans-query.test.ts"
   ]
 }
