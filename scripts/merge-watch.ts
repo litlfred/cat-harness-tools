@@ -720,6 +720,7 @@ export function watchRepo(api: GitHub, repo: string, opts: Options = DEFAULT_OPT
       details.push(pr);
       // Content PRs are not the merge manager's (owner, 2026-11-15): no row.
       if (pr.labels.some((l) => l.name === CONTENT_LABEL)) continue;
+      // mergeable_state: shown as served, never trusted (bean fx5r, above).
       row = { ...row, draft: pr.draft, headSha: pr.head.sha, mergeableState: pr.mergeable_state ?? "unknown" };
       let verdict: Verdict;
       try {
