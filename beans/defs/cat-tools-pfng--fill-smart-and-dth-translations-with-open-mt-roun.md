@@ -20,7 +20,7 @@ The six UN locales: `ar`, `es`, `fr`, `ru`, `zh` (and `en`, the source), unless 
 
 ## Per repository (one PR each, never to `main` directly)
 
-1. **Set up the engine, once per machine.** A Python venv OUTSIDE the repository with `transformers`, `torch` and `sentencepiece` (`schemas/sdlc/python-deps.ts`, extended tier). The models come from `huggingface.co` (with `cdn-lfs.hf.co`, `cdn-lfs-us-1.hf.co`, `cas-bridge.xethub.hf.co`); allow those hosts. Never commit the venv or model weights.
+1. **Set up the engine, once per machine.** A Python venv OUTSIDE the repository with `transformers`, `torch` and `sentencepiece` (`schemas/sdlc/python-deps.ts`, extended tier). The models come from `huggingface.co` (with `cdn-lfs.hf.co`, `cdn-lfs-us-1.hf.co`, `cas-bridge.xethub.hf.co`, `cas-server.xethub.hf.co`); allow those hosts. Never commit the venv or model weights.
 2. **Collect candidates.** From the repository root:
    ```
    bun run cat translation:candidates -- --instance . --engine opus-mt --init --python <venv>/bin/python
