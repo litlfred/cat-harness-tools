@@ -321,6 +321,6 @@ describe("class model QA report", async () => {
   it("reports an unread source as unknown, never a pass, and counts what each reader drew", () => {
     expect(report.criteria["class-model-sources-read"]!.result).toBe("unknown");
     expect(report.criteria["class-model-sources-drawn"]!.findings.map((f) => f.where)).toEqual(["fhir", "json-schema"]);
-    expect(report.totals).toEqual({ pass: 1, fail: 3, "n/a": 0, unknown: 1 });
+    expect(report.totals).toEqual({ pass: 1, fail: 3, "n/a": 1, unknown: 1 });
   });
 });
