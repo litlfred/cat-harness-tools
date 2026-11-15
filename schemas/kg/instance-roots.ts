@@ -266,7 +266,7 @@ export function findDeclarationFile(dir: string): string | undefined {
  * `scripts/input-hash.ts` (ci-cone.test.ts asserts they agree). This layer
  * may not import that module.
  */
-// input-site: inert #0f548420 — the build-output directories layer discovery leaves out; it reads none of them
+// input-site: inert #8fbd1be9 — the build-output directories layer discovery leaves out; it reads none of them
 export const NOT_LAYER_DIRS: readonly string[] = ["build", "_kg", "_site", "dist"];
 
 export function layerRootsIn(repoRoot: string): string[] {
