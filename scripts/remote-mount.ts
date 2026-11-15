@@ -841,9 +841,9 @@ function resolveClosureWith(
 
   // The kinds EVERY listed layer declares in its own `typologies/`, at its
   // pin, before any layer's nesting is read ({@link withKindsOf}): a layer may
-  // use a kind a layer listed after it contributes (smart-base names
-  // fhir-harness's `fhir-artifact-index`). A layer that cannot be opened or
-  // found here is skipped; the loop below reports it.
+  // use a kind a layer listed after it contributes (a layer's declaration
+  // names a kind only a layer it depends on registers). A layer that cannot be
+  // opened or found here is skipped; the loop below reports it.
   let kinds: GraphTypologyRegistry = defaultGraphTypologies;
   for (const m of ds.mounts) {
     if (m.overrides?.[m.harness]?.skip) continue;
