@@ -202,9 +202,33 @@ jobs:
           # The audit's findings are the gates' to judge, not this job's: a
           # non-zero exit with sidecars written is a computed result to publish.
           bun run cat-harness-tools/scripts/kg-audit.ts --instance "./$INSTANCE" | tail -25
-          n="$(find "${{ steps.home.outputs.home }}" -name '*.kg-qa.json' 2>/dev/null | wc -l)"
+          home="${{ steps.home.outputs.home }}"
+          # The instance stands where its mount was, and the lock still lists
+          # it as mounted, so kg-audit writes its sidecars to the layer output
+          # root (`build/layers/<instance>/…`, bean `cat-tools-sm8r` item 4)
+          # rather than into the instance. `qa:publish` already overlays that
+          # root onto the home, so count both. The bare home stays as the
+          # fallback for an index whose cat-harness-tools predates the move.
+          twin="$home"
+          if [ -f cat-harness-tools/scripts/lib/layer-output.ts ]; then
+            twin="$(bun -e '
+              const m = await import("./cat-harness-tools/scripts/lib/layer-output.ts");
+              const { relative, resolve } = await import("node:path");
+              const abs = resolve(process.argv[1]);
+              const out = typeof m.writePathOf === "function" ? m.writePathOf(abs, process.cwd()) : abs;
+              console.log(relative(process.cwd(), out));
+            ' "$home")" || twin="$home"
+          fi
+          n=0
+          for d in "$home" "$twin"; do
+            [ -d "$d" ] || continue
+            m="$(find "$d" -name '*.kg-qa.json' | wc -l)"
+            echo "kg-audit sidecars under $d: $m"
+            n=$((n + m))
+            [ "$twin" != "$home" ] || break
+          done
           echo "kg-audit sidecars written: $n"
-          [ "$n" -gt 0 ] || { echo "::error::kg-audit wrote no sidecar under ${{ steps.home.outputs.home }}: nothing to publish"; exit 1; }
+          [ "$n" -gt 0 ] || { echo "::error::kg-audit wrote no sidecar under $home or $twin: nothing to publish"; exit 1; }
       - name: Run the instance's own QA writers
         if: steps.key.outputs.skip != 'true' && steps.home.outputs.skip != 'true' && inputs.writers != ''
         working-directory: fa
