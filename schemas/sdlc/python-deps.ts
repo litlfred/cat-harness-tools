@@ -175,7 +175,7 @@ export const PYTHON_DEPS: readonly PythonDep[] = [
   {
     distribution: "anthropic",
     tier: "extended",
-    why: "`pdf-ocr.py --vision-digits` only: an opt-in fallback that asks a vision model to re-read the number words Tesseract is unsure of on Arabic-script pages (10665-94830-per, owner 2026-11-15). Imported inside `anthropic_ask`, so a run without the flag needs neither it nor credentials. Extended because CI never calls a remote model; the tests drive the fallback with a fake `ask`.",
+    why: "`pdf-ocr.py --vision-digits` only: an opt-in fallback that asks a vision model to re-read the number words Tesseract is unsure of on Arabic-script pages (10665-94830-per, owner 2026-11-15). Imported inside `anthropic_ask`, so a run without the flag needs neither it nor credentials. The wheel is 2.3 MB (anthropic 2.8.0, py3-none-any, PyPI, 2026-11-15) and pulls httpx, pydantic and jiter. Extended because CI never calls a remote model; the tests drive the fallback with a fake `ask`.",
   },
 ];
 
