@@ -260,9 +260,8 @@ export const QA_WRITERS: readonly QaWriter[] = [
       // kg:export qualifies a sidecar for any layer but the host with that
       // layer's stub (`kg-export.<stub>`, kg-export.ts), so in a content
       // layer's cone it writes `kg-export.<that layer>.qa-results.json`. Only
-      // the host's bare stem was claimed, and a core PR's qa:refresh refused
-      // `kg-export.folio-assistant-core.qa-results.json` as unclaimed
-      // (folio-assistant-core#814, 2026-11-15).
+      // the host's bare stem was claimed, so a content layer's PR refused its
+      // own `kg-export.<layer>.qa-results.json` as unclaimed (issue #2313).
       ...(script === "kg:export" ? [`${R}/kg-export.*.qa-results.json`] : []),
     ],
     // declared-path-literal: the skill artefacts the register's writer form regenerates, measured from the 2026-10-07 restore log.
