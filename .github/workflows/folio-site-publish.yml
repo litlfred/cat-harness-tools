@@ -287,7 +287,12 @@ jobs:
         # The job log is not readable from an agent's container, so a
         # failure's last lines are also raised as annotations, which the
         # checks API serves.
+        # GH_TOKEN: a site.build step may read its own repository through
+        # `gh api` (aai-programme's site:qa-validation reads the issues; run
+        # 43738298891 failed for want of it). It adds no reach: the same job
+        # token is already in the global git config above.
         env:
+          GH_TOKEN: ${{ github.token }}
           PLAN: ${{ inputs.plan && '--plan' || '' }}
         run: |
           set -o pipefail
