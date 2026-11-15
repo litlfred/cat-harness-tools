@@ -33,7 +33,7 @@ function step(): Step {
 }
 
 /** Run the step as `event` would; `existing` is an open repin PR, or none. */
-function runStep(event: string, existing?: number, labelFails = false): { code: number; calls: string[]; summary: string } {
+function runStep(event: string, existing?: number, labelFails = false, gitBody?: string): { code: number; calls: string[]; summary: string } {
   const dir = mkdtempSync(join(tmpdir(), "standing-repin-"));
   const log = join(dir, "calls.log");
   const stub = (name: string, body: string) => {
@@ -41,7 +41,7 @@ function runStep(event: string, existing?: number, labelFails = false): { code: 
     writeFileSync(p, `#!/usr/bin/env bash\necho "${name} $*" >> "${log}"\n${body}\n`);
     chmodSync(p, 0o755);
   };
-  stub("git", `case "$1" in status) echo " M index.lock.json";; diff) echo index.lock.json;; esac`);
+  stub("git", gitBody ?? `case "$1" in status) echo " M index.lock.json";; diff) echo index.lock.json;; esac`);
   const listed = existing ? `{"number":${existing},"headRefName":"repin/standing-2026-11-01"}` : "";
   stub(
     "gh",
@@ -111,5 +111,45 @@ describe("standing repin never merges: it labels needs-repin on every trigger", 
     const r = runStep("schedule", undefined, true);
     expect(r.code).not.toBe(0);
     expect(r.calls.some((c) => /--auto\b/.test(c))).toBe(false);
+  });
+});
+
+/**
+ * A `git` whose first push is refused, as GitHub refuses a credential without
+ * the `workflows` permission a commit that edits .github/workflows.
+ * `workflowsChanged` says whether the commit touched them.
+ */
+const refusingGit = (workflowsChanged: boolean) =>
+  [
+    `case "$1" in`,
+    `  status) echo " M index.lock.json";;`,
+    `  diff) if [[ "$*" == *".github/workflows"* ]]; then exit ${workflowsChanged ? 1 : 0}; fi; echo index.lock.json;;`,
+    `  push) if [ ! -f "$RUNNER_TEMP/pushed-once" ]; then touch "$RUNNER_TEMP/pushed-once"; exit 1; fi;;`,
+    `esac`,
+  ].join("\n");
+
+describe("standing repin moves the workflow pins with the lock when it may (cat-harness-tools#2315)", () => {
+  test("the re-pin step asks remote-mount to write the workflow pins in CI", () => {
+    const wf = parse(readFileSync(WORKFLOW, "utf8")) as { jobs: { repin: { steps: Step[] } } };
+    const repin = wf.jobs.repin.steps.find((x) => x.name === "Re-pin");
+    expect(repin?.env?.WORKFLOW_PINS_WRITE).toBe("1");
+    expect(wf.jobs.repin.steps.some((x) => x.name === "Refresh the root bun.lock")).toBe(true);
+  });
+
+  test("a push refused over the workflow pins is retried without them, and the summary says so", () => {
+    const r = runStep("schedule", undefined, false, refusingGit(true));
+    expect(r.code).toBe(0);
+    expect(r.calls.filter((c) => c.startsWith("git push"))).toHaveLength(2);
+    expect(r.calls).toContain("git checkout -q HEAD~1 -- .github/workflows");
+    expect(r.calls).toContain("git commit -q --amend --no-edit");
+    expect(r.summary).toContain("Workflow pins NOT moved");
+    expect(ghCalls(r.calls)).toEqual(["gh pr edit 42 --add-label needs-repin", "gh pr merge 42 --disable-auto"]);
+  });
+
+  test("a refused push that carried no workflow edit fails the run, with nothing dropped", () => {
+    const r = runStep("schedule", undefined, false, refusingGit(false));
+    expect(r.code).not.toBe(0);
+    expect(r.calls.some((c) => c.startsWith("git checkout -q HEAD~1"))).toBe(false);
+    expect(r.calls.some((c) => c.startsWith("gh pr create"))).toBe(false);
   });
 });

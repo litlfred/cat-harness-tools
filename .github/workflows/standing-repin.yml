@@ -36,7 +36,11 @@
 #      branch through the GitHub API, moves only the pins a standing consent
 #      covers (`seedRemote`, the `mount:remote --seed` write), re-mounts so
 #      `index.lock.json` follows (`mountRemote`), and re-renders the agent
-#      surface when the lock changed.
+#      surface when the lock changed. The `uses: litlfred/…@<sha>` calls
+#      move with the lock (`WORKFLOW_PINS_WRITE=1`), and a committed root
+#      `bun.lock` is refreshed for the moved mounts (cat-harness-tools#2315).
+#      A credential that may not push .github/workflows gets the lock and
+#      bun.lock without the pin edits, and the summary says so.
 #   4. When a tracked file changed, push `repin/standing-<date>` and open ONE
 #      PR, or update the one already open (any `repin/standing-*` head), so
 #      runs never stack PRs. Then label it `needs-repin` for the merge
@@ -141,6 +145,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           DRY_RUN: ${{ inputs.dry-run }}
           DEPTH: ${{ inputs.depth }}
+          # The `uses: litlfred/…@<sha> # index.lock.json` calls follow the
+          # lock in the same commit (cat-harness-tools#2315). Without this the
+          # re-pin moved only the lock and the site kept calling the old
+          # shared workflows. Whether the push may carry them is decided at
+          # push time below (owner Q-PIN-6 "C").
+          WORKFLOW_PINS_WRITE: "1"
         run: |
           set -uo pipefail
           git config user.name "github-actions[bot]"
@@ -157,6 +167,23 @@ jobs:
           # A refused or undetermined instance is a red run, and nothing is pushed:
           # a half-moved lock is not a PR (principle 4).
           exit $code
+      - name: Refresh the root bun.lock
+        # A site whose root declares the mounts as workspaces records each
+        # mounted layer's package.json in bun.lock, so a re-pin that moves a
+        # layer's dependencies leaves the lock stale and every
+        # `bun install --frozen-lockfile` after it fails ("lockfile had
+        # changes, but lockfile is frozen";
+        # cat-harness-tools#2315). Refresh it while the mounts are down.
+        if: inputs.dry-run == false && steps.repin.outputs.moved != '0'
+        working-directory: site
+        run: |
+          set -euo pipefail
+          if ! git ls-files --error-unmatch bun.lock >/dev/null 2>&1; then
+            echo "This site commits no bun.lock: nothing to refresh."
+            exit 0
+          fi
+          bun install
+          if git diff --quiet -- bun.lock; then echo "bun.lock is current."; else echo "bun.lock refreshed for the moved mounts."; fi
       - name: Open or update the one repin PR
         if: inputs.dry-run == false && steps.repin.outputs.moved != '0'
         working-directory: site
@@ -188,7 +215,19 @@ jobs:
 
           $(cat "$RUNNER_TEMP/repin.md")
           EOF
-          git push -q --force origin "HEAD:refs/heads/$branch"
+          # A credential without the `workflows` permission (the default
+          # GITHUB_TOKEN, or an App without it: owner Q-PIN-6 "C") cannot push
+          # a commit that edits .github/workflows. Then drop the pin edits and
+          # push the rest, so the lock still moves; check:workflow-pins warns
+          # that the calls trail it until an agent session moves them.
+          if ! git push -q --force origin "HEAD:refs/heads/$branch"; then
+            if git diff --quiet HEAD~1 HEAD -- .github/workflows; then exit 1; fi
+            echo "::warning::the push with the workflow pins was refused (no \`workflows\` permission?): pushing without them; the \`uses:\` calls trail index.lock.json until an agent session runs \`bun run cat workflow-pins\`"
+            git checkout -q HEAD~1 -- .github/workflows
+            git commit -q --amend --no-edit
+            git push -q --force origin "HEAD:refs/heads/$branch"
+            echo "Workflow pins NOT moved: the credential cannot push .github/workflows. Pass a \`repin-token\` with the \`workflows\` permission." >> "$GITHUB_STEP_SUMMARY"
+          fi
           title="Standing repin ($(date -u +%Y-%m-%d))"
           if [ -n "$number" ]; then
             gh pr edit "$number" --title "$title" --body-file "$RUNNER_TEMP/repin.md"
