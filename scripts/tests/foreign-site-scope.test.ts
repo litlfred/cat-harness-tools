@@ -508,10 +508,14 @@ describe("the injected rail (rail-standalone-pages --foreign-site) over a fixtur
     // The row is written ONCE beside the rail's data (2026-10-10); read it as a browser would.
     const json = navbarRowJsonOf(html, (f) => (existsSync(join(root, f)) ? readFileSync(join(root, f), "utf-8") : undefined));
     expect(json).toBeDefined();
-    const row = JSON.parse(json!) as { hrefs: Record<string, string>; notes: Record<string, string> };
+    const row = JSON.parse(json!) as { icons: string[]; hrefs: Record<string, string>; notes: Record<string, string> };
     expect(row.hrefs.beans).toBeUndefined();
     expect(row.hrefs.todos).toBeUndefined();
-    expect(row.notes.todos).toBe("smart-trust declares no todos graph");
+    // cat-harness's row no longer carries Todos or Beans at all (owner,
+    // 2026-11-13: "remove the fsh-guts, beans and todos"); a layer that still
+    // declares them gets the note, which the cases above test.
+    expect(row.icons).not.toContain("todos");
+    expect(row.icons).not.toContain("beans");
     expect(rootRelativeLeft(row)).toEqual([]);
   });
 });
