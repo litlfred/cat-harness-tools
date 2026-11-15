@@ -91,6 +91,11 @@
  * It only reads. The merge path is `merge:guard --merge`, the merge manager's
  * alone; this report never merges, re-pins or labels anything.
  *
+ * Repositories are reported in the order given: name them lowest dependency
+ * first, so the report reads in the order the merge manager works
+ * (cat-harness merge-manager-watcher §"Merging across dependent
+ * repositories", rules 1 and 4).
+ *
  * Usage:
  *   bun run cat merge:watch -- --queue --repos litlfred/cat-harness,litlfred/cat-harness-tools --json
  *   bun run cat merge:watch -- --repo litlfred/cat-harness --repo litlfred/cat-harness-tools
