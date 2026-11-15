@@ -29,6 +29,7 @@
         "@vocabulary/prov": "1.0.6",
         "@vocabulary/rdf": "1.0.6",
         "@vocabulary/rdfs": "1.0.6",
+        "@vocabulary/schema": "1.1.0",
         "@vocabulary/skos": "1.0.6",
         "@vocabulary/xsd": "1.0.6",
         "bpmn-moddle": "^10.2.0",
@@ -492,6 +493,8 @@
     "@vocabulary/rdf": ["@vocabulary/rdf@1.0.6", "", { "peerDependencies": { "@rdfjs/types": "^2.0.0" } }, "sha512-liNJ5EknQ31OQU6QDfynjCv7aZxtVLNLl6GDsY0jXMrASBoZwYN0ahrXaBoyMyTpCTe2jZrQ3ihaTCszFgp35g=="],
 
     "@vocabulary/rdfs": ["@vocabulary/rdfs@1.0.6", "", { "peerDependencies": { "@rdfjs/types": "^2.0.0" } }, "sha512-mVjwKdqcyG+YSAv+LZTGGuw8utH2aPsyoJvaqcrctvvo4rj/7868ToiOaR76fIaG4HS853DF/1JY7Yg9fKe8Yw=="],
+
+    "@vocabulary/schema": ["@vocabulary/schema@1.1.0", "", { "peerDependencies": { "@rdfjs/types": "^2.0.0" } }, "sha512-SLcTY6YVORGgt1YVyk4oqhI17fFU9lcVAA0MpNahHKpzbYI7MrOI0KYD1oX3EKIPL+6kyHWYXjdOOgNksyWwMA=="],
 
     "@vocabulary/skos": ["@vocabulary/skos@1.0.6", "", { "peerDependencies": { "@rdfjs/types": "^2.0.0" } }, "sha512-G8wzLlAtC3kcSMz5wPJcevDhUkc8OhpHRj3nYbXguZfevr57JknG1ZMkuKSdsYbOaGYwtW73XLrbUFFopHRIwg=="],
 

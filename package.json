@@ -81,6 +81,7 @@
     "@vocabulary/prov": "1.0.6",
     "@vocabulary/rdf": "1.0.6",
     "@vocabulary/rdfs": "1.0.6",
+    "@vocabulary/schema": "1.1.0",
     "@vocabulary/skos": "1.0.6",
     "@vocabulary/xsd": "1.0.6",
     "bpmn-moddle": "^10.2.0",
@@ -113,9 +114,11 @@
       "http://purl.org/spar/fabio/": "no @vocabulary/fabio package: the SPAR ontologies are not in the @zazuko/vocabularies bundle",
       "http://purl.org/spar/doco/": "no @vocabulary/doco package: the SPAR ontologies are not in the @zazuko/vocabularies bundle",
       "http://purl.org/spar/deo/": "no @vocabulary/deo package: the SPAR ontologies are not in the @zazuko/vocabularies bundle",
-      "http://purl.org/spar/cito/": "no @vocabulary/cito package: the SPAR ontologies are not in the @zazuko/vocabularies bundle",
-      "https://schema.org/": "@vocabulary/schema@1.1.0 exists and is not declared: 1,011 classes and 1,660 properties, a third again of the class model; the owner decides (bean cat-tools-xfd4)"
-    }
+      "http://purl.org/spar/cito/": "no @vocabulary/cito package: the SPAR ontologies are not in the @zazuko/vocabularies bundle"
+    },
+    "referencedOnly": [
+      "@vocabulary/schema"
+    ]
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

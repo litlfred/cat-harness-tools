@@ -1333,6 +1333,27 @@ export function loadFhirCore(
 }
 
 /**
+ * The class IRIs of the vocabulary `prefix` / `namespace` that `text` names:
+ * a CURIE (`schema:DefinedTerm`) or a full IRI, in either scheme
+ * (`https://schema.org/X` is the same name as `http://schema.org/X`). A class
+ * is a capitalised local name, as every vocabulary read here writes one.
+ */
+export function classMentions(text: string, prefix: string, namespace: string): Set<string> {
+  const esc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const bare = namespace.replace(/^https?:\/\//, "");
+  const re = new RegExp(`(?:\\b${esc(prefix)}:|https?://${esc(bare)})([A-Z][A-Za-z0-9_]*)`, "g");
+  const out = new Set<string>();
+  for (const m of text.matchAll(re)) out.add(`${namespace}${m[1]}`);
+  return out;
+}
+
+/** What the corpus's declarations name of a vocabulary: every field type and literal value, scanned. */
+function vocabularyMentions(decls: readonly SchemaDecl[]): (prefix: string, namespace: string) => Set<string> {
+  const text = decls.map((d) => `${d.fields.map((f) => f.type).join(" ")} ${d.values.join(" ")}`).join("\n");
+  return (prefix, namespace) => classMentions(text, prefix, namespace);
+}
+
+/**
  * Read the whole schema graph.
  *
  * Returns `null` — not an empty graph — when the declared directory does not
@@ -1539,7 +1560,22 @@ export function readSchemaGraph(root: string, opts: SchemaGraphScope = {}): Sche
   if (opts.scope === "checkout") {
     const pj = join(import.meta.dir, "..", "package.json");
     const layer = rel(join(import.meta.dir, "..")).split("/")[0] || rootName || "cat-harness-tools";
-    for (const read of [readRdfVocabularies(pj, rel, layer), readModdleMetamodels(pj, rel, layer)]) {
+    const mentions = vocabularyMentions(decls);
+    const rdf = readRdfVocabularies(pj, rel, layer, mentions);
+    // A shape the corpus types by a class of such a vocabulary (`"@type":
+    // z.literal("schema:DefinedTerm")`) names that class by IRI: an id-ref.
+    const byCanonical = new Map(rdf.decls.filter((d) => d.canonical).map((d) => [d.canonical!, d.id]));
+    for (const v of rdf.vocabularies.filter((x) => x.referencedOnly)) {
+      for (const d of decls) {
+        for (const f of d.fields) {
+          for (const iri of classMentions(`${f.type} ${d.values.join(" ")}`, v.prefix, v.namespace)) {
+            const to = byCanonical.get(iri);
+            if (to) jsonLocalEdges.push({ from: d.id, to, via: f.name, kind: "id-ref", optional: f.optional, array: f.array });
+          }
+        }
+      }
+    }
+    for (const read of [rdf, readModdleMetamodels(pj, rel, layer)]) {
       modules.push(...read.modules);
       decls.push(...read.decls);
       jsonRefs.push(...read.refs);

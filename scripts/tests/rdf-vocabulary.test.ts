@@ -15,7 +15,7 @@ import { diagramOfDecls, renderClassDiagram } from "../class-diagram.ts";
 import { classModelQa } from "../class-model-qa.ts";
 import { readModdleMetamodels } from "../moddle-metamodel.ts";
 import { declaredVocabularies, readRdfVocabularies, readRdfVocabularyTexts } from "../rdf-vocabulary.ts";
-import { cardinalityOf, resolveClassModelRefs, type SchemaDecl, type SchemaEdge } from "../schema-graph.ts";
+import { cardinalityOf, classMentions, resolveClassModelRefs, type SchemaDecl, type SchemaEdge } from "../schema-graph.ts";
 import { sourceOfKind, typeLink } from "../type-links.ts";
 
 const EX = "http://example.org/ex#";
@@ -169,6 +169,52 @@ describe("RDF vocabulary reader", () => {
   });
 });
 
+describe("a vocabulary read only where the corpus names it (schema.org, owner option C)", () => {
+  const SDO = "http://schema.org/";
+  const sq = (s: string, p: string, o: string): string => `${s} ${p} ${o} <${SDO}> .`;
+  const nquads = [
+    sq(iri(`${SDO}Thing`), a, iri(`${RDFS}Class`)),
+    sq(iri(`${SDO}CreativeWork`), a, iri(`${RDFS}Class`)),
+    sq(iri(`${SDO}CreativeWork`), iri(`${RDFS}subClassOf`), iri(`${SDO}Thing`)),
+    sq(iri(`${SDO}MediaObject`), a, iri(`${RDFS}Class`)),
+    sq(iri(`${SDO}MediaObject`), iri(`${RDFS}subClassOf`), iri(`${SDO}CreativeWork`)),
+    sq(iri(`${SDO}contentUrl`), a, iri(`${RDF}Property`)),
+    sq(iri(`${SDO}contentUrl`), iri(`${SDO}domainIncludes`), iri(`${SDO}MediaObject`)),
+    sq(iri(`${SDO}contentUrl`), iri(`${SDO}rangeIncludes`), iri(`${SDO}URL`)),
+    sq(iri(`${SDO}encodesCreativeWork`), a, iri(`${RDF}Property`)),
+    sq(iri(`${SDO}encodesCreativeWork`), iri(`${SDO}domainIncludes`), iri(`${SDO}MediaObject`)),
+    sq(iri(`${SDO}encodesCreativeWork`), iri(`${SDO}rangeIncludes`), iri(`${SDO}CreativeWork`)),
+    sq(iri(`${SDO}height`), a, iri(`${RDF}Property`)),
+    sq(iri(`${SDO}height`), iri(`${SDO}domainIncludes`), iri(`${SDO}MediaObject`)),
+    sq(iri(`${SDO}height`), iri(`${SDO}rangeIncludes`), iri(`${SDO}Distance`)),
+    sq(iri(`${SDO}height`), iri(`${SDO}rangeIncludes`), iri(`${SDO}QuantitativeValue`)),
+    sq(iri(`${SDO}author`), a, iri(`${RDF}Property`)),
+    sq(iri(`${SDO}author`), iri(`${SDO}domainIncludes`), iri(`${SDO}CreativeWork`)),
+  ].join("\n");
+
+  it("finds a class named by CURIE or by IRI in either scheme, and not a property", () => {
+    const text = 'z.literal("schema:MediaObject") "https://schema.org/DefinedTerm" schema:name';
+    expect([...classMentions(text, "schema", SDO)].sort()).toEqual([`${SDO}DefinedTerm`, `${SDO}MediaObject`]);
+  });
+
+  it("draws only the named class, with its domainIncludes properties, and leaves its superclass an external name", () => {
+    const read = readRdfVocabularyTexts([{ prefix: "schema", namespace: SDO, nquads, module: "schema.nq", only: new Set([`${SDO}MediaObject`]) }]);
+    expect(read.decls.map((d) => d.name)).toEqual(["schema:MediaObject"]);
+    expect(read.vocabularies[0]!.referencedOnly).toBe(true);
+    const media = read.decls[0]!;
+    expect(media.extendsNames).toEqual(["schema:CreativeWork"]);
+    expect(fieldOf(media, "schema:contentUrl").constraint).toBe("domainIncludes, rangeIncludes");
+    // Two rangeIncludes are one union type, with no edge to either.
+    expect(fieldOf(media, "schema:height").type).toBe("schema:Distance | schema:QuantitativeValue");
+    // A property of a class not read is not read either.
+    expect(media.fields.some((f) => f.name === "schema:author")).toBe(false);
+    const resolved = resolveClassModelRefs(read.refs, new Map(read.decls.map((d) => [d.id, d])));
+    // CreativeWork is left out on purpose, so it is no unresolved reference.
+    expect(resolved.unresolved.size).toBe(0);
+    expect(resolved.edges).toEqual([]);
+  });
+});
+
 describe("installed vocabularies", () => {
   const layerPackage = join(import.meta.dir, "..", "..", "package.json");
   const rel = (p: string): string => p;
@@ -184,6 +230,12 @@ describe("installed vocabularies", () => {
     // CSVW and PROV are read the same way.
     expect(read.decls.some((d) => d.name === "csvw:Table")).toBe(true);
     expect(read.decls.some((d) => d.name === "prov:Activity")).toBe(true);
+    // schema.org is referencedOnly: with nothing named, it is not even parsed.
+    expect(read.vocabularies.some((v) => v.prefix === "schema")).toBe(false);
+    expect(read.vocabularies.length).toBeGreaterThan(10);
+    const sdo = readRdfVocabularies(layerPackage, rel, "cat-harness-tools", (prefix, ns) => (prefix === "schema" ? new Set([`${ns}DefinedTerm`]) : new Set()));
+    expect(sdo.decls.filter((d) => d.name.startsWith("schema:")).map((d) => d.name)).toEqual(["schema:DefinedTerm"]);
+    expect(fieldOf(byName(sdo.decls, "schema:DefinedTerm"), "schema:termCode").type).toBe("schema:Text");
     // ODRL has no package: reported as not read, nothing stood in for it.
     expect(read.unread.some((u) => u.startsWith("http://www.w3.org/ns/odrl/2/: not read"))).toBe(true);
     expect(read.decls.some((d) => d.name.startsWith("odrl:"))).toBe(false);
