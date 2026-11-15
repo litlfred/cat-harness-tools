@@ -403,6 +403,17 @@ export interface NavbarModel {
    * the duplicate cost and why giving the second copy its own id was worse.
    */
   openControl?: "input" | "labels";
+  /**
+   * Text appended, unescaped, to every `id` this rendering writes (the
+   * Harnesses panel and the folds), for a surface that renders the navbar
+   * MORE THAN ONCE per page. The just-the-docs include passes a Liquid
+   * expression that is empty in the first copy and `-2` in the second, so
+   * the first copy keeps the ids the tests and scripts name and the second
+   * no longer repeats them (`fa-nav-harnesses ×2` on every built page).
+   * Each button's `aria-controls` carries the same suffix, so it still
+   * names its own panel.
+   */
+  idSuffix?: string;
 }
 
 /** How a rendering pass writes its hrefs. Threaded rather than global. */
@@ -410,6 +421,8 @@ export interface Ctx {
   readonly liquid: boolean;
   /** Numbers the folds of ONE rendering, so each toggle names its own list. */
   readonly folds?: { n: number };
+  /** {@link NavbarModel.idSuffix}: appended to every id this rendering writes. */
+  readonly idSuffix?: string;
 }
 
 const esc = (s: string): string =>
@@ -865,7 +878,7 @@ function itemHtml(i: NavItem, c: Ctx): string {
   let kids = "";
   if (inner && i.fold) {
     const folds = c.folds ?? { n: 0 };
-    const id = `fa-nav-fold-${++folds.n}`;
+    const id = `fa-nav-fold-${++folds.n}${c.idSuffix ?? ""}`;
     const open = (i.children ?? []).some(holdsCurrent);
     const name = foldLabel(i.label, i.fold, open);
     toggle =
@@ -1212,7 +1225,7 @@ export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
 }
 
 export function navbarRegionsHtml(m: NavbarModel): string {
-  const c: Ctx = { liquid: m.hrefs === "liquid", folds: { n: 0 } };
+  const c: Ctx = { liquid: m.hrefs === "liquid", folds: { n: 0 }, ...(m.idSuffix ? { idSuffix: m.idSuffix } : {}) };
   const graphs = m.graphs && m.graphs.items.length > 0 ? m.graphs : undefined;
   const pages = m.pages && m.pages.items.length > 0 ? m.pages : undefined;
   return (
@@ -1265,7 +1278,7 @@ export function navbarRegionsHtml(m: NavbarModel): string {
  */
 export function harnessesBottomHtml(g: NavGroup, c: Ctx): string {
   const label = g.label;
-  const id = "fa-nav-harnesses";
+  const id = `fa-nav-harnesses${c.idSuffix ?? ""}`;
   const items = g.items.map((i) => itemHtml(i, c)).join("");
   return (
     `<div class="fa-nav-bottom">` +
