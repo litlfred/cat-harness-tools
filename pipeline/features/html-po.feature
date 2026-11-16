@@ -33,12 +33,6 @@ Feature: gettext over finished HTML
     When extractHtml runs on it
     Then it never reads scripts, styles, drawings, code, pre or translate=no
 
-  @test:pipeline/html-po.test.ts::extractHtml::\n
-  Scenario: extractHtml: \n
-    Given the fixture in html-po.test.ts
-    When extractHtml runs on it
-    Then it \n
-
   @test:pipeline/html-po.test.ts::isWords::takes_words_and_leaves_identifiers_and_numbers
   Scenario: isWords: Takes words and leaves identifiers and numbers
     Given the fixture in html-po.test.ts
