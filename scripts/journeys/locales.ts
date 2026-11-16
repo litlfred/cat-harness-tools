@@ -174,18 +174,18 @@ export function mergeCatalogue(pot: string, po: string | undefined, memory: Read
 }
 
 /** The relative href from page `from` (site-relative) to page `to`. */
-function relHref(from: string, to: string): string {
+export function relHref(from: string, to: string): string {
   const up = from.split("/").length - 1;
   return "../".repeat(up) + to.replace(/index\.html$/, "");
 }
 
 /** `path` (site-relative, starting with the locale segment) in `locale`. */
-function inLocale(path: string, locale: string): string {
+export function inLocale(path: string, locale: string): string {
   return path.replace(/^[^/]+\//, `${locale}/`);
 }
 
 /** A page's language links, alternates and translation block, for the locale it is in. */
-function withLanguages(html: string, path: string, locale: string, locales: readonly string[], source: string): string {
+export function withLanguages(html: string, path: string, locale: string, locales: readonly string[], source: string): string {
   const others = locales.filter((l) => l !== locale);
   const alternates = locales.map((l) => `<link rel="alternate" hreflang="${l}" href="${relHref(path, inLocale(path, l))}">`).join("");
   const meta = {
