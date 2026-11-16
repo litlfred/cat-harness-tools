@@ -20,7 +20,7 @@ afterAll(() => {
   for (const d of made) rmSync(d, { recursive: true, force: true });
 });
 
-const LIB = { $schema: "software-library/1.0.0", name: "@types/jsonld", version: "1.5.15", dev: true, licence: "MIT" };
+const LIB = { $schema: "software-library/1.0.0", name: "@acme/widget", version: "1.5.15", dev: true, licence: "MIT" };
 
 function layer(): string {
   const root = mkdtempSync(join(tmpdir(), "swlib-"));
@@ -30,7 +30,7 @@ function layer(): string {
     JSON.stringify({ name: "acme", version: "0.1.0", directories: [{ id: "acme-libraries", path: "libraries/", graphTypologies: [SOFTWARE_LIBRARY_KIND] }] }),
   );
   mkdirSync(join(root, "libraries"), { recursive: true });
-  writeFileSync(join(root, "libraries", "types__jsonld.library.json"), JSON.stringify(LIB));
+  writeFileSync(join(root, "libraries", "acme__widget.library.json"), JSON.stringify(LIB));
   writeFileSync(join(root, "libraries", "README.md"), "not a node");
   return root;
 }
@@ -38,8 +38,8 @@ function layer(): string {
 describe("a software library's IRI", () => {
   test("is a subject kind kg-export may mint, and its class is glossed", () => {
     expect(SUBJECT_KINDS).toContain(SOFTWARE_LIBRARY_SUBJECT_KIND);
-    expect(subjectIri("https://e.org/fa/acme/acme.jsonld", SOFTWARE_LIBRARY_SUBJECT_KIND, "types__jsonld")).toBe(
-      "https://e.org/fa/acme/softwareLibrary/types__jsonld",
+    expect(subjectIri("https://e.org/fa/acme/acme.jsonld", SOFTWARE_LIBRARY_SUBJECT_KIND, "acme__widget")).toBe(
+      "https://e.org/fa/acme/softwareLibrary/acme__widget",
     );
     expect(CLASS_GLOSSES.SoftwareLibrary?.gloss).toBeTruthy();
   });
@@ -48,7 +48,7 @@ describe("a software library's IRI", () => {
 describe("the libraries a layer declares", () => {
   test("one node per `.library.json`, its id the file's name, its title `name@version`", () => {
     const nodes = softwareLibraryNodes(layer());
-    expect(nodes.map((n) => [n.id, n.sourcePath, n.title])).toEqual([["types__jsonld", "libraries/types__jsonld.library.json", "@types/jsonld@1.5.15"]]);
+    expect(nodes.map((n) => [n.id, n.sourcePath, n.title])).toEqual([["acme__widget", "libraries/acme__widget.library.json", "@acme/widget@1.5.15"]]);
     expect(nodes[0]!.description).toContain("a dev dependency");
   });
   test("a file that does not parse is still a node, and says so", () => {
@@ -64,15 +64,15 @@ describe("the software-libraries page lists each library", () => {
   test("each library is a row: its id, name@version, its node-kind page, its IRI and its .jsonld", () => {
     const dir = join(layer(), "libraries");
     const rows = registryRowsOf(dir);
-    expect(rows.map((r) => [r.id, r.text])).toEqual([["types__jsonld", "@types/jsonld@1.5.15"]]);
+    expect(rows.map((r) => [r.id, r.text])).toEqual([["acme__widget", "@acme/widget@1.5.15"]]);
     const linked = withSubjectIris(rows, dir, [SOFTWARE_LIBRARY_KIND], (_f, kind, id) => `https://e.org/fa/acme/${kind}/${id}`, {
       instance: "acme",
       layerPath: "libraries",
     });
-    expect(linked[0]!.iri).toBe("https://e.org/fa/acme/softwareLibrary/types__jsonld");
-    expect(linked[0]!.page).toBe("../../software-library/acme/libraries/types__jsonld.library/");
+    expect(linked[0]!.iri).toBe("https://e.org/fa/acme/softwareLibrary/acme__widget");
+    expect(linked[0]!.page).toBe("../../software-library/acme/libraries/acme__widget.library/");
     const html = registryTable(linked);
-    expect(html).toContain('<a href="../../software-library/acme/libraries/types__jsonld.library/"><code>types__jsonld</code></a>');
-    expect(html).toContain('href="https://e.org/fa/acme/softwareLibrary/types__jsonld.jsonld"');
+    expect(html).toContain('<a href="../../software-library/acme/libraries/acme__widget.library/"><code>acme__widget</code></a>');
+    expect(html).toContain('href="https://e.org/fa/acme/softwareLibrary/acme__widget.jsonld"');
   });
 });
