@@ -1186,10 +1186,11 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   mkdirSync(out, { recursive: true });
   const upstreamFile = join(out, "upstream-pages.txt");
   writeFileSync(upstreamFile, "");
+  const siteCommit = capture("git rev-parse HEAD", root);
   const env = {
     ...siteStepEnv({
       instance: o.instance, title, baseurl, url: `https://${gh.owner}.github.io`, linkRoot: o.linkRoot, work: out, source: docs, site,
-      repository: `${gh.owner}/${gh.repo}`, commit: capture("git rev-parse HEAD", root), ref: capture("git rev-parse --abbrev-ref HEAD", root),
+      repository: `${gh.owner}/${gh.repo}`, commit: siteCommit, ref: capture("git rev-parse --abbrev-ref HEAD", root),
     }),
     [STEP_ENV.baseurl]: baseurl,
     [STEP_ENV.upstreamPages]: upstreamFile,
@@ -1263,7 +1264,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // Every site: one overview page per harness, which the rail's Harnesses panel links
     // (owner, 2026-11-13). After the node-kind pages, whose declaration pages it links;
     // before the rail, which links a row to its page only where the site holds one.
-    run("harness pages", `bun run ${TOOLS}/${HARNESS_PAGES} --root . --out ${s} --title ${shellQuote(title)} --base-url ${shellQuote(`https://${gh.owner}.github.io${baseurl}/`)}${env.SITE_COMMIT ? ` --commit ${shellQuote(env.SITE_COMMIT)}` : ""}`, root);
+    run("harness pages", `bun run ${TOOLS}/${HARNESS_PAGES} --root . --out ${s} --title ${shellQuote(title)} --base-url ${shellQuote(`https://${gh.owner}.github.io${baseurl}/`)}${siteCommit ? ` --commit ${shellQuote(siteCommit)}` : ""}`, root);
     if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}${o.scope ? ` --scope ${shellQuote(scopeArg(o.scope))}` : ""}`, root);
     // A scoped site installs the viewer only when one of its pages embeds it (Q-SZ-6 "A").
     if (has.has("pdf") && o.scope && !pagesEmbedPdf(site)) console.log("pdf viewer: no page of this scoped site embeds a PDF; not installed");
