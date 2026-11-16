@@ -55,6 +55,7 @@ export const SUBJECT_KINDS: readonly string[] = [
   "decision",
   "directory",
   "externalSchema",
+  "softwareLibrary",
   "globalTask",
   "glossary-usage",
   "package",

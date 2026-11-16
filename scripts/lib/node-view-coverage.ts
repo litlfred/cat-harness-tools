@@ -658,8 +658,12 @@ export async function coverRow(r: RowInput): Promise<CoverageRow> {
       const canon = folderUrl ?? r.folderUrls[0];
       const canonUrl = canon ? nodePageUrl(canon, n.id) : undefined;
       const tail = n.id.split("/").pop()!;
+      // A node-kind page is named after the node's FILE (`<path without .json>/`),
+      // so its last segment is the id plus the file's own ending
+      // (`typescript.library`, `foo.attestations`): that names the node too.
+      const namesNode = (seg: string): boolean => seg === tail || seg.startsWith(`${tail}.`);
       const named = links.filter(
-        (l) => l === canonUrl || (n.iri !== undefined && (l === n.iri || l === `${n.iri}.jsonld`)) || (!isRawRepoLink(l) && lastSeg(l) === tail),
+        (l) => l === canonUrl || (n.iri !== undefined && (l === n.iri || l === `${n.iri}.jsonld`)) || (!isRawRepoLink(l) && namesNode(lastSeg(l))),
       );
       const listed = canonUrl !== undefined && (linkSet.has(canonUrl) || named.length > 0);
       if (!canonUrl) {

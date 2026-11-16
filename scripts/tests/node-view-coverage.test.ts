@@ -201,6 +201,21 @@ describe("one row", () => {
     expect(r.nodes[0]!.missing).toEqual(["listed"]);
   });
 
+  test("a node-kind page named after the node's file names the node: `e.library/` is node `e`'s page", async () => {
+    const other = "en/h/things/m/";
+    mkdirSync(join(site, other), { recursive: true });
+    mkdirSync(join(site, "en/h/kind/m/e.library"), { recursive: true });
+    writeFileSync(join(site, other, "index.html"), `<main><a href="../../kind/m/e.library/">e</a></main>`);
+    writeFileSync(join(site, "en/h/kind/m/e.library/index.html"), "<p>e</p>");
+    const r = await coverRow(base({ nodes: [{ id: "e" }, { id: "el" }], folderUrls: [siteUrl + other] }));
+    const by = Object.fromEntries(r.nodes.map((n) => [n.id, n]));
+    expect(by.e!.page).toBe("en/h/kind/m/e.library/");
+    expect(by.e!.missing).toContain("canonical-page");
+    expect(by.e!.missing).not.toContain("listed");
+    // A longer id is not named by a shorter one's page.
+    expect(by.el!.missing).toContain("page");
+  });
+
   test("no folder page: every node misses its row", async () => {
     const r = await coverRow(base({ folderUrls: [siteUrl + "en/h/none/l/"] }));
     expect(r.folderPageFound).toBe(false);
