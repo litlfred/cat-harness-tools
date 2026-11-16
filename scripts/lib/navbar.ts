@@ -1186,7 +1186,7 @@ export function wireNavAnchor(doc: Document): void {
   };
   // Once the scroll comes to rest, not every frame: deep in a long document
   // the walk is a few milliseconds, and a rail change is recorded afresh below.
-  let rest: ReturnType<typeof setTimeout> | undefined;
+  let rest: number | undefined;
   win.addEventListener(
     "scroll",
     () => {
