@@ -368,6 +368,7 @@ ${panelHead(o.body, `${o.up}assets/`)}
 </head>
 <body class="jv jv-${o.kind}${o.print ? ` jv-print-${o.print}` : ""}">
 <nav class="jv-crumbs" aria-label="Breadcrumb">${crumbs}</nav>
+<!--jv-langs-->
 <main class="jv-main">
 ${o.body.trim()}
 </main>
@@ -449,7 +450,7 @@ function indexPage(corpus: JourneyCorpus, links: SiteLinks, declaring: string): 
   const body = `<header class="jv-hero">
 <p class="jv-kicker">Journeys</p>
 <h1>Every journey in ${e(links.title)}</h1>
-<p class="jv-lede">${total} journey${total === 1 ? "" : "s"} and ${steps} step${steps === 1 ? "" : "s"} across ${names.length} instance${names.length === 1 ? "" : "s"} of this checkout, the mounted layers' included. Each journey is a user scenario told as a journey map; a journey's parts sit under it, in the order the story follows.</p>
+<p class="jv-lede">${total} journey${total === 1 ? "" : "s"} and ${steps} step${steps === 1 ? "" : "s"} across ${names.length} instance${names.length === 1 ? "" : "s"} of this checkout, the mounted layers included. Each journey is a user scenario told as a journey map; a journey's parts sit under it, in the order the story follows.</p>
 <label class="jv-filter"><span>Filter</span><input type="search" data-jv-filter placeholder="a title, a step code, a word" aria-label="Filter journeys"></label>
 </header>
 ${names.length ? names.map((n) => instanceSection(corpus, n, "", true)).join("\n") : `<p class="jv-empty">No instance in this checkout declares a <code>user-scenario</code> or <code>workshop</code> directory with anything in it.</p>`}`;
@@ -698,7 +699,7 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
     ? `<h4>User stories</h4><ul class="jv-stories">${stories
         .map(({ id, s: story }) =>
           story
-            ? `<li><span class="jv-code">${e(id)}</span> As a <b>${e(story.role.replace(/-/g, " "))}</b>, I want ${e(story.want.charAt(0).toLowerCase() + story.want.slice(1))}${story.soThat ? `, so that ${e(story.soThat)}` : ""}.</li>`
+            ? `<li><span class="jv-code">${e(id)}</span> As a <b>${e(story.role.replace(/-/g, " "))}</b>, I want to ${e(story.want.charAt(0).toLowerCase() + story.want.slice(1))}${story.soThat ? `, so that ${e(story.soThat)}` : ""}.</li>`
             : `<li class="jv-unresolved"><span class="jv-code">${e(id)}</span> not found</li>`,
         )
         .join("")}</ul>`

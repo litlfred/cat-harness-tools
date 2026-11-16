@@ -22,6 +22,19 @@
   var doc = document;
   var root = doc.documentElement;
 
+  // The page's catalogue for the words this script writes (`journeys/locales.ts`); English without one.
+  var I18N = (function () {
+    try {
+      var n = typeof document !== "undefined" && document.getElementById("jv-i18n");
+      return n ? JSON.parse(n.textContent) : {};
+    } catch (_e) {
+      return {};
+    }
+  })();
+  function T(s) {
+    return I18N[s] || s;
+  }
+
   function store(key, value) {
     try {
       if (value === undefined) return window.localStorage.getItem(key);
@@ -194,7 +207,7 @@
       a.target = "_blank";
       a.rel = "noopener";
       a.className = "jp-json-open";
-      a.textContent = "Open " + src.replace(/^.*\//, "");
+      a.textContent = T("Open") + " " + src.replace(/^.*\//, "");
       code.appendChild(a);
     }
     function load() {
@@ -202,7 +215,7 @@
       var pre = d.querySelector("[data-jp-pane]:not([hidden]) pre[data-jp-src]");
       if (!pre || pre.hasAttribute("data-jp-loading")) return;
       if (location.protocol === "file:") {
-        offline(pre, "This page is open from disk, so the JSON is in its own file:");
+        offline(pre, T("This page is open from disk, so the JSON is in its own file:"));
         return;
       }
       pre.setAttribute("data-jp-loading", "");
@@ -216,7 +229,7 @@
           pre.removeAttribute("data-jp-src");
         })
         .catch(function () {
-          offline(pre, "Could not load this payload here.");
+          offline(pre, T("Could not load this payload here."));
         })
         .then(function () {
           pre.removeAttribute("data-jp-loading");
@@ -250,9 +263,9 @@
         var pane = d.querySelector("[data-jp-pane]:not([hidden]) pre");
         if (!pane || pane.hasAttribute("data-jp-src") || !navigator.clipboard) return;
         navigator.clipboard.writeText(pane.textContent).then(function () {
-          copy.textContent = "Copied";
+          copy.textContent = T("Copied");
           setTimeout(function () {
-            copy.textContent = "Copy";
+            copy.textContent = T("Copy");
           }, 1500);
         });
       });
@@ -308,7 +321,7 @@
       report.statusOptions.forEach(function (o) {
         tr.appendChild(el("th", null, o.label));
       });
-      tr.appendChild(el("th", null, "Not rated"));
+      tr.appendChild(el("th", null, T("Not rated")));
       var thead = el("thead");
       thead.appendChild(tr);
       t.appendChild(thead);
@@ -359,20 +372,20 @@
       var grid = el("div", "jp-gr-grid");
       grid.appendChild(
         countsTable(
-          "Per moment",
+          T("Per moment"),
           report.perMoment.map(function (x) {
             return { link: stepLink(x.step), counts: x.counts };
           }),
-          "Moment",
+          T("Moment"),
         ),
       );
       grid.appendChild(
         countsTable(
-          "Per module",
+          T("Per module"),
           report.perModule.map(function (x) {
             return { label: (x.module ? x.module + " · " : "") + x.title, counts: x.counts };
           }),
-          "Module",
+          T("Module"),
         ),
       );
       body.appendChild(grid);
@@ -461,7 +474,7 @@
     function show(left) {
       var m = Math.floor(left / 60);
       var sec = left % 60;
-      label.textContent = "Stop · " + m + ":" + (sec < 10 ? "0" : "") + sec;
+      label.textContent = T("Stop") + " · " + m + ":" + (sec < 10 ? "0" : "") + sec;
     }
     b.addEventListener("click", function () {
       if (t) {
@@ -483,7 +496,7 @@
           t = null;
           b.classList.remove("is-on");
           b.classList.add("is-up");
-          label.textContent = "Time’s up · restart";
+          label.textContent = T("Time’s up · restart");
         }
       }, 1000);
     });
@@ -531,7 +544,7 @@
     var shown = box.querySelector("[data-jp-usecase-show]");
     var ticks = box.querySelector("[data-jp-usecase-ticks]");
     function aside() {
-      if (text && shown) shown.textContent = (text.value.split("\n")[0] || "No use case agreed yet. Agree one together in step 1.").trim();
+      if (text && shown) shown.textContent = (text.value.split("\n")[0] || T("No use case agreed yet. Agree one together in step 1.")).trim();
       if (!ticks) return;
       ticks.textContent = "";
       Array.prototype.forEach.call(box.querySelectorAll(".jp-uc input:checked"), function (c) {
@@ -642,16 +655,16 @@
           var last = sec.items.filter(function (i) {
             return i.type === "choice";
           })[0];
-          dl.appendChild(el("dt", null, last ? last.options[last.options.length - 1].label : "Not yet"));
+          dl.appendChild(el("dt", null, last ? last.options[last.options.length - 1].label : T("Not yet")));
           dl.appendChild(el("dd", null, worst.join(" · ")));
         }
         if (dl.childNodes.length) {
           any = true;
           block.appendChild(dl);
-        } else block.appendChild(el("p", "jp-small", "Nothing written yet."));
+        } else block.appendChild(el("p", "jp-small", T("Nothing written yet.")));
         out.appendChild(block);
       });
-      if (!any) out.insertBefore(el("p", "jp-small", "Nothing written yet. Work through the steps; what the table writes appears here."), out.firstChild);
+      if (!any) out.insertBefore(el("p", "jp-small", T("Nothing written yet. Work through the steps; what the table writes appears here.")), out.firstChild);
     }
     var printBtn = box.querySelector("[data-jp-lab-print]");
     if (printBtn) {
@@ -670,7 +683,7 @@
         function q(x) {
           return '"' + String(x).replace(/"/g, '""') + '"';
         }
-        var lines = [["Step", "Item", "Answer"].map(q).join(",")];
+        var lines = [[T("Step"), T("Item"), T("Answer")].map(q).join(",")];
         rows().forEach(function (r) {
           lines.push([r.sec.n + ". " + r.sec.label, r.it.group ? r.it.group + ": " + r.it.label : r.it.label, r.v.text].map(q).join(","));
         });
@@ -697,7 +710,7 @@
   // presenter's and the hood's choices, jp:…), then start again at the overview.
   function reset(b) {
     b.addEventListener("click", function () {
-      if (!window.confirm("Reset the simulation? This forgets the room's answers and choices kept in this browser.")) return;
+      if (!window.confirm(T("Reset the simulation? This forgets the room's answers and choices kept in this browser."))) return;
       var ws = "jv:" + b.getAttribute("data-jp-reset") + ":";
       try {
         var drop = [];

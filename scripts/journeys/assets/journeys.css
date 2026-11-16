@@ -46,6 +46,8 @@ body.jv {
 .jv a { color: var(--jv-accent); text-underline-offset: 2px; }
 .jv code { font: 0.86em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .jv-crumbs { padding: 14px 28px 0; font-size: 0.86rem; color: var(--jv-muted); display: flex; flex-wrap: wrap; gap: 6px; }
+.jv-langs { padding: 6px 28px 0; display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.86rem; }
+.jv-langs [aria-current] { font-weight: 600; }
 .jv-sep { opacity: 0.6; }
 .jv-main { max-width: 1240px; margin: 0 auto; padding: 8px 28px 48px; }
 .jv-foot { max-width: 1240px; margin: 0 auto; padding: 18px 28px 40px; font-size: 0.8rem; color: var(--jv-muted); border-top: 1px solid var(--jv-line); }
@@ -270,7 +272,7 @@ body.jv {
 @page a4 { size: A4 landscape; margin: 10mm; }
 @media print {
   body.jv { background: #fff; color: #111; font-size: 11pt; }
-  .jv-crumbs, .jv-foot, .jv-filter, .jv-btn, .jv-stepnav, .jv-pn, .jv-noprint, [data-jv-print] { display: none !important; }
+  .jv-crumbs, .jv-langs, .jv-foot, .jv-filter, .jv-btn, .jv-stepnav, .jv-pn, .jv-noprint, [data-jv-print] { display: none !important; }
   .jv-main { max-width: none; padding: 0; }
   .jv-map-scroll, .jv-bpmn-scroll { overflow: visible; border: 0; }
   .jv-grid { width: auto; }

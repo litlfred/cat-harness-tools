@@ -82,7 +82,7 @@ Feature: The journeys viewer
   @test:scripts/tests/journeys-viz.test.ts::a_journey_page::stories,_requirements,_examples_and_blocks_resolve,_and_what_does_not_is_drawn_as_unresolved
   Scenario: Stories, requirements, examples and blocks resolve, and what does not is drawn as unresolved
     Given the rendered page of p2-treated
-    Then it shows the story want "show my summary abroad"
+    Then it shows the story as "I want to show my summary abroad, so that I am treated safely."
     And it links the requirement to its GitHub file in example/lower
     And "ghost-story" is drawn unresolved
     And LOW-REQ-404 is drawn as having no req: node
