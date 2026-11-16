@@ -64,6 +64,7 @@ export const SUBJECT_KINDS: readonly string[] = [
   "theme",
   "schema",
   "skill",
+  "voice",
 ];
 
 const KINDS = new Set(SUBJECT_KINDS);
