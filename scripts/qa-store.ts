@@ -1217,7 +1217,7 @@ export function publishQa(
   for (const r of args.roots) {
     const rel = toRepoPath(r, repoRoot);
     if (rel === "") throw new QaUsageError("refusing to publish the whole checkout; name its test/results roots");
-    if (existsSync(join(repoRoot, rel))) roots.push(rel);
+    if (overlayDirs(join(repoRoot, rel)).length > 0) roots.push(rel);
     else skipped.push(rel);
   }
   if (skipped.length) store.log(`qa-store: not in the checkout, skipped: ${skipped.join(", ")}`);
