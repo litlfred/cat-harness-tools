@@ -997,7 +997,8 @@ export async function stageDeclared(
   log(`site        ${d.recipe.siteSteps.join(", ") || "(none)"}`);
   if (d.recipe.finalSteps?.length) log(`final       ${d.recipe.finalSteps.join(", ")} (after the platform's own writers)`);
   log(`profile     ${d.recipe.profile ?? "folio"}${d.recipe.profile === "ig-repo-site" ? " (the platform steps folio-site.yml runs: the shell, its navbar, Jekyll, the rail)" : ""}`);
-  log(`links       ${d.recipe.links === "refuse" ? "refuse: an unresolved link refuses the publish (the recipe says so)" : "report: unresolved links are said, not refused"}`);
+  if (d.recipe.extends) log(`extends     ${d.recipe.extends} (shared site preset: its steps run first, read once the layers are mounted)`);
+  log(`links       ${d.recipe.links === "refuse" ? "refuse: an unresolved link refuses the publish (the recipe says so)" : d.recipe.links === undefined && d.recipe.extends ? "as the preset says (refuse in the shared presets)" : "report: unresolved links are said, not refused"}`);
   log("refuses     only on graph data (.json/.jsonld) and a build that cannot run; pages, links, scripts and stylesheets are QA findings (assets/site-qa/)");
   if (target === "main") {
     log(`keeps       branches/, STAGING/, _render-log/${(d.recipe.keep ?? []).map((k) => `, ${k}/`).join("")}`);
@@ -1022,6 +1023,7 @@ export async function stageDeclared(
     ...(d.recipe.keep ? { keep: d.recipe.keep } : {}),
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
+    ...(d.recipe.extends ? { extends: d.recipe.extends } : {}),
     ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
     ...(d.recipe.rootIndex ? { rootIndex: true } : {}),
     ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => {

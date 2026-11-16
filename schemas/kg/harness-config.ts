@@ -309,9 +309,14 @@ const PackageScriptName = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:._-]*$/, "a p
  * - `home`: the page that becomes the site's `index.md`.
  * - `rootIndex`: publish every layer's graph document and the root index,
  *   `index.jsonld` (`publish-root-index.ts`). Off unless declared.
+ * - `extends`: the shared site preset the steps build on, a
+ *   `templates/site-presets/<name>.json` of a mounted layer
+ *   (`scripts/lib/site-presets.ts`, cat-harness-tools#2345): its steps run
+ *   first, so no content site can drop a step every other site runs.
  */
 export const HarnessSiteBuildSchema = z.object({
   home: z.string().optional(),
+  extends: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
   pre: z.array(PackageScriptName).default([]),
   sourceSteps: z.array(PackageScriptName).default([]),
   siteSteps: z.array(PackageScriptName).default([]),

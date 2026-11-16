@@ -187,11 +187,15 @@ describe("the recipe an IG declares (site.build)", () => {
   };
 
   test("keep, profile and links are read and checked", () => {
-    // `report` is the default (owner, 2026-11-14), so only `refuse` is carried.
+    // `report` is the default (owner, 2026-11-14). A DECLARED value is carried, `report` too, so
+    // a site's own choice wins over the shared preset it extends (cat-harness-tools#2345).
     expect(recipeFromConfig(checkout({ pre: ["site:ast"], keep: ["branches"], profile: "ig-repo-site", links: "refuse" }), "r")).toEqual({
       pre: ["site:ast"], sourceSteps: [], siteSteps: [], keep: ["branches"], profile: "ig-repo-site", links: "refuse",
     });
-    expect(recipeFromConfig(checkout({ links: "report", coverage: "report" }), "r")).toEqual({ pre: [], sourceSteps: [], siteSteps: [] });
+    expect(recipeFromConfig(checkout({ links: "report", coverage: "report" }), "r")).toEqual({ pre: [], sourceSteps: [], siteSteps: [], links: "report", coverage: "report" });
+    expect(recipeFromConfig(checkout({}), "r")).toEqual({ pre: [], sourceSteps: [], siteSteps: [] });
+    expect(recipeFromConfig(checkout({ extends: "document-folio" }), "r")).toEqual({ pre: [], sourceSteps: [], siteSteps: [], extends: "document-folio" });
+    expect(() => recipeFromConfig(checkout({ extends: "../x" }), "r")).toThrow(/extends/);
     expect(() => recipeFromConfig(checkout({ keep: ["../x"] }), "r")).toThrow(/keep/);
     expect(() => recipeFromConfig(checkout({ keep: ["."] }), "r")).toThrow(/keep/);
     expect(() => recipeFromConfig(checkout({ profile: "ig" }), "r")).toThrow(/profile/);
