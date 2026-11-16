@@ -88,6 +88,7 @@ function page(imgs: Img[], observer = true) {
     `${block()}\nreturn { inlineDiagrams: inlineDiagrams, inlineAll: inlineAll, queueLateDrawings: queueLateDrawings };`,
   )(win, doc, { href: "https://example.test/p/" }, () => { mounts++; }, (s: unknown) => s, (h: string) => h, () => {}, { warn() {} }) as {
     inlineDiagrams: (done: () => void) => void;
+    queueLateDrawings: () => void;
   };
   let done = 0;
   api.inlineDiagrams(() => { done++; });
