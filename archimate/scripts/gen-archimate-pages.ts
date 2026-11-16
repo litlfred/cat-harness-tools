@@ -765,12 +765,19 @@ export const AS_DRAWN_SUFFIX = ".as-drawn.svg";
  * refuses embedded objects).
  */
 export function inlineSvg(svg: string, label: string): string {
-  const body = svg
-    .replace(/<\?xml[\s\S]*?\?>/g, "")
-    .replace(/<!DOCTYPE[^>[]*(\[[\s\S]*?\])?\s*>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .trim();
+  // Until nothing changes: one pass can join the halves of a nested `<!<!---->--` into a new comment.
+  let body = svg;
+  for (let prev = ""; prev !== body; ) {
+    prev = body;
+    body = body
+      .replace(/<\?xml[\s\S]*?\?>/g, "")
+      .replace(/<!DOCTYPE[^>[]*(\[[\s\S]*?\])?\s*>/gi, "")
+      .replace(/<!--[\s\S]*?-->/g, "");
+  }
+  body = body.trim();
   if (!/^<svg[\s>]/.test(body)) throw new Error(`${label}: the as-drawn figure is not an SVG drawing`);
+  // An unclosed comment or a markup declaration left would swallow the rest of the page.
+  if (/<!/.test(body)) throw new Error(`${label}: the as-drawn figure carries an unclosed comment or a markup declaration, which a page must not inline`);
   const bad = /<(script|object|embed|iframe|foreignObject)[\s>/]/i.exec(body) ?? /\son[a-z]+\s*=/i.exec(body) ?? /javascript:/i.exec(body);
   if (bad) throw new Error(`${label}: the as-drawn figure carries ${JSON.stringify(bad[0].trim())}, which a page must not inline`);
   return body;

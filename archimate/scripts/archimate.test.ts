@@ -340,6 +340,8 @@ describe("an instance", () => {
       // A drawing that would run or embed something is refused, and a missing one is reported.
       writeFileSync(join(withDrawn, "folio", "media", "f-1.svg"), '<svg><script>alert(1)</script></svg>');
       expect(() => pagesFor(withDrawn, { site: true })).toThrow(/a page must not inline/);
+      writeFileSync(join(withDrawn, "folio", "media", "f-1.svg"), '<svg><!<!---->--<text>x</text></svg>');
+      expect(() => pagesFor(withDrawn, { site: true })).toThrow(/unclosed comment/);
       rmSync(join(withDrawn, "folio", "media", "f-1.svg"));
       expect(checkCommitted(withDrawn)).toEqual(["Figure 1: as-drawn figure folio/media/f-1.svg is not in the instance"]);
     } finally {
