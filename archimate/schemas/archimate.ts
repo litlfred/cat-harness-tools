@@ -104,6 +104,20 @@ export const ArchimateConfigFigureSchema = z
       .regex(/\.svg$/, "an .svg file")
       .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the instance root, without `..`")
       .optional(),
+    /**
+     * The figure as the source publication drew it, redrawn as SVG, relative
+     * to the layer root. Present, the view's page offers a two-way switch,
+     * "As drawn" (this SVG, inlined so its links work; checked first) and
+     * "ArchiMate" (the model's view), and the site build copies the file
+     * beside the view's drawing as `<view id>.as-drawn.svg`. Its links
+     * resolve from the view's page, so `../../element/<slug>/` reaches an
+     * element. Absent, the page shows the model's view alone.
+     */
+    asDrawn: z
+      .string()
+      .regex(/\.svg$/, "an .svg file")
+      .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the instance root, without `..`")
+      .optional(),
   })
   .strict();
 export type ArchimateConfigFigure = z.infer<typeof ArchimateConfigFigureSchema>;
