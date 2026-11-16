@@ -785,9 +785,8 @@ export function inlineSvg(svg: string, label: string): string {
 
 /**
  * The CSS-only switch on a view's page between the figure as the source
- * publication drew it and the model's view (the pattern of smart-trust's
- * `trust-network-figure.html`): two radios in a fieldset, their labels styled
- * as pill tabs, "As drawn" checked. `archimate.css` hides the drawing not
+ * publication drew it and the model's view (issue #2368): two radios in a
+ * fieldset, their labels styled as pill tabs, "As drawn" checked. `archimate.css` hides the drawing not
  * chosen (`.am-switch`, by `:has`), so with no script both still show. The
  * words are static, so `--pot` takes them like the rest of the page.
  */
