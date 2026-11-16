@@ -101,6 +101,9 @@ import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "../../schemas/kg/visualiser-route.ts";
+import { readHarnessConfig, TranslationConfigSchema } from "../../schemas/kg/harness-config.ts";
+import { potWithoutTimestamp } from "../../pipeline/pot-extract.ts";
+import { archimateLocales, CATALOGUE_STEM, formatArchimatePot, localizedArchimateFiles, readArchimateCatalogue, type SiteFile } from "./archimate-locales.ts";
 
 /**
  * The namespace every page written here declares its node's class in
@@ -942,11 +945,15 @@ if (import.meta.main) {
   const out = arg("out");
   const check = process.argv.includes("--check");
   const root = resolve(instance);
+  // `--pot` writes the template of every word the pages show
+  // (`translations/<locale>/archimate.pot`, archimate-locales.ts); `--pot-check`
+  // exits 1 when one is missing or stale.
+  const potMode = process.argv.includes("--pot") || process.argv.includes("--pot-check");
   // A site build lays the metamodel's DOT out to SVG with Graphviz compiled to
   // WebAssembly (no JVM, no binary). If it cannot load, the page says so and
   // still offers the DOT and Mermaid.
   let drawDot: ((dot: string) => string) | undefined;
-  if (out) {
+  if (out || potMode) {
     try {
       const { Graphviz } = await import("@hpcc-js/wasm-graphviz");
       drawDot = await drawEveryDot(Graphviz, (draw) => pagesFor(root, { site: true, drawDot: draw }));
@@ -954,13 +961,47 @@ if (import.meta.main) {
       console.warn(`! no metamodel drawing: @hpcc-js/wasm-graphviz would not load (${(e as Error).message})`);
     }
   }
-  const { graphPath, pageRoot, files } = pagesFor(root, { requireServed: out === undefined, site: out !== undefined, drawDot });
+  const { graphPath, pageRoot, files } = pagesFor(root, { requireServed: out === undefined && !potMode, site: out !== undefined || potMode, drawDot });
   const target = out ? join(resolve(out), graphPath) : archimateDir(root, readConfig(root));
+  const siteFiles: SiteFile[] = files.map((f) => ({ path: sitePathOf({ graphPath, pageRoot }, f), content: f.content, page: f.page === true }));
+  const tc = (() => {
+    const parsed = TranslationConfigSchema.safeParse((readHarnessConfig(root) as { translation?: unknown } | null)?.translation ?? {});
+    return parsed.success ? parsed.data : TranslationConfigSchema.parse({});
+  })();
+  if (potMode) {
+    const name = (JSON.parse(readFileSync(join(root, findDeclarationFile(root)!), "utf8")) as { name: string }).name;
+    const stale: string[] = [];
+    for (const l of tc.supportedLocales.filter((x) => x !== tc.defaultLocale)) {
+      const pot = formatArchimatePot(siteFiles, l, name);
+      const p = join(root, tc.translationDir, l, `${CATALOGUE_STEM}.pot`);
+      if (existsSync(p) && potWithoutTimestamp(readFileSync(p, "utf8")) === potWithoutTimestamp(pot)) continue;
+      stale.push(relative(root, p));
+      if (!process.argv.includes("--pot-check")) {
+        mkdirSync(dirname(p), { recursive: true });
+        writeFileSync(p, pot);
+      }
+    }
+    if (process.argv.includes("--pot-check")) {
+      if (stale.length) {
+        for (const s of stale) console.error(`✗ ${s} is missing or stale`);
+        console.error(`run: bun run cat-harness-tools/archimate/scripts/gen-archimate-pages.ts --instance ${instance} --pot`);
+        process.exit(1);
+      }
+      console.log("✓ archimate templates current");
+    } else console.log(stale.length ? stale.map((s) => `  wrote ${s}`).join("\n") : "✓ archimate templates current");
+    process.exit(0);
+  }
   if (out) {
-    for (const f of files) {
-      const p = join(resolve(out), sitePathOf({ graphPath, pageRoot }, f));
+    const locales = archimateLocales(root, tc.supportedLocales.filter((l) => l !== tc.defaultLocale), tc.translationDir);
+    const catalogues = new Map(locales.map((l) => [l, readArchimateCatalogue(root, l, tc.translationDir)] as const));
+    const localized = localizedArchimateFiles(siteFiles, catalogues, tc.defaultLocale);
+    for (const f of localized.files) {
+      const p = join(resolve(out), f.path);
       mkdirSync(dirname(p), { recursive: true });
       writeFileSync(p, f.content);
+    }
+    for (const r of localized.reports) {
+      console.log(`  ${r.locale}: ${r.pages} page(s), ${r.translated} segment(s) translated, ${r.untranslated} left in English${r.rejected.length ? `, ${r.rejected.length} rejected (placeholders differ)` : ""}`);
     }
     // Each model's Archi file, at the data path its page links and its node's
     // `schema:contentUrl` names (`<data root>/<file>`). A committed tree has it
