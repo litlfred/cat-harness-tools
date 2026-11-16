@@ -21,6 +21,8 @@
  * | `assessment` | the scales a capability is rated on at a table (exists / partial / absent; blocks us now / within 12 months / can wait), and the standing line read with them |
  * | `discussion` | closing questions, each in a module and tied to the steps it is about |
  * | `sheets` | the printable canvases (A3 or A4), each filled in one or more modules |
+ * | `sheetsSource` | the workshop's own canvas files (a Word file, a print PDF, page previews), shown by the Table sheets view in place of the drawn `sheets` |
+ * | `matrix` | where each module meets each step, technical and policy, and the overlaps across modules: drawn by a lab step's `matrix` |
  * | `resources` | job aids, handouts, readings, slides and links, each tied to modules or steps |
  * | `presentation` | how the journeys viewer presents the workshop in a room: the app frame's words, the story in one sentence, whose record the trust ladder follows, the presenter's note, the outward links |
  * | `lab` | the Discussion view as a table's working steps (team, use case, readiness, who decides, components, mapping, pathway, summary), each with a timer and a DISCUSS prompt, after DPI-H Lab; what a table writes is kept in its browser and assembled into one summary |
@@ -150,6 +152,72 @@ export const WorkshopSheetSchema = z
   .strict();
 export type WorkshopSheet = z.infer<typeof WorkshopSheetSchema>;
 
+/**
+ * The workshop's own canvas (JV-06): the files a room prints, made outside
+ * the viewer (an editable Word file, a print-ready PDF, and an image per
+ * page). When present, the Table sheets view shows the previews with links
+ * to download the files, in place of the sheets it draws from `sheets`;
+ * those stay the fallback. Each href is a URL (`https://…`), a path from
+ * the site's root (`/…`), or a path relative to the workshop file, which
+ * must be a file of the workshop's layer: the viewer copies it beside the
+ * page, so the canvas works wherever the viewer is published.
+ */
+export const WorkshopSheetsSourceSchema = z
+  .object({
+    /** What the canvas is called ("Country Canvas"); "Table canvas" when absent. */
+    title: Text.optional(),
+    /** One line under the title (what is in it, how to print it). */
+    description: Text.optional(),
+    /** The editable Word file. */
+    docx: Text.optional(),
+    /** The print-ready PDF. */
+    pdf: Text.optional(),
+    /** An image per page, in order (the cover first). */
+    previews: z.array(Text).min(1).optional(),
+    /** The paper the canvas is printed on, said beside the print button; A3 when absent. */
+    size: z.enum(["A3", "A4"]).optional(),
+  })
+  .strict();
+export type WorkshopSheetsSource = z.infer<typeof WorkshopSheetsSourceSchema>;
+
+/**
+ * One meeting point of a module and a step (JV-05): what is technical and
+ * what is policy there. A cell without `kind` is where the workshop asks
+ * that module's question at that step (`steps[].questions`); `draws` is
+ * where the module reads the step without asking there.
+ */
+export const WorkshopMatrixCellSchema = z
+  .object({
+    module: ModuleId,
+    /** A step of the workshop: its step id (`J2b`), or `<scenario>#<step>`. */
+    step: Text,
+    kind: z.enum(["draws"]).optional(),
+    technical: Text.optional(),
+    policy: Text.optional(),
+  })
+  .strict();
+export type WorkshopMatrixCell = z.infer<typeof WorkshopMatrixCellSchema>;
+
+/** What several modules share across steps: one system, or one decision, read at several points. */
+const MatrixOverlapSchema = z
+  .object({ label: Text, modules: z.array(ModuleId).min(1), steps: z.array(Text).min(1), text: Text })
+  .strict();
+
+/**
+ * The module × journey matrix's words: per-cell text and the overlaps across
+ * modules. The ● cells themselves are derived from `steps[].questions`; a
+ * lab step with `matrix` draws them, with this text on each cell.
+ */
+export const WorkshopMatrixSchema = z
+  .object({
+    /** A line above the matrix. */
+    intro: Text.optional(),
+    cells: z.array(WorkshopMatrixCellSchema).optional(),
+    overlaps: z.object({ technical: z.array(MatrixOverlapSchema).optional(), policy: z.array(MatrixOverlapSchema).optional() }).strict().optional(),
+  })
+  .strict();
+export type WorkshopMatrix = z.infer<typeof WorkshopMatrixSchema>;
+
 /** A write-in field of a lab step: kept in the browser, in the summary. */
 const LabFieldSchema = z
   .object({ id: Id, label: Text, hint: Text.optional(), lines: z.number().int().min(1).max(12).default(2) })
@@ -159,7 +227,8 @@ const LabFieldSchema = z
  * One step of the Discussion view's lab: a heading, a timer, a DISCUSS
  * prompt, and the parts the table works through, drawn in this order:
  * `fields`, `useCases`, `rate`, `holders`, `pick`, `capabilities` (the gap
- * strip of every moment, the same answers the walkthrough keeps),
+ * strip of every moment, the same answers the walkthrough keeps), `matrix`
+ * (modules × steps, from `steps[].questions` and `workshop.matrix`),
  * `modules` (the journey's questions of those modules, answerable here and
  * on the walkthrough alike), `discussion` (the closing questions), and
  * `summary` (everything above, on one page).
@@ -188,6 +257,8 @@ export const WorkshopLabStepSchema = z
     /** Tables whose rows the table ticks (the patterns it would start with, the cost drivers that dominate). */
     pick: z.array(Id).optional(),
     capabilities: z.boolean().optional(),
+    /** The module × journey matrix: modules down, the workshop's steps across, ● where a module's question is asked, each cell linking to its step. */
+    matrix: z.boolean().optional(),
     modules: z.array(ModuleId).optional(),
     discussion: z.boolean().optional(),
     summary: z.boolean().optional(),
@@ -406,6 +477,8 @@ export const WorkshopKind = nodeKind(
       .array(z.object({ id: Id, module: ModuleId.optional(), theme: Text, question: Text, steps: z.array(Text).optional() }).strict())
       .optional(),
     sheets: z.array(WorkshopSheetSchema).optional(),
+    sheetsSource: WorkshopSheetsSourceSchema.optional(),
+    matrix: WorkshopMatrixSchema.optional(),
     resources: z.array(WorkshopResourceSchema).optional(),
     presentation: WorkshopPresentationSchema.optional(),
     lab: WorkshopLabSchema.optional(),
@@ -449,6 +522,36 @@ export const WorkshopKind = nodeKind(
     for (const d of w.discussion ?? []) mod(`discussion ${d.id}`, d.module);
     for (const s of w.sheets ?? []) for (const m of s.modules) mod(`sheet ${s.id}`, m);
     for (const r of w.resources ?? []) for (const m of r.modules ?? []) mod(`resource ${r.id}`, m);
+    const src = w.sheetsSource;
+    if (src && !src.docx && !src.pdf && !src.previews?.length) issue("sheetsSource names no file: give docx, pdf or previews");
+    // A matrix cell or overlap names a step of the workshop: its id, or `<scenario>#<step>`.
+    const stepIds = new Set((w.steps ?? []).flatMap((s) => [s.step, `${s.scenario}#${s.step}`]));
+    const stepOf = (ref: string) => (w.steps ?? []).find((s) => s.step === ref || `${s.scenario}#${s.step}` === ref);
+    const stepRef = (where: string, ref: string) => {
+      if (!stepIds.has(ref)) issue(`${where} names step "${ref}", which the workshop does not list`);
+    };
+    if (w.matrix) {
+      const seen = new Set<string>();
+      for (const c of w.matrix.cells ?? []) {
+        const where = `matrix cell ${c.module} × ${c.step}`;
+        mod(where, c.module);
+        stepRef(where, c.step);
+        const s = stepOf(c.step);
+        const key = `${c.module} ${s ? `${s.scenario}#${s.step}` : c.step}`;
+        if (seen.has(key)) issue(`${where} appears twice`);
+        seen.add(key);
+        if (!c.technical && !c.policy) issue(`${where} has no text: give technical or policy`);
+        if (s) {
+          const asked = (s.questions ?? []).some((q) => q.module === c.module);
+          if (asked && c.kind === "draws") issue(`${where} is "draws", but ${c.module} asks a question at ${c.step}; drop the kind`);
+          if (!asked && c.kind === undefined) issue(`${where} has no kind, but ${c.module} asks no question at ${c.step}; mark it "draws"`);
+        }
+      }
+      for (const [side, list] of Object.entries(w.matrix.overlaps ?? {})) for (const o of list ?? []) {
+        for (const m of o.modules) mod(`matrix overlap "${o.label}" (${side})`, m);
+        for (const r of o.steps) stepRef(`matrix overlap "${o.label}" (${side})`, r);
+      }
+    }
     if (w.lab) {
       const resources = new Set((w.resources ?? []).map((r) => r.id));
       dup("lab step", w.lab.steps.map((s) => s.id));
@@ -458,6 +561,7 @@ export const WorkshopKind = nodeKind(
         for (const t of [...(s.rate ?? []), ...(s.holders ?? []), ...(s.pick ?? [])]) if (!tables.has(t)) issue(`lab step ${s.id} names table "${t}", which the workshop does not list`);
         for (const r of s.resources ?? []) if (!resources.has(r)) issue(`lab step ${s.id} names resource "${r}", which the workshop does not list`);
         if (s.rate?.length && !w.lab.scale) issue(`lab step ${s.id} rates tables, but the lab has no scale`);
+        if (s.matrix && !(w.steps ?? []).some((x) => x.questions?.length)) issue(`lab step ${s.id} draws the matrix, but no step asks a question`);
         if (s.useCases && !w.lab.useCases?.length) issue(`lab step ${s.id} shows the use cases, but the lab lists none`);
         dup(`lab step ${s.id} field`, (s.fields ?? []).map((f) => f.id));
       }
