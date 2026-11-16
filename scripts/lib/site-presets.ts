@@ -16,8 +16,8 @@
  * three of its own:
  *
  * - `extends`: the preset it builds on, so the lists layer the way the
- *   repositories do (this layer's `folio-base`, folio-assistant-core's
- *   `document-folio` on top of it);
+ *   repositories do (this layer's `folio-base`, and a higher layer's
+ *   preset on top of it);
  * - `scripts`: the command of each step it names, run from the checkout root
  *   with the step's arguments appended, exactly as a package script is. A
  *   checkout whose own package.json defines the same name runs its own

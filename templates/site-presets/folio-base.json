@@ -1,5 +1,5 @@
 {
-  "$comment": "The base of every content site's build (cat-harness-tools#2345): steps of this layer that every folio site runs. A site names a preset in site.build.extends (scripts/lib/site-presets.ts); folio-assistant-core's document-folio extends this one. A site's own package script of the same name runs instead of the command here, so it keeps its flags but cannot drop the step.",
+  "$comment": "The base of every content site's build (cat-harness-tools#2345): steps of this layer that every folio site runs. A site names a preset in site.build.extends (scripts/lib/site-presets.ts); a higher layer's preset extends this one. A site's own package script of the same name runs instead of the command here, so it keeps its flags but cannot drop the step.",
   "links": "refuse",
   "sourceSteps": ["site:archimate", "site:context"],
   "scripts": {
