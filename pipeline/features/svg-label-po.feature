@@ -15,6 +15,18 @@ Feature: gettext over an inline drawing's labels
     When injectSvgLabels runs on it
     Then it re-wraps a translation into centred lines around the English block's middle
 
+  @test:pipeline/svg-label-po.test.ts::injectSvgLabels::keeps_a_middle-anchored_label_centred_on_its_x,_reading_a_font-size_attribute
+  Scenario: injectSvgLabels: Keeps a middle-anchored label centred on its x, reading a font-size attribute
+    Given the fixture in svg-label-po.test.ts
+    When injectSvgLabels runs on it
+    Then it keeps a middle-anchored label centred on its x, reading a font-size attribute
+
+  @test:pipeline/svg-label-po.test.ts::injectSvgLabels::keeps_a_left-aligned_block_left-aligned
+  Scenario: injectSvgLabels: Keeps a left-aligned block left-aligned
+    Given the fixture in svg-label-po.test.ts
+    When injectSvgLabels runs on it
+    Then it keeps a left-aligned block left-aligned
+
   @test:pipeline/svg-label-po.test.ts::injectSvgLabels::leaves_a_drawing_untouched_when_nothing_is_translated
   Scenario: injectSvgLabels: Leaves a drawing untouched when nothing is translated
     Given the fixture in svg-label-po.test.ts

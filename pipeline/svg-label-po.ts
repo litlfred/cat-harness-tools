@@ -64,8 +64,15 @@ function num(attrs: string, name: string): number | undefined {
 }
 
 function fontSize(attrs: string): number {
-  const m = /font-size:\s*([0-9.]+)px/.exec(attrs);
+  // A CSS declaration (bpmn-js) or a presentation attribute (a drawing a script writes).
+  const m = /font-size:\s*([0-9.]+)px/.exec(attrs) ?? /\sfont-size="([0-9.]+)(?:px)?"/.exec(attrs);
   return m ? Number(m[1]) : 12;
+}
+
+/** How a label's `x` places its lines: their start (the default), their middle or their end. */
+function textAnchor(attrs: string): "start" | "middle" | "end" {
+  const m = /text-anchor(?:="|:\s*)(start|middle|end)/.exec(attrs);
+  return (m?.[1] as "start" | "middle" | "end" | undefined) ?? "start";
 }
 
 /** An estimated advance width, in px. */
@@ -137,7 +144,13 @@ export function injectSvgLabels(html: string, catalogue: ReadonlyMap<string, str
         return `<text${attrs}><tspan${spans[0].attrs}>${esc(t)}</tspan></text>`;
       }
       const widths = spans.map((s) => textWidth(s.text, size));
-      const centre = spans.reduce((a, _s, i) => a + xs[i]! + widths[i] / 2, 0) / spans.length;
+      // Each English line's centre, from where its anchor puts its x.
+      const anchor = textAnchor(attrs);
+      const mids = spans.map((_s, i) => (anchor === "middle" ? xs[i]! : anchor === "end" ? xs[i]! - widths[i] / 2 : xs[i]! + widths[i] / 2));
+      const left = spans.map((_s, i) => (anchor === "start" ? xs[i]! : NaN));
+      const centre = mids.reduce((a, m) => a + m, 0) / spans.length;
+      // A start-anchored block whose lines all begin at one x is left-aligned, and stays so.
+      const flushLeft = anchor === "start" && spans.length > 1 && left.every((x) => x === left[0]);
       const max = Math.max(...widths, size * 4);
       const lh = spans.length > 1 ? (ys[spans.length - 1]! - ys[0]!) / (spans.length - 1) : size * 1.2;
       const mid = (ys[0]! + ys[spans.length - 1]!) / 2;
@@ -145,7 +158,8 @@ export function injectSvgLabels(html: string, catalogue: ReadonlyMap<string, str
       const tspans = lines
         .map((l, k) => {
           const y = mid + (k - (lines.length - 1) / 2) * lh;
-          const x = centre - textWidth(l, size) / 2;
+          const w = textWidth(l, size);
+          const x = flushLeft ? left[0]! : anchor === "middle" ? centre : anchor === "end" ? centre + w / 2 : centre - w / 2;
           return `<tspan x="${x.toFixed(2)}" y="${y.toFixed(2)}">${esc(l)}</tspan>`;
         })
         .join("");

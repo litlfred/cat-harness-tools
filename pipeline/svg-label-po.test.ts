@@ -30,6 +30,24 @@ describe("injectSvgLabels", () => {
     expect((ys[0] + ys[ys.length - 1]) / 2).toBeCloseTo(37.2, 1);
   });
 
+  it("keeps a middle-anchored label centred on its x, reading a font-size attribute", () => {
+    const svg = `<svg><text x="100" y="50" font-size="19" text-anchor="middle"><tspan x="100" y="50">Country A's</tspan><tspan x="100" y="72.8">Certificate Authority</tspan></text></svg>`;
+    const r = injectSvgLabels(svg, new Map([["Country A's Certificate Authority", "Autorité de certification du pays A"]]));
+    const spans = [...r.html.matchAll(/<tspan x="([0-9.]+)" y="([0-9.]+)">([^<]*)<\/tspan>/g)];
+    expect(spans.map((s) => s[3]).join(" ")).toBe("Autorité de certification du pays A");
+    for (const s of spans) expect(Number(s[1])).toBe(100);
+    const ys = spans.map((s) => Number(s[2]));
+    expect((ys[0] + ys[ys.length - 1]) / 2).toBeCloseTo(61.4, 1);
+  });
+
+  it("keeps a left-aligned block left-aligned", () => {
+    const svg = `<svg><text font-size="16" text-anchor="start"><tspan x="40" y="20">Certify provenance,</tspan><tspan x="40" y="39.2">onboard members</tspan></text></svg>`;
+    const r = injectSvgLabels(svg, new Map([["Certify provenance, onboard members", "Certifier la provenance, intégrer les membres"]]));
+    const xs = [...r.html.matchAll(/<tspan x="([0-9.]+)"/g)].map((m) => Number(m[1]));
+    expect(xs.length).toBeGreaterThan(1);
+    for (const x of xs) expect(x).toBe(40);
+  });
+
   it("leaves a drawing untouched when nothing is translated", () => {
     expect(injectSvgLabels(SVG, new Map()).html).toBe(SVG);
   });
