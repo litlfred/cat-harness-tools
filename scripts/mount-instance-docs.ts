@@ -1943,13 +1943,51 @@ export interface Served {
 }
 
 /**
+ * The directories each instance's index entry chose to mount: from
+ * `index.lock.json`'s `instances[].directories[].id`, and only for an entry
+ * that lists its directories. An instance absent from the map mounts its
+ * whole declaration, as does a whole-layer mount (`id: "*"`).
+ */
+export function servedScope(repo = REPO): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  const file = join(repo, "index.lock.json");
+  if (!existsSync(file)) return out;
+  let lock: { instances?: { instance?: unknown; directories?: unknown }[] };
+  try {
+    lock = JSON.parse(readFileSync(file, "utf-8")) as typeof lock;
+  } catch (e) {
+    throw new Error(`${file} does not parse, so which directories are mounted cannot be determined: ${String(e)}`);
+  }
+  for (const i of lock.instances ?? []) {
+    if (typeof i.instance !== "string" || !Array.isArray(i.directories)) continue;
+    if ((i.directories as { id?: unknown }[]).some((d) => d?.id === "*")) continue;
+    const ids = out.get(i.instance) ?? new Set<string>();
+    for (const d of i.directories as { id?: unknown }[]) if (d && typeof d.id === "string") ids.add(d.id);
+    out.set(i.instance, ids);
+  }
+  return out;
+}
+
+/**
+ * Whether the index mounts `entry` of `instance`: yes when the instance's
+ * index entry lists no directories, or the entry has no id to match by.
+ * A directory the index chose not to mount is not served — its bytes are not
+ * in the checkout, so it is not owed.
+ */
+export function inMountScope(scope: Map<string, Set<string>>, instance: string, entry: { id?: string }): boolean {
+  const ids = scope.get(instance);
+  return ids === undefined || entry.id === undefined || ids.has(entry.id);
+}
+
+/**
  * Every directory declared `served`, with its route — `/<instance>/<path>`,
  * the same place the layer's composed pages sit under, so a page reaches
  * the data with a path that does not depend on where the site is hosted
  * (`visualizer-loading` §"How to fetch").
  */
 export function servedDirectories(entries: { name: string; entry: DeclaredEntry & { path: string }; abs: string }[] = declaredEntries(), repo = REPO): Served[] {
-  const served = entries.filter((x) => x.entry.served === true);
+  const scope = servedScope(repo);
+  const served = entries.filter((x) => x.entry.served === true && inMountScope(scope, x.name, x.entry));
   const mounted = served.length ? mountedInstances(repo) : new Map<string, string>();
   return served.map((x) => {
     const read = readPathAt(repo, x.abs, mounted);
