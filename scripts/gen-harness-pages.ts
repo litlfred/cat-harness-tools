@@ -246,7 +246,10 @@ export function buildOverviews(o: OverviewInput): HarnessOverview[] {
       .filter((v) => v.sameAs === undefined)
       .map((v) => {
         const l = v.label ?? v.kind;
-        if (v.path && siteHolds(o.site, v.path)) return { label: l, href: v.path.replace(/^\/+/, "") };
+        // The data's path names the platform's viewer; on a layer's own site the
+        // handler's route for this layer's graph is the page (as the rail's `ownSiteGraphs` reads it).
+        const at = [v.path, `${DEFAULT_LOCALE}/${HARNESS_NAME}/${v.kind}/${r.name}/`].find((p): p is string => typeof p === "string" && siteHolds(o.site, p));
+        if (at) return { label: l, href: at.replace(/^\/+/, "") };
         return { label: l, note: v.note ?? "not published on this site" };
       });
     const declRoute = `${DEFAULT_LOCALE}/${HARNESS_NAME}/${DECLARATION_KIND}/${r.name}/`;

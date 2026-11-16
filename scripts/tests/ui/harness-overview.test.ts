@@ -61,6 +61,9 @@ function fixture(): { checkout: string; site: string; rows: HarnessDataRow[] } {
   // The lower layer's skills view is on this site; its notes view is not.
   mkdirSync(join(site, "en", "cat-harness", "skills", "lower"), { recursive: true });
   writeFileSync(join(site, "en", "cat-harness", "skills", "lower", "index.html"), "<p>skills</p>");
+  // Its code view is not at the data's path, but at the handler's route for it on this site.
+  mkdirSync(join(site, "en", "cat-harness", "code", "lower"), { recursive: true });
+  writeFileSync(join(site, "en", "cat-harness", "code", "lower", "index.html"), "<p>code</p>");
   mkdirSync(join(site, "en", "cat-harness", "cat-harness-declaration", "lower"), { recursive: true });
   writeFileSync(join(site, "en", "cat-harness", "cat-harness-declaration", "lower", "index.html"), "<p>decl</p>");
   const rows: HarnessDataRow[] = [
@@ -74,6 +77,7 @@ function fixture(): { checkout: string; site: string; rows: HarnessDataRow[] } {
       visualisations: [
         { kind: "skills", label: "Skills", path: "/en/cat-harness/skills/lower/" },
         { kind: "notes", label: "Notes", path: "/en/cat-harness/notes/lower/" },
+        { kind: "code", label: "Code", path: "/lower/code/" },
         { kind: "kg", label: "Skills again", sameAs: "skills" },
       ],
       subgraphs: [{ id: "skills", where: "local" }],
@@ -142,6 +146,7 @@ describe("buildOverviews", () => {
     expect(l.graphs).toEqual([
       { label: "Skills", href: "en/cat-harness/skills/lower/" },
       { label: "Notes", note: "not published on this site" },
+      { label: "Code", href: "en/cat-harness/code/lower/" },
     ]);
     expect(by.get("base")!.declarationPage).toBeUndefined();
   });
