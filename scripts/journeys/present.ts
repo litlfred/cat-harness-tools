@@ -621,7 +621,7 @@ ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="n
 <header class="jp-head">
 <div class="jp-top">
 <div class="jp-top-l">${pr.occasion ? `<span class="jp-occasion">${icon("globe")}<span>${e(pr.occasion)}</span></span><span class="jp-bar">|</span>` : ""}<span>${e(pr.subject ?? ws.title)}</span>${range ? `<span class="jp-range">${e(range)}</span>` : ""}</div>
-<div class="jp-top-r">${pr.status ? `<span class="jp-status"><i></i>${e(pr.status)}</span>` : ""}<button type="button" class="jp-presenter-btn" data-jp-presenter title="Show or hide the presenter's notes">${icon("eye")}<span class="jp-on-only">Presenter Mode: ON</span><span class="jp-off-only">Presenter Notes</span></button></div>
+<div class="jp-top-r"><!--jv-langs-->${pr.status ? `<span class="jp-status"><i></i>${e(pr.status)}</span>` : ""}<button type="button" class="jp-presenter-btn" data-jp-presenter title="Show or hide the presenter's notes">${icon("eye")}<span class="jp-on-only">Presenter Mode: ON</span><span class="jp-off-only">Presenter Notes</span></button></div>
 </div>
 <div class="jp-app">
 <div class="jp-brand"><span class="jp-logo" aria-hidden="true">${e(name.trim().charAt(0).toUpperCase())}</span><div><div class="jp-brand-name"><span class="jp-name">${e(name)}</span>${pr.badge ? `<span class="jp-badge">${e(pr.badge)}</span>` : ""}</div>${pr.tagline ? `<p class="jp-tagline">${e(pr.tagline)}</p>` : ""}</div></div>

@@ -25,6 +25,16 @@
  * Nothing is committed: like `archimate:pages --out`, the pages are a build
  * product of the site, and a re-run with the same inputs writes the same
  * bytes.
+ *
+ * ## Languages
+ *
+ * The pages are drawn in English, then once more for every locale the
+ * declaring layer has a catalogue for, `translations/<locale>/journeys-viewer.po`,
+ * at the same route under `<locale>/` (`journeys/locales.ts`). `--pot` writes
+ * the templates those catalogues are made from, one per supported locale, and
+ * `--pot-check` exits 1 when one is missing or stale. `--pot --merge [--locale fr,es]`
+ * also brings each locale's `.po` up to its template, filling what the
+ * layer's other catalogues already translate.
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
@@ -44,6 +54,9 @@ import type { ArchimateModel } from "../archimate/schemas/archimate.ts";
 import { typeLabel } from "../archimate/scripts/render-view.ts";
 import { subjectHref } from "./lib/subject-pages.ts";
 import { panelFile } from "./lib/task-panel.ts";
+import { catalogueLocales, CATALOGUE_STEM, formatJourneysPot, localizedFiles, mergeCatalogue, readCatalogue, translationMemory, type LocaleReport } from "./journeys/locales.ts";
+import { readHarnessConfig, TranslationConfigSchema } from "../schemas/kg/harness-config.ts";
+import { potWithoutTimestamp } from "../pipeline/pot-extract.ts";
 
 export { TOOL_ID };
 
@@ -224,14 +237,74 @@ export function siteLinks(corpus: JourneyCorpus, route: string, title: string): 
   };
 }
 
-/** Every file the run writes, site-relative. */
-export function journeyFiles(instanceRoot: string): { route: string; files: PageFile[]; corpus: JourneyCorpus } | undefined {
+/** The declaring layer's translation config, with the schema's defaults (the six UN languages, source `en`). */
+export function translationConfig(root: string): { defaultLocale: string; supportedLocales: string[]; translationDir: string } {
+  const raw = (readHarnessConfig(root) as { translation?: unknown } | null)?.translation ?? {};
+  const parsed = TranslationConfigSchema.safeParse(raw);
+  return parsed.success ? parsed.data : TranslationConfigSchema.parse({});
+}
+
+/** The pages in the source language only, site-relative. */
+export function sourceJourneyFiles(instanceRoot: string): { route: string; files: PageFile[]; corpus: JourneyCorpus } | undefined {
   const route = journeysRoute(instanceRoot);
   if (route === undefined) return undefined;
   const decl = readDecl(instanceRoot);
   const corpus = readJourneyCorpus(instanceRoot);
   const files = renderJourneyPages(corpus, siteLinks(corpus, route, decl.title ?? decl.name), decl.name).map((f) => ({ ...f, path: posix.join(route, f.path) }));
   return { route, files, corpus };
+}
+
+/** Every file the run writes, site-relative: the source pages, then each locale's ({@link localizedFiles}). */
+export function journeyFiles(instanceRoot: string): { route: string; routes: string[]; files: PageFile[]; corpus: JourneyCorpus; reports: LocaleReport[] } | undefined {
+  const src = sourceJourneyFiles(instanceRoot);
+  if (src === undefined) return undefined;
+  const t = translationConfig(instanceRoot);
+  const locales = catalogueLocales(instanceRoot, t.supportedLocales.filter((l) => l !== t.defaultLocale), t.translationDir);
+  const catalogues = new Map(locales.map((l) => [l, readCatalogue(instanceRoot, l, t.translationDir)] as const));
+  const { files, reports } = localizedFiles(src.files, catalogues, t.defaultLocale);
+  const routes = [src.route, ...locales.map((l) => src.route.replace(/^[^/]+\//, `${l}/`))];
+  return { route: src.route, routes, files, corpus: src.corpus, reports };
+}
+
+/**
+ * Bring `translations/<locale>/journeys-viewer.po` up to its template for each
+ * locale in `locales` (every supported one when empty): translations kept, new
+ * msgids filled from the layer's other catalogues where they match exactly,
+ * the rest left empty for a translator. Creating the file is what publishes
+ * the locale, so this runs only when asked (`--merge`).
+ */
+export function mergeJourneysPos(instanceRoot: string, locales: readonly string[]): { locale: string; fromMemory: number; translated: number; total: number }[] {
+  const t = translationConfig(instanceRoot);
+  const out: { locale: string; fromMemory: number; translated: number; total: number }[] = [];
+  for (const l of t.supportedLocales.filter((x) => x !== t.defaultLocale && (locales.length === 0 || locales.includes(x)))) {
+    const potPath = join(instanceRoot, t.translationDir, l, `${CATALOGUE_STEM}.pot`);
+    if (!existsSync(potPath)) continue;
+    const poPath = potPath.replace(/\.pot$/, ".po");
+    const r = mergeCatalogue(readFileSync(potPath, "utf8"), existsSync(poPath) ? readFileSync(poPath, "utf8") : undefined, translationMemory(instanceRoot, l, t.translationDir));
+    writeFileSync(poPath, r.text);
+    out.push({ locale: l, fromMemory: r.fromMemory, translated: r.translated, total: r.total });
+  }
+  return out;
+}
+
+/** Write (or with `check`, compare) `translations/<locale>/journeys-viewer.pot` for every supported locale; the paths that were stale. */
+export function writeJourneysPots(instanceRoot: string, check: boolean): string[] {
+  const src = sourceJourneyFiles(instanceRoot);
+  if (src === undefined) return [];
+  const t = translationConfig(instanceRoot);
+  const name = readDecl(instanceRoot).name;
+  const stale: string[] = [];
+  for (const l of t.supportedLocales.filter((x) => x !== t.defaultLocale)) {
+    const pot = formatJourneysPot(src.files, l, name);
+    const p = join(instanceRoot, t.translationDir, l, `${CATALOGUE_STEM}.pot`);
+    if (existsSync(p) && potWithoutTimestamp(readFileSync(p, "utf8")) === potWithoutTimestamp(pot)) continue;
+    stale.push(relative(instanceRoot, p));
+    if (!check) {
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, pot);
+    }
+  }
+  return stale;
 }
 
 function arg(name: string): string | undefined {
@@ -246,6 +319,21 @@ if (import.meta.main) {
     process.exit(2);
   }
   const root = resolve(instance);
+  if (process.argv.includes("--pot") || process.argv.includes("--pot-check")) {
+    const check = process.argv.includes("--pot-check");
+    const stale = writeJourneysPots(root, check);
+    for (const p of stale) console.log(`${check ? "  ✗ stale" : "  wrote"} ${p}`);
+    if (check && stale.length) {
+      console.error(`${stale.length} journeys-viewer template(s) missing or stale: bun run cat journeys:viz --instance ${instance} --pot`);
+      process.exit(1);
+    }
+    console.log(`✓ journeys-viewer templates ${check ? "current" : "written"}`);
+    if (!check && process.argv.includes("--merge")) {
+      const only = (arg("locale") ?? "").split(",").filter(Boolean);
+      for (const r of mergeJourneysPos(root, only)) console.log(`  ${r.locale}: ${r.translated}/${r.total} translated (${r.fromMemory} from the layer's other catalogues)`);
+    }
+    process.exit(0);
+  }
   const out = journeyFiles(root);
   if (out === undefined) {
     exitNotApplicable("journeys:viz", `${readDecl(root).name} declares no visualiser renderedBy ${TOOL_ID}`);
@@ -257,14 +345,21 @@ if (import.meta.main) {
   })();
   // The route is this Tool's alone, so what an earlier run left there is replaced whole.
   const target = join(site, out.route);
-  if (existsSync(target)) rmSync(target, { recursive: true, force: true });
+  for (const r of out.routes) {
+    const t = join(site, r);
+    if (existsSync(t)) rmSync(t, { recursive: true, force: true });
+  }
   for (const f of out.files) {
     const p = join(site, f.path);
     mkdirSync(dirname(p), { recursive: true });
     writeFileSync(p, f.content);
   }
-  const pages = out.files.filter((f) => f.path.endsWith("index.html")).length;
+  const pages = out.files.filter((f) => f.path.endsWith("index.html") && f.path.startsWith(`${out.route}/`)).length;
   for (const p of out.corpus.problems) console.warn(`! ${p.instance}/${p.file}: ${p.message}`);
+  for (const r of out.reports) {
+    console.log(`  ${r.locale}: ${r.pages} page(s), ${r.translated} segment(s) translated, ${r.untranslated} left in the source language${r.rejected.length ? `, ${r.rejected.length} translation(s) refused for their placeholders` : ""}`);
+    for (const m of r.rejected.slice(0, 5)) console.warn(`    ! ${r.locale}: placeholders differ from the msgid: ${m.slice(0, 100)}`);
+  }
   console.log(
     `wrote ${pages} page(s) in ${relative(process.cwd(), target) || "."}/ — ${out.corpus.journeys.length} journey(s), ${out.corpus.workshops.length} workshop(s) across ${new Set(out.corpus.journeys.map((j) => j.instance)).size} instance(s)`,
   );

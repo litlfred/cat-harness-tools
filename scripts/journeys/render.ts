@@ -368,6 +368,7 @@ ${panelHead(o.body, `${o.up}assets/`)}
 </head>
 <body class="jv jv-${o.kind}${o.print ? ` jv-print-${o.print}` : ""}">
 <nav class="jv-crumbs" aria-label="Breadcrumb">${crumbs}</nav>
+<!--jv-langs-->
 <main class="jv-main">
 ${o.body.trim()}
 </main>

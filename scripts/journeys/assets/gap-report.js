@@ -15,6 +15,19 @@
 (function (scope) {
   "use strict";
 
+  // The page's catalogue for the words this script writes (`journeys/locales.ts`); English without one.
+  var I18N = (function () {
+    try {
+      var n = typeof document !== "undefined" && document.getElementById("jv-i18n");
+      return n ? JSON.parse(n.textContent) : {};
+    } catch (_e) {
+      return {};
+    }
+  })();
+  function T(s) {
+    return I18N[s] || s;
+  }
+
   function optionIndex(scale, id) {
     if (!scale || id === null || id === undefined) return -1;
     for (var i = 0; i < scale.options.length; i++) if (scale.options[i].id === id) return i;
@@ -81,7 +94,7 @@
     rows.filter(isGap).forEach(function (r) {
       var k = r.urgency === null ? "" : r.urgency;
       if (!byUrgency[k]) {
-        byUrgency[k] = { urgency: r.urgency, label: r.urgency === null ? "Urgency not set" : labelOf(urgency, r.urgency), rank: urgRank(r.urgency), modules: {} };
+        byUrgency[k] = { urgency: r.urgency, label: r.urgency === null ? T("Urgency not set") : labelOf(urgency, r.urgency), rank: urgRank(r.urgency), modules: {} };
         groups.push(byUrgency[k]);
       }
       var m = r.item.module || "";
@@ -100,7 +113,7 @@
         modules: mods.map(function (m) {
           return {
             module: m || null,
-            title: m ? moduleTitle[m] || m : "No module",
+            title: m ? moduleTitle[m] || m : T("No module"),
             rows: g.modules[m]
               .sort(function (a, b) {
                 return a.order - b.order;
@@ -135,7 +148,7 @@
       tally(momentAt[sk].counts, r.status, status);
       var mk = r.item.module || "";
       if (!moduleAt[mk]) {
-        moduleAt[mk] = { module: mk || null, title: mk ? moduleTitle[mk] || mk : "No module", counts: zero(status) };
+        moduleAt[mk] = { module: mk || null, title: mk ? moduleTitle[mk] || mk : T("No module"), counts: zero(status) };
         perModule.push(moduleAt[mk]);
       }
       tally(moduleAt[mk].counts, r.status, status);
@@ -155,7 +168,7 @@
 
   /** The gaps as CSV, one row each, in the report's order; `base` makes each step's link absolute. */
   function csv(report, base) {
-    var lines = [["Urgency", "Module", "Moment", "Moment title", "Capability", "Where we stand", "Link"].join(",")];
+    var lines = [[T("Urgency"), T("Module"), T("Moment"), T("Moment title"), T("Capability"), T("Where we stand"), T("Link")].join(",")];
     report.gaps.forEach(function (g) {
       g.modules.forEach(function (m) {
         m.rows.forEach(function (r) {

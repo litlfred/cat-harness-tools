@@ -9,6 +9,19 @@
   "use strict";
   var doc = document;
 
+  // The page's catalogue for the words this script writes (`journeys/locales.ts`); English without one.
+  var I18N = (function () {
+    try {
+      var n = typeof document !== "undefined" && document.getElementById("jv-i18n");
+      return n ? JSON.parse(n.textContent) : {};
+    } catch (_e) {
+      return {};
+    }
+  })();
+  function T(s) {
+    return I18N[s] || s;
+  }
+
   function store(key, value) {
     try {
       if (value === undefined) return window.localStorage.getItem(key);
@@ -27,7 +40,7 @@
     var all = doc.createElement("button");
     all.type = "button";
     all.className = "jv-btn";
-    all.textContent = "Show all steps";
+    all.textContent = T("Show all steps");
     all.setAttribute("aria-pressed", "false");
     if (bar) bar.insertBefore(all, bar.firstChild);
     var showingAll = false;
@@ -65,7 +78,7 @@
     all.addEventListener("click", function () {
       showingAll = !showingAll;
       all.setAttribute("aria-pressed", String(showingAll));
-      all.textContent = showingAll ? "One step at a time" : "Show all steps";
+      all.textContent = showingAll ? T("One step at a time") : T("Show all steps");
       show(current, false);
     });
     window.addEventListener("hashchange", function () {

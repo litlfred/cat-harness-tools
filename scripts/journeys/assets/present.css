@@ -48,6 +48,10 @@ body.jp { margin: 0; background: var(--alabaster); color: var(--ink); font-famil
 .jp-top { background: var(--s900); color: var(--s300); font-size: 12px; line-height: 16px; padding: 6px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--s800); }
 .jp-top-l, .jp-top-r { display: flex; align-items: center; gap: 12px; }
 .jp-top-r { gap: 16px; font-size: 11px; }
+.jp-top .jv-langs { display: flex; gap: 8px; }
+.jp-top .jv-langs a { color: inherit; opacity: 0.75; text-decoration: none; }
+.jp-top .jv-langs a:hover { opacity: 1; text-decoration: underline; }
+.jp-top .jv-langs [aria-current] { font-weight: 700; }
 .jp-occasion { display: inline-flex; align-items: center; gap: 6px; color: var(--sky400); font-weight: 600; letter-spacing: 0.025em; }
 .jp-occasion .jp-i { width: 14px; height: 14px; }
 .jp-bar { color: var(--s600); }

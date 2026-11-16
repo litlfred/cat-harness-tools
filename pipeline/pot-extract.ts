@@ -467,7 +467,10 @@ export type PotEntryKind =
   // (the content core's glossary producer). Declared 2026-09-30: that
   // producer predates `kind` and never decided, which compiled only because its
   // directory is outside tsconfig's include list.
-  | "glossary-term";
+  | "glossary-term"
+  // A segment of a rendered page (`html-po.ts`): a visualiser's words, taken
+  // from the page a reader reads (`scripts/journeys/locales.ts`).
+  | "html-text";
 
 /** A single translatable entry extracted from a source file. */
 export interface PotEntry {
