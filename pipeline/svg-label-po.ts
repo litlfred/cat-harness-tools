@@ -26,7 +26,7 @@ import { decodeEntities, isWords } from "./html-po.ts";
 const TEXT_RE = /<text\b([^>]*)>((?:\s*<tspan\b[^>]*>[^<]*<\/tspan>)+)\s*<\/text>/g;
 const TSPAN_RE = /<tspan\b([^>]*)>([^<]*)<\/tspan>/g;
 const PLAIN_TEXT_RE = /<text\b([^>]*)>([^<]+)<\/text>/g;
-const TITLE_RE = /<title>([^<]+)<\/title>/g;
+const TITLE_RE = /<title(\s[^>]*)?>([^<]+)<\/title>/g;
 
 function svgs(html: string): { start: number; end: number }[] {
   // Outermost drawings only, counting nested `<svg>`s so an inner one does not end its parent.
@@ -53,7 +53,7 @@ export function extractSvgLabels(html: string): string[] {
     const svg = html.slice(start, end);
     for (const m of svg.matchAll(TEXT_RE)) out.push(label([...m[2].matchAll(TSPAN_RE)].map((t) => t[2]).join(" ")));
     for (const m of svg.matchAll(PLAIN_TEXT_RE)) out.push(label(m[2]));
-    for (const m of svg.matchAll(TITLE_RE)) out.push(label(m[1]));
+    for (const m of svg.matchAll(TITLE_RE)) out.push(label(m[2]));
   }
   return [...new Set(out.filter(isWords))];
 }
@@ -64,8 +64,15 @@ function num(attrs: string, name: string): number | undefined {
 }
 
 function fontSize(attrs: string): number {
-  const m = /font-size:\s*([0-9.]+)px/.exec(attrs);
+  // A CSS declaration (bpmn-js) or a presentation attribute (a drawing a script writes).
+  const m = /font-size:\s*([0-9.]+)px/.exec(attrs) ?? /\sfont-size="([0-9.]+)(?:px)?"/.exec(attrs);
   return m ? Number(m[1]) : 12;
+}
+
+/** How a label's `x` places its lines: their start (the default), their middle or their end. */
+function textAnchor(attrs: string): "start" | "middle" | "end" {
+  const m = /text-anchor(?:="|:\s*)(start|middle|end)/.exec(attrs);
+  return (m?.[1] as "start" | "middle" | "end" | undefined) ?? "start";
 }
 
 /** An estimated advance width, in px. */
@@ -137,19 +144,41 @@ export function injectSvgLabels(html: string, catalogue: ReadonlyMap<string, str
         return `<text${attrs}><tspan${spans[0].attrs}>${esc(t)}</tspan></text>`;
       }
       const widths = spans.map((s) => textWidth(s.text, size));
-      const centre = spans.reduce((a, _s, i) => a + xs[i]! + widths[i] / 2, 0) / spans.length;
-      const max = Math.max(...widths, size * 4);
-      const lh = spans.length > 1 ? (ys[spans.length - 1]! - ys[0]!) / (spans.length - 1) : size * 1.2;
+      // Each English line's centre, from where its anchor puts its x.
+      const anchor = textAnchor(attrs);
+      const mids = spans.map((_s, i) => (anchor === "middle" ? xs[i]! : anchor === "end" ? xs[i]! - widths[i] / 2 : xs[i]! + widths[i] / 2));
+      const left = spans.map((_s, i) => (anchor === "start" ? xs[i]! : NaN));
+      const centre = mids.reduce((a, m) => a + m, 0) / spans.length;
+      // A drawing a script writes may say how wide a label may run, which way it grows
+      // (`data-label-width`, `data-label-grow="down"|"up"`: a caption under a pictogram grows
+      // down, away from it, one above an arrow grows up), and that it would rather shrink
+      // than take more lines than the English (`data-label-fit="shrink"`: a name in a list
+      // whose rows are fixed). Otherwise the block stays centred where the English was.
+      const max = num(attrs, "data-label-width") ?? Math.max(...widths, size * 4) * 1.05;
+      const grow = /\sdata-label-grow="(down|up)"/.exec(attrs)?.[1];
+      const shrink = /\sdata-label-fit="shrink"/.test(attrs);
+      // A start-anchored block whose lines all begin at one x is left-aligned, and stays so;
+      // so is a one-line start-anchored label that declares how it grows.
+      const flushLeft = anchor === "start" && (spans.length > 1 || grow !== undefined) && left.every((x) => x === left[0]);
+      let fs = size;
+      let lines = wrap(t, fs, max);
+      while (shrink && lines.length > spans.length && fs > size * 0.7) {
+        fs = Math.max(size * 0.7, fs * 0.92);
+        lines = wrap(t, fs, max);
+      }
+      const k0 = fs / size;
+      const lh = (spans.length > 1 ? (ys[spans.length - 1]! - ys[0]!) / (spans.length - 1) : size * 1.2) * (lines.length > spans.length ? 1 : Math.min(1, k0 * 1.05));
       const mid = (ys[0]! + ys[spans.length - 1]!) / 2;
-      const lines = wrap(t, size, max * 1.05);
       const tspans = lines
         .map((l, k) => {
-          const y = mid + (k - (lines.length - 1) / 2) * lh;
-          const x = centre - textWidth(l, size) / 2;
+          const y = grow === "down" ? ys[0]! + k * lh : grow === "up" ? ys[spans.length - 1]! - (lines.length - 1 - k) * lh : mid + (k - (lines.length - 1) / 2) * lh;
+          const w = textWidth(l, fs);
+          const x = flushLeft ? left[0]! : anchor === "middle" ? centre : anchor === "end" ? centre + w / 2 : centre - w / 2;
           return `<tspan x="${x.toFixed(2)}" y="${y.toFixed(2)}">${esc(l)}</tspan>`;
         })
         .join("");
-      return `<text${attrs}>${tspans}</text>`;
+      const sized = fs === size ? attrs : / font-size="[^"]*"/.test(attrs) ? attrs.replace(/ font-size="[^"]*"/, ` font-size="${fs.toFixed(1)}"`) : `${attrs} font-size="${fs.toFixed(1)}"`;
+      return `<text${sized}>${tspans}</text>`;
     });
     svg = svg.replace(PLAIN_TEXT_RE, (whole, attrs: string, text: string) => {
       const id = label(text);
@@ -162,7 +191,7 @@ export function injectSvgLabels(html: string, catalogue: ReadonlyMap<string, str
       translated++;
       return t === id ? whole : `<text${attrs}>${esc(t)}</text>`;
     });
-    svg = svg.replace(TITLE_RE, (whole, text: string) => {
+    svg = svg.replace(TITLE_RE, (whole, attrs: string | undefined, text: string) => {
       const id = label(text);
       if (!isWords(id)) return whole;
       const t = catalogue.get(id);
@@ -171,7 +200,7 @@ export function injectSvgLabels(html: string, catalogue: ReadonlyMap<string, str
         return whole;
       }
       translated++;
-      return t === id ? whole : `<title>${esc(t)}</title>`;
+      return t === id ? whole : `<title${attrs ?? ""}>${esc(t)}</title>`;
     });
     parts.push(svg);
     last = end;
