@@ -57,6 +57,7 @@
  * | `presentation.recordOf` | an actor |
  * | `presentation.views` | a view of a model the layer's ArchiMate config names |
  * | `presentation.deviceDemo.screens[].steps` | a step of a journey the workshop teaches (or of a sub-journey of one) |
+ * | `sheetsSource` `docx`, `pdf`, `previews` | a URL, or a file of the workshop's layer, relative to the workshop file |
  *
  * | a device screen names | it must resolve to |
  * |---|---|
@@ -75,6 +76,7 @@
  * workshop, which is said); 1 a reference does not; 2 the checkout's
  * declarations could not be read, which is not a pass.
  */
+import { relative, resolve } from "node:path";
 import { siteLinks } from "../gen-journeys-viz.ts";
 import { BASE_GRAPH_TYPOLOGIES } from "../../schemas/kg/graph-typology-registry.ts";
 import { dakUserScenario, derivedPersonas, includeConflict, isListedPart, laneExperiences, parentsOf, partsOf } from "./derive.ts";
@@ -285,6 +287,17 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
     for (const v of pr?.views ?? []) {
       references++;
       if (archimate?.(w.instance, v.model, v.view) === undefined) add("presentation", `view "${v.view}" of model "${v.model}" is not in the instance's ArchiMate config`);
+    }
+    // The canvas's files: a URL, or a file of the layer, read from the workshop file's directory.
+    const src = ws.sheetsSource;
+    if (src) {
+      const named = [src.docx, src.pdf, ...(src.previews ?? [])].filter((h): h is string => h !== undefined);
+      references += named.length;
+      const root = corpus.instances.get(w.instance)?.root;
+      for (const h of named) {
+        if (/^[a-z][a-z0-9+.-]*:/i.test(h) || h.startsWith("/")) continue;
+        if (root === undefined || instanceFile(corpus, w.instance, relative(root, resolve(w.dir, h))) === undefined) add("sheetsSource", `"${h}" is no file of instance ${w.instance} (read from the workshop file's directory)`);
+      }
     }
     // A screen shows steps the workshop teaches: a step id of one of its scenarios.
     const taught = new Set(ws.scenarios.flatMap((id) => {

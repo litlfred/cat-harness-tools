@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 
 import { readJourneyCorpus, unescapeXml } from "../journeys/read.ts";
+import { checkJourneyRefs } from "../journeys/check.ts";
 import { bpmnFigure, orderByFollows, panelHead, renderJourneyPages, stepAnchor, type PageFile, type SiteLinks } from "../journeys/render.ts";
 import { PANEL_CSS, PANEL_SCRIPT } from "../lib/task-panel.ts";
 import { BARE_VHL, checkDakLinks, DAK_ATTR, pascal, personaArtifact } from "../journeys/dak-links.ts";
@@ -723,6 +724,64 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     const bad = WorkshopSchema.safeParse({ ...ws, $schema: "workshop/0.1.0", lab: { ...lab, steps: [{ id: "x", label: "X", title: "X", holders: ["nowhere"] }] } });
     expect(bad.success).toBe(false);
   });
+  test("JV-05: the lab's module × journey matrix, ● from the steps' questions, the workshop's words on each cell, the overlaps; the summary lists an answer once", () => {
+    const w0 = corpus.workshops[0]!;
+    const matrix = {
+      intro: "Where each module meets the journey.",
+      cells: [
+        { module: "M1", step: "P2", technical: "A viewer reads the record.", policy: "Who may trust it." },
+        { module: "M2", step: "p1-checked#P1", kind: "draws" as const, technical: "The record is signed.", policy: "Who signs at home." },
+      ],
+      overlaps: { technical: [{ label: "Signing", modules: ["M1", "M2"], steps: ["P1", "P2"], text: "One key, two moments." }], policy: [{ label: "Trust anchor", modules: ["M2"], steps: ["P2"], text: "One decision." }] },
+    };
+    const lab = {
+      steps: [
+        { id: "use-case", label: "Use case", title: "Which use case?", modules: ["M1"] },
+        { id: "map", label: "Modules × journey", title: "Where do the modules meet the journey?", matrix: true, modules: ["M1", "M2"] },
+        { id: "summary", label: "Summary", title: "Our summary", summary: true },
+      ],
+    };
+    const ws = { ...w0.workshop, matrix, lab };
+    expect(WorkshopSchema.safeParse({ ...ws, $schema: "workshop/0.1.0" }).success).toBe(true);
+    const out = renderJourneyPages({ ...corpus, workshops: [{ ...w0, workshop: ws }] }, LINKS, "top");
+    const page = String(out.find((f) => f.path === `${base}/discuss/index.html`)!.content);
+    const table = /<table class="jp-mx-tbl">([\s\S]*?)<\/table>/.exec(page)![1]!;
+    // Steps across in the walkthrough's order, each heading linking to its step.
+    expect(table).toMatch(/<thead><tr><th scope="col" class="jp-mx-corner">Module<\/th><th scope="col"><a href="\.\.\/walkthrough\/P1\/"[^>]*>P1<\/a><\/th><th scope="col"><a href="\.\.\/walkthrough\/P2\/"/);
+    const rows = table.split("<tr>").slice(2);
+    // M1 is asked at both steps; M2 is asked at P2 and draws on P1.
+    expect(rows[0]!.match(/class="jp-mx-asked"/g)).toHaveLength(2);
+    expect(rows[1]).toContain('<td class="jp-mx-draws"><a class="jp-mx-cell" href="../walkthrough/P1/" aria-label="M2 × P1: the module draws on this step"><span aria-hidden="true">○</span></a>');
+    expect(rows[1]).toContain('<td class="jp-mx-asked"><a class="jp-mx-cell" href="../walkthrough/P2/"');
+    // A cell's words pop up on hover or focus, and are listed under the matrix to expand.
+    expect(table).toContain("<p><b>Technical.</b> A viewer reads the record.</p><p><b>Policy.</b> Who may trust it.</p>");
+    expect(page).toContain("<summary>Every meeting point, technical and policy</summary>");
+    expect(page).toContain("<p class=\"jp-small\">Where each module meets the journey.</p>");
+    expect(page).toContain('<h4 id="technical-overlaps">Technical overlaps</h4>');
+    expect(page).toMatch(/<b>Signing<\/b><p>One key, two moments\.<\/p>/);
+    expect(page).toContain('<h4 id="policy-overlaps">Policy overlaps</h4>');
+    expect(at("assets/present.css")).toContain(".jp-mx-tbl td:hover .jp-mx-pop, .jp-mx-tbl td:focus-within .jp-mx-pop { display: block; }");
+    // M1's questions show in both steps, under one key each; the summary lists each once, under the first step.
+    expect(page.match(/name="policy:q:P2:0"/g)).toHaveLength(2);
+    const model = JSON.parse(/<script type="application\/json" data-jp-lab-model>([\s\S]*?)<\/script>/.exec(page)![1]!);
+    const names = model.flatMap((x: { items: { name: string }[] }) => x.items.map((i) => i.name));
+    expect(names).toEqual([...new Set(names)]);
+    expect(model.find((x: { id: string }) => x.id === "use-case").items.map((i: { name: string }) => i.name)).toEqual(["policy:q:P1:0", "policy:q:P2:0"]);
+    expect(model.find((x: { id: string }) => x.id === "map").items.map((i: { name: string }) => i.name)).toEqual(["policy:q:P2:1"]);
+    // The schema holds the matrix to the workshop: a known module and step, kind as the questions say, some text, each cell once.
+    const refuse = (m: object, re: RegExp) => {
+      const r = WorkshopSchema.safeParse({ ...ws, $schema: "workshop/0.1.0", matrix: m });
+      expect(r.success).toBe(false);
+      expect(r.error!.issues.map((i) => i.message).join("; ")).toMatch(re);
+    };
+    refuse({ cells: [{ module: "M9", step: "P2", technical: "t" }] }, /module "M9"/);
+    refuse({ cells: [{ module: "M1", step: "P9", technical: "t" }] }, /step "P9"/);
+    refuse({ cells: [{ module: "M2", step: "P1", technical: "t" }] }, /M2 asks no question at P1; mark it "draws"/);
+    refuse({ cells: [{ module: "M1", step: "P1", kind: "draws", technical: "t" }] }, /drop the kind/);
+    refuse({ cells: [{ module: "M1", step: "P1" }] }, /has no text/);
+    refuse({ cells: [{ module: "M1", step: "P1", technical: "t" }, { module: "M1", step: "p1-checked#P1", policy: "p" }] }, /appears twice/);
+    refuse({ overlaps: { policy: [{ label: "x", modules: ["M1"], steps: ["P7"], text: "t" }] } }, /step "P7"/);
+  });
   test("JV-07: every page's header has Reset Simulation, scoped to the workshop, returning to the overview", () => {
     for (const path of ["overview", "walkthrough/P2", "map", "how", "demo/S2"]) {
       const page = at(`${base}/${path}/index.html`);
@@ -934,6 +993,64 @@ describe("presentation helpers", () => {
     expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0" }).success).toBe(true);
     const bad = WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", presentation: { ...w.workshop.presentation, cover: { table: "nowhere" } } });
     expect(bad.success).toBe(false);
+  });
+  test("JV-06: on screen a drawn sheet is as tall as its content; the A3 shape is print's alone", () => {
+    const css = at("assets/journeys.css");
+    const screen = css.slice(0, css.indexOf("@media print"));
+    const sheetRule = /\n\.jv-sheet \{[^}]*\}/.exec(screen)![0];
+    expect(sheetRule).not.toContain("aspect-ratio");
+    expect(sheetRule).not.toContain("overflow: hidden");
+    expect(screen).not.toMatch(/\.jv-sheet-a4 \{[^}]*aspect-ratio/);
+    expect(css).toMatch(/\.jv-print-sheets \.jv-sheet \{[^}]*width: 400mm; height: 277mm; overflow: hidden;/);
+  });
+  test("JV-06: a workshop's own canvas (sheetsSource) is the Table sheets view, its files copied beside it; the drawn sheets are the fallback", () => {
+    put("top/canvas/country-canvas.docx", "docx bytes");
+    put("top/canvas/country-canvas.pdf", "%PDF-1.7");
+    put("top/canvas/pages/page-1.png", "png 1");
+    put("top/canvas/pages/page-2.png", "png 2");
+    const w0 = corpus.workshops[0]!;
+    const sheetsSource = {
+      title: "Country Canvas",
+      docx: "../canvas/country-canvas.docx",
+      pdf: "https://example.org/canvas.pdf",
+      previews: ["../canvas/pages/page-1.png", "../canvas/pages/page-2.png", "../canvas/pages/missing.png"],
+    };
+    const w = { ...w0, workshop: { ...w0.workshop, sheetsSource } };
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0" }).success).toBe(true);
+    const out = renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top");
+    const file = (path: string) => out.find((f) => f.path === path);
+    const page = String(file("top/workshops/policy/sheets/index.html")!.content);
+    // The previews in place of the drawn sheets, a page each, with the downloads and a print button.
+    expect(page).not.toContain('class="jv-sheet ');
+    expect(page).toContain('<h2 id="country-canvas">Country Canvas</h2>');
+    expect(page).toContain('<figure class="jv-canvas-page jv-canvas-a3" id="canvas-page-1"><img src="canvas/page-1.png" alt="Country Canvas, page 1 of 2"');
+    expect(page).toContain('src="canvas/page-2.png"');
+    expect(page).not.toContain("missing.png");
+    expect(page).toMatch(/<a class="jp-btn-line" href="canvas\/country-canvas\.docx" download>[\s\S]*?Download Word \(\.docx\)<\/a>/);
+    // A URL is linked as given, not copied.
+    expect(page).toMatch(/<a class="jp-btn-line" href="https:\/\/example\.org\/canvas\.pdf">[\s\S]*?Download PDF<\/a>/);
+    expect(page).toContain("data-jv-print");
+    // The layer's files are copied beside the page, byte for byte; the URL is not.
+    expect(new TextDecoder().decode(file("top/workshops/policy/sheets/canvas/page-1.png")!.content as Uint8Array)).toBe("png 1");
+    expect(file("top/workshops/policy/sheets/canvas/country-canvas.docx")).toBeDefined();
+    expect(out.some((f) => f.path.endsWith("canvas.pdf"))).toBe(false);
+    // The tab still opens the sheets; printed, a page image fills its page.
+    expect(String(file("top/workshops/policy/overview/index.html")!.content)).toContain('href="../sheets/"');
+    expect(at("assets/journeys.css")).toContain(".jv-print-sheets .jv-canvas-page { break-after: page;");
+    // The check names the file that is not there, and only that one.
+    const refs = checkJourneyRefs({ ...corpus, workshops: [w] });
+    const canvasFindings = refs.findings.filter((f) => f.at === "sheetsSource");
+    expect(canvasFindings.map((f) => f.message)).toEqual(['"../canvas/pages/missing.png" is no file of instance top (read from the workshop file\'s directory)']);
+    // None of its files resolves: the drawn sheets again.
+    const none = { ...w0, workshop: { ...w0.workshop, sheetsSource: { previews: ["../nowhere.png"] } } };
+    const fallback = String(renderJourneyPages({ ...corpus, workshops: [none] }, LINKS, "top").find((f) => f.path === "top/workshops/policy/sheets/index.html")!.content);
+    expect(fallback).toContain('id="sheet-s1"');
+    // A path out of the layer is no file of it.
+    const out2 = { ...w0, workshop: { ...w0.workshop, sheetsSource: { docx: "../../../etc/passwd" } } };
+    expect(renderJourneyPages({ ...corpus, workshops: [out2] }, LINKS, "top").some((f) => f.path.includes("/canvas/"))).toBe(false);
+    // A sheetsSource naming no file is refused.
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", sheetsSource: { title: "Nothing" } }).success).toBe(false);
+    expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", sheetsSource: { docx: "x.docx", extra: 1 } }).success).toBe(false);
   });
   test("presentation.cast orders the cast everywhere; presentation.chapterTitles names a chapter", () => {
     const w0 = corpus.workshops[0]!;

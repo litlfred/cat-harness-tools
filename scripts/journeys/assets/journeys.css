@@ -242,8 +242,8 @@ body.jv {
 .jv-src { margin-top: 30px; font-size: 0.82rem; color: var(--jv-muted); }
 
 /* printable sheets */
-.jv-sheet { background: #fff; color: #111; border: 1px solid var(--jv-line); border-radius: 4px; padding: 14mm; margin: 0 auto 24px; aspect-ratio: 420 / 297; width: 100%; display: flex; flex-direction: column; font-size: 0.86rem; overflow: hidden; }
-.jv-sheet-a4 { aspect-ratio: 297 / 210; }
+/* On screen a sheet is as tall as what is on it (JV-06: no empty half-pages); the A3 or A4 page shape is print's alone (below). */
+.jv-sheet { background: #fff; color: #111; border: 1px solid var(--jv-line); border-radius: 4px; padding: 10mm 14mm; margin: 0 auto 24px; width: 100%; display: flex; flex-direction: column; font-size: 0.86rem; }
 .jv-sheet-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 10px; gap: 20px; }
 .jv-sheet-head h2 { margin: 0; font-size: 1.4rem; }
 .jv-sheet-head .jv-kicker { margin: 0; color: #444; }
@@ -268,6 +268,13 @@ body.jv {
 .jv-strip th, .jv-strip td { text-align: left; padding: 2px 6px; border-bottom: 1px solid #ccc; }
 .jv-strip .jv-standing { margin: 4px 0 0; color: #444; }
 
+/* The workshop's own canvas (JV-06): a page image each, as wide as the column, its own shape. */
+.jv-canvas { display: flex; flex-direction: column; gap: 24px; }
+.jv-canvas-page { margin: 0; background: #fff; border: 1px solid var(--jv-line); border-radius: 4px; padding: 8px; }
+.jv-canvas-page img { display: block; width: 100%; height: auto; }
+.jv-canvas-page figcaption { font-size: 0.78rem; color: var(--jv-muted); text-align: center; padding-top: 6px; }
+.jv-canvas-pdf { display: block; width: 100%; height: 80vh; border: 1px solid var(--jv-line); border-radius: 4px; }
+
 @page { size: A3 landscape; margin: 10mm; }
 @page a4 { size: A4 landscape; margin: 10mm; }
 @media print {
@@ -277,7 +284,12 @@ body.jv {
   .jv-map-scroll, .jv-bpmn-scroll { overflow: visible; border: 0; }
   .jv-grid { width: auto; }
   .jv-step { display: block !important; break-inside: avoid-page; border: 0; padding: 0; margin-bottom: 8mm; }
-  .jv-print-sheets .jv-sheet { break-after: page; border: 0; margin: 0; padding: 0; width: 400mm; height: 277mm; aspect-ratio: auto; }
+  .jv-print-sheets .jv-sheet { break-after: page; border: 0; margin: 0; padding: 0; width: 400mm; height: 277mm; overflow: hidden; }
+  .jv-print-sheets .jv-canvas { gap: 0; }
+  .jv-print-sheets .jv-canvas-page { break-after: page; border: 0; box-shadow: none; margin: 0; padding: 0; width: 400mm; height: 277mm; display: flex; align-items: center; justify-content: center; }
+  .jv-print-sheets .jv-canvas-page.jv-canvas-a4 { page: a4; width: 277mm; height: 190mm; }
+  .jv-print-sheets .jv-canvas-page img { width: 100%; height: 100%; object-fit: contain; }
+  .jv-print-sheets .jv-canvas-page:last-child { break-after: auto; }
   .jv-print-sheets .jv-sheet-a4 { page: a4; width: 277mm; height: 190mm; }
   .jv-print-sheets .jv-sheet:last-child { break-after: auto; }
   details { display: block; }
