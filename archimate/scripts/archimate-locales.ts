@@ -284,7 +284,8 @@ export function localizedArchimateFiles(
         report.untranslated += r.untranslated.length;
         report.rejected.push(...r.rejected);
         // The page's data in this locale: its model and drawings.
-        let html = r.html
+        // An inline drawing (a view's figure as drawn) is not read by html-po: its labels go as a drawing's do.
+        let html = injectSvgLabels(r.html, cat).html
           .replace(/(data-kg-model="[^"]*\/)model\.json"/g, `$1model.${locale}.json"`)
           .replace(/((?:data-kg-svg|data|src|href)="[^"]*?)\.svg(["#?])/g, `$1.${locale}.svg$2`)
           // The metamodel page's filter picks a drawing from a JSON map in an attribute.

@@ -40,6 +40,7 @@
  * | `<m>/` | the model's page: views, and elements by layer |
  * | `<m>/model.json` | the model, normalised — what the loader draws from |
  * | `<m>/view/<v>.svg` | the view, drawn (`render-view.ts`) |
+ * | `<m>/view/<v>.as-drawn.svg` | the source publication's figure of the view, as drawn (`figures[].asDrawn`); its page then switches between the two |
  * | `<m>/view/<v>.jsonld`, `.json`, `<m>/view/<slug>/` | a view's node and page |
  * | `<m>/element/<e>.jsonld`, `.json`, `<m>/element/<slug>/` | an element's node and page |
  * | `<m>/relationship/<r>.jsonld`, `.json`, `<m>/relationship/<r>/` | a relationship's node and page |
@@ -474,10 +475,20 @@ export function pagesFor(
       const vp = `${m}/view/${seg(v.id)}`;
       const viewNode: PageNode = { iri: viewIri(v.id), types: ["archimate:Diagram"] };
       stubAt(`${m}/view`, v.id, `${v.name} — ${title}`, viewNode, seg(v.id));
+      // The source publication's figure as drawn, beside the view's drawing, and the switch between the two.
+      const drawnAs = figuresOf(v.id).find((f) => f.asDrawn !== undefined);
+      let asDrawn = "";
+      if (drawnAs?.asDrawn !== undefined) {
+        const src = join(instanceRoot, drawnAs.asDrawn);
+        if (!existsSync(src)) throw new Error(`${drawnAs.label}: as-drawn figure ${drawnAs.asDrawn} is not in the instance`);
+        const svg = readFileSync(src, "utf8");
+        files.push({ path: `${vd}/${v.id}${AS_DRAWN_SUFFIX}`, content: svg });
+        asDrawn = asDrawnSwitch(drawnAs.label, svg, toData(vp, `../${v.id}${AS_DRAWN_SUFFIX}`));
+      }
       files.push(page(`${vp}/index.html`, 3, `${v.name} — ${title}`, toData(vp, `../${v.id}.jsonld`), viewNode,
         `${mount(viewNode, "am am-wide", { model: toData(vp, "../../model.json"), svg: toData(vp, `../${v.id}.svg`) })}<p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(v.name)}</h1>` +
           `<p class="am-kind">View${figuresOf(v.id).map((f) => ` · drawn in the document as ${escHtml(f.label)} (<code>${escHtml(f.block)}</code>)`).join("")}</p>` +
-          `<div class="am-body" aria-live="polite"><p>Loading the view…</p></div></main>`, nav("../../")));
+          `${asDrawn}<div class="am-body" aria-live="polite"><p>Loading the view…</p></div></main>`, nav("../../")));
     }
 
     for (const e of model.elements) {
@@ -741,6 +752,46 @@ function thinPage(
       ...(tail !== undefined ? { tail } : {}),
     }),
   };
+}
+
+/** The name, beside a view's drawing `<id>.svg`, of the copy of its figure as the source publication drew it (`figures[].asDrawn`). */
+export const AS_DRAWN_SUFFIX = ".as-drawn.svg";
+
+/**
+ * An as-drawn SVG made fit to inline in a page: no XML prolog, DOCTYPE or
+ * comments. Refused when it carries what a page must not run or embed — a
+ * script, an event handler, a `javascript:` link, or an
+ * `<object>`/`<embed>`/`<iframe>`/`<foreignObject>` (the IG content QA gate
+ * refuses embedded objects).
+ */
+export function inlineSvg(svg: string, label: string): string {
+  const body = svg
+    .replace(/<\?xml[\s\S]*?\?>/g, "")
+    .replace(/<!DOCTYPE[^>[]*(\[[\s\S]*?\])?\s*>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .trim();
+  if (!/^<svg[\s>]/.test(body)) throw new Error(`${label}: the as-drawn figure is not an SVG drawing`);
+  const bad = /<(script|object|embed|iframe|foreignObject)[\s>/]/i.exec(body) ?? /\son[a-z]+\s*=/i.exec(body) ?? /javascript:/i.exec(body);
+  if (bad) throw new Error(`${label}: the as-drawn figure carries ${JSON.stringify(bad[0].trim())}, which a page must not inline`);
+  return body;
+}
+
+/**
+ * The CSS-only switch on a view's page between the figure as the source
+ * publication drew it and the model's view (the pattern of smart-trust's
+ * `trust-network-figure.html`): two radios in a fieldset, their labels styled
+ * as pill tabs, "As drawn" checked. `archimate.css` hides the drawing not
+ * chosen (`.am-switch`, by `:has`), so with no script both still show. The
+ * words are static, so `--pot` takes them like the rest of the page.
+ */
+export function asDrawnSwitch(label: string, svg: string, href: string): string {
+  return (
+    `<fieldset class="am-switch"><legend>Show the figure</legend>` +
+    `<input type="radio" name="am-figure" id="am-show-drawn" value="drawn" checked><label for="am-show-drawn">As drawn</label>` +
+    `<input type="radio" name="am-figure" id="am-show-model" value="model"><label for="am-show-model">ArchiMate</label></fieldset>` +
+    `<figure class="am-figure am-as-drawn" aria-label="${escHtml(label)}, as drawn">${inlineSvg(svg, label)}` +
+    `<figcaption>${escHtml(label)}, as drawn in the source publication · <a href="${escHtml(href)}">the drawing (SVG)</a></figcaption></figure>`
+  );
 }
 
 /** A document figure the config maps to a view, with where the site holds its drawing and its page. */
