@@ -566,7 +566,16 @@ export function declaredFigureCaptions(sectionsDir: string): Map<string, string 
   // writes `Fig 1. Public health supply chain ...`; requiring it hid nine of
   // that handbook's figures from this check (the same fix as `CAPTION` in
   // pdf-vector-labels.py).
-  const FIGURE = /^[ \t]*(?:Fig\.?|Figure)[ \t]*(\d+(?:\.\d+)*)(?:\.[ \t]+(\S.*))?/gm;
+  // Markdown emphasis around the label: `**Fig. 1.** Caption`, `*Figure 2.*
+  // Caption`, `**Fig. 3**. Caption`, `__Fig. 4.__ Caption` and a wholly bold
+  // `**Fig. 5. Caption**`. dth-sfp's L1 (9789240120747-eng) writes its captions
+  // bold, and the line-start anchor saw only 2 of its 6 figures. The period
+  // still delimits the caption: `**Fig. 6** Caption` and `**Figure 8** shows`
+  // cannot be told apart, so both are bare declarations. The emphasis is
+  // stripped from the caption. A colon delimits as the period does:
+  // dth-pc's L1 (9789240116191-eng) writes `Fig. 1: Product master data`.
+  const FIGURE =
+    /^[ \t]*(?:[*_]{1,3}[ \t]*)?(?:Fig\.?|Figure)[ \t]*(\d+(?:\.\d+)*)(?:[*_]{0,3}[.:][*_]{0,3}[ \t]+(\S.*))?/gm;
   for (const f of files.sort()) {
     let body: string;
     try {
@@ -576,7 +585,7 @@ export function declaredFigureCaptions(sectionsDir: string): Map<string, string 
     }
     for (const m of body.matchAll(FIGURE)) {
       const label = m[1]!;
-      const caption = m[2]?.trim();
+      const caption = m[2]?.trim().replace(/[ \t]*[*_]{1,3}$/, "").trim();
       // A caption never loses to a later bare mention -- see the docstring.
       if (caption) figures.set(label, caption);
       else if (!figures.has(label)) figures.set(label, null);
