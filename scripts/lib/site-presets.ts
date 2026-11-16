@@ -30,8 +30,9 @@
  * ## Merging
  *
  * The base preset's lists come first, then each preset above it, then the
- * site's own `site.build`; a step named twice runs once, where it first
- * appears. For `links` and `coverage` the nearest declaration wins: the
+ * site's own `site.build`. A step named twice runs once: within a phase at the
+ * place the upper list gives it (so a preset can order the steps of the one it
+ * extends), and across phases in the earlier phase. For `links` and `coverage` the nearest declaration wins: the
  * site's own, else the top preset's, else the one below. `scripts` and `when`
  * merge by step name, the nearer winning.
  *
@@ -137,7 +138,12 @@ export function mergeSteps(lower: RecipeSteps, upper: RecipeSteps): RecipeSteps 
     scripts: { ...lower.scripts, ...upper.scripts },
     when: { ...lower.when, ...upper.when },
   };
-  for (const k of LISTS) out[k] = [...new Set([...lower[k], ...upper[k]])];
+  // Within a phase, a step the upper list names again takes the upper list's place: the layer
+  // above decides the order of the steps it knows of.
+  for (const k of LISTS) {
+    const all = [...lower[k], ...upper[k]];
+    out[k] = all.filter((x, i) => all.lastIndexOf(x) === i);
+  }
   // A step runs once in the whole build: named in two phases, it runs in the earlier one.
   const seen = new Set<string>();
   for (const k of LISTS) out[k] = out[k].filter((s) => (seen.has(s) ? false : (seen.add(s), true)));

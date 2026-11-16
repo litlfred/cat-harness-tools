@@ -53,9 +53,10 @@ describe("a site preset — shared, layered steps", () => {
   });
 
   test("a site's own steps come after the preset's, a step named twice runs once, and its own links wins", () => {
-    const own = { ...none(), sourceSteps: ["site:document", "site:mapper"], siteSteps: ["site:glossary"], links: "report" as const };
+    const own = { ...none(), sourceSteps: ["site:mapper", "site:context"], siteSteps: ["site:glossary"], links: "report" as const };
     const { steps } = applyPreset(checkout(), "test-document", own);
-    expect(steps.sourceSteps).toEqual(["site:context", "site:archimate", "site:document", "site:glossary", "site:bibliography", "site:mapper"]);
+    // Named again in the same phase, a step takes the upper list's place.
+    expect(steps.sourceSteps).toEqual(["site:archimate", "site:document", "site:glossary", "site:bibliography", "site:mapper", "site:context"]);
     // Named in two phases, it runs in the earlier one: the preset's.
     expect(steps.siteSteps).toEqual([]);
     expect(steps.links).toBe("report");

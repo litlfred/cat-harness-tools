@@ -16,9 +16,10 @@ Feature: Shared site build steps and a link check that refuses
 
   @test:scripts/tests/site-presets.test.ts::a_site_preset_—_shared,_layered_steps::a_site's_own_steps_come_after_the_preset's,_a_step_named_twice_runs_once,_and_its_own_links_wins
   Scenario: A site's own steps come after the preset's and run once
-    Given a site whose own steps name document, mapper and, as a site step, glossary, with links report
+    Given a site whose own steps name mapper, context and, as a site step, glossary, with links report
     When it extends the document preset
-    Then mapper runs after the preset's steps, document and glossary run once in the preset's place
+    Then mapper and context run after the preset's steps, context moved to the site's place
+    And glossary runs once, as a source step, where the preset puts it
     And the site's own links report wins
 
   @test:scripts/tests/site-presets.test.ts::a_site_preset_—_shared,_layered_steps::a_site_that_leaves_links_undeclared_gets_the_preset's_refuse
