@@ -706,6 +706,7 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-sheets-h { padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .jp-sheets-h h2 { font-size: 16px; font-weight: 700; color: var(--ink); }
 .jp-sheetlist { display: flex; flex-direction: column; gap: 24px; }
+.jp-sheets-act { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
 /* ── the device demo ────────────────────────────────────────────────── */
 .jp-stages { padding: 6px; display: flex; gap: 4px; overflow-x: auto; }
@@ -1057,6 +1058,37 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-pick input { width: 16px; height: 16px; accent-color: #4f46e5; vertical-align: -2px; }
 .jp-pick:has(input:checked) { border-color: #4f46e5; background: #f5f3ff; }
 .jp-lab-res { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; }
+/* The module × journey matrix (JV-05): modules down, steps across, ● asked, ○ draws; the cell's words pop up on hover or focus. */
+.jp-mx { display: flex; flex-direction: column; gap: 10px; }
+.jp-mx-scroll { overflow-x: auto; }
+.jp-mx-tbl { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+.jp-mx-tbl th, .jp-mx-tbl td { border: 1px solid var(--s200); padding: 6px 8px; text-align: center; }
+.jp-mx-tbl thead th { background: var(--s50); font: 700 12px/16px var(--mono); }
+.jp-mx-tbl thead th a { color: var(--s800) !important; }
+.jp-mx-tbl tbody th { text-align: left; font-weight: 600; white-space: nowrap; background: #fff; }
+.jp-mx-tbl tbody th span { font-weight: 500; color: var(--s600); margin-left: 4px; }
+.jp-mx-tbl td { position: relative; min-width: 44px; }
+.jp-mx-asked { background: #eef2ff; }
+.jp-mx-draws { background: #f8fafc; }
+.jp-mx-cell { display: block; font-size: 16px; line-height: 20px; color: #3730a3 !important; text-decoration: none; border-radius: 4px; }
+.jp-mx-draws .jp-mx-cell { color: var(--s500) !important; }
+.jp-mx-cell:focus-visible { outline: 2px solid #4f46e5; outline-offset: 1px; }
+.jp-mx-pop { display: none; position: absolute; z-index: 20; top: 100%; left: 50%; transform: translateX(-50%); width: 300px; text-align: left; background: #fff; border: 1px solid var(--s300); border-radius: 8px; box-shadow: 0 8px 24px rgba(15, 23, 42, .15); padding: 10px 12px; font-size: 12px; line-height: 1.45; color: var(--s800); }
+.jp-mx-pop small { color: var(--s500); }
+.jp-mx-pop p { margin-top: 6px; }
+.jp-mx-tbl td:hover .jp-mx-pop, .jp-mx-tbl td:focus-within .jp-mx-pop { display: block; }
+.jp-mx-q { color: var(--s600); font-style: italic; }
+.jp-mx-key { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.jp-mx-detail summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.jp-mx-mod h4 { margin: 12px 0 6px; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.jp-mx-mod ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.jp-mx-mod li { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: start; font-size: 13px; }
+.jp-mx-mod li p + p { margin-top: 2px; }
+.jp-mx-k { font: 600 11px/20px var(--mono); color: var(--s500); white-space: nowrap; }
+.jp-mx-ovs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.jp-mx-ov { display: flex; flex-direction: column; gap: 8px; }
+.jp-mx-ov h4 { font-size: 14px; }
+@media print { .jp-mx-pop { display: none !important; } .jp-mx-detail > :not(summary) { display: block; } }
 .jp-lab-nav { display: flex; justify-content: flex-end; }
 .jp-lab-aside { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
 .jp-lab-aside h4 { font: 700 11px/16px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--s600); }

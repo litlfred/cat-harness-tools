@@ -30,7 +30,7 @@ import type { BuildingBlock } from "../../schemas/process/user-scenario.ts";
 import { escHtml } from "../thin-page.ts";
 import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
-import { moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
+import { canvasDownloads, canvasFiles, canvasHtml, canvasOf, moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_FORM, DEVICE_LABEL, renderDevice, stateSwitch, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
 import {
@@ -727,6 +727,7 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
         .join("");
       out.push(`<div class="jp-gap jp-lab-caps">${rows}${ws.assessment?.standingLine ? `<p class="jp-standing">${e(ws.assessment.standingLine)}</p>` : ""}<p class="jp-small">The same ratings as each moment’s gap strip in the walkthrough. The gap report is in the summary.</p></div>`);
     }
+    if (st.matrix) out.push(matrixHtml(corpus, p, a, mod));
     for (const m of st.modules ?? []) {
       const module = ws.modules.find((x) => x.id === m);
       const qs = p.steps.flatMap((s) => (s.ws?.questions ?? []).map((q, i) => ({ s, q, i })).filter((x) => x.q.module === m));
@@ -751,9 +752,12 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
     return out.join("\n");
   };
 
+  // An answer shown in two steps (a module's questions in its own step and in the matrix step) is one answer: the summary lists it once, under the first.
+  const listed = new Set<string>();
   const steps = lab.steps.map((st, n) => {
-    const items: LabSummaryItem[] = [];
-    const body = part(st, items);
+    const all: LabSummaryItem[] = [];
+    const body = part(st, all);
+    const items = all.filter((x) => !listed.has(x.name) && (listed.add(x.name), true));
     if (items.length) summary.push({ id: st.id, n, label: st.label, items });
     return { st, n, body };
   });
@@ -788,6 +792,90 @@ ${next ? `<div class="jp-lab-nav jp-noprint"><a class="jp-btn-dark" href="#lab-$
 <div class="jp-lab" data-jp-lab="${e(ws.id)}"><div class="jp-lab-steps">${sections}</div>${aside}</div>
 ${credit}`;
   return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(model ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
+}
+
+// ── the module × journey matrix (JV-05) ───────────────────────────────────
+
+/** One cell of the matrix: whether the module's question is asked at the step, or the module only draws on it, and the workshop's words for it. */
+export interface MatrixCellView {
+  module: string;
+  step: PresentedStep;
+  kind: "asked" | "draws";
+  questions: string[];
+  technical?: string;
+  policy?: string;
+}
+
+/**
+ * The matrix's cells, modules in the workshop's order and steps in the
+ * walkthrough's: `asked` wherever a step's questions name the module (from
+ * `steps[].questions`), `draws` wherever `workshop.matrix` says the module
+ * reads the step without asking; each with the cell's text, if any.
+ */
+export function matrixCells(corpus: JourneyCorpus, p: Presentation): MatrixCellView[] {
+  const ws = p.w.workshop;
+  const text = new Map<string, { kind?: "draws"; technical?: string; policy?: string }>();
+  for (const c of ws.matrix?.cells ?? []) {
+    const s = stepByRef(corpus, p, c.step);
+    if (s) text.set(`${c.module} ${s.key}`, c);
+  }
+  const out: MatrixCellView[] = [];
+  for (const m of ws.modules) {
+    for (const s of p.steps) {
+      if (!s.ws) continue;
+      const questions = (s.ws.questions ?? []).filter((q) => q.module === m.id).map((q) => q.text);
+      const t = text.get(`${m.id} ${s.key}`);
+      if (questions.length === 0 && t?.kind !== "draws") continue;
+      out.push({ module: m.id, step: s, kind: questions.length ? "asked" : "draws", questions, ...(t?.technical ? { technical: t.technical } : {}), ...(t?.policy ? { policy: t.policy } : {}) });
+    }
+  }
+  return out;
+}
+
+/**
+ * The module × journey matrix: a row per module that meets any step, a
+ * column per step the workshop has, ● where the module's question is asked
+ * and ○ where it only draws on the step. Each cell links to its step in the
+ * walkthrough and shows its technical and policy text on hover or focus;
+ * the same text, cell by cell, is under the matrix to expand (and print),
+ * then the overlaps across modules.
+ */
+function matrixHtml(corpus: JourneyCorpus, p: Presentation, a: At, mod: (id: string) => string): string {
+  const ws = p.w.workshop;
+  const cells = matrixCells(corpus, p);
+  const cols = p.steps.filter((s) => s.ws);
+  const rows = ws.modules.filter((m) => cells.some((c) => c.module === m.id));
+  const at = new Map(cells.map((c) => [`${c.module} ${c.step.key}`, c]));
+  const words = (c: MatrixCellView) =>
+    `${c.questions.length ? `<p class="jp-mx-q">${c.questions.map((q) => e(q)).join("<br>")}</p>` : ""}${c.technical ? `<p><b>Technical.</b> ${e(c.technical)}</p>` : ""}${c.policy ? `<p><b>Policy.</b> ${e(c.policy)}</p>` : ""}`;
+  const label = (c: MatrixCellView) => `${c.module} × ${c.step.step.id}: ${c.kind === "asked" ? "the module’s question is asked here" : "the module draws on this step"}`;
+  const head = `<tr><th scope="col" class="jp-mx-corner">Module</th>${cols.map((s) => `<th scope="col"><a href="${e(walkHref(a, s))}" title="${e(s.step.title)}">${e(s.step.id)}</a></th>`).join("")}</tr>`;
+  const body = rows
+    .map((m) => `<tr><th scope="row">${mod(m.id)} <span>${e(m.title)}</span></th>${cols
+      .map((s) => {
+        const c = at.get(`${m.id} ${s.key}`);
+        if (!c) return `<td class="jp-mx-none"></td>`;
+        const w = words(c);
+        return `<td class="jp-mx-${c.kind}"><a class="jp-mx-cell" href="${e(walkHref(a, s))}" aria-label="${e(label(c))}"><span aria-hidden="true">${c.kind === "asked" ? "●" : "○"}</span></a>${w ? `<div class="jp-mx-pop" role="tooltip"><b>${e(c.module)} × ${e(c.step.step.id)}</b> <small>${e(c.step.step.title)}</small>${w}</div>` : ""}</td>`;
+      })
+      .join("")}</tr>`)
+    .join("");
+  const detail = rows
+    .map((m) => {
+      const mine = cells.filter((c) => c.module === m.id && (c.technical || c.policy));
+      return mine.length ? `<div class="jp-mx-mod"><h4>${mod(m.id)} ${e(m.title)}</h4><ul>${mine.map((c) => `<li class="jp-mx-${c.kind}">${stepChip(a, c.step, c.step.step.id)}<span class="jp-mx-k">${c.kind === "asked" ? "● asked" : "○ draws"}</span><div>${c.technical ? `<p><b>Technical.</b> ${e(c.technical)}</p>` : ""}${c.policy ? `<p><b>Policy.</b> ${e(c.policy)}</p>` : ""}</div></li>`).join("")}</ul></div>` : "";
+    })
+    .join("");
+  const ov = ws.matrix?.overlaps;
+  const overlapList = (title: string, list: NonNullable<NonNullable<typeof ov>["technical"]> | undefined) =>
+    list?.length
+      ? `<div class="jp-mx-ov"><h4>${e(title)}</h4>${list.map((o) => `<div class="jp-card jp-dt"><b>${e(o.label)}</b><p>${e(o.text)}</p><div class="jp-dq-rev"><span>Modules:</span>${o.modules.map((x) => mod(x)).join("")}</div><div class="jp-dq-rev"><span>Steps:</span>${o.steps.map((r) => stepChip(a, stepByRef(corpus, p, r), r)).join("")}</div></div>`).join("")}</div>`
+      : "";
+  const overlaps = overlapList("Technical overlaps", ov?.technical) + overlapList("Policy overlaps", ov?.policy);
+  return `<div class="jp-mx">${ws.matrix?.intro ? `<p class="jp-small">${e(ws.matrix.intro)}</p>` : ""}<div class="jp-mx-scroll"><table class="jp-mx-tbl"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+<p class="jp-small jp-mx-key"><span>● the module’s question is asked at this step</span>${cells.some((c) => c.kind === "draws") ? `<span>○ the module draws on this step without asking there</span>` : ""}<span>Each cell opens its step${detail ? "; hover or focus it for the technical and policy text" : ""}.</span></p>
+${detail ? `<details class="jp-mx-detail"><summary>Every meeting point, technical and policy</summary>${detail}</details>` : ""}
+${overlaps ? `<div class="jp-mx-ovs">${overlaps}</div>` : ""}</div>`;
 }
 
 // ── the gap report ───────────────────────────────────────────────────────
@@ -840,8 +928,13 @@ const jsonInHtml = (v: unknown): string => JSON.stringify(v).replace(/</g, "\\u0
 function sheetsPageFramed(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): string {
   const a = at(1, links);
   const ws = p.w.workshop;
+  const canvas = canvasOf(corpus, p.w);
   const sizes = [...new Set((ws.sheets ?? []).map((s) => s.size))].join(" and ");
-  const body = `<section class="jp-card jp-sheets-h jp-noprint"><div><h2>Table canvas: ${e(sizes)} sheets</h2><p class="jp-small">A cover and ${(ws.sheets ?? []).length} sheet${(ws.sheets ?? []).length === 1 ? "" : "s"}, each with this journey’s questions for its module${(ws.sheets ?? []).some((s) => s.assessmentStrip) ? " and the gap strip at its foot" : ""}. Print on ${e(sizes)}, landscape, at 100% with background graphics on.</p></div><button type="button" class="jp-btn-dark" data-jv-print>${icon("printer")} Print the sheets</button></section>
+  // The workshop's own canvas, when it names one; the drawn sheets otherwise.
+  const body = canvas
+    ? `<section class="jp-card jp-sheets-h jp-noprint"><div><h2>${e(canvas.title)}</h2><p class="jp-small">${canvas.description ? e(canvas.description) : `${canvas.previews.length ? `${canvas.previews.length} page${canvas.previews.length === 1 ? "" : "s"}, ` : ""}${e(canvas.size)} landscape. Print at 100% with background graphics on, or download the file to fill in on screen.`}</p></div><span class="jp-sheets-act">${canvasDownloads(canvas, "jp-btn-line", { file: icon("file") })}${canvas.previews.length ? `<button type="button" class="jp-btn-dark" data-jv-print>${icon("printer")} Print the canvas</button>` : ""}</span></section>
+${canvasHtml(canvas)}`
+    : `<section class="jp-card jp-sheets-h jp-noprint"><div><h2>Table canvas: ${e(sizes)} sheets</h2><p class="jp-small">A cover and ${(ws.sheets ?? []).length} sheet${(ws.sheets ?? []).length === 1 ? "" : "s"}, each with this journey’s questions for its module${(ws.sheets ?? []).some((s) => s.assessmentStrip) ? " and the gap strip at its foot" : ""}. Print on ${e(sizes)}, landscape, at 100% with background graphics on.</p></div><button type="button" class="jp-btn-dark" data-jv-print>${icon("printer")} Print the sheets</button></section>
 <div class="jp-sheetlist">${sheetsHtml(corpus, p.w)}</div>`;
   return frame({
     p,
@@ -997,7 +1090,10 @@ export function renderViewPages(corpus: JourneyCorpus, p: Presentation, links: S
   const cat = catalogueOf(corpus, p);
   for (const b of cat?.blocks.keys() ?? []) out.push({ path: `how/${b}/index.html`, content: howPage(corpus, p, links, b) });
   out.push({ path: "discuss/index.html", content: discussPage(corpus, p, links) });
-  if (p.w.workshop.sheets?.length) out.push({ path: "sheets/index.html", content: sheetsPageFramed(corpus, p, links) });
+  if (p.w.workshop.sheets?.length || p.w.workshop.sheetsSource) {
+    out.push({ path: "sheets/index.html", content: sheetsPageFramed(corpus, p, links) });
+    for (const f of canvasFiles(canvasOf(corpus, p.w))) out.push({ path: `sheets/${f.path}`, content: f.content });
+  }
   if (p.screens.length) {
     out.push({ path: "demo/index.html", content: demoIndex(corpus, p, links) });
     p.screens.forEach((x, i) => out.push({ path: `demo/${x.id}/index.html`, content: demoPage(corpus, p, links, i) }));
