@@ -29,6 +29,16 @@
  * A job that calls `layer-pr-checks.yml` must not pass `tools-ref: <branch>`:
  * the judging scripts follow the lock too (`tools-ref: lock`, the default).
  *
+ * A workflow that calls `layer-pr-checks.yml` on `pull_request` must list
+ * `labeled` in its types, key its concurrency group so a no-op label never
+ * cancels the real run, and skip its calling job on any label but `release`
+ * or `preview` (the caller snippet in layer-pr-checks.yml's header). Without
+ * `labeled`, adding `release` starts nothing and every run reads the labels
+ * the PR had when it was opened or pushed: the dth-* callers ran the fast tier
+ * (`full=false`) on every PR, so no gate ever ran on them (2026-11-16).
+ * `--write` adds all three to the usual caller shape; any other shape is
+ * reported for a hand fix.
+ *
  * `mount:remote` runs `--write` after it writes the lock, so a re-pin moves
  * the calls with the mounts. In CI (`CI=true`) it does not: the re-pin train's
  * App has no `workflows` permission, so a train cannot push workflow-file
@@ -267,7 +277,99 @@ export function judgeFile(
       lines[i] = "\u0000drop";
     }
   }
+  findings.push(...labeledTrigger(lines, rel));
   return { findings, text: lines.filter((x) => x !== "\u0000drop").join("\n") };
+}
+
+/** The labels that start a layer-pr-checks run; any other label is a no-op there. */
+const NOOP_LABEL = "(github.event.action == 'labeled' && github.event.label.name != 'release' && github.event.label.name != 'preview')";
+const JOB_IF = "github.event.action != 'labeled' || github.event.label.name == 'release' || github.event.label.name == 'preview'";
+const CALLS_CHECKS = /^\s*(-\s+)?uses:\s*\S*\/layer-pr-checks\.yml(@|\s|$)/;
+const indentOf = (l: string) => l.length - l.trimStart().length;
+
+/**
+ * A caller of `layer-pr-checks.yml` that runs on `pull_request` must start on
+ * `labeled` (see the header). Judges `lines` in place, fixing what it can;
+ * insertions come last and bottom-up, so earlier findings' line numbers hold.
+ */
+export function labeledTrigger(lines: string[], rel: string): Finding[] {
+  const live = (i: number) => lines[i] !== "\u0000drop" && !/^\s*#/.test(lines[i]);
+  const call = lines.findIndex((l, i) => live(i) && CALLS_CHECKS.test(l));
+  if (call < 0) return [];
+  const pr = lines.findIndex((l, i) => live(i) && /^\s+pull_request:\s*(\{\s*\}|null|~)?\s*(#.*)?$/.test(l));
+  const prInline = lines.some((l, i) => live(i) && /^on:\s*(\[[^\]]*\bpull_request\b[^\]]*\]|pull_request)\s*(#.*)?$/.test(l));
+  if (pr < 0 && !prInline) return [];
+  const findings: Finding[] = [];
+  const inserts: { at: number; line: string }[] = [];
+  const why = "a layer-pr-checks caller must start on `labeled`, or adding `release` runs nothing and every PR runs the fast tier only (full=false)";
+  if (pr < 0) {
+    findings.push({ file: rel, line: lines.findIndex((l) => /^on:/.test(l)) + 1, have: "on: pull_request", want: null, why: `${why}: write \`pull_request: { types: [opened, synchronize, reopened, ready_for_review, labeled] }\`` });
+  } else {
+    const ind = indentOf(lines[pr]);
+    let types = -1;
+    for (let i = pr + 1; i < lines.length && (lines[i].trim() === "" || indentOf(lines[i]) > ind); i++)
+      if (live(i) && /^\s*types:/.test(lines[i])) types = i;
+    if (types < 0) {
+      const want = `${" ".repeat(ind + 2)}types: [opened, synchronize, reopened, ready_for_review, labeled]`;
+      findings.push({ file: rel, line: pr + 1, have: lines[pr].trim(), want: want.trim(), why });
+      lines[pr] = lines[pr].replace(/:\s*(\{\s*\}|null|~)?\s*(#.*)?$/, ":");
+      inserts.push({ at: pr + 1, line: want });
+    } else {
+      const m = lines[types].match(/^(\s*types:\s*\[)([^\]]*)\](.*)$/);
+      const names = m ? m[2].split(",").map((x) => x.trim().replace(/^["']|["']$/g, "")) : [];
+      if (!m) {
+        // A block list: `types:` with `- opened` lines under it.
+        let has = false;
+        let last = types;
+        for (let i = types + 1; i < lines.length && /^\s*-\s/.test(lines[i]); i++) {
+          last = i;
+          if (/^\s*-\s*["']?labeled["']?\s*(#.*)?$/.test(lines[i])) has = true;
+        }
+        if (!has) {
+          const want = lines[last].replace(/-\s*.*$/, "- labeled");
+          findings.push({ file: rel, line: types + 1, have: lines[types].trim(), want: want.trim(), why });
+          inserts.push({ at: last + 1, line: want });
+        }
+      } else if (!names.includes("labeled")) {
+        const want = `${m[1]}${[...names.filter(Boolean), "labeled"].join(", ")}]${m[3]}`;
+        findings.push({ file: rel, line: types + 1, have: lines[types].trim(), want: want.trim(), why });
+        lines[types] = want;
+      }
+    }
+  }
+  // The workflow's own concurrency group: keyed by the ref alone, a no-op label
+  // (`ready-to-merge`) cancels the PR's real run.
+  const conc = lines.findIndex((l, i) => live(i) && /^concurrency:\s*$/.test(l));
+  if (conc >= 0) {
+    for (let i = conc + 1; i < lines.length && (lines[i].trim() === "" || indentOf(lines[i]) > 0); i++) {
+      if (!live(i) || !/^\s*group:/.test(lines[i]) || lines[i].includes("noop-label")) continue;
+      const g = lines[i].match(/^(\s*group:\s*)(["']?)(.*)\$\{\{\s*github\.ref\s*\}\}(.*)$/);
+      const cancels = lines.slice(conc + 1, i + 4).some((l) => /^\s*cancel-in-progress:\s*(?!false\b)\S/.test(l));
+      if (!cancels) break;
+      const want = g ? `${g[1]}${g[2]}${g[3]}\${{ ${NOOP_LABEL} && format('noop-label-{0}', github.run_id) || github.ref }}${g[4]}` : null;
+      findings.push({ file: rel, line: i + 1, have: lines[i].trim(), want: want?.trim() ?? null, why: "a `labeled` run for any label but `release` or `preview` must get its own concurrency group, or it cancels the PR's real run" });
+      if (want) lines[i] = want;
+      break;
+    }
+  }
+  // The calling job skips a no-op label.
+  const callInd = indentOf(lines[call]);
+  let job = call - 1;
+  while (job >= 0 && (lines[job].trim() === "" || /^\s*#/.test(lines[job]) || indentOf(lines[job]) >= callInd)) job--;
+  if (job >= 0 && /^\s*[A-Za-z0-9_-]+:\s*$/.test(lines[job])) {
+    let jobIf = -1;
+    for (let i = job + 1; i < lines.length && (lines[i].trim() === "" || indentOf(lines[i]) >= callInd); i++)
+      if (live(i) && indentOf(lines[i]) === callInd && /^\s*if:/.test(lines[i])) jobIf = i;
+    if (jobIf < 0) {
+      const want = `${" ".repeat(callInd)}if: ${JOB_IF}`;
+      findings.push({ file: rel, line: job + 1, have: lines[job].trim(), want: want.trim(), why: "the job calling layer-pr-checks skips a `labeled` run for any label but `release` or `preview`" });
+      inserts.push({ at: job + 1, line: want });
+    } else if (!lines[jobIf].includes("labeled")) {
+      findings.push({ file: rel, line: jobIf + 1, have: lines[jobIf].trim(), want: null, why: `the job calling layer-pr-checks skips a \`labeled\` run for any label but \`release\` or \`preview\`: add \`${JOB_IF}\` to its if` });
+    }
+  }
+  for (const { at, line } of inserts.sort((a, b) => b.at - a.at)) lines.splice(at, 0, line);
+  return findings;
 }
 
 export function run(root: string, write: boolean): { findings: Finding[]; fixed: number } {
@@ -312,7 +414,7 @@ if (import.meta.main) {
   }
   if (write) {
     const left = result.findings.filter((f) => f.want === null && !f.why.startsWith("tools-ref"));
-    console.log(`  rewrote ${result.fixed} line(s)${left.length ? `; ${left.length} need a hand pin` : ""}`);
+    console.log(`  rewrote ${result.fixed} line(s)${left.length ? `; ${left.length} need a hand pin or fix` : ""}`);
     process.exit(left.length ? 1 : 0);
   }
   // input-site: env WORKFLOW_PINS_STRICT #4e1adbf3 — when 1, trailing pins fail the check too
