@@ -361,7 +361,8 @@ describe("a journey page", () => {
     expect(p2).toContain('<script src="../../assets/task-panel.js" defer></script>');
   });
   test("stories, requirements, examples and blocks resolve, and what does not is drawn as unresolved", () => {
-    expect(p2).toContain("Show my summary abroad".charAt(0).toLowerCase() + "how my summary abroad");
+    // A story reads "I want to <want>": the want is a verb phrase (user-story.ts).
+    expect(p2).toContain("I want to show my summary abroad, so that I am treated safely.");
     expect(p2).toContain("https://github.com/example/lower/blob/HEAD/skills/requirements/low-req-001.json");
     expect(p2).toMatch(/jv-unresolved"><span class="jv-code">ghost-story/);
     expect(p2).toMatch(/LOW-REQ-404<\/span> no <code>req:<\/code> node/);
