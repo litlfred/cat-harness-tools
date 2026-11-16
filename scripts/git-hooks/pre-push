@@ -13,6 +13,17 @@ command -v bun >/dev/null 2>&1 || {
     exit 0
 }
 
+# The state-branch wipe guard first, and always (scripts/state-write-guard.ts):
+# a pushed commit that deletes a state branch's manifest.json or a mass of
+# files is refused. It needs the refs on stdin, so they are kept for both.
+refs="$(cat)"
+for p in cat-harness-tools/scripts/state-write-guard.ts scripts/state-write-guard.ts; do
+    if [ -f "$p" ]; then
+        printf '%s\n' "$refs" | bun run "$p" --git-hook pre-push "$1" || exit 1
+        break
+    fi
+done
+
 # By path, not through `bun run cat`: the index layout first, then
 # cat-harness-tools on its own (the same lookup as pre-commit's beans-retag).
 script=""
@@ -23,4 +34,4 @@ if [ -z "$script" ]; then
     echo "note: scripts/pre-push-gates.ts is not in this checkout, so pre-push ran no gate" >&2
     exit 0
 fi
-exec bun run "$script" --git-hook "$1"
+printf '%s\n' "$refs" | bun run "$script" --git-hook "$1"
