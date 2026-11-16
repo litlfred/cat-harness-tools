@@ -149,21 +149,36 @@ export function injectSvgLabels(html: string, catalogue: ReadonlyMap<string, str
       const mids = spans.map((_s, i) => (anchor === "middle" ? xs[i]! : anchor === "end" ? xs[i]! - widths[i] / 2 : xs[i]! + widths[i] / 2));
       const left = spans.map((_s, i) => (anchor === "start" ? xs[i]! : NaN));
       const centre = mids.reduce((a, m) => a + m, 0) / spans.length;
-      // A start-anchored block whose lines all begin at one x is left-aligned, and stays so.
-      const flushLeft = anchor === "start" && spans.length > 1 && left.every((x) => x === left[0]);
-      const max = Math.max(...widths, size * 4);
-      const lh = spans.length > 1 ? (ys[spans.length - 1]! - ys[0]!) / (spans.length - 1) : size * 1.2;
+      // A drawing a script writes may say how wide a label may run, which way it grows
+      // (`data-label-width`, `data-label-grow="down"|"up"`: a caption under a pictogram grows
+      // down, away from it, one above an arrow grows up), and that it would rather shrink
+      // than take more lines than the English (`data-label-fit="shrink"`: a name in a list
+      // whose rows are fixed). Otherwise the block stays centred where the English was.
+      const max = num(attrs, "data-label-width") ?? Math.max(...widths, size * 4) * 1.05;
+      const grow = /\sdata-label-grow="(down|up)"/.exec(attrs)?.[1];
+      const shrink = /\sdata-label-fit="shrink"/.test(attrs);
+      // A start-anchored block whose lines all begin at one x is left-aligned, and stays so;
+      // so is a one-line start-anchored label that declares how it grows.
+      const flushLeft = anchor === "start" && (spans.length > 1 || grow !== undefined) && left.every((x) => x === left[0]);
+      let fs = size;
+      let lines = wrap(t, fs, max);
+      while (shrink && lines.length > spans.length && fs > size * 0.7) {
+        fs = Math.max(size * 0.7, fs * 0.92);
+        lines = wrap(t, fs, max);
+      }
+      const k0 = fs / size;
+      const lh = (spans.length > 1 ? (ys[spans.length - 1]! - ys[0]!) / (spans.length - 1) : size * 1.2) * (lines.length > spans.length ? 1 : Math.min(1, k0 * 1.05));
       const mid = (ys[0]! + ys[spans.length - 1]!) / 2;
-      const lines = wrap(t, size, max * 1.05);
       const tspans = lines
         .map((l, k) => {
-          const y = mid + (k - (lines.length - 1) / 2) * lh;
-          const w = textWidth(l, size);
+          const y = grow === "down" ? ys[0]! + k * lh : grow === "up" ? ys[spans.length - 1]! - (lines.length - 1 - k) * lh : mid + (k - (lines.length - 1) / 2) * lh;
+          const w = textWidth(l, fs);
           const x = flushLeft ? left[0]! : anchor === "middle" ? centre : anchor === "end" ? centre + w / 2 : centre - w / 2;
           return `<tspan x="${x.toFixed(2)}" y="${y.toFixed(2)}">${esc(l)}</tspan>`;
         })
         .join("");
-      return `<text${attrs}>${tspans}</text>`;
+      const sized = fs === size ? attrs : / font-size="[^"]*"/.test(attrs) ? attrs.replace(/ font-size="[^"]*"/, ` font-size="${fs.toFixed(1)}"`) : `${attrs} font-size="${fs.toFixed(1)}"`;
+      return `<text${sized}>${tspans}</text>`;
     });
     svg = svg.replace(PLAIN_TEXT_RE, (whole, attrs: string, text: string) => {
       const id = label(text);

@@ -20,6 +20,12 @@ Feature: gettext over a page's HTML and SVG includes
     When injectInclude runs on it
     Then it puts an include's words, labels and tooltips into the catalogue's language
 
+  @test:pipeline/include-po.test.ts::injectInclude::lays_an_Arabic_label_out_right_to_left,_its_edge_where_the_English_edge_was
+  Scenario: injectInclude: Lays an Arabic label out right to left, its edge where the English edge was
+    Given the fixture in include-po.test.ts
+    When injectInclude runs on it
+    Then it lays an Arabic label out right to left, its edge where the English edge was
+
   @test:pipeline/include-po.test.ts::injectInclude::names_an_include's_catalogue_by_its_file
   Scenario: injectInclude: Names an include's catalogue by its file
     Given the fixture in include-po.test.ts

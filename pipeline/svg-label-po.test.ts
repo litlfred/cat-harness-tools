@@ -48,6 +48,24 @@ describe("injectSvgLabels", () => {
     for (const x of xs) expect(x).toBe(40);
   });
 
+  it("grows a label down or up from its line, within the width it declares", () => {
+    const down = `<svg><text font-size="18" text-anchor="middle" data-label-width="110" data-label-grow="down"><tspan x="100" y="200">Trust Anchor</tspan></text></svg>`;
+    const ys = (h: string) => [...h.matchAll(/<tspan x="[0-9.]+" y="([0-9.]+)">/g)].map((m) => Number(m[1]));
+    const d = ys(injectSvgLabels(down, new Map([["Trust Anchor", "Ancre de confiance"]])).html);
+    expect(d.length).toBe(2);
+    expect(d[0]).toBe(200);
+    const up = down.replace("down", "up");
+    const u = ys(injectSvgLabels(up, new Map([["Trust Anchor", "Ancre de confiance"]])).html);
+    expect(u[u.length - 1]).toBe(200);
+  });
+
+  it("shrinks a name that asks to fit rather than take more lines, keeping its left edge", () => {
+    const svg = `<svg><text font-size="12" data-label-width="90" data-label-grow="down" data-label-fit="shrink"><tspan x="40" y="20">Bahamas</tspan></text></svg>`;
+    const out = injectSvgLabels(svg, new Map([["Bahamas", "Багамские Острова"]])).html;
+    expect([...out.matchAll(/<tspan x="([0-9.]+)"/g)].map((m) => m[1])).toEqual(["40.00"]);
+    expect(Number(/font-size="([0-9.]+)"/.exec(out)![1])).toBeLessThan(12);
+  });
+
   it("leaves a drawing untouched when nothing is translated", () => {
     expect(injectSvgLabels(SVG, new Map()).html).toBe(SVG);
   });

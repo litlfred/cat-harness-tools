@@ -27,6 +27,18 @@ Feature: gettext over an inline drawing's labels
     When injectSvgLabels runs on it
     Then it keeps a left-aligned block left-aligned
 
+  @test:pipeline/svg-label-po.test.ts::injectSvgLabels::grows_a_label_down_or_up_from_its_line,_within_the_width_it_declares
+  Scenario: injectSvgLabels: Grows a label down or up from its line, within the width it declares
+    Given the fixture in svg-label-po.test.ts
+    When injectSvgLabels runs on it
+    Then it grows a label down or up from its line, within the width it declares
+
+  @test:pipeline/svg-label-po.test.ts::injectSvgLabels::shrinks_a_name_that_asks_to_fit_rather_than_take_more_lines,_keeping_its_left_edge
+  Scenario: injectSvgLabels: Shrinks a name that asks to fit rather than take more lines, keeping its left edge
+    Given the fixture in svg-label-po.test.ts
+    When injectSvgLabels runs on it
+    Then it shrinks a name that asks to fit rather than take more lines, keeping its left edge
+
   @test:pipeline/svg-label-po.test.ts::injectSvgLabels::leaves_a_drawing_untouched_when_nothing_is_translated
   Scenario: injectSvgLabels: Leaves a drawing untouched when nothing is translated
     Given the fixture in svg-label-po.test.ts

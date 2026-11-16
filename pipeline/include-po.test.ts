@@ -41,6 +41,15 @@ describe("injectInclude", () => {
     expect(svg).toContain("<title>Ancre de confiance : la racine de la confiance.</title>");
   });
 
+  it("lays an Arabic label out right to left, its edge where the English edge was", () => {
+    const svg = `<svg><text font-size="16" text-anchor="start"><tspan x="40" y="20">Verify each</tspan><tspan x="40" y="39.2">document</tspan></text><text x="5" y="9">1</text></svg>`;
+    const out = injectInclude(svg, "fig.svg", new Map([["Verify each document", "التحقق"]]), "ar").text;
+    expect(out.startsWith('<svg direction="ltr">')).toBe(true);
+    expect(out).toContain('text-anchor="end" direction="rtl"><tspan x="40.00"');
+    expect(out).toContain('<text x="5" y="9">1</text>');
+    expect(injectInclude(svg, "fig.svg", new Map([["Verify each document", "Vérifier"]]), "fr").text).not.toContain("direction");
+  });
+
   it("names an include's catalogue by its file", () => {
     expect(includeCatalogue("fig.svg")).toBe("includes/fig.svg");
   });

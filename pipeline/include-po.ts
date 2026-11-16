@@ -23,7 +23,7 @@
  *
  * Pure: no filesystem.
  */
-import { extractHtml, injectHtml } from "./html-po.ts";
+import { extractHtml, injectHtml, isRtl } from "./html-po.ts";
 import type { PotEntry } from "./pot-extract.ts";
 import { extractSvgLabels, injectSvgLabels } from "./svg-label-po.ts";
 
@@ -74,5 +74,28 @@ export function injectInclude(text: string, name: string, catalogue: ReadonlyMap
     untranslated.push(...h.untranslated.filter(words));
   }
   const s = injectSvgLabels(out, catalogue);
-  return { text: s.html, translated: translated + s.translated, untranslated: [...untranslated, ...s.untranslated] };
+  return { text: isRtl(locale) ? rtlLabels(s.html) : s.html, translated: translated + s.translated, untranslated: [...untranslated, ...s.untranslated] };
+}
+
+const RTL_CHAR = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/;
+
+/**
+ * A drawing's labels in a right-to-left language, placed where the English
+ * ones were. A page in Arabic is `dir="rtl"`, and a drawing inherits it: every
+ * `text-anchor` would then measure from the other side and a left-aligned
+ * caption would run off its box. So each drawing is pinned left to right, and
+ * each label holding right-to-left words is laid out right to left with its
+ * anchor swapped (start ↔ end), which keeps its edge where the English edge was
+ * and lets the bidi algorithm place its punctuation and quotation marks.
+ */
+export function rtlLabels(html: string): string {
+  return html
+    .replace(/<svg\b(?![^>]*\sdirection=)/g, '<svg direction="ltr"')
+    .replace(/<text\b([^>]*)>([\s\S]*?)<\/text>/g, (whole, attrs: string, inner: string) => {
+      if (!RTL_CHAR.test(inner) || /\sdirection=/.test(attrs)) return whole;
+      const anchor = /\stext-anchor="(start|middle|end)"/.exec(attrs)?.[1] ?? "start";
+      const swapped = anchor === "start" ? "end" : anchor === "end" ? "start" : "middle";
+      const a = /\stext-anchor="/.test(attrs) ? attrs.replace(/\stext-anchor="[a-z]+"/, ` text-anchor="${swapped}"`) : `${attrs} text-anchor="${swapped}"`;
+      return `<text${a} direction="rtl">${inner}</text>`;
+    });
 }
