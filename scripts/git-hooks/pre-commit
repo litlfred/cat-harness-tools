@@ -4,6 +4,20 @@
 
 MANIFEST="content/quantum-observable-universe/lean/lake-manifest.json"
 
+# A commit built from an index short of HEAD (a `--no-checkout` or sparse
+# clone) deletes every file it does not hold: on 2026-11-15 that wiped a state
+# branch twice (631aace4, e7d7e42). scripts/state-write-guard.ts refuses one
+# that deletes manifest.json or a mass of files; say why to commit it anyway:
+#   CAT_ALLOW_MASS_DELETE='<reason>' git commit ...
+if command -v bun >/dev/null 2>&1; then
+    for p in cat-harness-tools/scripts/state-write-guard.ts scripts/state-write-guard.ts; do
+        if [ -f "$p" ]; then
+            bun run "$p" --git-hook pre-commit || exit 1
+            break
+        fi
+    done
+fi
+
 if git diff --cached --name-only | grep -qF "$MANIFEST"; then
     echo ""
     echo "⚠  $MANIFEST is staged for commit."
