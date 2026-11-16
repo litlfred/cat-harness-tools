@@ -34,7 +34,9 @@ import {
   withRenderedBy,
   withRenderedByFrontMatter,
   withViewers,
+  type ViewedDirectory,
 } from "../../viewer-declarations.js";
+import { visualisationsOf } from "../../../schemas/kg/cat-harness.js";
 import { declarationFindings, pagePlacement } from "../../check-visualiser-routes.js";
 import { conflicts, sightingsFromHarnessData } from "../../check-nav-names.js";
 import { graphTiles, publishedHref } from "../../graph-tiles.js";
@@ -168,7 +170,7 @@ describe("a tile covering several kinds names its own page (owner, 2026-11-16)",
     clearDeclaredVisualisers();
     return repo;
   }
-  const dir = { id: "top-uploads", path: "uploads/", graphTypologies: ["uploads"] };
+  const dir: ViewedDirectory = { id: "top-uploads", path: "uploads/", graphTypologies: ["uploads"] };
 
   test("the viewer carries the tile's title and says it names the page", () => {
     const repo = twoKinds(["library", "uploads"]);
@@ -190,9 +192,9 @@ describe("a tile covering several kinds names its own page (owner, 2026-11-16)",
     const tiles = graphTiles(dirs, "base/docs");
     const pageNames = new Map<string, string>();
     const rows: { kind: string; path?: string; label?: string; sameAs?: string }[] = [];
-    for (const v of dirs[0]!.coverage?.visualiser as Array<{ ref: string; title: string }>) {
+    for (const v of visualisationsOf(dirs[0]!.coverage, dir.id)) {
       const path = publishedHref("base/docs", v.ref)!;
-      if (namesPage(v as never)) pageNames.set(path, v.title);
+      if (namesPage(v)) pageNames.set(path, v.title);
       rows.push({ kind: "uploads", path });
     }
     labelVisualisations(rows, [dir], withPageNames ? pageNames : undefined);
