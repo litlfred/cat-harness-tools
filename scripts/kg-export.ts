@@ -61,6 +61,7 @@ import { fileURLToPath } from "node:url";
 
 import { propertyIri, termIri } from "../schemas/kg/namespaces.js";
 import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
+import { SOFTWARE_LIBRARY_SUBJECT_KIND, softwareLibraryNodes } from "./lib/software-library-nodes.ts";
 import { STANDARD_PREFIXES, applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "../schemas/content/vocab-mapping.js";
 import { readPolicyGrants } from "../schemas/content/odrl.js";
 import { attestationNodes } from "./lib/attestation-nodes.ts";
@@ -2412,6 +2413,26 @@ function linkSchemas(graph: Node[], root: string = ROOT): void {
  * activity's `performedBy` reaches the role here through its lane's
  * `roleRef`. Lane-derived Roles, keyed by lane name, gave one role two nodes.
  */
+/**
+ * One node per outside library the layer's OWN `software-library` directory
+ * holds (owner, 2026-11-13, node-kind audit: every listed node kind has an
+ * IRI, a JSON-LD document and a page). The IRI is
+ * `<doc dir>/softwareLibrary/<id>`, so `writeSubjectDocuments` serves it with
+ * its `.jsonld`; the layer's software-libraries page links it
+ * (`lib/software-library-nodes.ts`, the one reader of both). The pin, the
+ * digest and the licence stay in the file (`sourcePath`).
+ */
+function collectSoftwareLibraries(doc: string, root: string = ROOT): Node[] {
+  return softwareLibraryNodes(root).map((l) => ({
+    "@id": makeIri(doc, SOFTWARE_LIBRARY_SUBJECT_KIND, l.id),
+    "@type": termIri("SoftwareLibrary"),
+    title: l.title,
+    description: l.description,
+    sourceKind: "software-library",
+    sourcePath: l.sourcePath,
+  }));
+}
+
 function collectDeclaredRoles(
   doc: string,
   root: string = ROOT,
@@ -2841,6 +2862,7 @@ export async function collectInstanceNodes(
     // (`auditSchemaNodes` takes the root), so a layer's schema modules are
     // published as nodes. `buildExport` links each to its `zod/` renderings.
     ...collectSchemas(doc, base, "instance", root),
+    ...collectSoftwareLibraries(doc, root),
   ];
   // A LINK TO AN OMITTED COLLECTOR'S NODES MUST NOT BE EMITTED.
   //
@@ -3444,6 +3466,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
           ...collectTools(docIri, base, problems, scope, ROOT, base || undefined),
           ...collectSchemas(docIri, base, scope),
           ...collectExternalSchemas(docIri),
+          ...collectSoftwareLibraries(docIri, ROOT),
           ...collectGraphTypologies(),
           ...collectAttestations(docIri, ROOT),
           ...collectVoices(docIri, ROOT),
@@ -4111,6 +4134,7 @@ const SUBJECT_NODE_KIND: Readonly<Record<string, string>> = {
   process: "processes",
   globalTask: "processes",
   decision: "processes",
+  softwareLibrary: "software-library",
   actor: "scenarios",
   role: "scenarios",
   capability: "scenarios",

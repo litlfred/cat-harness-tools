@@ -221,6 +221,11 @@ export const CLASS_GLOSSES: Readonly<Record<string, TermGloss>> = {
     gloss: "A directory of skills shipped and versioned together.",
     seeAlso: "/concepts/skills.html",
   },
+  SoftwareLibrary: {
+    layer: "harness",
+    gloss:
+      "An outside software package a layer's code imports, as its lockfile pins it: the version, the registry tarball and its digest, the SPDX licence, and the files that import it.",
+  },
   Tool: {
     // The harness's own term. Bootstrap defined it until v3 of its terms; the
     // owner, 2026-09-29: "no tools in bootstrap". Bootstrap names no program an
