@@ -19,6 +19,12 @@ Feature: Diagrams are drawn as a reader reaches them, and all of them before pri
     Given a browser with no IntersectionObserver
     Then every drawing is fetched at load
 
+  @test:scripts/tests/lazy-diagrams.test.ts::diagrams_are_inlined_as_they_near_the_viewport::a_drawing_added_after_load_is_queued_too,_once,_and_a_drawing_already_tried_is_left_alone
+  Scenario: A drawing added after load is inlined too
+    Given a whole-document page that fills a block holding a drawing after load
+    When mountFigures runs, twice
+    Then the new drawing is marked pending and observed once, an inlined drawing is not queued again, and it is fetched when it nears the viewport
+
   @test:scripts/tests/lazy-diagrams.test.ts::printing_gets_every_drawing::beforeprint_turns_lazy_images_eager_and_inlines_every_drawing_still_waiting
   Scenario: beforeprint loads every drawing
     Given one of three lazy drawings already inlined
