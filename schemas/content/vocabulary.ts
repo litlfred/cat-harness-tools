@@ -186,6 +186,11 @@ export const CLASS_GLOSSES: Readonly<Record<string, TermGloss>> = {
     gloss:
       "One subject's QA judgements — pair attestations, voice reviews, agent and human verdicts, bibliography verifications — kept as one `qa-attestations/v1` file in a layer's attestations store, each judgement pinned to the hash it attested so a stale one is detectable. The judgement half of a QA verdict: unlike a derived result, it cannot be regenerated.",
   },
+  Voice: {
+    layer: "harness",
+    gloss:
+      "A named editorial voice: a `folio-voice/v1` set of writing rules, each citing the passage of an ingested source or the knowledge-graph node it was read from. Opt-in per folio: shipping a voice does not apply it.",
+  },
   Requirement: {
     layer: "harness",
     gloss:

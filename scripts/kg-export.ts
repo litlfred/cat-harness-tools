@@ -64,6 +64,7 @@ import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
 import { STANDARD_PREFIXES, applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "../schemas/content/vocab-mapping.js";
 import { readPolicyGrants } from "../schemas/content/odrl.js";
 import { attestationNodes } from "./lib/attestation-nodes.ts";
+import { VOICE_SUBJECT_KIND, voiceNodes } from "./lib/voice-nodes.ts";
 import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "../schemas/kg/depends-on.js";
 import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "../schemas/process/role-graph.js";
@@ -2522,6 +2523,25 @@ function collectAttestations(doc: string, root: string = ROOT): Node[] {
   }));
 }
 
+/**
+ * One node per voice the layer's OWN `voices` directory holds, sub-graphs
+ * included (owner, 2026-11-13, node-kind audit: every listed node kind has an
+ * IRI, a JSON-LD document and a page). The IRI is `<doc dir>/voice/<id>`, so
+ * `writeSubjectDocuments` serves it with its `.jsonld`; the voices viewer
+ * draws its page and links it (`lib/voice-nodes.ts`, the one reader of both).
+ * The rules stay in the file (`sourcePath`).
+ */
+function collectVoices(doc: string, root: string = ROOT): Node[] {
+  return voiceNodes(root).map((v) => ({
+    "@id": makeIri(doc, VOICE_SUBJECT_KIND, v.id),
+    "@type": termIri("Voice"),
+    title: v.title,
+    description: v.description,
+    sourceKind: "voices",
+    sourcePath: v.sourcePath,
+  }));
+}
+
 function collectGraphTypologies(root: string = ROOT): Node[] {
   // `fsh-guts` and anything else in UNPUBLISHED_GRAPH_TYPOLOGIES never reaches a
   // published graph. Filtered HERE, where the document is built, rather than
@@ -2787,6 +2807,7 @@ export async function collectInstanceNodes(
     ...(await collectProcesses(doc, problems, root, notes, siteBase, corpusScopeFor(root), base)),
     ...collectGraphTypologies(root),
     ...collectAttestations(doc, root),
+    ...collectVoices(doc, root),
     ...collectDeclaredRoles(doc, root),
     ...collectDeclaration(doc, problems, root),
     ...collectDeclaredAssets(doc, problems, root),
@@ -3403,6 +3424,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
           ...collectExternalSchemas(docIri),
           ...collectGraphTypologies(),
           ...collectAttestations(docIri, ROOT),
+          ...collectVoices(docIri, ROOT),
           ...collectDeclaredRoles(docIri, ROOT, scope, base),
           ...collectDeclaration(docIri, problems),
           ...collectDeclaredAssets(docIri, problems),
@@ -4077,6 +4099,7 @@ const SUBJECT_NODE_KIND: Readonly<Record<string, string>> = {
   directory: "cat-harness",
   asset: "cat-harness",
   package: "skills",
+  voice: "voices",
 };
 
 /**
