@@ -77,6 +77,19 @@ describe("a site's navbar.po becomes a strings file", () => {
     expect(existsSync(join(site, navbarStringsFile("es")))).toBe(false);
   });
 
+  it("reads a site's menu catalogue under its navbar.po, navbar.po winning", () => {
+    const tr = mkdtempSync(join(tmpdir(), "nav-tr-"));
+    const site = mkdtempSync(join(tmpdir(), "nav-site-"));
+    mkdirSync(join(tr, "ar", "menu"), { recursive: true });
+    writeFileSync(join(tr, "ar", "menu", "menu.po"), 'msgid ""\nmsgstr ""\n\nmsgid "Deployment"\nmsgstr "النشر"\n\nmsgid "Pages"\nmsgstr "x"\n');
+    writeFileSync(join(tr, "ar", "navbar.po"), PO);
+    mkdirSync(join(tr, "fr", "menu"), { recursive: true });
+    writeFileSync(join(tr, "fr", "menu", "menu.po"), 'msgid ""\nmsgstr ""\n\nmsgid "Deployment"\nmsgstr "Déploiement"\n');
+    expect(writeNavbarStrings(site, tr).written.sort()).toEqual(["ar", "fr"]);
+    expect(readFileSync(join(site, navbarStringsFile("ar")), "utf-8")).toBe(navbarStringsBody("ar", { Deployment: "النشر", Pages: "الصفحات", "Business Requirements": "متطلبات الأعمال" }));
+    expect(readFileSync(join(site, navbarStringsFile("fr")), "utf-8")).toContain('"Deployment":"Déploiement"');
+  });
+
   it("a checkout with no translations writes nothing", () => {
     expect(writeNavbarStrings(mkdtempSync(join(tmpdir(), "nav-site-")), "/does/not/exist")).toEqual({ written: [], empty: [] });
   });

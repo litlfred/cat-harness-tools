@@ -25,6 +25,12 @@ Feature: Navbar strings in the page's language
     Then ar is written and es reported empty
     And the ar file is the strings body for the ar map, assigning into the global, and no es file exists
 
+  @test:scripts/tests/navbar-strings.test.ts::a_site's_navbar.po_becomes_a_strings_file::reads_a_site's_menu_catalogue_under_its_navbar.po,_navbar.po_winning
+  Scenario: A site's menu catalogue translates the rail's group labels
+    Given an Arabic navbar.po and Arabic and French menu catalogues
+    When the strings files are written
+    Then each locale's file holds its menu labels, and navbar.po wins where both name a label
+
   @test:scripts/tests/navbar-strings.test.ts::a_site's_navbar.po_becomes_a_strings_file::a_checkout_with_no_translations_writes_nothing
   Scenario: A checkout with no translations writes nothing
     When the navbar strings are written from a translations directory that does not exist

@@ -46,6 +46,16 @@ import { NAV_RESIZE_LABEL, NAV_TOGGLE_LABEL, RAIL_SECTION_LABELS } from "./navba
 /** A site's rail catalogue: `translations/<locale>/navbar.po`. */
 export const NAVBAR_CATALOGUE = "navbar";
 
+/**
+ * A site's menu catalogue, `translations/<locale>/menu/menu.po`: the labels of
+ * its top bar's menu (an IG's `sushi-config.yaml` `menu:`), which are the
+ * rail's group labels too. Read under `navbar.po`, which wins, so a site whose
+ * menu is translated has a translated rail without saying each label twice
+ * (owner, 2026-11-16: an Arabic IG page whose top bar was Arabic and whose
+ * rail was English).
+ */
+export const MENU_CATALOGUE = "menu/menu";
+
 /** The rail's own words, each with the note a translator sees. */
 export const RAIL_CHROME_STRINGS: readonly { msgid: string; note: string }[] = [
   { msgid: RAIL_SECTION_LABELS.pages, note: "Navbar section heading: the site's pages." },
@@ -83,10 +93,11 @@ export function navbarStringsBody(locale: string, map: Record<string, string>): 
 }
 
 /**
- * Write `assets/navbar/strings-<locale>.js` under `siteAbs` for every
- * `translations/<locale>/navbar.po` under `translationsDir` with at least one
- * translated entry. A locale with none gets no file, so its pages keep the
- * English rail rather than loading an empty map.
+ * Write `assets/navbar/strings-<locale>.js` under `siteAbs` for every locale
+ * under `translationsDir` whose `navbar.po` or menu catalogue
+ * ({@link MENU_CATALOGUE}) has at least one translated entry; `navbar.po`
+ * wins where both name a label. A locale with none gets no file, so its pages
+ * keep the English rail rather than loading an empty map.
  */
 export function writeNavbarStrings(siteAbs: string, translationsDir: string): { written: string[]; empty: string[] } {
   const written: string[] = [];
@@ -95,8 +106,12 @@ export function writeNavbarStrings(siteAbs: string, translationsDir: string): { 
   for (const e of readdirSync(translationsDir, { withFileTypes: true })) {
     if (!e.isDirectory()) continue;
     const po = join(translationsDir, e.name, `${NAVBAR_CATALOGUE}.po`);
-    if (!existsSync(po)) continue;
-    const map = navbarStringsMap(readFileSync(po, "utf-8"));
+    const menu = join(translationsDir, e.name, `${MENU_CATALOGUE}.po`);
+    if (!existsSync(po) && !existsSync(menu)) continue;
+    const map = {
+      ...(existsSync(menu) ? navbarStringsMap(readFileSync(menu, "utf-8")) : {}),
+      ...(existsSync(po) ? navbarStringsMap(readFileSync(po, "utf-8")) : {}),
+    };
     if (Object.keys(map).length === 0) {
       empty.push(e.name);
       continue;
