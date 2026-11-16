@@ -1470,6 +1470,9 @@ describe("a fold opens from its parent's row — owner, 2026-10-15: \"what is 26
     // And the reader keeps their place when it opens, closes or is dragged
     // (owner, 2026-11-16; driven in Chromium by rail-keeps-place.e2e.ts).
     expect(injectNavbar(page, { instance: "x" })!).toContain("wireNavAnchor");
+    // ...but not on a thin page, whose style is linked (bean lnoy): a few KB
+    // of content has no place to lose, and the weight is the point there.
+    expect(injectNavbar(page, { instance: "x" }, { cssHref: "../../assets/css/navbar.css" })!).not.toContain("wireNavAnchor");
   });
 });
 

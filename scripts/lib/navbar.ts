@@ -1228,9 +1228,16 @@ export function wireNavAnchor(doc: Document): void {
   else watch();
 }
 
-/** {@link wireNavFolds}, {@link wireNavResize} and {@link wireNavAnchor} as an inline script, for a rail rendered into the page. */
-export function navFoldsScript(): string {
-  return `<script data-fa-nav-folds>(${wireNavFolds.toString()})(document);(${wireNavResize.toString()})(document);(${wireNavAnchor.toString()})(document);</script>`;
+/**
+ * {@link wireNavFolds} and {@link wireNavResize} as an inline script, for a
+ * rail rendered into the page, and {@link wireNavAnchor} unless `anchor` is
+ * false. A THIN page (its style linked, bean `lnoy`) leaves the anchor out:
+ * it is a few KB of content with no place to lose, and the anchor would be
+ * most of the rail's weight on it.
+ */
+export function navFoldsScript(o: { anchor?: boolean } = {}): string {
+  const anchor = o.anchor === false ? "" : `(${wireNavAnchor.toString()})(document);`;
+  return `<script data-fa-nav-folds>(${wireNavFolds.toString()})(document);(${wireNavResize.toString()})(document);${anchor}</script>`;
 }
 
 /** Does this row, or any row beneath it, stand for the page being read? */
@@ -1531,7 +1538,7 @@ export function injectNavbar(html: string, m: NavbarModel, o: { cssHref?: string
   const nav = navbarHtml(m);
   // The fold toggles need their few lines of script where no `navbar.js` runs.
   // The fold toggles and the drag edge need their few lines of script where no `navbar.js` runs.
-  const folds = navFoldsScript();
+  const folds = navFoldsScript({ anchor: !o.cssHref });
   return html.slice(0, at) + style + nav + folds + html.slice(at);
 }
 
