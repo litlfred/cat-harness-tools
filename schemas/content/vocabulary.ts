@@ -197,6 +197,11 @@ export const CLASS_GLOSSES: Readonly<Record<string, TermGloss>> = {
       "A stated need a change must satisfy, elicited and signed off in the CRDM process before implementation begins. Distinct from the issue that tracks it and the bean that plans the work.",
     seeAlso: "/process/crdm-methodology.html",
   },
+  TranslationSource: {
+    layer: "harness",
+    gloss:
+      "One gettext source of a layer's translations: a `.po` catalogue of one locale's translated strings, or the `.pot` template it is made from. The input to injection; the rendered output declares its own `lang`.",
+  },
   Lane: {
     gloss:
       "A swimlane of one BPMN process: part of that process, naming the Role " +

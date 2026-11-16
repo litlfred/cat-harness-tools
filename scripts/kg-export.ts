@@ -63,6 +63,7 @@ import { propertyIri, termIri } from "../schemas/kg/namespaces.js";
 import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
 import { STANDARD_PREFIXES, applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "../schemas/content/vocab-mapping.js";
 import { readPolicyGrants } from "../schemas/content/odrl.js";
+import { TRANSLATION_SUBJECT_KIND, translationNodes } from "./lib/translation-nodes.ts";
 import { attestationNodes } from "./lib/attestation-nodes.ts";
 import { VOICE_SUBJECT_KIND, voiceNodes } from "./lib/voice-nodes.ts";
 import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "../schemas/kg/cat-harness.js";
@@ -2278,6 +2279,26 @@ function collectSchemas(doc: string, base: string, scope: CorpusScope = "checkou
  * DMN 1.3, ODRL, PROV-O, ...). They were a published page and not graph
  * nodes, so nothing in the graph could point at "BPMN". Owner, 2026-09-27.
  */
+/**
+ * One node per `.po` catalogue and `.pot` template the layer's OWN
+ * `translation-sources` directory holds (owner, 2026-11-13, node-kind audit:
+ * every listed node kind has an IRI, a JSON-LD document and a page). The IRI
+ * is `<doc dir>/translationSource/<path under the directory>`, ending kept, so
+ * `writeSubjectDocuments` serves it with its `.jsonld`; the translation-status
+ * viewer draws its page and links it (`lib/translation-nodes.ts`, the one
+ * reader of both). The strings stay in the file (`sourcePath`).
+ */
+function collectTranslationSources(doc: string, root: string = ROOT): Node[] {
+  return translationNodes(root).map((t) => ({
+    "@id": makeIri(doc, TRANSLATION_SUBJECT_KIND, t.id),
+    "@type": termIri("TranslationSource"),
+    title: t.title,
+    description: t.description,
+    sourceKind: "translation-sources",
+    sourcePath: t.sourcePath,
+  }));
+}
+
 function collectExternalSchemas(doc: string): Node[] {
   let specs: ReturnType<typeof loadSpecs>;
   try {
@@ -2826,6 +2847,7 @@ export async function collectInstanceNodes(
   const nodes = [
     ...collectSkills(doc, base, problems, root, corpusScopeFor(root), baseUrl),
     ...(await collectProcesses(doc, problems, root, notes, siteBase, corpusScopeFor(root), base)),
+    ...collectTranslationSources(doc, root),
     ...collectGraphTypologies(root),
     ...collectAttestations(doc, root),
     ...collectVoices(doc, root),
@@ -3443,6 +3465,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
           ...(await collectProcesses(docIri, problems, ROOT, undefined, base, scope, base)),
           ...collectTools(docIri, base, problems, scope, ROOT, base || undefined),
           ...collectSchemas(docIri, base, scope),
+          ...collectTranslationSources(docIri, ROOT),
           ...collectExternalSchemas(docIri),
           ...collectGraphTypologies(),
           ...collectAttestations(docIri, ROOT),
@@ -4108,6 +4131,7 @@ const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
 
 const SUBJECT_NODE_KIND: Readonly<Record<string, string>> = {
   skill: "skills",
+  translationSource: "translation-sources",
   process: "processes",
   globalTask: "processes",
   decision: "processes",
