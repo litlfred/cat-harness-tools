@@ -88,6 +88,7 @@ import { isPublished } from "../schemas/kg/url-space.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { instanceSitePath } from "./instance-exports.ts";
 import { inScope, siteScope } from "./lib/site-scope.ts";
+import { overviewHrefIn } from "./lib/harness-overview.ts";
 
 /**
  * A layer's route — `<instance>` or `<instance>/<path>`, no slash at
@@ -650,7 +651,16 @@ export function publishedGraphs(built: string, instanceName: string, toRoot: str
   return out;
 }
 
-export function instantiatedHarnesses(built: string, toRoot: string): NavItem[] | undefined {
+export function instantiatedHarnesses(
+  built: string,
+  toRoot: string,
+  /**
+   * Where a harness's OVERVIEW page is on this site, when it holds one
+   * (`lib/harness-overview.ts`): every row links there, and keeps its
+   * `harness.json` href only where the site has no such page.
+   */
+  overview?: (name: string) => string | undefined,
+): NavItem[] | undefined {
   // The site root is READ, never composed. `join(REPO, built, "docs", ...)`
   // was the first version and `check:declared-paths` refused it -- rightly,
   // and pointedly, because `publishedDocsPrefix` exists a few lines up in this
@@ -674,7 +684,7 @@ export function instantiatedHarnesses(built: string, toRoot: string): NavItem[] 
       const label = h.label ?? h.title ?? h.name ?? "?";
       // A site-absolute href has to be re-based for a page that is not at the
       // root. `/<instance>/` from `/docs/<instance>/index.html` is `../../<instance>/`.
-      const href = h.href ? `${toRoot}${h.href}` : undefined;
+      const href = (h.name ? overview?.(h.name) : undefined) ?? (h.href ? `${toRoot}${h.href}` : undefined);
       // The row's RESOLVED mark, never its `icon` (bean `2vpn`): reading
       // `icon` here dropped every theme avatar and every glyph, so only a
       // layer with a declared image ever drew one on a mounted page.
@@ -1096,9 +1106,10 @@ function injectRails<T extends { name: string; kind: string; route: string; visu
       const site = ownSite ? ownSiteGraphs(siteAbs, built, m.name, toRoot) : publishedGraphs(built, m.name, toRoot);
       const links: NavItem[] = declaredGraphs(m.name, linked, site, named.harness);
 
+      const overview = overviewHrefIn(siteAbs, toRoot);
       const harnesses = ownSite
-        ? instanceHarnesses(built, m.name, PLATFORM_BASE, `${toRoot}/`, toRoot)
-        : instantiatedHarnesses(built, toRoot);
+        ? instanceHarnesses(built, m.name, PLATFORM_BASE, `${toRoot}/`, toRoot, overview)
+        : instantiatedHarnesses(built, toRoot, overview);
       const read = readFileSync(file, "utf-8");
       // A Jekyll-laid-out page inside a mount (the IRIS replica's `catalogue/`) wears
       // the theme's side bar; the rail replaces it here as it does on every
@@ -1304,6 +1315,8 @@ export function instanceHarnesses(
   ownHref: string | undefined,
   /** Where the layer's OWN mark resolves; default `linkRoot`. See {@link ownsCheckout}. */
   ownMarkRoot: string = linkRoot,
+  /** Each harness's overview page on this site, which every row links when the site holds it (see {@link instantiatedHarnesses}). */
+  overview?: (name: string) => string | undefined,
 ): NavItem[] | undefined {
   const prefix = publishedDocsPrefix(REPO, built);
   if (prefix === undefined) return undefined;
@@ -1330,7 +1343,8 @@ export function instanceHarnesses(
     .sort((a, b) => (a.name === instance ? -1 : b.name === instance ? 1 : 0))
     .map((h) => {
       const label = h.label ?? h.title ?? h.name ?? "?";
-      const href = h.name === instance && ownHref !== undefined ? ownHref : h.href ? `${linkRoot}${h.href}` : undefined;
+      const page = h.name !== undefined ? overview?.(h.name) : undefined;
+      const href = page ?? (h.name === instance && ownHref !== undefined ? ownHref : h.href ? `${linkRoot}${h.href}` : undefined);
       const markRoot = h.name === instance ? ownMarkRoot : linkRoot;
       return { label, ...(href ? { href } : {}), ...navMarkFields(h.mark, h.tone, (src) => `${markRoot}${src}`) };
     });
@@ -1568,11 +1582,13 @@ export function railStandalonePages(
           // The folio's OWN mark is on its own site when it is the checkout's root (gap 4).
           const markRoot = foreign && ownsCheckout(foreign.instance) ? toRoot : linkRoot;
           const homeLabel = foreign ? foreign.homeLabel : named.site;
+          // Each harness row links its overview page on THIS site (owner, 2026-11-13), where the site holds one.
+          const overview = overviewHrefIn(siteAbs, toRoot);
           const listed = landed
-            ? [{ label: homeLabel ?? named.harness ?? owner, href: `${toRoot}/` }, ...(instanceHarnesses(built, foreign!.instance!, linkRoot, undefined) ?? [])]
+            ? [{ label: homeLabel ?? named.harness ?? owner, href: `${toRoot}/` }, ...(instanceHarnesses(built, foreign!.instance!, linkRoot, undefined, linkRoot, overview) ?? [])]
             : foreign?.instance
-              ? instanceHarnesses(built, foreign.instance, linkRoot, `${toRoot}/`, markRoot)
-              : instantiatedHarnesses(built, linkRoot);
+              ? instanceHarnesses(built, foreign.instance, linkRoot, `${toRoot}/`, markRoot, overview)
+              : instantiatedHarnesses(built, linkRoot, overview);
           // A FHIR IG rendered on this site gets a `[fhir]` row to its index
           // page, right after its harness's row (owner, 2026-10-31).
           const harnesses = withIgRenderRow(listed, {
