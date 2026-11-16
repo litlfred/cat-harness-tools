@@ -23,6 +23,13 @@ Feature: A rendered BPMN drawing links each step's title and each call activity'
     When the title of a shape "Nope" that is not in it is linked
     Then the SVG is unchanged
 
+  @test:scripts/tests/process/diagram-links.test.ts::a_step's_title_link::decodes_a_name's_character_references_once,_so_they_are_not_escaped_twice
+  Scenario: A name's character references are decoded once, not escaped twice
+    Given the SVG with A_Request's title linked under the name "Sign with Country B&#x27;s key &amp; go"
+    When the link is read
+    Then its aria-label reads "Open step: Sign with Country B's key &amp; go"
+    And "&amp;#x27;" appears nowhere
+
   @test:scripts/tests/process/diagram-links.test.ts::a_call_activity's_[+]_link::wraps_only_the_marker_box_and_its_cross,_not_the_title_or_the_shape
   Scenario: The [+] link wraps only the sub-process marker
     Given the same SVG
