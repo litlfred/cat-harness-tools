@@ -621,6 +621,18 @@ export interface ViewedDirectory {
 }
 
 /**
+ * One viewer of a directory, as {@link viewersOf} returns it. `namesPage` is
+ * set when the viewer is a tile covering several kinds: its title is then the
+ * name of the page, on the harness rows as on the tile.
+ */
+export type ViewerOf = Visualisation & { title: string; namesPage?: true };
+
+/** Whether a resolved visualisation names its page (see {@link ViewerOf}). */
+export function namesPage(v: Visualisation): boolean {
+  return (v as ViewerOf).namesPage === true;
+}
+
+/**
  * Does visualiser `v` cover directory `d` of the layer named `owner`?
  *
  * - `covers`: only the declaring harness's own directories, by id;
@@ -662,7 +674,7 @@ export function viewersOf(
   repoRoot: string = repoRootFor(instanceRoot),
   /** The site directory the routes are under; default the site owner's (`siteOwnerDir`). */
   siteDir?: string,
-): Array<Visualisation & { title: string }> {
+): Array<ViewerOf> {
   // The OWNER is the layer whose declaration carries the entry: this one,
   // or — for an entry `siteDirectories` presented from the checkout root —
   // the root. A `repository`-scoped path resolves from the checkout either way.
@@ -681,7 +693,7 @@ export function viewersOf(
   if (owner === undefined) return [];
   const absDir = join(d.scope === "repository" ? repoRoot : instanceRoot, d.path);
   let site: string | undefined = siteDir;
-  const out: Array<Visualisation & { title: string }> = [];
+  const out: ViewerOf[] = [];
   for (const v of declaredVisualisers(repoRoot)) {
     if (!covers(v, d, owner, absDir, repoRoot)) continue;
     site ??= siteOwnerDir(repoRoot);
@@ -758,7 +770,22 @@ export function viewersOf(
     // the directory declares about itself wins, since a directory drawn twice
     // needs two names, whereas a kind-covering visualiser's generic title
     // must not override the directory's own title or row label.
-    out.push({ ...d.tile, ...tile, ...(writer ? { writer } : {}), ref, title: (named ? v.title : undefined) ?? d.tile?.title ?? d.id });
+    //
+    // A TILE COVERING SEVERAL KINDS NAMES ITS OWN PAGE (owner, 2026-11-16).
+    // core's `bibliography` covers `references` and `catalogue`, and its page
+    // code calls every page it draws "Bibliography": a page shared by several
+    // kinds is named after none of them, so the tile's title is the page's
+    // name, and `namesPage` tells the harness rows (`labelVisualisations`) to
+    // print it too. A single-kind tile is left as above.
+    const shared = !named && (v.coversKinds ?? []).length > 1 && v.title !== undefined && v.title.trim() !== "";
+    out.push({
+      ...d.tile,
+      ...tile,
+      ...(writer ? { writer } : {}),
+      ref,
+      title: (named || shared ? v.title : undefined) ?? d.tile?.title ?? d.id,
+      ...(shared ? { namesPage: true as const } : {}),
+    });
   }
   return out;
 }

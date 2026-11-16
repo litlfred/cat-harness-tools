@@ -23,6 +23,7 @@ import {
   declaredVisualisers,
   existingPageDir,
   forwardingParts,
+  namesPage,
   PAGE_LOCALE,
   pageParts,
   renderedByOf,
@@ -32,8 +33,12 @@ import {
   visualiserSitePath,
   withRenderedBy,
   withRenderedByFrontMatter,
+  withViewers,
 } from "../../viewer-declarations.js";
 import { declarationFindings, pagePlacement } from "../../check-visualiser-routes.js";
+import { conflicts, sightingsFromHarnessData } from "../../check-nav-names.js";
+import { graphTiles, publishedHref } from "../../graph-tiles.js";
+import { labelVisualisations } from "../../lib/nav-label.js";
 
 describe("provenance: a page names the Tool that drew it, and nothing else", () => {
   test("HTML: inserted after <head>, replaced not duplicated, and any `renders` meta removed", () => {
@@ -139,6 +144,70 @@ describe("the declaration is the only source of a visualiser and its route", () 
   test("a directory nothing covers has no viewer — no page can claim one", () => {
     const repo = fixture();
     expect(viewersOf({ id: "x", path: "x/", graphTypologies: ["voices"] }, join(repo, "top"), repo)).toEqual([]);
+  });
+});
+
+describe("a tile covering several kinds names its own page (owner, 2026-11-16)", () => {
+  // core's `bibliography` covers `references` and `catalogue` and its page
+  // code calls every page "Bibliography". Named after one of its kinds, the
+  // page was "Bibliography" on the tile and "Catalogue" on the sidebar and
+  // landing: two names for one destination, which check:nav-names fails.
+  function twoKinds(coversKinds: string[]): string {
+    const repo = fixture();
+    writeFileSync(
+      join(repo, "base/cat-harness.json"),
+      JSON.stringify({
+        name: "cat-harness",
+        visualisers: [
+          { id: "shelf", renderedBy: "shelf-page", coversKinds, subgraphs: "directory", title: "Shelf", writer: ["scripts/gen-shelf.ts"] },
+        ],
+      }),
+    );
+    mkdirSync(join(repo, "base/scripts"), { recursive: true });
+    writeFileSync(join(repo, "base/scripts/gen-shelf.ts"), "");
+    clearDeclaredVisualisers();
+    return repo;
+  }
+  const dir = { id: "top-uploads", path: "uploads/", graphTypologies: ["uploads"] };
+
+  test("the viewer carries the tile's title and says it names the page", () => {
+    const repo = twoKinds(["library", "uploads"]);
+    const [v] = viewersOf(dir, join(repo, "top"), repo);
+    expect(v?.title).toBe("Shelf");
+    expect(namesPage(v!)).toBe(true);
+  });
+
+  test("a single-kind tile is unchanged: the directory's own name, and no claim on the page", () => {
+    const repo = twoKinds(["uploads"]);
+    const [v] = viewersOf(dir, join(repo, "top"), repo);
+    expect(v?.title).toBe("top-uploads");
+    expect(namesPage(v!)).toBe(false);
+  });
+
+  /** The harness data the tile and the rows make, as `check:nav-names` reads it. */
+  function surfaces(repo: string, withPageNames: boolean) {
+    const dirs = withViewers([dir], join(repo, "top"), repo);
+    const tiles = graphTiles(dirs, "base/docs");
+    const pageNames = new Map<string, string>();
+    const rows: { kind: string; path?: string; label?: string; sameAs?: string }[] = [];
+    for (const v of dirs[0]!.coverage?.visualiser as Array<{ ref: string; title: string }>) {
+      const path = publishedHref("base/docs", v.ref)!;
+      if (namesPage(v as never)) pageNames.set(path, v.title);
+      rows.push({ kind: "uploads", path });
+    }
+    labelVisualisations(rows, [dir], withPageNames ? pageNames : undefined);
+    const data = { tiles, harnesses: [{ name: "top", label: "Top", href: "/top/", instantiated: true, visualisations: rows }] };
+    return conflicts(sightingsFromHarnessData(data, "harness.json"));
+  }
+
+  test("before: rows named for their kind, the tile for itself — two names for one page", () => {
+    const found = surfaces(twoKinds(["library", "uploads"]), false);
+    expect(found).toHaveLength(1);
+    expect(found[0]!.names.map((n) => n.label)).toEqual(["Shelf", "Uploads"]);
+  });
+
+  test("after: the tile, the sidebar and the landing all print the tile's title", () => {
+    expect(surfaces(twoKinds(["library", "uploads"]), true)).toEqual([]);
   });
 });
 
