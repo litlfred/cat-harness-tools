@@ -75,7 +75,9 @@ export const CENSUS_RULES: Readonly<Record<string, CensusRule>> = {
   "bean-defs": { rule: "files", suffixes: [".md"] },
   "bean-notes": { rule: "files", suffixes: [".md"] },
   methodology: { rule: "files", suffixes: [".md", ".bpmn", ".json"] },
-  themes: { rule: "files", suffixes: [".json", ".ts"], except: [".test.ts", ".d.ts"] },
+  // A `themes` directory holds one module whose `INSTANCE_THEMES` are the
+  // nodes (`lib/theme-nodes.ts`); the export names each, so it is read first.
+  themes: { rule: "files", suffixes: [".json", ".ts"], except: [".test.ts", ".d.ts"], exportFirst: true },
   skills: { rule: "files", suffixes: [".md"], exportFirst: true },
   schemas: { rule: "files", suffixes: [".ts", ".json"], except: [".test.ts", ".d.ts"], exportFirst: true },
   scenarios: { ...JSON_FILES, exportFirst: true },

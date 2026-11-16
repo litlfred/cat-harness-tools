@@ -142,6 +142,7 @@ import {
 import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
 import { subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
+import { THEME_SUBJECT_KIND, themeNodes } from "./lib/theme-nodes.ts";
 import { placedOut } from "./lib/moved-document.ts";
 import { hostSchemaBase } from "./lib/host-schema.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
@@ -2602,6 +2603,26 @@ function collectGraphTypologies(root: string = ROOT): Node[] {
  * file is absent is a FINDING that `check-declared-assets` already raises, and
  * silently omitting it here would hide the node whose absence is the point.
  */
+/**
+ * One node per theme the layer's OWN `themes` directory declares (its
+ * `themes.ts` module's `INSTANCE_THEMES`; owner, 2026-11-13, node-kind audit:
+ * every listed node kind has an IRI, a JSON-LD document and a page). The IRI
+ * is `<doc dir>/theme/<id>`, so `writeSubjectDocuments` serves it with its
+ * `.jsonld`; the themes viewer draws its page and links it
+ * (`lib/theme-nodes.ts`, the one reader of both). The palette stays in the
+ * module (`sourcePath`).
+ */
+function collectThemes(doc: string, root: string = ROOT): Node[] {
+  return themeNodes(root).map((t) => ({
+    "@id": makeIri(doc, THEME_SUBJECT_KIND, t.id),
+    "@type": termIri("Theme"),
+    title: t.title,
+    description: t.description,
+    sourceKind: "themes",
+    sourcePath: t.sourcePath,
+  }));
+}
+
 function collectDeclaredAssets(doc: string, problems: string[], root: string = ROOT): Node[] {
   let assets: ReturnType<typeof declaredAssets>;
   try {
@@ -2789,6 +2810,7 @@ export async function collectInstanceNodes(
     ...collectAttestations(doc, root),
     ...collectDeclaredRoles(doc, root),
     ...collectDeclaration(doc, problems, root),
+    ...collectThemes(doc, root),
     ...collectDeclaredAssets(doc, problems, root),
     // Every declared `tools` graph is read by discovery, so Tools are generic
     // (bean `tdir`). The type vocabulary is the harness's: `baseUrl`, the
@@ -3405,6 +3427,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
           ...collectAttestations(docIri, ROOT),
           ...collectDeclaredRoles(docIri, ROOT, scope, base),
           ...collectDeclaration(docIri, problems),
+          ...collectThemes(docIri, ROOT),
           ...collectDeclaredAssets(docIri, problems),
         ]
   ).map(compact);
@@ -4069,6 +4092,7 @@ const SUBJECT_NODE_KIND: Readonly<Record<string, string>> = {
   actor: "scenarios",
   role: "scenarios",
   capability: "scenarios",
+  theme: "themes",
   schema: "schemas",
   convention: "schemas",
   externalSchema: "external-schema",

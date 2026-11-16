@@ -61,6 +61,7 @@ export const SUBJECT_KINDS: readonly string[] = [
   "process",
   "requirement",
   "role",
+  "theme",
   "schema",
   "skill",
 ];

@@ -207,6 +207,11 @@ export const CLASS_GLOSSES: Readonly<Record<string, TermGloss>> = {
       "regenerated wholesale and never retired, while a concept is a term " +
       "somebody may have cited.",
   },
+  Theme: {
+    layer: "harness",
+    gloss:
+      "A theme a layer derived from a source it holds — a served stylesheet or a style guide's stated rules: a palette and, for a sticky, its art, every value citing where it was measured. Kind `sticky`, `webpage` or `publication`.",
+  },
   SkillPackage: {
     gloss: "A directory of skills shipped and versioned together.",
     seeAlso: "/concepts/skills.html",
