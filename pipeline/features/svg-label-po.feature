@@ -38,6 +38,7 @@ Feature: gettext over an inline drawing's labels
     Given the fixture in svg-label-po.test.ts
     When injectSvgLabels runs on it
     Then it replaces a <title> and escapes it
+    And a drawing's own <title id> is read and keeps its id
 
   @test:pipeline/svg-label-po.test.ts::wrap::breaks_a_CJK_run_between_characters
   Scenario: wrap: Breaks a CJK run between characters

@@ -26,7 +26,7 @@ import { decodeEntities, isWords } from "./html-po.ts";
 const TEXT_RE = /<text\b([^>]*)>((?:\s*<tspan\b[^>]*>[^<]*<\/tspan>)+)\s*<\/text>/g;
 const TSPAN_RE = /<tspan\b([^>]*)>([^<]*)<\/tspan>/g;
 const PLAIN_TEXT_RE = /<text\b([^>]*)>([^<]+)<\/text>/g;
-const TITLE_RE = /<title>([^<]+)<\/title>/g;
+const TITLE_RE = /<title(\s[^>]*)?>([^<]+)<\/title>/g;
 
 function svgs(html: string): { start: number; end: number }[] {
   // Outermost drawings only, counting nested `<svg>`s so an inner one does not end its parent.
@@ -53,7 +53,7 @@ export function extractSvgLabels(html: string): string[] {
     const svg = html.slice(start, end);
     for (const m of svg.matchAll(TEXT_RE)) out.push(label([...m[2].matchAll(TSPAN_RE)].map((t) => t[2]).join(" ")));
     for (const m of svg.matchAll(PLAIN_TEXT_RE)) out.push(label(m[2]));
-    for (const m of svg.matchAll(TITLE_RE)) out.push(label(m[1]));
+    for (const m of svg.matchAll(TITLE_RE)) out.push(label(m[2]));
   }
   return [...new Set(out.filter(isWords))];
 }
@@ -176,7 +176,7 @@ export function injectSvgLabels(html: string, catalogue: ReadonlyMap<string, str
       translated++;
       return t === id ? whole : `<text${attrs}>${esc(t)}</text>`;
     });
-    svg = svg.replace(TITLE_RE, (whole, text: string) => {
+    svg = svg.replace(TITLE_RE, (whole, attrs: string | undefined, text: string) => {
       const id = label(text);
       if (!isWords(id)) return whole;
       const t = catalogue.get(id);
@@ -185,7 +185,7 @@ export function injectSvgLabels(html: string, catalogue: ReadonlyMap<string, str
         return whole;
       }
       translated++;
-      return t === id ? whole : `<title>${esc(t)}</title>`;
+      return t === id ? whole : `<title${attrs ?? ""}>${esc(t)}</title>`;
     });
     parts.push(svg);
     last = end;

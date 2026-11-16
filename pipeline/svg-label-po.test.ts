@@ -54,6 +54,10 @@ describe("injectSvgLabels", () => {
 
   it("replaces a <title> and escapes it", () => {
     expect(injectSvgLabels(SVG, new Map([["Dr. Anan", "Dr Anan <x>"]])).html).toContain("<title>Dr Anan &lt;x&gt;</title>");
+    // A drawing's own title, named by aria-labelledby, keeps its id.
+    const own = `<svg aria-labelledby="t"><title id="t">The network</title></svg>`;
+    expect(extractSvgLabels(own)).toEqual(["The network"]);
+    expect(injectSvgLabels(own, new Map([["The network", "Le réseau"]])).html).toBe(`<svg aria-labelledby="t"><title id="t">Le réseau</title></svg>`);
   });
 });
 
