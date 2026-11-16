@@ -666,6 +666,29 @@ describe("injectMarkdown", () => {
 // preserved blank lines by not collapsing at all would satisfy the first and
 // silently remove the feature.
 
+describe("a link target keeps its Liquid", () => {
+  // smart-trust#158: a home page linked the onboarding game as
+  // `.../onboarding-game/{{game_lang}}`. The msgid was right, but the target
+  // was recorded after Liquid output had become a placeholder, so every
+  // translated page linked to `.../onboarding-game/<NUL>LQD0<NUL>`.
+  test("Liquid output in a target is restored as written", () => {
+    const source = "Play [the game](https://example.org/game/{{game_lang}}) now.";
+    const result = injectMarkdown(source, new Map([["Play <a0>the game</a0> now.", "Jouez à <a0>le jeu</a0> maintenant."]]));
+    expect(result.translated).toBe("Jouez à [le jeu](https://example.org/game/{{game_lang}}) maintenant.");
+  });
+
+  test("a Liquid tag in a target is restored as written, and is still not in the msgid", () => {
+    const source = 'Play [the game](https://example.org/game/{% if page.lang %}?lang={{ page.lang }}{% endif %}) now.';
+    expect(cleanMarkdownText(source)).toBe("Play <a0>the game</a0> now.");
+    const result = injectMarkdown(source, new Map([["Play <a0>the game</a0> now.", "Jouez à <a0>le jeu</a0> maintenant."]]));
+    expect(result.translated).toBe('Jouez à [le jeu](https://example.org/game/{% if page.lang %}?lang={{ page.lang }}{% endif %}) maintenant.');
+  });
+
+  test("Liquid in the text, outside any target, is unchanged", () => {
+    expect(cleanMarkdownText("{% if x %}See [it](a.html) for {{ site.title }}.{% endif %}")).toBe("See <a0>it</a0> for {lqd_site.title}.");
+  });
+});
+
 describe("injectMarkdown preserves document structure", () => {
   test("the author's blank lines survive — all three of them", () => {
     // The bean's own fixture, byte for byte. Measured before the fix: 3 blank
