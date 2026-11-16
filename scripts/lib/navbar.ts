@@ -1067,9 +1067,170 @@ export function wireNavResize(doc: Document): void {
   });
 }
 
-/** {@link wireNavFolds} and {@link wireNavResize} as an inline script, for a rail rendered into the page. */
+/**
+ * THE READER KEEPS THEIR PLACE (owner, 2026-11-16, with a screen recording):
+ * on a whole-document page, follow "Glossary" from the rail and close the
+ * rail, and the text column widens, every block above the Glossary gets
+ * shorter, and the same `scrollY` now shows References 90–102. Opening the
+ * rail, hovering it open and dragging its edge did the same.
+ *
+ * The browser's own scroll anchoring cannot help: the push is a change to
+ * `body`'s `padding-inline-start` (`navbarCss`) or `.main`'s margin
+ * (`docs-ui.css`), and a change to an ancestor's box is one of the triggers
+ * that SUPPRESS native anchoring. So the anchor is held here:
+ *
+ * - **recorded** when a scroll comes to rest, on `hashchange`,
+ *   and again just before a rail change is asked for: `pointerdown` and
+ *   `keydown` on the open/close control and the drag edge. The anchor is the
+ *   `location.hash` target while it is within about a screen of the top, else
+ *   the first block at or below the reading pane's top edge (the page's
+ *   `scroll-padding-top`, where an anchor jump lands), with its viewport top.
+ *   Recording is a read only, so the `change` that flips the box would be too
+ *   late: reading a box then lays out the NEW width.
+ * - **restored** when the reading column's width changes and the window's
+ *   did not (a window resize is the browser's to handle): a
+ *   `ResizeObserver`, which runs after layout and before paint, so the jump
+ *   is never drawn — on open at once, on close after the rail's slide, and on
+ *   every step of a drag. The correction is `behavior: "instant"`: the page's
+ *   `scroll-behavior: smooth` would animate it, and nothing here moves under
+ *   `prefers-reduced-motion`.
+ *
+ * Self-contained, since it is inlined as text as well as bundled.
+ */
+export function wireNavAnchor(doc: Document): void {
+  const w = doc as Document & { faNavAnchor?: boolean };
+  const win = doc.defaultView;
+  if (w.faNavAnchor || !win || typeof win.ResizeObserver !== "function") return;
+  w.faNavAnchor = true;
+  type Anchor = { el: Element; top: number; vw: number };
+  let held: Anchor | undefined;
+  const edge = (): number => {
+    const v = parseFloat(win.getComputedStyle(doc.documentElement).scrollPaddingTop);
+    return v > 0 ? v : 0;
+  };
+  // Not part of the reading column: the rail, and anything that does not
+  // scroll with the page.
+  const skip = (el: Element): boolean => {
+    if (el.closest("nav.fa-nav, .side-bar, script, style, template")) return true;
+    const p = win.getComputedStyle(el).position;
+    return p === "fixed" || p === "sticky";
+  };
+  const hashTarget = (): Element | null => {
+    const h = win.location.hash.slice(1);
+    if (!h) return null;
+    let id = h;
+    try {
+      id = decodeURIComponent(h);
+    } catch {
+      /* a malformed escape: the raw fragment */
+    }
+    return doc.getElementById(id) || doc.getElementsByName(id)[0] || null;
+  };
+  // The reading column's width as last seen by the observer below. A column
+  // whose width has changed since is a change the observer has not yet
+  // delivered (keyboard focus opens the rail, and the Space that pins it
+  // lands in the same frame): recording now would read the NEW layout as the
+  // reader's place, so the held anchor stands until `restore` has run.
+  const widths = new Map<Element, number>();
+  // The CONTENT box, as the observer reports it: the push is padding, which
+  // leaves `body`'s border box the window's width.
+  const inner = (el: Element): number => {
+    const cs = win.getComputedStyle(el);
+    return el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  };
+  const pending = (): boolean => {
+    for (const [el, wd] of widths) if (Math.abs(inner(el) - wd) >= 1) return true;
+    return false;
+  };
+  const record = (): void => {
+    const body = doc.body;
+    if (!body || pending()) return;
+    const top = edge();
+    const t = hashTarget();
+    if (t && !skip(t)) {
+      const r = t.getBoundingClientRect();
+      if ((r.width || r.height) && Math.abs(r.top - top) <= win.innerHeight) {
+        held = { el: t, top: r.top, vw: win.innerWidth };
+        return;
+      }
+    }
+    // The first BLOCK, in reading order, whose top is at or below the edge.
+    // A block that ends above the edge is passed over whole; one that
+    // straddles it is looked inside, then its next siblings. Inline boxes are
+    // not blocks: a link inside a re-wrapping paragraph moves with the wrap.
+    // Failing all (one block taller than the screen), the block that
+    // straddles the edge, a few pixels above it.
+    let straddle: Element | undefined;
+    const first = (box: Element, depth: number): Element | undefined => {
+      for (const c of Array.from(box.children)) {
+        if (skip(c) || win.getComputedStyle(c).display.startsWith("inline")) continue;
+        const r = c.getBoundingClientRect();
+        if ((!r.width && !r.height) || r.bottom <= top) continue;
+        if (r.top >= top) return c;
+        straddle = c;
+        const inside = depth < 32 ? first(c, depth + 1) : undefined;
+        if (inside) return inside;
+      }
+      return undefined;
+    };
+    const found = first(body, 0) || straddle;
+    held = found ? { el: found, top: found.getBoundingClientRect().top, vw: win.innerWidth } : undefined;
+  };
+  const restore = (): void => {
+    const a = held;
+    if (!a || !a.el.isConnected || a.vw !== win.innerWidth) return;
+    const d = a.el.getBoundingClientRect().top - a.top;
+    if (Math.abs(d) < 1) return;
+    win.scrollBy({ top: d, behavior: "instant" as ScrollBehavior });
+    held = { ...a, top: a.el.getBoundingClientRect().top };
+  };
+  // Once the scroll comes to rest, not every frame: deep in a long document
+  // the walk is a few milliseconds, and a rail change is recorded afresh below.
+  let rest: ReturnType<typeof setTimeout> | undefined;
+  win.addEventListener(
+    "scroll",
+    () => {
+      if (rest !== undefined) win.clearTimeout(rest);
+      rest = win.setTimeout(record, 100);
+    },
+    { passive: true },
+  );
+  win.addEventListener("hashchange", () => win.requestAnimationFrame(record));
+  // Just before a change is asked for, with the layout the reader is looking at.
+  const before = (e: Event): void => {
+    const t = e.target as Element | null;
+    if (!t || typeof t.closest !== "function") return;
+    if (t.closest('label[for="fa-nav-open"], #fa-nav-open, .fa-nav-resize, button[data-fa-nav-pop]')) record();
+  };
+  doc.addEventListener("pointerdown", before, true);
+  doc.addEventListener("keydown", before, true);
+  // The reading column's width: the page's own padding (`navbarCss`) and a
+  // theme's `.main` margin (`docs-ui.css`) both narrow one of these.
+  const ro = new win.ResizeObserver((entries) => {
+    let changed = false;
+    for (const e of entries) {
+      const was = widths.get(e.target);
+      widths.set(e.target, e.contentRect.width);
+      if (was !== undefined && Math.abs(was - e.contentRect.width) >= 0.5) changed = true;
+    }
+    if (changed) restore();
+  });
+  const watch = (): void => {
+    for (const el of [doc.body, ...Array.from(doc.querySelectorAll(".main, main, [role=main]"))]) {
+      if (el && !widths.has(el)) {
+        widths.set(el, inner(el));
+        ro.observe(el);
+      }
+    }
+    record();
+  };
+  if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", watch);
+  else watch();
+}
+
+/** {@link wireNavFolds}, {@link wireNavResize} and {@link wireNavAnchor} as an inline script, for a rail rendered into the page. */
 export function navFoldsScript(): string {
-  return `<script data-fa-nav-folds>(${wireNavFolds.toString()})(document);(${wireNavResize.toString()})(document);</script>`;
+  return `<script data-fa-nav-folds>(${wireNavFolds.toString()})(document);(${wireNavResize.toString()})(document);(${wireNavAnchor.toString()})(document);</script>`;
 }
 
 /** Does this row, or any row beneath it, stand for the page being read? */
