@@ -44,15 +44,68 @@ import {
   frontMatter,
   pageKey,
   pageUrl,
+  serialise,
   siteRoot,
   sourceLocale,
 } from "./translation-index.ts";
 import { writeInstanceConfig } from "../test/support/instance-fixture.js";
-import { notApplicableAlone } from "../test/support/checkout.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { overlayPath } from "../scripts/lib/layer-output.ts";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
+
+/**
+ * The committed index's keys whose page a HIGHER layer builds into this site
+ * and this checkout has not built: the layer is not here, or its source page
+ * is on neither the layer nor its output root. A key of this layer's own
+ * pages is never one, so a stale entry for a page of its own still fails.
+ */
+function unbuiltHigherKeys(instanceRoot: string): string[] {
+  let own: string | undefined;
+  try {
+    own = readDeclaration(instanceRoot)?.name;
+  } catch {
+    own = undefined;
+  }
+  let pages: Record<string, { sourceUrl?: unknown }>;
+  try {
+    pages = (JSON.parse(readFileSync(join(instanceRoot, INDEX_PATH), "utf-8")) as { pages?: typeof pages }).pages ?? {};
+  } catch {
+    return []; // unreadable: the index test fails on it by name
+  }
+  const site = join(instanceRoot, SITE_DIR);
+  return Object.entries(pages)
+    .filter(([k, page]) => {
+      const inst = k.split("/")[1];
+      if (inst === undefined || inst === "" || inst === own) return false;
+      if (!existsSync(join(dirname(instanceRoot), inst))) return true;
+      const source = typeof page.sourceUrl === "string" ? sourceForPermalink(site, page.sourceUrl) : undefined;
+      return source === undefined || !existsSync(overlayPath(join(site, source)));
+    })
+    .map(([k]) => k);
+}
+
+/**
+ * The index this checkout draws, beside the committed one with the `excused`
+ * keys taken out (and any locale only they carried): the comparison the
+ * index test makes. With nothing excused the committed text is compared as
+ * it stands, byte for byte, as `checkTranslationIndex` compares it.
+ */
+function indexAgainst(instanceRoot: string, excused: readonly string[]): { drawn: string; committed: string; findings: string[] } {
+  const { index, findings } = buildTranslationIndex(instanceRoot);
+  const text = readFileSync(overlayPath(join(instanceRoot, INDEX_PATH)), "utf-8");
+  const bad = findings.filter((f) => f.severity !== "note").map((f) => `${f.where}: ${f.message}`);
+  if (excused.length === 0) return { drawn: serialise(index), committed: text, findings: bad };
+  const prev = JSON.parse(text) as { locales?: string[]; pages?: Record<string, { translations?: Record<string, unknown> }> };
+  const pages = Object.fromEntries(Object.entries(prev.pages ?? {}).filter(([k]) => !excused.includes(k)));
+  const kept = new Set(Object.values(pages).flatMap((p) => Object.keys(p.translations ?? {})));
+  const only = new Set(
+    excused.flatMap((k) => Object.keys(prev.pages?.[k]?.translations ?? {})).filter((l) => !kept.has(l)),
+  );
+  const locales = (prev.locales ?? []).filter((l) => !only.has(l));
+  return { drawn: serialise(index), committed: serialise({ ...prev, locales, pages } as never), findings: bad };
+}
 
 /**
  * A throwaway layer: a `harness.config.json`, and a `docs/` tree with the
@@ -470,37 +523,28 @@ describe("this repository's own corpus", () => {
 
   // A key's second segment is the layer whose page it is. The committed
   // index also names pages a HIGHER layer builds into this site
-  // (`en/folio-assistant-core/glossary`), and a checkout without that
-  // layer has no such page to find (bean w1gy F18).
-  const higherKeys = ((): string[] => {
-    try {
-      const pages = (JSON.parse(readFileSync(join(INSTANCE_ROOT, INDEX_PATH), "utf-8")) as { pages?: Record<string, unknown> }).pages ?? {};
-      return Object.keys(pages).filter((k) => {
-        const inst = k.split("/")[1];
-        return inst !== undefined && inst !== "" && !existsSync(join(dirname(INSTANCE_ROOT), inst));
-      });
-    } catch {
-      return []; // unreadable: the test below fails on it by name
-    }
-  })();
+  // (`en/<layer>/glossary`), and a checkout without that layer, or one
+  // where that layer has not yet built its pages, has no such page to find
+  // (bean w1gy F18).
+  const higherKeys = unbuiltHigherKeys(INSTANCE_ROOT);
   // The index is regenerated from the pages this checkout holds, so a checkout
-  // without the layer that builds a committed key's page draws an index
-  // without that key, and the committed one reads as stale by exactly those
-  // keys (bean w1gy F18).
-  it.skipIf(
-    higherKeys.length > 0 &&
-      notApplicableAlone(`the source page of ${higherKeys.map((k) => `"${k}"`).join(", ")}, which an instance this checkout does not hold builds into the site, so the index drawn here omits it`),
-  )("the committed index is up to date and valid", () => {
-    const r = checkTranslationIndex(INSTANCE_ROOT);
-    const bad = r.findings.filter((f) => f.severity !== "note").map((f) => `${f.where}: ${f.message}`);
-    expect(bad).toEqual([]);
-    expect(r.state, `run: bun run cat translation:index`).toBe("ok");
+  // without the pages a committed key names draws an index without that key,
+  // and the committed one reads as stale by exactly those keys (bean w1gy
+  // F18). The pages may be missing because the layer is not mounted, or
+  // because it is mounted and has not built them: a higher layer's glossary
+  // page is written into this site's output root by `derive:publish` only.
+  // Those keys are left out of the comparison, by name; every other key is
+  // still judged, so a stale entry of this layer's own is still caught.
+  it("the committed index is up to date and valid", () => {
+    if (higherKeys.length > 0) {
+      console.warn(`not compared: ${higherKeys.map((k) => `"${k}"`).join(", ")}, whose page a higher layer builds into the site and this checkout has not built`);
+    }
+    const r = indexAgainst(INSTANCE_ROOT, higherKeys);
+    expect(r.findings).toEqual([]);
+    expect(r.drawn === r.committed, `run: bun run cat translation:index`).toBe(true);
   });
 
-  it.skipIf(
-    higherKeys.length > 0 &&
-      notApplicableAlone(`the source page of ${higherKeys.map((k) => `"${k}"`).join(", ")}, which an instance this checkout does not hold builds into the site`),
-  )("the published index names a source page that really exists", () => {
+  it("the published index names a source page that really exists", () => {
     // Guards the one thing a self-consistent generator cannot catch: a key
     // scheme that agrees with itself and matches no nav link on the real site.
     const index = JSON.parse(readFileSync(join(INSTANCE_ROOT, INDEX_PATH), "utf-8")) as {
@@ -509,10 +553,86 @@ describe("this repository's own corpus", () => {
     expect(Object.keys(index.pages).length).toBeGreaterThan(0);
     for (const [key, page] of Object.entries(index.pages)) {
       expect(pageKey(page.sourceUrl), `${page.sourceUrl} does not key to ${key}`).toBe(key);
+      if (higherKeys.includes(key)) continue; // its page is not built here; named in the test above
       // The URL is where Jekyll PUBLISHES the page, which since bean `kc7k` is
       // not always its source path; ask the permalink rule which file serves it.
       const source = sourceForPermalink(join(INSTANCE_ROOT, SITE_DIR), page.sourceUrl);
       expect(source !== undefined && existsSync(overlayPath(join(INSTANCE_ROOT, SITE_DIR, source))), `no source page for key "${key}"`).toBe(true);
+    }
+  });
+});
+
+describe("which committed keys a checkout cannot redraw (unbuiltHigherKeys)", () => {
+  /** A checkout holding `base` (the site) and, optionally, the `upper` layer whose page `base` indexes. */
+  function checkout(o: { upper: boolean; built: boolean }): string {
+    const repo = mkdtempSync(join(tmpdir(), "translation-higher-"));
+    const base = join(repo, "base");
+    mkdirSync(join(base, SITE_DIR, "_data"), { recursive: true });
+    writeInstanceConfig(base, "{}", "base");
+    if (o.upper) mkdirSync(join(repo, "upper"), { recursive: true });
+    mkdirSync(join(base, SITE_DIR, "guide"), { recursive: true });
+    writeFileSync(join(base, SITE_DIR, "guide", "index.md"), "---\ntitle: Guide\n---\n");
+    if (o.built) {
+      mkdirSync(join(base, SITE_DIR, "en", "upper", "glossary"), { recursive: true });
+      writeFileSync(join(base, SITE_DIR, "en", "upper", "glossary", "index.md"), "---\ntitle: Glossary\n---\n");
+    }
+    const pages = {
+      "en/upper/glossary": { sourceUrl: "/en/upper/glossary/" },
+      "docs/base/gone": { sourceUrl: "/docs/base/gone/" },
+    };
+    writeFileSync(join(base, INDEX_PATH), JSON.stringify({ pages }));
+    return base;
+  }
+
+  it("a higher layer that is not mounted: its key cannot be redrawn", () => {
+    expect(unbuiltHigherKeys(checkout({ upper: false, built: false }))).toEqual(["en/upper/glossary"]);
+  });
+
+  it("a higher layer mounted but not yet built: its key cannot be redrawn either", () => {
+    expect(unbuiltHigherKeys(checkout({ upper: true, built: false }))).toEqual(["en/upper/glossary"]);
+  });
+
+  it("once its pages are built the key is redrawn, so the index test runs and judges it", () => {
+    expect(unbuiltHigherKeys(checkout({ upper: true, built: true }))).toEqual([]);
+  });
+
+  it("a key for this layer's own page is never excused, even when the page is gone", () => {
+    expect(unbuiltHigherKeys(checkout({ upper: true, built: true }))).not.toContain("docs/base/gone");
+  });
+});
+
+describe("the index test leaves out only what it names (indexAgainst)", () => {
+  /** A site whose index is current, then has a higher layer's unbuilt key, and maybe a stale key of its own, added. */
+  function site(o: { stale: boolean }): { root: string; dispose: () => void } {
+    const fx = instance({ [`${SITE_DIR}/index.md`]: SOURCE_PAGE, [`${SITE_DIR}/fr/index.md`]: FRENCH_PAGE });
+    const { index } = buildTranslationIndex(fx.root);
+    const fr = { url: "/fr/x/", title: "x", status: "unverified", dir: "ltr" };
+    const pages: Record<string, unknown> = { ...index.pages, "en/upper/glossary": { sourceUrl: "/en/upper/glossary/", sourceTitle: "Glossary", translations: { fr, zh: fr } } };
+    if (o.stale) pages["docs/gone"] = { sourceUrl: "/docs/gone/", sourceTitle: "Gone", translations: { fr } };
+    mkdirSync(dirname(join(fx.root, INDEX_PATH)), { recursive: true });
+    writeFileSync(join(fx.root, INDEX_PATH), serialise({ ...index, locales: ["fr", "zh"], pages } as never));
+    return fx;
+  }
+
+  it("an index current but for an excused key compares equal, its only locale dropped with it", () => {
+    const { root, dispose } = site({ stale: false });
+    try {
+      const r = indexAgainst(root, ["en/upper/glossary"]);
+      expect(r.drawn).toBe(r.committed);
+      expect(indexAgainst(root, []).drawn === indexAgainst(root, []).committed).toBe(false);
+    } finally {
+      dispose();
+    }
+  });
+
+  it("a stale entry of the layer's own still fails with the higher key excused", () => {
+    const { root, dispose } = site({ stale: true });
+    try {
+      const r = indexAgainst(root, ["en/upper/glossary"]);
+      expect(r.drawn === r.committed).toBe(false);
+      expect(r.committed).toContain('"docs/gone"');
+    } finally {
+      dispose();
     }
   });
 });
