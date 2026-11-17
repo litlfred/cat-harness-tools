@@ -131,5 +131,8 @@ describe("the canvas as an editable, pre-filled PDF", () => {
     expect(pdf).toContain("(Fill this in first \\227 together.) Tj");
     const zh = lib.build({ ...model, sheets: [{ ...model.sheets[0], title: "中文 sheet" }] }, () => null);
     expect(new TextDecoder("latin1").decode(zh)).toContain("(?? sheet) Tj");
+    // A symbol the printed sheets use and WinAnsi lacks is its nearest text, not "?".
+    const sym = new TextDecoder("latin1").decode(lib.build({ ...model, sheets: [{ ...model.sheets[0], title: "★ Priority ✓ → next ☐" }] }, () => null));
+    expect(sym).toContain("(* Priority v -> next [ ]) Tj");
   });
 });
