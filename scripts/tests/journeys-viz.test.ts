@@ -30,6 +30,7 @@ import {
   kramdownSlug,
   personaText,
   presentationOf,
+  questionId,
   rangeLabel,
   rungOf,
   screenHref,
@@ -229,7 +230,7 @@ put("top/workshops/policy.json", {
       scenario: "p2-treated",
       step: "P2",
       askTheRoom: "Should the family be told?",
-      questions: [{ module: "M1", text: "What must be true for Ben to trust it?" }, { module: "M2", text: "Who decides?" }],
+      questions: [{ id: "trust", module: "M1", text: "What must be true for Ben to trust it?" }, { module: "M2", text: "Who decides?" }],
       capabilities: [{ id: "viewer", label: "A viewer" }],
       tags: [{ table: "rights", row: "anchor", why: "a signature crosses" }],
     },
@@ -285,6 +286,11 @@ const at = (path: string): string => {
   if (!f) throw new Error(`no page ${path}; have ${files.map((x) => x.path).join(", ")}`);
   return String(f.content);
 };
+
+// The browser keys of the workshop's three questions: by journey, step and the question's id (or its text), never its position.
+const Q_TRUST = "policy:q:p2-treated:P2:trust";
+const Q_DECIDES = `policy:q:p2-treated:P2:${questionId({ text: "Who decides?" })}`;
+const Q_BREAKS = `policy:q:p1-checked:P1:${questionId({ text: "Where does it break?" })}`;
 
 describe("the reader finds every journey the checkout's declarations hold", () => {
   test("both instances' journeys and workshops, by kind, each parsed", () => {
@@ -659,9 +665,12 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
   test("the lab: the Discussion view as timed steps, the journey's questions answered under the walkthrough's keys, a summary", () => {
     // Without a lab the Discussion view keeps its closing-questions layout.
     expect(discuss).not.toContain("data-jp-lab=");
-    // The walkthrough's questions each have a write-in, kept per workshop and step.
-    expect(p2).toContain('name="policy:q:P2:0" rows="2" data-jv-text');
-    expect(p2).toContain('name="policy:q:P2:1"');
+    // The walkthrough's questions each have a write-in, kept per workshop and question, and naming the key it was kept under before.
+    expect(p2).toContain(`name="${Q_TRUST}" rows="2" data-jv-text data-jv-was="policy:q:P2:0"`);
+    expect(p2).toContain(`name="${Q_DECIDES}" rows="2" data-jv-text data-jv-was="policy:q:P2:1"`);
+    // The id is the question's, not its place: the same text hashes alike, whatever its case, spacing or punctuation.
+    expect(questionId({ text: "Who decides?" })).toBe(questionId({ text: "  who DECIDES " }));
+    expect(questionId({ text: "Who decides?" })).not.toBe(questionId({ text: "Who pays?" }));
     const w0 = corpus.workshops[0]!;
     const lab = {
       name: "The table's steps",
@@ -701,9 +710,9 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(statement.startsWith("A pilgrim checked at home should be treated abroad.\n• ")).toBe(true);
     expect(page).toContain('data-jp-text-reset="policy:lab:use-case"');
     // The journey's questions: the same keys as the walkthrough's, so an answer written in either shows in both.
-    expect(page).toContain('name="policy:q:P2:0"');
-    expect(page).toContain('name="policy:q:P1:0"');
-    expect(page).toContain('name="policy:q:P2:1"');
+    expect(page).toContain(`name="${Q_TRUST}"`);
+    expect(page).toContain(`name="${Q_BREAKS}"`);
+    expect(page).toContain(`name="${Q_DECIDES}"`);
     // Readiness rows grouped and rated; decision rights with who holds them; the gap strip's own radios.
     // Each group keeps its heading; anchorHeadings (#1894) gives it an id like every view heading.
     expect(page).toContain('<h4 id="strategy-investment">Strategy &amp; investment</h4>');
@@ -714,7 +723,7 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     const model = JSON.parse(/<script type="application\/json" data-jp-lab-model>([\s\S]*?)<\/script>/.exec(page)![1]!);
     expect(model.map((x: { id: string }) => x.id)).toEqual(["team", "use-case", "readiness", "decide", "summary"]);
     const names = model.flatMap((x: { items: { name: string }[] }) => x.items.map((i) => i.name));
-    expect(names).toEqual(expect.arrayContaining(["policy:lab:team:members", "policy:uc:immz", "policy:lab:use-case", "policy:rate:ready:strategy", "policy:hold:rights:anchor", "policy:q:P2:1", "policy:viewer:status", "policy:dq:q1"]));
+    expect(names).toEqual(expect.arrayContaining(["policy:lab:team:members", "policy:uc:immz", "policy:lab:use-case", "policy:rate:ready:strategy", "policy:hold:rights:anchor", Q_DECIDES, "policy:viewer:status", "policy:dq:q1"]));
     expect(page).toContain("data-jp-gapreport");
     expect(page).toContain("data-jp-lab-csv");
     expect(page).toContain('name="policy:dq:q1"');
@@ -762,12 +771,12 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(page).toContain('<h4 id="policy-overlaps">Policy overlaps</h4>');
     expect(at("assets/present.css")).toContain(".jp-mx-tbl td:hover .jp-mx-pop, .jp-mx-tbl td:focus-within .jp-mx-pop { display: block; }");
     // M1's questions show in both steps, under one key each; the summary lists each once, under the first step.
-    expect(page.match(/name="policy:q:P2:0"/g)).toHaveLength(2);
+    expect(page.split(`name="${Q_TRUST}"`)).toHaveLength(3);
     const model = JSON.parse(/<script type="application\/json" data-jp-lab-model>([\s\S]*?)<\/script>/.exec(page)![1]!);
     const names = model.flatMap((x: { items: { name: string }[] }) => x.items.map((i) => i.name));
     expect(names).toEqual([...new Set(names)]);
-    expect(model.find((x: { id: string }) => x.id === "use-case").items.map((i: { name: string }) => i.name)).toEqual(["policy:q:P1:0", "policy:q:P2:0"]);
-    expect(model.find((x: { id: string }) => x.id === "map").items.map((i: { name: string }) => i.name)).toEqual(["policy:q:P2:1"]);
+    expect(model.find((x: { id: string }) => x.id === "use-case").items.map((i: { name: string }) => i.name)).toEqual([Q_BREAKS, Q_TRUST]);
+    expect(model.find((x: { id: string }) => x.id === "map").items.map((i: { name: string }) => i.name)).toEqual([Q_DECIDES]);
     // The schema holds the matrix to the workshop: a known module and step, kind as the questions say, some text, each cell once.
     const refuse = (m: object, re: RegExp) => {
       const r = WorkshopSchema.safeParse({ ...ws, $schema: "workshop/0.1.0", matrix: m });

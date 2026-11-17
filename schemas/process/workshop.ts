@@ -112,7 +112,13 @@ export const WorkshopTableSchema = z
   .strict();
 export type WorkshopTable = z.infer<typeof WorkshopTableSchema>;
 
-const QuestionSchema = z.object({ module: ModuleId, text: Text }).strict();
+/**
+ * A question for the room. Its answer is kept in the participant's browser
+ * under the question's identity, not its position: `id` when given (so the
+ * text can be reworded and the answers kept), else one derived from its step
+ * and its text.
+ */
+const QuestionSchema = z.object({ id: Id.optional(), module: ModuleId, text: Text }).strict();
 
 /** Which rows of one table a step touches; `why` when the reason is not obvious. */
 const StepTagSchema = z.object({ table: Id, row: Id, why: Text.optional() }).strict();

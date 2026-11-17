@@ -436,17 +436,41 @@
     window.addEventListener("storage", function (ev) {
       if (ev.key && ev.key.indexOf("jv:") === 0) draw();
     });
+    window.addEventListener("jv:sync", draw);
     draw();
   }
 
   // Write-ins and ticks kept in this browser (jv:<name>), as the gap strip keeps its
-  // ratings: a journey question's answer is one key on the walkthrough and the lab.
+  // ratings: a journey question's answer is one key wherever the question shows (its
+  // walkthrough step, and each lab step listing its module). Every box under one name
+  // shows the one answer: typed in one, the others on the page follow at once, other
+  // tabs follow by the `storage` event, and a page brought back by Back (the
+  // back/forward cache, or the browser restoring the form) reads the store again.
+  function sameName(el, fn) {
+    Array.prototype.forEach.call(doc.getElementsByName(el.name), function (x) {
+      if (x !== el) fn(x);
+    });
+  }
+  // An answer kept under the question's old key (`data-jv-was`: its step and position)
+  // moves to its own key the first time the question is shown.
+  function migrate(el) {
+    var was = el.getAttribute("data-jv-was");
+    if (!was || store("jv:" + el.name) !== null) return;
+    var old = store("jv:" + was);
+    if (old === null) return;
+    store("jv:" + el.name, old);
+    forget("jv:" + was);
+  }
   function keepText(el) {
     var key = "jv:" + el.name;
+    migrate(el);
     var v = store(key);
     if (v !== null) el.value = v;
     el.addEventListener("input", function () {
       store(key, el.value);
+      sameName(el, function (x) {
+        if (x.hasAttribute("data-jv-text") && x.value !== el.value) x.value = el.value;
+      });
     });
   }
   function keepCheck(el) {
@@ -455,7 +479,31 @@
     if (v !== null) el.checked = v === "1";
     el.addEventListener("change", function () {
       store(key, el.checked ? "1" : "0");
+      sameName(el, function (x) {
+        if (x.hasAttribute("data-jv-check")) x.checked = el.checked;
+      });
     });
+  }
+  // Read every kept answer on the page from the store again; then whatever draws from
+  // the store (the gap report, the lab's summary) redraws on `jv:sync`.
+  function resync() {
+    each("[data-jv-text]", function (el) {
+      var v = store("jv:" + el.name);
+      if (v !== null && el.value !== v) el.value = v;
+    });
+    each("input[data-jv-check]", function (el) {
+      var v = store("jv:" + el.name);
+      if (v !== null) el.checked = v === "1";
+    });
+    each("input[data-jv-store]", function (el) {
+      var v = store("jv:" + el.name);
+      if (v !== null) el.checked = v === el.value;
+    });
+    try {
+      window.dispatchEvent(new Event("jv:sync"));
+    } catch (_e) {
+      /* no Event constructor: nothing redraws */
+    }
   }
   function forget(key) {
     try {
@@ -702,6 +750,7 @@
     window.addEventListener("storage", function (ev) {
       if (ev.key && ev.key.indexOf("jv:") === 0) drawSummary();
     });
+    window.addEventListener("jv:sync", drawSummary);
     drawSummary();
   }
 
@@ -822,6 +871,10 @@
     each("input[data-jv-store]", remember);
     each("[data-jv-text]", keepText);
     each("input[data-jv-check]", keepCheck);
+    window.addEventListener("storage", function (ev) {
+      if (ev.key === null || ev.key.indexOf("jv:") === 0) resync();
+    });
+    window.addEventListener("pageshow", resync);
     each("[data-jp-text-reset]", function (b) {
       b.addEventListener("click", function () {
         var name = b.getAttribute("data-jp-text-reset");
