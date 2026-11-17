@@ -30,6 +30,7 @@ const resolver: CodeRefResolver = {
   command: (k) => ({ "merge:guard": BLOB })[k],
   path: (p): CodeRefTarget[] => {
     const table: Record<string, CodeRefTarget[]> = {
+      // declared-path-literal: test vector — the owner card's own example span, used as a resolver KEY; nothing reads the file.
       "sdlc/processes/merge-train.bpmn": [{ kind: "process", href: "../../en/cat-harness/processes/merge-train.html" }],
       "schemas/skills/merge-queue.json": [{ kind: "schema", href: "../skills/merge-queue.html" }],
       "scripts/example-gate.ts": [{ kind: "file", href: BLOB }],
@@ -56,7 +57,7 @@ describe("probesFor — which registry a span's shape offers it to", () => {
   });
 
   test("paths by extension: process, schema, file", () => {
-    expect(probesFor("sdlc/processes/merge-train.bpmn")[0]?.kind).toBe("process");
+    expect(probesFor("example/processes/train.bpmn")[0]?.kind).toBe("process");
     expect(probesFor("schemas/kg/example.ts")[0]?.kind).toBe("schema");
     expect(probesFor("scripts/example.ts")[0]?.kind).toBe("file");
     expect(probesFor("example/dir/")[0]?.kind).toBe("file");
