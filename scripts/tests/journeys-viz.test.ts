@@ -656,9 +656,11 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(discuss).toContain("assets/journeys.css");
     // No tab, on any page.
     for (const page of [p2, map, how, discuss]) {
-      expect(page).not.toContain("<b>Table sheets</b><small>");
+      expect(page).not.toMatch(/<a class="jp-tab[^"]*" href="(\.\.\/)*sheets\/"/);
       expect(page).not.toContain('href="../sheets/"');
     }
+    // The redirect says which Tool drew it, as every page does.
+    expect(renderedByOf(at(`${base}/sheets/index.html`))).toBe("journeys-viewer");
     // The old address redirects, carrying its anchor, to the panel.
     const old = at(`${base}/sheets/index.html`);
     expect(old).toContain('<meta http-equiv="refresh" content="0; url=../discuss/#sheets">');

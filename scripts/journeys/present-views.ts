@@ -30,9 +30,10 @@ import type { BuildingBlock } from "../../schemas/process/user-scenario.ts";
 import { escHtml } from "../thin-page.ts";
 import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
 import { DAK_ATTR } from "./dak-links.ts";
-import { canvasDownloads, canvasFiles, canvasHtml, canvasOf, moduleSegment, personaOf, sheetsHtml, sourceHref, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
+import { canvasDownloads, canvasFiles, canvasHtml, canvasOf, moduleSegment, personaOf, sheetsHtml, sourceHref, TOOL_ID, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_FORM, DEVICE_LABEL, renderDevice, stateSwitch, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
+import { withRenderedBy } from "../viewer-declarations.ts";
 import {
   avatar,
   chapterScene,
@@ -972,14 +973,14 @@ ${canvasHtml(canvas)}`
  */
 export function sheetsRedirect(): string {
   const to = `../discuss/#${SHEETS_PANEL}`;
-  return `<!doctype html>
+  return withRenderedBy(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Table sheets: now in the discussion</title>
 <meta name="robots" content="noindex">
 <link rel="canonical" href="${to}">
 <script>location.replace("../discuss/" + location.search + (location.hash || "#${SHEETS_PANEL}"));</script>
 <meta http-equiv="refresh" content="0; url=${to}">
 </head><body><p>The Table sheets are in the <a href="${to}">discussion</a>.</p></body></html>
-`;
+`, TOOL_ID);
 }
 
 // ── the device demo ──────────────────────────────────────────────────────
