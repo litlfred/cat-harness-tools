@@ -23,6 +23,7 @@ import { resolve, join, basename, dirname, relative, isAbsolute } from "path";
 import {
   PaperSchema,
   ChapterSchema,
+  splitCrossPaperRef,
   type ConstraintContext,
 } from "../schemas/constraints.ts";
 // A block is parsed by the schema its kind is typed by: a vocabulary module's
@@ -34,7 +35,7 @@ import { readDeclaredFolioProfile } from "./profile-check";
 import { validateDefterms } from "./validate-defterm";
 import { validateValueDirectives } from "./validate-value";
 import { validateSimulatorAssets } from "./validate-simulator";
-import { findContentRepoRoot, findPapers } from "./repo-root";
+import { findContentRepoRoot, findPapers, folioLabelIndex } from "./repo-root";
 import { blockQaPath, blockOfQaPath, BLOCK_QA_SUFFIX } from "./qa-paths";
 import { referenceRegistryConfigured, getReferenceRegistry } from "./references-registry-di";
 import { referenceEntryIds } from "./reference-entries";
@@ -460,8 +461,10 @@ function checkSectionDedupes(
 ): void {
   // Per-chapter aggregate: block → first section seen
   const blockOrigin = new Map<string, string>();
-  for (const sec of chapter.sections) {
-    if (!("blocks" in sec)) continue;
+  // Every depth: a subsection's block emits a `\label{}` like any other, so a
+  // block listed in a section AND in one of its subsections is the same
+  // duplicate. This read the top level only.
+  for (const sec of listedSections(chapter.sections)) {
     // Within-section dupes
     const seenInSection = new Set<string>();
     for (const ref of (sec as Section).blocks) {
@@ -526,10 +529,7 @@ async function checkUnlistedBlocks(
   listed: readonly string[],
   issues: ValidationIssue[],
 ): Promise<void> {
-  const isRef = (sec: object): boolean => !("blocks" in sec);
-  const hasRef = chapter.sections.some(
-    (sec) => isRef(sec) || ((sec as Section).subsections ?? []).some(isRef),
-  );
+  const hasRef = hasSectionReference(chapter.sections);
   if (hasRef) {
     issues.push({
       level: "info",
@@ -612,6 +612,39 @@ function checkMathLinks(
  * @returns Validation result with issues
  */
 /**
+ * Every section that lists its blocks inline, at every depth, in document
+ * order. A section given by reference (`{ name }`, no `blocks`) is not
+ * included, and neither is what lies under it.
+ *
+ * The site renders subsections to any depth; this validator read exactly one
+ * level of them, so a block listed in a
+ * sub-subsection was neither loaded nor validated, and was then reported as
+ * unlisted although it renders.
+ */
+export function listedSections(sections: Chapter["sections"]): Section[] {
+  const out: Section[] = [];
+  for (const sec of sections) {
+    if (!("blocks" in sec)) continue;
+    out.push(sec as Section);
+    const subs = (sec as Section).subsections;
+    if (subs?.length) out.push(...listedSections(subs));
+  }
+  return out;
+}
+
+/** Every block name a chapter's sections list, at every depth. */
+export function sectionBlockNames(sections: Chapter["sections"]): string[] {
+  return listedSections(sections).flatMap((sec) => sec.blocks);
+}
+
+/** Whether any section, at any depth under an inline one, is a reference. */
+function hasSectionReference(sections: Chapter["sections"]): boolean {
+  return sections.some(
+    (sec) => !("blocks" in sec) || hasSectionReference((sec as Section).subsections ?? []),
+  );
+}
+
+/**
  * Every section label in a chapter, at every depth. A section's
  * `subsections` hold sections in their own right, so a cross-reference
  * may name a nested one; collecting only the top level reported a
@@ -651,17 +684,9 @@ export async function validateObjects(
     checkSectionDedupes(chapter, manifestPath, issues);
 
     // Collect block names from sections
-    const blockNames: string[] = [];
-    for (const sec of chapter.sections) {
-      if ("blocks" in sec) {
-        blockNames.push(...(sec as Section).blocks);
-        // Subsection blocks (one structural level deeper) are part of
-        // the document too (structural-framework.md P1–P6).
-        for (const sub of (sec as Section).subsections ?? []) {
-          if ("blocks" in sub) blockNames.push(...(sub as Section).blocks);
-        }
-      }
-    }
+    // Subsection blocks, at every depth, are part of the document too
+    // (structural-framework.md P1–P6).
+    const blockNames = sectionBlockNames(chapter.sections);
 
     await checkUnlistedBlocks(chapter, objectsDir, manifestPath, blockNames, issues);
     const chBlocks = await loadBlocksFromDir(objectsDir, blockNames, issues);
@@ -734,15 +759,7 @@ export async function validateObjects(
         checkSectionDedupes(chapter, chPath, issues);
 
         // Collect block names from sections
-        const blockNames: string[] = [];
-        for (const sec of chapter.sections) {
-          if ("blocks" in sec) {
-            blockNames.push(...(sec as Section).blocks);
-            for (const sub of (sec as Section).subsections ?? []) {
-              if ("blocks" in sub) blockNames.push(...(sub as Section).blocks);
-            }
-          }
-        }
+        const blockNames = sectionBlockNames(chapter.sections);
 
         // Load and validate blocks in this chapter dir
         await checkUnlistedBlocks(chapter, chDir, chPath, blockNames, issues);
@@ -871,6 +888,33 @@ export async function validateObjects(
     });
   }
 
+  // Cross-paper `<slug>:<label>` refs resolve against the labels of every
+  // document in the SAME folio. Only when the
+  // directory being validated is inside this repository's folio: anywhere
+  // else there is no folio to speak for, and that is said, not passed.
+  let folioRoot: string | undefined;
+  try {
+    folioRoot = resolve(folioDir(REPO_ROOT));
+  } catch {
+    folioRoot = undefined; // no readable folio declaration: reported below
+  }
+  const relToFolio = folioRoot ? relative(folioRoot, resolve(objectsDir)) : "..";
+  const inFolio = relToFolio !== "" && !relToFolio.startsWith("..") && !isAbsolute(relToFolio);
+  const folioLabels = inFolio && folioRoot ? folioLabelIndex(folioRoot) : undefined;
+  const hasCrossPaper = [...allBlocks.values()].some(({ block }) => {
+    const b = block as { uses?: string[]; foreshadows?: string[] };
+    return [...(b.uses ?? []), ...(b.foreshadows ?? [])].some((u) => splitCrossPaperRef(u) !== undefined);
+  });
+  if (!folioLabels && hasCrossPaper) {
+    issues.push({
+      level: "info",
+      block: "(folio)",
+      message:
+        `${objectsDir} is not inside the folio (${folioRoot ?? "undetermined"}) — cross-paper ` +
+        `<doc>:<label> entries in uses[] / foreshadows[] were NOT resolved`,
+    });
+  }
+
   for (const [name, { block, dir }] of allBlocks) {
     const mdContent = mdCache.get(name);
     const ctx: ConstraintContext = {
@@ -879,6 +923,7 @@ export async function validateObjects(
       dir,
       allLabels,
       allRefIds,
+      folioLabels,
       fileExists: (p: string) => existsSync(p),
       mdContent,
     };
