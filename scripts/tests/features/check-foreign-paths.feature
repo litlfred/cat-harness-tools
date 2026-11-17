@@ -130,3 +130,26 @@ Feature: Code does not spell paths into another instance's directories
   Scenario: The site's location is still printed under the finding
     Given the block reported in "harness/glossary/p.ts"
     Then the report contains "at harness/glossary/p.ts:1"
+
+  @test:scripts/tests/check-foreign-paths.test.ts::a_folio_block_manifest's_citation_fields_are_not_counted_(owner,_2026-11-17,_option_A)::meta.source_and_meta.provenance_in_a_folio_file_are_skipped
+  Scenario: A block manifest's meta.source and meta.provenance are not counted
+    Given a folio block manifest whose meta.source.file and meta.provenance cite an L1 section under who-iris/library
+    When it is scanned
+    Then nothing is counted
+
+  @test:scripts/tests/check-foreign-paths.test.ts::a_folio_block_manifest's_citation_fields_are_not_counted_(owner,_2026-11-17,_option_A)::the_same_literal_elsewhere_in_the_block,_or_as_block_code,_is_still_counted
+  Scenario: The same path anywhere else in the block is still counted
+    Given the same manifest with the path under another meta key and in a readFileSync call
+    Then both of those are counted
+
+  @test:scripts/tests/check-foreign-paths.test.ts::a_folio_block_manifest's_citation_fields_are_not_counted_(owner,_2026-11-17,_option_A)::a_`source`_nested_deeper_than_meta's_direct_children_is_still_counted
+  Scenario: Only meta's direct children are citations
+    Then a "source" key nested inside another meta field is counted
+
+  @test:scripts/tests/check-foreign-paths.test.ts::a_folio_block_manifest's_citation_fields_are_not_counted_(owner,_2026-11-17,_option_A)::outside_a_folio_directory,_meta.source_is_counted_as_before
+  Scenario: Outside a folio directory nothing changes
+    Then the same text in scripts/ is counted as before
+
+  @test:scripts/tests/check-foreign-paths.test.ts::a_folio_block_manifest's_citation_fields_are_not_counted_(owner,_2026-11-17,_option_A)::bare_keys_work_too
+  Scenario: Bare keys are read like quoted ones
+    Then an unquoted meta.source in a folio file is not counted

@@ -32,6 +32,14 @@
  * Test files are out of the count, as in `check:declared-paths`: a test that
  * builds a fixture names declared directories by necessity.
  *
+ * So are a folio block manifest's CITATION FIELDS: the value of a `source` or
+ * `provenance` key directly inside a `meta` object, in a file under a `folio/`
+ * directory (owner, 2026-11-17, option A). `meta.source.file` names the L1
+ * section a block was drawn from (`who-iris/library/<id>/sections/…`): a
+ * citation of content, not code that looks the path up, and changing it means
+ * editing every block through the editing process (149 sites in dth-sfp). Any
+ * other literal in the same file, a block's code included, is still counted.
+ *
  * ## A ratchet, one way
  *
  * The committed baseline (`foreign-path-baseline.json`) records a count per
@@ -158,6 +166,7 @@ export function scanText(
   const lines = code.split("\n");
   const cover = markerCoverage(rawLines);
   const ranges = pathContextRanges(code);
+  const citations = isFolioFile(file) ? citationRanges(code) : [];
   const lineStart: number[] = [];
   {
     let acc = 0;
@@ -180,6 +189,11 @@ export function scanText(
       const asRepo = value.startsWith("../") && instRoot !== "" ? normalize(join(instRoot, value)).split(sep).join("/") : value;
       const hit = targets.find((t) => asRepo === t.dir || asRepo.startsWith(`${t.dir}/`));
       if (!hit) continue;
+      // A block manifest's citation of its source, not a path lookup (header).
+      if (citations.length > 0) {
+        const at = lineStart[n]! + m.index;
+        if (citations.some(([a, b]) => at >= a && at < b)) continue;
+      }
       // A bare segment is a path only as the first literal of a path-building call.
       if (!value.includes("/")) {
         const at = lineStart[n]! + m.index;
@@ -200,6 +214,113 @@ export function scanText(
     }
   }
   return { counted, marked };
+}
+
+/** A file under a `folio/` directory: where block manifests live. */
+export function isFolioFile(file: string): boolean {
+  return /(^|\/)folio\//.test(file.replace(/\\/g, "/"));
+}
+
+/** The keys of `meta` whose values are citations (see the module header). */
+const CITATION_KEYS = new Set(["source", "provenance"]);
+
+/**
+ * The `[start, end)` offsets in `code` of the value of every `source` or
+ * `provenance` key that is a DIRECT child of a `meta` object literal. String-
+ * aware: a brace inside a string does not count. Keys may be bare or quoted
+ * (block manifests write `meta: {"source": {...}}`).
+ */
+export function citationRanges(code: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  const META = /(?:^|[{,\s])(["']?)meta\1\s*:\s*\{/g;
+  let m: RegExpExecArray | null;
+  while ((m = META.exec(code)) !== null) {
+    const open = m.index + m[0].length - 1;
+    const close = matching(code, open);
+    if (close < 0) continue;
+    // Walk the meta object's direct children.
+    let i = open + 1;
+    while (i < close) {
+      i = skipSpace(code, i, close);
+      if (i >= close) break;
+      const key = readKey(code, i);
+      if (!key) {
+        i = endOfValue(code, i, close) + 1;
+        continue;
+      }
+      let j = skipSpace(code, key.end, close);
+      if (code[j] !== ":") {
+        i = endOfValue(code, i, close) + 1;
+        continue;
+      }
+      j = skipSpace(code, j + 1, close);
+      const end = endOfValue(code, j, close);
+      if (CITATION_KEYS.has(key.name)) out.push([j, end]);
+      i = end + 1;
+    }
+  }
+  return out;
+}
+
+function skipSpace(code: string, i: number, limit: number): number {
+  while (i < limit && /[\s,]/.test(code[i]!)) i++;
+  return i;
+}
+
+/** A bare or quoted object key at `i`, or `undefined`. */
+function readKey(code: string, i: number): { name: string; end: number } | undefined {
+  const q = code[i];
+  if (q === '"' || q === "'") {
+    const e = endOfString(code, i);
+    return e < 0 ? undefined : { name: code.slice(i + 1, e), end: e + 1 };
+  }
+  const k = /^[A-Za-z_$][\w$]*/.exec(code.slice(i, i + 200));
+  return k ? { name: k[0], end: i + k[0].length } : undefined;
+}
+
+/** The index of the quote closing the string that opens at `i`, or -1. */
+function endOfString(code: string, i: number): number {
+  const q = code[i];
+  for (let k = i + 1; k < code.length; k++) {
+    if (code[k] === "\\") k++;
+    else if (code[k] === q) return k;
+  }
+  return -1;
+}
+
+/** The bracket matching the one at `open` (`{` or `[`), skipping strings; -1 if none. */
+function matching(code: string, open: number): number {
+  let depth = 0;
+  for (let k = open; k < code.length; k++) {
+    const c = code[k]!;
+    if (c === '"' || c === "'" || c === "`") {
+      const e = endOfString(code, k);
+      if (e < 0) return -1;
+      k = e;
+    } else if (c === "{" || c === "[" || c === "(") depth++;
+    else if (c === "}" || c === "]" || c === ")") {
+      depth--;
+      if (depth === 0) return k;
+    }
+  }
+  return -1;
+}
+
+/** The exclusive end of the value starting at `i`: up to the next top-level `,` or `limit`. */
+function endOfValue(code: string, i: number, limit: number): number {
+  for (let k = i; k < limit; k++) {
+    const c = code[k]!;
+    if (c === '"' || c === "'" || c === "`") {
+      const e = endOfString(code, k);
+      if (e < 0) return limit;
+      k = e;
+    } else if (c === "{" || c === "[" || c === "(") {
+      const e = matching(code, k);
+      if (e < 0) return limit;
+      k = e;
+    } else if (c === ",") return k;
+  }
+  return limit;
 }
 
 /** True when, between a call's opening paren and `at`, another call is still open. */
