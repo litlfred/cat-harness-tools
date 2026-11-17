@@ -1462,11 +1462,17 @@ describe("a fold opens from its parent's row — owner, 2026-10-15: \"what is 26
   it("no row in any rail is a bare count", () => {
     expect(html).not.toMatch(/<span class="fa-nav-label">\d+ (?:pages?|sub-sections?)<\/span>/);
   });
-  it("a rail rendered INTO a page carries its script: the fold toggles and the drag edge", () => {
+  it("a rail rendered INTO a page carries its script: the fold toggles, the drag edge and the reader's anchor", () => {
     const page = "<!doctype html><html><head></head><body><p>x</p></body></html>";
     expect(injectNavbar(page, { instance: "x", pages: { label: "Pages", items, collapsible: true } })!).toContain("<script data-fa-nav-folds>");
     // With no fold the drag edge still needs it (owner, 2026-11-10, option D).
     expect(injectNavbar(page, { instance: "x" })!).toContain("wireNavResize");
+    // And the reader keeps their place when it opens, closes or is dragged
+    // (owner, 2026-11-16; driven in Chromium by rail-keeps-place.e2e.ts).
+    expect(injectNavbar(page, { instance: "x" })!).toContain("wireNavAnchor");
+    // ...but not on a thin page, whose style is linked (bean lnoy): a few KB
+    // of content has no place to lose, and the weight is the point there.
+    expect(injectNavbar(page, { instance: "x" }, { cssHref: "../../assets/css/navbar.css" })!).not.toContain("wireNavAnchor");
   });
 });
 
