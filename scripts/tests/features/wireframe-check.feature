@@ -74,3 +74,28 @@ Feature: Wireframe check inputs
     When both are checked, the second with prefix "content-layer/"
     Then neither is refused for its topic
     And the incomplete names include "page" and "content-layer/page"
+
+  @test:scripts/tests/wireframe-check.test.ts::a_wireframe_covers_every_visualiser_a_writer_draws_(renderedBy:<tool>)::renderedByKeys_names_every_declared_visualiser_drawn_by_that_Tool,_and_nothing_for_another_form
+  Scenario: A renderedBy cover names the visualisers the Tool draws
+    Given visualisers dth-hrh, dpi-h-ra and dth-sfp "archimate" rendered by "archimate-pages", and dth-sfp "glossary" by another Tool
+    Then "renderedBy:archimate-pages" names the three archimate visualisers
+    And a Tool no visualiser names covers nothing, and a route key or a malformed Tool id is not of that form
+
+  @test:scripts/tests/wireframe-check.test.ts::a_wireframe_covers_every_visualiser_a_writer_draws_(renderedBy:<tool>)::every_visualiser_rendered_by_the_writer_inherits_its_wireframe;_one_drawn_by_another_Tool_does_not
+  Scenario: Every visualiser the writer draws inherits its wireframe
+    Given one passing wireframe "archimate-pages" covering "renderedBy:archimate-pages"
+    When the wireframes are checked
+    Then the three archimate visualisers are covered by it
+    And dth-sfp "glossary" is still uncovered, with no unknown ref
+
+  @test:scripts/tests/wireframe-check.test.ts::a_wireframe_covers_every_visualiser_a_writer_draws_(renderedBy:<tool>)::a_writer_no_mounted_layer_declares_a_visualiser_for_is_not_a_stale_ref
+  Scenario: A writer no mounted layer uses is not a stale ref
+    Given no declared visualiser rendered by "archimate-pages"
+    When the wireframes are checked
+    Then "renderedBy:archimate-pages" is not reported as an undeclared ref
+
+  @test:scripts/tests/wireframe-check.test.ts::a_wireframe_covers_every_visualiser_a_writer_draws_(renderedBy:<tool>)::a_wireframe_naming_the_visualiser_by_its_route_key_wins_over_the_writer's
+  Scenario: A route-key wireframe wins over the writer's
+    Given the shared "archimate-pages" wireframe and dth-sfp's own wireframe of "dth-sfp/archimate"
+    When the wireframes are checked
+    Then "dth-sfp/archimate" is covered by dth-sfp's own, and the other archimate visualisers by the shared one

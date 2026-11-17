@@ -13,6 +13,9 @@
  *   ({@link wireframeSources}): which wireframe covers which visualiser. A
  *   `covers` entry is a route key, or a route key and a sub-graph
  *   (`cat-harness/auto-docs/index/skills`); one wireframe may cover several.
+ *   Or `renderedBy:<tool>`: every declared visualiser whose `renderedBy` is
+ *   that Tool ({@link RENDERED_BY}), so one wireframe of a writer's page is
+ *   inherited by every layer that declares a visualiser drawn by it.
  * - **Each wireframe directory.** It must hold `intent.md`, at least one
  *   candidate `.html`, and `checks/report.json` written by `wireframe:check`
  *   (the Tool `wireframe-check`).
@@ -113,6 +116,33 @@ export function declaredVisualisers(repoRoot: string = REPO_ROOT): string[] {
   return [...new Set(harnessVisualisers(repoRoot).map((v) => `${v.harness}/${v.id}`))].sort();
 }
 
+/** Every declared visualiser's route key, mapped to the Tool its declaration says draws it (`renderedBy`). */
+export function declaredRenderers(repoRoot: string = REPO_ROOT): Map<string, string> {
+  return new Map(harnessVisualisers(repoRoot).map((v) => [`${v.harness}/${v.id}`, v.renderedBy]));
+}
+
+/**
+ * The `covers` form for a writer's page: `renderedBy:<tool>`, the Tool node
+ * id a visualiser names in its `renderedBy` (owner, 2026-11-17, option b: one
+ * shared ArchiMate wireframe). A writer that draws the same page for every
+ * layer that declares it (`archimate-pages` for dth-hrh, dpi-h-ra, dth-phc,
+ * dth-sfp, ...) is drawn once, beside the writer, and each of those visualisers
+ * inherits it. A wireframe naming a visualiser by its route key still wins.
+ */
+export const RENDERED_BY = /^renderedBy:([a-z0-9][a-z0-9-]*)$/;
+
+/**
+ * The declared route keys a `renderedBy:<tool>` entry covers: every declared
+ * visualiser drawn by that Tool, none when this checkout declares none (the
+ * layers that do are not mounted here; that is not a stale mapping).
+ * `undefined` when the entry is not of that form.
+ */
+export function renderedByKeys(entry: string, renderers: ReadonlyMap<string, string>): string[] | undefined {
+  const tool = RENDERED_BY.exec(entry)?.[1];
+  if (tool === undefined) return undefined;
+  return [...renderers].filter(([, by]) => by === tool).map(([k]) => k).sort();
+}
+
 /** The declared route key a `covers` entry names — itself, or the visualiser of the sub-graph it names. */
 export function coveredKey(entry: string, declared: readonly string[]): string | undefined {
   return declared.find((k) => entry === k || entry.startsWith(`${k}/`));
@@ -176,10 +206,13 @@ export function checkWireframes(
   dirs: string | { dir: string; prefix: string }[] = wireframeSources(repoRoot),
   /** Harnesses whose own wireframes are left out here ({@link wireframesLeftOut}). */
   leftOut: readonly string[] = wireframesLeftOut(),
+  /** Each declared visualiser's `renderedBy` ({@link declaredRenderers}), for `renderedBy:<tool>` covers. */
+  renderers: ReadonlyMap<string, string> = declaredRenderers(repoRoot),
 ): WireframeReport {
   const sources = typeof dirs === "string" ? [{ dir: dirs, prefix: "" }] : dirs;
   const r: WireframeReport = {
-    declared: declaredVisualisers(repoRoot),
+    // The same keys `declaredVisualisers` gives, read once with their writers.
+    declared: [...renderers.keys()].sort(),
     covered: [],
     uncovered: [],
     unknownRef: [],
@@ -189,12 +222,19 @@ export function checkWireframes(
     notJudged: [],
   };
   const coverer = new Map<string, string>();
+  /** Who covers a visualiser through its writer: used only where no wireframe names it by route key. */
+  const writerCoverer = new Map<string, string>();
   for (const { dir, prefix } of sources) {
     const indexFile = join(dir, "index.json");
     const index: Index = existsSync(indexFile) ? JSON.parse(readFileSync(indexFile, "utf-8")) : { wireframes: {} };
     for (const [topic, w] of Object.entries(index.wireframes)) {
       const name = `${prefix}${topic}`;
       for (const ref of w.covers) {
+        const byWriter = renderedByKeys(ref, renderers);
+        if (byWriter !== undefined) {
+          for (const k of byWriter) if (!writerCoverer.has(k)) writerCoverer.set(k, name);
+          continue;
+        }
         const key = coveredKey(ref, r.declared);
         if (key === undefined) r.unknownRef.push({ wireframe: name, ref });
         else if (!coverer.has(key)) coverer.set(key, name);
@@ -232,7 +272,7 @@ export function checkWireframes(
     }
   }
   for (const ref of r.declared) {
-    const w = coverer.get(ref);
+    const w = coverer.get(ref) ?? writerCoverer.get(ref);
     const off = leftOut.find((h) => ref.startsWith(`${h}/`));
     if (w) r.covered.push({ ref, wireframe: w });
     else if (off !== undefined) r.notJudged.push({ ref, reason: `${off}'s wireframes are switched off here: the mount left them out` });
