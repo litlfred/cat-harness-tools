@@ -329,13 +329,28 @@ describe("checkBeanRestatesSkill over a synthetic tree", () => {
     expect(r.findings).toEqual([]);
   });
 
-  test("a store with no OPEN bean examines nothing — the caller's vacuity guard exits 2", () => {
-    // The report itself cannot fail here; what must hold is that `examined` is
-    // 0 rather than the findings list merely being empty, because those are
-    // the two facts the guard in `import.meta.main` tells apart.
+  test("a store read whole with no OPEN bean is determined empty: a pass with a note (owner, 2026-11-17)", () => {
+    // `examined` stays 0 — the guard still tells "nothing examined" from
+    // "nothing found" — and `determinedEmpty` is what lets it pass.
     const r = checkBeanRestatesSkill(store([{ id: "aaaa", status: "completed", body: KN0T_BEFORE }]));
     expect(r.store).toBe(true);
     expect(r.examined).toBe(0);
     expect(r.findings).toEqual([]);
+    expect(r.determinedEmpty).toBeDefined();
+    expect(formatReport(r)).toContain("nothing to examine");
+  });
+
+  test("a freshly created store (defs/ holding only a .gitkeep) is determined empty", () => {
+    const root = store([]);
+    writeFileSync(join(root, "beans", "defs", ".gitkeep"), "");
+    expect(checkBeanRestatesSkill(root).determinedEmpty).toBeDefined();
+  });
+
+  test("a file whose front matter did not parse is NOT an empty store: a bean nobody read stays unknown", () => {
+    const root = store([]);
+    writeFileSync(join(root, "beans", "defs", "mangled.md"), "--\n# x\nstatus: todo\n--\nbody");
+    const r = checkBeanRestatesSkill(root);
+    expect(r.examined).toBe(0);
+    expect(r.determinedEmpty).toBeUndefined();
   });
 });

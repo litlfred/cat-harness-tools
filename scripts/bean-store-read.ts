@@ -280,3 +280,32 @@ export function openBeanCount(beans: readonly { status?: string }[]): number {
 export const OPEN_BEANS_UNIT = "open beans";
 /** Statuses that mean it is finished, one way or the other. */
 export const CLOSED_STATUSES = new Set(["completed", "scrapped"]);
+
+/**
+ * Whether the store was READ and holds no bean `examined` would look at: the
+ * one empty population a bean gate passes on (owner, 2026-11-17: "nothing to
+ * examine means pass", for a store that is mounted and determined empty).
+ *
+ * Narrow on purpose, so the vacuity guard (`iym1`, `xom7`) still catches every
+ * other way of examining nothing:
+ *
+ * - only `read`: a store that is `unreachable` (kept on a branch, not
+ *   mounted), `declared-but-absent` (`dh4f`) or `absent` is not this;
+ * - only when every `.md` in it is accounted for (`filesSeen`) and no file
+ *   was skipped for want of front matter: a bean whose fence was mangled
+ *   (`t6s7`) is a bean nobody read, not an empty store.
+ *
+ * A layer whose state branches were just created (`state:seed --init`) has
+ * exactly this store: `beans/defs/` mounted, holding a `.gitkeep` and nothing.
+ */
+export function storeDeterminedEmpty(store: BeanStore, examined: (b: BeanFile) => boolean): boolean {
+  if (store.state !== "read") return false;
+  if (store.skipped.some((s) => !s.expected)) return false;
+  if (store.beans.length + store.skipped.length !== store.filesSeen) return false;
+  return !store.beans.some(examined);
+}
+
+/** The line a bean gate prints when it passes over a {@link storeDeterminedEmpty} store. */
+export function emptyStoreNote(gate: string, dir: string): string {
+  return `  ✓ ${gate}: the bean store at ${dir} is mounted and holds no open bean — nothing to examine, so nothing failed (a determined-empty store, not an unread one)`;
+}

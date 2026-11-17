@@ -10,11 +10,15 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   assertsPending,
   attributedTo,
   chainRefs,
+  checkStalePaths,
   doneWhenClause,
   stalePaths,
   underPathHeading,
@@ -201,5 +205,39 @@ describe("an unchecked Done-when clause that waits on finished work", () => {
     // exactly like a green one that did.
     const f = done("Some prose.\n\n- [ ] migrated once `bbbb` is answered\n\nMore prose.");
     expect(f).toHaveLength(1);
+  });
+});
+
+/**
+ * The determined-empty store (owner, 2026-11-17: "nothing to examine means
+ * pass"): a store read whole that holds no open bean passes; a store that
+ * could not be read, or holds a bean whose front matter did not parse, does
+ * not. The CLI exits 0 exactly when `determinedEmpty` is set and nothing else failed.
+ */
+describe("an empty bean store", () => {
+  const storeWith = (files: Record<string, string>): string => {
+    const root = mkdtempSync(join(tmpdir(), "stale-empty-"));
+    mkdirSync(join(root, "beans", "defs"), { recursive: true });
+    for (const [name, text] of Object.entries(files)) writeFileSync(join(root, "beans", "defs", name), text);
+    return root;
+  };
+
+  test("mounted, holding only a .gitkeep or closed beans: determined empty", () => {
+    expect(checkStalePaths(storeWith({ ".gitkeep": "" })).determinedEmpty).toBeDefined();
+    const closed = checkStalePaths(storeWith({ "aaaa.md": "---\n# aaaa\ntitle: a\nstatus: completed\ntype: task\n---\nbody\n" }));
+    expect(closed.examined).toBe(0);
+    expect(closed.determinedEmpty).toBeDefined();
+  });
+
+  test("a bean whose front matter did not parse is not empty: it stays examined-nothing", () => {
+    const r = checkStalePaths(storeWith({ "mangled.md": "--\n# x\nstatus: todo\n--\nbody" }));
+    expect(r.examined).toBe(0);
+    expect(r.determinedEmpty).toBeUndefined();
+  });
+
+  test("an open bean is examined, and the empty pass does not apply", () => {
+    const r = checkStalePaths(storeWith({ "bbbb.md": "---\n# bbbb\ntitle: b\nstatus: todo\ntype: task\n---\nbody\n" }));
+    expect(r.examined).toBe(1);
+    expect(r.determinedEmpty).toBeUndefined();
   });
 });
