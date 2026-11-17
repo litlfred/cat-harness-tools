@@ -289,10 +289,14 @@ html[data-presenter="on"] .jp-off-only, html[data-presenter="off"] .jp-on-only, 
 .jp-wf-a { display: none; font-size: 14px; color: var(--s700); line-height: 1.375; }
 .jp-whatif.is-open .jp-wf-a { display: block; }
 .jp-whatif.is-open .jp-reveal { display: none; }
+/* Without the presenter, no one holds the reveal back: the outcome is shown (owner, 2026-11-17). */
+html[data-presenter="off"] .jp-wf-a { display: block; }
 .jp-reveal { align-self: flex-start; font-size: 12px; font-weight: 600; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 6px 12px; }
 .jp-reveal:hover { background: #fef3c7; }
 .jp-tone-indigo > p { font-size: 14px; color: var(--s800); line-height: 1.375; }
 .jp-policy { gap: 16px; }
+/* Below the moment, full width (owner, 2026-11-17): the questions side by side on a wide screen. */
+@media (min-width: 1024px) { .jp-walk ~ .jp-policy .jp-qs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; } }
 .jp-qs { display: flex; flex-direction: column; gap: 10px; }
 .jp-qs li { display: flex; align-items: flex-start; gap: 8px; }
 .jp-qs li > span { font-size: 14px; color: var(--s800); line-height: 1.375; }
@@ -444,9 +448,11 @@ a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .jp-av-lg { width: 48px; height: 48px; font-size: 15px; }
 /* "See what … sees": full width at the right column's foot, as VaxLink (ref/02). */
 .jp-sees { display: flex; flex-direction: column; gap: 8px; }
-.jp-see { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--s200); background: #fff; color: var(--s800) !important; font-size: 13px; font-weight: 500; box-shadow: var(--shadow-sm); }
-.jp-see:hover { background: var(--s50); border-color: var(--s300); }
-.jp-see small { font-weight: 500; color: inherit; font-size: inherit; }
+/* The device demo, first in the right column and the one call to action on a moment (owner, 2026-11-17: "hard to see"). */
+.jp-see { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 18px; border-radius: 12px; border: 2px solid #0369a1; background: #0284c7; color: #fff !important; font-size: 15px; font-weight: 700; box-shadow: 0 4px 12px rgb(2 132 199 / 0.3); text-decoration: none; }
+.jp-see:hover, .jp-see:focus-visible { background: #0369a1; border-color: #075985; }
+.jp-see small { font-weight: 500; color: rgb(255 255 255 / 0.85); font-size: 13px; }
+.jp-see .jp-i { width: 20px; height: 20px; }
 
 /* ── a view's heading, buttons ──────────────────────────────────────── */
 .jp-vhead h2 { font-size: 16px; line-height: 24px; font-weight: 700; color: var(--ink); }

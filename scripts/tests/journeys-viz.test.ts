@@ -502,6 +502,22 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(p2).toContain("Trust anchor ★");
     expect(p2).toContain("— a signature crosses");
     expect(p2).toContain('name="policy:viewer:status"');
+    // Owner, 2026-11-17: the room's question is the presenter's; the policy questions are full width, below the moment's two columns.
+    expect(p2).toContain('<section class="jp-ask jp-presenter-only">');
+    const walkEnd = p2.indexOf('<div class="jp-hood-toggle">');
+    const policyAt = p2.indexOf('<section class="jp-card jp-pad jp-tone-indigo jp-policy">');
+    expect(policyAt).toBeGreaterThan(p2.indexOf('<div class="jp-walk-r">'));
+    expect(p2.slice(p2.indexOf('<div class="jp-walk-r">'), policyAt)).toMatch(/<\/div>\n<\/div>\n$/);
+    expect(policyAt).toBeLessThan(walkEnd);
+  });
+  test("presenter mode is off until the presenter turns it on, and under the hood starts hidden (owner, 2026-11-17)", () => {
+    expect(p2).toContain('<html lang="en" data-presenter="off">');
+    expect(p2).toContain('if(localStorage.getItem("jp:presenter")==="on")');
+    expect(p2).toContain('<button type="button" data-jp-hood-toggle aria-controls="hood" aria-expanded="false">');
+    expect(p2).toContain('<section class="jp-hood" id="hood" data-jp-hood hidden>');
+    expect(at("assets/present.js")).toContain('if (store("jp:hood") === "on") setHood(true);');
+    // The journey page's under the hood is folded too.
+    expect(files.some((f) => /<details class="jv-col jv-hood"><summary class="jv-hood-h">Under the hood<\/summary>/.test(String(f.content)))).toBe(true);
   });
   test("a step: the people, each with the avatar in the card's header (never inside a sentence), and under the hood", () => {
     expect(p2).toContain('class="jp-who" style="--c:#123456"');
@@ -703,7 +719,10 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(page).toContain('<a class="jp-lab-tab" href="#lab-team" data-jp-lab-tab="team"><span>0</span>Team</a>');
     expect(page).toContain('data-jp-timer="5"');
     expect(page).toContain("<b>Discuss</b><span>Go round the table.</span>");
-    expect(page).toContain('<p class="jp-lab-note">No health data.</p>');
+    expect(page).toContain('<p class="jp-lab-note jp-presenter-only">No health data.</p>');
+    // Owner, 2026-11-17: the timers, the DISCUSS prompts and the notes are the presenter's.
+    expect(page).toContain('<button type="button" class="jp-lab-timer jp-noprint jp-presenter-only" data-jp-timer="5">');
+    expect(page).toContain('<div class="jp-lab-discuss jp-presenter-only"><b>Discuss</b><span>Go round the table.</span>');
     // Use cases: any number ticked; the journeys' own come ticked; the statement starts from the journeys and can be reset to them.
     expect(page).toContain('<input type="checkbox" name="policy:uc:immz" data-jv-check checked>');
     expect(page).toContain('<input type="checkbox" name="policy:uc:ips" data-jv-check>');
@@ -801,6 +820,10 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     }
     const js = at("assets/present.js");
     expect(js).toContain('each("[data-jp-reset]", reset)');
+    // Owner, 2026-11-17: Reset Simulation, the keyboard hint and the what-if reveal are the presenter's; without the presenter the outcome shows.
+    expect(at(`${base}/walkthrough/P2/index.html`)).toContain('class="jp-btn-link jp-reset jp-presenter-only"');
+    expect(at(`${base}/walkthrough/P2/index.html`)).toContain('<span class="jp-keys jp-presenter-only">');
+    expect(at("assets/present.css")).toContain('html[data-presenter="off"] .jp-wf-a { display: block; }');
   });
   test("JV-11: the map's moment columns are narrow enough on a desktop for eight, and a chapter's name wraps, never cut", () => {
     const css = at("assets/present.css");
