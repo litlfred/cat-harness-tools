@@ -781,14 +781,42 @@ ${prev ? `<a class="jp-pbtn" href="${e(prev)}" aria-label="Previous moment">${ic
 </div>`;
 }
 
-/** Where a table's answer to a step's question is kept (`jv:` + this, in the browser): one key for the walkthrough and the Discussion view. */
-export function questionKey(workshop: string, s: PresentedStep, i: number): string {
+/**
+ * A question's identity within its workshop step: `id` when the workshop names
+ * one, else a hash of its text (case, spacing and punctuation aside). Never its
+ * position, so adding or reordering questions moves no answer.
+ */
+export function questionId(q: { id?: string; text: string }): string {
+  if (q.id) return q.id;
+  const norm = q.text.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  let h = 0x811c9dc5;
+  for (let k = 0; k < norm.length; k++) h = Math.imul(h ^ norm.charCodeAt(k), 0x01000193) >>> 0;
+  return `t${h.toString(36)}`;
+}
+
+/**
+ * Where a table's answer to a step's question is kept (`jv:` + this, in the
+ * browser): one key wherever the question is shown — its walkthrough step and
+ * every lab step of the Discussion view that lists its module. Keyed by the
+ * workshop, the journey and step the question belongs to, and the question's
+ * own identity (`questionId`), never by page or position.
+ */
+export function questionKey(workshop: string, ws: WorkshopStep, q: { id?: string; text: string }): string {
+  return `${workshop}:q:${ws.scenario}:${ws.step}:${questionId(q)}`;
+}
+
+/**
+ * The key the same answer was kept under before (2026-11): the step's URL
+ * segment and the question's position. present.js moves an answer kept there
+ * to `questionKey` the first time the question is shown.
+ */
+export function legacyQuestionKey(workshop: string, s: PresentedStep, i: number): string {
   return `${workshop}:q:${s.key}:${i}`;
 }
 
 /** A write-in kept in the browser under `name` (present.js, `data-jv-text`); `value` is its text until the table writes its own. */
-export function answerBox(name: string, label: string, lines = 2, value = ""): string {
-  return `<textarea class="jp-answer" name="${e(name)}" rows="${lines}" data-jv-text aria-label="${e(`Our answer: ${label}`)}" placeholder="Our answer…">${e(value)}</textarea>`;
+export function answerBox(name: string, label: string, lines = 2, value = "", was?: string): string {
+  return `<textarea class="jp-answer" name="${e(name)}" rows="${lines}" data-jv-text${was ? ` data-jv-was="${e(was)}"` : ""} aria-label="${e(`Our answer: ${label}`)}" placeholder="Our answer…">${e(value)}</textarea>`;
 }
 
 function policyPanel(p: Presentation, s: PresentedStep, toWorkshop: string): string {
@@ -796,9 +824,9 @@ function policyPanel(p: Presentation, s: PresentedStep, toWorkshop: string): str
   if (!ws) return "";
   const w = p.w.workshop;
   const mod = (id: string) => w.modules.find((m) => m.id === id);
-  // Each question has a write-in: the same answer the Discussion view's lab shows (`questionKey`).
+  // Each question has a write-in: the same answer the Discussion view's lab shows, under one key per question (`questionKey`).
   const qs = (ws.questions ?? [])
-    .map((q, i) => `<li><a class="jp-mod" href="${e(`${toWorkshop}${moduleSegment(q.module)}/`)}" title="${e(mod(q.module)?.title ?? q.module)}">${e(q.module)}</a><span>${e(q.text)}</span>${answerBox(questionKey(w.id, s, i), q.text)}</li>`)
+    .map((q, i) => `<li><a class="jp-mod" href="${e(`${toWorkshop}${moduleSegment(q.module)}/`)}" title="${e(mod(q.module)?.title ?? q.module)}">${e(q.module)}</a><span>${e(q.text)}</span>${answerBox(questionKey(w.id, ws, q), q.text, 2, "", legacyQuestionKey(w.id, s, i))}</li>`)
     .join("");
   // The rows of the card's foot: the workshop's `tagRows` (VaxLink's Forces / Cost driver /
   // If it is missing), else one row per table the step touches, in the workshop's table order.

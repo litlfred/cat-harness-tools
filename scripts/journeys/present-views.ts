@@ -65,6 +65,7 @@ import {
   trustColor,
   answerBox,
   questionKey,
+  legacyQuestionKey,
   type Presentation,
   type PresentedStep,
   type View,
@@ -732,8 +733,8 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
       const module = ws.modules.find((x) => x.id === m);
       const qs = p.steps.flatMap((s) => (s.ws?.questions ?? []).map((q, i) => ({ s, q, i })).filter((x) => x.q.module === m));
       if (!module || qs.length === 0) continue;
-      for (const { s, q, i } of qs) items.push({ label: `${s.step.id} · ${q.text}`, name: questionKey(ws.id, s, i), type: "text" });
-      out.push(`<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m)}<b>${e(module.title)}</b></div>${module.carries ? `<p class="jp-dm-c">${e(module.carries)}</p>` : ""}<ul class="jp-lab-qs">${qs.map(({ s, q, i }) => `<li>${stepChip(a, s, s.step.id)}<div><span>${e(q.text)}</span>${answerBox(questionKey(ws.id, s, i), q.text)}</div></li>`).join("")}</ul></div>`);
+      for (const { s, q } of qs) items.push({ label: `${s.step.id} · ${q.text}`, name: questionKey(ws.id, s.ws!, q), type: "text" });
+      out.push(`<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m)}<b>${e(module.title)}</b></div>${module.carries ? `<p class="jp-dm-c">${e(module.carries)}</p>` : ""}<ul class="jp-lab-qs">${qs.map(({ s, q, i }) => `<li>${stepChip(a, s, s.step.id)}<div><span>${e(q.text)}</span>${answerBox(questionKey(ws.id, s.ws!, q), q.text, 2, "", legacyQuestionKey(ws.id, s, i))}</div></li>`).join("")}</ul></div>`);
     }
     if (st.discussion && ws.discussion?.length) {
       const cards = ws.discussion
