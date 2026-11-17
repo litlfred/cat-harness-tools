@@ -872,6 +872,93 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     refuse({ cells: [{ module: "M1", step: "P1", technical: "t" }, { module: "M1", step: "p1-checked#P1", policy: "p" }] }, /appears twice/);
     refuse({ overlaps: { policy: [{ label: "x", modules: ["M1"], steps: ["P7"], text: "t" }] } }, /step "P7"/);
   });
+  test("the canvas as data: an on-screen form keyed per field, a journey question naming a field shares its key, the annex, the PDF's model (owner, 2026-11-17)", () => {
+    const w0 = corpus.workshops[0]!;
+    const canvas = {
+      title: "Country Canvas",
+      size: "A3",
+      sheets: [
+        {
+          id: "cover",
+          label: "Cover",
+          title: "Who we are",
+          sections: [
+            {
+              id: "table",
+              title: "The table",
+              fields: [
+                { id: "country", type: "text", label: "Country", lines: 1 },
+                { id: "stage", type: "choice", label: "Where we are", options: [{ id: "pilot", label: "Pilot" }, { id: "scale", label: "At scale" }] },
+                { id: "std", type: "ticks", label: "Standards in use", options: [{ id: "fhir", label: "FHIR" }, { id: "icao", label: "ICAO VDS" }] },
+              ],
+            },
+          ],
+        },
+        {
+          id: "s1",
+          label: "Sheet 1",
+          title: "Who decides",
+          modules: ["M1"],
+          sections: [
+            {
+              id: "rights",
+              fields: [
+                { id: "rights", type: "grid", label: "Decision rights", rows: [{ id: "anchor", label: "Trust anchor" }], columns: [{ id: "today", label: "Who holds it today" }, { id: "signed", label: "Signed?", cell: "tick" }] },
+                { id: "gap", type: "gap", label: "Gap strip", rows: [{ id: "viewer", label: "A viewer" }] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const steps = w0.workshop.steps!.map((st) => (st.step === "P2" ? { ...st, questions: st.questions!.map((q) => (q.id === "trust" ? { ...q, canvas: "s1:rights:anchor:today" } : q)) } : st));
+    const lab = { steps: [{ id: "canvas", label: "Canvas", title: "Our canvas", canvas: ["cover", "s1"] }, { id: "summary", label: "Summary", title: "Our summary", summary: true }] };
+    const ws = { ...w0.workshop, steps, canvas, lab };
+    expect(WorkshopSchema.safeParse({ ...ws, $schema: "workshop/0.1.0" }).success).toBe(true);
+    // A question may be a write-in of the canvas, nothing else; a lab step names sheets the canvas has.
+    const refused = (w: object) => WorkshopSchema.safeParse({ ...w, $schema: "workshop/0.1.0" }).success;
+    expect(refused({ ...ws, steps: steps.map((st) => ({ ...st, questions: st.questions?.map((q) => ({ ...q, canvas: "cover:std:fhir" })) })) })).toBe(false);
+    expect(refused({ ...ws, lab: { steps: [{ id: "canvas", label: "C", title: "C", canvas: ["nowhere"] }] } })).toBe(false);
+    expect(refused({ ...ws, canvas: { ...canvas, sheets: [canvas.sheets[0], canvas.sheets[0]] } })).toBe(false);
+    // The schema checked it above; the literal's field kinds are plain strings to the compiler.
+    const out = renderJourneyPages({ ...corpus, workshops: [{ ...w0, workshop: ws as unknown as typeof w0.workshop }] }, LINKS, "top");
+    const page = (path: string) => String(out.find((f) => f.path === `${base}/${path}`)!.content);
+    const discuss = page("discuss/index.html");
+    // Every field, under <workshop>:cv:<sheet>:<field>[:<row>[:<col>]], in the same store as every answer.
+    expect(discuss).toContain('<article class="jp-cv-sheet jp-cv-a3" id="canvas-cover" data-jp-cv-sheet="cover">');
+    expect(discuss).toMatch(/<textarea class="jp-answer jp-cv-in" name="policy:cv:cover:country" rows="1" data-jv-text/);
+    expect(discuss).toContain('<input type="radio" name="policy:cv:cover:stage" value="scale" data-jv-store>');
+    expect(discuss).toContain('<input type="checkbox" name="policy:cv:cover:std:icao" data-jv-check>');
+    expect(discuss).toContain('<input type="checkbox" name="policy:cv:s1:rights:anchor:signed" data-jv-check');
+    expect(discuss).toContain('<input type="radio" name="policy:cv:s1:gap:viewer" value="no" data-jv-store');
+    // The journey question that is a canvas cell keeps its answer there, on the walkthrough too, moving it from its own key and its older one.
+    const was = `data-jv-was="${Q_TRUST} policy:q:P2:0"`;
+    expect(discuss).toContain(`name="policy:cv:s1:rights:anchor:today" rows="1" data-jv-text ${was}`);
+    expect(page("walkthrough/P2/index.html")).toContain(`name="policy:cv:s1:rights:anchor:today" rows="2" data-jv-text ${was}`);
+    expect(page("walkthrough/P2/index.html")).not.toContain(`name="${Q_TRUST}"`);
+    // The sheet's annex: its modules' other journey questions, answered under their own keys.
+    const s1 = discuss.slice(discuss.indexOf('id="canvas-s1"'));
+    expect(s1).toContain("Annex: the journey’s questions for this sheet");
+    expect(s1).toContain(`name="${Q_BREAKS}"`);
+    expect(s1.slice(0, s1.indexOf("</article>"))).not.toContain(`aria-label="Our answer: What must be true for Ben to trust it?"`);
+    // The PDF's model: the same keys, a radio per option of a choice, the annex; the writer is loaded.
+    const model = JSON.parse(/<script type="application\/json" data-jp-canvas-model>([\s\S]*?)<\/script>/.exec(discuss)![1]!);
+    expect(model.size).toBe("A3");
+    expect(model.sheets.map((x: { id: string }) => x.id)).toEqual(["cover", "s1"]);
+    expect(model.sheets[0].sections[0].fields[1].rows[0].cells).toEqual([
+      { key: "policy:cv:cover:stage", label: "Pilot", kind: "tick", value: "pilot", radio: true },
+      { key: "policy:cv:cover:stage", label: "At scale", kind: "tick", value: "scale", radio: true },
+    ]);
+    expect(model.sheets[1].annex).toEqual([{ step: "P1", label: "Where does it break?", key: Q_BREAKS }]);
+    expect(discuss).toContain("data-jp-canvas-pdf");
+    expect(discuss).toContain('<script src="../../../../assets/canvas-pdf.js" defer></script>');
+    expect(out.some((f) => f.path === "assets/canvas-pdf.js")).toBe(true);
+    // The lab's summary reads every canvas key back, once.
+    const sum = JSON.parse(/<script type="application\/json" data-jp-lab-model>([\s\S]*?)<\/script>/.exec(discuss)![1]!);
+    const names = sum.flatMap((x: { items: { name: string }[] }) => x.items.map((i) => i.name));
+    expect(names).toEqual(expect.arrayContaining(["policy:cv:cover:country", "policy:cv:cover:stage", "policy:cv:cover:std:fhir", "policy:cv:s1:rights:anchor:today", "policy:cv:s1:gap:viewer", Q_BREAKS]));
+    expect(new Set(names).size).toBe(names.length);
+  });
   test("JV-07: every page's header has Reset Simulation, scoped to the workshop, returning to the overview", () => {
     for (const path of ["overview", "walkthrough/P2", "personas", "how", "demo/S2"]) {
       const page = at(`${base}/${path}/index.html`);

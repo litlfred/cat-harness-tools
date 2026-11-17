@@ -3,7 +3,7 @@
  * Write the workshop pages `workshop-answers.e2e.ts` serves: a journey of two
  * steps and a workshop whose lab shows module M5's questions in two of its
  * steps ("Who decides" and "Map"), as a content layer's policy track
- * may, with a summary step and a drawn sheet (the Table sheets panel). Drawn by the REAL journeys viewer (`renderJourneyPages`), so the
+ * may, with a summary step and a drawn sheet (the Table sheets panel), and a canvas sheet whose field J4.0a's question is. Drawn by the REAL journeys viewer (`renderJourneyPages`), so the
  * browser runs the shipped `present.js` against the shipped markup.
  *
  *   bun run cat-harness-tools/test/workshop-answers-fixture.build.ts <out-dir>
@@ -64,7 +64,7 @@ put(repo, "demo/workshops/track.json", {
     { id: "M5", title: "Governance, decision rights and the legal basis" },
   ],
   steps: [
-    { scenario: "j4-home", step: "J4.0a", questions: [{ module: "M5", text: "Who may read it?" }] },
+    { scenario: "j4-home", step: "J4.0a", questions: [{ module: "M5", text: "Who may read it?", canvas: "rights:who" }] },
     {
       scenario: "j4-home",
       step: "J4.0b",
@@ -75,8 +75,28 @@ put(repo, "demo/workshops/track.json", {
     },
   ],
   sheets: [{ id: "s1", label: "Sheet 1", title: "Our journey", size: "A3", modules: ["M1"] }],
+  canvas: {
+    title: "Country Canvas",
+    sheets: [
+      {
+        id: "rights",
+        label: "Sheet 5",
+        title: "Who decides",
+        sections: [
+          {
+            id: "main",
+            fields: [
+              { id: "who", type: "text", label: "Who may read the record", lines: 2 },
+              { id: "stage", type: "choice", label: "Where we are", options: [{ id: "pilot", label: "Pilot" }, { id: "scale", label: "At scale" }] },
+            ],
+          },
+        ],
+      },
+    ],
+  },
   lab: {
     steps: [
+      { id: "canvas", label: "Canvas", title: "Our canvas", canvas: ["rights"] },
       { id: "who-decides", label: "Who decides", title: "Who holds it?", modules: ["M5"] },
       { id: "map", label: "Map", title: "Where it meets", modules: ["M1", "M5"] },
       { id: "summary", label: "Summary", title: "Our summary", summary: true },
@@ -98,4 +118,4 @@ const find = (suffix: string): string => {
   if (!f) throw new Error(`no page ending ${suffix}; have ${files.map((x) => x.path).join(", ")}`);
   return f.path.replace(/index\.html$/, "");
 };
-put(site, "paths.json", { walkthrough: find("/workshops/track/walkthrough/J4.0b/index.html"), discuss: find("/workshops/track/discuss/index.html"), sheets: find("/workshops/track/sheets/index.html"), map: find("/workshops/track/map/index.html") });
+put(site, "paths.json", { walkthroughA: find("/workshops/track/walkthrough/J4.0a/index.html"), walkthrough: find("/workshops/track/walkthrough/J4.0b/index.html"), discuss: find("/workshops/track/discuss/index.html"), sheets: find("/workshops/track/sheets/index.html"), map: find("/workshops/track/map/index.html") });

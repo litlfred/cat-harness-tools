@@ -32,6 +32,7 @@ import { DAK_ATTR } from "./dak-links.ts";
 import { canvasDownloads, canvasFiles, canvasHtml, canvasOf, moduleSegment, personaOf, sheetsHtml, sourceHref, TOOL_ID, type ArchimateElementLink, type ArchitecturePanel, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_FORM, DEVICE_LABEL, renderDevice, stateSwitch, type DemoScreen, type ScreenContext } from "./screens.ts";
 import { screenExamples } from "../../schemas/process/device-screen.ts";
+import { canvasFormHtml, canvasModel, canvasSummaryItems, type AnnexQuestion } from "./canvas-form.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import {
   avatar,
@@ -58,6 +59,7 @@ import {
   answerBox,
   questionKey,
   legacyQuestionKey,
+  earlierKeys,
   type Presentation,
   type PresentedStep,
   type View,
@@ -424,9 +426,49 @@ function architectureHtml(p: Presentation, a: At, spec: ArchitectureSpec, panel:
 
 // ── the discussion ───────────────────────────────────────────────────────
 
-/** The discussion's head: the gap report's script, and the sheets' styles when it carries the Table sheets. */
+// ── the canvas as a form (owner, 2026-11-17) ─────────────────────────────
+
+/** Every journey question of the workshop, with the key its answer is kept under and the canvas field it is, if any. */
+function journeyQuestions(p: Presentation): AnnexQuestion[] {
+  const ws = p.w.workshop;
+  return p.steps.flatMap((s) => (s.ws?.questions ?? []).map((q) => ({ step: s.step.id, stepKey: s.key, module: q.module, text: q.text, key: questionKey(ws.id, s.ws!, q), ...(q.canvas ? { canvas: q.canvas } : {}) })));
+}
+
+/** Per canvas field ref, the keys its answer may have been kept under before: the journey questions that are it. */
+function canvasWas(p: Presentation): Map<string, string> {
+  const ws = p.w.workshop;
+  const out = new Map<string, string>();
+  for (const s of p.steps) (s.ws?.questions ?? []).forEach((q, i) => {
+    if (q.canvas && !out.has(q.canvas)) out.set(q.canvas, earlierKeys(ws.id, s.ws!, q, legacyQuestionKey(ws.id, s, i)));
+  });
+  return out;
+}
+
+/** The canvas sheets `ids` (all when absent) as the on-screen form. */
+function canvasForm(p: Presentation, a: At, ids?: readonly string[]): string {
+  const ws = p.w.workshop;
+  if (!ws.canvas) return "";
+  const qs = journeyQuestions(p);
+  return `<div class="jp-cv">${canvasFormHtml(ws.id, ws.canvas, qs, {
+    ...(ids ? { ids } : {}),
+    scale: ws.assessment?.scales[0]?.options,
+    was: canvasWas(p),
+    stepLink: (q) => stepChip(a, p.steps.find((s) => s.key === q.stepKey), q.step),
+    answerBox: (name, label) => answerBox(name, label, 2),
+  })}</div>`;
+}
+
+/** The button that writes the canvas out as an editable, pre-filled PDF, and (once a page) the model it writes from. */
+function canvasPdf(p: Presentation, withModel = true): string {
+  const ws = p.w.workshop;
+  if (!ws.canvas) return "";
+  const model = canvasModel(ws.id, ws.canvas, journeyQuestions(p), ws.assessment?.scales[0]?.options);
+  return `<div class="jp-cv-pdf jp-noprint"><button type="button" class="jp-btn-dark" data-jp-canvas-pdf>${icon("file")} Download the ${e(ws.canvas.title)} (editable PDF, ${e(ws.canvas.size ?? "A3")})</button><span class="jp-small">Filled in with this browser’s answers; every field stays editable in a PDF reader.</span>${withModel ? `<script type="application/json" data-jp-canvas-model>${jsonInHtml(model)}</script>` : ""}</div>`;
+}
+
+/** The discussion's head: the gap report's script, the sheets' styles when it carries the Table sheets, and the canvas PDF writer when the workshop has a canvas. */
 function discussHead(p: Presentation, a: At, gap: boolean): { head?: string } {
-  const head = [gap ? `<script src="${a.root}assets/gap-report.js" defer></script>` : "", hasSheets(p) ? `<link rel="stylesheet" href="${a.root}assets/journeys.css">` : ""].filter(Boolean).join("\n");
+  const head = [gap ? `<script src="${a.root}assets/gap-report.js" defer></script>` : "", hasSheets(p) ? `<link rel="stylesheet" href="${a.root}assets/journeys.css">` : "", p.w.workshop.canvas ? `<script src="${a.root}assets/canvas-pdf.js" defer></script>` : ""].filter(Boolean).join("\n");
   return head ? { head } : {};
 }
 
@@ -471,6 +513,7 @@ ${cards ? `<div class="jp-dqs">${cards}</div>` : ""}
 ${ws.promise ? `<section class="jp-promise"><b>The scope promise.</b> ${e(ws.promise)}</section>` : ""}
 ${byModule ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("message", "jp-indigo")} The journey’s questions, module by module</h3><div class="jp-dms">${byModule}</div></section>` : ""}
 ${tables}
+${ws.canvas ? `<section class="jp-card jp-pad jp-cv-wrap" id="canvas"><h3 class="jp-h">${icon("clipboard", "jp-indigo")} ${e(ws.canvas.title)}</h3>${ws.canvas.description ? `<p class="jp-small">${e(ws.canvas.description)}</p>` : ""}${canvasPdf(p)}${canvasForm(p, a)}</section>` : ""}
 ${gap}
 ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}
 ${sheetsPanel(corpus, p)}`;
@@ -610,13 +653,19 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
         .join("");
       out.push(`<div class="jp-gap jp-lab-caps">${rows}${ws.assessment?.standingLine ? `<p class="jp-standing">${e(ws.assessment.standingLine)}</p>` : ""}<p class="jp-small">The same ratings as each moment’s gap strip in the walkthrough. The gap report is in the summary.</p></div>`);
     }
+    if (st.canvas?.length && ws.canvas) {
+      for (const g of canvasSummaryItems(ws.id, ws.canvas, scales[0]?.options)) if (st.canvas.includes(g.sheet.id)) items.push(...g.items);
+      const qs = journeyQuestions(p);
+      for (const sh of ws.canvas.sheets.filter((x) => st.canvas!.includes(x.id))) for (const q of qs.filter((x) => x.canvas === undefined && (sh.modules ?? []).includes(x.module))) items.push({ label: `${q.step} · ${q.text}`, name: q.key, type: "text" });
+      out.push(canvasPdf(p, st.id === lab.steps.find((x) => x.canvas?.length)?.id), canvasForm(p, a, st.canvas));
+    }
     if (st.matrix) out.push(matrixHtml(corpus, p, a, mod));
     for (const m of st.modules ?? []) {
       const module = ws.modules.find((x) => x.id === m);
       const qs = p.steps.flatMap((s) => (s.ws?.questions ?? []).map((q, i) => ({ s, q, i })).filter((x) => x.q.module === m));
       if (!module || qs.length === 0) continue;
       for (const { s, q } of qs) items.push({ label: `${s.step.id} · ${q.text}`, name: questionKey(ws.id, s.ws!, q), type: "text" });
-      out.push(`<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m)}<b>${e(module.title)}</b></div>${module.carries ? `<p class="jp-dm-c">${e(module.carries)}</p>` : ""}<ul class="jp-lab-qs">${qs.map(({ s, q, i }) => `<li>${stepChip(a, s, s.step.id)}<div><span>${e(q.text)}</span>${answerBox(questionKey(ws.id, s.ws!, q), q.text, 2, "", legacyQuestionKey(ws.id, s, i))}</div></li>`).join("")}</ul></div>`);
+      out.push(`<div class="jp-card jp-dm"><div class="jp-dm-h">${mod(m)}<b>${e(module.title)}</b></div>${module.carries ? `<p class="jp-dm-c">${e(module.carries)}</p>` : ""}<ul class="jp-lab-qs">${qs.map(({ s, q, i }) => `<li>${stepChip(a, s, s.step.id)}<div><span>${e(q.text)}</span>${answerBox(questionKey(ws.id, s.ws!, q), q.text, 2, "", earlierKeys(ws.id, s.ws!, q, legacyQuestionKey(ws.id, s, i)))}</div></li>`).join("")}</ul></div>`);
     }
     if (st.discussion && ws.discussion?.length) {
       const cards = ws.discussion
@@ -649,7 +698,7 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
     return { st, n, body };
   });
   const takeaways = p.steps.filter((s) => s.step.policy);
-  const summaryBody = `<div class="jp-lab-sum-act jp-noprint"><button type="button" class="jp-btn-line" data-jp-lab-print>${icon("printer")} Print / Save as PDF</button><button type="button" class="jp-btn-line" data-jp-lab-csv>${icon("file")} Download CSV</button></div>
+  const summaryBody = `${canvasPdf(p, !lab.steps.some((x) => x.canvas?.length))}<div class="jp-lab-sum-act jp-noprint"><button type="button" class="jp-btn-line" data-jp-lab-print>${icon("printer")} Print / Save as PDF</button><button type="button" class="jp-btn-line" data-jp-lab-csv>${icon("file")} Download CSV</button></div>
 <p class="jp-small">Assembled from every step, <b>in this browser only</b>: nothing is sent anywhere.</p>
 <script type="application/json" data-jp-lab-model>${jsonInHtml(summary)}</script>
 <div class="jp-lab-sum" data-jp-lab-summary></div>
