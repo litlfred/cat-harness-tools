@@ -393,16 +393,22 @@ export const MERGE_GUARD_PR_TYPES = ["opened", "synchronize", "reopened", "ready
  * The merge guard's pull-request signal, as every layer holds it. It has no
  * token and decides nothing: a PR may edit it in its own head, and the worst
  * that does is that no signal comes, which leaves the status unposted.
+ * It names no layer, since the layers below this one hold it too
+ * (\`check:reference-direction\`).
  */
-export const MERGE_GUARD_TRIGGER_TEXT = `# Written by \`bun run cat workflow-pins --write\` (cat-harness-tools): do not edit.
+export const MERGE_GUARD_TRIGGER_TEXT = `# Written by \`bun run cat workflow-pins --write\`: do not edit.
 #
 # The merge guard's pull-request signal. It holds no token, checks nothing out
 # and decides nothing: it only finishes, and \`.github/workflows/merge-guard.yml\`,
 # which runs on \`workflow_run\` from the default branch, then judges the PR and
 # posts the \`merge-guard\` status. A PR may edit this file in its own head; the
 # worst that does is that no signal comes, and the status stays unposted.
-# Why not \`pull_request_target\`: the header of cat-harness-tools'
-# \`.github/workflows/layer-merge-guard.yml\`.
+# Why not \`pull_request_target\`: the header of the shared
+# \`layer-merge-guard.yml\` that \`merge-guard.yml\` calls.
+#
+# TRIGGERS, ACTUAL: \`pull_request\` only, by the owner's decision of 2026-11-17
+# (no \`pull_request_target\`). The \`workflow_run\` named above is the
+# caller's trigger, not this file's.
 
 name: ${MERGE_GUARD_TRIGGER_NAME}
 run-name: "${MERGE_GUARD_TRIGGER_NAME} #\${{ github.event.pull_request.number }}"
