@@ -908,16 +908,24 @@ function runOrder(r: GuardRun): number {
   return r.id ?? Number(r.html_url?.match(/\/runs\/(\d+)/)?.[1] ?? 0);
 }
 
-/** A finished run whose every job was skipped: it judged nothing. */
-const allSkipped = (r: GuardRun) => r.status === "completed" && r.conclusion === "skipped";
+/**
+ * A finished run that judged nothing: every job skipped, or the run was
+ * cancelled. A run of the same workflow on the same head cancels it through
+ * the concurrency group (the PR is marked ready, then labelled
+ * `ready-to-merge` two seconds later: the ready run is cancelled and the
+ * label run skips), so its `cancelled` says nothing about the tree.
+ */
+const allSkipped = (r: GuardRun) => r.status === "completed" && (r.conclusion === "skipped" || r.conclusion === "cancelled");
 
 /**
- * The latest run per workflow name, by {@link runOrder}. A run whose every job
- * skipped judged nothing, so it never displaces another run of the same
+ * The latest run per workflow name, by {@link runOrder}. A run that judged
+ * nothing ({@link allSkipped}) never displaces another run of the same
  * workflow on the head: a `labeled` run for a label other than `release`
  * (`ready-to-merge`, added after the full tier) skips every job, and taken as
  * the latest it would read a red full tier as passed (owner, 2026-11-11,
- * card B). It stands only when no run of that workflow judged anything.
+ * card B); a run cancelled by such a run, taken as the latest, read a green
+ * full tier as a `cancelled` defect (smart-trust-phw#24, 2026-11-17). It
+ * stands only when no run of that workflow judged anything.
  */
 function latestByName(runs: readonly GuardRun[]): Map<string, GuardRun> {
   const latest = new Map<string, GuardRun>();
