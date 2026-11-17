@@ -60,6 +60,7 @@
     "test/layer-pr-checks-job-graph.test.ts",
     "test/layer-pr-checks-live-labels.test.ts",
     "test/layer-ready-reuse.test.ts",
+    "test/layer-state-pin.test.ts",
     "test/release-gated-ci.test.ts"
   ]
 }
