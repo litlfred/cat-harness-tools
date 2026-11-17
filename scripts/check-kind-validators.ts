@@ -415,7 +415,16 @@ export async function sweepFamilies(
       continue;
     }
     for (const dir of dirs) {
+      // The graph's own declaration file (`todos/todos.json`, `beans/beans.json`:
+      // the kind's `declarationFile`) declares the graph's directories; it is
+      // not one of its nodes, and the family map does not name it. A layer
+      // seeded from another's store carries that store's `$schema` on it (the
+      // bootstrap graph schema, dth-sfp#13 from cat/dth-sc/todos), which the
+      // sweep reported as an unmapped family. Its shape is the declaration
+      // checks' question (`check:declared-dirs`), not this one.
+      const declarationFile = def.declarationFile ? join(dir, def.declarationFile) : undefined;
       for (const file of jsonFiles(dir)) {
+        if (file === declarationFile) continue;
         let node: unknown;
         try {
           node = JSON.parse(readFileSync(file, "utf8"));
