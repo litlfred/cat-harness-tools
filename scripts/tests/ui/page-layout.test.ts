@@ -61,8 +61,14 @@ describe("page-layout.css", () => {
       .split("}")
       .map((r) => r.split("{")[0]!.trim())
       .filter(Boolean);
-    for (const s of selectors) expect(s).toMatch(/^(:root|body\b|\.fa-page-|body:has\(\.fa-page-)/);
+    // The one exception is the rail's own scrolling (`:root .fa-nav`), which every railed page needs and asserts below.
+    for (const s of selectors) expect(s).toMatch(/^(:root(?! \.)|:root \.fa-nav\b|body\b|\.fa-page-|body:has\(\.fa-page-)/);
     expect(rule("body")).toBe("margin:0");
+  });
+
+  it("makes the rail its own scroller, so a wheel or touch over it never scrolls the page (owner, 2026-11-17)", () => {
+    expect(rule(":root .fa-nav")).toBe("overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain");
+    expect(rule(":root .fa-nav :is(.fa-nav-graphs,.fa-nav-pop)")).toBe("overscroll-behavior:contain");
   });
 
   it("knows nothing of FHIR, an IG or WHO", () => {

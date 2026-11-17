@@ -78,6 +78,7 @@
     "test/process/subprocess-links.e2e.ts",
     "test/rail-icon-row.e2e.ts",
     "test/rail-keeps-place.e2e.ts",
+    "test/rail-own-scroll.e2e.ts",
     "test/rail-tips.e2e.ts",
     "test/render-wait.e2e.ts",
     "test/review-budget.e2e.ts",
