@@ -198,3 +198,66 @@ Feature: Lock coherence and freshness
   Scenario: Over real repositories, a pin that cannot be fetched is undetermined
     When a lock pinning tools at a commit that does not exist is judged with agreement enforced
     Then there are no disagreements and the exit code is 2
+
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_squash_merge_dates_the_lock's_commit_at_the_MERGE_(merge-manager,_2026-11-17)::without_pinnedAt,_T_is_the_squash's_date_and_the_pin_loses_the_race:_stale
+  Scenario: Without pinnedAt, a squash-merged lock loses the race to a main that moved before the merge
+    Given harness main gained h3 at 10:20, after the re-pin pinned h2
+    And the lock pinning h2 was squash-merged at 10:25, author and committer dates both 10:25
+    When freshness is judged at re-pin time
+    Then T is the squash's author date, 10:25
+    And h2 is stale, behind, since main already had h3 at T
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_squash_merge_dates_the_lock's_commit_at_the_MERGE_(merge-manager,_2026-11-17)::with_pinnedAt_written_at_the_re-pin_(10:15),_main's_10:20_merge_is_after_T:_fresh,_and_the_output_says_why
+  Scenario: With pinnedAt written at the re-pin, a main that moved before the squash is after T
+    Given the same squash at 10:25, its lock recording pinnedAt 10:15
+    When freshness is judged at re-pin time
+    Then T is the recorded pinnedAt, 10:15, with the commit's 10:25 kept as the fallback
+    And h2 is fresh at re-pin time, main's h3 at 10:20 being the first commit after it
+    And the report names pinnedAt as T and says main moved after the lock was written
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_squash_merge_dates_the_lock's_commit_at_the_MERGE_(merge-manager,_2026-11-17)::a_pin_already_behind_main_at_pinnedAt_is_still_stale
+  Scenario: A pin already behind main at pinnedAt is still stale
+    Given a squash-merged lock pinning h2 with pinnedAt 10:21, after main gained h3 at 10:20
+    When freshness is judged at re-pin time
+    Then h2 is stale
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_squash_merge_dates_the_lock's_commit_at_the_MERGE_(merge-manager,_2026-11-17)::without_pinnedAt,_a_rebase_merge's_author_date_(the_pull_request's)_is_T:_fresh
+  Scenario: Without pinnedAt, a rebase merge's author date is T
+    Given a lock pinning h2 committed at 10:25 with author date 10:15 and no pinnedAt
+    When freshness is judged at re-pin time
+    Then T is the author date, 10:15, and h2 is fresh
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_squash_merge_dates_the_lock's_commit_at_the_MERGE_(merge-manager,_2026-11-17)::a_pinnedAt_later_than_the_commit_that_carries_the_lock_is_set_aside,_with_a_note
+  Scenario: A pinnedAt later than the commit that carries the lock is set aside
+    Given a lock recording pinnedAt 11:00, committed at 10:25
+    When the time it was written is read
+    Then T is the author date, 10:25, with a note that pinnedAt is later than the commit
+    And h2 is stale, and the report carries the note
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_squash_merge_dates_the_lock's_commit_at_the_MERGE_(merge-manager,_2026-11-17)::a_pinnedAt_that_is_not_a_date_is_set_aside,_with_a_note
+  Scenario: A pinnedAt that is not a date is set aside
+    Given a lock recording pinnedAt "yesterday"
+    When the time it was written is read
+    Then T is the author date, with a note that pinnedAt is not an ISO 8601 date-time
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_squash_merge_dates_the_lock's_commit_at_the_MERGE_(merge-manager,_2026-11-17)::a_pinnedAt_older_than_the_pin's_own_commit_(a_hand-edited_ref)_judges_that_pin_against_the_commit's_date
+  Scenario: A pinnedAt older than the pin's own commit judges that pin against the commit's date
+    Given a lock pinning h2 (10:10) that records pinnedAt 09:00, committed at 10:25
+    When freshness is judged at re-pin time
+    Then h2 is judged against 10:25, and is stale
+    And the report says pinnedAt was set aside for that pin
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_squash_merge_dates_the_lock's_commit_at_the_MERGE_(merge-manager,_2026-11-17)::an_uncommitted_lock's_pinnedAt_is_T,_unless_it_is_in_the_future
+  Scenario: An uncommitted lock's pinnedAt is T, unless it is in the future
+    Given an uncommitted lock recording pinnedAt 10:30, at 10:40
+    Then T is 10:30, recorded
+    When its pinnedAt is 12:00 instead
+    Then T is now, 10:40, with a note that pinnedAt is in the future
+
+  @test:scripts/tests/lock-coherence.test.ts::the_git_reader:_real_commits,_real_locks::a_squash_merge_dates_the_lock's_commit_at_the_MERGE_(merge-manager,_2026-11-17)::--repo:_the_pinnedAt_read_at_the_commit_is_T
+  Scenario: With --repo, the pinnedAt read at the commit is T
+    Given a repository whose lock, committed at 10:25, records pinnedAt 10:15
+    When its lock is read at that commit with git
+    Then the lock carries pinnedAt 10:15
+    And T is 10:15, recorded, with 10:25 as the fallback

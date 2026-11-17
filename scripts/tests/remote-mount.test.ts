@@ -23,7 +23,7 @@ import { declarationChain } from "../../schemas/kg/harness-config.ts";
 import { layerRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { RemoteSourceSchema, resolveSubgraphSource } from "../../schemas/kg/subgraph-source.ts";
 import { MountLockSchema, mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
-import { AGENT_SURFACE_GENERATORS, checkRemote, currentPerLock, editedOnlyPerLock, optInDriftFromLock, exitCode, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise, switchedOffOptInPaths } from "../remote-mount.ts";
+import { AGENT_SURFACE_GENERATORS, checkRemote, currentPerLock, editedOnlyPerLock, optInDriftFromLock, exitCode, lockTextWithPinnedAt, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise, switchedOffOptInPaths } from "../remote-mount.ts";
 import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "../../schemas/kg/index-config.ts";
 import { run as replayLocks } from "../mount-from-lock.ts";
 import { gitCorpus } from "../../schemas/sdlc/git-corpus.ts";
@@ -1670,5 +1670,42 @@ describe("same-owner mounts (cat-harness-tools#2337, WHO migration plan T3)", ()
       if (prev === undefined) delete process.env.CAT_REPO_OWNER;
       else process.env.CAT_REPO_OWNER = prev;
     }
+  });
+});
+
+describe("the lock records when it was written: pinnedAt (merge-manager, 2026-11-17)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "lock-pinned-at-"));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  const file = join(dir, "index.lock.json");
+  const lock = (ref: string) =>
+    MountLockSchema.parse({
+      $schema: "cat-harness-mount-lock/v1",
+      mounts: [{ harness: "core", repository: "litlfred/core", ref: ref.repeat(40) }],
+      instances: [],
+    });
+  const at = (iso: string) => () => new Date(iso);
+
+  test("a new lock is stamped now, in whole seconds, after $schema, and parses", () => {
+    rmSync(file, { force: true });
+    const text = lockTextWithPinnedAt(lock("a"), file, at("2026-11-17T10:15:00.123Z"));
+    const parsed = JSON.parse(text);
+    expect(Object.keys(parsed).slice(0, 3)).toEqual(["$schema", "pinnedAt", "mounts"]);
+    expect(parsed.pinnedAt).toBe("2026-11-17T10:15:00Z");
+    expect(MountLockSchema.parse(parsed).pinnedAt).toBe("2026-11-17T10:15:00Z");
+    writeFileSync(file, text);
+  });
+
+  test("the same content keeps its pinnedAt, so a re-run leaves the bytes alone", () => {
+    const before = readFileSync(file, "utf-8");
+    expect(lockTextWithPinnedAt(lock("a"), file, at("2026-11-17T11:00:00Z"))).toBe(before);
+  });
+
+  test("changed pins are stamped anew", () => {
+    expect(JSON.parse(lockTextWithPinnedAt(lock("b"), file, at("2026-11-17T11:00:00Z"))).pinnedAt).toBe("2026-11-17T11:00:00Z");
+  });
+
+  test("a lock written before pinnedAt existed is stamped at its next write", () => {
+    writeFileSync(file, JSON.stringify(lock("a"), null, 2) + "\n");
+    expect(JSON.parse(lockTextWithPinnedAt(lock("a"), file, at("2026-11-17T12:00:00Z"))).pinnedAt).toBe("2026-11-17T12:00:00Z");
   });
 });
