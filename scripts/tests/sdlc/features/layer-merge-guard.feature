@@ -64,3 +64,9 @@ Feature: The merge-guard status on every layer PR
     Given a guard that says "could not post the merge-guard status" for PRs 7 and 8
     When the step runs under bash -e
     Then it fails, naming "#7 #8"
+
+  @test:scripts/tests/sdlc/layer-merge-guard.test.ts::layer-merge-guard:_how_it_installs_the_guard::it_seeds_the_install_from_cat-harness-tools'_committed_bun.lock,_never_a_lockless_resolve
+  Scenario: The guard installs from cat-harness-tools' committed lockfile
+    Given the step that composes the guard
+    Then it copies cat-harness-tools' bun.lock into tools/ before it runs bun install
+

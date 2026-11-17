@@ -96,6 +96,19 @@ describe("layer-merge-guard: which PRs a run judges", () => {
   });
 });
 
+describe("layer-merge-guard: how it installs the guard", () => {
+  const run = String(wf.jobs.guard.steps.find((s) => /^Compose the guard/.test(String(s.name)))!.run);
+
+  test("it seeds the install from cat-harness-tools' committed bun.lock, never a lockless resolve", () => {
+    // A lockless install took typescript-eslint 8.73.0 while it was half-published
+    // and turned core's guard red, 2026-11-16 17:09-17:14Z.
+    const seed = run.indexOf("cp tools/cat-harness-tools/bun.lock tools/bun.lock");
+    const install = run.indexOf("(cd tools && bun install)");
+    expect(seed).toBeGreaterThan(-1);
+    expect(install).toBeGreaterThan(seed);
+  });
+});
+
 describe("layer-merge-guard: what it runs", () => {
   test("it posts the `merge-guard` status with --full-tier, from the caller's default branch, and never merges", () => {
     expect(STATUS_CONTEXT).toBe("merge-guard");
