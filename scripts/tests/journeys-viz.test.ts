@@ -504,20 +504,33 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(p2).toContain('name="policy:viewer:status"');
     // Owner, 2026-11-17: the room's question is the presenter's; the policy questions are full width, below the moment's two columns.
     expect(p2).toContain('<section class="jp-ask jp-presenter-only">');
-    const walkEnd = p2.indexOf('<div class="jp-hood-toggle">');
+    const lens = p2.indexOf('<div class="jp-lens jp-noprint"');
     const policyAt = p2.indexOf('<section class="jp-card jp-pad jp-tone-indigo jp-policy">');
-    expect(policyAt).toBeGreaterThan(p2.indexOf('<div class="jp-walk-r">'));
-    expect(p2.slice(p2.indexOf('<div class="jp-walk-r">'), policyAt)).toMatch(/<\/div>\n<\/div>\n$/);
-    expect(policyAt).toBeLessThan(walkEnd);
+    expect(lens).toBeGreaterThan(p2.indexOf('<div class="jp-walk-r">'));
+    expect(p2.slice(p2.indexOf('<div class="jp-walk-r">'), lens)).toMatch(/<\/div>\n<\/div>\n$/);
+    expect(policyAt).toBeGreaterThan(lens);
+    expect(policyAt).toBeLessThan(p2.indexOf('id="hood"'));
   });
   test("presenter mode is off until the presenter turns it on, and under the hood starts hidden (owner, 2026-11-17)", () => {
     expect(p2).toContain('<html lang="en" data-presenter="off">');
     expect(p2).toContain('if(localStorage.getItem("jp:presenter")==="on")');
-    expect(p2).toContain('<button type="button" data-jp-hood-toggle aria-controls="hood" aria-expanded="false">');
-    expect(p2).toContain('<section class="jp-hood" id="hood" data-jp-hood hidden>');
+    expect(p2).toContain('<section class="jp-hood" id="hood" role="tabpanel" aria-labelledby="lens-technical" data-jp-hood hidden>');
     expect(at("assets/present.js")).toContain('if (store("jp:hood") === "on") setHood(true);');
     // The journey page's under the hood is folded too.
     expect(files.some((f) => /<details class="jv-col jv-hood"><summary class="jv-hood-h">Under the hood<\/summary>/.test(String(f.content)))).toBe(true);
+  });
+  test("below the journey, a toggle between the policy view and the technical one; policy first (owner, 2026-11-17)", () => {
+    expect(p2).toContain('<div class="jp-lens jp-noprint" role="tablist" aria-label="Below the journey">');
+    expect(p2).toMatch(/<button type="button" role="tab" id="lens-policy" class="is-on" data-jp-lens="policy" aria-controls="policy" aria-selected="true">[\s\S]*?Policy view<\/span><\/button>/);
+    expect(p2).toMatch(/<button type="button" role="tab" id="lens-technical" data-jp-lens="technical" aria-controls="hood" aria-selected="false">[\s\S]*?Technical view<\/span><\/button>/);
+    // The policy pane is shown, the technical one hidden, until the toggle (or a browser's last choice) says otherwise.
+    expect(p2).toMatch(/<div class="jp-lens-pane" id="policy" role="tabpanel" aria-labelledby="lens-policy" data-jp-policy><section class="jp-card jp-pad jp-tone-indigo jp-policy">/);
+    expect(p2).not.toContain("data-jp-hood-toggle");
+    const js = at("assets/present.js");
+    expect(js).toContain('setHood(b.getAttribute("data-jp-lens") === "technical")');
+    expect(js).toContain("if (policy) policy.hidden = show;");
+    // The full-width questions keep their two columns inside the pane.
+    expect(at("assets/present.css")).toContain(".jp-walk ~ .jp-lens-pane > .jp-policy .jp-qs");
   });
   test("a step: the people, each with the avatar in the card's header (never inside a sentence), and under the hood", () => {
     expect(p2).toContain('class="jp-who" style="--c:#123456"');
