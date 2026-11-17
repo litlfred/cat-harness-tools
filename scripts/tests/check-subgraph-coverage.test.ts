@@ -604,7 +604,10 @@ describe("the own-docs axis — an instance owes documentation of its own", () =
     // corpus: a checkout whose every instance has one (this layer alone,
     // once it declared docs/ for its wireframes) prints no such line, and
     // that is the axis working, not failing.
-    const probe = formatReport([auditInstance(inst())]);
+    // Its own root as the repository: the default walks the temp directory's
+    // parent (`/tmp` on a runner holds unreadable systemd directories, EACCES).
+    const probeRoot = inst();
+    const probe = formatReport([auditInstance(probeRoot, probeRoot)]);
     expect(probe).toContain("1 instance(s) have no `docs/` OF THEIR OWN");
     expect(probe).toContain("advisory, not gated");
     expect(probe).not.toContain("no `docs/` OF THEIR OWN — an instance a reader cannot enter");
