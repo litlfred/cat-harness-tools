@@ -3,7 +3,7 @@
    without it; it adds what a facilitator does in a room:
    - ← / PageUp and → / PageDown: the previous and next moment (the page's
      <link rel="prev|next">);
-   - W: reveal the "What if…"; T: show or hide what is under the hood;
+   - W: reveal the "What if…"; T: switch between the policy and the technical view (under the hood);
    - presenter mode: the presenter's note and the facilitator cue, on or off,
      remembered in this browser;
    - the gap strip's answers, remembered in this browser only;
@@ -63,13 +63,28 @@
     });
   }
 
+  // Below the journey: the policy view or the technical one (under the hood), or,
+  // on a step with nothing for the table, the hood alone behind its toggle.
+  function hoodShown() {
+    var hood = doc.querySelector("[data-jp-hood]");
+    return Boolean(hood && !hood.hidden);
+  }
   function setHood(show) {
     var hood = doc.querySelector("[data-jp-hood]");
+    if (!hood) return;
+    var policy = doc.querySelector("[data-jp-policy]");
     var btn = doc.querySelector("[data-jp-hood-toggle]");
-    if (!hood || !btn) return;
     hood.hidden = !show;
-    btn.classList.toggle("is-on", show);
-    btn.setAttribute("aria-expanded", String(show));
+    if (policy) policy.hidden = show;
+    if (btn) {
+      btn.classList.toggle("is-on", show);
+      btn.setAttribute("aria-expanded", String(show));
+    }
+    each("[data-jp-lens]", function (b) {
+      var on = (b.getAttribute("data-jp-lens") === "technical") === show;
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-selected", String(on));
+    });
     store("jp:hood", show ? "on" : "off");
   }
 
@@ -885,6 +900,20 @@
         setHood(!b.classList.contains("is-on"));
       });
     });
+    each("[data-jp-lens]", function (b) {
+      b.addEventListener("click", function () {
+        setHood(b.getAttribute("data-jp-lens") === "technical");
+      });
+      // The arrow keys move between the two tabs, as a tab list's do.
+      b.addEventListener("keydown", function (ev) {
+        if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        setHood(!hoodShown());
+        var to = doc.querySelector('[data-jp-lens="' + (hoodShown() ? "technical" : "policy") + '"]');
+        if (to) to.focus();
+      });
+    });
     // Under the hood starts hidden (owner, 2026-11-17); shown when this browser last showed it.
     if (store("jp:hood") === "on") setHood(true);
     each(".jp-proc", zoom);
@@ -968,8 +997,7 @@
       else if (ev.key === "ArrowLeft" || ev.key === "PageUp") go = linkHref("prev");
       else if (ev.key === "w" || ev.key === "W") toggleWhatIf();
       else if (ev.key === "t" || ev.key === "T") {
-        var b = doc.querySelector("[data-jp-hood-toggle]");
-        if (b) setHood(!b.classList.contains("is-on"));
+        if (doc.querySelector("[data-jp-hood]")) setHood(!hoodShown());
       }
       if (go) {
         ev.preventDefault();

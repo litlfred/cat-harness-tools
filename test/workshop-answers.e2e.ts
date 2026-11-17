@@ -136,6 +136,35 @@ test.describe("the Table sheets, folded into the discussion", () => {
 });
 
 /**
+ * POLICY OR TECHNICAL — owner, 2026-11-17: below the journey on a walkthrough
+ * step, a toggle between the policy view (the questions for the table) and the
+ * technical one (under the hood). Policy shows first; the choice is kept.
+ */
+test.describe("below the journey, the policy view or the technical one", () => {
+  test.beforeEach(async ({ context }) => serve(context));
+
+  test("policy first; the toggle, the T key and a reload keep to the chosen view", async ({ page }) => {
+    await page.goto(`http://site.test/${PATHS.walkthrough}`);
+    const policy = page.locator("[data-jp-policy]");
+    const hood = page.locator("[data-jp-hood]");
+    const tech = page.locator('[data-jp-lens="technical"]');
+    await expect(policy).toBeVisible();
+    await expect(hood).toBeHidden();
+    await expect(page.locator('[data-jp-lens="policy"]')).toHaveAttribute("aria-selected", "true");
+    await tech.click();
+    await expect(hood).toBeVisible();
+    await expect(policy).toBeHidden();
+    await expect(tech).toHaveAttribute("aria-selected", "true");
+    await page.reload();
+    await expect(hood).toBeVisible();
+    await expect(policy).toBeHidden();
+    await page.locator("body").press("t");
+    await expect(policy).toBeVisible();
+    await expect(hood).toBeHidden();
+  });
+});
+
+/**
  * THE CANVAS AS DATA — owner, 2026-11-17: the canvas is a form kept in the same
  * store; a journey question that names a field shares its answer; the export is
  * an editable PDF filled in from those answers.

@@ -747,3 +747,15 @@ Feature: Merge guard
     Then it refuses as not-ready, saying no test shard ran
     When a "bun test (head, 2/4)" shard that ran is added
     Then it passes
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_—_the_head's_own_pull_request_CI::a_later_cancelled_run_(superseded_on_the_same_head)_never_displaces_an_earlier_verdict,_green_or_red
+  Scenario: A cancelled run superseded on the same head never displaces a verdict
+    Given PR #1957 green and PR #1937 red, each with a later cancelled pull_request run of every workflow (and a skipped one on #1957)
+    When the "ci" check is read
+    Then #1957 passes and #1937 still refuses on "Code-quality gates: failure"
+
+  @test:scripts/tests/sdlc/merge-guard.test.ts::check_5_—_the_head's_own_pull_request_CI::a_cancelled_run_stands,_and_is_not_green,_when_it_is_the_only_run_of_its_workflow
+  Scenario: A lone cancelled run is still not green
+    Given PR #1957 with a workflow whose only run was cancelled
+    When the "ci" check is read
+    Then it refuses, naming that workflow as cancelled

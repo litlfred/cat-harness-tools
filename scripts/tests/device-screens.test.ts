@@ -154,7 +154,7 @@ describe("device screens: read, ordered, linked", () => {
     expect(p4).toMatch(/See what Reem sees <small>\(screen P4-scanner\)/);
     expect(p4).toMatch(/See what Kamal sees <small>\(screen P2\)/);
     // JV-10, then owner 2026-11-17 ("hard to see", "simulators above Ask the room"): first in the right column, a full-width button.
-    const right = p4.slice(p4.indexOf('<div class="jp-walk-r">'), p4.indexOf('<div class="jp-hood-toggle">'));
+    const right = p4.slice(p4.indexOf('<div class="jp-walk-r">'), p4.indexOf('id="hood"'));
     expect(right.startsWith('<div class="jp-walk-r">\n<div class="jp-sees"><a class="jp-see"')).toBe(true);
     expect(p4.slice(0, p4.indexOf('<div class="jp-walk-r">'))).not.toContain("jp-see");
   });
