@@ -669,6 +669,13 @@ echo
 # `bootstrap-tools/` are no longer submodules, and `state-mount.ts` cannot even
 # load without `bootstrap-tools`. `mount-from-lock.ts` replays the committed
 # lock with `node:*` only, so it runs on a fresh clone.
+#
+# The mount is also the layer's INITIALIZATION of its state (owner,
+# 2026-11-17): a state branch the root layer declares and its remote lacks is
+# created there, seeded empty (`state-branch-init.ts`, by hand
+# `bun run cat state:seed --init`), then mounted. Never a mounted dependency's
+# branch; where this token cannot push, the report names the command instead.
+# `CAT_STATE_INIT=0` turns the creation off.
 if command -v bun >/dev/null 2>&1 && [ -f "$REPO_ROOT/scripts/mount-from-lock.ts" ]; then
   lock_out="$(cd "$CHECKOUT_ROOT" && bun run "$REPO_ROOT/scripts/mount-from-lock.ts" --root "$CHECKOUT_ROOT" 2>&1)" || true
   case "$lock_out" in

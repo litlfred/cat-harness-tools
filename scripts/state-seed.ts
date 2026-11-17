@@ -11,6 +11,8 @@
  * bun run cat state:seed --id beans              # refresh the seed, verify, report
  * bun run cat state:seed --id beans --dry-run    # what it would push, pushing nothing
  * bun run cat state:seed --id beans --authoritative   # the CUTOVER half: the branch becomes the store
+ * bun run cat state:seed --init                  # INITIALIZATION: create this layer's missing declared state branches
+ * bun run cat state:seed --init --id beans --dry-run   # one of them, reporting what it would create
  * bun run cat state:seed --retire <root> --into <host instance> --repository <url> \\
  *   --also <root>.config.json                  # SEPARATION: a whole instance, into the host's fsh-guts
  * ```
@@ -89,6 +91,17 @@
  * Every default resolves through `defaultRepoRoot()`: the git toplevel of the
  * directory the command is run from. `--repo-root <dir>` overrides it.
  *
+ * ## `--init` CREATES; everything else here refreshes
+ *
+ * A layer's declared state branches are created by its initialization, not
+ * by hand: `--init` (and `state:mount`, which calls the same code) creates
+ * each branch the root layer declares and its remote is missing, seeded with
+ * the standard layout and an `authoritative: true` manifest — the branch is
+ * the store from its first commit. Never a mounted dependency's, never over
+ * an existing branch, never onto an empty remote. See `state-branch-init.ts`.
+ * Its exit codes are that module's: 0 created or present · 1 denied (the
+ * token cannot push) · 4 could not determine · 5 refused.
+ *
  * Exit codes: 0 refreshed or already current (or cut over / would cut over)
  * · 1 pushed and still not verified · 4 could not determine · 5 refused.
  */
@@ -103,6 +116,7 @@ import { findDeclarationFile, layerRootsIn } from "../schemas/kg/instance-roots.
 import { instanceStateBranch } from "../schemas/kg/subgraph-source.ts";
 import { BranchStore, gitBlobId, MANIFEST_FILE, MANIFEST_SCHEMA, tipLocations, type TreeEntry } from "./branch-store.ts";
 import { candidatesOf, defaultRepoRoot, observedRows, type SpecialBranch } from "./state-drift.ts";
+import { initDeclaredStateBranches, initExitCode, initReport } from "./state-branch-init.ts";
 
 /** What the manifest says, as far as a refresh needs it. */
 interface SeedManifest {
@@ -1151,10 +1165,21 @@ if (import.meta.main) {
     else console.log(retireReport(r));
     process.exit(r.state === "refused" ? 5 : r.state === "unknown" ? 4 : 0);
   }
+  if (argv.includes("--init")) {
+    const r = initDeclaredStateBranches({
+      repoRoot: repoRootArg ?? defaultRepoRoot(),
+      id: named("--id"),
+      dryRun: argv.includes("--dry-run"),
+    });
+    if (argv.includes("--json")) console.log(JSON.stringify(r, null, 2));
+    else console.log(initReport(r));
+    process.exit(initExitCode(r));
+  }
   const id = named("--id");
   if (!id) {
     console.error(
-      "usage: bun run cat state:seed --id <directory id or branch> [--repo-root <dir>] [--from-manifest] [--authoritative] [--dry-run] [--json]\n" +
+      "usage: bun run cat state:seed --init [--id <directory id>] [--repo-root <dir>] [--dry-run] [--json]\n" +
+        "       bun run cat state:seed --id <directory id or branch> [--repo-root <dir>] [--from-manifest] [--authoritative] [--dry-run] [--json]\n" +
         "       bun run cat state:seed --id <id> --cutover [--commit] [--repo-root <dir>] [--json]\n" +
         "       bun run cat state:seed --retire <instance root> --into <host instance> --repository <url> [--also <file>]... [--bean <id>] [--commit]",
     );
