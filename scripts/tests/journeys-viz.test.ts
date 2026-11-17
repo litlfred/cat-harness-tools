@@ -544,35 +544,41 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
 
 describe("the presentation views: map, persona lens, how it works, discussion, sheets, device demo", () => {
   const base = "top/workshops/policy";
-  const map = at(`${base}/map/index.html`);
   const how = at(`${base}/how/index.html`);
   const wallet = at(`${base}/how/wallet/index.html`);
   const discuss = at(`${base}/discuss/index.html`);
   const p2 = at(`${base}/walkthrough/P2/index.html`);
   test("every view has a page, in the frame, and the tabs link them", () => {
-    for (const path of ["map", "personas", "personas/ana", "personas/cleo", "how", "how/wallet", "discuss", "sheets", "demo", "demo/S2"]) {
+    for (const path of ["personas", "personas/ana", "personas/cleo", "how", "how/wallet", "discuss", "sheets", "demo", "demo/S2"]) {
       const page = at(`${base}/${path}/index.html`);
       expect(page).toContain(NAVBAR_OPT_OUT);
       expect(page).toContain('<span class="jp-name">PilgrimLink</span>');
     }
-    expect(p2).toContain('href="../../map/"');
+    expect(p2).not.toContain('href="../../map/"');
     expect(p2).toContain('href="../../personas/"');
     expect(p2).toContain('href="../../how/"');
     expect(p2).toContain('href="../../discuss/"');
     expect(p2).not.toContain("jp-tab-off");
-    expect(files.some((f) => f.path === `${base}/map/bpmn/processes-care.svg`)).toBe(true);
   });
-  test("the map: a lane per person to focus on, the two toggles, a column per step, the technical layer, the per-view note", () => {
-    expect(map).toContain('data-jp-focus="ana"');
-    expect(map).toContain('data-jp-show="pain"');
-    expect(map).toContain('data-jp-show="tech"');
-    expect(map).toContain('data-row="lane" data-actor="cleo"');
-    expect(map).toContain('href="../how/wallet/"');
-    // A hand-off end that is somebody of the cast wears their avatar.
-    expect(map).toMatch(/<b>Clinic EMR → <span class="jp-av jp-av-sm"[^>]*>A<\/span>Ana<\/b>/);
-    expect(map).toContain('data-jp-panel="1" hidden');
-    expect(map).toContain("Open screen S2");
-    expect(map).toContain("Read across, then down.");
+  test("the journey map is folded into How it works: its tab is gone, map/ redirects, and its hand-offs are How it works' Data on the move (owner, 2026-11-17)", () => {
+    for (const page of [p2, how, discuss, at(`${base}/overview/index.html`)]) {
+      expect(page).not.toContain("<b>Journey map</b>");
+      expect(page).not.toMatch(/href="(\.\.\/)*map\/"/);
+    }
+    expect(at(`${base}/overview/index.html`)).toContain('<a class="jp-cta jp-cta-2" href="../how/">See how it works');
+    const old = at(`${base}/map/index.html`);
+    expect(old).toContain('<meta http-equiv="refresh" content="0; url=../how/">');
+    expect(old).toContain('location.replace("../how/" + location.search)');
+    expect(old).not.toContain("data-jp-map");
+    expect(renderedByOf(old)).toBe("journeys-viewer");
+    expect(files.some((f) => f.path.startsWith(`${base}/map/bpmn/`))).toBe(false);
+    // Data on the move: after the grid, before the processes; a hand-off end that is somebody of the cast wears their avatar.
+    expect(how).toContain('<section class="jp-card jp-pad jp-move" id="data-on-the-move">');
+    expect(how).toMatch(/<b>Clinic EMR → <span class="jp-av jp-av-sm"[^>]*>A<\/span>Ana<\/b>/);
+    expect(how.indexOf('id="data-on-the-move"')).toBeGreaterThan(how.indexOf('id="jp-blocks"'));
+    // No duplicate: the building blocks per moment are the grid's alone, and the processes the BPMN list's.
+    expect(how).not.toContain("jp-mapgrid");
+    expect((how.match(/Business processes \(BPMN\)/g) ?? []).length).toBeLessThanOrEqual(1);
   });
   test("the persona lens: needs, frustrations, the curve's points linking to steps, the touchpoints; a glyph for an icon", () => {
     const ana = at(`${base}/personas/ana/index.html`);
@@ -584,8 +590,7 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     // JV-06: a persona with an icon wears it in every avatar, as VaxLink's baby does (owner's
     // review, 2026-11-11, superseding initials for everyone of 2026-11-06); the rest keep initials.
     expect(at(`${base}/personas/cleo/index.html`)).toMatch(/class="jp-av jp-av-lg jp-av-icon"[^>]*title="Cleo"[^>]*><svg/);
-    expect(map).toMatch(/class="jp-av[^"]* jp-av-icon"[^>]*title="Cleo"/);
-    expect(map).toMatch(/class="jp-av jp-av-sm"[^>]*title="Ana"[^>]*>A<\/span>/);
+    expect(how).toMatch(/class="jp-av jp-av-sm"[^>]*title="Ana"[^>]*>A<\/span>/);
     // JV-12: the curve's axis is three faces, not characters.
     const curve = at(`${base}/personas/ana/index.html`);
     for (const f of ["happy", "neutral", "sad"]) expect(curve).toContain(`class="jp-cv-face" aria-label="${f}"`);
@@ -648,7 +653,7 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     if (other) expect(String(other.content)).not.toContain("In the architecture (ArchiMate)");
   });
   test("JV-02: every view has the payload drawer; a view page loads each payload from one shared file, a step page carries it", () => {
-    for (const path of ["overview", "map", "personas", "personas/ana", "how", "how/wallet", "discuss", "sheets", "demo", "demo/S2"]) {
+    for (const path of ["overview", "personas", "personas/ana", "how", "how/wallet", "discuss", "sheets", "demo", "demo/S2"]) {
       const page = at(`${base}/${path}/index.html`);
       expect(page).toContain("data-jp-drawer");
       expect(page).toContain('data-jp-tab="Bundle/ana-ips"');
@@ -665,14 +670,14 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
   });
   test("JV-08: the drawer's bar names the active stage, and the workshop's inspector title, key and hint", () => {
     expect(p2).toContain('<span class="jp-drawer-chip">Active Stage: P2</span>');
-    expect(at(`${base}/map/index.html`)).toContain("Active Stage: Journey map");
+    expect(at(`${base}/how/index.html`)).toContain("Active Stage: How it works");
     expect(at(`${base}/demo/S2/index.html`)).toContain("Active Stage: S2 · P2");
     expect(p2).toContain("<b>FHIR payload inspector</b>");
     expect(p2).not.toContain("jp-drawer-key");
     const w0 = corpus.workshops[0]!;
     const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, inspector: { title: "FHIR R4 & WHO GDHCN payload inspector", key: "DEV Key: 916ffa (XXR)", hint: "Click to inspect raw FHIR / CBOR payload" } } } };
     const out = renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top");
-    for (const path of ["walkthrough/P2", "map", "demo/S2"]) {
+    for (const path of ["walkthrough/P2", "how", "demo/S2"]) {
       const page = String(out.find((f) => f.path === `${base}/${path}/index.html`)!.content);
       expect(page).toContain("<b>FHIR R4 &amp; WHO GDHCN payload inspector</b>");
       expect(page).toMatch(/<span class="jp-drawer-key"><svg[^>]*>[\s\S]*?<\/svg>DEV Key: 916ffa \(XXR\)<\/span>/);
@@ -812,7 +817,7 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     refuse({ overlaps: { policy: [{ label: "x", modules: ["M1"], steps: ["P7"], text: "t" }] } }, /step "P7"/);
   });
   test("JV-07: every page's header has Reset Simulation, scoped to the workshop, returning to the overview", () => {
-    for (const path of ["overview", "walkthrough/P2", "map", "how", "demo/S2"]) {
+    for (const path of ["overview", "walkthrough/P2", "personas", "how", "demo/S2"]) {
       const page = at(`${base}/${path}/index.html`);
       const depth = path.split("/").length;
       expect(page).toContain(`data-jp-reset="policy" data-jp-reset-to="${"../".repeat(depth)}overview/"`);
@@ -824,13 +829,6 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(at(`${base}/walkthrough/P2/index.html`)).toContain('class="jp-btn-link jp-reset jp-presenter-only"');
     expect(at(`${base}/walkthrough/P2/index.html`)).toContain('<span class="jp-keys jp-presenter-only">');
     expect(at("assets/present.css")).toContain('html[data-presenter="off"] .jp-wf-a { display: block; }');
-  });
-  test("JV-11: the map's moment columns are narrow enough on a desktop for eight, and a chapter's name wraps, never cut", () => {
-    const css = at("assets/present.css");
-    expect(css).toMatch(/@media \(min-width: 1280px\) \{ \.jp-mapgrid \{ grid-template-columns: 132px repeat\(var\(--n\), minmax\(136px, 1fr\)\)/);
-    // 132 + 8 × 136 = 1220px: inside a 1400px window less its gutters.
-    expect(132 + 8 * 136).toBeLessThan(1400 - 2 * 32 - 2);
-    expect(css).not.toMatch(/\.jp-mchap b \{[^}]*text-overflow: ellipsis/);
   });
   test("JV-13: How it works opens with the architecture panel from the ArchiMate graph, then the views, then the big ideas", () => {
     const w0 = corpus.workshops[0]!;
