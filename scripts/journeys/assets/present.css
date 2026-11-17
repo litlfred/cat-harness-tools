@@ -1154,6 +1154,29 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-cv-pdf { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 16px; }
 @media print { .jp-cv-sheet { break-after: page; box-shadow: none; } .jp-cv-secs { columns: 3; } }
 
+/* ── the Table sheets, an expanding panel of the discussion (owner, 2026-11-17) ── */
+.jp-sheets-panel { padding: 0; margin-top: 16px; }
+.jp-sheets-sum { display: flex; align-items: center; gap: 12px; padding: 14px 20px; cursor: pointer; list-style: none; }
+.jp-sheets-sum::-webkit-details-marker { display: none; }
+.jp-sheets-sum > span:first-of-type { display: flex; flex-direction: column; flex: 1; }
+.jp-sheets-sum b { font-size: 15px; color: var(--ink); }
+.jp-sheets-sum small { font-size: 13px; color: var(--s600); }
+.jp-sheets-chev { transition: transform 0.15s; }
+.jp-sheets-panel[open] .jp-sheets-chev { transform: rotate(90deg); }
+.jp-sheets-sum:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 12px; }
+.jp-sheets-in { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 16px; }
+.jp-sheets-in > .jp-sheets-h { padding: 0; }
+@media print {
+  /* Its print button prints the sheets alone: the panel open, everything else gone. */
+  .jp-print-sheets .jp-wrap > :not(.jp-lab):not(.jp-sheets-panel), .jp-print-sheets .jp-lab-aside, .jp-print-sheets .jp-lab-step:not(:has(.jp-sheets-panel)), .jp-print-sheets .jp-lab-step > :not(.jp-sheets-panel), .jp-print-sheets .fa-page-bar { display: none !important; }
+  .jp-print-sheets .jp-lab { display: block; }
+  .jp-print-sheets .jp-lab-step, .jp-print-sheets .jp-sheets-panel { border: 0; box-shadow: none; padding: 0; margin: 0; }
+  .jp-print-sheets .jp-sheets-in { padding: 0; gap: 0; }
+  .jp-print-sheets .jp-sheetlist { gap: 0; }
+  /* Printed from anywhere else, the folded panel stays folded. */
+  html:not(.jp-print-sheets) .jp-sheets-panel:not([open]) { display: none !important; }
+}
+
 /* ── How it works: data on the move, from the journey map's technical layer (owner, 2026-11-17) ── */
 .jp-move-scroll { overflow-x: auto; margin-top: 12px; }
 .jp-move-t { width: 100%; border-collapse: collapse; font-size: 13px; }

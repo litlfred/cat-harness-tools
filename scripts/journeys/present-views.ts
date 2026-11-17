@@ -1,6 +1,6 @@
 /**
  * The presentation frame's other views: the persona lens,
- * how it works, the discussion, the table sheets and the device demo — the
+ * how it works, the discussion (with the table sheets) and the device demo — the
  * tabs of the VaxLink walkthrough after its overview and walkthrough
  * (`present.ts`), each a page of its own in the same frame.
  *
@@ -15,7 +15,7 @@
  * | `personas/`, `personas/<actor>/` | one person end to end: goal, needs, frustrations, how they feel along the way, their touchpoints (`personas/` is the first of the cast) |
  * | `how/`, `how/<block>/` | the catalogue's big ideas, the building blocks × moments grid by layer, a block's detail with the moments it makes possible, the ArchiMate views of the taught journeys, what moves between the moments, the business processes |
  * | `discuss/` | the closing questions with the moments to revisit, the questions module by module, the tables with the moments that force each row, the gap list the walkthrough's gap strips assembled, every moment's policy takeaway |
- * | `sheets/` | the printable sheets, in the frame |
+ * | `sheets/` | a redirect to the Table sheets, now an expanding panel of `discuss/` (`#sheets`): in the lab’s summary step, or at the discussion’s foot |
  * | `demo/`, `demo/<screen>/` | the Device Demo: a screen per page with the moments it shows, both ways. The `device-screen` nodes that show a step the workshop presents, each drawn in its device frame with its owner beside it (`screens.ts`); only when there are none, the layer's own app framed, as the workshop's `presentation.deviceDemo` names it |
  *
  * VaxLink's own addresses (`#/map`, `#/personas/khamla`, `#/how/gdhcn`,
@@ -466,9 +466,9 @@ function canvasPdf(p: Presentation, withModel = true): string {
   return `<div class="jp-cv-pdf jp-noprint"><button type="button" class="jp-btn-dark" data-jp-canvas-pdf>${icon("file")} Download the ${e(ws.canvas.title)} (editable PDF, ${e(ws.canvas.size ?? "A3")})</button><span class="jp-small">Filled in with this browser’s answers; every field stays editable in a PDF reader.</span>${withModel ? `<script type="application/json" data-jp-canvas-model>${jsonInHtml(model)}</script>` : ""}</div>`;
 }
 
-/** The discussion's scripts: the gap report's, and the canvas PDF writer when the workshop has a canvas. */
-function discussScripts(p: Presentation, a: At, gap: boolean): { head?: string } {
-  const head = [gap ? `<script src="${a.root}assets/gap-report.js" defer></script>` : "", p.w.workshop.canvas ? `<script src="${a.root}assets/canvas-pdf.js" defer></script>` : ""].filter(Boolean).join("\n");
+/** The discussion's head: the gap report's script, the sheets' styles when it carries the Table sheets, and the canvas PDF writer when the workshop has a canvas. */
+function discussHead(p: Presentation, a: At, gap: boolean): { head?: string } {
+  const head = [gap ? `<script src="${a.root}assets/gap-report.js" defer></script>` : "", hasSheets(p) ? `<link rel="stylesheet" href="${a.root}assets/journeys.css">` : "", p.w.workshop.canvas ? `<script src="${a.root}assets/canvas-pdf.js" defer></script>` : ""].filter(Boolean).join("\n");
   return head ? { head } : {};
 }
 
@@ -515,8 +515,9 @@ ${byModule ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("message",
 ${tables}
 ${ws.canvas ? `<section class="jp-card jp-pad jp-cv-wrap" id="canvas"><h3 class="jp-h">${icon("clipboard", "jp-indigo")} ${e(ws.canvas.title)}</h3>${ws.canvas.description ? `<p class="jp-small">${e(ws.canvas.description)}</p>` : ""}${canvasPdf(p)}${canvasForm(p, a)}</section>` : ""}
 ${gap}
-${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussScripts(p, a, Boolean(gap)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
+${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}
+${sheetsPanel(corpus, p)}`;
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussHead(p, a, Boolean(gap)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
 }
 
 // ── the discussion as a lab ──────────────────────────────────────────────
@@ -714,7 +715,7 @@ ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("l
 <div class="jp-lab-head"><div><span class="jp-lab-kick">${n}. ${e(st.label)}</span><h3>${e(st.title)}</h3>${st.lede ? `<p class="jp-lab-lede">${e(st.lede)}</p>` : ""}</div>${st.minutes ? `<button type="button" class="jp-lab-timer jp-noprint jp-presenter-only" data-jp-timer="${st.minutes}">${icon("clock")} <span>Start ${st.minutes} min timer</span></button>` : ""}</div>
 ${st.discuss ? `<div class="jp-lab-discuss jp-presenter-only"><b>Discuss</b><span>${e(st.discuss)}</span></div>` : ""}
 ${body}
-${st.summary ? summaryBody : ""}
+${st.summary ? `${summaryBody}\n${sheetsPanel(corpus, p)}` : ""}
 ${st.note ? `<p class="jp-lab-note jp-presenter-only">${e(st.note)}</p>` : ""}
 ${next ? `<div class="jp-lab-nav jp-noprint"><a class="jp-btn-dark" href="#lab-${e(next.st.id)}" data-jp-lab-go="${e(next.st.id)}">${e(next.st.label)} ${icon("right")}</a></div>` : ""}
 </section>`;
@@ -725,8 +726,9 @@ ${next ? `<div class="jp-lab-nav jp-noprint"><a class="jp-btn-dark" href="#lab-$
   const body = `<section class="jp-dhero"><span class="jp-kicker">${icon("message")} ${e(lab.name ?? "Questions for the room")}</span><h2>${e(pr.closingQuestion ?? "Closing discussion")}</h2>${lab.intro ? `<p>${e(lab.intro)}</p>` : ""}</section>
 <nav class="jp-lab-tabs" aria-label="Steps">${tabs}</nav>
 <div class="jp-lab" data-jp-lab="${e(ws.id)}"><div class="jp-lab-steps">${sections}</div>${aside}</div>
+${lab.steps.some((st) => st.summary) ? "" : sheetsPanel(corpus, p)}
 ${credit}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussScripts(p, a, Boolean(model)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...discussHead(p, a, Boolean(model)), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body, foot: drawerOf(corpus, p, a, p.steps, "Discussion") });
 }
 
 // ── the module × journey matrix (JV-05) ───────────────────────────────────
@@ -858,31 +860,50 @@ export function gapReportModel(p: Presentation, href: (s: PresentedStep) => stri
 /** JSON safe inside a `<script>` element: no `</script>` or `<!--` can end it early. */
 const jsonInHtml = (v: unknown): string => JSON.stringify(v).replace(/</g, "\\u003c");
 
-// ── the table sheets ─────────────────────────────────────────────────────
+// ── the table sheets, folded into the discussion ─────────────────────────
 
-function sheetsPageFramed(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): string {
-  const a = at(1, links);
+/** The id of the Table sheets panel on the discussion page; `sheets/` redirects to it. */
+export const SHEETS_PANEL = "sheets";
+
+/** Whether a workshop has sheets to print: drawn ones, or its own canvas. */
+export const hasSheets = (p: Presentation): boolean => Boolean(p.w.workshop.sheets?.length || p.w.workshop.sheetsSource);
+
+/**
+ * The Table sheets as an expanding panel (owner, 2026-11-17: fold them into the
+ * discussion): folded, at the foot of the lab's summary step, or of the
+ * discussion when the workshop has no lab. The workshop's own canvas when it
+ * names one, the drawn sheets otherwise; its print button prints the sheets alone.
+ */
+function sheetsPanel(corpus: JourneyCorpus, p: Presentation): string {
+  if (!hasSheets(p)) return "";
   const ws = p.w.workshop;
   const canvas = canvasOf(corpus, p.w);
   const sizes = [...new Set((ws.sheets ?? []).map((s) => s.size))].join(" and ");
-  // The workshop's own canvas, when it names one; the drawn sheets otherwise.
+  const label = canvas ? canvas.title : "Table sheets";
+  const hint = canvas ? `Print the ${canvas.size} canvas, or download it` : `Print the ${sizes} sheets`;
   const body = canvas
-    ? `<section class="jp-card jp-sheets-h jp-noprint"><div><h2>${e(canvas.title)}</h2><p class="jp-small">${canvas.description ? e(canvas.description) : `${canvas.previews.length ? `${canvas.previews.length} page${canvas.previews.length === 1 ? "" : "s"}, ` : ""}${e(canvas.size)} landscape. Print at 100% with background graphics on, or download the file to fill in on screen.`}</p></div><span class="jp-sheets-act">${canvasDownloads(canvas, "jp-btn-line", { file: icon("file") })}${canvas.previews.length ? `<button type="button" class="jp-btn-dark" data-jv-print>${icon("printer")} Print the canvas</button>` : ""}</span></section>
+    ? `<section class="jp-sheets-h jp-noprint"><div><h2>${e(canvas.title)}</h2><p class="jp-small">${canvas.description ? e(canvas.description) : `${canvas.previews.length ? `${canvas.previews.length} page${canvas.previews.length === 1 ? "" : "s"}, ` : ""}${e(canvas.size)} landscape. Print at 100% with background graphics on, or download the file to fill in on screen.`}</p></div><span class="jp-sheets-act">${canvasDownloads(canvas, "jp-btn-line", { file: icon("file") })}${canvas.previews.length ? `<button type="button" class="jp-btn-dark" data-jp-sheets-print>${icon("printer")} Print the canvas</button>` : ""}</span></section>
 ${canvasHtml(canvas)}`
-    : `<section class="jp-card jp-sheets-h jp-noprint"><div><h2>Table canvas: ${e(sizes)} sheets</h2><p class="jp-small">A cover and ${(ws.sheets ?? []).length} sheet${(ws.sheets ?? []).length === 1 ? "" : "s"}, each with this journey’s questions for its module${(ws.sheets ?? []).some((s) => s.assessmentStrip) ? " and the gap strip at its foot" : ""}. Print on ${e(sizes)}, landscape, at 100% with background graphics on.</p></div><button type="button" class="jp-btn-dark" data-jv-print>${icon("printer")} Print the sheets</button></section>
+    : `<section class="jp-sheets-h jp-noprint"><div><h2>Table canvas: ${e(sizes)} sheets</h2><p class="jp-small">A cover and ${(ws.sheets ?? []).length} sheet${(ws.sheets ?? []).length === 1 ? "" : "s"}, each with this journey’s questions for its module${(ws.sheets ?? []).some((s) => s.assessmentStrip) ? " and the gap strip at its foot" : ""}. Print on ${e(sizes)}, landscape, at 100% with background graphics on.</p></div><button type="button" class="jp-btn-dark" data-jp-sheets-print>${icon("printer")} Print the sheets</button></section>
 <div class="jp-sheetlist">${sheetsHtml(corpus, p.w)}</div>`;
-  return frame({
-    p,
-    root: a.root,
-    toWorkshop: a.toWorkshop,
-    view: "sheets",
-    title: `Table sheets — ${presentationName(p)}`,
-    ...note(p, "sheets"),
-    head: `<link rel="stylesheet" href="${a.root}assets/journeys.css">`,
-    bodyClass: "jv-print-sheets",
-    body,
-    foot: drawerOf(corpus, p, a, p.steps, "Table sheets"),
-  });
+  return `<details class="jp-card jp-sheets-panel" id="${SHEETS_PANEL}" data-jp-sheets><summary class="jp-sheets-sum jp-noprint">${icon("printer", "jp-indigo")}<span><b>${e(label)}</b><small>${e(hint)}</small></span><span class="jp-sheets-chev" aria-hidden="true">${icon("right")}</span></summary>
+<div class="jp-sheets-in">${body}</div></details>`;
+}
+
+/**
+ * Where `sheets/` was: a redirect to the panel on the discussion page, keeping
+ * an old address's own anchor (`sheets/#sheet-s1` opens that sheet there).
+ */
+export function sheetsRedirect(): string {
+  const to = `../discuss/#${SHEETS_PANEL}`;
+  return withRenderedBy(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Table sheets: now in the discussion</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="${to}">
+<script>location.replace("../discuss/" + location.search + (location.hash || "#${SHEETS_PANEL}"));</script>
+<meta http-equiv="refresh" content="0; url=${to}">
+</head><body><p>The Table sheets are in the <a href="${to}">discussion</a>.</p></body></html>
+`, TOOL_ID);
 }
 
 // ── the device demo ──────────────────────────────────────────────────────
@@ -1015,9 +1036,10 @@ export function renderViewPages(corpus: JourneyCorpus, p: Presentation, links: S
   const cat = catalogueOf(corpus, p);
   for (const b of cat?.blocks.keys() ?? []) out.push({ path: `how/${b}/index.html`, content: howPage(corpus, p, links, b) });
   out.push({ path: "discuss/index.html", content: discussPage(corpus, p, links) });
-  if (p.w.workshop.sheets?.length || p.w.workshop.sheetsSource) {
-    out.push({ path: "sheets/index.html", content: sheetsPageFramed(corpus, p, links) });
-    for (const f of canvasFiles(canvasOf(corpus, p.w))) out.push({ path: `sheets/${f.path}`, content: f.content });
+  if (hasSheets(p)) {
+    // The sheets are a panel of the discussion (owner, 2026-11-17); the old address redirects to it.
+    for (const f of canvasFiles(canvasOf(corpus, p.w))) out.push({ path: `discuss/${f.path}`, content: f.content });
+    out.push({ path: "sheets/index.html", content: sheetsRedirect() });
   }
   if (p.screens.length) {
     out.push({ path: "demo/index.html", content: demoIndex(corpus, p, links) });
