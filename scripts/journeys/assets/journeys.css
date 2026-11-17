@@ -271,7 +271,7 @@ body.jv {
 /* The workshop's own canvas (JV-06): a page image each, as wide as the column, its own shape. */
 .jv-canvas { display: flex; flex-direction: column; gap: 24px; }
 .jv-canvas-page { margin: 0; background: #fff; border: 1px solid var(--jv-line); border-radius: 4px; padding: 8px; }
-.jv-canvas-page img { display: block; width: 100%; height: auto; }
+.jv-canvas-page img { display: block; width: 100%; height: auto; margin: 0 auto; }
 .jv-canvas-page figcaption { font-size: 0.78rem; color: var(--jv-muted); text-align: center; padding-top: 6px; }
 .jv-canvas-pdf { display: block; width: 100%; height: 80vh; border: 1px solid var(--jv-line); border-radius: 4px; }
 
@@ -288,7 +288,7 @@ body.jv {
   .jv-print-sheets .jv-canvas { gap: 0; }
   .jv-print-sheets .jv-canvas-page { break-after: page; border: 0; box-shadow: none; margin: 0; padding: 0; width: 400mm; height: 277mm; display: flex; align-items: center; justify-content: center; }
   .jv-print-sheets .jv-canvas-page.jv-canvas-a4 { page: a4; width: 277mm; height: 190mm; }
-  .jv-print-sheets .jv-canvas-page img { width: 100%; height: 100%; object-fit: contain; }
+  .jv-print-sheets .jv-canvas-page img { width: 100%; height: 100%; max-width: none !important; object-fit: contain; }
   .jv-print-sheets .jv-canvas-page:last-child { break-after: auto; }
   .jv-print-sheets .jv-sheet-a4 { page: a4; width: 277mm; height: 190mm; }
   .jv-print-sheets .jv-sheet:last-child { break-after: auto; }

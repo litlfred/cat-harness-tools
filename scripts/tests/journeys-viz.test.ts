@@ -44,6 +44,7 @@ import {
 } from "../journeys/present.ts";
 import { blockUsage, feelingPoints, stepByRef } from "../journeys/present-views.ts";
 import { NAVBAR_LINKED } from "../lib/harness-rail.ts";
+import { imageSizeOf } from "../journeys/image-size.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { clearDeclaredVisualisers, renderedByOf } from "../viewer-declarations.ts";
 
@@ -1060,6 +1061,32 @@ describe("presentation helpers", () => {
     // A sheetsSource naming no file is refused.
     expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", sheetsSource: { title: "Nothing" } }).success).toBe(false);
     expect(WorkshopSchema.safeParse({ ...w.workshop, $schema: "workshop/0.1.0", sheetsSource: { docx: "x.docx", extra: 1 } }).success).toBe(false);
+  });
+  test("a canvas preview is shown no wider than its pixels, and the check warns when it is too coarse for its paper (owner, 2026-11-17: \"blurry\")", () => {
+    // A PNG header (signature + IHDR) is all the size reader needs.
+    const png = (w: number, h: number): Uint8Array => {
+      const b = new Uint8Array(33);
+      b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+      new DataView(b.buffer).setUint32(16, w);
+      new DataView(b.buffer).setUint32(20, h);
+      return b;
+    };
+    mkdirSync(join(REPO, "top/canvas/sharp"), { recursive: true });
+    writeFileSync(join(REPO, "top/canvas/sharp/coarse.png"), png(1191, 842));
+    writeFileSync(join(REPO, "top/canvas/sharp/fine.png"), png(3572, 2526));
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, sheetsSource: { title: "Country Canvas", previews: ["../canvas/sharp/coarse.png", "../canvas/sharp/fine.png"] } } };
+    const page = String(renderJourneyPages({ ...corpus, workshops: [w] }, LINKS, "top").find((f) => f.path === "top/workshops/policy/sheets/index.html")!.content);
+    expect(page).toContain('<img src="canvas/coarse.png" width="1191" height="842" style="max-width:1191px" alt="Country Canvas, page 1 of 2"');
+    expect(page).toContain('<img src="canvas/fine.png" width="3572" height="2526" style="max-width:3572px"');
+    // Printed, an image fills its sheet whatever its pixels.
+    expect(at("assets/journeys.css")).toContain(".jv-print-sheets .jv-canvas-page img { width: 100%; height: 100%; max-width: none !important;");
+    const warned = checkJourneyRefs({ ...corpus, workshops: [w] }).warnings.filter((x) => x.at === "sheetsSource.previews").map((x) => x.message);
+    expect(warned).toEqual(['canvas-preview: "../canvas/sharp/coarse.png" is 1191×842 px, 72 dpi for an A3 page, and soft on screen; export it at 200 dpi or more (e.g. `pdftoppm -r 216 -png` from the PDF)']);
+    // A JPEG's size is read from its first frame header, past the segments before it.
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 11, 8, 0x03, 0x4a, 0x04, 0xa8, 3, 0, 0, 0]);
+    expect(imageSizeOf(jpeg)).toEqual({ width: 1192, height: 842 });
+    expect(imageSizeOf(new TextEncoder().encode("png 1"))).toBeUndefined();
   });
   test("presentation.cast orders the cast everywhere; presentation.chapterTitles names a chapter", () => {
     const w0 = corpus.workshops[0]!;

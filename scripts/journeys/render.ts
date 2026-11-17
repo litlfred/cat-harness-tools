@@ -58,6 +58,7 @@ import {
 import { igProcessPage, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
 import { PRESENT_ASSETS } from "./present-assets.ts";
 import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
+import { imageSize, type ImageSize } from "./image-size.ts";
 
 export const TOOL_ID = "journeys-viewer";
 const ASSET_DIR = join(import.meta.dir, "assets");
@@ -1032,6 +1033,8 @@ export interface CanvasFile {
   href: string;
   /** The file in the layer, when it is copied beside the page. */
   from?: string;
+  /** An image's pixel size, read from the file in the layer: the page never shows it wider. */
+  size?: ImageSize;
 }
 
 /** The workshop's `sheetsSource`, every file resolved; what the Table sheets view shows in place of the drawn sheets. */
@@ -1072,7 +1075,8 @@ export function canvasOf(corpus: JourneyCorpus, w: WorkshopEntry): Canvas | unde
     let name = basename(from);
     for (let i = 2; used.has(name); i++) name = `${basename(from, extname(from))}-${i}${extname(from)}`;
     used.add(name);
-    return { href: `canvas/${name}`, from };
+    const size = imageSize(from);
+    return { href: `canvas/${name}`, from, ...(size ? { size } : {}) };
   };
   const docx = file(src.docx);
   const pdf = file(src.pdf);
@@ -1101,7 +1105,9 @@ export function canvasDownloads(c: Canvas, cls: string, icons: { file?: string }
 }
 
 /**
- * The canvas's pages: an image per page, one printed page each; without
+ * The canvas's pages: an image per page, one printed page each, never shown
+ * wider than its pixels (a 72 dpi preview stretched to a wide column is what
+ * made the canvas blurry, owner 2026-11-17; `check:journey-refs` warns on one); without
  * previews, the PDF itself in the page; with only the Word file, a line
  * saying so.
  */
@@ -1109,7 +1115,7 @@ export function canvasHtml(c: Canvas): string {
   const n = c.previews.length;
   const pages = n
     ? c.previews
-        .map((f, i) => `<figure class="jv-canvas-page jv-canvas-${c.size.toLowerCase()}" id="canvas-page-${i + 1}"><img src="${e(f.href)}" alt="${e(`${c.title}, page ${i + 1} of ${n}`)}" loading="${i ? "lazy" : "eager"}"><figcaption class="jv-noprint">Page ${i + 1} of ${n}</figcaption></figure>`)
+        .map((f, i) => `<figure class="jv-canvas-page jv-canvas-${c.size.toLowerCase()}" id="canvas-page-${i + 1}"><img src="${e(f.href)}"${f.size ? ` width="${f.size.width}" height="${f.size.height}" style="max-width:${f.size.width}px"` : ""} alt="${e(`${c.title}, page ${i + 1} of ${n}`)}" loading="${i ? "lazy" : "eager"}"><figcaption class="jv-noprint">Page ${i + 1} of ${n}</figcaption></figure>`)
         .join("")
     : c.pdf
       ? `<object class="jv-canvas-pdf" type="application/pdf" data="${e(c.pdf.href)}" aria-label="${e(c.title)}"><p><a href="${e(c.pdf.href)}">${e(c.title)} (PDF)</a></p></object>`
