@@ -1154,6 +1154,14 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-cv-pdf { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 16px; }
 @media print { .jp-cv-sheet { break-after: page; box-shadow: none; } .jp-cv-secs { columns: 3; } }
 
+/* ── "we have this" on an application component, and the room's own country names (owner, 2026-11-17) ── */
+.jp-have { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; font-size: 12px; color: var(--s700); }
+.jp-have label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.jp-have-name { flex: 1 1 140px; min-width: 120px; font-size: 12px; padding: 3px 8px; }
+.jp-amels li .jp-have { margin: 4px 0 8px; }
+.jp-countries-in { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; margin-top: 10px; }
+.jp-countries-in label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: var(--s700); }
+
 /* ── below the journey: the policy view or the technical one (owner, 2026-11-17) ── */
 .jp-lens { display: flex; align-items: center; gap: 12px; }
 .jp-lens > i { flex: 1; border-top: 1px solid var(--s200); }

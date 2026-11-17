@@ -575,6 +575,40 @@ export function anchorHeadings(html: string): string {
   });
 }
 
+/**
+ * The fictional countries the workshop's journeys are set in (the chapters'
+ * `country`, and the architecture panel's country labels), in order, once
+ * each: the names a room may rename to its own (owner, 2026-11-17).
+ */
+export function countriesOf(p: Presentation): string[] {
+  const out: string[] = [];
+  const add = (c: string | undefined) => {
+    if (c && !out.includes(c)) out.push(c);
+  };
+  for (const c of p.chapters) add(c.journey.scenario.country);
+  for (const c of p.w.workshop.presentation?.architecture?.countries ?? []) add(c.label);
+  return out;
+}
+
+/** Where a room's own name for a country is kept (`jv:` + this). */
+export const countryKey = (workshop: string, name: string): string => `${workshop}:country:${name.normalize("NFKD").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "x"}`;
+
+/** The countries' block every frame page carries: present.js puts the room's names in place of these throughout the page's text. */
+function countriesBlock(p: Presentation): string {
+  const names = countriesOf(p);
+  if (!names.length) return "";
+  return `<script type="application/json" id="jp-countries">${JSON.stringify(names.map((n) => ({ name: n, key: countryKey(p.w.workshop.id, n) }))).replace(/</g, "\\u003c")}</script>`;
+}
+
+/** The overview's renaming panel: a box per fictional country, kept in the browser, applied on every page. */
+function countriesPanel(p: Presentation): string {
+  const names = countriesOf(p);
+  if (!names.length) return "";
+  return `<section class="jp-card jp-pad jp-countries" id="your-countries"><h3 class="jp-h">${icon("globe", "jp-sky")} Make it your countries</h3><p class="jp-small">The journeys are set in fictional countries. Give each one the name of a country at your table: the new names replace the old ones throughout the journeys’ text, in this browser only.</p><div class="jp-countries-in">${names
+    .map((n) => `<label><span>${e(n)}</span><input type="text" class="jp-answer" name="${e(countryKey(p.w.workshop.id, n))}" data-jv-text data-jp-country="${e(n)}" placeholder="${e(n)}" aria-label="${e(`Our name for ${n}`)}"></label>`)
+    .join("")}</div></section>`;
+}
+
 export function frame(o: FrameOpts): string {
   const ws = o.p.w.workshop;
   const pr = ws.presentation ?? {};
@@ -614,6 +648,7 @@ ${NAVBAR_OPT_OUT}
 ${panelHead(o.body, `${o.root}assets/`)}
 ${o.head ?? ""}
 ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="next" href="${e(o.next)}">` : ""}
+${countriesBlock(o.p)}
 </head>
 <body class="jp jp-${o.view}${o.bodyClass ? ` ${o.bodyClass}` : ""}">
 <header class="jp-head">
@@ -744,7 +779,8 @@ ${band}
 <div class="jp-split">
 <section class="jp-card jp-pad jp-col-3"><h3 class="jp-h">${icon("users", "jp-sky")} Meet the people</h3><div class="jp-people">${castHtml}</div></section>
 ${ladderHtml}
-</div>`;
+</div>
+${countriesPanel(p)}`;
   return frame({
     p,
     root,

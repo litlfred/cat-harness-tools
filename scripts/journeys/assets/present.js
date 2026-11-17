@@ -495,6 +495,53 @@
       });
     });
   }
+  var COUNTRY_ORIG = typeof WeakMap === "function" ? new WeakMap() : null;
+  function renameCountries() {
+    var src = doc.getElementById("jp-countries");
+    if (!src || !COUNTRY_ORIG) return;
+    var list;
+    try {
+      list = JSON.parse(src.textContent);
+    } catch (_e) {
+      return;
+    }
+    var pairs = [];
+    list.forEach(function (c) {
+      var to = (store("jv:" + c.key) || "").trim();
+      if (to && to !== c.name) pairs.push([c.name, to]);
+    });
+    // Longest first, so "North Onesa" is renamed before "Onesa".
+    pairs.sort(function (a, b) {
+      return b[0].length - a[0].length;
+    });
+    function reEsc(t) {
+      return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+    var walker = doc.createTreeWalker(doc.body, 4, {
+      acceptNode: function (n) {
+        var p = n.parentNode;
+        if (!p || /^(SCRIPT|STYLE|TEXTAREA|OPTION)$/.test(p.nodeName)) return 2;
+        if (p.closest && p.closest("[data-jp-countries-keep], .jp-countries label > span")) return 2;
+        return 1;
+      },
+    });
+    var n;
+    while ((n = walker.nextNode())) {
+      var orig = COUNTRY_ORIG.get(n);
+      if (orig === undefined) {
+        if (!pairs.length) continue;
+        orig = n.nodeValue;
+      }
+      var out = orig;
+      pairs.forEach(function (pr) {
+        out = out.replace(new RegExp("(^|[^\\p{L}\\p{N}])" + reEsc(pr[0]) + "(?=$|[^\\p{L}\\p{N}])", "gu"), function (_m, pre) {
+          return pre + pr[1];
+        });
+      });
+      if (out !== orig) COUNTRY_ORIG.set(n, orig);
+      if (n.nodeValue !== out) n.nodeValue = out;
+    }
+  }
   function keepCheck(el) {
     var key = "jv:" + el.name;
     var v = store(key);
@@ -983,6 +1030,13 @@
       root.classList.remove("jp-print-sheets");
       doc.body.classList.remove("jv-print-sheets");
     });
+    // The room's own names for the fictional countries (owner, 2026-11-17): kept per
+    // workshop, put in place of the old names throughout the page's text, live.
+    renameCountries();
+    each("[data-jp-country]", function (el) {
+      el.addEventListener("input", renameCountries);
+    });
+    window.addEventListener("jv:sync", renameCountries);
     each("[data-jv-print]", function (b) {
       b.addEventListener("click", function () {
         window.print();

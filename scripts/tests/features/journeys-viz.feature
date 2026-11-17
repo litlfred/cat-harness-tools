@@ -326,7 +326,7 @@ Feature: The journeys viewer
     And the discuss page has 5 lab tabs numbered from 0, a 5-minute timer, the Discuss prompt and the step note
     And the journey's use case comes ticked, the other not, and the statement starts from the use-case text and can be reset
     And the walkthrough's question keys reappear, readiness rows are grouped and rated, decision rights have holders, and the gap strip's radios are present
-    And the summary model lists the five steps and every answer's name, with the gap report, CSV, closing-question write-in and credit link
+    And the summary model lists the five steps, then the systems the room can mark, and every answer's name, with the gap report, CSV, closing-question write-in and credit link
     And a lab naming a table the workshop does not list is refused by the schema
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::the_canvas_as_data:_an_on-screen_form_keyed_per_field,_a_journey_question_naming_a_field_shares_its_key,_the_annex,_the_PDF's_model_(owner,_2026-11-17)
@@ -346,6 +346,15 @@ Feature: The journeys viewer
     Then each has a reset scoped to "policy" pointing back to the overview at its own depth
     And each shows "Reset Simulation"
     And present.js wires every data-jp-reset element
+
+  @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::a_room_marks_an_application_component_"we_have_this",_with_its_own_name_for_it,_and_renames_the_fictional_countries_(owner,_2026-11-17)
+  Scenario: A room marks an application component "we have this", and renames the fictional countries
+    Given a workshop whose architecture panel sets an application component in Taifafeki, beside Onesa, and a lab with a summary
+    Then the component carries a "We have this" tick and an "Our name for it" box, under one key, on the panel, in a view's element list and on its block's page
+    And no other kind of element is marked
+    And the lab's summary lists both marks under "Our systems"
+    And the overview has a box per fictional country, and every page names the countries present.js renames
+    And a workshop with no fictional countries has neither
 
   @test:scripts/tests/journeys-viz.test.ts::the_presentation_views:_map,_persona_lens,_how_it_works,_discussion,_sheets,_device_demo::JV-13:_How_it_works_opens_with_the_architecture_panel_from_the_ArchiMate_graph,_then_the_views,_then_the_big_ideas
   Scenario: How it works opens with the architecture panel, then the views, then the big ideas

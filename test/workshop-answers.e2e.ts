@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
  */
 
 let SITE = "";
-let PATHS: { walkthrough: string; walkthroughA: string; discuss: string; sheets: string; map: string } = { walkthrough: "", walkthroughA: "", discuss: "", sheets: "", map: "" };
+let PATHS: { overview: string; walkthrough: string; walkthroughA: string; discuss: string; sheets: string; map: string } = { overview: "", walkthrough: "", walkthroughA: "", discuss: "", sheets: "", map: "" };
 test.beforeAll(() => {
   const out = mkdtempSync(join(tmpdir(), "workshop-answers-"));
   execFileSync("bun", ["run", fileURLToPath(new URL("./workshop-answers-fixture.build.ts", import.meta.url)), out], { stdio: "pipe" });
@@ -188,5 +188,29 @@ test.describe("the canvas as a form, and its editable PDF", () => {
     expect(pdf).toContain(`/T ${hex("track:cv:rights:who")}`);
     expect(pdf).toContain(`/V ${hex("Only the clinician abroad")}`);
     expect(pdf).toMatch(new RegExp(`/T ${hex("track:cv:rights:stage")}[^\\n]*/V /scale`));
+  });
+});
+
+/**
+ * THE ROOM'S OWN COUNTRIES — owner, 2026-11-17: a table renames the fictional
+ * countries, and the new names stand in for the old throughout the text.
+ */
+test.describe("renaming the fictional countries", () => {
+  test.beforeEach(async ({ context }) => serve(context));
+
+  test("a name typed on the overview replaces the fictional one in the page's text, live and on every page after", async ({ page }) => {
+    await page.goto(`http://site.test/${PATHS.overview}`);
+    const main = page.locator(".jp-main");
+    await expect(main).toContainText("in Taifafeki");
+    await page.locator('input[data-jp-country="Taifafeki"]').fill("Kenya");
+    await expect(main).toContainText("in Kenya");
+    // The box's own label keeps the name it renames.
+    await expect(page.locator(".jp-countries-in label > span")).toHaveText("Taifafeki");
+    await page.reload();
+    await expect(main).toContainText("in Kenya");
+    await expect(page.locator(".jp-moments")).not.toContainText("Taifafeki");
+    // Cleared, the fictional name comes back.
+    await page.locator('input[data-jp-country="Taifafeki"]').fill("");
+    await expect(main).toContainText("in Taifafeki");
   });
 });

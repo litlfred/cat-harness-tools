@@ -316,7 +316,7 @@ ${layers
     : `<section class="jp-card jp-pad"><p class="jp-small">No building-block catalogue is declared for ${e(p.w.instance)}: declare one (a directory of the <code>building-blocks</code> kind) and the grid draws.</p></section>`;
   const b = selected ? cat?.blocks.get(selected) : undefined;
   const elementList = (els: readonly ArchimateElementLink[]) =>
-    `<ul class="jp-amels">${els.map((x) => `<li>${ext(a.siteRoot + x.page, x.name, "", DAK_ATTR)} <small>${e(x.type)}</small></li>`).join("")}</ul>`;
+    `<ul class="jp-amels">${els.map((x) => `<li>${ext(a.siteRoot + x.page, x.name, "", DAK_ATTR)} <small>${e(x.type)}</small>${haveMark(p, x)}</li>`).join("")}</ul>`;
   const blockEls = b ? (links.archimateBlock?.(p.w.instance, b.id) ?? []) : [];
   const detail = b
     ? `<aside class="jp-card jp-bdetail"><span class="jp-lchip jp-layer-${toneOf(b.layer)}">${e(layers.find((l) => l.id === b.layer)?.label ?? b.layer)}</span><h3>${e(b.name)}</h3><small>${glyph("clinic")} ${e([b.owner, b.jurisdiction].filter(Boolean).join(" · "))}</small>
@@ -371,6 +371,40 @@ ${procHtml}`;
   return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "how", title: `${b ? `${b.name} — ` : ""}How it works — ${presentationName(p)}`, ...note(p, "how"), body, foot: b ? drawerOf(corpus, p, a, blockUsage(p, b.id).map((x) => x.s), b.short ?? b.name, `where ${b.short ?? b.name} is used`) : drawerOf(corpus, p, a, steps, "How it works") });
 }
 
+// ── "we have this" (owner, 2026-11-17) ───────────────────────────────────
+
+/** The ArchiMate type a room marks as its own. */
+const MARKABLE = "Application Component";
+
+/** An element's id for its keys: the last segment of its page (`…/element/<id>/`), kebab. */
+export function elementSlug(x: ArchimateElementLink): string {
+  const seg = x.page.replace(/\/(index\.html)?$/, "").split("/").pop() ?? x.name;
+  return seg.replace(/\.html$/, "").replace(/[^A-Za-z0-9-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "element";
+}
+
+/** Where a room's mark on an element is kept (`jv:` + this): `<workshop>:am:<element>:have` ("1") and `…:name` (its local name). */
+export const elementKey = (workshop: string, x: ArchimateElementLink, part: "have" | "name"): string => `${workshop}:am:${elementSlug(x)}:${part}`;
+
+/** An application component's "We have this" tick and the room's own name for it; nothing for any other element. */
+function haveMark(p: Presentation, x: ArchimateElementLink): string {
+  if (x.type !== MARKABLE) return "";
+  const ws = p.w.workshop.id;
+  return `<span class="jp-have"><label><input type="checkbox" name="${e(elementKey(ws, x, "have"))}" data-jv-check> We have this</label><input type="text" class="jp-answer jp-have-name" name="${e(elementKey(ws, x, "name"))}" data-jv-text placeholder="Our name for it" aria-label="${e(`Our name for ${x.name}`)}"></span>`;
+}
+
+/** The application components a workshop's How it works shows, once each: the architecture panel's, then its views'. */
+function markableElements(p: Presentation, links: SiteLinks): ArchimateElementLink[] {
+  const pr = p.w.workshop.presentation ?? {};
+  const out = new Map<string, ArchimateElementLink>();
+  const add = (x: ArchimateElementLink) => {
+    if (x.type === MARKABLE && !out.has(elementSlug(x))) out.set(elementSlug(x), x);
+  };
+  const panel = pr.architecture ? links.archimateArchitecture?.(p.w.instance, pr.architecture) : undefined;
+  for (const r of panel?.rows ?? []) for (const c of r.cells) for (const b of c) add(b);
+  for (const v of viewsOf(p)) for (const x of links.archimateView?.(v.instance, v.model, v.view)?.elements ?? []) add(x);
+  return [...out.values()];
+}
+
 // ── the architecture panel (JV-13) ───────────────────────────────────────
 
 type ArchitectureSpec = NonNullable<NonNullable<Presentation["w"]["workshop"]["presentation"]>["architecture"]>;
@@ -408,7 +442,7 @@ function architectureHtml(p: Presentation, a: At, spec: ArchitectureSpec, panel:
                 ? cell
                     .map((b) => {
                       const ms = moments(b.bpmn);
-                      return `<div class="jp-arch-box"><small>${el(b.block)}</small><b>${el(b)}</b>${b.ig ? ext(b.ig, "IG page", "jp-arch-ig") : ""}${ms.length ? `<span class="jp-arch-ms">${ms.map((s) => stepChip(a, s, s.step.id)).join("")}</span>` : ""}</div>`;
+                      return `<div class="jp-arch-box"><small>${el(b.block)}</small><b>${el(b)}</b>${b.ig ? ext(b.ig, "IG page", "jp-arch-ig") : ""}${ms.length ? `<span class="jp-arch-ms">${ms.map((s) => stepChip(a, s, s.step.id)).join("")}</span>` : ""}${haveMark(p, b)}</div>`;
                     })
                     .join("")
                 : `<i>Not needed in this journey</i>`
@@ -697,6 +731,19 @@ function labPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, lab: 
     if (items.length) summary.push({ id: st.id, n, label: st.label, items });
     return { st, n, body };
   });
+  // The application components the room marked as its own (How it works), in the summary too.
+  const systems = markableElements(p, links);
+  if (systems.length && lab.steps.some((x) => x.summary)) {
+    summary.push({
+      id: "systems",
+      n: lab.steps.length,
+      label: "Our systems",
+      items: systems.flatMap((x) => [
+        { label: `${x.name}: we have this`, name: elementKey(ws.id, x, "have"), type: "check" as const, group: "Our systems" },
+        { label: `${x.name}: our name for it`, name: elementKey(ws.id, x, "name"), type: "text" as const },
+      ]),
+    });
+  }
   const takeaways = p.steps.filter((s) => s.step.policy);
   const summaryBody = `${canvasPdf(p, !lab.steps.some((x) => x.canvas?.length))}<div class="jp-lab-sum-act jp-noprint"><button type="button" class="jp-btn-line" data-jp-lab-print>${icon("printer")} Print / Save as PDF</button><button type="button" class="jp-btn-line" data-jp-lab-csv>${icon("file")} Download CSV</button></div>
 <p class="jp-small">Assembled from every step, <b>in this browser only</b>: nothing is sent anywhere.</p>

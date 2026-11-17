@@ -797,7 +797,8 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(page).toContain('name="policy:viewer:status" value="no"');
     // The summary: one model of every answer, the gap report, the closing questions with a write-in, and the credit.
     const model = JSON.parse(/<script type="application\/json" data-jp-lab-model>([\s\S]*?)<\/script>/.exec(page)![1]!);
-    expect(model.map((x: { id: string }) => x.id)).toEqual(["team", "use-case", "readiness", "decide", "summary"]);
+    // The five steps, then the application components the room can mark "we have this" (the view shows the wallet app).
+    expect(model.map((x: { id: string }) => x.id)).toEqual(["team", "use-case", "readiness", "decide", "summary", "systems"]);
     const names = model.flatMap((x: { items: { name: string }[] }) => x.items.map((i) => i.name));
     expect(names).toEqual(expect.arrayContaining(["policy:lab:team:members", "policy:uc:immz", "policy:lab:use-case", "policy:rate:ready:strategy", "policy:hold:rights:anchor", Q_DECIDES, "policy:viewer:status", "policy:dq:q1"]));
     expect(page).toContain("data-jp-gapreport");
@@ -972,6 +973,41 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(at(`${base}/walkthrough/P2/index.html`)).toContain('class="jp-btn-link jp-reset jp-presenter-only"');
     expect(at(`${base}/walkthrough/P2/index.html`)).toContain('<span class="jp-keys jp-presenter-only">');
     expect(at("assets/present.css")).toContain('html[data-presenter="off"] .jp-wf-a { display: block; }');
+  });
+  test("a room marks an application component \"we have this\", with its own name for it, and renames the fictional countries (owner, 2026-11-17)", () => {
+    const w0 = corpus.workshops[0]!;
+    const spec = { model: "ra", root: "root", countries: [{ group: "c-a", label: "Taifafeki" }, { group: "c-b", label: "Onesa" }] };
+    const comp = { name: "Wallet app", type: "Application Component", page: "en/top/archimate/ra/element/wallet-app/" };
+    const grp = (name: string) => ({ name, type: "Grouping", page: `en/top/archimate/ra/element/${name}/` });
+    const links: SiteLinks = {
+      ...LINKS,
+      archimateArchitecture: () => ({ countries: [grp("c-a"), grp("c-b")], rows: [{ layer: grp("pos"), cells: [[{ ...comp, block: grp("provider-systems"), bpmn: [] }], []], blocks: [] }] }),
+    };
+    const lab = { steps: [{ id: "summary", label: "Summary", title: "Our summary", summary: true }] };
+    const ws = { ...w0.workshop, lab, presentation: { ...w0.workshop.presentation, architecture: spec } };
+    const out = renderJourneyPages({ ...corpus, workshops: [{ ...w0, workshop: ws }] }, links, "top");
+    const page = (path: string) => String(out.find((f) => f.path === `${base}/${path}`)!.content);
+    const mark = '<span class="jp-have"><label><input type="checkbox" name="policy:am:wallet-app:have" data-jv-check> We have this</label><input type="text" class="jp-answer jp-have-name" name="policy:am:wallet-app:name" data-jv-text placeholder="Our name for it" aria-label="Our name for Wallet app"></span>';
+    // On the architecture panel's box, in a view's element list and on the block's page: one key, wherever it is shown.
+    const how = page("how/index.html");
+    expect(how.slice(how.indexOf("jp-arch-grid"))).toContain(mark);
+    expect(how.slice(how.indexOf("jp-amels"))).toContain(mark);
+    expect(page("how/wallet/index.html")).toContain(`<small>Application Component</small>${mark}`);
+    // Only an application component is marked.
+    expect(how).not.toContain('name="policy:am:pos:have"');
+    // The summary lists the marks.
+    const sum = JSON.parse(/<script type="application\/json" data-jp-lab-model>([\s\S]*?)<\/script>/.exec(page("discuss/index.html"))![1]!);
+    expect(sum.find((x: { id: string }) => x.id === "systems").items.map((i: { name: string }) => i.name)).toEqual(["policy:am:wallet-app:have", "policy:am:wallet-app:name"]);
+    // The countries: a box each on the overview, and on every page the names present.js replaces.
+    const overview = page("overview/index.html");
+    expect(overview).toContain('<input type="text" class="jp-answer" name="policy:country:taifafeki" data-jv-text data-jp-country="Taifafeki" placeholder="Taifafeki" aria-label="Our name for Taifafeki">');
+    expect(overview).toContain('name="policy:country:onesa"');
+    for (const path of ["overview/index.html", "walkthrough/P2/index.html", "how/index.html", "discuss/index.html"]) {
+      expect(page(path)).toContain('<script type="application/json" id="jp-countries">[{"name":"Taifafeki","key":"policy:country:taifafeki"},{"name":"Onesa","key":"policy:country:onesa"}]</script>');
+    }
+    expect(at("assets/present.js")).toContain("function renameCountries()");
+    // Without fictional countries, no box and no block.
+    expect(at(`${base}/overview/index.html`)).not.toContain("jp-countries");
   });
   test("JV-13: How it works opens with the architecture panel from the ArchiMate graph, then the views, then the big ideas", () => {
     const w0 = corpus.workshops[0]!;
