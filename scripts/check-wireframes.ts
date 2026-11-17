@@ -13,6 +13,11 @@
  *   ({@link wireframeSources}): which wireframe covers which visualiser. A
  *   `covers` entry is a route key, or a route key and a sub-graph
  *   (`cat-harness/auto-docs/index/skills`); one wireframe may cover several.
+ *   `coversRenderedBy` names a renderer (a visualiser's `renderedBy`, a Tool
+ *   id) instead: the wireframe covers every declared visualiser that renderer
+ *   draws, in whichever layer declares it ({@link coveredByRenderer}). It lets
+ *   a wireframe sit with the renderer it draws, below the layers that use it,
+ *   without naming any of them (`check:reference-direction`; dth-sc#50).
  * - **Each wireframe directory.** It must hold `intent.md`, at least one
  *   candidate `.html`, and `checks/report.json` written by `wireframe:check`
  *   (the Tool `wireframe-check`).
@@ -62,7 +67,7 @@ const WIREFRAMES = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "wireframes");
 /** The two viewports every usability review needs (owner, 2026-09-23). */
 export const VIEWPORTS = ["web", "mobile"] as const;
 
-type Index = { wireframes: Record<string, { covers: string[] }> };
+type Index = { wireframes: Record<string, { covers: string[]; coversRenderedBy?: string[] }> };
 type ReportEntry = { viewport: string; criterion: string; result: string; notes?: string };
 /**
  * `use`, `topic` and `surface` are the skill's input, recorded by `wireframe:check`
@@ -111,6 +116,20 @@ export function wireframesLeftOut(harnessRoot: string = INSTANCE_ROOT): string[]
 /** Every declared visualiser, by route key `<harness>/<visualiser>`, across every layer in the checkout. */
 export function declaredVisualisers(repoRoot: string = REPO_ROOT): string[] {
   return [...new Set(harnessVisualisers(repoRoot).map((v) => `${v.harness}/${v.id}`))].sort();
+}
+
+/**
+ * The declared route keys a `coversRenderedBy` entry covers: every visualiser,
+ * in any layer of the checkout, whose `renderedBy` is one of `renderers`. A
+ * renderer no declared visualiser uses covers nothing here and is not a
+ * finding: the layers that use it may not be in this checkout.
+ */
+export function coveredByRenderer(
+  renderers: readonly string[],
+  visualisers: readonly { harness: string; id: string; renderedBy?: string }[],
+): string[] {
+  const want = new Set(renderers);
+  return [...new Set(visualisers.filter((v) => v.renderedBy !== undefined && want.has(v.renderedBy)).map((v) => `${v.harness}/${v.id}`))].sort();
 }
 
 /** The declared route key a `covers` entry names — itself, or the visualiser of the sub-graph it names. */
@@ -189,6 +208,7 @@ export function checkWireframes(
     notJudged: [],
   };
   const coverer = new Map<string, string>();
+  let visualisers: ReturnType<typeof harnessVisualisers> | undefined;
   for (const { dir, prefix } of sources) {
     const indexFile = join(dir, "index.json");
     const index: Index = existsSync(indexFile) ? JSON.parse(readFileSync(indexFile, "utf-8")) : { wireframes: {} };
@@ -198,6 +218,10 @@ export function checkWireframes(
         const key = coveredKey(ref, r.declared);
         if (key === undefined) r.unknownRef.push({ wireframe: name, ref });
         else if (!coverer.has(key)) coverer.set(key, name);
+      }
+      if (w.coversRenderedBy?.length) {
+        visualisers ??= harnessVisualisers(repoRoot);
+        for (const key of coveredByRenderer(w.coversRenderedBy, visualisers)) if (!coverer.has(key)) coverer.set(key, name);
       }
       const wdir = join(dir, topic);
       if (!existsSync(join(wdir, "intent.md"))) r.incomplete.push({ wireframe: name, problem: "no intent.md" });

@@ -1,0 +1,9 @@
+{
+  "_comment": "Which wireframe covers which visualiser, for the pages THIS layer's renderers draw. read by check:wireframes through this layer's site directory (docs/). An entry names its visualisers by renderer (`coversRenderedBy`, a visualiser's `renderedBy`), not by route key, so a wireframe sits with the renderer it draws and covers every layer that declares a visualiser of it, without naming a layer above this one (check:reference-direction; dth-sc#50). `wireframe.css` is the shared mid-fidelity stylesheet, copied from the platform's docs/wireframes/.",
+  "wireframes": {
+    "archimate-pages": {
+      "covers": [],
+      "coversRenderedBy": ["archimate-pages"]
+    }
+  }
+}

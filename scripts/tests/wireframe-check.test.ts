@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { UsageError, parseArgs, resolveRun } from "../wireframe-check.mjs";
-import { checkWireframes } from "../check-wireframes.ts";
+import { checkWireframes, coveredByRenderer } from "../check-wireframes.ts";
 
 /** An index-shaped checkout: one layer holding an as-is wireframe and a design proposal. */
 const ROOT = mkdtempSync(join(tmpdir(), "wireframe-check-"));
@@ -155,5 +155,32 @@ describe("check:wireframes reads each instance's own index (cat-harness-tools#28
     expect(r.incomplete.filter((i) => i.problem.includes("was written for topic"))).toEqual([]);
     expect(names).toContain("page");
     expect(names).toContain("content-layer/page");
+  });
+});
+
+describe("coversRenderedBy covers every visualiser a renderer draws (dth-sc#50)", () => {
+  const visualisers = [
+    { harness: "dth-sc", id: "archimate", renderedBy: "archimate-pages" },
+    { harness: "dpi-h-ra", id: "archimate", renderedBy: "archimate-pages" },
+    { harness: "dth-sc", id: "folio", renderedBy: "folio-viewer" },
+    { harness: "cat-harness", id: "beans" },
+  ];
+
+  test("each layer's visualiser of that renderer, by route key, and nothing else", () => {
+    expect(coveredByRenderer(["archimate-pages"], visualisers)).toEqual(["dpi-h-ra/archimate", "dth-sc/archimate"]);
+  });
+
+  test("a renderer no declared visualiser uses covers nothing, and is not refused", () => {
+    expect(coveredByRenderer(["openapi-pages"], visualisers)).toEqual([]);
+    expect(coveredByRenderer([], visualisers)).toEqual([]);
+  });
+
+  test("an index entry with coversRenderedBy and no covers is not an unknown ref", () => {
+    const dir = join(ROOT, "byrenderer");
+    put(join(dir, "archimate-pages", "as-is.html"));
+    writeFileSync(join(dir, "archimate-pages", "intent.md"), "intent");
+    writeFileSync(join(dir, "index.json"), JSON.stringify({ wireframes: { "archimate-pages": { covers: [], coversRenderedBy: ["archimate-pages"] } } }));
+    const r = checkWireframes(ROOT, dir);
+    expect(r.unknownRef).toEqual([]);
   });
 });
