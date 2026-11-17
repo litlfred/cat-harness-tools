@@ -327,7 +327,7 @@ export const WorkshopPresentationSchema = z
     badge: Text.optional(),
     /** One line under the name. */
     tagline: Text.optional(),
-    /** The occasion, first on the frame's top bar ("WHO Pre-GDHF Vignette"). */
+    /** The occasion, first on the frame's top bar ("Workshop vignette"). */
     occasion: Text.optional(),
     /** What the story is about, beside the occasion. */
     subject: Text.optional(),
