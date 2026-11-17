@@ -123,6 +123,60 @@ export function isCrossPaperRef(label: string, contributedPrefixes: readonly str
   return ![...KNOWN_LABEL_PREFIXES, ...contributed].some(p => label.startsWith(p));
 }
 
+/**
+ * Split a cross-paper reference `<doc>:<kind>:<slug>` into the document it
+ * names and the label it names there.
+ *
+ * `undefined` for anything else. A leading KIND prefix is not a document: a
+ * `def:foo:bar` is a same-paper label whose slug carries a colon, and was
+ * skipped as "cross-paper" by the regex this replaces — never checked at all.
+ * A contributed kind's prefix (a DAK `dt:`) is not in {@link KNOWN_LABEL_PREFIXES},
+ * which is why {@link unresolvedReference} asks the local label set first.
+ */
+export function splitCrossPaperRef(ref: string): { doc: string; label: string } | undefined {
+  const m = ref.match(/^([a-z0-9-]+):([a-z]+:.+)$/);
+  if (!m || KNOWN_LABEL_PREFIXES.includes(`${m[1]!}:`)) return undefined;
+  return { doc: m[1]!, label: m[2]! };
+}
+
+/** {@link unresolvedReference}'s reason for a same-document label that is absent. */
+export const UNRESOLVED_LOCAL = "no block in the document has that label";
+
+/**
+ * Why one `uses[]` / `foreshadows[]` entry does not resolve, or `undefined`
+ * when it does (or cannot be judged here).
+ *
+ * - an empty entry never resolves;
+ * - an absolute URL is a cross-FOLIO ref, accepted as-is (nothing here can
+ *   fetch it);
+ * - an entry `hasLocal` accepts resolves — the document's own labels, which
+ *   is where a contributed kind's label and a colon-bearing slug land;
+ * - a cross-paper `<doc>:<label>` is looked up in `folioLabels`, the labels
+ *   of every document in the SAME folio, keyed by document slug. A slug that
+ *   is no document there, or a label that document does not carry, is a miss
+ *   (folio-assistant-core#841: a toolkit block linking into its guidance
+ *   document). With no index supplied the caller has not looked, and the
+ *   entry is NOT judged — the caller must say so rather than read it as a
+ *   pass.
+ * - anything else is an unresolved same-document label.
+ */
+export function unresolvedReference(
+  ref: string,
+  hasLocal: (label: string) => boolean,
+  folioLabels?: ReadonlyMap<string, ReadonlySet<string>>,
+): string | undefined {
+  if (ref.trim() === "") return "empty entry";
+  if (/^https?:\/\//i.test(ref)) return undefined;
+  if (hasLocal(ref)) return undefined;
+  const cross = splitCrossPaperRef(ref);
+  if (!cross) return UNRESOLVED_LOCAL;
+  if (!folioLabels) return undefined;
+  const doc = folioLabels.get(cross.doc);
+  if (!doc) return `no document "${cross.doc}" in this folio`;
+  if (!doc.has(cross.label)) return `document "${cross.doc}" has no label "${cross.label}"`;
+  return undefined;
+}
+
 // ── Label patterns ───────────────────────────────────────────────
 
 /**
@@ -650,6 +704,13 @@ export interface ConstraintContext {
   fileExists: (path: string) => boolean;
   /** Markdown content of the companion .md file (for cross-ref scanning). */
   mdContent?: string;
+  /**
+   * The labels of every document in the same folio, keyed by document slug —
+   * what a cross-paper `<slug>:<label>` in `uses[]` / `foreshadows[]` resolves
+   * against (folio-assistant-core#841). Absent when the caller did not build
+   * it; a cross-paper ref is then not judged, and the caller says so.
+   */
+  folioLabels?: ReadonlyMap<string, ReadonlySet<string>>;
   // A vocabulary module's rules may read more than this: whatever its
   // `constraintContext` contributes (below), typed in that module's own layer
   // by extending this interface — the science layer's sibling `.lean` and
@@ -706,13 +767,11 @@ export const CONSTRAINT_RULES: ConstraintRule[] = [
     check: (block, ctx) => {
       const fs = (block as { foreshadows?: string[] }).foreshadows;
       if (!fs?.length) return null;
-      const missing = fs.filter((f: string) => {
-        // Cross-paper qualified ref ("paper-dir:label") — resolved at folio
-        // level, not here. Mirrors uses-resolve.
-        if (/^([a-z0-9-]+):([a-z]+:.+)$/.test(f)) return false;
-        if (f.startsWith("https://") || f.startsWith("http://")) return false;
-        return !ctx.allLabels.has(f);
-      });
+      // Cross-paper `<doc>:<label>` resolves against the folio-wide index,
+      // as in uses-resolve.
+      const missing = fs.filter(
+        (f: string) => unresolvedReference(f, (l) => ctx.allLabels.has(l), ctx.folioLabels) !== undefined,
+      );
       return missing.length === 0 ? null
         : `Unresolved foreshadows: ${missing.join(", ")}`;
     },
@@ -775,7 +834,7 @@ export const CONSTRAINT_RULES: ConstraintRule[] = [
   },
   {
     id: "uses-resolve",
-    description: "All labels in uses[] must exist in the document (or be qualified cross-paper refs)",
+    description: "All labels in uses[] must exist in the document, or (`<doc>:<label>`) in that document of the same folio",
     appliesTo: [
       // `uses` is a BlockBase field, so ANY kind can carry one — the same
       // reason `cites-resolve` and `simulator-ref-resolve` derive theirs.
@@ -788,23 +847,19 @@ export const CONSTRAINT_RULES: ConstraintRule[] = [
     ],
     check: (block, ctx) => {
       if (!("uses" in block) || !block.uses) return null;
-      const missing = block.uses.filter((u: string) => {
-        // An empty entry is never resolvable and must be reported as one —
-        // not skipped. Ten `*-table-data` blocks in qou carry `uses: [""]`
-        // beside `title: "Data table N from "`, an extraction generator that
-        // failed to substitute its source label.
-        if (u.trim() === "") return true;
-        // Cross-paper qualified ref: "paper-dir:label" (contains exactly
-        // one colon-delimited paper prefix before the label-kind prefix).
-        // Pattern: non-label chars, colon, then a standard label.
-        // e.g. "unital-groebner-bases:cor:pbw"
-        const crossPaperMatch = u.match(/^([a-z0-9-]+):([a-z]+:.+)$/);
-        if (crossPaperMatch) return false;  // skip — resolved at folio level
-        // Full URL cross-folio ref
-        if (u.startsWith("https://") || u.startsWith("http://")) return false;
-        // Same-paper ref — must exist in allLabels
-        return !ctx.allLabels.has(u);
-      });
+      // An empty entry is never resolvable and is reported as one — ten
+      // `*-table-data` blocks in qou carried `uses: [""]`, an extraction
+      // generator that failed to substitute its source label.
+      //
+      // A cross-paper `<doc>:<label>` (e.g. "unital-groebner-bases:cor:pbw")
+      // used to be skipped here as "resolved at folio level", and nothing at
+      // folio level resolved it: a toolkit block naming a guidance block that
+      // did not exist passed (folio-assistant-core#841). It is now looked up
+      // in `ctx.folioLabels`, every document's labels in the same folio, and
+      // a miss fails. A full URL is a cross-FOLIO ref and is still accepted.
+      const missing = block.uses.filter(
+        (u: string) => unresolvedReference(u, (l) => ctx.allLabels.has(l), ctx.folioLabels) !== undefined,
+      );
       // Quote each label: an empty entry rendered bare produced
       // "Unresolved uses: " with nothing after it, which reads as a checker
       // bug rather than as the content defect it is.
